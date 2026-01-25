@@ -1520,6 +1520,7 @@ img {
 /* Month Section */
 .schedule-month {
     margin-bottom: var(--space-4);
+    scroll-margin-top: 80px; /* Offset for sticky header */
 }
 
 .schedule-month__header {

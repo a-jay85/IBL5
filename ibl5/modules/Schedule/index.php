@@ -116,7 +116,7 @@ echo '</div>';
 echo '<nav class="schedule-months">';
 foreach ($months as $key => $label) {
     $abbrev = date('M', strtotime($key . '-01')); // 3-letter abbreviation
-    echo '<a href="#month-' . $key . '" class="schedule-months__link">';
+    echo '<a href="#month-' . $key . '" class="schedule-months__link" onclick="scrollToMonth(event, \'' . $key . '\')">';
     echo '<span class="schedule-months__full">' . $label . '</span>';
     echo '<span class="schedule-months__abbr">' . $abbrev . '</span>';
     echo '</a>';
@@ -174,8 +174,21 @@ foreach ($gamesByMonth as $monthKey => $dates) {
 
 echo '</div>'; // schedule-container
 
-// Scroll script - centers the first unplayed game
+// Scroll scripts
 echo '<script>
+var headerOffset = 70; // Offset for sticky header
+
+function scrollToMonth(e, monthKey) {
+    e.preventDefault();
+    var el = document.getElementById("month-" + monthKey);
+    if (el) {
+        var rect = el.getBoundingClientRect();
+        var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        var targetY = scrollTop + rect.top - headerOffset;
+        window.scrollTo({ top: targetY, behavior: "smooth" });
+    }
+}
+
 function scrollToNextGames(e) {
     e.preventDefault();
     var el = document.getElementById("' . ($firstUnplayedId ?? '') . '");

@@ -106,6 +106,33 @@ $count = DatabaseConnection::fetchValue("SELECT COUNT(*) FROM ibl_plr");
 
 **Why MAMP's client?** Homebrew's mysql client has authentication plugin incompatibility with MAMP's MySQL 8.0 server. Always use `/Applications/MAMP/Library/bin/mysql80/bin/mysql`.
 
+## Git Commit Conventions
+
+When committing changes, use this format:
+
+1. **Short message (first line):** Concise summary using conventional commit style (e.g., `feat:`, `fix:`, `test:`, `docs:`, `refactor:`)
+2. **Long message (body):** Detailed summary with sections, bullet points, and context
+
+**Format:**
+```
+<type>: <short summary>
+
+## Section Header
+
+<detailed description with bullet points>
+
+- Item 1
+- Item 2
+
+## Another Section
+
+<more details>
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+```
+
+**Important:** When asked to commit, only stage files that were modified as part of the current task. Check `git status` first and be selective about what to stage.
+
 ## Mandatory Rules
 
 ### XSS Protection

@@ -19,7 +19,7 @@ if (!defined('MODULE_FILE')) {
 use TeamSchedule\TeamScheduleService;
 use TeamSchedule\TeamScheduleView;
 
-global $db, $cookie, $mysqli_db;
+global $cookie, $mysqli_db;
 
 $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 $season = new Season($mysqli_db);
@@ -46,18 +46,17 @@ if ($isValidTeam) {
     echo $view->render($team, $games, $league->getSimLengthInDays());
 } else {
     // League-wide schedule
-    renderLeagueSchedule($db, $mysqli_db, $commonRepository, $season, $league);
+    renderLeagueSchedule($mysqli_db, $commonRepository, $season, $league);
 }
 
 CloseTable();
 Nuke\Footer::footer();
 
 /**
- * Render the league-wide schedule
+ * Render the league-wide schedule using MySQLi
  */
 function renderLeagueSchedule(
-    object $db,
-    object $mysqli_db,
+    mysqli $mysqli_db,
     Services\CommonMysqliRepository $commonRepository,
     Season $season,
     League $league
@@ -66,32 +65,33 @@ function renderLeagueSchedule(
     $projectedNextSimEndDate = $season->projectedNextSimEndDate;
     $simLengthDays = $league->getSimLengthInDays();
 
-    // Get all games
-    $query = "SELECT * FROM ibl_schedule ORDER BY Date ASC, SchedID ASC";
-    $result = $db->sql_query($query);
-    $num = $db->sql_numrows($result);
+    // Get all games using MySQLi
+    $query = "SELECT SchedID, Date, Visitor, VScore, Home, HScore, BoxID
+              FROM ibl_schedule
+              ORDER BY Date ASC, SchedID ASC";
+    $result = $mysqli_db->query($query);
 
-    // Get team records
+    // Get team records using MySQLi
     $teamRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC";
-    $teamRecordsResult = $db->sql_query($teamRecordsQuery);
+    $teamRecordsResult = $mysqli_db->query($teamRecordsQuery);
     $teamRecords = [];
-    while ($row = $db->sql_fetch_assoc($teamRecordsResult)) {
-        $teamRecords[$row['tid']] = $row['leagueRecord'];
+    while ($row = $teamRecordsResult->fetch_assoc()) {
+        $teamRecords[(int)$row['tid']] = $row['leagueRecord'];
     }
+    $teamRecordsResult->free();
 
     // Organize games by month and date
     $gamesByMonth = [];
     $months = [];
     $firstUnplayedId = null;
 
-    $i = 0;
-    while ($i < $num) {
-        $date = $db->sql_result($result, $i, "Date");
-        $visitor = $db->sql_result($result, $i, "Visitor");
-        $visitorScore = $db->sql_result($result, $i, "VScore");
-        $home = $db->sql_result($result, $i, "Home");
-        $homeScore = $db->sql_result($result, $i, "HScore");
-        $boxid = $db->sql_result($result, $i, "BoxID");
+    while ($row = $result->fetch_assoc()) {
+        $date = $row['Date'];
+        $visitor = (int)$row['Visitor'];
+        $visitorScore = (int)$row['VScore'];
+        $home = (int)$row['Home'];
+        $homeScore = (int)$row['HScore'];
+        $boxid = (int)$row['BoxID'];
 
         $monthKey = date('Y-m', strtotime($date));
         $monthLabel = date('F', strtotime($date));
@@ -121,23 +121,22 @@ function renderLeagueSchedule(
 
         $gamesByMonth[$monthKey][$date][] = [
             'date' => $date,
-            'visitor' => (int)$visitor,
-            'visitorScore' => (int)$visitorScore,
-            'visitorTeam' => $commonRepository->getTeamnameFromTeamID((int)$visitor),
-            'visitorRecord' => $teamRecords[(int)$visitor] ?? '',
-            'home' => (int)$home,
-            'homeScore' => (int)$homeScore,
-            'homeTeam' => $commonRepository->getTeamnameFromTeamID((int)$home),
-            'homeRecord' => $teamRecords[(int)$home] ?? '',
+            'visitor' => $visitor,
+            'visitorScore' => $visitorScore,
+            'visitorTeam' => $commonRepository->getTeamnameFromTeamID($visitor),
+            'visitorRecord' => $teamRecords[$visitor] ?? '',
+            'home' => $home,
+            'homeScore' => $homeScore,
+            'homeTeam' => $commonRepository->getTeamnameFromTeamID($home),
+            'homeRecord' => $teamRecords[$home] ?? '',
             'boxid' => $boxid,
             'isUnplayed' => $isUnplayed,
             'isUpcoming' => $isUpcoming,
             'visitorWon' => ($visitorScore > $homeScore),
             'homeWon' => ($homeScore > $visitorScore),
         ];
-
-        $i++;
     }
+    $result->free();
 
     // Output schedule container
     echo '<div class="schedule-container">';

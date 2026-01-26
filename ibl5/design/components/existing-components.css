@@ -1530,7 +1530,9 @@
 }
 
 /* @ symbol */
-.schedule-game__vs {
+.schedule-game__vs,
+.schedule-game__vs:link,
+.schedule-game__vs:visited {
     font-size: 1rem;
     font-weight: 600;
     color: var(--gray-300);
@@ -1540,6 +1542,7 @@
 
 .schedule-game__vs:hover {
     color: var(--accent-600);
+    text-decoration: none;
 }
 
 /* Mobile */

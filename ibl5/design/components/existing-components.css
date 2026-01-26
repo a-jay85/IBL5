@@ -1637,7 +1637,7 @@
         padding: var(--space-2);
         margin-bottom: var(--space-3);
         border-radius: var(--radius-md);
-        border: 4px solid var(--team-primary);
+        border: 2px solid var(--team-primary);
         margin-left: auto;
         margin-right: auto;
     }

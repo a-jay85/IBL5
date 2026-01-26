@@ -537,7 +537,7 @@ class NavigationView
         <div id="nav-overlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"></div>
 
         <!-- Mobile menu -->
-        <nav id="nav-mobile-menu" class="fixed top-12 right-0 bottom-0 w-[300px] max-w-[85vw] z-50 transform translate-x-full transition-transform duration-300 ease-out lg:hidden">
+        <nav id="nav-mobile-menu" class="fixed top-[71px] right-0 bottom-0 w-[300px] max-w-[85vw] z-50 transform translate-x-full transition-transform duration-300 ease-out lg:hidden">
             <!-- Background - solid opaque navy matching dropdown menus -->
             <div class="absolute inset-0" style="background: #1e293b;"></div>
             <!-- Left accent line -->

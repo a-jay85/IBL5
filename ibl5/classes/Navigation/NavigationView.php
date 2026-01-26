@@ -314,7 +314,7 @@ class NavigationView
         $icon = $data['icon'] ?? '';
 
         $html = '<div class="relative group">';
-        $html .= '<button class="flex items-center gap-2 px-3 py-2.5 text-lg font-semibold font-display text-gray-300 hover:text-white transition-colors duration-200">';
+        $html .= '<button class="flex items-center gap-2 px-3 py-2.5 text-2xl font-semibold font-display text-gray-300 hover:text-white transition-colors duration-200">';
         if ($icon) {
             $html .= '<span class="text-accent-500 group-hover:text-accent-400 transition-colors">' . $icon . '</span>';
         }

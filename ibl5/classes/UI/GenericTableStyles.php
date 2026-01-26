@@ -232,7 +232,7 @@ class GenericTableStyles
     padding: 0.75rem 1rem;
     margin: 0;
     font-family: var(--font-display, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-size: 1.125rem;
+    font-size: 1.25rem;
     font-weight: 600;
     color: white;
     text-transform: uppercase;

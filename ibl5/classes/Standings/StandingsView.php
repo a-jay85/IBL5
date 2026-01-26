@@ -61,7 +61,7 @@ class StandingsView implements StandingsViewInterface
 /* Standings section title */
 .standings-title {
     font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: 600;
     color: var(--navy-900, #0f172a);
     text-transform: uppercase;

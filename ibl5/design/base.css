@@ -52,7 +52,6 @@ body {
 FONT,
 TD,
 P,
-DIV,
 FORM {
     font-family: var(--font-sans);
     font-size: 1rem;
@@ -99,7 +98,7 @@ A:hover {
 .title {
     background: none;
     color: #000000;
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: bold;
     font-family: var(--font-display);
     text-decoration: none;
@@ -115,14 +114,14 @@ A:hover {
 .block-title {
     background: none;
     color: #FFFFFF;
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-family: var(--font-display);
 }
 
 .storytitle {
     background: none;
     color: #363636;
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: bold;
     font-family: var(--font-display);
     text-decoration: none;
@@ -140,7 +139,7 @@ A:hover {
 .boxtitle {
     background: none;
     color: #363636;
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: bold;
     font-family: var(--font-display);
     text-decoration: none;

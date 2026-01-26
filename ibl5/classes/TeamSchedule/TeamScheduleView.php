@@ -167,7 +167,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $opposingTeam = $row['opposingTeam'];
 
         $isUpcoming = ($row['highlight'] === 'next-sim');
-        $gameClass = 'schedule-game';
+        $gameClass = 'schedule-game schedule-game--team';
         if ($isUpcoming) {
             $gameClass .= ' schedule-game--upcoming';
         }
@@ -182,6 +182,9 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $isHome = ($game->homeTeamID === $userTeamId);
 
         $html = '<div class="' . $gameClass . '" id="' . $gameId . '">';
+
+        // Main game content wrapper
+        $html .= '<div class="schedule-game__content">';
 
         if ($isHome) {
             // User team is home: Opponent @ User
@@ -227,8 +230,33 @@ class TeamScheduleView implements TeamScheduleViewInterface
             $html .= $this->renderTeamLink($opponentUrl, $opposingTeam->name, $opposingTeam->seasonRecord, $opponentTeamId, false, true);
         }
 
-        $html .= '</div>';
+        $html .= '</div>'; // Close schedule-game__content
+
+        // Streak column (mirrors date column on left)
+        $html .= $this->renderStreakColumn($row);
+
+        $html .= '</div>'; // Close schedule-game
         return $html;
+    }
+
+    /**
+     * Render the streak column on the right side of the game row
+     */
+    private function renderStreakColumn(array $row): string
+    {
+        if ($row['isUnplayed']) {
+            return '<div class="schedule-game__streak"></div>';
+        }
+
+        $isWin = ($row['winLossColor'] === 'green');
+        $resultClass = $isWin ? 'schedule-game__streak--win' : 'schedule-game__streak--loss';
+        $resultLetter = $isWin ? 'W' : 'L';
+        $streakNum = $isWin ? substr($row['streak'], 2) : substr($row['streak'], 2); // Extract number from "W 3" or "L 2"
+
+        return '<div class="schedule-game__streak ' . $resultClass . '">'
+            . '<span class="schedule-game__streak-result">' . $resultLetter . '</span>'
+            . '<span class="schedule-game__streak-num">' . HtmlSanitizer::safeHtmlOutput(trim($streakNum)) . '</span>'
+            . '</div>';
     }
 
     /**
@@ -253,7 +281,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
     }
 
     /**
-     * Render user team stats (record and streak) in place of team name
+     * Render user team stats (record only) in place of team name
      * @param bool $isHomeSide If true, renders logo before team-link (home side layout)
      */
     private function renderUserTeamStats(array $row, int $userTeamId, bool $isHomeSide = false): string
@@ -269,7 +297,6 @@ class TeamScheduleView implements TeamScheduleViewInterface
             $record = $row['wins'] . '-' . $row['losses'];
             $teamLink .= '<span class="schedule-game__team' . $winClass . '">';
             $teamLink .= HtmlSanitizer::safeHtmlOutput($record);
-            $teamLink .= ' <span class="schedule-game__record">' . HtmlSanitizer::safeHtmlOutput($row['streak']) . '</span>';
             $teamLink .= '</span>';
         }
         $teamLink .= '</a>';

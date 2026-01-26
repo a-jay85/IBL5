@@ -1450,13 +1450,14 @@
     text-align: left;
 }
 
-/* Upcoming game */
+/* Upcoming game - highlighted for next sim */
 .schedule-game--upcoming {
-    background: #fffbeb;
+    background: var(--accent-100);
+    border-left: 3px solid var(--accent-500);
 }
 
 .schedule-game--upcoming:hover {
-    background: #fef3c7;
+    background: var(--accent-300);
 }
 
 /* Team name */

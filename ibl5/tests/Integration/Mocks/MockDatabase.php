@@ -12,6 +12,7 @@ class MockDatabase
     private array $mockTradeInfo = [];
     private array $mockTeamData = [];
     private array $mockPythagoreanData = [];
+    private array $votingResultsQueue = [];
     private ?int $numRows = null;
     private bool $returnTrue = true;
     private array $executedQueries = [];
@@ -71,6 +72,15 @@ class MockDatabase
             }
             // Return empty result if no pythagorean data configured
             return new MockDatabaseResult([]);
+        }
+
+        // Special handling for voting queries (ASG and EOY tables)
+        // Returns results from queue for consecutive queries
+        if ((stripos($query, 'ibl_votes_ASG') !== false ||
+             stripos($query, 'ibl_votes_EOY') !== false) &&
+            !empty($this->votingResultsQueue)) {
+            $data = array_shift($this->votingResultsQueue);
+            return new MockDatabaseResult($data ?? []);
         }
         
         // Smart filtering for player queries with pid/itemid/pickid
@@ -170,6 +180,16 @@ class MockDatabase
     public function setMockPythagoreanData(array $data): void
     {
         $this->mockPythagoreanData = $data;
+    }
+
+    /**
+     * Set voting results queue for ASG/EOY voting queries
+     * Each element is returned for consecutive sql_query() calls to voting tables
+     * Used when tests need VotingResultsService to return voting data
+     */
+    public function setVotingResultsQueue(array $resultsQueue): void
+    {
+        $this->votingResultsQueue = $resultsQueue;
     }
     
     public function setNumRows(int $numRows): void

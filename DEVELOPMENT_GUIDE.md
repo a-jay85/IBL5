@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1591 tests • ~75% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1621 tests • ~76% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -12,7 +12,7 @@
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - Strong progress with 1591 tests (~75% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. Waivers, DepthChart, RookieOption, Schedule, and Standings integration tests completed. **Next Steps:** Expand edge case coverage in existing modules to reach 80% goal.
+1. **Test Coverage → 80%** - Strong progress with 1621 tests (~76% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. Waivers, DepthChart, RookieOption, Schedule, Standings, and Voting integration tests completed. **Next Steps:** Expand edge case coverage in existing modules to reach 80% goal.
 
    **Priority Integration Tests Needed:**
    - ~~**HIGH**: Waivers (add/drop workflow with cap validation, waiver wire timing)~~ ✅ Complete
@@ -20,7 +20,7 @@
    - ~~**MEDIUM**: RookieOption (option exercise with eligibility checks, contract updates)~~ ✅ Complete
    - ~~**MEDIUM**: Schedule (win/loss tracking, streak calculation, next-sim highlighting)~~ ✅ Complete
    - ~~**MEDIUM**: Standings (calculation accuracy, tie-breaking logic)~~ ✅ Complete
-   - **LOW**: Voting (All-star/awards voting submission)
+   - ~~**LOW**: Voting (All-star/awards voting submission)~~ ✅ Complete
 
    **Unit Test Gaps:** Discord (1 test), Shared (1 test), League (1 test), Injuries (2 tests), Standings (2 tests)
 
@@ -91,7 +91,37 @@
 - Full render tests (3 tests)
 - Complete workflow tests (2 tests)
 
-**Status:** All 1591 tests passing ✅ Standings module now has comprehensive integration test coverage
+**Status:** All 1621 tests passing ✅ Standings module now has comprehensive integration test coverage
+
+---
+
+### Voting Integration Tests Added (Jan 25, 2026)
+
+**Impact:** Added 30 integration test methods for complete voting results display workflow coverage
+
+**Integration Test Coverage:**
+- **Voting Integration:** VotingIntegrationTest (30 test methods)
+  - Service tests: ASG/EOY table queries, vote aggregation, weighted scoring
+  - All-Star voting: Eastern/Western Conference Frontcourt/Backcourt categories
+  - End-of-Year voting: MVP, Sixth Man, Rookie of Year, GM of Year with weighted points
+  - Blank ballot handling: Empty names get special label, whitespace trimmed
+  - Renderer tests: Table structure, player/votes display, alternating row styles
+  - XSS protection: Player names, titles, and quotes escaped
+  - Controller routing: Phase-based routing (Regular Season vs Playoffs/Free Agency)
+  - Explicit view methods: Bypass phase routing for direct category access
+  - Complete workflows: Full voting display with multiple categories
+
+**Test Categories:**
+- Service All-Star tests (4 tests)
+- Service End-of-Year tests (4 tests)
+- Blank ballot handling (2 tests)
+- Renderer output tests (6 tests)
+- XSS security tests (3 tests)
+- Controller routing tests (5 tests)
+- Complete workflow tests (4 tests)
+- Table styling tests (2 tests)
+
+**Status:** All 1621 tests passing ✅ Voting module now has comprehensive integration test coverage
 
 ---
 

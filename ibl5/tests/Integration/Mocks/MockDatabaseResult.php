@@ -48,6 +48,17 @@ class MockDatabaseResult
         }
         return false;
     }
+
+    /**
+     * MySQLi-style fetch_assoc method (snake_case alias)
+     * Used by VotingResultsService which expects mysqli result interface
+     * Returns null instead of false to match mysqli_result::fetch_assoc()
+     */
+    public function fetch_assoc(): array|null|false
+    {
+        $result = $this->fetchAssoc();
+        return $result === false ? null : $result;
+    }
     
     public function numRows(): int
     {

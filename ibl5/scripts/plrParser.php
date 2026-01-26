@@ -726,7 +726,7 @@ while (!feof($plrFile)) {
             ($pid,
             '" . $mysqli_db->real_escape_string($name) . "',
             $season->endingYear,
-            '" . $mysqli_db->real_escape_string($commonRepository->getTeamnameFromTeamID($tid)) . "',
+            '" . $mysqli_db->real_escape_string($commonRepository->getTeamnameFromTeamID((int) $tid)) . "',
             $tid,
             $seasonGamesPlayed,
             $seasonMIN,
@@ -766,7 +766,7 @@ while (!feof($plrFile)) {
             $ratingTD,
             $currentSeasonSalary)
         ON DUPLICATE KEY UPDATE
-            `team` = '" . $mysqli_db->real_escape_string($commonRepository->getTeamnameFromTeamID($tid)) . "',
+            `team` = '" . $mysqli_db->real_escape_string($commonRepository->getTeamnameFromTeamID((int) $tid)) . "',
             `teamid` = $tid,
             `games` = $seasonGamesPlayed,
             `minutes` = $seasonMIN,
@@ -821,7 +821,7 @@ while (!feof($plrFile)) {
             }
             $tidOffenseStats++;
             $sideOfTheBall = 'offense';
-            $teamName = $commonRepository->getTeamnameFromTeamID($tidOffenseStats);
+            $teamName = $commonRepository->getTeamnameFromTeamID((int) $tidOffenseStats);
         } elseif ($ordinal >= 1473 && $ordinal <= 1504) {
             if ($ordinal == 1473) {
                 echo "ibl_team_offense_stats updated!<br><br>";
@@ -829,7 +829,7 @@ while (!feof($plrFile)) {
             }
             $tidDefenseStats++;
             $sideOfTheBall = 'defense';
-            $teamName = $commonRepository->getTeamnameFromTeamID($tidDefenseStats);
+            $teamName = $commonRepository->getTeamnameFromTeamID((int) $tidDefenseStats);
         }
 
         $teamUpdateQuery = 'UPDATE `ibl_team_' . $sideOfTheBall . '_stats`

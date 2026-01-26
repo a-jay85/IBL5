@@ -85,14 +85,14 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     private function mapBasicFields(PlayerData $playerData, array $plrRow): void
     {
-        $playerData->playerID = $plrRow['pid'];
-        $playerData->ordinal = $plrRow['ordinal'];
-        $playerData->name = stripslashes($plrRow['name']);
+        $playerData->playerID = isset($plrRow['pid']) ? (int) $plrRow['pid'] : null;
+        $playerData->ordinal = isset($plrRow['ordinal']) ? (int) $plrRow['ordinal'] : null;
+        $playerData->name = isset($plrRow['name']) ? stripslashes($plrRow['name']) : null;
         $playerData->nickname = $this->getOptionalStrippedValue($plrRow, 'nickname');
-        $playerData->age = $plrRow['age'];
-        $playerData->teamID = $plrRow['tid'];
-        $playerData->teamName = stripslashes($plrRow['teamname']);
-        $playerData->position = $plrRow['pos'];
+        $playerData->age = isset($plrRow['age']) ? (int) $plrRow['age'] : null;
+        $playerData->teamID = isset($plrRow['tid']) ? (int) $plrRow['tid'] : null;
+        $playerData->teamName = isset($plrRow['teamname']) ? stripslashes($plrRow['teamname']) : null;
+        $playerData->position = $plrRow['pos'] ?? null;
     }
 
     /**
@@ -100,32 +100,32 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     private function mapRatingsFromCurrentRow(PlayerData $playerData, array $plrRow): void
     {
-        $playerData->ratingFieldGoalAttempts = $plrRow['r_fga'];
-        $playerData->ratingFieldGoalPercentage = $plrRow['r_fgp'];
-        $playerData->ratingFreeThrowAttempts = $plrRow['r_fta'];
-        $playerData->ratingFreeThrowPercentage = $plrRow['r_ftp'];
-        $playerData->ratingThreePointAttempts = $plrRow['r_tga'];
-        $playerData->ratingThreePointPercentage = $plrRow['r_tgp'];
-        $playerData->ratingOffensiveRebounds = $plrRow['r_orb'];
-        $playerData->ratingDefensiveRebounds = $plrRow['r_drb'];
-        $playerData->ratingAssists = $plrRow['r_ast'];
-        $playerData->ratingSteals = $plrRow['r_stl'];
-        $playerData->ratingTurnovers = $plrRow['r_to'];
-        $playerData->ratingBlocks = $plrRow['r_blk'];
-        $playerData->ratingFouls = $plrRow['r_foul'];
-        $playerData->ratingOutsideOffense = $plrRow['oo'];
-        $playerData->ratingOutsideDefense = $plrRow['od'];
-        $playerData->ratingDriveOffense = $plrRow['do'];
-        $playerData->ratingDriveDefense = $plrRow['dd'];
-        $playerData->ratingPostOffense = $plrRow['po'];
-        $playerData->ratingPostDefense = $plrRow['pd'];
-        $playerData->ratingTransitionOffense = $plrRow['to'];
-        $playerData->ratingTransitionDefense = $plrRow['td'];
-        $playerData->ratingClutch = $plrRow['Clutch'];
-        $playerData->ratingConsistency = $plrRow['Consistency'];
-        $playerData->ratingTalent = $plrRow['talent'];
-        $playerData->ratingSkill = $plrRow['skill'];
-        $playerData->ratingIntangibles = $plrRow['intangibles'];
+        $playerData->ratingFieldGoalAttempts = isset($plrRow['r_fga']) ? (int) $plrRow['r_fga'] : null;
+        $playerData->ratingFieldGoalPercentage = isset($plrRow['r_fgp']) ? (int) $plrRow['r_fgp'] : null;
+        $playerData->ratingFreeThrowAttempts = isset($plrRow['r_fta']) ? (int) $plrRow['r_fta'] : null;
+        $playerData->ratingFreeThrowPercentage = isset($plrRow['r_ftp']) ? (int) $plrRow['r_ftp'] : null;
+        $playerData->ratingThreePointAttempts = isset($plrRow['r_tga']) ? (int) $plrRow['r_tga'] : null;
+        $playerData->ratingThreePointPercentage = isset($plrRow['r_tgp']) ? (int) $plrRow['r_tgp'] : null;
+        $playerData->ratingOffensiveRebounds = isset($plrRow['r_orb']) ? (int) $plrRow['r_orb'] : null;
+        $playerData->ratingDefensiveRebounds = isset($plrRow['r_drb']) ? (int) $plrRow['r_drb'] : null;
+        $playerData->ratingAssists = isset($plrRow['r_ast']) ? (int) $plrRow['r_ast'] : null;
+        $playerData->ratingSteals = isset($plrRow['r_stl']) ? (int) $plrRow['r_stl'] : null;
+        $playerData->ratingTurnovers = isset($plrRow['r_to']) ? (int) $plrRow['r_to'] : null;
+        $playerData->ratingBlocks = isset($plrRow['r_blk']) ? (int) $plrRow['r_blk'] : null;
+        $playerData->ratingFouls = isset($plrRow['r_foul']) ? (int) $plrRow['r_foul'] : null;
+        $playerData->ratingOutsideOffense = isset($plrRow['oo']) ? (int) $plrRow['oo'] : null;
+        $playerData->ratingOutsideDefense = isset($plrRow['od']) ? (int) $plrRow['od'] : null;
+        $playerData->ratingDriveOffense = isset($plrRow['do']) ? (int) $plrRow['do'] : null;
+        $playerData->ratingDriveDefense = isset($plrRow['dd']) ? (int) $plrRow['dd'] : null;
+        $playerData->ratingPostOffense = isset($plrRow['po']) ? (int) $plrRow['po'] : null;
+        $playerData->ratingPostDefense = isset($plrRow['pd']) ? (int) $plrRow['pd'] : null;
+        $playerData->ratingTransitionOffense = isset($plrRow['to']) ? (int) $plrRow['to'] : null;
+        $playerData->ratingTransitionDefense = isset($plrRow['td']) ? (int) $plrRow['td'] : null;
+        $playerData->ratingClutch = isset($plrRow['Clutch']) ? (int) $plrRow['Clutch'] : null;
+        $playerData->ratingConsistency = isset($plrRow['Consistency']) ? (int) $plrRow['Consistency'] : null;
+        $playerData->ratingTalent = isset($plrRow['talent']) ? (int) $plrRow['talent'] : null;
+        $playerData->ratingSkill = isset($plrRow['skill']) ? (int) $plrRow['skill'] : null;
+        $playerData->ratingIntangibles = isset($plrRow['intangibles']) ? (int) $plrRow['intangibles'] : null;
     }
 
     /**
@@ -133,11 +133,11 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     private function mapFreeAgencyFields(PlayerData $playerData, array $plrRow): void
     {
-        $playerData->freeAgencyLoyalty = $plrRow['loyalty'];
-        $playerData->freeAgencyPlayingTime = $plrRow['playingTime'];
-        $playerData->freeAgencyPlayForWinner = $plrRow['winner'];
-        $playerData->freeAgencyTradition = $plrRow['tradition'];
-        $playerData->freeAgencySecurity = $plrRow['security'];
+        $playerData->freeAgencyLoyalty = isset($plrRow['loyalty']) ? (int) $plrRow['loyalty'] : null;
+        $playerData->freeAgencyPlayingTime = isset($plrRow['playingTime']) ? (int) $plrRow['playingTime'] : null;
+        $playerData->freeAgencyPlayForWinner = isset($plrRow['winner']) ? (int) $plrRow['winner'] : null;
+        $playerData->freeAgencyTradition = isset($plrRow['tradition']) ? (int) $plrRow['tradition'] : null;
+        $playerData->freeAgencySecurity = isset($plrRow['security']) ? (int) $plrRow['security'] : null;
     }
 
     /**
@@ -162,9 +162,9 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     private function mapDraftFields(PlayerData $playerData, array $plrRow): void
     {
-        $playerData->draftYear = $plrRow['draftyear'];
-        $playerData->draftRound = $plrRow['draftround'];
-        $playerData->draftPickNumber = $plrRow['draftpickno'];
+        $playerData->draftYear = isset($plrRow['draftyear']) ? (int) $plrRow['draftyear'] : null;
+        $playerData->draftRound = isset($plrRow['draftround']) ? (int) $plrRow['draftround'] : null;
+        $playerData->draftPickNumber = isset($plrRow['draftpickno']) ? (int) $plrRow['draftpickno'] : null;
         $playerData->draftTeamOriginalName = $this->getOptionalStrippedValue($plrRow, 'draftedby');
         $playerData->draftTeamCurrentName = $this->getOptionalStrippedValue($plrRow, 'draftedbycurrentname');
         $playerData->collegeName = $this->getOptionalStrippedValue($plrRow, 'college');
@@ -175,9 +175,9 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     private function mapPhysicalFields(PlayerData $playerData, array $plrRow): void
     {
-        $playerData->heightFeet = $plrRow['htft'];
-        $playerData->heightInches = $plrRow['htin'];
-        $playerData->weightPounds = $plrRow['wt'];
+        $playerData->heightFeet = isset($plrRow['htft']) ? (int) $plrRow['htft'] : null;
+        $playerData->heightInches = isset($plrRow['htin']) ? (int) $plrRow['htin'] : null;
+        $playerData->weightPounds = isset($plrRow['wt']) ? (int) $plrRow['wt'] : null;
     }
 
     /**
@@ -185,9 +185,9 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     private function mapStatusFields(PlayerData $playerData, array $plrRow): void
     {
-        $playerData->daysRemainingForInjury = $plrRow['injured'];
-        $playerData->isRetired = $plrRow['retired'];
-        $playerData->timeDroppedOnWaivers = $plrRow['droptime'];
+        $playerData->daysRemainingForInjury = isset($plrRow['injured']) ? (int) $plrRow['injured'] : null;
+        $playerData->isRetired = $plrRow['retired'] ?? null;
+        $playerData->timeDroppedOnWaivers = isset($plrRow['droptime']) ? (int) $plrRow['droptime'] : null;
     }
 
     /**
@@ -207,17 +207,17 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         $playerData = new PlayerData();
 
         // Basic historical player information
-        $playerData->playerID = $plrRow['pid'];
-        $playerData->historicalYear = $plrRow['year'];
-        $playerData->name = stripslashes($plrRow['name']);
-        $playerData->teamName = stripslashes($plrRow['team']);
-        $playerData->teamID = $plrRow['teamid'];
-        
+        $playerData->playerID = isset($plrRow['pid']) ? (int) $plrRow['pid'] : null;
+        $playerData->historicalYear = isset($plrRow['year']) ? (int) $plrRow['year'] : null;
+        $playerData->name = isset($plrRow['name']) ? stripslashes($plrRow['name']) : null;
+        $playerData->teamName = isset($plrRow['team']) ? stripslashes($plrRow['team']) : null;
+        $playerData->teamID = isset($plrRow['teamid']) ? (int) $plrRow['teamid'] : null;
+
         // Ratings from historical row (note different column names)
         $this->mapRatingsFromHistoricalRow($playerData, $plrRow);
-        
+
         // Salary
-        $playerData->salaryJSB = $plrRow['salary'];
+        $playerData->salaryJSB = isset($plrRow['salary']) ? (int) $plrRow['salary'] : null;
 
         // Initialize contract fields for historical data (values are snapshots, not current)
         $playerData->contractCurrentYear = 0;
@@ -237,26 +237,26 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     private function mapRatingsFromHistoricalRow(PlayerData $playerData, array $plrRow): void
     {
-        $playerData->ratingFieldGoalAttempts = $plrRow['r_2ga'];
-        $playerData->ratingFieldGoalPercentage = $plrRow['r_2gp'];
-        $playerData->ratingFreeThrowAttempts = $plrRow['r_fta'];
-        $playerData->ratingFreeThrowPercentage = $plrRow['r_ftp'];
-        $playerData->ratingThreePointAttempts = $plrRow['r_3ga'];
-        $playerData->ratingThreePointPercentage = $plrRow['r_3gp'];
-        $playerData->ratingOffensiveRebounds = $plrRow['r_orb'];
-        $playerData->ratingDefensiveRebounds = $plrRow['r_drb'];
-        $playerData->ratingAssists = $plrRow['r_ast'];
-        $playerData->ratingSteals = $plrRow['r_stl'];
-        $playerData->ratingBlocks = $plrRow['r_blk'];
-        $playerData->ratingTurnovers = $plrRow['r_tvr'];
-        $playerData->ratingOutsideOffense = $plrRow['r_oo'];
-        $playerData->ratingOutsideDefense = $plrRow['r_od'];
-        $playerData->ratingDriveOffense = $plrRow['r_do'];
-        $playerData->ratingDriveDefense = $plrRow['r_dd'];
-        $playerData->ratingPostOffense = $plrRow['r_po'];
-        $playerData->ratingPostDefense = $plrRow['r_pd'];
-        $playerData->ratingTransitionOffense = $plrRow['r_to'];
-        $playerData->ratingTransitionDefense = $plrRow['r_td'];
+        $playerData->ratingFieldGoalAttempts = isset($plrRow['r_2ga']) ? (int) $plrRow['r_2ga'] : null;
+        $playerData->ratingFieldGoalPercentage = isset($plrRow['r_2gp']) ? (int) $plrRow['r_2gp'] : null;
+        $playerData->ratingFreeThrowAttempts = isset($plrRow['r_fta']) ? (int) $plrRow['r_fta'] : null;
+        $playerData->ratingFreeThrowPercentage = isset($plrRow['r_ftp']) ? (int) $plrRow['r_ftp'] : null;
+        $playerData->ratingThreePointAttempts = isset($plrRow['r_3ga']) ? (int) $plrRow['r_3ga'] : null;
+        $playerData->ratingThreePointPercentage = isset($plrRow['r_3gp']) ? (int) $plrRow['r_3gp'] : null;
+        $playerData->ratingOffensiveRebounds = isset($plrRow['r_orb']) ? (int) $plrRow['r_orb'] : null;
+        $playerData->ratingDefensiveRebounds = isset($plrRow['r_drb']) ? (int) $plrRow['r_drb'] : null;
+        $playerData->ratingAssists = isset($plrRow['r_ast']) ? (int) $plrRow['r_ast'] : null;
+        $playerData->ratingSteals = isset($plrRow['r_stl']) ? (int) $plrRow['r_stl'] : null;
+        $playerData->ratingBlocks = isset($plrRow['r_blk']) ? (int) $plrRow['r_blk'] : null;
+        $playerData->ratingTurnovers = isset($plrRow['r_tvr']) ? (int) $plrRow['r_tvr'] : null;
+        $playerData->ratingOutsideOffense = isset($plrRow['r_oo']) ? (int) $plrRow['r_oo'] : null;
+        $playerData->ratingOutsideDefense = isset($plrRow['r_od']) ? (int) $plrRow['r_od'] : null;
+        $playerData->ratingDriveOffense = isset($plrRow['r_do']) ? (int) $plrRow['r_do'] : null;
+        $playerData->ratingDriveDefense = isset($plrRow['r_dd']) ? (int) $plrRow['r_dd'] : null;
+        $playerData->ratingPostOffense = isset($plrRow['r_po']) ? (int) $plrRow['r_po'] : null;
+        $playerData->ratingPostDefense = isset($plrRow['r_pd']) ? (int) $plrRow['r_pd'] : null;
+        $playerData->ratingTransitionOffense = isset($plrRow['r_to']) ? (int) $plrRow['r_to'] : null;
+        $playerData->ratingTransitionDefense = isset($plrRow['r_td']) ? (int) $plrRow['r_td'] : null;
     }
 
     /**

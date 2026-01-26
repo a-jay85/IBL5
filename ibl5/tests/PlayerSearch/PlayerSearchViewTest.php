@@ -194,7 +194,7 @@ final class PlayerSearchViewTest extends TestCase
     public function testRenderPlayerRowShowsRetiredStatus(): void
     {
         $player = $this->createTestPlayer();
-        $player->isRetired = 1;
+        $player->isRetired = '1';
 
         $html = $this->view->renderPlayerRow($player, 0);
 
@@ -258,7 +258,7 @@ final class PlayerSearchViewTest extends TestCase
         $player->position = 'PG';
         $player->teamID = 5;
         $player->teamName = 'Test Team';
-        $player->isRetired = 0;
+        $player->isRetired = '0';
         $player->age = 25;
         $player->yearsOfExperience = 5;
         $player->collegeName = 'UCLA';

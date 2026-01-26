@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyProcessorInterface;
@@ -87,7 +89,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     private function parseOfferData(\Player\Player $player, array $postData, \Team $team): array
     {
         // Reconstruct derived values from player object
-        $birdYears = $player->teamName == $team->name ? $player->birdYears : 0;
+        $birdYears = $player->teamName === $team->name ? $player->birdYears : 0;
         $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience);
         $maxContractYear1 = \ContractRules::getMaxContractSalary($player->yearsOfExperience);
         
@@ -218,7 +220,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     {
         $years = 6;
         for ($i = 6; $i >= 1; $i--) {
-            if ($offerData["offer{$i}"] == 0) {
+            if ($offerData["offer{$i}"] === 0) {
                 $years = $i - 1;
             } else {
                 break;
@@ -253,14 +255,14 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     {
         $season = new \Season($this->mysqli_db);
         
-        if ($season->freeAgencyNotificationsState != "On") {
+        if ($season->freeAgencyNotificationsState !== "On") {
             return;
         }
         
         $discord = new \Discord($this->mysqli_db);
         $playerTeamDiscordID = $discord->getDiscordIDFromTeamname($player->teamName);
         
-        if ($teamName == $player->teamName) {
+        if ($teamName === $player->teamName) {
             $message = "Free agent **{$player->name}** has been offered a contract to _stay_ with the **{$player->teamName}**.
 _**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for comment._";
         } else {

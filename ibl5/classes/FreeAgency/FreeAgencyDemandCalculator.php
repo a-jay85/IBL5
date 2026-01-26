@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
@@ -162,7 +164,7 @@ class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
         $factorTradition = self::TRADITION_FACTOR * $traditionDifferential * ($playerTradition - 1);
         
         // Loyalty factor (bonus for staying, penalty for leaving)
-        if ($teamName == $playerTeamName) {
+        if ($teamName === $playerTeamName) {
             $factorLoyalty = self::LOYALTY_BONUS_PERCENTAGE * ($playerLoyalty - 1);
         } else {
             $factorLoyalty = -self::LOYALTY_BONUS_PERCENTAGE * ($playerLoyalty - 1);

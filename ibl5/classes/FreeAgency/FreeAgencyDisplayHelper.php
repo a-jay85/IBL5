@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyDisplayHelperInterface;
@@ -393,12 +395,12 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     private function renderPlayerDemands(array $demands): string
     {
         ob_start();
-        if ($demands['dem1'] != 0) echo "<td>" . htmlspecialchars($demands['dem1']) . "</td>"; else echo "<td></td>";
-        if ($demands['dem2'] != 0) echo "<td>" . htmlspecialchars($demands['dem2']) . "</td>"; else echo "<td></td>";
-        if ($demands['dem3'] != 0) echo "<td>" . htmlspecialchars($demands['dem3']) . "</td>"; else echo "<td></td>";
-        if ($demands['dem4'] != 0) echo "<td>" . htmlspecialchars($demands['dem4']) . "</td>"; else echo "<td></td>";
-        if ($demands['dem5'] != 0) echo "<td>" . htmlspecialchars($demands['dem5']) . "</td>"; else echo "<td></td>";
-        if ($demands['dem6'] != 0) echo "<td>" . htmlspecialchars($demands['dem6']) . "</td>"; else echo "<td></td>";
+        if ($demands['dem1'] !== 0) echo "<td>" . htmlspecialchars((string)$demands['dem1']) . "</td>"; else echo "<td></td>";
+        if ($demands['dem2'] !== 0) echo "<td>" . htmlspecialchars((string)$demands['dem2']) . "</td>"; else echo "<td></td>";
+        if ($demands['dem3'] !== 0) echo "<td>" . htmlspecialchars((string)$demands['dem3']) . "</td>"; else echo "<td></td>";
+        if ($demands['dem4'] !== 0) echo "<td>" . htmlspecialchars((string)$demands['dem4']) . "</td>"; else echo "<td></td>";
+        if ($demands['dem5'] !== 0) echo "<td>" . htmlspecialchars((string)$demands['dem5']) . "</td>"; else echo "<td></td>";
+        if ($demands['dem6'] !== 0) echo "<td>" . htmlspecialchars((string)$demands['dem6']) . "</td>"; else echo "<td></td>";
         return ob_get_clean();
     }
 
@@ -409,8 +411,8 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
      */
     private function renderCapSpaceFooter(): string
     {
-        $MLEicon = ($this->team->hasMLE == "1") ? "\u{2705}" : "\u{274C}";
-        $LLEicon = ($this->team->hasLLE == "1") ? "\u{2705}" : "\u{274C}";
+        $MLEicon = ($this->team->hasMLE === "1") ? "\u{2705}" : "\u{274C}";
+        $LLEicon = ($this->team->hasLLE === "1") ? "\u{2705}" : "\u{274C}";
         
         ob_start();
         ?>

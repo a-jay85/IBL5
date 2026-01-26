@@ -35,7 +35,7 @@ body {
     width: 100%;
     max-width: 100%;
     position: relative;
-    padding-top: 64px; /* Space for fixed navigation */
+    padding-top: 96px; /* Space for fixed navigation (72px nav + 24px breathing room) */
     font-family: var(--font-sans);
     font-size: 1rem;
     margin: 0;

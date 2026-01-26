@@ -97,3 +97,13 @@ Register in `ibl5/phpunit.xml`:
 - Zero warnings, zero failures
 - No skipped tests
 - All public methods tested
+
+## Post-Task Documentation Update
+
+After completing any PHPUnit task (adding tests, fixing tests, etc.):
+
+1. Run `vendor/bin/phpunit` and note the final test count
+2. Update these files with new test count and coverage percentage:
+   - `DEVELOPMENT_GUIDE.md` - Status line and relevant sections
+   - `ibl5/docs/STRATEGIC_PRIORITIES.md` - Progress section (if significantly changed)
+3. If adding integration tests, document them in the "Recent Updates" section of `DEVELOPMENT_GUIDE.md`

@@ -1546,10 +1546,13 @@
 @media (max-width: 640px) {
     .schedule-container {
         margin: 0;
+        padding-left: 8px;
+        padding-right: 8px;
+        overflow-x: hidden;
     }
 
     .schedule-header {
-        padding: 0 8px;
+        padding: 0;
     }
 
     .schedule-months {
@@ -1598,7 +1601,7 @@
     }
 
     .schedule-game__record {
-        font-size: 1rem;
+        display: none;
     }
 
     .schedule-game__logo {

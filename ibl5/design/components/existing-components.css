@@ -1267,6 +1267,13 @@
     margin: 0;
 }
 
+.schedule-highlight-note {
+    font-size: 0.875rem;
+    font-style: italic;
+    color: var(--gray-500);
+    margin: 0.25rem 0 0 0;
+}
+
 .schedule-jump-btn {
     display: inline-flex;
     align-items: center;

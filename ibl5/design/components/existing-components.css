@@ -1612,13 +1612,13 @@
 
 /* Team Banner - unique to Team Schedule */
 .schedule-team-banner {
-    width: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 4px;
-    margin-bottom: var(--space-4);
+    padding: 4px 2px;
+    margin: 0 auto var(--space-4);
     border-radius: var(--radius-lg);
+    width: fit-content;
 }
 
 .schedule-team-banner__logo {

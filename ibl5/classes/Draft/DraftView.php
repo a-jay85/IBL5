@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Draft;
 
 use Draft\Contracts\DraftViewInterface;
-use Services\DatabaseService;
 use Utilities\HtmlSanitizer;
 
 /**

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace DepthChart;
 
 use DepthChart\Contracts\DepthChartViewInterface;
-use Services\DatabaseService;
 use Utilities\HtmlSanitizer;
 
 /**

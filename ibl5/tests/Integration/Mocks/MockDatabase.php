@@ -5,9 +5,18 @@ namespace Tests\Integration\Mocks;
 /**
  * Mock database class for testing
  * Provides a mock implementation of database operations without requiring actual database connections
+ * Extends mysqli to satisfy type hints in modern code while supporting legacy sql_* methods
  */
-class MockDatabase
+class MockDatabase extends \mysqli
 {
+    /**
+     * Override constructor to prevent actual database connection
+     */
+    public function __construct()
+    {
+        // Don't call parent constructor - we're a mock that doesn't need a real connection
+    }
+
     private array $mockData = [];
     private array $mockTradeInfo = [];
     private array $mockTeamData = [];
@@ -224,9 +233,19 @@ class MockDatabase
     }
 
     /**
+     * Override real_escape_string to work without a real connection
+     * Uses addslashes as a simple substitute for testing
+     */
+    public function real_escape_string(string $string): string
+    {
+        return addslashes($string);
+    }
+
+    /**
      * Mock prepared statement support
      * Returns a MockPreparedStatement that supports bind_param and execute
      */
+    #[\ReturnTypeWillChange]
     public function prepare(string $query): MockPreparedStatement
     {
         return new MockPreparedStatement($this, $query);

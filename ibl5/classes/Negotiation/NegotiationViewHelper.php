@@ -6,7 +6,6 @@ namespace Negotiation;
 
 use Negotiation\Contracts\NegotiationViewHelperInterface;
 use Player\Player;
-use Services\DatabaseService;
 use Utilities\HtmlSanitizer;
 
 /**

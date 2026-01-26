@@ -2,7 +2,6 @@
 
 namespace UI\Tables;
 
-use Services\DatabaseService;
 use Utilities\HtmlSanitizer;
 
 /**

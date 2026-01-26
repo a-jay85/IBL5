@@ -23,20 +23,29 @@ if (!defined("SQL_LAYER")) {
     define("SQL_LAYER", "mysql");
 
     /**
-     * @deprecated Use mysqli with prepared statements instead.
-     * 
-     * This legacy wrapper will be removed once all code is migrated.
-     * For new code, use $mysqli_db global with prepared statements:
-     * 
+     * @deprecated This class is for PHP-Nuke module backward compatibility only.
+     *
+     * All IBL5 classes in /ibl5/classes/ and scripts in /ibl5/scripts/ have been
+     * migrated to modern mysqli with prepared statements via BaseMysqliRepository.
+     *
+     * This class is ONLY used by legacy PHP-Nuke code in:
+     * - /ibl5/modules/
+     * - /ibl5/admin/modules/
+     * - /ibl5/blocks/
+     *
+     * DO NOT use this class for new code. Instead:
+     * - Extend BaseMysqliRepository for repository classes
+     * - Use $mysqli_db global with prepared statements
+     *
      * Example:
      *   $stmt = $mysqli_db->prepare("SELECT * FROM table WHERE id = ?");
      *   $stmt->bind_param("i", $id);
      *   $stmt->execute();
      *   $result = $stmt->get_result();
-     * 
-     * Or extend BaseMysqliRepository for repository classes.
-     * 
-     * @see \Repositories\BaseMysqliRepository
+     *
+     * Scheduled for removal once PHP-Nuke modules are deprecated.
+     *
+     * @see \BaseMysqliRepository
      */
     class MySQL
     {

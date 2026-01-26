@@ -344,9 +344,9 @@ class StandingsIntegrationTest extends TestCase
         $result = $view->renderRegion('Eastern');
 
         // Should show Z, not Y or X
-        $this->assertStringContainsString('<strong>Z</strong>-Test Team', $result);
-        $this->assertStringNotContainsString('<strong>Y</strong>-Test Team', $result);
-        $this->assertStringNotContainsString('<strong>X</strong>-Test Team', $result);
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">Z</span>-Test Team', $result);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">Y</span>-Test Team', $result);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">X</span>-Test Team', $result);
     }
 
     /**
@@ -382,8 +382,8 @@ class StandingsIntegrationTest extends TestCase
         $result = $view->renderRegion('Eastern');
 
         // Should show Y, not X
-        $this->assertStringContainsString('<strong>Y</strong>-Test Team', $result);
-        $this->assertStringNotContainsString('<strong>X</strong>-Test Team', $result);
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">Y</span>-Test Team', $result);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">X</span>-Test Team', $result);
     }
 
     /**
@@ -419,9 +419,9 @@ class StandingsIntegrationTest extends TestCase
         $result = $view->renderRegion('Eastern');
 
         // Should not have any indicator prefix
-        $this->assertStringNotContainsString('<strong>Z</strong>', $result);
-        $this->assertStringNotContainsString('<strong>Y</strong>', $result);
-        $this->assertStringNotContainsString('<strong>X</strong>', $result);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">Z</span>', $result);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">Y</span>', $result);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">X</span>', $result);
         $this->assertStringContainsString('>Test Team<', $result);
     }
 
@@ -523,8 +523,8 @@ class StandingsIntegrationTest extends TestCase
         $view = new StandingsView($mockRepository);
         $result = $view->renderRegion('Eastern');
 
-        // Rating should be in the standings-rating class span
-        $this->assertStringContainsString('standings-rating', $result);
+        // Rating should be in the ibl-stat-highlight class span
+        $this->assertStringContainsString('ibl-stat-highlight', $result);
         $this->assertStringContainsString('>7<', $result);
     }
 
@@ -557,9 +557,9 @@ class StandingsIntegrationTest extends TestCase
     }
 
     /**
-     * Test render includes CSS style block
+     * Test render includes JavaScript scroll container functionality
      */
-    public function testRenderIncludesCssStyleBlock(): void
+    public function testRenderIncludesScrollContainerScript(): void
     {
         $mockRepository = $this->createMock(StandingsRepositoryInterface::class);
         $mockRepository->method('getStandingsByRegion')->willReturn([]);
@@ -569,9 +569,9 @@ class StandingsIntegrationTest extends TestCase
         $view = new StandingsView($mockRepository);
         $result = $view->render();
 
-        $this->assertStringContainsString('<style>', $result);
-        $this->assertStringContainsString('</style>', $result);
-        $this->assertStringContainsString('.standings-table', $result);
+        $this->assertStringContainsString('<script>', $result);
+        $this->assertStringContainsString('</script>', $result);
+        $this->assertStringContainsString('table-scroll-container', $result);
     }
 
     /**
@@ -626,7 +626,7 @@ class StandingsIntegrationTest extends TestCase
         $result = $view->renderRegion('Eastern');
 
         $this->assertStringContainsString('<img src="images/logo/', $result);
-        $this->assertStringContainsString('standings-team-logo', $result);
+        $this->assertStringContainsString('ibl-team-cell__logo', $result);
     }
 
     // ============================================

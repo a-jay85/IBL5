@@ -312,7 +312,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
 
         // Assert
         $this->assertStringContainsString('Eastern Conference', $html);
-        $this->assertStringContainsString('standings-title', $html);
+        $this->assertStringContainsString('ibl-title', $html);
     }
 
     /**
@@ -401,7 +401,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $html = $this->view->renderRegion('Eastern');
 
         // Assert
-        $this->assertStringContainsString('<strong>Z</strong>-Boston', $html);
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">Z</span>-Boston', $html);
     }
 
     /**
@@ -423,7 +423,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $html = $this->view->renderRegion('Eastern');
 
         // Assert
-        $this->assertStringContainsString('<strong>Y</strong>-Miami', $html);
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">Y</span>-Miami', $html);
     }
 
     /**
@@ -445,7 +445,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $html = $this->view->renderRegion('Eastern');
 
         // Assert
-        $this->assertStringContainsString('<strong>X</strong>-New York', $html);
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">X</span>-New York', $html);
     }
 
     /**
@@ -467,9 +467,9 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $html = $this->view->renderRegion('Eastern');
 
         // Assert - Should show Z, not Y or X
-        $this->assertStringContainsString('<strong>Z</strong>-Boston', $html);
-        $this->assertStringNotContainsString('<strong>Y</strong>-Boston', $html);
-        $this->assertStringNotContainsString('<strong>X</strong>-Boston', $html);
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">Z</span>-Boston', $html);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">Y</span>-Boston', $html);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">X</span>-Boston', $html);
     }
 
     /**
@@ -491,9 +491,9 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $html = $this->view->renderRegion('Eastern');
 
         // Assert - Team name without strong prefix
-        $this->assertStringNotContainsString('<strong>Z</strong>-Chicago', $html);
-        $this->assertStringNotContainsString('<strong>Y</strong>-Chicago', $html);
-        $this->assertStringNotContainsString('<strong>X</strong>-Chicago', $html);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">Z</span>-Chicago', $html);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">Y</span>-Chicago', $html);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">X</span>-Chicago', $html);
         $this->assertStringContainsString('Chicago', $html);
     }
 
@@ -611,7 +611,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
 
         // Assert - Rating column exists with proper class
         $this->assertStringContainsString('Rating', $html);
-        $this->assertStringContainsString('standings-rating', $html);
+        $this->assertStringContainsString('ibl-stat-highlight', $html);
     }
 
     // ========== VIEW - XSS PROTECTION TESTS ==========
@@ -707,7 +707,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
 
         // Assert
         $this->assertStringContainsString('images/logo/new5.png', $html);
-        $this->assertStringContainsString('standings-team-logo', $html);
+        $this->assertStringContainsString('ibl-team-cell__logo', $html);
     }
 
     // ========== VIEW - FULL RENDER TESTS ==========
@@ -740,7 +740,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
      * @group standings
      * @group view
      */
-    public function testRenderIncludesStylesOnce(): void
+    public function testRenderIncludesScriptOnce(): void
     {
         // Arrange
         $this->mockDb->setMockData([]);
@@ -749,9 +749,9 @@ class StandingsIntegrationTest extends IntegrationTestCase
         // Act
         $html = $this->view->render();
 
-        // Assert - Styles should appear only once at the beginning
-        $this->assertStringContainsString('<style>', $html);
-        $this->assertEquals(1, substr_count($html, '<style>'));
+        // Assert - Script should appear only once at the beginning
+        $this->assertStringContainsString('<script>', $html);
+        $this->assertEquals(1, substr_count($html, '<script>'));
     }
 
     /**
@@ -796,10 +796,10 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $html = $this->view->renderRegion('Eastern');
 
         // Assert - All teams rendered with correct indicators
-        $this->assertStringContainsString('<strong>Z</strong>-Boston', $html);
-        $this->assertStringContainsString('<strong>X</strong>-Miami', $html);
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">Z</span>-Boston', $html);
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">X</span>-Miami', $html);
         $this->assertStringContainsString('New York', $html);
-        $this->assertStringNotContainsString('<strong>Z</strong>-New York', $html);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">Z</span>-New York', $html);
     }
 
     /**

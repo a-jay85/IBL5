@@ -83,9 +83,16 @@ $season = new Season($mysqli_db);
 
 $tidOffenseStats = $tidDefenseStats = 0;
 
-$queryTeamIDsNames = "SELECT teamid, team_name FROM ibl_team_info ORDER BY teamid ASC;";
-$resultTeamIDsNames = $db->sql_query($queryTeamIDsNames);
-$numRowsTeamIDsNames = $db->sql_numrows($resultTeamIDsNames);
+// Fetch all team IDs and names using modern mysqli
+$queryTeamIDsNames = "SELECT teamid, team_name FROM ibl_team_info ORDER BY teamid ASC";
+$resultTeamIDsNames = $mysqli_db->query($queryTeamIDsNames);
+$allTeamData = [];
+if ($resultTeamIDsNames) {
+    while ($row = $resultTeamIDsNames->fetch_assoc()) {
+        $allTeamData[] = $row;
+    }
+}
+$numRowsTeamIDsNames = count($allTeamData);
 
 echo "Calculating foul baseline...<br>";
 
@@ -799,11 +806,11 @@ while (!feof($plrFile)) {
             `r_td` = $ratingTD,
             `salary` = $currentSeasonSalary;";
         if ($pid != 0) {
-            if (!$db->sql_query($playerUpdateQuery)) {
-                die('Invalid query: ' . $db->sql_error());
+            if (!$mysqli_db->query($playerUpdateQuery)) {
+                die('Invalid query: ' . $mysqli_db->error);
             }
-            if (!$db->sql_query($historicalStatsUpdateQuery)) {
-                die('Invalid query: ' . $db->sql_error());
+            if (!$mysqli_db->query($historicalStatsUpdateQuery)) {
+                die('Invalid query: ' . $mysqli_db->error);
             }
         }
     } elseif ($ordinal >= 1441 && $ordinal <= 1504) {
@@ -844,8 +851,8 @@ while (!feof($plrFile)) {
             `pf` = ' . $seasonPF . '
             WHERE
             `name` = \'' . $teamName . '\';';
-        if (!$db->sql_query($teamUpdateQuery)) {
-            die('Invalid query: ' . $db->sql_error());
+        if (!$mysqli_db->query($teamUpdateQuery)) {
+            die('Invalid query: ' . $mysqli_db->error);
         }
     }
 }
@@ -855,17 +862,21 @@ echo "ibl_team_defense_stats updated!<br><br>";
 
 echo "Assigning team names to players...<br>";
 
-$i = 0;
-while ($i < $numRowsTeamIDsNames) {
-    $teamname = $db->sql_result($resultTeamIDsNames, $i, 'team_name');
-    $teamID = $db->sql_result($resultTeamIDsNames, $i, 'teamid');
-    $teamnameUpdateQuery = "UPDATE `ibl_plr` SET `teamname` = '$teamname' WHERE `tid` = $teamID;";
-    if (!$db->sql_query($teamnameUpdateQuery)) {
-        die('Invalid query: ' . $db->sql_error());
-    }
-
-    $i++;
+// Update player team names using prepared statements
+$updateTeamNameStmt = $mysqli_db->prepare("UPDATE ibl_plr SET teamname = ? WHERE tid = ?");
+if (!$updateTeamNameStmt) {
+    die('Failed to prepare statement: ' . $mysqli_db->error);
 }
+
+foreach ($allTeamData as $teamRow) {
+    $teamname = $teamRow['team_name'];
+    $teamID = (int) $teamRow['teamid'];
+    $updateTeamNameStmt->bind_param('si', $teamname, $teamID);
+    if (!$updateTeamNameStmt->execute()) {
+        die('Invalid query: ' . $updateTeamNameStmt->error);
+    }
+}
+$updateTeamNameStmt->close();
 
 echo "Team names successfully assigned to players!<br><br>";
 

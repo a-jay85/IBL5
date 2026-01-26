@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace RookieOption;
 
-use Services\DatabaseService;
 use Utilities\HtmlSanitizer;
 use RookieOption\Contracts\RookieOptionFormViewInterface;
 

@@ -3,53 +3,35 @@
 declare(strict_types=1);
 
 /**
- * Team_Schedule Module - Display team game schedule
+ * Team_Schedule Module - Redirect to unified Schedule module
  *
- * Shows a team's complete schedule with game results, records, and streaks.
- * Modern card-based design with team color theming.
+ * This module now redirects to the Schedule module with the teamID parameter.
+ * The Schedule module handles both league-wide and team-specific schedules.
  *
- * @see TeamSchedule\TeamScheduleService For business logic
- * @see TeamSchedule\TeamScheduleView For HTML rendering
+ * @deprecated Use modules.php?name=Schedule&teamID=X instead
+ * @see modules/Schedule/index.php For the unified schedule module
  */
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use TeamSchedule\TeamScheduleService;
-use TeamSchedule\TeamScheduleView;
-
-global $db, $cookie, $mysqli_db;
-
-$commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
-$season = new Season($mysqli_db);
+global $cookie, $mysqli_db;
 
 // Get team ID from request or user's team
-$userTeamID = isset($_GET['teamID']) ? (int)$_GET['teamID'] : 0;
-if (!$userTeamID) {
-    if (!empty($cookie[1])) {
-        $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
-        $userTeamID = $commonRepository->getTidFromTeamname($userTeamName);
-    } else {
-        $userTeamID = 0;
-    }
+$teamID = isset($_GET['teamID']) ? (int)$_GET['teamID'] : 0;
+
+if (!$teamID && !empty($cookie[1])) {
+    $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+    $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
+    $teamID = $commonRepository->getTidFromTeamname($userTeamName);
 }
 
-$userTeam = Team::initialize($mysqli_db, $userTeamID);
-$league = new League($mysqli_db);
+// Redirect to unified Schedule module
+$redirectUrl = 'modules.php?name=Schedule';
+if ($teamID > 0) {
+    $redirectUrl .= '&teamID=' . $teamID;
+}
 
-// Initialize services
-$service = new TeamScheduleService($mysqli_db);
-$view = new TeamScheduleView();
-
-// Get processed schedule data
-$games = $service->getProcessedSchedule($userTeamID, $season);
-
-// Render page with minimal wrapper (no legacy nav/footer)
-Nuke\Header::header();
-OpenTable();
-
-echo $view->render($userTeam, $games, $league->getSimLengthInDays());
-
-CloseTable();
-Nuke\Footer::footer();
+header('Location: ' . $redirectUrl);
+exit;

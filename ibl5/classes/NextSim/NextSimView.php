@@ -48,16 +48,13 @@ class NextSimView implements NextSimViewInterface
             return $html;
         }
 
-        $html .= '<table style="width: 100%; margin: 0 auto;">';
-
         for ($i = 0; $i < $simLengthInDays; $i++) {
             if (isset($games[$i])) {
                 $html .= $this->renderGameRow($games[$i]);
-                $html .= '<tr style="height: 15px;"></tr>';
+                $html .= '<div style="height: 15px;"></div>';
             }
         }
 
-        $html .= '</table>';
         $html .= '</div>';
 
         return $html;
@@ -88,13 +85,13 @@ class NextSimView implements NextSimViewInterface
         /** @var \Team $opposingTeam */
         $opposingTeam = $gameData['opposingTeam'];
 
-        $dayLabel = 'Day ' . HtmlSanitizer::safeHtmlOutput($gameData['dayNumber']) . ' ' . 
+        $dayLabel = 'Day ' . HtmlSanitizer::safeHtmlOutput($gameData['dayNumber']) . ' ' .
             HtmlSanitizer::safeHtmlOutput($gameData['locationPrefix']);
         $gameDate = HtmlSanitizer::safeHtmlOutput($game->date);
         $opposingTeamId = (int)$opposingTeam->teamID;
         $seasonRecord = HtmlSanitizer::safeHtmlOutput($opposingTeam->seasonRecord);
 
-        $html = '<tr><td class="next-sim-game">';
+        $html = '<div class="next-sim-game">';
         $html .= '<div class="next-sim-day-row">';
         $html .= '<div class="next-sim-day-label"><h2 title="' . $gameDate . '">' . $dayLabel . '</h2></div>';
         $html .= '<div class="next-sim-logo">';
@@ -104,13 +101,13 @@ class NextSimView implements NextSimViewInterface
         $html .= '</div>';
         $html .= '<div class="next-sim-record"><h2>' . $seasonRecord . '</h2></div>';
         $html .= '</div>';
-        $html .= '</td></tr>';
+        $html .= '</div>';
 
         // Render matchup ratings
-        $html .= '<tr><td>';
+        $html .= '<div>';
         $matchupPlayers = $this->prepareMatchupPlayers($gameData);
         $html .= \UI::ratings($this->db, $matchupPlayers, $opposingTeam, '', $this->season, $this->moduleName);
-        $html .= '</td></tr>';
+        $html .= '</div>';
 
         return $html;
     }

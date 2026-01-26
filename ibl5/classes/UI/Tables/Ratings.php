@@ -91,10 +91,10 @@ class Ratings
             <th class="sep-team"></th>
             <th>2ga</th>
             <th>2g%</th>
-            <th class="sep-team"></th>
+            <th class="sep-weak"></th>
             <th>fta</th>
             <th>ft%</th>
-            <th class="sep-team"></th>
+            <th class="sep-weak"></th>
             <th>3ga</th>
             <th>3g%</th>
             <th class="sep-team"></th>
@@ -110,7 +110,7 @@ class Ratings
             <th>do</th>
             <th>po</th>
             <th>to</th>
-            <th class="sep-team"></th>
+            <th class="sep-weak"></th>
             <th>od</th>
             <th>dd</th>
             <th>pd</th>

@@ -248,8 +248,10 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 
 ### Optional Display Modules (Low Priority)
 These simple information display modules may not require full refactoring:
-- Team_Schedule (130 lines), Franchise_History (103 lines), Power_Rankings (90 lines)
+- Franchise_History (103 lines), Power_Rankings (90 lines)
 - Next_Sim (95 lines), League_Starters (85 lines), Draft_Pick_Locator (81 lines), Injuries (57 lines)
+
+Note: Team_Schedule module removed (January 2026) - functionality consolidated into unified Schedule module.
 
 **Recommendation:** Refactor only if time permits after priorities 1-5
 

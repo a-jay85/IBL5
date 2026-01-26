@@ -75,7 +75,7 @@ class TopMenu
     </div>
     <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem;">
         <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamID ?>">Team Page</a></span>
-        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules.php?name=Team_Schedule&amp;teamID=<?= $teamID ?>">Team Schedule</a></span>
+        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules.php?name=Schedule&amp;teamID=<?= $teamID ?>">Schedule</a></span>
         <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules/Team/draftHistory.php?teamID=<?= $teamID ?>">Draft History</a></span>
         <span style="white-space: nowrap; display: flex; align-items: center;"><span style="font: bold 14px Helvetica;"> | </span></span>
         <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules.php?name=Depth_Chart_Entry">Depth Chart Entry</a></span>

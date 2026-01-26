@@ -63,7 +63,7 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 5. **League_Starters** - All-star starters for current season
 6. **Next_Sim** - Upcoming season simulation results
 7. **Power_Rankings** - League power rankings
-8. **Team_Schedule** - Team schedule and game results
+8. **Team_Schedule** - Team schedule and game results (Note: Legacy `modules/Team_Schedule/` removed January 2026; functionality consolidated into unified Schedule module at `modules/Schedule/`)
 
 **Key Improvements (All 8 Modules):**
 - Created Repository/Service/View pattern for each module with interfaces

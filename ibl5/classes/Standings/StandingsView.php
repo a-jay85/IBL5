@@ -110,7 +110,7 @@ class StandingsView implements StandingsViewInterface
     color: white;
     font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 0.6875rem;
+    font-size: 1rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 0.75rem 0.375rem;
@@ -121,7 +121,7 @@ class StandingsView implements StandingsViewInterface
 /* Data cells */
 .standings-cell {
     color: var(--gray-800, #1f2937);
-    font-size: 0.75rem;
+    font-size: 1rem;
     padding: 0.5rem 0.375rem;
     text-align: center;
     white-space: nowrap;

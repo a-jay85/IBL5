@@ -99,7 +99,7 @@ A:hover {
 .title {
     background: none;
     color: #000000;
-    font-size: 0.875rem; /* 14px */
+    font-size: 1rem;
     font-weight: bold;
     font-family: var(--font-display);
     text-decoration: none;
@@ -122,7 +122,7 @@ A:hover {
 .storytitle {
     background: none;
     color: #363636;
-    font-size: 0.75rem; /* 12px */
+    font-size: 1rem;
     font-weight: bold;
     font-family: var(--font-display);
     text-decoration: none;
@@ -131,7 +131,7 @@ A:hover {
 .storycat {
     background: none;
     color: #363636;
-    font-size: 0.875rem; /* 14px */
+    font-size: 1rem;
     font-weight: bold;
     font-family: var(--font-display);
     text-decoration: underline;

@@ -48,7 +48,7 @@ class GenericTableStyles
     color: white;
     font-family: var(--font-display, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 0.6875rem;
+    font-size: 1rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 0.75rem 0.5rem;
@@ -57,7 +57,7 @@ class GenericTableStyles
 }
 .<?= $tableClass ?> td {
     color: var(--gray-800, #1f2937);
-    font-size: 0.75rem;
+    font-size: 1rem;
     padding: 0.5rem;
     text-align: center;
 }
@@ -166,7 +166,7 @@ class GenericTableStyles
     color: white;
     font-family: var(--font-display, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 0.625rem;
+    font-size: 1rem;
     text-transform: uppercase;
     letter-spacing: 0.02em;
     padding: 0.5rem 0.25rem;
@@ -175,7 +175,7 @@ class GenericTableStyles
 }
 .<?= $tableClass ?> td {
     color: var(--gray-800, #1f2937);
-    font-size: 0.6875rem;
+    font-size: 1rem;
     padding: 0.375rem 0.25rem;
     text-align: center;
 }
@@ -232,7 +232,7 @@ class GenericTableStyles
     padding: 0.75rem 1rem;
     margin: 0;
     font-family: var(--font-display, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-size: 0.875rem;
+    font-size: 1.125rem;
     font-weight: 600;
     color: white;
     text-transform: uppercase;
@@ -251,7 +251,7 @@ class GenericTableStyles
     color: var(--gray-600, #4b5563);
     font-family: var(--font-display, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 0.6875rem;
+    font-size: 1rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 0.625rem 0.5rem;
@@ -259,7 +259,7 @@ class GenericTableStyles
 }
 .<?= $tableClass ?> td {
     color: var(--gray-800, #1f2937);
-    font-size: 0.75rem;
+    font-size: 1rem;
     padding: 0.5rem;
     text-align: center;
     border-bottom: 1px solid var(--gray-100, #f3f4f6);

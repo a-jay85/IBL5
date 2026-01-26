@@ -16,7 +16,7 @@
 .ibl-select,
 .ibl-textarea {
     font-family: var(--font-sans);
-    font-size: 0.875rem;
+    font-size: 1.125rem;
     color: var(--navy-800);
     background-color: white;
     border: 1px solid var(--gray-300);
@@ -48,12 +48,12 @@
 
 /* Input sizes */
 .ibl-input--sm {
-    font-size: 0.75rem;
+    font-size: 1rem;
     padding: var(--space-1) var(--space-2);
 }
 
 .ibl-input--lg {
-    font-size: 1rem;
+    font-size: 1.25rem;
     padding: var(--space-3) var(--space-4);
 }
 
@@ -64,7 +64,7 @@
 .ibl-label {
     display: block;
     font-family: var(--font-display);
-    font-size: 0.75rem;
+    font-size: 1rem;
     font-weight: 600;
     color: var(--gray-700);
     text-transform: uppercase;
@@ -87,7 +87,7 @@
     justify-content: center;
     gap: var(--space-2);
     font-family: var(--font-display);
-    font-size: 0.875rem;
+    font-size: 1.125rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -140,12 +140,12 @@
 
 /* Button sizes */
 .ibl-btn--sm {
-    font-size: 0.75rem;
+    font-size: 1rem;
     padding: var(--space-1) var(--space-3);
 }
 
 .ibl-btn--lg {
-    font-size: 1rem;
+    font-size: 1.25rem;
     padding: var(--space-3) var(--space-6);
 }
 
@@ -169,13 +169,13 @@
 }
 
 .ibl-form-help {
-    font-size: 0.75rem;
+    font-size: 1rem;
     color: var(--gray-500);
     margin-top: var(--space-1);
 }
 
 .ibl-form-error {
-    font-size: 0.75rem;
+    font-size: 1rem;
     color: #dc2626;
     margin-top: var(--space-1);
 }
@@ -202,7 +202,7 @@
 
 .ibl-checkbox__label,
 .ibl-radio__label {
-    font-size: 0.875rem;
+    font-size: 1.125rem;
     color: var(--gray-700);
 }
 
@@ -235,7 +235,7 @@
     flex: 1;
     border: none;
     outline: none;
-    font-size: 0.875rem;
+    font-size: 1.125rem;
     background: transparent;
 }
 
@@ -249,7 +249,7 @@
     border: none;
     border-radius: var(--radius-full);
     padding: var(--space-1) var(--space-3);
-    font-size: 0.75rem;
+    font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
     transition: background var(--transition-fast);

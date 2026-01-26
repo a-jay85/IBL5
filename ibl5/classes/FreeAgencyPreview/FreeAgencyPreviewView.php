@@ -54,7 +54,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
     box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
     width: 100%;
     margin: 0 auto;
-    font-size: 0.6875rem;
+    font-size: 1rem;
 }
 .fa-preview-table thead {
     background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
@@ -63,7 +63,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
     color: white;
     font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 0.5625rem;
+    font-size: 1rem;
     text-transform: uppercase;
     letter-spacing: 0.02em;
     padding: 0.5rem 0.25rem;

@@ -33,7 +33,7 @@
 
 .ibl-table th {
     background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
-    font-size: 0.6875rem;
+    font-size: 1rem;
     font-weight: 600;
     color: white;
     text-transform: uppercase;
@@ -41,7 +41,7 @@
 }
 
 .ibl-table td {
-    font-size: 0.8125rem;
+    font-size: 1.125rem;
     color: var(--navy-800);
 }
 
@@ -73,7 +73,7 @@
 
 .ibl-table-header__title {
     font-family: var(--font-display);
-    font-size: 0.875rem;
+    font-size: 1.125rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -163,14 +163,14 @@
         background-color: var(--gray-100);
     }
 
-    /* Compact sizing on mobile */
+    /* Compact sizing on mobile - maintain 1rem minimum */
     .ibl-table th {
-        font-size: 0.5625rem;
+        font-size: 1rem;
         padding: 0.5rem 0.25rem;
     }
 
     .ibl-table td {
-        font-size: 0.625rem;
+        font-size: 1rem;
         padding: 0.375rem 0.25rem;
     }
 
@@ -272,7 +272,7 @@
 }
 
 .ibl-player-cell__team {
-    font-size: 0.6875rem;
+    font-size: 1rem;
     color: var(--gray-500);
     text-decoration: none;
 }

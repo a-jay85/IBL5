@@ -56,7 +56,7 @@ class TableStyles
     color: #<?= $teamColor2 ?>;
     font-family: var(--font-display, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 0.6875rem;
+    font-size: 1rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding-top: 0.5rem;
@@ -64,7 +64,7 @@ class TableStyles
 }
 .<?= $tableClass ?> td {
     color: var(--gray-800, #1f2937);
-    font-size: 0.75rem;
+    font-size: 1rem;
 }
 .<?= $tableClass ?> tbody tr {
     transition: background-color 150ms ease;

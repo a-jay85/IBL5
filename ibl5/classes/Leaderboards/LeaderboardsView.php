@@ -55,7 +55,7 @@ class LeaderboardsView implements LeaderboardsViewInterface
 }
 .leaderboards-form__label {
     font-family: var(--font-display, 'Poppins', sans-serif);
-    font-size: 0.75rem;
+    font-size: 1rem;
     font-weight: 600;
     color: var(--gray-600, #4b5563);
     text-transform: uppercase;
@@ -64,7 +64,7 @@ class LeaderboardsView implements LeaderboardsViewInterface
 .leaderboards-form select,
 .leaderboards-form input[type="number"] {
     font-family: var(--font-sans, 'Inter', sans-serif);
-    font-size: 0.8125rem;
+    font-size: 1.125rem;
     padding: 0.375rem 0.625rem;
     border: 1px solid var(--gray-300, #d1d5db);
     border-radius: var(--radius-md, 0.375rem);
@@ -83,7 +83,7 @@ class LeaderboardsView implements LeaderboardsViewInterface
 }
 .leaderboards-form__submit {
     font-family: var(--font-display, 'Poppins', sans-serif);
-    font-size: 0.75rem;
+    font-size: 1rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
@@ -174,7 +174,7 @@ class LeaderboardsView implements LeaderboardsViewInterface
     color: white;
     font-family: var(--font-display, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 0.625rem;
+    font-size: 1rem;
     text-transform: uppercase;
     letter-spacing: 0.02em;
     padding: 0.625rem 0.375rem;
@@ -183,7 +183,7 @@ class LeaderboardsView implements LeaderboardsViewInterface
 }
 .leaderboards-table td {
     color: var(--gray-800, #1f2937);
-    font-size: 0.6875rem;
+    font-size: 1rem;
     padding: 0.5rem 0.375rem;
     text-align: center;
 }

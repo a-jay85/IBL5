@@ -117,7 +117,7 @@ class NavigationView
             <form action="modules.php?name=Your_Account" method="post" class="space-y-3">
                 <!-- Username field -->
                 <div>
-                    <label for="nav-username" class="block text-[0.75rem] font-semibold tracking-widest uppercase text-gray-400 mb-1.5">Username</label>
+                    <label for="nav-username" class="block text-base font-semibold tracking-widest uppercase text-gray-400 mb-1.5">Username</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -138,7 +138,7 @@ class NavigationView
 
                 <!-- Password field -->
                 <div>
-                    <label for="nav-password" class="block text-[0.75rem] font-semibold tracking-widest uppercase text-gray-400 mb-1.5">Password</label>
+                    <label for="nav-password" class="block text-base font-semibold tracking-widest uppercase text-gray-400 mb-1.5">Password</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -185,7 +185,7 @@ class NavigationView
             <form action="modules.php?name=Your_Account" method="post" class="space-y-3">
                 <!-- Username field -->
                 <div>
-                    <label for="mobile-nav-username" class="block text-[0.75rem] font-semibold tracking-widest uppercase text-gray-400 mb-2">Username</label>
+                    <label for="mobile-nav-username" class="block text-base font-semibold tracking-widest uppercase text-gray-400 mb-2">Username</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -206,7 +206,7 @@ class NavigationView
 
                 <!-- Password field -->
                 <div>
-                    <label for="mobile-nav-password" class="block text-[0.75rem] font-semibold tracking-widest uppercase text-gray-400 mb-2">Password</label>
+                    <label for="mobile-nav-password" class="block text-base font-semibold tracking-widest uppercase text-gray-400 mb-2">Password</label>
                     <div class="relative">
                         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,9 +290,9 @@ class NavigationView
 
         $target = $external ? ' target="_blank" rel="noopener noreferrer"' : '';
         $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
-        $badgeHtml = $badge ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[0.6875rem] font-bold bg-accent-500 text-white ml-2 tracking-wide">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
+        $badgeHtml = $badge ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2 tracking-wide">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
 
-        return '<a href="' . $url . '"' . $target . ' class="nav-dropdown-item block px-4 py-2.5 text-[0.875rem] text-gray-300 hover:text-white hover:bg-white/5 transition-all duration-150 border-l-2 border-transparent hover:border-accent-500">'
+        return '<a href="' . $url . '"' . $target . ' class="nav-dropdown-item block px-4 py-2.5 text-lg text-gray-300 hover:text-white hover:bg-white/5 transition-all duration-150 border-l-2 border-transparent hover:border-accent-500">'
             . '<span class="flex items-center justify-between">'
             . '<span>' . $label . $badgeHtml . '</span>'
             . $externalIcon
@@ -314,7 +314,7 @@ class NavigationView
         $icon = $data['icon'] ?? '';
 
         $html = '<div class="relative group">';
-        $html .= '<button class="flex items-center gap-2 px-3 py-2.5 text-[1.125rem] font-semibold font-display text-gray-300 hover:text-white transition-colors duration-200">';
+        $html .= '<button class="flex items-center gap-2 px-3 py-2.5 text-lg font-semibold font-display text-gray-300 hover:text-white transition-colors duration-200">';
         if ($icon) {
             $html .= '<span class="text-accent-500 group-hover:text-accent-400 transition-colors">' . $icon . '</span>';
         }
@@ -358,7 +358,7 @@ class NavigationView
         $olympicsSelected = $this->currentLeague === 'olympics' ? ' selected' : '';
 
         return '<div class="px-4 py-3 border-t border-white/10 bg-black/20">'
-            . '<label class="block text-[0.75rem] font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>'
+            . '<label class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>'
             . '<div class="relative">'
             . '<select onchange="window.location.href=this.value" class="w-full appearance-none bg-white/10 text-white text-sm font-medium border border-white/20 rounded-lg px-3 py-2 pr-8 cursor-pointer hover:bg-white/15 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition-all">'
             . '<option value="index.php?league=ibl"' . $iblSelected . ' class="bg-navy-800 text-white">IBL</option>'
@@ -410,9 +410,9 @@ class NavigationView
 
             $target = $external ? ' target="_blank" rel="noopener noreferrer"' : '';
             $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
-            $badgeHtml = $badge ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[0.6875rem] font-bold bg-accent-500 text-white ml-2">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
+            $badgeHtml = $badge ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
 
-            $html .= '<a href="' . $url . '"' . $target . ' class="flex items-center justify-between px-5 py-3 pl-14 text-[0.875rem] text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">'
+            $html .= '<a href="' . $url . '"' . $target . ' class="flex items-center justify-between px-5 py-3 pl-14 text-lg text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">'
                 . '<span>' . $label . $badgeHtml . '</span>'
                 . $externalIcon
                 . '</a>';
@@ -437,7 +437,7 @@ class NavigationView
         $olympicsSelected = $this->currentLeague === 'olympics' ? ' selected' : '';
 
         return '<div class="px-5 py-3 border-t border-white/10 mt-1">'
-            . '<label class="block text-[0.75rem] font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>'
+            . '<label class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>'
             . '<div class="relative">'
             . '<select onchange="window.location.href=this.value" class="w-full appearance-none bg-white/10 text-white text-sm font-medium border border-white/20 rounded-xl px-3 py-2.5 pr-8 cursor-pointer hover:bg-white/15 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition-all">'
             . '<option value="index.php?league=ibl"' . $iblSelected . ' class="bg-navy-800 text-white">IBL</option>'
@@ -485,7 +485,7 @@ class NavigationView
                         <!-- Text logo -->
                         <div class="flex flex-col">
                             <span class="font-display text-2xl tracking-wider text-white leading-none">IBL</span>
-                            <span class="text-[0.6875rem] tracking-[0.2em] text-accent-500 font-semibold uppercase">Sim League</span>
+                            <span class="text-base tracking-[0.2em] text-accent-500 font-semibold uppercase">Sim League</span>
                         </div>
                     </a>
 

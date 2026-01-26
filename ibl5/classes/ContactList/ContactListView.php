@@ -47,7 +47,7 @@ class ContactListView implements ContactListViewInterface
 }
 .contact-description {
     font-family: var(--font-sans, \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
-    font-size: 0.875rem;
+    font-size: 1.125rem;
     color: var(--gray-600, #4b5563);
     text-align: center;
     margin: 0 0 1.5rem 0;
@@ -71,7 +71,7 @@ class ContactListView implements ContactListViewInterface
     color: white;
     font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 0.6875rem;
+    font-size: 1rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 0.75rem 1rem;
@@ -79,7 +79,7 @@ class ContactListView implements ContactListViewInterface
 }
 .contact-table td {
     color: var(--gray-800, #1f2937);
-    font-size: 0.8125rem;
+    font-size: 1.125rem;
     padding: 0.625rem 0.75rem;
     text-align: center;
 }

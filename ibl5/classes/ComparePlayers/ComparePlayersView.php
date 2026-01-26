@@ -60,9 +60,9 @@ $(function() {
 
         ob_start();
         ?>
-<table border="1" cellspacing="0" align="center" class="sortable">
+<table class="sortable compare-players-table ibl-data-table">
     <caption>
-        <center><b>Current Ratings</b></center>
+        <strong>Current Ratings</strong>
     </caption>
     <colgroup>
         <col span="3">
@@ -157,9 +157,9 @@ $(function() {
 
 <p>
 
-<table border="1" cellspacing="0" align="center" class="sortable">
+<table class="sortable compare-players-table ibl-data-table">
     <caption>
-        <center><b>Current Season Stats</b></center>
+        <strong>Current Season Stats</strong>
     </caption>
     <colgroup>
         <col span="5">
@@ -237,9 +237,9 @@ $(function() {
 
 <p>
 
-<table border="1" cellspacing="0" align="center" class="sortable">
+<table class="sortable compare-players-table ibl-data-table">
     <caption>
-        <center><b>Career Stats</b></center>
+        <strong>Career Stats</strong>
     </caption>
     <colgroup>
         <col span="4">

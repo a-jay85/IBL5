@@ -64,8 +64,9 @@ class DraftPickLocatorViewTest extends TestCase
     {
         $result = $this->view->render([], 2025);
 
-        $this->assertStringContainsString('Round 1', $result);
-        $this->assertStringContainsString('Round 2', $result);
+        // Round headers are abbreviated as R1, R2
+        $this->assertStringContainsString('R1', $result);
+        $this->assertStringContainsString('R2', $result);
     }
 
     public function testRenderEscapesHtmlEntities(): void

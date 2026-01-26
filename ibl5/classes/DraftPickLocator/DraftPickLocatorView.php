@@ -33,27 +33,13 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
     /**
      * Generate CSS styles for the draft pick table
      *
-     * @return string CSS style block
+     * Styles are now in the design system (existing-components.css).
+     *
+     * @return string Empty string - styles are centralized
      */
     private function getStyleBlock(): string
     {
-        return '<style>
-            .draft-pick-table {
-                border: 1px solid #000;
-                border-collapse: collapse;
-            }
-            .draft-pick-table th, .draft-pick-table td {
-                border: 1px solid #000;
-                padding: 4px;
-                text-align: center;
-            }
-            .draft-pick-own {
-                background-color: #cccccc;
-            }
-            .draft-pick-traded {
-                background-color: #FF0000;
-            }
-        </style>';
+        return '';
     }
 
     /**
@@ -63,9 +49,9 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
      */
     private function renderTitle(): string
     {
-        return '<div style="text-align: center;">
-            <h2>Dude, Where\'s My Pick?</h2>
-            <p>Use this locator to see exactly who has your draft pick.</p>
+        return '<div class="draft-pick-locator-container">
+            <h2 class="draft-pick-title">Dude, Where\'s My Pick?</h2>
+            <p class="draft-pick-description">Use this locator to see exactly who has your draft pick.</p>
         </div>';
     }
 
@@ -77,20 +63,20 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
      */
     private function renderTableStart(int $currentEndingYear): string
     {
-        $html = '<div style="text-align: center;"><table class="draft-pick-table">';
-        
+        $html = '<div class="draft-pick-locator-container"><table class="draft-pick-table">';
+
         // First header row - year spans
-        $html .= '<tr><td rowspan="2">Team</td>';
+        $html .= '<tr><th rowspan="2">Team</th>';
         for ($i = 0; $i < 6; $i++) {
             $year = $currentEndingYear + $i;
-            $html .= '<td colspan="2">' . HtmlSanitizer::safeHtmlOutput($year) . '</td>';
+            $html .= '<th colspan="2">' . HtmlSanitizer::safeHtmlOutput((string)$year) . '</th>';
         }
         $html .= '</tr>';
 
         // Second header row - round labels
         $html .= '<tr>';
         for ($i = 0; $i < 6; $i++) {
-            $html .= '<td>Round 1</td><td>Round 2</td>';
+            $html .= '<th>R1</th><th>R2</th>';
         }
         $html .= '</tr>';
 
@@ -130,18 +116,18 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
 
         $html = '<tr>';
 
-        // Team name cell
-        $html .= '<td style="background-color: #' . $color1 . ';">';
+        // Team name cell with team colors
+        $html .= '<td class="league-stats-team-cell" style="background-color: #' . $color1 . ';">';
         $html .= '<a href="../modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" ';
         $html .= 'style="color: #' . $color2 . ';">' . $teamCity . ' ' . $teamName . '</a>';
         $html .= '</td>';
 
-        // Pick cells
+        // Pick cells - highlight traded picks
         foreach ($team['picks'] as $pick) {
             $ownerOfPick = $pick['ownerofpick'] ?? '';
             $isOwn = ($ownerOfPick === $team['teamName']);
             $cellClass = $isOwn ? 'draft-pick-own' : 'draft-pick-traded';
-            
+
             $html .= '<td class="' . $cellClass . '">';
             $html .= HtmlSanitizer::safeHtmlOutput($ownerOfPick);
             $html .= '</td>';

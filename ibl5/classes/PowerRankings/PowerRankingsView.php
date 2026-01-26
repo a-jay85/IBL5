@@ -34,61 +34,13 @@ class PowerRankingsView implements PowerRankingsViewInterface
     /**
      * Generate CSS styles for the power rankings table
      *
-     * Power Rankings uses a card-style layout with integrated header.
+     * Styles are now in the design system (existing-components.css).
      *
-     * @return string CSS style block
+     * @return string Empty string - styles are centralized
      */
     private function getStyleBlock(): string
     {
-        return '<style>
-/* Power Rankings Card Container */
-.power-rankings-wrapper {
-    background: white;
-    border-radius: var(--radius-xl, 0.75rem);
-    overflow: hidden;
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
-    border: 1px solid var(--gray-100, #f3f4f6);
-    max-width: 600px;
-    margin: 0 auto 1.5rem;
-}
-/* Title integrated in card header */
-.power-rankings-title {
-    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-    padding: 0.875rem 1rem;
-    margin: 0;
-    font-family: var(--font-display, \'Barlow Condensed\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: white;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    text-align: center;
-}
-/* Specific cell overrides */
-.power-rank-cell {
-    font-weight: 600;
-    color: var(--navy-700, #334155);
-    width: 40px;
-}
-.power-logo-cell {
-    width: 50px;
-}
-.power-logo-cell img {
-    width: 32px;
-    height: 32px;
-    object-fit: contain;
-    border-radius: var(--radius-sm, 0.25rem);
-}
-.power-data-cell {
-    text-align: center;
-}
-/* Rating highlight */
-.power-rating {
-    font-family: var(--font-display, \'Barlow Condensed\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-weight: 700;
-    color: var(--accent-500, #f97316);
-}
-        </style>';
+        return '';
     }
 
     /**

@@ -43,47 +43,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
      */
     private function getStyleBlock(): string
     {
-        return '<style>
-/* Year navigation */
-.draft-nav {
-    text-align: center;
-    margin-bottom: 1.5rem;
-    font-family: var(--font-sans, \'Barlow\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
-    font-size: 1.125rem;
-    line-height: 2;
-}
-.draft-nav a {
-    color: var(--gray-600, #4b5563);
-    text-decoration: none;
-    padding: 0.25rem 0.5rem;
-    margin: 0 0.125rem;
-    border-radius: var(--radius-sm, 0.25rem);
-    transition: all 150ms ease;
-}
-.draft-nav a:hover {
-    color: var(--accent-600, #ea580c);
-    background-color: var(--accent-50, #fff7ed);
-}
-.draft-nav a.active {
-    color: white;
-    background-color: var(--accent-500, #f97316);
-    font-weight: 600;
-}
-/* Draft history specific */
-.draft-history-table {
-    max-width: 900px;
-}
-.draft-history-table .player-image {
-    height: 50px;
-    border-radius: var(--radius-sm, 0.25rem);
-}
-.draft-no-data {
-    text-align: center;
-    padding: 2rem;
-    color: var(--gray-500, #6b7280);
-    font-family: var(--font-sans, \'Barlow\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
-}
-</style>';
+        return ''; // All styles provided by .ibl-year-nav and .ibl-data-table
     }
 
     /**
@@ -107,7 +67,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
      */
     private function renderYearNavigation(int $startYear, int $endYear, int $selectedYear): string
     {
-        $output = '<div class="draft-nav">';
+        $output = '<div class="ibl-year-nav">';
 
         for ($year = $startYear; $year <= $endYear; $year++) {
             $activeClass = ($year === $selectedYear) ? ' class="active"' : '';

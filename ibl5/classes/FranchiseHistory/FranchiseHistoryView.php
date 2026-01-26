@@ -24,7 +24,7 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
         $html = $this->getStyleBlock();
         $html .= $this->renderTableHeader();
         $html .= $this->renderTableRows($franchiseData);
-        $html .= '</table>';
+        $html .= '</tbody></table>';
 
         return $html;
     }
@@ -36,22 +36,7 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
      */
     private function getStyleBlock(): string
     {
-        return '<style>
-            .franchise-table {
-                border: 1px solid #000;
-                border-collapse: collapse;
-            }
-            .franchise-table th, .franchise-table td {
-                border: 1px solid #000;
-                padding: 4px;
-            }
-            .franchise-table th {
-                background-color: #ddd;
-            }
-            .last-five-cell {
-                background-color: #ddd;
-            }
-        </style>';
+        return ''; // All styles provided by .ibl-data-table
     }
 
     /**
@@ -61,21 +46,24 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
      */
     private function renderTableHeader(): string
     {
-        return '<table class="sortable franchise-table">
+        return '<table class="sortable ibl-data-table">
+            <thead>
             <tr>
                 <th>Team</th>
                 <th>All-Time<br>Wins</th>
                 <th>All-Time<br>Losses</th>
                 <th>All-Time<br>Pct.</th>
-                <th class="last-five-cell">Last Five<br>Seasons<br>Wins</th>
-                <th class="last-five-cell">Last Five<br>Seasons<br>Losses</th>
-                <th class="last-five-cell">Last Five<br>Seasons<br>Pct.</th>
+                <th>Last Five<br>Seasons<br>Wins</th>
+                <th>Last Five<br>Seasons<br>Losses</th>
+                <th>Last Five<br>Seasons<br>Pct.</th>
                 <th>Playoffs</th>
                 <th>H.E.A.T.<br>Titles</th>
                 <th>Div.<br>Titles</th>
                 <th>Conf.<br>Titles</th>
                 <th>IBL<br>Titles</th>
-            </tr>';
+            </tr>
+            </thead>
+            <tbody>';
     }
 
     /**

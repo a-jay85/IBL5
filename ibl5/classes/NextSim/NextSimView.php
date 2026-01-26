@@ -40,14 +40,15 @@ class NextSimView implements NextSimViewInterface
     public function render(array $games, int $simLengthInDays): string
     {
         $html = $this->getStyleBlock();
-        $html .= '<div style="text-align: center;"><h1>Next Sim</h1></div>';
+        $html .= '<div class="next-sim-container">';
+        $html .= '<h1 class="next-sim-title">Next Sim</h1>';
 
         if (empty($games)) {
-            $html .= '<div style="text-align: center;">No games projected next sim!</div>';
+            $html .= '<div class="next-sim-empty">No games projected next sim!</div></div>';
             return $html;
         }
 
-        $html .= '<table style="width: 100%;" align="center">';
+        $html .= '<table style="width: 100%; margin: 0 auto;">';
 
         for ($i = 0; $i < $simLengthInDays; $i++) {
             if (isset($games[$i])) {
@@ -57,6 +58,7 @@ class NextSimView implements NextSimViewInterface
         }
 
         $html .= '</table>';
+        $html .= '</div>';
 
         return $html;
     }
@@ -64,25 +66,13 @@ class NextSimView implements NextSimViewInterface
     /**
      * Generate CSS styles for the next sim display
      *
-     * @return string CSS style block
+     * Styles are now in the design system (existing-components.css).
+     *
+     * @return string Empty string - styles are centralized
      */
     private function getStyleBlock(): string
     {
-        return '<style>
-            .next-sim-day-label {
-                text-align: right;
-                width: 150px;
-            }
-            .next-sim-logo {
-                text-align: center;
-                padding-left: 4px;
-                padding-right: 4px;
-            }
-            .next-sim-record {
-                text-align: left;
-                width: 150px;
-            }
-        </style>';
+        return '';
     }
 
     /**
@@ -104,18 +94,16 @@ class NextSimView implements NextSimViewInterface
         $opposingTeamId = (int)$opposingTeam->teamID;
         $seasonRecord = HtmlSanitizer::safeHtmlOutput($opposingTeam->seasonRecord);
 
-        $html = '<tr><td>';
-        $html .= '<table align="center">';
-        $html .= '<tr>';
-        $html .= '<td class="next-sim-day-label"><h2 title="' . $gameDate . '">' . $dayLabel . '</h2></td>';
-        $html .= '<td class="next-sim-logo">';
+        $html = '<tr><td class="next-sim-game">';
+        $html .= '<div class="next-sim-day-row">';
+        $html .= '<div class="next-sim-day-label"><h2 title="' . $gameDate . '">' . $dayLabel . '</h2></div>';
+        $html .= '<div class="next-sim-logo">';
         $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $opposingTeamId . '">';
         $html .= '<img src="./images/logo/' . $opposingTeamId . '.jpg" alt="Team Logo">';
         $html .= '</a>';
-        $html .= '</td>';
-        $html .= '<td class="next-sim-record"><h2>' . $seasonRecord . '</h2></td>';
-        $html .= '</tr>';
-        $html .= '</table>';
+        $html .= '</div>';
+        $html .= '<div class="next-sim-record"><h2>' . $seasonRecord . '</h2></div>';
+        $html .= '</div>';
         $html .= '</td></tr>';
 
         // Render matchup ratings

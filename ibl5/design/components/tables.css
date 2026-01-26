@@ -406,11 +406,11 @@
 }
 
 .ibl-stat-value--positive {
-    color: #16a34a;
+    color: var(--success-600, #16a34a);
 }
 
 .ibl-stat-value--negative {
-    color: #dc2626;
+    color: var(--error-600, #dc2626);
 }
 
 /* ==========================================================================
@@ -490,4 +490,23 @@
 
 .ibl-player-cell__team:hover {
     color: var(--accent-500);
+}
+
+/* ==========================================================================
+   Stat Highlight (orange accent for important values)
+   ========================================================================== */
+
+.ibl-stat-highlight {
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--accent-500);
+}
+
+/* ==========================================================================
+   Clinched/Status Indicators
+   ========================================================================== */
+
+.ibl-clinched-indicator {
+    color: var(--accent-600);
+    font-weight: 700;
 }

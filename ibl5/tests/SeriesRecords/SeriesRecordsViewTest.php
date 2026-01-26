@@ -111,7 +111,7 @@ class SeriesRecordsViewTest extends TestCase
 
         $this->assertStringContainsString('<td', $result);
         $this->assertStringContainsString('10 - 5', $result);
-        $this->assertStringContainsString('bgcolor="#8f8"', $result);
+        $this->assertStringContainsString('background-color: #8f8', $result);
     }
 
     public function testRenderRecordCellBoldsWhenRequired(): void
@@ -169,7 +169,8 @@ class SeriesRecordsViewTest extends TestCase
 
         $this->assertStringContainsString('<table', $result);
         $this->assertStringContainsString('</table>', $result);
-        $this->assertStringContainsString('class="sortable"', $result);
+        $this->assertStringContainsString('sortable', $result);
+        $this->assertStringContainsString('ibl-data-table', $result);
         $this->assertStringContainsString('Boston Celtics', $result);
         $this->assertStringContainsString('Los Angeles Lakers', $result);
     }

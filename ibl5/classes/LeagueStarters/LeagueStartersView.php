@@ -48,15 +48,15 @@ class LeagueStartersView implements LeagueStartersViewInterface
      */
     public function render(array $startersByPosition, \Team $userTeam): string
     {
-        $html = '<div style="text-align: center;"><h1>League Starters</h1></div>';
-        $html .= '<table style="width: 100%;" align="center">';
+        $html = '<div class="text-center"><h1 class="ibl-title">League Starters</h1></div>';
+        $html .= '<table style="width: 100%; margin: 0 auto;">';
 
         foreach (self::POSITION_LABELS as $position => $label) {
             $html .= '<tr><td>';
-            $html .= '<h2 style="text-align: center;">' . HtmlSanitizer::safeHtmlOutput($label) . '</h2>';
+            $html .= '<h2 class="ibl-table-title">' . HtmlSanitizer::safeHtmlOutput($label) . '</h2>';
             $html .= \UI::ratings($this->db, $startersByPosition[$position], $userTeam, '', $this->season, $this->moduleName);
             $html .= '</td></tr>';
-            $html .= '<tr style="height: 15px;"></tr>';
+            $html .= '<tr><td style="height: 15px;"></td></tr>';
         }
 
         $html .= '</table>';

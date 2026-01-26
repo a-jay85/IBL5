@@ -31,29 +31,13 @@ class InjuriesView implements InjuriesViewInterface
     /**
      * Get the CSS styles for the injuries table.
      *
-     * Uses consolidated .ibl-data-table from design system with minimal overrides.
+     * Styles are now in the design system (existing-components.css).
      *
-     * @return string CSS style block
+     * @return string Empty string - styles are centralized
      */
     private function getStyleBlock(): string
     {
-        return '<style>
-/* Injuries-specific overrides only */
-.injuries-table {
-    max-width: 600px;
-}
-.injuries-table .team-cell {
-    border-radius: var(--radius-sm, 0.25rem);
-    padding: 0.375rem 0.5rem;
-}
-.injuries-table .team-cell a {
-    font-weight: 600;
-}
-.injuries-table .days-cell {
-    font-weight: 600;
-    color: var(--accent-600, #ea580c);
-}
-</style>';
+        return '';
     }
 
     /**

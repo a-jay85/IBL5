@@ -31,22 +31,13 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
     /**
      * Get the CSS styles for the all-star appearances table.
      *
-     * Uses consolidated .ibl-data-table with allstar-specific overrides.
+     * Styles are now in the design system (existing-components.css).
      *
-     * @return string CSS style block
+     * @return string Empty string - styles are centralized
      */
     private function getStyleBlock(): string
     {
-        return '<style>
-/* All-star specific overrides */
-.allstar-table {
-    max-width: 500px;
-}
-.allstar-table td:last-child {
-    font-weight: 600;
-    color: var(--accent-600, #ea580c);
-}
-</style>';
+        return '';
     }
 
     /**

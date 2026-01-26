@@ -24,7 +24,7 @@ class CapInfoView implements CapInfoViewInterface
         $html = $this->getStyleBlock();
         $html .= $this->renderTableHeader($beginningYear, $endingYear);
         $html .= $this->renderTableRows($teamsData, $userTeamId);
-        $html .= '</table>';
+        $html .= '</tbody></table>';
 
         return $html;
     }
@@ -36,26 +36,7 @@ class CapInfoView implements CapInfoViewInterface
      */
     private function getStyleBlock(): string
     {
-        return '<style>
-            .cap-table {
-                border: 1px solid #000;
-                border-collapse: collapse;
-            }
-            .cap-table th, .cap-table td {
-                border: 1px solid #000;
-                padding: 4px;
-                text-align: center;
-            }
-            .cap-table th {
-                background-color: #ddd;
-            }
-            .cap-divider {
-                background-color: #AAA;
-            }
-            .cap-highlight {
-                background-color: #FFFFAA;
-            }
-        </style>';
+        return ''; // All styles provided by .ibl-data-table with .divider and .highlight row classes
     }
 
     /**
@@ -67,8 +48,8 @@ class CapInfoView implements CapInfoViewInterface
      */
     private function renderTableHeader(int $beginningYear, int $endingYear): string
     {
-        $html = '<table class="sortable cap-table">';
-        $html .= '<tr>';
+        $html = '<table class="sortable ibl-data-table">';
+        $html .= '<thead><tr>';
         $html .= '<th>Team</th>';
 
         // Year columns (6 years)
@@ -79,7 +60,7 @@ class CapInfoView implements CapInfoViewInterface
             $html .= HtmlSanitizer::safeHtmlOutput($yearEnd) . '<br>Total</th>';
         }
 
-        $html .= '<td class="cap-divider"></td>';
+        $html .= '<th class="divider"></th>';
 
         // Position columns (current year only)
         foreach (\JSB::PLAYER_POSITIONS as $position) {
@@ -88,11 +69,11 @@ class CapInfoView implements CapInfoViewInterface
             $html .= HtmlSanitizer::safeHtmlOutput($position) . '</th>';
         }
 
-        $html .= '<td class="cap-divider"></td>';
+        $html .= '<th class="divider"></th>';
         $html .= '<th>FA Slots</th>';
         $html .= '<th>Has MLE</th>';
         $html .= '<th>Has LLE</th>';
-        $html .= '</tr>';
+        $html .= '</tr></thead><tbody>';
 
         return $html;
     }
@@ -125,7 +106,7 @@ class CapInfoView implements CapInfoViewInterface
     private function renderTeamRow(array $teamData, ?int $userTeamId): string
     {
         $isUserTeam = ($userTeamId !== null && $teamData['teamId'] === $userTeamId);
-        $highlightClass = $isUserTeam ? ' class="cap-highlight"' : '';
+        $highlightClass = $isUserTeam ? ' class="highlight"' : '';
         
         $color1 = HtmlSanitizer::safeHtmlOutput($teamData['color1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($teamData['color2']);
@@ -149,7 +130,7 @@ class CapInfoView implements CapInfoViewInterface
             $html .= '</td>';
         }
 
-        $html .= '<td class="cap-divider"></td>';
+        $html .= '<td class="divider"></td>';
 
         // Position salary columns
         foreach (\JSB::PLAYER_POSITIONS as $position) {
@@ -158,7 +139,7 @@ class CapInfoView implements CapInfoViewInterface
             $html .= '</td>';
         }
 
-        $html .= '<td class="cap-divider"></td>';
+        $html .= '<td class="divider"></td>';
 
         // FA Slots
         $html .= '<td' . $highlightClass . '>';

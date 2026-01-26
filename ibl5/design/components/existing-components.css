@@ -948,6 +948,62 @@
     }
 }
 
+/* ==========================================================================
+   Title Hierarchy
+
+   Unified title system for all headings:
+   - .ibl-title: Base title (1.5rem, uppercase, orange underline)
+   - .ibl-title--large: Larger variant (2rem)
+   - .ibl-title--centered: Centered text, no underline
+   - .ibl-section-title: Alias for .ibl-title--large with accent line
+   ========================================================================== */
+
+.ibl-title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--navy-900);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: var(--space-6) 0 var(--space-3) 0;
+    padding-bottom: var(--space-1);
+    border-bottom: 2px solid var(--accent-500);
+    display: inline-block;
+}
+
+.ibl-title:first-child {
+    margin-top: 0;
+}
+
+.ibl-title--large {
+    font-size: 2rem;
+    letter-spacing: 0.025em;
+    margin-bottom: var(--space-6);
+    padding-bottom: var(--space-4);
+    border-bottom: 2px solid var(--gray-200);
+    display: block;
+    position: relative;
+}
+
+.ibl-title--large::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 60px;
+    height: 2px;
+    background: var(--accent-500);
+}
+
+.ibl-title--centered {
+    text-align: center;
+    display: block;
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: var(--space-4);
+}
+
+/* Legacy alias - use .ibl-title--large for new code */
 .ibl-section-title {
     font-family: var(--font-display);
     font-size: 2rem;
@@ -969,6 +1025,69 @@
     width: 60px;
     height: 2px;
     background: var(--accent-500);
+}
+
+/* ==========================================================================
+   Year/Item Navigation (draft years, seasons, etc.)
+   ========================================================================== */
+
+.ibl-year-nav {
+    text-align: center;
+    margin-bottom: var(--space-6);
+    font-family: var(--font-sans);
+    font-size: 1.125rem;
+    line-height: 2;
+}
+
+.ibl-year-nav a {
+    color: var(--gray-600);
+    text-decoration: none;
+    padding: var(--space-1) var(--space-2);
+    margin: 0 2px;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.ibl-year-nav a:hover {
+    color: var(--accent-600);
+    background-color: var(--accent-100);
+}
+
+.ibl-year-nav a.active {
+    color: white;
+    background-color: var(--accent-500);
+    font-weight: 600;
+}
+
+/* ==========================================================================
+   Responsive Grid Layouts
+   ========================================================================== */
+
+.ibl-grid {
+    display: grid;
+    gap: var(--space-6);
+    margin-bottom: var(--space-8);
+}
+
+.ibl-grid--3col {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.ibl-grid--2col {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 1024px) {
+    .ibl-grid--3col {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .ibl-grid--3col,
+    .ibl-grid--2col {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* Empty State */
@@ -1683,4 +1802,663 @@ a.schedule-jump-btn:hover {
     .schedule-game__streak {
         font-size: 0.75rem;
     }
+}
+
+/* ==========================================================================
+   Draft Module
+   ========================================================================== */
+
+.draft-container {
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.draft-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.draft-team-logo {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+    margin-bottom: 0.75rem;
+}
+
+.draft-title {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--navy-900);
+    margin: 0;
+}
+
+.draft-error {
+    background: var(--error-100);
+    border: 1px solid #fecaca;
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    color: #991b1b;
+    margin-bottom: 1rem;
+}
+
+.draft-error a {
+    color: #991b1b;
+    font-weight: 500;
+}
+
+.draft-table input[type="radio"] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--accent-500);
+}
+
+.draft-submit-container {
+    text-align: center;
+    margin-top: 1rem;
+}
+
+.draft-submit-btn {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 1rem 2rem;
+    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.draft-submit-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.draft-submit-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* ==========================================================================
+   Draft Pick Locator Module
+   ========================================================================== */
+
+.draft-pick-locator-container {
+    text-align: center;
+}
+
+.draft-pick-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    margin: 0 auto;
+}
+
+.draft-pick-table th,
+.draft-pick-table td {
+    border: 1px solid var(--gray-200);
+    padding: 0.5rem 0.75rem;
+    text-align: center;
+    font-size: 0.875rem;
+}
+
+.draft-pick-table th {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.draft-pick-own {
+    background-color: var(--gray-100);
+}
+
+.draft-pick-traded {
+    background-color: var(--error-100);
+    color: var(--error-600);
+    font-weight: 600;
+}
+
+.draft-pick-title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--navy-900);
+    text-align: center;
+    margin-bottom: var(--space-2);
+}
+
+.draft-pick-description {
+    text-align: center;
+    color: var(--gray-600);
+    margin-bottom: var(--space-6);
+}
+
+/* ==========================================================================
+   All-Star Appearances Module
+   ========================================================================== */
+
+.allstar-table {
+    max-width: 500px;
+}
+
+.allstar-table td:last-child {
+    font-weight: 600;
+    color: var(--accent-600);
+}
+
+/* ==========================================================================
+   Next Sim Module
+   ========================================================================== */
+
+.next-sim-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.next-sim-title {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--navy-900);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: center;
+    margin-bottom: var(--space-6);
+}
+
+.next-sim-empty {
+    text-align: center;
+    color: var(--gray-500);
+    font-size: 1.125rem;
+    padding: var(--space-8);
+}
+
+.next-sim-game {
+    margin-bottom: var(--space-6);
+}
+
+.next-sim-day-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-4);
+    margin-bottom: var(--space-3);
+}
+
+.next-sim-day-label {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--navy-800);
+    text-align: right;
+    min-width: 150px;
+}
+
+.next-sim-day-label h2 {
+    margin: 0;
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+.next-sim-logo {
+    text-align: center;
+    padding: 0 var(--space-2);
+}
+
+.next-sim-logo img {
+    max-width: 80px;
+    height: auto;
+    border-radius: var(--radius-md);
+}
+
+.next-sim-record {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--navy-800);
+    text-align: left;
+    min-width: 150px;
+}
+
+.next-sim-record h2 {
+    margin: 0;
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+/* ==========================================================================
+   Contact List Module
+   ========================================================================== */
+
+.contact-description {
+    font-family: var(--font-sans);
+    font-size: 1.125rem;
+    color: var(--gray-600);
+    text-align: center;
+    margin: 0 0 1.5rem 0;
+}
+
+.contact-table {
+    max-width: 800px;
+}
+
+.contact-table .team-cell {
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+}
+
+.contact-table .team-cell a {
+    font-weight: 600;
+}
+
+.contact-table .gm-cell a {
+    color: var(--gray-700);
+}
+
+.contact-table .gm-cell a:hover {
+    color: var(--accent-600);
+}
+
+/* ==========================================================================
+   Power Rankings Module
+   ========================================================================== */
+
+.power-rankings-wrapper {
+    background: white;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+    max-width: 600px;
+    margin: 0 auto 1.5rem;
+}
+
+.power-rankings-title {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    padding: 0.875rem 1rem;
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: center;
+}
+
+.power-rank-cell {
+    font-weight: 600;
+    color: var(--navy-700);
+    width: 40px;
+}
+
+.power-logo-cell {
+    width: 50px;
+}
+
+.power-logo-cell img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+}
+
+.power-data-cell {
+    text-align: center;
+}
+
+.power-rating {
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--accent-500);
+}
+
+/* ==========================================================================
+   Injuries Module
+   ========================================================================== */
+
+.injuries-table {
+    max-width: 600px;
+}
+
+.injuries-table .team-cell {
+    border-radius: var(--radius-sm);
+    padding: 0.375rem 0.5rem;
+}
+
+.injuries-table .team-cell a {
+    font-weight: 600;
+}
+
+.injuries-table .days-cell {
+    font-weight: 600;
+    color: var(--accent-600);
+}
+
+/* ==========================================================================
+   Waivers Module
+   ========================================================================== */
+
+.waivers-error {
+    color: var(--error-600);
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: var(--space-4);
+}
+
+.waivers-form {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.waivers-form-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+}
+
+.waivers-form-header {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    padding: var(--space-3) var(--space-4);
+    color: white;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: center;
+}
+
+.waivers-form-body {
+    padding: var(--space-4);
+}
+
+.waivers-team-title {
+    font-weight: 700;
+    text-decoration: underline;
+    margin-bottom: var(--space-2);
+    text-align: center;
+}
+
+.waivers-select {
+    width: 100%;
+    padding: var(--space-2);
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    margin-bottom: var(--space-4);
+}
+
+.waivers-submit-btn {
+    display: block;
+    width: 100%;
+    padding: var(--space-3);
+    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+    color: white;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.waivers-submit-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+/* ==========================================================================
+   Depth Chart Module
+   ========================================================================== */
+
+.depth-chart-logo {
+    text-align: center;
+    margin-bottom: var(--space-4);
+}
+
+.depth-chart-logo img {
+    max-width: 120px;
+    height: auto;
+}
+
+.depth-chart-form {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.depth-chart-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    margin: 0 auto;
+    width: 100%;
+}
+
+.depth-chart-table th {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: var(--space-2) var(--space-3);
+    text-align: center;
+}
+
+.depth-chart-table td {
+    padding: var(--space-2);
+    text-align: center;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.depth-chart-table tbody tr:nth-child(odd) {
+    background-color: white;
+}
+
+.depth-chart-table tbody tr:nth-child(even) {
+    background-color: var(--gray-50);
+}
+
+.depth-chart-table select {
+    padding: 0.25rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+}
+
+.depth-chart-buttons {
+    text-align: center;
+    padding: var(--space-4);
+    background: var(--gray-50);
+}
+
+.depth-chart-reset-btn {
+    background-color: var(--gray-200);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-400);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    margin-right: var(--space-4);
+}
+
+.depth-chart-submit-btn {
+    background: linear-gradient(135deg, var(--success-500), var(--success-600));
+    color: white;
+    border: none;
+    padding: var(--space-2) var(--space-6);
+    border-radius: var(--radius-md);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* ==========================================================================
+   Compare Players Module
+   ========================================================================== */
+
+.compare-players-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    margin: 0 auto var(--space-6);
+}
+
+.compare-players-table caption {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--navy-900);
+    text-align: center;
+    margin-bottom: var(--space-2);
+}
+
+.compare-players-table th {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 600;
+    padding: var(--space-2) var(--space-3);
+    text-align: center;
+}
+
+.compare-players-table td,
+.compare-players-table tbody th {
+    padding: var(--space-2) var(--space-3);
+    text-align: center;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.compare-players-table tbody tr:nth-child(odd) {
+    background-color: white;
+}
+
+.compare-players-table tbody tr:nth-child(even) {
+    background-color: var(--gray-50);
+}
+
+/* ==========================================================================
+   League Stats Module
+   ========================================================================== */
+
+.league-stats-container {
+    text-align: center;
+}
+
+.league-stats-title {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--navy-900);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-6);
+}
+
+.league-stats-subtitle {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--navy-800);
+    text-transform: uppercase;
+    margin: var(--space-6) 0 var(--space-3);
+}
+
+.league-stats-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    margin: 0 auto var(--space-6);
+    width: auto;
+}
+
+.league-stats-table th {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 600;
+    padding: var(--space-2) var(--space-3);
+    text-align: center;
+}
+
+.league-stats-table td {
+    padding: var(--space-2) var(--space-3);
+    text-align: right;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.league-stats-table tbody tr:nth-child(odd) {
+    background-color: white;
+}
+
+.league-stats-table tbody tr:nth-child(even) {
+    background-color: var(--gray-50);
+}
+
+.league-stats-table tbody tr:hover {
+    background-color: var(--gray-100);
+}
+
+.league-stats-table tfoot tr {
+    background-color: var(--navy-100, #e0e7ff);
+    font-weight: 700;
+}
+
+.league-stats-user-row {
+    background-color: var(--warning-100) !important;
+}
+
+.league-stats-team-cell {
+    text-align: left !important;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+}
+
+.league-stats-team-cell a {
+    font-weight: 600;
+    text-decoration: none;
+}
+
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
+
+.text-center {
+    text-align: center;
+}
+
+.text-error {
+    color: var(--error-600);
+}
+
+.text-success {
+    color: var(--success-600);
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+.underline {
+    text-decoration: underline;
 }

@@ -29,47 +29,33 @@ class WaiversView implements WaiversViewInterface
         ob_start();
         ?>
         <?php if ($errorMessage): ?>
-            <center>
-            <font color="red"><b><?= htmlspecialchars($errorMessage, ENT_QUOTES, 'UTF-8') ?></b></font>
-            </center>
+            <div class="waivers-error"><?= htmlspecialchars($errorMessage, ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>
-        <form name="Waiver_Move" method="post" action="">
+        <form name="Waiver_Move" method="post" action="" class="waivers-form">
             <input type="hidden" name="Team_Name" value="<?= $teamNameEscaped ?>">
-            <center>
-            <img src="images/logo/<?= $teamID ?>.jpg"><br>
-            <table border="1" cellspacing="0" cellpadding="0">
-                <tr>
-                <th colspan="3">
-                    <center>
-                    WAIVER WIRE - YOUR TEAM CURRENTLY HAS <?= $openRosterSpots ?> EMPTY ROSTER SPOTS and <?= $healthyOpenRosterSpots ?> HEALTHY ROSTER SPOTS
-                    </center>
-                </th>
-                </tr>
-                <tr>
-                <td valign="top">
-                    <center>
-                    <b><u><?= $teamNameEscaped ?></u></b>
-                    <select name="Player_ID">
-                        <option value="">Select player...</option>
-                        <?php foreach ($players as $optionHtml): ?>
-                        <?= $optionHtml ?>
-                        <?php endforeach; ?>
-                    </select>
-                    </center>
-                </td>
-                </tr>
-                <input type="hidden" name="Action" value="<?= $actionEscaped ?>">
-                <input type="hidden" name="rosterslots" value="<?= $openRosterSpots ?>">
-                <input type="hidden" name="healthyrosterslots" value="<?= $healthyOpenRosterSpots ?>">
-                <tr>
-                <td colspan="3">
-                    <center>
-                    <input type="submit" value="Click to <?= $actionEscaped ?> player(s) to/from Waiver Pool" onclick="this.disabled=true;this.value='Submitting...'; this.form.submit();">
-                    </center>
-                </td>
-                </tr>
-            </table>
-            </center>
+            <div class="text-center">
+                <img src="images/logo/<?= $teamID ?>.jpg" alt="Team Logo" style="margin-bottom: 1rem;"><br>
+                <div class="waivers-form-card">
+                    <div class="waivers-form-header">
+                        WAIVER WIRE - <?= $openRosterSpots ?> EMPTY ROSTER SPOTS / <?= $healthyOpenRosterSpots ?> HEALTHY ROSTER SPOTS
+                    </div>
+                    <div class="waivers-form-body">
+                        <div class="waivers-team-title"><?= $teamNameEscaped ?></div>
+                        <select name="Player_ID" class="waivers-select">
+                            <option value="">Select player...</option>
+                            <?php foreach ($players as $optionHtml): ?>
+                            <?= $optionHtml ?>
+                            <?php endforeach; ?>
+                        </select>
+                        <input type="hidden" name="Action" value="<?= $actionEscaped ?>">
+                        <input type="hidden" name="rosterslots" value="<?= $openRosterSpots ?>">
+                        <input type="hidden" name="healthyrosterslots" value="<?= $healthyOpenRosterSpots ?>">
+                        <button type="submit" class="waivers-submit-btn" onclick="this.disabled=true;this.textContent='Submitting...'; this.form.submit();">
+                            Click to <?= $actionEscaped ?> player(s) to/from Waiver Pool
+                        </button>
+                    </div>
+                </div>
+            </div>
         </form>
         <?php
         echo ob_get_clean();
@@ -104,7 +90,7 @@ class WaiversView implements WaiversViewInterface
         \Nuke\Header::header();
         OpenTable();
         \UI::displaytopmenu($GLOBALS['db'], 0);
-        echo "<center><font class=\"title\"><b>" . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . "</b></font></center>";
+        echo '<div class="text-center"><strong class="ibl-title">' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</strong></div>';
         loginbox();
         CloseTable();
         \Nuke\Footer::footer();

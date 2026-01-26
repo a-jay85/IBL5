@@ -37,30 +37,30 @@ class LeagueStatsView implements LeagueStatsViewInterface
         $league = $data['league'] ?? [];
         $differentials = $data['differentials'] ?? [];
 
-        $html = '<center>';
-        $html .= '<h1>League-wide Statistics</h1>';
+        $html = '<div class="league-stats-container">';
+        $html .= '<h1 class="league-stats-title">League-wide Statistics</h1>';
 
         // Team Offense Totals
-        $html .= '<h2>Team Offense Totals</h2>';
+        $html .= '<h2 class="league-stats-subtitle">Team Offense Totals</h2>';
         $html .= $this->renderTotalsTable($teams, 'offense_totals', 'Offense', $userTeamId, $league['totals'] ?? []);
 
         // Team Defense Totals
-        $html .= '<h2>Team Defense Totals</h2>';
+        $html .= '<h2 class="league-stats-subtitle">Team Defense Totals</h2>';
         $html .= $this->renderTotalsTable($teams, 'defense_totals', 'Defense', $userTeamId, $league['totals'] ?? []);
 
         // Team Offense Averages
-        $html .= '<h2>Team Offense Averages</h2>';
+        $html .= '<h2 class="league-stats-subtitle">Team Offense Averages</h2>';
         $html .= $this->renderAveragesTable($teams, 'offense_averages', 'Offense', $userTeamId, $league['averages'] ?? []);
 
         // Team Defense Averages
-        $html .= '<h2>Team Defense Averages</h2>';
+        $html .= '<h2 class="league-stats-subtitle">Team Defense Averages</h2>';
         $html .= $this->renderAveragesTable($teams, 'defense_averages', 'Defense', $userTeamId, $league['averages'] ?? []);
 
         // Offense/Defense Differentials
-        $html .= '<h2>Team Off/Def Average Differentials</h2>';
+        $html .= '<h2 class="league-stats-subtitle">Team Off/Def Average Differentials</h2>';
         $html .= $this->renderDifferentialsTable($differentials, $userTeamId);
 
-        $html .= '</center>';
+        $html .= '</div>';
 
         return $html;
     }
@@ -82,7 +82,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
         int $userTeamId,
         array $leagueTotals
     ): string {
-        $html = '<table class="sortable">';
+        $html = '<table class="sortable league-stats-table ibl-data-table">';
         $html .= '<thead>' . $this->getTotalsHeaderRow() . '</thead>';
         $html .= '<tbody>';
 
@@ -115,7 +115,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
         int $userTeamId,
         array $leagueAverages
     ): string {
-        $html = '<table class="sortable">';
+        $html = '<table class="sortable league-stats-table ibl-data-table">';
         $html .= '<thead>' . $this->getAveragesHeaderRow() . '</thead>';
         $html .= '<tbody>';
 
@@ -140,7 +140,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
      */
     private function renderDifferentialsTable(array $differentials, int $userTeamId): string
     {
-        $html = '<table class="sortable">';
+        $html = '<table class="sortable league-stats-table ibl-data-table">';
         $html .= '<thead>' . $this->getAveragesHeaderRow() . '</thead>';
         $html .= '<tbody>';
 
@@ -383,9 +383,9 @@ class LeagueStatsView implements LeagueStatsViewInterface
     private function getRowTag(int $teamId, int $userTeamId): string
     {
         if ($teamId === $userTeamId) {
-            return '<tr bgcolor="#FFA" align="right">';
+            return '<tr class="league-stats-user-row">';
         }
-        return '<tr align="right">';
+        return '<tr>';
     }
 
     /**
@@ -403,10 +403,8 @@ class LeagueStatsView implements LeagueStatsViewInterface
         $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
 
-        return '<td bgcolor="' . $color1 . '">
-            <a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '">
-                <font color="' . $color2 . '">' . $city . ' ' . $name . ' ' . $label . '</font>
-            </a>
+        return '<td class="league-stats-team-cell" style="background-color: #' . $color1 . ';">
+            <a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" style="color: #' . $color2 . ';">' . $city . ' ' . $name . ' ' . $label . '</a>
         </td>';
     }
 }

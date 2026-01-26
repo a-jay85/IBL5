@@ -35,33 +35,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
      */
     private function getStyleBlock(): string
     {
-        return '<style>
-/* Season highs layout grid */
-.season-highs-container {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
-@media (max-width: 1024px) {
-    .season-highs-container {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-@media (max-width: 640px) {
-    .season-highs-container {
-        grid-template-columns: 1fr;
-    }
-}
-/* Stat table specific overrides */
-.stat-table th[colspan="4"] {
-    font-size: 1rem;
-    padding: 0.75rem 0.5rem;
-}
-.stat-table .value-cell {
-    font-weight: 600;
-}
-</style>';
+        return ''; // All styles provided by .ibl-grid and .ibl-data-table
     }
 
     /**
@@ -74,7 +48,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
     private function renderPlayerHighs(string $seasonPhase, array $playerHighs): string
     {
         $output = '<h1 class="ibl-table-title">Players\' ' . HtmlSanitizer::safeHtmlOutput($seasonPhase) . ' Highs</h1>';
-        $output .= '<div class="season-highs-container">';
+        $output .= '<div class="ibl-grid ibl-grid--3col">';
 
         foreach ($playerHighs as $statName => $stats) {
             $output .= $this->renderStatTable($statName, $stats);
@@ -94,7 +68,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
     private function renderTeamHighs(string $seasonPhase, array $teamHighs): string
     {
         $output = '<h1 class="ibl-table-title">Teams\' ' . HtmlSanitizer::safeHtmlOutput($seasonPhase) . ' Highs</h1>';
-        $output .= '<div class="season-highs-container">';
+        $output .= '<div class="ibl-grid ibl-grid--3col">';
 
         foreach ($teamHighs as $statName => $stats) {
             $output .= $this->renderStatTable($statName, $stats);

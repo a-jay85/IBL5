@@ -25,11 +25,11 @@ class DepthChartView implements DepthChartViewInterface
     public function renderTeamLogo(int $teamID): void
     {
         global $leagueContext;
-        
+
         $leagueConfig = $leagueContext->getConfig();
         $imagesPath = $leagueConfig['images_path'];
 
-        echo "<center><img src=\"./{$imagesPath}logo/$teamID.jpg\"></center><br>";
+        echo '<div class="depth-chart-logo"><img src="./' . $imagesPath . 'logo/' . $teamID . '.jpg" alt="Team Logo"></div>';
 
         return;
     }
@@ -116,29 +116,33 @@ class DepthChartView implements DepthChartViewInterface
      */
     public function renderFormHeader(string $teamLogo, int $teamID, array $slotNames): void
     {
-        echo "<form name=\"Depth_Chart\" method=\"post\" action=\"modules.php?name=Depth_Chart_Entry&op=submit\">
-            <input type=\"hidden\" name=\"Team_Name\" value=\"$teamLogo\">";
+        $teamLogoEscaped = HtmlSanitizer::safeHtmlOutput($teamLogo);
+        echo '<form name="Depth_Chart" method="post" action="modules.php?name=Depth_Chart_Entry&amp;op=submit" class="depth-chart-form">
+            <input type="hidden" name="Team_Name" value="' . $teamLogoEscaped . '">';
 
-        echo "<p><center><table>
-            <tr>
-                <th colspan=14><center>DEPTH CHART ENTRY</center></th>
-            </tr>
-            <tr>
-                <th>Pos</th>
-                <th>Player</th>
-                <th>{$slotNames[0]}</th>
-                <th>{$slotNames[1]}</th>
-                <th>{$slotNames[2]}</th>
-                <th>{$slotNames[3]}</th>
-                <th>{$slotNames[4]}</th>
-                <th>active</th>
-                <th>min</th>
-                <th>OF</th>
-                <th>DF</th>
-                <th>OI</th>
-                <th>DI</th>
-                <th>BH</th>
-            </tr>";
+        echo '<div class="text-center"><table class="depth-chart-table ibl-data-table">
+            <thead>
+                <tr>
+                    <th colspan="14">DEPTH CHART ENTRY</th>
+                </tr>
+                <tr>
+                    <th>Pos</th>
+                    <th>Player</th>
+                    <th>' . HtmlSanitizer::safeHtmlOutput($slotNames[0]) . '</th>
+                    <th>' . HtmlSanitizer::safeHtmlOutput($slotNames[1]) . '</th>
+                    <th>' . HtmlSanitizer::safeHtmlOutput($slotNames[2]) . '</th>
+                    <th>' . HtmlSanitizer::safeHtmlOutput($slotNames[3]) . '</th>
+                    <th>' . HtmlSanitizer::safeHtmlOutput($slotNames[4]) . '</th>
+                    <th>active</th>
+                    <th>min</th>
+                    <th>OF</th>
+                    <th>DF</th>
+                    <th>OI</th>
+                    <th>DI</th>
+                    <th>BH</th>
+                </tr>
+            </thead>
+            <tbody>';
     }
 
     /**
@@ -253,12 +257,16 @@ function resetDepthChart() {
 JAVASCRIPT;
 
         echo $resetScript;
-        echo "<tr>
-            <th colspan=14>
-                <input type=\"button\" value=\"Reset\" onclick=\"resetDepthChart();\" style=\"margin-right: 20px; background-color: #f0f0f0; color: #666; border: 1px solid #999; padding: 6px 12px; cursor: pointer;\">
-                <input type=\"submit\" value=\"Submit Depth Chart\" style=\"background-color: #28a745; color: white; border: 2px solid #1e7e34; padding: 8px 20px; cursor: pointer; font-weight: bold;\">
-            </th>
-        </tr></form></table></center>";
+        echo '</tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="14" class="depth-chart-buttons">
+                        <input type="button" value="Reset" onclick="resetDepthChart();" class="depth-chart-reset-btn">
+                        <input type="submit" value="Submit Depth Chart" class="depth-chart-submit-btn">
+                    </td>
+                </tr>
+            </tfoot>
+        </table></div></form>';
     }
 
     /**
@@ -271,44 +279,44 @@ JAVASCRIPT;
         string $errorHtml = ''
     ): void {
         if (!$success) {
-            echo "<center><u>Your lineup has <b>not</b> been submitted:</u></center><br>";
+            echo '<div class="text-center"><span class="underline">Your lineup has <strong>not</strong> been submitted:</span></div><br>';
             echo $errorHtml;
         } else {
-            echo "<center><u>Your depth chart has been submitted and e-mailed successfully. Thank you.</u></center><p>";
+            echo '<div class="text-center"><span class="underline">Your depth chart has been submitted and e-mailed successfully. Thank you.</span></div><p>';
         }
 
-        echo "$teamName Depth Chart Submission<br><table>";
-        echo "<tr>
-            <td><b>Name</td>";
+        echo HtmlSanitizer::safeHtmlOutput($teamName) . ' Depth Chart Submission<br><table class="ibl-data-table">';
+        echo '<thead><tr>
+            <th>Name</th>';
         foreach (\JSB::PLAYER_POSITIONS as $position) {
-            echo "<td><b>$position</td>";
+            echo '<th>' . HtmlSanitizer::safeHtmlOutput($position) . '</th>';
         }
-        echo "<td><b>Active</td>
-            <td><b>Min</td>
-            <td><b>OF</td>
-            <td><b>DF</td>
-            <td><b>OI</td>
-            <td><b>DI</td>
-            <td><b>BH</td>
-        </tr>";
+        echo '<th>Active</th>
+            <th>Min</th>
+            <th>OF</th>
+            <th>DF</th>
+            <th>OI</th>
+            <th>DI</th>
+            <th>BH</th>
+        </tr></thead><tbody>';
 
         foreach ($playerData as $player) {
-            echo "<tr>
-                <td>{$player['name']}</td>";
+            echo '<tr>
+                <td>' . HtmlSanitizer::safeHtmlOutput($player['name']) . '</td>';
             foreach (\JSB::PLAYER_POSITIONS as $position) {
                 $posKey = strtolower($position);
-                echo "<td>{$player[$posKey]}</td>";
+                echo '<td>' . HtmlSanitizer::safeHtmlOutput((string)$player[$posKey]) . '</td>';
             }
-            echo "<td>{$player['active']}</td>
-                <td>{$player['min']}</td>
-                <td>{$player['of']}</td>
-                <td>{$player['df']}</td>
-                <td>{$player['oi']}</td>
-                <td>{$player['di']}</td>
-                <td>{$player['bh']}</td>
-            </tr>";
+            echo '<td>' . HtmlSanitizer::safeHtmlOutput((string)$player['active']) . '</td>
+                <td>' . HtmlSanitizer::safeHtmlOutput((string)$player['min']) . '</td>
+                <td>' . HtmlSanitizer::safeHtmlOutput((string)$player['of']) . '</td>
+                <td>' . HtmlSanitizer::safeHtmlOutput((string)$player['df']) . '</td>
+                <td>' . HtmlSanitizer::safeHtmlOutput((string)$player['oi']) . '</td>
+                <td>' . HtmlSanitizer::safeHtmlOutput((string)$player['di']) . '</td>
+                <td>' . HtmlSanitizer::safeHtmlOutput((string)$player['bh']) . '</td>
+            </tr>';
         }
 
-        echo "</table>";
+        echo '</tbody></table>';
     }
 }

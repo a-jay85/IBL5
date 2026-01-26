@@ -375,34 +375,13 @@ class InjuriesIntegrationTest extends IntegrationTestCase
     }
 
     // ============================================
-    // VIEW RENDERING - CSS STYLE BLOCK TESTS
+    // VIEW RENDERING - CSS DESIGN SYSTEM TESTS
     // ============================================
-
-    /**
-     * Test render includes CSS style block
-     */
-    public function testRenderIncludesCssStyleBlock(): void
-    {
-        $result = $this->view->render([]);
-
-        $this->assertStringContainsString('<style>', $result);
-        $this->assertStringContainsString('</style>', $result);
-    }
-
-    /**
-     * Test render CSS includes injuries-table class
-     */
-    public function testRenderCssIncludesInjuriesTableClass(): void
-    {
-        $result = $this->view->render([]);
-
-        $this->assertStringContainsString('.injuries-table', $result);
-    }
 
     /**
      * Test render uses design system CSS classes for styling
      *
-     * Styling is now handled by the design system (design/components/tables.css)
+     * Styling is now handled by the design system (design/components/existing-components.css)
      * rather than inline CSS. Row alternation, hover effects, fonts, and colors
      * are all inherited from the ibl-data-table class.
      */
@@ -412,7 +391,7 @@ class InjuriesIntegrationTest extends IntegrationTestCase
 
         // Design system provides hover effects, fonts, and colors via this class
         $this->assertStringContainsString('ibl-data-table', $result);
-        // Module-specific styling via injuries-table class
+        // Module-specific styling via injuries-table class (defined in design system)
         $this->assertStringContainsString('injuries-table', $result);
     }
 

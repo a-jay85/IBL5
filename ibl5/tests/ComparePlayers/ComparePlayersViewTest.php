@@ -191,9 +191,9 @@ class ComparePlayersViewTest extends TestCase
         $comparisonData = $this->getValidComparisonData();
         $result = $this->view->renderComparisonResults($comparisonData);
 
-        $this->assertStringContainsString('class="sortable"', $result);
-        $this->assertStringContainsString('border="1"', $result);
-        $this->assertStringContainsString('cellspacing="0"', $result);
+        $this->assertStringContainsString('sortable', $result);
+        $this->assertStringContainsString('compare-players-table', $result);
+        $this->assertStringContainsString('ibl-data-table', $result);
         $this->assertStringContainsString('<colgroup>', $result);
         $this->assertStringContainsString('background-color: #ddd', $result);
     }

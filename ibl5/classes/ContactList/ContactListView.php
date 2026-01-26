@@ -32,38 +32,13 @@ class ContactListView implements ContactListViewInterface
     /**
      * Get the CSS styles for the contact list table.
      *
-     * Uses consolidated .ibl-data-table with contact-specific overrides.
+     * Styles are now in the design system (existing-components.css).
      *
-     * @return string CSS style block
+     * @return string Empty string - styles are centralized
      */
     private function getStyleBlock(): string
     {
-        return '<style>
-/* Contact list specific overrides */
-.contact-description {
-    font-family: var(--font-sans, \'Barlow\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
-    font-size: 1.125rem;
-    color: var(--gray-600, #4b5563);
-    text-align: center;
-    margin: 0 0 1.5rem 0;
-}
-.contact-table {
-    max-width: 800px;
-}
-.contact-table .team-cell {
-    border-radius: var(--radius-sm, 0.25rem);
-    padding: 0.5rem 0.75rem;
-}
-.contact-table .team-cell a {
-    font-weight: 600;
-}
-.contact-table .gm-cell a {
-    color: var(--gray-700, #374151);
-}
-.contact-table .gm-cell a:hover {
-    color: var(--accent-600, #ea580c);
-}
-</style>';
+        return '';
     }
 
     /**

@@ -56,79 +56,13 @@ class DraftView implements DraftViewInterface
     /**
      * Generate CSS styles for the draft interface
      *
-     * Uses consolidated .ibl-data-table from design system with draft-specific overrides.
+     * Styles are now in the design system (existing-components.css).
      *
-     * @return string CSS style block
+     * @return string Empty string - styles are centralized
      */
     private function getStyleBlock(): string
     {
-        return '<style>
-/* Draft-specific styles only - table base comes from .ibl-data-table */
-.draft-container {
-    max-width: 100%;
-    margin: 0 auto;
-}
-.draft-header {
-    text-align: center;
-    margin-bottom: 1.5rem;
-}
-.draft-team-logo {
-    width: 80px;
-    height: 80px;
-    object-fit: contain;
-    margin-bottom: 0.75rem;
-}
-.draft-title {
-    font-family: var(--font-display, \'Barlow Condensed\', sans-serif);
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--navy-900, #0f172a);
-    margin: 0;
-}
-.draft-error {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    border-radius: var(--radius-md, 0.375rem);
-    padding: 1rem;
-    color: #991b1b;
-    margin-bottom: 1rem;
-}
-.draft-error a {
-    color: #991b1b;
-    font-weight: 500;
-}
-.draft-table input[type="radio"] {
-    width: 1rem;
-    height: 1rem;
-    accent-color: var(--accent-500, #f97316);
-}
-.draft-submit-container {
-    text-align: center;
-    margin-top: 1rem;
-}
-.draft-submit-btn {
-    font-family: var(--font-display, \'Barlow Condensed\', sans-serif);
-    font-size: 1.125rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 1rem 2rem;
-    background: linear-gradient(135deg, var(--accent-500, #f97316), var(--accent-600, #ea580c));
-    color: white;
-    border: none;
-    border-radius: var(--radius-md, 0.375rem);
-    cursor: pointer;
-    transition: transform 150ms ease, box-shadow 150ms ease;
-}
-.draft-submit-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg, 0 10px 15px -3px rgb(0 0 0 / 0.1));
-}
-.draft-submit-btn:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-}
-</style>';
+        return '';
     }
 
     /**

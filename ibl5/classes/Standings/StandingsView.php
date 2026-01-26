@@ -51,168 +51,13 @@ class StandingsView implements StandingsViewInterface
     }
 
     /**
-     * Generate consolidated CSS styles for standings tables
+     * Generate JavaScript for scroll container functionality
      *
-     * @return string CSS style block
+     * @return string JavaScript block
      */
     private function getStyleBlock(): string
     {
-        return '<style>
-/* Standings section title */
-.standings-title {
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--navy-900, #0f172a);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin: 1.5rem 0 0.75rem 0;
-    padding-bottom: 0rem;
-    border-bottom: 2px solid var(--accent-500, #f97316);
-    display: inline-block;
-}
-.standings-title:first-of-type {
-    margin-top: 0;
-}
-
-/* Standings table */
-.standings-table {
-    font-family: var(--font-sans, \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
-    border-collapse: separate;
-    border-spacing: 0;
-    border: none;
-    width: 100%;
-    max-width: 100%;
-    margin-bottom: 0.5rem;
-    min-width: 800px; /* Ensure table is wide enough to scroll */
-}
-
-/* Scroll container gets the visual styling on mobile */
-@media (max-width: 768px) {
-    .standings-table-container {
-        /* No overflow hidden on mobile - allows sticky to work */
-    }
-}
-@media (min-width: 769px) {
-    .standings-table-container {
-        border-radius: var(--radius-lg, 0.5rem);
-        box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
-        overflow: hidden; /* For rounded corners - only on desktop */
-    }
-}
-
-/* Header row */
-.standings-header-row {
-    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-}
-
-.standings-header-cell {
-    color: white;
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-weight: 600;
-    font-size: 1.25rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 0.75rem 0.375rem;
-    text-align: center;
-    white-space: nowrap;
-}
-
-/* Data cells */
-.standings-cell {
-    color: var(--gray-800, #1f2937);
-    font-size: 1rem;
-    padding: 0.5rem 0.375rem;
-    text-align: center;
-    white-space: nowrap;
-}
-
-.standings-team-cell {
-    text-align: left;
-    padding-left: 0.75rem;
-    font-weight: 500;
-}
-
-.standings-team-cell a {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.standings-team-logo {
-    width: 24px;
-    height: 24px;
-    object-fit: contain;
-    border-radius: var(--radius-sm, 0.25rem);
-    flex-shrink: 0;
-}
-
-/* Rating highlight */
-.standings-rating {
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-weight: 700;
-    color: var(--accent-500, #f97316);
-}
-
-/* Row styling */
-.standings-table tbody tr {
-    transition: background-color 150ms ease;
-}
-.standings-table tbody tr:nth-child(odd) {
-    background-color: white;
-}
-.standings-table tbody tr:nth-child(even) {
-    background-color: var(--gray-50, #f9fafb);
-}
-.standings-table tbody tr:hover {
-    background-color: var(--gray-100, #f3f4f6);
-}
-
-/* Links */
-.standings-table a {
-    color: var(--gray-800, #1f2937);
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 150ms ease;
-}
-.standings-table a:hover {
-    color: var(--accent-500, #f97316);
-}
-
-/* Clinched indicators */
-.standings-table strong {
-    color: var(--accent-600, #ea580c);
-    font-weight: 700;
-}
-
-/* Mobile sticky column support */
-@media (max-width: 768px) {
-    .standings-table.responsive-table th.sticky-col,
-    .standings-table.responsive-table td.sticky-col {
-        position: sticky;
-        left: 0;
-        z-index: 1;
-        min-width: 120px;
-    }
-    .standings-table.responsive-table thead th.sticky-col {
-        background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-        z-index: 3;
-    }
-    .standings-table.responsive-table tbody tr:nth-child(odd) td.sticky-col {
-        background-color: white;
-    }
-    .standings-table.responsive-table tbody tr:nth-child(even) td.sticky-col {
-        background-color: var(--gray-50, #f9fafb);
-    }
-    .standings-table.responsive-table tbody tr:hover td.sticky-col {
-        background-color: var(--gray-100, #f3f4f6);
-    }
-    .standings-table.responsive-table td.sticky-col {
-        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
-    }
-}
-        </style>
-        <script>
+        return '<script>
         (function() {
             // Set explicit width on scroll containers for iOS compatibility
             function setContainerWidths() {
@@ -265,7 +110,7 @@ class StandingsView implements StandingsViewInterface
 
         $html = $this->renderHeader($region, $groupingType);
         $html .= $this->renderRows($standings);
-        $html .= '</tbody></table></div></div></div>'; // Close table, table-container, scroll container, and wrapper
+        $html .= '</tbody></table></div></div>'; // Close table, scroll container, and wrapper
 
         return $html;
     }
@@ -299,29 +144,28 @@ class StandingsView implements StandingsViewInterface
 
         ob_start();
         ?>
-        <div class="standings-title"><?= $title; ?></div>
+        <h2 class="ibl-title"><?= $title; ?></h2>
         <div class="table-scroll-wrapper">
         <div class="table-scroll-container">
-        <div class="standings-table-container">
-        <table class="sortable standings-table responsive-table">
+        <table class="sortable ibl-data-table responsive-table">
             <thead>
-                <tr class="standings-header-row">
-                    <th class="standings-header-cell sticky-col">Team</th>
-                    <th class="standings-header-cell">W-L</th>
-                    <th class="standings-header-cell">Pct</th>
-                    <th class="standings-header-cell">Pyth<br>W-L%</th>
-                    <th class="standings-header-cell">GB</th>
-                    <th class="standings-header-cell">Magic#</th>
-                    <th class="standings-header-cell">Left</th>
-                    <th class="standings-header-cell">Conf.</th>
-                    <th class="standings-header-cell">Div.</th>
-                    <th class="standings-header-cell">Home</th>
-                    <th class="standings-header-cell">Away</th>
-                    <th class="standings-header-cell">Home<br>Played</th>
-                    <th class="standings-header-cell">Away<br>Played</th>
-                    <th class="standings-header-cell">Last 10</th>
-                    <th class="standings-header-cell">Streak</th>
-                    <th class="standings-header-cell">Rating</th>
+                <tr>
+                    <th class="sticky-col">Team</th>
+                    <th>W-L</th>
+                    <th>Pct</th>
+                    <th>Pyth<br>W-L%</th>
+                    <th>GB</th>
+                    <th>Magic#</th>
+                    <th>Left</th>
+                    <th>Conf.</th>
+                    <th>Div.</th>
+                    <th>Home</th>
+                    <th>Away</th>
+                    <th>Home<br>Played</th>
+                    <th>Away<br>Played</th>
+                    <th>Last 10</th>
+                    <th>Streak</th>
+                    <th>Rating</th>
                 </tr>
             </thead>
             <tbody>
@@ -377,22 +221,22 @@ class StandingsView implements StandingsViewInterface
         ob_start();
         ?>
         <tr>
-            <td class="standings-team-cell sticky-col"><a href="modules.php?name=Team&op=team&teamID=<?= $teamId; ?>"><img src="images/logo/new<?= $teamId; ?>.png" alt="Team Logo" class="standings-team-logo" loading="lazy"><?= $teamName; ?></a></td>
-            <td class="standings-cell"><?= $team['leagueRecord']; ?></td>
-            <td class="standings-cell"><?= $team['pct']; ?></td>
-            <td class="standings-cell"><?= $pythagoreanPct; ?></td>
-            <td class="standings-cell"><?= $team['gamesBack']; ?></td>
-            <td class="standings-cell"><?= $team['magicNumber']; ?></td>
-            <td class="standings-cell"><?= $team['gamesUnplayed']; ?></td>
-            <td class="standings-cell"><?= $team['confRecord']; ?></td>
-            <td class="standings-cell"><?= $team['divRecord']; ?></td>
-            <td class="standings-cell"><?= $team['homeRecord']; ?></td>
-            <td class="standings-cell"><?= $team['awayRecord']; ?></td>
-            <td class="standings-cell"><?= $team['homeGames']; ?></td>
-            <td class="standings-cell"><?= $team['awayGames']; ?></td>
-            <td class="standings-cell"><?= $lastWin; ?>-<?= $lastLoss; ?></td>
-            <td class="standings-cell"><?= $streakType; ?> <?= $streak; ?></td>
-            <td class="standings-cell"><span class="standings-rating"><?= $rating; ?></span></td>
+            <td class="sticky-col"><a href="modules.php?name=Team&op=team&teamID=<?= $teamId; ?>" class="ibl-team-cell"><img src="images/logo/new<?= $teamId; ?>.png" alt="Team Logo" class="ibl-team-cell__logo" loading="lazy"><span class="ibl-team-cell__name"><?= $teamName; ?></span></a></td>
+            <td><?= $team['leagueRecord']; ?></td>
+            <td><?= $team['pct']; ?></td>
+            <td><?= $pythagoreanPct; ?></td>
+            <td><?= $team['gamesBack']; ?></td>
+            <td><?= $team['magicNumber']; ?></td>
+            <td><?= $team['gamesUnplayed']; ?></td>
+            <td><?= $team['confRecord']; ?></td>
+            <td><?= $team['divRecord']; ?></td>
+            <td><?= $team['homeRecord']; ?></td>
+            <td><?= $team['awayRecord']; ?></td>
+            <td><?= $team['homeGames']; ?></td>
+            <td><?= $team['awayGames']; ?></td>
+            <td><?= $lastWin; ?>-<?= $lastLoss; ?></td>
+            <td><?= $streakType; ?> <?= $streak; ?></td>
+            <td><span class="ibl-stat-highlight"><?= $rating; ?></span></td>
         </tr>
         <?php
         return ob_get_clean();
@@ -409,15 +253,15 @@ class StandingsView implements StandingsViewInterface
         $teamName = \Utilities\HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
         if ($team['clinchedConference'] == 1) {
-            return '<strong>Z</strong>-' . $teamName;
+            return '<span class="ibl-clinched-indicator">Z</span>-' . $teamName;
         }
 
         if ($team['clinchedDivision'] == 1) {
-            return '<strong>Y</strong>-' . $teamName;
+            return '<span class="ibl-clinched-indicator">Y</span>-' . $teamName;
         }
 
         if ($team['clinchedPlayoffs'] == 1) {
-            return '<strong>X</strong>-' . $teamName;
+            return '<span class="ibl-clinched-indicator">X</span>-' . $teamName;
         }
 
         return $teamName;

@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1935 tests • ~79% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 2062 tests • ~80% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -12,7 +12,7 @@
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - Strong progress with 1935 tests (~79% coverage). Edge case testing added for high-priority validators.
+1. **Test Coverage → 80%** - ✅ Goal achieved with 2062 tests (~80% coverage). Comprehensive edge case testing complete.
 
    **Priority Integration Tests:** ✅ All Complete
    - ~~Waivers, DepthChart, RookieOption, Schedule, Standings, Voting~~
@@ -20,8 +20,9 @@
    **Unit Test Gaps:** ✅ All Closed (Jan 26, 2026)
    - ~~Discord, Shared, League, Injuries, Standings~~ - Added 133 tests
 
-   **Edge Case Testing:** ✅ High-Priority Validators Complete (Jan 26, 2026)
+   **Edge Case Testing:** ✅ All Complete (Jan 26, 2026)
    - ~~TradeValidator, FreeAgencyOfferValidator, WaiversValidator, DraftValidator, CommonContractValidator~~ - Added 183 tests
+   - ~~PlayerInjuryCalculator, PlayerContractCalculator, NegotiationDemandCalculator, TeamStatsCalculator~~ - Added 127 tests
 
 2. **API Development** - REST API with JWT, rate limiting, OpenAPI docs
 3. **Security Hardening** - XSS audit, CSRF, security headers
@@ -29,6 +30,27 @@
 ---
 
 ## Recent Updates
+
+### Calculator Edge Case Tests Added (Jan 26, 2026)
+
+**Impact:** Added 127 edge case tests for 4 calculator classes, bringing total from 1935 to 2062 tests (~80% coverage)
+
+**New Test Files:**
+- **PlayerInjuryCalculatorEdgeCaseTest** (26 tests) - Negative days, year/month boundaries, leap years
+- **PlayerContractCalculatorEdgeCaseTest** (37 tests) - Contract year boundaries, buyout rounding, null handling
+- **NegotiationDemandCalculatorEdgeCaseTest** (25 tests) - Zero/near-zero modifiers, extreme preferences, division safety
+- **TeamStatsCalculatorEdgeCaseTest** (39 tests) - Ranking score precision, games back, streak tracking
+
+**Edge Cases Covered:**
+- Date calculations: leap years, month/year boundaries, multi-year injuries
+- Division safety: zero modifiers, zero total games, missing team factors
+- Boundary values: contract years 0-7+, minimum/maximum preferences
+- Floating-point precision: ranking score rounding, games back calculations
+- Null/missing data: null preferences, missing game fields
+
+**Status:** All 2062 tests passing ✅ • 80% coverage goal achieved
+
+---
 
 ### Validator Edge Case Tests Added (Jan 26, 2026)
 

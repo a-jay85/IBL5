@@ -107,8 +107,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
             <tr style="background-color: #' . $color1 . '; color: #' . $color2 . ';">
                 <td colspan="5" class="schedule-header">
                     <h1>Team Schedule</h1>
-                    <p><em style="font-style: italic;">games highlighted in yellow are projected to be run next sim (' . 
-                    HtmlSanitizer::safeHtmlOutput($simLengthInDays) . ' days)</em></p>
+                    <p><em style="font-style: italic;">Next sim length: ' . 
+                    HtmlSanitizer::safeHtmlOutput($simLengthInDays) . ' days</em></p>
                 </td>
             </tr>';
     }

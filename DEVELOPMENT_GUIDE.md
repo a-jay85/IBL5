@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1556 tests • ~73% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1591 tests • ~75% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -12,14 +12,14 @@
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - Strong progress with 1556 tests (~73% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. Waivers, DepthChart, RookieOption, and Schedule integration tests completed. **Next Steps:** Add integration tests for remaining workflows (Standings) and expand edge case coverage in existing modules to reach 80% goal.
+1. **Test Coverage → 80%** - Strong progress with 1591 tests (~75% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. Waivers, DepthChart, RookieOption, Schedule, and Standings integration tests completed. **Next Steps:** Expand edge case coverage in existing modules to reach 80% goal.
 
    **Priority Integration Tests Needed:**
    - ~~**HIGH**: Waivers (add/drop workflow with cap validation, waiver wire timing)~~ ✅ Complete
    - ~~**MEDIUM**: DepthChart (submission with position validation, injured player handling)~~ ✅ Complete
    - ~~**MEDIUM**: RookieOption (option exercise with eligibility checks, contract updates)~~ ✅ Complete
    - ~~**MEDIUM**: Schedule (win/loss tracking, streak calculation, next-sim highlighting)~~ ✅ Complete
-   - **MEDIUM**: Standings (calculation accuracy, tie-breaking logic)
+   - ~~**MEDIUM**: Standings (calculation accuracy, tie-breaking logic)~~ ✅ Complete
    - **LOW**: Voting (All-star/awards voting submission)
 
    **Unit Test Gaps:** Discord (1 test), Shared (1 test), League (1 test), Injuries (2 tests), Standings (2 tests)
@@ -58,7 +58,40 @@
 - View rendering (7 tests)
 - Complete workflow (2 tests)
 
-**Status:** All 1556 tests passing ✅ Schedule module now has comprehensive integration test coverage
+**Status:** All 1591 tests passing ✅ Schedule module now has comprehensive integration test coverage
+
+---
+
+### Standings Integration Tests Added (Jan 25, 2026)
+
+**Impact:** Added 35 integration test methods for complete standings display workflow coverage
+
+**Integration Test Coverage:**
+- **Standings Integration:** StandingsIntegrationTest (35 test methods)
+  - Repository tests: Conference/division standings queries, region validation
+  - Streak data: Power table queries, last 10 record, streak type/count
+  - Pythagorean stats: Points scored/allowed calculation from offense/defense stats
+  - Clinched indicators: Z (conference), Y (division), X (playoffs) with priority logic
+  - View rendering: Region titles, table headers, team data display
+  - XSS protection: Team name escaping, streak type sanitization
+  - Team links: Correct URL generation, team logo display
+  - Full page render: All regions included, styles output once, responsive classes
+
+**Test Categories:**
+- Repository conference standings (3 tests)
+- Repository division standings (3 tests)
+- Streak data handling (3 tests)
+- Pythagorean stats calculation (3 tests)
+- View region rendering (4 tests)
+- Clinched indicator display (5 tests)
+- Pythagorean column display (2 tests)
+- Streak/rating display (3 tests)
+- XSS security (2 tests)
+- Team link/logo tests (2 tests)
+- Full render tests (3 tests)
+- Complete workflow tests (2 tests)
+
+**Status:** All 1591 tests passing ✅ Standings module now has comprehensive integration test coverage
 
 ---
 

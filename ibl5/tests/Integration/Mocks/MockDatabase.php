@@ -11,6 +11,7 @@ class MockDatabase
     private array $mockData = [];
     private array $mockTradeInfo = [];
     private array $mockTeamData = [];
+    private array $mockPythagoreanData = [];
     private ?int $numRows = null;
     private bool $returnTrue = true;
     private array $executedQueries = [];
@@ -59,6 +60,17 @@ class MockDatabase
             }
             // Return all team data if no specific match
             return new MockDatabaseResult($this->mockTeamData);
+        }
+
+        // Special handling for pythagorean stats queries (offense/defense stats)
+        // Always intercept these queries to avoid returning standings data
+        if (stripos($query, 'ibl_team_offense_stats') !== false ||
+            stripos($query, 'ibl_team_defense_stats') !== false) {
+            if (!empty($this->mockPythagoreanData)) {
+                return new MockDatabaseResult([$this->mockPythagoreanData]);
+            }
+            // Return empty result if no pythagorean data configured
+            return new MockDatabaseResult([]);
         }
         
         // Smart filtering for player queries with pid/itemid/pickid
@@ -149,6 +161,15 @@ class MockDatabase
     public function setMockTeamData(array $data): void
     {
         $this->mockTeamData = $data;
+    }
+
+    /**
+     * Set mock pythagorean stats data for offense/defense stats queries
+     * Used when tests need StandingsRepository::getTeamPythagoreanStats() to return valid data
+     */
+    public function setMockPythagoreanData(array $data): void
+    {
+        $this->mockPythagoreanData = $data;
     }
     
     public function setNumRows(int $numRows): void

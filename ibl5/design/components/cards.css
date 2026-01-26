@@ -41,7 +41,7 @@
 
 .ibl-card__title {
     font-family: var(--font-display);
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -98,7 +98,7 @@
 
 .ibl-stat-card__category {
     font-family: var(--font-display);
-    font-size: 1.125rem;
+    font-size: 1.25rem;
     font-weight: 600;
     color: white;
     text-transform: uppercase;
@@ -152,7 +152,7 @@
 
 .ibl-sidebar-block__title {
     font-family: var(--font-display);
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     font-weight: 600;
     color: white;
     text-transform: uppercase;
@@ -191,7 +191,7 @@
 
 .ibl-centerbox__title {
     font-family: var(--font-display);
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     font-weight: 600;
     color: white;
     text-transform: uppercase;

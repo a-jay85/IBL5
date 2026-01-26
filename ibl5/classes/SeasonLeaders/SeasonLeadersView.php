@@ -196,7 +196,7 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
     color: white;
     font-family: var(--font-display, 'Poppins', sans-serif);
     font-weight: 600;
-    font-size: 1.125rem;
+    font-size: 1.25rem;
     text-transform: uppercase;
     letter-spacing: 0.02em;
     padding: 0.625rem 0.375rem;

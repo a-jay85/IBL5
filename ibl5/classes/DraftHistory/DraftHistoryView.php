@@ -93,7 +93,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
     color: white;
     font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 1.125rem;
+    font-size: 1.25rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 0.75rem 0.625rem;

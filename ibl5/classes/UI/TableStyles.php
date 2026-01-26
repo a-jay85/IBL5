@@ -56,7 +56,7 @@ class TableStyles
     color: #<?= $teamColor2 ?>;
     font-family: var(--font-display, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 1.125rem;
+    font-size: 1.25rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding-top: 0.5rem;

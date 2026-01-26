@@ -150,7 +150,7 @@ class LeaderboardsView implements LeaderboardsViewInterface
 <style>
 .leaderboards-title {
     font-family: var(--font-display, 'Poppins', sans-serif);
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     font-weight: 600;
     color: var(--navy-900, #0f172a);
     text-align: center;
@@ -174,7 +174,7 @@ class LeaderboardsView implements LeaderboardsViewInterface
     color: white;
     font-family: var(--font-display, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 1.125rem;
+    font-size: 1.25rem;
     text-transform: uppercase;
     letter-spacing: 0.02em;
     padding: 0.625rem 0.375rem;

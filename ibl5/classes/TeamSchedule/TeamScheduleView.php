@@ -62,11 +62,12 @@ class TeamScheduleView implements TeamScheduleViewInterface
                 color: var(--team-secondary);
             }
             .schedule-container--team .schedule-jump-btn {
-                background: var(--team-primary);
-                color: var(--team-secondary);
+                background: var(--team-primary) !important;
+                color: var(--team-secondary) !important;
                 box-shadow: 0 2px 8px color-mix(in srgb, var(--team-primary) 40%, transparent);
             }
             .schedule-container--team .schedule-jump-btn:hover {
+                background: var(--team-primary) !important;
                 opacity: 0.9;
                 box-shadow: 0 4px 12px color-mix(in srgb, var(--team-primary) 50%, transparent);
             }

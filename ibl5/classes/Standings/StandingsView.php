@@ -67,7 +67,7 @@ class StandingsView implements StandingsViewInterface
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin: 1.5rem 0 0.75rem 0;
-    padding-bottom: 0.5rem;
+    padding-bottom: 0rem;
     border-bottom: 2px solid var(--accent-500, #f97316);
     display: inline-block;
 }

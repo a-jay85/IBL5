@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1484 tests • ~69% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1506 tests • ~70% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -12,11 +12,11 @@
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - Strong progress with 1484 tests (~69% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. Waivers integration tests completed with 25 test methods. **Next Steps:** Add integration tests for remaining high-priority workflows (DepthChart, RookieOption) and expand edge case coverage in existing modules to reach 80% goal.
+1. **Test Coverage → 80%** - Strong progress with 1506 tests (~70% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. Waivers and DepthChart integration tests completed. **Next Steps:** Add integration tests for remaining high-priority workflows (RookieOption) and expand edge case coverage in existing modules to reach 80% goal.
 
    **Priority Integration Tests Needed:**
    - ~~**HIGH**: Waivers (add/drop workflow with cap validation, waiver wire timing)~~ ✅ Complete
-   - **MEDIUM**: DepthChart (submission with position validation, injured player handling)
+   - ~~**MEDIUM**: DepthChart (submission with position validation, injured player handling)~~ ✅ Complete
    - **MEDIUM**: RookieOption (option exercise with eligibility checks, contract updates)
    - **MEDIUM**: Standings/Schedule (calculation accuracy, tie-breaking logic)
    - **LOW**: Voting (All-star/awards voting submission)
@@ -29,6 +29,31 @@
 ---
 
 ## Recent Updates
+
+### DepthChart Integration Tests Added (Jan 25, 2026)
+
+**Impact:** Added 22 integration test methods for complete depth chart submission workflow coverage
+
+**Integration Test Coverage:**
+- **DepthChart Integration:** DepthChartIntegrationTest (22 test methods)
+  - Complete submission workflow: Processing → Validation → Database updates → CSV export
+  - Validation failures: Insufficient active players, position depth requirements, multiple starting positions
+  - Season phase rules: Regular Season (12 active, 3 per position) vs Playoffs (10-12 active, 2 per position)
+  - Database operations: Player updates, team history timestamps, query verification
+  - Input sanitization: HTML stripping, value boundary clamping, negative intensity handling
+  - Error handling: Error accumulation, cross-validation clearing, HTML error formatting
+
+**Test Categories:**
+- Submission workflow success (3 tests)
+- Validation failure scenarios (5 tests)
+- Playoffs vs Regular Season rules (4 tests)
+- Database operations (4 tests)
+- Input sanitization (3 tests)
+- Error handling (3 tests)
+
+**Status:** All 1506 tests passing ✅ DepthChart module now has comprehensive integration test coverage following IntegrationTestCase pattern
+
+---
 
 ### Waivers Integration Tests Added (Jan 25, 2026)
 
@@ -53,7 +78,7 @@
 - Veteran minimum calculation (2 tests)
 - Validator error handling (2 tests)
 
-**Status:** All 1484 tests passing ✅ Waivers module now has comprehensive integration test coverage following TestDataFactory pattern
+**Status:** All tests passing ✅ Waivers module now has comprehensive integration test coverage following TestDataFactory pattern
 
 ---
 

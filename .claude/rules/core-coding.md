@@ -1,67 +1,87 @@
-# IBL5 Core Coding Rules (Always Loaded)
+# Core Coding Reference
 
-These rules apply to ALL code work in this project.
+Quick reference for frequently-used patterns not covered in CLAUDE.md.
 
-## Class Autoloading - NO Manual Requires
+## Key Constants
+
 ```php
-// ✅ CORRECT - Just use the class name
-$player = new Player($db);
+// Salary Cap (in thousands)
+\League::HARD_CAP_MAX  // 7000
 
-// ❌ WRONG - NEVER do this
-require_once 'classes/Player.php';
+// Contract Rules
+\ContractRules::BIRD_RIGHTS_THRESHOLD        // 3 years
+\ContractRules::STANDARD_RAISE_PERCENTAGE    // 0.10 (10%)
+\ContractRules::BIRD_RIGHTS_RAISE_PERCENTAGE // 0.125 (12.5%)
+\ContractRules::getVeteranMinimumSalary($experience)
+\ContractRules::getMaxContractSalary($experience)
+\ContractRules::hasBirdRights($birdYears)
 ```
-All classes in `ibl5/classes/`, filename = class name.
 
-## Type Hints Required
+## Common Repository Helpers
+
+`CommonMysqliRepository` provides these frequently-used queries:
+
 ```php
-public function getPlayer(int $playerId): ?Player
+$repo->getUserByUsername(string $username): ?array
+$repo->getTeamByName(string $teamName): ?array
+$repo->getPlayerByID(int $pid): ?array
+$repo->getTeamnameFromUsername(string $username): string  // Returns "Free Agents" if none
+$repo->getTidFromTeamname(string $teamName): int
+$repo->getTeamTotalSalary(string $teamName): int
+$repo->getTeamDiscordID(string $teamName): ?string
 ```
-- `declare(strict_types=1);` in every file
 
-## Database Object Preference
-**Use `$mysqli_db` (modern MySQLi)** over legacy `$db`:
+## Validation Return Patterns
+
+**Standard pattern** (CommonValidator, TradeValidator):
 ```php
-global $mysqli_db;
-$stmt = $mysqli_db->prepare('SELECT * FROM ibl_plr WHERE pid = ?');
-$stmt->bind_param('i', $playerId);
-$stmt->execute();
+['valid' => true, 'error' => null]        // Success
+['valid' => false, 'error' => 'Message']  // Failure
 ```
 
-## Schema Verification (CRITICAL)
-**Always verify table/column names in `ibl5/schema.sql` before writing queries.**
-Never assume database structures exist.
-
-## XSS Protection (MANDATORY)
-Use `Utilities\HtmlSanitizer::safeHtmlOutput()` on ALL output:
-- Database query results
-- User inputs (player names, form data)
-- Play-by-play text, error messages
-
-## HTML/CSS Modernization (MANDATORY)
-Replace deprecated tags immediately:
-- `<b>` → `<strong style="font-weight: bold;">`
-- `<i>` → `<em style="font-style: italic;">`
-- `<font>` → `<span style="...">`
-- `<center>` → `<div style="text-align: center;">`
-- `border=1` → `style="border: 1px solid #000; border-collapse: collapse;"`
-
-## Local Database Command Line Access
-**Always use MAMP's mysql client** (Homebrew's client has auth plugin incompatibility):
-```bash
-/Applications/MAMP/Library/bin/mysql80/bin/mysql \
-  --socket=/Applications/MAMP/tmp/mysql/mysql.sock \
-  -u root -p'root' \
-  iblhoops_ibl5 \
-  -e "YOUR SQL QUERY HERE"
+**Validator class pattern** (DraftValidator, WaiversValidator):
+```php
+if (!$validator->validateX(...)) {
+    $errors = $validator->getErrors();  // Returns array of error strings
+}
 ```
 
-## Quick Reference
-| Task | Command |
-|------|---------|
-| Run tests | `cd ibl5 && vendor/bin/phpunit` |
-| Run tests with all issues shown | `cd ibl5 && vendor/bin/phpunit --display-all-issues` |
-| Schema | `ibl5/schema.sql` |
-| Stats formatting | `BasketballStats\StatsFormatter` |
-| MySQL CLI | `/Applications/MAMP/Library/bin/mysql80/bin/mysql --socket=/Applications/MAMP/tmp/mysql/mysql.sock -u root -p'root' iblhoops_ibl5` |
+## Common Gotchas
 
-**Detailed specifications in `.github/skills/` (auto-loaded by task).**
+| Issue | Correct Approach |
+|-------|------------------|
+| Contract year salary | If `cy=2`, read `cy2` field (not `cy1`) |
+| Retired players | Check `retired = '0'` (string, not int) |
+| Free agents | `tid = 0` or empty username |
+| Team lookup | Some methods use `tid`, others use team name string |
+| Null in queries | Build conditional SQL; `bind_param` has no NULL type |
+
+## Testing Quick Reference
+
+```php
+// Integration test setup
+class MyTest extends IntegrationTestCase {
+    protected function setUp(): void {
+        parent::setUp();  // Sets up $this->mockDb
+    }
+}
+
+// Test data factory
+$player = TestDataFactory::createPlayer(['pid' => 1, 'name' => 'Test']);
+$team = TestDataFactory::createTeam(['team_name' => 'Miami']);
+$season = TestDataFactory::createSeason(['Phase' => 'Regular Season']);
+
+// Assert queries
+$this->assertQueryExecuted('UPDATE ibl_plr');
+$this->assertQueryNotExecuted('DELETE');
+```
+
+## Database Tables
+
+| Purpose | Table | Key Fields |
+|---------|-------|------------|
+| Players | `ibl_plr` | `pid`, `tid`, `name`, `cy`, `cy1-cy6` |
+| Teams | `ibl_team_info` | `teamid`, `team_name` |
+| Users | `nuke_users` | `username`, `user_ibl_team` |
+| History | `ibl_hist` | Historical player stats |
+| Schedule | `ibl_schedule` | Game schedule |

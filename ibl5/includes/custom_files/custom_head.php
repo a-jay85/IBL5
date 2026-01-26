@@ -5,9 +5,55 @@
  */
 
 // Google Fonts - Barlow Condensed for display, Barlow for body
+// Using display=block to prevent FOUT (flash of unstyled text)
 echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
 echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
-echo '<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">';
+echo '<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=block" rel="stylesheet">';
+
+// Font loading styles - hide content until fonts are ready
+echo '<style id="font-loading-styles">
+.fonts-loading {
+    visibility: hidden;
+}
+.fonts-loaded {
+    visibility: visible;
+}
+</style>';
+
+// Font loading detection script (runs immediately, before body)
+echo '<script>
+// Add fonts-loading class immediately
+document.documentElement.classList.add("fonts-loading");
+
+// Check if fonts are already cached
+if (document.fonts && document.fonts.check("1em Barlow")) {
+    document.documentElement.classList.remove("fonts-loading");
+    document.documentElement.classList.add("fonts-loaded");
+} else if (document.fonts) {
+    // Wait for fonts to load
+    Promise.all([
+        document.fonts.load("400 1em Barlow"),
+        document.fonts.load("600 1em Barlow Condensed")
+    ]).then(function() {
+        document.documentElement.classList.remove("fonts-loading");
+        document.documentElement.classList.add("fonts-loaded");
+    }).catch(function() {
+        // Fallback: show content anyway if fonts fail
+        document.documentElement.classList.remove("fonts-loading");
+        document.documentElement.classList.add("fonts-loaded");
+    });
+
+    // Safety timeout - show content after 1 second max
+    setTimeout(function() {
+        document.documentElement.classList.remove("fonts-loading");
+        document.documentElement.classList.add("fonts-loaded");
+    }, 1000);
+} else {
+    // Fallback for browsers without Font Loading API
+    document.documentElement.classList.remove("fonts-loading");
+    document.documentElement.classList.add("fonts-loaded");
+}
+</script>';
 
 // Tailwind CSS via CDN with custom config
 echo '<script src="https://cdn.tailwindcss.com"></script>';
@@ -59,132 +105,18 @@ tailwind.config = {
 // Navigation JavaScript for mobile menu toggle
 echo '<script src="' . ($relativePath ?? '') . 'jslib/navigation.js" defer></script>';
 
-// Body padding and custom navigation styles
+// Critical inline styles that must load immediately
+// Note: Most styles are now in the compiled CSS (design/input.css -> themes/IBL/style/style.css)
+// These remain inline because they must be available before any CSS files load
 echo '<style>
-body {
-    padding-top: 64px !important;
-    font-family: "Barlow", system-ui, sans-serif;
+/* FOUT Prevention - Hide body until fonts are loaded */
+.fonts-loading body {
+    visibility: hidden;
 }
-
-/* Navigation link colors for accessibility - override browser defaults */
-/* Main nav links (Home link specifically and any other direct links) */
-nav .group > a:link,
-nav .group > a:visited {
-    color: #e5e7eb !important; /* gray-200 - match dropdown text brightness */
-    font-size: 0.875rem !important; /* 14px - match button text-sm */
-    font-weight: 500 !important; /* match button font-medium */
-}
-
-nav .group > a:hover {
-    color: #ffffff !important;
-}
-
-/* Desktop dropdown links */
-.nav-dropdown-item:link {
-    color: #e5e7eb; /* gray-200 - brighter for better contrast */
-}
-
-.nav-dropdown-item:visited {
-    color: #fdba74; /* accent-300 - warm orange for visited state */
-}
-
-.nav-dropdown-item:hover {
-    color: #ffffff !important;
-    background-color: rgba(255, 255, 255, 0.05) !important;
-}
-
-/* Mobile menu links */
-#nav-mobile-menu a:link {
-    color: #e5e7eb; /* gray-200 */
-}
-
-#nav-mobile-menu a:visited {
-    color: #fdba74; /* accent-300 - warm orange */
-}
-
-#nav-mobile-menu a:hover {
-    color: #ffffff !important;
-}
-
-/* Mobile section buttons (not links) */
-#nav-mobile-menu .mobile-dropdown-btn {
-    color: #ffffff; /* Keep section headers white */
-}
-
-/* Mobile home link */
-#nav-mobile-menu > div > a:link,
-#nav-mobile-menu > div > a:visited {
-    color: #ffffff; /* Keep home link white */
-}
-
-/* Navigation dropdown items - staggered reveal with transitions */
-.nav-dropdown-item {
-    opacity: 0;
-    transform: translateY(6px);
-    transition: opacity 0.2s ease-out, transform 0.2s ease-out;
-}
-
-.group:hover .nav-dropdown-item {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.group:hover .nav-dropdown-item:nth-child(1) { transition-delay: 0ms; }
-.group:hover .nav-dropdown-item:nth-child(2) { transition-delay: 25ms; }
-.group:hover .nav-dropdown-item:nth-child(3) { transition-delay: 50ms; }
-.group:hover .nav-dropdown-item:nth-child(4) { transition-delay: 75ms; }
-.group:hover .nav-dropdown-item:nth-child(5) { transition-delay: 100ms; }
-.group:hover .nav-dropdown-item:nth-child(6) { transition-delay: 125ms; }
-.group:hover .nav-dropdown-item:nth-child(7) { transition-delay: 150ms; }
-.group:hover .nav-dropdown-item:nth-child(8) { transition-delay: 175ms; }
-.group:hover .nav-dropdown-item:nth-child(9) { transition-delay: 200ms; }
-.group:hover .nav-dropdown-item:nth-child(10) { transition-delay: 225ms; }
-.group:hover .nav-dropdown-item:nth-child(11) { transition-delay: 250ms; }
-
-/* Mobile menu custom scrollbar */
-.mobile-menu-scroll::-webkit-scrollbar {
-    width: 4px;
-}
-.mobile-menu-scroll::-webkit-scrollbar-track {
-    background: rgba(255,255,255,0.05);
-}
-.mobile-menu-scroll::-webkit-scrollbar-thumb {
-    background: rgba(249,115,22,0.4);
-    border-radius: 4px;
-}
-.mobile-menu-scroll::-webkit-scrollbar-thumb:hover {
-    background: rgba(249,115,22,0.6);
-}
-
-/* Grain texture overlay */
-.nav-grain::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E");
-    opacity: 0.03;
-    pointer-events: none;
-    mix-blend-mode: overlay;
-}
-
-/* Mobile menu section animation */
-.mobile-section {
-    opacity: 0;
-    transform: translateX(20px);
-    transition: opacity 0.3s ease, transform 0.3s ease;
-}
-.mobile-menu-open .mobile-section:nth-child(1) { transition-delay: 0.05s; }
-.mobile-menu-open .mobile-section:nth-child(2) { transition-delay: 0.1s; }
-.mobile-menu-open .mobile-section:nth-child(3) { transition-delay: 0.15s; }
-.mobile-menu-open .mobile-section:nth-child(4) { transition-delay: 0.2s; }
-.mobile-menu-open .mobile-section:nth-child(5) { transition-delay: 0.25s; }
-.mobile-menu-open .mobile-section:nth-child(6) { transition-delay: 0.3s; }
-.mobile-menu-open .mobile-section:nth-child(7) { transition-delay: 0.35s; }
-.mobile-menu-open .mobile-section:nth-child(8) { transition-delay: 0.4s; }
-.mobile-menu-open .mobile-section:nth-child(9) { transition-delay: 0.45s; }
-
-.mobile-menu-open .mobile-section {
-    opacity: 1;
-    transform: translateX(0);
+.fonts-loaded body {
+    visibility: visible;
 }
 </style>';
+
+// Load the compiled CSS from the design system
+echo '<link rel="stylesheet" href="' . ($relativePath ?? '') . 'themes/IBL/style/style.css">';

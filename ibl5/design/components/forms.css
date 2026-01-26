@@ -1,0 +1,260 @@
+/**
+ * IBL5 Form Components
+ *
+ * Shared form element styles for:
+ * - Login/Registration forms
+ * - Search forms
+ * - Admin forms
+ * - Settings pages
+ */
+
+/* ==========================================================================
+   Base Form Elements
+   ========================================================================== */
+
+.ibl-input,
+.ibl-select,
+.ibl-textarea {
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    color: var(--navy-800);
+    background-color: white;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    width: 100%;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ibl-input:focus,
+.ibl-select:focus,
+.ibl-textarea:focus {
+    outline: none;
+    border-color: var(--accent-500);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.ibl-input::placeholder {
+    color: var(--gray-400);
+}
+
+.ibl-input:disabled,
+.ibl-select:disabled,
+.ibl-textarea:disabled {
+    background-color: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+}
+
+/* Input sizes */
+.ibl-input--sm {
+    font-size: 0.75rem;
+    padding: var(--space-1) var(--space-2);
+}
+
+.ibl-input--lg {
+    font-size: 1rem;
+    padding: var(--space-3) var(--space-4);
+}
+
+/* ==========================================================================
+   Labels
+   ========================================================================== */
+
+.ibl-label {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-2);
+}
+
+.ibl-label--required::after {
+    content: ' *';
+    color: #dc2626;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.ibl-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-decoration: none;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.ibl-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Primary button */
+.ibl-btn--primary {
+    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+    color: white;
+    box-shadow: 0 2px 6px rgb(249 115 22 / 0.3);
+}
+
+.ibl-btn--primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--accent-600), var(--accent-600));
+    box-shadow: 0 4px 12px rgb(249 115 22 / 0.4);
+}
+
+/* Secondary button */
+.ibl-btn--secondary {
+    background: var(--navy-800);
+    color: white;
+}
+
+.ibl-btn--secondary:hover:not(:disabled) {
+    background: var(--navy-900);
+}
+
+/* Ghost button */
+.ibl-btn--ghost {
+    background: transparent;
+    color: var(--navy-800);
+    border: 1px solid var(--gray-300);
+}
+
+.ibl-btn--ghost:hover:not(:disabled) {
+    background: var(--gray-100);
+    border-color: var(--gray-400);
+}
+
+/* Button sizes */
+.ibl-btn--sm {
+    font-size: 0.75rem;
+    padding: var(--space-1) var(--space-3);
+}
+
+.ibl-btn--lg {
+    font-size: 1rem;
+    padding: var(--space-3) var(--space-6);
+}
+
+/* Full-width button */
+.ibl-btn--block {
+    width: 100%;
+}
+
+/* ==========================================================================
+   Form Groups
+   ========================================================================== */
+
+.ibl-form-group {
+    margin-bottom: var(--space-4);
+}
+
+.ibl-form-group--inline {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.ibl-form-help {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-top: var(--space-1);
+}
+
+.ibl-form-error {
+    font-size: 0.75rem;
+    color: #dc2626;
+    margin-top: var(--space-1);
+}
+
+/* ==========================================================================
+   Checkbox & Radio
+   ========================================================================== */
+
+.ibl-checkbox,
+.ibl-radio {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+}
+
+.ibl-checkbox input,
+.ibl-radio input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-500);
+    cursor: pointer;
+}
+
+.ibl-checkbox__label,
+.ibl-radio__label {
+    font-size: 0.875rem;
+    color: var(--gray-700);
+}
+
+/* ==========================================================================
+   Search Form
+   ========================================================================== */
+
+.ibl-search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: white;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-full);
+    padding: var(--space-1) var(--space-3);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ibl-search:focus-within {
+    border-color: var(--accent-500);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.ibl-search__icon {
+    color: var(--gray-400);
+    flex-shrink: 0;
+}
+
+.ibl-search__input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 0.875rem;
+    background: transparent;
+}
+
+.ibl-search__input::placeholder {
+    color: var(--gray-400);
+}
+
+.ibl-search__btn {
+    background: var(--accent-500);
+    color: white;
+    border: none;
+    border-radius: var(--radius-full);
+    padding: var(--space-1) var(--space-3);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.ibl-search__btn:hover {
+    background: var(--accent-600);
+}

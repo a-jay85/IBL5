@@ -1,0 +1,263 @@
+/**
+ * IBL5 Card Components
+ *
+ * Shared card/block styles used across:
+ * - SeasonHighsView
+ * - DraftView
+ * - Sidebar blocks
+ * - News articles
+ * - Stat cards
+ */
+
+/* ==========================================================================
+   Base Card
+   ========================================================================== */
+
+.ibl-card {
+    font-family: var(--font-sans);
+    background: white;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+    margin-bottom: var(--space-4);
+    transition: box-shadow var(--transition-base);
+}
+
+.ibl-card:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+/* Card Header */
+.ibl-card__header {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    padding: var(--space-3) var(--space-4);
+    color: white;
+}
+
+.ibl-card__header--accent {
+    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+}
+
+.ibl-card__title {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.ibl-card__subtitle {
+    font-size: 0.6875rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: var(--space-1);
+}
+
+/* Card Body */
+.ibl-card__body {
+    padding: var(--space-4);
+}
+
+.ibl-card__body--compact {
+    padding: var(--space-2) var(--space-3);
+}
+
+/* Card Footer */
+.ibl-card__footer {
+    padding: var(--space-3) var(--space-4);
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-100);
+}
+
+/* ==========================================================================
+   Stat Card (Leaders Block)
+   ========================================================================== */
+
+.ibl-stat-card {
+    background: white;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.ibl-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.ibl-stat-card__header {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ibl-stat-card__category {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ibl-stat-card__badge {
+    font-size: 0.625rem;
+    font-weight: 700;
+    color: var(--accent-400);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Leader display */
+.ibl-stat-card__leader {
+    padding: var(--space-4);
+    background: linear-gradient(180deg, var(--gray-50) 0%, white 100%);
+    border-bottom: 1px solid var(--gray-100);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.ibl-stat-card__leader-value {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--accent-500);
+    line-height: 1;
+}
+
+/* ==========================================================================
+   Sidebar Block
+   ========================================================================== */
+
+.ibl-sidebar-block {
+    font-family: var(--font-sans);
+    background: white;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+    margin-bottom: var(--space-4);
+}
+
+.ibl-sidebar-block__header {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    padding: var(--space-3) var(--space-4);
+}
+
+.ibl-sidebar-block__title {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.ibl-sidebar-block__body {
+    padding: var(--space-4);
+    font-size: 0.8125rem;
+    color: var(--gray-700);
+}
+
+/* ==========================================================================
+   Center Block (Legacy OpenTable replacement)
+   ========================================================================== */
+
+.ibl-centerbox {
+    font-family: var(--font-sans);
+    background: white;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+    margin-bottom: var(--space-6);
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.ibl-centerbox__header {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    padding: var(--space-4) var(--space-6);
+    text-align: center;
+}
+
+.ibl-centerbox__title {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.ibl-centerbox__content {
+    padding: var(--space-6);
+    max-width: 100%;
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   Empty State
+   ========================================================================== */
+
+.ibl-empty-state {
+    text-align: center;
+    padding: var(--space-12) var(--space-6);
+    color: var(--gray-500);
+}
+
+.ibl-empty-state__icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto var(--space-4);
+    color: var(--gray-300);
+}
+
+.ibl-empty-state__text {
+    font-size: 0.875rem;
+}
+
+/* ==========================================================================
+   Badge/Status Indicators
+   ========================================================================== */
+
+.ibl-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-full);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ibl-badge--success {
+    background: #f0fdf4;
+    color: #16a34a;
+}
+
+.ibl-badge--warning {
+    background: #fffbeb;
+    color: #d97706;
+}
+
+.ibl-badge--danger {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.ibl-badge--info {
+    background: #eff6ff;
+    color: #2563eb;
+}

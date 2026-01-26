@@ -1,0 +1,1608 @@
+/**
+ * IBL5 Existing Component Styles
+ *
+ * These are the existing component styles migrated from the original style.css.
+ * They are organized here to work with the Tailwind build system while
+ * preserving all the existing functionality.
+ */
+
+/* ==========================================================================
+   Modern Block Components
+   ========================================================================== */
+
+/* Leaders Block - Grid Container */
+.leaders-block {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto var(--space-8);
+    font-family: var(--font-sans);
+}
+
+.leaders-block__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-6);
+    padding-bottom: var(--space-4);
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.leaders-block__icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+    border-radius: var(--radius-lg);
+    color: white;
+    box-shadow: 0 4px 12px rgb(249 115 22 / 0.3);
+}
+
+.leaders-block__title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--navy-900);
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+    margin: 0;
+}
+
+.leaders-block__subtitle {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+}
+
+/* Leaders Grid */
+.leaders-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-4);
+}
+
+@media (max-width: 1200px) {
+    .leaders-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .leaders-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .leaders-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Stat Category Card */
+.stat-card {
+    background: white;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.stat-card__header {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.stat-card__category {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stat-card__badge {
+    font-size: 0.667rem; /* Accessibility: min 12px */
+    font-weight: 700;
+    color: var(--accent-400);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Leader Item (Top Player) */
+.stat-card__leader {
+    padding: var(--space-4);
+    background: linear-gradient(180deg, var(--gray-50) 0%, white 100%);
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.stat-card__leader-inner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.stat-card__images {
+    display: flex;
+    align-items: flex-end;
+    position: relative;
+}
+
+.stat-card__player-img {
+    width: 56px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: var(--radius-md);
+    border: 2px solid white;
+    box-shadow: var(--shadow-sm);
+    background: var(--gray-200);
+}
+
+.stat-card__team-img {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    position: absolute;
+    bottom: -4px;
+    right: -8px;
+    background: white;
+    border-radius: var(--radius-full);
+    padding: 2px;
+    box-shadow: var(--shadow-sm);
+}
+
+.stat-card__leader-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.stat-card__player-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--navy-900);
+    text-decoration: none;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color var(--transition-fast);
+}
+
+.stat-card__player-name:hover {
+    color: var(--accent-500);
+}
+
+.stat-card__team-name {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    text-decoration: none;
+    display: block;
+    margin-top: 2px;
+    transition: color var(--transition-fast);
+}
+
+.stat-card__team-name:hover {
+    color: var(--accent-500);
+}
+
+.stat-card__stat-value {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--accent-500);
+    line-height: 1;
+}
+
+/* Runner-up List */
+.stat-card__runners {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.stat-card__runner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--gray-50);
+    transition: background var(--transition-fast);
+}
+
+.stat-card__runner:last-child {
+    border-bottom: none;
+}
+
+.stat-card__runner:hover {
+    background: var(--gray-50);
+}
+
+.stat-card__runner-rank {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--gray-400);
+    width: 20px;
+    flex-shrink: 0;
+}
+
+.stat-card__runner-info {
+    flex: 1;
+    min-width: 0;
+    margin-left: var(--space-2);
+}
+
+.stat-card__runner-name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--navy-800);
+    text-decoration: none;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color var(--transition-fast);
+}
+
+.stat-card__runner-name:hover {
+    color: var(--accent-500);
+}
+
+.stat-card__runner-team {
+    font-size: 0.6875rem;
+    color: var(--gray-400);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+
+.stat-card__runner-team:hover {
+    color: var(--accent-500);
+}
+
+.stat-card__runner-value {
+    font-family: var(--font-display);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--navy-700);
+    flex-shrink: 0;
+    margin-left: var(--space-2);
+}
+
+/* ==========================================================================
+   Leaders Grid Layout (Side-by-Side on Desktop)
+   ========================================================================== */
+
+/* Use CSS Grid to display leaders blocks side-by-side on desktop */
+@media (min-width: 1024px) {
+    /* Target consecutive leaders-grid-item elements */
+    .leaders-grid-item {
+        display: inline-block;
+        vertical-align: top;
+        width: calc(50% - 0.5rem);
+        margin-right: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .leaders-grid-item:nth-of-type(2n) {
+        margin-right: 0;
+        margin-left: 0.5rem;
+    }
+}
+
+/* ==========================================================================
+   Tabbed Leaders Component (Ultra-Compact Layout)
+   ========================================================================== */
+
+.leaders-tabbed {
+    width: 100%;
+    max-width: 100%;
+    font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+    background: white;
+    border: 1px solid var(--gray-100);
+    border-radius: 0.5rem;
+    -webkit-border-radius: 0.5rem;
+    -moz-border-radius: 0.5rem;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+/* Rounded corners preserved at all sizes for cross-browser compatibility */
+
+/* Header */
+.leaders-tabbed__header {
+    background: var(--navy-800);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.leaders-tabbed__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Orange variant header */
+.leaders-tabbed--chunk .leaders-tabbed__header {
+    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+}
+
+/* Tabs Bar */
+.leaders-tabbed__tabs {
+    display: flex;
+    background: var(--navy-800);
+    padding: 0;
+    gap: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.leaders-tabbed__tab {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: var(--space-2) var(--space-1);
+    font-family: var(--font-display);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: center;
+}
+
+.leaders-tabbed__tab:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.leaders-tabbed__tab--active {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    border-bottom-color: var(--accent-500);
+}
+
+/* Tab Panels */
+.leaders-tabbed__panels {
+    position: relative;
+}
+
+.leaders-tabbed__panel {
+    display: none;
+}
+
+.leaders-tabbed__panel--active {
+    display: block;
+}
+
+/* Leader Row - Compact centered layout */
+.leaders-tabbed__leader {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-100);
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.leaders-tabbed__leader-images {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.leaders-tabbed__leader-img {
+    width: 40px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    border: 2px solid white;
+    box-shadow: var(--shadow-sm);
+    background: var(--gray-200);
+}
+
+.leaders-tabbed__leader-team-img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    position: absolute;
+    bottom: -3px;
+    right: -5px;
+    background: white;
+    border-radius: var(--radius-full);
+    padding: 2px;
+    box-shadow: var(--shadow-sm);
+}
+
+.leaders-tabbed__leader-info {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.leaders-tabbed__leader-rank {
+    display: none;
+}
+
+.leaders-tabbed__leader-name {
+    font-weight: 600;
+    font-size: 0.8125rem;
+    color: var(--navy-900);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color var(--transition-fast);
+    line-height: 1.3;
+    display: block;
+}
+
+.leaders-tabbed__leader-name:hover {
+    color: var(--accent-500);
+}
+
+.leaders-tabbed__leader-team {
+    font-size: 0.667rem; /* Accessibility: min 12px */
+    color: var(--gray-500);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
+.leaders-tabbed__leader-team:hover {
+    color: var(--accent-500);
+}
+
+.leaders-tabbed__leader-value {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent-500);
+    line-height: 1;
+    flex-shrink: 0;
+    padding-left: var(--space-2);
+}
+
+/* Runners-up - Horizontal compact list */
+.leaders-tabbed__runners {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    background: white;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.leaders-tabbed__runner {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--space-1) 2px;
+    text-align: center;
+    border-right: 1px solid var(--gray-100);
+    transition: background var(--transition-fast);
+    overflow: hidden;
+}
+
+.leaders-tabbed__runner:last-child {
+    border-right: none;
+}
+
+.leaders-tabbed__runner:hover {
+    background: var(--gray-50);
+}
+
+.leaders-tabbed__runner-rank {
+    font-size: 0.667rem; /* Accessibility: min 12px */
+    font-weight: 700;
+    color: var(--gray-400);
+    line-height: 1;
+}
+
+.leaders-tabbed__runner-logo {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.leaders-tabbed__runner-name {
+    font-size: 0.667rem; /* Accessibility: min 12px */
+    font-weight: 600;
+    color: var(--navy-800);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    transition: color var(--transition-fast);
+    line-height: 1.2;
+}
+
+.leaders-tabbed__runner-name:hover {
+    color: var(--accent-500);
+}
+
+.leaders-tabbed__runner-team {
+    display: none;
+}
+
+.leaders-tabbed__runner-value {
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--navy-700);
+    line-height: 1.2;
+}
+
+/* Sim/Chunk Leaders Variant - Orange tabs */
+.leaders-tabbed--chunk .leaders-tabbed__tabs {
+    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+}
+
+.leaders-tabbed--chunk .leaders-tabbed__tab {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.leaders-tabbed--chunk .leaders-tabbed__tab:hover {
+    color: white;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.leaders-tabbed--chunk .leaders-tabbed__tab--active {
+    color: white;
+    background: rgba(0, 0, 0, 0.15);
+    border-bottom-color: white;
+}
+
+.leaders-tabbed--chunk .leaders-tabbed__leader-value {
+    color: var(--navy-800);
+}
+
+/* ==========================================================================
+   Legacy Grid Layout (Keep for backwards compatibility)
+   ========================================================================== */
+
+.leaders-block--chunk .stat-card {
+    border-top: 3px solid var(--accent-500);
+}
+
+.leaders-block--chunk .stat-card__header {
+    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+}
+
+.leaders-block--chunk .stat-card__stat-value {
+    color: var(--navy-800);
+}
+
+/* ==========================================================================
+   Injury Report Block
+   ========================================================================== */
+
+.injury-block {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto var(--space-8);
+    font-family: var(--font-sans);
+    background: white;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+}
+
+.injury-block__header {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    padding: var(--space-4) var(--space-6);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.injury-block__icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-md);
+    color: white;
+}
+
+.injury-block__title {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.injury-block__description {
+    padding: var(--space-3) var(--space-6);
+    background: #fef2f2;
+    border-bottom: 1px solid #fecaca;
+    font-size: 0.8125rem;
+    color: #991b1b;
+}
+
+/* Responsive Table */
+.injury-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.injury-table th {
+    background: var(--gray-50);
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.injury-table td {
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--gray-100);
+    font-size: 0.8125rem;
+    color: var(--navy-800);
+}
+
+.injury-table tr:last-child td {
+    border-bottom: none;
+}
+
+.injury-table tr:hover td {
+    background: var(--gray-50);
+}
+
+.injury-table__team-name {
+    font-weight: 600;
+    color: var(--navy-900);
+}
+
+.injury-table__count {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.injury-table__count--warning {
+    color: #dc2626;
+}
+
+.injury-table__count--ok {
+    color: #16a34a;
+}
+
+.injury-table__status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-full);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.injury-table__status--yes {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.injury-table__status--no {
+    background: #f0fdf4;
+    color: #16a34a;
+}
+
+/* Mobile Cards for Injury Table */
+@media (max-width: 640px) {
+    .injury-block {
+        max-width: 100%;
+        overflow: hidden;
+    }
+
+    .injury-table,
+    .injury-table thead,
+    .injury-table tbody,
+    .injury-table th,
+    .injury-table td,
+    .injury-table tr {
+        display: block;
+        width: 100%;
+    }
+
+    .injury-table thead {
+        display: none;
+    }
+
+    .injury-table tr {
+        padding: var(--space-3);
+        border-bottom: 1px solid var(--gray-200);
+    }
+
+    .injury-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-1) 0;
+        border: none;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .injury-table td::before {
+        content: attr(data-label);
+        font-size: 0.667rem; /* Accessibility: min 12px */
+        font-weight: 600;
+        color: var(--gray-500);
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        flex-shrink: 0;
+    }
+
+    .injury-table__team-name,
+    .injury-table__count,
+    .injury-table__status {
+        text-align: right;
+    }
+}
+
+/* ==========================================================================
+   News/Transactions Block
+   ========================================================================== */
+
+.news-block {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto var(--space-8);
+    font-family: var(--font-sans);
+}
+
+.news-article {
+    background: white;
+    border-radius: 0.75rem;
+    -webkit-border-radius: 0.75rem;
+    -moz-border-radius: 0.75rem;
+    overflow: hidden;
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
+    border: 1px solid var(--gray-100, #f3f4f6);
+    margin-bottom: var(--space-4, 1rem);
+    transition: box-shadow var(--transition-base, 0.2s ease);
+}
+
+.news-article:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+.news-article__header {
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--gray-100);
+    background: linear-gradient(180deg, var(--gray-50) 0%, white 100%);
+}
+
+.news-article__title {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--navy-900);
+    margin: 0 0 var(--space-2);
+    line-height: 1.3;
+}
+
+.news-article__title a {
+    color: inherit;
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+
+.news-article__title a:hover {
+    color: var(--accent-500);
+}
+
+.news-category {
+    color: var(--accent-500);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 1.125rem;
+    letter-spacing: 0.05em;
+}
+
+.news-article--transaction .news-category {
+    color: var(--accent-400);
+}
+
+.news-article__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    font-size: 0.75rem;
+    color: var(--gray-500);
+}
+
+.news-article__meta-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.news-article__body {
+    padding: var(--space-5);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--gray-700);
+}
+
+.news-article__footer {
+    padding: var(--space-3) var(--space-5);
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-100);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: center;
+    justify-content: space-between;
+}
+
+.news-article__link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--accent-500);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+
+.news-article__link:hover {
+    color: var(--accent-600);
+}
+
+.news-article__score {
+    font-size: 0.75rem;
+    color: var(--gray-500);
+}
+
+/* Transaction-specific styling */
+.news-article--transaction .news-article__header {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    border-bottom: none;
+}
+
+.news-article--transaction .news-article__title {
+    color: white;
+}
+
+.news-article--transaction .news-article__meta {
+    color: var(--gray-400);
+}
+
+/* Topic icon */
+.news-article__topic-icon {
+    float: right;
+    margin: 0 0 var(--space-4) var(--space-4);
+    max-width: 80px;
+    border-radius: var(--radius-md);
+}
+
+@media (max-width: 640px) {
+    .news-article__topic-icon {
+        float: none;
+        margin: 0 auto var(--space-4);
+        display: block;
+    }
+}
+
+/* ==========================================================================
+   Utility Classes for Blocks
+   ========================================================================== */
+
+.ibl-container {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+@media (min-width: 1440px) {
+    .ibl-container {
+        max-width: 1400px;
+        padding: 0 var(--space-4);
+    }
+}
+
+.ibl-section-title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--navy-900);
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    margin: 0 0 var(--space-6);
+    padding-bottom: var(--space-4);
+    border-bottom: 2px solid var(--gray-200);
+    position: relative;
+}
+
+.ibl-section-title::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 60px;
+    height: 2px;
+    background: var(--accent-500);
+}
+
+/* Empty State */
+.ibl-empty-state {
+    text-align: center;
+    padding: var(--space-12) var(--space-6);
+    color: var(--gray-500);
+}
+
+.ibl-empty-state__icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto var(--space-4);
+    color: var(--gray-300);
+}
+
+.ibl-empty-state__text {
+    font-size: 0.875rem;
+}
+
+/* ==========================================================================
+   Mobile Table Responsiveness
+   ========================================================================== */
+
+/* Prevent line breaks on hyphens in record data (W-L, etc.) */
+.responsive-table td {
+    white-space: nowrap;
+}
+
+/* Wrapper for scroll container - holds the fixed shadow */
+.table-scroll-wrapper {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+/* Scroll container for wide tables on mobile */
+.table-scroll-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    width: 100%;
+}
+
+/* On mobile, constrain scroll container to viewport */
+@media (max-width: 768px) {
+    .table-scroll-wrapper {
+        width: 100%;
+        max-width: 100%;
+        padding-left: 0;
+        padding-right: 0;
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .table-scroll-container {
+        display: block;
+        overflow-x: scroll !important;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x pan-y;
+        padding: 0 !important;
+        /* Width set by JavaScript for iOS compatibility */
+    }
+
+    /* Remove border-radius and padding on mobile for edge-to-edge tables */
+    .standings-table-container {
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .table-scroll-wrapper {
+        padding: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .standings-table {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+}
+
+/* Scroll indicator shadow on right edge - on wrapper so it doesn't scroll */
+.table-scroll-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 24px;
+    background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.08));
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    z-index: 2;
+}
+
+/* Hide scroll indicator when scrolled to the end */
+.table-scroll-wrapper.scrolled-end::after {
+    opacity: 0;
+}
+
+@media (max-width: 768px) {
+    /* Sticky first column(s) for context while scrolling */
+    .responsive-table th.sticky-col,
+    .responsive-table td.sticky-col {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        background: inherit;
+    }
+
+    /* Ensure sticky cells maintain their background on hover */
+    .responsive-table tbody tr:nth-child(odd) td.sticky-col {
+        background-color: white;
+    }
+    .responsive-table tbody tr:nth-child(even) td.sticky-col {
+        background-color: var(--gray-50, #f9fafb);
+    }
+    .responsive-table tbody tr:hover td.sticky-col {
+        background-color: var(--gray-100, #f3f4f6);
+    }
+
+    /* Header sticky cells */
+    .responsive-table thead th.sticky-col {
+        background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+        z-index: 3;
+    }
+
+    /* Shadow on sticky column edge */
+    .responsive-table th.sticky-col,
+    .responsive-table td.sticky-col {
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Reduce font sizes on mobile for density */
+    .responsive-table th {
+        font-size: 0.667rem; /* Accessibility: min 12px */
+        padding: 0.5rem 0.25rem;
+    }
+    .responsive-table td {
+        font-size: 0.667rem; /* Accessibility: min 12px */
+        padding: 0.375rem 0.25rem;
+    }
+
+    /* Ensure minimum width for scrollable tables */
+    .table-scroll-container table {
+        min-width: 600px;
+    }
+}
+
+/* Second sticky column (for rank + name patterns) */
+@media (max-width: 768px) {
+    .responsive-table th.sticky-col-2,
+    .responsive-table td.sticky-col-2 {
+        position: sticky;
+        z-index: 1;
+        background: inherit;
+    }
+
+    /* First sticky column */
+    .responsive-table th.sticky-col-1,
+    .responsive-table td.sticky-col-1 {
+        left: 0;
+    }
+
+    /* Second sticky column - offset by first column width */
+    .responsive-table th.sticky-col-2,
+    .responsive-table td.sticky-col-2 {
+        left: 40px; /* Approximate width of rank column */
+    }
+
+    /* Backgrounds for multi-sticky columns */
+    .responsive-table tbody tr:nth-child(odd) td.sticky-col-1,
+    .responsive-table tbody tr:nth-child(odd) td.sticky-col-2 {
+        background-color: white;
+    }
+    .responsive-table tbody tr:nth-child(even) td.sticky-col-1,
+    .responsive-table tbody tr:nth-child(even) td.sticky-col-2 {
+        background-color: var(--gray-50, #f9fafb);
+    }
+    .responsive-table tbody tr:hover td.sticky-col-1,
+    .responsive-table tbody tr:hover td.sticky-col-2 {
+        background-color: var(--gray-100, #f3f4f6);
+    }
+
+    /* Header backgrounds for multi-sticky */
+    .responsive-table thead th.sticky-col-1,
+    .responsive-table thead th.sticky-col-2 {
+        background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+        z-index: 3;
+    }
+
+    /* Shadow only on the rightmost sticky column */
+    .responsive-table th.sticky-col-1,
+    .responsive-table td.sticky-col-1 {
+        box-shadow: none;
+    }
+    .responsive-table th.sticky-col-2,
+    .responsive-table td.sticky-col-2 {
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+    }
+}
+
+/* Hide less important columns on very small screens */
+@media (max-width: 480px) {
+    .hide-mobile {
+        display: none !important;
+    }
+}
+
+/* ==========================================================================
+   Team Page Responsive Layout
+   ========================================================================== */
+
+.team-page-layout {
+    display: flex;
+    gap: var(--space-4);
+    align-items: flex-start;
+    width: 100%;
+    max-width: 100%;
+}
+
+.team-page-main {
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.team-page-sidebar {
+    flex-shrink: 0;
+    width: 220px;
+}
+
+/* Mobile sidebar is hidden on desktop, shown on mobile */
+.team-page-sidebar-mobile {
+    display: none;
+}
+
+.team-page-rafters {
+    margin-top: var(--space-4);
+}
+
+/* Mobile: Stack columns and reorder */
+@media (max-width: 768px) {
+    .team-page-layout {
+        flex-direction: column;
+    }
+
+    /* Hide desktop sidebar on mobile */
+    .team-page-sidebar {
+        display: none;
+    }
+
+    /* Show mobile sidebar (appears after Draft Picks) */
+    .team-page-sidebar-mobile {
+        display: block;
+        width: 100%;
+        margin-top: var(--space-4);
+    }
+
+    /* Ensure the sidebar table fits mobile */
+    .team-page-sidebar-mobile > table {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+/* ==========================================================================
+   Schedule Page - Month/Day Grouped Layout
+   ========================================================================== */
+
+.schedule-container {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    font-family: var(--font-display);
+}
+
+/* Header */
+.schedule-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-3);
+}
+
+.schedule-title {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--navy-900);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.schedule-jump-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    background: var(--accent-500);
+    color: white;
+    font-size: 0.667rem; /* Accessibility: min 12px */
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    border-radius: var(--radius-full);
+    transition: all var(--transition-fast);
+    box-shadow: 0 2px 6px rgb(249 115 22 / 0.3);
+}
+
+.schedule-jump-btn:hover {
+    background: var(--accent-600);
+    box-shadow: 0 3px 10px rgb(249 115 22 / 0.4);
+}
+
+/* Month Navigation */
+.schedule-months {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 2px;
+    margin-bottom: var(--space-4);
+    padding: 3px;
+    background: var(--gray-100);
+    border-radius: var(--radius-lg);
+    container-type: inline-size;
+}
+
+.schedule-months__link {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 4px;
+    font-size: 0.667rem; /* Accessibility: min 12px */
+    font-weight: 600;
+    color: var(--gray-600);
+    text-align: center;
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.schedule-months__link:hover {
+    background: white;
+    color: var(--navy-900);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Full/abbreviated month name toggle */
+.schedule-months__full {
+    display: inline;
+}
+
+.schedule-months__abbr {
+    display: none;
+}
+
+/* Switch to abbreviations when container is narrow */
+@container (max-width: 480px) {
+    .schedule-months__full {
+        display: none;
+    }
+    .schedule-months__abbr {
+        display: inline;
+    }
+}
+
+/* Fallback for browsers without container query support */
+@supports not (container-type: inline-size) {
+    @media (max-width: 540px) {
+        .schedule-months__full {
+            display: none;
+        }
+        .schedule-months__abbr {
+            display: inline;
+        }
+    }
+}
+
+/* Month Section */
+.schedule-month {
+    margin-bottom: var(--space-4);
+    scroll-margin-top: 80px; /* Offset for sticky header */
+}
+
+.schedule-month__header {
+    padding: 4px 8px;
+    background: var(--navy-800);
+    color: white;
+    font-family: var(--font-display);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+/* Day Row */
+.schedule-day {
+    display: flex;
+    border-bottom: 1px solid var(--gray-100);
+    background: white;
+}
+
+.schedule-day:last-child {
+    border-bottom: none;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.schedule-day__header {
+    flex-shrink: 0;
+    width: 36px;
+    padding: 4px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--gray-50);
+    border-right: 1px solid var(--gray-100);
+}
+
+.schedule-day__name {
+    font-size: 0.667rem; /* Accessibility: min 12px */
+    font-weight: 600;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.schedule-day__num {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--navy-800);
+    line-height: 1;
+}
+
+/* Games within a day */
+.schedule-day__games {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Game Row - CSS Grid for vertical alignment */
+.schedule-game {
+    display: grid;
+    grid-template-columns: 1fr 20px 24px 16px 24px 20px 1fr;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: background var(--transition-fast);
+    font-size: 0.6875rem;
+    border-bottom: 1px solid var(--gray-50);
+}
+
+.schedule-game:last-child {
+    border-bottom: none;
+}
+
+.schedule-game:hover {
+    background: var(--gray-50);
+}
+
+/* Team name alignment */
+.schedule-game__team-link:first-of-type {
+    text-align: right;
+}
+
+.schedule-game__team-link:last-of-type {
+    text-align: left;
+}
+
+/* Upcoming game */
+.schedule-game--upcoming {
+    background: #fffbeb;
+}
+
+.schedule-game--upcoming:hover {
+    background: #fef3c7;
+}
+
+/* Team name */
+.schedule-game__team {
+    font-weight: 500;
+    color: var(--navy-700);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Winner styling */
+.schedule-game__team--win {
+    font-weight: 700;
+    color: var(--accent-600);
+}
+
+/* Team record (W-L) - inline with team name */
+.schedule-game__record {
+    font-size: 0.667rem; /* Accessibility: min 12px */
+    font-weight: 400;
+    color: var(--gray-400);
+}
+
+/* Team logo */
+.schedule-game__logo {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    justify-self: center;
+}
+
+/* Team link (name) */
+.schedule-game__team-link {
+    text-decoration: none;
+    color: inherit;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.schedule-game__team-link:hover .schedule-game__team {
+    color: var(--accent-600);
+}
+
+/* Logo link */
+.schedule-game__logo-link {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.schedule-game__logo-link:hover {
+    opacity: 0.8;
+}
+
+/* Score link */
+.schedule-game__score-link {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--navy-600);
+    text-align: center;
+    text-decoration: none;
+}
+
+.schedule-game__score-link:hover {
+    color: var(--accent-600);
+}
+
+.schedule-game__score-link.schedule-game__team--win {
+    color: var(--accent-600);
+}
+
+/* @ symbol */
+.schedule-game__vs {
+    font-size: 0.667rem; /* Accessibility: min 12px */
+    font-weight: 600;
+    color: var(--gray-300);
+    text-align: center;
+    text-decoration: none;
+}
+
+.schedule-game__vs:hover {
+    color: var(--accent-600);
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+    .schedule-container {
+        margin: 0;
+    }
+
+    .schedule-header {
+        padding: 0 8px;
+    }
+
+    .schedule-months {
+        border-radius: 0;
+        margin-left: -8px;
+        margin-right: -8px;
+        width: calc(100% + 16px);
+        padding: 2px;
+    }
+
+    .schedule-months__link {
+        padding: 5px 2px;
+        font-size: 0.667rem; /* Accessibility: min 12px */
+    }
+
+    .schedule-month {
+        margin-left: -8px;
+        margin-right: -8px;
+        width: calc(100% + 16px);
+    }
+
+    .schedule-month__header {
+        border-radius: 0;
+    }
+
+    .schedule-day:last-child {
+        border-radius: 0;
+    }
+
+    .schedule-day__header {
+        width: 32px;
+    }
+
+    .schedule-day__num {
+        font-size: 0.75rem;
+    }
+
+    .schedule-game {
+        grid-template-columns: 1fr 16px 20px 12px 20px 16px 1fr;
+        padding: 3px 4px;
+        font-size: 0.667rem; /* Accessibility: min 12px */
+    }
+
+    .schedule-game__score-link {
+        font-size: 0.667rem; /* Accessibility: min 12px */
+    }
+
+    .schedule-game__record {
+        font-size: 0.55rem;
+    }
+
+    .schedule-game__logo {
+        width: 14px;
+        height: 14px;
+    }
+}

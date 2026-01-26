@@ -1,0 +1,282 @@
+/**
+ * IBL5 Table Components
+ *
+ * Shared table styles used across:
+ * - StandingsView
+ * - LeagueStatsView
+ * - InjuriesView
+ * - PlayerStatsView
+ * - Other data tables
+ */
+
+/* ==========================================================================
+   Base Table Styles
+   ========================================================================== */
+
+.ibl-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-sans);
+    background: white;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+}
+
+.ibl-table th,
+.ibl-table td {
+    padding: var(--space-3) var(--space-4);
+    text-align: left;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.ibl-table th {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ibl-table td {
+    font-size: 0.8125rem;
+    color: var(--navy-800);
+}
+
+.ibl-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.ibl-table tbody tr:nth-child(even) {
+    background-color: var(--gray-50);
+}
+
+.ibl-table tbody tr:hover {
+    background-color: var(--gray-100);
+}
+
+/* ==========================================================================
+   Table Header Variants
+   ========================================================================== */
+
+.ibl-table-header {
+    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    padding: var(--space-3) var(--space-4);
+    color: white;
+}
+
+.ibl-table-header--accent {
+    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+}
+
+.ibl-table-header__title {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+/* ==========================================================================
+   Table Row Variants
+   ========================================================================== */
+
+.ibl-table-row--highlight {
+    background-color: var(--accent-100) !important;
+}
+
+.ibl-table-row--user-team {
+    background-color: #ffffcc !important;
+}
+
+.ibl-table-row--winner {
+    font-weight: 700;
+    color: var(--accent-600);
+}
+
+/* ==========================================================================
+   Responsive Table Wrapper
+   ========================================================================== */
+
+.ibl-table-wrapper {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.ibl-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    width: 100%;
+}
+
+/* Scroll indicator shadow */
+.ibl-table-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 24px;
+    background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.08));
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    z-index: 2;
+}
+
+.ibl-table-wrapper.scrolled-end::after {
+    opacity: 0;
+}
+
+/* ==========================================================================
+   Sticky Column Support (Mobile)
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    .ibl-table-sticky th.sticky-col,
+    .ibl-table-sticky td.sticky-col {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        background: inherit;
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .ibl-table-sticky thead th.sticky-col {
+        background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+        z-index: 3;
+    }
+
+    .ibl-table-sticky tbody tr:nth-child(odd) td.sticky-col {
+        background-color: white;
+    }
+
+    .ibl-table-sticky tbody tr:nth-child(even) td.sticky-col {
+        background-color: var(--gray-50);
+    }
+
+    .ibl-table-sticky tbody tr:hover td.sticky-col {
+        background-color: var(--gray-100);
+    }
+
+    /* Compact sizing on mobile */
+    .ibl-table th {
+        font-size: 0.5625rem;
+        padding: 0.5rem 0.25rem;
+    }
+
+    .ibl-table td {
+        font-size: 0.625rem;
+        padding: 0.375rem 0.25rem;
+    }
+
+    .ibl-table-scroll table {
+        min-width: 600px;
+    }
+}
+
+/* ==========================================================================
+   Stat Value Formatting
+   ========================================================================== */
+
+.ibl-stat-value {
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-align: right;
+}
+
+.ibl-stat-value--highlight {
+    color: var(--accent-500);
+    font-weight: 700;
+}
+
+.ibl-stat-value--positive {
+    color: #16a34a;
+}
+
+.ibl-stat-value--negative {
+    color: #dc2626;
+}
+
+/* ==========================================================================
+   Team Name Cell
+   ========================================================================== */
+
+.ibl-team-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.ibl-team-cell__logo {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.ibl-team-cell__name {
+    font-weight: 600;
+    color: var(--navy-900);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color var(--transition-fast);
+}
+
+.ibl-team-cell__name:hover {
+    color: var(--accent-500);
+}
+
+/* ==========================================================================
+   Player Name Cell
+   ========================================================================== */
+
+.ibl-player-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.ibl-player-cell__img {
+    width: 32px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--gray-200);
+    flex-shrink: 0;
+}
+
+.ibl-player-cell__info {
+    min-width: 0;
+}
+
+.ibl-player-cell__name {
+    font-weight: 600;
+    color: var(--navy-900);
+    text-decoration: none;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color var(--transition-fast);
+}
+
+.ibl-player-cell__name:hover {
+    color: var(--accent-500);
+}
+
+.ibl-player-cell__team {
+    font-size: 0.6875rem;
+    color: var(--gray-500);
+    text-decoration: none;
+}
+
+.ibl-player-cell__team:hover {
+    color: var(--accent-500);
+}

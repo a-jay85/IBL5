@@ -1,0 +1,229 @@
+/**
+ * IBL5 Base Styles
+ *
+ * Essential global styles that cannot be achieved with Tailwind utilities:
+ * - CSS reset and box-sizing
+ * - Body/HTML overflow management
+ * - Legacy PHP-Nuke element normalization
+ * - Legacy PHP-Nuke class compatibility
+ *
+ * Note: Utility classes like .text-center, .font-bold, .bg-white, etc.
+ * are provided by Tailwind CSS and should NOT be duplicated here.
+ */
+
+/* ==========================================================================
+   CSS Reset & Box Sizing
+   ========================================================================== */
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+/* ==========================================================================
+   HTML & Body Base Styles
+   ========================================================================== */
+
+html {
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    /* Accessibility: Scale up base font size for better readability */
+    font-size: 112.5%; /* 18px base instead of 16px */
+}
+
+body {
+    overscroll-behavior-x: none;
+    width: 100%;
+    max-width: 100%;
+    position: relative;
+    padding-top: 64px; /* Space for fixed navigation */
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* ==========================================================================
+   Legacy PHP-Nuke Element Normalization
+
+   These styles normalize deprecated HTML elements that still exist in
+   legacy PHP-Nuke code. They ensure consistent font rendering across
+   the old codebase while we transition to modern HTML/CSS.
+   ========================================================================== */
+
+FONT,
+TD,
+P,
+DIV,
+FORM {
+    font-family: var(--font-sans);
+    font-size: 1rem;
+}
+
+INPUT,
+TEXTAREA,
+SELECT {
+    border: 1px solid #000000;
+    font-size: 1rem;
+    font-family: var(--font-sans);
+}
+
+/* ==========================================================================
+   Legacy Link Styles
+
+   PHP-Nuke uses explicit link states. These provide baseline styling
+   that individual components can override.
+   ========================================================================== */
+
+A:link,
+A:active,
+A:visited {
+    background: none;
+    color: #363636;
+    font-family: inherit;
+    text-decoration: underline;
+}
+
+A:hover {
+    background: none;
+    color: #363636;
+    font-family: inherit;
+    text-decoration: underline;
+}
+
+/* ==========================================================================
+   Legacy PHP-Nuke Classes
+
+   These classes are used by core PHP-Nuke modules and cannot be removed
+   without refactoring the entire CMS. They provide backward compatibility.
+   ========================================================================== */
+
+.title {
+    background: none;
+    color: #000000;
+    font-size: 14px;
+    font-weight: bold;
+    font-family: var(--font-display);
+    text-decoration: none;
+}
+
+.content {
+    background: none;
+    color: #000000;
+    font-size: 1rem;
+    font-family: var(--font-sans);
+}
+
+.block-title {
+    background: none;
+    color: #FFFFFF;
+    font-size: 1rem;
+    font-family: var(--font-display);
+}
+
+.storytitle {
+    background: none;
+    color: #363636;
+    font-size: 12px;
+    font-weight: bold;
+    font-family: var(--font-display);
+    text-decoration: none;
+}
+
+.storycat {
+    background: none;
+    color: #363636;
+    font-size: 14px;
+    font-weight: bold;
+    font-family: var(--font-display);
+    text-decoration: underline;
+}
+
+.boxtitle {
+    background: none;
+    color: #363636;
+    font-size: 1rem;
+    font-weight: bold;
+    font-family: var(--font-display);
+    text-decoration: none;
+}
+
+.boxcontent {
+    background: none;
+    color: #000000;
+    font-size: 1rem;
+    font-family: var(--font-sans);
+}
+
+.option {
+    background: none;
+    color: #000000;
+    font-size: 1rem;
+    font-weight: bold;
+    font-family: var(--font-sans);
+    text-decoration: none;
+}
+
+.tiny {
+    background: none;
+    color: #000000;
+    font-size: 1rem;
+    font-weight: normal;
+    font-family: var(--font-sans);
+    text-decoration: none;
+}
+
+/* ==========================================================================
+   Legacy Layout Constraints
+
+   Prevent legacy table-based layouts from causing horizontal overflow.
+   ========================================================================== */
+
+table,
+center,
+.center-block {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Legacy centerbox containers */
+.ibl-centerbox,
+.ibl-centerbox__content {
+    max-width: 100%;
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   Mobile Layout Fixes for Legacy Tables
+
+   PHP-Nuke uses nested tables for layout. These rules force them to
+   stack vertically on mobile devices.
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    body > table,
+    body > table > tbody,
+    body > table > tbody > tr,
+    body > table > tbody > tr > td {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    body > table > tbody > tr > td > table,
+    body > table > tbody > tr > td > table > tbody,
+    body > table > tbody > tr > td > table > tbody > tr,
+    body > table > tbody > tr > td > table > tbody > tr > td {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+}

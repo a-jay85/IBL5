@@ -1,0 +1,390 @@
+/**
+ * IBL5 Navigation Components
+ *
+ * Styles for:
+ * - Main navigation bar
+ * - Mobile navigation
+ * - Breadcrumbs
+ * - Tab navigation
+ * - Pagination
+ */
+
+/* ==========================================================================
+   Main Navigation (handled by NavigationView.php)
+   These are utility classes for nav-related components
+   ========================================================================== */
+
+.ibl-nav-link {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.ibl-nav-link:hover {
+    color: var(--accent-500);
+    background: var(--gray-100);
+}
+
+.ibl-nav-link--active {
+    color: var(--accent-500);
+    background: rgba(249, 115, 22, 0.1);
+}
+
+/* ==========================================================================
+   Breadcrumbs
+   ========================================================================== */
+
+.ibl-breadcrumbs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+    margin-bottom: var(--space-4);
+}
+
+.ibl-breadcrumbs__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.ibl-breadcrumbs__link {
+    color: var(--gray-600);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+
+.ibl-breadcrumbs__link:hover {
+    color: var(--accent-500);
+}
+
+.ibl-breadcrumbs__separator {
+    color: var(--gray-300);
+}
+
+.ibl-breadcrumbs__current {
+    color: var(--navy-800);
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   Tab Navigation
+   ========================================================================== */
+
+.ibl-tabs {
+    display: flex;
+    gap: 0;
+    background: var(--navy-800);
+    padding: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ibl-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: var(--space-2) var(--space-3);
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: center;
+    text-decoration: none;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.ibl-tab:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.ibl-tab--active {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    border-bottom-color: var(--accent-500);
+}
+
+/* Accent variant tabs */
+.ibl-tabs--accent {
+    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+}
+
+.ibl-tabs--accent .ibl-tab {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.ibl-tabs--accent .ibl-tab:hover {
+    color: white;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.ibl-tabs--accent .ibl-tab--active {
+    color: white;
+    background: rgba(0, 0, 0, 0.15);
+    border-bottom-color: white;
+}
+
+/* ==========================================================================
+   Pagination
+   ========================================================================== */
+
+.ibl-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    margin: var(--space-6) 0;
+}
+
+.ibl-pagination__item {
+    min-width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--navy-800);
+    text-decoration: none;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.ibl-pagination__item:hover {
+    border-color: var(--accent-500);
+    color: var(--accent-500);
+}
+
+.ibl-pagination__item--active {
+    background: var(--accent-500);
+    border-color: var(--accent-500);
+    color: white;
+}
+
+.ibl-pagination__item--disabled {
+    color: var(--gray-300);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.ibl-pagination__ellipsis {
+    color: var(--gray-400);
+    padding: 0 var(--space-2);
+}
+
+/* ==========================================================================
+   Jump Menu (Month/Season Selector)
+   ========================================================================== */
+
+.ibl-jump-menu {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 2px;
+    padding: 3px;
+    background: var(--gray-100);
+    border-radius: var(--radius-lg);
+}
+
+.ibl-jump-menu__link {
+    flex: 1;
+    min-width: 0;
+    padding: var(--space-2) var(--space-2);
+    font-family: var(--font-display);
+    font-size: 0.625rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    text-align: center;
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.ibl-jump-menu__link:hover {
+    background: white;
+    color: var(--navy-900);
+    box-shadow: var(--shadow-sm);
+}
+
+.ibl-jump-menu__link--active {
+    background: white;
+    color: var(--accent-500);
+    box-shadow: var(--shadow-sm);
+}
+
+/* ==========================================================================
+   Mobile Navigation Menu
+   ========================================================================== */
+
+/* Hide mobile nav menu when closed to prevent overflow */
+@media (max-width: 1023px) {
+    #nav-mobile-menu {
+        right: 0;
+    }
+
+    #nav-mobile-menu.translate-x-full {
+        display: none;
+    }
+
+    #nav-mobile-menu.translate-x-0 {
+        display: block;
+    }
+}
+
+/* Mobile menu custom scrollbar */
+.mobile-menu-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+
+.mobile-menu-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.mobile-menu-scroll::-webkit-scrollbar-thumb {
+    background: rgba(249, 115, 22, 0.4);
+    border-radius: 4px;
+}
+
+.mobile-menu-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(249, 115, 22, 0.6);
+}
+
+/* Mobile menu section animation */
+.mobile-section {
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.mobile-menu-open .mobile-section:nth-child(1) { transition-delay: 0.05s; }
+.mobile-menu-open .mobile-section:nth-child(2) { transition-delay: 0.1s; }
+.mobile-menu-open .mobile-section:nth-child(3) { transition-delay: 0.15s; }
+.mobile-menu-open .mobile-section:nth-child(4) { transition-delay: 0.2s; }
+.mobile-menu-open .mobile-section:nth-child(5) { transition-delay: 0.25s; }
+.mobile-menu-open .mobile-section:nth-child(6) { transition-delay: 0.3s; }
+.mobile-menu-open .mobile-section:nth-child(7) { transition-delay: 0.35s; }
+.mobile-menu-open .mobile-section:nth-child(8) { transition-delay: 0.4s; }
+.mobile-menu-open .mobile-section:nth-child(9) { transition-delay: 0.45s; }
+
+.mobile-menu-open .mobile-section {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* ==========================================================================
+   Navigation Dropdown Items
+   Staggered reveal with transitions
+   ========================================================================== */
+
+.nav-dropdown-item {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+
+.group:hover .nav-dropdown-item {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.group:hover .nav-dropdown-item:nth-child(1) { transition-delay: 0ms; }
+.group:hover .nav-dropdown-item:nth-child(2) { transition-delay: 25ms; }
+.group:hover .nav-dropdown-item:nth-child(3) { transition-delay: 50ms; }
+.group:hover .nav-dropdown-item:nth-child(4) { transition-delay: 75ms; }
+.group:hover .nav-dropdown-item:nth-child(5) { transition-delay: 100ms; }
+.group:hover .nav-dropdown-item:nth-child(6) { transition-delay: 125ms; }
+.group:hover .nav-dropdown-item:nth-child(7) { transition-delay: 150ms; }
+.group:hover .nav-dropdown-item:nth-child(8) { transition-delay: 175ms; }
+.group:hover .nav-dropdown-item:nth-child(9) { transition-delay: 200ms; }
+.group:hover .nav-dropdown-item:nth-child(10) { transition-delay: 225ms; }
+.group:hover .nav-dropdown-item:nth-child(11) { transition-delay: 250ms; }
+
+/* ==========================================================================
+   Navigation Link Colors (Accessibility Override)
+   These override browser defaults for proper contrast
+   ========================================================================== */
+
+/* Main nav links (Home link and direct links) */
+nav .group > a:link,
+nav .group > a:visited {
+    color: #e5e7eb !important; /* gray-200 */
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+}
+
+nav .group > a:hover {
+    color: #ffffff !important;
+}
+
+/* Desktop dropdown links */
+.nav-dropdown-item:link {
+    color: #e5e7eb; /* gray-200 */
+}
+
+.nav-dropdown-item:visited {
+    color: #fdba74; /* accent-300 - visited state */
+}
+
+.nav-dropdown-item:hover {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Mobile menu links */
+#nav-mobile-menu a:link {
+    color: #e5e7eb; /* gray-200 */
+}
+
+#nav-mobile-menu a:visited {
+    color: #fdba74; /* accent-300 */
+}
+
+#nav-mobile-menu a:hover {
+    color: #ffffff !important;
+}
+
+/* Mobile section buttons (not links) */
+#nav-mobile-menu .mobile-dropdown-btn {
+    color: #ffffff;
+}
+
+/* Mobile home link */
+#nav-mobile-menu > div > a:link,
+#nav-mobile-menu > div > a:visited {
+    color: #ffffff;
+}
+
+/* ==========================================================================
+   Grain Texture Overlay (Nav Background Effect)
+   ========================================================================== */
+
+.nav-grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    opacity: 0.03;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+}

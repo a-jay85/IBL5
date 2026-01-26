@@ -1,0 +1,35 @@
+/**
+ * IBL5 Design System - Main Entry Point
+ *
+ * This file imports all design system components and generates
+ * the final compiled CSS for the site.
+ *
+ * Build: npm run css:build (or bun run css:build:bun)
+ * Watch: npm run css:watch (or bun run css:watch:bun)
+ *
+ * Architecture:
+ * 1. Google Fonts - external font loading
+ * 2. Tailwind CSS - utility-first framework (provides .text-*, .bg-*, .font-*, etc.)
+ * 3. Design Tokens - CSS custom properties (colors, spacing, fonts)
+ * 4. Base Styles - CSS reset, legacy PHP-Nuke compatibility
+ * 5. Components - reusable UI components (tables, cards, navigation, etc.)
+ */
+
+/* Google Fonts - must be at very top */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap');
+
+/* Tailwind CSS 4 - provides all utility classes */
+@import 'tailwindcss';
+
+/* Design Tokens (CSS Custom Properties) */
+@import './tokens/colors.css';
+
+/* Base Styles (CSS reset, legacy element normalization, PHP-Nuke classes) */
+@import './base.css';
+
+/* Component Styles */
+@import './components/existing-components.css';
+@import './components/tables.css';
+@import './components/cards.css';
+@import './components/forms.css';
+@import './components/navigation.css';

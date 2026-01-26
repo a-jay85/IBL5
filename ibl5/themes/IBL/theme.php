@@ -13,6 +13,10 @@ $textcolor2 = "#000000";
 $theme_home = "Web_Links";
 $hr = 1; # 1 to have horizonal rule in comments instead of table bgcolor
 
+/**
+ * @deprecated Use CSS classes directly: <div class="ibl-card">
+ * Legacy PHP-Nuke table wrapper. Prefer modern CSS components.
+ */
 function OpenTable()
 {
     global $bgcolor1, $bgcolor2;
@@ -20,6 +24,10 @@ function OpenTable()
     echo "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"8\" bgcolor=\"$bgcolor1\"><tr><td>\n";
 }
 
+/**
+ * @deprecated Use CSS classes directly: <div class="ibl-card">
+ * Legacy PHP-Nuke centered table wrapper. Prefer modern CSS components.
+ */
 function OpenTable2()
 {
     global $bgcolor1, $bgcolor2;
@@ -27,11 +35,19 @@ function OpenTable2()
     echo "<table border=\"0\" cellspacing=\"1\" cellpadding=\"8\" bgcolor=\"$bgcolor1\"><tr><td>\n";
 }
 
+/**
+ * @deprecated Use CSS classes directly: </div> (closing .ibl-card)
+ * Legacy PHP-Nuke table closer. Prefer modern CSS components.
+ */
 function CloseTable()
 {
     echo "</td></tr></table></td></tr></table>\n";
 }
 
+/**
+ * @deprecated Use CSS classes directly: </div> (closing .ibl-card)
+ * Legacy PHP-Nuke centered table closer. Prefer modern CSS components.
+ */
 function CloseTable2()
 {
     echo "</td></tr></table></td></tr></table>\n";

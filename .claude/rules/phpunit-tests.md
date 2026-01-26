@@ -94,7 +94,16 @@ Register in `ibl5/phpunit.xml`:
 ```
 
 ## Completion Criteria
-- Zero warnings, zero failures
+
+**IMPORTANT:** Before considering ANY PHPUnit task complete:
+
+1. **Run the full test suite**: `vendor/bin/phpunit`
+2. **Verify clean output**: The final line must show `OK (X tests, Y assertions)` with NO warnings, failures, or errors
+3. **Check for warnings**: If output shows `OK, but there were issues!`, run `--display-all-issues` and FIX the warnings
+4. **Don't silence warnings**: Resolve root causes instead of suppressing warnings (unless truly necessary)
+
+Requirements:
+- Zero warnings, zero failures, zero errors
 - No skipped tests
 - All public methods tested
 

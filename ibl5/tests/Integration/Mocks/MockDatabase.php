@@ -10,6 +10,7 @@ class MockDatabase
 {
     private array $mockData = [];
     private array $mockTradeInfo = [];
+    private array $mockTeamData = [];
     private ?int $numRows = null;
     private bool $returnTrue = true;
     private array $executedQueries = [];
@@ -39,10 +40,25 @@ class MockDatabase
         }
         
         // Special handling for trade info queries (support both direct and prepared statement patterns)
-        if (stripos($query, 'ibl_trade_info') !== false && 
+        if (stripos($query, 'ibl_trade_info') !== false &&
             stripos($query, 'tradeofferid') !== false &&
             !empty($this->mockTradeInfo)) {
             return new MockDatabaseResult($this->mockTradeInfo);
+        }
+
+        // Special handling for team info queries - return mock team data if available
+        if (stripos($query, 'ibl_team_info') !== false && !empty($this->mockTeamData)) {
+            // Try to match by teamid if specified in query
+            if (preg_match('/teamid\s*=\s*[\'"]?(\d+)[\'"]?/i', $query, $matches)) {
+                $searchId = (int)$matches[1];
+                foreach ($this->mockTeamData as $team) {
+                    if (isset($team['teamid']) && (int)$team['teamid'] === $searchId) {
+                        return new MockDatabaseResult([$team]);
+                    }
+                }
+            }
+            // Return all team data if no specific match
+            return new MockDatabaseResult($this->mockTeamData);
         }
         
         // Smart filtering for player queries with pid/itemid/pickid
@@ -124,6 +140,15 @@ class MockDatabase
         $this->mockTradeInfo = $data;
         // Also set numRows to match trade info count
         $this->numRows = count($data);
+    }
+
+    /**
+     * Set mock team data for team queries (ibl_team_info)
+     * Used when tests need Team::initialize() to return valid team objects
+     */
+    public function setMockTeamData(array $data): void
+    {
+        $this->mockTeamData = $data;
     }
     
     public function setNumRows(int $numRows): void

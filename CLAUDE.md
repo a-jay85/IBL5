@@ -38,6 +38,13 @@ By default, PHPUnit 12.x only shows summary counts for non-failures. Use these f
 
 **Note:** `-v`/`--verbose` do NOT exist in PHPUnit 12.x. Use `--display-all-issues` instead.
 
+### Test Completion Requirements
+**IMPORTANT:** Before considering any PHPUnit-related task complete:
+1. Run the full test suite: `vendor/bin/phpunit`
+2. Verify zero warnings, zero failures, zero errors
+3. If warnings exist, resolve them (don't just silence them unless truly necessary)
+4. The final output should show `OK (X tests, Y assertions)` with no issues
+
 ## Architecture
 
 ### Interface-Driven Modules

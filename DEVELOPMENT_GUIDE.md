@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1526 tests • ~71% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1556 tests • ~73% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -12,13 +12,14 @@
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - Strong progress with 1526 tests (~71% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. Waivers, DepthChart, and RookieOption integration tests completed. **Next Steps:** Add integration tests for remaining workflows (Standings/Schedule) and expand edge case coverage in existing modules to reach 80% goal.
+1. **Test Coverage → 80%** - Strong progress with 1556 tests (~73% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. Waivers, DepthChart, RookieOption, and Schedule integration tests completed. **Next Steps:** Add integration tests for remaining workflows (Standings) and expand edge case coverage in existing modules to reach 80% goal.
 
    **Priority Integration Tests Needed:**
    - ~~**HIGH**: Waivers (add/drop workflow with cap validation, waiver wire timing)~~ ✅ Complete
    - ~~**MEDIUM**: DepthChart (submission with position validation, injured player handling)~~ ✅ Complete
    - ~~**MEDIUM**: RookieOption (option exercise with eligibility checks, contract updates)~~ ✅ Complete
-   - **MEDIUM**: Standings/Schedule (calculation accuracy, tie-breaking logic)
+   - ~~**MEDIUM**: Schedule (win/loss tracking, streak calculation, next-sim highlighting)~~ ✅ Complete
+   - **MEDIUM**: Standings (calculation accuracy, tie-breaking logic)
    - **LOW**: Voting (All-star/awards voting submission)
 
    **Unit Test Gaps:** Discord (1 test), Shared (1 test), League (1 test), Injuries (2 tests), Standings (2 tests)
@@ -29,6 +30,37 @@
 ---
 
 ## Recent Updates
+
+### Schedule Integration Tests Added (Jan 25, 2026)
+
+**Impact:** Added 30 integration test methods for complete team schedule display workflow coverage
+
+**Integration Test Coverage:**
+- **Schedule Integration:** ScheduleIntegrationTest (30 test methods)
+  - Repository tests: Query generation, result iteration, date ordering, empty result handling
+  - Win/loss tracking: Cumulative wins/losses, mixed results across season
+  - Streak calculation: Win streaks, loss streaks, streak reset on opposite result
+  - Unplayed game detection: Identifies games with equal scores as unplayed
+  - Next-sim highlighting: Games within projected next sim period highlighted
+  - Month grouping: Games grouped by month with proper headers
+  - Opponent identification: Home vs away game prefix (@ vs vs)
+  - Color coding: Wins green, losses red
+  - View rendering: HTML output with team colors, XSS protection, result formatting
+
+**Test Categories:**
+- Repository tests (5 tests)
+- Win/loss tracking (3 tests)
+- Streak calculation (3 tests)
+- Unplayed game handling (2 tests)
+- Next-sim highlighting (3 tests)
+- Month and opponent identification (3 tests)
+- Color coding (2 tests)
+- View rendering (7 tests)
+- Complete workflow (2 tests)
+
+**Status:** All 1556 tests passing ✅ Schedule module now has comprehensive integration test coverage
+
+---
 
 ### RookieOption Integration Tests Added (Jan 25, 2026)
 
@@ -53,7 +85,7 @@
 - Complete workflow tests (4 tests)
 - Edge cases (4 tests)
 
-**Status:** All 1526 tests passing ✅ RookieOption module now has comprehensive integration test coverage
+**Status:** RookieOption module now has comprehensive integration test coverage
 
 ---
 
@@ -78,7 +110,7 @@
 - Input sanitization (3 tests)
 - Error handling (3 tests)
 
-**Status:** All 1506 tests passing ✅ DepthChart module now has comprehensive integration test coverage following IntegrationTestCase pattern
+**Status:** DepthChart module now has comprehensive integration test coverage following IntegrationTestCase pattern
 
 ---
 

@@ -75,7 +75,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
     color: white;
     font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 1.125rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 0.625rem 0.5rem;

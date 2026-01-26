@@ -63,7 +63,7 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
     color: white;
     font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 1.125rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 0.75rem 1rem;
@@ -74,7 +74,7 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
 }
 .allstar-table td {
     color: var(--gray-800, #1f2937);
-    font-size: 1.125rem;
+    font-size: 1rem;
     padding: 0.75rem 1rem;
 }
 .allstar-table td:last-child {

@@ -48,7 +48,7 @@ class GenericTableStyles
     color: white;
     font-family: var(--font-display, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 1.125rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 0.75rem 0.5rem;
@@ -166,7 +166,7 @@ class GenericTableStyles
     color: white;
     font-family: var(--font-display, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 1.125rem;
     text-transform: uppercase;
     letter-spacing: 0.02em;
     padding: 0.5rem 0.25rem;
@@ -251,7 +251,7 @@ class GenericTableStyles
     color: var(--gray-600, #4b5563);
     font-family: var(--font-display, 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 1.125rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 0.625rem 0.5rem;

@@ -93,7 +93,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
     color: white;
     font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 1.125rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     padding: 0.75rem 0.625rem;
@@ -101,7 +101,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
 }
 .draft-table td {
     color: var(--gray-800, #1f2937);
-    font-size: 1.125rem;
+    font-size: 1rem;
     padding: 0.625rem;
     text-align: center;
 }

@@ -33,7 +33,7 @@
 
 .ibl-table th {
     background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
-    font-size: 1rem;
+    font-size: 1.125rem;
     font-weight: 600;
     color: white;
     text-transform: uppercase;
@@ -41,7 +41,7 @@
 }
 
 .ibl-table td {
-    font-size: 1.125rem;
+    font-size: 1rem;
     color: var(--navy-800);
 }
 

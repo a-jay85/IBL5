@@ -51,10 +51,14 @@ if (!$validator->validateX(...)) {
 | Issue | Correct Approach |
 |-------|------------------|
 | Contract year salary | If `cy=2`, read `cy2` field (not `cy1`) |
-| Retired players | Check `retired = '0'` (string, not int) |
-| Free agents | `tid = 0` or empty username |
+| Retired players | Check `retired === '0'` (string, not int) |
+| Free agents | `tid === 0` or empty username |
 | Team lookup | Some methods use `tid`, others use team name string |
 | Null in queries | Build conditional SQL; `bind_param` has no NULL type |
+| Database booleans | Use `=== '1'` or `=== '0'`, never `== 1` |
+| MLE/LLE flags | `HasMLE === '1'`, `HasLLE === '1'` (strings) |
+| Equality checks | Always `===`/`!==`, never `==`/`!=` |
+| Division guards | Use `=== 0` or `=== 0.0`, not `== 0` |
 
 ## Testing Quick Reference
 

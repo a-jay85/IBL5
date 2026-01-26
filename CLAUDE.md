@@ -140,13 +140,25 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 
 **Important:** When asked to commit, only stage files that were modified as part of the current task. Check `git status` first and be selective about what to stage.
 
+**Multiple Claude Instances Warning:** Other Claude instances may have unstaged changes in the working tree. Before committing:
+1. Run `git status` to see ALL modified files
+2. Only stage files YOU modified in this session
+3. Leave other unstaged files alone - they belong to other instances
+4. If unsure which files you modified, ask the user
+
 ## Mandatory Rules
 
 ### XSS Protection
 Use `Utilities\HtmlSanitizer::safeHtmlOutput()` on ALL output (database results, user input, error messages).
 
-### Type Hints
-`declare(strict_types=1);` in every file. Full type hints on all methods.
+### Type Safety (Strict Types)
+Every PHP file must have `declare(strict_types=1);` at the top. Additional requirements:
+
+- **Typed properties:** All class properties must have type declarations
+- **Typed methods:** All parameters and return types must be declared
+- **Strict equality:** Always use `===` and `!==`, never `==` or `!=`
+- **Null handling:** Use nullable types (`?string`) and null coalescing (`??`) appropriately
+- **Database values:** Database returns strings - compare with string literals (e.g., `'1'` not `1`)
 
 ### Statistics Formatting
 Use `BasketballStats\StatsFormatter` for all stats - never `number_format()` directly.

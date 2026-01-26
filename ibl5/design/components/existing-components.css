@@ -1616,11 +1616,9 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: var(--space-4);
+    padding: 4px;
     margin-bottom: var(--space-4);
     border-radius: var(--radius-lg);
-    border: 2px solid var(--team-primary);
-    background: transparent !important;
 }
 
 .schedule-team-banner__logo {
@@ -1635,10 +1633,9 @@
 /* Mobile adjustments for team banner */
 @media (max-width: 640px) {
     .schedule-team-banner {
-        padding: var(--space-2);
+        padding: 4px;
         margin-bottom: var(--space-3);
         border-radius: var(--radius-md);
-        border: 2px solid var(--team-primary);
         margin-left: auto;
         margin-right: auto;
     }

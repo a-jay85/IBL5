@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1506 tests • ~70% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1526 tests • ~71% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -12,12 +12,12 @@
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - Strong progress with 1506 tests (~70% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. Waivers and DepthChart integration tests completed. **Next Steps:** Add integration tests for remaining high-priority workflows (RookieOption) and expand edge case coverage in existing modules to reach 80% goal.
+1. **Test Coverage → 80%** - Strong progress with 1526 tests (~71% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. Waivers, DepthChart, and RookieOption integration tests completed. **Next Steps:** Add integration tests for remaining workflows (Standings/Schedule) and expand edge case coverage in existing modules to reach 80% goal.
 
    **Priority Integration Tests Needed:**
    - ~~**HIGH**: Waivers (add/drop workflow with cap validation, waiver wire timing)~~ ✅ Complete
    - ~~**MEDIUM**: DepthChart (submission with position validation, injured player handling)~~ ✅ Complete
-   - **MEDIUM**: RookieOption (option exercise with eligibility checks, contract updates)
+   - ~~**MEDIUM**: RookieOption (option exercise with eligibility checks, contract updates)~~ ✅ Complete
    - **MEDIUM**: Standings/Schedule (calculation accuracy, tie-breaking logic)
    - **LOW**: Voting (All-star/awards voting submission)
 
@@ -29,6 +29,33 @@
 ---
 
 ## Recent Updates
+
+### RookieOption Integration Tests Added (Jan 25, 2026)
+
+**Impact:** Added 20 integration test methods for complete rookie option exercise workflow coverage
+
+**Integration Test Coverage:**
+- **RookieOption Integration:** RookieOptionIntegrationTest (20 test methods)
+  - First round pick workflows: Regular Season and Free Agency phases
+  - Second round pick workflows: Regular Season and Free Agency phases
+  - Ownership validation: Player must be on requesting team
+  - Eligibility validation: canRookieOption checks, final year salary requirements
+  - Database operations: cy4 updates for round 1, cy3 updates for round 2
+  - Complete workflow tests: Ownership → Eligibility → Database update
+  - Edge cases: Minimum/maximum extension amounts, different season phases
+
+**Test Categories:**
+- First round pick success scenarios (2 tests)
+- Second round pick success scenarios (2 tests)
+- Ownership validation failures (2 tests)
+- Eligibility validation failures (3 tests)
+- Database operations (3 tests)
+- Complete workflow tests (4 tests)
+- Edge cases (4 tests)
+
+**Status:** All 1526 tests passing ✅ RookieOption module now has comprehensive integration test coverage
+
+---
 
 ### DepthChart Integration Tests Added (Jan 25, 2026)
 

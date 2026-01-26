@@ -671,9 +671,9 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $this->assertStringContainsString('schedule-container--team', $html);
         $this->assertStringContainsString('January', $html);
         $this->assertStringContainsString('1-0', $html);
-        // Streak is now in a separate column with W and 1 in separate elements
+        // Streak is now in a single-line format (e.g., "W1")
         $this->assertStringContainsString('schedule-game__streak--win', $html);
-        $this->assertStringContainsString('schedule-game__streak-result">W<', $html);
+        $this->assertStringContainsString('">W1<', $html);
     }
 
     /**

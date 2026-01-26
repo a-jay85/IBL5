@@ -36,7 +36,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $html .= $this->renderTeamBanner($teamId, $teamName, $color1);
         $html .= $this->renderHeader($simLengthInDays, $firstUpcomingId);
         $html .= $this->renderMonthNav($gamesByMonth);
-        $html .= $this->renderGamesByMonth($gamesByMonth, $games, $teamId);
+        $html .= $this->renderGamesByMonth($gamesByMonth, $games, $teamId, $team->name);
         $html .= '</div>';
         $html .= $this->renderScrollScripts($firstUpcomingId);
 
@@ -126,7 +126,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
     /**
      * Render all games organized by month using same layout as Schedule module
      */
-    private function renderGamesByMonth(array $gamesByMonth, array $allGames, int $userTeamId): string
+    private function renderGamesByMonth(array $gamesByMonth, array $allGames, int $userTeamId, string $userTeamName): string
     {
         $html = '';
         foreach ($gamesByMonth as $monthKey => $data) {
@@ -145,7 +145,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
                 $html .= '<div class="schedule-day__games">';
                 foreach ($games as $row) {
-                    $html .= $this->renderGameRow($row, $userTeamId);
+                    $html .= $this->renderGameRow($row, $userTeamId, $userTeamName);
                 }
                 $html .= '</div>';
                 $html .= '</div>';
@@ -157,9 +157,10 @@ class TeamScheduleView implements TeamScheduleViewInterface
     }
 
     /**
-     * Render a single game row matching Schedule module format
+     * Render a single game row matching Schedule module format exactly
+     * Same layout as League Schedule, plus streak column on the right
      */
-    private function renderGameRow(array $row, int $userTeamId): string
+    private function renderGameRow(array $row, int $userTeamId, string $userTeamName): string
     {
         /** @var \Game $game */
         $game = $row['game'];
@@ -167,146 +168,108 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $opposingTeam = $row['opposingTeam'];
 
         $isUpcoming = ($row['highlight'] === 'next-sim');
-        $gameClass = 'schedule-game schedule-game--team';
+        $gameClass = 'schedule-game';
         if ($isUpcoming) {
             $gameClass .= ' schedule-game--upcoming';
         }
 
         $gameId = 'team-game-' . (int)$game->boxScoreID;
-        $opponentTeamId = (int)$opposingTeam->teamID;
+        $visitorTeamId = (int)$game->visitorTeamID;
+        $homeTeamId = (int)$game->homeTeamID;
         $boxScoreUrl = './ibl/IBL/box' . (int)$game->boxScoreID . '.htm';
-        $opponentUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $opponentTeamId;
-        $userTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $userTeamId;
 
-        // Determine visitor/home based on game data
-        $isHome = ($game->homeTeamID === $userTeamId);
+        // Determine which team is visitor/home
+        $isUserHome = ($homeTeamId === $userTeamId);
+
+        // Get team info for both sides - use actual team names with records
+        $userRecord = $row['isUnplayed'] ? '' : $row['wins'] . '-' . $row['losses'];
+        if ($isUserHome) {
+            $visitorName = $opposingTeam->name;
+            $visitorRecord = $opposingTeam->seasonRecord;
+            $homeName = $userTeamName;
+            $homeRecord = $userRecord;
+        } else {
+            $visitorName = $userTeamName;
+            $visitorRecord = $userRecord;
+            $homeName = $opposingTeam->name;
+            $homeRecord = $opposingTeam->seasonRecord;
+        }
+
+        $visitorUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $visitorTeamId;
+        $homeUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $homeTeamId;
 
         $html = '<div class="' . $gameClass . '" id="' . $gameId . '">';
 
-        // Main game content wrapper
-        $html .= '<div class="schedule-game__content">';
-
-        if ($isHome) {
-            // User team is home: Opponent @ User
-            // Visitor (opponent) - visitor side layout (team-link before logo)
-            $html .= $this->renderTeamLink($opponentUrl, $opposingTeam->name, $opposingTeam->seasonRecord, $opponentTeamId, false, false);
-
-            // Scores
-            if ($row['isUnplayed']) {
-                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link">–</a>';
-                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
-                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link">–</a>';
-            } else {
-                $userWon = ($row['winLossColor'] === 'green');
-                $vClass = $userWon ? '' : ' schedule-game__team--win';
-                $hClass = $userWon ? ' schedule-game__team--win' : '';
-                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vClass . '">' . HtmlSanitizer::safeHtmlOutput($game->visitorScore) . '</a>';
-                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
-                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hClass . '">' . HtmlSanitizer::safeHtmlOutput($game->homeScore) . '</a>';
-            }
-
-            // Home (user team) - home side layout (logo before team-link)
-            $html .= $this->renderUserTeamStats($row, $userTeamId, true);
+        // Determine win classes
+        $userWon = ($row['winLossColor'] === 'green');
+        if ($row['isUnplayed']) {
+            $vWinClass = '';
+            $hWinClass = '';
+        } elseif ($isUserHome) {
+            $vWinClass = $userWon ? '' : ' schedule-game__team--win';
+            $hWinClass = $userWon ? ' schedule-game__team--win' : '';
         } else {
-            // User team is visitor: User @ Opponent
-            // Visitor (user team) - visitor side layout (team-link before logo)
-            $html .= $this->renderUserTeamStats($row, $userTeamId, false);
-
-            // Scores
-            if ($row['isUnplayed']) {
-                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link">–</a>';
-                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
-                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link">–</a>';
-            } else {
-                $userWon = ($row['winLossColor'] === 'green');
-                $vClass = $userWon ? ' schedule-game__team--win' : '';
-                $hClass = $userWon ? '' : ' schedule-game__team--win';
-                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vClass . '">' . HtmlSanitizer::safeHtmlOutput($game->visitorScore) . '</a>';
-                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
-                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hClass . '">' . HtmlSanitizer::safeHtmlOutput($game->homeScore) . '</a>';
-            }
-
-            // Home (opponent) - home side layout (logo before team-link)
-            $html .= $this->renderTeamLink($opponentUrl, $opposingTeam->name, $opposingTeam->seasonRecord, $opponentTeamId, false, true);
+            $vWinClass = $userWon ? ' schedule-game__team--win' : '';
+            $hWinClass = $userWon ? '' : ' schedule-game__team--win';
         }
 
-        $html .= '</div>'; // Close schedule-game__content
+        // Visitor team + logo (same as League Schedule)
+        $html .= '<a href="' . $visitorUrl . '" class="schedule-game__team-link">';
+        $html .= '<span class="schedule-game__team' . $vWinClass . '">' . HtmlSanitizer::safeHtmlOutput($visitorName);
+        if ($visitorRecord) {
+            $html .= ' <span class="schedule-game__record">(' . HtmlSanitizer::safeHtmlOutput($visitorRecord) . ')</span>';
+        }
+        $html .= '</span></a>';
+        $html .= '<a href="' . $visitorUrl . '" class="schedule-game__logo-link">';
+        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $visitorTeamId . '.png" alt="">';
+        $html .= '</a>';
 
-        // Streak column (mirrors date column on left)
+        // Scores + @ (same as League Schedule)
+        if ($row['isUnplayed']) {
+            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link">–</a>';
+            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
+            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link">–</a>';
+        } else {
+            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vWinClass . '">' . HtmlSanitizer::safeHtmlOutput($game->visitorScore) . '</a>';
+            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
+            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hWinClass . '">' . HtmlSanitizer::safeHtmlOutput($game->homeScore) . '</a>';
+        }
+
+        // Home logo + team (same as League Schedule)
+        $html .= '<a href="' . $homeUrl . '" class="schedule-game__logo-link">';
+        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $homeTeamId . '.png" alt="">';
+        $html .= '</a>';
+        $html .= '<a href="' . $homeUrl . '" class="schedule-game__team-link">';
+        $html .= '<span class="schedule-game__team' . $hWinClass . '">' . HtmlSanitizer::safeHtmlOutput($homeName);
+        if ($homeRecord) {
+            $html .= ' <span class="schedule-game__record">(' . HtmlSanitizer::safeHtmlOutput($homeRecord) . ')</span>';
+        }
+        $html .= '</span></a>';
+
+        // Streak column on right (single line)
         $html .= $this->renderStreakColumn($row);
 
-        $html .= '</div>'; // Close schedule-game
+        $html .= '</div>';
         return $html;
     }
 
     /**
-     * Render the streak column on the right side of the game row
+     * Render the streak column on the right side of the game row (single line)
      */
     private function renderStreakColumn(array $row): string
     {
         if ($row['isUnplayed']) {
-            return '<div class="schedule-game__streak"></div>';
+            return '<span class="schedule-game__streak"></span>';
         }
 
         $isWin = ($row['winLossColor'] === 'green');
         $resultClass = $isWin ? 'schedule-game__streak--win' : 'schedule-game__streak--loss';
         $resultLetter = $isWin ? 'W' : 'L';
-        $streakNum = $isWin ? substr($row['streak'], 2) : substr($row['streak'], 2); // Extract number from "W 3" or "L 2"
+        $streakNum = trim(substr($row['streak'], 2)); // Extract number from "W 3" or "L 2"
 
-        return '<div class="schedule-game__streak ' . $resultClass . '">'
-            . '<span class="schedule-game__streak-result">' . $resultLetter . '</span>'
-            . '<span class="schedule-game__streak-num">' . HtmlSanitizer::safeHtmlOutput(trim($streakNum)) . '</span>'
-            . '</div>';
-    }
-
-    /**
-     * Render team link with logo and name
-     * @param bool $isHomeSide If true, renders logo before team-link (home side layout)
-     */
-    private function renderTeamLink(string $url, string $name, string $record, int $teamId, bool $isWinner, bool $isHomeSide = false): string
-    {
-        $winClass = $isWinner ? ' schedule-game__team--win' : '';
-
-        $teamLink = '<a href="' . $url . '" class="schedule-game__team-link">';
-        $teamLink .= '<span class="schedule-game__team' . $winClass . '">' . HtmlSanitizer::safeHtmlOutput($name);
-        $teamLink .= ' <span class="schedule-game__record">(' . HtmlSanitizer::safeHtmlOutput($record) . ')</span>';
-        $teamLink .= '</span></a>';
-
-        $logoLink = '<a href="' . $url . '" class="schedule-game__logo-link">';
-        $logoLink .= '<img class="schedule-game__logo" src="images/logo/new' . $teamId . '.png" alt="">';
-        $logoLink .= '</a>';
-
-        // Home side: logo before team-link; Visitor side: team-link before logo
-        return $isHomeSide ? $logoLink . $teamLink : $teamLink . $logoLink;
-    }
-
-    /**
-     * Render user team stats (record only) in place of team name
-     * @param bool $isHomeSide If true, renders logo before team-link (home side layout)
-     */
-    private function renderUserTeamStats(array $row, int $userTeamId, bool $isHomeSide = false): string
-    {
-        $userWon = ($row['winLossColor'] === 'green');
-        $winClass = $userWon ? ' schedule-game__team--win' : '';
-        $userTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $userTeamId;
-
-        $teamLink = '<a href="' . $userTeamUrl . '" class="schedule-game__team-link">';
-        if ($row['isUnplayed']) {
-            $teamLink .= '<span class="schedule-game__team">—</span>';
-        } else {
-            $record = $row['wins'] . '-' . $row['losses'];
-            $teamLink .= '<span class="schedule-game__team' . $winClass . '">';
-            $teamLink .= HtmlSanitizer::safeHtmlOutput($record);
-            $teamLink .= '</span>';
-        }
-        $teamLink .= '</a>';
-
-        $logoLink = '<a href="' . $userTeamUrl . '" class="schedule-game__logo-link">';
-        $logoLink .= '<img class="schedule-game__logo" src="images/logo/new' . $userTeamId . '.png" alt="">';
-        $logoLink .= '</a>';
-
-        // Home side: logo before team-link; Visitor side: team-link before logo
-        return $isHomeSide ? $logoLink . $teamLink : $teamLink . $logoLink;
+        return '<span class="schedule-game__streak ' . $resultClass . '">'
+            . $resultLetter . $streakNum
+            . '</span>';
     }
 
     /**

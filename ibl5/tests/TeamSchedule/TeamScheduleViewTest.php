@@ -196,7 +196,8 @@ class TeamScheduleViewTest extends TestCase
         $game->visitorScore = 105;
         $game->homeScore = 98;
         $game->boxScoreID = 12345;
-        $game->homeTeamID = 2;  // Added for home/away detection
+        $game->visitorTeamID = 1;  // User's team is visitor
+        $game->homeTeamID = 2;     // Opponent is home team
 
         // Create mock opposing Team object
         $opposingTeam = new \stdClass();

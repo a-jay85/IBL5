@@ -1654,71 +1654,35 @@
     }
 }
 
-/* Team Schedule - Game row with streak column */
-.schedule-game--team {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
+/* Team Schedule - Add streak column to grid */
+.schedule-container--team .schedule-game {
+    grid-template-columns: 1fr 20px 24px 16px 24px 20px 1fr 36px;
 }
 
-.schedule-game--team .schedule-game__content {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-1);
-    min-width: 0;
-}
-
-/* Streak column - mirrors date column */
+/* Streak column styling */
 .schedule-game__streak {
-    flex-shrink: 0;
-    width: 36px;
-    padding: 4px 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-}
-
-.schedule-game__streak-result {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--gray-400);
-}
-
-.schedule-game__streak-num {
     font-family: var(--font-display);
-    font-size: 1.125rem;
+    font-size: 0.875rem;
     font-weight: 700;
-    color: var(--gray-700);
-}
-
-/* Win/Loss coloring for streak */
-.schedule-game__streak--win .schedule-game__streak-result {
-    color: var(--accent-500);
-}
-
-.schedule-game__streak--win .schedule-game__streak-num {
-    color: var(--accent-600);
-}
-
-.schedule-game__streak--loss .schedule-game__streak-result {
-    color: var(--gray-400);
-}
-
-.schedule-game__streak--loss .schedule-game__streak-num {
+    text-align: center;
     color: var(--gray-500);
 }
 
-/* Mobile adjustments for streak column */
+.schedule-game__streak--win {
+    color: var(--accent-500);
+}
+
+.schedule-game__streak--loss {
+    color: var(--gray-400);
+}
+
+/* Mobile adjustments for team schedule grid with streak */
 @media (max-width: 640px) {
-    .schedule-game__streak {
-        width: 32px;
+    .schedule-container--team .schedule-game {
+        grid-template-columns: 1fr 16px 20px 12px 20px 16px 1fr 28px;
     }
 
-    .schedule-game__streak-num {
-        font-size: 1rem;
+    .schedule-game__streak {
+        font-size: 0.75rem;
     }
 }

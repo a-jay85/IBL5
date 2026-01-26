@@ -37,23 +37,18 @@ class DraftHistoryView implements DraftHistoryViewInterface
     /**
      * Get the CSS styles for the draft history table.
      *
+     * Uses consolidated .ibl-data-table with draft-history-specific overrides.
+     *
      * @return string CSS style block
      */
     private function getStyleBlock(): string
     {
         return '<style>
-.draft-title {
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--navy-900, #0f172a);
-    text-align: center;
-    margin: 0 0 1rem 0;
-}
+/* Year navigation */
 .draft-nav {
     text-align: center;
     margin-bottom: 1.5rem;
-    font-family: var(--font-sans, \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
+    font-family: var(--font-sans, \'Barlow\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
     font-size: 1.125rem;
     line-height: 2;
 }
@@ -74,59 +69,11 @@ class DraftHistoryView implements DraftHistoryViewInterface
     background-color: var(--accent-500, #f97316);
     font-weight: 600;
 }
-.draft-table {
-    font-family: var(--font-sans, \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
-    border-collapse: separate;
-    border-spacing: 0;
-    border: none;
-    border-radius: var(--radius-lg, 0.5rem);
-    overflow: hidden;
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
-    width: 100%;
+/* Draft history specific */
+.draft-history-table {
     max-width: 900px;
-    margin: 0 auto;
 }
-.draft-table thead {
-    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-}
-.draft-table th {
-    color: white;
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-weight: 600;
-    font-size: 1.25rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 0.75rem 0.625rem;
-    text-align: center;
-}
-.draft-table td {
-    color: var(--gray-800, #1f2937);
-    font-size: 1rem;
-    padding: 0.625rem;
-    text-align: center;
-}
-.draft-table tbody tr {
-    transition: background-color 150ms ease;
-}
-.draft-table tbody tr:nth-child(odd) {
-    background-color: white;
-}
-.draft-table tbody tr:nth-child(even) {
-    background-color: var(--gray-50, #f9fafb);
-}
-.draft-table tbody tr:hover {
-    background-color: var(--gray-100, #f3f4f6);
-}
-.draft-table a {
-    color: var(--gray-800, #1f2937);
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 150ms ease;
-}
-.draft-table a:hover {
-    color: var(--accent-500, #f97316);
-}
-.draft-table .player-image {
+.draft-history-table .player-image {
     height: 50px;
     border-radius: var(--radius-sm, 0.25rem);
 }
@@ -134,7 +81,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
     text-align: center;
     padding: 2rem;
     color: var(--gray-500, #6b7280);
-    font-family: var(--font-sans, \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
+    font-family: var(--font-sans, \'Barlow\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
 }
 </style>';
     }
@@ -147,7 +94,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
      */
     private function renderTitle(int $year): string
     {
-        return '<h2 class="draft-title">' . $year . ' Draft</h2>';
+        return '<h2 class="ibl-table-title">' . $year . ' Draft</h2>';
     }
 
     /**
@@ -191,7 +138,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable draft-table">
+        return '<table class="sortable ibl-data-table draft-history-table">
             <thead>
                 <tr>
                     <th>Round</th>

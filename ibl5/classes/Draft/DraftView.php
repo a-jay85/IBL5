@@ -57,11 +57,14 @@ class DraftView implements DraftViewInterface
     /**
      * Generate CSS styles for the draft interface
      *
+     * Uses consolidated .ibl-data-table from design system with draft-specific overrides.
+     *
      * @return string CSS style block
      */
     private function getStyleBlock(): string
     {
         return '<style>
+/* Draft-specific styles only - table base comes from .ibl-data-table */
 .draft-container {
     max-width: 100%;
     margin: 0 auto;
@@ -77,7 +80,7 @@ class DraftView implements DraftViewInterface
     margin-bottom: 0.75rem;
 }
 .draft-title {
-    font-family: var(--font-display, \'Poppins\', sans-serif);
+    font-family: var(--font-display, \'Barlow Condensed\', sans-serif);
     font-size: 1.25rem;
     font-weight: 600;
     color: var(--navy-900, #0f172a);
@@ -95,65 +98,6 @@ class DraftView implements DraftViewInterface
     color: #991b1b;
     font-weight: 500;
 }
-.draft-table {
-    font-family: var(--font-sans, \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
-    border-collapse: separate;
-    border-spacing: 0;
-    border: none;
-    border-radius: var(--radius-lg, 0.5rem);
-    overflow: hidden;
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
-    width: 100%;
-    margin: 0 auto 1rem;
-}
-.draft-table thead {
-    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-}
-.draft-table th {
-    color: white;
-    font-family: var(--font-display, \'Poppins\', sans-serif);
-    font-weight: 600;
-    font-size: 1.25rem;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    padding: 0.625rem 0.375rem;
-    text-align: center;
-    white-space: nowrap;
-}
-.draft-table td {
-    color: var(--gray-800, #1f2937);
-    font-size: 1rem;
-    padding: 0.5rem 0.375rem;
-    text-align: center;
-}
-.draft-table tbody tr {
-    transition: background-color 150ms ease;
-}
-.draft-table tbody tr:nth-child(odd) {
-    background-color: white;
-}
-.draft-table tbody tr:nth-child(even) {
-    background-color: var(--gray-50, #f9fafb);
-}
-.draft-table tbody tr:hover {
-    background-color: var(--gray-100, #f3f4f6);
-}
-.draft-table tbody tr.drafted {
-    opacity: 0.5;
-}
-.draft-table tbody tr.drafted td {
-    text-decoration: line-through;
-    font-style: italic;
-}
-.draft-table a {
-    color: var(--gray-800, #1f2937);
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 150ms ease;
-}
-.draft-table a:hover {
-    color: var(--accent-500, #f97316);
-}
 .draft-table input[type="radio"] {
     width: 1rem;
     height: 1rem;
@@ -164,7 +108,7 @@ class DraftView implements DraftViewInterface
     margin-top: 1rem;
 }
 .draft-submit-btn {
-    font-family: var(--font-display, \'Poppins\', sans-serif);
+    font-family: var(--font-display, \'Barlow Condensed\', sans-serif);
     font-size: 1.125rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -185,48 +129,6 @@ class DraftView implements DraftViewInterface
     opacity: 0.7;
     cursor: not-allowed;
 }
-
-/* Mobile sticky columns support */
-@media (max-width: 768px) {
-    .draft-table.responsive-table th.sticky-col,
-    .draft-table.responsive-table td.sticky-col {
-        position: sticky;
-        left: 0;
-        z-index: 1;
-        min-width: 28px;
-    }
-    .draft-table.responsive-table th.sticky-col-2,
-    .draft-table.responsive-table td.sticky-col-2 {
-        position: sticky;
-        left: 28px;
-        z-index: 1;
-        min-width: 100px;
-    }
-    .draft-table.responsive-table thead th.sticky-col,
-    .draft-table.responsive-table thead th.sticky-col-2 {
-        background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-        z-index: 3;
-    }
-    .draft-table.responsive-table tbody tr:nth-child(odd) td.sticky-col,
-    .draft-table.responsive-table tbody tr:nth-child(odd) td.sticky-col-2 {
-        background-color: white;
-    }
-    .draft-table.responsive-table tbody tr:nth-child(even) td.sticky-col,
-    .draft-table.responsive-table tbody tr:nth-child(even) td.sticky-col-2 {
-        background-color: var(--gray-50, #f9fafb);
-    }
-    .draft-table.responsive-table tbody tr:hover td.sticky-col,
-    .draft-table.responsive-table tbody tr:hover td.sticky-col-2 {
-        background-color: var(--gray-100, #f3f4f6);
-    }
-    .draft-table.responsive-table tbody tr.drafted td.sticky-col,
-    .draft-table.responsive-table tbody tr.drafted td.sticky-col-2 {
-        background-color: var(--gray-100, #f3f4f6);
-    }
-    .draft-table.responsive-table td.sticky-col-2 {
-        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
-    }
-}
 </style>';
     }
 
@@ -236,7 +138,7 @@ class DraftView implements DraftViewInterface
     public function renderPlayerTable(array $players, string $teamLogo, ?string $pickOwner): string
     {
         $html = '<div class="table-scroll-container">
-        <table class="sortable draft-table responsive-table">
+        <table class="sortable ibl-data-table draft-table responsive-table">
             <thead>
                 <tr>
                     <th class="sticky-col">Draft</th>

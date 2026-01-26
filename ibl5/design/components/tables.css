@@ -1,64 +1,316 @@
 /**
  * IBL5 Table Components
  *
- * Shared table styles used across:
- * - StandingsView
- * - LeagueStatsView
- * - InjuriesView
- * - PlayerStatsView
- * - Other data tables
+ * Consolidated table styles used across all data tables:
+ * - StandingsView, LeagueStatsView, InjuriesView
+ * - SeasonLeadersView, LeaderboardsView, DraftView
+ * - ContractListView, SeasonHighsView, DraftHistoryView
+ * - And all other data display tables
+ *
+ * Classes:
+ * - .ibl-data-table: Primary data table (navy header, alternating rows)
+ * - .ibl-table: Legacy alias for .ibl-data-table
  */
 
 /* ==========================================================================
-   Base Table Styles
+   Primary Data Table (.ibl-data-table)
+
+   The standard table style for all data displays. Features:
+   - Navy gradient header
+   - Alternating row colors
+   - Hover states
+   - Rounded corners with shadow
+   - Responsive sticky columns on mobile
    ========================================================================== */
 
+.ibl-data-table,
 .ibl-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: var(--font-sans);
-    background: white;
-    border-radius: var(--radius-xl);
+    font-family: var(--font-sans, 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+    border-collapse: separate;
+    border-spacing: 0;
+    border: none;
+    border-radius: var(--radius-lg, 0.5rem);
     overflow: hidden;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--gray-100);
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
+    width: 100%;
+    margin: 0 auto;
 }
 
-.ibl-table th,
-.ibl-table td {
-    padding: var(--space-3) var(--space-4);
-    text-align: left;
-    border-bottom: 1px solid var(--gray-100);
+/* Header row */
+.ibl-data-table thead,
+.ibl-table thead {
+    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
 }
 
+.ibl-data-table th,
 .ibl-table th {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
-    font-size: 1.25rem;
-    font-weight: 600;
     color: white;
+    font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
+    font-weight: 600;
+    font-size: 1.25rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.03em;
+    padding: 0.75rem 0.5rem;
+    text-align: center;
+    white-space: nowrap;
 }
 
+/* Data cells */
+.ibl-data-table td,
 .ibl-table td {
+    color: var(--gray-800, #1f2937);
     font-size: 1rem;
-    color: var(--navy-800);
+    padding: 0.5rem 0.375rem;
+    text-align: center;
 }
 
-.ibl-table tbody tr:last-child td {
-    border-bottom: none;
+/* Row styling */
+.ibl-data-table tbody tr,
+.ibl-table tbody tr {
+    transition: background-color 150ms ease;
 }
 
+.ibl-data-table tbody tr:nth-child(odd),
+.ibl-table tbody tr:nth-child(odd) {
+    background-color: white;
+}
+
+.ibl-data-table tbody tr:nth-child(even),
 .ibl-table tbody tr:nth-child(even) {
-    background-color: var(--gray-50);
+    background-color: var(--gray-50, #f9fafb);
 }
 
+.ibl-data-table tbody tr:hover,
 .ibl-table tbody tr:hover {
-    background-color: var(--gray-100);
+    background-color: var(--gray-100, #f3f4f6);
+}
+
+/* Links */
+.ibl-data-table a,
+.ibl-table a {
+    color: var(--gray-800, #1f2937);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 150ms ease;
+}
+
+.ibl-data-table a:hover,
+.ibl-table a:hover {
+    color: var(--accent-500, #f97316);
+}
+
+/* First/last cell padding */
+.ibl-data-table th:first-child,
+.ibl-data-table td:first-child,
+.ibl-table th:first-child,
+.ibl-table td:first-child {
+    padding-left: 0.75rem;
+}
+
+.ibl-data-table th:last-child,
+.ibl-data-table td:last-child,
+.ibl-table th:last-child,
+.ibl-table td:last-child {
+    padding-right: 0.75rem;
+}
+
+/* Rank cell styling */
+.ibl-data-table .rank-cell,
+.ibl-table .rank-cell {
+    font-weight: 600;
+    color: var(--navy-700, #334155);
+}
+
+/* Highlight row */
+.ibl-data-table tbody tr.highlight,
+.ibl-table tbody tr.highlight {
+    background-color: var(--accent-100, #ffedd5) !important;
+}
+
+.ibl-data-table tbody tr.highlight:hover,
+.ibl-table tbody tr.highlight:hover {
+    background-color: var(--accent-200, #fed7aa) !important;
+}
+
+/* Drafted/disabled row */
+.ibl-data-table tbody tr.drafted,
+.ibl-table tbody tr.drafted {
+    opacity: 0.5;
+}
+
+.ibl-data-table tbody tr.drafted td,
+.ibl-table tbody tr.drafted td {
+    text-decoration: line-through;
+    font-style: italic;
+}
+
+/* Divider column */
+.ibl-data-table .divider,
+.ibl-table .divider {
+    background-color: var(--navy-900, #0f172a);
+    width: 3px;
+    padding: 0;
+}
+
+/* Totals/summary row */
+.ibl-data-table .totals-row,
+.ibl-table .totals-row {
+    background-color: var(--accent-100, #ffedd5) !important;
+    font-weight: 600;
+}
+
+.ibl-data-table .totals-row:hover,
+.ibl-table .totals-row:hover {
+    background-color: var(--accent-200, #fed7aa) !important;
 }
 
 /* ==========================================================================
-   Table Header Variants
+   Mobile Sticky Column Support
+
+   Use .responsive-table class on tables with sticky columns.
+   Add .sticky-col, .sticky-col-1, .sticky-col-2 to columns that should stick.
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    /* Single sticky column */
+    .ibl-data-table.responsive-table th.sticky-col,
+    .ibl-data-table.responsive-table td.sticky-col,
+    .ibl-table.responsive-table th.sticky-col,
+    .ibl-table.responsive-table td.sticky-col {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        min-width: 100px;
+    }
+
+    .ibl-data-table.responsive-table thead th.sticky-col,
+    .ibl-table.responsive-table thead th.sticky-col {
+        background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+        z-index: 3;
+    }
+
+    .ibl-data-table.responsive-table tbody tr:nth-child(odd) td.sticky-col,
+    .ibl-table.responsive-table tbody tr:nth-child(odd) td.sticky-col {
+        background-color: white;
+    }
+
+    .ibl-data-table.responsive-table tbody tr:nth-child(even) td.sticky-col,
+    .ibl-table.responsive-table tbody tr:nth-child(even) td.sticky-col {
+        background-color: var(--gray-50, #f9fafb);
+    }
+
+    .ibl-data-table.responsive-table tbody tr:hover td.sticky-col,
+    .ibl-table.responsive-table tbody tr:hover td.sticky-col {
+        background-color: var(--gray-100, #f3f4f6);
+    }
+
+    .ibl-data-table.responsive-table td.sticky-col,
+    .ibl-table.responsive-table td.sticky-col {
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Two sticky columns (rank + name pattern) */
+    .ibl-data-table.responsive-table th.sticky-col-1,
+    .ibl-data-table.responsive-table td.sticky-col-1,
+    .ibl-table.responsive-table th.sticky-col-1,
+    .ibl-table.responsive-table td.sticky-col-1 {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        min-width: 36px;
+    }
+
+    .ibl-data-table.responsive-table th.sticky-col-2,
+    .ibl-data-table.responsive-table td.sticky-col-2,
+    .ibl-table.responsive-table th.sticky-col-2,
+    .ibl-table.responsive-table td.sticky-col-2 {
+        position: sticky;
+        left: 36px;
+        z-index: 1;
+        min-width: 100px;
+    }
+
+    .ibl-data-table.responsive-table thead th.sticky-col-1,
+    .ibl-data-table.responsive-table thead th.sticky-col-2,
+    .ibl-table.responsive-table thead th.sticky-col-1,
+    .ibl-table.responsive-table thead th.sticky-col-2 {
+        background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+        z-index: 3;
+    }
+
+    .ibl-data-table.responsive-table tbody tr:nth-child(odd) td.sticky-col-1,
+    .ibl-data-table.responsive-table tbody tr:nth-child(odd) td.sticky-col-2,
+    .ibl-table.responsive-table tbody tr:nth-child(odd) td.sticky-col-1,
+    .ibl-table.responsive-table tbody tr:nth-child(odd) td.sticky-col-2 {
+        background-color: white;
+    }
+
+    .ibl-data-table.responsive-table tbody tr:nth-child(even) td.sticky-col-1,
+    .ibl-data-table.responsive-table tbody tr:nth-child(even) td.sticky-col-2,
+    .ibl-table.responsive-table tbody tr:nth-child(even) td.sticky-col-1,
+    .ibl-table.responsive-table tbody tr:nth-child(even) td.sticky-col-2 {
+        background-color: var(--gray-50, #f9fafb);
+    }
+
+    .ibl-data-table.responsive-table tbody tr:hover td.sticky-col-1,
+    .ibl-data-table.responsive-table tbody tr:hover td.sticky-col-2,
+    .ibl-table.responsive-table tbody tr:hover td.sticky-col-1,
+    .ibl-table.responsive-table tbody tr:hover td.sticky-col-2 {
+        background-color: var(--gray-100, #f3f4f6);
+    }
+
+    /* Shadow only on rightmost sticky column */
+    .ibl-data-table.responsive-table th.sticky-col-1,
+    .ibl-data-table.responsive-table td.sticky-col-1,
+    .ibl-table.responsive-table th.sticky-col-1,
+    .ibl-table.responsive-table td.sticky-col-1 {
+        box-shadow: none;
+    }
+
+    .ibl-data-table.responsive-table td.sticky-col-2,
+    .ibl-table.responsive-table td.sticky-col-2 {
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Drafted row sticky backgrounds */
+    .ibl-data-table.responsive-table tbody tr.drafted td.sticky-col,
+    .ibl-data-table.responsive-table tbody tr.drafted td.sticky-col-1,
+    .ibl-data-table.responsive-table tbody tr.drafted td.sticky-col-2,
+    .ibl-table.responsive-table tbody tr.drafted td.sticky-col,
+    .ibl-table.responsive-table tbody tr.drafted td.sticky-col-1,
+    .ibl-table.responsive-table tbody tr.drafted td.sticky-col-2 {
+        background-color: var(--gray-100, #f3f4f6);
+    }
+
+    /* Mobile compact sizing */
+    .ibl-data-table th,
+    .ibl-table th {
+        font-size: 1rem;
+        padding: 0.5rem 0.25rem;
+    }
+
+    .ibl-data-table td,
+    .ibl-table td {
+        font-size: 1rem;
+        padding: 0.375rem 0.25rem;
+    }
+}
+
+/* ==========================================================================
+   Table Title (placed above table)
+   ========================================================================== */
+
+.ibl-table-title {
+    font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--navy-900, #0f172a);
+    text-align: center;
+    margin: 0 0 1rem 0;
+}
+
+/* ==========================================================================
+   Table Header (integrated header row)
    ========================================================================== */
 
 .ibl-table-header {
@@ -132,48 +384,7 @@
     opacity: 0;
 }
 
-/* ==========================================================================
-   Sticky Column Support (Mobile)
-   ========================================================================== */
-
 @media (max-width: 768px) {
-    .ibl-table-sticky th.sticky-col,
-    .ibl-table-sticky td.sticky-col {
-        position: sticky;
-        left: 0;
-        z-index: 1;
-        background: inherit;
-        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
-    }
-
-    .ibl-table-sticky thead th.sticky-col {
-        background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
-        z-index: 3;
-    }
-
-    .ibl-table-sticky tbody tr:nth-child(odd) td.sticky-col {
-        background-color: white;
-    }
-
-    .ibl-table-sticky tbody tr:nth-child(even) td.sticky-col {
-        background-color: var(--gray-50);
-    }
-
-    .ibl-table-sticky tbody tr:hover td.sticky-col {
-        background-color: var(--gray-100);
-    }
-
-    /* Compact sizing on mobile - maintain 1rem minimum */
-    .ibl-table th {
-        font-size: 1rem;
-        padding: 0.5rem 0.25rem;
-    }
-
-    .ibl-table td {
-        font-size: 1rem;
-        padding: 0.375rem 0.25rem;
-    }
-
     .ibl-table-scroll table {
         min-width: 600px;
     }

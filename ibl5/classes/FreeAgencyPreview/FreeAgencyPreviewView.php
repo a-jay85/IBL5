@@ -31,71 +31,13 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
     /**
      * Get the CSS styles for the free agency preview table.
      *
+     * Uses consolidated .ibl-data-table from design system - no overrides needed.
+     *
      * @return string CSS style block
      */
     private function getStyleBlock(): string
     {
-        return '<style>
-.fa-preview-title {
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--navy-900, #0f172a);
-    text-align: center;
-    margin: 0 0 1.5rem 0;
-}
-.fa-preview-table {
-    font-family: var(--font-sans, \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
-    border-collapse: separate;
-    border-spacing: 0;
-    border: none;
-    border-radius: var(--radius-lg, 0.5rem);
-    overflow: hidden;
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
-    width: 100%;
-    margin: 0 auto;
-    font-size: 1rem;
-}
-.fa-preview-table thead {
-    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-}
-.fa-preview-table th {
-    color: white;
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-weight: 600;
-    font-size: 1.25rem;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    padding: 0.5rem 0.25rem;
-    text-align: center;
-}
-.fa-preview-table td {
-    color: var(--gray-800, #1f2937);
-    padding: 0.375rem 0.25rem;
-    text-align: center;
-}
-.fa-preview-table tbody tr {
-    transition: background-color 150ms ease;
-}
-.fa-preview-table tbody tr:nth-child(odd) {
-    background-color: white;
-}
-.fa-preview-table tbody tr:nth-child(even) {
-    background-color: var(--gray-50, #f9fafb);
-}
-.fa-preview-table tbody tr:hover {
-    background-color: var(--gray-100, #f3f4f6);
-}
-.fa-preview-table a {
-    color: var(--gray-800, #1f2937);
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 150ms ease;
-}
-.fa-preview-table a:hover {
-    color: var(--accent-500, #f97316);
-}
-</style>';
+        return ''; // All styles provided by .ibl-data-table
     }
 
     /**
@@ -106,7 +48,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
      */
     private function renderTitle(int $seasonEndingYear): string
     {
-        return '<h2 class="fa-preview-title">Players Currently to be Free Agents at the end of the ' . $seasonEndingYear . ' Season</h2>';
+        return '<h2 class="ibl-table-title">Players Currently to be Free Agents at the end of the ' . $seasonEndingYear . ' Season</h2>';
     }
 
     /**
@@ -116,7 +58,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable fa-preview-table">
+        return '<table class="sortable ibl-data-table">
             <thead>
                 <tr>
                     <th>Pos</th>

@@ -25,89 +25,27 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
     {
         ob_start();
         ?>
-<style>
-.season-leaders-form {
-    background: var(--gray-50, #f9fafb);
-    border: 1px solid var(--gray-200, #e5e7eb);
-    border-radius: var(--radius-lg, 0.5rem);
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-}
-.season-leaders-form__row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 1rem;
-}
-.season-leaders-form__group {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.season-leaders-form__label {
-    font-family: var(--font-display, 'Poppins', sans-serif);
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--gray-600, #4b5563);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-.season-leaders-form select {
-    font-family: var(--font-sans, 'Inter', sans-serif);
-    font-size: 1.125rem;
-    padding: 0.375rem 0.625rem;
-    border: 1px solid var(--gray-300, #d1d5db);
-    border-radius: var(--radius-md, 0.375rem);
-    background: white;
-    color: var(--gray-800, #1f2937);
-    transition: border-color 150ms ease, box-shadow 150ms ease;
-}
-.season-leaders-form select:focus {
-    outline: none;
-    border-color: var(--accent-500, #f97316);
-    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
-}
-.season-leaders-form__submit {
-    font-family: var(--font-display, 'Poppins', sans-serif);
-    font-size: 1rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 0.5rem 1rem;
-    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-    color: white;
-    border: none;
-    border-radius: var(--radius-md, 0.375rem);
-    cursor: pointer;
-    transition: transform 150ms ease, box-shadow 150ms ease;
-}
-.season-leaders-form__submit:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
-}
-</style>
-<form name="Leaderboards" method="post" action="modules.php?name=Season_Leaders" class="season-leaders-form">
-    <div class="season-leaders-form__row">
-        <div class="season-leaders-form__group">
-            <label class="season-leaders-form__label">Team:</label>
+<form name="Leaderboards" method="post" action="modules.php?name=Season_Leaders" class="ibl-filter-form">
+    <div class="ibl-filter-form__row">
+        <div class="ibl-filter-form__group">
+            <label class="ibl-filter-form__label">Team:</label>
             <select name="team">
                 <?php echo $this->renderTeamOptions($teams, $currentFilters['team'] ?? 0); ?>
             </select>
         </div>
-        <div class="season-leaders-form__group">
-            <label class="season-leaders-form__label">Year:</label>
+        <div class="ibl-filter-form__group">
+            <label class="ibl-filter-form__label">Year:</label>
             <select name="year">
                 <?php echo $this->renderYearOptions($years, $currentFilters['year'] ?? ''); ?>
             </select>
         </div>
-        <div class="season-leaders-form__group">
-            <label class="season-leaders-form__label">Sort By:</label>
+        <div class="ibl-filter-form__group">
+            <label class="ibl-filter-form__label">Sort By:</label>
             <select name="sortby">
                 <?php echo $this->renderSortOptions($currentFilters['sortby'] ?? '1'); ?>
             </select>
         </div>
-        <button type="submit" class="season-leaders-form__submit">Search Season Data</button>
+        <button type="submit" class="ibl-filter-form__submit">Search Season Data</button>
     </div>
 </form>
         <?php
@@ -177,104 +115,8 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
     {
         ob_start();
         ?>
-<style>
-.season-leaders-table {
-    font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
-    border-collapse: separate;
-    border-spacing: 0;
-    border: none;
-    border-radius: var(--radius-lg, 0.5rem);
-    overflow: hidden;
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
-    width: 100%;
-    margin: 0 auto;
-}
-.season-leaders-table thead {
-    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-}
-.season-leaders-table th {
-    color: white;
-    font-family: var(--font-display, 'Poppins', sans-serif);
-    font-weight: 600;
-    font-size: 1.25rem;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    padding: 0.625rem 0.375rem;
-    text-align: center;
-    white-space: nowrap;
-}
-.season-leaders-table td {
-    color: var(--gray-800, #1f2937);
-    font-size: 1rem;
-    padding: 0.5rem 0.375rem;
-    text-align: center;
-}
-.season-leaders-table tbody tr {
-    transition: background-color 150ms ease;
-}
-.season-leaders-table tbody tr:nth-child(odd) {
-    background-color: white;
-}
-.season-leaders-table tbody tr:nth-child(even) {
-    background-color: var(--gray-50, #f9fafb);
-}
-.season-leaders-table tbody tr:hover {
-    background-color: var(--gray-100, #f3f4f6);
-}
-.season-leaders-table a {
-    color: var(--gray-800, #1f2937);
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 150ms ease;
-}
-.season-leaders-table a:hover {
-    color: var(--accent-500, #f97316);
-}
-.season-leaders-table .rank-cell {
-    font-weight: 600;
-    color: var(--navy-700, #334155);
-}
-
-/* Mobile sticky columns support */
-@media (max-width: 768px) {
-    .season-leaders-table.responsive-table th.sticky-col-1,
-    .season-leaders-table.responsive-table td.sticky-col-1 {
-        position: sticky;
-        left: 0;
-        z-index: 1;
-        min-width: 36px;
-    }
-    .season-leaders-table.responsive-table th.sticky-col-2,
-    .season-leaders-table.responsive-table td.sticky-col-2 {
-        position: sticky;
-        left: 36px;
-        z-index: 1;
-        min-width: 100px;
-    }
-    .season-leaders-table.responsive-table thead th.sticky-col-1,
-    .season-leaders-table.responsive-table thead th.sticky-col-2 {
-        background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-        z-index: 3;
-    }
-    .season-leaders-table.responsive-table tbody tr:nth-child(odd) td.sticky-col-1,
-    .season-leaders-table.responsive-table tbody tr:nth-child(odd) td.sticky-col-2 {
-        background-color: white;
-    }
-    .season-leaders-table.responsive-table tbody tr:nth-child(even) td.sticky-col-1,
-    .season-leaders-table.responsive-table tbody tr:nth-child(even) td.sticky-col-2 {
-        background-color: var(--gray-50, #f9fafb);
-    }
-    .season-leaders-table.responsive-table tbody tr:hover td.sticky-col-1,
-    .season-leaders-table.responsive-table tbody tr:hover td.sticky-col-2 {
-        background-color: var(--gray-100, #f3f4f6);
-    }
-    .season-leaders-table.responsive-table td.sticky-col-2 {
-        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
-    }
-}
-</style>
 <div class="table-scroll-container">
-<table class="sortable season-leaders-table responsive-table">
+<table class="sortable ibl-data-table responsive-table">
     <thead>
         <tr>
             <th class="sticky-col-1">Rank</th>

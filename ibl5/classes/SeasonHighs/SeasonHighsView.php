@@ -29,18 +29,14 @@ class SeasonHighsView implements SeasonHighsViewInterface
     /**
      * Get the CSS styles for the season highs tables.
      *
+     * Uses consolidated .ibl-data-table with layout-specific overrides.
+     *
      * @return string CSS style block
      */
     private function getStyleBlock(): string
     {
         return '<style>
-.season-highs-title {
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--navy-900, #0f172a);
-    margin: 0 0 1.5rem 0;
-}
+/* Season highs layout grid */
 .season-highs-container {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -57,54 +53,10 @@ class SeasonHighsView implements SeasonHighsViewInterface
         grid-template-columns: 1fr;
     }
 }
-.stat-table {
-    font-family: var(--font-sans, \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
-    border-collapse: separate;
-    border-spacing: 0;
-    border: none;
-    border-radius: var(--radius-lg, 0.5rem);
-    overflow: hidden;
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
-    width: 100%;
-    font-size: 1rem;
-}
-.stat-table thead {
-    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-}
-.stat-table th {
-    color: white;
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-weight: 600;
-    font-size: 1.25rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 0.625rem 0.5rem;
-    text-align: center;
-}
+/* Stat table specific overrides */
 .stat-table th[colspan="4"] {
     font-size: 1rem;
     padding: 0.75rem 0.5rem;
-}
-.stat-table td {
-    color: var(--gray-800, #1f2937);
-    padding: 0.375rem 0.5rem;
-    text-align: center;
-}
-.stat-table tbody tr {
-    transition: background-color 150ms ease;
-}
-.stat-table tbody tr:nth-child(odd) {
-    background-color: white;
-}
-.stat-table tbody tr:nth-child(even) {
-    background-color: var(--gray-50, #f9fafb);
-}
-.stat-table tbody tr:hover {
-    background-color: var(--gray-100, #f3f4f6);
-}
-.stat-table .rank-cell {
-    font-weight: 600;
-    color: var(--accent-600, #ea580c);
 }
 .stat-table .value-cell {
     font-weight: 600;
@@ -121,7 +73,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
      */
     private function renderPlayerHighs(string $seasonPhase, array $playerHighs): string
     {
-        $output = '<h1 class="season-highs-title">Players\' ' . HtmlSanitizer::safeHtmlOutput($seasonPhase) . ' Highs</h1>';
+        $output = '<h1 class="ibl-table-title">Players\' ' . HtmlSanitizer::safeHtmlOutput($seasonPhase) . ' Highs</h1>';
         $output .= '<div class="season-highs-container">';
 
         foreach ($playerHighs as $statName => $stats) {
@@ -141,7 +93,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
      */
     private function renderTeamHighs(string $seasonPhase, array $teamHighs): string
     {
-        $output = '<h1 class="season-highs-title">Teams\' ' . HtmlSanitizer::safeHtmlOutput($seasonPhase) . ' Highs</h1>';
+        $output = '<h1 class="ibl-table-title">Teams\' ' . HtmlSanitizer::safeHtmlOutput($seasonPhase) . ' Highs</h1>';
         $output .= '<div class="season-highs-container">';
 
         foreach ($teamHighs as $statName => $stats) {
@@ -163,7 +115,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
     {
         $safeName = HtmlSanitizer::safeHtmlOutput($statName);
 
-        $output = '<table class="stat-table">
+        $output = '<table class="ibl-data-table stat-table">
             <thead>
                 <tr><th colspan="4">' . $safeName . '</th></tr>
             </thead>

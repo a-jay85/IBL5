@@ -31,70 +31,16 @@ class InjuriesView implements InjuriesViewInterface
     /**
      * Get the CSS styles for the injuries table.
      *
+     * Uses consolidated .ibl-data-table from design system with minimal overrides.
+     *
      * @return string CSS style block
      */
     private function getStyleBlock(): string
     {
         return '<style>
-.injuries-title {
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--navy-900, #0f172a);
-    text-align: center;
-    margin: 0 0 1rem 0;
-}
+/* Injuries-specific overrides only */
 .injuries-table {
-    font-family: var(--font-sans, \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
-    border-collapse: separate;
-    border-spacing: 0;
-    border: none;
-    border-radius: var(--radius-lg, 0.5rem);
-    overflow: hidden;
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
-    width: 100%;
     max-width: 600px;
-    margin: 0 auto;
-}
-.injuries-table thead {
-    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-}
-.injuries-table th {
-    color: white;
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-weight: 600;
-    font-size: 1.25rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 0.75rem 0.625rem;
-    text-align: center;
-}
-.injuries-table td {
-    color: var(--gray-800, #1f2937);
-    font-size: 1rem;
-    padding: 0.625rem;
-    text-align: center;
-}
-.injuries-table tbody tr {
-    transition: background-color 150ms ease;
-}
-.injuries-table tbody tr:nth-child(odd) {
-    background-color: white;
-}
-.injuries-table tbody tr:nth-child(even) {
-    background-color: var(--gray-50, #f9fafb);
-}
-.injuries-table tbody tr:hover {
-    background-color: var(--gray-100, #f3f4f6);
-}
-.injuries-table a {
-    color: var(--gray-800, #1f2937);
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 150ms ease;
-}
-.injuries-table a:hover {
-    color: var(--accent-500, #f97316);
 }
 .injuries-table .team-cell {
     border-radius: var(--radius-sm, 0.25rem);
@@ -117,7 +63,7 @@ class InjuriesView implements InjuriesViewInterface
      */
     private function renderTitle(): string
     {
-        return '<h2 class="injuries-title">Injured Players</h2>';
+        return '<h2 class="ibl-table-title">Injured Players</h2>';
     }
 
     /**
@@ -127,7 +73,7 @@ class InjuriesView implements InjuriesViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable injuries-table">
+        return '<table class="sortable ibl-data-table injuries-table">
             <thead>
                 <tr>
                     <th>Pos</th>

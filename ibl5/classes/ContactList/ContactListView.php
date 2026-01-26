@@ -32,76 +32,23 @@ class ContactListView implements ContactListViewInterface
     /**
      * Get the CSS styles for the contact list table.
      *
+     * Uses consolidated .ibl-data-table with contact-specific overrides.
+     *
      * @return string CSS style block
      */
     private function getStyleBlock(): string
     {
         return '<style>
-.contact-title {
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--navy-900, #0f172a);
-    text-align: center;
-    margin: 0 0 0.5rem 0;
-}
+/* Contact list specific overrides */
 .contact-description {
-    font-family: var(--font-sans, \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
+    font-family: var(--font-sans, \'Barlow\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
     font-size: 1.125rem;
     color: var(--gray-600, #4b5563);
     text-align: center;
     margin: 0 0 1.5rem 0;
 }
 .contact-table {
-    font-family: var(--font-sans, \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
-    border-collapse: separate;
-    border-spacing: 0;
-    border: none;
-    border-radius: var(--radius-lg, 0.5rem);
-    overflow: hidden;
-    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
-    width: 100%;
     max-width: 800px;
-    margin: 0 auto;
-}
-.contact-table thead {
-    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-}
-.contact-table th {
-    color: white;
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-weight: 600;
-    font-size: 1.25rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 0.75rem 1rem;
-    text-align: center;
-}
-.contact-table td {
-    color: var(--gray-800, #1f2937);
-    font-size: 1rem;
-    padding: 0.625rem 0.75rem;
-    text-align: center;
-}
-.contact-table tbody tr {
-    transition: background-color 150ms ease;
-}
-.contact-table tbody tr:nth-child(odd) {
-    background-color: white;
-}
-.contact-table tbody tr:nth-child(even) {
-    background-color: var(--gray-50, #f9fafb);
-}
-.contact-table tbody tr:hover {
-    background-color: var(--gray-100, #f3f4f6);
-}
-.contact-table a {
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 150ms ease;
-}
-.contact-table a:hover {
-    text-decoration: underline;
 }
 .contact-table .team-cell {
     border-radius: var(--radius-sm, 0.25rem);
@@ -126,7 +73,7 @@ class ContactListView implements ContactListViewInterface
      */
     private function renderTitle(): string
     {
-        return '<h2 class="contact-title">IBL GM Contact List</h2>';
+        return '<h2 class="ibl-table-title">IBL GM Contact List</h2>';
     }
 
     /**
@@ -146,7 +93,7 @@ class ContactListView implements ContactListViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable contact-table">
+        return '<table class="sortable ibl-data-table contact-table">
             <thead>
                 <tr>
                     <th>Team</th>

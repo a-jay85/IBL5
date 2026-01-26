@@ -258,3 +258,85 @@
 .ibl-search__btn:hover {
     background: var(--accent-600);
 }
+
+/* ==========================================================================
+   Filter Form (for data table filtering)
+
+   Used by LeaderboardsView, SeasonLeadersView, and other pages with
+   filter/search forms above data tables.
+   ========================================================================== */
+
+.ibl-filter-form {
+    background: var(--gray-50, #f9fafb);
+    border: 1px solid var(--gray-200, #e5e7eb);
+    border-radius: var(--radius-lg, 0.5rem);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.ibl-filter-form__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.ibl-filter-form__group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ibl-filter-form__label {
+    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-600, #4b5563);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.ibl-filter-form select,
+.ibl-filter-form input[type="text"],
+.ibl-filter-form input[type="number"] {
+    font-family: var(--font-sans, 'Barlow', sans-serif);
+    font-size: 1.125rem;
+    padding: 0.375rem 0.625rem;
+    border: 1px solid var(--gray-300, #d1d5db);
+    border-radius: var(--radius-md, 0.375rem);
+    background: white;
+    color: var(--gray-800, #1f2937);
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.ibl-filter-form select:focus,
+.ibl-filter-form input:focus {
+    outline: none;
+    border-color: var(--accent-500, #f97316);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.ibl-filter-form input[type="number"] {
+    width: 5rem;
+}
+
+.ibl-filter-form__submit {
+    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+    color: white;
+    border: none;
+    border-radius: var(--radius-md, 0.375rem);
+    cursor: pointer;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.ibl-filter-form__submit:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
+}

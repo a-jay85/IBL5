@@ -34,6 +34,8 @@ class PowerRankingsView implements PowerRankingsViewInterface
     /**
      * Generate CSS styles for the power rankings table
      *
+     * Power Rankings uses a card-style layout with integrated header.
+     *
      * @return string CSS style block
      */
     private function getStyleBlock(): string
@@ -49,13 +51,12 @@ class PowerRankingsView implements PowerRankingsViewInterface
     max-width: 600px;
     margin: 0 auto 1.5rem;
 }
-
-/* Title */
+/* Title integrated in card header */
 .power-rankings-title {
     background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
     padding: 0.875rem 1rem;
     margin: 0;
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
+    font-family: var(--font-display, \'Barlow Condensed\', -apple-system, BlinkMacSystemFont, sans-serif);
     font-size: 1.25rem;
     font-weight: 600;
     color: white;
@@ -63,89 +64,27 @@ class PowerRankingsView implements PowerRankingsViewInterface
     letter-spacing: 0.05em;
     text-align: center;
 }
-
-/* Table */
-.power-rankings-table {
-    font-family: var(--font-sans, \'Inter\', -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif);
-    border-collapse: collapse;
-    width: 100%;
-}
-
-/* Header */
-.power-rankings-table thead {
-    background: var(--gray-50, #f9fafb);
-    border-bottom: 1px solid var(--gray-200, #e5e7eb);
-}
-
-.power-rankings-table th {
-    color: var(--gray-600, #4b5563);
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
-    font-weight: 600;
-    font-size: 1.25rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 0.625rem 0.5rem;
-    text-align: center;
-}
-
-/* Data cells */
-.power-rankings-table td {
-    color: var(--gray-800, #1f2937);
-    font-size: 1rem;
-    padding: 0.625rem 0.5rem;
-    text-align: center;
-    border-bottom: 1px solid var(--gray-100, #f3f4f6);
-}
-
-/* Row styling */
-.power-rankings-table tbody tr {
-    transition: background-color 150ms ease;
-}
-.power-rankings-table tbody tr:hover {
-    background-color: var(--gray-50, #f9fafb);
-}
-
-/* Specific cells */
+/* Specific cell overrides */
 .power-rank-cell {
     font-weight: 600;
     color: var(--navy-700, #334155);
     width: 40px;
 }
-
 .power-logo-cell {
     width: 50px;
 }
-
 .power-logo-cell img {
     width: 32px;
     height: 32px;
     object-fit: contain;
     border-radius: var(--radius-sm, 0.25rem);
 }
-
 .power-data-cell {
     text-align: center;
 }
-
-/* Links */
-.power-rankings-table a {
-    color: var(--gray-800, #1f2937);
-    text-decoration: none;
-    transition: opacity 150ms ease;
-}
-.power-rankings-table a:hover {
-    opacity: 0.8;
-}
-
-/* Strong values */
-.power-rankings-table strong {
-    font-weight: 600;
-    color: var(--navy-900, #0f172a);
-}
-
 /* Rating highlight */
 .power-rating {
-    font-family: var(--font-display, \'Poppins\', -apple-system, BlinkMacSystemFont, sans-serif);
+    font-family: var(--font-display, \'Barlow Condensed\', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 700;
     color: var(--accent-500, #f97316);
 }
@@ -174,7 +113,7 @@ class PowerRankingsView implements PowerRankingsViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="power-rankings-table">
+        return '<table class="ibl-data-table power-rankings-table">
             <thead>
                 <tr>
                     <th class="power-rank-cell">Rank</th>

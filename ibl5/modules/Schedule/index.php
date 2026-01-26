@@ -29,9 +29,9 @@ $season = new Season($mysqli_db);
 $league = new League($mysqli_db);
 $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 
-$lastSimEndDate = $season->lastSimEndDate;
+// Use Season's projectedNextSimEndDate which handles All-Star break correctly
+$projectedNextSimEndDate = $season->projectedNextSimEndDate;
 $simLengthDays = $league->getSimLengthInDays();
-$projectedNextSimEnd = date('Y-m-d', strtotime($lastSimEndDate . ' + ' . $simLengthDays . ' days'));
 
 // Get all games
 $query = "SELECT * FROM ibl_schedule ORDER BY Date ASC, SchedID ASC";
@@ -72,10 +72,17 @@ while ($i < $num) {
         $gamesByMonth[$monthKey][$date] = [];
     }
 
-    $isUnplayed = ($visitorScore == $homeScore && strtotime($date) <= strtotime($projectedNextSimEnd));
+    $gameDate = date_create($date);
+    $isUpcoming = \Utilities\ScheduleHighlighter::shouldHighlight(
+        $visitorScore,
+        $homeScore,
+        $gameDate,
+        $projectedNextSimEndDate
+    );
+    $isUnplayed = \Utilities\ScheduleHighlighter::isGameUnplayed($visitorScore, $homeScore);
 
-    // Track first unplayed game
-    if ($isUnplayed && $firstUnplayedId === null) {
+    // Track first upcoming game (next sim)
+    if ($isUpcoming && $firstUnplayedId === null) {
         $firstUnplayedId = 'game-' . $boxid;
     }
 
@@ -91,6 +98,7 @@ while ($i < $num) {
         'homeRecord' => $teamRecords[$home] ?? '',
         'boxid' => $boxid,
         'isUnplayed' => $isUnplayed,
+        'isUpcoming' => $isUpcoming,
         'visitorWon' => ($visitorScore > $homeScore),
         'homeWon' => ($homeScore > $visitorScore),
     ];
@@ -103,7 +111,10 @@ echo '<div class="schedule-container">';
 
 // Header with month nav and jump button
 echo '<div class="schedule-header">';
+echo '<div class="schedule-header__left">';
 echo '<h1 class="schedule-title">Schedule</h1>';
+echo '<p class="schedule-highlight-note">Games highlighted are projected to be run next sim (' . \Utilities\HtmlSanitizer::safeHtmlOutput($simLengthDays) . ' days)</p>';
+echo '</div>';
 if ($firstUnplayedId) {
     echo '<a href="#' . $firstUnplayedId . '" class="schedule-jump-btn" onclick="scrollToNextGames(event)">';
     echo '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
@@ -143,7 +154,7 @@ foreach ($gamesByMonth as $monthKey => $dates) {
         echo '<div class="schedule-day__games">';
         foreach ($games as $game) {
             $gameClass = 'schedule-game';
-            if ($game['isUnplayed']) {
+            if ($game['isUpcoming']) {
                 $gameClass .= ' schedule-game--upcoming';
             }
 

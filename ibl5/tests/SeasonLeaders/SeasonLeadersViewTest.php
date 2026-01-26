@@ -82,12 +82,12 @@ final class SeasonLeadersViewTest extends TestCase
         $this->assertStringContainsString('0.500', $html); // FG%
     }
 
-    public function testRenderTableHeaderUsesNthChildForRowAlternation(): void
+    public function testRenderTableHeaderUsesDesignSystemClasses(): void
     {
-        // Row alternation is handled via CSS nth-child in the style block
+        // Row alternation is handled by design system CSS via ibl-data-table class
         $html = $this->view->renderTableHeader();
-        $this->assertStringContainsString('nth-child(odd)', $html);
-        $this->assertStringContainsString('nth-child(even)', $html);
+        $this->assertStringContainsString('ibl-data-table', $html);
+        $this->assertStringContainsString('table-scroll-container', $html);
     }
 
     public function testRenderTableFooterReturnsClosingTags(): void

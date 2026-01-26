@@ -119,7 +119,7 @@ class InjuriesViewTest extends TestCase
         $this->assertStringContainsString('Lakers', $result);
     }
 
-    public function testRenderAlternatesRowColors(): void
+    public function testRenderUsesDataTableClassForRowAlternation(): void
     {
         $injuredPlayers = [
             [
@@ -148,9 +148,8 @@ class InjuriesViewTest extends TestCase
 
         $result = $this->view->render($injuredPlayers);
 
-        // CSS nth-child selectors in style block handle row alternation
-        $this->assertStringContainsString('nth-child(odd)', $result);
-        $this->assertStringContainsString('nth-child(even)', $result);
+        // Row alternation handled by design system CSS via ibl-data-table class
+        $this->assertStringContainsString('ibl-data-table', $result);
     }
 
     public function testRenderEscapesHtmlEntities(): void

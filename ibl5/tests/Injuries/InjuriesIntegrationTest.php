@@ -400,35 +400,20 @@ class InjuriesIntegrationTest extends IntegrationTestCase
     }
 
     /**
-     * Test render CSS includes hover effects
+     * Test render uses design system CSS classes for styling
+     *
+     * Styling is now handled by the design system (design/components/tables.css)
+     * rather than inline CSS. Row alternation, hover effects, fonts, and colors
+     * are all inherited from the ibl-data-table class.
      */
-    public function testRenderCssIncludesHoverEffects(): void
+    public function testRenderUsesDesignSystemCssClasses(): void
     {
         $result = $this->view->render([]);
 
-        $this->assertStringContainsString(':hover', $result);
-    }
-
-    /**
-     * Test render CSS includes font family variables
-     */
-    public function testRenderCssIncludesFontFamilyVariables(): void
-    {
-        $result = $this->view->render([]);
-
-        $this->assertStringContainsString('font-family', $result);
-        $this->assertStringContainsString('var(--font-', $result);
-    }
-
-    /**
-     * Test render CSS includes color variables
-     */
-    public function testRenderCssIncludesColorVariables(): void
-    {
-        $result = $this->view->render([]);
-
-        $this->assertStringContainsString('var(--gray-', $result);
-        $this->assertStringContainsString('var(--navy-', $result);
+        // Design system provides hover effects, fonts, and colors via this class
+        $this->assertStringContainsString('ibl-data-table', $result);
+        // Module-specific styling via injuries-table class
+        $this->assertStringContainsString('injuries-table', $result);
     }
 
     // ============================================

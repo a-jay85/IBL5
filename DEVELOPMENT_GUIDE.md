@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1754 tests • ~78% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1935 tests • ~79% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -12,7 +12,7 @@
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - Strong progress with 1754 tests (~78% coverage). All priority integration tests complete. All unit test gaps closed. **Next Steps:** Expand edge case coverage in remaining modules to reach 80% goal.
+1. **Test Coverage → 80%** - Strong progress with 1935 tests (~79% coverage). Edge case testing added for high-priority validators.
 
    **Priority Integration Tests:** ✅ All Complete
    - ~~Waivers, DepthChart, RookieOption, Schedule, Standings, Voting~~
@@ -20,12 +20,41 @@
    **Unit Test Gaps:** ✅ All Closed (Jan 26, 2026)
    - ~~Discord, Shared, League, Injuries, Standings~~ - Added 133 tests
 
+   **Edge Case Testing:** ✅ High-Priority Validators Complete (Jan 26, 2026)
+   - ~~TradeValidator, FreeAgencyOfferValidator, WaiversValidator, DraftValidator, CommonContractValidator~~ - Added 183 tests
+
 2. **API Development** - REST API with JWT, rate limiting, OpenAPI docs
 3. **Security Hardening** - XSS audit, CSRF, security headers
 
 ---
 
 ## Recent Updates
+
+### Validator Edge Case Tests Added (Jan 26, 2026)
+
+**Impact:** Added 183 edge case tests for 5 high-priority validators, bringing total from 1754 to 1935 tests (~79% coverage)
+
+**New Test Files:**
+- **TradeValidatorEdgeCaseTest** (32 tests) - Salary cap boundaries, cash minimums, player tradability
+- **FreeAgencyOfferValidatorEdgeCaseTest** (31 tests) - Bird rights, hard/soft cap, MLE/LLE type coercion
+- **WaiversValidatorEdgeCaseTest** (36 tests) - Roster slot boundaries, salary limits, player ID handling
+- **DraftValidatorEdgeCaseTest** (40 tests) - Whitespace, special characters, unicode, length limits
+- **CommonContractValidatorEdgeCaseTest** (44 tests) - Raise percentages, bird years boundaries, gaps
+
+**Edge Cases Covered:**
+- Boundary conditions: exactly at cap, one over cap, exactly at raise limits
+- Null/empty handling: missing keys, empty arrays, null values
+- Type coercion: string vs int for MLE/LLE flags ("0"/"1" vs 0/1)
+- Special characters: apostrophes, hyphens, unicode (Chinese, Cyrillic, emoji)
+- Large values: very long names, large salary amounts
+
+**Brittle Tests Fixed:**
+- Refactored 5 CSS implementation-detail tests to check behavior (design system classes) instead
+- Removed inline CSS checks that were invalidated by design system refactoring
+
+**Status:** All 1935 tests passing ✅
+
+---
 
 ### Unit Test Gaps Closed (Jan 26, 2026)
 
@@ -45,7 +74,7 @@
 - Standings: Clinching indicator priority (Z > Y > X), Pythagorean stats
 - League: IBL-only modules list verification, setLeague/getCurrentLeague edge cases
 
-**Status:** All 1754 tests passing ✅ Unit test gaps closed for all 5 priority modules
+**Status:** Unit test gaps closed for all 5 priority modules
 
 ---
 

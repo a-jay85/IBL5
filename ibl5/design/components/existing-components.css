@@ -1619,7 +1619,8 @@
     padding: var(--space-4);
     margin-bottom: var(--space-4);
     border-radius: var(--radius-lg);
-    overflow: hidden;
+    border: 2px solid var(--team-primary);
+    background: transparent !important;
 }
 
 .schedule-team-banner__logo {

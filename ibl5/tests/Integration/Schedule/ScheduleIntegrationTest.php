@@ -668,7 +668,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $html = $this->view->render($team, $games, 7);
 
         // Assert
-        $this->assertStringContainsString('team-schedule-container', $html);
+        $this->assertStringContainsString('schedule-container--team', $html);
         $this->assertStringContainsString('January', $html);
         $this->assertStringContainsString('1-0', $html);
         $this->assertStringContainsString('W 1', $html);
@@ -712,8 +712,8 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         // Act
         $html = $this->view->render($team, $games, 7);
 
-        // Assert - Modern design uses team-schedule-game--upcoming class
-        $this->assertStringContainsString('team-schedule-game--upcoming', $html);
+        // Assert - Modern design uses schedule-game--upcoming class (shared with Schedule module)
+        $this->assertStringContainsString('schedule-game--upcoming', $html);
     }
 
     /**
@@ -732,9 +732,9 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         // Act
         $html = $this->view->render($team, $games, 7);
 
-        // Assert - Modern design shows TBD for unplayed games
-        $this->assertStringContainsString('team-schedule-game__result--upcoming', $html);
-        $this->assertStringContainsString('TBD', $html);
+        // Assert - Modern design shows dashes for unplayed games (same as Schedule module)
+        $this->assertStringContainsString('schedule-game__score-link', $html);
+        $this->assertStringContainsString('–', $html); // Em-dash for pending scores
     }
 
     /**
@@ -867,12 +867,12 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $processed = $this->service->getProcessedSchedule($teamId, $season);
         $html = $this->view->render($team, $processed, 7);
 
-        // Assert - End-to-end verification with modern design
-        $this->assertStringContainsString('team-schedule-container', $html);
+        // Assert - End-to-end verification with modern design (shared Schedule module classes)
+        $this->assertStringContainsString('schedule-container--team', $html);
         $this->assertStringContainsString('January', $html);
         $this->assertStringContainsString('February', $html);
         $this->assertStringContainsString('FF5500', $html);
-        $this->assertStringContainsString('team-schedule-game__result--win', $html);
+        $this->assertStringContainsString('schedule-game__team--win', $html);
     }
 
     // ========== HELPER METHODS ==========

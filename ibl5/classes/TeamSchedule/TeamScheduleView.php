@@ -10,8 +10,8 @@ use Utilities\HtmlSanitizer;
 /**
  * TeamScheduleView - HTML rendering for team schedule
  *
- * Generates modern card-based HTML displaying a team's game schedule with results.
- * Uses the design system with team-specific color theming.
+ * Generates HTML displaying a team's game schedule using the shared schedule
+ * layout with team-specific color theming.
  *
  * @see TeamScheduleViewInterface For the interface contract
  */
@@ -27,16 +27,16 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $teamId = (int)$team->teamID;
         $teamName = HtmlSanitizer::safeHtmlOutput($team->name);
 
-        // Organize games by month
+        // Organize games by month and date
         $gamesByMonth = $this->organizeGamesByMonth($games);
         $firstUpcomingId = $this->findFirstUpcomingGameId($games);
 
         $html = $this->renderTeamColorStyles($color1, $color2);
-        $html .= '<div class="team-schedule-container">';
-        $html .= $this->renderTeamBanner($teamId, $teamName, $color1, $color2);
-        $html .= $this->renderHeader($teamName, $simLengthInDays, $firstUpcomingId);
+        $html .= '<div class="schedule-container schedule-container--team">';
+        $html .= $this->renderTeamBanner($teamId, $teamName, $color1);
+        $html .= $this->renderHeader($simLengthInDays, $firstUpcomingId);
         $html .= $this->renderMonthNav($gamesByMonth);
-        $html .= $this->renderGamesByMonth($gamesByMonth, $teamId);
+        $html .= $this->renderGamesByMonth($gamesByMonth, $games, $teamId);
         $html .= '</div>';
         $html .= $this->renderScrollScripts($firstUpcomingId);
 
@@ -49,9 +49,26 @@ class TeamScheduleView implements TeamScheduleViewInterface
     private function renderTeamColorStyles(string $color1, string $color2): string
     {
         return '<style>
-            .team-schedule-container {
+            .schedule-container--team {
                 --team-primary: #' . $color1 . ';
                 --team-secondary: #' . $color2 . ';
+            }
+            .schedule-container--team .schedule-month__header {
+                background: var(--team-primary);
+                color: var(--team-secondary);
+            }
+            .schedule-container--team .schedule-months__link:hover {
+                background: var(--team-primary);
+                color: var(--team-secondary);
+            }
+            .schedule-container--team .schedule-jump-btn {
+                background: var(--team-primary);
+                color: var(--team-secondary);
+                box-shadow: 0 2px 8px color-mix(in srgb, var(--team-primary) 40%, transparent);
+            }
+            .schedule-container--team .schedule-jump-btn:hover {
+                opacity: 0.9;
+                box-shadow: 0 4px 12px color-mix(in srgb, var(--team-primary) 50%, transparent);
             }
         </style>';
     }
@@ -59,26 +76,26 @@ class TeamScheduleView implements TeamScheduleViewInterface
     /**
      * Render responsive team banner with logo
      */
-    private function renderTeamBanner(int $teamId, string $teamName, string $color1, string $color2): string
+    private function renderTeamBanner(int $teamId, string $teamName, string $color1): string
     {
-        return '<div class="team-schedule-banner" style="background: linear-gradient(135deg, #' . $color1 . ', #' . $color1 . 'dd);">
-            <img class="team-schedule-banner__logo" src="./images/logo/' . $teamId . '.jpg" alt="' . $teamName . ' Logo">
+        return '<div class="schedule-team-banner" style="background: linear-gradient(135deg, #' . $color1 . ', #' . $color1 . 'cc);">
+            <img class="schedule-team-banner__logo" src="./images/logo/' . $teamId . '.jpg" alt="' . $teamName . '">
         </div>';
     }
 
     /**
      * Render header with title and jump button
      */
-    private function renderHeader(string $teamName, int $simLengthInDays, ?string $firstUpcomingId): string
+    private function renderHeader(int $simLengthInDays, ?string $firstUpcomingId): string
     {
-        $html = '<div class="team-schedule-header">';
-        $html .= '<div class="team-schedule-header__left">';
-        $html .= '<h1 class="team-schedule-title">' . $teamName . ' Schedule</h1>';
-        $html .= '<p class="team-schedule-note">Next sim length: ' . HtmlSanitizer::safeHtmlOutput($simLengthInDays) . ' days</p>';
+        $html = '<div class="schedule-header">';
+        $html .= '<div class="schedule-header__left">';
+        $html .= '<h1 class="schedule-title">Schedule</h1>';
+        $html .= '<p class="schedule-highlight-note">Next sim: ' . HtmlSanitizer::safeHtmlOutput($simLengthInDays) . ' days</p>';
         $html .= '</div>';
 
         if ($firstUpcomingId) {
-            $html .= '<a href="#' . $firstUpcomingId . '" class="team-schedule-jump-btn" onclick="scrollToNextGames(event)">';
+            $html .= '<a href="#' . $firstUpcomingId . '" class="schedule-jump-btn" onclick="scrollToNextGames(event)">';
             $html .= '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
             $html .= 'Next Games';
             $html .= '</a>';
@@ -93,13 +110,13 @@ class TeamScheduleView implements TeamScheduleViewInterface
      */
     private function renderMonthNav(array $gamesByMonth): string
     {
-        $html = '<nav class="team-schedule-months">';
+        $html = '<nav class="schedule-months">';
         foreach ($gamesByMonth as $monthKey => $data) {
             $monthLabel = $data['label'];
             $abbrev = date('M', strtotime($monthKey . '-01'));
-            $html .= '<a href="#team-month-' . $monthKey . '" class="team-schedule-months__link" onclick="scrollToMonth(event, \'' . $monthKey . '\')">';
-            $html .= '<span class="team-schedule-months__full">' . HtmlSanitizer::safeHtmlOutput($monthLabel) . '</span>';
-            $html .= '<span class="team-schedule-months__abbr">' . HtmlSanitizer::safeHtmlOutput($abbrev) . '</span>';
+            $html .= '<a href="#team-month-' . $monthKey . '" class="schedule-months__link" onclick="scrollToMonth(event, \'' . $monthKey . '\')">';
+            $html .= '<span class="schedule-months__full">' . HtmlSanitizer::safeHtmlOutput($monthLabel) . '</span>';
+            $html .= '<span class="schedule-months__abbr">' . HtmlSanitizer::safeHtmlOutput($abbrev) . '</span>';
             $html .= '</a>';
         }
         $html .= '</nav>';
@@ -107,28 +124,28 @@ class TeamScheduleView implements TeamScheduleViewInterface
     }
 
     /**
-     * Render all games organized by month
+     * Render all games organized by month using same layout as Schedule module
      */
-    private function renderGamesByMonth(array $gamesByMonth, int $userTeamId): string
+    private function renderGamesByMonth(array $gamesByMonth, array $allGames, int $userTeamId): string
     {
         $html = '';
         foreach ($gamesByMonth as $monthKey => $data) {
-            $html .= '<div class="team-schedule-month" id="team-month-' . $monthKey . '">';
-            $html .= '<div class="team-schedule-month__header">' . HtmlSanitizer::safeHtmlOutput($data['label']) . '</div>';
+            $html .= '<div class="schedule-month" id="team-month-' . $monthKey . '">';
+            $html .= '<div class="schedule-month__header">' . HtmlSanitizer::safeHtmlOutput($data['label']) . '</div>';
 
             foreach ($data['dates'] as $date => $games) {
                 $dayName = date('D', strtotime($date));
                 $dayNum = date('j', strtotime($date));
 
-                $html .= '<div class="team-schedule-day">';
-                $html .= '<div class="team-schedule-day__header">';
-                $html .= '<span class="team-schedule-day__name">' . $dayName . '</span>';
-                $html .= '<span class="team-schedule-day__num">' . $dayNum . '</span>';
+                $html .= '<div class="schedule-day">';
+                $html .= '<div class="schedule-day__header">';
+                $html .= '<span class="schedule-day__name">' . $dayName . '</span>';
+                $html .= '<span class="schedule-day__num">' . $dayNum . '</span>';
                 $html .= '</div>';
 
-                $html .= '<div class="team-schedule-day__games">';
+                $html .= '<div class="schedule-day__games">';
                 foreach ($games as $row) {
-                    $html .= $this->renderGameCard($row, $userTeamId);
+                    $html .= $this->renderGameRow($row, $userTeamId);
                 }
                 $html .= '</div>';
                 $html .= '</div>';
@@ -140,9 +157,9 @@ class TeamScheduleView implements TeamScheduleViewInterface
     }
 
     /**
-     * Render a single game card
+     * Render a single game row matching Schedule module format
      */
-    private function renderGameCard(array $row, int $userTeamId): string
+    private function renderGameRow(array $row, int $userTeamId): string
     {
         /** @var \Game $game */
         $game = $row['game'];
@@ -150,59 +167,114 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $opposingTeam = $row['opposingTeam'];
 
         $isUpcoming = ($row['highlight'] === 'next-sim');
-        $gameClass = 'team-schedule-game';
+        $gameClass = 'schedule-game';
         if ($isUpcoming) {
-            $gameClass .= ' team-schedule-game--upcoming';
+            $gameClass .= ' schedule-game--upcoming';
         }
 
         $gameId = 'team-game-' . (int)$game->boxScoreID;
         $opponentTeamId = (int)$opposingTeam->teamID;
         $boxScoreUrl = './ibl/IBL/box' . (int)$game->boxScoreID . '.htm';
         $opponentUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $opponentTeamId;
+        $userTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $userTeamId;
 
-        // Determine if home or away
+        // Determine visitor/home based on game data
         $isHome = ($game->homeTeamID === $userTeamId);
-        $locationPrefix = $isHome ? 'vs' : '@';
 
         $html = '<div class="' . $gameClass . '" id="' . $gameId . '">';
 
-        // Opponent logo
-        $html .= '<a href="' . $opponentUrl . '" class="team-schedule-game__logo-link">';
-        $html .= '<img class="team-schedule-game__logo" src="images/logo/new' . $opponentTeamId . '.png" alt="">';
-        $html .= '</a>';
+        if ($isHome) {
+            // User team is home: Opponent @ User
+            // Visitor (opponent)
+            $html .= $this->renderTeamLink($opponentUrl, $opposingTeam->name, $opposingTeam->seasonRecord, $opponentTeamId, false);
 
-        // Opponent info
-        $html .= '<div class="team-schedule-game__info">';
-        $html .= '<a href="' . $opponentUrl . '" class="team-schedule-game__opponent">';
-        $html .= '<span class="team-schedule-game__location">' . $locationPrefix . '</span> ';
-        $html .= HtmlSanitizer::safeHtmlOutput($opposingTeam->name);
-        $html .= '</a>';
-        $html .= '<span class="team-schedule-game__record">(' . HtmlSanitizer::safeHtmlOutput($opposingTeam->seasonRecord) . ')</span>';
-        $html .= '</div>';
+            // Scores
+            if ($row['isUnplayed']) {
+                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link">–</a>';
+                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
+                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link">–</a>';
+            } else {
+                $userWon = ($row['winLossColor'] === 'green');
+                $vClass = $userWon ? '' : ' schedule-game__team--win';
+                $hClass = $userWon ? ' schedule-game__team--win' : '';
+                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vClass . '">' . HtmlSanitizer::safeHtmlOutput($game->visitorScore) . '</a>';
+                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
+                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hClass . '">' . HtmlSanitizer::safeHtmlOutput($game->homeScore) . '</a>';
+            }
 
-        // Result or upcoming indicator
-        if ($row['isUnplayed']) {
-            $html .= '<div class="team-schedule-game__result team-schedule-game__result--upcoming">';
-            $html .= '<span class="team-schedule-game__time">TBD</span>';
-            $html .= '</div>';
+            // Home (user team) - show record/streak instead of team name
+            $html .= $this->renderUserTeamStats($row, $userTeamId);
         } else {
-            $isWin = ($row['winLossColor'] === 'green');
-            $resultClass = $isWin ? 'team-schedule-game__result--win' : 'team-schedule-game__result--loss';
-            $resultLetter = $isWin ? 'W' : 'L';
+            // User team is visitor: User @ Opponent
+            // Visitor (user team) - show record/streak
+            $html .= $this->renderUserTeamStats($row, $userTeamId);
 
-            $html .= '<a href="' . $boxScoreUrl . '" class="team-schedule-game__result ' . $resultClass . '">';
-            $html .= '<span class="team-schedule-game__outcome">' . $resultLetter . '</span>';
-            $html .= '<span class="team-schedule-game__score">' . HtmlSanitizer::safeHtmlOutput($game->visitorScore . '-' . $game->homeScore) . '</span>';
-            $html .= '</a>';
+            // Scores
+            if ($row['isUnplayed']) {
+                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link">–</a>';
+                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
+                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link">–</a>';
+            } else {
+                $userWon = ($row['winLossColor'] === 'green');
+                $vClass = $userWon ? ' schedule-game__team--win' : '';
+                $hClass = $userWon ? '' : ' schedule-game__team--win';
+                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vClass . '">' . HtmlSanitizer::safeHtmlOutput($game->visitorScore) . '</a>';
+                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
+                $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hClass . '">' . HtmlSanitizer::safeHtmlOutput($game->homeScore) . '</a>';
+            }
 
-            // Record and streak
-            $html .= '<div class="team-schedule-game__stats">';
-            $html .= '<span class="team-schedule-game__wl">' . HtmlSanitizer::safeHtmlOutput($row['wins'] . '-' . $row['losses']) . '</span>';
-            $html .= '<span class="team-schedule-game__streak">' . HtmlSanitizer::safeHtmlOutput($row['streak']) . '</span>';
-            $html .= '</div>';
+            // Home (opponent)
+            $html .= $this->renderTeamLink($opponentUrl, $opposingTeam->name, $opposingTeam->seasonRecord, $opponentTeamId, false);
         }
 
         $html .= '</div>';
+        return $html;
+    }
+
+    /**
+     * Render team link with logo and name
+     */
+    private function renderTeamLink(string $url, string $name, string $record, int $teamId, bool $isWinner): string
+    {
+        $winClass = $isWinner ? ' schedule-game__team--win' : '';
+
+        $html = '<a href="' . $url . '" class="schedule-game__team-link">';
+        $html .= '<span class="schedule-game__team' . $winClass . '">' . HtmlSanitizer::safeHtmlOutput($name);
+        $html .= ' <span class="schedule-game__record">(' . HtmlSanitizer::safeHtmlOutput($record) . ')</span>';
+        $html .= '</span></a>';
+        $html .= '<a href="' . $url . '" class="schedule-game__logo-link">';
+        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $teamId . '.png" alt="">';
+        $html .= '</a>';
+
+        return $html;
+    }
+
+    /**
+     * Render user team stats (record and streak) in place of team name
+     */
+    private function renderUserTeamStats(array $row, int $userTeamId): string
+    {
+        $userWon = ($row['winLossColor'] === 'green');
+        $winClass = $userWon ? ' schedule-game__team--win' : '';
+        $userTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $userTeamId;
+
+        $html = '<a href="' . $userTeamUrl . '" class="schedule-game__team-link">';
+
+        if ($row['isUnplayed']) {
+            $html .= '<span class="schedule-game__team">—</span>';
+        } else {
+            $record = $row['wins'] . '-' . $row['losses'];
+            $html .= '<span class="schedule-game__team' . $winClass . '">';
+            $html .= HtmlSanitizer::safeHtmlOutput($record);
+            $html .= ' <span class="schedule-game__record">' . HtmlSanitizer::safeHtmlOutput($row['streak']) . '</span>';
+            $html .= '</span>';
+        }
+
+        $html .= '</a>';
+        $html .= '<a href="' . $userTeamUrl . '" class="schedule-game__logo-link">';
+        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $userTeamId . '.png" alt="">';
+        $html .= '</a>';
+
         return $html;
     }
 

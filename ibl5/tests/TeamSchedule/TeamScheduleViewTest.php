@@ -68,8 +68,9 @@ class TeamScheduleViewTest extends TestCase
 
         $result = $this->view->render($mockTeam, $games, 7);
 
-        $this->assertStringContainsString('team-schedule-container', $result);
-        $this->assertStringContainsString('team-schedule-banner', $result);
+        $this->assertStringContainsString('schedule-container', $result);
+        $this->assertStringContainsString('schedule-container--team', $result);
+        $this->assertStringContainsString('schedule-team-banner', $result);
     }
 
     public function testRenderDisplaysSimLengthInDays(): void
@@ -140,7 +141,8 @@ class TeamScheduleViewTest extends TestCase
 
         $result = $this->view->render($mockTeam, $games, 7);
 
-        $this->assertStringContainsString('team-schedule-game__result--win', $result);
+        // Win is now shown by highlighting the winning team's score/record
+        $this->assertStringContainsString('schedule-game__team--win', $result);
     }
 
     public function testRenderShowsLossResult(): void
@@ -152,7 +154,9 @@ class TeamScheduleViewTest extends TestCase
 
         $result = $this->view->render($mockTeam, $games, 7);
 
-        $this->assertStringContainsString('team-schedule-game__result--loss', $result);
+        // Loss is shown by NOT having the --win class on the user's team
+        // The opponent's score gets the --win class instead
+        $this->assertStringContainsString('schedule-game__team--win', $result);
     }
 
     /**

@@ -85,3 +85,11 @@ $this->assertQueryNotExecuted('DELETE');
 | Users | `nuke_users` | `username`, `user_ibl_team` |
 | History | `ibl_hist` | Historical player stats |
 | Schedule | `ibl_schedule` | Game schedule |
+
+## Environment Commands
+
+**Bun:** The PATH for bun (`~/.bun/bin`) may not be loaded in the shell. Before running `bun` commands, source the shell config first:
+
+```bash
+source ~/.zshrc && bun <command>
+```

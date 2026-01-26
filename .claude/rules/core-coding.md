@@ -88,8 +88,15 @@ $this->assertQueryNotExecuted('DELETE');
 
 ## Environment Commands
 
-**Bun:** The PATH for bun (`~/.bun/bin`) may not be loaded in the shell. Before running `bun` commands, source the shell config first:
+**Bun:** The PATH for bun (`~/.bun/bin`) may not be loaded in the shell. Before running `bun` commands, source the shell config first.
 
+**CSS Development (Tailwind 4):**
 ```bash
-source ~/.zshrc && bun <command>
+# DEVELOPMENT: Use this during active development - auto-rebuilds on save
+source ~/.zshrc && bun run css:watch
+
+# PRODUCTION: Only use for production builds - minifies output
+source ~/.zshrc && bun run css:build
 ```
+
+**Important:** Always use `css:watch` during development. It monitors `design/input.css` and automatically rebuilds `themes/IBL/style/style.css` whenever changes are saved. Only use `css:build` for final production builds.

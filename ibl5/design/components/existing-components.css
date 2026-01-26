@@ -665,7 +665,7 @@
     background: var(--gray-50);
     padding: var(--space-3) var(--space-4);
     text-align: left;
-    font-size: 1rem;
+    font-size: 1.125rem;
     font-weight: 600;
     color: var(--gray-500);
     text-transform: uppercase;
@@ -1364,7 +1364,7 @@
     background: var(--navy-800);
     color: white;
     font-family: var(--font-display);
-    font-size: 1rem;
+    font-size: 1.125rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;

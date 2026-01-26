@@ -174,12 +174,10 @@ function renderLeagueSchedule(
         echo '<div class="schedule-month__header">' . $monthLabel . '</div>';
 
         foreach ($dates as $date => $games) {
-            $dayName = date('D', strtotime($date));
             $dayNum = date('j', strtotime($date));
 
             echo '<div class="schedule-day">';
             echo '<div class="schedule-day__header">';
-            echo '<span class="schedule-day__name">' . $dayName . '</span>';
             echo '<span class="schedule-day__num">' . $dayNum . '</span>';
             echo '</div>';
 

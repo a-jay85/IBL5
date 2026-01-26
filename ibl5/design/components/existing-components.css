@@ -1395,14 +1395,6 @@
     border-right: 1px solid var(--gray-100);
 }
 
-.schedule-day__name {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--gray-400);
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-}
-
 .schedule-day__num {
     font-family: var(--font-display);
     font-size: 1.125rem;

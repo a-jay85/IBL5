@@ -134,12 +134,10 @@ class TeamScheduleView implements TeamScheduleViewInterface
             $html .= '<div class="schedule-month__header">' . HtmlSanitizer::safeHtmlOutput($data['label']) . '</div>';
 
             foreach ($data['dates'] as $date => $games) {
-                $dayName = date('D', strtotime($date));
                 $dayNum = date('j', strtotime($date));
 
                 $html .= '<div class="schedule-day">';
                 $html .= '<div class="schedule-day__header">';
-                $html .= '<span class="schedule-day__name">' . $dayName . '</span>';
                 $html .= '<span class="schedule-day__num">' . $dayNum . '</span>';
                 $html .= '</div>';
 

@@ -2015,7 +2015,7 @@ a.schedule-jump-btn:hover {
 }
 
 .next-sim-logo img {
-    max-width: 80px;
+    max-width: 300px;
     height: auto;
     border-radius: var(--radius-md);
 }

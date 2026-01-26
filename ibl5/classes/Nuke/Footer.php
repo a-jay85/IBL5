@@ -6,7 +6,7 @@ class Footer
 {
     public static function footmsg()
     {
-        global $foot1, $foot2, $foot3, $start_time;
+        global $start_time;
         $mtime = microtime();
         $mtime = explode(" ", $mtime);
         $mtime = $mtime[1] + $mtime[0];
@@ -15,15 +15,6 @@ class Footer
         $total_time = _PAGEGENERATION . " " . substr($total_time, 0, 4) . " " . _SECONDS;
 
         $footmsg = "<div class=\"site-footer\">\n";
-        if (!empty($foot1)) {
-            $footmsg .= "<p>" . $foot1 . "</p>\n";
-        }
-        if (!empty($foot2)) {
-            $footmsg .= "<p>" . $foot2 . "</p>\n";
-        }
-        if (!empty($foot3)) {
-            $footmsg .= "<p>" . $foot3 . "</p>\n";
-        }
         $footmsg .= "<p class=\"page-time\">" . $total_time . "</p>\n";
         $footmsg .= "</div>\n";
         echo $footmsg;

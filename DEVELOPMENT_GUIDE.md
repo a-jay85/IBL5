@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1621 tests • ~76% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 1754 tests • ~78% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -12,17 +12,13 @@
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - Strong progress with 1621 tests (~76% coverage). PR #158 added 365 unit tests, PR #159 added 38 integration test methods across 5 critical workflows. Waivers, DepthChart, RookieOption, Schedule, Standings, and Voting integration tests completed. **Next Steps:** Expand edge case coverage in existing modules to reach 80% goal.
+1. **Test Coverage → 80%** - Strong progress with 1754 tests (~78% coverage). All priority integration tests complete. All unit test gaps closed. **Next Steps:** Expand edge case coverage in remaining modules to reach 80% goal.
 
-   **Priority Integration Tests Needed:**
-   - ~~**HIGH**: Waivers (add/drop workflow with cap validation, waiver wire timing)~~ ✅ Complete
-   - ~~**MEDIUM**: DepthChart (submission with position validation, injured player handling)~~ ✅ Complete
-   - ~~**MEDIUM**: RookieOption (option exercise with eligibility checks, contract updates)~~ ✅ Complete
-   - ~~**MEDIUM**: Schedule (win/loss tracking, streak calculation, next-sim highlighting)~~ ✅ Complete
-   - ~~**MEDIUM**: Standings (calculation accuracy, tie-breaking logic)~~ ✅ Complete
-   - ~~**LOW**: Voting (All-star/awards voting submission)~~ ✅ Complete
+   **Priority Integration Tests:** ✅ All Complete
+   - ~~Waivers, DepthChart, RookieOption, Schedule, Standings, Voting~~
 
-   **Unit Test Gaps:** Discord (1 test), Shared (1 test), League (1 test), Injuries (2 tests), Standings (2 tests)
+   **Unit Test Gaps:** ✅ All Closed (Jan 26, 2026)
+   - ~~Discord, Shared, League, Injuries, Standings~~ - Added 133 tests
 
 2. **API Development** - REST API with JWT, rate limiting, OpenAPI docs
 3. **Security Hardening** - XSS audit, CSRF, security headers
@@ -30,6 +26,28 @@
 ---
 
 ## Recent Updates
+
+### Unit Test Gaps Closed (Jan 26, 2026)
+
+**Impact:** Added 133 tests across 5 modules that had testing gaps, bringing total from 1621 to 1754 tests (~78% coverage)
+
+**New Test Files:**
+- **SalaryConverterTest** (14 tests) - Full coverage for previously untested utility class
+- **DiscordIntegrationTest** (29 tests) - Config loading, database queries, message formatting
+- **InjuriesIntegrationTest** (28 tests) - XSS protection, HTML structure, rendering edge cases
+- **StandingsIntegrationTest** (26 tests) - Region validation, clinching indicators, streak display
+- **LeagueContextIntegrationTest** (36 tests) - Constants, config structure, module lists
+
+**Coverage Added:**
+- SalaryConverter: `convertToMillions()` with edge cases (zero, vet min, max contracts)
+- Discord: `getDiscordIDFromTeamname()` queries, `postToChannel()` message processing
+- Injuries: XSS protection for all fields, HTML structure validation
+- Standings: Clinching indicator priority (Z > Y > X), Pythagorean stats
+- League: IBL-only modules list verification, setLeague/getCurrentLeague edge cases
+
+**Status:** All 1754 tests passing ✅ Unit test gaps closed for all 5 priority modules
+
+---
 
 ### Schedule Integration Tests Added (Jan 25, 2026)
 

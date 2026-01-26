@@ -29,7 +29,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
 
     /**
      * Initialize cap data from the cap calculator
-     * 
+     *
      * @return void
      */
     private function initializeCapMetrics(): void
@@ -45,7 +45,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     {
         ob_start();
         ?>
-<center><img src="images/logo/<?= htmlspecialchars($this->team->teamID) ?>.jpg"></center>
+<center><img src="images/logo/<?= (int) $this->team->teamID ?>.jpg"></center>
 <p>
 <?= $this->renderPlayersUnderContract() ?>
 <p>
@@ -61,7 +61,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
 
     /**
      * Render players under contract table
-     * 
+     *
      * @return string HTML table
      */
     private function renderPlayersUnderContract(): string
@@ -77,7 +77,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
         <?php foreach ($this->team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
             <?php
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
-            
+
             if (!$player->isPlayerFreeAgent($this->season)):
                 $futureSalaries = $player->getFutureSalaries();
                 $playerName = $player->name;
@@ -88,16 +88,16 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
         <tr>
             <td>
                 <?php if ($player->canRookieOption($this->season->phase)): ?>
-                    <a href="modules.php?name=Player&pa=rookieoption&pid=<?= htmlspecialchars($player->playerID) ?>">Rookie Option</a>
+                    <a href="modules.php?name=Player&pa=rookieoption&pid=<?= (int) $player->playerID ?>">Rookie Option</a>
                 <?php endif; ?>
             </td>
-            <td><?= htmlspecialchars($player->position) ?></td>
-            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars($player->playerID) ?>"><?= htmlspecialchars($playerName) ?></a></td>
-            <td><a href="modules.php?name=Team&op=team&teamID=<?= htmlspecialchars($player->teamID) ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
-            <td><?= htmlspecialchars($player->age) ?></td>
+            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= (int) $player->playerID ?>"><?= htmlspecialchars($playerName ?? '') ?></a></td>
+            <td><a href="modules.php?name=Team&op=team&teamID=<?= (int) $player->teamID ?>"><?= htmlspecialchars($player->teamName ?? '') ?></a></td>
+            <td><?= (int) $player->age ?></td>
             <?= $this->renderPlayerRatings($player) ?>
             <?php foreach ($futureSalaries as $salary): ?>
-                <td><?= htmlspecialchars($salary) ?></td>
+                <td><?= (int) $salary ?></td>
             <?php endforeach; ?>
             <?= $this->renderPlayerPreferences($player) ?>
         </tr>
@@ -108,7 +108,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
         <tr>
             <td colspan="29" align="right"><b><i><?= htmlspecialchars($this->team->name) ?> Total Salary</i></b></td>
             <?php foreach ($this->capMetrics['totalSalaries'] as $salary): ?>
-                <td><b><i><?= htmlspecialchars($salary) ?></i></b></td>
+                <td><b><i><?= (int) $salary ?></i></b></td>
             <?php endforeach; ?>
         </tr>
     </tfoot>
@@ -119,13 +119,13 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
 
     /**
      * Render contract offers table
-     * 
+     *
      * @return string HTML table
      */
     private function renderContractOffers(): string
     {
         $commonRepository = new \Services\CommonMysqliRepository($this->mysqli_db);
-        
+
         ob_start();
         ?>
 <table border="1" cellspacing="0" class="sortable">
@@ -140,18 +140,18 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
             $player = Player::withPlayerID($this->mysqli_db, $playerID);
             ?>
         <tr>
-            <td><a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= htmlspecialchars($player->playerID) ?>">Negotiate</a></td>
-            <td><?= htmlspecialchars($player->position) ?></td>
-            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars($player->playerID) ?>"><?= htmlspecialchars($player->name) ?></a></td>
-            <td><a href="modules.php?name=Team&op=team&teamID=<?= htmlspecialchars($player->teamID) ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
-            <td><?= htmlspecialchars($player->age) ?></td>
+            <td><a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= (int) $player->playerID ?>">Negotiate</a></td>
+            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= (int) $player->playerID ?>"><?= htmlspecialchars($player->name ?? '') ?></a></td>
+            <td><a href="modules.php?name=Team&op=team&teamID=<?= (int) $player->teamID ?>"><?= htmlspecialchars($player->teamName ?? '') ?></a></td>
+            <td><?= (int) $player->age ?></td>
             <?= $this->renderPlayerRatings($player) ?>
-            <td><?= htmlspecialchars($offerRow['offer1']) ?></td>
-            <td><?= htmlspecialchars($offerRow['offer2']) ?></td>
-            <td><?= htmlspecialchars($offerRow['offer3']) ?></td>
-            <td><?= htmlspecialchars($offerRow['offer4']) ?></td>
-            <td><?= htmlspecialchars($offerRow['offer5']) ?></td>
-            <td><?= htmlspecialchars($offerRow['offer6']) ?></td>
+            <td><?= (int) $offerRow['offer1'] ?></td>
+            <td><?= (int) $offerRow['offer2'] ?></td>
+            <td><?= (int) $offerRow['offer3'] ?></td>
+            <td><?= (int) $offerRow['offer4'] ?></td>
+            <td><?= (int) $offerRow['offer5'] ?></td>
+            <td><?= (int) $offerRow['offer6'] ?></td>
             <?= $this->renderPlayerPreferences($player) ?>
         </tr>
         <?php endforeach; ?>
@@ -160,7 +160,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
         <tr>
             <td colspan="29" align="right"><b><i><?= htmlspecialchars($this->team->name) ?> Total Salary Plus Contract Offers</i></b></td>
             <?php foreach ($this->capMetrics['totalSalaries'] as $salary): ?>
-                <td><b><i><?= htmlspecialchars($salary) ?></i></b></td>
+                <td><b><i><?= (int) $salary ?></i></b></td>
             <?php endforeach; ?>
         </tr>
         <?= $this->renderCapSpaceFooter() ?>
@@ -172,7 +172,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
 
     /**
      * Render team free agents table
-     * 
+     *
      * @return string HTML table
      */
     private function renderTeamFreeAgents(): string
@@ -189,26 +189,26 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
         <?php foreach ($this->team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
             <?php
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
-            
+
             if ($player->isPlayerFreeAgent($this->season)):
                 $demands = $player->getFreeAgencyDemands();
             ?>
         <tr>
             <td>
                 <?php if ($this->capMetrics['rosterSpots'][0] > 0): ?>
-                    <a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= htmlspecialchars($player->playerID) ?>">Negotiate</a>
+                    <a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= (int) $player->playerID ?>">Negotiate</a>
                 <?php endif; ?>
             </td>
-            <td><?= htmlspecialchars($player->position) ?></td>
-            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars($player->playerID) ?>">
+            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= (int) $player->playerID ?>">
                 <?php if ($player->birdYears >= 3): ?>
-                    *<i><?= htmlspecialchars($player->name) ?></i>*
+                    *<i><?= htmlspecialchars($player->name ?? '') ?></i>*
                 <?php else: ?>
-                    <?= htmlspecialchars($player->name) ?>
+                    <?= htmlspecialchars($player->name ?? '') ?>
                 <?php endif; ?>
             </a></td>
-            <td><a href="modules.php?name=Team&op=team&teamID=<?= htmlspecialchars($player->teamID) ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
-            <td><?= htmlspecialchars($player->age) ?></td>
+            <td><a href="modules.php?name=Team&op=team&teamID=<?= (int) $player->teamID ?>"><?= htmlspecialchars($player->teamName ?? '') ?></a></td>
+            <td><?= (int) $player->age ?></td>
             <?= $this->renderPlayerRatings($player) ?>
             <?= $this->renderPlayerDemands($demands) ?>
             <?= $this->renderPlayerPreferences($player) ?>
@@ -223,7 +223,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
 
     /**
      * Render other free agents table
-     * 
+     *
      * @return string HTML table
      */
     private function renderOtherFreeAgents(): string
@@ -238,19 +238,19 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     <tbody>
         <?php
         $allPlayers = $this->repository->getAllPlayersExcludingTeam($this->team->name);
-        
+
         foreach ($allPlayers as $playerRow):
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
-            
+
             if ($player->isPlayerFreeAgent($this->season)):
                 $demands = $player->getFreeAgencyDemands();
         ?>
         <tr>
-            <td><a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= htmlspecialchars($player->playerID) ?>">Negotiate</a></td>
-            <td><?= htmlspecialchars($player->position) ?></td>
-            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars($player->playerID) ?>"><?= htmlspecialchars($player->name) ?></a></td>
-            <td><a href="modules.php?name=Team&op=team&teamID=<?= htmlspecialchars($player->teamID) ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
-            <td><?= htmlspecialchars($player->age) ?></td>
+            <td><a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= (int) $player->playerID ?>">Negotiate</a></td>
+            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= (int) $player->playerID ?>"><?= htmlspecialchars($player->name ?? '') ?></a></td>
+            <td><a href="modules.php?name=Team&op=team&teamID=<?= (int) $player->teamID ?>"><?= htmlspecialchars($player->teamName ?? '') ?></a></td>
+            <td><?= (int) $player->age ?></td>
             <?= $this->renderPlayerRatings($player) ?>
             <?= $this->renderPlayerDemands($demands) ?>
             <?= $this->renderPlayerPreferences($player) ?>
@@ -265,7 +265,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
 
     /**
      * Render table header
-     * 
+     *
      * @return string HTML table header
      */
     private function renderTableHeader(): string
@@ -331,7 +331,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
 
     /**
      * Render player ratings cells
-     * 
+     *
      * @param Player $player
      * @return string HTML table cells
      */
@@ -339,37 +339,37 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     {
         ob_start();
         ?>
-<td><?= htmlspecialchars($player->ratingFieldGoalAttempts) ?></td>
-<td><?= htmlspecialchars($player->ratingFieldGoalPercentage) ?></td>
-<td><?= htmlspecialchars($player->ratingFreeThrowAttempts) ?></td>
-<td><?= htmlspecialchars($player->ratingFreeThrowPercentage) ?></td>
-<td><?= htmlspecialchars($player->ratingThreePointAttempts) ?></td>
-<td><?= htmlspecialchars($player->ratingThreePointPercentage) ?></td>
-<td><?= htmlspecialchars($player->ratingOffensiveRebounds) ?></td>
-<td><?= htmlspecialchars($player->ratingDefensiveRebounds) ?></td>
-<td><?= htmlspecialchars($player->ratingAssists) ?></td>
-<td><?= htmlspecialchars($player->ratingSteals) ?></td>
-<td><?= htmlspecialchars($player->ratingTurnovers) ?></td>
-<td><?= htmlspecialchars($player->ratingBlocks) ?></td>
-<td><?= htmlspecialchars($player->ratingFouls) ?></td>
-<td><?= htmlspecialchars($player->ratingOutsideOffense) ?></td>
-<td><?= htmlspecialchars($player->ratingDriveOffense) ?></td>
-<td><?= htmlspecialchars($player->ratingPostOffense) ?></td>
-<td><?= htmlspecialchars($player->ratingTransitionOffense) ?></td>
-<td><?= htmlspecialchars($player->ratingOutsideDefense) ?></td>
-<td><?= htmlspecialchars($player->ratingDriveDefense) ?></td>
-<td><?= htmlspecialchars($player->ratingPostDefense) ?></td>
-<td><?= htmlspecialchars($player->ratingTransitionDefense) ?></td>
-<td><?= htmlspecialchars($player->ratingTalent) ?></td>
-<td><?= htmlspecialchars($player->ratingSkill) ?></td>
-<td><?= htmlspecialchars($player->ratingIntangibles) ?></td>
+<td><?= (int) $player->ratingFieldGoalAttempts ?></td>
+<td><?= (int) $player->ratingFieldGoalPercentage ?></td>
+<td><?= (int) $player->ratingFreeThrowAttempts ?></td>
+<td><?= (int) $player->ratingFreeThrowPercentage ?></td>
+<td><?= (int) $player->ratingThreePointAttempts ?></td>
+<td><?= (int) $player->ratingThreePointPercentage ?></td>
+<td><?= (int) $player->ratingOffensiveRebounds ?></td>
+<td><?= (int) $player->ratingDefensiveRebounds ?></td>
+<td><?= (int) $player->ratingAssists ?></td>
+<td><?= (int) $player->ratingSteals ?></td>
+<td><?= (int) $player->ratingTurnovers ?></td>
+<td><?= (int) $player->ratingBlocks ?></td>
+<td><?= (int) $player->ratingFouls ?></td>
+<td><?= (int) $player->ratingOutsideOffense ?></td>
+<td><?= (int) $player->ratingDriveOffense ?></td>
+<td><?= (int) $player->ratingPostOffense ?></td>
+<td><?= (int) $player->ratingTransitionOffense ?></td>
+<td><?= (int) $player->ratingOutsideDefense ?></td>
+<td><?= (int) $player->ratingDriveDefense ?></td>
+<td><?= (int) $player->ratingPostDefense ?></td>
+<td><?= (int) $player->ratingTransitionDefense ?></td>
+<td><?= (int) $player->ratingTalent ?></td>
+<td><?= (int) $player->ratingSkill ?></td>
+<td><?= (int) $player->ratingIntangibles ?></td>
         <?php
         return ob_get_clean();
     }
 
     /**
      * Render player preferences cells
-     * 
+     *
      * @param Player $player
      * @return string HTML table cells
      */
@@ -377,43 +377,43 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     {
         ob_start();
         ?>
-<td><?= htmlspecialchars($player->freeAgencyLoyalty) ?></td>
-<td><?= htmlspecialchars($player->freeAgencyPlayForWinner) ?></td>
-<td><?= htmlspecialchars($player->freeAgencyPlayingTime) ?></td>
-<td><?= htmlspecialchars($player->freeAgencySecurity) ?></td>
-<td><?= htmlspecialchars($player->freeAgencyTradition) ?></td>
+<td><?= (int) $player->freeAgencyLoyalty ?></td>
+<td><?= (int) $player->freeAgencyPlayForWinner ?></td>
+<td><?= (int) $player->freeAgencyPlayingTime ?></td>
+<td><?= (int) $player->freeAgencySecurity ?></td>
+<td><?= (int) $player->freeAgencyTradition ?></td>
         <?php
         return ob_get_clean();
     }
 
     /**
      * Render player demands cells
-     * 
+     *
      * @param array<string, mixed> $demands
      * @return string HTML table cells
      */
     private function renderPlayerDemands(array $demands): string
     {
         ob_start();
-        if ($demands['dem1'] !== 0) echo "<td>" . htmlspecialchars((string)$demands['dem1']) . "</td>"; else echo "<td></td>";
-        if ($demands['dem2'] !== 0) echo "<td>" . htmlspecialchars((string)$demands['dem2']) . "</td>"; else echo "<td></td>";
-        if ($demands['dem3'] !== 0) echo "<td>" . htmlspecialchars((string)$demands['dem3']) . "</td>"; else echo "<td></td>";
-        if ($demands['dem4'] !== 0) echo "<td>" . htmlspecialchars((string)$demands['dem4']) . "</td>"; else echo "<td></td>";
-        if ($demands['dem5'] !== 0) echo "<td>" . htmlspecialchars((string)$demands['dem5']) . "</td>"; else echo "<td></td>";
-        if ($demands['dem6'] !== 0) echo "<td>" . htmlspecialchars((string)$demands['dem6']) . "</td>"; else echo "<td></td>";
+        if ($demands['dem1'] !== 0) echo "<td>" . (int) $demands['dem1'] . "</td>"; else echo "<td></td>";
+        if ($demands['dem2'] !== 0) echo "<td>" . (int) $demands['dem2'] . "</td>"; else echo "<td></td>";
+        if ($demands['dem3'] !== 0) echo "<td>" . (int) $demands['dem3'] . "</td>"; else echo "<td></td>";
+        if ($demands['dem4'] !== 0) echo "<td>" . (int) $demands['dem4'] . "</td>"; else echo "<td></td>";
+        if ($demands['dem5'] !== 0) echo "<td>" . (int) $demands['dem5'] . "</td>"; else echo "<td></td>";
+        if ($demands['dem6'] !== 0) echo "<td>" . (int) $demands['dem6'] . "</td>"; else echo "<td></td>";
         return ob_get_clean();
     }
 
     /**
      * Render cap space footer rows
-     * 
+     *
      * @return string HTML table rows
      */
     private function renderCapSpaceFooter(): string
     {
         $MLEicon = ($this->team->hasMLE === "1") ? "\u{2705}" : "\u{274C}";
         $LLEicon = ($this->team->hasLLE === "1") ? "\u{2705}" : "\u{274C}";
-        
+
         ob_start();
         ?>
 <tr bgcolor="#cc0000">
@@ -422,7 +422,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     <td colspan="19" bgcolor="#eeeeee"></td>
     <td colspan="8" align="right"><font color="white"><b>Soft Cap Space</b></font></td>
     <?php foreach ($this->capMetrics['softCapSpace'] as $capSpace): ?>
-        <td><?= htmlspecialchars($capSpace) ?></td>
+        <td><?= (int) $capSpace ?></td>
     <?php endforeach; ?>
 </tr>
 <tr bgcolor="#cc0000">
@@ -431,14 +431,14 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     <td colspan="19" bgcolor="#eeeeee"></td>
     <td colspan="8" align="right"><font color="white"><b>Hard Cap Space</b></font></td>
     <?php foreach ($this->capMetrics['hardCapSpace'] as $capSpace): ?>
-        <td><?= htmlspecialchars($capSpace) ?></td>
+        <td><?= (int) $capSpace ?></td>
     <?php endforeach; ?>
 </tr>
 <tr bgcolor="#cc0000">
     <td colspan="21" bgcolor="#eeeeee"></td>
     <td colspan="8" align="right"><font color="white"><b>Empty Roster Slots</b></font></td>
     <?php foreach ($this->capMetrics['rosterSpots'] as $spots): ?>
-        <td><?= htmlspecialchars($spots) ?></td>
+        <td><?= (int) $spots ?></td>
     <?php endforeach; ?>
 </tr>
         <?php

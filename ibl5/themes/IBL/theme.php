@@ -164,9 +164,7 @@ function themefooter()
     // echo "</td>";
     // // }
     echo "</td></tr></table></td></tr></table>";
-    echo "<center>";
     Nuke\Footer::footmsg();
-    echo "</center>";
 }
 
 function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext)

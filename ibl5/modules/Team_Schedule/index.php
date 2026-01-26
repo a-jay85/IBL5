@@ -6,8 +6,7 @@ declare(strict_types=1);
  * Team_Schedule Module - Display team game schedule
  *
  * Shows a team's complete schedule with game results, records, and streaks.
- *
- * Refactored to use the interface-driven architecture pattern.
+ * Modern card-based design with team color theming.
  *
  * @see TeamSchedule\TeamScheduleService For business logic
  * @see TeamSchedule\TeamScheduleView For HTML rendering
@@ -46,10 +45,9 @@ $view = new TeamScheduleView();
 // Get processed schedule data
 $games = $service->getProcessedSchedule($userTeamID, $season);
 
-// Render page
+// Render page with minimal wrapper (no legacy nav/footer)
 Nuke\Header::header();
 OpenTable();
-UI::displaytopmenu($mysqli_db, $userTeamID);
 
 echo $view->render($userTeam, $games, $league->getSimLengthInDays());
 

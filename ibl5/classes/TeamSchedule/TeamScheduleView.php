@@ -185,8 +185,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
         if ($isHome) {
             // User team is home: Opponent @ User
-            // Visitor (opponent)
-            $html .= $this->renderTeamLink($opponentUrl, $opposingTeam->name, $opposingTeam->seasonRecord, $opponentTeamId, false);
+            // Visitor (opponent) - visitor side layout (team-link before logo)
+            $html .= $this->renderTeamLink($opponentUrl, $opposingTeam->name, $opposingTeam->seasonRecord, $opponentTeamId, false, false);
 
             // Scores
             if ($row['isUnplayed']) {
@@ -202,12 +202,12 @@ class TeamScheduleView implements TeamScheduleViewInterface
                 $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hClass . '">' . HtmlSanitizer::safeHtmlOutput($game->homeScore) . '</a>';
             }
 
-            // Home (user team) - show record/streak instead of team name
-            $html .= $this->renderUserTeamStats($row, $userTeamId);
+            // Home (user team) - home side layout (logo before team-link)
+            $html .= $this->renderUserTeamStats($row, $userTeamId, true);
         } else {
             // User team is visitor: User @ Opponent
-            // Visitor (user team) - show record/streak
-            $html .= $this->renderUserTeamStats($row, $userTeamId);
+            // Visitor (user team) - visitor side layout (team-link before logo)
+            $html .= $this->renderUserTeamStats($row, $userTeamId, false);
 
             // Scores
             if ($row['isUnplayed']) {
@@ -223,8 +223,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
                 $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hClass . '">' . HtmlSanitizer::safeHtmlOutput($game->homeScore) . '</a>';
             }
 
-            // Home (opponent)
-            $html .= $this->renderTeamLink($opponentUrl, $opposingTeam->name, $opposingTeam->seasonRecord, $opponentTeamId, false);
+            // Home (opponent) - home side layout (logo before team-link)
+            $html .= $this->renderTeamLink($opponentUrl, $opposingTeam->name, $opposingTeam->seasonRecord, $opponentTeamId, false, true);
         }
 
         $html .= '</div>';
@@ -233,49 +233,53 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
     /**
      * Render team link with logo and name
+     * @param bool $isHomeSide If true, renders logo before team-link (home side layout)
      */
-    private function renderTeamLink(string $url, string $name, string $record, int $teamId, bool $isWinner): string
+    private function renderTeamLink(string $url, string $name, string $record, int $teamId, bool $isWinner, bool $isHomeSide = false): string
     {
         $winClass = $isWinner ? ' schedule-game__team--win' : '';
 
-        $html = '<a href="' . $url . '" class="schedule-game__team-link">';
-        $html .= '<span class="schedule-game__team' . $winClass . '">' . HtmlSanitizer::safeHtmlOutput($name);
-        $html .= ' <span class="schedule-game__record">(' . HtmlSanitizer::safeHtmlOutput($record) . ')</span>';
-        $html .= '</span></a>';
-        $html .= '<a href="' . $url . '" class="schedule-game__logo-link">';
-        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $teamId . '.png" alt="">';
-        $html .= '</a>';
+        $teamLink = '<a href="' . $url . '" class="schedule-game__team-link">';
+        $teamLink .= '<span class="schedule-game__team' . $winClass . '">' . HtmlSanitizer::safeHtmlOutput($name);
+        $teamLink .= ' <span class="schedule-game__record">(' . HtmlSanitizer::safeHtmlOutput($record) . ')</span>';
+        $teamLink .= '</span></a>';
 
-        return $html;
+        $logoLink = '<a href="' . $url . '" class="schedule-game__logo-link">';
+        $logoLink .= '<img class="schedule-game__logo" src="images/logo/new' . $teamId . '.png" alt="">';
+        $logoLink .= '</a>';
+
+        // Home side: logo before team-link; Visitor side: team-link before logo
+        return $isHomeSide ? $logoLink . $teamLink : $teamLink . $logoLink;
     }
 
     /**
      * Render user team stats (record and streak) in place of team name
+     * @param bool $isHomeSide If true, renders logo before team-link (home side layout)
      */
-    private function renderUserTeamStats(array $row, int $userTeamId): string
+    private function renderUserTeamStats(array $row, int $userTeamId, bool $isHomeSide = false): string
     {
         $userWon = ($row['winLossColor'] === 'green');
         $winClass = $userWon ? ' schedule-game__team--win' : '';
         $userTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $userTeamId;
 
-        $html = '<a href="' . $userTeamUrl . '" class="schedule-game__team-link">';
-
+        $teamLink = '<a href="' . $userTeamUrl . '" class="schedule-game__team-link">';
         if ($row['isUnplayed']) {
-            $html .= '<span class="schedule-game__team">—</span>';
+            $teamLink .= '<span class="schedule-game__team">—</span>';
         } else {
             $record = $row['wins'] . '-' . $row['losses'];
-            $html .= '<span class="schedule-game__team' . $winClass . '">';
-            $html .= HtmlSanitizer::safeHtmlOutput($record);
-            $html .= ' <span class="schedule-game__record">' . HtmlSanitizer::safeHtmlOutput($row['streak']) . '</span>';
-            $html .= '</span>';
+            $teamLink .= '<span class="schedule-game__team' . $winClass . '">';
+            $teamLink .= HtmlSanitizer::safeHtmlOutput($record);
+            $teamLink .= ' <span class="schedule-game__record">' . HtmlSanitizer::safeHtmlOutput($row['streak']) . '</span>';
+            $teamLink .= '</span>';
         }
+        $teamLink .= '</a>';
 
-        $html .= '</a>';
-        $html .= '<a href="' . $userTeamUrl . '" class="schedule-game__logo-link">';
-        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $userTeamId . '.png" alt="">';
-        $html .= '</a>';
+        $logoLink = '<a href="' . $userTeamUrl . '" class="schedule-game__logo-link">';
+        $logoLink .= '<img class="schedule-game__logo" src="images/logo/new' . $userTeamId . '.png" alt="">';
+        $logoLink .= '</a>';
 
-        return $html;
+        // Home side: logo before team-link; Visitor side: team-link before logo
+        return $isHomeSide ? $logoLink . $teamLink : $teamLink . $logoLink;
     }
 
     /**

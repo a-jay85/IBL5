@@ -2482,3 +2482,8 @@ a.schedule-jump-btn:hover {
 .underline {
     text-decoration: underline;
 }
+
+/* Ratings table headers */
+table.sortable thead th {
+    font-size: 1rem;
+}

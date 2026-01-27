@@ -63,7 +63,7 @@ class NavigationView
                 'links' => [
                     ['label' => 'Season Archive', 'url' => 'modules.php?name=Content&pa=showpage&pid=5'],
                     ['label' => 'Franchise History', 'url' => 'modules.php?name=Franchise_History'],
-                    ['label' => 'Record Holders', 'url' => 'modules.php?name=Content&pa=showpage&pid=8'],
+                    ['label' => 'Record Holders', 'url' => 'modules.php?name=Record_Holders'],
                     ['label' => 'Transaction History', 'url' => 'modules.php?name=Stories_Archive'],
                     ['label' => 'Award History', 'url' => 'modules.php?name=Player_Awards'],
                     ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=All_Star_Appearances'],

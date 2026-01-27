@@ -58,9 +58,7 @@ foreach ($games as $index => $game) {
 
 // Render page
 Nuke\Header::header();
-OpenTable();
 
 echo $view->render($games, $league->getSimLengthInDays());
 
-CloseTable();
 Nuke\Footer::footer();

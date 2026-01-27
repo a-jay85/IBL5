@@ -51,7 +51,6 @@ class NextSimView implements NextSimViewInterface
         for ($i = 0; $i < $simLengthInDays; $i++) {
             if (isset($games[$i])) {
                 $html .= $this->renderGameRow($games[$i]);
-                $html .= '<div style="height: 15px;"></div>';
             }
         }
 
@@ -91,7 +90,7 @@ class NextSimView implements NextSimViewInterface
         $opposingTeamId = (int)$opposingTeam->teamID;
         $seasonRecord = HtmlSanitizer::safeHtmlOutput($opposingTeam->seasonRecord);
 
-        $html = '<div class="next-sim-game">';
+        $html = '<div class="next-sim-day-game">';
         $html .= '<div class="next-sim-day-row">';
         $html .= '<div class="next-sim-day-label"><h2 title="' . $gameDate . '">' . $dayLabel . '</h2></div>';
         $html .= '<div class="next-sim-logo">';
@@ -101,12 +100,12 @@ class NextSimView implements NextSimViewInterface
         $html .= '</div>';
         $html .= '<div class="next-sim-record"><h2>' . $seasonRecord . '</h2></div>';
         $html .= '</div>';
-        $html .= '</div>';
-
+        
         // Render matchup ratings
         $html .= '<div>';
         $matchupPlayers = $this->prepareMatchupPlayers($gameData);
         $html .= \UI::ratings($this->db, $matchupPlayers, $opposingTeam, '', $this->season, $this->moduleName);
+        $html .= '</div>';
         $html .= '</div>';
 
         return $html;

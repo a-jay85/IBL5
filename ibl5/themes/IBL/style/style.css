@@ -2674,15 +2674,14 @@ a.schedule-jump-btn:hover {
   font-size: 1.125rem;
   padding: var(--space-8);
 }
-.next-sim-game {
-  margin-bottom: var(--space-6);
+.next-sim-day-game {
+  padding: var(--space-4);
 }
 .next-sim-day-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 .next-sim-day-label {
   font-family: var(--font-display);

@@ -311,7 +311,6 @@ class LeagueContextIntegrationTest extends TestCase
         $commonModules = [
             'Standings',
             'Schedule',
-            'Power_Rankings',
             'Injuries',
             'Player',
             'Team',

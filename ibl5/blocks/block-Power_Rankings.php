@@ -117,5 +117,5 @@ while ($row = $result->fetch_assoc()) {
 }
 
 $content .= '</tbody></table>';
-$content .= '<div class="power-block__footer"><a href="modules.php?name=Power_Rankings">-- Full Power Rankings --</a></div>';
+$content .= '<div class="power-block__footer"><a href="modules.php?name=Standings">-- Full Standings --</a></div>';
 $content .= '</div>';

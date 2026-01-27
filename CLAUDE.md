@@ -61,6 +61,9 @@ ibl5/classes/
 └── ... (30 modules total)
 ```
 
+### Legacy (Non-IBL) Modules
+- **SiteStatistics:** A legacy PHP-Nuke module for tracking site visitor/page-view statistics. It is **not** basketball- or IBL-related and should be deprioritized against core IBL modules during refactoring or feature work.
+
 ### Key Patterns
 - **Repository:** Database queries via prepared statements
 - **Service:** Business logic, validation, calculations

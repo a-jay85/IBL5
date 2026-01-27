@@ -253,6 +253,7 @@ class NavigationView
             return [
                 'icon' => '<img src="/ibl5/images/logo/new' . $this->teamId . '.png" alt="Team Logo" class="w-6 h-6 object-contain">',
                 'links' => [
+                    ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamID=' . $this->teamId],
                     ['label' => 'Next Sim', 'url' => 'modules.php?name=Next_Sim', 'badge' => 'NEW'],
                     ['label' => 'Depth Chart Form', 'url' => 'modules.php?name=Depth_Chart_Entry'],
                     ['label' => 'Depth Chart Tracker', 'url' => 'modules.php?name=Depth_Record'],

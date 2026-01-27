@@ -99,8 +99,12 @@ $this->assertQueryNotExecuted('DELETE');
 # DEVELOPMENT: Use this during active development - auto-rebuilds on save
 source ~/.zshrc && bun run css:watch
 
-# PRODUCTION: Only use for production builds - minifies output
-source ~/.zshrc && bun run css:build
+# LOCAL BUILDS: Rebuild CSS without minification (for commits)
+source ~/.zshrc && bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
 ```
 
-**Important:** Always use `css:watch` during development. It monitors `design/input.css` and automatically rebuilds `themes/IBL/style/style.css` whenever changes are saved. Only use `css:build` for final production builds.
+**Important:**
+- Always use `css:watch` during active development. It monitors `design/input.css` and automatically rebuilds `themes/IBL/style/style.css` whenever changes are saved.
+- For local builds (when committing CSS changes), use the bunx command WITHOUT the `--minify` flag.
+- **NEVER use `--minify` flag or other minification methods locally.** Minification is handled automatically by GitHub Actions upon merge/push to production.
+- The `css:build` script in package.json includes `--minify` and is ONLY used by GitHub Actions in production deployments.

@@ -560,8 +560,14 @@ class NavigationView
                     </div>
                 <?php endif; ?>
 
+                <!-- My Team section first for thumb reachability (if user has a team) -->
+                <?php $index = 2; ?>
+                <?php if ($myTeamMenu): ?>
+                    <?= $this->renderMobileDropdown('My Team', $myTeamMenu, $index++) ?>
+                <?php endif; ?>
+
                 <!-- Menu sections -->
-                <?php $index = 2; foreach ($menus as $title => $menu): ?>
+                <?php foreach ($menus as $title => $menu): ?>
                     <?= $this->renderMobileDropdown(
                         $title,
                         $menu,
@@ -570,11 +576,6 @@ class NavigationView
                         $title === 'Season' // include league switcher only for Season menu
                     ) ?>
                 <?php endforeach; ?>
-
-                <!-- My Team section (if user has a team) -->
-                <?php if ($myTeamMenu): ?>
-                    <?= $this->renderMobileDropdown('My Team', $myTeamMenu, $index++) ?>
-                <?php endif; ?>
 
                 <!-- Account section -->
                 <?= $this->renderMobileDropdown(

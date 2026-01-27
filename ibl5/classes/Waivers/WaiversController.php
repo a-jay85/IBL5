@@ -212,8 +212,7 @@ class WaiversController implements WaiversControllerInterface
     private function displayWaiverForm(array $userInfo, string $action, string $errorMessage): void
     {
         \Nuke\Header::header();
-        OpenTable();
-        
+
         $team = \Team::initialize($this->db, $userInfo['user_ibl_team']);
         \UI::displaytopmenu($this->db, $team->teamID);
         
@@ -248,10 +247,9 @@ class WaiversController implements WaiversControllerInterface
         $tableRatings = \UI::ratings($this->db, $result, $teamFreeAgency, "", $season);
         echo $tableRatings;
         
-        CloseTable();
         \Nuke\Footer::footer();
     }
-    
+
     private function getPlayersForAction($team, string $action): array
     {
         $league = new \League($this->db);

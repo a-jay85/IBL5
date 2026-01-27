@@ -45,7 +45,6 @@ $searchResult = $service->search($_POST);
 
 // Render page
 Nuke\Header::header();
-OpenTable();
 UI::playerMenu();
 
 // Render search form with current parameters
@@ -64,5 +63,4 @@ if ($searchResult['count'] > 0) {
 
 echo $view->renderTableFooter();
 
-CloseTable();
 Nuke\Footer::footer();

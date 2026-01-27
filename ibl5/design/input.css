@@ -33,3 +33,10 @@
 @import './components/cards.css';
 @import './components/forms.css';
 @import './components/navigation.css';
+
+/* Site-wide layout wrapper (replaces legacy themeheader table) */
+.site-content {
+  max-width: 100%;
+  padding: 1rem;
+  vertical-align: top;
+}

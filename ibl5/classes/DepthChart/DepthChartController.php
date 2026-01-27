@@ -38,7 +38,6 @@ class DepthChartController implements DepthChartControllerInterface
         $team = \Team::initialize($this->db, $teamID);
         
         \Nuke\Header::header();
-        OpenTable();
         \UI::displaytopmenu($this->db, $teamID);
 
         $this->view->renderTeamLogo($teamID);
@@ -60,7 +59,6 @@ class DepthChartController implements DepthChartControllerInterface
         
         $this->view->renderFormFooter();
         
-        CloseTable();
         \Nuke\Footer::footer();
     }
     

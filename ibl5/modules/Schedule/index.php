@@ -36,7 +36,6 @@ if ($teamID > 0) {
 }
 
 Nuke\Header::header();
-OpenTable();
 
 if ($isValidTeam) {
     // Team-specific schedule with colors, logo, and win/loss tracking
@@ -49,7 +48,6 @@ if ($isValidTeam) {
     renderLeagueSchedule($mysqli_db, $commonRepository, $season, $league);
 }
 
-CloseTable();
 Nuke\Footer::footer();
 
 /**

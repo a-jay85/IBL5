@@ -27,7 +27,6 @@ $filters = [
 
 // Render page
 Nuke\Header::header();
-OpenTable();
 
 // Get data for dropdowns
 $teams = $repository->getTeams();
@@ -55,5 +54,4 @@ foreach ($rows as $row) {
 // Render table footer
 echo $view->renderTableFooter();
 
-CloseTable();
 Nuke\Footer::footer();

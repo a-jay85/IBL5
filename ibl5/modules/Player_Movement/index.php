@@ -37,7 +37,6 @@ $result = $stmt->get_result();
 
 // Render page
 Nuke\Header::header();
-OpenTable();
 
 echo "<script src=\"/ibl5/jslib/sorttable.js\"></script>
 <div style=\"text-align: center;\">
@@ -65,5 +64,4 @@ $stmt->close();
 
 echo "</table></div>";
 
-CloseTable();
 Nuke\Footer::footer();

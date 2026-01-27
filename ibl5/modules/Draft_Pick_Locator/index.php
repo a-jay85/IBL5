@@ -41,9 +41,7 @@ $teamsWithPicks = $service->getAllTeamsWithPicks();
 
 // Render page
 Nuke\Header::header();
-OpenTable();
 
 echo $view->render($teamsWithPicks, $season->endingYear);
 
-CloseTable();
 Nuke\Footer::footer();

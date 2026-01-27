@@ -22,9 +22,7 @@ get_lang($module_name);
 $pagetitle = "- $module_name";
 
 Nuke\Header::header();
-OpenTable();
 
 echo "Module works!";
 
-CloseTable();
 Nuke\Footer::footer();

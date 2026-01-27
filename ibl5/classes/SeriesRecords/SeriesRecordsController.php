@@ -38,7 +38,6 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
     public function displaySeriesRecords(int $userTeamId): void
     {
         \Nuke\Header::header();
-        OpenTable();
         \UI::displaytopmenu($this->db, $userTeamId);
 
         // Get all teams and series records
@@ -52,7 +51,6 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
         // Render the table
         echo $this->view->renderSeriesRecordsTable($teams, $seriesMatrix, $userTeamId, $numTeams);
 
-        CloseTable();
         \Nuke\Footer::footer();
     }
 
@@ -64,15 +62,11 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
         global $stop;
 
         \Nuke\Header::header();
-        OpenTable();
         echo '<div style="text-align: center;"><strong class="title">'
             . ($stop ? _LOGININCOR : _USERREGLOGIN)
             . '</strong></div>';
-        CloseTable();
         echo '<br>';
-        OpenTable();
         loginbox();
-        CloseTable();
         \Nuke\Footer::footer();
     }
 

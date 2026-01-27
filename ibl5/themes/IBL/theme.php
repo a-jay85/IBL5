@@ -16,6 +16,7 @@ $hr = 1; # 1 to have horizonal rule in comments instead of table bgcolor
 /**
  * @deprecated Use CSS classes directly: <div class="ibl-card">
  * Legacy PHP-Nuke table wrapper. Prefer modern CSS components.
+ * Remaining callers: ~60 legacy PHP-Nuke module files (News, Your_Account, Trading, etc.)
  */
 function OpenTable()
 {
@@ -38,6 +39,7 @@ function OpenTable2()
 /**
  * @deprecated Use CSS classes directly: </div> (closing .ibl-card)
  * Legacy PHP-Nuke table closer. Prefer modern CSS components.
+ * Remaining callers: ~60 legacy PHP-Nuke module files (News, Your_Account, Trading, etc.)
  */
 function CloseTable()
 {
@@ -151,8 +153,7 @@ function themeheader()
 
     // Body tag and main content wrapper
     echo "<body bgcolor=\"$bgcolor1\">";
-    echo "<table border=\"0\" cellpadding=\"4\" cellspacing=\"0\" width=\"100%\" align=\"center\">\n"
-        . "<tr><td valign=\"top\" width=\"100%\" colspan=\"3\">\n";
+    echo "<div class=\"site-content\">\n";
 }
 
 function themefooter()
@@ -163,7 +164,7 @@ function themefooter()
     // blocks("right");
     // echo "</td>";
     // // }
-    echo "</td></tr></table></td></tr></table>";
+    echo "</div>"; // closes .site-content
     Nuke\Footer::footmsg();
 }
 

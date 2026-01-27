@@ -44,9 +44,7 @@ $draftPicks = ($year > 0) ? $repository->getDraftPicksByYear($year) : [];
 
 // Render page
 Nuke\Header::header();
-OpenTable();
 
 echo $view->render($year, $startYear, $endYear, $draftPicks);
 
-CloseTable();
 Nuke\Footer::footer();

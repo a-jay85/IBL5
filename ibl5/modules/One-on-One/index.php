@@ -53,7 +53,6 @@ function oneonone(): void
         $ownerplaying = '';
     }
 
-    OpenTable();
     UI::playerMenu();
 
     // Get form inputs
@@ -107,6 +106,5 @@ function oneonone(): void
         }
     }
 
-    CloseTable();
     Nuke\Footer::footer();
 }

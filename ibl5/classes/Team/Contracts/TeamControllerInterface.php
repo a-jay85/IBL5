@@ -59,10 +59,9 @@ interface TeamControllerInterface
      * @return void Outputs complete HTML page directly (via echo)
      * 
      * **Side Effects:**
-     * - Calls OpenTable() and Nuke\Header::header() for page framing
+     * - Calls Nuke\Header::header() for page framing
      * - Echoes complete HTML to output buffer
      * - Expects these global functions to be available:
-     *   - OpenTable(), CloseTable() - page framing
      *   - Nuke\Header::header() - page header
      *   - \UI\Modules\Team - static UI helper methods
      *   - \UI:: - static UI helper methods

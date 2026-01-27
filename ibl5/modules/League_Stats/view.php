@@ -8,10 +8,8 @@
  */
 
 Nuke\Header::header();
-OpenTable();
 
 // Output the pre-rendered HTML from LeagueStatsView
 echo $leagueStatsHtml;
 
-CloseTable();
 Nuke\Footer::footer();

@@ -28,9 +28,7 @@ class Footer
         }
         if (basename($_SERVER['PHP_SELF']) != "index.php" and defined('MODULE_FILE') and (file_exists("modules/$name/admin/panel.php") && is_admin($admin))) {
             echo "<br>";
-            OpenTable();
             include "modules/$name/admin/panel.php";
-            CloseTable();
         }
         themefooter();
         if (file_exists("includes/custom_files/custom_footer.php")) {

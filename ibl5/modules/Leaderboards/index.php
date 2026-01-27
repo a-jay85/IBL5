@@ -29,7 +29,6 @@ $filters = [
 
 // Render page
 Nuke\Header::header();
-OpenTable();
 UI::playerMenu();
 
 // Render filter form
@@ -70,5 +69,4 @@ if ($filters['submitted'] != null) {
     }
 }
 
-CloseTable();
 Nuke\Footer::footer();

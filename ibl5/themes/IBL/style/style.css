@@ -4124,6 +4124,11 @@ nav .group > a:hover {
   pointer-events: none;
   mix-blend-mode: overlay;
 }
+.site-content {
+  max-width: 100%;
+  padding: 1rem;
+  vertical-align: top;
+}
 @property --tw-translate-x {
   syntax: "*";
   inherits: false;

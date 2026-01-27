@@ -40,9 +40,7 @@ $data = $service->getContractsWithCalculations();
 
 // Render page
 Nuke\Header::header();
-OpenTable();
 
 echo $view->render($data);
 
-CloseTable();
 Nuke\Footer::footer();

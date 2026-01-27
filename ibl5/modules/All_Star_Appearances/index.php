@@ -36,9 +36,7 @@ $appearances = $repository->getAllStarAppearances();
 
 // Render page
 Nuke\Header::header();
-OpenTable();
 
 echo $view->render($appearances);
 
-CloseTable();
 Nuke\Footer::footer();

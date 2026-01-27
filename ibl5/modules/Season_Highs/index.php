@@ -48,9 +48,7 @@ $data = $service->getSeasonHighsData($seasonPhase);
 
 // Render page
 Nuke\Header::header();
-OpenTable();
 
 echo $view->render($seasonPhase, $data);
 
-CloseTable();
 Nuke\Footer::footer();

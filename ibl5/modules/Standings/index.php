@@ -31,9 +31,7 @@ $view = new Standings\StandingsView($repository);
 
 // Render and output the standings
     Nuke\Header::header();
-    OpenTable();
     
     echo $view->render();
 
-    CloseTable();
     Nuke\Footer::footer();

@@ -20,7 +20,6 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- " . _ACTIVETOPICS . "";
 Nuke\Header::header();
-OpenTable();
 
 global $mysqli_db, $prefix, $tipath;
 $ThemeSel = get_theme();
@@ -74,5 +73,4 @@ if ($result instanceof mysqli_result && $result->num_rows > 0) {
     echo "<i>" . _NONEWSYET . "</i>";
 }
 
-CloseTable();
 Nuke\Footer::footer();

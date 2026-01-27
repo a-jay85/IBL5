@@ -43,9 +43,7 @@ $startersByPosition = $service->getAllStartersByPosition();
 
 // Render page
 Nuke\Header::header();
-OpenTable();
 
 echo $view->render($startersByPosition, $userTeam);
 
-CloseTable();
 Nuke\Footer::footer();

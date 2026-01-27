@@ -24,7 +24,6 @@ $query2 = "SELECT * FROM ibl_team_history WHERE teamid != " . League::FREE_AGENT
 $result2 = $db->sql_query($query2);
 $num2 = $db->sql_numrows($result2);
 
-OpenTable();
 UI::displaytopmenu($mysqli_db, 0);
 
 $k = 0;
@@ -62,5 +61,4 @@ $text .= "<table class=\"sortable\" border=1>
 
 echo $text;
 
-CloseTable();
 Nuke\Footer::footer();

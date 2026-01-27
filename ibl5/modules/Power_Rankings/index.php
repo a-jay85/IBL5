@@ -30,7 +30,6 @@ $pagetitle = "- $module_name";
 $season = new Season($mysqli_db);
 
 Nuke\Header::header();
-OpenTable();
 
 // Initialize services
 $repository = new PowerRankingsRepository($mysqli_db);
@@ -42,5 +41,4 @@ $rankings = $repository->getPowerRankings();
 // Render output
 echo $view->render($rankings, $season->endingYear);
 
-CloseTable();
 Nuke\Footer::footer();

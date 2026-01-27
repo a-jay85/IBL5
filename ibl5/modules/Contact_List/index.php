@@ -36,9 +36,7 @@ $contacts = $repository->getAllTeamContacts();
 
 // Render page
 Nuke\Header::header();
-OpenTable();
 
 echo $view->render($contacts);
 
-CloseTable();
 Nuke\Footer::footer();

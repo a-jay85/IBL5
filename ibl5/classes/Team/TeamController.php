@@ -46,7 +46,6 @@ class TeamController implements TeamControllerInterface
         $display = $_REQUEST['display'] ?? 'ratings';
 
         \Nuke\Header::header();
-        OpenTable();
 
         $isFreeAgencyModuleActive = $sharedFunctions->isFreeAgencyModuleActive();
 
@@ -127,7 +126,6 @@ class TeamController implements TeamControllerInterface
 
         echo "</td></tr></table>";
 
-        CloseTable();
         \Nuke\Footer::footer();
     }
 
@@ -137,11 +135,9 @@ class TeamController implements TeamControllerInterface
     public function displayMenu(): void
     {
         \Nuke\Header::header();
-        OpenTable();
 
         \UI::displaytopmenu($this->db, 0);
 
-        CloseTable();
         \Nuke\Footer::footer();
     }
 }

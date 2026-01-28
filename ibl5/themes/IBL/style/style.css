@@ -2875,9 +2875,12 @@ a.schedule-jump-btn:hover {
   max-width: 120px;
   height: auto;
 }
+html:has(.depth-chart-form) {
+  overflow-x: auto;
+}
 .depth-chart-form {
   max-width: 100%;
-  overflow-x: auto;
+  overflow-x: visible;
 }
 .depth-chart-table {
   border-collapse: separate;
@@ -2886,7 +2889,8 @@ a.schedule-jump-btn:hover {
   overflow: hidden;
   box-shadow: var(--shadow-md);
   margin: 0 auto;
-  width: 100%;
+  width: auto;
+  max-width: none;
 }
 .depth-chart-table th {
   background: linear-gradient(135deg, var(--navy-800), var(--navy-900));

@@ -2234,9 +2234,14 @@ a.schedule-jump-btn:hover {
     height: auto;
 }
 
+/* Allow horizontal page scrolling on Depth Chart Entry so users can pan/zoom */
+html:has(.depth-chart-form) {
+    overflow-x: auto;
+}
+
 .depth-chart-form {
     max-width: 100%;
-    overflow-x: auto;
+    overflow-x: visible;
 }
 
 .depth-chart-table {
@@ -2246,7 +2251,8 @@ a.schedule-jump-btn:hover {
     overflow: hidden;
     box-shadow: var(--shadow-md);
     margin: 0 auto;
-    width: 100%;
+    width: auto;
+    max-width: none;
 }
 
 .depth-chart-table th {

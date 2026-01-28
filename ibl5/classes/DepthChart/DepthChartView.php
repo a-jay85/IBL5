@@ -120,7 +120,7 @@ class DepthChartView implements DepthChartViewInterface
         echo '<form name="Depth_Chart" method="post" action="modules.php?name=Depth_Chart_Entry&amp;op=submit" class="depth-chart-form">
             <input type="hidden" name="Team_Name" value="' . $teamLogoEscaped . '">';
 
-        echo '<div class="text-center"><table class="depth-chart-table ibl-data-table">
+        echo '<div class="text-center"><table class="depth-chart-table ibl-data-table" data-no-responsive>
             <thead>
                 <tr>
                     <th colspan="14">DEPTH CHART ENTRY</th>

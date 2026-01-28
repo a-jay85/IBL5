@@ -74,6 +74,9 @@
      * Apply responsive features to an overflowing table.
      */
     function makeResponsive(table) {
+        // Skip tables that opt out of responsive treatment (sticky columns, scroll wrapper, shadows)
+        if (table.dataset.noResponsive !== undefined) return;
+
         // Add responsive-table class for CSS sticky column support
         table.classList.add("responsive-table");
 

@@ -19,7 +19,9 @@ class OneOnOneView implements OneOnOneViewInterface
      */
     public function renderHeader(): string
     {
-        return '<div style="text-align: center;"><table><tr><th>One-on-One Match</th></tr></table></div>';
+        return '<h2 class="ibl-title">One-on-One Match</h2>
+<div class="table-scroll-wrapper">
+<div class="table-scroll-container">';
     }
 
     /**
@@ -59,6 +61,8 @@ class OneOnOneView implements OneOnOneViewInterface
         return '<form name="LookUpOldGame" method="post" action="modules.php?name=One-on-One">
 Review Old Game (Input Game ID): <input type="text" name="gameid" size="11"><input type="submit" value="Review Old Game">
 </form>
+</div>
+</div>
 <hr>';
     }
 
@@ -70,12 +74,13 @@ Review Old Game (Input Game ID): <input type="text" name="gameid" size="11"><inp
         if (empty($errors)) {
             return '';
         }
-        
-        $html = '';
+
+        $html = '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
         foreach ($errors as $error) {
             $html .= HtmlSanitizer::safeHtmlOutput($error) . "<br>\n";
         }
-        
+        $html .= '</div></div>';
+
         return $html;
     }
 
@@ -84,9 +89,11 @@ Review Old Game (Input Game ID): <input type="text" name="gameid" size="11"><inp
      */
     public function renderGameResult(OneOnOneGameResult $result, int $gameId): string
     {
-        $html = $result->playByPlay;
+        $html = '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
+        $html .= $result->playByPlay;
         $html .= "GAME ID: $gameId";
-        
+        $html .= '</div></div>';
+
         return $html;
     }
 
@@ -103,10 +110,12 @@ Review Old Game (Input Game ID): <input type="text" name="gameid" size="11"><inp
         $owner = HtmlSanitizer::safeHtmlOutput($gameData['owner']);
         // Play-by-play is already sanitized when generated, don't double-escape
         $playByPlay = (string) $gameData['playbyplay'];
-        
-        return '<div style="text-align: center;"><h2>Replay of Game Number ' . $gameId . '<br>'
+
+        return '<div class="table-scroll-wrapper"><div class="table-scroll-container">'
+            . '<h2 style="text-align: center;">Replay of Game Number ' . $gameId . '<br>'
             . $winner . ' ' . $winScore . ', ' . $loser . ' ' . $lossScore . '<br>'
-            . '<small>(Game played by ' . $owner . ')</small></h2></div> '
-            . $playByPlay;
+            . '<small>(Game played by ' . $owner . ')</small></h2>'
+            . $playByPlay
+            . '</div></div>';
     }
 }

@@ -239,7 +239,7 @@ class UIHelper implements UIHelperInterface
                 <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
                     <a href=\"modules.php?name=Trading&amp;op=offertrade&amp;partner={$teamName}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
                         <img src=\"images/logo/new{$teamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-                        {$fullName}
+                        <span class=\"ibl-team-cell__text\">{$fullName}</span>
                     </a>
                 </td>
             </tr>";

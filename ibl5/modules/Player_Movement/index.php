@@ -113,13 +113,13 @@ while ($row = $result->fetch_assoc()) {
         <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$oldColor1};\">
             <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$oldTeamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$oldColor2};\">
                 <img src=\"images/logo/new{$oldTeamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-                {$oldTeamDisplay}
+                <span class=\"ibl-team-cell__text\">{$oldTeamDisplay}</span>
             </a>
         </td>
         <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$newColor1};\">
             <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$newTeamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$newColor2};\">
                 <img src=\"images/logo/new{$newTeamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-                {$newTeamDisplay}
+                <span class=\"ibl-team-cell__text\">{$newTeamDisplay}</span>
             </a>
         </td>
     </tr>";

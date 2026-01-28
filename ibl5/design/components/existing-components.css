@@ -1747,6 +1747,11 @@ a.schedule-jump-btn:hover {
         display: none;
     }
 
+    /* Hide team names on mobile, show only logos */
+    .schedule-game__team-link {
+        display: none;
+    }
+
     .schedule-game__logo {
         width: 14px;
         height: 14px;

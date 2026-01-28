@@ -118,7 +118,7 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         return '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">'
             . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';">'
             . '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">'
-            . $boldOpen . $city . ' ' . $name . $boldClose
+            . '<span class="ibl-team-cell__text">' . $boldOpen . $city . ' ' . $name . $boldClose . '</span>'
             . '</a></td>';
     }
 

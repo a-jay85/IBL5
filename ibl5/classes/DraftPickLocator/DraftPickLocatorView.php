@@ -121,7 +121,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
         $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" ';
         $html .= 'class="ibl-team-cell__name" style="color: #' . $color2 . ';">';
         $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">';
-        $html .= $teamCity . ' ' . $teamName . '</a>';
+        $html .= '<span class="ibl-team-cell__text">' . $teamCity . ' ' . $teamName . '</span></a>';
         $html .= '</td>';
 
         // Pick cells - highlight traded picks

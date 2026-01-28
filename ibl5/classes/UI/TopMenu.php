@@ -41,18 +41,16 @@ class TopMenu
         $teamsById = $teams;
         usort($teamsById, fn($a, $b) => $a['teamid'] <=> $b['teamid']);
 
-        // Button styles
-        $buttonStyle = "font: bold 11px Helvetica; text-decoration: none; " .
-            "background-color: #" . htmlspecialchars($team->color2) . "; " .
-            "color: #" . htmlspecialchars($team->color1) . "; " .
-            "padding: 2px 6px; border: 1px solid #000000;";
+        // Dynamic team colors (kept inline since they vary per team)
+        $teamColorStyle = "background-color: #" . htmlspecialchars($team->color2) . "; " .
+            "color: #" . htmlspecialchars($team->color1) . ";";
 
         ob_start();
         ?>
-<div style="text-align: center; margin: 0 auto; margin-bottom: 1rem;">
-    <div style="margin-bottom: 1rem;">
-        <p style="margin: 0.5rem 0;">
-            <b>Team Pages:</b>
+<div class="team-subnav">
+    <div class="team-subnav__selects">
+        <p class="team-subnav__label">
+            <strong>Team Pages:</strong>
             <select name="teamSelectCity" onchange="location = this.options[this.selectedIndex].value;">
                 <option value="">Location</option>
                 <?php foreach ($teamsByCity as $row): ?>
@@ -75,13 +73,13 @@ class TopMenu
             </select>
         </p>
     </div>
-    <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem;">
-        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamID ?>">Team Page</a></span>
-        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules.php?name=Schedule&amp;teamID=<?= $teamID ?>">Schedule</a></span>
-        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules/Team/draftHistory.php?teamID=<?= $teamID ?>">Draft History</a></span>
-        <span style="white-space: nowrap; display: flex; align-items: center;"><span style="font: bold 14px Helvetica;"> | </span></span>
-        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules.php?name=Depth_Chart_Entry">Depth Chart Entry</a></span>
-        <span style="white-space: nowrap;"><a style="<?= $buttonStyle ?>" href="/ibl5/modules.php?name=Trading&amp;op=reviewtrade">Trades/Waivers</a></span>
+    <div class="team-subnav__buttons">
+        <span class="team-subnav__btn-wrap"><a class="team-subnav__btn" style="<?= $teamColorStyle ?>" href="/ibl5/modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamID ?>">Team Page</a></span>
+        <span class="team-subnav__btn-wrap"><a class="team-subnav__btn" style="<?= $teamColorStyle ?>" href="/ibl5/modules.php?name=Schedule&amp;teamID=<?= $teamID ?>">Schedule</a></span>
+        <span class="team-subnav__btn-wrap"><a class="team-subnav__btn" style="<?= $teamColorStyle ?>" href="/ibl5/modules/Team/draftHistory.php?teamID=<?= $teamID ?>">Draft History</a></span>
+        <span class="team-subnav__divider"> | </span>
+        <span class="team-subnav__btn-wrap"><a class="team-subnav__btn" style="<?= $teamColorStyle ?>" href="/ibl5/modules.php?name=Depth_Chart_Entry">Depth Chart Entry</a></span>
+        <span class="team-subnav__btn-wrap"><a class="team-subnav__btn" style="<?= $teamColorStyle ?>" href="/ibl5/modules.php?name=Trading&amp;op=reviewtrade">Trades/Waivers</a></span>
     </div>
 </div>
 <hr>

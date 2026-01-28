@@ -67,14 +67,7 @@ $(function() {
 <h2 class="ibl-title">Current Ratings</h2>
 <div class="table-scroll-wrapper">
 <div class="table-scroll-container">
-<table class="sortable compare-players-table ibl-data-table responsive-table">
-    <colgroup>
-        <col span="3">
-        <col span="6" class="compare-highlight-cols">
-        <col span="7">
-        <col span="4" class="compare-highlight-cols">
-        <col span="4">
-    </colgroup>
+<table class="sortable ibl-data-table responsive-table">
     <thead>
         <tr>
             <th>Pos</th>
@@ -164,12 +157,7 @@ $(function() {
 <h2 class="ibl-title">Current Season Stats</h2>
 <div class="table-scroll-wrapper">
 <div class="table-scroll-container">
-<table class="sortable compare-players-table ibl-data-table responsive-table">
-    <colgroup>
-        <col span="5">
-        <col span="6" class="compare-highlight-cols">
-        <col span="8">
-    </colgroup>
+<table class="sortable ibl-data-table responsive-table">
     <thead>
         <tr>
             <th>Pos</th>
@@ -244,12 +232,7 @@ $(function() {
 <h2 class="ibl-title">Career Stats</h2>
 <div class="table-scroll-wrapper">
 <div class="table-scroll-container">
-<table class="sortable compare-players-table ibl-data-table responsive-table">
-    <colgroup>
-        <col span="4">
-        <col span="6" class="compare-highlight-cols">
-        <col span="8">
-    </colgroup>
+<table class="sortable ibl-data-table responsive-table">
     <thead>
         <tr>
             <th>Pos</th>

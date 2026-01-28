@@ -3516,18 +3516,6 @@ table.sortable thead th {
 .voting-results-table th:last-child, .voting-results-table td:last-child {
   text-align: right;
 }
-.compare-highlight-cols {
-  background-color: var(--gray-100, #f3f4f6);
-}
-.compare-players-table tbody tr:nth-child(odd) {
-  background-color: transparent;
-}
-.compare-players-table tbody tr:nth-child(even) {
-  background-color: rgba(249, 250, 251, 0.7);
-}
-.compare-players-table tbody tr:hover {
-  background-color: rgba(243, 244, 246, 0.9);
-}
 .trading-layout {
   border-collapse: separate;
   border-spacing: var(--space-2);

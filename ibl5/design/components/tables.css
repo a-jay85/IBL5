@@ -680,30 +680,6 @@
 }
 
 /* ==========================================================================
-   Compare Players Table Column Highlighting
-
-   Use .compare-highlight-cols on <col> elements to highlight column groups.
-   Uses CSS background for visual grouping of related stats.
-   ========================================================================== */
-
-.compare-highlight-cols {
-    background-color: var(--gray-100, #f3f4f6);
-}
-
-/* Ensure highlighted columns show through transparent row backgrounds */
-.compare-players-table tbody tr:nth-child(odd) {
-    background-color: transparent;
-}
-
-.compare-players-table tbody tr:nth-child(even) {
-    background-color: rgba(249, 250, 251, 0.7);
-}
-
-.compare-players-table tbody tr:hover {
-    background-color: rgba(243, 244, 246, 0.9);
-}
-
-/* ==========================================================================
    Trading Module Tables
 
    Specialized tables for the Trading module including:

@@ -192,11 +192,8 @@ class ComparePlayersViewTest extends TestCase
         $result = $this->view->renderComparisonResults($comparisonData);
 
         $this->assertStringContainsString('sortable', $result);
-        $this->assertStringContainsString('compare-players-table', $result);
         $this->assertStringContainsString('ibl-data-table', $result);
         $this->assertStringContainsString('responsive-table', $result);
-        $this->assertStringContainsString('<colgroup>', $result);
-        $this->assertStringContainsString('compare-highlight-cols', $result);
         // Check scroll wrappers are present
         $this->assertStringContainsString('table-scroll-wrapper', $result);
         $this->assertStringContainsString('table-scroll-container', $result);

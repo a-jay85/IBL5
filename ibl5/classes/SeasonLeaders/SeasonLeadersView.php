@@ -45,6 +45,11 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
                 <?php echo $this->renderSortOptions($currentFilters['sortby'] ?? '1'); ?>
             </select>
         </div>
+        <div class="ibl-filter-form__group">
+            <label class="ibl-filter-form__label">Limit:</label>
+            <input type="number" name="limit" value="<?= htmlspecialchars((string)($currentFilters['limit'] ?? '')) ?>" min="1" placeholder="50">
+            <span class="ibl-filter-form__label">Records</span>
+        </div>
         <button type="submit" class="ibl-filter-form__submit">Search Season Data</button>
     </div>
 </form>

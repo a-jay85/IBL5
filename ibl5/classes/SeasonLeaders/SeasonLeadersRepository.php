@@ -19,40 +19,41 @@ class SeasonLeadersRepository extends \BaseMysqliRepository implements SeasonLea
 
     /**
      * @see SeasonLeadersRepositoryInterface::getSeasonLeaders()
-     * 
+     *
      * SECURITY NOTE: $sortBy is validated and mapped to whitelisted SQL expressions
      * in getSortColumn() method. Dynamic ORDER BY clause is acceptable here because
      * the sort expression is generated from a strict whitelist.
      */
-    public function getSeasonLeaders(array $filters): array
+    public function getSeasonLeaders(array $filters, int $limit = 0): array
     {
         $conditions = ["name IS NOT NULL"];
         $params = [];
         $types = "";
-        
+
         // Add year filter if specified
         if (!empty($filters['year'])) {
             $conditions[] = "year = ?";
             $types .= "s";
             $params[] = $filters['year'];
         }
-        
+
         // Add team filter if specified and not "All"
         $teamId = (int)($filters['team'] ?? 0);
-        if (!empty($teamId) && $teamId != 0) {
+        if (!empty($teamId) && $teamId !== 0) {
             $conditions[] = "teamid = ?";
             $types .= "i";
             $params[] = $teamId;
         }
-        
+
         $whereClause = implode(' AND ', $conditions);
         $sortBy = $this->getSortColumn($filters['sortby'] ?? '1');
-        
+
         // NOTE: $sortBy is validated in getSortColumn() against a strict whitelist
-        $query = "SELECT * FROM ibl_hist WHERE $whereClause ORDER BY $sortBy DESC";
-        
+        $query = "SELECT * FROM ibl_hist WHERE $whereClause ORDER BY $sortBy DESC"
+            . ($limit > 0 ? " LIMIT $limit" : "");
+
         $rows = $this->fetchAll($query, $types, ...$params);
-        
+
         return [
             'result' => $rows,
             'count' => count($rows)

@@ -22,8 +22,18 @@ $view = new SeasonLeadersView($service);
 $filters = [
     'year' => $_POST['year'] ?? '',
     'team' => (int)($_POST['team'] ?? 0),
-    'sortby' => $_POST['sortby'] ?? '1'
+    'sortby' => $_POST['sortby'] ?? '1',
+    'limit' => $_POST['limit'] ?? ''
 ];
+
+// Determine limit: use POST value if provided, otherwise default to 50 on first load
+$isFirstLoad = empty($_POST);
+$limit = 0;
+if ($isFirstLoad) {
+    $limit = 50; // Default limit on first load
+} elseif (is_numeric($filters['limit']) && (int)$filters['limit'] > 0) {
+    $limit = (int)$filters['limit'];
+}
 
 // Render page
 Nuke\Header::header();
@@ -36,7 +46,7 @@ $years = $repository->getYears();
 echo $view->renderFilterForm($teams, $years, $filters);
 
 // Get and render season leaders
-$leadersData = $repository->getSeasonLeaders($filters);
+$leadersData = $repository->getSeasonLeaders($filters, $limit);
 $rows = $leadersData['result'];
 $numRows = $leadersData['count'];
 

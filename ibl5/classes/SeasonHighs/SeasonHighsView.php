@@ -111,10 +111,16 @@ class SeasonHighsView implements SeasonHighsViewInterface
                 $name = "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$teamId}\">{$name}</a>";
             }
 
+            // Link dates to box score when boxId is available
+            if (isset($row['boxId'])) {
+                $boxId = (int) $row['boxId'];
+                $date = "<a href=\"./ibl/IBL/box{$boxId}.htm\">{$date}</a>";
+            }
+
             $output .= "<tr>
     <td class=\"rank-cell\">{$rank}</td>
     <td>{$name}</td>
-    <td>{$date}</td>
+    <td class=\"date-cell\">{$date}</td>
     <td class=\"value-cell\">{$value}</td>
 </tr>";
         }

@@ -121,6 +121,12 @@
     color: var(--navy-700, #334155);
 }
 
+/* Date cell styling - prevent wrapping */
+.ibl-data-table .date-cell,
+.ibl-table .date-cell {
+    white-space: nowrap;
+}
+
 /* Highlight row */
 .ibl-data-table tbody tr.highlight,
 .ibl-table tbody tr.highlight {

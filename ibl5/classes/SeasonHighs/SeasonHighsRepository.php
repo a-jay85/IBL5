@@ -33,18 +33,22 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         // For player stats (no suffix), JOIN with ibl_plr to get full names
         // The ibl_box_scores.name field is varchar(16) which truncates longer names
         // The ibl_plr.name field is varchar(32) which stores full names
+        // Also JOIN with ibl_schedule to get BoxID for linking to box scores
         if ($tableSuffix === '') {
-            $query = "SELECT p.`pid`, p.`name`, bs.`Date` AS `date`, {$statExpression} AS `{$safeStatName}`
+            $query = "SELECT p.`pid`, p.`name`, bs.`Date` AS `date`, sch.`BoxID`, {$statExpression} AS `{$safeStatName}`
                 FROM ibl_box_scores bs
                 JOIN ibl_plr p ON bs.pid = p.pid
+                JOIN ibl_schedule sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
                 WHERE bs.`Date` BETWEEN ? AND ?
                 ORDER BY `{$safeStatName}` DESC, bs.`Date` ASC
                 LIMIT {$limit}";
         } else {
             // For team stats, JOIN with ibl_team_info to get team ID for linking
-            $query = "SELECT t.`teamid`, bs.`name`, bs.`Date` AS `date`, {$statExpression} AS `{$safeStatName}`
+            // Also JOIN with ibl_schedule to get BoxID for linking to box scores
+            $query = "SELECT t.`teamid`, bs.`name`, bs.`Date` AS `date`, sch.`BoxID`, {$statExpression} AS `{$safeStatName}`
                 FROM ibl_box_scores{$tableSuffix} bs
                 JOIN ibl_team_info t ON bs.name = t.team_name
+                JOIN ibl_schedule sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTeamID AND sch.Home = bs.homeTeamID
                 WHERE bs.`Date` BETWEEN ? AND ?
                 ORDER BY `{$safeStatName}` DESC, bs.`Date` ASC
                 LIMIT {$limit}";
@@ -67,6 +71,10 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
             // Include teamid for team stats (used for team page links)
             if (isset($row['teamid'])) {
                 $entry['teamid'] = (int) $row['teamid'];
+            }
+            // Include BoxID for linking dates to box scores
+            if (isset($row['BoxID'])) {
+                $entry['boxId'] = (int) $row['BoxID'];
             }
             $normalized[] = $entry;
         }

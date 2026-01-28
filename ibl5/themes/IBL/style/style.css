@@ -3150,6 +3150,9 @@ table.sortable thead th {
   font-weight: 600;
   color: var(--navy-700, #334155);
 }
+.ibl-data-table .date-cell, .ibl-table .date-cell {
+  white-space: nowrap;
+}
 .ibl-data-table tbody tr.highlight, .ibl-table tbody tr.highlight {
   background-color: var(--accent-100, #ffedd5) !important;
 }

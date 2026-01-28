@@ -30,11 +30,24 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         // Sanitize the stat name for use as column alias
         $safeStatName = preg_replace('/[^a-zA-Z0-9_]/', '', $statName);
 
-        $query = "SELECT `name`, `date`, {$statExpression} AS `{$safeStatName}`
-            FROM ibl_box_scores{$tableSuffix}
-            WHERE date BETWEEN ? AND ?
-            ORDER BY `{$safeStatName}` DESC, date ASC
-            LIMIT {$limit}";
+        // For player stats (no suffix), JOIN with ibl_plr to get full names
+        // The ibl_box_scores.name field is varchar(16) which truncates longer names
+        // The ibl_plr.name field is varchar(32) which stores full names
+        if ($tableSuffix === '') {
+            $query = "SELECT p.`name`, bs.`Date` AS `date`, {$statExpression} AS `{$safeStatName}`
+                FROM ibl_box_scores bs
+                JOIN ibl_plr p ON bs.pid = p.pid
+                WHERE bs.`Date` BETWEEN ? AND ?
+                ORDER BY `{$safeStatName}` DESC, bs.`Date` ASC
+                LIMIT {$limit}";
+        } else {
+            // For team stats, use the box_scores table name directly
+            $query = "SELECT `name`, `Date` AS `date`, {$statExpression} AS `{$safeStatName}`
+                FROM ibl_box_scores{$tableSuffix}
+                WHERE `Date` BETWEEN ? AND ?
+                ORDER BY `{$safeStatName}` DESC, `Date` ASC
+                LIMIT {$limit}";
+        }
 
         $results = $this->fetchAll($query, "ss", $startDate, $endDate);
 

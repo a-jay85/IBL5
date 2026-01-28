@@ -1070,7 +1070,7 @@
 }
 
 .ibl-grid--3col {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
 .ibl-grid--2col {
@@ -1604,6 +1604,7 @@ a.schedule-jump-btn:hover {
 .schedule-game__logo {
     width: 18px;
     height: 18px;
+    aspect-ratio: 75 / 83;
     object-fit: contain;
     justify-self: center;
 }
@@ -1729,6 +1730,7 @@ a.schedule-jump-btn:hover {
     .schedule-game__logo {
         width: 14px;
         height: 14px;
+        aspect-ratio: 75 / 83;
     }
 }
 
@@ -1827,6 +1829,14 @@ a.schedule-jump-btn:hover {
     font-weight: 600;
     color: var(--navy-900);
     margin: 0;
+}
+
+/* Player image - standard dimensions for CLS prevention */
+.player-image {
+    width: 65px;
+    height: 90px;
+    aspect-ratio: 65 / 90;
+    object-fit: cover;
 }
 
 .draft-error {

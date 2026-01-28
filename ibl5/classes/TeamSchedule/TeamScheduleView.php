@@ -80,7 +80,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
     private function renderTeamBanner(int $teamId, string $teamName, string $color1): string
     {
         return '<div class="schedule-team-banner" style="background: linear-gradient(135deg, #' . $color1 . ', #' . $color1 . 'cc);">
-            <img class="schedule-team-banner__logo" src="./images/logo/' . $teamId . '.jpg" alt="' . $teamName . '">
+            <img class="schedule-team-banner__logo" src="./images/logo/' . $teamId . '.jpg" alt="' . $teamName . '" width="415" height="50">
         </div>';
     }
 
@@ -220,7 +220,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
         }
         $html .= '</span></a>';
         $html .= '<a href="' . $visitorUrl . '" class="schedule-game__logo-link">';
-        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $visitorTeamId . '.png" alt="">';
+        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $visitorTeamId . '.png" alt="" width="18" height="18" loading="lazy">';
         $html .= '</a>';
 
         // Scores + @ (same as League Schedule)
@@ -236,7 +236,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
         // Home logo + team (same as League Schedule)
         $html .= '<a href="' . $homeUrl . '" class="schedule-game__logo-link">';
-        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $homeTeamId . '.png" alt="">';
+        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $homeTeamId . '.png" alt="" width="18" height="18" loading="lazy">';
         $html .= '</a>';
         $html .= '<a href="' . $homeUrl . '" class="schedule-game__team-link">';
         $html .= '<span class="schedule-game__team' . $hWinClass . '">' . HtmlSanitizer::safeHtmlOutput($homeName);

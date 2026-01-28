@@ -1992,7 +1992,7 @@ img {
   margin-bottom: var(--space-8);
 }
 .ibl-grid--3col {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 .ibl-grid--2col {
   grid-template-columns: repeat(2, 1fr);
@@ -2391,6 +2391,7 @@ a.schedule-jump-btn:hover {
 .schedule-game__logo {
   width: 18px;
   height: 18px;
+  aspect-ratio: 75 / 83;
   object-fit: contain;
   justify-self: center;
 }
@@ -2487,6 +2488,7 @@ a.schedule-jump-btn:hover {
   .schedule-game__logo {
     width: 14px;
     height: 14px;
+    aspect-ratio: 75 / 83;
   }
 }
 .schedule-team-banner {
@@ -2559,6 +2561,12 @@ a.schedule-jump-btn:hover {
   font-weight: 600;
   color: var(--navy-900);
   margin: 0;
+}
+.player-image {
+  width: 65px;
+  height: 90px;
+  aspect-ratio: 65 / 90;
+  object-fit: cover;
 }
 .draft-error {
   background: var(--error-100);
@@ -3324,6 +3332,7 @@ table.sortable thead th {
 .ibl-team-cell__logo {
   width: 24px;
   height: 24px;
+  aspect-ratio: 75 / 83;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -3384,6 +3393,12 @@ table.sortable thead th {
 .ibl-clinched-indicator {
   color: var(--accent-600);
   font-weight: 700;
+}
+.stat-table {
+  min-width: 280px;
+}
+.ibl-grid .stat-table {
+  width: 100%;
 }
 .ibl-card {
   font-family: var(--font-sans);

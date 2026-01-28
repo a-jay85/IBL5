@@ -95,7 +95,7 @@ class NextSimView implements NextSimViewInterface
         $html .= '<div class="next-sim-day-label"><h2 title="' . $gameDate . '">' . $dayLabel . '</h2></div>';
         $html .= '<div class="next-sim-logo">';
         $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $opposingTeamId . '">';
-        $html .= '<img src="./images/logo/' . $opposingTeamId . '.jpg" alt="Team Logo">';
+        $html .= '<img src="./images/logo/' . $opposingTeamId . '.jpg" alt="Team Logo" width="415" height="50">';
         $html .= '</a>';
         $html .= '</div>';
         $html .= '<div class="next-sim-record"><h2>' . $seasonRecord . '</h2></div>';

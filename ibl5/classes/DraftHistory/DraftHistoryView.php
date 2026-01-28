@@ -135,7 +135,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
     <td>{$pickNo}</td>
     <td><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
     <td>{$draftedBy}</td>
-    <td><img class=\"player-image\" src=\"/ibl5/images/player/{$pid}.jpg\" alt=\"{$name}\"></td>
+    <td><img class=\"player-image\" src=\"/ibl5/images/player/{$pid}.jpg\" alt=\"{$name}\" width=\"65\" height=\"90\" loading=\"lazy\"></td>
     <td>{$college}</td>
 </tr>";
         }

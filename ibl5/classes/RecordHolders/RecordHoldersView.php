@@ -174,7 +174,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
         $years = str_replace(', ', '<br>', $allStar['years']);
 
         $output .= '<tr class="text-center">';
-        $output .= '<td><img src="images/player/' . $allStar['image'] . '.jpg" alt="' . $allStar['name'] . '"><strong><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $allStar['pid'] . '">' . $allStar['name'] . '</a></strong></td>';
+        $output .= '<td><img src="images/player/' . $allStar['image'] . '.jpg" alt="' . $allStar['name'] . '" width="65" height="90" loading="lazy"><strong><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $allStar['pid'] . '">' . $allStar['name'] . '</a></strong></td>';
         $output .= '<td><strong>' . $teamLogos . '</strong></td>';
         $output .= '<td><strong>' . $allStar['amount'] . '</strong></td>';
         $output .= '<td colspan="2"><strong>' . $years . '</strong></td>';
@@ -238,7 +238,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
             $output .= '</tr>';
             foreach ($records as $record) {
                 $output .= '<tr class="text-center">';
-                $output .= '<td><img src="images/player/' . $record['image'] . '.jpg" alt="' . $record['name'] . '"><strong><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $record['pid'] . '">' . $record['name'] . '</a></strong></td>';
+                $output .= '<td><img src="images/player/' . $record['image'] . '.jpg" alt="' . $record['name'] . '" width="65" height="90" loading="lazy"><strong><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $record['pid'] . '">' . $record['name'] . '</a></strong></td>';
                 $output .= '<td><strong><a href="../online/team.php?tid=' . $record['teamTid'] . '&amp;yr=' . $record['teamYr'] . '"><img src="images/topics/' . $record['team'] . '.png" alt="' . strtoupper($record['team']) . '"></a></strong></td>';
                 $output .= '<td><strong>' . $record['season'] . '</strong></td>';
                 $output .= '<td><strong>' . $record['amount'] . '</strong></td>';
@@ -607,7 +607,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
             : '<strong>' . $record['amount'] . '</strong>';
 
         $output = '<tr class="text-center">';
-        $output .= '<td><img src="images/player/' . $record['image'] . '.jpg" alt="' . $record['name'] . '"><strong><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $record['pid'] . '">' . $record['name'] . '</a></strong></td>';
+        $output .= '<td><img src="images/player/' . $record['image'] . '.jpg" alt="' . $record['name'] . '" width="65" height="90" loading="lazy"><strong><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $record['pid'] . '">' . $record['name'] . '</a></strong></td>';
         $output .= '<td><strong><a href="../online/team.php?tid=' . $record['teamTid'] . '&amp;yr=' . $record['teamYr'] . '"><img src="images/topics/' . $record['team'] . '.png" alt="' . strtoupper($record['team']) . '"></a></strong></td>';
         $output .= '<td><strong><a href="' . $record['boxScore'] . '">' . $record['date'] . '</a></strong></td>';
         $output .= '<td><strong><a href="../online/team.php?tid=' . $record['oppTid'] . '&amp;yr=' . $record['oppYr'] . '"><img src="images/topics/' . $record['oppTeam'] . '.png" alt="' . strtoupper($record['oppTeam']) . '"></a></strong></td>';

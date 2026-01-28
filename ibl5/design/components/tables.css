@@ -434,6 +434,7 @@
 .ibl-team-cell__logo {
     width: 24px;
     height: 24px;
+    aspect-ratio: 75 / 83;
     object-fit: contain;
     flex-shrink: 0;
 }
@@ -517,4 +518,21 @@
 .ibl-clinched-indicator {
     color: var(--accent-600);
     font-weight: 700;
+}
+
+/* ==========================================================================
+   Season Highs Stat Tables (.stat-table)
+
+   Small tables showing stat leaders with columns: rank, name, date, value.
+   Used in .ibl-grid--3col layouts. Needs min-width to prevent long player
+   names (e.g., "Karl-Anthony Towns", "Anfernee Hardaway") from being clipped.
+   ========================================================================== */
+
+.stat-table {
+    min-width: 280px;
+}
+
+/* Ensure stat-table in grids can expand beyond 1fr if needed */
+.ibl-grid .stat-table {
+    width: 100%;
 }

@@ -198,7 +198,7 @@ function renderLeagueSchedule(
                 echo '<a href="' . $visitorTeamUrl . '" class="schedule-game__team-link">';
                 echo '<span class="schedule-game__team' . $vClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorTeam']) . ' <span class="schedule-game__record">(' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorRecord']) . ')</span></span>';
                 echo '</a>';
-                echo '<a href="' . $visitorTeamUrl . '" class="schedule-game__logo-link"><img class="schedule-game__logo" src="images/logo/new' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitor']) . '.png" alt=""></a>';
+                echo '<a href="' . $visitorTeamUrl . '" class="schedule-game__logo-link"><img class="schedule-game__logo" src="images/logo/new' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitor']) . '.png" alt="" width="18" height="18" loading="lazy"></a>';
 
                 // Scores + @ (links to box score)
                 echo '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorScore'])) . '</a>';
@@ -207,7 +207,7 @@ function renderLeagueSchedule(
                 echo '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeScore'])) . '</a>';
 
                 // Home logo + team (links to team page)
-                echo '<a href="' . $homeTeamUrl . '" class="schedule-game__logo-link"><img class="schedule-game__logo" src="images/logo/new' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['home']) . '.png" alt=""></a>';
+                echo '<a href="' . $homeTeamUrl . '" class="schedule-game__logo-link"><img class="schedule-game__logo" src="images/logo/new' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['home']) . '.png" alt="" width="18" height="18" loading="lazy"></a>';
                 echo '<a href="' . $homeTeamUrl . '" class="schedule-game__team-link">';
                 echo '<span class="schedule-game__team' . $hClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeTeam']) . ' <span class="schedule-game__record">(' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeRecord']) . ')</span></span>';
                 echo '</a>';

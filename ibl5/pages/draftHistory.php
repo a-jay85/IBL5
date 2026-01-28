@@ -66,7 +66,7 @@ if ($num == 0) {
             <td>$draftpickno</td>
             <td><a href=\"/ibl5/modules.php?name=Player&pa=showpage&pid=$pid\">$name</a></td>
             <td>$draftedby</td>
-            <td><img height=50 src=\"/ibl5/images/player/$pid.jpg\"></td>
+            <td><img src=\"/ibl5/images/player/$pid.jpg\" width=\"36\" height=\"50\" loading=\"lazy\"></td>
             <td>$college</td>
         </tr>
 ";

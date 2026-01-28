@@ -34,7 +34,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         // The ibl_box_scores.name field is varchar(16) which truncates longer names
         // The ibl_plr.name field is varchar(32) which stores full names
         if ($tableSuffix === '') {
-            $query = "SELECT p.`name`, bs.`Date` AS `date`, {$statExpression} AS `{$safeStatName}`
+            $query = "SELECT p.`pid`, p.`name`, bs.`Date` AS `date`, {$statExpression} AS `{$safeStatName}`
                 FROM ibl_box_scores bs
                 JOIN ibl_plr p ON bs.pid = p.pid
                 WHERE bs.`Date` BETWEEN ? AND ?
@@ -54,11 +54,16 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         // Normalize the results
         $normalized = [];
         foreach ($results as $row) {
-            $normalized[] = [
+            $entry = [
                 'name' => $row['name'] ?? '',
                 'date' => $row['date'] ?? '',
                 'value' => (int) ($row[$safeStatName] ?? 0),
             ];
+            // Include pid for player stats (used for profile links)
+            if (isset($row['pid'])) {
+                $entry['pid'] = (int) $row['pid'];
+            }
+            $normalized[] = $entry;
         }
 
         return $normalized;

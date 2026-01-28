@@ -101,6 +101,12 @@ class SeasonHighsView implements SeasonHighsViewInterface
             $date = HtmlSanitizer::safeHtmlOutput($row['date'] ?? '');
             $value = (int) ($row['value'] ?? 0);
 
+            // Link player names to their profile page when pid is available
+            if (isset($row['pid'])) {
+                $pid = (int) $row['pid'];
+                $name = "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a>";
+            }
+
             $output .= "<tr>
     <td class=\"rank-cell\">{$rank}</td>
     <td>{$name}</td>

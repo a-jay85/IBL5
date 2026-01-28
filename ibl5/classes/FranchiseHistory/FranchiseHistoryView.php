@@ -99,10 +99,12 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
 
         $html = '<tr>';
 
-        // Team name cell
-        $html .= '<td style="background-color: #' . $color1 . ';">';
+        // Team name cell with logo
+        $html .= '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">';
         $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" ';
-        $html .= 'style="color: #' . $color2 . ';">' . $teamCity . ' ' . $teamName . '</a>';
+        $html .= 'class="ibl-team-cell__name" style="color: #' . $color2 . ';">';
+        $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">';
+        $html .= $teamCity . ' ' . $teamName . '</a>';
         $html .= '</td>';
 
         // All-time stats

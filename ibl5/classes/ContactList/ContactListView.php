@@ -136,8 +136,11 @@ class ContactListView implements ContactListViewInterface
         $aim = HtmlSanitizer::safeHtmlOutput($contact['aim'] ?? '');
 
         return "<tr>
-    <td class=\"team-cell\" style=\"background-color: #{$color1};\">
-        <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$teamId}\" style=\"color: #{$color2};\">{$teamCity} {$teamName}</a>
+    <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
+        <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$teamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
+            <img src=\"images/logo/new{$teamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
+            {$teamCity} {$teamName}
+        </a>
     </td>
     <td class=\"gm-cell\">
         <a href=\"mailto:{$ownerEmail}\">{$ownerName}</a>

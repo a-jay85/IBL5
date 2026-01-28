@@ -101,8 +101,8 @@ class StandingsIntegrationTest extends IntegrationTestCase
         // Act
         $this->repository->getStandingsByRegion('Western');
 
-        // Assert
-        $this->assertQueryExecuted('ORDER BY confGB ASC');
+        // Assert - Query now uses table alias 's.' for standings table
+        $this->assertQueryExecuted('ORDER BY s.confGB ASC');
     }
 
     // ========== REPOSITORY - DIVISION STANDINGS TESTS ==========
@@ -684,8 +684,8 @@ class StandingsIntegrationTest extends IntegrationTestCase
         // Act
         $html = $this->view->renderRegion('Eastern');
 
-        // Assert - PHP outputs literal & in href attribute
-        $this->assertStringContainsString('modules.php?name=Team&op=team&teamID=5', $html);
+        // Assert - HTML entities are properly escaped in href attribute
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=5', $html);
     }
 
     /**
@@ -865,6 +865,8 @@ class StandingsIntegrationTest extends IntegrationTestCase
             'awayLosses' => 15,
             'homeGames' => 35,
             'awayGames' => 35,
+            'color1' => '000000',
+            'color2' => 'FFFFFF',
         ];
     }
 

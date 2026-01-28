@@ -150,6 +150,8 @@ class StandingsView implements StandingsViewInterface
     {
         $teamId = (int) $team['tid'];
         $teamName = $this->formatTeamName($team);
+        $color1 = \Utilities\HtmlSanitizer::safeHtmlOutput($team['color1'] ?? '');
+        $color2 = \Utilities\HtmlSanitizer::safeHtmlOutput($team['color2'] ?? '');
         $streakData = $this->repository->getTeamStreakData($teamId);
 
         $lastWin = $streakData['last_win'] ?? 0;
@@ -171,7 +173,7 @@ class StandingsView implements StandingsViewInterface
         ob_start();
         ?>
         <tr>
-            <td class="sticky-col"><a href="modules.php?name=Team&op=team&teamID=<?= $teamId; ?>" class="ibl-team-cell"><img src="images/logo/new<?= $teamId; ?>.png" alt="Team Logo" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__name"><?= $teamName; ?></span></a></td>
+            <td class="sticky-col ibl-team-cell--colored" style="background-color: #<?= $color1; ?>;"><a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId; ?>" class="ibl-team-cell__name" style="color: #<?= $color2; ?>;"><img src="images/logo/new<?= $teamId; ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><?= $teamName; ?></a></td>
             <td><?= $team['leagueRecord']; ?></td>
             <td><?= $team['pct']; ?></td>
             <td><?= $pythagoreanPct; ?></td>

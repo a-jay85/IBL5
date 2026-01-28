@@ -128,8 +128,11 @@ class InjuriesView implements InjuriesViewInterface
         return "<tr>
     <td>{$position}</td>
     <td><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$playerID}\">{$name}</a></td>
-    <td class=\"team-cell\" style=\"background-color: #{$color1};\">
-        <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$teamID}\" style=\"color: #{$color2};\">{$teamCity} {$teamName}</a>
+    <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
+        <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$teamID}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
+            <img src=\"images/logo/new{$teamID}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
+            {$teamCity} {$teamName}
+        </a>
     </td>
     <td class=\"days-cell\">{$daysRemaining}</td>
 </tr>";

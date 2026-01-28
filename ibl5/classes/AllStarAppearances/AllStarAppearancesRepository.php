@@ -21,11 +21,11 @@ class AllStarAppearancesRepository extends \BaseMysqliRepository implements AllS
      */
     public function getAllStarAppearances(): array
     {
-        $query = "SELECT name, COUNT(*) as appearances
-            FROM ibl_awards
-            WHERE Award LIKE '%Conference All-Star'
-            GROUP BY name
-            ORDER BY appearances DESC, name ASC";
+        $query = "SELECT a.name, a.pid, COUNT(*) as appearances
+            FROM ibl_awards a
+            WHERE a.Award LIKE '%Conference All-Star'
+            GROUP BY a.name, a.pid
+            ORDER BY appearances DESC, a.name ASC";
 
         return $this->fetchAll($query);
     }

@@ -49,15 +49,28 @@
         );
 
         nameLinks.forEach(link => {
-            // Store original name on first encounter
-            if (!link.dataset.fullName) {
-                link.dataset.fullName = link.textContent.trim();
+            // Find the text node containing the player name (skip img elements)
+            let textNode = null;
+            for (let i = 0; i < link.childNodes.length; i++) {
+                if (link.childNodes[i].nodeType === Node.TEXT_NODE && link.childNodes[i].textContent.trim()) {
+                    textNode = link.childNodes[i];
+                    break;
+                }
             }
 
-            if (isMobile) {
-                link.textContent = abbreviateName(link.dataset.fullName);
-            } else {
-                link.textContent = link.dataset.fullName;
+            // Store original name on first encounter
+            if (!link.dataset.fullName) {
+                link.dataset.fullName = textNode ? textNode.textContent.trim() : link.textContent.trim();
+            }
+
+            const newName = isMobile ? abbreviateName(link.dataset.fullName) : link.dataset.fullName;
+
+            if (textNode) {
+                // Preserve images/other elements, only update the text node
+                textNode.textContent = newName;
+            } else if (!link.querySelector('img')) {
+                // Only use textContent if there are no images to preserve
+                link.textContent = newName;
             }
         });
     }

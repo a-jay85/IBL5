@@ -26,6 +26,7 @@ $previousSeasonEndingYear = $season->endingYear - 1;
 // Old team uses ibl_team_history (historical data), new team uses ibl_team_info (current)
 $stmt = $mysqli_db->prepare("
     SELECT
+        a.pid,
         a.name,
         a.teamid AS old_teamid,
         a.team AS old_team,
@@ -55,7 +56,24 @@ $result = $stmt->get_result();
 // Render page
 Nuke\Header::header();
 
-echo '<h2 class="ibl-title">Player Transactions Since Last Season</h2>
+echo '<style>
+.ibl-player-cell {
+    text-align: left;
+}
+.ibl-player-cell a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.ibl-player-photo {
+    width: 24px;
+    height: 24px;
+    object-fit: cover;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+</style>
+<h2 class="ibl-title">Player Transactions Since Last Season</h2>
 <p style="text-align: center;"><em>Click the headings to sort the table</em></p>
 <table class="sortable ibl-data-table">
     <thead>
@@ -68,7 +86,9 @@ echo '<h2 class="ibl-title">Player Transactions Since Last Season</h2>
     <tbody>';
 
 while ($row = $result->fetch_assoc()) {
+    $pid = (int) $row['pid'];
     $playerName = Utilities\HtmlSanitizer::safeHtmlOutput($row['name']);
+    $playerImage = "images/player/{$pid}.jpg";
 
     // New team data
     $newTeamId = (int) $row['new_teamid'];
@@ -89,7 +109,7 @@ while ($row = $result->fetch_assoc()) {
     $oldTeamDisplay = trim("{$oldCity} {$oldTeam}");
 
     echo "<tr>
-        <td>{$playerName}</td>
+        <td class=\"ibl-player-cell\"><a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\">{$playerName}</a></td>
         <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$oldColor1};\">
             <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$oldTeamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$oldColor2};\">
                 <img src=\"images/logo/new{$oldTeamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">

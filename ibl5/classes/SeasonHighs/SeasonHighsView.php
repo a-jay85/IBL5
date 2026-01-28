@@ -39,6 +39,21 @@ class SeasonHighsView implements SeasonHighsViewInterface
 .stat-table .name-cell {
     white-space: nowrap;
 }
+.stat-table .name-cell {
+    text-align: left;
+}
+.stat-table .name-cell a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.ibl-player-photo {
+    width: 24px;
+    height: 24px;
+    object-fit: cover;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
 </style>';
     }
 
@@ -108,7 +123,8 @@ class SeasonHighsView implements SeasonHighsViewInterface
             // Link player names to their profile page when pid is available
             if (isset($row['pid'])) {
                 $pid = (int) $row['pid'];
-                $name = "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a>";
+                $playerImage = "images/player/{$pid}.jpg";
+                $name = "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\">{$name}</a>";
             } elseif (isset($row['teamid'])) {
                 // Link team names to their team page when teamid is available
                 $teamId = (int) $row['teamid'];

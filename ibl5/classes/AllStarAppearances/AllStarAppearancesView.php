@@ -37,7 +37,23 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
      */
     private function getStyleBlock(): string
     {
-        return '';
+        return '<style>
+.allstar-table .ibl-player-cell {
+    text-align: left;
+}
+.allstar-table .ibl-player-cell a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.ibl-player-photo {
+    width: 24px;
+    height: 24px;
+    object-fit: cover;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+</style>';
     }
 
     /**
@@ -70,7 +86,7 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
     /**
      * Render all table rows.
      *
-     * @param array<int, array{name: string, appearances: int}> $appearances Array of appearance data
+     * @param array<int, array{name: string, pid: int, appearances: int}> $appearances Array of appearance data
      * @return string HTML table rows
      */
     private function renderTableRows(array $appearances): string
@@ -79,10 +95,12 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
 
         foreach ($appearances as $row) {
             $name = HtmlSanitizer::safeHtmlOutput($row['name'] ?? '');
+            $pid = (int) ($row['pid'] ?? 0);
             $count = (int) ($row['appearances'] ?? 0);
+            $playerImage = "images/player/{$pid}.jpg";
 
             $output .= "<tr>
-    <td>{$name}</td>
+    <td class=\"ibl-player-cell\"><a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\">{$name}</a></td>
     <td>{$count}</td>
 </tr>";
         }

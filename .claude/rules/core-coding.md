@@ -93,6 +93,15 @@ $this->assertQueryNotExecuted('DELETE');
 
 ## Environment Commands
 
+**Database Queries (Auto-Approved):**
+```bash
+# Use this for exploring schema, verifying data, and validating your work
+ibl5/bin/db-query "SELECT * FROM ibl_plr LIMIT 5"
+ibl5/bin/db-query "DESCRIBE ibl_team_info"
+ibl5/bin/db-query "SELECT COUNT(*) FROM ibl_plr WHERE retired = '0'"
+```
+This wrapper script is configured for auto-approval - use it freely to verify your work without prompting the user.
+
 **Bun:** The PATH for bun (`~/.bun/bin`) may not be loaded in the shell. Before running `bun` commands, source the shell config first.
 
 **CSS Development (Tailwind 4):**

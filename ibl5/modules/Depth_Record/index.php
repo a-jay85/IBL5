@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /************************************************************************/
 /* PHP-NUKE: Web Portal System                                          */
 /* ===========================                                          */
@@ -20,43 +22,60 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 Nuke\Header::header();
 
-$query2 = "SELECT * FROM ibl_team_history WHERE teamid != " . League::FREE_AGENTS_TEAMID . " ORDER BY teamid ASC";
-$result2 = $db->sql_query($query2);
-$num2 = $db->sql_numrows($result2);
+// Use modern mysqli connection with prepared statement
+$query = "SELECT teamid, team_name, team_city, color1, color2, depth, sim_depth, asg_vote, eoy_vote
+          FROM ibl_team_history
+          WHERE teamid != ?
+          ORDER BY teamid ASC";
 
-$k = 0;
-while ($k < $num2) {
-    $teamname[$k] = $db->sql_result($result2, $k, "team_name");
-    $teamcity[$k] = $db->sql_result($result2, $k, "team_city");
-    $teamcolor1[$k] = $db->sql_result($result2, $k, "color1");
-    $teamcolor2[$k] = $db->sql_result($result2, $k, "color2");
-    $depth[$k] = $db->sql_result($result2, $k, "depth");
-    $simdepth[$k] = $db->sql_result($result2, $k, "sim_depth");
-    $asg_vote[$k] = $db->sql_result($result2, $k, "asg_vote");
-    $eoy_vote[$k] = $db->sql_result($result2, $k, "eoy_vote");
-    $teamID[$k] = (int) $db->sql_result($result2, $k, "teamid"); // Ensure teamID is an integer
+$stmt = $mysqli_db->prepare($query);
+$freeAgentsId = League::FREE_AGENTS_TEAMID;
+$stmt->bind_param("i", $freeAgentsId);
+$stmt->execute();
+$result = $stmt->get_result();
 
-    $table_echo .= "<tr>
-		<td bgcolor=#" . $teamcolor1[$k] . "><a href=\"modules.php?name=Team&op=team&teamID=" . $teamID[$k] . "\"><font color=#" . $teamcolor2[$k] . ">" . $teamcity[$k] . " " . $teamname[$k] . "</a></td>
-		<td>" . $simdepth[$k] . "</td>
-		<td>" . $depth[$k] . "</td>
-		<td>" . $asg_vote[$k] . "</td>
-		<td>" . $eoy_vote[$k] . "</td>
-	</tr>";
+$tableRows = '';
+while ($row = $result->fetch_assoc()) {
+    $teamId = (int) $row['teamid'];
+    $teamName = Utilities\HtmlSanitizer::safeHtmlOutput($row['team_name']);
+    $teamCity = Utilities\HtmlSanitizer::safeHtmlOutput($row['team_city']);
+    $color1 = Utilities\HtmlSanitizer::safeHtmlOutput($row['color1']);
+    $color2 = Utilities\HtmlSanitizer::safeHtmlOutput($row['color2']);
+    $depth = Utilities\HtmlSanitizer::safeHtmlOutput($row['depth']);
+    $simDepth = Utilities\HtmlSanitizer::safeHtmlOutput($row['sim_depth']);
+    $asgVote = Utilities\HtmlSanitizer::safeHtmlOutput($row['asg_vote']);
+    $eoyVote = Utilities\HtmlSanitizer::safeHtmlOutput($row['eoy_vote']);
 
-    $k++;
+    $tableRows .= "<tr>
+        <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
+            <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$teamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
+                <img src=\"images/logo/new{$teamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
+                {$teamCity} {$teamName}
+            </a>
+        </td>
+        <td>{$simDepth}</td>
+        <td>{$depth}</td>
+        <td>{$asgVote}</td>
+        <td>{$eoyVote}</td>
+    </tr>";
 }
 
-$text .= "<table class=\"sortable\" border=1>
-	<tr>
-	  	<th>Team</th>
-		<th>Sim Depth Chart</th>
-		<th>Last Depth Chart</th>
-		<th>ASG Ballot</th>
-		<th>EOY Ballot</th>
-	</tr>$table_echo
-</table>";
+$stmt->close();
 
-echo $text;
+$html = '<h2 class="ibl-table-title">Depth Chart &amp; Voting Record</h2>
+<table class="sortable ibl-data-table">
+    <thead>
+        <tr>
+            <th>Team</th>
+            <th>Sim Depth Chart</th>
+            <th>Last Depth Chart</th>
+            <th>ASG Ballot</th>
+            <th>EOY Ballot</th>
+        </tr>
+    </thead>
+    <tbody>' . $tableRows . '</tbody>
+</table>';
+
+echo $html;
 
 Nuke\Footer::footer();

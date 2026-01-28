@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /***************************************************************************
  *                                 mysql.php
  *                            -------------------
@@ -75,7 +78,7 @@ if (!defined("SQL_LAYER")) {
                 $this->db_connect_id = @mysqli_connect($this->server, $this->user, $this->password);
             }
             if ($this->db_connect_id) {
-                if ($database != "") {
+                if ($database !== "") {
                     $this->dbname = $database;
                     $dbselect = @mysqli_select_db($this->db_connect_id, $this->dbname);
                     if (!$dbselect) {
@@ -114,7 +117,7 @@ if (!defined("SQL_LAYER")) {
         {
             // Remove any pre-existing queries
             unset($this->query_result);
-            if ($query != "") {
+            if ($query !== "") {
                 $this->query_result = @mysqli_query($this->db_connect_id, $query);
             }
             if ($this->query_result) {
@@ -122,7 +125,7 @@ if (!defined("SQL_LAYER")) {
                 unset($this->rowset);
                 return $this->query_result;
             } else {
-                return ($transaction == END_TRANSACTION) ? true : false;
+                return ($transaction === END_TRANSACTION) ? true : false;
             }
         }
 

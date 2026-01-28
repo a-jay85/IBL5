@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Nuke;
 
 class Navbar
@@ -43,7 +45,7 @@ class Navbar
             . "<a href=\"modules.php?name=Your_Account&amp;op=edithome\">" . _CHANGEHOME . "</a>"
             . "</center></form></font></td>";
     
-        if ($articlecomm == 1) {
+        if ($articlecomm === 1) {
             $menuimg = Navbar::menuimg("comments.gif");
             echo "<td width=\"10%\"><font class=\"content\">"
                 . "<center><a href=\"modules.php?name=Your_Account&amp;op=editcomm\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _CONFIGCOMMENTS . "\" title=\"" . _CONFIGCOMMENTS . "\"></a><br>"
@@ -53,7 +55,7 @@ class Navbar
         
 
     
-        if ($thmcount > 1 and $overwrite_theme == 1) {
+        if ($thmcount > 1 and $overwrite_theme === 1) {
             $menuimg = Navbar::menuimg("themes.gif");
             echo "<td width=\"10%\"><font class=\"content\">"
                 . "<center><a href=\"modules.php?name=Your_Account&amp;op=chgtheme\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _SELECTTHETHEME . "\" title=\"" . _SELECTTHETHEME . "\"></a><br>"
@@ -68,7 +70,7 @@ class Navbar
             . "</center></form></font>";
     
         echo "</td></tr></table>";
-        if ($main_up != 1) {
+        if ($main_up !== 1) {
             echo "<br><center>[ <a href=\"modules.php?name=Your_Account\">" . _RETURNACCOUNT . "</a> ]</center>\n";
         }
     }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Player;
 
 use BaseMysqliRepository;
@@ -186,7 +188,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     private function mapStatusFields(PlayerData $playerData, array $plrRow): void
     {
         $playerData->daysRemainingForInjury = isset($plrRow['injured']) ? (int) $plrRow['injured'] : null;
-        $playerData->isRetired = $plrRow['retired'] ?? null;
+        $playerData->isRetired = isset($plrRow['retired']) ? (string) $plrRow['retired'] : null;
         $playerData->timeDroppedOnWaivers = isset($plrRow['droptime']) ? (int) $plrRow['droptime'] : null;
     }
 

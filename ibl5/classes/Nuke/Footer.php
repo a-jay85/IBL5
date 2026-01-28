@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Nuke;
 
 class Footer
@@ -26,7 +28,7 @@ class Footer
         if (defined('HOME_FILE')) {
             blocks("Down");
         }
-        if (basename($_SERVER['PHP_SELF']) != "index.php" and defined('MODULE_FILE') and (file_exists("modules/$name/admin/panel.php") && is_admin($admin))) {
+        if (basename($_SERVER['PHP_SELF']) !== "index.php" and defined('MODULE_FILE') and (file_exists("modules/$name/admin/panel.php") && is_admin($admin))) {
             echo "<br>";
             include "modules/$name/admin/panel.php";
         }

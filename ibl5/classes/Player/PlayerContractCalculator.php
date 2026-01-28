@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Player;
 
 use Player\Contracts\PlayerContractCalculatorInterface;
@@ -31,7 +33,7 @@ class PlayerContractCalculator implements PlayerContractCalculatorInterface
     private function getSalaryForYear(PlayerData $playerData, int $year): int
     {
         // Year 0 defaults to year 1
-        if ($year == 0) {
+        if ($year === 0) {
             return $playerData->contractYear1Salary ?? 0;
         }
         
@@ -69,14 +71,14 @@ class PlayerContractCalculator implements PlayerContractCalculatorInterface
      */
     public function getRemainingContractArray(PlayerData $playerData): array
     {
-        $contractCurrentYear = ($playerData->contractCurrentYear != 0) ? $playerData->contractCurrentYear : 1;
-        $contractTotalYears = ($playerData->contractTotalYears != 0) ? $playerData->contractTotalYears : 1;
+        $contractCurrentYear = ($playerData->contractCurrentYear !== 0) ? $playerData->contractCurrentYear : 1;
+        $contractTotalYears = ($playerData->contractTotalYears !== 0) ? $playerData->contractTotalYears : 1;
 
         $contractArray = [];
         $remainingContractYear = 1;
         for ($i = $contractCurrentYear; $i <= $contractTotalYears; $i++) {
             $salary = $this->getSalaryForYear($playerData, $i);
-            if ($salary != 0) {
+            if ($salary !== 0) {
                 $contractArray[$remainingContractYear] = $salary;
             }
             $remainingContractYear++;

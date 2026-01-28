@@ -67,12 +67,7 @@ class TeamController implements TeamControllerInterface
             }
         }
 
-        echo "<div style=\"text-align: center;\">";
-        echo "<img src=\"./{$imagesPath}logo/$teamID.jpg\">";
-        echo "</div>";
-
         if ($yr != "") {
-            echo "<h1 class=\"ibl-title\">$yr $team->name</h1>";
             $insertyear = "&yr=$yr";
         } else {
             $insertyear = "";
@@ -97,8 +92,10 @@ class TeamController implements TeamControllerInterface
         echo "
         <div class=\"team-page-layout\">
             <div class=\"team-page-main\">
-                <div style=\"text-align: center;\">
-                    <table><tr>$tabs</tr></table>
+                <div style=\"text-align: center; margin-bottom: 1rem;\">
+                    <img src=\"./{$imagesPath}logo/$teamID.jpg\" style=\"display: block; margin: 0 auto;\">
+                    " . ($yr !== "" && $yr !== null ? "<h1 class=\"ibl-title\" style=\"margin: 0.5rem 0;\">$yr $team->name</h1>" : "") . "
+                    <table style=\"margin: 0 auto;\"><tr>$tabs</tr></table>
                 </div>
                 <div class=\"table-scroll-wrapper\">
                     <div class=\"table-scroll-container\">

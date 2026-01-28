@@ -68,6 +68,8 @@ class PlayerSearchView implements PlayerSearchViewInterface
 
         ob_start();
         ?>
+<div class="table-scroll-wrapper">
+<div class="table-scroll-container">
 <p>Age is less than or equal to the age entered. All other fields are greater than or equal to the amount entered.</p>
 <p>Partial matches on a name or college are okay and are <strong>not</strong> case sensitive<br>
 (e.g., entering "Dard" will match with "Darden" and "Bedard").</p>
@@ -238,6 +240,8 @@ function resetPlayerSearch() {
     return false;
 }
 </script>
+</div>
+</div>
 <br>
         <?php
         return ob_get_clean();

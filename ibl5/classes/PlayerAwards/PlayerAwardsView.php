@@ -55,7 +55,9 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
     }
 </style>
 
-<p>Partial matches on a name or award are okay and are <strong>not</strong> case sensitive 
+<div class="table-scroll-wrapper">
+<div class="table-scroll-container">
+<p>Partial matches on a name or award are okay and are <strong>not</strong> case sensitive
 (e.g., entering "Dard" will match with "Darden" and "Bedard").</p>
 
 <form name="Search" method="post" action="modules.php?name=Player_Awards" class="player-awards-form">
@@ -66,7 +68,7 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
             <td>Year: <input type="text" name="aw_year" size="4" value="<?= $year ?>"></td>
         </tr>
         <tr>
-            <td colspan="3">SORT BY: 
+            <td colspan="3">SORT BY:
             <?php foreach ($sortOptions as $value => $label): ?>
                 <?php $checked = ($sortby == $value) ? ' checked' : ''; ?>
                 <input type="radio" name="aw_sortby" value="<?= $value ?>"<?= $checked ?>> <?= HtmlSanitizer::safeHtmlOutput($label) ?> |
@@ -76,6 +78,8 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
     </table>
     <input type="submit" value="Search for Matches!">
 </form>
+</div>
+</div>
         <?php
         return ob_get_clean();
     }

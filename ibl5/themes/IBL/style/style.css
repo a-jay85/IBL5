@@ -2902,8 +2902,8 @@ html:has(.depth-chart-form) {
   padding: var(--space-2) var(--space-3);
   text-align: center;
 }
-.depth-chart-table td {
-  padding: var(--space-2);
+table.depth-chart-table td {
+  padding: 0.125rem;
   text-align: center;
   border-bottom: 1px solid var(--gray-100);
 }
@@ -2914,7 +2914,7 @@ html:has(.depth-chart-form) {
   background-color: var(--gray-50);
 }
 .depth-chart-table select {
-  padding: 0.25rem;
+  padding: 0rem;
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-sm);
   font-size: 0.875rem;

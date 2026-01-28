@@ -2266,10 +2266,15 @@ html:has(.depth-chart-form) {
     text-align: center;
 }
 
-.depth-chart-table td {
-    padding: var(--space-2);
+table.depth-chart-table td {
+    padding: 0.25rem;
     text-align: center;
     border-bottom: 1px solid var(--gray-100);
+}
+
+table.depth-chart-table td:first-child,
+table.depth-chart-table td:last-child {
+    padding: 0.25rem;
 }
 
 .depth-chart-table tbody tr:nth-child(odd) {

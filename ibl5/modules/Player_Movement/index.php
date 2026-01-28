@@ -22,12 +22,29 @@ $pagetitle = "- Player Movement";
 
 $previousSeasonEndingYear = $season->endingYear - 1;
 
-$stmt = $mysqli_db->prepare("SELECT a.name, a.teamid, a.team, b.tid, b.teamname
-	FROM ibl_hist a, ibl_plr b
-	WHERE a.pid = b.pid
-	AND a.year = ?
-	AND a.teamid != b.tid
-	ORDER BY b.teamname");
+// Query with JOINs to get team colors for both old and new teams
+// Old team uses ibl_team_history (historical data), new team uses ibl_team_info (current)
+$stmt = $mysqli_db->prepare("
+    SELECT
+        a.name,
+        a.teamid AS old_teamid,
+        a.team AS old_team,
+        b.tid AS new_teamid,
+        b.teamname AS new_team,
+        old_hist.team_city AS old_city,
+        old_hist.color1 AS old_color1,
+        old_hist.color2 AS old_color2,
+        new_info.team_city AS new_city,
+        new_info.color1 AS new_color1,
+        new_info.color2 AS new_color2
+    FROM ibl_hist a
+    JOIN ibl_plr b ON a.pid = b.pid
+    LEFT JOIN ibl_team_history old_hist ON a.teamid = old_hist.teamid
+    LEFT JOIN ibl_team_info new_info ON b.tid = new_info.teamid
+    WHERE a.year = ?
+    AND a.teamid != b.tid
+    ORDER BY b.teamname
+");
 if (!$stmt) {
     throw new RuntimeException("Prepare failed: " . $mysqli_db->error);
 }
@@ -38,31 +55,58 @@ $result = $stmt->get_result();
 // Render page
 Nuke\Header::header();
 
-echo "<script src=\"/ibl5/jslib/sorttable.js\"></script>
-<h2 class=\"ibl-title\">Player Transactions Since Last Season</h2>
-<p style=\"text-align: center;\"><em>Click the headings to sort the table</em></p>
-<div class=\"table-scroll-wrapper\">
-<div class=\"table-scroll-container\">
-<table class=\"sortable ibl-data-table responsive-table\">
-	<tr>
-		<th>Player</th>
-		<th>New Team</th>
-		<th>Old Team</th>
-	</tr>";
+echo '<h2 class="ibl-title">Player Transactions Since Last Season</h2>
+<p style="text-align: center;"><em>Click the headings to sort the table</em></p>
+<table class="sortable ibl-data-table">
+    <thead>
+        <tr>
+            <th>Player</th>
+            <th>New Team</th>
+            <th>Old Team</th>
+        </tr>
+    </thead>
+    <tbody>';
 
 while ($row = $result->fetch_assoc()) {
-    $playername = htmlspecialchars($row['name'], ENT_QUOTES, 'UTF-8');
-    $oldteam = htmlspecialchars($row['team'], ENT_QUOTES, 'UTF-8');
-    $newteam = htmlspecialchars($row['teamname'], ENT_QUOTES, 'UTF-8');
+    $playerName = Utilities\HtmlSanitizer::safeHtmlOutput($row['name']);
+
+    // New team data
+    $newTeamId = (int) $row['new_teamid'];
+    $newTeam = Utilities\HtmlSanitizer::safeHtmlOutput($row['new_team']);
+    $newCity = Utilities\HtmlSanitizer::safeHtmlOutput($row['new_city'] ?? '');
+    $newColor1 = $row['new_color1'] ?? '333333';
+    $newColor2 = $row['new_color2'] ?? 'FFFFFF';
+
+    // Old team data
+    $oldTeamId = (int) $row['old_teamid'];
+    $oldTeam = Utilities\HtmlSanitizer::safeHtmlOutput($row['old_team']);
+    $oldCity = Utilities\HtmlSanitizer::safeHtmlOutput($row['old_city'] ?? '');
+    $oldColor1 = $row['old_color1'] ?? '333333';
+    $oldColor2 = $row['old_color2'] ?? 'FFFFFF';
+
+    // Build team display names (city + name, or just name if city missing)
+    $newTeamDisplay = trim("{$newCity} {$newTeam}");
+    $oldTeamDisplay = trim("{$oldCity} {$oldTeam}");
+
     echo "<tr>
-		<td>$playername</td>
-		<td>$newteam</td>
-		<td>$oldteam</td>
-	</tr>";
+        <td>{$playerName}</td>
+        <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$newColor1};\">
+            <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$newTeamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$newColor2};\">
+                <img src=\"images/logo/new{$newTeamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
+                {$newTeamDisplay}
+            </a>
+        </td>
+        <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$oldColor1};\">
+            <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$oldTeamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$oldColor2};\">
+                <img src=\"images/logo/new{$oldTeamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
+                {$oldTeamDisplay}
+            </a>
+        </td>
+    </tr>";
 }
 
 $stmt->close();
 
-echo "</table></div></div>";
+echo '</tbody></table>';
 
 Nuke\Footer::footer();

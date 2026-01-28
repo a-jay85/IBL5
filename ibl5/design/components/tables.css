@@ -461,9 +461,6 @@
 
 /* Team Cell with Colors - combines logo + team-specific background/text */
 .ibl-team-cell--colored {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
     padding: 0.375rem 0.5rem;
     text-align: left !important;
 }

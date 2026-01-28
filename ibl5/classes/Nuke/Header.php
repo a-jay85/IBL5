@@ -35,6 +35,7 @@ class Header
         echo "<title>$sitename $pagetitle</title>\n";
         echo '<meta name="google-site-verification" content="3y3xJYDHSYUitn7cbfFfI6C2BiK_q66dtRfykpzHW5w" />';
         echo "<script src=\"{$relativePath}jslib/sorttable.js\"></script>";
+        echo "<script src=\"{$relativePath}jslib/responsive-tables.js\"></script>";
 
         include "includes/meta.php";
         include "includes/javascript.php";

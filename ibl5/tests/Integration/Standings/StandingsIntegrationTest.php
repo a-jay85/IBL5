@@ -740,7 +740,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
      * @group standings
      * @group view
      */
-    public function testRenderIncludesScriptOnce(): void
+    public function testRenderDoesNotIncludeInlineScript(): void
     {
         // Arrange
         $this->mockDb->setMockData([]);
@@ -749,9 +749,8 @@ class StandingsIntegrationTest extends IntegrationTestCase
         // Act
         $html = $this->view->render();
 
-        // Assert - Script should appear only once at the beginning
-        $this->assertStringContainsString('<script>', $html);
-        $this->assertEquals(1, substr_count($html, '<script>'));
+        // Assert - Inline script removed; scroll logic now in external responsive-tables.js
+        $this->assertStringNotContainsString('<script>', $html);
     }
 
     /**

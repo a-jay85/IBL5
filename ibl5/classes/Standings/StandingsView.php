@@ -35,7 +35,7 @@ class StandingsView implements StandingsViewInterface
      */
     public function render(): string
     {
-        $html = $this->getStyleBlock();
+        $html = '';
 
         // Conference standings
         $html .= $this->renderRegion('Eastern');
@@ -48,56 +48,6 @@ class StandingsView implements StandingsViewInterface
         $html .= $this->renderRegion('Pacific');
 
         return $html;
-    }
-
-    /**
-     * Generate JavaScript for scroll container functionality
-     *
-     * @return string JavaScript block
-     */
-    private function getStyleBlock(): string
-    {
-        return '<script>
-        (function() {
-            // Set explicit width on scroll containers for iOS compatibility
-            function setContainerWidths() {
-                var containers = document.querySelectorAll(".table-scroll-container");
-                containers.forEach(function(container) {
-                    var wrapper = container.closest(".table-scroll-wrapper");
-                    if (wrapper) {
-                        var availableWidth = wrapper.clientWidth;
-                        container.style.width = availableWidth + "px";
-                        container.style.maxWidth = availableWidth + "px";
-                    }
-                });
-            }
-
-            function initScrollContainers() {
-                // Scroll indicator logic
-                document.querySelectorAll(".table-scroll-container").forEach(function(container) {
-                    var wrapper = container.closest(".table-scroll-wrapper");
-                    function updateScrollIndicator() {
-                        var isAtEnd = container.scrollLeft + container.clientWidth >= container.scrollWidth - 5;
-                        if (wrapper) wrapper.classList.toggle("scrolled-end", isAtEnd);
-                    }
-                    container.addEventListener("scroll", updateScrollIndicator);
-                    updateScrollIndicator();
-                });
-
-                // Set widths
-                setContainerWidths();
-                window.addEventListener("resize", setContainerWidths);
-                window.addEventListener("orientationchange", setContainerWidths);
-            }
-
-            // Run on DOMContentLoaded and load to ensure it works
-            if (document.readyState === "loading") {
-                document.addEventListener("DOMContentLoaded", initScrollContainers);
-            } else {
-                initScrollContainers();
-            }
-        })();
-        </script>';
     }
 
     /**

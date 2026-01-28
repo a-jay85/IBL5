@@ -557,9 +557,9 @@ class StandingsIntegrationTest extends TestCase
     }
 
     /**
-     * Test render includes JavaScript scroll container functionality
+     * Test render includes scroll container HTML structure
      */
-    public function testRenderIncludesScrollContainerScript(): void
+    public function testRenderIncludesScrollContainerStructure(): void
     {
         $mockRepository = $this->createMock(StandingsRepositoryInterface::class);
         $mockRepository->method('getStandingsByRegion')->willReturn([]);
@@ -569,15 +569,14 @@ class StandingsIntegrationTest extends TestCase
         $view = new StandingsView($mockRepository);
         $result = $view->render();
 
-        $this->assertStringContainsString('<script>', $result);
-        $this->assertStringContainsString('</script>', $result);
+        $this->assertStringContainsString('table-scroll-wrapper', $result);
         $this->assertStringContainsString('table-scroll-container', $result);
     }
 
     /**
-     * Test render includes JavaScript for scroll indicators
+     * Test render does not include inline JavaScript (moved to external file)
      */
-    public function testRenderIncludesJavaScript(): void
+    public function testRenderDoesNotIncludeInlineJavaScript(): void
     {
         $mockRepository = $this->createMock(StandingsRepositoryInterface::class);
         $mockRepository->method('getStandingsByRegion')->willReturn([]);
@@ -587,9 +586,7 @@ class StandingsIntegrationTest extends TestCase
         $view = new StandingsView($mockRepository);
         $result = $view->render();
 
-        $this->assertStringContainsString('<script>', $result);
-        $this->assertStringContainsString('</script>', $result);
-        $this->assertStringContainsString('table-scroll-container', $result);
+        $this->assertStringNotContainsString('<script>', $result);
     }
 
     /**

@@ -482,6 +482,15 @@
     .ibl-team-cell__text {
         display: none;
     }
+
+    /* Center the logo when text is hidden */
+    .ibl-team-cell--colored {
+        text-align: center !important;
+    }
+
+    .ibl-team-cell--colored .ibl-team-cell__name {
+        justify-content: center;
+    }
 }
 
 /* ==========================================================================

@@ -3389,6 +3389,12 @@ table.sortable thead th {
   .ibl-team-cell__text {
     display: none;
   }
+  .ibl-team-cell--colored {
+    text-align: center !important;
+  }
+  .ibl-team-cell--colored .ibl-team-cell__name {
+    justify-content: center;
+  }
 }
 .ibl-player-cell {
   display: flex;

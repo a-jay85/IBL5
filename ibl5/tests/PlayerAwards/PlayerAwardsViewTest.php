@@ -146,15 +146,18 @@ final class PlayerAwardsViewTest extends TestCase
         $this->assertStringContainsString('Magic Johnson', $result);
     }
 
-    public function testRenderAwardRowAlternatesRowColors(): void
+    public function testRenderAwardRowCreatesPlainRows(): void
     {
         $award = ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson'];
-        
+
         $evenRow = $this->view->renderAwardRow($award, 0);
         $oddRow = $this->view->renderAwardRow($award, 1);
 
-        $this->assertStringContainsString('row-even', $evenRow);
-        $this->assertStringContainsString('row-odd', $oddRow);
+        // Row alternation is now handled by CSS :nth-child, not row classes
+        $this->assertStringContainsString('<tr>', $evenRow);
+        $this->assertStringContainsString('<tr>', $oddRow);
+        $this->assertStringNotContainsString('row-even', $evenRow);
+        $this->assertStringNotContainsString('row-odd', $oddRow);
     }
 
     public function testRenderAwardRowEscapesHtmlCharacters(): void

@@ -124,7 +124,8 @@ final class PlayerSearchViewTest extends TestCase
         $html = $this->view->renderTableHeader();
 
         $this->assertStringContainsString('<table', $html);
-        $this->assertStringContainsString('class="sortable"', $html);
+        $this->assertStringContainsString('sortable', $html);
+        $this->assertStringContainsString('ibl-data-table', $html);
         $this->assertStringContainsString('<tr>', $html);
         $this->assertStringContainsString('<th>', $html);
     }
@@ -180,15 +181,18 @@ final class PlayerSearchViewTest extends TestCase
         $this->assertStringContainsString('>Test Team<', $html);
     }
 
-    public function testRenderPlayerRowAlternatesRowColors(): void
+    public function testRenderPlayerRowCreatesPlainRows(): void
     {
         $player = $this->createTestPlayer();
 
         $htmlEven = $this->view->renderPlayerRow($player, 0);
         $htmlOdd = $this->view->renderPlayerRow($player, 1);
 
-        $this->assertStringContainsString('#e6e7e2', $htmlEven);
-        $this->assertStringContainsString('#ffffff', $htmlOdd);
+        // Row alternation is now handled by CSS :nth-child, not inline styles
+        $this->assertStringContainsString('<tr>', $htmlEven);
+        $this->assertStringContainsString('<tr>', $htmlOdd);
+        $this->assertStringNotContainsString('background-color', $htmlEven);
+        $this->assertStringNotContainsString('background-color', $htmlOdd);
     }
 
     public function testRenderPlayerRowShowsRetiredStatus(): void

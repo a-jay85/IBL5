@@ -250,7 +250,9 @@ function resetPlayerSearch() {
     {
         ob_start();
         ?>
-<table class="sortable" border="1" cellpadding="0" cellspacing="0">
+<div class="table-scroll-wrapper">
+<div class="table-scroll-container">
+<table class="sortable ibl-data-table responsive-table">
     <tr>
         <th>Pos</th>
         <th>Player</th>
@@ -295,60 +297,59 @@ function resetPlayerSearch() {
      */
     public function renderPlayerRow(\Player\PlayerData $player, int $rowIndex): string
     {
-        $bgColor = ($rowIndex % 2) ? '#ffffff' : '#e6e7e2';
         $retired = (int)$player->isRetired;
 
         ob_start();
-        
+
         if ($retired === 1) {
             ?>
-<tr style="background-color: <?= $bgColor ?>;">
-    <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
-    <td style="text-align: center;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= htmlspecialchars($player->name) ?></a></td>
-    <td colspan="30" style="text-align: center;"> --- Retired --- </td>
+<tr>
+    <td><?= htmlspecialchars($player->position) ?></td>
+    <td><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= htmlspecialchars($player->name) ?></a></td>
+    <td colspan="30"> --- Retired --- </td>
     <td><?= htmlspecialchars((string)($player->collegeName ?? '')) ?></td>
 </tr>
             <?php
         } else {
             ?>
-<tr style="background-color: <?= $bgColor ?>;">
-    <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
-    <td style="text-align: center;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= htmlspecialchars($player->name) ?></a></td>
-    <td style="text-align: center;"><?= $player->age ?></td>
-    <td style="text-align: center;"><a href="modules.php?name=Team&op=team&teamID=<?= $player->teamID ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
-    <td style="text-align: center;"><?= $player->yearsOfExperience ?></td>
-    <td style="text-align: center;"><?= $player->birdYears ?></td>
-    <td style="text-align: center;"><?= $player->ratingFieldGoalAttempts ?></td>
-    <td style="text-align: center;"><?= $player->ratingFieldGoalPercentage ?></td>
-    <td style="text-align: center;"><?= $player->ratingFreeThrowAttempts ?></td>
-    <td style="text-align: center;"><?= $player->ratingFreeThrowPercentage ?></td>
-    <td style="text-align: center;"><?= $player->ratingThreePointAttempts ?></td>
-    <td style="text-align: center;"><?= $player->ratingThreePointPercentage ?></td>
-    <td style="text-align: center;"><?= $player->ratingOffensiveRebounds ?></td>
-    <td style="text-align: center;"><?= $player->ratingDefensiveRebounds ?></td>
-    <td style="text-align: center;"><?= $player->ratingAssists ?></td>
-    <td style="text-align: center;"><?= $player->ratingSteals ?></td>
-    <td style="text-align: center;"><?= $player->ratingTurnovers ?></td>
-    <td style="text-align: center;"><?= $player->ratingBlocks ?></td>
-    <td style="text-align: center;"><?= $player->ratingFouls ?></td>
-    <td style="text-align: center;"><?= $player->ratingOutsideOffense ?></td>
-    <td style="text-align: center;"><?= $player->ratingOutsideDefense ?></td>
-    <td style="text-align: center;"><?= $player->ratingDriveOffense ?></td>
-    <td style="text-align: center;"><?= $player->ratingDriveDefense ?></td>
-    <td style="text-align: center;"><?= $player->ratingPostOffense ?></td>
-    <td style="text-align: center;"><?= $player->ratingPostDefense ?></td>
-    <td style="text-align: center;"><?= $player->ratingTransitionOffense ?></td>
-    <td style="text-align: center;"><?= $player->ratingTransitionDefense ?></td>
-    <td style="text-align: center;"><?= $player->ratingTalent ?></td>
-    <td style="text-align: center;"><?= $player->ratingSkill ?></td>
-    <td style="text-align: center;"><?= $player->ratingIntangibles ?></td>
-    <td style="text-align: center;"><?= $player->ratingClutch ?></td>
-    <td style="text-align: center;"><?= $player->ratingConsistency ?></td>
+<tr>
+    <td><?= htmlspecialchars($player->position) ?></td>
+    <td><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= htmlspecialchars($player->name) ?></a></td>
+    <td><?= $player->age ?></td>
+    <td><a href="modules.php?name=Team&op=team&teamID=<?= $player->teamID ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
+    <td><?= $player->yearsOfExperience ?></td>
+    <td><?= $player->birdYears ?></td>
+    <td><?= $player->ratingFieldGoalAttempts ?></td>
+    <td><?= $player->ratingFieldGoalPercentage ?></td>
+    <td><?= $player->ratingFreeThrowAttempts ?></td>
+    <td><?= $player->ratingFreeThrowPercentage ?></td>
+    <td><?= $player->ratingThreePointAttempts ?></td>
+    <td><?= $player->ratingThreePointPercentage ?></td>
+    <td><?= $player->ratingOffensiveRebounds ?></td>
+    <td><?= $player->ratingDefensiveRebounds ?></td>
+    <td><?= $player->ratingAssists ?></td>
+    <td><?= $player->ratingSteals ?></td>
+    <td><?= $player->ratingTurnovers ?></td>
+    <td><?= $player->ratingBlocks ?></td>
+    <td><?= $player->ratingFouls ?></td>
+    <td><?= $player->ratingOutsideOffense ?></td>
+    <td><?= $player->ratingOutsideDefense ?></td>
+    <td><?= $player->ratingDriveOffense ?></td>
+    <td><?= $player->ratingDriveDefense ?></td>
+    <td><?= $player->ratingPostOffense ?></td>
+    <td><?= $player->ratingPostDefense ?></td>
+    <td><?= $player->ratingTransitionOffense ?></td>
+    <td><?= $player->ratingTransitionDefense ?></td>
+    <td><?= $player->ratingTalent ?></td>
+    <td><?= $player->ratingSkill ?></td>
+    <td><?= $player->ratingIntangibles ?></td>
+    <td><?= $player->ratingClutch ?></td>
+    <td><?= $player->ratingConsistency ?></td>
     <td><?= htmlspecialchars((string)($player->collegeName ?? '')) ?></td>
 </tr>
             <?php
         }
-        
+
         return ob_get_clean();
     }
 
@@ -357,6 +358,6 @@ function resetPlayerSearch() {
      */
     public function renderTableFooter(): string
     {
-        return '</table>';
+        return '</table></div></div>';
     }
 }

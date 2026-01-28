@@ -67,14 +67,12 @@ class TeamController implements TeamControllerInterface
             }
         }
 
-        echo "<table>
-            <tr>
-                <td align=center valign=top>";
-
+        echo "<div style=\"text-align: center;\">";
         echo "<img src=\"./{$imagesPath}logo/$teamID.jpg\">";
-                
+        echo "</div>";
+
         if ($yr != "") {
-            echo "<center><h1>$yr $team->name</h1></center>";
+            echo "<h1 class=\"ibl-title\">$yr $team->name</h1>";
             $insertyear = "&yr=$yr";
         } else {
             $insertyear = "";
@@ -99,30 +97,32 @@ class TeamController implements TeamControllerInterface
         echo "
         <div class=\"team-page-layout\">
             <div class=\"team-page-main\">
-                <table align=center>
-                    <tr>
-                        <td align=center><table><tr>$tabs</tr></table></td>
-                    </tr>
-                    <tr>
-                        <td align=center>$table_output</td>
-                    </tr>
-                    <tr>
-                        <td align=center>$starters_table</td>
-                    </tr>
-                    <tr bgcolor=$team->color1>
-                        <td><span style=\"color: $team->color2; font-weight: bold; display: block; text-align: center;\">Draft Picks</span></td>
-                    </tr>
-                    <tr>
-                        <td>$tableDraftPicks</td>
-                    </tr>
-                </table>
+                <div style=\"text-align: center;\">
+                    <table><tr>$tabs</tr></table>
+                </div>
+                <div class=\"table-scroll-wrapper\">
+                    <div class=\"table-scroll-container\">
+                        $table_output
+                    </div>
+                </div>
+                <div class=\"table-scroll-wrapper\">
+                    <div class=\"table-scroll-container\">
+                        $starters_table
+                    </div>
+                </div>
+                <div style=\"background-color: $team->color1; text-align: center; padding: 4px;\">
+                    <span style=\"color: $team->color2; font-weight: bold;\">Draft Picks</span>
+                </div>
+                <div class=\"table-scroll-wrapper\">
+                    <div class=\"table-scroll-container\">
+                        $tableDraftPicks
+                    </div>
+                </div>
                 <div class=\"team-page-sidebar-mobile\">$team_info_right</div>
                 <div class=\"team-page-rafters\">$rafters</div>
             </div>
             <div class=\"team-page-sidebar\">$team_info_right</div>
         </div>";
-
-        echo "</td></tr></table>";
 
         \Nuke\Footer::footer();
     }

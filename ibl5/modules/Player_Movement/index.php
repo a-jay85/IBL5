@@ -39,14 +39,15 @@ $result = $stmt->get_result();
 Nuke\Header::header();
 
 echo "<script src=\"/ibl5/jslib/sorttable.js\"></script>
-<div style=\"text-align: center;\">
-<h1>Player Transactions Since Last Season</h1>
-<p><em>Click the headings to sort the table</em></p>
-<table style=\"border: 1px solid #000; border-collapse: collapse;\" class=\"sortable\">
+<h2 class=\"ibl-title\">Player Transactions Since Last Season</h2>
+<p style=\"text-align: center;\"><em>Click the headings to sort the table</em></p>
+<div class=\"table-scroll-wrapper\">
+<div class=\"table-scroll-container\">
+<table class=\"sortable ibl-data-table responsive-table\">
 	<tr>
-		<th><strong>Player</strong></th>
-		<th><strong>New Team</strong></th>
-		<th><strong>Old Team</strong></th>
+		<th>Player</th>
+		<th>New Team</th>
+		<th>Old Team</th>
 	</tr>";
 
 while ($row = $result->fetch_assoc()) {
@@ -62,6 +63,6 @@ while ($row = $result->fetch_assoc()) {
 
 $stmt->close();
 
-echo "</table></div>";
+echo "</table></div></div>";
 
 Nuke\Footer::footer();

@@ -87,37 +87,20 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
     {
         ob_start();
         ?>
-<style>
-    .player-awards-results {
-        border: 1px solid #000;
-        border-collapse: collapse;
-    }
-    .player-awards-results th,
-    .player-awards-results td {
-        padding: 4px 8px;
-        text-align: center;
-    }
-    .player-awards-results th {
-        background-color: #e0e0e0;
-        font-weight: bold;
-    }
-    .player-awards-results .row-even {
-        background-color: #ffffff;
-    }
-    .player-awards-results .row-odd {
-        background-color: #e6e7e2;
-    }
-</style>
-
-<table class="player-awards-results">
-    <tr>
-        <td colspan="3" style="text-align: center;"><em>Search Results</em></td>
-    </tr>
-    <tr>
-        <th>Year</th>
-        <th>Player</th>
-        <th>Award</th>
-    </tr>
+<div class="table-scroll-wrapper">
+<div class="table-scroll-container">
+<table class="ibl-data-table">
+    <thead>
+        <tr>
+            <th colspan="3"><em>Search Results</em></th>
+        </tr>
+        <tr>
+            <th>Year</th>
+            <th>Player</th>
+            <th>Award</th>
+        </tr>
+    </thead>
+    <tbody>
         <?php
         return ob_get_clean();
     }
@@ -127,15 +110,13 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
      */
     public function renderAwardRow(array $award, int $rowIndex): string
     {
-        $rowClass = ($rowIndex % 2 === 0) ? 'row-even' : 'row-odd';
-        
         $year = HtmlSanitizer::safeHtmlOutput((string)($award['year'] ?? ''));
         $name = HtmlSanitizer::safeHtmlOutput($award['name'] ?? '');
         $awardName = HtmlSanitizer::safeHtmlOutput($award['Award'] ?? '');
 
         ob_start();
         ?>
-<tr class="<?= $rowClass ?>">
+<tr>
     <td><?= $year ?></td>
     <td><?= $name ?></td>
     <td><?= $awardName ?></td>
@@ -149,6 +130,6 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
      */
     public function renderTableFooter(): string
     {
-        return "</table>\n";
+        return "</tbody></table></div></div>\n";
     }
 }

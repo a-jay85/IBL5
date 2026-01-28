@@ -340,6 +340,7 @@ nav .group > a:hover {
 /* Desktop dropdown links */
 .nav-dropdown-item:link {
     color: #e5e7eb; /* gray-200 */
+    font-family: var(--font-display);
 }
 
 .nav-dropdown-item:visited {
@@ -354,6 +355,7 @@ nav .group > a:hover {
 /* Mobile menu links */
 #nav-mobile-menu a:link {
     color: #e5e7eb; /* gray-200 */
+    font-family: var(--font-display);
 }
 
 #nav-mobile-menu a:visited {

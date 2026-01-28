@@ -137,7 +137,7 @@ class Ratings
             <td><?= htmlspecialchars($player->teamName ?? '') ?></td>
 <?php endif; ?>
             <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
-            <td><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
+            <td style="white-space: nowrap;"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
             <td style="text-align: center;"><?= (int)$player->age ?></td>
             <td class="sep-team"></td>
             <td style="text-align: center;"><?= (int)$player->ratingFieldGoalAttempts ?></td>

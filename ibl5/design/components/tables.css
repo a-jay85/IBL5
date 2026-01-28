@@ -30,10 +30,16 @@
     border-spacing: 0;
     border: none;
     border-radius: var(--radius-lg, 0.5rem);
-    overflow: hidden;
     box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
     width: 100%;
     margin: 0 auto;
+}
+
+/* Clip content to rounded corners, but NOT on responsive tables where
+   overflow: hidden breaks position: sticky on child cells */
+.ibl-data-table:not(.responsive-table),
+.ibl-table:not(.responsive-table) {
+    overflow: hidden;
 }
 
 /* Header row */

@@ -45,7 +45,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     {
         ob_start();
         ?>
-<center><img src="images/logo/<?= (int) $this->team->teamID ?>.jpg"></center>
+<center><img src="images/logo/<?= (int) $this->team->teamID ?>.jpg" width="415" height="50" style="max-width: 100%; height: auto;"></center>
 <p>
 <?= $this->renderPlayersUnderContract() ?>
 <p>

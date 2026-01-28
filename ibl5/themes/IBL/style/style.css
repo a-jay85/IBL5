@@ -2499,11 +2499,10 @@ a.schedule-jump-btn:hover {
   width: fit-content;
 }
 .schedule-team-banner__logo {
-  max-width: 100%;
-  max-height: 180px;
-  width: auto;
+  width: 100%;
+  max-width: 415px;
+  aspect-ratio: 415 / 50;
   height: auto;
-  object-fit: contain;
   border-radius: var(--radius-md);
 }
 @media (max-width: 640px) {
@@ -2513,9 +2512,6 @@ a.schedule-jump-btn:hover {
     border-radius: var(--radius-md);
     margin-left: auto;
     margin-right: auto;
-  }
-  .schedule-team-banner__logo {
-    max-height: 120px;
   }
 }
 .schedule-container--team .schedule-game {
@@ -2551,9 +2547,10 @@ a.schedule-jump-btn:hover {
   margin-bottom: 1.5rem;
 }
 .draft-team-logo {
-  width: 80px;
-  height: 80px;
-  object-fit: contain;
+  width: 100%;
+  max-width: 415px;
+  aspect-ratio: 415 / 50;
+  height: auto;
   margin-bottom: 0.75rem;
 }
 .draft-title {
@@ -2705,7 +2702,9 @@ a.schedule-jump-btn:hover {
   padding: 0 var(--space-2);
 }
 .next-sim-logo img {
-  max-width: 300px;
+  width: 100%;
+  max-width: 415px;
+  aspect-ratio: 415 / 50;
   height: auto;
   border-radius: var(--radius-md);
 }
@@ -2872,7 +2871,9 @@ a.schedule-jump-btn:hover {
   margin-bottom: var(--space-4);
 }
 .depth-chart-logo img {
-  max-width: 120px;
+  width: 100%;
+  max-width: 415px;
+  aspect-ratio: 415 / 50;
   height: auto;
 }
 html:has(.depth-chart-form) {
@@ -2882,7 +2883,7 @@ html:has(.depth-chart-form) {
   max-width: 100%;
   overflow-x: visible;
 }
-.depth-chart-table {
+table.depth-chart-table {
   border-collapse: separate;
   border-spacing: 0;
   border-radius: var(--radius-lg);
@@ -2903,9 +2904,12 @@ html:has(.depth-chart-form) {
   text-align: center;
 }
 table.depth-chart-table td {
-  padding: 0.125rem;
+  padding: 0.25rem;
   text-align: center;
   border-bottom: 1px solid var(--gray-100);
+}
+table.depth-chart-table td:first-child, table.depth-chart-table td:last-child {
+  padding: 0.25rem;
 }
 .depth-chart-table tbody tr:nth-child(odd) {
   background-color: white;
@@ -2914,7 +2918,7 @@ table.depth-chart-table td {
   background-color: var(--gray-50);
 }
 .depth-chart-table select {
-  padding: 0rem;
+  padding: 0.25rem;
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-sm);
   font-size: 0.875rem;

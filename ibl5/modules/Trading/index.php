@@ -66,7 +66,7 @@ function tradeoffer($username)
     echo "<form name=\"Trade_Offer\" method=\"post\" action=\"/ibl5/modules/Trading/maketradeoffer.php\">
 		<input type=\"hidden\" name=\"offeringTeam\" value=\"$teamlogo\">
 		<center>
-			<img src=\"images/logo/$teamID.jpg\"><br>
+			<img src=\"images/logo/$teamID.jpg\" width=\"415\" height=\"50\" style=\"max-width: 100%; height: auto;\"><br>
 			<table border=1 cellspacing=0 cellpadding=5>
 				<tr>
 					<th colspan=4><center>TRADING MENU</center></th>
@@ -210,7 +210,7 @@ function tradereview($username)
     OpenTable();
     UI::displaytopmenu($mysqli_db, $teamID);
 
-    echo "<center><img src=\"images/logo/$teamID.jpg\"><br>";
+    echo "<center><img src=\"images/logo/$teamID.jpg\" width=\"415\" height=\"50\" style=\"max-width: 100%; height: auto;\"><br>";
 
     $sql3 = "SELECT * FROM ibl_trade_info ORDER BY tradeofferid ASC";
     $result3 = $mysqli_db->query($sql3);

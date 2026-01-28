@@ -211,7 +211,7 @@ function userinfo($username)
     $formAction = ($season->phase == "Regular Season") ? "modules/Voting/ASGVote.php" : "modules/Voting/EOYVote.php";
     echo "<form name=\"$formName\" method=\"post\" action=\"$formAction\">
 		<center>
-			<img src=\"images/logo/$tid.jpg\"><br><br>";
+			<img src=\"images/logo/$tid.jpg\" width=\"415\" height=\"50\" style=\"max-width: 100%; height: auto;\"><br><br>";
 
     echo "<input type=\"submit\" value=\"Submit Votes!\">";
 

@@ -14,7 +14,7 @@ class Footer
         $mtime = $mtime[1] + $mtime[0];
         $end_time = $mtime;
         $total_time = ($end_time - $start_time);
-        $total_time = _PAGEGENERATION . " " . substr($total_time, 0, 4) . " " . _SECONDS;
+        $total_time = _PAGEGENERATION . " " . substr((string) $total_time, 0, 4) . " " . _SECONDS;
 
         $footmsg = "<div class=\"site-footer\">\n";
         $footmsg .= "<p class=\"page-time\">" . $total_time . "</p>\n";

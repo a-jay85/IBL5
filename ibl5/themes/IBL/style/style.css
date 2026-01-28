@@ -2032,6 +2032,14 @@ img {
   .table-scroll-wrapper {
     width: fit-content;
     max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .table-scroll-wrapper ~ .ibl-title, .ibl-title:has(+ .table-scroll-wrapper), h2.ibl-title {
+    display: block;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
   }
 }
 .table-scroll-container {

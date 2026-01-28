@@ -39,7 +39,7 @@
 /* Header row */
 .ibl-data-table thead,
 .ibl-table thead {
-    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+    background: var(--gradient-navy-header);
 }
 
 .ibl-data-table th,
@@ -127,15 +127,19 @@
     white-space: nowrap;
 }
 
-/* Highlight row */
-.ibl-data-table tbody tr.highlight,
-.ibl-table tbody tr.highlight {
-    background-color: var(--accent-100, #ffedd5) !important;
+/* Highlight row - use :nth-child for higher specificity without !important */
+.ibl-data-table tbody tr.highlight:nth-child(odd),
+.ibl-data-table tbody tr.highlight:nth-child(even),
+.ibl-table tbody tr.highlight:nth-child(odd),
+.ibl-table tbody tr.highlight:nth-child(even) {
+    background-color: var(--accent-100, #ffedd5);
 }
 
-.ibl-data-table tbody tr.highlight:hover,
-.ibl-table tbody tr.highlight:hover {
-    background-color: var(--accent-200, #fed7aa) !important;
+.ibl-data-table tbody tr.highlight:nth-child(odd):hover,
+.ibl-data-table tbody tr.highlight:nth-child(even):hover,
+.ibl-table tbody tr.highlight:nth-child(odd):hover,
+.ibl-table tbody tr.highlight:nth-child(even):hover {
+    background-color: var(--accent-200, #fed7aa);
 }
 
 /* Drafted/disabled row */
@@ -158,16 +162,20 @@
     padding: 0;
 }
 
-/* Totals/summary row */
-.ibl-data-table .totals-row,
-.ibl-table .totals-row {
-    background-color: var(--accent-100, #ffedd5) !important;
+/* Totals/summary row - use :nth-child for higher specificity without !important */
+.ibl-data-table tbody tr.totals-row:nth-child(odd),
+.ibl-data-table tbody tr.totals-row:nth-child(even),
+.ibl-table tbody tr.totals-row:nth-child(odd),
+.ibl-table tbody tr.totals-row:nth-child(even) {
+    background-color: var(--accent-100, #ffedd5);
     font-weight: 600;
 }
 
-.ibl-data-table .totals-row:hover,
-.ibl-table .totals-row:hover {
-    background-color: var(--accent-200, #fed7aa) !important;
+.ibl-data-table tbody tr.totals-row:nth-child(odd):hover,
+.ibl-data-table tbody tr.totals-row:nth-child(even):hover,
+.ibl-table tbody tr.totals-row:nth-child(odd):hover,
+.ibl-table tbody tr.totals-row:nth-child(even):hover {
+    background-color: var(--accent-200, #fed7aa);
 }
 
 /* ==========================================================================
@@ -199,22 +207,20 @@
 
     .ibl-data-table.responsive-table thead th.sticky-col,
     .ibl-table.responsive-table thead th.sticky-col {
-        background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+        background: var(--gradient-navy-header);
         z-index: 3;
     }
 
-    .ibl-data-table.responsive-table tbody tr:nth-child(odd) td.sticky-col,
-    .ibl-table.responsive-table tbody tr:nth-child(odd) td.sticky-col {
+    /* Sticky column backgrounds - consolidated for all variants */
+    .responsive-table tbody tr:nth-child(odd) td[class*="sticky-col"] {
         background-color: white;
     }
 
-    .ibl-data-table.responsive-table tbody tr:nth-child(even) td.sticky-col,
-    .ibl-table.responsive-table tbody tr:nth-child(even) td.sticky-col {
+    .responsive-table tbody tr:nth-child(even) td[class*="sticky-col"] {
         background-color: var(--gray-50, #f9fafb);
     }
 
-    .ibl-data-table.responsive-table tbody tr:hover td.sticky-col,
-    .ibl-table.responsive-table tbody tr:hover td.sticky-col {
+    .responsive-table tbody tr:hover td[class*="sticky-col"] {
         background-color: var(--gray-100, #f3f4f6);
     }
 
@@ -248,30 +254,11 @@
     .ibl-data-table.responsive-table thead th.sticky-col-2,
     .ibl-table.responsive-table thead th.sticky-col-1,
     .ibl-table.responsive-table thead th.sticky-col-2 {
-        background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+        background: var(--gradient-navy-header);
         z-index: 3;
     }
 
-    .ibl-data-table.responsive-table tbody tr:nth-child(odd) td.sticky-col-1,
-    .ibl-data-table.responsive-table tbody tr:nth-child(odd) td.sticky-col-2,
-    .ibl-table.responsive-table tbody tr:nth-child(odd) td.sticky-col-1,
-    .ibl-table.responsive-table tbody tr:nth-child(odd) td.sticky-col-2 {
-        background-color: white;
-    }
-
-    .ibl-data-table.responsive-table tbody tr:nth-child(even) td.sticky-col-1,
-    .ibl-data-table.responsive-table tbody tr:nth-child(even) td.sticky-col-2,
-    .ibl-table.responsive-table tbody tr:nth-child(even) td.sticky-col-1,
-    .ibl-table.responsive-table tbody tr:nth-child(even) td.sticky-col-2 {
-        background-color: var(--gray-50, #f9fafb);
-    }
-
-    .ibl-data-table.responsive-table tbody tr:hover td.sticky-col-1,
-    .ibl-data-table.responsive-table tbody tr:hover td.sticky-col-2,
-    .ibl-table.responsive-table tbody tr:hover td.sticky-col-1,
-    .ibl-table.responsive-table tbody tr:hover td.sticky-col-2 {
-        background-color: var(--gray-100, #f3f4f6);
-    }
+    /* Background colors now handled by consolidated rules above */
 
     /* Shadow only on rightmost sticky column */
     .ibl-data-table.responsive-table th.sticky-col-1,
@@ -286,13 +273,8 @@
         box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
     }
 
-    /* Drafted row sticky backgrounds */
-    .ibl-data-table.responsive-table tbody tr.drafted td.sticky-col,
-    .ibl-data-table.responsive-table tbody tr.drafted td.sticky-col-1,
-    .ibl-data-table.responsive-table tbody tr.drafted td.sticky-col-2,
-    .ibl-table.responsive-table tbody tr.drafted td.sticky-col,
-    .ibl-table.responsive-table tbody tr.drafted td.sticky-col-1,
-    .ibl-table.responsive-table tbody tr.drafted td.sticky-col-2 {
+    /* Drafted row sticky backgrounds - consolidated */
+    .responsive-table tbody tr.drafted td[class*="sticky-col"] {
         background-color: var(--gray-100, #f3f4f6);
     }
 
@@ -328,7 +310,7 @@
    ========================================================================== */
 
 .ibl-table-header {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    background: var(--gradient-navy-header);
     padding: var(--space-3) var(--space-4);
     color: white;
 }
@@ -350,12 +332,14 @@
    Table Row Variants
    ========================================================================== */
 
-.ibl-table-row--highlight {
-    background-color: var(--accent-100) !important;
+.ibl-table-row--highlight:nth-child(odd),
+.ibl-table-row--highlight:nth-child(even) {
+    background-color: var(--accent-100);
 }
 
-.ibl-table-row--user-team {
-    background-color: #ffffcc !important;
+.ibl-table-row--user-team:nth-child(odd),
+.ibl-table-row--user-team:nth-child(even) {
+    background-color: #ffffcc;
 }
 
 .ibl-table-row--winner {
@@ -808,7 +792,7 @@
 }
 
 .ibl-btn--primary {
-    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+    background: var(--gradient-navy-header);
     color: white;
 }
 

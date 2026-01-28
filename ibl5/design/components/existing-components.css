@@ -98,7 +98,7 @@
 }
 
 .stat-card__header {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    background: var(--gradient-navy-header);
     padding: var(--space-3) var(--space-4);
     display: flex;
     align-items: center;
@@ -900,7 +900,7 @@
 
 /* Transaction-specific styling */
 .news-article--transaction .news-article__header {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    background: var(--gradient-navy-header);
     border-bottom: none;
 }
 
@@ -1234,7 +1234,7 @@
 
     /* Header sticky cells */
     .responsive-table thead th.sticky-col {
-        background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+        background: var(--gradient-navy-header);
         z-index: 3;
     }
 
@@ -1298,7 +1298,7 @@
     /* Header backgrounds for multi-sticky */
     .responsive-table thead th.sticky-col-1,
     .responsive-table thead th.sticky-col-2 {
-        background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+        background: var(--gradient-navy-header);
         z-index: 3;
     }
 
@@ -1935,7 +1935,7 @@ a.schedule-jump-btn:hover {
 }
 
 .draft-pick-table th {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    background: var(--gradient-navy-header);
     color: white;
     font-family: var(--font-display);
     font-weight: 600;
@@ -2109,7 +2109,7 @@ a.schedule-jump-btn:hover {
 }
 
 .power-rankings-title {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    background: var(--gradient-navy-header);
     padding: 0.875rem 1rem;
     margin: 0;
     font-family: var(--font-display);
@@ -2195,7 +2195,7 @@ a.schedule-jump-btn:hover {
 }
 
 .waivers-form-header {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    background: var(--gradient-navy-header);
     padding: var(--space-3) var(--space-4);
     color: white;
     font-family: var(--font-display);
@@ -2286,7 +2286,7 @@ table.depth-chart-table {
 }
 
 .depth-chart-table th {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    background: var(--gradient-navy-header);
     color: white;
     font-family: var(--font-display);
     font-weight: 600;
@@ -2371,7 +2371,7 @@ table.depth-chart-table td:last-child {
 }
 
 .compare-players-table th {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    background: var(--gradient-navy-header);
     color: white;
     font-family: var(--font-display);
     font-weight: 600;
@@ -2432,7 +2432,7 @@ table.depth-chart-table td:last-child {
 }
 
 .league-stats-table th {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    background: var(--gradient-navy-header);
     color: white;
     font-family: var(--font-display);
     font-weight: 600;

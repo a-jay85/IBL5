@@ -30,7 +30,7 @@
 
 /* Card Header */
 .ibl-card__header {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    background: var(--gradient-navy-header);
     padding: var(--space-3) var(--space-4);
     color: white;
 }
@@ -89,7 +89,7 @@
 }
 
 .ibl-stat-card__header {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    background: var(--gradient-navy-header);
     padding: var(--space-3) var(--space-4);
     display: flex;
     align-items: center;
@@ -146,7 +146,7 @@
 }
 
 .ibl-sidebar-block__header {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    background: var(--gradient-navy-header);
     padding: var(--space-3) var(--space-4);
 }
 
@@ -184,7 +184,7 @@
 }
 
 .ibl-centerbox__header {
-    background: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    background: var(--gradient-navy-header);
     padding: var(--space-4) var(--space-6);
     text-align: center;
 }

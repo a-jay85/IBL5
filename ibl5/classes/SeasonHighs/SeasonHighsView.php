@@ -105,6 +105,10 @@ class SeasonHighsView implements SeasonHighsViewInterface
             if (isset($row['pid'])) {
                 $pid = (int) $row['pid'];
                 $name = "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a>";
+            } elseif (isset($row['teamid'])) {
+                // Link team names to their team page when teamid is available
+                $teamId = (int) $row['teamid'];
+                $name = "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$teamId}\">{$name}</a>";
             }
 
             $output .= "<tr>

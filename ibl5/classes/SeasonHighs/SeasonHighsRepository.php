@@ -41,11 +41,12 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 ORDER BY `{$safeStatName}` DESC, bs.`Date` ASC
                 LIMIT {$limit}";
         } else {
-            // For team stats, use the box_scores table name directly
-            $query = "SELECT `name`, `Date` AS `date`, {$statExpression} AS `{$safeStatName}`
-                FROM ibl_box_scores{$tableSuffix}
-                WHERE `Date` BETWEEN ? AND ?
-                ORDER BY `{$safeStatName}` DESC, `Date` ASC
+            // For team stats, JOIN with ibl_team_info to get team ID for linking
+            $query = "SELECT t.`teamid`, bs.`name`, bs.`Date` AS `date`, {$statExpression} AS `{$safeStatName}`
+                FROM ibl_box_scores{$tableSuffix} bs
+                JOIN ibl_team_info t ON bs.name = t.team_name
+                WHERE bs.`Date` BETWEEN ? AND ?
+                ORDER BY `{$safeStatName}` DESC, bs.`Date` ASC
                 LIMIT {$limit}";
         }
 
@@ -62,6 +63,10 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
             // Include pid for player stats (used for profile links)
             if (isset($row['pid'])) {
                 $entry['pid'] = (int) $row['pid'];
+            }
+            // Include teamid for team stats (used for team page links)
+            if (isset($row['teamid'])) {
+                $entry['teamid'] = (int) $row['teamid'];
             }
             $normalized[] = $entry;
         }

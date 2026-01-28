@@ -37,6 +37,8 @@ $(function() {
     });
 });
 </script>
+<div class="table-scroll-wrapper">
+<div class="table-scroll-container">
 <form action="modules.php?name=Compare_Players" method="POST">
     <div class="ui-widget">
         <label for="Player1">Player 1: </label>
@@ -46,6 +48,8 @@ $(function() {
     </div>
     <input type="submit" value="Compare">
 </form>
+</div>
+</div>
         <?php
         return ob_get_clean();
     }
@@ -60,15 +64,15 @@ $(function() {
 
         ob_start();
         ?>
-<table class="sortable compare-players-table ibl-data-table">
-    <caption>
-        <strong>Current Ratings</strong>
-    </caption>
+<h2 class="ibl-title">Current Ratings</h2>
+<div class="table-scroll-wrapper">
+<div class="table-scroll-container">
+<table class="sortable compare-players-table ibl-data-table responsive-table">
     <colgroup>
         <col span="3">
-        <col span="6" style="background-color: #ddd">
+        <col span="6" class="compare-highlight-cols">
         <col span="7">
-        <col span="4" style="background-color: #ddd">
+        <col span="4" class="compare-highlight-cols">
         <col span="4">
     </colgroup>
     <thead>
@@ -101,69 +105,69 @@ $(function() {
     </thead>
     <tbody>
         <tr>
-            <th><?= htmlspecialchars($player1['pos']) ?></th>
-            <th><?= htmlspecialchars($player1['name']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['age']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['r_fga']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['r_fgp']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['r_fta']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['r_ftp']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['r_tga']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['r_tgp']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['r_orb']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['r_drb']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['r_ast']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['r_stl']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['r_to']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['r_blk']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['r_foul']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['oo']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['do']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['po']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['to']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['od']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['dd']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['pd']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['td']) ?></th>
+            <td><?= htmlspecialchars($player1['pos']) ?></td>
+            <td><?= htmlspecialchars($player1['name']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['age']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['r_fga']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['r_fgp']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['r_fta']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['r_ftp']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['r_tga']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['r_tgp']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['r_orb']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['r_drb']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['r_ast']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['r_stl']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['r_to']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['r_blk']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['r_foul']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['oo']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['do']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['po']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['to']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['od']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['dd']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['pd']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['td']) ?></td>
         </tr>
         <tr>
-            <th><?= htmlspecialchars($player2['pos']) ?></th>
-            <th><?= htmlspecialchars($player2['name']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['age']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['r_fga']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['r_fgp']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['r_fta']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['r_ftp']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['r_tga']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['r_tgp']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['r_orb']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['r_drb']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['r_ast']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['r_stl']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['r_to']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['r_blk']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['r_foul']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['oo']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['do']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['po']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['to']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['od']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['dd']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['pd']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['td']) ?></th>
+            <td><?= htmlspecialchars($player2['pos']) ?></td>
+            <td><?= htmlspecialchars($player2['name']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['age']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['r_fga']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['r_fgp']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['r_fta']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['r_ftp']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['r_tga']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['r_tgp']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['r_orb']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['r_drb']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['r_ast']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['r_stl']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['r_to']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['r_blk']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['r_foul']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['oo']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['do']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['po']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['to']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['od']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['dd']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['pd']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['td']) ?></td>
         </tr>
     </tbody>
 </table>
+</div>
+</div>
 
-<p>
-
-<table class="sortable compare-players-table ibl-data-table">
-    <caption>
-        <strong>Current Season Stats</strong>
-    </caption>
+<h2 class="ibl-title">Current Season Stats</h2>
+<div class="table-scroll-wrapper">
+<div class="table-scroll-container">
+<table class="sortable compare-players-table ibl-data-table responsive-table">
     <colgroup>
         <col span="5">
-        <col span="6" style="background-color: #ddd">
+        <col span="6" class="compare-highlight-cols">
         <col span="8">
     </colgroup>
     <thead>
@@ -191,59 +195,59 @@ $(function() {
     </thead>
     <tbody>
         <tr>
-            <th><?= htmlspecialchars($player1['pos']) ?></th>
-            <th><?= htmlspecialchars($player1['name']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_gm']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_gs']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_min']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_fgm']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_fga']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_ftm']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_fta']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_3gm']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_3ga']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_orb']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_drb']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_ast']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_stl']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_to']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_blk']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['stats_pf']) ?></th>
-            <th><?= (2 * $player1['stats_fgm'] + $player1['stats_ftm'] + $player1['stats_3gm']) ?></th>
+            <td><?= htmlspecialchars($player1['pos']) ?></td>
+            <td><?= htmlspecialchars($player1['name']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_gm']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_gs']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_min']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_fgm']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_fga']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_ftm']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_fta']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_3gm']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_3ga']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_orb']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_drb']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_ast']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_stl']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_to']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_blk']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['stats_pf']) ?></td>
+            <td><?= (2 * $player1['stats_fgm'] + $player1['stats_ftm'] + $player1['stats_3gm']) ?></td>
         </tr>
         <tr>
-            <th><?= htmlspecialchars($player2['pos']) ?></th>
-            <th><?= htmlspecialchars($player2['name']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_gm']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_gs']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_min']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_fgm']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_fga']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_ftm']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_fta']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_3gm']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_3ga']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_orb']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_drb']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_ast']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_stl']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_to']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_blk']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['stats_pf']) ?></th>
-            <th><?= (2 * $player2['stats_fgm'] + $player2['stats_ftm'] + $player2['stats_3gm']) ?></th>
+            <td><?= htmlspecialchars($player2['pos']) ?></td>
+            <td><?= htmlspecialchars($player2['name']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_gm']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_gs']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_min']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_fgm']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_fga']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_ftm']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_fta']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_3gm']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_3ga']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_orb']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_drb']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_ast']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_stl']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_to']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_blk']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['stats_pf']) ?></td>
+            <td><?= (2 * $player2['stats_fgm'] + $player2['stats_ftm'] + $player2['stats_3gm']) ?></td>
         </tr>
     </tbody>
 </table>
+</div>
+</div>
 
-<p>
-
-<table class="sortable compare-players-table ibl-data-table">
-    <caption>
-        <strong>Career Stats</strong>
-    </caption>
+<h2 class="ibl-title">Career Stats</h2>
+<div class="table-scroll-wrapper">
+<div class="table-scroll-container">
+<table class="sortable compare-players-table ibl-data-table responsive-table">
     <colgroup>
         <col span="4">
-        <col span="6" style="background-color: #ddd">
+        <col span="6" class="compare-highlight-cols">
         <col span="8">
     </colgroup>
     <thead>
@@ -271,49 +275,51 @@ $(function() {
     </thead>
     <tbody>
         <tr>
-            <th><?= htmlspecialchars($player1['pos']) ?></th>
-            <th><?= htmlspecialchars($player1['name']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_gm']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_min']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_fgm']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_fga']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_ftm']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_fta']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_tgm']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_tga']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_orb']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_drb']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_reb']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_ast']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_stl']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_to']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_blk']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_pf']) ?></th>
-            <th><?= htmlspecialchars((string)$player1['car_pts']) ?></th>
+            <td><?= htmlspecialchars($player1['pos']) ?></td>
+            <td><?= htmlspecialchars($player1['name']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_gm']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_min']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_fgm']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_fga']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_ftm']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_fta']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_tgm']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_tga']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_orb']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_drb']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_reb']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_ast']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_stl']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_to']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_blk']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_pf']) ?></td>
+            <td><?= htmlspecialchars((string)$player1['car_pts']) ?></td>
         </tr>
         <tr>
-            <th><?= htmlspecialchars($player2['pos']) ?></th>
-            <th><?= htmlspecialchars($player2['name']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_gm']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_min']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_fgm']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_fga']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_ftm']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_fta']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_tgm']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_tga']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_orb']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_drb']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_reb']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_ast']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_stl']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_to']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_blk']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_pf']) ?></th>
-            <th><?= htmlspecialchars((string)$player2['car_pts']) ?></th>
+            <td><?= htmlspecialchars($player2['pos']) ?></td>
+            <td><?= htmlspecialchars($player2['name']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_gm']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_min']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_fgm']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_fga']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_ftm']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_fta']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_tgm']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_tga']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_orb']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_drb']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_reb']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_ast']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_stl']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_to']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_blk']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_pf']) ?></td>
+            <td><?= htmlspecialchars((string)$player2['car_pts']) ?></td>
         </tr>
     </tbody>
 </table>
+</div>
+</div>
         <?php
         return ob_get_clean();
     }

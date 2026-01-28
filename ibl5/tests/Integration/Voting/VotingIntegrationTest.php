@@ -424,8 +424,9 @@ class VotingIntegrationTest extends IntegrationTestCase
         // Act
         $html = $this->renderer->renderTables($tables);
 
-        // Assert - Alternating background colors
-        $this->assertStringContainsString('#f8f9fb', $html);
+        // Assert - CSS handles alternating row styles via ibl-data-table class
+        $this->assertStringContainsString('ibl-data-table', $html);
+        $this->assertStringContainsString('<tbody>', $html);
     }
 
     // ========== XSS PROTECTION TESTS ==========
@@ -769,7 +770,8 @@ class VotingIntegrationTest extends IntegrationTestCase
         $html = $this->renderer->renderTables($tables);
 
         // Assert
-        $this->assertStringContainsString('class="sortable"', $html);
+        $this->assertStringContainsString('sortable', $html);
+        $this->assertStringContainsString('ibl-data-table', $html);
     }
 
     /**
@@ -787,8 +789,9 @@ class VotingIntegrationTest extends IntegrationTestCase
         // Act
         $html = $this->renderer->renderTables($tables);
 
-        // Assert
-        $this->assertStringContainsString('text-align: center', $html);
+        // Assert - Uses ibl-title class for centering
+        $this->assertStringContainsString('class="ibl-title"', $html);
+        $this->assertStringContainsString('Centered Title', $html);
     }
 
     // ========== HELPER METHODS ==========

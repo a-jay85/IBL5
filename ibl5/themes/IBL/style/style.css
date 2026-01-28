@@ -2500,6 +2500,9 @@ a.schedule-jump-btn:hover {
   .schedule-game__record {
     display: none;
   }
+  .schedule-game__team-link {
+    display: none;
+  }
   .schedule-game__logo {
     width: 14px;
     height: 14px;
@@ -3381,6 +3384,11 @@ table.sortable thead th {
 }
 .ibl-team-cell--colored .ibl-team-cell__name:hover {
   opacity: 0.85;
+}
+@media (max-width: 768px) {
+  .ibl-team-cell__text {
+    display: none;
+  }
 }
 .ibl-player-cell {
   display: flex;

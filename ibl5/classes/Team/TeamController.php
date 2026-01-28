@@ -70,9 +70,7 @@ class TeamController implements TeamControllerInterface
         echo "<table>
             <tr>
                 <td align=center valign=top>";
-                
-        \UI::displaytopmenu($this->db, $teamID);
-                
+
         echo "<img src=\"./{$imagesPath}logo/$teamID.jpg\">";
                 
         if ($yr != "") {
@@ -135,9 +133,6 @@ class TeamController implements TeamControllerInterface
     public function displayMenu(): void
     {
         \Nuke\Header::header();
-
-        \UI::displaytopmenu($this->db, 0);
-
         \Nuke\Footer::footer();
     }
 }

@@ -88,7 +88,6 @@ class WaiversView implements WaiversViewInterface
     public function renderNotLoggedIn(string $message): void
     {
         \Nuke\Header::header();
-        \UI::displaytopmenu($GLOBALS['db'], 0);
         echo '<div class="text-center"><strong class="ibl-title">' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</strong></div>';
         loginbox();
         \Nuke\Footer::footer();
@@ -100,7 +99,6 @@ class WaiversView implements WaiversViewInterface
     public function renderWaiversClosed(): void
     {
         \Nuke\Header::header();
-        \UI::displaytopmenu($GLOBALS['db'], 0);
         echo "Sorry, but players may not be added from or dropped to waivers at the present time.";
         \Nuke\Footer::footer();
     }

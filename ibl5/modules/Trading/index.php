@@ -15,9 +15,6 @@ function menu()
 
     Nuke\Header::header();
     OpenTable();
-
-    UI::displaytopmenu($mysqli_db, 0);
-
     CloseTable();
     Nuke\Footer::footer();
 }
@@ -48,7 +45,6 @@ function tradeoffer($username)
 
     Nuke\Header::header();
     OpenTable();
-    UI::displaytopmenu($mysqli_db, $teamID);
 
     $queryUserTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM ibl_plr
@@ -208,7 +204,6 @@ function tradereview($username)
 
     Nuke\Header::header();
     OpenTable();
-    UI::displaytopmenu($mysqli_db, $teamID);
 
     echo "<center><img src=\"images/logo/$teamID.jpg\" width=\"415\" height=\"50\" style=\"max-width: 100%; height: auto;\"><br>";
 
@@ -365,7 +360,6 @@ function reviewtrade($user)
         }
         if (!is_user($user)) {
             OpenTable();
-            UI::displaytopmenu($mysqli_db, 0);
             loginbox();
             CloseTable();
         }
@@ -378,7 +372,6 @@ function reviewtrade($user)
         } else {
             Nuke\Header::header();
             OpenTable();
-            UI::displaytopmenu($mysqli_db, 0);
             echo "Sorry, but trades are not allowed right now.";
             if ($season->allowWaivers == 'Yes') {
                 echo "<br>
@@ -409,7 +402,6 @@ function offertrade($user)
         }
         if (!is_user($user)) {
             OpenTable();
-            UI::displaytopmenu($mysqli_db, 0); // Default to Free Agents for login screen
             loginbox();
             CloseTable();
         }

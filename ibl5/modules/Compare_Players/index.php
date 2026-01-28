@@ -52,7 +52,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
 
     Nuke\Header::header();
     OpenTable();
-    UI::displaytopmenu($mysqli_db, $tid);
 
     // Initialize compare players classes
     $repository = new \ComparePlayers\ComparePlayersRepository($mysqli_db);

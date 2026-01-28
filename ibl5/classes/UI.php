@@ -9,7 +9,6 @@ declare(strict_types=1);
  * All methods are preserved for backward compatibility.
  *
  * @see UI\DebugOutput
- * @see UI\TopMenu
  * @see UI\PlayerMenu
  * @see UI\TableStyles
  * @see UI\Tables\Contracts
@@ -31,18 +30,6 @@ class UI
     public static function displayDebugOutput($content, $title = 'Debug Output'): void
     {
         UI\DebugOutput::display($content, $title);
-    }
-
-    /**
-     * Display the top menu with team navigation
-     *
-     * @param \mysqli $db Mysqli database connection
-     * @param int $teamID Current team ID (defaults to Free Agents)
-     * @return void
-     */
-    public static function displaytopmenu(\mysqli $db, $teamID = League::FREE_AGENTS_TEAMID): void
-    {
-        UI\TopMenu::display($db, $teamID);
     }
 
     /**

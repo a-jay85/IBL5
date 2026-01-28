@@ -214,8 +214,7 @@ class WaiversController implements WaiversControllerInterface
         \Nuke\Header::header();
 
         $team = \Team::initialize($this->db, $userInfo['user_ibl_team']);
-        \UI::displaytopmenu($this->db, $team->teamID);
-        
+
         $season = new \Season($this->db);
         $players = $this->getPlayersForAction($team, $action);
         

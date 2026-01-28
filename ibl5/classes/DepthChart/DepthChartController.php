@@ -38,7 +38,6 @@ class DepthChartController implements DepthChartControllerInterface
         $team = \Team::initialize($this->db, $teamID);
         
         \Nuke\Header::header();
-        \UI::displaytopmenu($this->db, $teamID);
 
         $this->view->renderTeamLogo($teamID);
         

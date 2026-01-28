@@ -52,8 +52,6 @@ function display()
     $teamName = $commonRepository->getTeamnameFromUsername($username);
     $team = Team::initialize($mysqli_db, $teamName);
 
-    UI::displaytopmenu($mysqli_db, $team->teamID);
-
     $displayHelper = new FreeAgencyDisplayHelper($mysqli_db, $team, $season);
     echo $displayHelper->renderMainPage();
 

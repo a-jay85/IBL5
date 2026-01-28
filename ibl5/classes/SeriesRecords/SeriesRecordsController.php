@@ -38,7 +38,6 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
     public function displaySeriesRecords(int $userTeamId): void
     {
         \Nuke\Header::header();
-        \UI::displaytopmenu($this->db, $userTeamId);
 
         // Get all teams and series records
         $teams = $this->repository->getTeamsForSeriesRecords();

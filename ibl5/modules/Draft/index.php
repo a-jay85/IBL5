@@ -37,8 +37,6 @@ function userinfo($username)
     $teamlogo = $userinfo['user_ibl_team'];
     $tid = $commonRepository->getTidFromTeamname($teamlogo);
 
-    UI::displaytopmenu($mysqli_db, $tid);
-
     // Get current draft pick information
     $currentPick = $repository->getCurrentDraftPick();
 

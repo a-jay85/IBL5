@@ -2028,6 +2028,12 @@ img {
   position: relative;
   margin-bottom: 1rem;
 }
+@media (min-width: 769px) {
+  .table-scroll-wrapper {
+    width: fit-content;
+    max-width: 100%;
+  }
+}
 .table-scroll-container {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -3096,7 +3102,7 @@ table.sortable thead th {
   border-radius: var(--radius-lg, 0.5rem);
   overflow: hidden;
   box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
-  width: 100%;
+  width: auto;
   margin: 0 auto;
 }
 .ibl-data-table thead, .ibl-table thead {

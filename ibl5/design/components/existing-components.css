@@ -1123,6 +1123,14 @@
     margin-bottom: 1rem;
 }
 
+/* On desktop, constrain tables to fit content (not full width on ultrawide) */
+@media (min-width: 769px) {
+    .table-scroll-wrapper {
+        width: fit-content;
+        max-width: 100%;
+    }
+}
+
 /* Scroll container for wide tables on mobile */
 .table-scroll-container {
     overflow-x: auto;

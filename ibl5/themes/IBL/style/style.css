@@ -3400,6 +3400,65 @@ table.sortable thead th {
 .ibl-grid .stat-table {
   width: 100%;
 }
+.injury-days-tooltip {
+  position: relative;
+  cursor: help;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--gray-400, #9ca3af);
+  text-underline-offset: 2px;
+}
+.injury-days-tooltip[title] {
+  position: relative;
+}
+.injury-days-tooltip::after {
+  content: attr(title);
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  transform: translateY(-50%);
+  padding: 0.375rem 0.625rem;
+  background-color: var(--navy-900, #0f172a);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: var(--radius-sm, 0.25rem);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 150ms ease, visibility 150ms ease;
+  z-index: 100;
+  pointer-events: none;
+  margin-right: 8px;
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
+}
+.injury-days-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-left-color: var(--navy-900, #0f172a);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 150ms ease, visibility 150ms ease;
+  z-index: 100;
+  margin-right: -2px;
+}
+.injury-days-tooltip:hover::after, .injury-days-tooltip:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+.injury-days-tooltip:focus::after, .injury-days-tooltip:focus::before {
+  opacity: 1;
+  visibility: visible;
+}
+.injury-days-tooltip:focus {
+  outline: none;
+  background-color: var(--accent-100, #ffedd5);
+  border-radius: var(--radius-sm, 0.25rem);
+}
 .ibl-card {
   font-family: var(--font-sans);
   background: white;
@@ -4146,41 +4205,6 @@ nav .group > a:hover {
 }
 #nav-mobile-menu > div > a:link, #nav-mobile-menu > div > a:visited {
   color: #ffffff;
-}
-.team-subnav {
-  text-align: center;
-  margin: 0 auto 1rem;
-}
-.team-subnav__selects {
-  margin-bottom: 1rem;
-}
-.team-subnav__label {
-  margin: 0.5rem 0;
-}
-.team-subnav__buttons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.25rem;
-}
-.team-subnav__btn-wrap {
-  white-space: nowrap;
-}
-.team-subnav__divider {
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.875rem;
-}
-.team-subnav__btn {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.75rem;
-  text-decoration: none;
-  padding: 2px 6px;
-  border: 1px solid #000;
 }
 .player-menu-dropdown {
   width: 50%;

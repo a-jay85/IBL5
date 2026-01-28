@@ -57,15 +57,14 @@ class Ratings
                 $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
             }
 
-            $injuryInfo = $player->getInjuryReturnDate($season->lastSimEndDate);
-            if ($injuryInfo != "") {
-                $injuryInfo .= " ($player->daysRemainingForInjury days)";
-            }
+            $injuryReturnDate = $player->getInjuryReturnDate($season->lastSimEndDate);
+            $injuryDays = $player->daysRemainingForInjury;
 
             $playerRows[] = [
                 'player' => $player,
                 'bgcolor' => $bgcolor,
-                'injuryInfo' => $injuryInfo,
+                'injuryDays' => $injuryDays,
+                'injuryReturnDate' => $injuryReturnDate,
                 'addSeparator' => (($i % 2) == 0 && $moduleName == "Next_Sim" && $i > 0),
             ];
 
@@ -119,7 +118,7 @@ class Ratings
             <th>Clu</th>
             <th>Con</th>
             <th class="sep-team"></th>
-            <th>Injury Return Date</th>
+            <th>Days Injured</th>
         </tr>
     </thead>
     <tbody>
@@ -171,7 +170,7 @@ class Ratings
             <td style="text-align: center;"><?= (int)$player->ratingClutch ?></td>
             <td style="text-align: center;"><?= (int)$player->ratingConsistency ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= htmlspecialchars($row['injuryInfo']) ?></td>
+            <td style="text-align: center;"><?php if ($row['injuryDays'] > 0): ?><span class="injury-days-tooltip" title="Returns: <?= htmlspecialchars($row['injuryReturnDate']) ?>" tabindex="0"><?= (int)$row['injuryDays'] ?></span><?php endif; ?></td>
         </tr>
 <?php endforeach; ?>
     </tbody>

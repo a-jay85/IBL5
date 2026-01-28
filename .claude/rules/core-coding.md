@@ -59,6 +59,7 @@ if (!$validator->validateX(...)) {
 | MLE/LLE flags | `HasMLE === '1'`, `HasLLE === '1'` (strings) |
 | Equality checks | Always `===`/`!==`, never `==`/`!=` |
 | Division guards | Use `=== 0` or `=== 0.0`, not `== 0` |
+| Sticky columns + overflow | Never set `overflow: hidden` on a table that uses `position: sticky` cells — it breaks sticky. Use `.ibl-data-table:not(.responsive-table)` for overflow clipping so `.responsive-table` tables (which have sticky columns) are excluded |
 
 ## Testing Quick Reference
 

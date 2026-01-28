@@ -35,7 +35,11 @@ class SeasonHighsView implements SeasonHighsViewInterface
      */
     private function getStyleBlock(): string
     {
-        return ''; // All styles provided by .ibl-grid and .ibl-data-table
+        return '<style>
+.stat-table .name-cell {
+    white-space: nowrap;
+}
+</style>';
     }
 
     /**
@@ -119,7 +123,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
 
             $output .= "<tr>
     <td class=\"rank-cell\">{$rank}</td>
-    <td>{$name}</td>
+    <td class=\"name-cell\">{$name}</td>
     <td class=\"date-cell\">{$date}</td>
     <td class=\"value-cell\">{$value}</td>
 </tr>";

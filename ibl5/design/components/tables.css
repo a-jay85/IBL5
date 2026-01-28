@@ -653,3 +653,195 @@
     background-color: var(--accent-100, #ffedd5);
     border-radius: var(--radius-sm, 0.25rem);
 }
+
+/* ==========================================================================
+   Voting Results Table
+
+   Narrower table optimized for vote counts (two columns: Player, Votes).
+   Centers on the page with constrained width.
+   ========================================================================== */
+
+.voting-results-table {
+    max-width: 420px;
+}
+
+.voting-results-table th,
+.voting-results-table td {
+    text-align: left;
+}
+
+.voting-results-table th:last-child,
+.voting-results-table td:last-child {
+    text-align: right;
+}
+
+/* ==========================================================================
+   Compare Players Table Column Highlighting
+
+   Use .compare-highlight-cols on <col> elements to highlight column groups.
+   Uses CSS background for visual grouping of related stats.
+   ========================================================================== */
+
+.compare-highlight-cols {
+    background-color: var(--gray-100, #f3f4f6);
+}
+
+/* Ensure highlighted columns show through transparent row backgrounds */
+.compare-players-table tbody tr:nth-child(odd) {
+    background-color: transparent;
+}
+
+.compare-players-table tbody tr:nth-child(even) {
+    background-color: rgba(249, 250, 251, 0.7);
+}
+
+.compare-players-table tbody tr:hover {
+    background-color: rgba(243, 244, 246, 0.9);
+}
+
+/* ==========================================================================
+   Trading Module Tables
+
+   Specialized tables for the Trading module including:
+   - Team selection list with logos and colors
+   - Roster tables for trade form
+   - Cap totals and cash exchange tables
+   - Trade offer review cards
+   ========================================================================== */
+
+/* Trading layout table - simple layout container, not a data table */
+.trading-layout {
+    border-collapse: separate;
+    border-spacing: var(--space-2);
+}
+
+.trading-layout > tbody > tr > td {
+    vertical-align: top;
+}
+
+/* Team selection table with logos */
+.trading-team-select {
+    min-width: 220px;
+    max-width: 280px;
+}
+
+.trading-team-select td {
+    padding: 0;
+}
+
+.trading-team-select .ibl-team-cell--colored {
+    padding: 0.5rem 0.75rem;
+}
+
+/* Roster tables for player/pick selection */
+.trading-roster {
+    min-width: 280px;
+}
+
+.trading-roster td {
+    text-align: center;
+    padding: 0.375rem 0.5rem;
+}
+
+.trading-roster td:nth-child(3) {
+    text-align: left;
+}
+
+.trading-roster td:nth-child(4) {
+    text-align: right;
+}
+
+/* Cap totals table */
+.trading-cap-totals th {
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.5rem 0.75rem;
+    text-align: center;
+}
+
+.trading-cap-totals td {
+    padding: 0.5rem 0.75rem;
+}
+
+/* Cash exchange table */
+.trading-cash-exchange td {
+    padding: 0.5rem 0.75rem;
+}
+
+.trading-cash-exchange input[type="number"] {
+    width: 80px;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--gray-300, #d1d5db);
+    border-radius: var(--radius-sm, 0.25rem);
+    text-align: right;
+}
+
+/* Trade offer cards */
+.trade-offer-card {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--gray-200, #e5e7eb);
+    border-radius: var(--radius-md, 0.375rem);
+    background: white;
+    box-shadow: var(--shadow-sm, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+}
+
+.trade-offer-card p {
+    margin: 0.25rem 0;
+}
+
+/* Trading buttons */
+.ibl-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-weight: 600;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border: none;
+    border-radius: var(--radius-md, 0.375rem);
+    cursor: pointer;
+    transition: all 150ms ease;
+}
+
+.ibl-btn--primary {
+    background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
+    color: white;
+}
+
+.ibl-btn--primary:hover {
+    background: linear-gradient(135deg, var(--navy-700, #334155), var(--navy-800, #1e293b));
+}
+
+.ibl-btn--success {
+    background: linear-gradient(135deg, var(--success-500, #22c55e), var(--success-600, #16a34a));
+    color: white;
+}
+
+.ibl-btn--success:hover {
+    background: linear-gradient(135deg, var(--success-400, #4ade80), var(--success-500, #22c55e));
+}
+
+.ibl-btn--danger {
+    background: linear-gradient(135deg, var(--error-500, #ef4444), var(--error-600, #dc2626));
+    color: white;
+}
+
+.ibl-btn--danger:hover {
+    background: linear-gradient(135deg, var(--error-400, #f87171), var(--error-500, #ef4444));
+}
+
+/* Link styling for Trading */
+.ibl-link {
+    color: var(--navy-700, #334155);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 150ms ease;
+}
+
+.ibl-link:hover {
+    color: var(--accent-500, #f97316);
+}

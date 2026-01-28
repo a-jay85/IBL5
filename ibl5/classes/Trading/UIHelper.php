@@ -192,7 +192,7 @@ class UIHelper implements UIHelperInterface
     public function getAllTeamsForTrading(): array
     {
         $teams = [];
-        
+
         // Fetch teams using repository
         $allTeams = $this->repository->getAllTeamsWithCity();
 
@@ -200,11 +200,14 @@ class UIHelper implements UIHelperInterface
             $teamName = $row['team_name'];
             $teamCity = $row['team_city'];
 
-            if ($teamName != 'Free Agents') {
+            if ($teamName !== 'Free Agents') {
                 $teams[] = [
                     'name' => $teamName,
                     'city' => $teamCity,
-                    'fullName' => "$teamCity $teamName"
+                    'fullName' => "$teamCity $teamName",
+                    'teamid' => (int) $row['teamid'],
+                    'color1' => $row['color1'] ?? '333333',
+                    'color2' => $row['color2'] ?? 'FFFFFF',
                 ];
             }
         }
@@ -217,10 +220,32 @@ class UIHelper implements UIHelperInterface
      */
     public function renderTeamSelectionLinks(array $teams): string
     {
-        $html = '';
+        $html = '<table class="ibl-data-table trading-team-select">
+            <thead>
+                <tr>
+                    <th>Make Trade Offer To...</th>
+                </tr>
+            </thead>
+            <tbody>';
+
         foreach ($teams as $team) {
-            $html .= "<a href=\"modules.php?name=Trading&op=offertrade&partner={$team['name']}\">{$team['fullName']}</a><br>";
+            $teamId = $team['teamid'];
+            $teamName = \Utilities\HtmlSanitizer::safeHtmlOutput($team['name']);
+            $fullName = \Utilities\HtmlSanitizer::safeHtmlOutput($team['fullName']);
+            $color1 = \Utilities\HtmlSanitizer::safeHtmlOutput($team['color1']);
+            $color2 = \Utilities\HtmlSanitizer::safeHtmlOutput($team['color2']);
+
+            $html .= "<tr>
+                <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
+                    <a href=\"modules.php?name=Trading&amp;op=offertrade&amp;partner={$teamName}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
+                        <img src=\"images/logo/new{$teamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
+                        {$fullName}
+                    </a>
+                </td>
+            </tr>";
         }
+
+        $html .= '</tbody></table>';
         return $html;
     }
 }

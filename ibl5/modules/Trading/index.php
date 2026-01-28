@@ -61,47 +61,48 @@ function tradeoffer($username)
 
     echo "<form name=\"Trade_Offer\" method=\"post\" action=\"/ibl5/modules/Trading/maketradeoffer.php\">
 		<input type=\"hidden\" name=\"offeringTeam\" value=\"$teamlogo\">
-		<center>
+		<div style=\"text-align: center;\">
 			<img src=\"images/logo/$teamID.jpg\" width=\"415\" height=\"50\" style=\"max-width: 100%; height: auto;\"><br>
-			<table border=1 cellspacing=0 cellpadding=5>
+			<h2 class=\"ibl-table-title\">Trading Menu</h2>
+			<table class=\"trading-layout\">
 				<tr>
-					<th colspan=4><center>TRADING MENU</center></th>
-				</tr>
-				<tr>
-					<td valign=top>
-						<table cellspacing=3>
-							<tr>
-								<td valign=top colspan=4>
-									<center><b><u>$teamlogo</u></b></center>
-								</td>
-							</tr>
-							<tr>
-								<td valign=top><b>Select</b></td>
-								<td valign=top><b>Pos</b></td>
-								<td valign=top><b>Name</b></td>
-								<td valign=top><b>Salary</b></td>";
+					<td style=\"vertical-align: top;\">
+						<table class=\"ibl-data-table trading-roster\">
+							<thead>
+								<tr>
+									<th colspan=\"4\">$teamlogo</th>
+								</tr>
+								<tr>
+									<th>Select</th>
+									<th>Pos</th>
+									<th>Name</th>
+									<th>Salary</th>
+								</tr>
+							</thead>
+							<tbody>";
 
     $future_salary_array = buildTeamFutureSalary($resultUserTeamPlayers, 0);
     $future_salary_array = buildTeamFuturePicks($resultUserTeamDraftPicks, $future_salary_array);
     $k = $future_salary_array['k']; // pull $k value out to populate $Fields_Counter in maketradeoffer.php
 
-    echo "</table>
-		</td>
-		<td valign=top>
-			<table cellspacing=3>
-				<tr>
-					<td valign=top align=center colspan=4>
+    echo "</tbody></table>
+					</td>
+					<td style=\"vertical-align: top;\">
 						<input type=\"hidden\" name=\"switchCounter\" value=\"$k\">
 						<input type=\"hidden\" name=\"listeningTeam\" value=\"$partner\">
-						<b><u>$partner</u></b>
-					</td>
-				</tr>
-				<tr>
-					<td valign=top><b>Select</b></td>
-					<td valign=top><b>Pos</b></td>
-					<td valign=top><b>Name</b></td>
-					<td valign=top><b>Salary</b></td>
-				</tr>";
+						<table class=\"ibl-data-table trading-roster\">
+							<thead>
+								<tr>
+									<th colspan=\"4\">$partner</th>
+								</tr>
+								<tr>
+									<th>Select</th>
+									<th>Pos</th>
+									<th>Name</th>
+									<th>Salary</th>
+								</tr>
+							</thead>
+							<tbody>";
 
     $partnerTeamID = $commonRepository->getTidFromTeamname($partner);
     $queryPartnerTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
@@ -122,72 +123,82 @@ function tradeoffer($username)
     $k = $future_salary_arrayb['k']; // pull $k value out to populate $Fields_Counter in maketradeoffer.php
 
     $k--;
-    echo "</table>
-		</td>
-		<td valign=top>
-			<table>
-				<tr>
-					<td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
+    echo "</tbody></table>
+					</td>
+					<td style=\"vertical-align: top;\">";
 
     $uiHelper = new Trading\UIHelper($mysqli_db);
     $teams = $uiHelper->getAllTeamsForTrading();
     echo $uiHelper->renderTeamSelectionLinks($teams);
 
-    echo "</td></tr></table>";
+    echo "</td>";
+    echo "</tr>";
+
+    // Cap totals section
+    echo "<tr><td colspan=\"3\"><table class=\"ibl-data-table trading-cap-totals\" style=\"width: 100%; margin-top: 1rem;\">
+        <thead><tr><th colspan=\"2\">Cap Totals</th></tr></thead>
+        <tbody>";
+
     $z = 0;
     $seasonsToDisplay = 6;
     if (
-        $season->phase == "Playoffs"
-        OR $season->phase == "Draft"
-        OR $season->phase == "Free Agency"
+        $season->phase === "Playoffs"
+        || $season->phase === "Draft"
+        || $season->phase === "Free Agency"
     ) {
         $currentSeasonEndingYear++;
         $seasonsToDisplay--;
     }
     while ($z < $seasonsToDisplay) {
+        $yearLabel = ($currentSeasonEndingYear + $z - 1) . "-" . ($currentSeasonEndingYear + $z);
         echo "<tr>
-            <td>
-                <b>$teamlogo Cap Total in " . ($currentSeasonEndingYear + $z - 1) . "-" . ($currentSeasonEndingYear + $z) . ":</b> " . $future_salary_array['player'][$z] . "
-            </td>
-            <td align=right>
-                <b>$partner Cap Total in " . ($currentSeasonEndingYear + $z - 1) . "-" . ($currentSeasonEndingYear + $z) . ":</b> " . $future_salary_arrayb['player'][$z] . "
-            </td>";
+            <td style=\"text-align: left;\"><strong>{$teamlogo}</strong> in {$yearLabel}: " . $future_salary_array['player'][$z] . "</td>
+            <td style=\"text-align: right;\"><strong>{$partner}</strong> in {$yearLabel}: " . $future_salary_arrayb['player'][$z] . "</td>
+        </tr>";
         $z++;
     }
+    echo "</tbody></table></td></tr>";
+
+    // Cash exchange section
+    echo "<tr><td colspan=\"3\"><table class=\"ibl-data-table trading-cash-exchange\" style=\"width: 100%; margin-top: 1rem;\">
+        <thead><tr><th colspan=\"2\">Cash Exchange</th></tr></thead>
+        <tbody>";
 
     $currentSeasonEndingYear = $season->endingYear; // This resets the incrementation from the last block.
     $i = 1; // We need to start at 1 because of the "xSendsCash" value names.
     if (
-        $season->phase == "Playoffs"
-        OR $season->phase == "Draft"
-        OR $season->phase == "Free Agency"
+        $season->phase === "Playoffs"
+        || $season->phase === "Draft"
+        || $season->phase === "Free Agency"
     ) {
         $i++;
     }
     while ($i <= 6) {
         // Because we start $i = 1, the math to derive the years to display increases by 1 too.
+        $yearLabel = ($currentSeasonEndingYear - 2 + $i) . "-" . ($currentSeasonEndingYear - 1 + $i);
         echo "<tr>
-            <td>
-                <b>$teamlogo send
-                <input type=\"number\" name=\"userSendsCash$i\" value =\"0\" min=\"0\" max =\"2000\">
-                for " . ($currentSeasonEndingYear - 2 + $i) . "-" . ($currentSeasonEndingYear - 1 + $i) . "</b>
+            <td style=\"text-align: left;\">
+                <strong>{$teamlogo}</strong> send
+                <input type=\"number\" name=\"userSendsCash$i\" value=\"0\" min=\"0\" max=\"2000\" style=\"width: 80px;\">
+                for {$yearLabel}
             </td>
-            <td align=right>
-                <b>$partner send
-                <input type=\"number\" name=\"partnerSendsCash$i\" value =\"0\" min=\"0\" max =\"2000\">
-                for " . ($currentSeasonEndingYear - 2 + $i) . "-" . ($currentSeasonEndingYear - 1 + $i) . "</b>
+            <td style=\"text-align: right;\">
+                <strong>{$partner}</strong> send
+                <input type=\"number\" name=\"partnerSendsCash$i\" value=\"0\" min=\"0\" max=\"2000\" style=\"width: 80px;\">
+                for {$yearLabel}
             </td>
         </tr>";
         $i++;
     }
+    echo "</tbody></table></td></tr>";
 
     echo "<tr>
-            <td colspan=3 align=center>
+            <td colspan=\"3\" style=\"text-align: center; padding: 1rem;\">
                 <input type=\"hidden\" name=\"fieldsCounter\" value=\"$k\">
-                <input type=\"submit\" value=\"Make Trade Offer\">
+                <button type=\"submit\" class=\"ibl-btn ibl-btn--primary\">Make Trade Offer</button>
             </td>
         </tr>
-    </form></center></table>";
+    </table></form></div>";
 
     CloseTable();
 
@@ -205,138 +216,160 @@ function tradereview($username)
     Nuke\Header::header();
     OpenTable();
 
-    echo "<center><img src=\"images/logo/$teamID.jpg\" width=\"415\" height=\"50\" style=\"max-width: 100%; height: auto;\"><br>";
+    echo "<div style=\"text-align: center;\">
+        <img src=\"images/logo/$teamID.jpg\" width=\"415\" height=\"50\" style=\"max-width: 100%; height: auto;\">
+        <h2 class=\"ibl-table-title\">Review Trade Offers</h2>
+    </div>";
 
     $sql3 = "SELECT * FROM ibl_trade_info ORDER BY tradeofferid ASC";
     $result3 = $mysqli_db->query($sql3);
 
     $tradeworkingonnow = 0;
+    $tradeOffers = [];
 
-    echo "<table>
-		<th>
-			<tr>
-				<td valign=top>REVIEW TRADE OFFERS";
-
+    // Group trade items by offer ID
     while ($row3 = $result3->fetch_assoc()) {
-        $isinvolvedintrade = 0;
-        $hashammer = 0;
         $offerid = $row3['tradeofferid'];
         $itemid = $row3['itemid'];
-
-        // For itemtype (1 = player, 0 = pick, cash = cash)
         $itemtype = $row3['itemtype'];
         $from = $row3['from'];
         $to = $row3['to'];
         $approval = $row3['approval'];
 
-        if ($from == $teamlogo) {
-            $isinvolvedintrade = 1;
-            $oppositeTeam = $to;
-        }
-        if ($to == $teamlogo) {
-            $isinvolvedintrade = 1;
-            $oppositeTeam = $from;
-        }
-        if ($approval == $teamlogo) {
-            $hashammer = 1;
-        }
+        $isinvolvedintrade = ($from === $teamlogo || $to === $teamlogo);
 
-        if ($isinvolvedintrade == 1) {
-            if ($offerid == $tradeworkingonnow) {
+        if ($isinvolvedintrade) {
+            if (!isset($tradeOffers[$offerid])) {
+                $tradeOffers[$offerid] = [
+                    'from' => $from,
+                    'to' => $to,
+                    'approval' => $approval,
+                    'oppositeTeam' => ($from === $teamlogo) ? $to : $from,
+                    'hashammer' => ($approval === $teamlogo || $approval === 'test'),
+                    'items' => []
+                ];
+            }
+            $tradeOffers[$offerid]['items'][] = [
+                'itemid' => $itemid,
+                'itemtype' => $itemtype,
+                'from' => $from,
+                'to' => $to
+            ];
+        }
+    }
+
+    echo "<table class=\"trading-layout\" style=\"margin: 0 auto;\">
+        <tr>
+            <td style=\"vertical-align: top;\">";
+
+    if (empty($tradeOffers)) {
+        echo "<p style=\"padding: 1rem;\">No pending trade offers.</p>";
+    } else {
+        foreach ($tradeOffers as $offerid => $offer) {
+            echo "<div class=\"trade-offer-card\" style=\"margin-bottom: 1rem; padding: 1rem; border: 1px solid var(--gray-200); border-radius: var(--radius-md); background: white;\">
+                <div style=\"display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;\">
+                    <strong>Trade Offer #{$offerid}</strong>
+                    <div style=\"display: flex; gap: 0.5rem;\">";
+
+            if ($offer['hashammer']) {
+                echo "<form name=\"tradeaccept\" method=\"post\" action=\"/ibl5/modules/Trading/accepttradeoffer.php\" style=\"margin: 0;\">
+                    <input type=\"hidden\" name=\"offer\" value=\"$offerid\">
+                    <button type=\"submit\" class=\"ibl-btn ibl-btn--success\" onclick=\"this.disabled=true;this.textContent='Submitting...'; this.form.submit();\">Accept</button>
+                </form>";
             } else {
-                echo "				</td>
-							</tr>
-						</th>
-					</table>
-					<table border=1 valign=top align=center>
-						<tr>
-							<td>
-								<b><u>TRADE OFFER</u></b><br>
-								<table align=right border=1 cellspacing=0 cellpadding=0>
-									<tr>
-										<td valign=center>";
-                if ($hashammer == 1 | $approval == 'test') {
-                    echo "<form name=\"tradeaccept\" method=\"post\" action=\"/ibl5/modules/Trading/accepttradeoffer.php\">
-						<input type=\"hidden\" name=\"offer\" value=\"$offerid\">
-						<input type=\"submit\" value=\"Accept\" onclick=\"this.disabled=true;this.value='Submitting...'; this.form.submit();\">
-					</form>";
-                } else {
-                    echo "(Awaiting Approval)";
-                }
-                echo "</td>
-						<td valign=center>
-							<form name=\"tradereject\" method=\"post\" action=\"/ibl5/modules/Trading/rejecttradeoffer.php\">
-								<input type=\"hidden\" name=\"offer\" value=\"$offerid\">
-                                <input type=\"hidden\" name=\"teamRejecting\" value=\"$teamlogo\">
-                                <input type=\"hidden\" name=\"teamReceiving\" value=\"$oppositeTeam\">
-								<input type=\"submit\" value=\"Reject\">
-							</form>
-						</td>
-					</tr>
-				</table>";
+                echo "<span style=\"color: var(--gray-500); font-style: italic;\">Awaiting Approval</span>";
             }
 
-            if ($itemtype == 'cash') {
-                $queryCashDetails = "SELECT * FROM ibl_trade_cash WHERE tradeOfferID = $offerid AND sendingTeam = '$from';";
-                $stmt = $mysqli_db->prepare($queryCashDetails);
-                $stmt->execute();
-                $cashDetails = $stmt->get_result()->fetch_assoc();
+            $oppositeTeam = \Utilities\HtmlSanitizer::safeHtmlOutput($offer['oppositeTeam']);
+            echo "<form name=\"tradereject\" method=\"post\" action=\"/ibl5/modules/Trading/rejecttradeoffer.php\" style=\"margin: 0;\">
+                    <input type=\"hidden\" name=\"offer\" value=\"$offerid\">
+                    <input type=\"hidden\" name=\"teamRejecting\" value=\"$teamlogo\">
+                    <input type=\"hidden\" name=\"teamReceiving\" value=\"{$oppositeTeam}\">
+                    <button type=\"submit\" class=\"ibl-btn ibl-btn--danger\">Reject</button>
+                </form>
+                    </div>
+                </div>
+                <div class=\"trade-offer-items\">";
 
-                $cashYear[1] = $cashDetails['cy1'];
-                $cashYear[2] = $cashDetails['cy2'];
-                $cashYear[3] = $cashDetails['cy3'];
-                $cashYear[4] = $cashDetails['cy4'];
-                $cashYear[5] = $cashDetails['cy5'];
-                $cashYear[6] = $cashDetails['cy6'];
+            foreach ($offer['items'] as $item) {
+                $itemid = $item['itemid'];
+                $itemtype = $item['itemtype'];
+                $from = \Utilities\HtmlSanitizer::safeHtmlOutput($item['from']);
+                $to = \Utilities\HtmlSanitizer::safeHtmlOutput($item['to']);
 
-                echo "The $from send 
-                $cashYear[1] $cashYear[2] $cashYear[3] $cashYear[4] $cashYear[5] $cashYear[6]
-                in cash to the $to.<br>";
-            } elseif ($itemtype == 0) {
-                $sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = '$itemid'";
-                $resultgetpick = $mysqli_db->query($sqlgetpick);
-                $rowsgetpick = $resultgetpick->fetch_assoc();
+                if ($itemtype === 'cash') {
+                    $queryCashDetails = "SELECT * FROM ibl_trade_cash WHERE tradeOfferID = ? AND sendingTeam = ?";
+                    $stmt = $mysqli_db->prepare($queryCashDetails);
+                    $stmt->bind_param("is", $offerid, $item['from']);
+                    $stmt->execute();
+                    $cashDetails = $stmt->get_result()->fetch_assoc();
 
-                $pickteam = $rowsgetpick['teampick'];
-                $pickyear = $rowsgetpick['year'];
-                $pickround = $rowsgetpick['round'];
-                $picknotes = $rowsgetpick['notes'];
+                    if ($cashDetails) {
+                        $cashAmounts = [];
+                        for ($y = 1; $y <= 6; $y++) {
+                            if (isset($cashDetails["cy{$y}"]) && $cashDetails["cy{$y}"] > 0) {
+                                $cashAmounts[] = $cashDetails["cy{$y}"];
+                            }
+                        }
+                        $cashStr = implode(', ', $cashAmounts);
+                        echo "<p>The <strong>{$from}</strong> send {$cashStr} in cash to the <strong>{$to}</strong>.</p>";
+                    }
+                } elseif ($itemtype == 0) {
+                    $sqlgetpick = "SELECT * FROM ibl_draft_picks WHERE pickid = ?";
+                    $stmtPick = $mysqli_db->prepare($sqlgetpick);
+                    $stmtPick->bind_param("i", $itemid);
+                    $stmtPick->execute();
+                    $rowsgetpick = $stmtPick->get_result()->fetch_assoc();
 
-                echo "The $from send the $pickteam $pickyear Round $pickround draft pick to the $to.<br>";
-                if ($picknotes != NULL) {
-                    echo "<i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" . $picknotes . "</i><br>";
+                    if ($rowsgetpick) {
+                        $pickteam = \Utilities\HtmlSanitizer::safeHtmlOutput($rowsgetpick['teampick']);
+                        $pickyear = \Utilities\HtmlSanitizer::safeHtmlOutput($rowsgetpick['year']);
+                        $pickround = \Utilities\HtmlSanitizer::safeHtmlOutput($rowsgetpick['round']);
+                        $picknotes = $rowsgetpick['notes'];
+
+                        echo "<p>The <strong>{$from}</strong> send the {$pickteam} {$pickyear} Round {$pickround} draft pick to the <strong>{$to}</strong>.</p>";
+                        if ($picknotes !== null && $picknotes !== '') {
+                            $escapedNotes = \Utilities\HtmlSanitizer::safeHtmlOutput($picknotes);
+                            echo "<p style=\"margin-left: 1rem; font-style: italic; color: var(--gray-600);\">{$escapedNotes}</p>";
+                        }
+                    }
+                } elseif ($itemtype == 1) {
+                    $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = ?";
+                    $stmtPlyr = $mysqli_db->prepare($sqlgetplyr);
+                    $stmtPlyr->bind_param("i", $itemid);
+                    $stmtPlyr->execute();
+                    $rowsgetplyr = $stmtPlyr->get_result()->fetch_assoc();
+
+                    if ($rowsgetplyr) {
+                        $plyrname = \Utilities\HtmlSanitizer::safeHtmlOutput($rowsgetplyr['name']);
+                        $plyrpos = \Utilities\HtmlSanitizer::safeHtmlOutput($rowsgetplyr['pos']);
+
+                        echo "<p>The <strong>{$from}</strong> send {$plyrpos} {$plyrname} to the <strong>{$to}</strong>.</p>";
+                    }
                 }
-            } elseif ($itemtype == 1) {
-                $sqlgetplyr = "SELECT * FROM ibl_plr WHERE pid = '$itemid'";
-                $resultgetplyr = $mysqli_db->query($sqlgetplyr);
-                $rowsgetplyr = $resultgetplyr->fetch_assoc();
-
-                $plyrname = $rowsgetplyr['name'];
-                $plyrpos = $rowsgetplyr['pos'];
-
-                echo "The $from send $plyrpos $plyrname to the $to.<br>";
             }
 
-            $tradeworkingonnow = $offerid;
+            echo "</div></div>";
         }
     }
 
     echo "</td>
-		<td valign=top><center><b><u>Make Trade Offer To...</u></b></center>";
+            <td style=\"vertical-align: top;\">";
 
     $uiHelper = new Trading\UIHelper($mysqli_db);
     $teams = $uiHelper->getAllTeamsForTrading();
     echo $uiHelper->renderTeamSelectionLinks($teams);
 
     echo "</td>
-		</tr>
-		<tr>
-			<td colspan=2 align=center>
-				<a href=\"modules.php?name=Waivers&action=drop\">Drop a player to Waivers</a><br>
-				<a href=\"modules.php?name=Waivers&action=add\">Add a player from Waivers</a><br>
-			</td>
-		</tr>
-	</table>";
+        </tr>
+        <tr>
+            <td colspan=\"2\" style=\"text-align: center; padding: 1rem;\">
+                <a href=\"modules.php?name=Waivers&action=drop\" class=\"ibl-link\">Drop a player to Waivers</a>
+                &nbsp;|&nbsp;
+                <a href=\"modules.php?name=Waivers&action=add\" class=\"ibl-link\">Add a player from Waivers</a>
+            </td>
+        </tr>
+    </table>";
 
     CloseTable();
     Nuke\Footer::footer();

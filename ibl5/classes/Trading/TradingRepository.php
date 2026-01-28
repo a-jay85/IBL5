@@ -450,14 +450,14 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get all teams with city and name for trading UI
-     * 
+     * Get all teams with city, name, colors and ID for trading UI
+     *
      * @return array Array of team rows ordered by city
      */
     public function getAllTeamsWithCity(): array
     {
         return $this->fetchAll(
-            "SELECT team_name, team_city FROM ibl_team_info ORDER BY team_city ASC"
+            "SELECT teamid, team_name, team_city, color1, color2 FROM ibl_team_info ORDER BY team_city ASC"
         );
     }
 }

@@ -70,10 +70,13 @@ interface UIHelperInterface
      * Retrieves all teams from ibl_team_info ordered by city name,
      * excluding the "Free Agents" pseudo-team.
      *
-     * @return array<array{name: string, city: string, fullName: string}> Array of team data:
+     * @return array<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}> Array of team data:
      *         - 'name': string - Team name only (e.g., "Lakers")
      *         - 'city': string - City name only (e.g., "Los Angeles")
      *         - 'fullName': string - Combined city and name (e.g., "Los Angeles Lakers")
+     *         - 'teamid': int - Team ID for logo image path
+     *         - 'color1': string - Primary team color (hex without #)
+     *         - 'color2': string - Secondary team color (hex without #)
      *
      * IMPORTANT BEHAVIORS:
      *  - Orders results by city alphabetically (ASC)

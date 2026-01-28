@@ -61,14 +61,14 @@ class StandingsView implements StandingsViewInterface
         (function() {
             // Set explicit width on scroll containers for iOS compatibility
             function setContainerWidths() {
-                var viewportWidth = document.documentElement.clientWidth;
                 var containers = document.querySelectorAll(".table-scroll-container");
                 containers.forEach(function(container) {
-                    // Get the container offset from the left edge of viewport
-                    var rect = container.getBoundingClientRect();
-                    var availableWidth = viewportWidth - rect.left;
-                    container.style.width = availableWidth + "px";
-                    container.style.maxWidth = availableWidth + "px";
+                    var wrapper = container.closest(".table-scroll-wrapper");
+                    if (wrapper) {
+                        var availableWidth = wrapper.clientWidth;
+                        container.style.width = availableWidth + "px";
+                        container.style.maxWidth = availableWidth + "px";
+                    }
                 });
             }
 

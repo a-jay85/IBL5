@@ -26,13 +26,16 @@ class StatsFormatter
      * @param float|int|null $attempted Number of shots attempted
      * @return string Formatted percentage or "0.000" if attempted is 0
      */
-    public static function formatPercentage(float|int|null $made, float|int|null $attempted): string
+    public static function formatPercentage(string|float|int|null $made, string|float|int|null $attempted): string
     {
-        if ($attempted === null || $attempted === 0 || $attempted === 0.0) {
+        $attempted = $attempted !== null ? (float)$attempted : null;
+        $made = $made !== null ? (float)$made : null;
+
+        if ($attempted === null || $attempted === 0.0) {
             return "0.000";
         }
 
-        $made = $made ?? 0;
+        $made = $made ?? 0.0;
         $percentage = $made / $attempted;
         return number_format($percentage, 3);
     }
@@ -45,13 +48,16 @@ class StatsFormatter
      * @param int|null $games Number of games
      * @return string Formatted per-game average or "0.0" if games is 0
      */
-    public static function formatPerGameAverage(float|int|null $total, ?int $games): string
+    public static function formatPerGameAverage(string|float|int|null $total, string|int|null $games): string
     {
+        $games = $games !== null ? (int)$games : null;
+        $total = $total !== null ? (float)$total : null;
+
         if ($games === null || $games === 0) {
             return "0.0";
         }
 
-        $total = $total ?? 0;
+        $total = $total ?? 0.0;
         $average = $total / $games;
         return number_format($average, 1);
     }
@@ -64,13 +70,16 @@ class StatsFormatter
      * @param float|int|null $minutes Total minutes played
      * @return string Formatted per-36-minute stat or "0.0" if minutes is 0
      */
-    public static function formatPer36Stat(float|int|null $total, float|int|null $minutes): string
+    public static function formatPer36Stat(string|float|int|null $total, string|float|int|null $minutes): string
     {
-        if ($minutes === null || $minutes === 0 || $minutes === 0.0) {
+        $minutes = $minutes !== null ? (float)$minutes : null;
+        $total = $total !== null ? (float)$total : null;
+
+        if ($minutes === null || $minutes === 0.0) {
             return "0.0";
         }
 
-        $total = $total ?? 0;
+        $total = $total ?? 0.0;
         $per36 = (36 / $minutes) * $total;
         return number_format($per36, 1);
     }
@@ -82,9 +91,9 @@ class StatsFormatter
      * @param float|int|null $value The value to format
      * @return string Formatted total as integer with comma separators
      */
-    public static function formatTotal(float|int|null $value): string
+    public static function formatTotal(string|float|int|null $value): string
     {
-        $value = $value ?? 0;
+        $value = $value !== null ? (float)$value : 0;
         return number_format($value, 0);
     }
 
@@ -95,9 +104,9 @@ class StatsFormatter
      * @param float|int|null $value The value to format
      * @return string Formatted value with 2 decimal places
      */
-    public static function formatAverage(float|int|null $value): string
+    public static function formatAverage(string|float|int|null $value): string
     {
-        $value = $value ?? 0;
+        $value = $value !== null ? (float)$value : 0;
         return number_format($value, 2);
     }
 
@@ -109,11 +118,11 @@ class StatsFormatter
      * @param int|null $tgm Three-pointers made
      * @return int Total points (FGM*2 + FTM + TGM)
      */
-    public static function calculatePoints(?int $fgm, ?int $ftm, ?int $tgm): int
+    public static function calculatePoints(string|int|null $fgm, string|int|null $ftm, string|int|null $tgm): int
     {
-        $fgm = $fgm ?? 0;
-        $ftm = $ftm ?? 0;
-        $tgm = $tgm ?? 0;
+        $fgm = $fgm !== null ? (int)$fgm : 0;
+        $ftm = $ftm !== null ? (int)$ftm : 0;
+        $tgm = $tgm !== null ? (int)$tgm : 0;
 
         return (2 * $fgm) + $ftm + $tgm;
     }
@@ -125,13 +134,16 @@ class StatsFormatter
      * @param float|int|null $denominator
      * @return float Result of division or 0 if denominator is 0
      */
-    public static function safeDivide(float|int|null $numerator, float|int|null $denominator): float
+    public static function safeDivide(string|float|int|null $numerator, string|float|int|null $denominator): float
     {
-        if ($denominator === null || $denominator === 0 || $denominator === 0.0) {
+        $denominator = $denominator !== null ? (float)$denominator : null;
+        $numerator = $numerator !== null ? (float)$numerator : null;
+
+        if ($denominator === null || $denominator === 0.0) {
             return 0.0;
         }
 
-        $numerator = $numerator ?? 0;
+        $numerator = $numerator ?? 0.0;
         return $numerator / $denominator;
     }
 
@@ -143,13 +155,16 @@ class StatsFormatter
      * @param int $decimals Number of decimal places (default: 3)
      * @return string Formatted percentage
      */
-    public static function formatPercentageWithDecimals(float|int|null $made, float|int|null $attempted, int $decimals = 3): string
+    public static function formatPercentageWithDecimals(string|float|int|null $made, string|float|int|null $attempted, int $decimals = 3): string
     {
-        if ($attempted === null || $attempted === 0 || $attempted === 0.0) {
+        $attempted = $attempted !== null ? (float)$attempted : null;
+        $made = $made !== null ? (float)$made : null;
+
+        if ($attempted === null || $attempted === 0.0) {
             return number_format(0, $decimals);
         }
 
-        $made = $made ?? 0;
+        $made = $made ?? 0.0;
         $percentage = $made / $attempted;
         return number_format($percentage, $decimals);
     }
@@ -161,9 +176,9 @@ class StatsFormatter
      * @param int $decimals Number of decimal places
      * @return string Formatted value
      */
-    public static function formatWithDecimals(float|int|null $value, int $decimals): string
+    public static function formatWithDecimals(string|float|int|null $value, int $decimals): string
     {
-        $value = $value ?? 0;
+        $value = $value !== null ? (float)$value : 0;
         return number_format($value, $decimals);
     }
 
@@ -176,8 +191,11 @@ class StatsFormatter
      * @param int $pointsAllowed Team's total points allowed
      * @return string Formatted win percentage (e.g., "0.625")
      */
-    public static function calculatePythagoreanWinPercentage(int $pointsScored, int $pointsAllowed): string
+    public static function calculatePythagoreanWinPercentage(string|int $pointsScored, string|int $pointsAllowed): string
     {
+        $pointsScored = (int)$pointsScored;
+        $pointsAllowed = (int)$pointsAllowed;
+
         // Handle edge cases
         if ($pointsScored <= 0 && $pointsAllowed <= 0) {
             return "0.000";

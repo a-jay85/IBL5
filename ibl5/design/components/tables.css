@@ -486,6 +486,8 @@
     /* Center the logo when text is hidden */
     .ibl-team-cell--colored {
         text-align: center !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
     }
 
     .ibl-team-cell--colored .ibl-team-cell__name {

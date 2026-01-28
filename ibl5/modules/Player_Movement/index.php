@@ -61,8 +61,8 @@ echo '<h2 class="ibl-title">Player Transactions Since Last Season</h2>
     <thead>
         <tr>
             <th>Player</th>
-            <th>New Team</th>
             <th>Old Team</th>
+            <th>New Team</th>
         </tr>
     </thead>
     <tbody>';
@@ -90,16 +90,16 @@ while ($row = $result->fetch_assoc()) {
 
     echo "<tr>
         <td>{$playerName}</td>
-        <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$newColor1};\">
-            <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$newTeamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$newColor2};\">
-                <img src=\"images/logo/new{$newTeamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-                {$newTeamDisplay}
-            </a>
-        </td>
         <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$oldColor1};\">
             <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$oldTeamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$oldColor2};\">
                 <img src=\"images/logo/new{$oldTeamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
                 {$oldTeamDisplay}
+            </a>
+        </td>
+        <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$newColor1};\">
+            <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$newTeamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$newColor2};\">
+                <img src=\"images/logo/new{$newTeamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
+                {$newTeamDisplay}
             </a>
         </td>
     </tr>";

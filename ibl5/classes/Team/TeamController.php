@@ -82,12 +82,32 @@ class TeamController implements TeamControllerInterface
             $starters_table = $this->statsService->getLastSimsStarters($result, $team);
         }
 
-        $teamModules = new \UI\Modules\Team($this->repository);
-        $tableDraftPicks = $team ? $teamModules->draftPicks($team) : "";
+        $isActualTeam = ($teamID !== 0);
 
-        $inforight = $this->uiService->renderTeamInfoRight($team);
-        $team_info_right = $inforight[0];
-        $rafters = $inforight[1];
+        $teamModules = new \UI\Modules\Team($this->repository);
+        $tableDraftPicks = ($isActualTeam && $team) ? $teamModules->draftPicks($team) : "";
+
+        $team_info_right = "";
+        $rafters = "";
+        if ($isActualTeam) {
+            $inforight = $this->uiService->renderTeamInfoRight($team);
+            $team_info_right = $inforight[0];
+            $rafters = $inforight[1];
+        }
+
+        $draftPicksHtml = $isActualTeam ? "
+                <div style=\"background-color: $team->color1; text-align: center; padding: 4px;\">
+                    <span style=\"color: $team->color2; font-weight: bold;\">Draft Picks</span>
+                </div>
+                <div class=\"table-scroll-wrapper\">
+                    <div class=\"table-scroll-container\">
+                        $tableDraftPicks
+                    </div>
+                </div>" : "";
+
+        $sidebarMobileHtml = $isActualTeam ? "<div class=\"team-page-sidebar-mobile\">$team_info_right</div>" : "";
+        $raftersHtml = $isActualTeam ? "<div class=\"team-page-rafters\">$rafters</div>" : "";
+        $sidebarDesktopHtml = $isActualTeam ? "<div class=\"team-page-sidebar\">$team_info_right</div>" : "";
 
         echo "
         <div class=\"team-page-layout\">
@@ -107,18 +127,11 @@ class TeamController implements TeamControllerInterface
                         $starters_table
                     </div>
                 </div>
-                <div style=\"background-color: $team->color1; text-align: center; padding: 4px;\">
-                    <span style=\"color: $team->color2; font-weight: bold;\">Draft Picks</span>
-                </div>
-                <div class=\"table-scroll-wrapper\">
-                    <div class=\"table-scroll-container\">
-                        $tableDraftPicks
-                    </div>
-                </div>
-                <div class=\"team-page-sidebar-mobile\">$team_info_right</div>
-                <div class=\"team-page-rafters\">$rafters</div>
+                $draftPicksHtml
+                $sidebarMobileHtml
+                $raftersHtml
             </div>
-            <div class=\"team-page-sidebar\">$team_info_right</div>
+            $sidebarDesktopHtml
         </div>";
 
         \Nuke\Footer::footer();

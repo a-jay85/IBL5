@@ -2777,6 +2777,178 @@ a.schedule-jump-btn:hover {
 .series-records-table--sticky thead .sticky-corner {
   box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
 }
+.cap-info-scroll-wrapper {
+  position: relative;
+  max-height: 80vh;
+  overflow: auto;
+  margin: 0 auto;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+.cap-info-scroll-container {
+  display: inline-block;
+  min-width: 100%;
+}
+.cap-info-scroll-wrapper .table-scroll-wrapper {
+  overflow: visible !important;
+}
+.cap-info-scroll-wrapper .table-scroll-wrapper::after {
+  display: none !important;
+}
+.cap-info-scroll-wrapper .table-scroll-container {
+  overflow: visible !important;
+}
+.cap-info-table--sticky {
+  overflow: visible;
+  border-radius: 0;
+  box-shadow: none;
+}
+.cap-info-table--sticky thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.cap-info-table--sticky thead th {
+  background: var(--gradient-navy-header);
+}
+.cap-info-table--sticky .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+}
+.cap-info-table--sticky .sticky-corner {
+  z-index: 15;
+  background: var(--navy-800);
+}
+.cap-info-table--sticky tbody td.sticky-col {
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+.cap-info-table--sticky thead tr th {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.cap-info-table--sticky thead .sticky-corner {
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+.fa-preview-scroll-wrapper {
+  position: relative;
+  max-height: 80vh;
+  overflow: auto;
+  margin: 0 auto;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+.fa-preview-scroll-container {
+  display: inline-block;
+  min-width: 100%;
+}
+.fa-preview-scroll-wrapper .table-scroll-wrapper {
+  overflow: visible !important;
+}
+.fa-preview-scroll-wrapper .table-scroll-wrapper::after {
+  display: none !important;
+}
+.fa-preview-scroll-wrapper .table-scroll-container {
+  overflow: visible !important;
+}
+.fa-preview-table--sticky {
+  overflow: visible;
+  border-radius: 0;
+  box-shadow: none;
+}
+.fa-preview-table--sticky thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.fa-preview-table--sticky thead th {
+  background: var(--gradient-navy-header);
+}
+.fa-preview-table--sticky .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  white-space: nowrap;
+}
+.fa-preview-table--sticky tbody tr:nth-child(odd) td.sticky-col {
+  background-color: white;
+}
+.fa-preview-table--sticky tbody tr:nth-child(even) td.sticky-col {
+  background-color: var(--gray-50, #f9fafb);
+}
+.fa-preview-table--sticky tbody tr:hover td.sticky-col {
+  background-color: var(--gray-100, #f3f4f6);
+}
+.fa-preview-table--sticky .sticky-corner {
+  z-index: 15;
+  background: var(--navy-800);
+}
+.fa-preview-table--sticky tbody td.sticky-col {
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+.fa-preview-table--sticky thead tr th {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.fa-preview-table--sticky thead .sticky-corner {
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+.fa-preview-pos-col {
+  width: 1%;
+  white-space: nowrap;
+  padding-left: 0.25rem !important;
+  padding-right: 0.25rem !important;
+}
+.franchise-history-scroll-wrapper {
+  position: relative;
+  max-height: 80vh;
+  overflow: auto;
+  margin: 0 auto;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+.franchise-history-scroll-container {
+  display: inline-block;
+  min-width: 100%;
+}
+.franchise-history-scroll-wrapper .table-scroll-wrapper {
+  overflow: visible !important;
+}
+.franchise-history-scroll-wrapper .table-scroll-wrapper::after {
+  display: none !important;
+}
+.franchise-history-scroll-wrapper .table-scroll-container {
+  overflow: visible !important;
+}
+.franchise-history-table--sticky {
+  overflow: visible;
+  border-radius: 0;
+  box-shadow: none;
+}
+.franchise-history-table--sticky thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.franchise-history-table--sticky thead th {
+  background: var(--gradient-navy-header);
+}
+.franchise-history-table--sticky .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+}
+.franchise-history-table--sticky .sticky-corner {
+  z-index: 15;
+  background: var(--navy-800);
+}
+.franchise-history-table--sticky tbody td.sticky-col {
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+.franchise-history-table--sticky thead tr th {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.franchise-history-table--sticky thead .sticky-corner {
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
 .allstar-table {
   max-width: 500px;
 }

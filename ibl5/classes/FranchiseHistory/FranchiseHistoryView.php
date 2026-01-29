@@ -22,9 +22,12 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
     public function render(array $franchiseData): string
     {
         $html = $this->getStyleBlock();
+        $html .= '<div class="franchise-history-scroll-wrapper">';
+        $html .= '<div class="franchise-history-scroll-container">';
         $html .= $this->renderTableHeader();
         $html .= $this->renderTableRows($franchiseData);
         $html .= '</tbody></table>';
+        $html .= '</div></div>';
 
         return $html;
     }
@@ -46,10 +49,10 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
      */
     private function renderTableHeader(): string
     {
-        return '<table class="sortable ibl-data-table">
+        return '<table class="sortable ibl-data-table franchise-history-table--sticky">
             <thead>
             <tr>
-                <th class="ibl-team-cell--colored">Team</th>
+                <th class="ibl-team-cell--colored sticky-col sticky-corner">Team</th>
                 <th>All-Time<br>Wins</th>
                 <th>All-Time<br>Losses</th>
                 <th>All-Time<br>Pct.</th>
@@ -99,8 +102,8 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
 
         $html = '<tr>';
 
-        // Team name cell with logo
-        $html .= '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">';
+        // Team name cell with logo - sticky column
+        $html .= '<td class="ibl-team-cell--colored sticky-col" style="background-color: #' . $color1 . ';">';
         $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" ';
         $html .= 'class="ibl-team-cell__name" style="color: #' . $color2 . ';">';
         $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">';

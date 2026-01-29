@@ -2294,6 +2294,84 @@ a.schedule-jump-btn:hover {
 }
 
 /* ==========================================================================
+   Franchise History Module - Sticky Header & Column
+   ========================================================================== */
+
+/* Scroll wrapper for sticky headers and columns */
+.franchise-history-scroll-wrapper {
+    position: relative;
+    max-height: 80vh;
+    overflow: auto;
+    margin: 0 auto;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+}
+
+.franchise-history-scroll-container {
+    display: inline-block;
+    min-width: 100%;
+}
+
+/* Disable injected scroll wrappers that break sticky positioning */
+.franchise-history-scroll-wrapper .table-scroll-wrapper {
+    overflow: visible !important;
+}
+
+.franchise-history-scroll-wrapper .table-scroll-wrapper::after {
+    display: none !important;
+}
+
+.franchise-history-scroll-wrapper .table-scroll-container {
+    overflow: visible !important;
+}
+
+/* Table with sticky support */
+.franchise-history-table--sticky {
+    overflow: visible;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Sticky header */
+.franchise-history-table--sticky thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.franchise-history-table--sticky thead th {
+    background: var(--gradient-navy-header);
+}
+
+/* Sticky first column (Team) */
+.franchise-history-table--sticky .sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+}
+
+/* Corner cell (intersection of sticky header and column) */
+.franchise-history-table--sticky .sticky-corner {
+    z-index: 15;
+    background: var(--navy-800);
+}
+
+/* Sticky column shadow */
+.franchise-history-table--sticky tbody td.sticky-col {
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Header bottom shadow */
+.franchise-history-table--sticky thead tr th {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Corner cell combined shadow */
+.franchise-history-table--sticky thead .sticky-corner {
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================================================================
    All-Star Appearances Module
    ========================================================================== */
 

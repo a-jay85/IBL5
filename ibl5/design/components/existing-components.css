@@ -2194,6 +2194,106 @@ a.schedule-jump-btn:hover {
 }
 
 /* ==========================================================================
+   Free Agency Preview Module - Sticky Header & Column
+   ========================================================================== */
+
+/* Scroll wrapper for sticky headers and columns */
+.fa-preview-scroll-wrapper {
+    position: relative;
+    max-height: 80vh;
+    overflow: auto;
+    margin: 0 auto;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+}
+
+.fa-preview-scroll-container {
+    display: inline-block;
+    min-width: 100%;
+}
+
+/* Disable injected scroll wrappers that break sticky positioning */
+.fa-preview-scroll-wrapper .table-scroll-wrapper {
+    overflow: visible !important;
+}
+
+.fa-preview-scroll-wrapper .table-scroll-wrapper::after {
+    display: none !important;
+}
+
+.fa-preview-scroll-wrapper .table-scroll-container {
+    overflow: visible !important;
+}
+
+/* Table with sticky support */
+.fa-preview-table--sticky {
+    overflow: visible;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Sticky header */
+.fa-preview-table--sticky thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.fa-preview-table--sticky thead th {
+    background: var(--gradient-navy-header);
+}
+
+/* Sticky first column (Player) */
+.fa-preview-table--sticky .sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    white-space: nowrap;
+}
+
+/* Sticky column backgrounds for body cells */
+.fa-preview-table--sticky tbody tr:nth-child(odd) td.sticky-col {
+    background-color: white;
+}
+
+.fa-preview-table--sticky tbody tr:nth-child(even) td.sticky-col {
+    background-color: var(--gray-50, #f9fafb);
+}
+
+.fa-preview-table--sticky tbody tr:hover td.sticky-col {
+    background-color: var(--gray-100, #f3f4f6);
+}
+
+/* Corner cell (intersection of sticky header and column) */
+.fa-preview-table--sticky .sticky-corner {
+    z-index: 15;
+    background: var(--navy-800);
+}
+
+/* Sticky column shadow */
+.fa-preview-table--sticky tbody td.sticky-col {
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Header bottom shadow */
+.fa-preview-table--sticky thead tr th {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Corner cell combined shadow */
+.fa-preview-table--sticky thead .sticky-corner {
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Position column - minimal width */
+.fa-preview-pos-col {
+    width: 1%;
+    white-space: nowrap;
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+}
+
+/* ==========================================================================
    All-Star Appearances Module
    ========================================================================== */
 

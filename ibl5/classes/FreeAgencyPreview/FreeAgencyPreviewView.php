@@ -21,9 +21,12 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
     {
         $output = $this->getStyleBlock();
         $output .= $this->renderTitle($seasonEndingYear);
+        $output .= '<div class="fa-preview-scroll-wrapper">';
+        $output .= '<div class="fa-preview-scroll-container">';
         $output .= $this->renderTableStart();
         $output .= $this->renderTableRows($freeAgents);
         $output .= $this->renderTableEnd();
+        $output .= '</div></div>';
 
         return $output;
     }
@@ -58,12 +61,12 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable ibl-data-table">
+        return '<table class="sortable ibl-data-table fa-preview-table--sticky">
             <thead>
                 <tr>
-                    <th>Pos</th>
-                    <th>Player</th>
+                    <th class="sticky-col sticky-corner">Player</th>
                     <th>Team</th>
+                    <th class="fa-preview-pos-col">Pos</th>
                     <th>Age</th>
                     <th>2ga</th>
                     <th>2g%</th>
@@ -132,9 +135,9 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
             }
 
             $output .= "<tr>
-    <td>{$pos}</td>
-    <td><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
+    <td class=\"sticky-col\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
     {$teamCell}
+    <td class=\"fa-preview-pos-col\">{$pos}</td>
     <td>{$age}</td>
     <td>{$player['r_fga']}</td>
     <td>{$player['r_fgp']}</td>

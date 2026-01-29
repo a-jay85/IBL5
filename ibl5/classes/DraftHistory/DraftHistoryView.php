@@ -65,7 +65,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
         white-space: normal;
     }
     .draft-history-table th:last-child {
-        text-align: left;
+        text-align: center;
     }
 }
 </style>';

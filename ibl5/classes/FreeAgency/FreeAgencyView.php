@@ -4,64 +4,50 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use FreeAgency\Contracts\FreeAgencyDisplayHelperInterface;
+use FreeAgency\Contracts\FreeAgencyViewInterface;
 use Player\Player;
 
 /**
- * @see FreeAgencyDisplayHelperInterface
+ * @see FreeAgencyViewInterface
  */
-class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
+class FreeAgencyView implements FreeAgencyViewInterface
 {
     private object $mysqli_db;
-    private FreeAgencyRepository $repository;
-    private array $capMetrics;
-    private $team;
-    private $season;
 
-    public function __construct(object $mysqli_db, $team, $season)
+    public function __construct(object $mysqli_db)
     {
         $this->mysqli_db = $mysqli_db;
-        $this->team = $team;
-        $this->season = $season;
-        $this->repository = new FreeAgencyRepository($mysqli_db);
-        $this->initializeCapMetrics();
     }
 
     /**
-     * Initialize cap data from the cap calculator
-     *
-     * @return void
+     * @see FreeAgencyViewInterface::render()
      */
-    private function initializeCapMetrics(): void
+    public function render(array $mainPageData): string
     {
-        $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $this->team, $this->season);
-        $this->capMetrics = $capCalculator->calculateTeamCapMetrics();
-    }
+        $team = $mainPageData['team'];
+        $season = $mainPageData['season'];
+        $capMetrics = $mainPageData['capMetrics'];
+        $allOtherPlayers = $mainPageData['allOtherPlayers'];
 
-    /**
-     * @see FreeAgencyDisplayHelperInterface::renderMainPage()
-     */
-    public function renderMainPage(): string
-    {
         ob_start();
         // Generate team-colored table styles for all 4 tables
-        $teamColor = $this->team->color1 ?? 'D4AF37';
-        $teamColor2 = $this->team->color2 ?? '1e3a5f';
+        $teamColor = $team->color1 ?? 'D4AF37';
+        $teamColor2 = $team->color2 ?? '1e3a5f';
         echo \UI\TableStyles::render('fa-under-contract', $teamColor, $teamColor2);
         echo \UI\TableStyles::render('fa-offers', $teamColor, $teamColor2);
         echo \UI\TableStyles::render('fa-team-free-agents', $teamColor, $teamColor2);
         echo \UI\TableStyles::render('fa-other-free-agents', '666666', 'ffffff');
         ?>
-<img src="images/logo/<?= (int) $this->team->teamID ?>.jpg" alt="Team Logo" class="team-logo-banner">
+<img src="images/logo/<?= (int) $team->teamID ?>.jpg" alt="Team Logo" class="team-logo-banner">
 <p>
-<?= $this->renderPlayersUnderContract() ?>
+<?= $this->renderPlayersUnderContract($team, $season, $capMetrics) ?>
 <p>
-<?= $this->renderContractOffers() ?>
+<?= $this->renderContractOffers($team, $capMetrics) ?>
 <p>
 <hr>
 <p>
-<?= $this->renderTeamFreeAgents() ?>
-<?= $this->renderOtherFreeAgents() ?>
+<?= $this->renderTeamFreeAgents($team, $season, $capMetrics) ?>
+<?= $this->renderOtherFreeAgents($team, $season, $allOtherPlayers) ?>
         <?php
         return ob_get_clean();
     }
@@ -69,27 +55,30 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     /**
      * Render players under contract table
      *
+     * @param object $team Team object
+     * @param \Season $season Season object
+     * @param array $capMetrics Cap metrics from service
      * @return string HTML table
      */
-    private function renderPlayersUnderContract(): string
+    private function renderPlayersUnderContract(object $team, \Season $season, array $capMetrics): string
     {
-        $teamId = (int) ($this->team->teamID ?? 0);
-        $teamCity = htmlspecialchars($this->team->city ?? '');
-        $teamNameStr = htmlspecialchars($this->team->name ?? '');
-        $color1 = htmlspecialchars($this->team->color1 ?? 'D4AF37');
-        $color2 = htmlspecialchars($this->team->color2 ?? '1e3a5f');
+        $teamId = (int) ($team->teamID ?? 0);
+        $teamCity = htmlspecialchars($team->city ?? '');
+        $teamNameStr = htmlspecialchars($team->name ?? '');
+        $color1 = htmlspecialchars($team->color1 ?? 'D4AF37');
+        $color2 = htmlspecialchars($team->color2 ?? '1e3a5f');
 
         ob_start();
         ?>
 <table style="margin: 0 auto;" class="sortable fa-under-contract">
     <?= $this->renderColgroups() ?>
-    <?= $this->renderTableHeader('Players Under Contract') ?>
+    <?= $this->renderTableHeader('Players Under Contract', false, $team) ?>
     <tbody>
-        <?php foreach ($this->team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
+        <?php foreach ($team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
             <?php
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
 
-            if (!$player->isPlayerFreeAgent($this->season)):
+            if (!$player->isPlayerFreeAgent($season)):
                 $futureSalaries = $player->getFutureSalaries();
                 $playerName = $player->name;
                 if ($player->ordinal > \JSB::WAIVERS_ORDINAL) {
@@ -98,7 +87,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
             ?>
         <tr>
             <td style="text-align: center;">
-                <?php if ($player->canRookieOption($this->season->phase)): ?>
+                <?php if ($player->canRookieOption($season->phase)): ?>
                     <a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= (int) $player->playerID ?>">Rookie Option</a>
                 <?php endif; ?>
             </td>
@@ -123,8 +112,8 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="30" style="text-align: right;"><strong><em><?= htmlspecialchars($this->team->name) ?> Total Salary</em></strong></td>
-            <?php foreach ($this->capMetrics['totalSalaries'] as $salary): ?>
+            <td colspan="30" style="text-align: right;"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary</em></strong></td>
+            <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
                 <td style="text-align: center;"><strong><em><?= (int) $salary ?></em></strong></td>
             <?php endforeach; ?>
         </tr>
@@ -137,24 +126,26 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     /**
      * Render contract offers table
      *
+     * @param object $team Team object
+     * @param array $capMetrics Cap metrics from service
      * @return string HTML table
      */
-    private function renderContractOffers(): string
+    private function renderContractOffers(object $team, array $capMetrics): string
     {
         $commonRepository = new \Services\CommonMysqliRepository($this->mysqli_db);
-        $teamId = (int) ($this->team->teamID ?? 0);
-        $teamCity = htmlspecialchars($this->team->city ?? '');
-        $teamNameStr = htmlspecialchars($this->team->name ?? '');
-        $color1 = htmlspecialchars($this->team->color1 ?? 'D4AF37');
-        $color2 = htmlspecialchars($this->team->color2 ?? '1e3a5f');
+        $teamId = (int) ($team->teamID ?? 0);
+        $teamCity = htmlspecialchars($team->city ?? '');
+        $teamNameStr = htmlspecialchars($team->name ?? '');
+        $color1 = htmlspecialchars($team->color1 ?? 'D4AF37');
+        $color2 = htmlspecialchars($team->color2 ?? '1e3a5f');
 
         ob_start();
         ?>
 <table style="margin: 0 auto;" class="sortable fa-offers">
     <?= $this->renderColgroups() ?>
-    <?= $this->renderTableHeader('Contract Offers') ?>
+    <?= $this->renderTableHeader('Contract Offers', false, $team) ?>
     <tbody>
-        <?php foreach ($this->team->getFreeAgencyOffersResult() as $offerRow): ?>
+        <?php foreach ($team->getFreeAgencyOffersResult() as $offerRow): ?>
             <?php
             $playerID = $commonRepository->getPlayerIDFromPlayerName($offerRow['name']);
             $player = Player::withPlayerID($this->mysqli_db, $playerID);
@@ -184,12 +175,12 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="30" style="text-align: right;"><strong><em><?= htmlspecialchars($this->team->name) ?> Total Salary Plus Contract Offers</em></strong></td>
-            <?php foreach ($this->capMetrics['totalSalaries'] as $salary): ?>
+            <td colspan="30" style="text-align: right;"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary Plus Contract Offers</em></strong></td>
+            <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
                 <td style="text-align: center;"><strong><em><?= (int) $salary ?></em></strong></td>
             <?php endforeach; ?>
         </tr>
-        <?= $this->renderCapSpaceFooter() ?>
+        <?= $this->renderCapSpaceFooter($team, $capMetrics) ?>
     </tfoot>
 </table>
         <?php
@@ -199,32 +190,35 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     /**
      * Render team free agents table
      *
+     * @param object $team Team object
+     * @param \Season $season Season object
+     * @param array $capMetrics Cap metrics from service
      * @return string HTML table
      */
-    private function renderTeamFreeAgents(): string
+    private function renderTeamFreeAgents(object $team, \Season $season, array $capMetrics): string
     {
-        $teamId = (int) ($this->team->teamID ?? 0);
-        $teamCity = htmlspecialchars($this->team->city ?? '');
-        $teamNameStr = htmlspecialchars($this->team->name ?? '');
-        $color1 = htmlspecialchars($this->team->color1 ?? 'D4AF37');
-        $color2 = htmlspecialchars($this->team->color2 ?? '1e3a5f');
+        $teamId = (int) ($team->teamID ?? 0);
+        $teamCity = htmlspecialchars($team->city ?? '');
+        $teamNameStr = htmlspecialchars($team->name ?? '');
+        $color1 = htmlspecialchars($team->color1 ?? 'D4AF37');
+        $color2 = htmlspecialchars($team->color2 ?? '1e3a5f');
 
         ob_start();
         ?>
 <table style="margin: 0 auto;" class="sortable fa-team-free-agents">
     <?= $this->renderColgroups() ?>
-    <?= $this->renderTableHeader('Unsigned Free Agents', true) ?>
+    <?= $this->renderTableHeader('Unsigned Free Agents', true, $team) ?>
     <tbody>
-        <?php foreach ($this->team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
+        <?php foreach ($team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
             <?php
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
 
-            if ($player->isPlayerFreeAgent($this->season)):
+            if ($player->isPlayerFreeAgent($season)):
                 $demands = $player->getFreeAgencyDemands();
             ?>
         <tr>
             <td style="text-align: center;">
-                <?php if ($this->capMetrics['rosterSpots'][0] > 0): ?>
+                <?php if ($capMetrics['rosterSpots'][0] > 0): ?>
                     <a href="modules.php?name=Free_Agency&amp;pa=negotiate&amp;pid=<?= (int) $player->playerID ?>">Negotiate</a>
                 <?php endif; ?>
             </td>
@@ -259,25 +253,25 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     /**
      * Render other free agents table
      *
+     * @param object $team Team object
+     * @param \Season $season Season object
+     * @param array $allOtherPlayers Pre-fetched player rows from service
      * @return string HTML table
      */
-    private function renderOtherFreeAgents(): string
+    private function renderOtherFreeAgents(object $team, \Season $season, array $allOtherPlayers): string
     {
         ob_start();
         ?>
 <table style="margin: 0 auto;" class="sortable fa-other-free-agents">
     <?= $this->renderColgroups() ?>
-    <?= $this->renderTableHeader('All Other Free Agents') ?>
+    <?= $this->renderTableHeader('All Other Free Agents', false, $team) ?>
     <tbody>
         <?php
-        $allPlayers = $this->repository->getAllPlayersExcludingTeam($this->team->name);
-
-        foreach ($allPlayers as $playerRow):
+        foreach ($allOtherPlayers as $playerRow):
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
 
-            if ($player->isPlayerFreeAgent($this->season)):
+            if ($player->isPlayerFreeAgent($season)):
                 $demands = $player->getFreeAgencyDemands();
-                $pTeamId = (int) ($player->teamID ?? 0);
         ?>
         <tr>
             <td style="text-align: center;"><a href="modules.php?name=Free_Agency&amp;pa=negotiate&amp;pid=<?= (int) $player->playerID ?>">Negotiate</a></td>
@@ -317,11 +311,12 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
      *
      * @param string $title Table title to display in header
      * @param bool $showBirdRightsNote Whether to show the Bird Rights note
+     * @param object $team Team object for name display
      * @return string HTML table header
      */
-    private function renderTableHeader(string $title = '', bool $showBirdRightsNote = false): string
+    private function renderTableHeader(string $title, bool $showBirdRightsNote, object $team): string
     {
-        $teamName = htmlspecialchars($this->team->name ?? '');
+        $teamName = htmlspecialchars($team->name ?? '');
         $fullTitle = $title;
         if ($title !== 'All Other Free Agents') {
             $fullTitle = $teamName . ' ' . $title;
@@ -522,12 +517,14 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     /**
      * Render cap space footer rows
      *
+     * @param object $team Team object
+     * @param array $capMetrics Cap metrics from service
      * @return string HTML table rows
      */
-    private function renderCapSpaceFooter(): string
+    private function renderCapSpaceFooter(object $team, array $capMetrics): string
     {
-        $MLEicon = ($this->team->hasMLE === "1") ? "\u{2705}" : "\u{274C}";
-        $LLEicon = ($this->team->hasLLE === "1") ? "\u{2705}" : "\u{274C}";
+        $MLEicon = ($team->hasMLE === "1") ? "\u{2705}" : "\u{274C}";
+        $LLEicon = ($team->hasLLE === "1") ? "\u{2705}" : "\u{274C}";
 
         ob_start();
         ?>
@@ -536,7 +533,7 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     <td style="text-align: center;"><?= $MLEicon ?></td>
     <td colspan="28" style="background-color: #eeeeee;"></td>
     <td colspan="8" style="text-align: right; color: white;"><strong>Soft Cap Space</strong></td>
-    <?php foreach ($this->capMetrics['softCapSpace'] as $capSpace): ?>
+    <?php foreach ($capMetrics['softCapSpace'] as $capSpace): ?>
         <td style="text-align: center;"><?= (int) $capSpace ?></td>
     <?php endforeach; ?>
 </tr>
@@ -545,14 +542,14 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     <td style="text-align: center;"><?= $LLEicon ?></td>
     <td colspan="28" style="background-color: #eeeeee;"></td>
     <td colspan="8" style="text-align: right; color: white;"><strong>Hard Cap Space</strong></td>
-    <?php foreach ($this->capMetrics['hardCapSpace'] as $capSpace): ?>
+    <?php foreach ($capMetrics['hardCapSpace'] as $capSpace): ?>
         <td style="text-align: center;"><?= (int) $capSpace ?></td>
     <?php endforeach; ?>
 </tr>
 <tr style="background-color: #cc0000;">
     <td colspan="30" style="background-color: #eeeeee;"></td>
     <td colspan="8" style="text-align: right; color: white;"><strong>Empty Roster Slots</strong></td>
-    <?php foreach ($this->capMetrics['rosterSpots'] as $spots): ?>
+    <?php foreach ($capMetrics['rosterSpots'] as $spots): ?>
         <td style="text-align: center;"><?= (int) $spots ?></td>
     <?php endforeach; ?>
 </tr>

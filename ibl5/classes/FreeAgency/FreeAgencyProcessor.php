@@ -21,9 +21,9 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     {
         $this->mysqli_db = $mysqli_db;
         $this->season = new \Season($this->mysqli_db);
-        
+
         $demandRepository = new FreeAgencyDemandRepository($this->mysqli_db);
-        $this->validator = new FreeAgencyOfferValidator($this->mysqli_db);
+        $this->validator = new FreeAgencyOfferValidator();
         $this->calculator = new FreeAgencyDemandCalculator($demandRepository);
         $this->repository = new FreeAgencyRepository($this->mysqli_db);
     }
@@ -44,7 +44,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $team = \Team::initialize($this->mysqli_db, $teamName);
         
         // Check if player already signed
-        if ($this->validator->isPlayerAlreadySigned($playerID)) {
+        if ($this->repository->isPlayerAlreadySigned($playerID)) {
             return $this->renderOfferResponse(
                 false,
                 "Sorry, this player was previously signed to a team this Free Agency period.<p>
@@ -56,7 +56,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $offerData = $this->parseOfferData($player, $postData, $team);
         
         // Create validator with team data for MLE/LLE checks
-        $validator = new FreeAgencyOfferValidator($this->mysqli_db, $team);
+        $validator = new FreeAgencyOfferValidator($team);
         
         // Validate the offer
         $validationResult = $validator->validateOffer($offerData);
@@ -98,9 +98,9 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
         
         // Get existing offer to calculate amended cap space
-        $helper = new FreeAgencyNegotiationHelper($this->mysqli_db, $this->season);
-        $existingOffer = $helper->getExistingOffer($team->name, $player->name);
-        $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0] + $existingOffer['offer1'];
+        $existingOfferRow = $this->repository->getExistingOffer($team->name, $player->name);
+        $existingOfferYear1 = $existingOfferRow !== null ? (int) ($existingOfferRow['offer1'] ?? 0) : 0;
+        $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0] + $existingOfferYear1;
         
         $offerType = (int) ($postData['offerType'] ?? 0);
         

@@ -10,7 +10,7 @@ namespace FreeAgency\Contracts;
  * Renders HTML for contract offer forms including ratings, demands,
  * input fields, and quick-offer buttons (max contract, MLE, LLE, vet min).
  */
-interface FreeAgencyViewHelperInterface
+interface FreeAgencyFormComponentsInterface
 {
     /**
      * Render player ratings table

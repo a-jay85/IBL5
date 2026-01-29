@@ -18,13 +18,11 @@ use FreeAgency\FreeAgencyOfferValidator;
  */
 class FreeAgencyOfferValidatorEdgeCaseTest extends TestCase
 {
-    private \MockDatabase $mockDb;
     private FreeAgencyOfferValidator $validator;
 
     protected function setUp(): void
     {
-        $this->mockDb = new \MockDatabase();
-        $this->validator = new FreeAgencyOfferValidator($this->mockDb, null);
+        $this->validator = new FreeAgencyOfferValidator(null);
     }
 
     // ============================================
@@ -207,7 +205,7 @@ class FreeAgencyOfferValidatorEdgeCaseTest extends TestCase
             'hasMLE' => "1", // String
             'hasLLE' => "1"
         ];
-        $validator = new FreeAgencyOfferValidator($this->mockDb, $mockTeam);
+        $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR;
 
@@ -225,7 +223,7 @@ class FreeAgencyOfferValidatorEdgeCaseTest extends TestCase
             'hasMLE' => "0", // String zero
             'hasLLE' => "1"
         ];
-        $validator = new FreeAgencyOfferValidator($this->mockDb, $mockTeam);
+        $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::MLE_1_YEAR;
 
@@ -244,7 +242,7 @@ class FreeAgencyOfferValidatorEdgeCaseTest extends TestCase
             'hasMLE' => "1",
             'hasLLE' => "1" // String
         ];
-        $validator = new FreeAgencyOfferValidator($this->mockDb, $mockTeam);
+        $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION;
 
@@ -262,7 +260,7 @@ class FreeAgencyOfferValidatorEdgeCaseTest extends TestCase
             'hasMLE' => "1",
             'hasLLE' => "0" // String zero
         ];
-        $validator = new FreeAgencyOfferValidator($this->mockDb, $mockTeam);
+        $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
         $offerData['offerType'] = \FreeAgency\OfferType::LOWER_LEVEL_EXCEPTION;
 

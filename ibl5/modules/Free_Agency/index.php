@@ -1,8 +1,11 @@
 <?php
 
-use Player\Player;
-use FreeAgency\FreeAgencyDisplayHelper;
-use FreeAgency\FreeAgencyNegotiationHelper;
+use FreeAgency\FreeAgencyRepository;
+use FreeAgency\FreeAgencyDemandRepository;
+use FreeAgency\FreeAgencyService;
+use FreeAgency\FreeAgencyView;
+use FreeAgency\FreeAgencyNegotiationView;
+use FreeAgency\FreeAgencyFormComponents;
 use FreeAgency\FreeAgencyProcessor;
 
 /************************************************************************/
@@ -41,7 +44,7 @@ function main($user)
 
 function display()
 {
-    global $db, $mysqli_db, $cookie;
+    global $mysqli_db, $cookie;
     $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
     $season = new Season($mysqli_db);
 
@@ -52,8 +55,14 @@ function display()
     $teamName = $commonRepository->getTeamnameFromUsername($username);
     $team = Team::initialize($mysqli_db, $teamName);
 
-    $displayHelper = new FreeAgencyDisplayHelper($mysqli_db, $team, $season);
-    echo $displayHelper->renderMainPage();
+    // Service assembles data, view renders it
+    $repository = new FreeAgencyRepository($mysqli_db);
+    $demandRepository = new FreeAgencyDemandRepository($mysqli_db);
+    $service = new FreeAgencyService($repository, $demandRepository, $mysqli_db);
+    $view = new FreeAgencyView($mysqli_db);
+
+    $mainPageData = $service->getMainPageData($team, $season);
+    echo $view->render($mainPageData);
 
     CloseTable();
     Nuke\Footer::footer();
@@ -61,7 +70,7 @@ function display()
 
 function negotiate($pid)
 {
-    global $db, $cookie, $mysqli_db;
+    global $cookie, $mysqli_db;
     $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 
     $pid = intval($pid);
@@ -76,8 +85,19 @@ function negotiate($pid)
 
     $team = \Team::initialize($mysqli_db, $teamID);
     $season = new Season($mysqli_db);
-    $negotiationHelper = new FreeAgencyNegotiationHelper($mysqli_db, $season);
-    echo $negotiationHelper->renderNegotiationPage($pid, $team);
+
+    // Service assembles data, view renders it
+    $repository = new FreeAgencyRepository($mysqli_db);
+    $demandRepository = new FreeAgencyDemandRepository($mysqli_db);
+    $service = new FreeAgencyService($repository, $demandRepository, $mysqli_db);
+
+    $negotiationData = $service->getNegotiationData($pid, $team, $season);
+    $negotiationData['team'] = $team;
+
+    // FormComponents needs the player and team name for rendering
+    $formComponents = new FreeAgencyFormComponents($team->name, $negotiationData['player']);
+    $view = new FreeAgencyNegotiationView($formComponents);
+    echo $view->render($negotiationData);
 
     CloseTable();
     Nuke\Footer::footer();

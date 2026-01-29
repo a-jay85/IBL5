@@ -4,69 +4,45 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use FreeAgency\Contracts\FreeAgencyNegotiationHelperInterface;
+use FreeAgency\Contracts\FreeAgencyNegotiationViewInterface;
 use Player\Player;
 use Player\PlayerImageHelper;
 
 /**
- * @see FreeAgencyNegotiationHelperInterface
+ * @see FreeAgencyNegotiationViewInterface
  */
-class FreeAgencyNegotiationHelper implements FreeAgencyNegotiationHelperInterface
+class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
 {
-    private object $mysqli_db;
-    private FreeAgencyViewHelper $viewHelper;
-    private FreeAgencyDemandCalculator $calculator;
-    private FreeAgencyRepository $repository;
-    private \Season $season;
+    private FreeAgencyFormComponents $formComponents;
 
-    public function __construct(object $mysqli_db, \Season $season)
+    public function __construct(FreeAgencyFormComponents $formComponents)
     {
-        $this->mysqli_db = $mysqli_db;
-        $this->season = $season;
-        
-        // Placeholder - will be replaced with actual player in renderNegotiationPage
-        // Using a dummy player object for initialization
-        $dummyPlayer = new Player();
-        $this->viewHelper = new FreeAgencyViewHelper('', $dummyPlayer);
-        $demandRepository = new FreeAgencyDemandRepository($this->mysqli_db);
-        $this->calculator = new FreeAgencyDemandCalculator($demandRepository);
-        $this->repository = new FreeAgencyRepository($this->mysqli_db);
+        $this->formComponents = $formComponents;
     }
 
     /**
-     * @see FreeAgencyNegotiationHelperInterface::renderNegotiationPage()
+     * @see FreeAgencyNegotiationViewInterface::render()
      */
-    public function renderNegotiationPage(int $playerID, \Team $team): string
+    public function render(array $negotiationData): string
     {
-        $player = Player::withPlayerID($this->mysqli_db, $playerID);
-        
-        // Initialize ViewHelper with actual team and player
-        $this->viewHelper = new FreeAgencyViewHelper($team->name, $player);
-        
-        $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $team, $this->season);
-        $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
-        
-        $demands = $this->calculator->getPlayerDemands($player->name);
-        $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience);
-        $maxContract = \ContractRules::getMaxContractSalary($player->yearsOfExperience);
-        
-        // Get existing offer if any
-        $existingOffer = $this->getExistingOffer($team->name, $player->name);
-        
-        // Adjust cap space to account for existing offer
-        $amendedCapSpace = $capMetrics['softCapSpace'][0] + $existingOffer['offer1'];
-        
-        // Check if there's an existing offer
-        $hasExistingOffer = $existingOffer['offer1'] > 0;
-        
+        $player = $negotiationData['player'];
+        $capMetrics = $negotiationData['capMetrics'];
+        $demands = $negotiationData['demands'];
+        $existingOffer = $negotiationData['existingOffer'];
+        $amendedCapSpace = $negotiationData['amendedCapSpace'];
+        $hasExistingOffer = $negotiationData['hasExistingOffer'];
+        $veteranMinimum = $negotiationData['veteranMinimum'];
+        $maxContract = $negotiationData['maxContract'];
+        $team = $negotiationData['team'];
+
         ob_start();
         ?>
 <b><?= htmlspecialchars($player->position) ?> <?= htmlspecialchars($player->name) ?></b> - Contract Demands:
 <br>
 
-<?= $this->viewHelper->renderPlayerRatings() ?>
+<?= $this->formComponents->renderPlayerRatings() ?>
 
-<img align="left" src="<?= htmlspecialchars(PlayerImageHelper::getImageUrl($playerID)) ?>">
+<img align="left" src="<?= htmlspecialchars(PlayerImageHelper::getImageUrl($player->playerID)) ?>">
 
 Here are my demands (note these are not adjusted for your team's attributes; I will adjust the offer you make to me accordingly):
 
@@ -80,14 +56,14 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
     <table cellspacing="0" border="1">
         <tr>
             <td>My demands are:</td>
-            <td><?= $this->viewHelper->renderDemandDisplay($demands) ?></td>
+            <td><?= $this->formComponents->renderDemandDisplay($demands) ?></td>
         </tr>
-        
+
         <form name="FAOffer" method="post" action="modules.php?name=Free_Agency&pa=processoffer">
         <tr>
             <td>Please enter your offer in this row:</td>
-            <td><?= $this->viewHelper->renderOfferInputs($existingOffer) ?></td>
-            
+            <td><?= $this->formComponents->renderOfferInputs($existingOffer) ?></td>
+
             <input type="hidden" name="teamname" value="<?= htmlspecialchars($team->name) ?>">
             <input type="hidden" name="playerID" value="<?= $player->playerID ?>">
             <input type="hidden" name="offerType" value="0">
@@ -95,15 +71,15 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             <td><input type="submit" value="Offer/Amend Free Agent Contract!"></td>
         </tr>
         </form>
-        
+
         <tr>
             <td colspan="8"><center><b>MAX SALARY OFFERS:</b></center></td>
         </tr>
-        
+
         <?= $this->renderOfferButtons($player) ?>
-        
+
         <?= $this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capMetrics, $player->birdYears) ?>
-        
+
         <?php if ($hasExistingOffer): ?>
         <tr>
             <td colspan="8">
@@ -123,7 +99,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
 
     /**
      * Render all offer button rows (Max Contract, MLE, LLE, Vet Min)
-     * 
+     *
      * @param Player $player
      * @return string HTML table rows
      */
@@ -133,9 +109,9 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
         $maxContract = \ContractRules::getMaxContractSalary($player->yearsOfExperience);
         $raisePercentage = \ContractRules::getMaxRaisePercentage($player->birdYears);
         $maxRaise = (int) round($maxContract * $raisePercentage);
-        
+
         // Build max salaries for all 6 years using same raise logic as validator
-        // Use 0-based indexing for array_slice compatibility in FreeAgencyViewHelper
+        // Use 0-based indexing for array_slice compatibility in FreeAgencyFormComponents
         $maxSalaries = [
             0 => $maxContract,
             1 => $maxContract + $maxRaise,
@@ -144,59 +120,31 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             4 => $maxContract + ($maxRaise * 4),
             5 => $maxContract + ($maxRaise * 5),
         ];
-        
+
         ob_start();
-        echo $this->viewHelper->renderMaxContractButtons($maxSalaries, $player->birdYears);
-        
+        echo $this->formComponents->renderMaxContractButtons($maxSalaries, $player->birdYears);
+
         // MLE row
         echo "<tr>";
-        echo $this->viewHelper->renderExceptionButtons('MLE');
+        echo $this->formComponents->renderExceptionButtons('MLE');
         echo "</tr>";
-        
+
         // LLE row
         echo "<tr>";
-        echo $this->viewHelper->renderExceptionButtons('LLE');
+        echo $this->formComponents->renderExceptionButtons('LLE');
         echo "</tr>";
-        
+
         // Vet Min row
         echo "<tr>";
-        echo $this->viewHelper->renderExceptionButtons('VET');
+        echo $this->formComponents->renderExceptionButtons('VET');
         echo "</tr>";
-        
+
         return ob_get_clean();
     }
 
     /**
-     * @see FreeAgencyNegotiationHelperInterface::getExistingOffer()
-     */
-    public function getExistingOffer(string $teamName, string $playerName): array
-    {
-        $offer = $this->repository->getExistingOffer($teamName, $playerName);
-        
-        if ($offer === null) {
-            return [
-                'offer1' => 0,
-                'offer2' => 0,
-                'offer3' => 0,
-                'offer4' => 0,
-                'offer5' => 0,
-                'offer6' => 0,
-            ];
-        }
-        
-        return [
-            'offer1' => (int) ($offer['offer1'] ?? 0),
-            'offer2' => (int) ($offer['offer2'] ?? 0),
-            'offer3' => (int) ($offer['offer3'] ?? 0),
-            'offer4' => (int) ($offer['offer4'] ?? 0),
-            'offer5' => (int) ($offer['offer5'] ?? 0),
-            'offer6' => (int) ($offer['offer6'] ?? 0),
-        ];
-    }
-
-    /**
      * Render Notes/Reminders section
-     * 
+     *
      * @param int $maxContract Maximum contract value
      * @param int $veteranMinimum Veteran minimum salary
      * @param int $amendedCapSpace Amended cap space for year 1
@@ -213,20 +161,20 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
     ): string {
         $softCapSpace = $capMetrics['softCapSpace'];
         $hardCapSpace = $capMetrics['hardCapSpace'];
-        
+
         // Calculate raise percentage and example based on bird years (matching validator logic)
         $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
         $raisePercentageDisplay = (int)($raisePercentage * 100);
         $exampleSalary = 500;
         $exampleRaise = (int) round($exampleSalary * $raisePercentage);
-        
+
         $hasBirdRights = \ContractRules::hasBirdRights($birdYears);
         if ($hasBirdRights) {
             $birdRightsText = "<b>Bird Rights Player on Your Team:</b> You may add no more than {$raisePercentageDisplay}% of the amount you offer in the first year as a raise between years (for instance, if you offer {$exampleSalary} in Year 1, you cannot offer a raise of more than {$exampleRaise} between any two subsequent years.)";
         } else {
             $birdRightsText = "<b>For Players who do not have Bird Rights with your team:</b> You may add no more than {$raisePercentageDisplay}% of the amount you offer in the first year as a raise between years (for instance, if you offer {$exampleSalary} in Year 1, you cannot offer a raise of more than {$exampleRaise} between any two subsequent years.)";
         }
-        
+
         ob_start();
         ?>
 <tr>

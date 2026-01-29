@@ -11,13 +11,11 @@ use FreeAgency\Contracts\FreeAgencyOfferValidatorInterface;
  */
 class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
 {
-    private object $mysqli_db;
     private array $offerData = [];
     private $team;
 
-    public function __construct(object $mysqli_db, $team = null)
+    public function __construct($team = null)
     {
-        $this->mysqli_db = $mysqli_db;
         $this->team = $team;
     }
 
@@ -233,33 +231,4 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         return ['valid' => true];
     }
 
-    /**
-     * @see FreeAgencyOfferValidatorInterface::isPlayerAlreadySigned()
-     */
-    public function isPlayerAlreadySigned(int $playerId): bool
-    {
-        $query = "SELECT cy, cy1 FROM ibl_plr WHERE pid = ?";
-        $stmt = $this->mysqli_db->prepare($query);
-        if ($stmt === false) {
-            throw new \Exception('Prepare failed: ' . $this->mysqli_db->error);
-        }
-        
-        $stmt->bind_param("i", $playerId);
-        if (!$stmt->execute()) {
-            throw new \Exception('Execute failed: ' . $stmt->error);
-        }
-        
-        $result = $stmt->get_result();
-        $stmt->close();
-        
-        if ($result->num_rows === 0) {
-            return false;
-        }
-        
-        $row = $result->fetch_assoc();
-        $currentContractYear = $row['cy'] ?? 0;
-        $year1Contract = $row['cy1'] ?? '0';
-        
-        return ($currentContractYear === 0 && $year1Contract !== "0");
-    }
 }

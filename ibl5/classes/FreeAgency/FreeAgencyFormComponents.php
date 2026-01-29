@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use FreeAgency\Contracts\FreeAgencyViewHelperInterface;
+use FreeAgency\Contracts\FreeAgencyFormComponentsInterface;
 
 /**
- * @see FreeAgencyViewHelperInterface
+ * @see FreeAgencyFormComponentsInterface
  */
-class FreeAgencyViewHelper implements FreeAgencyViewHelperInterface
+class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
 {
     private string $teamName;
     private \Player\Player $player;
@@ -27,7 +27,7 @@ class FreeAgencyViewHelper implements FreeAgencyViewHelperInterface
     }
 
     /**
-     * @see FreeAgencyViewHelperInterface::renderPlayerRatings()
+     * @see FreeAgencyFormComponentsInterface::renderPlayerRatings()
      */
     public function renderPlayerRatings(): string
     {
@@ -88,7 +88,7 @@ class FreeAgencyViewHelper implements FreeAgencyViewHelperInterface
     }
 
     /**
-     * @see FreeAgencyViewHelperInterface::renderDemandDisplay()
+     * @see FreeAgencyFormComponentsInterface::renderDemandDisplay()
      */
     public function renderDemandDisplay(array $demands): string
     {
@@ -106,18 +106,18 @@ class FreeAgencyViewHelper implements FreeAgencyViewHelperInterface
     }
 
     /**
-     * @see FreeAgencyViewHelperInterface::renderOfferInputs()
+     * @see FreeAgencyFormComponentsInterface::renderOfferInputs()
      */
     public function renderOfferInputs(array $prefills): string
     {
         ob_start();
         ?>
-<input type="number" style="width: 4em" name="offeryear1" size="4" value="<?= htmlspecialchars($prefills['offer1'] ?: '') ?>" min="0" max="9999"></td><td>
-<input type="number" style="width: 4em" name="offeryear2" size="4" value="<?= htmlspecialchars($prefills['offer2'] ?: '') ?>" min="0" max="9999"></td><td>
-<input type="number" style="width: 4em" name="offeryear3" size="4" value="<?= htmlspecialchars($prefills['offer3'] ?: '') ?>" min="0" max="9999"></td><td>
-<input type="number" style="width: 4em" name="offeryear4" size="4" value="<?= htmlspecialchars($prefills['offer4'] ?: '') ?>" min="0" max="9999"></td><td>
-<input type="number" style="width: 4em" name="offeryear5" size="4" value="<?= htmlspecialchars($prefills['offer5'] ?: '') ?>" min="0" max="9999"></td><td>
-<input type="number" style="width: 4em" name="offeryear6" size="4" value="<?= htmlspecialchars($prefills['offer6'] ?: '') ?>" min="0" max="9999"></td>
+<input type="number" style="width: 4em" name="offeryear1" size="4" value="<?= $prefills['offer1'] ?: '' ?>" min="0" max="9999"></td><td>
+<input type="number" style="width: 4em" name="offeryear2" size="4" value="<?= $prefills['offer2'] ?: '' ?>" min="0" max="9999"></td><td>
+<input type="number" style="width: 4em" name="offeryear3" size="4" value="<?= $prefills['offer3'] ?: '' ?>" min="0" max="9999"></td><td>
+<input type="number" style="width: 4em" name="offeryear4" size="4" value="<?= $prefills['offer4'] ?: '' ?>" min="0" max="9999"></td><td>
+<input type="number" style="width: 4em" name="offeryear5" size="4" value="<?= $prefills['offer5'] ?: '' ?>" min="0" max="9999"></td><td>
+<input type="number" style="width: 4em" name="offeryear6" size="4" value="<?= $prefills['offer6'] ?: '' ?>" min="0" max="9999"></td>
         <?php
         return ob_get_clean();
     }
@@ -170,7 +170,7 @@ class FreeAgencyViewHelper implements FreeAgencyViewHelperInterface
     }
 
     /**
-     * @see FreeAgencyViewHelperInterface::renderMaxContractButtons()
+     * @see FreeAgencyFormComponentsInterface::renderMaxContractButtons()
      */
     public function renderMaxContractButtons(array $maxSalaries, int $birdYears = 0): string
     {
@@ -196,7 +196,7 @@ class FreeAgencyViewHelper implements FreeAgencyViewHelperInterface
     }
 
     /**
-     * @see FreeAgencyViewHelperInterface::renderExceptionButtons()
+     * @see FreeAgencyFormComponentsInterface::renderExceptionButtons()
      */
     public function renderExceptionButtons(string $exceptionType): string
     {

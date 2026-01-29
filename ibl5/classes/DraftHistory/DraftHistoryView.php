@@ -104,7 +104,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
                     <th>Round</th>
                     <th>Pick</th>
                     <th>Player</th>
-                    <th>Selected By</th>
+                    <th>Team</th>
                     <th>Pic</th>
                     <th>College</th>
                 </tr>

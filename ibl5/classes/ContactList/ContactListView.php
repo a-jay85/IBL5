@@ -72,7 +72,7 @@ class ContactListView implements ContactListViewInterface
             <thead>
                 <tr>
                     <th>Team</th>
-                    <th>GM\'s Name</th>
+                    <th>Name</th>
                     <th>AIM</th>
                     <th>Skype</th>
                 </tr>

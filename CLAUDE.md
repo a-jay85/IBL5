@@ -128,36 +128,17 @@ ibl5/bin/db-query "DESCRIBE ibl_plr"
 
 ## Git Commit Conventions
 
-When committing changes, use this format:
-
-1. **Short message (first line):** Concise summary using conventional commit style (e.g., `feat:`, `fix:`, `test:`, `docs:`, `refactor:`)
-2. **Long message (body):** Detailed summary with sections, bullet points, and context
-
-**Format:**
+Commit body format — use `## Section` headers with bullet points:
 ```
 <type>: <short summary>
 
 ## Section Header
 
-<detailed description with bullet points>
-
-- Item 1
-- Item 2
-
-## Another Section
-
-<more details>
-
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+- Detail 1
+- Detail 2
 ```
 
-**Important:** When asked to commit, only stage files that were modified as part of the current task. Check `git status` first and be selective about what to stage.
-
-**Multiple Claude Instances Warning:** Other Claude instances may have unstaged changes in the working tree. Before committing:
-1. Run `git status` to see ALL modified files
-2. Only stage files YOU modified in this session
-3. Leave other unstaged files alone - they belong to other instances
-4. If unsure which files you modified, ask the user
+**Multiple Claude Instances Warning:** Other Claude instances may have unstaged changes in the working tree. Only stage files YOU modified in this session; leave other unstaged files alone. If unsure, ask the user.
 
 ## Mandatory Rules
 

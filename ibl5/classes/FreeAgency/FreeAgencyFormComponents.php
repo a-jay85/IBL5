@@ -16,7 +16,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
 
     /**
      * Constructor
-     * 
+     *
      * @param string $teamName Team name for hidden form fields
      * @param \Player\Player $player Player object with all necessary data
      */
@@ -33,56 +33,58 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     {
         ob_start();
         ?>
-<center>
-    <table>
+<table class="ibl-data-table" style="font-size: 0.875rem;">
+    <thead>
         <tr>
-            <td align="center"><b>2ga</b></td>
-            <td align="center"><b>2gp</b></td>
-            <td align="center"><b>fta</b></td>
-            <td align="center"><b>ftp</b></td>
-            <td align="center"><b>3ga</b></td>
-            <td align="center"><b>3gp</b></td>
-            <td align="center"><b>orb</b></td>
-            <td align="center"><b>drb</b></td>
-            <td align="center"><b>ast</b></td>
-            <td align="center"><b>stl</b></td>
-            <td align="center"><b>tvr</b></td>
-            <td align="center"><b>blk</b></td>
-            <td align="center"><b>foul</b></td>
-            <td align="center"><b>oo</b></td>
-            <td align="center"><b>do</b></td>
-            <td align="center"><b>po</b></td>
-            <td align="center"><b>to</b></td>
-            <td align="center"><b>od</b></td>
-            <td align="center"><b>dd</b></td>
-            <td align="center"><b>pd</b></td>
-            <td align="center"><b>td</b></td>
+            <th>2ga</th>
+            <th>2gp</th>
+            <th>fta</th>
+            <th>ftp</th>
+            <th>3ga</th>
+            <th>3gp</th>
+            <th>orb</th>
+            <th>drb</th>
+            <th>ast</th>
+            <th>stl</th>
+            <th>tvr</th>
+            <th>blk</th>
+            <th>foul</th>
+            <th>oo</th>
+            <th>do</th>
+            <th>po</th>
+            <th>to</th>
+            <th>od</th>
+            <th>dd</th>
+            <th>pd</th>
+            <th>td</th>
         </tr>
+    </thead>
+    <tbody>
         <tr>
-            <td align="center"><?= $this->player->ratingFieldGoalAttempts ?></td>
-            <td align="center"><?= $this->player->ratingFieldGoalPercentage ?></td>
-            <td align="center"><?= $this->player->ratingFreeThrowAttempts ?></td>
-            <td align="center"><?= $this->player->ratingFreeThrowPercentage ?></td>
-            <td align="center"><?= $this->player->ratingThreePointAttempts ?></td>
-            <td align="center"><?= $this->player->ratingThreePointPercentage ?></td>
-            <td align="center"><?= $this->player->ratingOffensiveRebounds ?></td>
-            <td align="center"><?= $this->player->ratingDefensiveRebounds ?></td>
-            <td align="center"><?= $this->player->ratingAssists ?></td>
-            <td align="center"><?= $this->player->ratingSteals ?></td>
-            <td align="center"><?= $this->player->ratingTurnovers ?></td>
-            <td align="center"><?= $this->player->ratingBlocks ?></td>
-            <td align="center"><?= $this->player->ratingFouls ?></td>
-            <td align="center"><?= $this->player->ratingOutsideOffense ?></td>
-            <td align="center"><?= $this->player->ratingDriveOffense ?></td>
-            <td align="center"><?= $this->player->ratingPostOffense ?></td>
-            <td align="center"><?= $this->player->ratingTransitionOffense ?></td>
-            <td align="center"><?= $this->player->ratingOutsideDefense ?></td>
-            <td align="center"><?= $this->player->ratingDriveDefense ?></td>
-            <td align="center"><?= $this->player->ratingPostDefense ?></td>
-            <td align="center"><?= $this->player->ratingTransitionDefense ?></td>
+            <td><?= (int) $this->player->ratingFieldGoalAttempts ?></td>
+            <td><?= (int) $this->player->ratingFieldGoalPercentage ?></td>
+            <td><?= (int) $this->player->ratingFreeThrowAttempts ?></td>
+            <td><?= (int) $this->player->ratingFreeThrowPercentage ?></td>
+            <td><?= (int) $this->player->ratingThreePointAttempts ?></td>
+            <td><?= (int) $this->player->ratingThreePointPercentage ?></td>
+            <td><?= (int) $this->player->ratingOffensiveRebounds ?></td>
+            <td><?= (int) $this->player->ratingDefensiveRebounds ?></td>
+            <td><?= (int) $this->player->ratingAssists ?></td>
+            <td><?= (int) $this->player->ratingSteals ?></td>
+            <td><?= (int) $this->player->ratingTurnovers ?></td>
+            <td><?= (int) $this->player->ratingBlocks ?></td>
+            <td><?= (int) $this->player->ratingFouls ?></td>
+            <td><?= (int) $this->player->ratingOutsideOffense ?></td>
+            <td><?= (int) $this->player->ratingDriveOffense ?></td>
+            <td><?= (int) $this->player->ratingPostOffense ?></td>
+            <td><?= (int) $this->player->ratingTransitionOffense ?></td>
+            <td><?= (int) $this->player->ratingOutsideDefense ?></td>
+            <td><?= (int) $this->player->ratingDriveDefense ?></td>
+            <td><?= (int) $this->player->ratingPostDefense ?></td>
+            <td><?= (int) $this->player->ratingTransitionDefense ?></td>
         </tr>
-    </table>
-</center>
+    </tbody>
+</table>
         <?php
         return ob_get_clean();
     }
@@ -93,15 +95,18 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     public function renderDemandDisplay(array $demands): string
     {
         ob_start();
-        
-        echo htmlspecialchars((string)$demands['dem1']);
-        if ($demands['dem2'] !== 0) echo "</td><td>" . htmlspecialchars((string)$demands['dem2']);
-        if ($demands['dem3'] !== 0) echo "</td><td>" . htmlspecialchars((string)$demands['dem3']);
-        if ($demands['dem4'] !== 0) echo "</td><td>" . htmlspecialchars((string)$demands['dem4']);
-        if ($demands['dem5'] !== 0) echo "</td><td>" . htmlspecialchars((string)$demands['dem5']);
-        if ($demands['dem6'] !== 0) echo "</td><td>" . htmlspecialchars((string)$demands['dem6']);
-        echo "</td><td></td>";
-        
+        ?>
+<div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+    <?php for ($i = 1; $i <= 6; $i++): ?>
+        <?php if ($demands["dem{$i}"] !== 0): ?>
+        <div style="text-align: center;">
+            <div class="ibl-label" style="font-size: 0.75rem;">Yr <?= $i ?></div>
+            <div style="font-weight: 600;"><?= (int) $demands["dem{$i}"] ?></div>
+        </div>
+        <?php endif; ?>
+    <?php endfor; ?>
+</div>
+        <?php
         return ob_get_clean();
     }
 
@@ -112,21 +117,23 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     {
         ob_start();
         ?>
-<input type="number" style="width: 4em" name="offeryear1" size="4" value="<?= $prefills['offer1'] ?: '' ?>" min="0" max="9999"></td><td>
-<input type="number" style="width: 4em" name="offeryear2" size="4" value="<?= $prefills['offer2'] ?: '' ?>" min="0" max="9999"></td><td>
-<input type="number" style="width: 4em" name="offeryear3" size="4" value="<?= $prefills['offer3'] ?: '' ?>" min="0" max="9999"></td><td>
-<input type="number" style="width: 4em" name="offeryear4" size="4" value="<?= $prefills['offer4'] ?: '' ?>" min="0" max="9999"></td><td>
-<input type="number" style="width: 4em" name="offeryear5" size="4" value="<?= $prefills['offer5'] ?: '' ?>" min="0" max="9999"></td><td>
-<input type="number" style="width: 4em" name="offeryear6" size="4" value="<?= $prefills['offer6'] ?: '' ?>" min="0" max="9999"></td>
+<div style="display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap;">
+    <?php for ($i = 1; $i <= 6; $i++): ?>
+    <div style="text-align: center;">
+        <label class="ibl-label" style="font-size: 0.75rem; display: block;">Yr <?= $i ?></label>
+        <input type="number" class="ibl-input ibl-input--sm" style="width: 4.5rem;" name="offeryear<?= $i ?>" value="<?= $prefills["offer{$i}"] ?: '' ?>" min="0" max="9999">
+    </div>
+    <?php endfor; ?>
+</div>
         <?php
         return ob_get_clean();
     }
 
     /**
      * Render a single offer button form
-     * 
+     *
      * Used for all contract offer types (max contract, MLE, LLE, vet min)
-     * 
+     *
      * @param array<int> $offers Salary amounts for each year
      * @param int $finalYear Final year of contract
      * @param int $offerType Offer type (0=normal, 1-6=MLE, 7=LLE, 8=VET)
@@ -136,9 +143,9 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     {
         ob_start();
         ?>
-<form name="FAOffer" method="post" action="modules.php?name=Free_Agency&pa=processoffer">
+<form name="FAOffer" method="post" action="modules.php?name=Free_Agency&pa=processoffer" style="display: inline;">
     <?= $this->renderHiddenFields($offers, $offerType) ?>
-    <input type="submit" value="<?= $offers[$finalYear - 1] ?>">
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary"><?= (int) $offers[$finalYear - 1] ?></button>
 </form>
         <?php
         return ob_get_clean();
@@ -146,7 +153,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
 
     /**
      * Render hidden form fields
-     * 
+     *
      * @param array<int> $offers Offer amounts
      * @param int $offerType Offer type (0=normal, 1-6=MLE, 7=LLE, 8=VET)
      * @return string HTML hidden inputs
@@ -154,18 +161,18 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     private function renderHiddenFields(array $offers, int $offerType = 0): string
     {
         ob_start();
-        
+
         // Offer years
         for ($i = 0; $i < count($offers); $i++) {
             $yearNum = $i + 1;
-            echo "<input type=\"hidden\" name=\"offeryear{$yearNum}\" value=\"" . $offers[$i] . "\">\n";
+            echo "<input type=\"hidden\" name=\"offeryear{$yearNum}\" value=\"" . (int) $offers[$i] . "\">\n";
         }
-        
+
         // Essential form data - uses player properties
         echo "<input type=\"hidden\" name=\"teamname\" value=\"" . htmlspecialchars($this->teamName) . "\">\n";
-        echo "<input type=\"hidden\" name=\"playerID\" value=\"" . $this->player->playerID . "\">\n";
-        echo "<input type=\"hidden\" name=\"offerType\" value=\"" . $offerType . "\">\n";
-        
+        echo "<input type=\"hidden\" name=\"playerID\" value=\"" . (int) $this->player->playerID . "\">\n";
+        echo "<input type=\"hidden\" name=\"offerType\" value=\"" . (int) $offerType . "\">\n";
+
         return ob_get_clean();
     }
 
@@ -180,14 +187,14 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
                 'offers' => array_slice($maxSalaries, 0, $years),
             ];
         }
-        
+
         $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
         $raisePercentageDisplay = (int)($raisePercentage * 100);
         $hasBirdRights = \ContractRules::hasBirdRights($birdYears);
         $birdRightsText = $hasBirdRights ? ' with Bird Rights' : '';
-        
+
         $label = "Max Level Contract {$raisePercentageDisplay}%{$birdRightsText} (click the button that corresponds to the final year you wish to offer):";
-        
+
         return $this->renderButtonRow(
             $label,
             $contractOfferConfigs,
@@ -201,7 +208,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     public function renderExceptionButtons(string $exceptionType): string
     {
         ob_start();
-        
+
         if ($exceptionType === 'MLE') {
             $this->renderMLEButtons();
         } elseif ($exceptionType === 'LLE') {
@@ -209,13 +216,13 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         } elseif ($exceptionType === 'VET') {
             $this->renderVetMinButton();
         }
-        
+
         return ob_get_clean();
     }
 
     /**
      * Render Mid-Level Exception buttons
-     * 
+     *
      * @return void
      */
     private function renderMLEButtons(): void
@@ -227,7 +234,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
                 'offerType' => (string) $years,
             ];
         }
-        
+
         echo $this->renderButtonRow(
             'Mid-Level Exception (click the button that corresponds to the final year you wish to offer):',
             $contractOfferConfigs,
@@ -237,7 +244,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
 
     /**
      * Render Lower-Level Exception button
-     * 
+     *
      * @return void
      */
     private function renderLLEButton(): void
@@ -248,17 +255,17 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
                 'offerType' => (string) OfferType::LOWER_LEVEL_EXCEPTION,
             ],
         ];
-        
+
         echo $this->renderButtonRow(
             'Lower-Level Exception:',
             $contractOfferConfigs,
-            6
+            0
         );
     }
 
     /**
      * Render Veteran's Minimum button
-     * 
+     *
      * @return void
      */
     private function renderVetMinButton(): void
@@ -269,40 +276,39 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
                 'offerType' => (string) OfferType::VETERAN_MINIMUM,
             ],
         ];
-        
+
         echo $this->renderButtonRow(
             'Veterans Exception:',
             $contractOfferConfigs,
-            6
+            0
         );
     }
 
     /**
-     * Render a row of contract offer buttons with label and fill cells
-     * 
-     * @param string $label Label text for the first cell
+     * Render a row of contract offer buttons with label
+     *
+     * @param string $label Label text for the row
      * @param array<array{offers: array<int>, offerType?: string}> $contractOfferConfigs Contract offer configurations by years
-     * @param int $fillCells Number of empty cells to add at end
-     * @return string HTML table row content
+     * @param int $fillCells Unused, kept for interface compatibility
+     * @return string HTML flex row content
      */
     private function renderButtonRow(string $label, array $contractOfferConfigs, int $fillCells = 0): string
     {
         ob_start();
-        
-        echo "<td>" . htmlspecialchars($label) . "</td>";
-        
-        foreach ($contractOfferConfigs as $config) {
+        ?>
+<div style="margin-bottom: 0.75rem;">
+    <span class="ibl-label"><?= htmlspecialchars($label) ?></span>
+    <div style="display: flex; gap: 0.375rem; flex-wrap: wrap; margin-top: 0.25rem;">
+        <?php foreach ($contractOfferConfigs as $config): ?>
+            <?php
             $offerType = isset($config['offerType']) ? (int) $config['offerType'] : 0;
             $finalYear = count($config['offers']);
-            echo "<td>{$this->renderOfferButtonForm($config['offers'], $finalYear, $offerType)}</td>";
-        }
-        
-        if ($fillCells > 0) {
-            echo "<td colspan=\"{$fillCells}\"></td>";
-        } else {
-            echo "<td></td>";
-        }
-        
+            echo $this->renderOfferButtonForm($config['offers'], $finalYear, $offerType);
+            ?>
+        <?php endforeach; ?>
+    </div>
+</div>
+        <?php
         return ob_get_clean();
     }
 }

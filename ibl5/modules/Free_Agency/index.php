@@ -62,7 +62,8 @@ function display()
     $view = new FreeAgencyView($mysqli_db);
 
     $mainPageData = $service->getMainPageData($team, $season);
-    echo $view->render($mainPageData);
+    $result = $_GET['result'] ?? null;
+    echo $view->render($mainPageData, $result);
 
     CloseTable();
     Nuke\Footer::footer();
@@ -97,7 +98,8 @@ function negotiate($pid)
     // FormComponents needs the player and team name for rendering
     $formComponents = new FreeAgencyFormComponents($team->name, $negotiationData['player']);
     $view = new FreeAgencyNegotiationView($formComponents);
-    echo $view->render($negotiationData);
+    $error = $_GET['error'] ?? null;
+    echo $view->render($negotiationData, $error);
 
     CloseTable();
     Nuke\Footer::footer();
@@ -107,7 +109,17 @@ function processOffer()
 {
     global $mysqli_db;
     $processor = new FreeAgencyProcessor($mysqli_db);
-    echo $processor->processOfferSubmission($_POST);
+    $result = $processor->processOfferSubmission($_POST);
+    $pid = $result['playerID'];
+
+    if ($result['success']) {
+        header('Location: modules.php?name=Free_Agency&result=offer_success');
+    } elseif ($result['type'] === 'already_signed') {
+        header('Location: modules.php?name=Free_Agency&result=already_signed');
+    } else {
+        header('Location: modules.php?name=Free_Agency&pa=negotiate&pid=' . $pid . '&error=' . rawurlencode($result['message']));
+    }
+    exit;
 }
 
 function deleteOffer()
@@ -115,7 +127,9 @@ function deleteOffer()
     global $mysqli_db;
     $processor = new FreeAgencyProcessor($mysqli_db);
     $playerID = (int) ($_POST['playerID'] ?? 0);
-    echo $processor->deleteOffers($_POST['teamname'], $playerID);
+    $processor->deleteOffers($_POST['teamname'], $playerID);
+    header('Location: modules.php?name=Free_Agency&result=deleted');
+    exit;
 }
 
 switch ($pa) {

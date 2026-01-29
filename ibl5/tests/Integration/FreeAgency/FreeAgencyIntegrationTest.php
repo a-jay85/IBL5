@@ -71,8 +71,9 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->processOfferSubmission($postData);
 
         // Assert
-        $this->assertStringContainsString('Your offer is legal', $result);
-        $this->assertStringContainsString('Free_Agency', $result);
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
+        $this->assertSame('offer_success', $result['type']);
 
         // Verify offer was saved to database
         $this->assertQueryExecuted('INSERT INTO ibl_fa_offers');
@@ -98,7 +99,9 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->processOfferSubmission($postData);
 
         // Assert
-        $this->assertStringContainsString('Your offer is legal', $result);
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
+        $this->assertSame('offer_success', $result['type']);
 
         // Verify MLE flag was set
         $this->assertQueryExecuted('INSERT INTO ibl_fa_offers');
@@ -123,7 +126,9 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->processOfferSubmission($postData);
 
         // Assert
-        $this->assertStringContainsString('Your offer is legal', $result);
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
+        $this->assertSame('offer_success', $result['type']);
 
         // Verify LLE flag was set
         $this->assertQueryExecuted('INSERT INTO ibl_fa_offers');
@@ -148,7 +153,9 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->processOfferSubmission($postData);
 
         // Assert
-        $this->assertStringContainsString('Your offer is legal', $result);
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
+        $this->assertSame('offer_success', $result['type']);
         $this->assertQueryExecuted('INSERT INTO ibl_fa_offers');
     }
 
@@ -179,8 +186,10 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->processOfferSubmission($postData);
 
         // Assert
-        $this->assertStringContainsString('previously signed', $result);
-        $this->assertStringContainsString('ff0000', $result); // Error color
+        $this->assertIsArray($result);
+        $this->assertFalse($result['success']);
+        $this->assertSame('already_signed', $result['type']);
+        $this->assertStringContainsString('previously signed', $result['message']);
 
         // Verify no offer was saved
         $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
@@ -211,7 +220,9 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->processOfferSubmission($postData);
 
         // Assert
-        $this->assertStringContainsString('ff0000', $result); // Error color
+        $this->assertIsArray($result);
+        $this->assertFalse($result['success']);
+        $this->assertSame('validation_error', $result['type']);
 
         // Verify no offer was saved
         $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
@@ -232,8 +243,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->deleteOffers('Miami Cyclones', 1);
 
         // Assert
-        $this->assertStringContainsString('deleted', $result);
-        $this->assertStringContainsString('Free_Agency', $result);
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
 
         // Verify DELETE query was executed
         $this->assertQueryExecuted('DELETE FROM ibl_fa_offers');

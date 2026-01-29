@@ -261,3 +261,21 @@
     background: #eff6ff;
     color: #2563eb;
 }
+
+/* ==========================================================================
+   Alert Banners
+   ========================================================================== */
+
+.ibl-alert {
+    font-family: var(--font-sans);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-4);
+    font-size: 1.125rem;
+    line-height: 1.5;
+}
+
+.ibl-alert--success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.ibl-alert--error   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.ibl-alert--info    { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.ibl-alert--warning { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }

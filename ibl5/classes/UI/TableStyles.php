@@ -45,6 +45,7 @@ class TableStyles
     border-radius: 0.5rem;
     overflow: hidden;
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    margin: 0 auto;
 }
 .<?= $tableClass ?> thead {
     background: linear-gradient(135deg, #<?= $teamColor ?>, #<?= $teamColorDark ?>);
@@ -67,6 +68,8 @@ class TableStyles
 .<?= $tableClass ?> td {
     color: var(--gray-800, #1f2937);
     font-size: 1rem;
+    text-align: center;
+    padding: 0.5rem 0.375rem;
 }
 .<?= $tableClass ?> tbody tr {
     transition: background-color 150ms ease;

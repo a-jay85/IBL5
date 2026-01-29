@@ -16,20 +16,17 @@ interface FreeAgencyNegotiationViewInterface
     /**
      * Render the complete negotiation page from pre-computed data
      *
-     * Outputs a comprehensive negotiation interface showing:
-     * - Player position and name
-     * - Player ratings (statistical abilities)
-     * - Player image
-     * - Player demands for all 6 contract years
-     * - Cap space information (soft cap, hard cap, roster spots)
-     * - Contract offer input fields (6 years)
-     * - Max contract offer buttons (pre-calculated max salaries by year)
-     * - Exception offer buttons (MLE, LLE, Veteran Minimum)
-     * - Existing offer display (if already offered to this player)
+     * Outputs a card-based negotiation interface showing:
+     * - Error banner (if redirected from failed offer submission)
+     * - Player info card (position, name, image, ratings)
+     * - Demands + custom offer card (demands display, 6-year input fields)
+     * - Quick offer presets card (max contract, MLE, LLE, vet min buttons)
+     * - Notes/reminders card (cap rules, raise limits)
      * - Delete offer button (if offer exists)
      *
      * @param array $negotiationData Pre-computed data from FreeAgencyService::getNegotiationData()
+     * @param string|null $error Error message from PRG redirect (validation failure)
      * @return string Complete HTML negotiation form
      */
-    public function render(array $negotiationData): string;
+    public function render(array $negotiationData, ?string $error = null): string;
 }

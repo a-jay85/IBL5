@@ -19,7 +19,7 @@ function waivers($user)
     global $mysqli_db, $action;
     
     $controller = new Waivers\WaiversController($mysqli_db);
-    $controller->handleWaiverRequest($user, $action);
+    $controller->handleWaiverRequest($user, $action ?? 'add');
 }
 
 waivers($user);

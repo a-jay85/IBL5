@@ -87,12 +87,12 @@ class Contracts
             <th>Exp</th>
             <th>Bird</th>
             <th class="sep-team"></th>
-            <th class="salary"><?= substr(($season->endingYear + -1), -2) ?>-<?= substr(($season->endingYear + 0), -2) ?></th>
-            <th class="salary"><?= substr(($season->endingYear + 0), -2) ?>-<?= substr(($season->endingYear + 1), -2) ?></th>
-            <th class="salary"><?= substr(($season->endingYear + 1), -2) ?>-<?= substr(($season->endingYear + 2), -2) ?></th>
-            <th class="salary"><?= substr(($season->endingYear + 2), -2) ?>-<?= substr(($season->endingYear + 3), -2) ?></th>
-            <th class="salary"><?= substr(($season->endingYear + 3), -2) ?>-<?= substr(($season->endingYear + 4), -2) ?></th>
-            <th class="sep-team salary"><?= substr(($season->endingYear + 4), -2) ?>-<?= substr(($season->endingYear + 5), -2) ?></th>
+            <th class="salary"><?= substr((string) ($season->endingYear - 1), -2) ?>-<?= substr((string) $season->endingYear, -2) ?></th>
+            <th class="salary"><?= substr((string) $season->endingYear, -2) ?>-<?= substr((string) ($season->endingYear + 1), -2) ?></th>
+            <th class="salary"><?= substr((string) ($season->endingYear + 1), -2) ?>-<?= substr((string) ($season->endingYear + 2), -2) ?></th>
+            <th class="salary"><?= substr((string) ($season->endingYear + 2), -2) ?>-<?= substr((string) ($season->endingYear + 3), -2) ?></th>
+            <th class="salary"><?= substr((string) ($season->endingYear + 3), -2) ?>-<?= substr((string) ($season->endingYear + 4), -2) ?></th>
+            <th class="sep-team salary"><?= substr((string) ($season->endingYear + 4), -2) ?>-<?= substr((string) ($season->endingYear + 5), -2) ?></th>
             <th>Tal</th>
             <th>Skl</th>
             <th>Int</th>

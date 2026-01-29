@@ -278,6 +278,15 @@
         background-color: var(--gray-100, #f3f4f6);
     }
 
+    /* Remove first-column left padding on responsive tables -
+       sticky columns sit at the edge, so extra padding looks off */
+    .ibl-data-table.responsive-table th:first-child,
+    .ibl-data-table.responsive-table td:first-child,
+    .ibl-table.responsive-table th:first-child,
+    .ibl-table.responsive-table td:first-child {
+        padding-left: 0;
+    }
+
     /* Mobile compact sizing */
     .ibl-data-table th,
     .ibl-table th {

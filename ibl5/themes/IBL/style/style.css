@@ -3258,6 +3258,9 @@ table.sortable thead th {
   .responsive-table tbody tr.drafted td[class*="sticky-col"] {
     background-color: var(--gray-100, #f3f4f6);
   }
+  .ibl-data-table.responsive-table th:first-child, .ibl-data-table.responsive-table td:first-child, .ibl-table.responsive-table th:first-child, .ibl-table.responsive-table td:first-child {
+    padding-left: 0;
+  }
   .ibl-data-table th, .ibl-table th {
     font-size: 1rem;
     padding: 0.5rem 0.25rem;

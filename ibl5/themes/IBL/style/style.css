@@ -767,6 +767,10 @@
       --tw-shadow-color: color-mix(in oklab, color-mix(in oklab, var(--color-black) 30%, transparent) var(--tw-shadow-alpha), transparent);
     }
   }
+  .outline {
+    outline-style: var(--tw-outline-style);
+    outline-width: 1px;
+  }
   .filter {
     filter: var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,);
   }
@@ -2673,6 +2677,11 @@ a.schedule-jump-btn:hover {
   color: var(--gray-600);
   margin-bottom: var(--space-6);
 }
+@media (max-width: 768px) {
+  .draft-pick-header {
+    display: none;
+  }
+}
 .draft-pick-scroll-wrapper {
   position: relative;
   max-height: 80vh;
@@ -2714,6 +2723,58 @@ a.schedule-jump-btn:hover {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 .draft-pick-table--sticky thead .sticky-corner {
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+.series-records-scroll-wrapper {
+  position: relative;
+  max-height: 80vh;
+  overflow: auto;
+  margin: 0 auto;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+.series-records-scroll-container {
+  display: inline-block;
+  min-width: 100%;
+}
+.series-records-scroll-wrapper .table-scroll-wrapper {
+  overflow: visible !important;
+}
+.series-records-scroll-wrapper .table-scroll-wrapper::after {
+  display: none !important;
+}
+.series-records-scroll-wrapper .table-scroll-container {
+  overflow: visible !important;
+}
+.series-records-table--sticky {
+  overflow: visible;
+  border-radius: 0;
+  box-shadow: none;
+}
+.series-records-table--sticky thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.series-records-table--sticky thead th {
+  background: var(--gradient-navy-header);
+}
+.series-records-table--sticky .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+}
+.series-records-table--sticky .sticky-corner {
+  z-index: 15;
+  background: var(--navy-800);
+}
+.series-records-table--sticky tbody td.sticky-col {
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+.series-records-table--sticky thead tr th {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.series-records-table--sticky thead .sticky-corner {
   box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
 }
 .allstar-table {
@@ -4733,6 +4794,11 @@ nav .group > a:hover {
   inherits: false;
   initial-value: 0 0 #0000;
 }
+@property --tw-outline-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
 @property --tw-blur {
   syntax: "*";
   inherits: false;
@@ -4874,6 +4940,7 @@ nav .group > a:hover {
       --tw-ring-offset-width: 0px;
       --tw-ring-offset-color: #fff;
       --tw-ring-offset-shadow: 0 0 #0000;
+      --tw-outline-style: solid;
       --tw-blur: initial;
       --tw-brightness: initial;
       --tw-contrast: initial;

@@ -59,27 +59,27 @@ class FreeAgencyViewHelper implements FreeAgencyViewHelperInterface
             <td align="center"><b>td</b></td>
         </tr>
         <tr>
-            <td align="center"><?= htmlspecialchars($this->player->ratingFieldGoalAttempts) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingFieldGoalPercentage) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingFreeThrowAttempts) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingFreeThrowPercentage) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingThreePointAttempts) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingThreePointPercentage) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingOffensiveRebounds) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingDefensiveRebounds) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingAssists) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingSteals) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingTurnovers) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingBlocks) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingFouls) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingOutsideOffense) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingDriveOffense) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingPostOffense) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingTransitionOffense) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingOutsideDefense) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingDriveDefense) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingPostDefense) ?></td>
-            <td align="center"><?= htmlspecialchars($this->player->ratingTransitionDefense) ?></td>
+            <td align="center"><?= $this->player->ratingFieldGoalAttempts ?></td>
+            <td align="center"><?= $this->player->ratingFieldGoalPercentage ?></td>
+            <td align="center"><?= $this->player->ratingFreeThrowAttempts ?></td>
+            <td align="center"><?= $this->player->ratingFreeThrowPercentage ?></td>
+            <td align="center"><?= $this->player->ratingThreePointAttempts ?></td>
+            <td align="center"><?= $this->player->ratingThreePointPercentage ?></td>
+            <td align="center"><?= $this->player->ratingOffensiveRebounds ?></td>
+            <td align="center"><?= $this->player->ratingDefensiveRebounds ?></td>
+            <td align="center"><?= $this->player->ratingAssists ?></td>
+            <td align="center"><?= $this->player->ratingSteals ?></td>
+            <td align="center"><?= $this->player->ratingTurnovers ?></td>
+            <td align="center"><?= $this->player->ratingBlocks ?></td>
+            <td align="center"><?= $this->player->ratingFouls ?></td>
+            <td align="center"><?= $this->player->ratingOutsideOffense ?></td>
+            <td align="center"><?= $this->player->ratingDriveOffense ?></td>
+            <td align="center"><?= $this->player->ratingPostOffense ?></td>
+            <td align="center"><?= $this->player->ratingTransitionOffense ?></td>
+            <td align="center"><?= $this->player->ratingOutsideDefense ?></td>
+            <td align="center"><?= $this->player->ratingDriveDefense ?></td>
+            <td align="center"><?= $this->player->ratingPostDefense ?></td>
+            <td align="center"><?= $this->player->ratingTransitionDefense ?></td>
         </tr>
     </table>
 </center>
@@ -138,7 +138,7 @@ class FreeAgencyViewHelper implements FreeAgencyViewHelperInterface
         ?>
 <form name="FAOffer" method="post" action="modules.php?name=Free_Agency&pa=processoffer">
     <?= $this->renderHiddenFields($offers, $offerType) ?>
-    <input type="submit" value="<?= htmlspecialchars($offers[$finalYear - 1]) ?>">
+    <input type="submit" value="<?= $offers[$finalYear - 1] ?>">
 </form>
         <?php
         return ob_get_clean();
@@ -158,13 +158,13 @@ class FreeAgencyViewHelper implements FreeAgencyViewHelperInterface
         // Offer years
         for ($i = 0; $i < count($offers); $i++) {
             $yearNum = $i + 1;
-            echo "<input type=\"hidden\" name=\"offeryear{$yearNum}\" value=\"" . htmlspecialchars($offers[$i]) . "\">\n";
+            echo "<input type=\"hidden\" name=\"offeryear{$yearNum}\" value=\"" . $offers[$i] . "\">\n";
         }
         
         // Essential form data - uses player properties
         echo "<input type=\"hidden\" name=\"teamname\" value=\"" . htmlspecialchars($this->teamName) . "\">\n";
-        echo "<input type=\"hidden\" name=\"playerID\" value=\"" . htmlspecialchars($this->player->playerID) . "\">\n";
-        echo "<input type=\"hidden\" name=\"offerType\" value=\"" . htmlspecialchars($offerType) . "\">\n";
+        echo "<input type=\"hidden\" name=\"playerID\" value=\"" . $this->player->playerID . "\">\n";
+        echo "<input type=\"hidden\" name=\"offerType\" value=\"" . $offerType . "\">\n";
         
         return ob_get_clean();
     }

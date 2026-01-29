@@ -89,9 +89,9 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             <td><?= $this->viewHelper->renderOfferInputs($existingOffer) ?></td>
             
             <input type="hidden" name="teamname" value="<?= htmlspecialchars($team->name) ?>">
-            <input type="hidden" name="playerID" value="<?= htmlspecialchars($player->playerID) ?>">
+            <input type="hidden" name="playerID" value="<?= $player->playerID ?>">
             <input type="hidden" name="offerType" value="0">
-            
+
             <td><input type="submit" value="Offer/Amend Free Agent Contract!"></td>
         </tr>
         </form>
@@ -109,7 +109,7 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
             <td colspan="8">
                 <form method="post" action="modules.php?name=Free_Agency&pa=deleteoffer">
                     <input type="hidden" name="teamname" value="<?= htmlspecialchars($team->name) ?>">
-                    <input type="hidden" name="playerID" value="<?= htmlspecialchars($player->playerID) ?>">
+                    <input type="hidden" name="playerID" value="<?= $player->playerID ?>">
                     <center><input type="submit" value="DELETE this offer"></center>
                 </form>
             </td>
@@ -233,17 +233,17 @@ Here are my demands (note these are not adjusted for your team's attributes; I w
     <td colspan="8">
         <b>Notes/Reminders:</b>
         <ul>
-            <li>The maximum contract permitted for me (based on my years of service) starts at <?= htmlspecialchars($maxContract) ?> in Year 1.</li>
-            <li>You have <b><?= htmlspecialchars($amendedCapSpace) ?></b> in <b>soft cap</b> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>
+            <li>The maximum contract permitted for me (based on my years of service) starts at <?= $maxContract ?> in Year 1.</li>
+            <li>You have <b><?= $amendedCapSpace ?></b> in <b>soft cap</b> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>
             <?php for ($year = 1; $year < 6; $year++): ?>
-            <li>You have <b><?= htmlspecialchars($softCapSpace[$year]) ?></b> in <b>soft cap</b> space available; the amount you offer in year <?= $year + 1 ?> cannot exceed this unless you are using one of the exceptions.</li>
+            <li>You have <b><?= $softCapSpace[$year] ?></b> in <b>soft cap</b> space available; the amount you offer in year <?= $year + 1 ?> cannot exceed this unless you are using one of the exceptions.</li>
             <?php endfor; ?>
             <?php for ($year = 0; $year < 6; $year++): ?>
-            <li>You have <b><?= htmlspecialchars($hardCapSpace[$year]) ?></b> in <b>hard cap</b> space available; the amount you offer in year <?= $year + 1 ?> cannot exceed this.</li>
+            <li>You have <b><?= $hardCapSpace[$year] ?></b> in <b>hard cap</b> space available; the amount you offer in year <?= $year + 1 ?> cannot exceed this.</li>
             <?php endfor; ?>
             <li>Enter "0" for years you do not want to offer a contract.</li>
             <li>The amounts offered each year must equal or exceed the previous year.</li>
-            <li>The first year of the contract must be at least the veteran's minimum (<?= htmlspecialchars($veteranMinimum) ?> for this player).</li>
+            <li>The first year of the contract must be at least the veteran's minimum (<?= $veteranMinimum ?> for this player).</li>
             <li><?= $birdRightsText ?></li>
         </ul>
     </td>

@@ -324,7 +324,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
     private function renderLeagueTotalsRow(array $totals): string
     {
         return '<tr style="font-weight:bold">
-            <td>TOTAL</td>
+            <td></td>
             <td>' . ($totals['games'] ?? '0') . '</td>
             <td>' . ($totals['fgm'] ?? '0') . '</td>
             <td>' . ($totals['fga'] ?? '0') . '</td>
@@ -352,7 +352,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
     private function renderLeagueAveragesRow(array $averages): string
     {
         return '<tr style="font-weight:bold">
-            <td>AVGS</td>
+            <td></td>
             <td>' . ($averages['fgm'] ?? '0.0') . '</td>
             <td>' . ($averages['fga'] ?? '0.0') . '</td>
             <td>' . ($averages['fgp'] ?? '0.000') . '</td>

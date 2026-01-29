@@ -62,7 +62,7 @@ function tradeoffer($username)
     echo "<form name=\"Trade_Offer\" method=\"post\" action=\"/ibl5/modules/Trading/maketradeoffer.php\">
 		<input type=\"hidden\" name=\"offeringTeam\" value=\"$teamlogo\">
 		<div style=\"text-align: center;\">
-			<img src=\"images/logo/$teamID.jpg\" width=\"415\" height=\"50\" style=\"max-width: 100%; height: auto;\"><br>
+			<img src=\"images/logo/$teamID.jpg\" alt=\"Team Logo\" class=\"team-logo-banner\"><br>
 			<h2 class=\"ibl-table-title\">Trading Menu</h2>
 			<table class=\"trading-layout\">
 				<tr>
@@ -217,7 +217,7 @@ function tradereview($username)
     OpenTable();
 
     echo "<div style=\"text-align: center;\">
-        <img src=\"images/logo/$teamID.jpg\" width=\"415\" height=\"50\" style=\"max-width: 100%; height: auto;\">
+        <img src=\"images/logo/$teamID.jpg\" alt=\"Team Logo\" class=\"team-logo-banner\">
         <h2 class=\"ibl-table-title\">Review Trade Offers</h2>
     </div>";
 

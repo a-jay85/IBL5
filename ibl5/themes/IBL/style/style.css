@@ -2567,11 +2567,12 @@ a.schedule-jump-btn:hover {
   margin-bottom: 1.5rem;
 }
 .draft-team-logo {
+  display: block;
   width: 100%;
   max-width: 415px;
   aspect-ratio: 415 / 50;
   height: auto;
-  margin-bottom: 0.75rem;
+  margin: 0 auto 0.75rem;
 }
 .draft-title {
   font-family: var(--font-display);
@@ -2897,10 +2898,12 @@ a.schedule-jump-btn:hover {
   margin-bottom: var(--space-4);
 }
 .depth-chart-logo img {
+  display: block;
   width: 100%;
   max-width: 415px;
   aspect-ratio: 415 / 50;
   height: auto;
+  margin: 0 auto;
 }
 html:has(.depth-chart-form) {
   overflow-x: auto;
@@ -3090,6 +3093,14 @@ table.depth-chart-table td:first-child, table.depth-chart-table td:last-child {
 }
 .text-center {
   text-align: center;
+}
+.team-logo-banner {
+  display: block;
+  width: 100%;
+  max-width: 415px;
+  aspect-ratio: 415 / 50;
+  height: auto;
+  margin: 0 auto 1rem;
 }
 .text-error {
   color: var(--error-600);

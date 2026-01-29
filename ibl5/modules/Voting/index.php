@@ -210,8 +210,8 @@ function userinfo($username)
 
     $formAction = ($season->phase == "Regular Season") ? "modules/Voting/ASGVote.php" : "modules/Voting/EOYVote.php";
     echo "<form name=\"$formName\" method=\"post\" action=\"$formAction\">
-		<center>
-			<img src=\"images/logo/$tid.jpg\" width=\"415\" height=\"50\" style=\"max-width: 100%; height: auto;\"><br><br>";
+		<div style=\"text-align: center;\">
+			<img src=\"images/logo/$tid.jpg\" alt=\"Team Logo\" class=\"team-logo-banner\"><br><br>";
 
     echo "<input type=\"submit\" value=\"Submit Votes!\">";
 
@@ -283,7 +283,7 @@ function userinfo($username)
     echo "<input type=\"hidden\" name=\"teamname\" value=\"$voterTeamName\">
 
 		<input type=\"submit\" value=\"Submit Votes!\">
-	</center>
+	</div>
 	</form>";
 
     CloseTable();

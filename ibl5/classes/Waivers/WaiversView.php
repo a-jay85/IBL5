@@ -34,7 +34,7 @@ class WaiversView implements WaiversViewInterface
         <form name="Waiver_Move" method="post" action="" class="waivers-form">
             <input type="hidden" name="Team_Name" value="<?= $teamNameEscaped ?>">
             <div class="text-center">
-                <img src="images/logo/<?= $teamID ?>.jpg" alt="Team Logo" width="415" height="50" style="max-width: 100%; height: auto; margin-bottom: 1rem;"><br>
+                <img src="images/logo/<?= $teamID ?>.jpg" alt="Team Logo" class="team-logo-banner"><br>
                 <div class="waivers-form-card">
                     <div class="waivers-form-header">
                         WAIVER WIRE - <?= $openRosterSpots ?> EMPTY ROSTER SPOTS / <?= $healthyOpenRosterSpots ?> HEALTHY ROSTER SPOTS

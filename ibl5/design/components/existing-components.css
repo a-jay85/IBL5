@@ -1841,11 +1841,12 @@ a.schedule-jump-btn:hover {
 }
 
 .draft-team-logo {
+    display: block;
     width: 100%;
     max-width: 415px;
     aspect-ratio: 415 / 50;
     height: auto;
-    margin-bottom: 0.75rem;
+    margin: 0 auto 0.75rem;
 }
 
 .draft-title {
@@ -2263,10 +2264,12 @@ a.schedule-jump-btn:hover {
 }
 
 .depth-chart-logo img {
+    display: block;
     width: 100%;
     max-width: 415px;
     aspect-ratio: 415 / 50;
     height: auto;
+    margin: 0 auto;
 }
 
 /* Allow horizontal page scrolling on Depth Chart Entry so users can pan/zoom */
@@ -2510,6 +2513,16 @@ table.depth-chart-table td:last-child {
 
 .text-center {
     text-align: center;
+}
+
+/* Team Logo Banner - centered banner image used across team pages */
+.team-logo-banner {
+    display: block;
+    width: 100%;
+    max-width: 415px;
+    aspect-ratio: 415 / 50;
+    height: auto;
+    margin: 0 auto 1rem;
 }
 
 .text-error {

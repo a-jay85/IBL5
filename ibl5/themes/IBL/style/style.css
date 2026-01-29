@@ -3408,6 +3408,14 @@ table.sortable thead th {
   .ibl-team-cell--colored .ibl-team-cell__name {
     justify-content: center;
   }
+  td.ibl-team-cell--colored, th.ibl-team-cell--colored {
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+  }
+  .ibl-data-table.responsive-table td.sticky-col.ibl-team-cell--colored, .ibl-data-table.responsive-table th.sticky-col.ibl-team-cell--colored, .ibl-table.responsive-table td.sticky-col.ibl-team-cell--colored, .ibl-table.responsive-table th.sticky-col.ibl-team-cell--colored {
+    min-width: 44px;
+  }
 }
 .ibl-player-cell {
   display: flex;
@@ -3715,6 +3723,13 @@ table.sortable thead th {
 }
 .ibl-link:hover {
   color: var(--accent-500, #f97316);
+}
+@media (max-width: 768px) {
+  .draft-history-table th:nth-child(1), .draft-history-table td:nth-child(1), .draft-history-table th:nth-child(2), .draft-history-table td:nth-child(2) {
+    width: 36px;
+    min-width: 36px;
+    max-width: 36px;
+  }
 }
 .ibl-card {
   font-family: var(--font-sans);

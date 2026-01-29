@@ -37,9 +37,9 @@ final class VotingResultsTableRendererTest extends TestCase
         // Check header columns
         $this->assertStringContainsString('<th>Player</th>', $html);
         $this->assertStringContainsString('<th>Votes</th>', $html);
-        // Check scroll wrappers
-        $this->assertStringContainsString('table-scroll-wrapper', $html);
-        $this->assertStringContainsString('table-scroll-container', $html);
+        // Voting tables should NOT have scroll wrappers (full display on mobile)
+        $this->assertStringNotContainsString('table-scroll-wrapper', $html);
+        $this->assertStringNotContainsString('table-scroll-container', $html);
     }
 
     public function testRenderTablesOutputsEmptyTableWhenNoRows(): void

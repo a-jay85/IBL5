@@ -46,19 +46,15 @@ class VotingResultsTableRenderer implements VotingResultsTableRendererInterface
         $tableRowsHtml = $rowsHtml ? "\n" . implode("\n", $rowsHtml) . "\n    " : "\n    ";
 
         $html = '<h2 class="ibl-title">' . $escapedTitle . '</h2>
-<div class="table-scroll-wrapper">
-<div class="table-scroll-container">
-    <table class="sortable ibl-data-table voting-results-table">
-        <thead>
-            <tr>
-                <th>Player</th>
-                <th>' . self::METRIC_LABEL . '</th>
-            </tr>
-        </thead>
-        <tbody>' . $tableRowsHtml . '</tbody>
-    </table>
-</div>
-</div>';
+<table class="sortable ibl-data-table voting-results-table">
+    <thead>
+        <tr>
+            <th>Player</th>
+            <th>' . self::METRIC_LABEL . '</th>
+        </tr>
+    </thead>
+    <tbody>' . $tableRowsHtml . '</tbody>
+</table>';
 
         return $html;
     }

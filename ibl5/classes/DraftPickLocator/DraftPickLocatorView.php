@@ -23,8 +23,8 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
     {
         $html = $this->getStyleBlock();
         $html .= $this->renderTitle();
-        $html .= '<div class="draft-pick-scroll-wrapper">';
-        $html .= '<div class="draft-pick-scroll-container">';
+        $html .= '<div class="sticky-scroll-wrapper">';
+        $html .= '<div class="sticky-scroll-container">';
         $html .= $this->renderTableStart($currentEndingYear);
         $html .= $this->renderTableRows($teamsWithPicks);
         $html .= '</tbody></table>';
@@ -67,7 +67,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
     private function renderTableStart(int $currentEndingYear): string
     {
         $html = '<div class="draft-pick-locator-container">';
-        $html .= '<table class="draft-pick-table draft-pick-table--sticky">';
+        $html .= '<table class="draft-pick-table sticky-table">';
         $html .= '<thead>';
 
         // First header row - year spans

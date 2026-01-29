@@ -33,9 +33,9 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         int $userTeamId,
         int $numTeams
     ): string {
-        $output = '<div class="series-records-scroll-wrapper">';
-        $output .= '<div class="series-records-scroll-container">';
-        $output .= '<table class="sortable ibl-data-table series-records-table--sticky">';
+        $output = '<div class="sticky-scroll-wrapper">';
+        $output .= '<div class="sticky-scroll-container">';
+        $output .= '<table class="sortable ibl-data-table sticky-table">';
 
         // Header row with team logos
         $output .= '<thead><tr>';

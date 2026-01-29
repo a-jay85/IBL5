@@ -22,8 +22,8 @@ class CapInfoView implements CapInfoViewInterface
     public function render(array $teamsData, int $beginningYear, int $endingYear, ?int $userTeamId): string
     {
         $html = $this->getStyleBlock();
-        $html .= '<div class="cap-info-scroll-wrapper">';
-        $html .= '<div class="cap-info-scroll-container">';
+        $html .= '<div class="sticky-scroll-wrapper">';
+        $html .= '<div class="sticky-scroll-container">';
         $html .= $this->renderTableHeader($beginningYear, $endingYear);
         $html .= $this->renderTableRows($teamsData, $userTeamId);
         $html .= '</tbody></table>';
@@ -51,7 +51,7 @@ class CapInfoView implements CapInfoViewInterface
      */
     private function renderTableHeader(int $beginningYear, int $endingYear): string
     {
-        $html = '<table class="sortable ibl-data-table cap-info-table--sticky">';
+        $html = '<table class="sortable ibl-data-table sticky-table">';
         $html .= '<thead><tr>';
         $html .= '<th class="sticky-col sticky-corner">Team</th>';
 

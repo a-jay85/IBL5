@@ -21,8 +21,8 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
     {
         $output = $this->getStyleBlock();
         $output .= $this->renderTitle($seasonEndingYear);
-        $output .= '<div class="fa-preview-scroll-wrapper">';
-        $output .= '<div class="fa-preview-scroll-container">';
+        $output .= '<div class="sticky-scroll-wrapper">';
+        $output .= '<div class="sticky-scroll-container">';
         $output .= $this->renderTableStart();
         $output .= $this->renderTableRows($freeAgents);
         $output .= $this->renderTableEnd();
@@ -61,7 +61,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable ibl-data-table fa-preview-table--sticky">
+        return '<table class="sortable ibl-data-table sticky-table">
             <thead>
                 <tr>
                     <th class="sticky-col sticky-corner">Player</th>

@@ -322,6 +322,119 @@
 }
 
 /* ==========================================================================
+   Sticky Header + Column Tables
+
+   For tables that need both a sticky thead AND a sticky first column
+   (grid/matrix tables scrollable in both directions).
+
+   Structure:
+     <div class="sticky-scroll-wrapper">
+       <div class="sticky-scroll-container">
+         <table class="ibl-data-table sticky-table">
+           <thead><tr><th class="sticky-col sticky-corner">…</th>…</tr></thead>
+           <tbody><tr><td class="sticky-col">…</td>…</tr></tbody>
+         </table>
+       </div>
+     </div>
+
+   Classes:
+   - .sticky-scroll-wrapper   Scroll container (max-height, overflow, border-radius, shadow)
+   - .sticky-scroll-container Inner sizing container (inline-block, min-width: 100%)
+   - .sticky-table             Table overrides (visible overflow, no radius/shadow) + sticky thead
+   - .sticky-col               Sticky first column (position: sticky, left: 0)
+   - .sticky-corner            Corner cell at thead/col intersection (highest z-index)
+   ========================================================================== */
+
+/* Scroll wrapper — provides the scrollable viewport */
+.sticky-scroll-wrapper {
+    position: relative;
+    max-height: 80vh;
+    overflow: auto;
+    margin: 0 auto;
+    border-radius: var(--radius-lg, 0.5rem);
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
+}
+
+/* Inner container — keeps inline-block sizing so horizontal scroll works */
+.sticky-scroll-container {
+    display: inline-block;
+    min-width: 100%;
+}
+
+/* Disable any injected .table-scroll-wrapper / .table-scroll-container
+   that would add extra overflow:hidden and break sticky positioning */
+.sticky-scroll-wrapper .table-scroll-wrapper {
+    overflow: visible !important;
+}
+
+.sticky-scroll-wrapper .table-scroll-wrapper::after {
+    display: none !important;
+}
+
+.sticky-scroll-wrapper .table-scroll-container {
+    overflow: visible !important;
+}
+
+/* Table — remove the border-radius/shadow/overflow that .ibl-data-table sets,
+   because those are now on .sticky-scroll-wrapper instead */
+.sticky-table {
+    overflow: visible;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Sticky header row */
+.sticky-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.sticky-table thead th {
+    background: var(--gradient-navy-header);
+}
+
+/* Sticky first column */
+.sticky-table .sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+}
+
+/* Corner cell — intersection of sticky header and sticky column */
+.sticky-table .sticky-corner {
+    z-index: 15;
+    background: var(--navy-800, #1e293b);
+}
+
+/* Shadows — column edge, header bottom, corner combined */
+.sticky-table tbody td.sticky-col {
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+
+.sticky-table thead tr th {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sticky-table thead .sticky-corner {
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Sticky-col body cell backgrounds — required so content behind
+   the sticky column doesn't bleed through on scroll */
+.sticky-table tbody tr:nth-child(odd) td.sticky-col {
+    background-color: white;
+}
+
+.sticky-table tbody tr:nth-child(even) td.sticky-col {
+    background-color: var(--gray-50, #f9fafb);
+}
+
+.sticky-table tbody tr:hover td.sticky-col {
+    background-color: var(--gray-100, #f3f4f6);
+}
+
+/* ==========================================================================
    Table Title (placed above table)
    ========================================================================== */
 

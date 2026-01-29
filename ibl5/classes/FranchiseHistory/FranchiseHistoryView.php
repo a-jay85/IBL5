@@ -22,8 +22,8 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
     public function render(array $franchiseData): string
     {
         $html = $this->getStyleBlock();
-        $html .= '<div class="franchise-history-scroll-wrapper">';
-        $html .= '<div class="franchise-history-scroll-container">';
+        $html .= '<div class="sticky-scroll-wrapper">';
+        $html .= '<div class="sticky-scroll-container">';
         $html .= $this->renderTableHeader();
         $html .= $this->renderTableRows($franchiseData);
         $html .= '</tbody></table>';
@@ -49,7 +49,7 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
      */
     private function renderTableHeader(): string
     {
-        return '<table class="sortable ibl-data-table franchise-history-table--sticky">
+        return '<table class="sortable ibl-data-table sticky-table">
             <thead>
             <tr>
                 <th class="ibl-team-cell--colored sticky-col sticky-corner">Team</th>

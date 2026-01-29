@@ -33,16 +33,19 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         int $userTeamId,
         int $numTeams
     ): string {
-        $output = '<table class="sortable ibl-data-table">';
+        $output = '<div class="series-records-scroll-wrapper">';
+        $output .= '<div class="series-records-scroll-container">';
+        $output .= '<table class="sortable ibl-data-table series-records-table--sticky">';
 
         // Header row with team logos
-        $output .= '<tr>';
-        $output .= '<th>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr;&rarr;<br>vs.<br>&uarr;</th>';
+        $output .= '<thead><tr>';
+        $output .= '<th class="sticky-col sticky-corner">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr;&rarr;<br>vs.<br>&uarr;</th>';
 
         for ($i = 1; $i <= $numTeams; $i++) {
             $output .= $this->renderHeaderCell($i);
         }
-        $output .= '</tr>';
+        $output .= '</tr></thead>';
+        $output .= '<tbody>';
 
         // Data rows - one per team
         $teamIndex = 0;
@@ -87,7 +90,8 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
             $teamIndex++;
         }
 
-        $output .= '</table>';
+        $output .= '</tbody></table>';
+        $output .= '</div></div>';
 
         return $output;
     }
@@ -115,7 +119,7 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         $boldOpen = $isUserTeam ? '<strong>' : '';
         $boldClose = $isUserTeam ? '</strong>' : '';
 
-        return '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">'
+        return '<td class="ibl-team-cell--colored sticky-col" style="background-color: #' . $color1 . ';">'
             . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';">'
             . '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">'
             . '<span class="ibl-team-cell__text">' . $boldOpen . $city . ' ' . $name . $boldClose . '</span>'
@@ -165,7 +169,7 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         $boldClose = $isUserTeamRow ? '</strong>' : '';
 
         $output = '<tr>';
-        $output .= '<td>' . $boldOpen . 'Team ' . $teamId . $boldClose . '</td>';
+        $output .= '<td class="sticky-col">' . $boldOpen . 'Team ' . $teamId . $boldClose . '</td>';
 
         for ($i = 1; $i <= $numTeams; $i++) {
             if ($teamId === $i) {

@@ -2038,6 +2038,71 @@ a.schedule-jump-btn:hover {
 }
 
 /* ==========================================================================
+   Series Records Module - Sticky Header & Column
+   ========================================================================== */
+
+/* Scroll wrapper for sticky headers and columns */
+.series-records-scroll-wrapper {
+    position: relative;
+    max-height: 80vh;
+    overflow: auto;
+    margin: 0 auto;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+}
+
+.series-records-scroll-container {
+    display: inline-block;
+    min-width: 100%;
+}
+
+/* Table with sticky support */
+.series-records-table--sticky {
+    overflow: visible;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Sticky header */
+.series-records-table--sticky thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.series-records-table--sticky thead th {
+    background: var(--gradient-navy-header);
+}
+
+/* Sticky first column */
+.series-records-table--sticky .sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+}
+
+/* Corner cell (intersection of sticky header and column) */
+.series-records-table--sticky .sticky-corner {
+    z-index: 15;
+    background: var(--navy-800);
+}
+
+/* Sticky column shadow */
+.series-records-table--sticky tbody td.sticky-col {
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Header bottom shadow */
+.series-records-table--sticky thead tr th {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Corner cell combined shadow */
+.series-records-table--sticky thead .sticky-corner {
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================================================================
    All-Star Appearances Module
    ========================================================================== */
 

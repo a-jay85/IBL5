@@ -44,8 +44,7 @@
         // Target player name links in data tables
         // Look for links with pid= parameter (player pages)
         const nameLinks = document.querySelectorAll(
-            '.ibl-data-table a[href*="pid="], ' +
-            '.ibl-table a[href*="pid="]'
+            '.ibl-data-table a[href*="pid="]'
         );
 
         nameLinks.forEach(link => {

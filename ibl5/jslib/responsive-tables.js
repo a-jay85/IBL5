@@ -19,7 +19,7 @@
      */
     function initResponsiveTables() {
         var tables = document.querySelectorAll(
-            ".ibl-data-table, .ibl-table, .league-stats-table, .compare-players-table"
+            ".ibl-data-table, .league-stats-table, .compare-players-table"
         );
         for (var i = 0; i < tables.length; i++) {
             processTable(tables[i]);

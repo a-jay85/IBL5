@@ -9,7 +9,6 @@
  *
  * Classes:
  * - .ibl-data-table: Primary data table (navy header, alternating rows)
- * - .ibl-table: Legacy alias for .ibl-data-table
  */
 
 /* ==========================================================================
@@ -23,8 +22,7 @@
    - Responsive sticky columns on mobile
    ========================================================================== */
 
-.ibl-data-table,
-.ibl-table {
+.ibl-data-table {
     font-family: var(--font-sans, 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
     border-collapse: separate;
     border-spacing: 0;
@@ -37,13 +35,11 @@
 }
 
 /* Header row */
-.ibl-data-table thead,
-.ibl-table thead {
+.ibl-data-table thead {
     background: var(--gradient-navy-header);
 }
 
-.ibl-data-table th,
-.ibl-table th {
+.ibl-data-table th {
     color: white;
     font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
     font-weight: 600;
@@ -56,8 +52,7 @@
 }
 
 /* Data cells */
-.ibl-data-table td,
-.ibl-table td {
+.ibl-data-table td {
     color: var(--gray-800, #1f2937);
     font-size: 1rem;
     padding: 0.5rem 0.375rem;
@@ -65,98 +60,79 @@
 }
 
 /* Row styling */
-.ibl-data-table tbody tr,
-.ibl-table tbody tr {
+.ibl-data-table tbody tr {
     transition: background-color 150ms ease;
 }
 
-.ibl-data-table tbody tr:nth-child(odd),
-.ibl-table tbody tr:nth-child(odd) {
+.ibl-data-table tbody tr:nth-child(odd) {
     background-color: white;
 }
 
-.ibl-data-table tbody tr:nth-child(even),
-.ibl-table tbody tr:nth-child(even) {
+.ibl-data-table tbody tr:nth-child(even) {
     background-color: var(--gray-50, #f9fafb);
 }
 
-.ibl-data-table tbody tr:hover,
-.ibl-table tbody tr:hover {
+.ibl-data-table tbody tr:hover {
     background-color: var(--gray-100, #f3f4f6);
 }
 
 /* Links */
-.ibl-data-table a,
-.ibl-table a {
+.ibl-data-table a {
     color: var(--gray-800, #1f2937);
     text-decoration: none;
     font-weight: 500;
     transition: color 150ms ease;
 }
 
-.ibl-data-table a:hover,
-.ibl-table a:hover {
+.ibl-data-table a:hover {
     color: var(--accent-500, #f97316);
 }
 
 /* First/last cell padding */
 .ibl-data-table th:first-child,
-.ibl-data-table td:first-child,
-.ibl-table th:first-child,
-.ibl-table td:first-child {
+.ibl-data-table td:first-child {
     padding-left: 0.75rem;
 }
 
 .ibl-data-table th:last-child,
-.ibl-data-table td:last-child,
-.ibl-table th:last-child,
-.ibl-table td:last-child {
+.ibl-data-table td:last-child {
     padding-right: 0.75rem;
 }
 
 /* Rank cell styling */
-.ibl-data-table .rank-cell,
-.ibl-table .rank-cell {
+.ibl-data-table .rank-cell {
     font-weight: 600;
     color: var(--navy-700, #334155);
 }
 
 /* Date cell styling - prevent wrapping */
-.ibl-data-table .date-cell,
-.ibl-table .date-cell {
+.ibl-data-table .date-cell {
     white-space: nowrap;
 }
 
 /* Highlight row - use :nth-child for higher specificity without !important */
 .ibl-data-table tbody tr.highlight:nth-child(odd),
-.ibl-data-table tbody tr.highlight:nth-child(even),
-.ibl-table tbody tr.highlight:nth-child(odd),
-.ibl-table tbody tr.highlight:nth-child(even) {
+.ibl-data-table tbody tr.highlight:nth-child(even) {
     background-color: var(--accent-100, #ffedd5);
 }
 
 .ibl-data-table tbody tr.highlight:nth-child(odd):hover,
-.ibl-data-table tbody tr.highlight:nth-child(even):hover,
-.ibl-table tbody tr.highlight:nth-child(odd):hover,
-.ibl-table tbody tr.highlight:nth-child(even):hover {
+.ibl-data-table tbody tr.highlight:nth-child(even):hover {
     background-color: var(--accent-200, #fed7aa);
 }
 
 /* Drafted/disabled row */
-.ibl-data-table tbody tr.drafted,
-.ibl-table tbody tr.drafted {
+.ibl-data-table tbody tr.drafted {
     opacity: 0.5;
 }
 
-.ibl-data-table tbody tr.drafted td,
-.ibl-table tbody tr.drafted td {
+.ibl-data-table tbody tr.drafted td {
     text-decoration: line-through;
     font-style: italic;
 }
 
 /* Divider column */
-.ibl-data-table .divider,
-.ibl-table .divider {
+.ibl-data-table .divider {
     background-color: var(--navy-900, #0f172a);
     width: 3px;
     padding: 0;
@@ -164,17 +140,13 @@
 
 /* Totals/summary row - use :nth-child for higher specificity without !important */
 .ibl-data-table tbody tr.totals-row:nth-child(odd),
-.ibl-data-table tbody tr.totals-row:nth-child(even),
-.ibl-table tbody tr.totals-row:nth-child(odd),
-.ibl-table tbody tr.totals-row:nth-child(even) {
+.ibl-data-table tbody tr.totals-row:nth-child(even) {
     background-color: var(--accent-100, #ffedd5);
     font-weight: 600;
 }
 
 .ibl-data-table tbody tr.totals-row:nth-child(odd):hover,
-.ibl-data-table tbody tr.totals-row:nth-child(even):hover,
-.ibl-table tbody tr.totals-row:nth-child(odd):hover,
-.ibl-table tbody tr.totals-row:nth-child(even):hover {
+.ibl-data-table tbody tr.totals-row:nth-child(even):hover {
     background-color: var(--accent-200, #fed7aa);
 }
 
@@ -189,24 +161,20 @@
     /* Remove overflow clipping on mobile so position: sticky works.
        On mobile, tables scroll edge-to-edge and rounded corners
        are not visible, so clipping is unnecessary. */
-    .ibl-data-table.responsive-table,
-    .ibl-table.responsive-table {
+    .ibl-data-table.responsive-table {
         overflow: visible;
     }
 
     /* Single sticky column */
     .ibl-data-table.responsive-table th.sticky-col,
-    .ibl-data-table.responsive-table td.sticky-col,
-    .ibl-table.responsive-table th.sticky-col,
-    .ibl-table.responsive-table td.sticky-col {
+    .ibl-data-table.responsive-table td.sticky-col {
         position: sticky;
         left: 0;
         z-index: 1;
         min-width: 100px;
     }
 
-    .ibl-data-table.responsive-table thead th.sticky-col,
-    .ibl-table.responsive-table thead th.sticky-col {
+    .ibl-data-table.responsive-table thead th.sticky-col {
         background: var(--gradient-navy-header);
         z-index: 3;
     }
@@ -224,16 +192,13 @@
         background-color: var(--gray-100, #f3f4f6);
     }
 
-    .ibl-data-table.responsive-table td.sticky-col,
-    .ibl-table.responsive-table td.sticky-col {
+    .ibl-data-table.responsive-table td.sticky-col {
         box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
     }
 
     /* Two sticky columns (rank + name pattern) */
     .ibl-data-table.responsive-table th.sticky-col-1,
-    .ibl-data-table.responsive-table td.sticky-col-1,
-    .ibl-table.responsive-table th.sticky-col-1,
-    .ibl-table.responsive-table td.sticky-col-1 {
+    .ibl-data-table.responsive-table td.sticky-col-1 {
         position: sticky;
         left: 0;
         z-index: 1;
@@ -241,9 +206,7 @@
     }
 
     .ibl-data-table.responsive-table th.sticky-col-2,
-    .ibl-data-table.responsive-table td.sticky-col-2,
-    .ibl-table.responsive-table th.sticky-col-2,
-    .ibl-table.responsive-table td.sticky-col-2 {
+    .ibl-data-table.responsive-table td.sticky-col-2 {
         position: sticky;
         left: 36px;
         z-index: 1;
@@ -252,9 +215,7 @@
 
     /* Three sticky columns (rd + pick + player pattern) */
     .ibl-data-table.responsive-table th.sticky-col-3,
-    .ibl-data-table.responsive-table td.sticky-col-3,
-    .ibl-table.responsive-table th.sticky-col-3,
-    .ibl-table.responsive-table td.sticky-col-3 {
+    .ibl-data-table.responsive-table td.sticky-col-3 {
         position: sticky;
         left: 72px;
         z-index: 1;
@@ -263,10 +224,7 @@
 
     .ibl-data-table.responsive-table thead th.sticky-col-1,
     .ibl-data-table.responsive-table thead th.sticky-col-2,
-    .ibl-data-table.responsive-table thead th.sticky-col-3,
-    .ibl-table.responsive-table thead th.sticky-col-1,
-    .ibl-table.responsive-table thead th.sticky-col-2,
-    .ibl-table.responsive-table thead th.sticky-col-3 {
+    .ibl-data-table.responsive-table thead th.sticky-col-3 {
         background: var(--gradient-navy-header);
         z-index: 3;
     }
@@ -275,21 +233,17 @@
 
     /* Shadow only on rightmost sticky column */
     .ibl-data-table.responsive-table th.sticky-col-1,
-    .ibl-data-table.responsive-table td.sticky-col-1,
-    .ibl-table.responsive-table th.sticky-col-1,
-    .ibl-table.responsive-table td.sticky-col-1 {
+    .ibl-data-table.responsive-table td.sticky-col-1 {
         box-shadow: none;
     }
 
     /* Col-2 gets shadow only for 2-column sticky layouts */
-    .ibl-data-table.responsive-table:not(:has(.sticky-col-3)) td.sticky-col-2,
-    .ibl-table.responsive-table:not(:has(.sticky-col-3)) td.sticky-col-2 {
+    .ibl-data-table.responsive-table:not(:has(.sticky-col-3)) td.sticky-col-2 {
         box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
     }
 
     /* Col-3 gets shadow for 3-column sticky layouts */
-    .ibl-data-table.responsive-table td.sticky-col-3,
-    .ibl-table.responsive-table td.sticky-col-3 {
+    .ibl-data-table.responsive-table td.sticky-col-3 {
         box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
     }
 
@@ -301,24 +255,133 @@
     /* Remove first-column left padding on responsive tables -
        sticky columns sit at the edge, so extra padding looks off */
     .ibl-data-table.responsive-table th:first-child,
-    .ibl-data-table.responsive-table td:first-child,
-    .ibl-table.responsive-table th:first-child,
-    .ibl-table.responsive-table td:first-child {
+    .ibl-data-table.responsive-table td:first-child {
         padding-left: 0;
     }
 
     /* Mobile compact sizing - exclude voting tables which stay full size */
-    .ibl-data-table:not(.voting-form-table):not(.voting-results-table) th,
-    .ibl-table:not(.voting-form-table):not(.voting-results-table) th {
+    .ibl-data-table:not(.voting-form-table):not(.voting-results-table) th {
         font-size: 1rem;
         padding: 0.5rem 0.25rem;
     }
 
-    .ibl-data-table:not(.voting-form-table):not(.voting-results-table) td,
-    .ibl-table:not(.voting-form-table):not(.voting-results-table) td {
+    .ibl-data-table:not(.voting-form-table):not(.voting-results-table) td {
         font-size: 1rem;
         padding: 0.375rem 0.25rem;
     }
+}
+
+/* ==========================================================================
+   Table Scroll Wrapper
+
+   Wrapper/container pattern used by responsive-tables.js for tables that
+   overflow on mobile. Provides horizontal scrolling + scroll-shadow indicator.
+
+   Structure:
+     <div class="table-scroll-wrapper">
+       <div class="table-scroll-container">
+         <table class="ibl-data-table responsive-table">…</table>
+       </div>
+     </div>
+   ========================================================================== */
+
+/* Prevent line breaks on hyphens in record data (W-L, etc.) */
+.responsive-table td {
+    white-space: nowrap;
+}
+
+/* Wrapper for scroll container - holds the fixed shadow */
+.table-scroll-wrapper {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+/* On desktop, constrain tables to fit content and center (not full width on ultrawide) */
+@media (min-width: 769px) {
+    .table-scroll-wrapper {
+        width: fit-content;
+        max-width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* Center section titles above centered tables */
+    .table-scroll-wrapper ~ .ibl-title,
+    .ibl-title:has(+ .table-scroll-wrapper),
+    h2.ibl-title {
+        display: block;
+        width: fit-content;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+/* Scroll container for wide tables on mobile */
+.table-scroll-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    width: 100%;
+}
+
+/* On mobile, constrain scroll container to viewport */
+@media (max-width: 768px) {
+    .table-scroll-wrapper {
+        width: 100%;
+        max-width: 100%;
+        padding-left: 0;
+        padding-right: 0;
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .table-scroll-container {
+        display: block;
+        overflow-x: scroll !important;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x pan-y;
+        padding: 0 !important;
+        /* Width set by JavaScript for iOS compatibility */
+    }
+
+    /* Remove border-radius and padding on mobile for edge-to-edge tables */
+    .standings-table-container {
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .table-scroll-wrapper {
+        padding: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .standings-table {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+}
+
+/* Scroll indicator shadow on right edge - on wrapper so it doesn't scroll */
+.table-scroll-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 24px;
+    background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.08));
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    z-index: 2;
+}
+
+/* Hide scroll indicator when scrolled to the end */
+.table-scroll-wrapper.scrolled-end::after {
+    opacity: 0;
 }
 
 /* ==========================================================================
@@ -490,47 +553,6 @@
 }
 
 /* ==========================================================================
-   Responsive Table Wrapper
-   ========================================================================== */
-
-.ibl-table-wrapper {
-    position: relative;
-    margin-bottom: 1rem;
-}
-
-.ibl-table-scroll {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    max-width: 100%;
-    width: 100%;
-}
-
-/* Scroll indicator shadow */
-.ibl-table-wrapper::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 24px;
-    background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.08));
-    pointer-events: none;
-    opacity: 1;
-    transition: opacity 0.3s ease;
-    z-index: 2;
-}
-
-.ibl-table-wrapper.scrolled-end::after {
-    opacity: 0;
-}
-
-@media (max-width: 768px) {
-    .ibl-table-scroll table {
-        min-width: 600px;
-    }
-}
-
-/* ==========================================================================
    Stat Value Formatting
    ========================================================================== */
 
@@ -646,9 +668,7 @@
 
     /* Override sticky-col min-width when it's a team cell (logo-only on mobile) */
     .ibl-data-table.responsive-table td.sticky-col.ibl-team-cell--colored,
-    .ibl-data-table.responsive-table th.sticky-col.ibl-team-cell--colored,
-    .ibl-table.responsive-table td.sticky-col.ibl-team-cell--colored,
-    .ibl-table.responsive-table th.sticky-col.ibl-team-cell--colored {
+    .ibl-data-table.responsive-table th.sticky-col.ibl-team-cell--colored {
         min-width: 36px;
     }
 }

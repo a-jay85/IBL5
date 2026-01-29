@@ -73,7 +73,7 @@ echo '<style>
     flex-shrink: 0;
 }
 </style>
-<h2 class="ibl-title">Player Transactions Since Last Season</h2>
+<h2 class="ibl-title">Player Movement</h2>
 <p style="text-align: center;"><em>Click the headings to sort the table</em></p>
 <table class="sortable ibl-data-table">
     <thead>

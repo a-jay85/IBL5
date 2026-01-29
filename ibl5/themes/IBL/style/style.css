@@ -2185,6 +2185,9 @@ a.schedule-jump-btn:hover {
   letter-spacing: 0.05em;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
+.schedule-month__header--playoffs {
+  background: var(--accent-500);
+}
 .schedule-day {
   display: flex;
   border-bottom: 1px solid var(--gray-100);

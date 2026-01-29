@@ -20,7 +20,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
     /**
      * @see TeamScheduleViewInterface::render()
      */
-    public function render(\Team $team, array $games, int $simLengthInDays): string
+    public function render(\Team $team, array $games, int $simLengthInDays, string $seasonPhase): string
     {
         $color1 = HtmlSanitizer::safeHtmlOutput($team->color1);
         $color2 = HtmlSanitizer::safeHtmlOutput($team->color2);
@@ -31,12 +31,30 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $gamesByMonth = $this->organizeGamesByMonth($games);
         $firstUpcomingId = $this->findFirstUpcomingGameId($games);
 
+        // In playoff phases, relabel June as "Playoffs" and move to front
+        $isPlayoffPhase = in_array($seasonPhase, ['Playoffs', 'Draft', 'Free Agency'], true);
+        $playoffMonthKey = null;
+        if ($isPlayoffPhase) {
+            foreach (array_keys($gamesByMonth) as $key) {
+                if ((int)date('n', strtotime($key . '-01')) === \Season::IBL_PLAYOFF_MONTH) {
+                    $playoffMonthKey = $key;
+                    break;
+                }
+            }
+            if ($playoffMonthKey !== null && isset($gamesByMonth[$playoffMonthKey])) {
+                $gamesByMonth[$playoffMonthKey]['label'] = 'Playoffs';
+                $reordered = [$playoffMonthKey => $gamesByMonth[$playoffMonthKey]];
+                unset($gamesByMonth[$playoffMonthKey]);
+                $gamesByMonth = $reordered + $gamesByMonth;
+            }
+        }
+
         $html = $this->renderTeamColorStyles($color1, $color2);
         $html .= '<div class="schedule-container schedule-container--team">';
         $html .= $this->renderTeamBanner($teamId, $teamName, $color1);
         $html .= $this->renderHeader($simLengthInDays, $firstUpcomingId);
-        $html .= $this->renderMonthNav($gamesByMonth);
-        $html .= $this->renderGamesByMonth($gamesByMonth, $games, $teamId, $team->name);
+        $html .= $this->renderMonthNav($gamesByMonth, $isPlayoffPhase, $playoffMonthKey);
+        $html .= $this->renderGamesByMonth($gamesByMonth, $games, $teamId, $team->name, $isPlayoffPhase, $playoffMonthKey);
         $html .= '</div>';
         $html .= $this->renderScrollScripts($firstUpcomingId);
 
@@ -56,6 +74,10 @@ class TeamScheduleView implements TeamScheduleViewInterface
             .schedule-container--team .schedule-month__header {
                 background: var(--team-primary);
                 color: var(--team-secondary);
+            }
+            .schedule-container--team .schedule-month__header--playoffs {
+                background: var(--accent-500);
+                color: white;
             }
             .schedule-container--team .schedule-months__link:hover {
                 background: var(--team-primary);
@@ -109,10 +131,13 @@ class TeamScheduleView implements TeamScheduleViewInterface
     /**
      * Render month navigation
      */
-    private function renderMonthNav(array $gamesByMonth): string
+    private function renderMonthNav(array $gamesByMonth, bool $isPlayoffPhase, ?string $playoffMonthKey): string
     {
         $html = '<nav class="schedule-months">';
         foreach ($gamesByMonth as $monthKey => $data) {
+            if ($isPlayoffPhase && $monthKey === $playoffMonthKey) {
+                continue;
+            }
             $monthLabel = $data['label'];
             $abbrev = date('M', strtotime($monthKey . '-01'));
             $html .= '<a href="#team-month-' . $monthKey . '" class="schedule-months__link" onclick="scrollToMonth(event, \'' . $monthKey . '\')">';
@@ -127,12 +152,16 @@ class TeamScheduleView implements TeamScheduleViewInterface
     /**
      * Render all games organized by month using same layout as Schedule module
      */
-    private function renderGamesByMonth(array $gamesByMonth, array $allGames, int $userTeamId, string $userTeamName): string
+    private function renderGamesByMonth(array $gamesByMonth, array $allGames, int $userTeamId, string $userTeamName, bool $isPlayoffPhase, ?string $playoffMonthKey): string
     {
         $html = '';
         foreach ($gamesByMonth as $monthKey => $data) {
             $html .= '<div class="schedule-month" id="team-month-' . $monthKey . '">';
-            $html .= '<div class="schedule-month__header">' . HtmlSanitizer::safeHtmlOutput($data['label']) . '</div>';
+            $headerClass = 'schedule-month__header';
+            if ($isPlayoffPhase && $monthKey === $playoffMonthKey) {
+                $headerClass .= ' schedule-month__header--playoffs';
+            }
+            $html .= '<div class="' . $headerClass . '">' . HtmlSanitizer::safeHtmlOutput($data['label']) . '</div>';
 
             foreach ($data['dates'] as $date => $games) {
                 $dayNum = date('j', strtotime($date));

@@ -33,7 +33,7 @@ class TeamScheduleViewTest extends TestCase
         $games = [];
         $simLengthInDays = 7;
 
-        $result = $this->view->render($mockTeam, $games, $simLengthInDays);
+        $result = $this->view->render($mockTeam, $games, $simLengthInDays, 'Regular Season');
 
         $this->assertIsString($result);
     }
@@ -43,7 +43,7 @@ class TeamScheduleViewTest extends TestCase
         $mockTeam = $this->createMockTeam();
         $games = [];
 
-        $result = $this->view->render($mockTeam, $games, 7);
+        $result = $this->view->render($mockTeam, $games, 7, 'Regular Season');
 
         $this->assertStringContainsString('<style>', $result);
         $this->assertStringContainsString('--team-primary', $result);
@@ -55,7 +55,7 @@ class TeamScheduleViewTest extends TestCase
         $mockTeam = $this->createMockTeam();
         $games = [];
 
-        $result = $this->view->render($mockTeam, $games, 7);
+        $result = $this->view->render($mockTeam, $games, 7, 'Regular Season');
 
         $this->assertStringContainsString('images/logo/', $result);
         $this->assertStringContainsString('.jpg', $result);
@@ -66,7 +66,7 @@ class TeamScheduleViewTest extends TestCase
         $mockTeam = $this->createMockTeam();
         $games = [];
 
-        $result = $this->view->render($mockTeam, $games, 7);
+        $result = $this->view->render($mockTeam, $games, 7, 'Regular Season');
 
         $this->assertStringContainsString('schedule-container', $result);
         $this->assertStringContainsString('schedule-container--team', $result);
@@ -79,7 +79,7 @@ class TeamScheduleViewTest extends TestCase
         $games = [];
         $simLengthInDays = 14;
 
-        $result = $this->view->render($mockTeam, $games, $simLengthInDays);
+        $result = $this->view->render($mockTeam, $games, $simLengthInDays, 'Regular Season');
 
         $this->assertStringContainsString('14 days', $result);
     }
@@ -91,7 +91,7 @@ class TeamScheduleViewTest extends TestCase
             $this->createMockGame('October', '2025-10-15'),
         ];
 
-        $result = $this->view->render($mockTeam, $games, 7);
+        $result = $this->view->render($mockTeam, $games, 7, 'Regular Season');
 
         $this->assertStringContainsString('October', $result);
     }
@@ -104,7 +104,7 @@ class TeamScheduleViewTest extends TestCase
             $this->createMockGame('November', '2025-11-15'),
         ];
 
-        $result = $this->view->render($mockTeam, $games, 7);
+        $result = $this->view->render($mockTeam, $games, 7, 'Regular Season');
 
         $this->assertStringContainsString('October', $result);
         $this->assertStringContainsString('November', $result);
@@ -115,7 +115,7 @@ class TeamScheduleViewTest extends TestCase
         $mockTeam = $this->createMockTeam('FF0000', '000000');
         $games = [];
 
-        $result = $this->view->render($mockTeam, $games, 7);
+        $result = $this->view->render($mockTeam, $games, 7, 'Regular Season');
 
         $this->assertStringContainsString('FF0000', $result);
     }
@@ -126,7 +126,7 @@ class TeamScheduleViewTest extends TestCase
         $mockTeam = $this->createMockTeam('<script>alert(1)</script>', '000000');
         $games = [];
 
-        $result = $this->view->render($mockTeam, $games, 7);
+        $result = $this->view->render($mockTeam, $games, 7, 'Regular Season');
 
         // The malicious script should be escaped
         $this->assertStringNotContainsString('<script>alert(1)</script>', $result);
@@ -139,7 +139,7 @@ class TeamScheduleViewTest extends TestCase
             $this->createMockGame('October', '2025-10-15', false, 'green'),
         ];
 
-        $result = $this->view->render($mockTeam, $games, 7);
+        $result = $this->view->render($mockTeam, $games, 7, 'Regular Season');
 
         // Win is now shown by highlighting the winning team's score/record
         $this->assertStringContainsString('schedule-game__team--win', $result);
@@ -152,7 +152,7 @@ class TeamScheduleViewTest extends TestCase
             $this->createMockGame('October', '2025-10-15', false, 'red'),
         ];
 
-        $result = $this->view->render($mockTeam, $games, 7);
+        $result = $this->view->render($mockTeam, $games, 7, 'Regular Season');
 
         // Loss is shown by NOT having the --win class on the user's team
         // The opponent's score gets the --win class instead

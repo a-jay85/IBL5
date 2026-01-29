@@ -42,7 +42,7 @@ if ($isValidTeam) {
     $service = new TeamScheduleService($mysqli_db);
     $view = new TeamScheduleView();
     $games = $service->getProcessedSchedule($teamID, $season);
-    echo $view->render($team, $games, $league->getSimLengthInDays());
+    echo $view->render($team, $games, $league->getSimLengthInDays(), $season->phase);
 } else {
     // League-wide schedule
     renderLeagueSchedule($mysqli_db, $commonRepository, $season, $league);
@@ -136,6 +136,29 @@ function renderLeagueSchedule(
     }
     $result->free();
 
+    // In playoff phases, relabel June as "Playoffs" and move to front
+    $isPlayoffPhase = in_array($season->phase, ['Playoffs', 'Draft', 'Free Agency'], true);
+    $playoffMonthKey = null;
+    if ($isPlayoffPhase) {
+        foreach (array_keys($gamesByMonth) as $key) {
+            if ((int)date('n', strtotime($key . '-01')) === Season::IBL_PLAYOFF_MONTH) {
+                $playoffMonthKey = $key;
+                break;
+            }
+        }
+        if ($playoffMonthKey !== null) {
+            $months[$playoffMonthKey] = 'Playoffs';
+
+            $reorderedMonths = [$playoffMonthKey => 'Playoffs'];
+            unset($months[$playoffMonthKey]);
+            $months = $reorderedMonths + $months;
+
+            $reorderedGames = [$playoffMonthKey => $gamesByMonth[$playoffMonthKey]];
+            unset($gamesByMonth[$playoffMonthKey]);
+            $gamesByMonth = $reorderedGames + $gamesByMonth;
+        }
+    }
+
     // Output schedule container
     echo '<div class="schedule-container">';
 
@@ -156,6 +179,9 @@ function renderLeagueSchedule(
     // Month navigation
     echo '<nav class="schedule-months">';
     foreach ($months as $key => $label) {
+        if ($isPlayoffPhase && $key === $playoffMonthKey) {
+            continue;
+        }
         $abbrev = date('M', strtotime($key . '-01')); // 3-letter abbreviation
         echo '<a href="#month-' . $key . '" class="schedule-months__link" onclick="scrollToMonth(event, \'' . $key . '\')">';
         echo '<span class="schedule-months__full">' . $label . '</span>';
@@ -169,7 +195,11 @@ function renderLeagueSchedule(
         $monthLabel = $months[$monthKey];
 
         echo '<div class="schedule-month" id="month-' . $monthKey . '">';
-        echo '<div class="schedule-month__header">' . $monthLabel . '</div>';
+        $headerClass = 'schedule-month__header';
+        if ($isPlayoffPhase && $monthKey === $playoffMonthKey) {
+            $headerClass .= ' schedule-month__header--playoffs';
+        }
+        echo '<div class="' . $headerClass . '">' . $monthLabel . '</div>';
 
         foreach ($dates as $date => $games) {
             $dayNum = date('j', strtotime($date));

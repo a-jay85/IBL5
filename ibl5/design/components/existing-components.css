@@ -1314,6 +1314,10 @@ a.schedule-jump-btn:hover {
     border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
+.schedule-month__header--playoffs {
+    background: var(--accent-500);
+}
+
 /* Day Row */
 .schedule-day {
     display: flex;

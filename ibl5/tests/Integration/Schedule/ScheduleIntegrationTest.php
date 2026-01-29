@@ -665,7 +665,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         ];
 
         // Act
-        $html = $this->view->render($team, $games, 7);
+        $html = $this->view->render($team, $games, 7, 'Regular Season');
 
         // Assert
         $this->assertStringContainsString('schedule-container--team', $html);
@@ -691,7 +691,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         ];
 
         // Act
-        $html = $this->view->render($team, $games, 7);
+        $html = $this->view->render($team, $games, 7, 'Regular Season');
 
         // Assert
         $this->assertStringContainsString('January', $html);
@@ -712,7 +712,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         ];
 
         // Act
-        $html = $this->view->render($team, $games, 7);
+        $html = $this->view->render($team, $games, 7, 'Regular Season');
 
         // Assert - Modern design uses schedule-game--upcoming class (shared with Schedule module)
         $this->assertStringContainsString('schedule-game--upcoming', $html);
@@ -732,7 +732,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         ];
 
         // Act
-        $html = $this->view->render($team, $games, 7);
+        $html = $this->view->render($team, $games, 7, 'Regular Season');
 
         // Assert - Modern design shows dashes for unplayed games (same as Schedule module)
         $this->assertStringContainsString('schedule-game__score-link', $html);
@@ -751,7 +751,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $games = [];
 
         // Act
-        $html = $this->view->render($team, $games, 7);
+        $html = $this->view->render($team, $games, 7, 'Regular Season');
 
         // Assert
         $this->assertStringContainsString('FF5500', $html);
@@ -770,7 +770,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $games = [];
 
         // Act
-        $html = $this->view->render($team, $games, 7);
+        $html = $this->view->render($team, $games, 7, 'Regular Season');
 
         // Assert
         $this->assertStringNotContainsString('<script>alert(1)</script>', $html);
@@ -788,7 +788,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $games = [];
 
         // Act
-        $html = $this->view->render($team, $games, 14);
+        $html = $this->view->render($team, $games, 14, 'Regular Season');
 
         // Assert
         $this->assertStringContainsString('14 days', $html);
@@ -867,7 +867,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
 
         // Act
         $processed = $this->service->getProcessedSchedule($teamId, $season);
-        $html = $this->view->render($team, $processed, 7);
+        $html = $this->view->render($team, $processed, 7, 'Regular Season');
 
         // Assert - End-to-end verification with modern design (shared Schedule module classes)
         $this->assertStringContainsString('schedule-container--team', $html);

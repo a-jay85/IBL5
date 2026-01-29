@@ -2056,6 +2056,19 @@ a.schedule-jump-btn:hover {
     min-width: 100%;
 }
 
+/* Disable injected scroll wrappers that break sticky positioning */
+.series-records-scroll-wrapper .table-scroll-wrapper {
+    overflow: visible !important;
+}
+
+.series-records-scroll-wrapper .table-scroll-wrapper::after {
+    display: none !important;
+}
+
+.series-records-scroll-wrapper .table-scroll-container {
+    overflow: visible !important;
+}
+
 /* Table with sticky support */
 .series-records-table--sticky {
     overflow: visible;

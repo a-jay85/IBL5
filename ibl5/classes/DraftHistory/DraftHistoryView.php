@@ -128,7 +128,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
                 <tr>
                     <th class="sticky-col-1">Rd</th>
                     <th class="sticky-col-2">Pick</th>
-                    <th class="sticky-col-3">Player</th>
+                    <th>Player</th>
                     <th class="ibl-team-cell--colored">Team</th>
                     <th>College</th>
                 </tr>
@@ -177,7 +177,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
             $output .= "<tr>
     <td class=\"sticky-col-1\">{$round}</td>
     <td class=\"sticky-col-2\">{$pickNo}</td>
-    <td class=\"sticky-col-3 name-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\" loading=\"lazy\">{$name}</a></td>
+    <td class=\"name-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\" loading=\"lazy\">{$name}</a></td>
     {$teamCell}
     <td>{$college}</td>
 </tr>";

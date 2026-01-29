@@ -44,6 +44,13 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     public function renderMainPage(): string
     {
         ob_start();
+        // Generate team-colored table styles for all 4 tables
+        $teamColor = $this->team->color1 ?? 'D4AF37';
+        $teamColor2 = $this->team->color2 ?? '1e3a5f';
+        echo \UI\TableStyles::render('fa-under-contract', $teamColor, $teamColor2);
+        echo \UI\TableStyles::render('fa-offers', $teamColor, $teamColor2);
+        echo \UI\TableStyles::render('fa-team-free-agents', $teamColor, $teamColor2);
+        echo \UI\TableStyles::render('fa-other-free-agents', '666666', 'ffffff');
         ?>
 <img src="images/logo/<?= (int) $this->team->teamID ?>.jpg" alt="Team Logo" class="team-logo-banner">
 <p>
@@ -66,13 +73,17 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
      */
     private function renderPlayersUnderContract(): string
     {
+        $teamId = (int) ($this->team->teamID ?? 0);
+        $teamCity = htmlspecialchars($this->team->city ?? '');
+        $teamNameStr = htmlspecialchars($this->team->name ?? '');
+        $color1 = htmlspecialchars($this->team->color1 ?? 'D4AF37');
+        $color2 = htmlspecialchars($this->team->color2 ?? '1e3a5f');
+
         ob_start();
         ?>
-<table border="1" cellspacing="0" class="sortable">
-    <caption style="background-color: #0000cc">
-        <center><b><font color="white"><?= htmlspecialchars($this->team->name) ?> Players Under Contract</font></b></center>
-    </caption>
-    <?= $this->renderTableHeader() ?>
+<table style="margin: 0 auto;" class="sortable fa-under-contract">
+    <?= $this->renderColgroups() ?>
+    <?= $this->renderTableHeader('Players Under Contract') ?>
     <tbody>
         <?php foreach ($this->team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
             <?php
@@ -86,18 +97,24 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
                 }
             ?>
         <tr>
-            <td>
+            <td style="text-align: center;">
                 <?php if ($player->canRookieOption($this->season->phase)): ?>
-                    <a href="modules.php?name=Player&pa=rookieoption&pid=<?= (int) $player->playerID ?>">Rookie Option</a>
+                    <a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= (int) $player->playerID ?>">Rookie Option</a>
                 <?php endif; ?>
             </td>
-            <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= (int) $player->playerID ?>"><?= htmlspecialchars($playerName ?? '') ?></a></td>
-            <td><a href="modules.php?name=Team&op=team&teamID=<?= (int) $player->teamID ?>"><?= htmlspecialchars($player->teamName ?? '') ?></a></td>
-            <td><?= (int) $player->age ?></td>
+            <td style="text-align: center;"><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>"><?= htmlspecialchars($playerName ?? '') ?></a></td>
+            <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
+                <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
+                    <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+                    <span class="ibl-team-cell__text"><?= $teamCity ?> <?= $teamNameStr ?></span>
+                </a>
+            </td>
+            <td class="sep-team"></td>
+            <td style="text-align: center;"><?= (int) $player->age ?></td>
             <?= $this->renderPlayerRatings($player) ?>
             <?php foreach ($futureSalaries as $salary): ?>
-                <td><?= (int) $salary ?></td>
+                <td style="text-align: center;"><?= (int) $salary ?></td>
             <?php endforeach; ?>
             <?= $this->renderPlayerPreferences($player) ?>
         </tr>
@@ -106,9 +123,9 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="29" align="right"><b><i><?= htmlspecialchars($this->team->name) ?> Total Salary</i></b></td>
+            <td colspan="30" style="text-align: right;"><strong><em><?= htmlspecialchars($this->team->name) ?> Total Salary</em></strong></td>
             <?php foreach ($this->capMetrics['totalSalaries'] as $salary): ?>
-                <td><b><i><?= (int) $salary ?></i></b></td>
+                <td style="text-align: center;"><strong><em><?= (int) $salary ?></em></strong></td>
             <?php endforeach; ?>
         </tr>
     </tfoot>
@@ -125,14 +142,17 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     private function renderContractOffers(): string
     {
         $commonRepository = new \Services\CommonMysqliRepository($this->mysqli_db);
+        $teamId = (int) ($this->team->teamID ?? 0);
+        $teamCity = htmlspecialchars($this->team->city ?? '');
+        $teamNameStr = htmlspecialchars($this->team->name ?? '');
+        $color1 = htmlspecialchars($this->team->color1 ?? 'D4AF37');
+        $color2 = htmlspecialchars($this->team->color2 ?? '1e3a5f');
 
         ob_start();
         ?>
-<table border="1" cellspacing="0" class="sortable">
-    <caption style="background-color: #0000cc">
-        <center><b><font color="white"><?= htmlspecialchars($this->team->name) ?> Contract Offers</font></b></center>
-    </caption>
-    <?= $this->renderTableHeader() ?>
+<table style="margin: 0 auto;" class="sortable fa-offers">
+    <?= $this->renderColgroups() ?>
+    <?= $this->renderTableHeader('Contract Offers') ?>
     <tbody>
         <?php foreach ($this->team->getFreeAgencyOffersResult() as $offerRow): ?>
             <?php
@@ -140,27 +160,33 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
             $player = Player::withPlayerID($this->mysqli_db, $playerID);
             ?>
         <tr>
-            <td><a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= (int) $player->playerID ?>">Negotiate</a></td>
-            <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= (int) $player->playerID ?>"><?= htmlspecialchars($player->name ?? '') ?></a></td>
-            <td><a href="modules.php?name=Team&op=team&teamID=<?= (int) $player->teamID ?>"><?= htmlspecialchars($player->teamName ?? '') ?></a></td>
-            <td><?= (int) $player->age ?></td>
+            <td style="text-align: center;"><a href="modules.php?name=Free_Agency&amp;pa=negotiate&amp;pid=<?= (int) $player->playerID ?>">Negotiate</a></td>
+            <td style="text-align: center;"><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>"><?= htmlspecialchars($player->name ?? '') ?></a></td>
+            <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
+                <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
+                    <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+                    <span class="ibl-team-cell__text"><?= $teamCity ?> <?= $teamNameStr ?></span>
+                </a>
+            </td>
+            <td class="sep-team"></td>
+            <td style="text-align: center;"><?= (int) $player->age ?></td>
             <?= $this->renderPlayerRatings($player) ?>
-            <td><?= (int) $offerRow['offer1'] ?></td>
-            <td><?= (int) $offerRow['offer2'] ?></td>
-            <td><?= (int) $offerRow['offer3'] ?></td>
-            <td><?= (int) $offerRow['offer4'] ?></td>
-            <td><?= (int) $offerRow['offer5'] ?></td>
-            <td><?= (int) $offerRow['offer6'] ?></td>
+            <td style="text-align: center;"><?= (int) $offerRow['offer1'] ?></td>
+            <td style="text-align: center;"><?= (int) $offerRow['offer2'] ?></td>
+            <td style="text-align: center;"><?= (int) $offerRow['offer3'] ?></td>
+            <td style="text-align: center;"><?= (int) $offerRow['offer4'] ?></td>
+            <td style="text-align: center;"><?= (int) $offerRow['offer5'] ?></td>
+            <td style="text-align: center;"><?= (int) $offerRow['offer6'] ?></td>
             <?= $this->renderPlayerPreferences($player) ?>
         </tr>
         <?php endforeach; ?>
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="29" align="right"><b><i><?= htmlspecialchars($this->team->name) ?> Total Salary Plus Contract Offers</i></b></td>
+            <td colspan="30" style="text-align: right;"><strong><em><?= htmlspecialchars($this->team->name) ?> Total Salary Plus Contract Offers</em></strong></td>
             <?php foreach ($this->capMetrics['totalSalaries'] as $salary): ?>
-                <td><b><i><?= (int) $salary ?></i></b></td>
+                <td style="text-align: center;"><strong><em><?= (int) $salary ?></em></strong></td>
             <?php endforeach; ?>
         </tr>
         <?= $this->renderCapSpaceFooter() ?>
@@ -177,14 +203,17 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
      */
     private function renderTeamFreeAgents(): string
     {
+        $teamId = (int) ($this->team->teamID ?? 0);
+        $teamCity = htmlspecialchars($this->team->city ?? '');
+        $teamNameStr = htmlspecialchars($this->team->name ?? '');
+        $color1 = htmlspecialchars($this->team->color1 ?? 'D4AF37');
+        $color2 = htmlspecialchars($this->team->color2 ?? '1e3a5f');
+
         ob_start();
         ?>
-<table border="1" cellspacing="0" class="sortable">
-    <caption style="background-color: #0000cc">
-        <center><b><font color="white"><?= htmlspecialchars($this->team->name) ?> Unsigned Free Agents</b><br>
-        (Note: * and <i>italicized</i> indicates player has Bird Rights)</font></b></center>
-    </caption>
-    <?= $this->renderTableHeader() ?>
+<table style="margin: 0 auto;" class="sortable fa-team-free-agents">
+    <?= $this->renderColgroups() ?>
+    <?= $this->renderTableHeader('Unsigned Free Agents', true) ?>
     <tbody>
         <?php foreach ($this->team->getRosterUnderContractOrderedByOrdinalResult() as $playerRow): ?>
             <?php
@@ -194,21 +223,27 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
                 $demands = $player->getFreeAgencyDemands();
             ?>
         <tr>
-            <td>
+            <td style="text-align: center;">
                 <?php if ($this->capMetrics['rosterSpots'][0] > 0): ?>
-                    <a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= (int) $player->playerID ?>">Negotiate</a>
+                    <a href="modules.php?name=Free_Agency&amp;pa=negotiate&amp;pid=<?= (int) $player->playerID ?>">Negotiate</a>
                 <?php endif; ?>
             </td>
-            <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= (int) $player->playerID ?>">
+            <td style="text-align: center;"><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>">
                 <?php if ($player->birdYears >= 3): ?>
-                    *<i><?= htmlspecialchars($player->name ?? '') ?></i>*
+                    *<em><?= htmlspecialchars($player->name ?? '') ?></em>*
                 <?php else: ?>
                     <?= htmlspecialchars($player->name ?? '') ?>
                 <?php endif; ?>
             </a></td>
-            <td><a href="modules.php?name=Team&op=team&teamID=<?= (int) $player->teamID ?>"><?= htmlspecialchars($player->teamName ?? '') ?></a></td>
-            <td><?= (int) $player->age ?></td>
+            <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
+                <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
+                    <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+                    <span class="ibl-team-cell__text"><?= $teamCity ?> <?= $teamNameStr ?></span>
+                </a>
+            </td>
+            <td class="sep-team"></td>
+            <td style="text-align: center;"><?= (int) $player->age ?></td>
             <?= $this->renderPlayerRatings($player) ?>
             <?= $this->renderPlayerDemands($demands) ?>
             <?= $this->renderPlayerPreferences($player) ?>
@@ -230,11 +265,9 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     {
         ob_start();
         ?>
-<table border="1" cellspacing="0" class="sortable">
-    <caption style="background-color: #0000cc">
-        <center><b><font color="white">All Other Free Agents</font></b></center>
-    </caption>
-    <?= $this->renderTableHeader() ?>
+<table style="margin: 0 auto;" class="sortable fa-other-free-agents">
+    <?= $this->renderColgroups() ?>
+    <?= $this->renderTableHeader('All Other Free Agents') ?>
     <tbody>
         <?php
         $allPlayers = $this->repository->getAllPlayersExcludingTeam($this->team->name);
@@ -244,13 +277,15 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
 
             if ($player->isPlayerFreeAgent($this->season)):
                 $demands = $player->getFreeAgencyDemands();
+                $pTeamId = (int) ($player->teamID ?? 0);
         ?>
         <tr>
-            <td><a href="modules.php?name=Free_Agency&pa=negotiate&pid=<?= (int) $player->playerID ?>">Negotiate</a></td>
-            <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <td><a href="modules.php?name=Player&pa=showpage&pid=<?= (int) $player->playerID ?>"><?= htmlspecialchars($player->name ?? '') ?></a></td>
-            <td><a href="modules.php?name=Team&op=team&teamID=<?= (int) $player->teamID ?>"><?= htmlspecialchars($player->teamName ?? '') ?></a></td>
-            <td><?= (int) $player->age ?></td>
+            <td style="text-align: center;"><a href="modules.php?name=Free_Agency&amp;pa=negotiate&amp;pid=<?= (int) $player->playerID ?>">Negotiate</a></td>
+            <td style="text-align: center;"><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>"><?= htmlspecialchars($player->name ?? '') ?></a></td>
+            <?= $this->renderTeamCell($player) ?>
+            <td class="sep-team"></td>
+            <td style="text-align: center;"><?= (int) $player->age ?></td>
             <?= $this->renderPlayerRatings($player) ?>
             <?= $this->renderPlayerDemands($demands) ?>
             <?= $this->renderPlayerPreferences($player) ?>
@@ -264,67 +299,140 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     }
 
     /**
-     * Render table header
+     * Render colgroups for table column organization
      *
-     * @return string HTML table header
+     * @return string HTML colgroup elements
      */
-    private function renderTableHeader(): string
+    private function renderColgroups(): string
     {
         ob_start();
         ?>
-    <colgroup>
-        <col span="5">
-        <col span="6" style="background-color: #ddd">
-        <col span="7">
-        <col span="8" style="background-color: #ddd">
-        <col span="3">
-        <col span="6" style="background-color: #ddd">
-        <col span="5">
-    </colgroup>
+<colgroup span="4"></colgroup><colgroup span="1"></colgroup><colgroup span="1"></colgroup><colgroup span="6"></colgroup><colgroup span="7"></colgroup><colgroup span="4"></colgroup><colgroup span="4"></colgroup><colgroup span="3"></colgroup><colgroup span="6"></colgroup><colgroup span="5"></colgroup>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Render table header
+     *
+     * @param string $title Table title to display in header
+     * @param bool $showBirdRightsNote Whether to show the Bird Rights note
+     * @return string HTML table header
+     */
+    private function renderTableHeader(string $title = '', bool $showBirdRightsNote = false): string
+    {
+        $teamName = htmlspecialchars($this->team->name ?? '');
+        $fullTitle = $title;
+        if ($title !== 'All Other Free Agents') {
+            $fullTitle = $teamName . ' ' . $title;
+        }
+
+        ob_start();
+        ?>
     <thead>
         <tr>
-            <td><b>Options</b></td>
-            <td><b>Pos</b></td>
-            <td><b>Player</b></td>
-            <td><b>Team</b></td>
-            <td><b>Age</b></td>
-            <td><b>2ga</b></td>
-            <td><b>2g%</b></td>
-            <td><b>fta</b></td>
-            <td><b>ft%</b></td>
-            <td><b>3ga</b></td>
-            <td><b>3g%</b></td>
-            <td><b>orb</b></td>
-            <td><b>drb</b></td>
-            <td><b>ast</b></td>
-            <td><b>stl</b></td>
-            <td><b>to</b></td>
-            <td><b>blk</b></td>
-            <td><b>foul</b></td>
-            <td><b>oo</b></td>
-            <td><b>do</b></td>
-            <td><b>po</b></td>
-            <td><b>to</b></td>
-            <td><b>od</b></td>
-            <td><b>dd</b></td>
-            <td><b>pd</b></td>
-            <td><b>td</b></td>
-            <td><b>T</b></td>
-            <td><b>S</b></td>
-            <td><b>I</b></td>
-            <td><b>Yr1</b></td>
-            <td><b>Yr2</b></td>
-            <td><b>Yr3</b></td>
-            <td><b>Yr4</b></td>
-            <td><b>Yr5</b></td>
-            <td><b>Yr6</b></td>
-            <td><b>Loy</b></td>
-            <td><b>PFW</b></td>
-            <td><b>PT</b></td>
-            <td><b>Sec</b></td>
-            <td><b>Trad</b></td>
+            <th colspan="41">
+                <?= $fullTitle ?>
+                <?php if ($showBirdRightsNote): ?>
+                    <br><small>(Note: * and <em>italicized</em> indicates player has Bird Rights)</small>
+                <?php endif; ?>
+            </th>
+        </tr>
+        <tr>
+            <th>Options</th>
+            <th>Pos</th>
+            <th>Player</th>
+            <th>Team</th>
+            <th class="sep-team"></th>
+            <th>Age</th>
+            <th>2ga</th>
+            <th>2g%</th>
+            <th class="sep-weak"></th>
+            <th>fta</th>
+            <th>ft%</th>
+            <th class="sep-weak"></th>
+            <th>3ga</th>
+            <th>3g%</th>
+            <th class="sep-team"></th>
+            <th>orb</th>
+            <th>drb</th>
+            <th>ast</th>
+            <th>stl</th>
+            <th>tvr</th>
+            <th>blk</th>
+            <th>foul</th>
+            <th class="sep-team"></th>
+            <th>oo</th>
+            <th>do</th>
+            <th>po</th>
+            <th>to</th>
+            <th class="sep-weak"></th>
+            <th>od</th>
+            <th>dd</th>
+            <th>pd</th>
+            <th>td</th>
+            <th class="sep-team"></th>
+            <th>T</th>
+            <th>S</th>
+            <th>I</th>
+            <th class="sep-team"></th>
+            <th>Yr1</th>
+            <th>Yr2</th>
+            <th>Yr3</th>
+            <th>Yr4</th>
+            <th>Yr5</th>
+            <th>Yr6</th>
+            <th>Loy</th>
+            <th>PFW</th>
+            <th>PT</th>
+            <th>Sec</th>
+            <th>Trad</th>
         </tr>
     </thead>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Render a team cell with colors and logo
+     *
+     * @param Player $player Player with team data
+     * @return string HTML table cell
+     */
+    private function renderTeamCell(Player $player): string
+    {
+        $teamId = (int) ($player->teamID ?? 0);
+
+        // Free agents without a team
+        if ($teamId === 0) {
+            return '<td>Free Agent</td>';
+        }
+
+        // Get team colors from database
+        $teamColors = \Player\Views\TeamColorHelper::getTeamColors($this->mysqli_db, $teamId);
+        $color1 = htmlspecialchars($teamColors['color1'] ?? 'D4AF37');
+        $color2 = htmlspecialchars($teamColors['color2'] ?? '1e3a5f');
+        $teamName = htmlspecialchars($player->teamName ?? '');
+
+        // Fetch team city from database
+        $stmt = $this->mysqli_db->prepare('SELECT team_city FROM ibl_team_info WHERE teamid = ?');
+        $stmt->bind_param('i', $teamId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $teamCity = '';
+        if ($row = $result->fetch_assoc()) {
+            $teamCity = htmlspecialchars($row['team_city'] ?? '');
+        }
+        $stmt->close();
+
+        ob_start();
+        ?>
+<td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
+    <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
+        <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+        <span class="ibl-team-cell__text"><?= $teamCity ?> <?= $teamName ?></span>
+    </a>
+</td>
         <?php
         return ob_get_clean();
     }
@@ -339,30 +447,37 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     {
         ob_start();
         ?>
-<td><?= (int) $player->ratingFieldGoalAttempts ?></td>
-<td><?= (int) $player->ratingFieldGoalPercentage ?></td>
-<td><?= (int) $player->ratingFreeThrowAttempts ?></td>
-<td><?= (int) $player->ratingFreeThrowPercentage ?></td>
-<td><?= (int) $player->ratingThreePointAttempts ?></td>
-<td><?= (int) $player->ratingThreePointPercentage ?></td>
-<td><?= (int) $player->ratingOffensiveRebounds ?></td>
-<td><?= (int) $player->ratingDefensiveRebounds ?></td>
-<td><?= (int) $player->ratingAssists ?></td>
-<td><?= (int) $player->ratingSteals ?></td>
-<td><?= (int) $player->ratingTurnovers ?></td>
-<td><?= (int) $player->ratingBlocks ?></td>
-<td><?= (int) $player->ratingFouls ?></td>
-<td><?= (int) $player->ratingOutsideOffense ?></td>
-<td><?= (int) $player->ratingDriveOffense ?></td>
-<td><?= (int) $player->ratingPostOffense ?></td>
-<td><?= (int) $player->ratingTransitionOffense ?></td>
-<td><?= (int) $player->ratingOutsideDefense ?></td>
-<td><?= (int) $player->ratingDriveDefense ?></td>
-<td><?= (int) $player->ratingPostDefense ?></td>
-<td><?= (int) $player->ratingTransitionDefense ?></td>
-<td><?= (int) $player->ratingTalent ?></td>
-<td><?= (int) $player->ratingSkill ?></td>
-<td><?= (int) $player->ratingIntangibles ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingFieldGoalAttempts ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingFieldGoalPercentage ?></td>
+<td class="sep-weak"></td>
+<td style="text-align: center;"><?= (int) $player->ratingFreeThrowAttempts ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingFreeThrowPercentage ?></td>
+<td class="sep-weak"></td>
+<td style="text-align: center;"><?= (int) $player->ratingThreePointAttempts ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingThreePointPercentage ?></td>
+<td class="sep-team"></td>
+<td style="text-align: center;"><?= (int) $player->ratingOffensiveRebounds ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingDefensiveRebounds ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingAssists ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingSteals ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingTurnovers ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingBlocks ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingFouls ?></td>
+<td class="sep-team"></td>
+<td style="text-align: center;"><?= (int) $player->ratingOutsideOffense ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingDriveOffense ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingPostOffense ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingTransitionOffense ?></td>
+<td class="sep-weak"></td>
+<td style="text-align: center;"><?= (int) $player->ratingOutsideDefense ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingDriveDefense ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingPostDefense ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingTransitionDefense ?></td>
+<td class="sep-team"></td>
+<td style="text-align: center;"><?= (int) $player->ratingTalent ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingSkill ?></td>
+<td style="text-align: center;"><?= (int) $player->ratingIntangibles ?></td>
+<td class="sep-team"></td>
         <?php
         return ob_get_clean();
     }
@@ -377,11 +492,11 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     {
         ob_start();
         ?>
-<td><?= (int) $player->freeAgencyLoyalty ?></td>
-<td><?= (int) $player->freeAgencyPlayForWinner ?></td>
-<td><?= (int) $player->freeAgencyPlayingTime ?></td>
-<td><?= (int) $player->freeAgencySecurity ?></td>
-<td><?= (int) $player->freeAgencyTradition ?></td>
+<td style="text-align: center;"><?= (int) $player->freeAgencyLoyalty ?></td>
+<td style="text-align: center;"><?= (int) $player->freeAgencyPlayForWinner ?></td>
+<td style="text-align: center;"><?= (int) $player->freeAgencyPlayingTime ?></td>
+<td style="text-align: center;"><?= (int) $player->freeAgencySecurity ?></td>
+<td style="text-align: center;"><?= (int) $player->freeAgencyTradition ?></td>
         <?php
         return ob_get_clean();
     }
@@ -395,12 +510,12 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
     private function renderPlayerDemands(array $demands): string
     {
         ob_start();
-        if ($demands['dem1'] !== 0) echo "<td>" . (int) $demands['dem1'] . "</td>"; else echo "<td></td>";
-        if ($demands['dem2'] !== 0) echo "<td>" . (int) $demands['dem2'] . "</td>"; else echo "<td></td>";
-        if ($demands['dem3'] !== 0) echo "<td>" . (int) $demands['dem3'] . "</td>"; else echo "<td></td>";
-        if ($demands['dem4'] !== 0) echo "<td>" . (int) $demands['dem4'] . "</td>"; else echo "<td></td>";
-        if ($demands['dem5'] !== 0) echo "<td>" . (int) $demands['dem5'] . "</td>"; else echo "<td></td>";
-        if ($demands['dem6'] !== 0) echo "<td>" . (int) $demands['dem6'] . "</td>"; else echo "<td></td>";
+        echo '<td style="text-align: center;">' . ($demands['dem1'] !== 0 ? (int) $demands['dem1'] : '') . '</td>';
+        echo '<td style="text-align: center;">' . ($demands['dem2'] !== 0 ? (int) $demands['dem2'] : '') . '</td>';
+        echo '<td style="text-align: center;">' . ($demands['dem3'] !== 0 ? (int) $demands['dem3'] : '') . '</td>';
+        echo '<td style="text-align: center;">' . ($demands['dem4'] !== 0 ? (int) $demands['dem4'] : '') . '</td>';
+        echo '<td style="text-align: center;">' . ($demands['dem5'] !== 0 ? (int) $demands['dem5'] : '') . '</td>';
+        echo '<td style="text-align: center;">' . ($demands['dem6'] !== 0 ? (int) $demands['dem6'] : '') . '</td>';
         return ob_get_clean();
     }
 
@@ -416,29 +531,29 @@ class FreeAgencyDisplayHelper implements FreeAgencyDisplayHelperInterface
 
         ob_start();
         ?>
-<tr bgcolor="#cc0000">
-    <td align="right"><font color="white"><b>MLE:</b></font></td>
-    <td align="center"><?= $MLEicon ?></td>
-    <td colspan="19" bgcolor="#eeeeee"></td>
-    <td colspan="8" align="right"><font color="white"><b>Soft Cap Space</b></font></td>
+<tr style="background-color: #cc0000;">
+    <td style="text-align: right; color: white;"><strong>MLE:</strong></td>
+    <td style="text-align: center;"><?= $MLEicon ?></td>
+    <td colspan="28" style="background-color: #eeeeee;"></td>
+    <td colspan="8" style="text-align: right; color: white;"><strong>Soft Cap Space</strong></td>
     <?php foreach ($this->capMetrics['softCapSpace'] as $capSpace): ?>
-        <td><?= (int) $capSpace ?></td>
+        <td style="text-align: center;"><?= (int) $capSpace ?></td>
     <?php endforeach; ?>
 </tr>
-<tr bgcolor="#cc0000">
-    <td align="right"><font color="white"><b>LLE:</b></font></td>
-    <td align="center"><?= $LLEicon ?></td>
-    <td colspan="19" bgcolor="#eeeeee"></td>
-    <td colspan="8" align="right"><font color="white"><b>Hard Cap Space</b></font></td>
+<tr style="background-color: #cc0000;">
+    <td style="text-align: right; color: white;"><strong>LLE:</strong></td>
+    <td style="text-align: center;"><?= $LLEicon ?></td>
+    <td colspan="28" style="background-color: #eeeeee;"></td>
+    <td colspan="8" style="text-align: right; color: white;"><strong>Hard Cap Space</strong></td>
     <?php foreach ($this->capMetrics['hardCapSpace'] as $capSpace): ?>
-        <td><?= (int) $capSpace ?></td>
+        <td style="text-align: center;"><?= (int) $capSpace ?></td>
     <?php endforeach; ?>
 </tr>
-<tr bgcolor="#cc0000">
-    <td colspan="21" bgcolor="#eeeeee"></td>
-    <td colspan="8" align="right"><font color="white"><b>Empty Roster Slots</b></font></td>
+<tr style="background-color: #cc0000;">
+    <td colspan="30" style="background-color: #eeeeee;"></td>
+    <td colspan="8" style="text-align: right; color: white;"><strong>Empty Roster Slots</strong></td>
     <?php foreach ($this->capMetrics['rosterSpots'] as $spots): ?>
-        <td><?= (int) $spots ?></td>
+        <td style="text-align: center;"><?= (int) $spots ?></td>
     <?php endforeach; ?>
 </tr>
         <?php

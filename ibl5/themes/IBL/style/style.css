@@ -2673,6 +2673,49 @@ a.schedule-jump-btn:hover {
   color: var(--gray-600);
   margin-bottom: var(--space-6);
 }
+.draft-pick-scroll-wrapper {
+  position: relative;
+  max-height: 80vh;
+  overflow: auto;
+  margin: 0 auto;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+.draft-pick-scroll-container {
+  display: inline-block;
+  min-width: 100%;
+}
+.draft-pick-table--sticky {
+  overflow: visible;
+  border-radius: 0;
+  box-shadow: none;
+}
+.draft-pick-table--sticky thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.draft-pick-table--sticky thead th {
+  background: var(--gradient-navy-header);
+}
+.draft-pick-table--sticky .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+}
+.draft-pick-table--sticky .sticky-corner {
+  z-index: 15;
+  background: var(--navy-800);
+}
+.draft-pick-table--sticky tbody td.sticky-col {
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+.draft-pick-table--sticky thead tr:last-child th {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.draft-pick-table--sticky thead .sticky-corner {
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
 .allstar-table {
   max-width: 500px;
 }
@@ -3240,16 +3283,25 @@ table.sortable thead th {
     position: sticky;
     left: 36px;
     z-index: 1;
+    min-width: 36px;
+  }
+  .ibl-data-table.responsive-table th.sticky-col-3, .ibl-data-table.responsive-table td.sticky-col-3, .ibl-table.responsive-table th.sticky-col-3, .ibl-table.responsive-table td.sticky-col-3 {
+    position: sticky;
+    left: 72px;
+    z-index: 1;
     min-width: 100px;
   }
-  .ibl-data-table.responsive-table thead th.sticky-col-1, .ibl-data-table.responsive-table thead th.sticky-col-2, .ibl-table.responsive-table thead th.sticky-col-1, .ibl-table.responsive-table thead th.sticky-col-2 {
+  .ibl-data-table.responsive-table thead th.sticky-col-1, .ibl-data-table.responsive-table thead th.sticky-col-2, .ibl-data-table.responsive-table thead th.sticky-col-3, .ibl-table.responsive-table thead th.sticky-col-1, .ibl-table.responsive-table thead th.sticky-col-2, .ibl-table.responsive-table thead th.sticky-col-3 {
     background: var(--gradient-navy-header);
     z-index: 3;
   }
   .ibl-data-table.responsive-table th.sticky-col-1, .ibl-data-table.responsive-table td.sticky-col-1, .ibl-table.responsive-table th.sticky-col-1, .ibl-table.responsive-table td.sticky-col-1 {
     box-shadow: none;
   }
-  .ibl-data-table.responsive-table td.sticky-col-2, .ibl-table.responsive-table td.sticky-col-2 {
+  .ibl-data-table.responsive-table:not(:has(.sticky-col-3)) td.sticky-col-2, .ibl-table.responsive-table:not(:has(.sticky-col-3)) td.sticky-col-2 {
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+  }
+  .ibl-data-table.responsive-table td.sticky-col-3, .ibl-table.responsive-table td.sticky-col-3 {
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
   }
   .responsive-table tbody tr.drafted td[class*="sticky-col"] {

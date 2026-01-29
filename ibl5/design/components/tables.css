@@ -182,7 +182,7 @@
    Mobile Sticky Column Support
 
    Use .responsive-table class on tables with sticky columns.
-   Add .sticky-col, .sticky-col-1, .sticky-col-2 to columns that should stick.
+   Add .sticky-col, .sticky-col-1, .sticky-col-2, .sticky-col-3 to columns that should stick.
    ========================================================================== */
 
 @media (max-width: 768px) {
@@ -247,13 +247,26 @@
         position: sticky;
         left: 36px;
         z-index: 1;
+        min-width: 36px;
+    }
+
+    /* Three sticky columns (rd + pick + player pattern) */
+    .ibl-data-table.responsive-table th.sticky-col-3,
+    .ibl-data-table.responsive-table td.sticky-col-3,
+    .ibl-table.responsive-table th.sticky-col-3,
+    .ibl-table.responsive-table td.sticky-col-3 {
+        position: sticky;
+        left: 72px;
+        z-index: 1;
         min-width: 100px;
     }
 
     .ibl-data-table.responsive-table thead th.sticky-col-1,
     .ibl-data-table.responsive-table thead th.sticky-col-2,
+    .ibl-data-table.responsive-table thead th.sticky-col-3,
     .ibl-table.responsive-table thead th.sticky-col-1,
-    .ibl-table.responsive-table thead th.sticky-col-2 {
+    .ibl-table.responsive-table thead th.sticky-col-2,
+    .ibl-table.responsive-table thead th.sticky-col-3 {
         background: var(--gradient-navy-header);
         z-index: 3;
     }
@@ -268,8 +281,15 @@
         box-shadow: none;
     }
 
-    .ibl-data-table.responsive-table td.sticky-col-2,
-    .ibl-table.responsive-table td.sticky-col-2 {
+    /* Col-2 gets shadow only for 2-column sticky layouts */
+    .ibl-data-table.responsive-table:not(:has(.sticky-col-3)) td.sticky-col-2,
+    .ibl-table.responsive-table:not(:has(.sticky-col-3)) td.sticky-col-2 {
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Col-3 gets shadow for 3-column sticky layouts */
+    .ibl-data-table.responsive-table td.sticky-col-3,
+    .ibl-table.responsive-table td.sticky-col-3 {
         box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
     }
 

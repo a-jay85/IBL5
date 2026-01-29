@@ -2500,9 +2500,6 @@ a.schedule-jump-btn:hover {
   .schedule-game__record {
     display: none;
   }
-  .schedule-game__team-link {
-    display: none;
-  }
   .schedule-game__logo {
     width: 14px;
     height: 14px;
@@ -3261,11 +3258,11 @@ table.sortable thead th {
   .ibl-data-table.responsive-table th:first-child, .ibl-data-table.responsive-table td:first-child, .ibl-table.responsive-table th:first-child, .ibl-table.responsive-table td:first-child {
     padding-left: 0;
   }
-  .ibl-data-table th, .ibl-table th {
+  .ibl-data-table:not(.voting-form-table):not(.voting-results-table) th, .ibl-table:not(.voting-form-table):not(.voting-results-table) th {
     font-size: 1rem;
     padding: 0.5rem 0.25rem;
   }
-  .ibl-data-table td, .ibl-table td {
+  .ibl-data-table:not(.voting-form-table):not(.voting-results-table) td, .ibl-table:not(.voting-form-table):not(.voting-results-table) td {
     font-size: 1rem;
     padding: 0.375rem 0.25rem;
   }
@@ -3531,6 +3528,88 @@ table.sortable thead th {
 }
 .voting-results-table th:last-child, .voting-results-table td:last-child {
   text-align: right;
+}
+.voting-form-container {
+  text-align: center;
+  max-width: 100%;
+}
+.voting-form-table {
+  margin: 0 auto var(--space-6);
+}
+.voting-form-table th, .voting-form-table td {
+  text-align: center;
+  white-space: nowrap;
+  padding: 0.5rem 0.375rem;
+}
+.voting-form-table input[type="checkbox"], .voting-form-table input[type="radio"] {
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--accent-500);
+  cursor: pointer;
+}
+.voting-category {
+  cursor: pointer;
+  margin: var(--space-4) 0;
+  padding: var(--space-3);
+  background: var(--gray-50);
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast);
+}
+.voting-category:hover {
+  background: var(--gray-100);
+}
+.voting-category-title {
+  margin: 0;
+  display: block;
+  text-align: center;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.voting-category-instruction {
+  margin: var(--space-1) 0 0 0;
+  font-size: 1rem;
+  font-style: italic;
+  color: var(--gray-500);
+}
+.voting-submit-btn {
+  display: inline-block;
+  margin: var(--space-4) 0;
+  padding: var(--space-3) var(--space-8);
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: white;
+  background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+  box-shadow: 0 2px 8px rgb(249 115 22 / 0.3);
+}
+.voting-submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgb(249 115 22 / 0.4);
+}
+.voting-submit-btn:active {
+  transform: translateY(0);
+}
+@media (max-width: 768px) {
+  .voting-category {
+    padding: var(--space-2);
+  }
+  .voting-category-title {
+    font-size: 1.25rem;
+  }
+  .voting-form-table th, .voting-form-table td {
+    font-size: 1rem;
+    padding: 0.5rem 0.375rem;
+  }
+  .voting-results-table th, .voting-results-table td {
+    font-size: 1rem;
+    padding: 0.5rem 0.375rem;
+  }
 }
 .trading-layout {
   border-collapse: separate;

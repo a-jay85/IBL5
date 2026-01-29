@@ -38,8 +38,6 @@ class SeasonHighsView implements SeasonHighsViewInterface
         return '<style>
 .stat-table .name-cell {
     white-space: nowrap;
-}
-.stat-table .name-cell {
     text-align: left;
 }
 .stat-table .name-cell a {
@@ -53,6 +51,11 @@ class SeasonHighsView implements SeasonHighsViewInterface
     object-fit: cover;
     border-radius: 50%;
     flex-shrink: 0;
+}
+@media (max-width: 768px) {
+    .stat-table .name-cell {
+        white-space: normal;
+    }
 }
 </style>';
     }

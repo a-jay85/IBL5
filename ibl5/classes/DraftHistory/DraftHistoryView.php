@@ -20,8 +20,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
     public function render(int $selectedYear, int $startYear, int $endYear, array $draftPicks): string
     {
         $output = $this->getStyleBlock();
-        $output .= $this->renderTitle($selectedYear);
-        $output .= $this->renderYearNavigation($startYear, $endYear, $selectedYear);
+        $output .= $this->renderTitleWithYearSelect($startYear, $endYear, $selectedYear);
 
         if (empty($draftPicks)) {
             $output .= $this->renderNoDataMessage();
@@ -44,30 +43,21 @@ class DraftHistoryView implements DraftHistoryViewInterface
     private function getStyleBlock(): string
     {
         return '<style>
-.draft-year-select-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-}
-.draft-year-select-wrapper label {
-    font-weight: 600;
-    color: var(--gray-700, #374151);
-}
 .draft-year-select {
-    padding: 0.5rem 2rem 0.5rem 0.75rem;
-    font-size: 1rem;
-    font-weight: 500;
+    padding: 0.25rem 1.75rem 0.25rem 0.5rem;
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
     border: 1px solid var(--gray-300, #d1d5db);
     border-radius: 0.375rem;
     background-color: white;
     background-image: url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e");
-    background-position: right 0.5rem center;
+    background-position: right 0.25rem center;
     background-repeat: no-repeat;
-    background-size: 1.5em 1.5em;
+    background-size: 1.25em 1.25em;
     appearance: none;
     cursor: pointer;
+    vertical-align: baseline;
 }
 .draft-year-select:hover {
     border-color: var(--gray-400, #9ca3af);
@@ -105,28 +95,16 @@ class DraftHistoryView implements DraftHistoryViewInterface
     }
 
     /**
-     * Render the page title.
-     *
-     * @param int $year Selected year
-     * @return string HTML title
-     */
-    private function renderTitle(int $year): string
-    {
-        return '<h2 class="ibl-table-title">' . $year . ' Draft</h2>';
-    }
-
-    /**
-     * Render the year navigation.
+     * Render the page title with integrated year select dropdown.
      *
      * @param int $startYear First draft year
      * @param int $endYear Last draft year
      * @param int $selectedYear Currently selected year
-     * @return string HTML navigation
+     * @return string HTML title with dropdown
      */
-    private function renderYearNavigation(int $startYear, int $endYear, int $selectedYear): string
+    private function renderTitleWithYearSelect(int $startYear, int $endYear, int $selectedYear): string
     {
-        $output = '<div class="draft-year-select-wrapper">';
-        $output .= '<label for="draft-year-select">Draft Year:</label>';
+        $output = '<h2 class="ibl-table-title">';
         $output .= '<select id="draft-year-select" class="draft-year-select" onchange="window.location.href=\'./modules.php?name=Draft_History&amp;year=\' + this.value">';
 
         for ($year = $endYear; $year >= $startYear; $year--) {
@@ -134,8 +112,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
             $output .= '<option value="' . $year . '"' . $selected . '>' . $year . '</option>';
         }
 
-        $output .= '</select>';
-        $output .= '</div>';
+        $output .= '</select> Draft</h2>';
         return $output;
     }
 

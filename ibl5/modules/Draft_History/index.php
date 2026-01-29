@@ -33,14 +33,14 @@ $view = new DraftHistoryView();
 $startYear = $repository->getFirstDraftYear();
 $endYear = $repository->getLastDraftYear();
 
-// Get selected year from request
-$year = isset($_REQUEST['year']) ? (int) $_REQUEST['year'] : 0;
+// Get selected year from request, default to most recent draft
+$year = isset($_REQUEST['year']) ? (int) $_REQUEST['year'] : $endYear;
 
 // Set page title
-$pagetitle = "- " . ($year > 0 ? "$year Draft" : "Draft History");
+$pagetitle = "- $year Draft";
 
 // Get draft picks for selected year
-$draftPicks = ($year > 0) ? $repository->getDraftPicksByYear($year) : [];
+$draftPicks = $repository->getDraftPicksByYear($year);
 
 // Render page
 Nuke\Header::header();

@@ -2030,6 +2030,13 @@ a.schedule-jump-btn:hover {
     box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Hide draft pick locator on mobile - table is too wide for small screens */
+@media (max-width: 768px) {
+    .draft-pick-locator-container {
+        display: none;
+    }
+}
+
 /* ==========================================================================
    All-Star Appearances Module
    ========================================================================== */

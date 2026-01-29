@@ -52,7 +52,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
      */
     private function renderTitle(): string
     {
-        return '<div class="draft-pick-locator-container">
+        return '<div class="draft-pick-header">
             <h2 class="draft-pick-title">Dude, Where\'s My Pick?</h2>
             <p class="draft-pick-description">Use this locator to see exactly who has your draft pick.</p>
         </div>';

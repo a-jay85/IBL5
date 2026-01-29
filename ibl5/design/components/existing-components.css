@@ -1969,6 +1969,13 @@ a.schedule-jump-btn:hover {
     margin-bottom: var(--space-6);
 }
 
+/* Hide header text on mobile - table is self-explanatory */
+@media (max-width: 768px) {
+    .draft-pick-header {
+        display: none;
+    }
+}
+
 /* Scroll wrapper for sticky headers and columns */
 .draft-pick-scroll-wrapper {
     position: relative;
@@ -2028,13 +2035,6 @@ a.schedule-jump-btn:hover {
 /* Corner cell needs combined shadow */
 .draft-pick-table--sticky thead .sticky-corner {
     box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* Hide draft pick locator on mobile - table is too wide for small screens */
-@media (max-width: 768px) {
-    .draft-pick-locator-container {
-        display: none;
-    }
 }
 
 /* ==========================================================================

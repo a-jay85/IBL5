@@ -23,9 +23,12 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
     {
         $html = $this->getStyleBlock();
         $html .= $this->renderTitle();
+        $html .= '<div class="draft-pick-scroll-wrapper">';
+        $html .= '<div class="draft-pick-scroll-container">';
         $html .= $this->renderTableStart($currentEndingYear);
         $html .= $this->renderTableRows($teamsWithPicks);
-        $html .= '</table></div>';
+        $html .= '</tbody></table>';
+        $html .= '</div></div></div>';
 
         return $html;
     }
@@ -63,10 +66,12 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
      */
     private function renderTableStart(int $currentEndingYear): string
     {
-        $html = '<div class="draft-pick-locator-container"><table class="draft-pick-table">';
+        $html = '<div class="draft-pick-locator-container">';
+        $html .= '<table class="draft-pick-table draft-pick-table--sticky">';
+        $html .= '<thead>';
 
         // First header row - year spans
-        $html .= '<tr><th rowspan="2">Team</th>';
+        $html .= '<tr><th rowspan="2" class="sticky-col sticky-corner">Team</th>';
         for ($i = 0; $i < 6; $i++) {
             $year = $currentEndingYear + $i;
             $html .= '<th colspan="2">' . HtmlSanitizer::safeHtmlOutput((string)$year) . '</th>';
@@ -79,6 +84,8 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
             $html .= '<th>R1</th><th>R2</th>';
         }
         $html .= '</tr>';
+
+        $html .= '</thead><tbody>';
 
         return $html;
     }
@@ -116,8 +123,8 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
 
         $html = '<tr>';
 
-        // Team name cell with team colors and logo
-        $html .= '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">';
+        // Team name cell with team colors and logo - sticky column
+        $html .= '<td class="ibl-team-cell--colored sticky-col" style="background-color: #' . $color1 . ';">';
         $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" ';
         $html .= 'class="ibl-team-cell__name" style="color: #' . $color2 . ';">';
         $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">';

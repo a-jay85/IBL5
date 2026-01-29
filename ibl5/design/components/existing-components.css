@@ -1969,6 +1969,67 @@ a.schedule-jump-btn:hover {
     margin-bottom: var(--space-6);
 }
 
+/* Scroll wrapper for sticky headers and columns */
+.draft-pick-scroll-wrapper {
+    position: relative;
+    max-height: 80vh;
+    overflow: auto;
+    margin: 0 auto;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+}
+
+.draft-pick-scroll-container {
+    display: inline-block;
+    min-width: 100%;
+}
+
+/* Table with sticky support - remove overflow: hidden from table */
+.draft-pick-table--sticky {
+    overflow: visible;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Sticky header */
+.draft-pick-table--sticky thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.draft-pick-table--sticky thead th {
+    background: var(--gradient-navy-header);
+}
+
+/* Sticky first column */
+.draft-pick-table--sticky .sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+}
+
+/* Corner cell (intersection of sticky header and column) - needs highest z-index */
+.draft-pick-table--sticky .sticky-corner {
+    z-index: 15;
+    background: var(--navy-800);
+}
+
+/* Sticky column backgrounds for body cells */
+.draft-pick-table--sticky tbody td.sticky-col {
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Bottom shadow on header to separate from content */
+.draft-pick-table--sticky thead tr:last-child th {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Corner cell needs combined shadow */
+.draft-pick-table--sticky thead .sticky-corner {
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
 /* ==========================================================================
    All-Star Appearances Module
    ========================================================================== */

@@ -14,7 +14,7 @@ interface AllStarAppearancesRepositoryInterface
     /**
      * Get all-star appearance counts grouped by player name.
      *
-     * @return array<int, array{name: string, appearances: int}> Array of player names and their appearance counts
+     * @return array<int, array{name: string, pid: int|null, appearances: int}> Array of player names, IDs, and their appearance counts
      */
     public function getAllStarAppearances(): array;
 }

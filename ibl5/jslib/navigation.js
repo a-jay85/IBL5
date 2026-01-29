@@ -61,10 +61,12 @@
             }
 
             // Animate hamburger to X
+            // Use rem units so translation scales with container size (h-4 = 1rem)
+            // 0.4375rem = 7px at 16px root font, scales proportionally
             if (hamburgerTop && hamburgerMiddle && hamburgerBottom) {
-                hamburgerTop.style.transform = 'translateY(7px) rotate(45deg)';
+                hamburgerTop.style.transform = 'translateY(0.4375rem) rotate(45deg)';
                 hamburgerMiddle.style.opacity = '0';
-                hamburgerBottom.style.transform = 'translateY(-7px) rotate(-45deg)';
+                hamburgerBottom.style.transform = 'translateY(-0.4375rem) rotate(-45deg)';
             }
 
             hamburger.setAttribute('aria-expanded', 'true');

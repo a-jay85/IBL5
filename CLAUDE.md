@@ -164,6 +164,8 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 ### XSS Protection
 Use `Utilities\HtmlSanitizer::safeHtmlOutput()` on ALL output (database results, user input, error messages).
 
+**`htmlspecialchars()` type rule:** PHP 8.1+ requires the first argument to be a string. Never pass integers, floats, or null — this causes a `TypeError` at runtime. For integer values (player IDs, salaries, ages, team IDs, ratings), use `(int)` casting instead — integers cannot contain HTML special characters and do not need escaping. Only use `htmlspecialchars()` on actual string data (names, cities, user input). Remove any existing `htmlspecialchars()` calls wrapping values that are already known to be integers.
+
 ### Type Safety (Strict Types)
 Every PHP file must have `declare(strict_types=1);` at the top. Additional requirements:
 

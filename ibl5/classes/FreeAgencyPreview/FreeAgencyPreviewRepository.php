@@ -21,14 +21,16 @@ class FreeAgencyPreviewRepository extends \BaseMysqliRepository implements FreeA
      */
     public function getActivePlayers(): array
     {
-        $query = "SELECT pid, tid, name, teamname, pos, age, draftyear, exp, cy, cyt,
-                         r_fga, r_fgp, r_fta, r_ftp, r_tga, r_tgp,
-                         r_orb, r_drb, r_ast, r_stl, r_blk, r_to, r_foul,
-                         oo, `do`, po, `to`, od, dd, pd, td,
-                         loyalty, winner, playingTime, security, tradition
-            FROM ibl_plr
-            WHERE retired = 0
-            ORDER BY ordinal ASC";
+        $query = "SELECT p.pid, p.tid, p.name, p.teamname, p.pos, p.age, p.draftyear, p.exp, p.cy, p.cyt,
+                         p.r_fga, p.r_fgp, p.r_fta, p.r_ftp, p.r_tga, p.r_tgp,
+                         p.r_orb, p.r_drb, p.r_ast, p.r_stl, p.r_blk, p.r_to, p.r_foul,
+                         p.oo, p.`do`, p.po, p.`to`, p.od, p.dd, p.pd, p.td,
+                         p.loyalty, p.winner, p.playingTime, p.security, p.tradition,
+                         t.team_city, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.retired = 0
+            ORDER BY p.ordinal ASC";
 
         return $this->fetchAll($query);
     }

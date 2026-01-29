@@ -26,13 +26,13 @@ class SeasonLeadersRepository extends \BaseMysqliRepository implements SeasonLea
      */
     public function getSeasonLeaders(array $filters, int $limit = 0): array
     {
-        $conditions = ["name IS NOT NULL"];
+        $conditions = ["h.name IS NOT NULL"];
         $params = [];
         $types = "";
 
         // Add year filter if specified
         if (!empty($filters['year'])) {
-            $conditions[] = "year = ?";
+            $conditions[] = "h.year = ?";
             $types .= "s";
             $params[] = $filters['year'];
         }
@@ -40,7 +40,7 @@ class SeasonLeadersRepository extends \BaseMysqliRepository implements SeasonLea
         // Add team filter if specified and not "All"
         $teamId = (int)($filters['team'] ?? 0);
         if (!empty($teamId) && $teamId !== 0) {
-            $conditions[] = "teamid = ?";
+            $conditions[] = "h.teamid = ?";
             $types .= "i";
             $params[] = $teamId;
         }
@@ -49,7 +49,10 @@ class SeasonLeadersRepository extends \BaseMysqliRepository implements SeasonLea
         $sortBy = $this->getSortColumn($filters['sortby'] ?? '1');
 
         // NOTE: $sortBy is validated in getSortColumn() against a strict whitelist
-        $query = "SELECT * FROM ibl_hist WHERE $whereClause ORDER BY $sortBy DESC"
+        $query = "SELECT h.*, t.team_city, t.color1, t.color2
+            FROM ibl_hist h
+            LEFT JOIN ibl_team_info t ON h.teamid = t.teamid
+            WHERE $whereClause ORDER BY $sortBy DESC"
             . ($limit > 0 ? " LIMIT $limit" : "");
 
         $rows = $this->fetchAll($query, $types, ...$params);

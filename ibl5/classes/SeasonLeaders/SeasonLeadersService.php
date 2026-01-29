@@ -18,13 +18,18 @@ class SeasonLeadersService implements SeasonLeadersServiceInterface
     public function processPlayerRow(array $row): array
     {
         $stats = [];
-        
+
         // Basic info
         $stats['pid'] = $row['pid'];
         $stats['name'] = $row['name'];
         $stats['year'] = $row['year'];
         $stats['teamname'] = $row['team'];
         $stats['teamid'] = $row['teamid'];
+
+        // Team styling data
+        $stats['team_city'] = $row['team_city'] ?? '';
+        $stats['color1'] = $row['color1'] ?? 'FFFFFF';
+        $stats['color2'] = $row['color2'] ?? '000000';
         
         // Raw stats
         $stats['games'] = $row['games'];

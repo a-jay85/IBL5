@@ -133,8 +133,22 @@ class Ratings
         </tr>
 <?php endif; ?>
         <tr<?= ($moduleName == "League_Starters" && $player->teamID == $team->teamID) ? ' class="ratings-highlight"' : '' ?><?= ($moduleName == "Next_Sim" && $row['bgcolor'] == 'FFFFAA') ? ' class="ratings-highlight"' : '' ?>>
-<?php if ($moduleName == "League_Starters"): ?>
-            <td><?= htmlspecialchars($player->teamName ?? '') ?></td>
+<?php if ($moduleName == "League_Starters"):
+    $teamId = (int) ($player->teamID ?? 0);
+    $teamCity = htmlspecialchars($player->teamCity ?? '');
+    $teamNameStr = htmlspecialchars($player->teamName ?? '');
+    $color1 = htmlspecialchars($player->teamColor1 ?? 'FFFFFF');
+    $color2 = htmlspecialchars($player->teamColor2 ?? '000000');
+    if ($teamId === 0): ?>
+            <td>Free Agent</td>
+    <?php else: ?>
+            <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
+        <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
+            <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+            <span class="ibl-team-cell__text"><?= $teamCity ?> <?= $teamNameStr ?></span>
+        </a>
+    </td>
+    <?php endif; ?>
 <?php endif; ?>
             <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
             <td style="white-space: nowrap;"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>

@@ -70,7 +70,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
         $output .= '<div class="ibl-grid ibl-grid--3col">';
 
         foreach ($playerHighs as $statName => $stats) {
-            $output .= $this->renderStatTable($statName, $stats);
+            $output .= $this->renderStatTable($statName, $stats, true);
         }
 
         $output .= '</div>';
@@ -90,7 +90,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
         $output .= '<div class="ibl-grid ibl-grid--3col">';
 
         foreach ($teamHighs as $statName => $stats) {
-            $output .= $this->renderStatTable($statName, $stats);
+            $output .= $this->renderStatTable($statName, $stats, false);
         }
 
         $output .= '</div>';
@@ -102,15 +102,18 @@ class SeasonHighsView implements SeasonHighsViewInterface
      *
      * @param string $statName Stat name
      * @param array $stats Stat data
+     * @param bool $isPlayerStats Whether this is a player stats table (adds Team column)
      * @return string HTML table
      */
-    private function renderStatTable(string $statName, array $stats): string
+    private function renderStatTable(string $statName, array $stats, bool $isPlayerStats = false): string
     {
         $safeName = HtmlSanitizer::safeHtmlOutput($statName);
 
+        // Use 5 columns for player stats (with Team), 4 columns for team stats
+        $colCount = $isPlayerStats ? 5 : 4;
         $output = '<table class="ibl-data-table stat-table">
             <thead>
-                <tr><th colspan="4">' . $safeName . '</th></tr>
+                <tr><th colspan="' . $colCount . '">' . $safeName . '</th></tr>
             </thead>
             <tbody>';
 
@@ -119,16 +122,43 @@ class SeasonHighsView implements SeasonHighsViewInterface
             $name = HtmlSanitizer::safeHtmlOutput($row['name'] ?? '');
             $date = HtmlSanitizer::safeHtmlOutput($row['date'] ?? '');
             $value = (int) ($row['value'] ?? 0);
+            $teamCell = '';
+            $isTeamStat = false;
 
             // Link player names to their profile page when pid is available
             if (isset($row['pid'])) {
                 $pid = (int) $row['pid'];
                 $playerImage = "images/player/{$pid}.jpg";
                 $name = "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\">{$name}</a>";
+
+                // Build team cell for player stats
+                if ($isPlayerStats) {
+                    $tid = (int) ($row['tid'] ?? 0);
+                    $teamCity = HtmlSanitizer::safeHtmlOutput($row['team_city'] ?? '');
+                    $teamName = HtmlSanitizer::safeHtmlOutput($row['teamname'] ?? '');
+                    $color1 = HtmlSanitizer::safeHtmlOutput($row['color1'] ?? 'FFFFFF');
+                    $color2 = HtmlSanitizer::safeHtmlOutput($row['color2'] ?? '000000');
+
+                    if ($tid === 0) {
+                        $teamCell = '<td>FA</td>';
+                    } else {
+                        $teamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
+        <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$tid}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
+            <img src=\"images/logo/new{$tid}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
+            <span class=\"ibl-team-cell__text\">{$teamCity} {$teamName}</span>
+        </a>
+    </td>";
+                    }
+                }
             } elseif (isset($row['teamid'])) {
-                // Link team names to their team page when teamid is available
+                // Style team names with colored cell for team stats
                 $teamId = (int) $row['teamid'];
-                $name = "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$teamId}\">{$name}</a>";
+                $teamCity = HtmlSanitizer::safeHtmlOutput($row['team_city'] ?? '');
+                $color1 = HtmlSanitizer::safeHtmlOutput($row['color1'] ?? 'FFFFFF');
+                $color2 = HtmlSanitizer::safeHtmlOutput($row['color2'] ?? '000000');
+
+                // For team stats, we'll use a special flag to render differently
+                $isTeamStat = true;
             }
 
             // Link dates to box score when boxId is available
@@ -137,12 +167,33 @@ class SeasonHighsView implements SeasonHighsViewInterface
                 $date = "<a href=\"./ibl/IBL/box{$boxId}.htm\">{$date}</a>";
             }
 
-            $output .= "<tr>
+            // Render row differently for team stats (styled team cell) vs player stats
+            if ($isTeamStat) {
+                $teamId = (int) $row['teamid'];
+                $teamCity = HtmlSanitizer::safeHtmlOutput($row['team_city'] ?? '');
+                $color1 = HtmlSanitizer::safeHtmlOutput($row['color1'] ?? 'FFFFFF');
+                $color2 = HtmlSanitizer::safeHtmlOutput($row['color2'] ?? '000000');
+
+                $output .= "<tr>
     <td class=\"rank-cell\">{$rank}</td>
-    <td class=\"name-cell\">{$name}</td>
+    <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
+        <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$teamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
+            <img src=\"images/logo/new{$teamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
+            <span class=\"ibl-team-cell__text\">{$teamCity} {$name}</span>
+        </a>
+    </td>
     <td class=\"date-cell\">{$date}</td>
     <td class=\"value-cell\">{$value}</td>
 </tr>";
+            } else {
+                $output .= "<tr>
+    <td class=\"rank-cell\">{$rank}</td>
+    <td class=\"name-cell\">{$name}</td>
+    {$teamCell}
+    <td class=\"date-cell\">{$date}</td>
+    <td class=\"value-cell\">{$value}</td>
+</tr>";
+            }
         }
 
         $output .= '</tbody></table>';

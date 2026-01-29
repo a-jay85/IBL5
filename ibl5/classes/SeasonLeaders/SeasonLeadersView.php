@@ -160,13 +160,31 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
      */
     public function renderPlayerRow(array $stats, int $rank): string
     {
+        $teamId = (int)$stats['teamid'];
+        $teamCity = htmlspecialchars($stats['team_city'] ?? '');
+        $teamName = htmlspecialchars($stats['teamname']);
+        $color1 = htmlspecialchars($stats['color1'] ?? 'FFFFFF');
+        $color2 = htmlspecialchars($stats['color2'] ?? '000000');
+
+        // Handle free agents (tid=0) gracefully
+        if ($teamId === 0) {
+            $teamCell = '<td>Free Agent</td>';
+        } else {
+            $teamCell = '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">
+        <a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';">
+            <img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+            <span class="ibl-team-cell__text">' . $teamCity . ' ' . $teamName . '</span>
+        </a>
+    </td>';
+        }
+
         ob_start();
         ?>
 <tr>
     <td class="rank-cell sticky-col-1"><?= htmlspecialchars((string)$rank) ?>.</td>
     <td><?= htmlspecialchars((string)$stats['year']) ?></td>
     <td class="sticky-col-2"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= htmlspecialchars((string)$stats['pid']) ?>"><?= htmlspecialchars($stats['name']) ?></a></td>
-    <td><a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= htmlspecialchars((string)$stats['teamid']) ?>"><?= htmlspecialchars($stats['teamname']) ?></a></td>
+    <?= $teamCell ?>
     <td><?= htmlspecialchars((string)$stats['games']) ?></td>
     <td><?= htmlspecialchars((string)$stats['mpg']) ?></td>
     <td><?= htmlspecialchars((string)$stats['fgmpg']) ?></td>

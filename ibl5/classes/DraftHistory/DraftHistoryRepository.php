@@ -43,10 +43,12 @@ class DraftHistoryRepository extends \BaseMysqliRepository implements DraftHisto
     public function getDraftPicksByYear(int $year): array
     {
         return $this->fetchAll(
-            "SELECT pid, name, draftround, draftpickno, draftedby, college
-            FROM ibl_plr
-            WHERE draftyear = ? AND draftround > 0
-            ORDER BY draftround ASC, draftpickno ASC",
+            "SELECT p.pid, p.name, p.draftround, p.draftpickno, p.draftedby, p.college,
+                    t.teamid, t.team_city, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.draftedby = t.team_name
+            WHERE p.draftyear = ? AND p.draftround > 0
+            ORDER BY p.draftround ASC, p.draftpickno ASC",
             "i",
             $year
         );

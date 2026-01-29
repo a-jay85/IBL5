@@ -34,18 +34,23 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         // The ibl_box_scores.name field is varchar(16) which truncates longer names
         // The ibl_plr.name field is varchar(32) which stores full names
         // Also JOIN with ibl_schedule to get BoxID for linking to box scores
+        // Also JOIN with ibl_team_info to get team colors for styled team cell
         if ($tableSuffix === '') {
-            $query = "SELECT p.`pid`, p.`name`, bs.`Date` AS `date`, sch.`BoxID`, {$statExpression} AS `{$safeStatName}`
+            $query = "SELECT p.`pid`, p.`name`, p.`tid`, p.`teamname`,
+                t.`team_city`, t.`color1`, t.`color2`,
+                bs.`Date` AS `date`, sch.`BoxID`, {$statExpression} AS `{$safeStatName}`
                 FROM ibl_box_scores bs
                 JOIN ibl_plr p ON bs.pid = p.pid
+                LEFT JOIN ibl_team_info t ON p.tid = t.teamid
                 JOIN ibl_schedule sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
                 WHERE bs.`Date` BETWEEN ? AND ?
                 ORDER BY `{$safeStatName}` DESC, bs.`Date` ASC
                 LIMIT {$limit}";
         } else {
-            // For team stats, JOIN with ibl_team_info to get team ID for linking
+            // For team stats, JOIN with ibl_team_info to get team ID and colors for linking
             // Also JOIN with ibl_schedule to get BoxID for linking to box scores
-            $query = "SELECT t.`teamid`, bs.`name`, bs.`Date` AS `date`, sch.`BoxID`, {$statExpression} AS `{$safeStatName}`
+            $query = "SELECT t.`teamid`, t.`team_city`, t.`color1`, t.`color2`,
+                bs.`name`, bs.`Date` AS `date`, sch.`BoxID`, {$statExpression} AS `{$safeStatName}`
                 FROM ibl_box_scores{$tableSuffix} bs
                 JOIN ibl_team_info t ON bs.name = t.team_name
                 JOIN ibl_schedule sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTeamID AND sch.Home = bs.homeTeamID
@@ -68,9 +73,20 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
             if (isset($row['pid'])) {
                 $entry['pid'] = (int) $row['pid'];
             }
-            // Include teamid for team stats (used for team page links)
+            // Include team data for player stats (used for styled team cell)
+            if (isset($row['tid'])) {
+                $entry['tid'] = (int) $row['tid'];
+                $entry['teamname'] = $row['teamname'] ?? '';
+                $entry['team_city'] = $row['team_city'] ?? '';
+                $entry['color1'] = $row['color1'] ?? 'FFFFFF';
+                $entry['color2'] = $row['color2'] ?? '000000';
+            }
+            // Include teamid and colors for team stats (used for styled team cell)
             if (isset($row['teamid'])) {
                 $entry['teamid'] = (int) $row['teamid'];
+                $entry['team_city'] = $row['team_city'] ?? '';
+                $entry['color1'] = $row['color1'] ?? 'FFFFFF';
+                $entry['color2'] = $row['color2'] ?? '000000';
             }
             // Include BoxID for linking dates to box scores
             if (isset($row['BoxID'])) {

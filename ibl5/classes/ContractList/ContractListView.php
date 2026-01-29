@@ -91,7 +91,7 @@ class ContractListView implements ContractListViewInterface
         foreach ($contracts as $contract) {
             $name = HtmlSanitizer::safeHtmlOutput($contract['name'] ?? '');
             $pos = HtmlSanitizer::safeHtmlOutput($contract['pos'] ?? '');
-            $teamname = HtmlSanitizer::safeHtmlOutput($contract['teamname'] ?? '');
+            $tid = (int) ($contract['tid'] ?? 0);
             $bird = HtmlSanitizer::safeHtmlOutput($contract['bird'] ?? '');
             $con1 = (int) ($contract['con1'] ?? 0);
             $con2 = (int) ($contract['con2'] ?? 0);
@@ -99,6 +99,24 @@ class ContractListView implements ContractListViewInterface
             $con4 = (int) ($contract['con4'] ?? 0);
             $con5 = (int) ($contract['con5'] ?? 0);
             $con6 = (int) ($contract['con6'] ?? 0);
+
+            // Team cell styling
+            $teamCity = HtmlSanitizer::safeHtmlOutput($contract['team_city'] ?? '');
+            $teamName = HtmlSanitizer::safeHtmlOutput($contract['teamname'] ?? '');
+            $color1 = HtmlSanitizer::safeHtmlOutput($contract['color1'] ?? 'FFFFFF');
+            $color2 = HtmlSanitizer::safeHtmlOutput($contract['color2'] ?? '000000');
+
+            // Handle free agents (tid=0) gracefully
+            if ($tid === 0) {
+                $teamCell = '<td>Free Agent</td>';
+            } else {
+                $teamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
+        <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$tid}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
+            <img src=\"images/logo/new{$tid}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
+            <span class=\"ibl-team-cell__text\">{$teamCity} {$teamName}</span>
+        </a>
+    </td>";
+            }
 
             $output .= "<tr>
     <td>{$pos}</td>
@@ -111,7 +129,7 @@ class ContractListView implements ContractListViewInterface
     <td>{$con5}</td>
     <td>{$con6}</td>
     <td class=\"divider\"></td>
-    <td>{$teamname}</td>
+    {$teamCell}
 </tr>";
         }
 

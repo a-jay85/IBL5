@@ -40,7 +40,10 @@ class ComparePlayersRepository extends \BaseMysqliRepository implements CompareP
     public function getPlayerByName(string $playerName): ?array
     {
         return $this->fetchOne(
-            "SELECT * FROM ibl_plr WHERE name = ? LIMIT 1",
+            "SELECT p.*, t.team_city, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.name = ? LIMIT 1",
             "s",
             $playerName
         );

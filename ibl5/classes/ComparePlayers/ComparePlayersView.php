@@ -55,6 +55,32 @@ $(function() {
     }
 
     /**
+     * Render a team cell for a player
+     *
+     * @param array $player Player data array
+     * @return string HTML team cell
+     */
+    private function renderTeamCell(array $player): string
+    {
+        $tid = (int) ($player['tid'] ?? 0);
+        $teamCity = htmlspecialchars($player['team_city'] ?? '');
+        $teamName = htmlspecialchars($player['teamname'] ?? '');
+        $color1 = htmlspecialchars($player['color1'] ?? 'FFFFFF');
+        $color2 = htmlspecialchars($player['color2'] ?? '000000');
+
+        if ($tid === 0) {
+            return '<td>Free Agent</td>';
+        }
+
+        return '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">
+        <a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $tid . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';">
+            <img src="images/logo/new' . $tid . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+            <span class="ibl-team-cell__text">' . $teamCity . ' ' . $teamName . '</span>
+        </a>
+    </td>';
+    }
+
+    /**
      * @see ComparePlayersViewInterface::renderComparisonResults()
      */
     public function renderComparisonResults(array $comparisonData): string
@@ -72,6 +98,7 @@ $(function() {
         <tr>
             <th>Pos</th>
             <th>Player</th>
+            <th>Team</th>
             <th>Age</th>
             <th>2ga</th>
             <th>2g%</th>
@@ -100,6 +127,7 @@ $(function() {
         <tr>
             <td><?= htmlspecialchars($player1['pos']) ?></td>
             <td><?= htmlspecialchars($player1['name']) ?></td>
+            <?= $this->renderTeamCell($player1) ?>
             <td><?= htmlspecialchars((string)$player1['age']) ?></td>
             <td><?= htmlspecialchars((string)$player1['r_fga']) ?></td>
             <td><?= htmlspecialchars((string)$player1['r_fgp']) ?></td>
@@ -126,6 +154,7 @@ $(function() {
         <tr>
             <td><?= htmlspecialchars($player2['pos']) ?></td>
             <td><?= htmlspecialchars($player2['name']) ?></td>
+            <?= $this->renderTeamCell($player2) ?>
             <td><?= htmlspecialchars((string)$player2['age']) ?></td>
             <td><?= htmlspecialchars((string)$player2['r_fga']) ?></td>
             <td><?= htmlspecialchars((string)$player2['r_fgp']) ?></td>
@@ -162,6 +191,7 @@ $(function() {
         <tr>
             <th>Pos</th>
             <th>Player</th>
+            <th>Team</th>
             <th>g</th>
             <th>gs</th>
             <th>min</th>
@@ -185,6 +215,7 @@ $(function() {
         <tr>
             <td><?= htmlspecialchars($player1['pos']) ?></td>
             <td><?= htmlspecialchars($player1['name']) ?></td>
+            <?= $this->renderTeamCell($player1) ?>
             <td><?= htmlspecialchars((string)$player1['stats_gm']) ?></td>
             <td><?= htmlspecialchars((string)$player1['stats_gs']) ?></td>
             <td><?= htmlspecialchars((string)$player1['stats_min']) ?></td>
@@ -206,6 +237,7 @@ $(function() {
         <tr>
             <td><?= htmlspecialchars($player2['pos']) ?></td>
             <td><?= htmlspecialchars($player2['name']) ?></td>
+            <?= $this->renderTeamCell($player2) ?>
             <td><?= htmlspecialchars((string)$player2['stats_gm']) ?></td>
             <td><?= htmlspecialchars((string)$player2['stats_gs']) ?></td>
             <td><?= htmlspecialchars((string)$player2['stats_min']) ?></td>
@@ -237,6 +269,7 @@ $(function() {
         <tr>
             <th>Pos</th>
             <th>Player</th>
+            <th>Team</th>
             <th>g</th>
             <th>min</th>
             <th>fgm</th>
@@ -260,6 +293,7 @@ $(function() {
         <tr>
             <td><?= htmlspecialchars($player1['pos']) ?></td>
             <td><?= htmlspecialchars($player1['name']) ?></td>
+            <?= $this->renderTeamCell($player1) ?>
             <td><?= htmlspecialchars((string)$player1['car_gm']) ?></td>
             <td><?= htmlspecialchars((string)$player1['car_min']) ?></td>
             <td><?= htmlspecialchars((string)$player1['car_fgm']) ?></td>
@@ -281,6 +315,7 @@ $(function() {
         <tr>
             <td><?= htmlspecialchars($player2['pos']) ?></td>
             <td><?= htmlspecialchars($player2['name']) ?></td>
+            <?= $this->renderTeamCell($player2) ?>
             <td><?= htmlspecialchars((string)$player2['car_gm']) ?></td>
             <td><?= htmlspecialchars((string)$player2['car_min']) ?></td>
             <td><?= htmlspecialchars((string)$player2['car_fgm']) ?></td>

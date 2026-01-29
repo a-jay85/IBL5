@@ -127,14 +127,32 @@ class DraftHistoryView implements DraftHistoryViewInterface
             $name = HtmlSanitizer::safeHtmlOutput($pick['name'] ?? '');
             $round = (int) ($pick['draftround'] ?? 0);
             $pickNo = (int) ($pick['draftpickno'] ?? 0);
-            $draftedBy = HtmlSanitizer::safeHtmlOutput($pick['draftedby'] ?? '');
             $college = HtmlSanitizer::safeHtmlOutput($pick['college'] ?? '');
+
+            // Team cell styling
+            $teamId = (int) ($pick['teamid'] ?? 0);
+            $teamCity = HtmlSanitizer::safeHtmlOutput($pick['team_city'] ?? '');
+            $teamName = HtmlSanitizer::safeHtmlOutput($pick['draftedby'] ?? '');
+            $color1 = HtmlSanitizer::safeHtmlOutput($pick['color1'] ?? 'FFFFFF');
+            $color2 = HtmlSanitizer::safeHtmlOutput($pick['color2'] ?? '000000');
+
+            // Handle unknown teams (no match found) gracefully
+            if ($teamId === 0) {
+                $teamCell = "<td>{$teamName}</td>";
+            } else {
+                $teamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
+        <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$teamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
+            <img src=\"images/logo/new{$teamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
+            <span class=\"ibl-team-cell__text\">{$teamCity} {$teamName}</span>
+        </a>
+    </td>";
+            }
 
             $output .= "<tr>
     <td>{$round}</td>
     <td>{$pickNo}</td>
     <td><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
-    <td>{$draftedBy}</td>
+    {$teamCell}
     <td><img class=\"player-image\" src=\"/ibl5/images/player/{$pid}.jpg\" alt=\"{$name}\" width=\"65\" height=\"90\" loading=\"lazy\"></td>
     <td>{$college}</td>
 </tr>";

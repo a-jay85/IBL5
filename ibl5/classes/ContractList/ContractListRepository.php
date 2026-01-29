@@ -21,10 +21,12 @@ class ContractListRepository extends \BaseMysqliRepository implements ContractLi
      */
     public function getActivePlayerContracts(): array
     {
-        $query = "SELECT name, pos, teamname, cy, cyt, cy1, cy2, cy3, cy4, cy5, cy6, bird
-            FROM ibl_plr
-            WHERE retired = 0
-            ORDER BY ordinal ASC";
+        $query = "SELECT p.name, p.pos, p.teamname, p.tid, p.cy, p.cyt, p.cy1, p.cy2, p.cy3, p.cy4, p.cy5, p.cy6, p.bird,
+                         t.team_city, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.retired = 0
+            ORDER BY p.ordinal ASC";
 
         return $this->fetchAll($query);
     }

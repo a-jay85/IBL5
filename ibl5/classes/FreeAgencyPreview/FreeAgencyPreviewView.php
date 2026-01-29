@@ -110,14 +110,31 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
             $pid = (int) ($player['pid'] ?? 0);
             $tid = (int) ($player['tid'] ?? 0);
             $name = HtmlSanitizer::safeHtmlOutput($player['name'] ?? '');
-            $teamname = HtmlSanitizer::safeHtmlOutput($player['teamname'] ?? '');
             $pos = HtmlSanitizer::safeHtmlOutput($player['pos'] ?? '');
             $age = (int) ($player['age'] ?? 0);
+
+            // Team cell styling
+            $teamCity = HtmlSanitizer::safeHtmlOutput($player['team_city'] ?? '');
+            $teamName = HtmlSanitizer::safeHtmlOutput($player['teamname'] ?? '');
+            $color1 = HtmlSanitizer::safeHtmlOutput($player['color1'] ?? 'FFFFFF');
+            $color2 = HtmlSanitizer::safeHtmlOutput($player['color2'] ?? '000000');
+
+            // Handle free agents (tid=0) gracefully
+            if ($tid === 0) {
+                $teamCell = '<td>Free Agent</td>';
+            } else {
+                $teamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
+        <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$tid}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
+            <img src=\"images/logo/new{$tid}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
+            <span class=\"ibl-team-cell__text\">{$teamCity} {$teamName}</span>
+        </a>
+    </td>";
+            }
 
             $output .= "<tr>
     <td>{$pos}</td>
     <td><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
-    <td><a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$tid}\">{$teamname}</a></td>
+    {$teamCell}
     <td>{$age}</td>
     <td>{$player['r_fga']}</td>
     <td>{$player['r_fgp']}</td>

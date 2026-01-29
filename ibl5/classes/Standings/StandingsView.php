@@ -100,7 +100,7 @@ class StandingsView implements StandingsViewInterface
         <table class="sortable ibl-data-table responsive-table">
             <thead>
                 <tr>
-                    <th class="sticky-col">Team</th>
+                    <th class="sticky-col ibl-team-cell--colored">Team</th>
                     <th>W-L</th>
                     <th>Pct</th>
                     <th>Pyth<br>W-L%</th>

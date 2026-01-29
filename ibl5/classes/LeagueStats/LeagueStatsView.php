@@ -162,7 +162,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
     private function getTotalsHeaderRow(): string
     {
         return '<tr>
-            <th>Team</th>
+            <th class="ibl-team-cell--colored">Team</th>
             <th>Gm</th>
             <th>FGM</th>
             <th>FGA</th>
@@ -189,7 +189,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
     private function getAveragesHeaderRow(): string
     {
         return '<tr>
-            <th>Team</th>
+            <th class="ibl-team-cell--colored">Team</th>
             <th>FGM</th>
             <th>FGA</th>
             <th>FGP</th>

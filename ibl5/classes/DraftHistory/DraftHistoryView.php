@@ -104,7 +104,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
                     <th>Round</th>
                     <th>Pick</th>
                     <th>Player</th>
-                    <th>Team</th>
+                    <th class="ibl-team-cell--colored">Team</th>
                     <th>Pic</th>
                     <th>College</th>
                 </tr>

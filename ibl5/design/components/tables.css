@@ -495,8 +495,8 @@
     /* Center the logo when text is hidden */
     .ibl-team-cell--colored {
         text-align: center !important;
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
+        padding-left: 0rem !important;
+        padding-right: 0rem !important;
     }
 
     .ibl-team-cell--colored .ibl-team-cell__name {
@@ -506,9 +506,9 @@
     /* Constrain logo-only team columns to free up horizontal space */
     td.ibl-team-cell--colored,
     th.ibl-team-cell--colored {
-        width: 44px;
-        min-width: 44px;
-        max-width: 44px;
+        width: 24px;
+        min-width: 24px;
+        max-width: 24px;
     }
 
     /* Override sticky-col min-width when it's a team cell (logo-only on mobile) */
@@ -516,7 +516,7 @@
     .ibl-data-table.responsive-table th.sticky-col.ibl-team-cell--colored,
     .ibl-table.responsive-table td.sticky-col.ibl-team-cell--colored,
     .ibl-table.responsive-table th.sticky-col.ibl-team-cell--colored {
-        min-width: 44px;
+        min-width: 36px;
     }
 }
 

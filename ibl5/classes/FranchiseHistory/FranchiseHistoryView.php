@@ -49,7 +49,7 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
         return '<table class="sortable ibl-data-table">
             <thead>
             <tr>
-                <th>Team</th>
+                <th class="ibl-team-cell--colored">Team</th>
                 <th>All-Time<br>Wins</th>
                 <th>All-Time<br>Losses</th>
                 <th>All-Time<br>Pct.</th>

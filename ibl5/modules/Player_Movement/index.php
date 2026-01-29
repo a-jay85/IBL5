@@ -79,8 +79,8 @@ echo '<style>
     <thead>
         <tr>
             <th>Player</th>
-            <th>Old Team</th>
-            <th>New Team</th>
+            <th>Old</th>
+            <th>New</th>
         </tr>
     </thead>
     <tbody>';

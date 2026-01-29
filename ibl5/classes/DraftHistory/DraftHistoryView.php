@@ -43,7 +43,29 @@ class DraftHistoryView implements DraftHistoryViewInterface
      */
     private function getStyleBlock(): string
     {
-        return ''; // All styles provided by .ibl-year-nav and .ibl-data-table
+        return '<style>
+.draft-history-table .name-cell {
+    white-space: nowrap;
+    text-align: left;
+}
+.draft-history-table .name-cell a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.ibl-player-photo {
+    width: 24px;
+    height: 24px;
+    object-fit: cover;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+@media (max-width: 768px) {
+    .draft-history-table .name-cell {
+        white-space: normal;
+    }
+}
+</style>';
     }
 
     /**
@@ -98,14 +120,13 @@ class DraftHistoryView implements DraftHistoryViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable ibl-data-table draft-history-table">
+        return '<table class="sortable ibl-data-table draft-history-table" data-no-responsive
             <thead>
                 <tr>
-                    <th>Round</th>
+                    <th>Rd</th>
                     <th>Pick</th>
                     <th>Player</th>
                     <th class="ibl-team-cell--colored">Team</th>
-                    <th>Pic</th>
                     <th>College</th>
                 </tr>
             </thead>
@@ -148,12 +169,13 @@ class DraftHistoryView implements DraftHistoryViewInterface
     </td>";
             }
 
+            $playerImage = "images/player/{$pid}.jpg";
+
             $output .= "<tr>
     <td>{$round}</td>
     <td>{$pickNo}</td>
-    <td><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
+    <td class=\"name-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\" loading=\"lazy\">{$name}</a></td>
     {$teamCell}
-    <td><img class=\"player-image\" src=\"/ibl5/images/player/{$pid}.jpg\" alt=\"{$name}\" width=\"65\" height=\"90\" loading=\"lazy\"></td>
     <td>{$college}</td>
 </tr>";
         }

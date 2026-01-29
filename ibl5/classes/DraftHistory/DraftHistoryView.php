@@ -44,6 +44,39 @@ class DraftHistoryView implements DraftHistoryViewInterface
     private function getStyleBlock(): string
     {
         return '<style>
+.draft-year-select-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+.draft-year-select-wrapper label {
+    font-weight: 600;
+    color: var(--gray-700, #374151);
+}
+.draft-year-select {
+    padding: 0.5rem 2rem 0.5rem 0.75rem;
+    font-size: 1rem;
+    font-weight: 500;
+    border: 1px solid var(--gray-300, #d1d5db);
+    border-radius: 0.375rem;
+    background-color: white;
+    background-image: url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    appearance: none;
+    cursor: pointer;
+}
+.draft-year-select:hover {
+    border-color: var(--gray-400, #9ca3af);
+}
+.draft-year-select:focus {
+    outline: none;
+    border-color: var(--navy-500, #1e3a5f);
+    box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+}
 .draft-history-table .name-cell {
     white-space: nowrap;
     text-align: left;
@@ -92,16 +125,16 @@ class DraftHistoryView implements DraftHistoryViewInterface
      */
     private function renderYearNavigation(int $startYear, int $endYear, int $selectedYear): string
     {
-        $output = '<div class="ibl-year-nav">';
+        $output = '<div class="draft-year-select-wrapper">';
+        $output .= '<label for="draft-year-select">Draft Year:</label>';
+        $output .= '<select id="draft-year-select" class="draft-year-select" onchange="window.location.href=\'./modules.php?name=Draft_History&amp;year=\' + this.value">';
 
-        for ($year = $startYear; $year <= $endYear; $year++) {
-            $activeClass = ($year === $selectedYear) ? ' class="active"' : '';
-            $output .= '<a href="./modules.php?name=Draft_History&amp;year=' . $year . '"' . $activeClass . '>' . $year . '</a>';
-            if ($year < $endYear) {
-                $output .= ' | ';
-            }
+        for ($year = $endYear; $year >= $startYear; $year--) {
+            $selected = ($year === $selectedYear) ? ' selected' : '';
+            $output .= '<option value="' . $year . '"' . $selected . '>' . $year . '</option>';
         }
 
+        $output .= '</select>';
         $output .= '</div>';
         return $output;
     }

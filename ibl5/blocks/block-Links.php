@@ -50,7 +50,7 @@ $content = '
     <li><a href="modules.php?name=Content&pa=showpage&pid=5">Season Archive</a></li>
     <li><a href="modules.php?name=Franchise_History">Franchise History</a></li>
     <li><a href="modules.php?name=Content&pa=showpage&pid=8">Record Holders</a></li>
-    <li><a href="/ibl5/pages/transactionHistory.php">Transaction History</a></li>
+    <li><a href="modules.php?name=Transaction_History">Transaction History</a></li>
     <li><a href="modules.php?name=Player_Awards">Award History</a></li>
     <li><a href="/ibl5/pages/allStarAppearances.php">All-Star Appearances</a></li>
     <li><a href="modules.php?name=Season_Leaders">Season Leaderboards</a></li>

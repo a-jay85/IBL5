@@ -100,6 +100,55 @@
             document.body.style.overflow = '';
         }
 
+        // Desktop dropdown click-to-pin
+        // Clicking a column heading keeps it open; clicking again closes it.
+        // Hover behavior continues to work independently.
+        var desktopGroups = document.querySelectorAll('nav.nav-grain .group');
+
+        desktopGroups.forEach(function(group) {
+            var btn = group.querySelector('button');
+            if (!btn) return;
+
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                var wasPinned = group.classList.contains('nav-pinned');
+
+                // Close all other pinned dropdowns
+                desktopGroups.forEach(function(other) {
+                    if (other !== group) {
+                        other.classList.remove('nav-pinned');
+                    }
+                });
+
+                // Toggle current dropdown
+                if (wasPinned) {
+                    group.classList.remove('nav-pinned');
+                } else {
+                    group.classList.add('nav-pinned');
+                }
+            });
+        });
+
+        // Close pinned dropdowns when clicking outside nav groups
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.group')) {
+                desktopGroups.forEach(function(group) {
+                    group.classList.remove('nav-pinned');
+                });
+            }
+        });
+
+        // Close pinned dropdowns on Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                desktopGroups.forEach(function(group) {
+                    group.classList.remove('nav-pinned');
+                });
+            }
+        });
+
         // Handle mobile dropdown toggles
         var mobileDropdownBtns = document.querySelectorAll('.mobile-dropdown-btn');
         mobileDropdownBtns.forEach(function(btn) {

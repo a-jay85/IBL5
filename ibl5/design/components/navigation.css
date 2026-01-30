@@ -353,6 +353,35 @@
 .group:hover .nav-dropdown-item:nth-child(11) { transition-delay: 250ms; }
 
 /* ==========================================================================
+   Desktop Dropdown Click-to-Pin State
+   Clicking a column heading keeps its dropdown open;
+   clicking again (or clicking outside) closes it.
+   Hover behavior is preserved independently.
+   ========================================================================== */
+
+.group.nav-pinned > div {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.group.nav-pinned .nav-dropdown-item {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.group.nav-pinned .nav-dropdown-item:nth-child(1) { transition-delay: 0ms; }
+.group.nav-pinned .nav-dropdown-item:nth-child(2) { transition-delay: 25ms; }
+.group.nav-pinned .nav-dropdown-item:nth-child(3) { transition-delay: 50ms; }
+.group.nav-pinned .nav-dropdown-item:nth-child(4) { transition-delay: 75ms; }
+.group.nav-pinned .nav-dropdown-item:nth-child(5) { transition-delay: 100ms; }
+.group.nav-pinned .nav-dropdown-item:nth-child(6) { transition-delay: 125ms; }
+.group.nav-pinned .nav-dropdown-item:nth-child(7) { transition-delay: 150ms; }
+.group.nav-pinned .nav-dropdown-item:nth-child(8) { transition-delay: 175ms; }
+.group.nav-pinned .nav-dropdown-item:nth-child(9) { transition-delay: 200ms; }
+.group.nav-pinned .nav-dropdown-item:nth-child(10) { transition-delay: 225ms; }
+.group.nav-pinned .nav-dropdown-item:nth-child(11) { transition-delay: 250ms; }
+
+/* ==========================================================================
    Navigation Link Colors (Accessibility Override)
    These override browser defaults for proper contrast
    ========================================================================== */

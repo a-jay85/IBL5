@@ -43,7 +43,9 @@ class NavigationView
                     ['label' => 'Draft Pick Locator', 'url' => 'modules.php?name=Draft_Pick_Locator'],
                     ['label' => 'Cap Space', 'url' => 'modules.php?name=Cap_Info'],
                     ['label' => 'Free Agency Preview', 'url' => 'modules.php?name=Free_Agency_Preview'],
+                    ['label' => 'Topics (News)', 'url' => 'modules.php?name=Topics'],
                     ['label' => 'Contract List', 'url' => 'modules.php?name=Contract_List'],
+                    ['label' => 'Player Movement', 'url' => 'modules.php?name=Player_Movement'],
                     ['label' => 'JSB Export', 'url' => 'ibl/IBL'],
                 ],
             ],
@@ -70,8 +72,6 @@ class NavigationView
                     ['label' => 'Career Leaderboards', 'url' => 'modules.php?name=Leaderboards'],
                     ['label' => 'Season Archive', 'url' => 'modules.php?name=Content&pa=showpage&pid=5'],
                     ['label' => '1-On-1 Game', 'url' => 'modules.php?name=One-on-One'],
-                    ['label' => 'Forums (archived)', 'url' => '../iblforum/forum.php'],
-                    ['label' => 'v2/v3 Archive', 'url' => '../previous-ibl-archive'],
                 ],
             ],
             'Community' => [
@@ -79,6 +79,7 @@ class NavigationView
                 'links' => [
                     ['label' => 'Discord Server', 'url' => 'https://discord.com/invite/QXwBQxR', 'external' => true],
                     ['label' => 'Prime Time Football', 'url' => 'http://www.thakfu.com/ptf/index.php', 'external' => true],
+                    ['label' => 'Activity Tracker', 'url' => 'modules.php?name=Depth_Record'],
                     ['label' => 'GM Contact List', 'url' => 'modules.php?name=Contact_List'],
                 ],
             ],
@@ -94,7 +95,6 @@ class NavigationView
         if ($this->isLoggedIn) {
             return [
                 ['label' => 'Your Account', 'url' => 'modules.php?name=Your_Account'],
-                ['label' => 'Topics', 'url' => 'modules.php?name=Topics'],
                 ['label' => 'Logout', 'url' => 'modules.php?name=Your_Account&op=logout'],
             ];
         }
@@ -254,23 +254,21 @@ class NavigationView
                 'links' => [
                     ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamID=' . $this->teamId],
                     ['label' => 'Next Sim', 'url' => 'modules.php?name=Next_Sim', 'badge' => 'NEW'],
-                    ['label' => 'Depth Chart Form', 'url' => 'modules.php?name=Depth_Chart_Entry'],
-                    ['label' => 'Depth Chart Tracker', 'url' => 'modules.php?name=Depth_Record'],
-                    ['label' => 'Offer Trade', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
-                    ['label' => 'Waiver Wire', 'url' => 'modules.php?name=Waivers&action=add'],
-                    ['label' => 'Waive Player', 'url' => 'modules.php?name=Waivers&action=drop'],
-                    ['label' => 'ASG/Award Voting', 'url' => 'modules.php?name=Voting'],
-                    ['label' => 'Draft Scout/Select', 'url' => 'modules.php?name=Draft'],
+                    ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=Depth_Chart_Entry'],
+                    ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
+                    ['label' => 'Waivers: Add', 'url' => 'modules.php?name=Waivers&action=add'],
+                    ['label' => 'Waivers: Drop', 'url' => 'modules.php?name=Waivers&action=drop'],
+                    ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
+                    ['label' => 'Draft', 'url' => 'modules.php?name=Draft'],
                     ['label' => 'Free Agency', 'url' => 'modules.php?name=Free_Agency'],
-                    ['label' => 'Player Movement', 'url' => 'modules.php?name=Player_Movement'],
                 ]
             ];
         } elseif ($this->currentLeague === 'olympics') {
             return [
                 'icon' => '<img src="/ibl5/images/logo/new' . $this->teamId . '.png" alt="Team Logo" class="w-6 h-6 object-contain">',
                 'links' => [
-                    ['label' => 'Depth Chart Form', 'url' => 'modules.php?name=Depth_Chart_Entry'],
-                    ['label' => 'Depth Chart Tracker', 'url' => 'modules.php?name=Depth_Record'],
+                    ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=Depth_Chart_Entry'],
+                    ['label' => 'Activity Tracker', 'url' => 'modules.php?name=Depth_Record'],
                 ]
             ];
         }
@@ -290,7 +288,7 @@ class NavigationView
 
         $target = $external ? ' target="_blank" rel="noopener noreferrer"' : '';
         $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
-        $badgeHtml = $badge ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2 tracking-wide">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
+        $badgeHtml = $badge ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2 tracking-wide">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
 
         return '<a href="' . $url . '"' . $target . ' class="nav-dropdown-item block px-4 py-2.5 text-base font-display text-gray-300 hover:text-white hover:bg-white/5 transition-all duration-150 border-l-2 border-transparent hover:border-accent-500">'
             . '<span class="flex items-center justify-between">'
@@ -410,7 +408,7 @@ class NavigationView
 
             $target = $external ? ' target="_blank" rel="noopener noreferrer"' : '';
             $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
-            $badgeHtml = $badge ? ' <span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
+            $badgeHtml = $badge ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
 
             $html .= '<a href="' . $url . '"' . $target . ' class="flex items-center justify-between px-5 py-3 pl-14 text-base font-display text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">'
                 . '<span>' . $label . $badgeHtml . '</span>'

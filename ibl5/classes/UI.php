@@ -9,7 +9,6 @@ declare(strict_types=1);
  * All methods are preserved for backward compatibility.
  *
  * @see UI\DebugOutput
- * @see UI\PlayerMenu
  * @see UI\TableStyles
  * @see UI\Tables\Contracts
  * @see UI\Tables\Per36Minutes
@@ -30,16 +29,6 @@ class UI
     public static function displayDebugOutput($content, $title = 'Debug Output'): void
     {
         UI\DebugOutput::display($content, $title);
-    }
-
-    /**
-     * Display the player menu with navigation links
-     *
-     * @return void
-     */
-    public static function playerMenu(): void
-    {
-        UI\PlayerMenu::display();
     }
 
     /**

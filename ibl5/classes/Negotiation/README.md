@@ -43,7 +43,6 @@ function negotiate($playerID)
 
     Nuke\Header::header();
     OpenTable();
-    UI::playerMenu();
 
     // Use NegotiationProcessor to handle all business logic
     $processor = new Negotiation\NegotiationProcessor($db, $mysqli_db);

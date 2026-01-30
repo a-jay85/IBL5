@@ -46,7 +46,6 @@ $searchResult = $service->search($_POST);
 
 // Render page
 Nuke\Header::header();
-UI::playerMenu();
 
 // Render search form with current parameters
 echo $view->renderSearchForm($searchResult['params']);

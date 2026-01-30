@@ -29,7 +29,6 @@ $filters = [
 
 // Render page
 Nuke\Header::header();
-UI::playerMenu();
 
 // Render filter form
 echo $view->renderFilterForm($filters);

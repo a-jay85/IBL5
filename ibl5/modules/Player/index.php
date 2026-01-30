@@ -233,7 +233,6 @@ function negotiate($playerID)
     $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
 
     Nuke\Header::header();
-    UI::playerMenu();
 
     // Use NegotiationProcessor to handle all business logic
     $processor = new NegotiationProcessor($db, $mysqli_db);

@@ -53,8 +53,6 @@ function oneonone(): void
         $ownerplaying = '';
     }
 
-    UI::playerMenu();
-
     // Get form inputs
     $player1 = isset($_POST['pid1']) ? (int) $_POST['pid1'] : null;
     $player2 = isset($_POST['pid2']) ? (int) $_POST['pid2'] : null;

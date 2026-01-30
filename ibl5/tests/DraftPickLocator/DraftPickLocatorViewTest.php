@@ -91,4 +91,58 @@ class DraftPickLocatorViewTest extends TestCase
         // Should NOT contain the raw dangerous characters
         $this->assertStringNotContainsString('<script>', $result);
     }
+
+    public function testTradedPickUsesOwningTeamColors(): void
+    {
+        $teams = [
+            [
+                'teamId' => 1,
+                'teamCity' => 'Miami',
+                'teamName' => 'Heat',
+                'color1' => '98002E',
+                'color2' => 'F9A01B',
+                'picks' => [
+                    ['ownerofpick' => 'Celtics', 'year' => '2025', 'round' => '1'],
+                ],
+            ],
+            [
+                'teamId' => 2,
+                'teamCity' => 'Boston',
+                'teamName' => 'Celtics',
+                'color1' => '007A33',
+                'color2' => 'FFFFFF',
+                'picks' => [
+                    ['ownerofpick' => 'Celtics', 'year' => '2025', 'round' => '1'],
+                ],
+            ],
+        ];
+
+        $result = $this->view->render($teams, 2025);
+
+        // Heat's row should show Celtics' colors for the traded pick
+        $this->assertStringContainsString('background-color: #007A33', $result);
+        $this->assertStringContainsString('color: #FFFFFF', $result);
+    }
+
+    public function testOwnPickDoesNotUseInlineColors(): void
+    {
+        $teams = [
+            [
+                'teamId' => 1,
+                'teamCity' => 'Miami',
+                'teamName' => 'Heat',
+                'color1' => '98002E',
+                'color2' => 'F9A01B',
+                'picks' => [
+                    ['ownerofpick' => 'Heat', 'year' => '2025', 'round' => '1'],
+                ],
+            ],
+        ];
+
+        $result = $this->view->render($teams, 2025);
+
+        // Own pick should use draft-pick-own class, not inline team colors
+        $this->assertStringContainsString('draft-pick-own', $result);
+        $this->assertStringNotContainsString('draft-pick-traded', $result);
+    }
 }

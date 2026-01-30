@@ -67,6 +67,8 @@ class FreeAgencyView implements FreeAgencyViewInterface
             'offer_success' => ['class' => 'ibl-alert--success', 'message' => 'Your offer is legal and has been saved.'],
             'deleted' => ['class' => 'ibl-alert--info', 'message' => 'Your offer has been deleted.'],
             'already_signed' => ['class' => 'ibl-alert--warning', 'message' => 'This player was previously signed to a team this Free Agency period.'],
+            'rookie_option_success' => ['class' => 'ibl-alert--success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
+            'email_failed' => ['class' => 'ibl-alert--warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
         ];
 
         if (!isset($banners[$result])) {
@@ -113,7 +115,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <tr>
             <td>
                 <?php if ($player->canRookieOption($season->phase)): ?>
-                    <a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= (int) $player->playerID ?>">Rookie Option</a>
+                    <a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= (int) $player->playerID ?>&amp;from=fa">Rookie Option</a>
                 <?php endif; ?>
             </td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>

@@ -17,6 +17,7 @@ use Player\Views\PlayerStatsFlipCardView;
 use Player\Views\TeamColorHelper;
 use RookieOption\RookieOptionValidator;
 use RookieOption\RookieOptionFormView;
+use RookieOption\RookieOptionController;
 use Services\CommonMysqliRepository;
 use Negotiation\NegotiationProcessor;
 
@@ -51,7 +52,20 @@ function showpage($playerID, $pageView)
 
     Nuke\Header::header();
     OpenTable();
-    
+
+    // Render result banner from PRG redirect (e.g., after rookie option exercise)
+    $result = $_GET['result'] ?? null;
+    if ($result !== null) {
+        $resultBanners = [
+            'rookie_option_success' => ['class' => 'ibl-alert--success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
+            'email_failed' => ['class' => 'ibl-alert--warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
+        ];
+        if (isset($resultBanners[$result])) {
+            $banner = $resultBanners[$result];
+            echo '<tr><td colspan="2"><div class="ibl-alert ' . $banner['class'] . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($banner['message']) . '</div></td></tr>';
+        }
+    }
+
     // Generate team color scheme once for the entire page
     $teamColors = TeamColorHelper::getTeamColors($mysqli_db, $player->teamID);
     $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
@@ -235,38 +249,93 @@ function negotiate($playerID)
 function rookieoption($pid)
 {
     global $db, $cookie, $mysqli_db;
-    
+
     // Initialize dependencies
     $commonRepository = new CommonMysqliRepository($mysqli_db);
     $season = new Season($mysqli_db);
     $validator = new RookieOptionValidator();
     $formView = new RookieOptionFormView();
-    
+
     // Get user's team name
     $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
-    
+
     // Load player
     $player = Player::withPlayerID($db, $pid);
-    
+
+    Nuke\Header::header();
+    OpenTable();
+
     // Validate player ownership
     $ownershipValidation = $validator->validatePlayerOwnership($player, $userTeamName);
     if (!$ownershipValidation['valid']) {
-        $formView->renderError($ownershipValidation['error']);
+        echo '<div class="ibl-alert ibl-alert--error">' . \Utilities\HtmlSanitizer::safeHtmlOutput($ownershipValidation['error']) . '</div>';
+        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
+        CloseTable();
+        Nuke\Footer::footer();
         return;
     }
-    
+
     // Validate eligibility and get final year salary
     $eligibilityValidation = $validator->validateEligibilityAndGetSalary($player, $season->phase);
     if (!$eligibilityValidation['valid']) {
-        $formView->renderError($eligibilityValidation['error']);
+        echo '<div class="ibl-alert ibl-alert--error">' . \Utilities\HtmlSanitizer::safeHtmlOutput($eligibilityValidation['error']) . '</div>';
+        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
+        CloseTable();
+        Nuke\Footer::footer();
         return;
     }
-    
+
     // Calculate rookie option value (2x final year salary)
     $rookieOptionValue = 2 * $eligibilityValidation['finalYearSalary'];
-    
+
+    // Get PRG redirect params and origin tracking
+    $error = $_GET['error'] ?? null;
+    $result = $_GET['result'] ?? null;
+    $from = $_GET['from'] ?? null;
+
     // Render form
-    $formView->renderForm($player, $userTeamName, $rookieOptionValue);
+    echo $formView->renderForm($player, $userTeamName, $rookieOptionValue, $error, $result, $from);
+
+    CloseTable();
+    Nuke\Footer::footer();
+}
+
+function processrookieoption()
+{
+    global $mysqli_db;
+
+    // Get POST parameters
+    $teamName = $_POST['teamname'] ?? '';
+    $playerID = isset($_POST['playerID']) ? (int) $_POST['playerID'] : 0;
+    $extensionAmount = isset($_POST['rookieOptionValue']) ? (int) $_POST['rookieOptionValue'] : 0;
+    $from = $_POST['from'] ?? '';
+
+    // Validate input
+    if ($teamName === '' || $playerID === 0 || $extensionAmount === 0) {
+        header('Location: modules.php?name=Player&pa=rookieoption&pid=' . $playerID . '&from=' . rawurlencode($from) . '&error=' . rawurlencode('Invalid request. Missing required parameters.'));
+        exit;
+    }
+
+    // Process rookie option using controller
+    $controller = new RookieOptionController($mysqli_db);
+    $result = $controller->processRookieOption($teamName, $playerID, $extensionAmount);
+
+    $resultParam = '';
+    if ($result['success']) {
+        $resultParam = ($result['emailSuccess'] ?? true) ? 'rookie_option_success' : 'email_failed';
+    }
+
+    if ($result['success'] && $from === 'fa') {
+        // Came from Free Agency — redirect back there with result banner
+        header('Location: modules.php?name=Free_Agency&result=' . $resultParam);
+    } elseif ($result['success']) {
+        // Came from Player page (or unknown) — redirect to player page with result banner
+        header('Location: modules.php?name=Player&pa=showpage&pid=' . $playerID . '&result=' . $resultParam);
+    } else {
+        // Error — redirect back to rookie option form with error
+        header('Location: modules.php?name=Player&pa=rookieoption&pid=' . $playerID . '&from=' . rawurlencode($from) . '&error=' . rawurlencode($result['message']));
+    }
+    exit;
 }
 
 switch ($pa) {
@@ -277,6 +346,10 @@ switch ($pa) {
 
     case "rookieoption":
         rookieoption($pid);
+        break;
+
+    case "processrookieoption":
+        processrookieoption();
         break;
 
     case "showpage":

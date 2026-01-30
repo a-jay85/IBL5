@@ -103,7 +103,7 @@ class StatisticsView
         $this->renderBrowserRow(_UNKNOWN, 'question.gif', _OTHER, $browserStats['Other'] ?? ['count' => 0, 'percentage' => 0]);
         
         echo "</table>";
-        CloseTable2();
+        CloseTable();
     }
 
     /**
@@ -151,7 +151,7 @@ class StatisticsView
         $this->renderOSRow(_UNKNOWN, 'question.gif', $osStats['Other'] ?? ['count' => 0, 'percentage' => 0]);
         
         echo "</table>\n";
-        CloseTable2();
+        CloseTable();
     }
 
     /**
@@ -202,7 +202,7 @@ class StatisticsView
         }
         
         echo "</table>\n";
-        CloseTable2();
+        CloseTable();
     }
 
     /**

@@ -47,15 +47,6 @@ function CloseTable()
 }
 
 /**
- * @deprecated Use CSS classes directly: </div> (closing .ibl-card)
- * Legacy PHP-Nuke centered table closer. Prefer modern CSS components.
- */
-function CloseTable2()
-{
-    echo "</td></tr></table></td></tr></table>\n";
-}
-
-/**
  * Modern story formatting for the redesigned news blocks
  */
 function FormatStoryModern($thetext, $notes, $aid, $informant)

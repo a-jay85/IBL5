@@ -1836,7 +1836,8 @@ a.schedule-jump-btn:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: var(--space-2);
+    margin: 0 auto var(--space-2);
+    max-width: 100vw;
 }
 
 .next-sim-day-label {
@@ -1845,7 +1846,6 @@ a.schedule-jump-btn:hover {
     font-weight: 700;
     color: var(--navy-800);
     text-align: right;
-    min-width: 150px;
 }
 
 .next-sim-day-label h2 {
@@ -1882,12 +1882,6 @@ a.schedule-jump-btn:hover {
     .next-sim-mobile-logo {
         display: block;
     }
-
-    .next-sim-day-label,
-    .next-sim-record {
-        flex: 1;
-        min-width: 0;
-    }
 }
 
 .next-sim-record {
@@ -1896,13 +1890,16 @@ a.schedule-jump-btn:hover {
     font-weight: 700;
     color: var(--navy-800);
     text-align: left;
-    min-width: 150px;
 }
 
 .next-sim-record h2 {
     margin: 0;
     font-size: inherit;
     font-weight: inherit;
+}
+
+.next-sim-day-game{
+    margin-bottom: 36px;
 }
 
 /* ==========================================================================

@@ -39,7 +39,6 @@ class NavigationView
                     ['label' => 'Standings', 'url' => 'modules.php?name=Standings'],
                     ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule'],
                     ['label' => 'Injuries', 'url' => 'modules.php?name=Injuries'],
-                    ['label' => 'Waiver Wire', 'url' => 'modules.php?name=Team&op=team&tid=0'],
                     ['label' => 'Player Database', 'url' => 'modules.php?name=Player_Search'],
                     ['label' => 'Draft Pick Locator', 'url' => 'modules.php?name=Draft_Pick_Locator'],
                     ['label' => 'Cap Space', 'url' => 'modules.php?name=Cap_Info'],

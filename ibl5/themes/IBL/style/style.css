@@ -3201,6 +3201,12 @@ table.sortable thead th {
   width: 100%;
 }
 @media (max-width: 768px) {
+  h2.ibl-title {
+    display: block;
+    text-align: center;
+  }
+}
+@media (max-width: 768px) {
   .table-scroll-wrapper {
     width: 100%;
     max-width: 100%;
@@ -4549,7 +4555,7 @@ nav .group > a:hover {
 }
 .site-content {
   max-width: 100%;
-  padding: 1rem;
+  padding: 0rem 1rem;
   vertical-align: top;
 }
 @property --tw-translate-x {

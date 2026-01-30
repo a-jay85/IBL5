@@ -332,6 +332,14 @@
     width: 100%;
 }
 
+/* Center section titles on mobile */
+@media (max-width: 768px) {
+    h2.ibl-title {
+        display: block;
+        text-align: center;
+    }
+}
+
 /* On mobile, constrain scroll container to viewport */
 @media (max-width: 768px) {
     .table-scroll-wrapper {

@@ -37,6 +37,6 @@
 /* Site-wide layout wrapper (replaces legacy themeheader table) */
 .site-content {
   max-width: 100%;
-  padding: 1rem;
+  padding: 0rem 1rem;
   vertical-align: top;
 }

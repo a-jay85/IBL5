@@ -102,20 +102,20 @@ class StandingsView implements StandingsViewInterface
                 <tr>
                     <th class="sticky-col">Team</th>
                     <th>W-L</th>
-                    <th>Pct</th>
+                    <th>Win%</th>
                     <th>Pyth<br>W-L%</th>
                     <th>GB</th>
-                    <th>Magic#</th>
-                    <th>Left</th>
+                    <th>Magic<br>#</th>
+                    <th>Games<br>Left</th>
                     <th>Conf.</th>
                     <th>Div.</th>
                     <th>Home</th>
                     <th>Away</th>
                     <th>Home<br>Played</th>
                     <th>Away<br>Played</th>
-                    <th>Last 10</th>
+                    <th>Last 10<br>W-L</th>
                     <th>Streak</th>
-                    <th>Rating</th>
+                    <th>Power<br>Rank</th>
                 </tr>
             </thead>
             <tbody>

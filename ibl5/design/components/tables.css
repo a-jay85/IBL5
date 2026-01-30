@@ -1134,14 +1134,6 @@
     max-width: 280px;
 }
 
-.trading-team-select td {
-    padding: 0;
-}
-
-.trading-team-select .ibl-team-cell--colored {
-    padding: 0.5rem 0.75rem;
-}
-
 /* Roster tables for player/pick selection */
 .trading-roster {
     min-width: 280px;

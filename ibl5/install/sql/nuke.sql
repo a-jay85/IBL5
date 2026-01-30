@@ -8709,7 +8709,6 @@ INSERT INTO nuke_modules VALUES (20, 'Topics', 'Topics', 1, 0, 1, 0, '');
 INSERT INTO nuke_modules VALUES (21, 'Web_Links', 'Web Links', 1, 0, 1, 0, '');
 INSERT INTO nuke_modules VALUES (22, 'Your_Account', 'Your Account', 1, 0, 1, 0, '');
 INSERT INTO nuke_modules VALUES (23, 'Advertising', 'Advertising', 0, 0, 1, 0, '');
-INSERT INTO nuke_modules VALUES (24, 'AutoTheme', 'AutoTheme', 1, 0, 0, 0, '');
 
 # --------------------------------------------------------
 

@@ -398,13 +398,12 @@ class LeagueStatsView implements LeagueStatsViewInterface
     private function renderTeamCell(array $team, string $label): string
     {
         $teamId = (int) $team['teamid'];
-        $city = HtmlSanitizer::safeHtmlOutput($team['team_city']);
         $name = HtmlSanitizer::safeHtmlOutput($team['team_name']);
         $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
 
         return '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">
-            <a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';"><img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">' . $city . ' ' . $name . ' ' . $label . '</span></a>
+            <a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';"><img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">' . $name . ' ' . $label . '</span></a>
         </td>';
     }
 }

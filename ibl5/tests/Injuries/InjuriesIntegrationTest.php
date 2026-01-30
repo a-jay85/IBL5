@@ -529,9 +529,9 @@ class InjuriesIntegrationTest extends IntegrationTestCase
     }
 
     /**
-     * Test render with apostrophe in team city
+     * Test render with apostrophe in team name
      */
-    public function testRenderWithApostropheInTeamCity(): void
+    public function testRenderWithApostropheInTeamName(): void
     {
         $injuredPlayers = [
             [
@@ -540,8 +540,8 @@ class InjuriesIntegrationTest extends IntegrationTestCase
                 'position' => 'C',
                 'daysRemaining' => 5,
                 'teamID' => 1,
-                'teamCity' => "O'Brien",
-                'teamName' => 'Team',
+                'teamCity' => 'City',
+                'teamName' => "O'Brien",
                 'teamColor1' => '000000',
                 'teamColor2' => 'FFFFFF',
             ],

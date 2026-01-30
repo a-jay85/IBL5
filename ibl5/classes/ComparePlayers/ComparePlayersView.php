@@ -63,7 +63,6 @@ $(function() {
     private function renderTeamCell(array $player): string
     {
         $tid = (int) ($player['tid'] ?? 0);
-        $teamCity = htmlspecialchars($player['team_city'] ?? '');
         $teamName = htmlspecialchars($player['teamname'] ?? '');
         $color1 = htmlspecialchars($player['color1'] ?? 'FFFFFF');
         $color2 = htmlspecialchars($player['color2'] ?? '000000');
@@ -75,7 +74,7 @@ $(function() {
         return '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">
         <a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $tid . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';">
             <img src="images/logo/new' . $tid . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-            <span class="ibl-team-cell__text">' . $teamCity . ' ' . $teamName . '</span>
+            <span class="ibl-team-cell__text">' . $teamName . '</span>
         </a>
     </td>';
     }

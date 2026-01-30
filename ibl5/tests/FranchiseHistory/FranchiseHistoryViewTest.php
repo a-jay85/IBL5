@@ -89,8 +89,8 @@ class FranchiseHistoryViewTest extends TestCase
         $result = $this->view->render($franchises);
 
         // Should escape HTML entities - verify the escaped versions appear
-        $this->assertStringContainsString('Test&lt;script&gt;', $result);
         $this->assertStringContainsString('Team&amp;Name', $result);
+        // City is no longer displayed, so only team name escaping matters
         // Should NOT contain the raw dangerous characters
         $this->assertStringNotContainsString('<script>', $result);
     }

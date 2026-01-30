@@ -97,7 +97,6 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
         $teamId = (int)$team['teamid'];
         $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
-        $teamCity = HtmlSanitizer::safeHtmlOutput($team['team_city']);
         $teamName = HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
         $html = '<tr>';
@@ -107,7 +106,7 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
         $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" ';
         $html .= 'class="ibl-team-cell__name" style="color: #' . $color2 . ';">';
         $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">';
-        $html .= '<span class="ibl-team-cell__text">' . $teamCity . ' ' . $teamName . '</span></a>';
+        $html .= '<span class="ibl-team-cell__text">' . $teamName . '</span></a>';
         $html .= '</td>';
 
         // All-time stats

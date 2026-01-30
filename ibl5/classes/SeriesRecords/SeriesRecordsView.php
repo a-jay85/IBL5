@@ -113,7 +113,6 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         $teamId = HtmlSanitizer::safeHtmlOutput((string)$team['teamid']);
         $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
-        $city = HtmlSanitizer::safeHtmlOutput($team['team_city']);
         $name = HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
         $boldOpen = $isUserTeam ? '<strong>' : '';
@@ -122,7 +121,7 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         return '<td class="ibl-team-cell--colored sticky-col" style="background-color: #' . $color1 . ';">'
             . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';">'
             . '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">'
-            . '<span class="ibl-team-cell__text">' . $boldOpen . $city . ' ' . $name . $boldClose . '</span>'
+            . '<span class="ibl-team-cell__text">' . $boldOpen . $name . $boldClose . '</span>'
             . '</a></td>';
     }
 

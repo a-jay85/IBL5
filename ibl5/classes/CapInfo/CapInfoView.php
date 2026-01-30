@@ -113,7 +113,6 @@ class CapInfoView implements CapInfoViewInterface
         
         $color1 = HtmlSanitizer::safeHtmlOutput($teamData['color1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($teamData['color2']);
-        $teamCity = HtmlSanitizer::safeHtmlOutput($teamData['teamCity']);
         $teamName = HtmlSanitizer::safeHtmlOutput($teamData['teamName']);
         $teamId = (int)$teamData['teamId'];
 
@@ -124,7 +123,7 @@ class CapInfoView implements CapInfoViewInterface
         $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '&amp;display=contracts" ';
         $html .= 'class="ibl-team-cell__name" style="color: #' . $color2 . ';">';
         $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">';
-        $html .= '<span class="ibl-team-cell__text">' . $teamCity . ' ' . $teamName . '</span></a>';
+        $html .= '<span class="ibl-team-cell__text">' . $teamName . '</span></a>';
         $html .= '</td>';
 
         // Available salary columns

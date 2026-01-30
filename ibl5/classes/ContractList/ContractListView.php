@@ -59,12 +59,11 @@ class ContractListView implements ContractListViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable ibl-data-table" data-no-responsive>
+        return '<table class="sortable ibl-data-table">
             <thead>
                 <tr>
                     <th>Pos</th>
                     <th colspan="3">Player</th>
-                    <th>Team</th>
                     <th>Bird</th>
                     <th>Year1</th>
                     <th>Year2</th>
@@ -72,6 +71,8 @@ class ContractListView implements ContractListViewInterface
                     <th>Year4</th>
                     <th>Year5</th>
                     <th>Year6</th>
+                    <th class="divider"></th>
+                    <th>Team</th>
                 </tr>
             </thead>
             <tbody>';
@@ -100,7 +101,6 @@ class ContractListView implements ContractListViewInterface
             $con6 = (int) ($contract['con6'] ?? 0);
 
             // Team cell styling
-            $teamCity = HtmlSanitizer::safeHtmlOutput($contract['team_city'] ?? '');
             $teamName = HtmlSanitizer::safeHtmlOutput($contract['teamname'] ?? '');
             $color1 = HtmlSanitizer::safeHtmlOutput($contract['color1'] ?? 'FFFFFF');
             $color2 = HtmlSanitizer::safeHtmlOutput($contract['color2'] ?? '000000');
@@ -112,7 +112,7 @@ class ContractListView implements ContractListViewInterface
                 $teamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
         <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$tid}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
             <img src=\"images/logo/new{$tid}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-            <span class=\"ibl-team-cell__text\">{$teamCity} {$teamName}</span>
+            <span class=\"ibl-team-cell__text\">{$teamName}</span>
         </a>
     </td>";
             }
@@ -120,7 +120,6 @@ class ContractListView implements ContractListViewInterface
             $output .= "<tr>
     <td>{$pos}</td>
     <td colspan=\"3\">{$name}</td>
-    {$teamCell}
     <td>{$bird}</td>
     <td>{$con1}</td>
     <td>{$con2}</td>
@@ -128,6 +127,8 @@ class ContractListView implements ContractListViewInterface
     <td>{$con4}</td>
     <td>{$con5}</td>
     <td>{$con6}</td>
+    <td class=\"divider\"></td>
+    {$teamCell}
 </tr>";
         }
 
@@ -147,13 +148,14 @@ class ContractListView implements ContractListViewInterface
     <td></td>
     <td colspan="3">Cap Totals</td>
     <td></td>
+    <td>%.2f</td>
+    <td>%.2f</td>
+    <td>%.2f</td>
+    <td>%.2f</td>
+    <td>%.2f</td>
+    <td>%.2f</td>
+    <td class="divider"></td>
     <td></td>
-    <td>%.2f</td>
-    <td>%.2f</td>
-    <td>%.2f</td>
-    <td>%.2f</td>
-    <td>%.2f</td>
-    <td>%.2f</td>
 </tr>',
             $capTotals['cap1'],
             $capTotals['cap2'],
@@ -177,13 +179,14 @@ class ContractListView implements ContractListViewInterface
     <td></td>
     <td colspan="3">Average Team Cap</td>
     <td></td>
+    <td>%.2f</td>
+    <td>%.2f</td>
+    <td>%.2f</td>
+    <td>%.2f</td>
+    <td>%.2f</td>
+    <td>%.2f</td>
+    <td class="divider"></td>
     <td></td>
-    <td>%.2f</td>
-    <td>%.2f</td>
-    <td>%.2f</td>
-    <td>%.2f</td>
-    <td>%.2f</td>
-    <td>%.2f</td>
 </tr>',
             $avgCaps['acap1'],
             $avgCaps['acap2'],

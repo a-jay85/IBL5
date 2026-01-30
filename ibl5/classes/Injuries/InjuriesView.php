@@ -136,7 +136,6 @@ class InjuriesView implements InjuriesViewInterface
         $name = HtmlSanitizer::safeHtmlOutput($player['name']);
         $position = HtmlSanitizer::safeHtmlOutput($player['position']);
         $daysRemaining = (int) $player['daysRemaining'];
-        $teamCity = HtmlSanitizer::safeHtmlOutput($player['teamCity']);
         $teamName = HtmlSanitizer::safeHtmlOutput($player['teamName']);
         $color1 = HtmlSanitizer::safeHtmlOutput($player['teamColor1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($player['teamColor2']);
@@ -148,7 +147,7 @@ class InjuriesView implements InjuriesViewInterface
     <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
         <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$teamID}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
             <img src=\"images/logo/new{$teamID}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-            <span class=\"ibl-team-cell__text\">{$teamCity} {$teamName}</span>
+            <span class=\"ibl-team-cell__text\">{$teamName}</span>
         </a>
     </td>
     <td class=\"days-cell\">{$daysRemaining}</td>

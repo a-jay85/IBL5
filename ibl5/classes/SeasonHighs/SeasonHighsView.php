@@ -137,7 +137,6 @@ class SeasonHighsView implements SeasonHighsViewInterface
                 // Build team cell for player stats
                 if ($isPlayerStats) {
                     $tid = (int) ($row['tid'] ?? 0);
-                    $teamCity = HtmlSanitizer::safeHtmlOutput($row['team_city'] ?? '');
                     $teamName = HtmlSanitizer::safeHtmlOutput($row['teamname'] ?? '');
                     $color1 = HtmlSanitizer::safeHtmlOutput($row['color1'] ?? 'FFFFFF');
                     $color2 = HtmlSanitizer::safeHtmlOutput($row['color2'] ?? '000000');
@@ -148,7 +147,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
                         $teamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
         <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$tid}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
             <img src=\"images/logo/new{$tid}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-            <span class=\"ibl-team-cell__text\">{$teamCity} {$teamName}</span>
+            <span class=\"ibl-team-cell__text\">{$teamName}</span>
         </a>
     </td>";
                     }
@@ -156,7 +155,6 @@ class SeasonHighsView implements SeasonHighsViewInterface
             } elseif (isset($row['teamid'])) {
                 // Style team names with colored cell for team stats
                 $teamId = (int) $row['teamid'];
-                $teamCity = HtmlSanitizer::safeHtmlOutput($row['team_city'] ?? '');
                 $color1 = HtmlSanitizer::safeHtmlOutput($row['color1'] ?? 'FFFFFF');
                 $color2 = HtmlSanitizer::safeHtmlOutput($row['color2'] ?? '000000');
 
@@ -173,7 +171,6 @@ class SeasonHighsView implements SeasonHighsViewInterface
             // Render row differently for team stats (styled team cell) vs player stats
             if ($isTeamStat) {
                 $teamId = (int) $row['teamid'];
-                $teamCity = HtmlSanitizer::safeHtmlOutput($row['team_city'] ?? '');
                 $color1 = HtmlSanitizer::safeHtmlOutput($row['color1'] ?? 'FFFFFF');
                 $color2 = HtmlSanitizer::safeHtmlOutput($row['color2'] ?? '000000');
 
@@ -182,7 +179,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
     <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
         <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$teamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
             <img src=\"images/logo/new{$teamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-            <span class=\"ibl-team-cell__text\">{$teamCity} {$name}</span>
+            <span class=\"ibl-team-cell__text\">{$name}</span>
         </a>
     </td>
     <td class=\"date-cell\">{$date}</td>

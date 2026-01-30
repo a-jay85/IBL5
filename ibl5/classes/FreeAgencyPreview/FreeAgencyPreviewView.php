@@ -61,10 +61,10 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable ibl-data-table" data-no-responsive>
+        return '<table class="sortable ibl-data-table sticky-table">
             <thead>
                 <tr>
-                    <th>Player</th>
+                    <th class="sticky-col sticky-corner">Player</th>
                     <th>Team</th>
                     <th class="fa-preview-pos-col">Pos</th>
                     <th>Age</th>
@@ -117,7 +117,6 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
             $age = (int) ($player['age'] ?? 0);
 
             // Team cell styling
-            $teamCity = HtmlSanitizer::safeHtmlOutput($player['team_city'] ?? '');
             $teamName = HtmlSanitizer::safeHtmlOutput($player['teamname'] ?? '');
             $color1 = HtmlSanitizer::safeHtmlOutput($player['color1'] ?? 'FFFFFF');
             $color2 = HtmlSanitizer::safeHtmlOutput($player['color2'] ?? '000000');
@@ -129,13 +128,13 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
                 $teamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
         <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$tid}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
             <img src=\"images/logo/new{$tid}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-            <span class=\"ibl-team-cell__text\">{$teamCity} {$teamName}</span>
+            <span class=\"ibl-team-cell__text\">{$teamName}</span>
         </a>
     </td>";
             }
 
             $output .= "<tr>
-    <td><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
+    <td class=\"sticky-col\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
     {$teamCell}
     <td class=\"fa-preview-pos-col\">{$pos}</td>
     <td>{$age}</td>

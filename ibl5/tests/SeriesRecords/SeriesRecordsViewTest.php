@@ -63,7 +63,7 @@ class SeriesRecordsViewTest extends TestCase
         $result = $this->view->renderTeamNameCell($team, false);
 
         $this->assertStringContainsString('<td', $result);
-        $this->assertStringContainsString('Chicago Bulls', $result);
+        $this->assertStringContainsString('Bulls', $result);
         $this->assertStringContainsString('teamID=5', $result);
         $this->assertStringNotContainsString('<strong>', $result);
     }
@@ -96,8 +96,7 @@ class SeriesRecordsViewTest extends TestCase
 
         $result = $this->view->renderTeamNameCell($team, false);
 
-        // Should be HTML escaped (apos can be &apos; or &#039; depending on PHP version)
-        $this->assertMatchesRegularExpression('/O(&apos;|&#039;)Fallon/', $result);
+        // City is no longer displayed; team name should be HTML escaped
         $this->assertStringContainsString('Test&lt;Team&gt;', $result);
     }
 
@@ -171,8 +170,8 @@ class SeriesRecordsViewTest extends TestCase
         $this->assertStringContainsString('</table>', $result);
         $this->assertStringContainsString('sortable', $result);
         $this->assertStringContainsString('ibl-data-table', $result);
-        $this->assertStringContainsString('Boston Celtics', $result);
-        $this->assertStringContainsString('Los Angeles Lakers', $result);
+        $this->assertStringContainsString('Celtics', $result);
+        $this->assertStringContainsString('Lakers', $result);
     }
 
     public function testRenderSeriesRecordsTableIncludesHeaderLogos(): void

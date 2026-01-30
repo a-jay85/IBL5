@@ -80,7 +80,6 @@ class InjuriesViewTest extends TestCase
         $this->assertStringContainsString('John Smith', $result);
         $this->assertStringContainsString('PG', $result);
         $this->assertStringContainsString('5', $result);
-        $this->assertStringContainsString('Boston', $result);
         $this->assertStringContainsString('Celtics', $result);
     }
 
@@ -172,8 +171,10 @@ class InjuriesViewTest extends TestCase
 
         // The raw <script> tag should not appear - should be escaped
         $this->assertStringNotContainsString('<script>alert', $result);
-        // Escaped version should appear
+        // Escaped player name should appear (city is no longer displayed)
         $this->assertStringContainsString('&lt;script&gt;', $result);
+        // Team name should be escaped
+        $this->assertStringContainsString('Team&amp;Name', $result);
     }
 
     public function testRenderIncludesPlayerLinks(): void

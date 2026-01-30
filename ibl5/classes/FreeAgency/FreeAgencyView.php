@@ -90,13 +90,13 @@ class FreeAgencyView implements FreeAgencyViewInterface
     private function renderPlayersUnderContract(object $team, \Season $season, array $capMetrics): string
     {
         $teamId = (int) ($team->teamID ?? 0);
-        $teamCity = htmlspecialchars($team->city ?? '');
         $teamNameStr = htmlspecialchars($team->name ?? '');
         $color1 = htmlspecialchars($team->color1 ?? 'D4AF37');
         $color2 = htmlspecialchars($team->color2 ?? '1e3a5f');
 
         ob_start();
         ?>
+<div style="overflow-x: auto; width: 0; min-width: 100%;">
 <table class="sortable fa-under-contract" style="max-width: none;">
     <?= $this->renderColgroups() ?>
     <?= $this->renderTableHeader('Players Under Contract', false, $team) ?>
@@ -123,7 +123,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
                 <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
                     <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-                    <span class="ibl-team-cell__text"><?= $teamCity ?> <?= $teamNameStr ?></span>
+                    <span class="ibl-team-cell__text"><?= $teamNameStr ?></span>
                 </a>
             </td>
             <td class="sep-team"></td>
@@ -146,6 +146,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         </tr>
     </tfoot>
 </table>
+</div>
         <?php
         return ob_get_clean();
     }
@@ -161,13 +162,13 @@ class FreeAgencyView implements FreeAgencyViewInterface
     {
         $commonRepository = new \Services\CommonMysqliRepository($this->mysqli_db);
         $teamId = (int) ($team->teamID ?? 0);
-        $teamCity = htmlspecialchars($team->city ?? '');
         $teamNameStr = htmlspecialchars($team->name ?? '');
         $color1 = htmlspecialchars($team->color1 ?? 'D4AF37');
         $color2 = htmlspecialchars($team->color2 ?? '1e3a5f');
 
         ob_start();
         ?>
+<div style="overflow-x: auto; width: 0; min-width: 100%;">
 <table class="sortable fa-offers" style="max-width: none;">
     <?= $this->renderColgroups() ?>
     <?= $this->renderTableHeader('Contract Offers', false, $team) ?>
@@ -184,7 +185,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
                 <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
                     <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-                    <span class="ibl-team-cell__text"><?= $teamCity ?> <?= $teamNameStr ?></span>
+                    <span class="ibl-team-cell__text"><?= $teamNameStr ?></span>
                 </a>
             </td>
             <td class="sep-team"></td>
@@ -210,6 +211,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <?= $this->renderCapSpaceFooter($team, $capMetrics) ?>
     </tfoot>
 </table>
+</div>
         <?php
         return ob_get_clean();
     }
@@ -225,13 +227,13 @@ class FreeAgencyView implements FreeAgencyViewInterface
     private function renderTeamFreeAgents(object $team, \Season $season, array $capMetrics): string
     {
         $teamId = (int) ($team->teamID ?? 0);
-        $teamCity = htmlspecialchars($team->city ?? '');
         $teamNameStr = htmlspecialchars($team->name ?? '');
         $color1 = htmlspecialchars($team->color1 ?? 'D4AF37');
         $color2 = htmlspecialchars($team->color2 ?? '1e3a5f');
 
         ob_start();
         ?>
+<div style="overflow-x: auto; width: 0; min-width: 100%;">
 <table class="sortable fa-team-free-agents" style="max-width: none;">
     <?= $this->renderColgroups() ?>
     <?= $this->renderTableHeader('Unsigned Free Agents', true, $team) ?>
@@ -260,7 +262,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
                 <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
                     <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-                    <span class="ibl-team-cell__text"><?= $teamCity ?> <?= $teamNameStr ?></span>
+                    <span class="ibl-team-cell__text"><?= $teamNameStr ?></span>
                 </a>
             </td>
             <td class="sep-team"></td>
@@ -273,6 +275,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <?php endforeach; ?>
     </tbody>
 </table>
+</div>
         <?php
         return ob_get_clean();
     }
@@ -289,6 +292,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     {
         ob_start();
         ?>
+<div style="overflow-x: auto; width: 0; min-width: 100%;">
 <table class="sortable fa-other-free-agents" style="max-width: none;">
     <?= $this->renderColgroups() ?>
     <?= $this->renderTableHeader('All Other Free Agents', false, $team) ?>
@@ -315,6 +319,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <?php endforeach; ?>
     </tbody>
 </table>
+</div>
         <?php
         return ob_get_clean();
     }
@@ -436,23 +441,12 @@ class FreeAgencyView implements FreeAgencyViewInterface
         $color2 = htmlspecialchars($teamColors['color2'] ?? '1e3a5f');
         $teamName = htmlspecialchars($player->teamName ?? '');
 
-        // Fetch team city from database
-        $stmt = $this->mysqli_db->prepare('SELECT team_city FROM ibl_team_info WHERE teamid = ?');
-        $stmt->bind_param('i', $teamId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $teamCity = '';
-        if ($row = $result->fetch_assoc()) {
-            $teamCity = htmlspecialchars($row['team_city'] ?? '');
-        }
-        $stmt->close();
-
         ob_start();
         ?>
 <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
     <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
         <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-        <span class="ibl-team-cell__text"><?= $teamCity ?> <?= $teamName ?></span>
+        <span class="ibl-team-cell__text"><?= $teamName ?></span>
     </a>
 </td>
         <?php

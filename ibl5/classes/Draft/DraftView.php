@@ -70,11 +70,12 @@ class DraftView implements DraftViewInterface
      */
     public function renderPlayerTable(array $players, string $teamLogo, ?string $pickOwner): string
     {
-        $html = '<table class="sortable ibl-data-table draft-table" data-no-responsive>
+        $html = '<div class="table-scroll-container">
+        <table class="sortable ibl-data-table draft-table responsive-table">
             <thead>
                 <tr>
-                    <th>Draft</th>
-                    <th>Name</th>
+                    <th class="sticky-col">Draft</th>
+                    <th class="sticky-col-2">Name</th>
                     <th>Pos</th>
                     <th>Team</th>
                     <th>Age</th>
@@ -112,16 +113,16 @@ class DraftView implements DraftViewInterface
 
             if ($teamLogo == $pickOwner && $isPlayerDrafted == 0) {
                 $html .= '<tr' . $rowClass . '>
-                    <td><input type="radio" name="player" value="' . htmlspecialchars($player['name'], ENT_QUOTES) . '"></td>
-                    <td style="white-space: nowrap;">' . $playerName . '</td>';
+                    <td class="sticky-col"><input type="radio" name="player" value="' . htmlspecialchars($player['name'], ENT_QUOTES) . '"></td>
+                    <td class="sticky-col-2" style="white-space: nowrap;">' . $playerName . '</td>';
             } elseif ($isPlayerDrafted == 1) {
                 $html .= '<tr' . $rowClass . '>
-                    <td></td>
-                    <td style="white-space: nowrap;">' . $playerName . '</td>';
+                    <td class="sticky-col"></td>
+                    <td class="sticky-col-2" style="white-space: nowrap;">' . $playerName . '</td>';
             } else {
                 $html .= '<tr' . $rowClass . '>
-                    <td></td>
-                    <td style="white-space: nowrap;">' . $playerName . '</td>';
+                    <td class="sticky-col"></td>
+                    <td class="sticky-col-2" style="white-space: nowrap;">' . $playerName . '</td>';
             }
 
             $html .= '
@@ -154,7 +155,7 @@ class DraftView implements DraftViewInterface
             </tr>';
         }
 
-        $html .= '</tbody></table>';
+        $html .= '</tbody></table></div>'; // Close table and scroll container
 
         return $html;
     }

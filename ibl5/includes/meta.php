@@ -24,7 +24,7 @@ global $commercial_license, $sitename, $slogan;
 
 $metastring = "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=" . _CHARSET . "\">\n";
 $metastring .= "<meta id=\"viewport-meta\" name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
-$metastring .= "<script>(function(){try{if(localStorage.getItem('ibl_desktop_view')==='1'){document.getElementById('viewport-meta').setAttribute('content','width=1024');document.documentElement.classList.add('desktop-view-active');}}catch(e){}})()</script>\n";
+$metastring .= "<script>(function(){try{if(localStorage.getItem('ibl_desktop_view')==='1'){document.getElementById('viewport-meta').setAttribute('content','width=1440');document.documentElement.classList.add('desktop-view-active');}}catch(e){}})()</script>\n";
 $metastring .= "<META HTTP-EQUIV=\"EXPIRES\" CONTENT=\"0\">\n";
 $metastring .= "<META NAME=\"RESOURCE-TYPE\" CONTENT=\"DOCUMENT\">\n";
 $metastring .= "<META NAME=\"DISTRIBUTION\" CONTENT=\"GLOBAL\">\n";

@@ -728,11 +728,6 @@
     opacity: 0.85;
 }
 
-/* Team name text - hidden on mobile to save space, showing only logo */
-.ibl-team-cell__text {
-    /* Default: visible */
-}
-
 @media (max-width: 768px) {
     .ibl-team-cell__text {
         display: none;

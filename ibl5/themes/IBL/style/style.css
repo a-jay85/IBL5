@@ -2578,9 +2578,6 @@ a.schedule-jump-btn:hover {
   font-size: 1.125rem;
   padding: var(--space-8);
 }
-.next-sim-day-game {
-  padding: var(--space-4);
-}
 .next-sim-day-row {
   display: flex;
   align-items: center;

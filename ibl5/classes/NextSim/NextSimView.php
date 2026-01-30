@@ -90,7 +90,7 @@ class NextSimView implements NextSimViewInterface
         $opposingTeamId = (int)$opposingTeam->teamID;
         $seasonRecord = HtmlSanitizer::safeHtmlOutput($opposingTeam->seasonRecord);
 
-        $html = '<div class="next-sim-day-game">';
+        $html = '<div>';
         $html .= '<div class="next-sim-day-row">';
         $html .= '<div class="next-sim-day-label"><h2 title="' . $gameDate . '">' . $dayLabel . '</h2></div>';
         $html .= '<div class="next-sim-logo">';

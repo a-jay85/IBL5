@@ -523,6 +523,16 @@
     box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
 }
 
+/* Desktop: remove visual decoration and height constraint;
+   keep overflow:auto for tables that may still overflow horizontally */
+@media (min-width: 1024px) {
+    .sticky-scroll-wrapper {
+        max-height: none;
+        border-radius: 0;
+        box-shadow: none;
+    }
+}
+
 /* Inner container — keeps inline-block sizing so horizontal scroll works */
 .sticky-scroll-container {
     display: inline-block;

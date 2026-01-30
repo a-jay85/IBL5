@@ -51,7 +51,6 @@ function showpage($playerID, $pageView)
     // DISPLAY PAGE
 
     Nuke\Header::header();
-    OpenTable();
 
     // Render result banner from PRG redirect (e.g., after rookie option exercise)
     $result = $_GET['result'] ?? null;
@@ -218,7 +217,6 @@ function showpage($playerID, $pageView)
         echo $view->renderOverview($playerID, $player, $playerStats, $season, $sharedFunctions);
     }
 
-    CloseTable();
     Nuke\Footer::footer();
 
     // END OF DISPLAY PAGE
@@ -235,14 +233,12 @@ function negotiate($playerID)
     $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
 
     Nuke\Header::header();
-    OpenTable();
     UI::playerMenu();
 
     // Use NegotiationProcessor to handle all business logic
     $processor = new NegotiationProcessor($db, $mysqli_db);
     echo $processor->processNegotiation($playerID, $userTeamName, $prefix);
 
-    CloseTable();
     Nuke\Footer::footer();
 }
 
@@ -263,14 +259,12 @@ function rookieoption($pid)
     $player = Player::withPlayerID($db, $pid);
 
     Nuke\Header::header();
-    OpenTable();
 
     // Validate player ownership
     $ownershipValidation = $validator->validatePlayerOwnership($player, $userTeamName);
     if (!$ownershipValidation['valid']) {
         echo '<div class="ibl-alert ibl-alert--error">' . \Utilities\HtmlSanitizer::safeHtmlOutput($ownershipValidation['error']) . '</div>';
         echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
-        CloseTable();
         Nuke\Footer::footer();
         return;
     }
@@ -280,7 +274,6 @@ function rookieoption($pid)
     if (!$eligibilityValidation['valid']) {
         echo '<div class="ibl-alert ibl-alert--error">' . \Utilities\HtmlSanitizer::safeHtmlOutput($eligibilityValidation['error']) . '</div>';
         echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
-        CloseTable();
         Nuke\Footer::footer();
         return;
     }
@@ -296,7 +289,6 @@ function rookieoption($pid)
     // Render form
     echo $formView->renderForm($player, $userTeamName, $rookieOptionValue, $error, $result, $from);
 
-    CloseTable();
     Nuke\Footer::footer();
 }
 

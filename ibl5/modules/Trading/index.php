@@ -14,8 +14,6 @@ function menu()
     global $mysqli_db;
 
     Nuke\Header::header();
-    OpenTable();
-    CloseTable();
     Nuke\Footer::footer();
 }
 
@@ -44,7 +42,6 @@ function tradeoffer($username)
     $currentSeasonEndingYear = $season->endingYear; // we use this as an incrementer
 
     Nuke\Header::header();
-    OpenTable();
 
     $queryUserTeamPlayers = "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
 		FROM ibl_plr
@@ -193,8 +190,6 @@ function tradeoffer($username)
         </tr>
     </table></form></div>";
 
-    CloseTable();
-
     Nuke\Footer::footer();
 }
 
@@ -207,7 +202,6 @@ function tradereview($username)
     $teamID = $commonRepository->getTidFromTeamname($teamlogo);
 
     Nuke\Header::header();
-    OpenTable();
 
     echo "<div style=\"text-align: center;\">
         <img src=\"images/logo/$teamID.jpg\" alt=\"Team Logo\" class=\"team-logo-banner\">
@@ -366,7 +360,6 @@ function tradereview($username)
         </tr>
     </table>";
 
-    CloseTable();
     Nuke\Footer::footer();
 }
 
@@ -378,18 +371,12 @@ function reviewtrade($user)
     if (!is_user($user)) {
         Nuke\Header::header();
         if ($stop) {
-            OpenTable();
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
-            CloseTable();
         } else {
-            OpenTable();
             echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
-            CloseTable();
         }
         if (!is_user($user)) {
-            OpenTable();
             loginbox();
-            CloseTable();
         }
         Nuke\Footer::footer();
     } elseif (is_user($user)) {
@@ -399,7 +386,6 @@ function reviewtrade($user)
             tradereview(strval($cookie[1] ?? ''));
         } else {
             Nuke\Header::header();
-            OpenTable();
             echo "Sorry, but trades are not allowed right now.";
             if ($season->allowWaivers == 'Yes') {
                 echo "<br>
@@ -407,7 +393,6 @@ function reviewtrade($user)
             } else {
                 echo "<br>The waiver wire is also closed.";
             }
-            CloseTable();
             Nuke\Footer::footer();
         }
     }
@@ -420,18 +405,12 @@ function offertrade($user)
     if (!is_user($user)) {
         Nuke\Header::header();
         if ($stop) {
-            OpenTable();
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
-            CloseTable();
         } else {
-            OpenTable();
             echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
-            CloseTable();
         }
         if (!is_user($user)) {
-            OpenTable();
             loginbox();
-            CloseTable();
         }
         Nuke\Footer::footer();
     } elseif (is_user($user)) {

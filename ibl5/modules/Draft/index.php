@@ -32,8 +32,6 @@ function userinfo($username)
 
     Nuke\Header::header();
 
-    OpenTable();
-
     $teamlogo = $userinfo['user_ibl_team'];
     $tid = $commonRepository->getTidFromTeamname($teamlogo);
 
@@ -55,7 +53,6 @@ function userinfo($username)
     // Render the draft interface
     echo $view->renderDraftInterface($players, $teamlogo, $pickOwner, $draft_round, $draft_pick, $season->endingYear, $tid);
 
-    CloseTable();
     Nuke\Footer::footer();
 }
 
@@ -64,14 +61,10 @@ function main($user)
     global $stop;
     if (!is_user($user)) {
         Nuke\Header::header();
-        OpenTable();
         echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
-        CloseTable();
         echo "<br>";
         if (!is_user($user)) {
-            OpenTable();
             loginbox();
-            CloseTable();
         }
         Nuke\Footer::footer();
     } elseif (is_user($user)) {

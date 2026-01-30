@@ -48,8 +48,6 @@ function userinfo($username)
 
 // === CODE TO INSERT IBL DEPTH CHART ===
 
-    OpenTable();
-
     function getCandidates($votingCategory, $voterTeamName)
     {
         global $db, $mysqli_db;
@@ -289,8 +287,6 @@ function userinfo($username)
 	</div>
 	</form>";
 
-    CloseTable();
-
     Nuke\Footer::footer();
 }
 
@@ -300,14 +296,10 @@ function main($user)
     if (!is_user($user)) {
         Nuke\Header::header();
         if ($stop) {
-            OpenTable();
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
-            CloseTable();
             echo "<br>\n";
         } else {
-            OpenTable();
             echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
-            CloseTable();
             echo "<br>\n";
         }
         if (!is_user($user)) {

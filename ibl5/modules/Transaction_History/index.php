@@ -38,9 +38,7 @@ $pageData = $service->getPageData($_GET);
 
 // Render page
 Nuke\Header::header();
-OpenTable();
 
 echo $view->render($pageData);
 
-CloseTable();
 Nuke\Footer::footer();

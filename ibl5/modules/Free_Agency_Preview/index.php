@@ -34,9 +34,7 @@ $season = new Season($mysqli_db);
 // Check if season is available
 if ($season->endingYear === null || $season->endingYear === 0) {
     Nuke\Header::header();
-    OpenTable();
     echo '<p style="text-align: center; padding: 2rem;">Season information is not available.</p>';
-    CloseTable();
     Nuke\Footer::footer();
     return;
 }
@@ -53,9 +51,5 @@ $freeAgents = $service->getUpcomingFreeAgents($season->endingYear);
 
 // Render page
 Nuke\Header::header();
-OpenTable();
-
 echo $view->render($season->endingYear, $freeAgents);
-
-CloseTable();
 Nuke\Footer::footer();

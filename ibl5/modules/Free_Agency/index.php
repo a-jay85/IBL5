@@ -27,14 +27,10 @@ function main($user)
     global $stop;
     if (!is_user($user)) {
         Nuke\Header::header();
-        OpenTable();
         echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
-        CloseTable();
         echo "<br>";
         if (!is_user($user)) {
-            OpenTable();
             loginbox();
-            CloseTable();
         }
         Nuke\Footer::footer();
     } elseif (is_user($user)) {
@@ -49,7 +45,6 @@ function display()
     $season = new Season($mysqli_db);
 
     Nuke\Header::header();
-    OpenTable();
 
     $username = strval($cookie[1] ?? '');
     $teamName = $commonRepository->getTeamnameFromUsername($username);
@@ -65,7 +60,6 @@ function display()
     $result = $_GET['result'] ?? null;
     echo $view->render($mainPageData, $result);
 
-    CloseTable();
     Nuke\Footer::footer();
 }
 
@@ -82,7 +76,6 @@ function negotiate($pid)
     $teamID = $commonRepository->getTidFromTeamname($userTeamName);
 
     Nuke\Header::header();
-    OpenTable();
 
     $team = \Team::initialize($mysqli_db, $teamID);
     $season = new Season($mysqli_db);
@@ -101,7 +94,6 @@ function negotiate($pid)
     $error = $_GET['error'] ?? null;
     echo $view->render($negotiationData, $error);
 
-    CloseTable();
     Nuke\Footer::footer();
 }
 

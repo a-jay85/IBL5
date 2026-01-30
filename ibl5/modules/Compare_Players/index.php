@@ -51,7 +51,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
     $tid = $commonRepository->getTidFromTeamname($teamlogo);
 
     Nuke\Header::header();
-    OpenTable();
 
     // Initialize compare players classes
     $repository = new \ComparePlayers\ComparePlayersRepository($mysqli_db);
@@ -73,7 +72,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
         if (strlen($player1Name) > 100 || strlen($player2Name) > 100) {
             echo '<p style="color: red; font-weight: bold;">Error: Player names must be 100 characters or less.</p>';
             echo $view->renderSearchForm($playerNames);
-            CloseTable();
             Nuke\Footer::footer();
             return;
         }
@@ -88,7 +86,6 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
         }
     }
 
-    CloseTable();
     Nuke\Footer::footer();
 }
 
@@ -102,14 +99,10 @@ function main($user): void
     global $stop;
     if (!is_user($user)) {
         Nuke\Header::header();
-        OpenTable();
         echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
-        CloseTable();
         echo "<br>";
         if (!is_user($user)) {
-            OpenTable();
             loginbox();
-            CloseTable();
         }
         Nuke\Footer::footer();
     } elseif (is_user($user)) {

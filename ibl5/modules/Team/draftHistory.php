@@ -7,7 +7,6 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 $teamID = isset($_GET['teamID']) ? (int) $_GET['teamID'] : 0;
 
 Nuke\Header::header();
-OpenTable();
 
 $team = Team::initialize($mysqli_db, $teamID);
 
@@ -42,5 +41,4 @@ foreach ($team->getDraftHistoryResult() as $playerRow) {
 
 echo "</table>";
 
-CloseTable();
 Nuke\Footer::footer();

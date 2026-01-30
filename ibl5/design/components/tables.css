@@ -193,29 +193,17 @@
 /* Team-colored separators */
 .team-table th.sep-team,
 .team-table td.sep-team {
-    border-right: 2px solid var(--team-sep-color);
-    padding-right: 3px;
-}
-
-.team-table th.sep-team + th,
-.team-table th.sep-team + td,
-.team-table td.sep-team + th,
-.team-table td.sep-team + td {
-    padding-left: 3px;
+    border-left: 0.5px solid var(--team-sep-color);
+    border-right: 0.5px solid var(--team-sep-color);
+    padding: 0 !important;
 }
 
 /* Weak separators (gray, same as before) */
 .team-table th.sep-weak,
 .team-table td.sep-weak {
-    border-right: 1px solid var(--gray-200, #e5e7eb);
-    padding-right: 3px;
-}
-
-.team-table th.sep-weak + th,
-.team-table th.sep-weak + td,
-.team-table td.sep-weak + th,
-.team-table td.sep-weak + td {
-    padding-left: 3px;
+    border-left: 0.5px solid var(--gray-200, #e5e7eb);
+    border-right: 0.5px solid var(--gray-200, #e5e7eb);
+    padding: 0 !important;
 }
 
 /* Salary column left alignment */

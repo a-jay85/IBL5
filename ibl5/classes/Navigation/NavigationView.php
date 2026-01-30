@@ -519,16 +519,29 @@ class NavigationView
                             false, // No league switcher
                             true // Align dropdown to right edge
                         ) ?>
+
+                        <!-- Mobile view toggle (visible only in forced desktop mode) -->
+                        <button id="mobile-view-toggle" class="hidden w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-lg transition-colors ml-1" aria-label="Switch to mobile view" title="Switch to mobile view">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"/></svg>
+                        </button>
                     </div>
 
-                    <!-- Mobile hamburger button -->
-                    <button id="nav-hamburger" class="lg:hidden relative w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-lg transition-colors" aria-label="Toggle menu" aria-expanded="false">
-                        <div class="w-5 h-4 flex flex-col justify-between">
-                            <span class="block h-0.5 w-full bg-current rounded-full transition-transform origin-center" id="hamburger-top"></span>
-                            <span class="block h-0.5 w-full bg-current rounded-full transition-opacity" id="hamburger-middle"></span>
-                            <span class="block h-0.5 w-full bg-current rounded-full transition-transform origin-center" id="hamburger-bottom"></span>
-                        </div>
-                    </button>
+                    <!-- Mobile controls -->
+                    <div class="lg:hidden flex items-center gap-1">
+                        <!-- Desktop view toggle -->
+                        <button id="desktop-view-toggle" class="relative w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-lg transition-colors" aria-label="Switch to desktop view" title="Switch to desktop view">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z"/></svg>
+                        </button>
+
+                        <!-- Hamburger button -->
+                        <button id="nav-hamburger" class="relative w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-lg transition-colors" aria-label="Toggle menu" aria-expanded="false">
+                            <div class="w-5 h-4 flex flex-col justify-between">
+                                <span class="block h-0.5 w-full bg-current rounded-full transition-transform origin-center" id="hamburger-top"></span>
+                                <span class="block h-0.5 w-full bg-current rounded-full transition-opacity" id="hamburger-middle"></span>
+                                <span class="block h-0.5 w-full bg-current rounded-full transition-transform origin-center" id="hamburger-bottom"></span>
+                            </div>
+                        </button>
+                    </div>
                 </div>
             </div>
         </nav>

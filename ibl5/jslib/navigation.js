@@ -131,4 +131,32 @@
             });
         });
     });
+
+    // Desktop/Mobile view toggle
+    (function() {
+        var desktopToggle = document.getElementById('desktop-view-toggle');
+        var mobileToggle = document.getElementById('mobile-view-toggle');
+
+        // Show mobile-view toggle when desktop-view is forced
+        if (mobileToggle && document.documentElement.classList.contains('desktop-view-active')) {
+            mobileToggle.classList.remove('hidden');
+        }
+
+        function enableDesktopView() {
+            try { localStorage.setItem('ibl_desktop_view', '1'); } catch (e) {}
+            window.location.reload();
+        }
+
+        function enableMobileView() {
+            try { localStorage.removeItem('ibl_desktop_view'); } catch (e) {}
+            window.location.reload();
+        }
+
+        if (desktopToggle) {
+            desktopToggle.addEventListener('click', enableDesktopView);
+        }
+        if (mobileToggle) {
+            mobileToggle.addEventListener('click', enableMobileView);
+        }
+    })();
 })();

@@ -39,6 +39,12 @@ class PlayerData
     /** @var string|null Team name */
     public ?string $teamName = null;
 
+    /** @var string|null Team primary color (hex without #) */
+    public ?string $teamColor1 = null;
+
+    /** @var string|null Team secondary/text color (hex without #) */
+    public ?string $teamColor2 = null;
+
     /** @var string|null Player position (PG, SG, SF, PF, C) */
     public ?string $position = null;
 

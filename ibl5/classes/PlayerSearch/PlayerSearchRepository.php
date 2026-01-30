@@ -72,56 +72,56 @@ class PlayerSearchRepository extends BaseMysqliRepository implements PlayerSearc
      */
     public function searchPlayers(array $params): array
     {
-        $conditions = ['pid > 0'];
+        $conditions = ['ibl_plr.pid > 0'];
         $bindParams = [];
         $bindTypes = '';
 
         if ($params['active'] === 0) {
-            $conditions[] = 'retired = 0';
+            $conditions[] = 'ibl_plr.retired = 0';
         }
 
         if ($params['search_name'] !== null) {
-            $conditions[] = 'name LIKE ?';
+            $conditions[] = 'ibl_plr.name LIKE ?';
             $bindParams[] = '%' . $params['search_name'] . '%';
             $bindTypes .= 's';
         }
 
         if ($params['college'] !== null) {
-            $conditions[] = 'college LIKE ?';
+            $conditions[] = 'ibl_plr.college LIKE ?';
             $bindParams[] = '%' . $params['college'] . '%';
             $bindTypes .= 's';
         }
 
         if ($params['pos'] !== null) {
-            $conditions[] = 'pos = ?';
+            $conditions[] = 'ibl_plr.pos = ?';
             $bindParams[] = $params['pos'];
             $bindTypes .= 's';
         }
 
         if ($params['age'] !== null) {
-            $conditions[] = 'age <= ?';
+            $conditions[] = 'ibl_plr.age <= ?';
             $bindParams[] = $params['age'];
             $bindTypes .= 'i';
         }
 
         if ($params['exp'] !== null) {
-            $conditions[] = 'exp >= ?';
+            $conditions[] = 'ibl_plr.exp >= ?';
             $bindParams[] = $params['exp'];
             $bindTypes .= 'i';
         }
         if ($params['exp_max'] !== null) {
-            $conditions[] = 'exp <= ?';
+            $conditions[] = 'ibl_plr.exp <= ?';
             $bindParams[] = $params['exp_max'];
             $bindTypes .= 'i';
         }
 
         if ($params['bird'] !== null) {
-            $conditions[] = 'bird >= ?';
+            $conditions[] = 'ibl_plr.bird >= ?';
             $bindParams[] = $params['bird'];
             $bindTypes .= 'i';
         }
         if ($params['bird_max'] !== null) {
-            $conditions[] = 'bird <= ?';
+            $conditions[] = 'ibl_plr.bird <= ?';
             $bindParams[] = $params['bird_max'];
             $bindTypes .= 'i';
         }
@@ -136,14 +136,18 @@ class PlayerSearchRepository extends BaseMysqliRepository implements PlayerSearc
         foreach ($greaterThanFilters as $filter) {
             if (isset($params[$filter]) && $params[$filter] !== null) {
                 $column = self::COLUMN_MAP[$filter] ?? $filter;
-                $conditions[] = "$column >= ?";
+                $conditions[] = "ibl_plr.$column >= ?";
                 $bindParams[] = $params[$filter];
                 $bindTypes .= 'i';
             }
         }
 
         $whereClause = implode(' AND ', $conditions);
-        $query = "SELECT * FROM ibl_plr WHERE $whereClause ORDER BY retired ASC, ordinal ASC";
+        $query = "SELECT ibl_plr.*, ibl_team_info.color1, ibl_team_info.color2
+            FROM ibl_plr
+            LEFT JOIN ibl_team_info ON ibl_plr.tid = ibl_team_info.teamid
+            WHERE $whereClause
+            ORDER BY ibl_plr.retired ASC, ibl_plr.ordinal ASC";
 
         // Use executeQuery from BaseMysqliRepository for dynamic parameter binding
         // executeQuery handles prepare, bind_param, execute, and error logging

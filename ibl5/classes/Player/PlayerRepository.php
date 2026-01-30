@@ -94,6 +94,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         $playerData->age = isset($plrRow['age']) ? (int) $plrRow['age'] : null;
         $playerData->teamID = isset($plrRow['tid']) ? (int) $plrRow['tid'] : null;
         $playerData->teamName = isset($plrRow['teamname']) ? stripslashes($plrRow['teamname']) : null;
+        $playerData->teamColor1 = $plrRow['color1'] ?? null;
+        $playerData->teamColor2 = $plrRow['color2'] ?? null;
         $playerData->position = $plrRow['pos'] ?? null;
     }
 

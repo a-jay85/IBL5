@@ -177,7 +177,10 @@ final class PlayerSearchViewTest extends TestCase
 
         $html = $this->view->renderPlayerRow($player, 0);
 
-        $this->assertStringContainsString('href="modules.php?name=Team&op=team&teamID=5"', $html); // I don't know why the test expects & and not &amp;
+        $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamID=5"', $html);
+        $this->assertStringContainsString('ibl-team-cell--colored', $html);
+        $this->assertStringContainsString('ibl-team-cell__name', $html);
+        $this->assertStringContainsString('ibl-team-cell__logo', $html);
         $this->assertStringContainsString('>Test Team<', $html);
     }
 
@@ -191,8 +194,8 @@ final class PlayerSearchViewTest extends TestCase
         // Row alternation is now handled by CSS :nth-child, not inline styles
         $this->assertStringContainsString('<tr>', $htmlEven);
         $this->assertStringContainsString('<tr>', $htmlOdd);
-        $this->assertStringNotContainsString('background-color', $htmlEven);
-        $this->assertStringNotContainsString('background-color', $htmlOdd);
+        $this->assertStringNotContainsString('<tr style=', $htmlEven);
+        $this->assertStringNotContainsString('<tr style=', $htmlOdd);
     }
 
     public function testRenderPlayerRowShowsRetiredStatus(): void
@@ -293,7 +296,9 @@ final class PlayerSearchViewTest extends TestCase
         $player->ratingIntangibles = 75;
         $player->ratingClutch = 90;
         $player->ratingConsistency = 85;
-        
+        $player->teamColor1 = 'FF0000';
+        $player->teamColor2 = 'FFFFFF';
+
         return $player;
     }
 }

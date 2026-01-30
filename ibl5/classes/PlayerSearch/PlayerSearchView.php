@@ -68,8 +68,6 @@ class PlayerSearchView implements PlayerSearchViewInterface
 
         ob_start();
         ?>
-<div class="table-scroll-wrapper">
-<div class="table-scroll-container">
 <p>Age is less than or equal to the age entered. All other fields are greater than or equal to the amount entered.</p>
 <p>Partial matches on a name or college are okay and are <strong>not</strong> case sensitive<br>
 (e.g., entering "Dard" will match with "Darden" and "Bedard").</p>
@@ -240,8 +238,6 @@ function resetPlayerSearch() {
     return false;
 }
 </script>
-</div>
-</div>
 <br>
         <?php
         return ob_get_clean();
@@ -254,14 +250,12 @@ function resetPlayerSearch() {
     {
         ob_start();
         ?>
-<div class="table-scroll-wrapper">
-<div class="table-scroll-container">
-<table class="sortable ibl-data-table responsive-table">
+<table class="sortable ibl-data-table" data-no-responsive>
     <tr>
         <th>Pos</th>
         <th>Player</th>
         <th>Age</th>
-        <th>Team</th>
+        <th class="ibl-team-cell--colored">Team</th>
         <th>Exp</th>
         <th>Bird</th>
         <th>2ga</th>
@@ -320,7 +314,16 @@ function resetPlayerSearch() {
     <td><?= htmlspecialchars($player->position) ?></td>
     <td><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= htmlspecialchars($player->name) ?></a></td>
     <td><?= $player->age ?></td>
-    <td><a href="modules.php?name=Team&op=team&teamID=<?= $player->teamID ?>"><?= htmlspecialchars($player->teamName) ?></a></td>
+    <?php if ($player->teamColor1 !== null && $player->teamID > 0): ?>
+    <td class="ibl-team-cell--colored" style="background-color: #<?= \Utilities\HtmlSanitizer::safeHtmlOutput($player->teamColor1) ?>;">
+        <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $player->teamID ?>" class="ibl-team-cell__name" style="color: #<?= \Utilities\HtmlSanitizer::safeHtmlOutput($player->teamColor2 ?? '') ?>;">
+            <img src="images/logo/new<?= $player->teamID ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+            <span class="ibl-team-cell__text"><?= htmlspecialchars($player->teamName) ?></span>
+        </a>
+    </td>
+    <?php else: ?>
+    <td><?= htmlspecialchars($player->teamName ?? '') ?></td>
+    <?php endif; ?>
     <td><?= $player->yearsOfExperience ?></td>
     <td><?= $player->birdYears ?></td>
     <td><?= $player->ratingFieldGoalAttempts ?></td>
@@ -362,6 +365,6 @@ function resetPlayerSearch() {
      */
     public function renderTableFooter(): string
     {
-        return '</table></div></div>';
+        return '</table>';
     }
 }

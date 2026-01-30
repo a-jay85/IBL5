@@ -85,7 +85,37 @@ function themeheader()
     }
 
     $currentLeague = $leagueContext->getCurrentLeague();
-    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId);
+
+    // Fetch teams organized by conference and division for navigation mega-menu
+    $teamsData = null;
+    if ($mysqli_db) {
+        $teamsData = [];
+        $stmt = $mysqli_db->prepare(
+            "SELECT ti.teamid, ti.team_name, ti.team_city, s.division, s.conference
+             FROM ibl_team_info ti
+             JOIN ibl_standings s ON ti.team_name = s.team_name
+             ORDER BY s.conference, s.division, ti.team_city"
+        );
+        if ($stmt) {
+            $stmt->execute();
+            $result = $stmt->get_result();
+            while ($row = $result->fetch_assoc()) {
+                $conf = $row['conference'];
+                $div = $row['division'];
+                $teamsData[$conf][$div][] = [
+                    'teamid' => (int)$row['teamid'],
+                    'team_name' => $row['team_name'],
+                    'team_city' => $row['team_city'],
+                ];
+            }
+            $stmt->close();
+        }
+        if (empty($teamsData)) {
+            $teamsData = null;
+        }
+    }
+
+    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId, $teamsData);
     echo $navView->render();
 
     echo "<body bgcolor=\"$bgcolor1\">";

@@ -17,13 +17,16 @@ class NavigationView
     private ?string $username;
     private string $currentLeague;
     private ?int $teamId;
+    /** @var array<string, array<string, list<array{teamid: int, team_name: string, team_city: string}>>>|null */
+    private ?array $teamsData;
 
-    public function __construct(bool $isLoggedIn, ?string $username, string $currentLeague, ?int $teamId = null)
+    public function __construct(bool $isLoggedIn, ?string $username, string $currentLeague, ?int $teamId = null, ?array $teamsData = null)
     {
         $this->isLoggedIn = $isLoggedIn;
         $this->username = $username;
         $this->currentLeague = $currentLeague;
         $this->teamId = $teamId;
+        $this->teamsData = $teamsData;
     }
 
     /**
@@ -484,6 +487,144 @@ class NavigationView
     }
 
     /**
+     * Render the desktop Teams mega-menu dropdown with 2x2 conference/division grid
+     */
+    private function renderDesktopTeamsDropdown(): string
+    {
+        if ($this->teamsData === null) {
+            return '';
+        }
+
+        $icon = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"/></svg>';
+
+        $html = '<div class="relative group">';
+        $html .= '<button class="flex items-center gap-2 px-3 py-2.5 text-lg font-semibold font-display text-gray-300 hover:text-white transition-colors duration-200">';
+        $html .= '<span class="text-accent-500 group-hover:text-accent-400 transition-colors">' . $icon . '</span>';
+        $html .= '<span>Teams</span>';
+        $html .= '<svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
+        $html .= '</button>';
+
+        // Wider dropdown for the 2-column grid
+        $html .= '<div class="absolute left-0 top-full pt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">';
+        $html .= '<div class="min-w-[580px] bg-navy-800/95 backdrop-blur-xl rounded-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">';
+
+        // 2-column grid: Western on left, Eastern on right
+        $html .= '<div class="grid grid-cols-2 gap-x-8 p-4">';
+
+        // Column order: Western (Midwest, Pacific), Eastern (Atlantic, Central)
+        $conferenceOrder = ['Western', 'Eastern'];
+        foreach ($conferenceOrder as $conference) {
+            $html .= '<div>';
+            $html .= '<div class="uppercase font-display text-xs tracking-wider text-accent-400 mb-3">' . HtmlSanitizer::safeHtmlOutput($conference) . ' Conference</div>';
+
+            $divisions = $this->teamsData[$conference] ?? [];
+            ksort($divisions); // Alphabetical: Atlantic/Central, Midwest/Pacific
+            $divIndex = 0;
+            foreach ($divisions as $division => $teams) {
+                if ($divIndex > 0) {
+                    $html .= '<div class="mt-3"></div>';
+                }
+                $html .= '<div class="uppercase font-display text-xs tracking-wider text-gray-400 mb-1.5">' . HtmlSanitizer::safeHtmlOutput($division) . '</div>';
+                foreach ($teams as $team) {
+                    $teamId = (int)$team['teamid'];
+                    $teamName = HtmlSanitizer::safeHtmlOutput($team['team_city'] . ' ' . $team['team_name']);
+                    $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="nav-dropdown-item flex items-center gap-2 px-2 py-1.5 text-sm font-display text-gray-300 hover:text-white hover:bg-white/5 rounded transition-all duration-150">';
+                    $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="w-6 h-6 object-contain" loading="lazy">';
+                    $html .= '<span>' . $teamName . '</span>';
+                    $html .= '</a>';
+                }
+                $divIndex++;
+            }
+            $html .= '</div>';
+        }
+
+        $html .= '</div>'; // close grid
+        $html .= '</div></div></div>';
+        return $html;
+    }
+
+    /**
+     * Render the mobile Teams collapsible section with division sub-headers
+     */
+    private function renderMobileTeamsDropdown(): string
+    {
+        if ($this->teamsData === null) {
+            return '';
+        }
+
+        $icon = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"/></svg>';
+
+        $html = '<div class="mobile-section">';
+        $html .= '<button class="mobile-dropdown-btn w-full flex items-center justify-between px-5 py-3.5 text-white hover:bg-white/5 transition-colors">';
+        $html .= '<span class="flex items-center gap-3">';
+        $html .= '<span class="text-accent-500">' . $icon . '</span>';
+        $html .= '<span class="font-display text-lg font-semibold">Teams</span>';
+        $html .= '</span>';
+        $html .= '<svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
+        $html .= '</button>';
+
+        $html .= '<div class="hidden bg-black/20">';
+
+        // Determine user's conference/division to list them first
+        $userConference = null;
+        $userDivision = null;
+        if ($this->teamId !== null) {
+            foreach ($this->teamsData as $conf => $divisions) {
+                foreach ($divisions as $div => $teams) {
+                    foreach ($teams as $team) {
+                        if ((int)$team['teamid'] === $this->teamId) {
+                            $userConference = $conf;
+                            $userDivision = $div;
+                            break 3;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Order conferences: user's conference first, then the other
+        $conferenceOrder = array_keys($this->teamsData);
+        sort($conferenceOrder); // Alphabetical baseline: Eastern, Western
+        if ($userConference !== null) {
+            $conferenceOrder = array_values(array_unique(
+                array_merge([$userConference], $conferenceOrder)
+            ));
+        }
+
+        // Conference -> Division -> Teams
+        foreach ($conferenceOrder as $conference) {
+            $html .= '<div class="px-5 pt-3 pb-1">';
+            $html .= '<div class="uppercase font-display text-xs tracking-wider text-accent-400">' . HtmlSanitizer::safeHtmlOutput($conference) . ' Conference</div>';
+            $html .= '</div>';
+
+            $divisions = $this->teamsData[$conference] ?? [];
+            ksort($divisions); // Alphabetical baseline
+            // If user's division is in this conference, move it first
+            if ($userConference === $conference && $userDivision !== null && isset($divisions[$userDivision])) {
+                $userDiv = [$userDivision => $divisions[$userDivision]];
+                unset($divisions[$userDivision]);
+                $divisions = $userDiv + $divisions;
+            }
+            foreach ($divisions as $division => $teams) {
+                $html .= '<div class="px-5 pt-2 pb-1">';
+                $html .= '<div class="uppercase font-display text-xs tracking-wider text-gray-400">' . HtmlSanitizer::safeHtmlOutput($division) . '</div>';
+                $html .= '</div>';
+                foreach ($teams as $team) {
+                    $teamId = (int)$team['teamid'];
+                    $teamName = HtmlSanitizer::safeHtmlOutput($team['team_city'] . ' ' . $team['team_name']);
+                    $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="flex items-center gap-2.5 px-5 py-2.5 pl-10 text-base font-display text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">';
+                    $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="w-6 h-6 object-contain" loading="lazy">';
+                    $html .= '<span>' . $teamName . '</span>';
+                    $html .= '</a>';
+                }
+            }
+        }
+
+        $html .= '</div></div>';
+        return $html;
+    }
+
+    /**
      * Render the complete navigation bar
      */
     public function render(): string
@@ -534,6 +675,9 @@ class NavigationView
                                 $title === 'Season' // include league switcher only for Season menu
                             ) ?>
                         <?php endforeach; ?>
+
+                        <!-- Teams mega-menu -->
+                        <?= $this->renderDesktopTeamsDropdown() ?>
 
                         <!-- My Team dropdown (if user has a team) -->
                         <?php if ($myTeamMenu): ?>
@@ -612,6 +756,9 @@ class NavigationView
                 <?php if ($myTeamMenu): ?>
                     <?= $this->renderMobileDropdown('My Team', $myTeamMenu, $index++) ?>
                 <?php endif; ?>
+
+                <!-- Teams mega-menu -->
+                <?= $this->renderMobileTeamsDropdown() ?>
 
                 <!-- Menu sections -->
                 <?php foreach ($menus as $title => $menu): ?>

@@ -19,7 +19,7 @@ class ContractListView implements ContractListViewInterface
      */
     public function render(array $data): string
     {
-        $output = $this->getStyleBlock();
+        $output = '';
         $output .= $this->renderTitle();
         $output .= $this->renderTableStart();
         $output .= $this->renderTableRows($data['contracts']);
@@ -28,18 +28,6 @@ class ContractListView implements ContractListViewInterface
         $output .= $this->renderTableEnd();
 
         return $output;
-    }
-
-    /**
-     * Get the CSS styles for the contract list table.
-     *
-     * Uses consolidated .ibl-data-table from design system - no overrides needed.
-     *
-     * @return string CSS style block
-     */
-    private function getStyleBlock(): string
-    {
-        return ''; // All styles provided by .ibl-data-table
     }
 
     /**

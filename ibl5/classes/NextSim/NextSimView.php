@@ -39,7 +39,7 @@ class NextSimView implements NextSimViewInterface
      */
     public function render(array $games, int $simLengthInDays): string
     {
-        $html = $this->getStyleBlock();
+        $html = '';
         $html .= '<div class="next-sim-container">';
         $html .= '<h1 class="next-sim-title">Next Sim</h1>';
 
@@ -57,18 +57,6 @@ class NextSimView implements NextSimViewInterface
         $html .= '</div>';
 
         return $html;
-    }
-
-    /**
-     * Generate CSS styles for the next sim display
-     *
-     * Styles are now in the design system (existing-components.css).
-     *
-     * @return string Empty string - styles are centralized
-     */
-    private function getStyleBlock(): string
-    {
-        return '';
     }
 
     /**

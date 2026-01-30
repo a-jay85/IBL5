@@ -21,7 +21,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
      */
     public function render(array $teamsWithPicks, int $currentEndingYear): string
     {
-        $html = $this->getStyleBlock();
+        $html = '';
         $html .= $this->renderTitle();
         $html .= '<div class="sticky-scroll-wrapper">';
         $html .= '<div class="sticky-scroll-container">';
@@ -31,18 +31,6 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
         $html .= '</div></div></div>';
 
         return $html;
-    }
-
-    /**
-     * Generate CSS styles for the draft pick table
-     *
-     * Styles are now in the design system (existing-components.css).
-     *
-     * @return string Empty string - styles are centralized
-     */
-    private function getStyleBlock(): string
-    {
-        return '';
     }
 
     /**

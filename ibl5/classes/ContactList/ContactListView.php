@@ -19,7 +19,7 @@ class ContactListView implements ContactListViewInterface
      */
     public function render(array $contacts): string
     {
-        $output = $this->getStyleBlock();
+        $output = '';
         $output .= $this->renderTitle();
         $output .= $this->renderDescription();
         $output .= $this->renderTableStart();
@@ -27,18 +27,6 @@ class ContactListView implements ContactListViewInterface
         $output .= $this->renderTableEnd();
 
         return $output;
-    }
-
-    /**
-     * Get the CSS styles for the contact list table.
-     *
-     * Styles are now in the design system (existing-components.css).
-     *
-     * @return string Empty string - styles are centralized
-     */
-    private function getStyleBlock(): string
-    {
-        return '';
     }
 
     /**

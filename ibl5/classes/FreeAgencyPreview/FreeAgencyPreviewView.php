@@ -19,7 +19,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
      */
     public function render(int $seasonEndingYear, array $freeAgents): string
     {
-        $output = $this->getStyleBlock();
+        $output = '';
         $output .= $this->renderTitle($seasonEndingYear);
         $output .= '<div class="sticky-scroll-wrapper">';
         $output .= '<div class="sticky-scroll-container">';
@@ -29,18 +29,6 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
         $output .= '</div></div>';
 
         return $output;
-    }
-
-    /**
-     * Get the CSS styles for the free agency preview table.
-     *
-     * Uses consolidated .ibl-data-table from design system - no overrides needed.
-     *
-     * @return string CSS style block
-     */
-    private function getStyleBlock(): string
-    {
-        return ''; // All styles provided by .ibl-data-table
     }
 
     /**

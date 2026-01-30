@@ -21,7 +21,7 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
      */
     public function render(array $franchiseData): string
     {
-        $html = $this->getStyleBlock();
+        $html = '';
         $html .= '<div class="sticky-scroll-wrapper">';
         $html .= '<div class="sticky-scroll-container">';
         $html .= $this->renderTableHeader();
@@ -30,16 +30,6 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
         $html .= '</div></div>';
 
         return $html;
-    }
-
-    /**
-     * Generate CSS styles for the franchise history table
-     *
-     * @return string CSS style block
-     */
-    private function getStyleBlock(): string
-    {
-        return ''; // All styles provided by .ibl-data-table
     }
 
     /**

@@ -21,7 +21,7 @@ class CapInfoView implements CapInfoViewInterface
      */
     public function render(array $teamsData, int $beginningYear, int $endingYear, ?int $userTeamId): string
     {
-        $html = $this->getStyleBlock();
+        $html = '';
         $html .= '<div class="sticky-scroll-wrapper">';
         $html .= '<div class="sticky-scroll-container">';
         $html .= $this->renderTableHeader($beginningYear, $endingYear);
@@ -30,16 +30,6 @@ class CapInfoView implements CapInfoViewInterface
         $html .= '</div></div>';
 
         return $html;
-    }
-
-    /**
-     * Generate CSS styles for the cap info table
-     *
-     * @return string CSS style block
-     */
-    private function getStyleBlock(): string
-    {
-        return ''; // All styles provided by .ibl-data-table with .divider and .highlight row classes
     }
 
     /**

@@ -31,7 +31,7 @@ class DraftView implements DraftViewInterface
      */
     public function renderDraftInterface(array $players, string $teamLogo, ?string $pickOwner, ?int $draftRound, ?int $draftPick, int $seasonYear, int $tid): string
     {
-        $html = $this->getStyleBlock();
+        $html = '';
         $html .= '<div class="draft-container">';
         $html .= '<div class="draft-header">';
         $html .= '<img src="images/logo/' . $tid . '.jpg" alt="Team Logo" class="draft-team-logo">';
@@ -51,18 +51,6 @@ class DraftView implements DraftViewInterface
         $html .= "</form></div>";
 
         return $html;
-    }
-
-    /**
-     * Generate CSS styles for the draft interface
-     *
-     * Styles are now in the design system (existing-components.css).
-     *
-     * @return string Empty string - styles are centralized
-     */
-    private function getStyleBlock(): string
-    {
-        return '';
     }
 
     /**

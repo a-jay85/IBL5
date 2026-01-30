@@ -125,17 +125,10 @@ function tradeoffer($username)
     $k--;
     echo "</tbody></table>
 					</td>
-					<td style=\"vertical-align: top;\">";
-
-    $uiHelper = new Trading\UIHelper($mysqli_db);
-    $teams = $uiHelper->getAllTeamsForTrading();
-    echo $uiHelper->renderTeamSelectionLinks($teams);
-
-    echo "</td>";
-    echo "</tr>";
+				</tr>";
 
     // Cap totals section
-    echo "<tr><td colspan=\"3\"><table class=\"ibl-data-table trading-cap-totals\" style=\"width: 100%; margin-top: 1rem;\">
+    echo "<tr><td colspan=\"2\"><table class=\"ibl-data-table trading-cap-totals\" data-no-responsive style=\"width: 100%; margin-top: 1rem;\">
         <thead><tr><th colspan=\"2\">Cap Totals</th></tr></thead>
         <tbody>";
 
@@ -160,7 +153,7 @@ function tradeoffer($username)
     echo "</tbody></table></td></tr>";
 
     // Cash exchange section
-    echo "<tr><td colspan=\"3\"><table class=\"ibl-data-table trading-cash-exchange\" style=\"width: 100%; margin-top: 1rem;\">
+    echo "<tr><td colspan=\"2\"><table class=\"ibl-data-table trading-cash-exchange\" data-no-responsive style=\"width: 100%; margin-top: 1rem;\">
         <thead><tr><th colspan=\"2\">Cash Exchange</th></tr></thead>
         <tbody>";
 
@@ -193,7 +186,7 @@ function tradeoffer($username)
     echo "</tbody></table></td></tr>";
 
     echo "<tr>
-            <td colspan=\"3\" style=\"text-align: center; padding: 1rem;\">
+            <td colspan=\"2\" style=\"text-align: center; padding: 1rem;\">
                 <input type=\"hidden\" name=\"fieldsCounter\" value=\"$k\">
                 <button type=\"submit\" class=\"ibl-btn ibl-btn--primary\">Make Trade Offer</button>
             </td>
@@ -354,7 +347,9 @@ function tradereview($username)
     }
 
     echo "</td>
-            <td style=\"vertical-align: top;\">";
+        </tr>
+        <tr>
+            <td>";
 
     $uiHelper = new Trading\UIHelper($mysqli_db);
     $teams = $uiHelper->getAllTeamsForTrading();
@@ -363,7 +358,7 @@ function tradereview($username)
     echo "</td>
         </tr>
         <tr>
-            <td colspan=\"2\" style=\"text-align: center; padding: 1rem;\">
+            <td style=\"text-align: center; padding: 1rem;\">
                 <a href=\"modules.php?name=Waivers&action=drop\" class=\"ibl-link\">Drop a player to Waivers</a>
                 &nbsp;|&nbsp;
                 <a href=\"modules.php?name=Waivers&action=add\" class=\"ibl-link\">Add a player from Waivers</a>

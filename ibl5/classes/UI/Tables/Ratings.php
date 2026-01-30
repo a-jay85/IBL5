@@ -84,8 +84,8 @@ class Ratings
 <?php if ($moduleName == "League_Starters"): ?>
             <th>Team</th>
 <?php endif; ?>
-            <th class="sticky-col-1">Pos</th>
-            <th class="sticky-col-2">Player</th>
+            <th class="sticky-col">Player</th>
+            <th>Pos</th>
             <th>Age</th>
             <th class="sep-team"></th>
             <th>2ga</th>
@@ -150,8 +150,8 @@ class Ratings
     </td>
     <?php endif; ?>
 <?php endif; ?>
-            <td class="sticky-col-1" style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
-            <td class="sticky-col-2" style="white-space: nowrap;"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
+            <td class="sticky-col" style="white-space: nowrap;"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
+            <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
             <td style="text-align: center;"><?= (int)$player->age ?></td>
             <td class="sep-team"></td>
             <td style="text-align: center;"><?= (int)$player->ratingFieldGoalAttempts ?></td>

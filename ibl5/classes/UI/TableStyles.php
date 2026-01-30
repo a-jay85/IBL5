@@ -38,6 +38,10 @@ class TableStyles
     --team-color-primary: #<?= $teamColor ?>;
     --team-color-secondary: #<?= $teamColor2 ?>;
     --team-sep-color: #<?= $teamColor ?>;
+    --team-row-hover-bg: #<?= $teamColorLight8 ?>;
+    --team-row-highlight-bg: #<?= $teamColorLight15 ?>;
+    --team-row-highlight-hover-bg: #<?= $teamColorLight22 ?>;
+    --team-header-bg: linear-gradient(135deg, #<?= $teamColor ?>, #<?= $teamColorDark ?>);
     font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
     border-collapse: separate;
     border-spacing: 0;
@@ -51,6 +55,12 @@ class TableStyles
     background: linear-gradient(135deg, #<?= $teamColor ?>, #<?= $teamColorDark ?>);
 }
 @supports (background: color-mix(in srgb, red, blue)) {
+    .<?= $tableClass ?> {
+        --team-row-hover-bg: color-mix(in srgb, #<?= $teamColor ?> 8%, white);
+        --team-row-highlight-bg: color-mix(in srgb, #<?= $teamColor ?> 15%, white);
+        --team-row-highlight-hover-bg: color-mix(in srgb, #<?= $teamColor ?> 22%, white);
+        --team-header-bg: linear-gradient(135deg, #<?= $teamColor ?>, color-mix(in srgb, #<?= $teamColor ?> 85%, black));
+    }
     .<?= $tableClass ?> thead {
         background: linear-gradient(135deg, #<?= $teamColor ?>, color-mix(in srgb, #<?= $teamColor ?> 85%, black));
     }

@@ -62,8 +62,8 @@ class ContractListView implements ContractListViewInterface
         return '<table class="sortable ibl-data-table responsive-table">
             <thead>
                 <tr>
-                    <th>Pos</th>
                     <th class="sticky-col">Player</th>
+                    <th>Pos</th>
                     <th>Team</th>
                     <th>Bird</th>
                     <th>Year1</th>
@@ -118,8 +118,8 @@ class ContractListView implements ContractListViewInterface
             }
 
             $output .= "<tr>
-    <td>{$pos}</td>
     <td class=\"sticky-col\" style=\"white-space: nowrap;\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
+    <td>{$pos}</td>
     {$teamCell}
     <td>{$bird}</td>
     <td>{$con1}</td>
@@ -144,8 +144,8 @@ class ContractListView implements ContractListViewInterface
     {
         return sprintf(
             '<tr class="totals-row">
-    <td></td>
     <td class="sticky-col">Cap Totals</td>
+    <td></td>
     <td></td>
     <td></td>
     <td>%.2f</td>
@@ -174,8 +174,8 @@ class ContractListView implements ContractListViewInterface
     {
         return sprintf(
             '<tr class="totals-row">
-    <td></td>
     <td class="sticky-col">Average Team Cap</td>
+    <td></td>
     <td></td>
     <td></td>
     <td>%.2f</td>

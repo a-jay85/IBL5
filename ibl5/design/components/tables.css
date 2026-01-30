@@ -174,7 +174,7 @@
     }
 
     .ibl-data-table.responsive-table thead th.sticky-col {
-        background: var(--gradient-navy-header);
+        background: var(--team-header-bg, var(--gradient-navy-header));
         z-index: 3;
     }
 
@@ -188,7 +188,7 @@
     }
 
     .responsive-table tbody tr:hover td[class*="sticky-col"] {
-        background-color: var(--gray-100, #f3f4f6);
+        background-color: var(--team-row-hover-bg, var(--gray-100, #f3f4f6));
     }
 
     .ibl-data-table.responsive-table td.sticky-col {
@@ -224,7 +224,7 @@
     .ibl-data-table.responsive-table thead th.sticky-col-1,
     .ibl-data-table.responsive-table thead th.sticky-col-2,
     .ibl-data-table.responsive-table thead th.sticky-col-3 {
-        background: var(--gradient-navy-header);
+        background: var(--team-header-bg, var(--gradient-navy-header));
         z-index: 3;
     }
 
@@ -251,9 +251,13 @@
         background-color: var(--gray-100, #f3f4f6);
     }
 
-    /* Ratings highlight row sticky backgrounds (Next Sim alternating yellow) */
+    /* Ratings highlight row sticky backgrounds (team-colored in Next Sim, League Starters) */
     .responsive-table tbody tr.ratings-highlight td[class*="sticky-col"] {
-        background-color: #FFFFAA;
+        background-color: var(--team-row-highlight-bg, #FFFFAA);
+    }
+
+    .responsive-table tbody tr.ratings-highlight:hover td[class*="sticky-col"] {
+        background-color: var(--team-row-highlight-hover-bg, var(--gray-100, #f3f4f6));
     }
 
     /* Remove first-column left padding on responsive tables -

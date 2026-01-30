@@ -3111,7 +3111,7 @@ table.sortable thead th {
     z-index: 1;
   }
   .ibl-data-table.responsive-table thead th.sticky-col {
-    background: var(--gradient-navy-header);
+    background: var(--team-header-bg, var(--gradient-navy-header));
     z-index: 3;
   }
   .responsive-table tbody tr:nth-child(odd) td[class*="sticky-col"] {
@@ -3121,7 +3121,7 @@ table.sortable thead th {
     background-color: var(--gray-50, #f9fafb);
   }
   .responsive-table tbody tr:hover td[class*="sticky-col"] {
-    background-color: var(--gray-100, #f3f4f6);
+    background-color: var(--team-row-hover-bg, var(--gray-100, #f3f4f6));
   }
   .ibl-data-table.responsive-table td.sticky-col {
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
@@ -3145,7 +3145,7 @@ table.sortable thead th {
     min-width: 100px;
   }
   .ibl-data-table.responsive-table thead th.sticky-col-1, .ibl-data-table.responsive-table thead th.sticky-col-2, .ibl-data-table.responsive-table thead th.sticky-col-3 {
-    background: var(--gradient-navy-header);
+    background: var(--team-header-bg, var(--gradient-navy-header));
     z-index: 3;
   }
   .ibl-data-table.responsive-table th.sticky-col-1, .ibl-data-table.responsive-table td.sticky-col-1 {
@@ -3161,7 +3161,10 @@ table.sortable thead th {
     background-color: var(--gray-100, #f3f4f6);
   }
   .responsive-table tbody tr.ratings-highlight td[class*="sticky-col"] {
-    background-color: #FFFFAA;
+    background-color: var(--team-row-highlight-bg, #FFFFAA);
+  }
+  .responsive-table tbody tr.ratings-highlight:hover td[class*="sticky-col"] {
+    background-color: var(--team-row-highlight-hover-bg, var(--gray-100, #f3f4f6));
   }
   .ibl-data-table.responsive-table th:first-child, .ibl-data-table.responsive-table td:first-child {
     padding-left: 0;

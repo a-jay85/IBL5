@@ -1,0 +1,163 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Team;
+
+use PHPUnit\Framework\TestCase;
+use Team\TeamView;
+use Team\Contracts\TeamViewInterface;
+
+/**
+ * Tests for TeamView
+ *
+ * Validates HTML rendering from pre-computed page data
+ */
+class TeamViewTest extends TestCase
+{
+    private TeamView $view;
+
+    protected function setUp(): void
+    {
+        $this->view = new TeamView();
+    }
+
+    private function createPageData(array $overrides = []): array
+    {
+        $team = new \stdClass();
+        $team->name = 'Celtics';
+        $team->color1 = 'FF0000';
+        $team->color2 = '0000FF';
+
+        return array_merge([
+            'teamID' => 1,
+            'team' => $team,
+            'imagesPath' => 'images/',
+            'yr' => null,
+            'display' => 'ratings',
+            'insertyear' => '',
+            'isActualTeam' => true,
+            'tabs' => '<div class="ibl-tabs">tabs</div>',
+            'tableOutput' => '<table>roster</table>',
+            'startersTable' => '<table>starters</table>',
+            'draftPicksTable' => '<table>picks</table>',
+            'teamInfoRight' => '<div>sidebar</div>',
+            'rafters' => '<div>banners</div>',
+        ], $overrides);
+    }
+
+    // ============================================
+    // INTERFACE IMPLEMENTATION
+    // ============================================
+
+    public function testImplementsInterface(): void
+    {
+        $this->assertInstanceOf(TeamViewInterface::class, $this->view);
+    }
+
+    // ============================================
+    // RENDER TESTS
+    // ============================================
+
+    public function testRenderContainsPageLayout(): void
+    {
+        $output = $this->view->render($this->createPageData());
+
+        $this->assertStringContainsString('team-page-layout', $output);
+        $this->assertStringContainsString('team-page-main', $output);
+    }
+
+    public function testRenderContainsTeamLogo(): void
+    {
+        $output = $this->view->render($this->createPageData());
+
+        $this->assertStringContainsString('images/logo/1.jpg', $output);
+    }
+
+    public function testRenderContainsTabsAndTable(): void
+    {
+        $output = $this->view->render($this->createPageData());
+
+        $this->assertStringContainsString('<div class="ibl-tabs">tabs</div>', $output);
+        $this->assertStringContainsString('<table>roster</table>', $output);
+    }
+
+    public function testRenderContainsStartersTable(): void
+    {
+        $output = $this->view->render($this->createPageData());
+
+        $this->assertStringContainsString('<table>starters</table>', $output);
+    }
+
+    public function testRenderContainsDraftPicksForActualTeam(): void
+    {
+        $output = $this->view->render($this->createPageData());
+
+        $this->assertStringContainsString('Draft Picks', $output);
+        $this->assertStringContainsString('<table>picks</table>', $output);
+    }
+
+    public function testRenderOmitsDraftPicksForNonTeam(): void
+    {
+        $team = new \stdClass();
+        $team->name = 'Free Agents';
+        $team->color1 = '000000';
+        $team->color2 = 'FFFFFF';
+
+        $output = $this->view->render($this->createPageData([
+            'teamID' => 0,
+            'team' => $team,
+            'isActualTeam' => false,
+        ]));
+
+        $this->assertStringNotContainsString('Draft Picks', $output);
+    }
+
+    public function testRenderContainsSidebarForActualTeam(): void
+    {
+        $output = $this->view->render($this->createPageData());
+
+        $this->assertStringContainsString('team-page-sidebar', $output);
+        $this->assertStringContainsString('<div>sidebar</div>', $output);
+    }
+
+    public function testRenderOmitsSidebarForNonTeam(): void
+    {
+        $team = new \stdClass();
+        $team->name = 'Free Agents';
+        $team->color1 = '000000';
+        $team->color2 = 'FFFFFF';
+
+        $output = $this->view->render($this->createPageData([
+            'teamID' => 0,
+            'team' => $team,
+            'isActualTeam' => false,
+        ]));
+
+        $this->assertStringNotContainsString('team-page-sidebar', $output);
+    }
+
+    public function testRenderShowsYearHeadingForHistoricalYear(): void
+    {
+        $output = $this->view->render($this->createPageData(['yr' => '2023']));
+
+        $this->assertStringContainsString('2023', $output);
+        $this->assertStringContainsString('Celtics', $output);
+        $this->assertStringContainsString('ibl-title', $output);
+    }
+
+    public function testRenderOmitsYearHeadingForCurrentSeason(): void
+    {
+        $output = $this->view->render($this->createPageData(['yr' => null]));
+
+        $this->assertStringNotContainsString('ibl-title', $output);
+    }
+
+    public function testRenderContainsRaftersForActualTeam(): void
+    {
+        $output = $this->view->render($this->createPageData());
+
+        $this->assertStringContainsString('team-page-rafters', $output);
+        $this->assertStringContainsString('<div>banners</div>', $output);
+    }
+}

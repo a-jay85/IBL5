@@ -81,10 +81,10 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
     }
 
     /**
-     * Build a lookup map of team name to colors
+     * Build a lookup map of team name to team info (colors, ID)
      *
      * @param array $teamsWithPicks Teams with draft pick data
-     * @return array<string, array{color1: string, color2: string}> Map of team name to colors
+     * @return array<string, array{color1: string, color2: string, teamId: int}> Map of team name to info
      */
     private function buildTeamColorMap(array $teamsWithPicks): array
     {
@@ -93,6 +93,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
             $map[$team['teamName']] = [
                 'color1' => $team['color1'],
                 'color2' => $team['color2'],
+                'teamId' => (int)$team['teamId'],
             ];
         }
 
@@ -145,20 +146,27 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
         foreach ($team['picks'] as $pick) {
             $ownerOfPick = $pick['ownerofpick'] ?? '';
             $isOwn = ($ownerOfPick === $team['teamName']);
+            $ownerInfo = $teamColorMap[$ownerOfPick] ?? null;
 
             if ($isOwn) {
                 $html .= '<td class="draft-pick-own">';
             } else {
-                $ownerColors = $teamColorMap[$ownerOfPick] ?? null;
-                if ($ownerColors !== null) {
-                    $bgColor = HtmlSanitizer::safeHtmlOutput($ownerColors['color1']);
-                    $textColor = HtmlSanitizer::safeHtmlOutput($ownerColors['color2']);
+                if ($ownerInfo !== null) {
+                    $bgColor = HtmlSanitizer::safeHtmlOutput($ownerInfo['color1']);
+                    $textColor = HtmlSanitizer::safeHtmlOutput($ownerInfo['color2']);
                     $html .= '<td class="draft-pick-traded" style="background-color: #' . $bgColor . '; color: #' . $textColor . ';">';
                 } else {
                     $html .= '<td class="draft-pick-traded">';
                 }
             }
-            $html .= HtmlSanitizer::safeHtmlOutput($ownerOfPick);
+
+            $escapedOwner = HtmlSanitizer::safeHtmlOutput($ownerOfPick);
+            if ($ownerInfo !== null) {
+                $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $ownerInfo['teamId'] . '" style="color: inherit; text-decoration: none;">';
+                $html .= $escapedOwner . '</a>';
+            } else {
+                $html .= $escapedOwner;
+            }
             $html .= '</td>';
         }
 

@@ -145,4 +145,40 @@ class DraftPickLocatorViewTest extends TestCase
         $this->assertStringContainsString('draft-pick-own', $result);
         $this->assertStringNotContainsString('draft-pick-traded', $result);
     }
+
+    public function testPickCellsLinkToTeamPage(): void
+    {
+        $teams = [
+            [
+                'teamId' => 1,
+                'teamCity' => 'Miami',
+                'teamName' => 'Heat',
+                'color1' => '98002E',
+                'color2' => 'F9A01B',
+                'picks' => [
+                    ['ownerofpick' => 'Heat', 'year' => '2025', 'round' => '1'],
+                    ['ownerofpick' => 'Celtics', 'year' => '2025', 'round' => '2'],
+                ],
+            ],
+            [
+                'teamId' => 2,
+                'teamCity' => 'Boston',
+                'teamName' => 'Celtics',
+                'color1' => '007A33',
+                'color2' => 'FFFFFF',
+                'picks' => [
+                    ['ownerofpick' => 'Celtics', 'year' => '2025', 'round' => '1'],
+                ],
+            ],
+        ];
+
+        $result = $this->view->render($teams, 2025);
+
+        // Own pick links to own team page
+        $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamID=1"', $result);
+        // Traded pick links to owning team page
+        $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamID=2"', $result);
+        // Links should have no underline
+        $this->assertStringContainsString('text-decoration: none', $result);
+    }
 }

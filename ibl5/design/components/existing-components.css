@@ -928,6 +928,28 @@
     }
 }
 
+/* News Article - Note callout box */
+.news-article__note {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--gray-50);
+    border-left: 3px solid var(--accent-500);
+    border-radius: 0 0.5rem 0.5rem 0;
+    font-size: 0.875rem;
+    color: var(--gray-600);
+}
+
+/* News Article - Author attribution */
+.news-article__attribution {
+    margin-top: 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--gray-500);
+}
+
+.news-article__attribution a {
+    color: var(--accent-500);
+}
+
 /* ==========================================================================
    Utility Classes for Blocks
    ========================================================================== */

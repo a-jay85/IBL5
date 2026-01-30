@@ -27,6 +27,43 @@ class NavigationView
     }
 
     /**
+     * Resolve a user's team ID from their username via the database.
+     * Looks up the team name from nuke_users, then the team ID from ibl_team_info.
+     */
+    public static function resolveTeamId(\mysqli $db, string $username): ?int
+    {
+        $stmt = $db->prepare("SELECT user_ibl_team FROM nuke_users WHERE username = ?");
+        if (!$stmt) {
+            return null;
+        }
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if (!($row = $result->fetch_assoc())) {
+            $stmt->close();
+            return null;
+        }
+        $teamName = trim($row['user_ibl_team']);
+        $stmt->close();
+
+        if ($teamName === '' || $teamName === '0') {
+            return null;
+        }
+
+        $stmt2 = $db->prepare("SELECT teamid FROM ibl_team_info WHERE team_name = ?");
+        if (!$stmt2) {
+            return null;
+        }
+        $stmt2->bind_param('s', $teamName);
+        $stmt2->execute();
+        $result2 = $stmt2->get_result();
+        $teamId = ($row2 = $result2->fetch_assoc()) ? (int)$row2['teamid'] : null;
+        $stmt2->close();
+
+        return $teamId;
+    }
+
+    /**
      * Get the navigation menu structure
      * @return array<string, array{links: array, icon?: string}>
      */

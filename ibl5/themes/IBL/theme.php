@@ -55,27 +55,6 @@ function CloseTable2()
     echo "</td></tr></table></td></tr></table>\n";
 }
 
-function FormatStory($thetext, $notes, $aid, $informant)
-{
-    global $anonymous;
-    if (!empty($notes)) {
-        $notes = "<b>" . _NOTE . "</b> <i>$notes</i>\n";
-    } else {
-        $notes = "";
-    }
-    if ("$aid" == "$informant") {
-        echo "<font size=\"2\">$thetext<br>$notes</font>\n";
-    } else {
-        if (!empty($informant)) {
-            $boxstuff = "<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$informant\">$informant</a> ";
-        } else {
-            $boxstuff = "$anonymous ";
-        }
-        $boxstuff .= "" . _WRITES . " <i>\"$thetext\"</i> $notes\n";
-        echo "<font size=\"2\">$boxstuff</font>\n";
-    }
-}
-
 /**
  * Modern story formatting for the redesigned news blocks
  */
@@ -83,29 +62,25 @@ function FormatStoryModern($thetext, $notes, $aid, $informant)
 {
     global $anonymous;
 
-    // Output the main text
     echo $thetext;
 
-    // Add notes if present
     if (!empty($notes)) {
-        echo '<div style="margin-top: 1rem; padding: 0.75rem 1rem; background: var(--gray-50, #f9fafb); border-left: 3px solid var(--accent-500, #f97316); border-radius: 0 0.5rem 0.5rem 0; font-size: 0.875rem; color: var(--gray-600, #4b5563);">
+        echo '<div class="news-article__note">
             <strong>' . _NOTE . ':</strong> <em>' . $notes . '</em>
         </div>';
     }
 
-    // If different informant, show attribution
     if ("$aid" != "$informant" && !empty($informant)) {
-        echo '<p style="margin-top: 0.75rem; font-size: 0.8125rem; color: var(--gray-500, #6b7280);">
-            ' . _WRITES . ': <a href="modules.php?name=Your_Account&amp;op=userinfo&amp;username=' . \Utilities\HtmlSanitizer::safeHtmlOutput($informant) . '" style="color: var(--accent-500, #f97316);">' . \Utilities\HtmlSanitizer::safeHtmlOutput($informant) . '</a>
+        echo '<p class="news-article__attribution">
+            ' . _WRITES . ': <a href="modules.php?name=Your_Account&amp;op=userinfo&amp;username=' . \Utilities\HtmlSanitizer::safeHtmlOutput($informant) . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($informant) . '</a>
         </p>';
     }
 }
 
 function themeheader()
 {
-    global $user, $cookie, $bgcolor1, $bgcolor2, $user, $leagueContext, $mysqli_db;
+    global $user, $cookie, $bgcolor1, $leagueContext, $mysqli_db;
 
-    // Determine login state
     $isLoggedIn = is_user($user);
     $username = null;
     $teamId = null;
@@ -113,45 +88,15 @@ function themeheader()
     if ($isLoggedIn) {
         cookiedecode($user);
         $username = $cookie[1];
-
-        // Fetch user's team name and then lookup team ID
         if ($mysqli_db && $username) {
-            // First get the team name from nuke_users
-            $stmt = $mysqli_db->prepare("SELECT user_ibl_team FROM nuke_users WHERE username = ?");
-            if ($stmt) {
-                $stmt->bind_param('s', $username);
-                $stmt->execute();
-                $result = $stmt->get_result();
-                if ($row = $result->fetch_assoc()) {
-                    $teamName = trim($row['user_ibl_team']);
-
-                    // If team name exists, lookup the team ID from ibl_team_info
-                    if ($teamName !== '' && $teamName !== '0') {
-                        $stmt2 = $mysqli_db->prepare("SELECT teamid FROM ibl_team_info WHERE team_name = ?");
-                        if ($stmt2) {
-                            $stmt2->bind_param('s', $teamName);
-                            $stmt2->execute();
-                            $result2 = $stmt2->get_result();
-                            if ($row2 = $result2->fetch_assoc()) {
-                                $teamId = (int)$row2['teamid'];
-                            }
-                            $stmt2->close();
-                        }
-                    }
-                }
-                $stmt->close();
-            }
+            $teamId = \Navigation\NavigationView::resolveTeamId($mysqli_db, $username);
         }
     }
 
-    // Get current league for switcher
     $currentLeague = $leagueContext->getCurrentLeague();
-
-    // Render the floating navigation bar
     $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId);
     echo $navView->render();
 
-    // Body tag and main content wrapper
     echo "<body bgcolor=\"$bgcolor1\">";
     echo "<div class=\"site-content\">\n";
 }
@@ -301,35 +246,13 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
 
 function themesidebox($title, $content)
 {
-    // Use modern card-style sidebar box
     $safeTitle = \Utilities\HtmlSanitizer::safeHtmlOutput($title);
 
-    echo '<aside class="sidebar-block" style="
-        font-family: var(--font-sans, Inter, -apple-system, sans-serif);
-        background: white;
-        border-radius: var(--radius-xl, 0.75rem);
-        overflow: hidden;
-        box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
-        border: 1px solid var(--gray-100, #f3f4f6);
-        margin-bottom: var(--space-4, 1rem);
-    ">
-        <header style="
-            background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-            padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
-        ">
-            <h3 style="
-                font-family: var(--font-display, Oswald, sans-serif);
-                font-size: 0.875rem;
-                font-weight: 600;
-                color: white;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-                margin: 0;
-            ">' . $safeTitle . '</h3>
+    echo '<aside class="ibl-sidebar-block">
+        <header class="ibl-sidebar-block__header">
+            <h3 class="ibl-sidebar-block__title">' . $safeTitle . '</h3>
         </header>
-        <div style="padding: var(--space-4, 1rem); font-size: 0.8125rem; color: var(--gray-700, #374151);">
-            ' . $content . '
-        </div>
+        <div class="ibl-sidebar-block__body">' . $content . '</div>
     </aside>';
 }
 
@@ -357,36 +280,11 @@ function themecenterbox($title, $content)
         // Legacy content needs the box wrapper
         $safeTitle = \Utilities\HtmlSanitizer::safeHtmlOutput($title);
 
-        echo '<section class="center-block" style="
-            font-family: var(--font-sans, Inter, -apple-system, sans-serif);
-            background: white;
-            border-radius: var(--radius-xl, 0.75rem);
-            overflow: hidden;
-            box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
-            border: 1px solid var(--gray-100, #f3f4f6);
-            margin-bottom: var(--space-6, 1.5rem);
-            max-width: 1400px;
-            margin-left: auto;
-            margin-right: auto;
-        ">
-            <header style="
-                background: linear-gradient(135deg, var(--navy-800, #1e293b), var(--navy-900, #0f172a));
-                padding: var(--space-4, 1rem) var(--space-6, 1.5rem);
-                text-align: center;
-            ">
-                <h2 style="
-                    font-family: var(--font-display, Oswald, sans-serif);
-                    font-size: 1.25rem;
-                    font-weight: 600;
-                    color: white;
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                    margin: 0;
-                ">' . $safeTitle . '</h2>
+        echo '<section class="ibl-centerbox">
+            <header class="ibl-centerbox__header">
+                <h2 class="ibl-centerbox__title">' . $safeTitle . '</h2>
             </header>
-            <div style="padding: var(--space-6, 1.5rem);">
-                ' . $content . '
-            </div>
+            <div class="ibl-centerbox__content">' . $content . '</div>
         </section>';
     }
 }

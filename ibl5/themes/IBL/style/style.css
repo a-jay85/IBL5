@@ -2604,12 +2604,30 @@ a.schedule-jump-btn:hover {
   text-align: center;
   padding: 0 var(--space-2);
 }
-.next-sim-logo img {
+.next-sim-banner {
   width: 100%;
   max-width: 415px;
   aspect-ratio: 415 / 50;
   height: auto;
   border-radius: var(--radius-md);
+}
+.next-sim-mobile-logo {
+  display: none;
+  width: 50px;
+  height: 50px;
+  border-radius: var(--radius-md);
+}
+@media (max-width: 768px) {
+  .next-sim-banner {
+    display: none;
+  }
+  .next-sim-mobile-logo {
+    display: block;
+  }
+  .next-sim-day-label, .next-sim-record {
+    flex: 1;
+    min-width: 0;
+  }
 }
 .next-sim-record {
   font-family: var(--font-display);
@@ -3091,7 +3109,6 @@ table.sortable thead th {
     position: sticky;
     left: 0;
     z-index: 1;
-    min-width: 100px;
   }
   .ibl-data-table.responsive-table thead th.sticky-col {
     background: var(--gradient-navy-header);
@@ -3142,6 +3159,9 @@ table.sortable thead th {
   }
   .responsive-table tbody tr.drafted td[class*="sticky-col"] {
     background-color: var(--gray-100, #f3f4f6);
+  }
+  .responsive-table tbody tr.ratings-highlight td[class*="sticky-col"] {
+    background-color: #FFFFAA;
   }
   .ibl-data-table.responsive-table th:first-child, .ibl-data-table.responsive-table td:first-child {
     padding-left: 0;

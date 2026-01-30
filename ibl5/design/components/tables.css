@@ -171,7 +171,6 @@
         position: sticky;
         left: 0;
         z-index: 1;
-        min-width: 100px;
     }
 
     .ibl-data-table.responsive-table thead th.sticky-col {
@@ -250,6 +249,11 @@
     /* Drafted row sticky backgrounds - consolidated */
     .responsive-table tbody tr.drafted td[class*="sticky-col"] {
         background-color: var(--gray-100, #f3f4f6);
+    }
+
+    /* Ratings highlight row sticky backgrounds (Next Sim alternating yellow) */
+    .responsive-table tbody tr.ratings-highlight td[class*="sticky-col"] {
+        background-color: #FFFFAA;
     }
 
     /* Remove first-column left padding on responsive tables -

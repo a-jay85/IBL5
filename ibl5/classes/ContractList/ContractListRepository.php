@@ -21,7 +21,7 @@ class ContractListRepository extends \BaseMysqliRepository implements ContractLi
      */
     public function getActivePlayerContracts(): array
     {
-        $query = "SELECT p.name, p.pos, p.teamname, p.tid, p.cy, p.cyt, p.cy1, p.cy2, p.cy3, p.cy4, p.cy5, p.cy6, p.bird,
+        $query = "SELECT p.pid, p.name, p.pos, p.teamname, p.tid, p.cy, p.cyt, p.cy1, p.cy2, p.cy3, p.cy4, p.cy5, p.cy6, p.bird,
                          t.team_city, t.color1, t.color2
             FROM ibl_plr p
             LEFT JOIN ibl_team_info t ON p.tid = t.teamid

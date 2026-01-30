@@ -77,15 +77,15 @@ class Ratings
         ob_start();
         echo \UI\TableStyles::render($tableClass, $team->color1, $team->color2);
         ?>
-<table style="margin: 0 auto;" class="sortable <?= $tableClass ?>">
+<table style="margin: 0 auto;" class="sortable ibl-data-table responsive-table <?= $tableClass ?>">
 <colgroup span="2"></colgroup><colgroup span="2"></colgroup><colgroup span="6"></colgroup><colgroup span="6"></colgroup><colgroup span="4"></colgroup><colgroup span="4"></colgroup><colgroup span="1"></colgroup>
     <thead>
         <tr>
 <?php if ($moduleName == "League_Starters"): ?>
             <th>Team</th>
 <?php endif; ?>
-            <th>Pos</th>
-            <th>Player</th>
+            <th class="sticky-col-1">Pos</th>
+            <th class="sticky-col-2">Player</th>
             <th>Age</th>
             <th class="sep-team"></th>
             <th>2ga</th>
@@ -150,8 +150,8 @@ class Ratings
     </td>
     <?php endif; ?>
 <?php endif; ?>
-            <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
-            <td style="white-space: nowrap;"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
+            <td class="sticky-col-1" style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
+            <td class="sticky-col-2" style="white-space: nowrap;"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
             <td style="text-align: center;"><?= (int)$player->age ?></td>
             <td class="sep-team"></td>
             <td style="text-align: center;"><?= (int)$player->ratingFieldGoalAttempts ?></td>

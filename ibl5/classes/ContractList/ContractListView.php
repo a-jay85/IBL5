@@ -59,11 +59,12 @@ class ContractListView implements ContractListViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable ibl-data-table">
+        return '<table class="sortable ibl-data-table responsive-table">
             <thead>
                 <tr>
                     <th>Pos</th>
-                    <th colspan="3">Player</th>
+                    <th class="sticky-col">Player</th>
+                    <th>Team</th>
                     <th>Bird</th>
                     <th>Year1</th>
                     <th>Year2</th>
@@ -71,8 +72,6 @@ class ContractListView implements ContractListViewInterface
                     <th>Year4</th>
                     <th>Year5</th>
                     <th>Year6</th>
-                    <th class="divider"></th>
-                    <th>Team</th>
                 </tr>
             </thead>
             <tbody>';
@@ -89,6 +88,7 @@ class ContractListView implements ContractListViewInterface
         $output = '';
 
         foreach ($contracts as $contract) {
+            $pid = (int) ($contract['pid'] ?? 0);
             $name = HtmlSanitizer::safeHtmlOutput($contract['name'] ?? '');
             $pos = HtmlSanitizer::safeHtmlOutput($contract['pos'] ?? '');
             $tid = (int) ($contract['tid'] ?? 0);
@@ -119,7 +119,8 @@ class ContractListView implements ContractListViewInterface
 
             $output .= "<tr>
     <td>{$pos}</td>
-    <td colspan=\"3\">{$name}</td>
+    <td class=\"sticky-col\" style=\"white-space: nowrap;\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
+    {$teamCell}
     <td>{$bird}</td>
     <td>{$con1}</td>
     <td>{$con2}</td>
@@ -127,8 +128,6 @@ class ContractListView implements ContractListViewInterface
     <td>{$con4}</td>
     <td>{$con5}</td>
     <td>{$con6}</td>
-    <td class=\"divider\"></td>
-    {$teamCell}
 </tr>";
         }
 
@@ -146,7 +145,8 @@ class ContractListView implements ContractListViewInterface
         return sprintf(
             '<tr class="totals-row">
     <td></td>
-    <td colspan="3">Cap Totals</td>
+    <td class="sticky-col">Cap Totals</td>
+    <td></td>
     <td></td>
     <td>%.2f</td>
     <td>%.2f</td>
@@ -154,8 +154,6 @@ class ContractListView implements ContractListViewInterface
     <td>%.2f</td>
     <td>%.2f</td>
     <td>%.2f</td>
-    <td class="divider"></td>
-    <td></td>
 </tr>',
             $capTotals['cap1'],
             $capTotals['cap2'],
@@ -177,7 +175,8 @@ class ContractListView implements ContractListViewInterface
         return sprintf(
             '<tr class="totals-row">
     <td></td>
-    <td colspan="3">Average Team Cap</td>
+    <td class="sticky-col">Average Team Cap</td>
+    <td></td>
     <td></td>
     <td>%.2f</td>
     <td>%.2f</td>
@@ -185,8 +184,6 @@ class ContractListView implements ContractListViewInterface
     <td>%.2f</td>
     <td>%.2f</td>
     <td>%.2f</td>
-    <td class="divider"></td>
-    <td></td>
 </tr>',
             $avgCaps['acap1'],
             $avgCaps['acap2'],

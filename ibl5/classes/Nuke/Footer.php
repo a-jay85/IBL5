@@ -6,7 +6,7 @@ namespace Nuke;
 
 class Footer
 {
-    public static function footmsg()
+    public static function renderPageGenerationTime(): void
     {
         global $start_time;
         $mtime = microtime();
@@ -16,10 +16,7 @@ class Footer
         $total_time = ($end_time - $start_time);
         $total_time = _PAGEGENERATION . " " . substr((string) $total_time, 0, 4) . " " . _SECONDS;
 
-        $footmsg = "<div class=\"site-footer\">\n";
-        $footmsg .= "<p class=\"page-time\">" . $total_time . "</p>\n";
-        $footmsg .= "</div>\n";
-        echo $footmsg;
+        echo "<!-- " . $total_time . " -->\n";
     }
 
     public static function foot()

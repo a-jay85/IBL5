@@ -101,7 +101,7 @@ function themefooter()
     // echo "</td>";
     // // }
     echo "</div>"; // closes .site-content
-    Nuke\Footer::footmsg();
+    Nuke\Footer::renderPageGenerationTime();
 }
 
 function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext)

@@ -30,13 +30,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
         $allOtherPlayers = $mainPageData['allOtherPlayers'];
 
         ob_start();
-        // Generate team-colored table styles for all 4 tables
-        $teamColor = $team->color1 ?? 'D4AF37';
-        $teamColor2 = $team->color2 ?? '1e3a5f';
-        echo \UI\TableStyles::render('fa-under-contract', $teamColor, $teamColor2);
-        echo \UI\TableStyles::render('fa-offers', $teamColor, $teamColor2);
-        echo \UI\TableStyles::render('fa-team-free-agents', $teamColor, $teamColor2);
-        echo \UI\TableStyles::render('fa-other-free-agents', '666666', 'ffffff');
         echo $this->renderResultBanner($result);
         ?>
 <img src="images/logo/<?= (int) $team->teamID ?>.jpg" alt="Team Logo" class="team-logo-banner">
@@ -97,7 +90,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         ob_start();
         ?>
 <div style="overflow-x: auto; width: 0; min-width: 100%;">
-<table class="sortable fa-under-contract" style="max-width: none;">
+<table class="ibl-data-table team-table sortable" style="max-width: none; <?= \UI\TableStyles::inlineVars($team->color1 ?? 'D4AF37', $team->color2 ?? '1e3a5f') ?>">
     <?= $this->renderColgroups() ?>
     <?= $this->renderTableHeader('Players Under Contract', false, $team) ?>
     <tbody>
@@ -169,7 +162,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         ob_start();
         ?>
 <div style="overflow-x: auto; width: 0; min-width: 100%;">
-<table class="sortable fa-offers" style="max-width: none;">
+<table class="ibl-data-table team-table sortable" style="max-width: none; <?= \UI\TableStyles::inlineVars($team->color1 ?? 'D4AF37', $team->color2 ?? '1e3a5f') ?>">
     <?= $this->renderColgroups() ?>
     <?= $this->renderTableHeader('Contract Offers', false, $team) ?>
     <tbody>
@@ -234,7 +227,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         ob_start();
         ?>
 <div style="overflow-x: auto; width: 0; min-width: 100%;">
-<table class="sortable fa-team-free-agents" style="max-width: none;">
+<table class="ibl-data-table team-table sortable" style="max-width: none; <?= \UI\TableStyles::inlineVars($team->color1 ?? 'D4AF37', $team->color2 ?? '1e3a5f') ?>">
     <?= $this->renderColgroups() ?>
     <?= $this->renderTableHeader('Unsigned Free Agents', true, $team) ?>
     <tbody>
@@ -293,7 +286,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         ob_start();
         ?>
 <div style="overflow-x: auto; width: 0; min-width: 100%;">
-<table class="sortable fa-other-free-agents" style="max-width: none;">
+<table class="ibl-data-table team-table sortable" style="max-width: none; <?= \UI\TableStyles::inlineVars('666666', 'ffffff') ?>">
     <?= $this->renderColgroups() ?>
     <?= $this->renderTableHeader('All Other Free Agents', false, $team) ?>
     <tbody>

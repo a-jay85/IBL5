@@ -25,7 +25,6 @@ class Per36Minutes
     public static function render($db, $result, $team, string $yr): string
     {
         $playerRows = [];
-        $i = 0;
         foreach ($result as $plrRow) {
             if ($yr == "") {
                 $player = Player::withPlrRow($db, $plrRow);
@@ -40,12 +39,9 @@ class Per36Minutes
                 $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
             }
 
-            $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
-
             $playerRows[] = [
                 'player' => $player,
                 'playerStats' => $playerStats,
-                'bgcolor' => $bgcolor,
                 'stats_fgm' => StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsMade, $playerStats->seasonMinutes),
                 'stats_fga' => StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsAttempted, $playerStats->seasonMinutes),
                 'stats_fgp' => StatsFormatter::formatPercentage($playerStats->seasonFieldGoalsMade, $playerStats->seasonFieldGoalsAttempted),
@@ -66,16 +62,13 @@ class Per36Minutes
                 'stats_fpg' => StatsFormatter::formatPer36Stat($playerStats->seasonPersonalFouls, $playerStats->seasonMinutes),
                 'stats_ppg' => StatsFormatter::formatPer36Stat($playerStats->seasonPoints, $playerStats->seasonMinutes),
             ];
-
-            $i++;
         }
 
         ob_start();
-        echo \UI\TableStyles::render('per36', $team->color1, $team->color2);
         ?>
-<table style="margin: 0 auto;" class="sortable per36">
+<table class="ibl-data-table team-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
-        <tr style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
+        <tr>
             <th>Pos</th>
             <th colspan="3">Player</th>
             <th>g</th>
@@ -110,7 +103,7 @@ class Per36Minutes
     $player = $row['player'];
     $playerStats = $row['playerStats'];
 ?>
-        <tr style="background-color: #<?= $row['bgcolor'] ?>;">
+        <tr>
             <td><?= htmlspecialchars($player->position) ?></td>
             <td colspan="3"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
             <td style="text-align: center;"><?= (int)$playerStats->seasonGamesPlayed ?></td>

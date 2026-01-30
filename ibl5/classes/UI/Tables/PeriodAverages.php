@@ -91,11 +91,8 @@ class PeriodAverages
         $stmt->close();
 
         $playerRows = [];
-        $i = 0;
 
         while ($row = $resultPlayerSimBoxScores->fetch_assoc()) {
-            $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
-
             $playerRows[] = [
                 'name' => HtmlSanitizer::safeHtmlOutput($row['name']),
                 'pos' => $row['pos'],
@@ -119,18 +116,14 @@ class PeriodAverages
                 'blk' => $row['gameBLKavg'],
                 'pf' => $row['gamePFavg'],
                 'pts' => $row['gamePTSavg'],
-                'bgcolor' => $bgcolor,
             ];
-
-            $i++;
         }
 
         ob_start();
-        echo \UI\TableStyles::render('sim-avg', $team->color1, $team->color2);
         ?>
-<table style="margin: 0 auto;" class="sortable sim-avg">
+<table class="ibl-data-table team-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
-        <tr style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
+        <tr>
             <th>Pos</th>
             <th colspan="3">Player</th>
             <th>g</th>
@@ -160,7 +153,7 @@ class PeriodAverages
     </thead>
     <tbody>
 <?php foreach ($playerRows as $row): ?>
-        <tr style="background-color: #<?= $row['bgcolor'] ?>;">
+        <tr>
             <td><?= htmlspecialchars($row['pos']) ?></td>
             <td colspan="3"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$row['pid'] ?>"><?= $row['name'] ?></a></td>
             <td style="text-align: center;"><?= (int)$row['games'] ?></td>

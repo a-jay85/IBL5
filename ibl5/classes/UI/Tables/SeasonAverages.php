@@ -24,7 +24,6 @@ class SeasonAverages
     public static function render($db, $result, $team, string $yr): string
     {
         $playerRows = [];
-        $i = 0;
         foreach ($result as $plrRow) {
             if ($yr == "") {
                 $player = Player::withPlrRow($db, $plrRow);
@@ -39,25 +38,19 @@ class SeasonAverages
                 $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
             }
 
-            $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
-
             $playerRows[] = [
                 'player' => $player,
                 'playerStats' => $playerStats,
-                'bgcolor' => $bgcolor,
             ];
-
-            $i++;
         }
 
         $teamStats = \TeamStats::withTeamName($db, $team->name);
 
         ob_start();
-        echo \UI\TableStyles::render('season-avg', $team->color1, $team->color2);
         ?>
-<table style="margin: 0 auto;" class="sortable season-avg">
+<table class="ibl-data-table team-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
-        <tr style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
+        <tr>
             <th>Pos</th>
             <th colspan="3">Player</th>
             <th>g</th>
@@ -91,7 +84,7 @@ class SeasonAverages
     $player = $row['player'];
     $playerStats = $row['playerStats'];
 ?>
-        <tr style="background-color: #<?= $row['bgcolor'] ?>;">
+        <tr>
             <td><?= htmlspecialchars($player->position) ?></td>
             <td colspan="3"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
             <td style="text-align: center;"><?= (int)$playerStats->seasonGamesPlayed ?></td>

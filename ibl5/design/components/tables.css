@@ -151,6 +151,93 @@
 }
 
 /* ==========================================================================
+   Team-Colored Table Modifier (.team-table)
+
+   Adds team-specific colors to .ibl-data-table via CSS custom properties.
+   Set --team-color-primary and --team-color-secondary on the <table> element:
+
+     <table class="ibl-data-table team-table"
+            style="--team-color-primary: #1e3a5f; --team-color-secondary: #D4AF37;">
+
+   Derives hover, highlight, and header colors from --team-color-primary
+   using color-mix().
+   ========================================================================== */
+
+.team-table {
+    --team-row-hover-bg: color-mix(in srgb, var(--team-color-primary) 8%, white);
+    --team-row-highlight-bg: color-mix(in srgb, var(--team-color-primary) 15%, white);
+    --team-row-highlight-hover-bg: color-mix(in srgb, var(--team-color-primary) 22%, white);
+    --team-header-bg: linear-gradient(135deg, var(--team-color-primary), color-mix(in srgb, var(--team-color-primary) 85%, black));
+    --team-sep-color: var(--team-color-primary);
+}
+
+/* Team-colored header */
+.team-table thead {
+    background: var(--team-header-bg);
+}
+
+.team-table th {
+    color: var(--team-color-secondary);
+}
+
+/* Team-colored hover */
+.team-table tbody tr:hover {
+    background-color: var(--team-row-hover-bg) !important;
+}
+
+/* Team-colored link hover */
+.team-table a:hover {
+    color: var(--team-color-primary);
+}
+
+/* Team-colored separators */
+.team-table th.sep-team,
+.team-table td.sep-team {
+    border-right: 2px solid var(--team-sep-color);
+    padding-right: 3px;
+}
+
+.team-table th.sep-team + th,
+.team-table th.sep-team + td,
+.team-table td.sep-team + th,
+.team-table td.sep-team + td {
+    padding-left: 3px;
+}
+
+/* Weak separators (gray, same as before) */
+.team-table th.sep-weak,
+.team-table td.sep-weak {
+    border-right: 1px solid var(--gray-200, #e5e7eb);
+    padding-right: 3px;
+}
+
+.team-table th.sep-weak + th,
+.team-table th.sep-weak + td,
+.team-table td.sep-weak + th,
+.team-table td.sep-weak + td {
+    padding-left: 3px;
+}
+
+/* Salary column left alignment */
+.team-table th.salary {
+    text-align: left;
+}
+
+/* Ratings highlight rows (team-colored) */
+.team-table tr.ratings-highlight {
+    background-color: var(--team-row-highlight-bg) !important;
+}
+
+.team-table tr.ratings-highlight:hover {
+    background-color: var(--team-row-highlight-hover-bg) !important;
+}
+
+/* Ratings separator row (zero-padding divider) */
+.team-table tr.ratings-separator td {
+    padding: 0 !important;
+}
+
+/* ==========================================================================
    Mobile Sticky Column Support
 
    Use .responsive-table class on tables with sticky columns.

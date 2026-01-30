@@ -31,7 +31,6 @@ class Contracts
         $cap1 = $cap2 = $cap3 = $cap4 = $cap5 = $cap6 = 0;
         $playerRows = [];
 
-        $i = 0;
         foreach ($result as $plrRow) {
             $player = Player::withPlrRow($db, $plrRow);
 
@@ -53,11 +52,8 @@ class Contracts
                 }
             }
 
-            $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
-
             $playerRows[] = [
                 'player' => $player,
-                'bgcolor' => $bgcolor,
                 'con1' => $contracts[1],
                 'con2' => $contracts[2],
                 'con3' => $contracts[3],
@@ -72,15 +68,13 @@ class Contracts
             $cap4 += $contracts[4];
             $cap5 += $contracts[5];
             $cap6 += $contracts[6];
-            $i++;
         }
 
         ob_start();
-        echo \UI\TableStyles::render('contracts', $team->color1, $team->color2);
         ?>
-<table style="margin: 0 auto;" class="sortable contracts">
+<table class="ibl-data-table team-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
-        <tr style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
+        <tr>
             <th>Pos</th>
             <th colspan="2">Player</th>
             <th>Age</th>
@@ -107,9 +101,8 @@ class Contracts
     <tbody>
 <?php foreach ($playerRows as $row):
     $player = $row['player'];
-    $bgcolor = $row['bgcolor'];
 ?>
-        <tr style="background-color: #<?= $bgcolor ?>;">
+        <tr>
             <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
             <td colspan="2"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
             <td style="text-align: center;"><?= (int)$player->age ?></td>

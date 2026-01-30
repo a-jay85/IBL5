@@ -32,18 +32,18 @@ class Ratings
                 if ($plrRow instanceof Player) {
                     $player = $plrRow;
                     if ($moduleName == "Next_Sim") {
-                        $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "FFFFAA";
+                        $isHighlight = (($i % 2) !== 0);
                     } elseif ($moduleName == "League_Starters") {
-                        $bgcolor = ($player->teamID == $team->teamID) ? "FFFFAA" : "FFFFFF";
+                        $isHighlight = ($player->teamID == $team->teamID);
                     } else {
-                        $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
+                        $isHighlight = false;
                     }
                 } elseif (is_array($data) AND $plrRow instanceof Player) {
                     $player = Player::withPlrRow($db, $plrRow);
-                    $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
+                    $isHighlight = false;
                 } elseif (is_array($plrRow)) {
                     $player = Player::withPlrRow($db, $plrRow);
-                    $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
+                    $isHighlight = false;
                 } else {
                     continue;
                 }
@@ -54,7 +54,7 @@ class Ratings
                 }
             } else {
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
-                $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
+                $isHighlight = false;
             }
 
             $injuryReturnDate = $player->getInjuryReturnDate($season->lastSimEndDate);
@@ -62,7 +62,7 @@ class Ratings
 
             $playerRows[] = [
                 'player' => $player,
-                'bgcolor' => $bgcolor,
+                'isHighlight' => $isHighlight,
                 'injuryDays' => $injuryDays,
                 'injuryReturnDate' => $injuryReturnDate,
                 'addSeparator' => (($i % 2) == 0 && $moduleName == "Next_Sim" && $i > 0),
@@ -71,13 +71,9 @@ class Ratings
             $i++;
         }
 
-        // Use unique class name per team to avoid CSS conflicts in multi-table views (e.g., Next_Sim)
-        $tableClass = 'ratings-' . ((int)($team->teamID ?? 0));
-
         ob_start();
-        echo \UI\TableStyles::render($tableClass, $team->color1, $team->color2);
         ?>
-<table style="margin: 0 auto;" class="sortable ibl-data-table responsive-table <?= $tableClass ?>">
+<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
 <colgroup span="2"></colgroup><colgroup span="2"></colgroup><colgroup span="6"></colgroup><colgroup span="6"></colgroup><colgroup span="4"></colgroup><colgroup span="4"></colgroup><colgroup span="1"></colgroup>
     <thead>
         <tr>
@@ -128,11 +124,11 @@ class Ratings
     $colCount = ($moduleName == "League_Starters") ? 36 : 35;
     if ($row['addSeparator']): ?>
         <tr class="ratings-separator">
-        <td colspan="<?= $colCount ?>" style="background-color: #<?= htmlspecialchars($team->color1) ?>; height: 3px; padding: 0;">
+        <td colspan="<?= $colCount ?>" style="background-color: var(--team-color-primary); height: 3px; padding: 0;">
         </td>
         </tr>
 <?php endif; ?>
-        <tr<?= ($moduleName == "League_Starters" && $player->teamID == $team->teamID) ? ' class="ratings-highlight"' : '' ?><?= ($moduleName == "Next_Sim" && $row['bgcolor'] == 'FFFFAA') ? ' class="ratings-highlight"' : '' ?>>
+        <tr<?= $row['isHighlight'] ? ' class="ratings-highlight"' : '' ?>>
 <?php if ($moduleName == "League_Starters"):
     $teamId = (int) ($player->teamID ?? 0);
     $teamCity = htmlspecialchars($player->teamCity ?? '');

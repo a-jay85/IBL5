@@ -318,9 +318,6 @@
   .block {
     display: block;
   }
-  .contents {
-    display: contents;
-  }
   .flex {
     display: flex;
   }
@@ -655,9 +652,6 @@
   .text-left {
     text-align: left;
   }
-  .text-right {
-    text-align: right;
-  }
   .text-2xl {
     font-size: var(--text-2xl);
     line-height: var(--tw-leading, var(--text-2xl--line-height));
@@ -727,9 +721,6 @@
   }
   .uppercase {
     text-transform: uppercase;
-  }
-  .italic {
-    font-style: italic;
   }
   .ordinal {
     --tw-ordinal: ordinal;
@@ -3112,6 +3103,63 @@ table.sortable thead th {
 }
 .ibl-data-table tbody tr.totals-row:nth-child(odd):hover, .ibl-data-table tbody tr.totals-row:nth-child(even):hover {
   background-color: var(--accent-200, #fed7aa);
+}
+.team-table {
+  --team-row-hover-bg: var(--team-color-primary);
+  @supports (color: color-mix(in lab, red, red)) {
+    --team-row-hover-bg: color-mix(in srgb, var(--team-color-primary) 8%, white);
+  }
+  --team-row-highlight-bg: var(--team-color-primary);
+  @supports (color: color-mix(in lab, red, red)) {
+    --team-row-highlight-bg: color-mix(in srgb, var(--team-color-primary) 15%, white);
+  }
+  --team-row-highlight-hover-bg: var(--team-color-primary);
+  @supports (color: color-mix(in lab, red, red)) {
+    --team-row-highlight-hover-bg: color-mix(in srgb, var(--team-color-primary) 22%, white);
+  }
+  --team-header-bg: linear-gradient(135deg, var(--team-color-primary), var(--team-color-primary));
+  @supports (color: color-mix(in lab, red, red)) {
+    --team-header-bg: linear-gradient(135deg, var(--team-color-primary), color-mix(in srgb, var(--team-color-primary) 85%, black));
+  }
+  --team-sep-color: var(--team-color-primary);
+}
+.team-table thead {
+  background: var(--team-header-bg);
+}
+.team-table th {
+  color: var(--team-color-secondary);
+}
+.team-table tbody tr:hover {
+  background-color: var(--team-row-hover-bg) !important;
+}
+.team-table a:hover {
+  color: var(--team-color-primary);
+}
+.team-table th.sep-team, .team-table td.sep-team {
+  border-right: 2px solid var(--team-sep-color);
+  padding-right: 3px;
+}
+.team-table th.sep-team + th, .team-table th.sep-team + td, .team-table td.sep-team + th, .team-table td.sep-team + td {
+  padding-left: 3px;
+}
+.team-table th.sep-weak, .team-table td.sep-weak {
+  border-right: 1px solid var(--gray-200, #e5e7eb);
+  padding-right: 3px;
+}
+.team-table th.sep-weak + th, .team-table th.sep-weak + td, .team-table td.sep-weak + th, .team-table td.sep-weak + td {
+  padding-left: 3px;
+}
+.team-table th.salary {
+  text-align: left;
+}
+.team-table tr.ratings-highlight {
+  background-color: var(--team-row-highlight-bg) !important;
+}
+.team-table tr.ratings-highlight:hover {
+  background-color: var(--team-row-highlight-hover-bg) !important;
+}
+.team-table tr.ratings-separator td {
+  padding: 0 !important;
 }
 @media (max-width: 768px) {
   .ibl-data-table.responsive-table {

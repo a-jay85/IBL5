@@ -43,16 +43,17 @@ class UI
     }
 
     /**
-     * Generate CSS styles for tables with team-colored separators
+     * Generate inline CSS custom property declarations for team-colored tables
      *
-     * @param string $tableClass CSS class name for the table
      * @param string $teamColor Primary team color (hex without #)
      * @param string $teamColor2 Secondary team color (hex without #)
-     * @return string CSS style block
+     * @return string Inline style value for --team-color-primary and --team-color-secondary
+     *
+     * @see UI\TableStyles::inlineVars()
      */
-    public static function tableStyles(string $tableClass, string $teamColor, string $teamColor2): string
+    public static function teamColorVars(string $teamColor, string $teamColor2): string
     {
-        return UI\TableStyles::render($tableClass, $teamColor, $teamColor2);
+        return UI\TableStyles::inlineVars($teamColor, $teamColor2);
     }
 
     /**

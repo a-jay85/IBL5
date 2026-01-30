@@ -61,10 +61,10 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable ibl-data-table sticky-table">
+        return '<table class="sortable ibl-data-table" data-no-responsive>
             <thead>
                 <tr>
-                    <th class="sticky-col sticky-corner">Player</th>
+                    <th>Player</th>
                     <th>Team</th>
                     <th class="fa-preview-pos-col">Pos</th>
                     <th>Age</th>
@@ -135,7 +135,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
             }
 
             $output .= "<tr>
-    <td class=\"sticky-col\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
+    <td><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
     {$teamCell}
     <td class=\"fa-preview-pos-col\">{$pos}</td>
     <td>{$age}</td>

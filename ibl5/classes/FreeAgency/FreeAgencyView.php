@@ -95,7 +95,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
 
         ob_start();
         ?>
-<div style="overflow-x: auto; width: 0; min-width: 100%;">
 <table class="sortable fa-under-contract" style="max-width: none;">
     <?= $this->renderColgroups() ?>
     <?= $this->renderTableHeader('Players Under Contract', false, $team) ?>
@@ -145,7 +144,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
         </tr>
     </tfoot>
 </table>
-</div>
         <?php
         return ob_get_clean();
     }
@@ -168,7 +166,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
 
         ob_start();
         ?>
-<div style="overflow-x: auto; width: 0; min-width: 100%;">
 <table class="sortable fa-offers" style="max-width: none;">
     <?= $this->renderColgroups() ?>
     <?= $this->renderTableHeader('Contract Offers', false, $team) ?>
@@ -211,7 +208,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <?= $this->renderCapSpaceFooter($team, $capMetrics) ?>
     </tfoot>
 </table>
-</div>
         <?php
         return ob_get_clean();
     }
@@ -234,7 +230,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
 
         ob_start();
         ?>
-<div style="overflow-x: auto; width: 0; min-width: 100%;">
 <table class="sortable fa-team-free-agents" style="max-width: none;">
     <?= $this->renderColgroups() ?>
     <?= $this->renderTableHeader('Unsigned Free Agents', true, $team) ?>
@@ -276,7 +271,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <?php endforeach; ?>
     </tbody>
 </table>
-</div>
         <?php
         return ob_get_clean();
     }
@@ -293,7 +287,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
     {
         ob_start();
         ?>
-<div style="overflow-x: auto; width: 0; min-width: 100%;">
 <table class="sortable fa-other-free-agents" style="max-width: none;">
     <?= $this->renderColgroups() ?>
     <?= $this->renderTableHeader('All Other Free Agents', false, $team) ?>
@@ -320,7 +313,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <?php endforeach; ?>
     </tbody>
 </table>
-</div>
         <?php
         return ob_get_clean();
     }

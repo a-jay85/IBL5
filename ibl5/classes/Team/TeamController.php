@@ -99,11 +99,7 @@ class TeamController implements TeamControllerInterface
                 <div style=\"background-color: $team->color1; text-align: center; padding: 4px;\">
                     <span style=\"color: $team->color2; font-weight: bold;\">Draft Picks</span>
                 </div>
-                <div class=\"table-scroll-wrapper\">
-                    <div class=\"table-scroll-container\">
-                        $tableDraftPicks
-                    </div>
-                </div>" : "";
+                $tableDraftPicks" : "";
 
         $sidebarMobileHtml = $isActualTeam ? "<div class=\"team-page-sidebar-mobile\">$team_info_right</div>" : "";
         $raftersHtml = $isActualTeam ? "<div class=\"team-page-rafters\">$rafters</div>" : "";
@@ -117,16 +113,8 @@ class TeamController implements TeamControllerInterface
                     " . ($yr !== "" && $yr !== null ? "<h1 class=\"ibl-title\" style=\"margin: 0.5rem 0;\">$yr $team->name</h1>" : "") . "
                     <table style=\"margin: 0 auto;\"><tr>$tabs</tr></table>
                 </div>
-                <div class=\"table-scroll-wrapper\">
-                    <div class=\"table-scroll-container\">
-                        $table_output
-                    </div>
-                </div>
-                <div class=\"table-scroll-wrapper\">
-                    <div class=\"table-scroll-container\">
-                        $starters_table
-                    </div>
-                </div>
+                $table_output
+                $starters_table
                 $draftPicksHtml
                 $sidebarMobileHtml
                 $raftersHtml

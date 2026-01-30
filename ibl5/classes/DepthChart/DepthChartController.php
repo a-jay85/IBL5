@@ -40,23 +40,23 @@ class DepthChartController implements DepthChartControllerInterface
         \Nuke\Header::header();
 
         $this->view->renderTeamLogo($teamID);
-        
+
         $playersResult = $this->repository->getPlayersOnTeam($teamName, $teamID);
-        
-        $table_ratings = \UI::ratings($this->db, $playersResult, $team, "", $season);
-        echo $table_ratings;
-        
+
         $slotNames = \JSB::PLAYER_POSITIONS;
-        
+
         $this->view->renderFormHeader($teamName, $teamID, $slotNames);
-        
+
         $depthCount = 1;
         foreach ($playersResult as $player) {
             $this->view->renderPlayerRow($player, $depthCount);
             $depthCount++;
         }
-        
+
         $this->view->renderFormFooter();
+
+        $table_ratings = \UI::ratings($this->db, $playersResult, $team, "", $season);
+        echo $table_ratings;
         
         \Nuke\Footer::footer();
     }

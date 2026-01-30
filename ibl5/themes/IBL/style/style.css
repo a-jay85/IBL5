@@ -2622,7 +2622,6 @@ a.schedule-jump-btn:hover {
     display: block;
   }
   .next-sim-day-label, .next-sim-record {
-    flex: 1;
     min-width: 0;
   }
 }
@@ -3428,6 +3427,22 @@ table.sortable thead th {
   }
   .ibl-data-table.responsive-table td.sticky-col.ibl-team-cell--colored, .ibl-data-table.responsive-table th.sticky-col.ibl-team-cell--colored {
     min-width: 36px;
+  }
+  .trading-team-select .ibl-team-cell__text {
+    display: inline;
+  }
+  .trading-team-select .ibl-team-cell--colored {
+    text-align: left !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  .trading-team-select .ibl-team-cell--colored .ibl-team-cell__name {
+    justify-content: flex-start;
+  }
+  .trading-team-select td.ibl-team-cell--colored, .trading-team-select th.ibl-team-cell--colored {
+    width: auto;
+    min-width: auto;
+    max-width: none;
   }
 }
 .ibl-player-cell {

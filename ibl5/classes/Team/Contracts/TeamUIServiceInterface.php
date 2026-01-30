@@ -50,26 +50,26 @@ interface TeamUIServiceInterface
      * @param string $insertyear Query parameter for historical year (e.g., "&yr=2023"), empty string if current season
      * @param object $season Season object with phase property ("Playoffs", "Draft", "Free Agency", etc.)
      * 
-     * @return string Complete HTML table row with tab cells
-     * 
+     * @return string Self-contained HTML div with tab links
+     *
      * **Return Structure:**
-     * - HTML table row (<tr>) with multiple <td> cells
-     * - Each cell contains a link to a different display tab
-     * - Active tab (matching $display parameter) uses team colors and bold text
-     * - Inactive tabs use neutral styling
+     * - `<div class="ibl-tabs">` container with `--team-tab-active-color` CSS custom property
+     * - Each tab is an `<a class="ibl-tab">` link
+     * - Active tab has additional `ibl-tab--active` class
      * - Tabs included: ratings, total_s, avg_s, per36mins, chunk, [playoffs if applicable], contracts
-     * 
+     *
      * **Behaviors:**
-     * - Active tab identified by matching display parameter
-     * - Active tab background uses team->color2, text is bold black
+     * - Active tab identified by matching display parameter via CSS class
+     * - Active tab border color set via `--team-tab-active-color` custom property using team color2
      * - Playoff tab only included if season->phase matches playoff phases
      * - All links include teamID and display parameter
      * - All links include $insertyear parameter
+     * - Team data fetched once per call (not per tab)
      * - Never throws exceptions
-     * 
+     *
      * **Example:**
      * $tabs = $uiService->renderTabs(5, 'ratings', '&yr=2023', $season);
-     * // Returns: <tr><td bgcolor="..."><a href="...">Ratings</a></td>...</tr>
+     * // Returns: <div class="ibl-tabs" style="--team-tab-active-color: #0000FF"><a class="ibl-tab ibl-tab--active" href="...">Ratings</a>...</div>
      */
     public function renderTabs(int $teamID, string $display, string $insertyear, object $season): string;
 

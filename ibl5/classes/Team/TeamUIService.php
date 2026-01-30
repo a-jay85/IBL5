@@ -58,29 +58,25 @@ class TeamUIService implements TeamUIServiceInterface
 
         $tabDefinitions['contracts'] = 'Contracts';
 
-        $tabs = "";
+        // Fetch team data once to avoid N+1 queries
+        $teamData = $this->repository->getTeam($teamID);
+        $teamColor1 = \UI\TableStyles::sanitizeColor($teamData['color1'] ?? '000000');
+        $teamColor2 = \UI\TableStyles::sanitizeColor($teamData['color2'] ?? 'FFFFFF');
+
+        $tabs = '';
         foreach ($tabDefinitions as $tabKey => $tabLabel) {
             $tabs .= $this->buildTab($tabKey, $tabLabel, $display, $teamID, $insertyear);
         }
 
-        return $tabs;
+        return '<div class="ibl-tabs" style="--team-tab-bg-color: #' . $teamColor1 . '; --team-tab-active-color: #' . $teamColor2 . '">' . $tabs . '</div>';
     }
 
     private function buildTab(string $tabKey, string $tabLabel, string $display, int $teamID, string $insertyear): string
     {
-        // Retrieve team data from repository
-        $teamData = $this->repository->getTeam($teamID);
-        $teamColor2 = $teamData['color2'] ?? '#FFFFFF';
+        $activeClass = ($display === $tabKey) ? ' ibl-tab--active' : '';
+        $href = "modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;display=$tabKey" . \Utilities\HtmlSanitizer::safeHtmlOutput($insertyear);
 
-        if ($display === $tabKey) {
-            $isActiveLink = ' style="font-weight:bold; color: black !important;"';
-            $isActiveTableCell = ' bgcolor="' . $teamColor2 . '"';
-        } else {
-            $isActiveLink = '';
-            $isActiveTableCell = '';
-        }
-
-        return "<td{$isActiveTableCell}><a href=\"modules.php?name=Team&op=team&teamID=$teamID&display=$tabKey$insertyear\"{$isActiveLink}>$tabLabel</a></td>";
+        return '<a href="' . $href . '" class="ibl-tab' . $activeClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($tabLabel) . '</a>';
     }
 
     /**

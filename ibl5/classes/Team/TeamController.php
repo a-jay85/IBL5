@@ -115,11 +115,13 @@ class TeamController implements TeamControllerInterface
                 <div style=\"text-align: center; margin-bottom: 1rem;\">
                     <img src=\"./{$imagesPath}logo/$teamID.jpg\" style=\"display: block; margin: 0 auto;\">
                     " . ($yr !== "" && $yr !== null ? "<h1 class=\"ibl-title\" style=\"margin: 0.5rem 0;\">$yr $team->name</h1>" : "") . "
-                    <table style=\"margin: 0 auto;\"><tr>$tabs</tr></table>
                 </div>
-                <div class=\"table-scroll-wrapper\">
-                    <div class=\"table-scroll-container\">
-                        $table_output
+                <div class=\"team-stats-block\">
+                    $tabs
+                    <div class=\"table-scroll-wrapper\">
+                        <div class=\"table-scroll-container\">
+                            $table_output
+                        </div>
                     </div>
                 </div>
                 <div class=\"table-scroll-wrapper\">

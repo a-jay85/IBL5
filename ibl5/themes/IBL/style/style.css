@@ -3035,14 +3035,14 @@ table.sortable thead th {
   font-size: 1.25rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  padding: 0.75rem 0.5rem;
+  padding: 0.5rem;
   text-align: center;
   white-space: nowrap;
 }
 .ibl-data-table td {
   color: var(--gray-800, #1f2937);
   font-size: 1rem;
-  padding: 0.5rem 0.375rem;
+  padding: 0rem;
   text-align: center;
 }
 .ibl-data-table tbody tr {
@@ -3136,18 +3136,14 @@ table.sortable thead th {
   color: var(--team-color-primary);
 }
 .team-table th.sep-team, .team-table td.sep-team {
-  border-right: 2px solid var(--team-sep-color);
-  padding-right: 3px;
-}
-.team-table th.sep-team + th, .team-table th.sep-team + td, .team-table td.sep-team + th, .team-table td.sep-team + td {
-  padding-left: 3px;
+  border-left: 0.5px solid var(--team-sep-color);
+  border-right: 0.5px solid var(--team-sep-color);
+  padding: 0 !important;
 }
 .team-table th.sep-weak, .team-table td.sep-weak {
-  border-right: 1px solid var(--gray-200, #e5e7eb);
-  padding-right: 3px;
-}
-.team-table th.sep-weak + th, .team-table th.sep-weak + td, .team-table td.sep-weak + th, .team-table td.sep-weak + td {
-  padding-left: 3px;
+  border-left: 0.5px solid var(--gray-200, #e5e7eb);
+  border-right: 0.5px solid var(--gray-200, #e5e7eb);
+  padding: 0 !important;
 }
 .team-table th.salary {
   text-align: left;
@@ -3231,11 +3227,11 @@ table.sortable thead th {
   }
   .ibl-data-table:not(.voting-form-table):not(.voting-results-table) th {
     font-size: 1rem;
-    padding: 0.5rem 0.25rem;
+    padding: 0.25rem 0.25rem;
   }
   .ibl-data-table:not(.voting-form-table):not(.voting-results-table) td {
     font-size: 1rem;
-    padding: 0.375rem 0.25rem;
+    padding: 0.25rem 0.25rem;
   }
 }
 .responsive-table td {
@@ -3257,6 +3253,17 @@ table.sortable thead th {
     width: fit-content;
     margin-left: auto;
     margin-right: auto;
+  }
+  .team-stats-block {
+    width: fit-content;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .team-stats-block .table-scroll-wrapper {
+    width: auto;
+    margin-left: 0;
+    margin-right: 0;
   }
 }
 .table-scroll-container {
@@ -4355,7 +4362,7 @@ table.sortable thead th {
   min-width: 0;
   padding: var(--space-2) var(--space-3);
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--gray-400);
   text-transform: uppercase;
@@ -4377,6 +4384,46 @@ table.sortable thead th {
   color: white;
   background: rgba(255, 255, 255, 0.1);
   border-bottom-color: var(--accent-500);
+}
+.ibl-tabs[style*="--team-tab-bg-color"] {
+  background: var(--team-tab-bg-color);
+  @supports (color: color-mix(in lab, red, red)) {
+    background: color-mix(in srgb, var(--team-tab-bg-color) 15%, white);
+  }
+}
+.ibl-tabs[style*="--team-tab-bg-color"] .ibl-tab {
+  color: var(--team-tab-bg-color);
+  @supports (color: color-mix(in lab, red, red)) {
+    color: color-mix(in srgb, var(--team-tab-bg-color) 70%, black);
+  }
+}
+.ibl-tabs[style*="--team-tab-bg-color"] .ibl-tab:hover {
+  background: var(--team-tab-bg-color);
+  @supports (color: color-mix(in lab, red, red)) {
+    background: color-mix(in srgb, var(--team-tab-bg-color) 25%, white);
+  }
+}
+.ibl-tabs[style*="--team-tab-bg-color"] .ibl-tab--active {
+  color: var(--team-tab-bg-color);
+  @supports (color: color-mix(in lab, red, red)) {
+    color: color-mix(in srgb, var(--team-tab-bg-color) 85%, black);
+  }
+  background: var(--team-tab-bg-color);
+  @supports (color: color-mix(in lab, red, red)) {
+    background: color-mix(in srgb, var(--team-tab-bg-color) 25%, white);
+  }
+  border-bottom-color: var(--team-tab-active-color);
+}
+@media (max-width: 768px) {
+  .ibl-tabs {
+    flex-wrap: wrap;
+    border-radius: var(--radius-md);
+  }
+  .ibl-tab {
+    flex: 0 1 auto;
+    padding: var(--space-1) var(--space-2);
+    font-size: 0.85rem;
+  }
 }
 .ibl-tabs--accent {
   background: linear-gradient(135deg, var(--accent-500), var(--accent-600));

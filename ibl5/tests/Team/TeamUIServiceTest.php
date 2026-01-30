@@ -56,7 +56,7 @@ class TeamUIServiceTest extends TestCase
     public function testRenderTabsContainsAllBasicTabs()
     {
         $tabs = $this->service->renderTabs(1, 'ratings', '', $this->season);
-        
+
         $this->assertStringContainsString('Ratings</a>', $tabs);
         $this->assertStringContainsString('Season Totals</a>', $tabs);
         $this->assertStringContainsString('Season Averages</a>', $tabs);
@@ -64,11 +64,38 @@ class TeamUIServiceTest extends TestCase
         $this->assertStringContainsString('Sim Averages</a>', $tabs);
     }
 
+    public function testRenderTabsUsesDiv()
+    {
+        $tabs = $this->service->renderTabs(1, 'ratings', '', $this->season);
+
+        $this->assertStringContainsString('<div class="ibl-tabs"', $tabs);
+        $this->assertStringContainsString('class="ibl-tab ibl-tab--active"', $tabs);
+        $this->assertStringNotContainsString('<td', $tabs);
+        $this->assertStringNotContainsString('<tr', $tabs);
+    }
+
+    public function testRenderTabsActiveTabHasCorrectClass()
+    {
+        $tabs = $this->service->renderTabs(1, 'contracts', '', $this->season);
+
+        // Only the contracts tab should be active
+        $this->assertStringContainsString('display=contracts" class="ibl-tab ibl-tab--active"', $tabs);
+        // Other tabs should not be active
+        $this->assertStringNotContainsString('display=ratings" class="ibl-tab ibl-tab--active"', $tabs);
+    }
+
+    public function testRenderTabsIncludesTeamColorCustomProperty()
+    {
+        $tabs = $this->service->renderTabs(1, 'ratings', '', $this->season);
+
+        $this->assertStringContainsString('--team-tab-active-color:', $tabs);
+    }
+
     public function testRenderTabsExcludesPlayoffTabDuringRegularSeason()
     {
         $this->season->phase = 'Regular Season';
         $tabs = $this->service->renderTabs(1, 'ratings', '', $this->season);
-        
+
         $this->assertStringNotContainsString('Playoffs Averages</a>', $tabs);
     }
 
@@ -76,11 +103,11 @@ class TeamUIServiceTest extends TestCase
     {
         // Test that playoff tab appears during all offseason phases
         $offseasonPhases = ['Playoffs', 'Draft', 'Free Agency'];
-        
+
         foreach ($offseasonPhases as $phase) {
             $this->season->phase = $phase;
             $tabs = $this->service->renderTabs(1, 'playoffs', '', $this->season);
-            
+
             $this->assertStringContainsString('Playoffs Averages</a>', $tabs, "Failed for phase: $phase");
         }
     }

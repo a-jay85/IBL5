@@ -397,6 +397,20 @@
         margin-left: auto;
         margin-right: auto;
     }
+
+    /* Shared wrapper for tabs + table so tabs match table width */
+    .team-stats-block {
+        width: fit-content;
+        max-width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .team-stats-block .table-scroll-wrapper {
+        width: auto;
+        margin-left: 0;
+        margin-right: 0;
+    }
 }
 
 /* Scroll container for wide tables on mobile */

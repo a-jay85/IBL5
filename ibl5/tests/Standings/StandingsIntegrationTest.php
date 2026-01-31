@@ -546,9 +546,9 @@ class StandingsIntegrationTest extends TestCase
         $result = $view->render();
 
         $expectedHeaders = [
-            'Team', 'W-L', 'Pct', 'Pyth', 'GB', 'Magic#',
+            'Team', 'W-L', 'Win%', 'Pyth', 'GB', 'Magic',
             'Left', 'Conf.', 'Div.', 'Home', 'Away',
-            'Last 10', 'Streak', 'Rating',
+            'Last 10', 'Streak', 'Power',
         ];
 
         foreach ($expectedHeaders as $header) {

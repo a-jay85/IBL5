@@ -332,11 +332,11 @@ class StandingsIntegrationTest extends IntegrationTestCase
         // Assert
         $this->assertStringContainsString('Team', $html);
         $this->assertStringContainsString('W-L', $html);
-        $this->assertStringContainsString('Pct', $html);
+        $this->assertStringContainsString('Win%', $html);
         $this->assertStringContainsString('GB', $html);
-        $this->assertStringContainsString('Magic#', $html);
+        $this->assertStringContainsString('Magic', $html);
         $this->assertStringContainsString('Streak', $html);
-        $this->assertStringContainsString('Rating', $html);
+        $this->assertStringContainsString('Power', $html);
     }
 
     /**
@@ -609,8 +609,8 @@ class StandingsIntegrationTest extends IntegrationTestCase
         // Act
         $html = $this->view->renderRegion('Eastern');
 
-        // Assert - Rating column exists with proper class
-        $this->assertStringContainsString('Rating', $html);
+        // Assert - Power Rank column exists with proper class
+        $this->assertStringContainsString('Power', $html);
         $this->assertStringContainsString('ibl-stat-highlight', $html);
     }
 

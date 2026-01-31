@@ -525,13 +525,13 @@
     box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
 }
 
-/* Desktop: remove visual decoration and height constraint;
-   keep overflow:auto for tables that may still overflow horizontally */
+/* Desktop: remove height constraint; fit-content so border-radius
+   hugs the table edges rather than stretching full-width */
 @media (min-width: 1024px) {
     .sticky-scroll-wrapper {
         max-height: none;
-        border-radius: 0;
-        box-shadow: none;
+        width: fit-content;
+        max-width: calc(100vw - 2.25rem);
     }
 }
 

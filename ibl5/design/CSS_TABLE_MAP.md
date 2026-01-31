@@ -79,7 +79,7 @@ Affects ALL data tables site-wide:
 | `.draft-pick-table` | DraftPickLocatorView |
 | `.contact-table` | ContactListView |
 | `.voting-form-table` | Voting views |
-| `.trading-*` | Trading/UIHelper |
+| `.trading-*` | Trading/TradingView |
 
 ## Cell / Helper Classes
 

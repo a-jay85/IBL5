@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 2062 tests • ~80% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 2164 tests • ~80% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -12,7 +12,7 @@
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - ✅ Goal achieved with 2062 tests (~80% coverage). Comprehensive edge case testing complete.
+1. **Test Coverage → 80%** - ✅ Goal achieved with 2164 tests (~80% coverage). Comprehensive edge case testing complete.
 
    **Priority Integration Tests:** ✅ All Complete
    - ~~Waivers, DepthChart, RookieOption, Schedule, Standings, Voting~~
@@ -33,7 +33,7 @@
 
 ### Calculator Edge Case Tests Added (Jan 26, 2026)
 
-**Impact:** Added 127 edge case tests for 4 calculator classes, bringing total from 1935 to 2062 tests (~80% coverage)
+**Impact:** Added 127 edge case tests for 4 calculator classes, bringing total from 1935 to 2164 tests (~80% coverage)
 
 **New Test Files:**
 - **PlayerInjuryCalculatorEdgeCaseTest** (26 tests) - Negative days, year/month boundaries, leap years
@@ -48,7 +48,7 @@
 - Floating-point precision: ranking score rounding, games back calculations
 - Null/missing data: null preferences, missing game fields
 
-**Status:** All 2062 tests passing ✅ • 80% coverage goal achieved
+**Status:** All 2164 tests passing ✅ • 80% coverage goal achieved
 
 ---
 

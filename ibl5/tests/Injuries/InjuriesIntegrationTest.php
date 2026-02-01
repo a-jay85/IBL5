@@ -259,8 +259,8 @@ class InjuriesIntegrationTest extends IntegrationTestCase
         $result = $this->view->render($injuredPlayers);
 
         // Check days cell content
-        $this->assertStringContainsString('days-cell', $result);
-        $this->assertMatchesRegularExpression('/days-cell[^>]*>1</', $result);
+        $this->assertStringContainsString('ibl-stat-highlight', $result);
+        $this->assertMatchesRegularExpression('/ibl-stat-highlight[^>]*>1</', $result);
     }
 
     /**
@@ -284,7 +284,7 @@ class InjuriesIntegrationTest extends IntegrationTestCase
 
         $result = $this->view->render($injuredPlayers);
 
-        $this->assertMatchesRegularExpression('/days-cell[^>]*>0</', $result);
+        $this->assertMatchesRegularExpression('/ibl-stat-highlight[^>]*>0</', $result);
     }
 
     // ============================================
@@ -371,7 +371,7 @@ class InjuriesIntegrationTest extends IntegrationTestCase
 
         $result = $this->view->render($injuredPlayers);
 
-        $this->assertStringContainsString('class="days-cell"', $result);
+        $this->assertStringContainsString('class="ibl-stat-highlight"', $result);
     }
 
     // ============================================

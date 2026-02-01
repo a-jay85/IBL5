@@ -32,6 +32,7 @@ interface DraftHistoryRepositoryInterface
      * @return array<int, array{
      *     pid: int,
      *     name: string,
+     *     pos: string,
      *     draftround: int,
      *     draftpickno: int,
      *     draftedby: string,
@@ -39,4 +40,21 @@ interface DraftHistoryRepositoryInterface
      * }> Array of draft pick data
      */
     public function getDraftPicksByYear(int $year): array;
+
+    /**
+     * Get all draft picks for a specific team.
+     *
+     * @param string $teamName Team name (matches ibl_plr.draftedby)
+     * @return array<int, array{
+     *     pid: int,
+     *     name: string,
+     *     pos: string,
+     *     draftround: int,
+     *     draftpickno: int,
+     *     draftyear: int,
+     *     college: string,
+     *     retired: string
+     * }> Array of draft pick data ordered by year desc, round asc, pick asc
+     */
+    public function getDraftPicksByTeam(string $teamName): array;
 }

@@ -43,7 +43,7 @@ class DraftHistoryRepository extends \BaseMysqliRepository implements DraftHisto
     public function getDraftPicksByYear(int $year): array
     {
         return $this->fetchAll(
-            "SELECT p.pid, p.name, p.draftround, p.draftpickno, p.draftedby, p.college,
+            "SELECT p.pid, p.name, p.pos, p.draftround, p.draftpickno, p.draftedby, p.college,
                     t.teamid, t.team_city, t.color1, t.color2
             FROM ibl_plr p
             LEFT JOIN ibl_team_info t ON p.draftedby = t.team_name
@@ -51,6 +51,21 @@ class DraftHistoryRepository extends \BaseMysqliRepository implements DraftHisto
             ORDER BY p.draftround ASC, p.draftpickno ASC",
             "i",
             $year
+        );
+    }
+
+    /**
+     * @see DraftHistoryRepositoryInterface::getDraftPicksByTeam()
+     */
+    public function getDraftPicksByTeam(string $teamName): array
+    {
+        return $this->fetchAll(
+            "SELECT p.pid, p.name, p.pos, p.draftround, p.draftpickno, p.draftyear, p.college, p.retired
+            FROM ibl_plr p
+            WHERE p.draftedby = ? AND p.draftround > 0
+            ORDER BY p.draftyear DESC, p.draftround ASC, p.draftpickno ASC",
+            "s",
+            $teamName
         );
     }
 }

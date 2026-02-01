@@ -34,6 +34,29 @@ class DraftHistoryView implements DraftHistoryViewInterface
     }
 
     /**
+     * @see DraftHistoryViewInterface::renderTeamHistory()
+     */
+    public function renderTeamHistory(\Team $team, array $draftPicks): string
+    {
+        $teamName = HtmlSanitizer::safeHtmlOutput($team->name);
+        $teamId = (int) $team->teamID;
+
+        $output = $this->getStyleBlock();
+        $output .= "<img src=\"images/logo/{$teamId}.jpg\" alt=\"\" class=\"team-logo-banner\">";
+        $output .= "<h2 class=\"ibl-title\">{$teamName} Draft History</h2>";
+
+        if (empty($draftPicks)) {
+            $output .= '<p class="draft-no-data">No draft history found.</p>';
+        } else {
+            $output .= $this->renderTeamTableStart();
+            $output .= $this->renderTeamTableRows($draftPicks);
+            $output .= $this->renderTableEnd();
+        }
+
+        return $output;
+    }
+
+    /**
      * Get the CSS styles for the draft history table.
      *
      * Uses consolidated .ibl-data-table with draft-history-specific overrides.
@@ -139,6 +162,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
                     <th class="sticky-col-1">Rd</th>
                     <th class="sticky-col-2">Pick</th>
                     <th>Player</th>
+                    <th>Pos</th>
                     <th class="ibl-team-cell--colored">Team</th>
                     <th>College</th>
                 </tr>
@@ -159,6 +183,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
         foreach ($draftPicks as $pick) {
             $pid = (int) ($pick['pid'] ?? 0);
             $name = HtmlSanitizer::safeHtmlOutput($pick['name'] ?? '');
+            $pos = HtmlSanitizer::safeHtmlOutput($pick['pos'] ?? '');
             $round = (int) ($pick['draftround'] ?? 0);
             $pickNo = (int) ($pick['draftpickno'] ?? 0);
             $college = HtmlSanitizer::safeHtmlOutput($pick['college'] ?? '');
@@ -187,8 +212,66 @@ class DraftHistoryView implements DraftHistoryViewInterface
     <td class=\"sticky-col-1\">{$round}</td>
     <td class=\"sticky-col-2\">{$pickNo}</td>
     <td class=\"name-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\" loading=\"lazy\">{$name}</a></td>
+    <td>{$pos}</td>
     {$teamCell}
     <td>{$college}</td>
+</tr>";
+        }
+
+        return $output;
+    }
+
+    /**
+     * Render the start of the team history table.
+     *
+     * @return string HTML table start
+     */
+    private function renderTeamTableStart(): string
+    {
+        return '<table class="sortable ibl-data-table draft-history-table">
+            <thead>
+                <tr>
+                    <th>Rd</th>
+                    <th>Pick</th>
+                    <th>Player</th>
+                    <th>Pos</th>
+                    <th>College</th>
+                    <th>Year</th>
+                </tr>
+            </thead>
+            <tbody>';
+    }
+
+    /**
+     * Render team history table rows.
+     *
+     * @param array $draftPicks Array of team draft pick data
+     * @return string HTML table rows
+     */
+    private function renderTeamTableRows(array $draftPicks): string
+    {
+        $output = '';
+
+        foreach ($draftPicks as $pick) {
+            $pid = (int) ($pick['pid'] ?? 0);
+            $name = HtmlSanitizer::safeHtmlOutput($pick['name'] ?? '');
+            $pos = HtmlSanitizer::safeHtmlOutput($pick['pos'] ?? '');
+            $round = (int) ($pick['draftround'] ?? 0);
+            $pickNo = (int) ($pick['draftpickno'] ?? 0);
+            $draftYear = (int) ($pick['draftyear'] ?? 0);
+            $college = HtmlSanitizer::safeHtmlOutput($pick['college'] ?? '');
+            $retired = ($pick['retired'] ?? '0') === '0';
+
+            $retiredBadge = $retired ? '' : ' (ret.)';
+            $playerImage = "images/player/{$pid}.jpg";
+
+            $output .= "<tr>
+    <td>{$round}</td>
+    <td>{$pickNo}</td>
+    <td class=\"name-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\" loading=\"lazy\">{$name}</a>{$retiredBadge}</td>
+    <td>{$pos}</td>
+    <td>{$college}</td>
+    <td>{$draftYear}</td>
 </tr>";
         }
 

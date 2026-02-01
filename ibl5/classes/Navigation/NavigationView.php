@@ -449,7 +449,7 @@ class NavigationView
 
         foreach ($links as $link) {
             if (isset($link['rawHtml'])) {
-                $html .= '<span class="flex items-center px-5 py-3 pl-14 text-base font-display text-gray-400 border-l-2 border-transparent">'
+                $html .= '<span class="block px-5 py-3 pl-14 text-base font-display text-gray-400 border-l-2 border-transparent">'
                     . $link['rawHtml']
                     . '</span>';
                 continue;

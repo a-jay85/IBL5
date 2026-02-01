@@ -33,10 +33,8 @@ class DraftView implements DraftViewInterface
     {
         $html = '';
         $html .= '<div class="draft-container">';
-        $html .= '<div class="draft-header">';
-        $html .= '<img src="images/logo/' . $tid . '.jpg" alt="Team Logo" class="draft-team-logo">';
         $html .= '<h2 class="ibl-title">Draft</h2>';
-        $html .= '</div>';
+        $html .= '<img src="images/logo/' . $tid . '.jpg" alt="Team Logo" class="team-logo-banner">';
 
         $html .= "<form name='draft_form' action='/ibl5/modules/Draft/draft_selection.php' method='POST'>";
         $html .= "<input type='hidden' name='teamname' value='" . HtmlSanitizer::safeHtmlOutput($teamLogo) . "'>";

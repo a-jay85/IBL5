@@ -79,7 +79,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
                 background: var(--accent-500);
                 color: white;
             }
-            .schedule-container--team .schedule-months__link:hover {
+            .schedule-container--team .ibl-jump-menu__link:hover {
                 background: var(--team-primary);
                 color: var(--team-secondary);
             }
@@ -133,14 +133,14 @@ class TeamScheduleView implements TeamScheduleViewInterface
      */
     private function renderMonthNav(array $gamesByMonth, bool $isPlayoffPhase, ?string $playoffMonthKey): string
     {
-        $html = '<nav class="schedule-months">';
+        $html = '<nav class="ibl-jump-menu schedule-months">';
         foreach ($gamesByMonth as $monthKey => $data) {
             if ($isPlayoffPhase && $monthKey === $playoffMonthKey) {
                 continue;
             }
             $monthLabel = $data['label'];
             $abbrev = date('M', strtotime($monthKey . '-01'));
-            $html .= '<a href="#team-month-' . $monthKey . '" class="schedule-months__link" onclick="scrollToMonth(event, \'' . $monthKey . '\')">';
+            $html .= '<a href="#team-month-' . $monthKey . '" class="ibl-jump-menu__link schedule-months__link" onclick="scrollToMonth(event, \'' . $monthKey . '\')">';
             $html .= '<span class="schedule-months__full">' . HtmlSanitizer::safeHtmlOutput($monthLabel) . '</span>';
             $html .= '<span class="schedule-months__abbr">' . HtmlSanitizer::safeHtmlOutput($abbrev) . '</span>';
             $html .= '</a>';

@@ -177,13 +177,13 @@ function renderLeagueSchedule(
     echo '</div>';
 
     // Month navigation
-    echo '<nav class="schedule-months">';
+    echo '<nav class="ibl-jump-menu schedule-months">';
     foreach ($months as $key => $label) {
         if ($isPlayoffPhase && $key === $playoffMonthKey) {
             continue;
         }
         $abbrev = date('M', strtotime($key . '-01')); // 3-letter abbreviation
-        echo '<a href="#month-' . $key . '" class="schedule-months__link" onclick="scrollToMonth(event, \'' . $key . '\')">';
+        echo '<a href="#month-' . $key . '" class="ibl-jump-menu__link schedule-months__link" onclick="scrollToMonth(event, \'' . $key . '\')">';
         echo '<span class="schedule-months__full">' . $label . '</span>';
         echo '<span class="schedule-months__abbr">' . $abbrev . '</span>';
         echo '</a>';

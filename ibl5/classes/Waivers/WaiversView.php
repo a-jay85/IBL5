@@ -51,7 +51,7 @@ class WaiversView implements WaiversViewInterface
                         <input type="hidden" name="Action" value="<?= $actionEscaped ?>">
                         <input type="hidden" name="rosterslots" value="<?= $openRosterSpots ?>">
                         <input type="hidden" name="healthyrosterslots" value="<?= $healthyOpenRosterSpots ?>">
-                        <button type="submit" class="waivers-submit-btn" onclick="this.disabled=true;this.textContent='Submitting...'; this.form.submit();">
+                        <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block" onclick="this.disabled=true;this.textContent='Submitting...'; this.form.submit();">
                             Click to <?= $actionEscaped ?> player(s) to/from Waiver Pool
                         </button>
                     </div>

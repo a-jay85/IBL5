@@ -155,7 +155,7 @@
 
 /* Accent variant tabs */
 .ibl-tabs--accent {
-    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+    background: var(--gradient-accent);
 }
 
 .ibl-tabs--accent .ibl-tab {

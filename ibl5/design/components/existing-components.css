@@ -33,7 +33,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+    background: var(--gradient-accent);
     border-radius: var(--radius-lg);
     color: white;
     box-shadow: 0 4px 12px rgb(249 115 22 / 0.3);
@@ -82,203 +82,7 @@
     }
 }
 
-/* Stat Category Card */
-.stat-card {
-    background: white;
-    border-radius: var(--radius-xl);
-    overflow: hidden;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--gray-100);
-    transition: transform var(--transition-base), box-shadow var(--transition-base);
-}
-
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-}
-
-.stat-card__header {
-    background: var(--gradient-navy-header);
-    padding: var(--space-3) var(--space-4);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.stat-card__category {
-    font-family: var(--font-display);
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: white;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.stat-card__badge {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--accent-400);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-}
-
-/* Leader Item (Top Player) */
-.stat-card__leader {
-    padding: var(--space-4);
-    background: linear-gradient(180deg, var(--gray-50) 0%, white 100%);
-    border-bottom: 1px solid var(--gray-100);
-}
-
-.stat-card__leader-inner {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-}
-
-.stat-card__images {
-    display: flex;
-    align-items: flex-end;
-    position: relative;
-}
-
-.stat-card__player-img {
-    width: 56px;
-    height: 72px;
-    object-fit: cover;
-    border-radius: var(--radius-md);
-    border: 2px solid white;
-    box-shadow: var(--shadow-sm);
-    background: var(--gray-200);
-}
-
-.stat-card__team-img {
-    width: 36px;
-    height: 36px;
-    object-fit: contain;
-    position: absolute;
-    bottom: -4px;
-    right: -8px;
-    background: white;
-    border-radius: var(--radius-full);
-    padding: 2px;
-    box-shadow: var(--shadow-sm);
-}
-
-.stat-card__leader-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.stat-card__player-name {
-    font-weight: 600;
-    font-size: 1.125rem;
-    color: var(--navy-900);
-    text-decoration: none;
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    transition: color var(--transition-fast);
-}
-
-.stat-card__player-name:hover {
-    color: var(--accent-500);
-}
-
-.stat-card__team-name {
-    font-size: 1rem;
-    color: var(--gray-500);
-    text-decoration: none;
-    display: block;
-    margin-top: 2px;
-    transition: color var(--transition-fast);
-}
-
-.stat-card__team-name:hover {
-    color: var(--accent-500);
-}
-
-.stat-card__stat-value {
-    font-family: var(--font-display);
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--accent-500);
-    line-height: 1;
-}
-
-/* Runner-up List */
-.stat-card__runners {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.stat-card__runner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-3) var(--space-4);
-    border-bottom: 1px solid var(--gray-50);
-    transition: background var(--transition-fast);
-}
-
-.stat-card__runner:last-child {
-    border-bottom: none;
-}
-
-.stat-card__runner:hover {
-    background: var(--gray-50);
-}
-
-.stat-card__runner-rank {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--gray-400);
-    width: 20px;
-    flex-shrink: 0;
-}
-
-.stat-card__runner-info {
-    flex: 1;
-    min-width: 0;
-    margin-left: var(--space-2);
-}
-
-.stat-card__runner-name {
-    font-size: 1.125rem;
-    font-weight: 500;
-    color: var(--navy-800);
-    text-decoration: none;
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    transition: color var(--transition-fast);
-}
-
-.stat-card__runner-name:hover {
-    color: var(--accent-500);
-}
-
-.stat-card__runner-team {
-    font-size: 1rem;
-    color: var(--gray-400);
-    text-decoration: none;
-    transition: color var(--transition-fast);
-}
-
-.stat-card__runner-team:hover {
-    color: var(--accent-500);
-}
-
-.stat-card__runner-value {
-    font-family: var(--font-display);
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--navy-700);
-    flex-shrink: 0;
-    margin-left: var(--space-2);
-}
+/* .stat-card tree removed — use .ibl-stat-card (cards.css) instead */
 
 /* ==========================================================================
    Leaders Grid Layout (Side-by-Side on Desktop)
@@ -339,7 +143,7 @@
 
 /* Orange variant header */
 .leaders-tabbed--chunk .leaders-tabbed__header {
-    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+    background: var(--gradient-accent);
 }
 
 /* Tabs Bar */
@@ -564,7 +368,7 @@
 
 /* Sim/Chunk Leaders Variant - Orange tabs */
 .leaders-tabbed--chunk .leaders-tabbed__tabs {
-    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+    background: var(--gradient-accent);
 }
 
 .leaders-tabbed--chunk .leaders-tabbed__tab {
@@ -590,15 +394,15 @@
    Legacy Grid Layout (Keep for backwards compatibility)
    ========================================================================== */
 
-.leaders-block--chunk .stat-card {
+.leaders-block--chunk .ibl-stat-card {
     border-top: 3px solid var(--accent-500);
 }
 
-.leaders-block--chunk .stat-card__header {
-    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+.leaders-block--chunk .ibl-stat-card__header {
+    background: var(--gradient-accent);
 }
 
-.leaders-block--chunk .stat-card__stat-value {
+.leaders-block--chunk .ibl-stat-card__leader-value {
     color: var(--navy-800);
 }
 
@@ -1025,29 +829,7 @@
     margin-bottom: var(--space-4);
 }
 
-/* Legacy alias - use .ibl-title--large for new code */
-.ibl-section-title {
-    font-family: var(--font-display);
-    font-size: 2rem;
-    font-weight: 600;
-    color: var(--navy-900);
-    text-transform: uppercase;
-    letter-spacing: 0.025em;
-    margin: 0 0 var(--space-6);
-    padding-bottom: var(--space-4);
-    border-bottom: 2px solid var(--gray-200);
-    position: relative;
-}
-
-.ibl-section-title::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    left: 0;
-    width: 60px;
-    height: 2px;
-    background: var(--accent-500);
-}
+/* .ibl-section-title removed — use .ibl-title--large instead */
 
 /* ==========================================================================
    Year/Item Navigation (draft years, seasons, etc.)
@@ -1112,23 +894,7 @@
     }
 }
 
-/* Empty State */
-.ibl-empty-state {
-    text-align: center;
-    padding: var(--space-12) var(--space-6);
-    color: var(--gray-500);
-}
-
-.ibl-empty-state__icon {
-    width: 48px;
-    height: 48px;
-    margin: 0 auto var(--space-4);
-    color: var(--gray-300);
-}
-
-.ibl-empty-state__text {
-    font-size: 1.125rem;
-}
+/* .ibl-empty-state moved to cards.css */
 
 /* Table scroll infrastructure moved to tables.css */
 
@@ -1254,37 +1020,12 @@ a.schedule-jump-btn:hover {
     box-shadow: 0 3px 10px rgb(249 115 22 / 0.4);
 }
 
-/* Month Navigation */
+/* Month Navigation — base styles provided by .ibl-jump-menu (navigation.css).
+   Schedule-specific additions: container queries for full/abbreviated month names,
+   margin-bottom for spacing in the schedule layout. */
 .schedule-months {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 2px;
     margin-bottom: var(--space-4);
-    padding: 3px;
-    background: var(--gray-100);
-    border-radius: var(--radius-lg);
     container-type: inline-size;
-}
-
-.schedule-months__link {
-    flex: 1;
-    min-width: 0;
-    padding: 6px 4px;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--gray-600);
-    text-align: center;
-    text-decoration: none;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    border-radius: var(--radius-md);
-    transition: all var(--transition-fast);
-}
-
-.schedule-months__link:hover {
-    background: white;
-    color: var(--navy-900);
-    box-shadow: var(--shadow-sm);
 }
 
 /* Full/abbreviated month name toggle */
@@ -1708,30 +1449,7 @@ a.schedule-jump-btn:hover {
     margin-top: 1rem;
 }
 
-.draft-submit-btn {
-    font-family: var(--font-display);
-    font-size: 1.125rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 1rem 2rem;
-    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
-    color: white;
-    border: none;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: transform 150ms ease, box-shadow 150ms ease;
-}
-
-.draft-submit-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
-}
-
-.draft-submit-btn:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-}
+/* .draft-submit-btn removed — use .ibl-btn .ibl-btn--primary .ibl-btn--lg instead */
 
 /* ==========================================================================
    Draft Pick Locator Module
@@ -2003,11 +1721,7 @@ a.schedule-jump-btn:hover {
     text-align: center;
 }
 
-.power-rating {
-    font-family: var(--font-display);
-    font-weight: 700;
-    color: var(--accent-500);
-}
+/* .power-rating removed — use .ibl-stat-highlight (tables.css) instead */
 
 /* ==========================================================================
    Injuries Module
@@ -2087,27 +1801,7 @@ a.schedule-jump-btn:hover {
     margin-bottom: var(--space-4);
 }
 
-.waivers-submit-btn {
-    display: block;
-    width: 100%;
-    padding: var(--space-3);
-    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
-    color: white;
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    border: none;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: transform 150ms ease, box-shadow 150ms ease;
-}
-
-.waivers-submit-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
-}
+/* .waivers-submit-btn removed — use .ibl-btn .ibl-btn--primary .ibl-btn--block instead */
 
 /* ==========================================================================
    Depth Chart Module

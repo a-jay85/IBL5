@@ -28,24 +28,33 @@
     box-shadow: var(--shadow-lg);
 }
 
-/* Card Header */
-.ibl-card__header {
+/* Card Header — shared by .ibl-card, .ibl-sidebar-block, and former .ibl-table-header */
+.ibl-card__header,
+.ibl-sidebar-block__header {
     background: var(--gradient-navy-header);
     padding: var(--space-3) var(--space-4);
     color: white;
 }
 
 .ibl-card__header--accent {
-    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+    background: var(--gradient-accent);
 }
 
-.ibl-card__title {
+/* Card Title — shared base across card components */
+.ibl-card__title,
+.ibl-sidebar-block__title,
+.ibl-centerbox__title {
     font-family: var(--font-display);
     font-size: 1.5rem;
-    font-weight: 700;
+    font-weight: 600;
+    color: white;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin: 0;
+}
+
+.ibl-card__title {
+    font-weight: 700;
 }
 
 .ibl-card__subtitle {
@@ -145,20 +154,7 @@
     margin-bottom: var(--space-4);
 }
 
-.ibl-sidebar-block__header {
-    background: var(--gradient-navy-header);
-    padding: var(--space-3) var(--space-4);
-}
-
-.ibl-sidebar-block__title {
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: white;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin: 0;
-}
+/* .ibl-sidebar-block__header and __title now share rules with .ibl-card equivalents above */
 
 .ibl-sidebar-block__body {
     padding: var(--space-4);
@@ -183,20 +179,11 @@
     margin-right: auto;
 }
 
+/* .ibl-centerbox__title now shares rule with .ibl-card__title above */
 .ibl-centerbox__header {
     background: var(--gradient-navy-header);
     padding: var(--space-4) var(--space-6);
     text-align: center;
-}
-
-.ibl-centerbox__title {
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: white;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin: 0;
 }
 
 .ibl-centerbox__content {

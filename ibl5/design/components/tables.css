@@ -628,28 +628,9 @@
     margin: 0 0 1rem 0;
 }
 
-/* ==========================================================================
-   Table Header (integrated header row)
-   ========================================================================== */
-
-.ibl-table-header {
-    background: var(--gradient-navy-header);
-    padding: var(--space-3) var(--space-4);
-    color: white;
-}
-
-.ibl-table-header--accent {
-    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
-}
-
-.ibl-table-header__title {
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin: 0;
-}
+/* .ibl-table-header removed — use .ibl-card__header (cards.css) instead.
+   For accent variant, use .ibl-card__header--accent.
+   For title, use .ibl-card__title. */
 
 /* ==========================================================================
    Table Row Variants
@@ -1057,33 +1038,7 @@
     color: var(--gray-500);
 }
 
-/* Submit button */
-.voting-submit-btn {
-    display: inline-block;
-    margin: var(--space-4) 0;
-    padding: var(--space-3) var(--space-8);
-    font-family: var(--font-display);
-    font-size: 1.125rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: white;
-    background: linear-gradient(135deg, var(--accent-500), var(--accent-600));
-    border: none;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: transform 150ms ease, box-shadow 150ms ease;
-    box-shadow: 0 2px 8px rgb(249 115 22 / 0.3);
-}
-
-.voting-submit-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgb(249 115 22 / 0.4);
-}
-
-.voting-submit-btn:active {
-    transform: translateY(0);
-}
+/* .voting-submit-btn removed — use .ibl-btn .ibl-btn--primary .ibl-btn--lg instead */
 
 /* Mobile adjustments for voting form - keep full table display */
 @media (max-width: 768px) {
@@ -1193,23 +1148,7 @@
     margin: 0.25rem 0;
 }
 
-/* Trading buttons */
-.ibl-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.5rem 1rem;
-    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
-    font-weight: 600;
-    font-size: 1rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    border: none;
-    border-radius: var(--radius-md, 0.375rem);
-    cursor: pointer;
-    transition: all 150ms ease;
-}
-
+/* Trading button variants (base .ibl-btn defined in forms.css) */
 .ibl-btn--primary {
     background: var(--gradient-navy-header);
     color: white;

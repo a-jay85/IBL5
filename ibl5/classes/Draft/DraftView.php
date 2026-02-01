@@ -43,7 +43,7 @@ class DraftView implements DraftViewInterface
 
         $html .= $this->renderPlayerTable($players, $teamLogo, $pickOwner);
         if ($teamLogo == $pickOwner && $this->hasUndraftedPlayers($players)) {
-            $html .= '<div class="draft-submit-container"><button type="submit" class="draft-submit-btn" onclick="this.disabled=true;this.textContent=\'Submitting...\'; this.form.submit();">Draft Player</button></div>';
+            $html .= '<div class="draft-submit-container"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg" onclick="this.disabled=true;this.textContent=\'Submitting...\'; this.form.submit();">Draft Player</button></div>';
         }
 
         $html .= "</form></div>";

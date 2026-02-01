@@ -214,7 +214,7 @@ function userinfo($username)
 		<div class=\"voting-form-container\">
 			<img src=\"images/logo/$tid.jpg\" alt=\"Team Logo\" class=\"team-logo-banner\">";
 
-    echo "<button type=\"submit\" class=\"voting-submit-btn\">Submit Votes!</button>";
+    echo "<button type=\"submit\" class=\"ibl-btn ibl-btn--primary ibl-btn--lg\">Submit Votes!</button>";
 
     $easternConferenceFrontcourt = $easternConferenceBackcourt = "";
     $westernConferenceFrontcourt = $westernConferenceBackcourt = "";
@@ -283,7 +283,7 @@ function userinfo($username)
 
     echo "<input type=\"hidden\" name=\"teamname\" value=\"$voterTeamName\">
 
-		<button type=\"submit\" class=\"voting-submit-btn\">Submit Votes!</button>
+		<button type=\"submit\" class=\"ibl-btn ibl-btn--primary ibl-btn--lg\">Submit Votes!</button>
 	</div>
 	</form>";
 

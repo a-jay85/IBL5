@@ -47,7 +47,7 @@ class TradingView implements TradingViewInterface
     <input type="hidden" name="offeringTeam" value="<?= $userTeam ?>">
     <div style="text-align: center;">
         <img src="images/logo/<?= $userTeamId ?>.jpg" alt="Team Logo" class="team-logo-banner"><br>
-        <h2 class="ibl-table-title">Trading Menu</h2>
+        <h2 class="ibl-title">Trading</h2>
         <table class="trading-layout">
             <tr>
                 <td style="vertical-align: top;">
@@ -120,7 +120,7 @@ class TradingView implements TradingViewInterface
         ?>
 <div style="text-align: center;">
     <img src="images/logo/<?= $userTeamId ?>.jpg" alt="Team Logo" class="team-logo-banner">
-    <h2 class="ibl-table-title">Review Trade Offers</h2>
+    <h2 class="ibl-title">Trading</h2>
 </div>
 <table class="trading-layout" style="margin: 0 auto;">
     <tr>

@@ -42,8 +42,8 @@ class DraftHistoryView implements DraftHistoryViewInterface
         $teamId = (int) $team->teamID;
 
         $output = $this->getStyleBlock();
-        $output .= "<img src=\"images/logo/{$teamId}.jpg\" alt=\"\" class=\"team-logo-banner\">";
         $output .= "<h2 class=\"ibl-title\">{$teamName} Draft History</h2>";
+        $output .= "<img src=\"images/logo/{$teamId}.jpg\" alt=\"\" class=\"team-logo-banner\">";
 
         if (empty($draftPicks)) {
             $output .= '<p class="draft-no-data">No draft history found.</p>';
@@ -89,6 +89,11 @@ class DraftHistoryView implements DraftHistoryViewInterface
     outline: none;
     border-color: var(--navy-500, #1e3a5f);
     box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+}
+.draft-retired-badge {
+    font-size: 0.75em;
+    color: var(--gray-400, #9ca3af);
+    vertical-align: baseline;
 }
 .draft-history-table .name-cell {
     white-space: nowrap;
@@ -260,9 +265,9 @@ class DraftHistoryView implements DraftHistoryViewInterface
             $pickNo = (int) ($pick['draftpickno'] ?? 0);
             $draftYear = (int) ($pick['draftyear'] ?? 0);
             $college = HtmlSanitizer::safeHtmlOutput($pick['college'] ?? '');
-            $retired = ($pick['retired'] ?? '0') === '0';
+            $isRetired = (int) ($pick['retired'] ?? 0) === 1;
 
-            $retiredBadge = $retired ? '' : ' (ret.)';
+            $retiredBadge = $isRetired ? ' <span class="draft-retired-badge">(ret.)</span>' : '';
             $playerImage = "images/player/{$pid}.jpg";
 
             $output .= "<tr>

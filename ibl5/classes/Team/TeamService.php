@@ -7,6 +7,7 @@ namespace Team;
 use Team\Contracts\TeamServiceInterface;
 use Team\Contracts\TeamRepositoryInterface;
 use UI\Components\StartersLineupComponent;
+use UI\Components\TableViewSwitcher;
 
 /**
  * @see TeamServiceInterface
@@ -59,9 +60,28 @@ class TeamService implements TeamServiceInterface
 
         $insertyear = ($yr !== null && $yr !== '') ? "&yr=$yr" : "";
 
-        $tabsHtml = $this->renderTabs($teamID, $display, $insertyear, $season);
+        $tabDefinitions = [
+            'ratings' => 'Ratings',
+            'total_s' => 'Season Totals',
+            'avg_s' => 'Season Averages',
+            'per36mins' => 'Per 36 Minutes',
+            'chunk' => 'Sim Averages',
+        ];
 
-        $tableOutput = $this->getTableOutput($display, $result, $team, $yr, $season, $sharedFunctions, $tabsHtml);
+        if (in_array($season->phase, ["Playoffs", "Draft", "Free Agency"])) {
+            $tabDefinitions['playoffs'] = 'Playoffs Averages';
+        }
+
+        $tabDefinitions['contracts'] = 'Contracts';
+
+        $baseUrl = "modules.php?name=Team&op=team&teamID=$teamID" . $insertyear;
+        $teamData = $this->repository->getTeam($teamID);
+        $teamColor1 = $teamData['color1'] ?? '000000';
+        $teamColor2 = $teamData['color2'] ?? 'FFFFFF';
+
+        $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $teamColor1, $teamColor2);
+        $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $sharedFunctions);
+        $tableOutput = $switcher->wrap($tableHtml);
 
         $startersTable = "";
         if ($teamID > 0 && ($yr === null || $yr === '')) {
@@ -126,102 +146,26 @@ class TeamService implements TeamServiceInterface
     }
 
     /**
-     * Render tab navigation for team display selection
-     *
-     * Absorbed from TeamUIService::renderTabs()
+     * Render the appropriate table HTML based on display type
      */
-    private function renderTabs(int $teamID, string $display, string $insertyear, object $season): string
-    {
-        $tabDefinitions = [
-            'ratings' => 'Ratings',
-            'total_s' => 'Season Totals',
-            'avg_s' => 'Season Averages',
-            'per36mins' => 'Per 36 Minutes',
-            'chunk' => 'Sim Averages',
-        ];
-
-        if (in_array($season->phase, ["Playoffs", "Draft", "Free Agency"])) {
-            $tabDefinitions['playoffs'] = 'Playoffs Averages';
-        }
-
-        $tabDefinitions['contracts'] = 'Contracts';
-
-        $teamData = $this->repository->getTeam($teamID);
-        $teamColor1 = \UI\TableStyles::sanitizeColor($teamData['color1'] ?? '000000');
-        $teamColor2 = \UI\TableStyles::sanitizeColor($teamData['color2'] ?? 'FFFFFF');
-
-        $tabs = '';
-        foreach ($tabDefinitions as $tabKey => $tabLabel) {
-            $tabs .= $this->buildTab($tabKey, $tabLabel, $display, $teamID, $insertyear);
-        }
-
-        return '<div class="ibl-tabs" style="--team-tab-bg-color: #' . $teamColor1 . '; --team-tab-active-color: #' . $teamColor2 . '">' . $tabs . '</div>';
-    }
-
-    /**
-     * Build a single tab link
-     *
-     * Absorbed from TeamUIService::buildTab()
-     */
-    private function buildTab(string $tabKey, string $tabLabel, string $display, int $teamID, string $insertyear): string
-    {
-        $activeClass = ($display === $tabKey) ? ' ibl-tab--active' : '';
-        $href = "modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;display=$tabKey" . \Utilities\HtmlSanitizer::safeHtmlOutput($insertyear);
-
-        return '<a href="' . $href . '" class="ibl-tab' . $activeClass . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($tabLabel) . '</a>';
-    }
-
-    /**
-     * Get the appropriate table output based on display type
-     *
-     * Absorbed from TeamUIService::getTableOutput()
-     */
-    private function getTableOutput(string $display, mixed $result, object $team, ?string $yr, object $season, object $sharedFunctions, string $tabsHtml): string
+    private function renderTableForDisplay(string $display, mixed $result, object $team, ?string $yr, object $season, object $sharedFunctions): string
     {
         switch ($display) {
-            case 'ratings':
-                $html = \UI::ratings($this->db, $result, $team, $yr, $season);
-                break;
             case 'total_s':
-                $html = \UI::seasonTotals($this->db, $result, $team, $yr);
-                break;
+                return \UI::seasonTotals($this->db, $result, $team, $yr);
             case 'avg_s':
-                $html = \UI::seasonAverages($this->db, $result, $team, $yr);
-                break;
+                return \UI::seasonAverages($this->db, $result, $team, $yr);
             case 'per36mins':
-                $html = \UI::per36Minutes($this->db, $result, $team, $yr);
-                break;
+                return \UI::per36Minutes($this->db, $result, $team, $yr);
             case 'chunk':
-                $html = \UI::periodAverages($this->db, $team, $season);
-                break;
+                return \UI::periodAverages($this->db, $team, $season);
             case 'playoffs':
-                $html = \UI::periodAverages($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate);
-                break;
+                return \UI::periodAverages($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate);
             case 'contracts':
-                $html = \UI::contracts($this->db, $result, $team, $sharedFunctions);
-                break;
+                return \UI::contracts($this->db, $result, $team, $sharedFunctions);
             default:
-                $html = \UI::ratings($this->db, $result, $team, $yr, $season);
-                break;
+                return \UI::ratings($this->db, $result, $team, $yr, $season);
         }
-
-        return $this->injectCaption($html, $tabsHtml);
-    }
-
-    /**
-     * Inject tabs HTML as a <caption> element inside the table
-     *
-     * Inserts a <caption> immediately after the opening <table ...> tag
-     * so tabs inherit the table's width by definition.
-     */
-    private function injectCaption(string $tableHtml, string $tabsHtml): string
-    {
-        return preg_replace(
-            '/(<table\b[^>]*>)/i',
-            '$1<caption class="team-table-caption">' . $tabsHtml . '</caption>',
-            $tableHtml,
-            1
-        );
     }
 
     /**

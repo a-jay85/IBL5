@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Waivers;
 
 use Player\Player;
+use UI\Components\TableViewSwitcher;
 use Waivers\Contracts\WaiversControllerInterface;
 
 /**
@@ -211,16 +212,18 @@ class WaiversController implements WaiversControllerInterface
     
     private function displayWaiverForm(array $userInfo, string $action, string $errorMessage): void
     {
+        $display = $_REQUEST['display'] ?? 'ratings';
+
         \Nuke\Header::header();
 
         $team = \Team::initialize($this->db, $userInfo['user_ibl_team']);
 
         $season = new \Season($this->db);
         $players = $this->getPlayersForAction($team, $action);
-        
+
         $openRosterSpots = 15 - count($team->getHealthyAndInjuredPlayersOrderedByNameResult($season));
         $healthyOpenRosterSpots = 15 - count($team->getHealthyPlayersOrderedByNameResult($season));
-        
+
         $this->view->renderWaiverForm(
             $team->name,
             $team->teamID,
@@ -230,23 +233,51 @@ class WaiversController implements WaiversControllerInterface
             $healthyOpenRosterSpots,
             $errorMessage
         );
-        
-        // Display player ratings table
+
+        // Display player table with view switcher
         $league = new \League($this->db);
-        
+
         if ($action === 'drop') {
             $result = $team->getHealthyAndInjuredPlayersOrderedByNameResult($season);
+            $styleTeam = $team;
         } elseif ($season->phase === 'Free Agency') {
             $result = $league->getFreeAgentsResult($season);
+            $styleTeam = \Team::initialize($this->db, \League::FREE_AGENTS_TEAMID);
         } else {
             $result = $league->getWaivedPlayersResult();
+            $styleTeam = \Team::initialize($this->db, \League::FREE_AGENTS_TEAMID);
         }
-        
-        $teamFreeAgency = \Team::initialize($this->db, \League::FREE_AGENTS_TEAMID);
-        $tableRatings = \UI::ratings($this->db, $result, $teamFreeAgency, "", $season);
-        echo $tableRatings;
-        
+
+        $tabDefinitions = [
+            'ratings' => 'Ratings',
+            'total_s' => 'Season Totals',
+            'avg_s' => 'Season Averages',
+            'per36mins' => 'Per 36 Minutes',
+        ];
+
+        $baseUrl = 'modules.php?name=Waivers&action=' . $action;
+        $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $styleTeam->color1, $styleTeam->color2);
+        $tableHtml = $this->renderTableForDisplay($display, $result, $styleTeam, $season);
+        echo $switcher->wrap($tableHtml);
+
         \Nuke\Footer::footer();
+    }
+
+    /**
+     * Render the appropriate table HTML based on display type
+     */
+    private function renderTableForDisplay(string $display, array $result, object $team, object $season): string
+    {
+        switch ($display) {
+            case 'total_s':
+                return \UI::seasonTotals($this->db, $result, $team, '');
+            case 'avg_s':
+                return \UI::seasonAverages($this->db, $result, $team, '');
+            case 'per36mins':
+                return \UI::per36Minutes($this->db, $result, $team, '');
+            default:
+                return \UI::ratings($this->db, $result, $team, '', $season);
+        }
     }
 
     private function getPlayersForAction($team, string $action): array

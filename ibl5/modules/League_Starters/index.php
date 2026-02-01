@@ -40,10 +40,11 @@ $view = new LeagueStartersView($mysqli_db, $season, $module_name);
 
 // Get starters by position
 $startersByPosition = $service->getAllStartersByPosition();
+$display = $_REQUEST['display'] ?? 'ratings';
 
 // Render page
 Nuke\Header::header();
 
-echo $view->render($startersByPosition, $userTeam);
+echo $view->render($startersByPosition, $userTeam, $display);
 
 Nuke\Footer::footer();

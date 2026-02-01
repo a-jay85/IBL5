@@ -26,8 +26,13 @@ class SeasonAverages
         $playerRows = [];
         foreach ($result as $plrRow) {
             if ($yr == "") {
-                $player = Player::withPlrRow($db, $plrRow);
-                $playerStats = PlayerStats::withPlrRow($db, $plrRow);
+                if ($plrRow instanceof Player) {
+                    $player = $plrRow;
+                    $playerStats = PlayerStats::withPlayerID($db, (int) $player->playerID);
+                } else {
+                    $player = Player::withPlrRow($db, $plrRow);
+                    $playerStats = PlayerStats::withPlrRow($db, $plrRow);
+                }
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1);
                 if ($firstCharacterOfPlayerName == '|') {

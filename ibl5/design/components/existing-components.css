@@ -2819,34 +2819,6 @@ table.sortable thead th {
     color: var(--gray-300);
 }
 
-/* Match type badges */
-.search-result__match {
-    display: inline-block;
-    font-family: var(--font-display);
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 2px var(--space-2);
-    border-radius: var(--radius-full);
-    flex-shrink: 0;
-}
-
-.search-result__match--title {
-    background: var(--accent-100);
-    color: var(--accent-600);
-}
-
-.search-result__match--text {
-    background: var(--info-100);
-    color: var(--info-600);
-}
-
-.search-result__match--both {
-    background: var(--success-100);
-    color: var(--success-600);
-}
-
 /* Result metadata */
 .search-result__meta {
     display: flex;

@@ -72,7 +72,7 @@ function userinfo($username)
 			function ShowAndHide$votingCategory() {
 				var x = document.getElementById('$votingCategory');
 				if (x.style.display == 'none') {
-					x.style.display = 'block';
+					x.style.display = '';
 				} else {
 					x.style.display = 'none';
 				}

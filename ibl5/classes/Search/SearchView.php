@@ -36,10 +36,6 @@ class SearchView implements SearchViewInterface
 
         $output .= '</div>';
 
-        if ($data['query'] !== '' && $data['results'] !== null) {
-            $output .= $this->renderExternalLinks($data['query']);
-        }
-
         return $output;
     }
 
@@ -421,22 +417,4 @@ class SearchView implements SearchViewInterface
         return $output;
     }
 
-    /**
-     * Render external search links section.
-     */
-    private function renderExternalLinks(string $query): string
-    {
-        $safeQuery = HtmlSanitizer::safeHtmlOutput($query);
-
-        $output = '<div class="search-external">';
-        $output .= '<div class="search-external__header">';
-        $output .= '<span class="search-external__title">' . HtmlSanitizer::safeHtmlOutput(_DIDNOTFIND) . '</span>';
-        $output .= '</div>';
-        $output .= '<p class="search-external__text">' . HtmlSanitizer::safeHtmlOutput(_SEARCH) . ' "<strong>' . $safeQuery . '</strong>" ' . HtmlSanitizer::safeHtmlOutput(_ON) . ':</p>';
-        $output .= '<ul class="search-external__links">';
-        $output .= '<li><a href="https://www.google.com/search?q=' . urlencode($query) . '" target="_blank" rel="noopener">Google</a></li>';
-        $output .= '</ul></div>';
-
-        return $output;
-    }
 }

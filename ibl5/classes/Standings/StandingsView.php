@@ -204,15 +204,15 @@ class StandingsView implements StandingsViewInterface
     {
         $teamName = \Utilities\HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
-        if ($team['clinchedConference'] == 1) {
+        if ($team['clinchedConference'] === 1) {
             return '<span class="ibl-clinched-indicator">Z</span>-' . $teamName;
         }
 
-        if ($team['clinchedDivision'] == 1) {
+        if ($team['clinchedDivision'] === 1) {
             return '<span class="ibl-clinched-indicator">Y</span>-' . $teamName;
         }
 
-        if ($team['clinchedPlayoffs'] == 1) {
+        if ($team['clinchedPlayoffs'] === 1) {
             return '<span class="ibl-clinched-indicator">X</span>-' . $teamName;
         }
 

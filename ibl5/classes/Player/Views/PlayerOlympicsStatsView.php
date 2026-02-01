@@ -154,7 +154,7 @@ class PlayerOlympicsStatsView implements PlayerOlympicsStatsViewInterface
         <?php
         foreach ($olympicsStats as $stats) {
             $games = $stats['games'];
-            if ($games == 0) {
+            if ($games === 0) {
                 continue;
             }
 

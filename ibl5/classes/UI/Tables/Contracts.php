@@ -24,7 +24,7 @@ class Contracts
     {
         $season = new \Season($db);
 
-        if ($sharedFunctions->isFreeAgencyModuleActive() == 1) {
+        if ($sharedFunctions->isFreeAgencyModuleActive() === 1) {
             $season->endingYear++;
         }
 
@@ -35,14 +35,14 @@ class Contracts
             $player = Player::withPlrRow($db, $plrRow);
 
             // Calculate contract year offset based on free agency status
-            $yearOffset = ($sharedFunctions->isFreeAgencyModuleActive() == 0) ? 0 : 1;
-            
+            $yearOffset = ($sharedFunctions->isFreeAgencyModuleActive() === 0) ? 0 : 1;
+
             // Calculate contract values for each year
             $contracts = [];
             for ($y = 1; $y <= 6; $y++) {
                 $yearNum = $player->contractCurrentYear + ($y - 1) + $yearOffset;
                 if ($yearNum < 7) {
-                    if ($player->contractCurrentYear == 0) {
+                    if ($player->contractCurrentYear === 0) {
                         $contracts[$y] = $player->{'contractYear' . $y . 'Salary'};
                     } else {
                         $contracts[$y] = $player->{'contractYear' . $yearNum . 'Salary'};

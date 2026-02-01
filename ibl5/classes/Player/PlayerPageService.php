@@ -54,12 +54,12 @@ class PlayerPageService implements PlayerPageServiceInterface
             return false;
         }
 
-        return $userTeam->name != "Free Agents"
-            && $userTeam->hasUsedExtensionThisSeason == 0
+        return $userTeam->name !== "Free Agents"
+            && $userTeam->hasUsedExtensionThisSeason === 0
             && $player->canRenegotiateContract()
-            && $player->teamName == $userTeam->name
-            && $season->phase != 'Draft'
-            && $season->phase != 'Free Agency';
+            && $player->teamName === $userTeam->name
+            && $season->phase !== 'Draft'
+            && $season->phase !== 'Free Agency';
     }
 
     /**

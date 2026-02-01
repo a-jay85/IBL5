@@ -65,7 +65,7 @@ class Ratings
                 'isHighlight' => $isHighlight,
                 'injuryDays' => $injuryDays,
                 'injuryReturnDate' => $injuryReturnDate,
-                'addSeparator' => (($i % 2) == 0 && $moduleName == "Next_Sim" && $i > 0),
+                'addSeparator' => (($i % 2) === 0 && $moduleName === "Next_Sim" && $i > 0),
             ];
 
             $i++;

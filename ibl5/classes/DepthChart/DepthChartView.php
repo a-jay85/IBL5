@@ -80,8 +80,8 @@ class DepthChartView implements DepthChartViewInterface
         $options = [2, 1, 0, -1, -2];
 
         foreach ($options as $value) {
-            $selected = ($selectedValue == $value) ? ' SELECTED' : '';
-            $label = ($value == 0) ? '-' : $value;
+            $selected = ($selectedValue === $value) ? ' SELECTED' : '';
+            $label = ($value === 0) ? '-' : $value;
             echo "<option value=\"$value\"$selected>$label</option>";
         }
     }
@@ -91,7 +91,7 @@ class DepthChartView implements DepthChartViewInterface
      */
     public function renderActiveOptions(int $selectedValue): void
     {
-        if ($selectedValue == 1) {
+        if ($selectedValue === 1) {
             echo '<option value="1" SELECTED>Yes</option><option value="0">No</option>';
         } else {
             echo '<option value="1">Yes</option><option value="0" SELECTED>No</option>';
@@ -103,10 +103,10 @@ class DepthChartView implements DepthChartViewInterface
      */
     public function renderMinutesOptions(int $selectedValue, int $staminaCap): void
     {
-        echo '<option value="0"' . ($selectedValue == 0 ? ' SELECTED' : '') . '>Auto</option>';
+        echo '<option value="0"' . ($selectedValue === 0 ? ' SELECTED' : '') . '>Auto</option>';
 
         for ($i = 1; $i <= $staminaCap; $i++) {
-            $selected = ($selectedValue == $i) ? ' SELECTED' : '';
+            $selected = ($selectedValue === $i) ? ' SELECTED' : '';
             echo "<option value=\"$i\"$selected>$i</option>";
         }
     }

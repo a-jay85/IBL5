@@ -137,7 +137,7 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
         $stmt->execute();
         $result = $stmt->get_result();
 
-        if ($result->num_rows == 0) {
+        if ($result->num_rows === 0) {
             $stmt->close();
             return null;
         }
@@ -154,7 +154,7 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
         $stmt->execute();
         $result = $stmt->get_result();
 
-        if ($result->num_rows == 0) {
+        if ($result->num_rows === 0) {
             $stmt->close();
             return null;
         }
@@ -174,10 +174,10 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
     private function calculateOfferYears($offer)
     {
         $years = 5;
-        if ($offer['year5'] == 0) {
+        if ($offer['year5'] === 0) {
             $years = 4;
         }
-        if ($offer['year4'] == 0) {
+        if ($offer['year4'] === 0) {
             $years = 3;
         }
         return $years;

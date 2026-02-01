@@ -39,8 +39,8 @@ class Team
             $bannername = $banner['bannername'] ?? '';
             $bannertype = $banner['bannertype'] ?? 0;
 
-            if ($bannertype == 1) {
-                if ($championships % 5 == 0) {
+            if ($bannertype === 1) {
+                if ($championships % 5 === 0) {
                     $ibl_banner .= "<tr><td align=\"center\"><table><tr>";
                 }
                 $ibl_banner .= "<td><table><tr bgcolor=$team->color1><td valign=top height=80 width=120 background=\"./images/banners/banner1.gif\"><font color=#$team->color2>
@@ -49,27 +49,27 @@ class Team
 
                 $championships++;
 
-                if ($championships % 5 == 0) {
+                if ($championships % 5 === 0) {
                     $ibl_banner .= "</tr></td></table></tr>";
                 }
 
-                if ($champ_text == "") {
+                if ($champ_text === "") {
                     $champ_text = "$banneryear";
                 } else {
                     $champ_text .= ", $banneryear";
                 }
-                if ($bannername != $team->name) {
+                if ($bannername !== $team->name) {
                     $champ_text .= " (as $bannername)";
                 }
-            } else if ($bannertype == 2 or $bannertype == 3) {
-                if ($conference_titles % 5 == 0) {
+            } else if ($bannertype === 2 or $bannertype === 3) {
+                if ($conference_titles % 5 === 0) {
                     $conf_banner .= "<tr><td align=\"center\"><table><tr>";
                 }
 
                 $conf_banner .= "<td><table><tr bgcolor=$team->color1><td valign=top height=80 width=120 background=\"./images/banners/banner2.gif\"><font color=#$team->color2>
                     <center><b>$banneryear<br>
                     $bannername<br>";
-                if ($bannertype == 2) {
+                if ($bannertype === 2) {
                     $conf_banner .= "Eastern Conf. Champions</b></center></td></tr></table></td>";
                 } else {
                     $conf_banner .= "Western Conf. Champions</b></center></td></tr></table></td>";
@@ -77,74 +77,74 @@ class Team
 
                 $conference_titles++;
 
-                if ($conference_titles % 5 == 0) {
+                if ($conference_titles % 5 === 0) {
                     $conf_banner .= "</tr></table></td></tr>";
                 }
 
-                if ($conf_text == "") {
+                if ($conf_text === "") {
                     $conf_text = "$banneryear";
                 } else {
                     $conf_text .= ", $banneryear";
                 }
-                if ($bannername != $team->name) {
+                if ($bannername !== $team->name) {
                     $conf_text .= " (as $bannername)";
                 }
-            } else if ($bannertype == 4 or $bannertype == 5 or $bannertype == 6 or $bannertype == 7) {
-                if ($division_titles % 5 == 0) {
+            } else if ($bannertype === 4 or $bannertype === 5 or $bannertype === 6 or $bannertype === 7) {
+                if ($division_titles % 5 === 0) {
                     $div_banner .= "<tr><td align=\"center\"><table><tr>";
                 }
                 $div_banner .= "<td><table><tr bgcolor=$team->color1><td valign=top height=80 width=120><font color=#$team->color2>
                     <center><b>$banneryear<br>
                     $bannername<br>";
-                if ($bannertype == 4) {
+                if ($bannertype === 4) {
                     $div_banner .= "Atlantic Div. Champions</b></center></td></tr></table></td>";
-                } else if ($bannertype == 5) {
+                } else if ($bannertype === 5) {
                     $div_banner .= "Central Div. Champions</b></center></td></tr></table></td>";
-                } else if ($bannertype == 6) {
+                } else if ($bannertype === 6) {
                     $div_banner .= "Midwest Div. Champions</b></center></td></tr></table></td>";
-                } else if ($bannertype == 7) {
+                } else if ($bannertype === 7) {
                     $div_banner .= "Pacific Div. Champions</b></center></td></tr></table></td>";
                 }
 
                 $division_titles++;
 
-                if ($division_titles % 5 == 0) {
+                if ($division_titles % 5 === 0) {
                     $div_banner .= "</tr></table></td></tr>";
                 }
 
-                if ($div_text == "") {
+                if ($div_text === "") {
                     $div_text = "$banneryear";
                 } else {
                     $div_text .= ", $banneryear";
                 }
-                if ($bannername != $team->team_name) {
+                if ($bannername !== $team->team_name) {
                     $div_text .= " (as $bannername)";
                 }
             }
             $j++;
         }
 
-        if (substr($ibl_banner, -23) != "</tr></table></td></tr>" and $ibl_banner != "") {
+        if (substr($ibl_banner, -23) !== "</tr></table></td></tr>" and $ibl_banner !== "") {
             $ibl_banner .= "</tr></table></td></tr>";
         }
-        if (substr($conf_banner, -23) != "</tr></table></td></tr>" and $conf_banner != "") {
+        if (substr($conf_banner, -23) !== "</tr></table></td></tr>" and $conf_banner !== "") {
             $conf_banner .= "</tr></table></td></tr>";
         }
-        if (substr($div_banner, -23) != "</tr></table></td></tr>" and $div_banner != "") {
+        if (substr($div_banner, -23) !== "</tr></table></td></tr>" and $div_banner !== "") {
             $div_banner .= "</tr></table></td></tr>";
         }
 
         $banner_output = "";
-        if ($ibl_banner != "") {
+        if ($ibl_banner !== "") {
             $banner_output .= $ibl_banner;
         }
-        if ($conf_banner != "") {
+        if ($conf_banner !== "") {
             $banner_output .= $conf_banner;
         }
-        if ($div_banner != "") {
+        if ($div_banner !== "") {
             $banner_output .= $div_banner;
         }
-        if ($banner_output != "") {
+        if ($banner_output !== "") {
             $banner_output = "<center><table><tr><td bgcolor=\"#$team->color1\" align=\"center\"><font color=\"#$team->color2\"><h2>$team->team_name Banners</h2></font></td></tr>" . $banner_output . "</table></center>";
         }
 
@@ -225,7 +225,7 @@ class Team
                         <td align='right'><b>Arena:</td>
                         <td>$team->arena</td>
                     </tr>";
-        if ($team->capacity != 0) {
+        if ($team->capacity !== 0) {
             $output .= "
                     <tr>
                         <td align='right'><b>Capacity:</td>
@@ -394,15 +394,15 @@ class Team
             $playoffloser = $playoff['loser'] ?? '';
             $playoffloser_games = $playoff['loser_games'] ?? 0;
 
-            if ($playoffround == 1) {
-                if ($playoffwinner == $team->name) {
+            if ($playoffround === 1) {
+                if ($playoffwinner === $team->name) {
                     $totalplayoffwins += 4;
                     $totalplayofflosses += $playoffloser_games;
                     $first_wins += 4;
                     $first_losses += $playoffloser_games;
                     $first_round_victories++;
                     $round_one_output .= "$playoffyear - $team->name 4, $playoffloser $playoffloser_games<br>";
-                } else if ($playoffloser == $team->name) {
+                } else if ($playoffloser === $team->name) {
                     $totalplayofflosses += 4;
                     $totalplayoffwins += $playoffloser_games;
                     $first_losses += 4;
@@ -410,15 +410,15 @@ class Team
                     $first_round_losses++;
                     $round_one_output .= "$playoffyear - $playoffwinner 4, $team->name $playoffloser_games<br>";
                 }
-            } else if ($playoffround == 2) {
-                if ($playoffwinner == $team->name) {
+            } else if ($playoffround === 2) {
+                if ($playoffwinner === $team->name) {
                     $totalplayoffwins += 4;
                     $totalplayofflosses += $playoffloser_games;
                     $second_wins += 4;
                     $second_losses += $playoffloser_games;
                     $second_round_victories++;
                     $round_two_output .= "$playoffyear - $team->name 4, $playoffloser $playoffloser_games<br>";
-                } else if ($playoffloser == $team->name) {
+                } else if ($playoffloser === $team->name) {
                     $totalplayofflosses += 4;
                     $totalplayoffwins += $playoffloser_games;
                     $second_losses += 4;
@@ -426,15 +426,15 @@ class Team
                     $second_round_losses++;
                     $round_two_output .= "$playoffyear - $playoffwinner 4, $team->name $playoffloser_games<br>";
                 }
-            } else if ($playoffround == 3) {
-                if ($playoffwinner == $team->name) {
+            } else if ($playoffround === 3) {
+                if ($playoffwinner === $team->name) {
                     $totalplayoffwins += 4;
                     $totalplayofflosses += $playoffloser_games;
                     $third_wins += 4;
                     $third_losses += $playoffloser_games;
                     $third_round_victories++;
                     $round_three_output .= "$playoffyear - $team->name 4, $playoffloser $playoffloser_games<br>";
-                } else if ($playoffloser == $team->name) {
+                } else if ($playoffloser === $team->name) {
                     $totalplayofflosses += 4;
                     $totalplayoffwins += $playoffloser_games;
                     $third_losses += 4;
@@ -442,15 +442,15 @@ class Team
                     $third_round_losses++;
                     $round_three_output .= "$playoffyear - $playoffwinner 4, $team->name $playoffloser_games<br>";
                 }
-            } else if ($playoffround == 4) {
-                if ($playoffwinner == $team->name) {
+            } else if ($playoffround === 4) {
+                if ($playoffwinner === $team->name) {
                     $totalplayoffwins += 4;
                     $totalplayofflosses += $playoffloser_games;
                     $fourth_wins += 4;
                     $fourth_losses += $playoffloser_games;
                     $fourth_round_victories++;
                     $round_four_output .= "$playoffyear - $team->name 4, $playoffloser $playoffloser_games<br>";
-                } else if ($playoffloser == $team->name) {
+                } else if ($playoffloser === $team->name) {
                     $totalplayofflosses += 4;
                     $totalplayoffwins += $playoffloser_games;
                     $fourth_losses += 4;
@@ -461,9 +461,9 @@ class Team
             }
         }
 
-        $pwlpct = ($totalplayoffwins + $totalplayofflosses != 0) ? number_format($totalplayoffwins / ($totalplayoffwins + $totalplayofflosses), 3) : "0.000";
-        $r1wlpct = ($first_round_victories + $first_round_losses != 0) ? number_format($first_round_victories / ($first_round_victories + $first_round_losses), 3) : "0.000";
-        $r2wlpct = ($second_round_victories + $second_round_losses != 0) ? number_format($second_round_victories / ($second_round_victories + $second_round_losses), 3) : "0.000";
+        $pwlpct = ($totalplayoffwins + $totalplayofflosses !== 0) ? number_format($totalplayoffwins / ($totalplayoffwins + $totalplayofflosses), 3) : "0.000";
+        $r1wlpct = ($first_round_victories + $first_round_losses !== 0) ? number_format($first_round_victories / ($first_round_victories + $first_round_losses), 3) : "0.000";
+        $r2wlpct = ($second_round_victories + $second_round_losses !== 0) ? number_format($second_round_victories / ($second_round_victories + $second_round_losses), 3) : "0.000";
         $r3wlpct = ($third_round_victories + $third_round_losses) ? number_format($third_round_victories / ($third_round_victories + $third_round_losses), 3) : "0.000";
         $r4wlpct = ($fourth_round_victories + $fourth_round_losses) ? number_format($fourth_round_victories / ($fourth_round_victories + $fourth_round_losses), 3) : "0.000";
         $round_victories = $first_round_victories + $second_round_victories + $third_round_victories + $fourth_round_victories;

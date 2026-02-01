@@ -87,7 +87,7 @@ class SeasonLeadersService implements SeasonLeadersServiceInterface
      */
     private function calculateQualityAssessment(array $stats): string
     {
-        if ($stats['games'] == 0) {
+        if ($stats['games'] === 0) {
             return "0.0";
         }
         

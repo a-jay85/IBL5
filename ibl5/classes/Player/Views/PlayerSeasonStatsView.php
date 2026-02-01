@@ -158,7 +158,7 @@ class PlayerSeasonStatsView implements PlayerSeasonStatsViewInterface
         <?php
         foreach ($historicalStats as $stats) {
             $games = $stats['games'];
-            if ($games == 0) {
+            if ($games === 0) {
                 continue;
             }
 

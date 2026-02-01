@@ -293,6 +293,7 @@ class NavigationView
                 'icon' => '<img src="/ibl5/images/logo/new' . $this->teamId . '.png" alt="Team Logo" class="w-6 h-6 object-contain">',
                 'links' => [
                     ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamID=' . $this->teamId],
+                    ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule&teamID=' . $this->teamId],
                     ['label' => 'Next Sim', 'url' => 'modules.php?name=Next_Sim', 'badge' => 'NEW'],
                     ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=Depth_Chart_Entry'],
                     ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],

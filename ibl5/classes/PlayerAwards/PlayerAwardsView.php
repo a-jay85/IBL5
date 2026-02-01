@@ -9,10 +9,10 @@ use Utilities\HtmlSanitizer;
 
 /**
  * PlayerAwardsView - HTML rendering for player awards search interface
- * 
+ *
  * Implements the view contract defined in PlayerAwardsViewInterface.
  * See the interface for detailed behavior documentation.
- * 
+ *
  * @see PlayerAwardsViewInterface
  */
 class PlayerAwardsView implements PlayerAwardsViewInterface
@@ -20,8 +20,6 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
     private PlayerAwardsService $service;
 
     /**
-     * Constructor with dependency injection
-     * 
      * @param PlayerAwardsService $service Service for getting sort options
      */
     public function __construct(PlayerAwardsService $service)
@@ -41,47 +39,46 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
 
         $sortOptions = $this->service->getSortOptions();
 
-        ob_start();
-        ?>
-<style>
-    .player-awards-form table {
-        border: 1px solid #000;
-    }
-    .player-awards-form td {
-        padding: 4px 8px;
-    }
-    .player-awards-form input[type="text"] {
-        padding: 2px 4px;
-    }
-</style>
+        $output = '<form method="post" action="modules.php?name=Player_Awards" class="ibl-filter-form">';
 
-<div class="table-scroll-wrapper">
-<div class="table-scroll-container">
-<p>Partial matches on a name or award are okay and are <strong>not</strong> case sensitive
-(e.g., entering "Dard" will match with "Darden" and "Bedard").</p>
+        // Input row
+        $output .= '<div class="ibl-filter-form__row">';
+        $output .= '<div class="ibl-filter-form__group">';
+        $output .= '<label class="ibl-filter-form__label" for="aw_name">Name</label>';
+        $output .= '<input type="text" name="aw_name" id="aw_name" value="' . $name . '" placeholder="Player name...">';
+        $output .= '</div>';
 
-<form name="Search" method="post" action="modules.php?name=Player_Awards" class="player-awards-form">
-    <table>
-        <tr>
-            <td>NAME: <input type="text" name="aw_name" size="32" value="<?= $name ?>"></td>
-            <td>AWARD: <input type="text" name="aw_Award" size="32" value="<?= $award ?>"></td>
-            <td>Year: <input type="text" name="aw_year" size="4" value="<?= $year ?>"></td>
-        </tr>
-        <tr>
-            <td colspan="3">SORT BY:
-            <?php foreach ($sortOptions as $value => $label): ?>
-                <?php $checked = ($sortby == $value) ? ' checked' : ''; ?>
-                <input type="radio" name="aw_sortby" value="<?= $value ?>"<?= $checked ?>> <?= HtmlSanitizer::safeHtmlOutput($label) ?> |
-            <?php endforeach; ?>
-            </td>
-        </tr>
-    </table>
-    <input type="submit" value="Search for Matches!">
-</form>
-</div>
-</div>
-        <?php
-        return ob_get_clean();
+        $output .= '<div class="ibl-filter-form__group">';
+        $output .= '<label class="ibl-filter-form__label" for="aw_Award">Award</label>';
+        $output .= '<input type="text" name="aw_Award" id="aw_Award" value="' . $award . '" placeholder="Award name...">';
+        $output .= '</div>';
+
+        $output .= '<div class="ibl-filter-form__group">';
+        $output .= '<label class="ibl-filter-form__label" for="aw_year">Year</label>';
+        $output .= '<input type="text" name="aw_year" id="aw_year" value="' . $year . '" placeholder="Year" style="width: 5rem;">';
+        $output .= '</div>';
+        $output .= '</div>';
+
+        // Sort row
+        $output .= '<div class="ibl-filter-form__row" style="margin-top: var(--space-3);">';
+        $output .= '<div class="ibl-filter-form__group">';
+        $output .= '<span class="ibl-filter-form__label">Sort by</span>';
+        foreach ($sortOptions as $value => $label) {
+            $checked = ($sortby === $value) ? ' checked' : '';
+            $id = 'sort-' . $value;
+            $output .= '<label class="player-awards-sort__option" for="' . $id . '">';
+            $output .= '<input type="radio" name="aw_sortby" value="' . $value . '" id="' . $id . '"' . $checked . '>';
+            $output .= ' <span>' . HtmlSanitizer::safeHtmlOutput($label) . '</span>';
+            $output .= '</label>';
+        }
+        $output .= '</div>';
+
+        $output .= '<button type="submit" class="ibl-filter-form__submit">Search</button>';
+        $output .= '</div>';
+
+        $output .= '</form>';
+
+        return $output;
     }
 
     /**
@@ -89,24 +86,17 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
      */
     public function renderTableHeader(): string
     {
-        ob_start();
-        ?>
-<div class="table-scroll-wrapper">
-<div class="table-scroll-container">
-<table class="ibl-data-table">
-    <thead>
-        <tr>
-            <th colspan="3"><em>Search Results</em></th>
-        </tr>
-        <tr>
-            <th>Year</th>
-            <th>Player</th>
-            <th>Award</th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php
-        return ob_get_clean();
+        $output = '<div class="table-scroll-wrapper">';
+        $output .= '<div class="table-scroll-container">';
+        $output .= '<table class="ibl-data-table sortable">';
+        $output .= '<thead><tr>';
+        $output .= '<th>Year</th>';
+        $output .= '<th>Player</th>';
+        $output .= '<th>Award</th>';
+        $output .= '</tr></thead>';
+        $output .= '<tbody>';
+
+        return $output;
     }
 
     /**
@@ -118,15 +108,7 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
         $name = HtmlSanitizer::safeHtmlOutput($award['name'] ?? '');
         $awardName = HtmlSanitizer::safeHtmlOutput($award['Award'] ?? '');
 
-        ob_start();
-        ?>
-<tr>
-    <td><?= $year ?></td>
-    <td><?= $name ?></td>
-    <td><?= $awardName ?></td>
-</tr>
-        <?php
-        return ob_get_clean();
+        return '<tr><td>' . $year . '</td><td>' . $name . '</td><td>' . $awardName . '</td></tr>';
     }
 
     /**

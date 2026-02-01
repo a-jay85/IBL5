@@ -5,8 +5,14 @@ declare(strict_types=1);
 namespace ComparePlayers;
 
 use ComparePlayers\Contracts\ComparePlayersViewInterface;
+use Utilities\HtmlSanitizer;
 
 /**
+ * ComparePlayersView - HTML rendering for player comparison
+ *
+ * Uses the IBL5 design system with ibl-filter-form for search
+ * and ibl-data-table for comparison tables.
+ *
  * @see ComparePlayersViewInterface
  */
 class ComparePlayersView implements ComparePlayersViewInterface
@@ -16,67 +22,35 @@ class ComparePlayersView implements ComparePlayersViewInterface
      */
     public function renderSearchForm(array $playerNames): string
     {
-        ob_start();
-        ?>
-<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
-<link rel="stylesheet" href="/resources/demos/style.css">
-<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
-<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-<script>
-$(function() {
-    var availableTags = [
-<?php foreach ($playerNames as $name): ?>
-        <?= json_encode(stripslashes($name), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>,
-<?php endforeach; ?>
-    ];
-    $("#Player1").autocomplete({
-        source: availableTags
-    });
-    $("#Player2").autocomplete({
-        source: availableTags
-    });
-});
-</script>
-<div class="table-scroll-wrapper">
-<div class="table-scroll-container">
-<form action="modules.php?name=Compare_Players" method="POST">
-    <div class="ui-widget">
-        <label for="Player1">Player 1: </label>
-        <input id="Player1" type="text" name="Player1"><br>
-        <label for="Player2">Player 2: </label>
-        <input id="Player2" type="text" name="Player2"><br>
-    </div>
-    <input type="submit" value="Compare">
-</form>
-</div>
-</div>
-        <?php
-        return ob_get_clean();
-    }
+        $output = '<h2 class="ibl-title">Compare Players</h2>';
 
-    /**
-     * Render a team cell for a player
-     *
-     * @param array $player Player data array
-     * @return string HTML team cell
-     */
-    private function renderTeamCell(array $player): string
-    {
-        $tid = (int) ($player['tid'] ?? 0);
-        $teamName = htmlspecialchars($player['teamname'] ?? '');
-        $color1 = htmlspecialchars($player['color1'] ?? 'FFFFFF');
-        $color2 = htmlspecialchars($player['color2'] ?? '000000');
-
-        if ($tid === 0) {
-            return '<td>Free Agent</td>';
+        // Build datalist options for autocomplete
+        $datalistHtml = '<datalist id="player-names">';
+        foreach ($playerNames as $name) {
+            $datalistHtml .= '<option value="' . HtmlSanitizer::safeHtmlOutput(stripslashes($name)) . '">';
         }
+        $datalistHtml .= '</datalist>';
 
-        return '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">
-        <a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $tid . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';">
-            <img src="images/logo/new' . $tid . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-            <span class="ibl-team-cell__text">' . $teamName . '</span>
-        </a>
-    </td>';
+        $output .= '<form action="modules.php?name=Compare_Players" method="POST" class="ibl-filter-form">';
+        $output .= '<div class="ibl-filter-form__row">';
+
+        $output .= '<div class="ibl-filter-form__group">';
+        $output .= '<label class="ibl-filter-form__label" for="Player1">Player 1</label>';
+        $output .= '<input type="text" name="Player1" id="Player1" list="player-names" placeholder="Search player..." autocomplete="off">';
+        $output .= '</div>';
+
+        $output .= '<div class="ibl-filter-form__group">';
+        $output .= '<label class="ibl-filter-form__label" for="Player2">Player 2</label>';
+        $output .= '<input type="text" name="Player2" id="Player2" list="player-names" placeholder="Search player..." autocomplete="off">';
+        $output .= '</div>';
+
+        $output .= '<button type="submit" class="ibl-filter-form__submit">Compare</button>';
+
+        $output .= '</div>';
+        $output .= '</form>';
+        $output .= $datalistHtml;
+
+        return $output;
     }
 
     /**
@@ -87,257 +61,193 @@ $(function() {
         $player1 = $comparisonData['player1'];
         $player2 = $comparisonData['player2'];
 
-        ob_start();
-        ?>
-<h2 class="ibl-title">Current Ratings</h2>
-<div class="table-scroll-wrapper">
-<div class="table-scroll-container">
-<table class="sortable ibl-data-table responsive-table">
-    <thead>
-        <tr>
-            <th>Pos</th>
-            <th>Player</th>
-            <th>Team</th>
-            <th>Age</th>
-            <th>2ga</th>
-            <th>2g%</th>
-            <th>fta</th>
-            <th>ft%</th>
-            <th>3ga</th>
-            <th>3g%</th>
-            <th>orb</th>
-            <th>drb</th>
-            <th>ast</th>
-            <th>stl</th>
-            <th>tvr</th>
-            <th>blk</th>
-            <th>foul</th>
-            <th>oo</th>
-            <th>do</th>
-            <th>po</th>
-            <th>to</th>
-            <th>od</th>
-            <th>dd</th>
-            <th>pd</th>
-            <th>td</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td><?= htmlspecialchars($player1['pos']) ?></td>
-            <td><?= htmlspecialchars($player1['name']) ?></td>
-            <?= $this->renderTeamCell($player1) ?>
-            <td><?= htmlspecialchars((string)$player1['age']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['r_fga']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['r_fgp']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['r_fta']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['r_ftp']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['r_tga']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['r_tgp']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['r_orb']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['r_drb']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['r_ast']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['r_stl']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['r_to']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['r_blk']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['r_foul']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['oo']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['do']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['po']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['to']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['od']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['dd']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['pd']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['td']) ?></td>
-        </tr>
-        <tr>
-            <td><?= htmlspecialchars($player2['pos']) ?></td>
-            <td><?= htmlspecialchars($player2['name']) ?></td>
-            <?= $this->renderTeamCell($player2) ?>
-            <td><?= htmlspecialchars((string)$player2['age']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['r_fga']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['r_fgp']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['r_fta']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['r_ftp']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['r_tga']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['r_tgp']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['r_orb']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['r_drb']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['r_ast']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['r_stl']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['r_to']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['r_blk']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['r_foul']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['oo']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['do']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['po']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['to']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['od']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['dd']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['pd']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['td']) ?></td>
-        </tr>
-    </tbody>
-</table>
-</div>
-</div>
+        $output = '';
+        $output .= $this->renderRatingsTable($player1, $player2);
+        $output .= $this->renderSeasonStatsTable($player1, $player2);
+        $output .= $this->renderCareerStatsTable($player1, $player2);
 
-<h2 class="ibl-title">Current Season Stats</h2>
-<div class="table-scroll-wrapper">
-<div class="table-scroll-container">
-<table class="sortable ibl-data-table responsive-table">
-    <thead>
-        <tr>
-            <th>Pos</th>
-            <th>Player</th>
-            <th>Team</th>
-            <th>g</th>
-            <th>gs</th>
-            <th>min</th>
-            <th>fgm</th>
-            <th>fga</th>
-            <th>ftm</th>
-            <th>fta</th>
-            <th>3gm</th>
-            <th>3ga</th>
-            <th>orb</th>
-            <th>reb</th>
-            <th>ast</th>
-            <th>stl</th>
-            <th>to</th>
-            <th>blk</th>
-            <th>pf</th>
-            <th>pts</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td><?= htmlspecialchars($player1['pos']) ?></td>
-            <td><?= htmlspecialchars($player1['name']) ?></td>
-            <?= $this->renderTeamCell($player1) ?>
-            <td><?= htmlspecialchars((string)$player1['stats_gm']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_gs']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_min']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_fgm']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_fga']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_ftm']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_fta']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_3gm']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_3ga']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_orb']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_drb']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_ast']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_stl']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_to']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_blk']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['stats_pf']) ?></td>
-            <td><?= (2 * $player1['stats_fgm'] + $player1['stats_ftm'] + $player1['stats_3gm']) ?></td>
-        </tr>
-        <tr>
-            <td><?= htmlspecialchars($player2['pos']) ?></td>
-            <td><?= htmlspecialchars($player2['name']) ?></td>
-            <?= $this->renderTeamCell($player2) ?>
-            <td><?= htmlspecialchars((string)$player2['stats_gm']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_gs']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_min']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_fgm']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_fga']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_ftm']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_fta']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_3gm']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_3ga']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_orb']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_drb']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_ast']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_stl']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_to']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_blk']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['stats_pf']) ?></td>
-            <td><?= (2 * $player2['stats_fgm'] + $player2['stats_ftm'] + $player2['stats_3gm']) ?></td>
-        </tr>
-    </tbody>
-</table>
-</div>
-</div>
+        return $output;
+    }
 
-<h2 class="ibl-title">Career Stats</h2>
-<div class="table-scroll-wrapper">
-<div class="table-scroll-container">
-<table class="sortable ibl-data-table responsive-table">
-    <thead>
-        <tr>
-            <th>Pos</th>
-            <th>Player</th>
-            <th>Team</th>
-            <th>g</th>
-            <th>min</th>
-            <th>fgm</th>
-            <th>fga</th>
-            <th>ftm</th>
-            <th>fta</th>
-            <th>3gm</th>
-            <th>3ga</th>
-            <th>orb</th>
-            <th>drb</th>
-            <th>reb</th>
-            <th>ast</th>
-            <th>stl</th>
-            <th>to</th>
-            <th>blk</th>
-            <th>pf</th>
-            <th>pts</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td><?= htmlspecialchars($player1['pos']) ?></td>
-            <td><?= htmlspecialchars($player1['name']) ?></td>
-            <?= $this->renderTeamCell($player1) ?>
-            <td><?= htmlspecialchars((string)$player1['car_gm']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_min']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_fgm']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_fga']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_ftm']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_fta']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_tgm']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_tga']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_orb']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_drb']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_reb']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_ast']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_stl']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_to']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_blk']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_pf']) ?></td>
-            <td><?= htmlspecialchars((string)$player1['car_pts']) ?></td>
-        </tr>
-        <tr>
-            <td><?= htmlspecialchars($player2['pos']) ?></td>
-            <td><?= htmlspecialchars($player2['name']) ?></td>
-            <?= $this->renderTeamCell($player2) ?>
-            <td><?= htmlspecialchars((string)$player2['car_gm']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_min']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_fgm']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_fga']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_ftm']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_fta']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_tgm']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_tga']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_orb']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_drb']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_reb']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_ast']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_stl']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_to']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_blk']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_pf']) ?></td>
-            <td><?= htmlspecialchars((string)$player2['car_pts']) ?></td>
-        </tr>
-    </tbody>
-</table>
-</div>
-</div>
-        <?php
-        return ob_get_clean();
+    /**
+     * Render the Current Ratings comparison table.
+     */
+    private function renderRatingsTable(array $player1, array $player2): string
+    {
+        $headers = [
+            'Pos', 'Player', 'Team', 'Age',
+            '2ga', '2g%', 'fta', 'ft%', '3ga', '3g%',
+            'orb', 'drb', 'ast', 'stl', 'tvr', 'blk', 'foul',
+            'oo', 'do', 'po', 'to', 'od', 'dd', 'pd', 'td',
+        ];
+
+        $output = '<h2 class="ibl-title">Current Ratings</h2>';
+        $output .= '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
+        $output .= '<table class="sortable ibl-data-table responsive-table">';
+        $output .= '<thead><tr>';
+        foreach ($headers as $h) {
+            $output .= '<th>' . HtmlSanitizer::safeHtmlOutput($h) . '</th>';
+        }
+        $output .= '</tr></thead><tbody>';
+
+        foreach ([$player1, $player2] as $player) {
+            $output .= '<tr>';
+            $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['pos']) . '</td>';
+            $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['name']) . '</td>';
+            $output .= $this->renderTeamCell($player);
+            $output .= '<td>' . (int)$player['age'] . '</td>';
+            $output .= '<td>' . (int)$player['r_fga'] . '</td>';
+            $output .= '<td>' . (int)$player['r_fgp'] . '</td>';
+            $output .= '<td>' . (int)$player['r_fta'] . '</td>';
+            $output .= '<td>' . (int)$player['r_ftp'] . '</td>';
+            $output .= '<td>' . (int)$player['r_tga'] . '</td>';
+            $output .= '<td>' . (int)$player['r_tgp'] . '</td>';
+            $output .= '<td>' . (int)$player['r_orb'] . '</td>';
+            $output .= '<td>' . (int)$player['r_drb'] . '</td>';
+            $output .= '<td>' . (int)$player['r_ast'] . '</td>';
+            $output .= '<td>' . (int)$player['r_stl'] . '</td>';
+            $output .= '<td>' . (int)$player['r_to'] . '</td>';
+            $output .= '<td>' . (int)$player['r_blk'] . '</td>';
+            $output .= '<td>' . (int)$player['r_foul'] . '</td>';
+            $output .= '<td>' . (int)$player['oo'] . '</td>';
+            $output .= '<td>' . (int)$player['do'] . '</td>';
+            $output .= '<td>' . (int)$player['po'] . '</td>';
+            $output .= '<td>' . (int)$player['to'] . '</td>';
+            $output .= '<td>' . (int)$player['od'] . '</td>';
+            $output .= '<td>' . (int)$player['dd'] . '</td>';
+            $output .= '<td>' . (int)$player['pd'] . '</td>';
+            $output .= '<td>' . (int)$player['td'] . '</td>';
+            $output .= '</tr>';
+        }
+
+        $output .= '</tbody></table></div></div>';
+
+        return $output;
+    }
+
+    /**
+     * Render the Current Season Stats comparison table.
+     */
+    private function renderSeasonStatsTable(array $player1, array $player2): string
+    {
+        $headers = [
+            'Pos', 'Player', 'Team',
+            'g', 'gs', 'min', 'fgm', 'fga', 'ftm', 'fta',
+            '3gm', '3ga', 'orb', 'reb', 'ast', 'stl', 'to', 'blk', 'pf', 'pts',
+        ];
+
+        $output = '<h2 class="ibl-title">Current Season Stats</h2>';
+        $output .= '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
+        $output .= '<table class="sortable ibl-data-table responsive-table">';
+        $output .= '<thead><tr>';
+        foreach ($headers as $h) {
+            $output .= '<th>' . HtmlSanitizer::safeHtmlOutput($h) . '</th>';
+        }
+        $output .= '</tr></thead><tbody>';
+
+        foreach ([$player1, $player2] as $player) {
+            $fgm = (int)$player['stats_fgm'];
+            $ftm = (int)$player['stats_ftm'];
+            $tgm = (int)$player['stats_3gm'];
+            $pts = 2 * $fgm + $ftm + $tgm;
+
+            $output .= '<tr>';
+            $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['pos']) . '</td>';
+            $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['name']) . '</td>';
+            $output .= $this->renderTeamCell($player);
+            $output .= '<td>' . (int)$player['stats_gm'] . '</td>';
+            $output .= '<td>' . (int)$player['stats_gs'] . '</td>';
+            $output .= '<td>' . (int)$player['stats_min'] . '</td>';
+            $output .= '<td>' . $fgm . '</td>';
+            $output .= '<td>' . (int)$player['stats_fga'] . '</td>';
+            $output .= '<td>' . $ftm . '</td>';
+            $output .= '<td>' . (int)$player['stats_fta'] . '</td>';
+            $output .= '<td>' . $tgm . '</td>';
+            $output .= '<td>' . (int)$player['stats_3ga'] . '</td>';
+            $output .= '<td>' . (int)$player['stats_orb'] . '</td>';
+            $output .= '<td>' . (int)$player['stats_drb'] . '</td>';
+            $output .= '<td>' . (int)$player['stats_ast'] . '</td>';
+            $output .= '<td>' . (int)$player['stats_stl'] . '</td>';
+            $output .= '<td>' . (int)$player['stats_to'] . '</td>';
+            $output .= '<td>' . (int)$player['stats_blk'] . '</td>';
+            $output .= '<td>' . (int)$player['stats_pf'] . '</td>';
+            $output .= '<td>' . $pts . '</td>';
+            $output .= '</tr>';
+        }
+
+        $output .= '</tbody></table></div></div>';
+
+        return $output;
+    }
+
+    /**
+     * Render the Career Stats comparison table.
+     */
+    private function renderCareerStatsTable(array $player1, array $player2): string
+    {
+        $headers = [
+            'Pos', 'Player', 'Team',
+            'g', 'min', 'fgm', 'fga', 'ftm', 'fta',
+            '3gm', '3ga', 'orb', 'drb', 'reb', 'ast', 'stl', 'to', 'blk', 'pf', 'pts',
+        ];
+
+        $output = '<h2 class="ibl-title">Career Stats</h2>';
+        $output .= '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
+        $output .= '<table class="sortable ibl-data-table responsive-table">';
+        $output .= '<thead><tr>';
+        foreach ($headers as $h) {
+            $output .= '<th>' . HtmlSanitizer::safeHtmlOutput($h) . '</th>';
+        }
+        $output .= '</tr></thead><tbody>';
+
+        foreach ([$player1, $player2] as $player) {
+            $output .= '<tr>';
+            $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['pos']) . '</td>';
+            $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['name']) . '</td>';
+            $output .= $this->renderTeamCell($player);
+            $output .= '<td>' . (int)$player['car_gm'] . '</td>';
+            $output .= '<td>' . (int)$player['car_min'] . '</td>';
+            $output .= '<td>' . (int)$player['car_fgm'] . '</td>';
+            $output .= '<td>' . (int)$player['car_fga'] . '</td>';
+            $output .= '<td>' . (int)$player['car_ftm'] . '</td>';
+            $output .= '<td>' . (int)$player['car_fta'] . '</td>';
+            $output .= '<td>' . (int)$player['car_tgm'] . '</td>';
+            $output .= '<td>' . (int)$player['car_tga'] . '</td>';
+            $output .= '<td>' . (int)$player['car_orb'] . '</td>';
+            $output .= '<td>' . (int)$player['car_drb'] . '</td>';
+            $output .= '<td>' . (int)$player['car_reb'] . '</td>';
+            $output .= '<td>' . (int)$player['car_ast'] . '</td>';
+            $output .= '<td>' . (int)$player['car_stl'] . '</td>';
+            $output .= '<td>' . (int)$player['car_to'] . '</td>';
+            $output .= '<td>' . (int)$player['car_blk'] . '</td>';
+            $output .= '<td>' . (int)$player['car_pf'] . '</td>';
+            $output .= '<td>' . (int)$player['car_pts'] . '</td>';
+            $output .= '</tr>';
+        }
+
+        $output .= '</tbody></table></div></div>';
+
+        return $output;
+    }
+
+    /**
+     * Render a team cell with team colors and logo.
+     */
+    private function renderTeamCell(array $player): string
+    {
+        $tid = (int)($player['tid'] ?? 0);
+        $teamName = HtmlSanitizer::safeHtmlOutput($player['teamname'] ?? '');
+        $color1 = HtmlSanitizer::safeHtmlOutput($player['color1'] ?? 'FFFFFF');
+        $color2 = HtmlSanitizer::safeHtmlOutput($player['color2'] ?? '000000');
+
+        if ($tid === 0) {
+            return '<td>Free Agent</td>';
+        }
+
+        return '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">'
+            . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $tid . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';">'
+            . '<img src="images/logo/new' . $tid . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">'
+            . '<span class="ibl-team-cell__text">' . $teamName . '</span>'
+            . '</a></td>';
     }
 }

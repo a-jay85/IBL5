@@ -72,7 +72,7 @@ final class PlayerAwardsViewTest extends TestCase
         $result = $this->view->renderSearchForm($params);
 
         $this->assertStringContainsString('type="submit"', $result);
-        $this->assertStringContainsString('Search for Matches', $result);
+        $this->assertStringContainsString('Search', $result);
     }
 
     public function testRenderSearchFormEscapesHtmlCharacters(): void
@@ -115,11 +115,11 @@ final class PlayerAwardsViewTest extends TestCase
         $this->assertStringContainsString('Award', $result);
     }
 
-    public function testRenderTableHeaderIncludesResultsTitle(): void
+    public function testRenderTableHeaderIncludesDataTableClass(): void
     {
         $result = $this->view->renderTableHeader();
 
-        $this->assertStringContainsString('Search Results', $result);
+        $this->assertStringContainsString('ibl-data-table', $result);
     }
 
     // ==================== renderAwardRow Tests ====================

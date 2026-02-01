@@ -25,13 +25,13 @@ class ComparePlayersViewTest extends TestCase
         $this->assertNotEmpty($result);
     }
 
-    public function testRenderSearchFormIncludesJQueryUI(): void
+    public function testRenderSearchFormIncludesDatalist(): void
     {
         $playerNames = ['Player 1', 'Player 2'];
         $result = $this->view->renderSearchForm($playerNames);
 
-        $this->assertStringContainsString('jquery-ui', $result);
-        $this->assertStringContainsString('jquery-1.12.4.js', $result);
+        $this->assertStringContainsString('<datalist', $result);
+        $this->assertStringContainsString('list="player-names"', $result);
     }
 
     public function testRenderSearchFormIncludesFormElements(): void
@@ -47,7 +47,7 @@ class ComparePlayersViewTest extends TestCase
         $this->assertStringContainsString('type="submit"', $result);
     }
 
-    public function testRenderSearchFormIncludesPlayerNamesInJavaScript(): void
+    public function testRenderSearchFormIncludesPlayerNamesInDatalist(): void
     {
         $playerNames = ['Michael Jordan', 'Kobe Bryant', 'Tim Duncan'];
         $result = $this->view->renderSearchForm($playerNames);
@@ -55,18 +55,17 @@ class ComparePlayersViewTest extends TestCase
         $this->assertStringContainsString('Michael Jordan', $result);
         $this->assertStringContainsString('Kobe Bryant', $result);
         $this->assertStringContainsString('Tim Duncan', $result);
-        $this->assertStringContainsString('availableTags', $result);
+        $this->assertStringContainsString('<datalist id="player-names">', $result);
     }
 
-    public function testRenderSearchFormEscapesPlayerNamesForJavaScript(): void
+    public function testRenderSearchFormEscapesPlayerNamesInDatalist(): void
     {
         $playerNames = ["O'Neal", 'Player with "quotes"'];
         $result = $this->view->renderSearchForm($playerNames);
 
-        // JSON encoding with JSON_HEX_APOS escapes apostrophes as \u0027
-        $this->assertStringContainsString('O\\u0027Neal', $result);
-        // JSON encoding with JSON_HEX_QUOT escapes quotes as \u0022
-        $this->assertStringContainsString('\\u0022', $result);
+        // HtmlSanitizer escapes apostrophes and quotes in option values
+        $this->assertStringContainsString('O&apos;Neal', $result);
+        $this->assertStringContainsString('&quot;quotes&quot;', $result);
     }
 
     public function testRenderSearchFormHandlesEmptyPlayerArray(): void

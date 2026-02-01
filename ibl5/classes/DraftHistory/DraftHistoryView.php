@@ -98,6 +98,9 @@ class DraftHistoryView implements DraftHistoryViewInterface
 .draft-history-table .name-cell {
     white-space: nowrap;
     text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 .draft-history-table .name-cell a {
     display: inline-flex;

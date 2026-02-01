@@ -51,12 +51,14 @@ if (!$validator->validateX(...)) {
 | Issue | Correct Approach |
 |-------|------------------|
 | Contract year salary | If `cy=2`, read `cy2` field (not `cy1`) |
-| Retired players | Check `retired === '0'` (string, not int) |
-| Free agents | `tid === 0` or empty username |
-| Team lookup | Some methods use `tid`, others use team name string |
+| Native types enabled | `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is on — INT columns return PHP `int`, VARCHAR columns return PHP `string`. Compare accordingly: `=== 0` for INT, `=== '0'` for VARCHAR |
+| Retired players | `retired` is VARCHAR — check `retired === '0'` (string) |
+| Free agents | `tid` is INT — check `tid === 0` or empty username |
+| Team lookup | Some methods use `tid` (int), others use team name (string) |
 | Null in queries | Build conditional SQL; `bind_param` has no NULL type |
-| Database booleans | Use `=== '1'` or `=== '0'`, never `== 1` |
-| MLE/LLE flags | `HasMLE === '1'`, `HasLLE === '1'` (strings) |
+| Database booleans (INT cols) | `hasMLE === 1`, `hasLLE === 1` (native int) |
+| Database booleans (VARCHAR cols) | Check schema first — use `=== '1'` only for VARCHAR boolean columns |
+| Trade itemtype | `itemtype` is VARCHAR — compare with `=== '0'`, `=== '1'`, `=== 'cash'` |
 | Equality checks | Always `===`/`!==`, never `==`/`!=` |
 | Division guards | Use `=== 0` or `=== 0.0`, not `== 0` |
 | Sticky columns + overflow | Never set `overflow: hidden` on a table that uses `position: sticky` cells — it breaks sticky. Use `.ibl-data-table:not(.responsive-table)` for overflow clipping so `.responsive-table` tables (which have sticky columns) are excluded |

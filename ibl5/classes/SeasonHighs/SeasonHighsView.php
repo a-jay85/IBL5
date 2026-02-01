@@ -20,45 +20,10 @@ class SeasonHighsView implements SeasonHighsViewInterface
     public function render(string $seasonPhase, array $data): string
     {
         $output = '<h2 class="ibl-title">Season Highs</h2>';
-        $output .= $this->getStyleBlock();
         $output .= $this->renderPlayerHighs($seasonPhase, $data['playerHighs']);
         $output .= $this->renderTeamHighs($seasonPhase, $data['teamHighs']);
 
         return $output;
-    }
-
-    /**
-     * Get the CSS styles for the season highs tables.
-     *
-     * Uses consolidated .ibl-data-table with layout-specific overrides.
-     *
-     * @return string CSS style block
-     */
-    private function getStyleBlock(): string
-    {
-        return '<style>
-.stat-table .name-cell {
-    white-space: nowrap;
-    text-align: left;
-}
-.stat-table .name-cell a {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-.ibl-player-photo {
-    width: 24px;
-    height: 24px;
-    object-fit: cover;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-@media (max-width: 768px) {
-    .stat-table .name-cell {
-        white-space: normal;
-    }
-}
-</style>';
     }
 
     /**

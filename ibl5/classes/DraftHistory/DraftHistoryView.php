@@ -19,8 +19,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
      */
     public function render(int $selectedYear, int $startYear, int $endYear, array $draftPicks): string
     {
-        $output = $this->getStyleBlock();
-        $output .= $this->renderTitleWithYearSelect($startYear, $endYear, $selectedYear);
+        $output = $this->renderTitleWithYearSelect($startYear, $endYear, $selectedYear);
 
         if (empty($draftPicks)) {
             $output .= $this->renderNoDataMessage();
@@ -41,8 +40,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
         $teamName = HtmlSanitizer::safeHtmlOutput($team->name);
         $teamId = (int) $team->teamID;
 
-        $output = $this->getStyleBlock();
-        $output .= "<h2 class=\"ibl-title\">{$teamName} Draft History</h2>";
+        $output = "<h2 class=\"ibl-title\">{$teamName} Draft History</h2>";
         $output .= "<img src=\"images/logo/{$teamId}.jpg\" alt=\"\" class=\"team-logo-banner\">";
 
         if (empty($draftPicks)) {
@@ -54,75 +52,6 @@ class DraftHistoryView implements DraftHistoryViewInterface
         }
 
         return $output;
-    }
-
-    /**
-     * Get the CSS styles for the draft history table.
-     *
-     * Uses consolidated .ibl-data-table with draft-history-specific overrides.
-     *
-     * @return string CSS style block
-     */
-    private function getStyleBlock(): string
-    {
-        return '<style>
-.draft-year-select {
-    padding: 0.25rem 1.75rem 0.25rem 0.5rem;
-    font-size: inherit;
-    font-weight: inherit;
-    color: inherit;
-    border: 1px solid var(--gray-300, #d1d5db);
-    border-radius: 0.375rem;
-    background-color: white;
-    background-image: url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e");
-    background-position: right 0.25rem center;
-    background-repeat: no-repeat;
-    background-size: 1.25em 1.25em;
-    appearance: none;
-    cursor: pointer;
-    vertical-align: baseline;
-}
-.draft-year-select:hover {
-    border-color: var(--gray-400, #9ca3af);
-}
-.draft-year-select:focus {
-    outline: none;
-    border-color: var(--navy-500, #1e3a5f);
-    box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
-}
-.draft-retired-badge {
-    font-size: 0.75em;
-    color: var(--gray-400, #9ca3af);
-    vertical-align: baseline;
-}
-.draft-history-table .name-cell {
-    white-space: nowrap;
-    text-align: left;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-.draft-history-table .name-cell a {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-.ibl-player-photo {
-    width: 24px;
-    height: 24px;
-    object-fit: cover;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-@media (max-width: 768px) {
-    .draft-history-table .name-cell {
-        white-space: normal;
-    }
-    .draft-history-table th:last-child {
-        text-align: center;
-    }
-}
-</style>';
     }
 
     /**

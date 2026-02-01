@@ -19,41 +19,12 @@ class InjuriesView implements InjuriesViewInterface
      */
     public function render(array $injuredPlayers): string
     {
-        $output = $this->getStyleBlock();
-        $output .= $this->renderTitle();
+        $output = $this->renderTitle();
         $output .= $this->renderTableStart();
         $output .= $this->renderTableRows($injuredPlayers);
         $output .= $this->renderTableEnd();
 
         return $output;
-    }
-
-    /**
-     * Get the CSS styles for the injuries table.
-     *
-     * Styles are now in the design system (existing-components.css).
-     *
-     * @return string Empty string - styles are centralized
-     */
-    private function getStyleBlock(): string
-    {
-        return '<style>
-.ibl-player-cell {
-    text-align: left;
-}
-.ibl-player-cell a {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-.ibl-player-photo {
-    width: 24px;
-    height: 24px;
-    object-fit: cover;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-</style>';
     }
 
     /**

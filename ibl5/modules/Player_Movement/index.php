@@ -56,24 +56,7 @@ $result = $stmt->get_result();
 // Render page
 Nuke\Header::header();
 
-echo '<style>
-.ibl-player-cell {
-    text-align: left;
-}
-.ibl-player-cell a {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-.ibl-player-photo {
-    width: 24px;
-    height: 24px;
-    object-fit: cover;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-</style>
-<h2 class="ibl-title">Player Movement</h2>
+echo '<h2 class="ibl-title">Player Movement</h2>
 <p style="text-align: center;"><em>Click the headings to sort the table</em></p>
 <table class="sortable ibl-data-table">
     <thead>

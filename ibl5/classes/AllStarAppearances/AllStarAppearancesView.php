@@ -19,41 +19,12 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
      */
     public function render(array $appearances): string
     {
-        $output = $this->getStyleBlock();
-        $output .= $this->renderTitle();
+        $output = $this->renderTitle();
         $output .= $this->renderTableStart();
         $output .= $this->renderTableRows($appearances);
         $output .= $this->renderTableEnd();
 
         return $output;
-    }
-
-    /**
-     * Get the CSS styles for the all-star appearances table.
-     *
-     * Styles are now in the design system (existing-components.css).
-     *
-     * @return string Empty string - styles are centralized
-     */
-    private function getStyleBlock(): string
-    {
-        return '<style>
-.allstar-table .ibl-player-cell {
-    text-align: left;
-}
-.allstar-table .ibl-player-cell a {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-.ibl-player-photo {
-    width: 24px;
-    height: 24px;
-    object-fit: cover;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-</style>';
     }
 
     /**

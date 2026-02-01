@@ -77,6 +77,7 @@ Classes autoload from `ibl5/classes/`. Never use `require_once`.
 - Schema: `ibl5/schema.sql` - **always verify table/column names here**
 - Use `$mysqli_db` (modern MySQLi) over legacy `$db`
 - 52 InnoDB tables with foreign keys, 84 legacy MyISAM tables
+- **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on both `$mysqli_db` (in `db/db.php`) and `DatabaseConnection` (in `classes/DatabaseConnection.php`). INT columns return PHP `int`, FLOAT columns return PHP `float`, VARCHAR/TEXT columns return PHP `string`. Compare with native types accordingly (e.g., `=== 0` for INT columns, `=== '0'` for VARCHAR columns). The legacy `$db` connection does NOT have native types.
 
 ### Local MAMP Database Connection
 
@@ -154,7 +155,7 @@ Every PHP file must have `declare(strict_types=1);` at the top. Additional requi
 - **Typed methods:** All parameters and return types must be declared
 - **Strict equality:** Always use `===` and `!==`, never `==` or `!=`
 - **Null handling:** Use nullable types (`?string`) and null coalescing (`??`) appropriately
-- **Database values:** Database returns strings - compare with string literals (e.g., `'1'` not `1`)
+- **Database values:** Native types are enabled (`MYSQLI_OPT_INT_AND_FLOAT_NATIVE`). INT columns return PHP `int`, VARCHAR columns return PHP `string`. Compare with the correct native type: `=== 1` for INT columns, `=== '1'` for VARCHAR columns. Always check `schema.sql` for the column type when unsure.
 
 ### Statistics Formatting
 Use `BasketballStats\StatsFormatter` for all stats - never `number_format()` directly.

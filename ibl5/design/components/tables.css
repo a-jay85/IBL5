@@ -401,7 +401,9 @@
         margin-right: auto;
     }
 
-    /* Shared wrapper for tabs + table so tabs match table width */
+    /* Shared wrapper for tabs + table so tabs match table width.
+       Tab width is synced to table width via JS (responsive-tables.js)
+       to avoid fit-content race conditions with font loading. */
     .team-stats-block {
         width: fit-content;
         max-width: 100%;
@@ -797,6 +799,13 @@
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    text-align: left;
+}
+
+.ibl-player-cell a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .ibl-player-cell__img {
@@ -837,6 +846,15 @@
     color: var(--accent-500);
 }
 
+/* Player Photo (circular thumbnail in name cells) */
+.ibl-player-photo {
+    width: 24px;
+    height: 24px;
+    object-fit: cover;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
 /* ==========================================================================
    Stat Highlight (orange accent for important values)
    ========================================================================== */
@@ -871,6 +889,23 @@
 /* Ensure stat-table in grids can expand beyond 1fr if needed */
 .ibl-grid .stat-table {
     width: 100%;
+}
+
+.stat-table .name-cell {
+    white-space: nowrap;
+    text-align: left;
+}
+
+.stat-table .name-cell a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+@media (max-width: 768px) {
+    .stat-table .name-cell {
+        white-space: normal;
+    }
 }
 
 /* ==========================================================================
@@ -1192,8 +1227,30 @@
    Draft History Table
    ========================================================================== */
 
+.draft-history-table .name-cell {
+    white-space: nowrap;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.draft-history-table .name-cell a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
 /* Constrain Round and Pick columns on mobile */
 @media (max-width: 768px) {
+    .draft-history-table .name-cell {
+        white-space: normal;
+    }
+
+    .draft-history-table th:last-child {
+        text-align: center;
+    }
+
     .draft-history-table th:nth-child(1),
     .draft-history-table td:nth-child(1),
     .draft-history-table th:nth-child(2),

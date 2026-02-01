@@ -22,8 +22,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
      */
     public function render(array $data): string
     {
-        $output = $this->getStyleBlock();
-        $output .= $this->renderTitle();
+        $output = $this->renderTitle();
         $output .= $this->renderFilterForm($data);
 
         if (count($data['transactions']) > 0) {
@@ -36,33 +35,6 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
         }
 
         return $output;
-    }
-
-    /**
-     * Category badge color styles scoped to this module.
-     */
-    private function getStyleBlock(): string
-    {
-        return '<style>
-.txn-badge {
-    display: inline-block;
-    padding: 0.125rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-}
-.txn-badge--1  { background: #e3f2fd; color: #1565c0; }
-.txn-badge--2  { background: #fff3e0; color: #e65100; }
-.txn-badge--3  { background: #e8f5e9; color: #2e7d32; }
-.txn-badge--8  { background: #fce4ec; color: #c2185b; }
-.txn-badge--10 { background: #f3e5f5; color: #7b1fa2; }
-.txn-badge--14 { background: #e0f7fa; color: #00838f; }
-.txn-table td:nth-child(3) { text-align: left; }
-.txn-table th:nth-child(3) { text-align: left; }
-.txn-reset { margin-left: 0.5rem; }
-</style>';
     }
 
     private function renderTitle(): string

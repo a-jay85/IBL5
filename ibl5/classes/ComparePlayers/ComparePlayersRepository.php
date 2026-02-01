@@ -23,7 +23,7 @@ class ComparePlayersRepository extends \BaseMysqliRepository implements CompareP
     public function getAllPlayerNames(): array
     {
         $rows = $this->fetchAll(
-            "SELECT name FROM ibl_plr WHERE ordinal != 0 ORDER BY name ASC"
+            "SELECT name FROM ibl_plr WHERE ordinal != 0 AND name NOT LIKE '|%' AND name != '(no starter)' ORDER BY name ASC"
         );
         
         $names = [];

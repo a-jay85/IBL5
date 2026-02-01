@@ -27,6 +27,7 @@ final class OneOnOneViewTest extends TestCase
 
         $this->assertIsString($html);
         $this->assertStringContainsString('One-on-One Match', $html);
+        $this->assertStringContainsString('ibl-title', $html);
     }
 
     // ========== renderPlayerSelectionForm Tests ==========
@@ -92,6 +93,18 @@ final class OneOnOneViewTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $html);
     }
 
+    public function testRenderPlayerSelectionFormUsesDesignSystem(): void
+    {
+        $html = $this->view->renderPlayerSelectionForm([], null, null);
+
+        $this->assertStringContainsString('ibl-filter-form', $html);
+        $this->assertStringContainsString('ibl-filter-form__row', $html);
+        $this->assertStringContainsString('ibl-filter-form__group', $html);
+        $this->assertStringContainsString('ibl-filter-form__label', $html);
+        $this->assertStringContainsString('ibl-filter-form__submit', $html);
+        $this->assertStringContainsString('ibl-select', $html);
+    }
+
     // ========== renderGameLookupForm Tests ==========
 
     public function testRenderGameLookupFormReturnsHtml(): void
@@ -101,6 +114,15 @@ final class OneOnOneViewTest extends TestCase
         $this->assertStringContainsString('Review Old Game', $html);
         $this->assertStringContainsString('gameid', $html);
         $this->assertStringContainsString('type="text"', $html);
+    }
+
+    public function testRenderGameLookupFormUsesDesignSystem(): void
+    {
+        $html = $this->view->renderGameLookupForm();
+
+        $this->assertStringContainsString('ibl-filter-form', $html);
+        $this->assertStringContainsString('ibl-input', $html);
+        $this->assertStringContainsString('ibl-filter-form__submit', $html);
     }
 
     // ========== renderErrors Tests ==========
@@ -135,6 +157,14 @@ final class OneOnOneViewTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $html);
     }
 
+    public function testRenderErrorsUsesAlertStyling(): void
+    {
+        $html = $this->view->renderErrors(['Test error']);
+
+        $this->assertStringContainsString('ibl-alert', $html);
+        $this->assertStringContainsString('ibl-alert--error', $html);
+    }
+
     // ========== renderGameResult Tests ==========
 
     public function testRenderGameResultIncludesPlayByPlay(): void
@@ -154,6 +184,16 @@ final class OneOnOneViewTest extends TestCase
         $html = $this->view->renderGameResult($result, 456);
 
         $this->assertStringContainsString('GAME ID: 456', $html);
+    }
+
+    public function testRenderGameResultUsesCardStyling(): void
+    {
+        $result = new OneOnOneGameResult();
+
+        $html = $this->view->renderGameResult($result, 1);
+
+        $this->assertStringContainsString('ibl-card', $html);
+        $this->assertStringContainsString('ibl-card__body', $html);
     }
 
     // ========== renderGameReplay Tests ==========
@@ -197,5 +237,25 @@ final class OneOnOneViewTest extends TestCase
 
         $this->assertStringNotContainsString('<script>alert("xss")</script>', $html);
         $this->assertStringContainsString('&lt;script&gt;', $html);
+    }
+
+    public function testRenderGameReplayUsesCardStyling(): void
+    {
+        $gameData = [
+            'gameid' => 1,
+            'playbyplay' => '',
+            'winner' => 'Winner',
+            'loser' => 'Loser',
+            'winscore' => 21,
+            'lossscore' => 18,
+            'owner' => 'Owner',
+        ];
+
+        $html = $this->view->renderGameReplay($gameData);
+
+        $this->assertStringContainsString('ibl-card', $html);
+        $this->assertStringContainsString('ibl-card__header', $html);
+        $this->assertStringContainsString('ibl-card__title', $html);
+        $this->assertStringContainsString('ibl-card__body', $html);
     }
 }

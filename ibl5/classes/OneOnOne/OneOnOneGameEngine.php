@@ -564,15 +564,15 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
         $p1Name = $result->player1Name;
         $p2Name = $result->player2Name;
         
-        return "<style>
-.one-on-one-stats-table { border: 1px solid #000; border-collapse: collapse; }
-.one-on-one-stats-cell { border: 1px solid #000; padding: 4px; }
-</style>
-<table class=\"one-on-one-stats-table\"><tr><td colspan=11 class=\"one-on-one-stats-cell\"><span style=\"color: #ff0000;\"><strong style=\"font-weight: bold;\">FINAL SCORE: {$p1Name} {$result->player1Score}, {$p2Name} {$result->player2Score}</strong></span></td></tr>
-<tr><td class=\"one-on-one-stats-cell\">Name</td><td class=\"one-on-one-stats-cell\">FGM</td><td class=\"one-on-one-stats-cell\">FGA</td><td class=\"one-on-one-stats-cell\">3GM</td><td class=\"one-on-one-stats-cell\">3GA</td><td class=\"one-on-one-stats-cell\">ORB</td><td class=\"one-on-one-stats-cell\">REB</td><td class=\"one-on-one-stats-cell\">STL</td><td class=\"one-on-one-stats-cell\">BLK</td><td class=\"one-on-one-stats-cell\">TVR</td><td class=\"one-on-one-stats-cell\">FOUL</td></tr>
-<tr><td class=\"one-on-one-stats-cell\">{$p1Name}</td><td class=\"one-on-one-stats-cell\">{$p1Stats->fieldGoalsMade}</td><td class=\"one-on-one-stats-cell\">{$p1Stats->fieldGoalsAttempted}</td><td class=\"one-on-one-stats-cell\">{$p1Stats->threePointersMade}</td><td class=\"one-on-one-stats-cell\">{$p1Stats->threePointersAttempted}</td><td class=\"one-on-one-stats-cell\">{$p1Stats->offensiveRebounds}</td><td class=\"one-on-one-stats-cell\">{$p1Stats->totalRebounds}</td><td class=\"one-on-one-stats-cell\">{$p1Stats->steals}</td><td class=\"one-on-one-stats-cell\">{$p1Stats->blocks}</td><td class=\"one-on-one-stats-cell\">{$p1Stats->turnovers}</td><td class=\"one-on-one-stats-cell\">{$p1Stats->fouls}</td></tr>
-<tr><td class=\"one-on-one-stats-cell\">{$p2Name}</td><td class=\"one-on-one-stats-cell\">{$p2Stats->fieldGoalsMade}</td><td class=\"one-on-one-stats-cell\">{$p2Stats->fieldGoalsAttempted}</td><td class=\"one-on-one-stats-cell\">{$p2Stats->threePointersMade}</td><td class=\"one-on-one-stats-cell\">{$p2Stats->threePointersAttempted}</td><td class=\"one-on-one-stats-cell\">{$p2Stats->offensiveRebounds}</td><td class=\"one-on-one-stats-cell\">{$p2Stats->totalRebounds}</td><td class=\"one-on-one-stats-cell\">{$p2Stats->steals}</td><td class=\"one-on-one-stats-cell\">{$p2Stats->blocks}</td><td class=\"one-on-one-stats-cell\">{$p2Stats->turnovers}</td><td class=\"one-on-one-stats-cell\">{$p2Stats->fouls}</td></tr>
-</table>
-";
+        return "<div class=\"table-scroll-wrapper\"><div class=\"table-scroll-container\">"
+            . "<table class=\"ibl-data-table\">"
+            . "<thead><tr><th colspan=\"11\"><span style=\"color: var(--accent-500);\">FINAL SCORE: {$p1Name} {$result->player1Score}, {$p2Name} {$result->player2Score}</span></th></tr>"
+            . "<tr><th>Name</th><th>FGM</th><th>FGA</th><th>3GM</th><th>3GA</th><th>ORB</th><th>REB</th><th>STL</th><th>BLK</th><th>TVR</th><th>FOUL</th></tr></thead>"
+            . "<tbody>"
+            . "<tr><td>{$p1Name}</td><td>{$p1Stats->fieldGoalsMade}</td><td>{$p1Stats->fieldGoalsAttempted}</td><td>{$p1Stats->threePointersMade}</td><td>{$p1Stats->threePointersAttempted}</td><td>{$p1Stats->offensiveRebounds}</td><td>{$p1Stats->totalRebounds}</td><td>{$p1Stats->steals}</td><td>{$p1Stats->blocks}</td><td>{$p1Stats->turnovers}</td><td>{$p1Stats->fouls}</td></tr>"
+            . "<tr><td>{$p2Name}</td><td>{$p2Stats->fieldGoalsMade}</td><td>{$p2Stats->fieldGoalsAttempted}</td><td>{$p2Stats->threePointersMade}</td><td>{$p2Stats->threePointersAttempted}</td><td>{$p2Stats->offensiveRebounds}</td><td>{$p2Stats->totalRebounds}</td><td>{$p2Stats->steals}</td><td>{$p2Stats->blocks}</td><td>{$p2Stats->turnovers}</td><td>{$p2Stats->fouls}</td></tr>"
+            . "</tbody></table>"
+            . "</div></div>"
+            . "\n";
     }
 }

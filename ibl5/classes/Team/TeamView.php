@@ -37,6 +37,8 @@ class TeamView implements TeamViewInterface
             ? "<h1 class=\"ibl-title\" style=\"margin: 0.5rem 0;\">" . \Utilities\HtmlSanitizer::safeHtmlOutput($yr) . " " . \Utilities\HtmlSanitizer::safeHtmlOutput($team->name) . "</h1>"
             : "";
 
+        $actionLinks = $isActualTeam ? $this->renderTeamActionLinks($teamID, $team) : '';
+
         ob_start();
         ?>
 <div class="team-page-layout">
@@ -45,6 +47,7 @@ class TeamView implements TeamViewInterface
             <img src="./<?= $imagesPath ?>logo/<?= $teamID ?>.jpg" style="display: block; margin: 0 auto;">
             <?= $yearHeading ?>
         </div>
+        <?= $actionLinks ?>
         <div class="team-stats-block">
             <?= $tabs ?>
             <div class="table-scroll-wrapper">
@@ -63,6 +66,24 @@ class TeamView implements TeamViewInterface
         <?= $raftersHtml ?>
     </div>
     <?= $sidebarDesktopHtml ?>
+</div>
+        <?php
+        return ob_get_clean();
+    }
+
+    /**
+     * Render Schedule and Draft History action links below the team banner
+     */
+    private function renderTeamActionLinks(int $teamID, object $team): string
+    {
+        $color1 = \UI\TableStyles::sanitizeColor($team->color1);
+        $color2 = \UI\TableStyles::sanitizeColor($team->color2);
+
+        ob_start();
+        ?>
+<div class="team-action-links" style="--team-tab-bg-color: #<?= $color1 ?>; --team-tab-active-color: #<?= $color2 ?>;">
+    <a href="modules.php?name=Schedule&amp;teamID=<?= $teamID ?>" class="team-action-link">Schedule</a>
+    <a href="modules.php?name=Draft_History&amp;teamID=<?= $teamID ?>" class="team-action-link">Draft History</a>
 </div>
         <?php
         return ob_get_clean();

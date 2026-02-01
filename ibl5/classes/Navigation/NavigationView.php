@@ -301,6 +301,7 @@ class NavigationView
                     ['label' => 'Waivers: Drop', 'url' => 'modules.php?name=Waivers&action=drop'],
                     ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
                     ['label' => 'Draft', 'url' => 'modules.php?name=Draft'],
+                    ['label' => 'Draft History', 'url' => 'modules.php?name=Draft_History&teamID=' . $this->teamId],
                     ['label' => 'Free Agency', 'url' => 'modules.php?name=Free_Agency'],
                 ]
             ];

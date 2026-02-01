@@ -32,6 +32,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         ob_start();
         echo $this->renderResultBanner($result);
         ?>
+<h2 class="ibl-title">Free Agency</h2>
 <img src="images/logo/<?= (int) $team->teamID ?>.jpg" alt="Team Logo" class="team-logo-banner">
 <div style="margin-top: 1.5rem;"></div>
 <?= $this->renderPlayersUnderContract($team, $season, $capMetrics) ?>

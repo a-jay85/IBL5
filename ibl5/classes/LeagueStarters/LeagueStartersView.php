@@ -60,13 +60,13 @@ class LeagueStartersView implements LeagueStartersViewInterface
         $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $userTeam->color1, $userTeam->color2);
 
         $html = '<div class="text-center"><h1 class="ibl-title">League Starters</h1></div>';
-        $html .= $switcher->renderTabs();
         $html .= '<table style="width: 100%; margin: 0 auto;">';
 
         foreach (self::POSITION_LABELS as $position => $label) {
             $html .= '<tr><td>';
             $html .= '<h2 class="ibl-table-title">' . HtmlSanitizer::safeHtmlOutput($label) . '</h2>';
-            $html .= $this->renderTableForDisplay($display, $startersByPosition[$position], $userTeam);
+            $tableHtml = $this->renderTableForDisplay($display, $startersByPosition[$position], $userTeam);
+            $html .= $switcher->wrap($tableHtml);
             $html .= '</td></tr>';
             $html .= '<tr><td style="height: 15px;"></td></tr>';
         }

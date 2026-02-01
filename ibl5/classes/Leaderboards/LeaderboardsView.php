@@ -80,7 +80,7 @@ class LeaderboardsView implements LeaderboardsViewInterface
     {
         ob_start();
         ?>
-<h2 class="ibl-table-title">Leaderboards Display</h2>
+<h2 class="ibl-title">Leaderboards Display</h2>
 <div class="table-scroll-container">
 <table class="sortable ibl-data-table responsive-table">
     <thead>

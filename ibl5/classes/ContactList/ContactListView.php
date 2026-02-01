@@ -36,7 +36,7 @@ class ContactListView implements ContactListViewInterface
      */
     private function renderTitle(): string
     {
-        return '<h2 class="ibl-table-title">IBL GM Contact List</h2>';
+        return '<h2 class="ibl-title">IBL GM Contact List</h2>';
     }
 
     /**

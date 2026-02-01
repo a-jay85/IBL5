@@ -67,7 +67,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
 
     private function renderTitle(): string
     {
-        return '<h2 class="ibl-table-title">Transaction History</h2>';
+        return '<h2 class="ibl-title">Transaction History</h2>';
     }
 
     /**

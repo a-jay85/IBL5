@@ -30,6 +30,8 @@ $filters = [
 // Render page
 Nuke\Header::header();
 
+echo '<h2 class="ibl-title">Leaderboards</h2>';
+
 // Render filter form
 echo $view->renderFilterForm($filters);
 

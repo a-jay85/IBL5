@@ -19,7 +19,8 @@ class SeasonHighsView implements SeasonHighsViewInterface
      */
     public function render(string $seasonPhase, array $data): string
     {
-        $output = $this->getStyleBlock();
+        $output = '<h2 class="ibl-title">Season Highs</h2>';
+        $output .= $this->getStyleBlock();
         $output .= $this->renderPlayerHighs($seasonPhase, $data['playerHighs']);
         $output .= $this->renderTeamHighs($seasonPhase, $data['teamHighs']);
 

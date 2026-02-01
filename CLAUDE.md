@@ -10,23 +10,25 @@ IBL5 is an Internet Basketball League fantasy basketball site powered by Jump Sh
 
 ```bash
 # Run all tests
-cd ibl5 && vendor/bin/phpunit
+cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary
 
 # Run single test file
-cd ibl5 && vendor/bin/phpunit tests/Player/PlayerRepositoryTest.php
+cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary tests/Player/PlayerRepositoryTest.php
 
 # Run single test method
-cd ibl5 && vendor/bin/phpunit --filter testMethodName
+cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary --filter testMethodName
 
 # Run specific test suite
-cd ibl5 && vendor/bin/phpunit --testsuite "Player Module Tests"
+cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary --testsuite "Player Module Tests"
 
 # Show ALL issues (deprecations, warnings, notices, risky tests, etc.)
-cd ibl5 && vendor/bin/phpunit --display-all-issues
+cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary --display-all-issues
 
 # Use specific config (e.g., CI config without local-only tests)
-cd ibl5 && vendor/bin/phpunit -c phpunit.ci.xml
+cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary -c phpunit.ci.xml
 ```
+
+**PHPUnit output rule:** Always use `--no-progress --no-output --testdox-summary`. Only read output below `Summary of tests with errors, failures, or issues:` — this shows `OK (X tests, X assertions)` when passing, or only the failures/errors. Ignore everything above that line to save tokens.
 
 **Note:** PHPUnit 12.x has no `-v`/`--verbose`. Use `--display-all-issues` instead. See `phpunit-tests.md` for full testing rules and completion criteria.
 

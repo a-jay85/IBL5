@@ -22,6 +22,7 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
     public function render(array $franchiseData): string
     {
         $html = '';
+        $html .= '<h2 class="ibl-title">Franchise History</h2>';
         $html .= '<div class="sticky-scroll-wrapper">';
         $html .= '<div class="sticky-scroll-container">';
         $html .= $this->renderTableHeader();

@@ -47,6 +47,8 @@ $searchResult = $service->search($_POST);
 // Render page
 Nuke\Header::header();
 
+echo '<h2 class="ibl-title">Player Search</h2>';
+
 // Render search form with current parameters
 echo $view->renderSearchForm($searchResult['params']);
 

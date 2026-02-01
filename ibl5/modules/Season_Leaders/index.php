@@ -38,6 +38,8 @@ if ($isFirstLoad) {
 // Render page
 Nuke\Header::header();
 
+echo '<h2 class="ibl-title">Season Leaders</h2>';
+
 // Get data for dropdowns
 $teams = $repository->getTeams();
 $years = $repository->getYears();

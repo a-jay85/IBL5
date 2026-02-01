@@ -46,8 +46,8 @@ class DraftPickLocatorViewTest extends TestCase
     {
         $result = $this->view->render([], 2025);
 
-        $this->assertStringContainsString('Where', $result);
-        $this->assertStringContainsString('Pick', $result);
+        $this->assertStringContainsString('Draft Pick Locator', $result);
+        $this->assertStringContainsString('ibl-title', $result);
     }
 
     public function testRenderContainsYearHeaders(): void

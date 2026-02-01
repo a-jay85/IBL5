@@ -20,13 +20,6 @@
 └── .injury-table  (card layout on mobile)
 ```
 
-## Heading Classes
-
-| Class | Element | Purpose | Used On |
-|-------|---------|---------|---------|
-| `.ibl-title` | `<h1>` or `<h2>` | Page-level heading | Single-table pages (Contracts, Injuries, Leaderboards, etc.) and multi-table page titles (League Stats) |
-| `.ibl-table-title` | `<h2>` | Section heading above a table | Multi-table pages (Record Holders, Trading, Season Highs, League Starters, League Stats) |
-
 ## Wrapper / Layout Classes
 
 | Wrapper | Purpose | Paired With |

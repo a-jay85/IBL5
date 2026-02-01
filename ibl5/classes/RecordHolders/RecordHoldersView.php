@@ -20,7 +20,8 @@ class RecordHoldersView implements RecordHoldersViewInterface
      */
     public function render(): string
     {
-        $output = '<style>
+        $output = '<h2 class="ibl-title">Record Holders</h2>';
+        $output .= '<style>
 .record-holders-page td { text-align: center; vertical-align: middle; }
 .record-holders-page td img { margin: 0 auto; }
 .record-holders-page .ibl-data-table { max-width: 900px; margin-left: auto; margin-right: auto; table-layout: fixed; }

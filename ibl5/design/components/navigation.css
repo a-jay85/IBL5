@@ -340,17 +340,20 @@
     transform: translateY(0);
 }
 
-.group:hover .nav-dropdown-item:nth-child(1) { transition-delay: 0ms; }
-.group:hover .nav-dropdown-item:nth-child(2) { transition-delay: 25ms; }
-.group:hover .nav-dropdown-item:nth-child(3) { transition-delay: 50ms; }
-.group:hover .nav-dropdown-item:nth-child(4) { transition-delay: 75ms; }
-.group:hover .nav-dropdown-item:nth-child(5) { transition-delay: 100ms; }
-.group:hover .nav-dropdown-item:nth-child(6) { transition-delay: 125ms; }
-.group:hover .nav-dropdown-item:nth-child(7) { transition-delay: 150ms; }
-.group:hover .nav-dropdown-item:nth-child(8) { transition-delay: 175ms; }
-.group:hover .nav-dropdown-item:nth-child(9) { transition-delay: 200ms; }
-.group:hover .nav-dropdown-item:nth-child(10) { transition-delay: 225ms; }
-.group:hover .nav-dropdown-item:nth-child(11) { transition-delay: 250ms; }
+.group:hover .nav-dropdown-item:nth-of-type(1) { transition-delay: 0ms; }
+.group:hover .nav-dropdown-item:nth-of-type(2) { transition-delay: 25ms; }
+.group:hover .nav-dropdown-item:nth-of-type(3) { transition-delay: 50ms; }
+.group:hover .nav-dropdown-item:nth-of-type(4) { transition-delay: 75ms; }
+.group:hover .nav-dropdown-item:nth-of-type(5) { transition-delay: 100ms; }
+.group:hover .nav-dropdown-item:nth-of-type(6) { transition-delay: 125ms; }
+.group:hover .nav-dropdown-item:nth-of-type(7) { transition-delay: 150ms; }
+.group:hover .nav-dropdown-item:nth-of-type(8) { transition-delay: 175ms; }
+.group:hover .nav-dropdown-item:nth-of-type(9) { transition-delay: 200ms; }
+.group:hover .nav-dropdown-item:nth-of-type(10) { transition-delay: 225ms; }
+.group:hover .nav-dropdown-item:nth-of-type(11) { transition-delay: 250ms; }
+.group:hover .nav-dropdown-item:nth-of-type(12) { transition-delay: 275ms; }
+.group:hover .nav-dropdown-item:nth-of-type(13) { transition-delay: 300ms; }
+.group:hover .nav-dropdown-item:nth-of-type(14) { transition-delay: 325ms; }
 
 /* ==========================================================================
    Desktop Dropdown Click-to-Pin State
@@ -369,17 +372,20 @@
     transform: translateY(0);
 }
 
-.group.nav-pinned .nav-dropdown-item:nth-child(1) { transition-delay: 0ms; }
-.group.nav-pinned .nav-dropdown-item:nth-child(2) { transition-delay: 25ms; }
-.group.nav-pinned .nav-dropdown-item:nth-child(3) { transition-delay: 50ms; }
-.group.nav-pinned .nav-dropdown-item:nth-child(4) { transition-delay: 75ms; }
-.group.nav-pinned .nav-dropdown-item:nth-child(5) { transition-delay: 100ms; }
-.group.nav-pinned .nav-dropdown-item:nth-child(6) { transition-delay: 125ms; }
-.group.nav-pinned .nav-dropdown-item:nth-child(7) { transition-delay: 150ms; }
-.group.nav-pinned .nav-dropdown-item:nth-child(8) { transition-delay: 175ms; }
-.group.nav-pinned .nav-dropdown-item:nth-child(9) { transition-delay: 200ms; }
-.group.nav-pinned .nav-dropdown-item:nth-child(10) { transition-delay: 225ms; }
-.group.nav-pinned .nav-dropdown-item:nth-child(11) { transition-delay: 250ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(1) { transition-delay: 0ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(2) { transition-delay: 25ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(3) { transition-delay: 50ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(4) { transition-delay: 75ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(5) { transition-delay: 100ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(6) { transition-delay: 125ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(7) { transition-delay: 150ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(8) { transition-delay: 175ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(9) { transition-delay: 200ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(10) { transition-delay: 225ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(11) { transition-delay: 250ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(12) { transition-delay: 275ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(13) { transition-delay: 300ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(14) { transition-delay: 325ms; }
 
 /* ==========================================================================
    Navigation Link Colors (Accessibility Override)

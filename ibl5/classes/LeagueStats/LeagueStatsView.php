@@ -38,26 +38,26 @@ class LeagueStatsView implements LeagueStatsViewInterface
         $differentials = $data['differentials'] ?? [];
 
         $html = '<div class="league-stats-container">';
-        $html .= '<h1 class="league-stats-title">League-wide Statistics</h1>';
+        $html .= '<h1 class="ibl-title">League-wide Statistics</h1>';
 
         // Team Offense Totals
-        $html .= '<h2 class="league-stats-subtitle">Team Offense Totals</h2>';
+        $html .= '<h2 class="ibl-table-title">Team Offense Totals</h2>';
         $html .= $this->renderTotalsTable($teams, 'offense_totals', 'Offense', $userTeamId, $league['totals'] ?? []);
 
         // Team Defense Totals
-        $html .= '<h2 class="league-stats-subtitle">Team Defense Totals</h2>';
+        $html .= '<h2 class="ibl-table-title">Team Defense Totals</h2>';
         $html .= $this->renderTotalsTable($teams, 'defense_totals', 'Defense', $userTeamId, $league['totals'] ?? []);
 
         // Team Offense Averages
-        $html .= '<h2 class="league-stats-subtitle">Team Offense Averages</h2>';
+        $html .= '<h2 class="ibl-table-title">Team Offense Averages</h2>';
         $html .= $this->renderAveragesTable($teams, 'offense_averages', 'Offense', $userTeamId, $league['averages'] ?? []);
 
         // Team Defense Averages
-        $html .= '<h2 class="league-stats-subtitle">Team Defense Averages</h2>';
+        $html .= '<h2 class="ibl-table-title">Team Defense Averages</h2>';
         $html .= $this->renderAveragesTable($teams, 'defense_averages', 'Defense', $userTeamId, $league['averages'] ?? []);
 
         // Offense/Defense Differentials
-        $html .= '<h2 class="league-stats-subtitle">Team Off/Def Average Differentials</h2>';
+        $html .= '<h2 class="ibl-table-title">Team Off/Def Average Differentials</h2>';
         $html .= $this->renderDifferentialsTable($differentials, $userTeamId);
 
         $html .= '</div>';

@@ -401,21 +401,17 @@
         margin-right: auto;
     }
 
-    /* Shared wrapper for tabs + table so tabs match table width.
-       Tab width is synced to table width via JS (responsive-tables.js)
-       to avoid fit-content race conditions with font loading. */
-    .team-stats-block {
-        width: fit-content;
-        max-width: 100%;
-        margin-left: auto;
-        margin-right: auto;
-    }
+}
 
-    .team-stats-block .table-scroll-wrapper {
-        width: auto;
-        margin-left: 0;
-        margin-right: 0;
-    }
+/* When a table has a <caption> (team tabs), move the top border-radius
+   from the table to the caption so the tabs get the rounded corners. */
+.ibl-data-table:has(> caption) {
+    border-radius: 0 0 var(--radius-lg, 0.5rem) var(--radius-lg, 0.5rem);
+}
+
+.team-table-caption {
+    border-radius: var(--radius-lg, 0.5rem) var(--radius-lg, 0.5rem) 0 0;
+    overflow: hidden;
 }
 
 /* Scroll container for wide tables on mobile */
@@ -859,7 +855,8 @@
    Stat Highlight (orange accent for important values)
    ========================================================================== */
 
-.ibl-stat-highlight {
+.ibl-stat-highlight,
+.ibl-data-table td.ibl-stat-highlight {
     font-family: var(--font-display);
     font-weight: 700;
     color: var(--accent-500);

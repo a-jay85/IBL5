@@ -59,9 +59,9 @@ class TeamService implements TeamServiceInterface
 
         $insertyear = ($yr !== null && $yr !== '') ? "&yr=$yr" : "";
 
-        $tabs = $this->renderTabs($teamID, $display, $insertyear, $season);
+        $tabsHtml = $this->renderTabs($teamID, $display, $insertyear, $season);
 
-        $tableOutput = $this->getTableOutput($display, $result, $team, $yr, $season, $sharedFunctions);
+        $tableOutput = $this->getTableOutput($display, $result, $team, $yr, $season, $sharedFunctions, $tabsHtml);
 
         $startersTable = "";
         if ($teamID > 0 && ($yr === null || $yr === '')) {
@@ -89,7 +89,6 @@ class TeamService implements TeamServiceInterface
             'display' => $display,
             'insertyear' => $insertyear,
             'isActualTeam' => $isActualTeam,
-            'tabs' => $tabs,
             'tableOutput' => $tableOutput,
             'startersTable' => $startersTable,
             'draftPicksTable' => $draftPicksTable,
@@ -177,26 +176,52 @@ class TeamService implements TeamServiceInterface
      *
      * Absorbed from TeamUIService::getTableOutput()
      */
-    private function getTableOutput(string $display, mixed $result, object $team, ?string $yr, object $season, object $sharedFunctions): string
+    private function getTableOutput(string $display, mixed $result, object $team, ?string $yr, object $season, object $sharedFunctions, string $tabsHtml): string
     {
         switch ($display) {
             case 'ratings':
-                return \UI::ratings($this->db, $result, $team, $yr, $season);
+                $html = \UI::ratings($this->db, $result, $team, $yr, $season);
+                break;
             case 'total_s':
-                return \UI::seasonTotals($this->db, $result, $team, $yr);
+                $html = \UI::seasonTotals($this->db, $result, $team, $yr);
+                break;
             case 'avg_s':
-                return \UI::seasonAverages($this->db, $result, $team, $yr);
+                $html = \UI::seasonAverages($this->db, $result, $team, $yr);
+                break;
             case 'per36mins':
-                return \UI::per36Minutes($this->db, $result, $team, $yr);
+                $html = \UI::per36Minutes($this->db, $result, $team, $yr);
+                break;
             case 'chunk':
-                return \UI::periodAverages($this->db, $team, $season);
+                $html = \UI::periodAverages($this->db, $team, $season);
+                break;
             case 'playoffs':
-                return \UI::periodAverages($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate);
+                $html = \UI::periodAverages($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate);
+                break;
             case 'contracts':
-                return \UI::contracts($this->db, $result, $team, $sharedFunctions);
+                $html = \UI::contracts($this->db, $result, $team, $sharedFunctions);
+                break;
             default:
-                return \UI::ratings($this->db, $result, $team, $yr, $season);
+                $html = \UI::ratings($this->db, $result, $team, $yr, $season);
+                break;
         }
+
+        return $this->injectCaption($html, $tabsHtml);
+    }
+
+    /**
+     * Inject tabs HTML as a <caption> element inside the table
+     *
+     * Inserts a <caption> immediately after the opening <table ...> tag
+     * so tabs inherit the table's width by definition.
+     */
+    private function injectCaption(string $tableHtml, string $tabsHtml): string
+    {
+        return preg_replace(
+            '/(<table\b[^>]*>)/i',
+            '$1<caption class="team-table-caption">' . $tabsHtml . '</caption>',
+            $tableHtml,
+            1
+        );
     }
 
     /**

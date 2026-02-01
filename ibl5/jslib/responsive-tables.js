@@ -277,38 +277,6 @@
         }
     }
 
-    /**
-     * Sync .ibl-tabs width to its sibling table inside .team-stats-block.
-     * Uses ResizeObserver so the tabs always match the table width,
-     * even after font loading or responsive table reflows.
-     */
-    function initTabWidthSync() {
-        var blocks = document.querySelectorAll(".team-stats-block");
-        for (var i = 0; i < blocks.length; i++) {
-            observeTabWidth(blocks[i]);
-        }
-    }
-
-    function observeTabWidth(block) {
-        var tabs = block.querySelector(".ibl-tabs");
-        var wrapper = block.querySelector(".table-scroll-wrapper");
-        if (!tabs || !wrapper) return;
-
-        // Avoid duplicate observers
-        if (block.dataset.tabSyncInit === "1") return;
-        block.dataset.tabSyncInit = "1";
-
-        function sync() {
-            tabs.style.maxWidth = wrapper.offsetWidth + "px";
-        }
-
-        var observer = new ResizeObserver(sync);
-        observer.observe(wrapper);
-
-        // Initial sync
-        sync();
-    }
-
     // Debounced resize handler
     var resizeTimer;
     window.addEventListener("resize", function () {
@@ -329,7 +297,6 @@
     // Run on DOM ready
     function init() {
         initResponsiveTables();
-        initTabWidthSync();
     }
 
     if (document.readyState === "loading") {

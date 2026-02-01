@@ -31,7 +31,6 @@ interface TeamServiceInterface
      *     display: string,
      *     insertyear: string,
      *     isActualTeam: bool,
-     *     tabs: string,
      *     tableOutput: string,
      *     startersTable: string,
      *     draftPicksTable: string,

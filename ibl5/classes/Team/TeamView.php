@@ -21,7 +21,6 @@ class TeamView implements TeamViewInterface
         $imagesPath = \Utilities\HtmlSanitizer::safeHtmlOutput($pageData['imagesPath']);
         $yr = $pageData['yr'];
         $isActualTeam = $pageData['isActualTeam'];
-        $tabs = $pageData['tabs'];
         $tableOutput = $pageData['tableOutput'];
         $startersTable = $pageData['startersTable'];
         $draftPicksTable = $pageData['draftPicksTable'];
@@ -47,7 +46,6 @@ class TeamView implements TeamViewInterface
     <div class="team-page-main">
         <div class="team-stats-block">
             <?= $bannerHtml ?>
-            <?= $tabs ?>
             <div class="table-scroll-wrapper">
                 <div class="table-scroll-container">
                     <?= $tableOutput ?>

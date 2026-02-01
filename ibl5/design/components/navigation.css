@@ -204,6 +204,16 @@
     }
 }
 
+/* Caption-hosted tabs (inside <table><caption>) */
+.team-table-caption {
+    padding: 0;
+    text-align: left;
+}
+
+.team-table-caption .ibl-tabs {
+    border-radius: 0;
+}
+
 /* Accent variant tabs */
 .ibl-tabs--accent {
     background: var(--gradient-accent);

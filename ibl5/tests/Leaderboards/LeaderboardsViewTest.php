@@ -63,12 +63,10 @@ final class LeaderboardsViewTest extends TestCase
     {
         $html = $this->view->renderTableHeader();
 
-        // Check for header elements
-        $this->assertStringContainsString('<h2', $html);
-        $this->assertStringContainsString('Leaderboards Display', $html);
+        // Page heading is rendered in index.php, not in renderTableHeader()
         $this->assertStringContainsString('<table', $html);
         $this->assertStringContainsString('sortable', $html);
-        
+
         // Check that all stat columns are present
         $this->assertStringContainsString('>Rank<', $html);
         $this->assertStringContainsString('>Name<', $html);

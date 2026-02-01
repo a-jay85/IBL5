@@ -121,7 +121,7 @@ class InjuriesView implements InjuriesViewInterface
             <span class=\"ibl-team-cell__text\">{$teamName}</span>
         </a>
     </td>
-    <td class=\"days-cell\">{$daysRemaining}</td>
+    <td class=\"ibl-stat-highlight\">{$daysRemaining}</td>
 </tr>";
     }
 

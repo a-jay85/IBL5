@@ -297,8 +297,7 @@ class NavigationView
                     ['label' => 'Next Sim', 'url' => 'modules.php?name=Next_Sim', 'badge' => 'NEW'],
                     ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=Depth_Chart_Entry'],
                     ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
-                    ['label' => 'Waivers: Add', 'url' => 'modules.php?name=Waivers&action=add'],
-                    ['label' => 'Waivers: Drop', 'url' => 'modules.php?name=Waivers&action=drop'],
+                    ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=drop">Drop</a>'],
                     ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
                     ['label' => 'Draft', 'url' => 'modules.php?name=Draft'],
                     ['label' => 'Draft History', 'url' => 'modules.php?name=Draft_History&teamID=' . $this->teamId],
@@ -323,6 +322,12 @@ class NavigationView
      */
     private function renderDropdownLink(array $link): string
     {
+        if (isset($link['rawHtml'])) {
+            return '<span class="nav-dropdown-item block px-4 py-2.5 text-base font-display text-gray-300 border-l-2 border-transparent">'
+                . $link['rawHtml']
+                . '</span>';
+        }
+
         $label = HtmlSanitizer::safeHtmlOutput($link['label']);
         $url = HtmlSanitizer::safeHtmlOutput($link['url']);
         $external = $link['external'] ?? false;
@@ -443,6 +448,13 @@ class NavigationView
         }
 
         foreach ($links as $link) {
+            if (isset($link['rawHtml'])) {
+                $html .= '<span class="flex items-center px-5 py-3 pl-14 text-base font-display text-gray-400 border-l-2 border-transparent">'
+                    . $link['rawHtml']
+                    . '</span>';
+                continue;
+            }
+
             $label = HtmlSanitizer::safeHtmlOutput($link['label']);
             $url = HtmlSanitizer::safeHtmlOutput($link['url']);
             $external = $link['external'] ?? false;

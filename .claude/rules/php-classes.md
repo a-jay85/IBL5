@@ -4,18 +4,6 @@ paths: ibl5/classes/**/*.php
 
 # PHP Class Development Rules
 
-## Interface-Driven Architecture
-Structure modules in `ibl5/classes/ModuleName/`:
-```
-Module/
-├── Contracts/
-│   ├── ModuleRepositoryInterface.php
-│   └── ModuleServiceInterface.php
-├── ModuleRepository.php    # implements ModuleRepositoryInterface
-├── ModuleService.php       # implements ModuleServiceInterface
-└── ModuleView.php          # HTML rendering
-```
-
 ## Interface Standards
 - Method signatures with full PHPDoc
 - `@see InterfaceName::methodName()` instead of duplicating docblocks

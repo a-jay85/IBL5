@@ -18,26 +18,6 @@ ALL dynamic content must use `Utilities\HtmlSanitizer::safeHtmlOutput()`:
 echo $username;
 ```
 
-## Output Buffering Pattern
-```php
-public function renderTable(array $data): string
-{
-    ob_start();
-    ?>
-<table style="border: 1px solid #000; border-collapse: collapse;">
-    <?php foreach ($data as $row): ?>
-    <tr>
-        <td style="border: 1px solid #000; padding: 4px;">
-            <?= \Utilities\HtmlSanitizer::safeHtmlOutput($row['name']) ?>
-        </td>
-    </tr>
-    <?php endforeach; ?>
-</table>
-    <?php
-    return ob_get_clean();
-}
-```
-
 ## HTML Modernization
 Replace deprecated tags:
 
@@ -63,9 +43,4 @@ When inline styles repeat 2+ times, extract to `<style>` block:
 ```
 
 ## Statistics Display
-Use `BasketballStats\StatsFormatter`:
-```php
-<?= StatsFormatter::formatPercentage($fgm, $fga) ?>  // 0.523
-<?= StatsFormatter::formatPerGameAverage($pts, $gp) ?> // 12.5
-<?= StatsFormatter::formatTotal($careerPoints) ?>  // 1,234
-```
+Use `BasketballStats\StatsFormatter` — see `php-classes.md` for method list.

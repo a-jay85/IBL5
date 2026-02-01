@@ -28,22 +28,7 @@ cd ibl5 && vendor/bin/phpunit --display-all-issues
 cd ibl5 && vendor/bin/phpunit -c phpunit.ci.xml
 ```
 
-### PHPUnit 12.x Display Options
-By default, PHPUnit 12.x only shows summary counts for non-failures. Use these flags to see details:
-- `--display-all-issues` - Show ALL issue details (recommended)
-- `--display-deprecations` - Show deprecation details
-- `--display-warnings` - Show warning details
-- `--display-notices` - Show notice details
-- `--display-phpunit-deprecations` - Show PHPUnit deprecation details
-
-**Note:** `-v`/`--verbose` do NOT exist in PHPUnit 12.x. Use `--display-all-issues` instead.
-
-### Test Completion Requirements
-**IMPORTANT:** Before considering any PHPUnit-related task complete:
-1. Run the full test suite: `vendor/bin/phpunit`
-2. Verify zero warnings, zero failures, zero errors
-3. If warnings exist, resolve them (don't just silence them unless truly necessary)
-4. The final output should show `OK (X tests, Y assertions)` with no issues
+**Note:** PHPUnit 12.x has no `-v`/`--verbose`. Use `--display-all-issues` instead. See `phpunit-tests.md` for full testing rules and completion criteria.
 
 ## Architecture
 
@@ -155,13 +140,12 @@ Every PHP file must have `declare(strict_types=1);` at the top. Additional requi
 - **Typed methods:** All parameters and return types must be declared
 - **Strict equality:** Always use `===` and `!==`, never `==` or `!=`
 - **Null handling:** Use nullable types (`?string`) and null coalescing (`??`) appropriately
-- **Database values:** Native types are enabled (`MYSQLI_OPT_INT_AND_FLOAT_NATIVE`). INT columns return PHP `int`, VARCHAR columns return PHP `string`. Compare with the correct native type: `=== 1` for INT columns, `=== '1'` for VARCHAR columns. Always check `schema.sql` for the column type when unsure.
 
 ### Statistics Formatting
 Use `BasketballStats\StatsFormatter` for all stats - never `number_format()` directly.
 
 ### HTML Modernization
-Replace deprecated tags: `<b>` → `<strong>`, `<font>` → `<span>`, `<center>` → `<div style="text-align: center;">`.
+See `view-rendering.md` for the full deprecated-tag replacement table.
 
 ### Production Validation
 After refactoring, compare output against iblhoops.net. Results must match exactly.

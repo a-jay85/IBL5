@@ -1787,28 +1787,6 @@ a.schedule-jump-btn:hover {
 /* .power-rating removed — use .ibl-stat-highlight (tables.css) instead */
 
 /* ==========================================================================
-   Injuries Module
-   ========================================================================== */
-
-.injuries-table {
-    max-width: 600px;
-}
-
-.injuries-table .team-cell {
-    border-radius: var(--radius-sm);
-    padding: 0.375rem 0.5rem;
-}
-
-.injuries-table .team-cell a {
-    font-weight: 600;
-}
-
-.injuries-table .days-cell {
-    font-weight: 600;
-    color: var(--accent-600);
-}
-
-/* ==========================================================================
    Waivers Module
    ========================================================================== */
 

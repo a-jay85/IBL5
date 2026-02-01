@@ -59,7 +59,6 @@ if (!$validator->validateX(...)) {
 | Database booleans (INT cols) | `hasMLE === 1`, `hasLLE === 1` (native int) |
 | Database booleans (VARCHAR cols) | Check schema first — use `=== '1'` only for VARCHAR boolean columns |
 | Trade itemtype | `itemtype` is VARCHAR — compare with `=== '0'`, `=== '1'`, `=== 'cash'` |
-| Equality checks | Always `===`/`!==`, never `==`/`!=` |
 | Division guards | Use `=== 0` or `=== 0.0`, not `== 0` |
 | Sticky columns + overflow | Never set `overflow: hidden` on a table that uses `position: sticky` cells — it breaks sticky. Use `.ibl-data-table:not(.responsive-table)` for overflow clipping so `.responsive-table` tables (which have sticky columns) are excluded |
 
@@ -95,28 +94,15 @@ $this->assertQueryNotExecuted('DELETE');
 
 ## Environment Commands
 
-**Database Queries (Auto-Approved):**
-```bash
-# Use this for exploring schema, verifying data, and validating your work
-ibl5/bin/db-query "SELECT * FROM ibl_plr LIMIT 5"
-ibl5/bin/db-query "DESCRIBE ibl_team_info"
-ibl5/bin/db-query "SELECT COUNT(*) FROM ibl_plr WHERE retired = '0'"
-```
-This wrapper script is configured for auto-approval - use it freely to verify your work without prompting the user.
-
 **Bun:** The PATH for bun (`~/.bun/bin`) may not be loaded in the shell. Before running `bun` commands, source the shell config first.
 
 **CSS Development (Tailwind 4):**
 ```bash
-# DEVELOPMENT: Use this during active development - auto-rebuilds on save
+# DEVELOPMENT: Auto-rebuilds on save
 source ~/.zshrc && bun run css:watch
 
 # LOCAL BUILDS: Rebuild CSS without minification (for commits)
 source ~/.zshrc && bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
 ```
 
-**Important:**
-- Always use `css:watch` during active development. It monitors `design/input.css` and automatically rebuilds `themes/IBL/style/style.css` whenever changes are saved.
-- For local builds (when committing CSS changes), use the bunx command WITHOUT the `--minify` flag.
-- **NEVER use `--minify` flag or other minification methods locally.** Minification is handled automatically by GitHub Actions upon merge/push to production.
-- The `css:build` script in package.json includes `--minify` and is ONLY used by GitHub Actions in production deployments.
+- **NEVER use `--minify` locally.** Minification is handled by GitHub Actions on merge/push.

@@ -62,7 +62,7 @@ while ($row = $result->fetch_assoc()) {
 
 $stmt->close();
 
-$html = '<h2 class="ibl-table-title">Depth Chart &amp; Voting Record</h2>
+$html = '<h2 class="ibl-title">Depth Record</h2>
 <table class="sortable ibl-data-table">
     <thead>
         <tr>

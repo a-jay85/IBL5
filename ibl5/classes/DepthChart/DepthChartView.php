@@ -123,9 +123,6 @@ class DepthChartView implements DepthChartViewInterface
         echo '<div class="text-center"><table class="depth-chart-table ibl-data-table" data-no-responsive>
             <thead>
                 <tr>
-                    <th colspan="14">DEPTH CHART ENTRY</th>
-                </tr>
-                <tr>
                     <th>Pos</th>
                     <th>Player</th>
                     <th>' . HtmlSanitizer::safeHtmlOutput($slotNames[0]) . '</th>

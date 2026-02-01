@@ -39,6 +39,7 @@ class DepthChartController implements DepthChartControllerInterface
         
         \Nuke\Header::header();
 
+        echo '<h2 class="ibl-title">Depth Chart Entry</h2>';
         $this->view->renderTeamLogo($teamID);
 
         $playersResult = $this->repository->getPlayersOnTeam($teamName, $teamID);

@@ -28,6 +28,7 @@ class WaiversView implements WaiversViewInterface
 
         ob_start();
         ?>
+        <h2 class="ibl-title">Waivers</h2>
         <?php if ($errorMessage): ?>
             <div class="waivers-error"><?= htmlspecialchars($errorMessage, ENT_QUOTES, 'UTF-8') ?></div>
         <?php endif; ?>

@@ -20,4 +20,4 @@ jobs:
           git pull origin
     - name: Bun
       uses: oven-sh/setup-bun@v2
-    - run: bun run css:build
+    - run: bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --minify

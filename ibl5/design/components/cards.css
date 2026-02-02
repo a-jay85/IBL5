@@ -409,6 +409,7 @@
     justify-content: center;
     gap: var(--space-4);
     margin-top: var(--space-4);
+    margin-bottom: 18px;
 }
 
 .team-cards-row > .team-card {
@@ -416,9 +417,9 @@
     margin-bottom: 0;
 }
 
-.team-cards-row > .team-card:has(.franchise-history-columns) {
-    flex-basis: 100%;
+.team-card:has(.franchise-history-columns) {
     max-width: 1400px;
+    margin-inline: auto;
 }
 
 /* Draft picks list */

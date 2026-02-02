@@ -402,6 +402,11 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Draft picks card — constrain width since the list doesn't need full width */
+.team-card:has(.draft-picks-list) {
+    max-width: 360px;
+}
+
 /* Draft picks list */
 .draft-picks-list {
     list-style: none;

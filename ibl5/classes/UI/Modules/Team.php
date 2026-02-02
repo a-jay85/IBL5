@@ -171,8 +171,8 @@ class Team
         $win = $powerData['win'] ?? 0;
         $loss = $powerData['loss'] ?? 0;
         $gb = $powerData['gb'] ?? 0;
-        $division = $powerData['Division'] ?? '';
-        $conference = $powerData['Conference'] ?? '';
+        $division = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['Division'] ?? '');
+        $conference = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['Conference'] ?? '');
         $home_win = $powerData['home_win'] ?? 0;
         $home_loss = $powerData['home_loss'] ?? 0;
         $road_win = $powerData['road_win'] ?? 0;
@@ -180,10 +180,10 @@ class Team
         $last_win = $powerData['last_win'] ?? 0;
         $last_loss = $powerData['last_loss'] ?? 0;
 
-        $divisionStandings = $this->repository->getDivisionStandings($division);
+        $divisionStandings = $this->repository->getDivisionStandings($powerData['Division'] ?? '');
         $gbbase = $divisionStandings[0]['gb'] ?? 0;
         $gb = $gbbase - $gb;
-        
+
         $Div_Pos = 1;
         foreach ($divisionStandings as $index => $standing) {
             if ($standing['Team'] == $team->name) {
@@ -192,7 +192,7 @@ class Team
             }
         }
 
-        $conferenceStandings = $this->repository->getConferenceStandings($conference);
+        $conferenceStandings = $this->repository->getConferenceStandings($powerData['Conference'] ?? '');
         $Conf_Pos = 1;
         foreach ($conferenceStandings as $index => $standing) {
             if ($standing['Team'] == $team->name) {
@@ -201,111 +201,99 @@ class Team
             }
         }
 
-        $output = "<tr bgcolor=\"#$team->color1\">
-            <td align=\"center\">
-                <font color=\"#$team->color2\"><b>Current Season</b></font>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <table>
-                    <tr>
-                        <td align='right'><b>Team:</td>
-                        <td>$team->name</td>
-                    </tr>
-                    <tr>
-                        <td align='right'><b>f.k.a.:</td>
-                        <td>$team->formerlyKnownAs</td>
-                    </tr>
-                    <tr>
-                        <td align='right'><b>Record:</td>
-                        <td>$win-$loss</td>
-                    </tr>
-                    <tr>
-                        <td align='right'><b>Arena:</td>
-                        <td>$team->arena</td>
-                    </tr>";
+        $teamName = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
+        $fka = \Utilities\HtmlSanitizer::safeHtmlOutput($team->formerlyKnownAs);
+        $arena = \Utilities\HtmlSanitizer::safeHtmlOutput($team->arena);
+
+        $output = '<div class="team-info-list">'
+            . '<span class="team-info-list__label">Team</span>'
+            . "<span class=\"team-info-list__value\">$teamName</span>"
+            . '<span class="team-info-list__label">f.k.a.</span>'
+            . "<span class=\"team-info-list__value\">$fka</span>"
+            . '<span class="team-info-list__label">Record</span>'
+            . "<span class=\"team-info-list__value\">$win-$loss</span>"
+            . '<span class="team-info-list__label">Arena</span>'
+            . "<span class=\"team-info-list__value\">$arena</span>";
+
         if ($team->capacity !== 0) {
-            $output .= "
-                    <tr>
-                        <td align='right'><b>Capacity:</td>
-                        <td>$team->capacity</td>
-                    </tr>";
+            $capacity = (int) $team->capacity;
+            $output .= '<span class="team-info-list__label">Capacity</span>'
+                . "<span class=\"team-info-list__value\">$capacity</span>";
         }
-                    $output .= "
-                    <tr>
-                        <td align='right'><b>Conference:</td>
-                        <td>$conference</td>
-                    </tr>
-                    <tr>
-                        <td align='right'><b>Conf Position:</td>
-                        <td>$Conf_Pos</td>
-                    </tr>
-                    <tr>
-                        <td align='right'><b>Division:</td>
-                        <td>$division</td>
-                    </tr>
-                    <tr>
-                        <td align='right'><b>Div Position:</td>
-                        <td>$Div_Pos</td>
-                    </tr>
-                    <tr>
-                        <td align='right'><b>GB:</td>
-                        <td>$gb</td>
-                    </tr>
-                    <tr>
-                        <td align='right'><b>Home Record:</td>
-                        <td>$home_win-$home_loss</td>
-                    </tr>
-                    <tr>
-                        <td align='right'><b>Road Record:</td>
-                        <td>$road_win-$road_loss</td>
-                    </tr>
-                    <tr>
-                        <td align='right'><b>Last 10:</td>
-                        <td>$last_win-$last_loss</td>
-                    </tr>
-                </table>
-            </td>
-        </tr>";
+
+        $output .= '<span class="team-info-list__label">Conference</span>'
+            . "<span class=\"team-info-list__value\">$conference ($Conf_Pos" . $this->ordinalSuffix($Conf_Pos) . ")</span>"
+            . '<span class="team-info-list__label">Division</span>'
+            . "<span class=\"team-info-list__value\">$division ($Div_Pos" . $this->ordinalSuffix($Div_Pos) . ")</span>"
+            . '<span class="team-info-list__label">Games Back</span>'
+            . "<span class=\"team-info-list__value\">$gb</span>"
+            . '<span class="team-info-list__label">Home</span>'
+            . "<span class=\"team-info-list__value\">$home_win-$home_loss</span>"
+            . '<span class="team-info-list__label">Road</span>'
+            . "<span class=\"team-info-list__value\">$road_win-$road_loss</span>"
+            . '<span class="team-info-list__label">Last 10</span>'
+            . "<span class=\"team-info-list__value\">$last_win-$last_loss</span>"
+            . '</div>';
 
         return $output;
+    }
+
+    /**
+     * Return ordinal suffix for a position number (1st, 2nd, 3rd, etc.)
+     */
+    private function ordinalSuffix(int $n): string
+    {
+        if ($n % 100 >= 11 && $n % 100 <= 13) {
+            return 'th';
+        }
+        return match ($n % 10) {
+            1 => 'st',
+            2 => 'nd',
+            3 => 'rd',
+            default => 'th',
+        };
     }
 
     public function draftPicks(\Team $team): string
     {
         global $mysqli_db;
-        
+
         $resultPicks = $team->getDraftPicksResult();
-    
+
         $league = new \League($mysqli_db);
         $allTeamsResult = $league->getAllTeamsResult();
-    
+
         foreach ($allTeamsResult as $teamRow) {
             $teamsArray[$teamRow['team_name']] = \Team::initialize($mysqli_db, $teamRow);
         }
-    
-        $tableDraftPicks = "<table align=\"center\">";
-    
+
+        $tableDraftPicks = '<ul class="draft-picks-list">';
+
         foreach ($resultPicks as $draftPickRow) {
             $draftPick = new \DraftPick($draftPickRow);
-    
-            $draftPickOriginalTeamID = $teamsArray[$draftPick->originalTeam]->teamID;
-            $draftPickOriginalTeamCity = $teamsArray[$draftPick->originalTeam]->city;
-    
-            $tableDraftPicks .= "<tr>
-                <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&teamID=$draftPickOriginalTeamID\"><img src=\"images/logo/$draftPick->originalTeam.png\" height=33 width=33></a></td>
-                <td valign=\"center\"><a href=\"modules.php?name=Team&op=team&teamID=$draftPickOriginalTeamID\">$draftPick->year $draftPickOriginalTeamCity $draftPick->originalTeam (Round $draftPick->round)</a></td>
-            </tr>";
-            if ($draftPick->notes != NULL) {
-                $tableDraftPicks .= "<tr>
-                    <td width=200 colspan=2 valign=\"top\"><i>$draftPick->notes</i><br>&nbsp;</td>
-                </tr>";
+
+            $draftPickOriginalTeamID = (int) $teamsArray[$draftPick->originalTeam]->teamID;
+            $draftPickOriginalTeamCity = \Utilities\HtmlSanitizer::safeHtmlOutput($teamsArray[$draftPick->originalTeam]->city);
+            $draftPickYear = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $draftPick->year);
+            $draftPickOriginalTeamName = \Utilities\HtmlSanitizer::safeHtmlOutput($draftPick->originalTeam);
+            $draftPickRound = (int) $draftPick->round;
+
+            $tableDraftPicks .= '<li class="draft-picks-list__item">'
+                . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID=$draftPickOriginalTeamID\">"
+                . "<img class=\"draft-picks-list__logo\" src=\"images/logo/$draftPickOriginalTeamName.png\" height=\"33\" width=\"33\" alt=\"$draftPickOriginalTeamName\"></a>"
+                . '<div class="draft-picks-list__info">'
+                . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID=$draftPickOriginalTeamID\">$draftPickYear $draftPickOriginalTeamCity $draftPickOriginalTeamName (Round $draftPickRound)</a>";
+
+            if ($draftPick->notes !== null && $draftPick->notes !== '') {
+                $tableDraftPicks .= '<div class="draft-picks-list__notes">'
+                    . \Utilities\HtmlSanitizer::safeHtmlOutput($draftPick->notes) . '</div>';
             }
+
+            $tableDraftPicks .= '</div></li>';
         }
-    
-        $tableDraftPicks .= "</table>";
-    
+
+        $tableDraftPicks .= '</ul>';
+
         return $tableDraftPicks;
     }
 
@@ -313,26 +301,19 @@ class Team
     {
         $gmHistory = $this->repository->getGMHistory($team->ownerName, $team->name);
 
-        $output = "<tr bgcolor=\"#$team->color1\">
-            <td align=\"center\">
-                <font color=\"#$team->color2\"><b>GM History</b></font>
-            </td>
-        </tr>
-        <tr>
-            <td>";
-
-        foreach ($gmHistory as $record) {
-            $dec_year = $record['year'] ?? '';
-            $dec_Award = $record['Award'] ?? '';
-            $output .= "<table border=0 cellpadding=0 cellspacing=0>
-                <tr>
-                    <td>$dec_year $dec_Award</td>
-                </tr>
-            </table>";
+        if (empty($gmHistory)) {
+            return '';
         }
 
-        $output .= "</td>
-        </tr>";
+        $output = '<ul class="team-awards-list">';
+
+        foreach ($gmHistory as $record) {
+            $year = \Utilities\HtmlSanitizer::safeHtmlOutput((string) ($record['year'] ?? ''));
+            $award = \Utilities\HtmlSanitizer::safeHtmlOutput((string) ($record['Award'] ?? ''));
+            $output .= "<li><span class=\"award-year\">$year</span> $award</li>";
+        }
+
+        $output .= '</ul>';
 
         return $output;
     }
@@ -342,37 +323,25 @@ class Team
         $heatHistory = $this->repository->getHEATHistory($team->name);
         $wintot = 0;
         $lostot = 0;
-        
-        $output = "<tr bgcolor=\"#$team->color1\">
-            <td align=center>
-                <font color=\"#$team->color2\"><b>H.E.A.T. History</b></font>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div id=\"History-R\" style=\"overflow:auto\">";
-        
+
+        $output = '<ul class="team-history-list">';
+
         foreach ($heatHistory as $record) {
-            $yearwl = $record['year'] ?? '';
-            $namewl = $record['namethatyear'] ?? '';
+            $yearwl = \Utilities\HtmlSanitizer::safeHtmlOutput((string) ($record['year'] ?? ''));
+            $namewl = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear'] ?? '');
             $wins = $record['wins'] ?? 0;
             $losses = $record['losses'] ?? 0;
             $wintot += $wins;
             $lostot += $losses;
             $winpct = ($wins + $losses) ? number_format($wins / ($wins + $losses), 3) : "0.000";
-            $output .= "<a href=\"./modules.php?name=Team&op=team&teamID=$team->teamID&yr=$yearwl\">$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
+            $teamID = (int) $team->teamID;
+            $output .= "<li><a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$yearwl\">$yearwl $namewl</a> <span class=\"record\">$wins-$losses ($winpct)</span></li>";
         }
-        
+
+        $output .= '</ul>';
+
         $wlpct = ($wintot + $lostot) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
-        
-        $output .= "</div>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <b>Totals:</b> $wintot-$lostot ($wlpct)
-            </td>
-        </tr>";
+        $output .= "<div class=\"team-card__footer\">Totals: $wintot-$lostot ($wlpct)</div>";
 
         return $output;
     }
@@ -381,188 +350,83 @@ class Team
     {
         $playoffResults = $this->repository->getPlayoffResults();
         $totalplayoffwins = $totalplayofflosses = 0;
-        $first_round_victories = $second_round_victories = $third_round_victories = $fourth_round_victories = 0;
-        $first_round_losses = $second_round_losses = $third_round_losses = $fourth_round_losses = 0;
-        $round_one_output = $round_two_output = $round_three_output = $round_four_output = "";
-        $first_wins = $second_wins = $third_wins = $fourth_wins = 0;
-        $first_losses = $second_losses = $third_losses = $fourth_losses = 0;
+
+        $rounds = [
+            1 => ['name' => 'First Round', 'wins' => 0, 'losses' => 0, 'series_w' => 0, 'series_l' => 0, 'results' => []],
+            2 => ['name' => 'Conference Semis', 'wins' => 0, 'losses' => 0, 'series_w' => 0, 'series_l' => 0, 'results' => []],
+            3 => ['name' => 'Conference Finals', 'wins' => 0, 'losses' => 0, 'series_w' => 0, 'series_l' => 0, 'results' => []],
+            4 => ['name' => 'IBL Finals', 'wins' => 0, 'losses' => 0, 'series_w' => 0, 'series_l' => 0, 'results' => []],
+        ];
+
+        $teamName = $team->name;
 
         foreach ($playoffResults as $playoff) {
-            $playoffround = $playoff['round'] ?? 0;
-            $playoffyear = $playoff['year'] ?? '';
-            $playoffwinner = $playoff['winner'] ?? '';
-            $playoffloser = $playoff['loser'] ?? '';
-            $playoffloser_games = $playoff['loser_games'] ?? 0;
+            $round = $playoff['round'] ?? 0;
+            $year = \Utilities\HtmlSanitizer::safeHtmlOutput((string) ($playoff['year'] ?? ''));
+            $winner = $playoff['winner'] ?? '';
+            $loser = $playoff['loser'] ?? '';
+            $loserGames = $playoff['loser_games'] ?? 0;
 
-            if ($playoffround === 1) {
-                if ($playoffwinner === $team->name) {
-                    $totalplayoffwins += 4;
-                    $totalplayofflosses += $playoffloser_games;
-                    $first_wins += 4;
-                    $first_losses += $playoffloser_games;
-                    $first_round_victories++;
-                    $round_one_output .= "$playoffyear - $team->name 4, $playoffloser $playoffloser_games<br>";
-                } else if ($playoffloser === $team->name) {
-                    $totalplayofflosses += 4;
-                    $totalplayoffwins += $playoffloser_games;
-                    $first_losses += 4;
-                    $first_wins += $playoffloser_games;
-                    $first_round_losses++;
-                    $round_one_output .= "$playoffyear - $playoffwinner 4, $team->name $playoffloser_games<br>";
-                }
-            } else if ($playoffround === 2) {
-                if ($playoffwinner === $team->name) {
-                    $totalplayoffwins += 4;
-                    $totalplayofflosses += $playoffloser_games;
-                    $second_wins += 4;
-                    $second_losses += $playoffloser_games;
-                    $second_round_victories++;
-                    $round_two_output .= "$playoffyear - $team->name 4, $playoffloser $playoffloser_games<br>";
-                } else if ($playoffloser === $team->name) {
-                    $totalplayofflosses += 4;
-                    $totalplayoffwins += $playoffloser_games;
-                    $second_losses += 4;
-                    $second_wins += $playoffloser_games;
-                    $second_round_losses++;
-                    $round_two_output .= "$playoffyear - $playoffwinner 4, $team->name $playoffloser_games<br>";
-                }
-            } else if ($playoffround === 3) {
-                if ($playoffwinner === $team->name) {
-                    $totalplayoffwins += 4;
-                    $totalplayofflosses += $playoffloser_games;
-                    $third_wins += 4;
-                    $third_losses += $playoffloser_games;
-                    $third_round_victories++;
-                    $round_three_output .= "$playoffyear - $team->name 4, $playoffloser $playoffloser_games<br>";
-                } else if ($playoffloser === $team->name) {
-                    $totalplayofflosses += 4;
-                    $totalplayoffwins += $playoffloser_games;
-                    $third_losses += 4;
-                    $third_wins += $playoffloser_games;
-                    $third_round_losses++;
-                    $round_three_output .= "$playoffyear - $playoffwinner 4, $team->name $playoffloser_games<br>";
-                }
-            } else if ($playoffround === 4) {
-                if ($playoffwinner === $team->name) {
-                    $totalplayoffwins += 4;
-                    $totalplayofflosses += $playoffloser_games;
-                    $fourth_wins += 4;
-                    $fourth_losses += $playoffloser_games;
-                    $fourth_round_victories++;
-                    $round_four_output .= "$playoffyear - $team->name 4, $playoffloser $playoffloser_games<br>";
-                } else if ($playoffloser === $team->name) {
-                    $totalplayofflosses += 4;
-                    $totalplayoffwins += $playoffloser_games;
-                    $fourth_losses += 4;
-                    $fourth_wins += $playoffloser_games;
-                    $fourth_round_losses++;
-                    $round_four_output .= "$playoffyear - $playoffwinner 4, $team->name $playoffloser_games<br>";
-                }
+            if (!isset($rounds[$round])) {
+                continue;
+            }
+
+            $isWin = ($winner === $teamName);
+            $isLoss = ($loser === $teamName);
+
+            if (!$isWin && !$isLoss) {
+                continue;
+            }
+
+            $winnerSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($winner);
+            $loserSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($loser);
+
+            if ($isWin) {
+                $totalplayoffwins += 4;
+                $totalplayofflosses += $loserGames;
+                $rounds[$round]['wins'] += 4;
+                $rounds[$round]['losses'] += $loserGames;
+                $rounds[$round]['series_w']++;
+                $rounds[$round]['results'][] = "<li class=\"playoff-result playoff-result--win\">$year &mdash; $winnerSafe 4, $loserSafe $loserGames</li>";
+            } else {
+                $totalplayofflosses += 4;
+                $totalplayoffwins += $loserGames;
+                $rounds[$round]['losses'] += 4;
+                $rounds[$round]['wins'] += $loserGames;
+                $rounds[$round]['series_l']++;
+                $rounds[$round]['results'][] = "<li class=\"playoff-result\">$year &mdash; $winnerSafe 4, $loserSafe $loserGames</li>";
             }
         }
 
-        $pwlpct = ($totalplayoffwins + $totalplayofflosses !== 0) ? number_format($totalplayoffwins / ($totalplayoffwins + $totalplayofflosses), 3) : "0.000";
-        $r1wlpct = ($first_round_victories + $first_round_losses !== 0) ? number_format($first_round_victories / ($first_round_victories + $first_round_losses), 3) : "0.000";
-        $r2wlpct = ($second_round_victories + $second_round_losses !== 0) ? number_format($second_round_victories / ($second_round_victories + $second_round_losses), 3) : "0.000";
-        $r3wlpct = ($third_round_victories + $third_round_losses) ? number_format($third_round_victories / ($third_round_victories + $third_round_losses), 3) : "0.000";
-        $r4wlpct = ($fourth_round_victories + $fourth_round_losses) ? number_format($fourth_round_victories / ($fourth_round_victories + $fourth_round_losses), 3) : "0.000";
-        $round_victories = $first_round_victories + $second_round_victories + $third_round_victories + $fourth_round_victories;
-        $round_losses = $first_round_losses + $second_round_losses + $third_round_losses + $fourth_round_losses;
-        $swlpct = ($round_victories + $round_losses) ? number_format($round_victories / ($round_victories + $round_losses), 3) : "0.000";
-        $firstpct = ($first_wins + $first_losses) ? number_format($first_wins / ($first_wins + $first_losses), 3) : "0.000";
-        $secondpct = ($second_wins + $second_losses) ? number_format($second_wins / ($second_wins + $second_losses), 3) : "0.000";
-        $thirdpct = ($third_wins + $third_losses) ? number_format($third_wins / ($third_wins + $third_losses), 3) : "0.000";
-        $fourthpct = ($fourth_wins + $fourth_losses) ? number_format($fourth_wins / ($fourth_wins + $fourth_losses), 3) : "0.000";
+        $output = '';
+        $totalSeriesW = 0;
+        $totalSeriesL = 0;
 
-        $output = "";
-        if ($round_one_output != "") {
-            $output .= "<tr bgcolor=\"#$team->color1\">
-                <td align=center>
-                    <font color=\"#$team->color2\"><b>First-Round Playoff Results</b></font>
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <div id=\"History-P1\" style=\"overflow:auto\">" . $round_one_output . "</div>
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <b>Totals:</b> $first_wins-$first_losses ($firstpct)<br>
-                    <b>Series:</b> $first_round_victories-$first_round_losses ($r1wlpct)
-                </td>
-            </tr>";
-        }
-        if ($round_two_output != "") {
-            $output .= "<tr bgcolor=\"#$team->color1\">
-                <td align=center>
-                    <font color=\"#$team->color2\"><b>Conference Semis Playoff Results</b></font>
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <div id=\"History-P2\" style=\"overflow:auto\">" . $round_two_output . "</div>
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <b>Totals:</b> $second_wins-$second_losses ($secondpct)<br>
-                    <b>Series:</b> $second_round_victories-$second_round_losses ($r2wlpct)
-                </td>
-            </tr>";
-        }
-        if ($round_three_output != "") {
-            $output .= "<tr bgcolor=\"#$team->color1\">
-                <td align=center>
-                    <font color=\"#$team->color2\"><b>Conference Finals Playoff Results</b></font>
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <div id=\"History-P3\" style=\"overflow:auto\">" . $round_three_output . "</div>
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <b>Totals:</b> $third_wins-$third_losses ($thirdpct)<br>
-                    <b>Series:</b> $third_round_victories-$third_round_losses ($r3wlpct)
-                </td>
-            </tr>";
-        }
-        if ($round_four_output != "") {
-            $output .= "<tr bgcolor=\"#$team->color1\">
-                <td align=center>
-                    <font color=\"#$team->color2\"><b>IBL Finals Playoff Results</b></font>
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <div id=\"History-P4\" style=\"overflow:auto\">" . $round_four_output . "</div>
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <b>Totals:</b> $fourth_wins-$fourth_losses ($fourthpct)<br>
-                    <b>Series:</b> $fourth_round_victories-$fourth_round_losses ($r4wlpct)
-                </td>
-            </tr>";
+        foreach ($rounds as $r) {
+            if (empty($r['results'])) {
+                continue;
+            }
+            $totalSeriesW += $r['series_w'];
+            $totalSeriesL += $r['series_l'];
+            $gamePct = ($r['wins'] + $r['losses']) ? number_format($r['wins'] / ($r['wins'] + $r['losses']), 3) : "0.000";
+            $seriesPct = ($r['series_w'] + $r['series_l']) ? number_format($r['series_w'] / ($r['series_w'] + $r['series_l']), 3) : "0.000";
+            $roundName = $r['name'];
+
+            $output .= "<div class=\"team-card__body\" style=\"padding-bottom: 0;\">"
+                . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">$roundName</strong>"
+                . '</div>'
+                . '<ul class="team-history-list" style="padding: 0 var(--space-4);">'
+                . implode('', $r['results'])
+                . '</ul>'
+                . "<div class=\"team-card__footer\">Games: {$r['wins']}-{$r['losses']} ($gamePct) &middot; Series: {$r['series_w']}-{$r['series_l']} ($seriesPct)</div>";
         }
 
-        $output .= "<tr bgcolor=\"#$team->color1\">
-            <td align=center>
-                <font color=\"#$team->color2\"><b>Post-Season Totals</b></font>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <b>Games:</b> $totalplayoffwins-$totalplayofflosses ($pwlpct)
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <b>Series:</b> $round_victories-$round_losses ($swlpct)
-            </td>
-        </tr>";
+        $pwlpct = ($totalplayoffwins + $totalplayofflosses !== 0)
+            ? number_format($totalplayoffwins / ($totalplayoffwins + $totalplayofflosses), 3) : "0.000";
+        $swlpct = ($totalSeriesW + $totalSeriesL)
+            ? number_format($totalSeriesW / ($totalSeriesW + $totalSeriesL), 3) : "0.000";
+
+        $output .= "<div class=\"team-card__footer\" style=\"font-weight: 700;\">Post-Season: $totalplayoffwins-$totalplayofflosses ($pwlpct) &middot; Series: $totalSeriesW-$totalSeriesL ($swlpct)</div>";
 
         return $output;
     }
@@ -573,36 +437,25 @@ class Team
         $wintot = 0;
         $lostot = 0;
 
-        $output = "<tr bgcolor=\"#$team->color1\">
-            <td align=center>
-                <font color=\"#$team->color2\"><b>Regular Season History</b></font>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <div id=\"History-R\" style=\"overflow:auto\">";
+        $output = '<ul class="team-history-list">';
 
         foreach ($regularSeasonHistory as $record) {
             $yearwl = $record['year'] ?? 0;
-            $namewl = $record['namethatyear'] ?? '';
+            $namewl = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear'] ?? '');
             $wins = $record['wins'] ?? 0;
             $losses = $record['losses'] ?? 0;
             $wintot += $wins;
             $lostot += $losses;
             $winpct = ($wins + $losses) ? number_format($wins / ($wins + $losses), 3) : "0.000";
-            $output .= "<a href=\"./modules.php?name=Team&op=team&teamID=$team->teamID&yr=$yearwl\">" . ($yearwl - 1) . "-$yearwl $namewl</a>: $wins-$losses ($winpct)<br>";
+            $teamID = (int) $team->teamID;
+            $prevYear = $yearwl - 1;
+            $output .= "<li><a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$yearwl\">$prevYear-$yearwl $namewl</a> <span class=\"record\">$wins-$losses ($winpct)</span></li>";
         }
 
-        $wlpct = ($wintot + $lostot) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
+        $output .= '</ul>';
 
-        $output .= "</div>
-            </td>
-        </tr>
-        <tr>
-            <td>
-                <b>Totals:</b> $wintot-$lostot ($wlpct)
-            </td>
-        </tr>";
+        $wlpct = ($wintot + $lostot) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
+        $output .= "<div class=\"team-card__footer\">Totals: $wintot-$lostot ($wlpct)</div>";
 
         return $output;
     }
@@ -611,26 +464,19 @@ class Team
     {
         $teamAccomplishments = $this->repository->getTeamAccomplishments($team->name);
 
-        $output = "<tr bgcolor=\"#$team->color1\">
-            <td align=\"center\">
-                <font color=\"#$team->color2\"><b>Team Accomplishments</b></font>
-            </td>
-        </tr>
-        <tr>
-            <td>";
-
-        foreach ($teamAccomplishments as $record) {
-            $dec_year = $record['year'] ?? '';
-            $dec_Award = $record['Award'] ?? '';
-            $output .= "<table border=0 cellpadding=0 cellspacing=0>
-                <tr>
-                    <td>$dec_year $dec_Award</td>
-                </tr>
-            </table>";
+        if (empty($teamAccomplishments)) {
+            return '';
         }
 
-        $output .= "</td>
-        </tr>";
+        $output = '<ul class="team-awards-list">';
+
+        foreach ($teamAccomplishments as $record) {
+            $year = \Utilities\HtmlSanitizer::safeHtmlOutput((string) ($record['year'] ?? ''));
+            $award = \Utilities\HtmlSanitizer::safeHtmlOutput((string) ($record['Award'] ?? ''));
+            $output .= "<li><span class=\"award-year\">$year</span> $award</li>";
+        }
+
+        $output .= '</ul>';
 
         return $output;
     }

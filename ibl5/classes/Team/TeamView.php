@@ -52,11 +52,7 @@ class TeamView implements TeamViewInterface
                 </div>
             </div>
         </div>
-        <div class="table-scroll-wrapper">
-            <div class="table-scroll-container">
-                <?= $startersTable ?>
-            </div>
-        </div>
+        <?= $startersTable ?>
         <?= $draftPicksHtml ?>
         <?= $sidebarMobileHtml ?>
         <?= $raftersHtml ?>
@@ -94,16 +90,16 @@ class TeamView implements TeamViewInterface
      */
     private function renderDraftPicksSection(object $team, string $draftPicksTable): string
     {
-        $color1 = \Utilities\HtmlSanitizer::safeHtmlOutput($team->color1);
-        $color2 = \Utilities\HtmlSanitizer::safeHtmlOutput($team->color2);
+        $color1 = \UI\TableStyles::sanitizeColor($team->color1);
+        $color2 = \UI\TableStyles::sanitizeColor($team->color2);
 
         ob_start();
         ?>
-<div style="background-color: #<?= $color1 ?>; text-align: center; padding: 4px;">
-    <span style="color: #<?= $color2 ?>; font-weight: bold;">Draft Picks</span>
-</div>
-<div class="table-scroll-wrapper">
-    <div class="table-scroll-container">
+<div class="team-card" style="--team-color-primary: #<?= $color1 ?>; --team-color-secondary: #<?= $color2 ?>;">
+    <div class="team-card__header">
+        <h3 class="team-card__title">Draft Picks</h3>
+    </div>
+    <div class="team-card__body--flush">
         <?= $draftPicksTable ?>
     </div>
 </div>

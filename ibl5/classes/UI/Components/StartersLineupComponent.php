@@ -30,32 +30,32 @@ class StartersLineupComponent
     public function render(array $starters, string $color1, string $color2): string
     {
         $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
-        
+
         // Sanitize color values to prevent HTML injection
         $color1 = $this->sanitizeColor($color1);
         $color2 = $this->sanitizeColor($color2);
 
         ob_start();
         ?>
-<table style="margin: 0 auto; border-collapse: collapse;" border="1" cellpadding="1" cellspacing="1">
-    <tr style="background-color: #<?= $color1 ?>;">
-        <td colspan="5" style="text-align: center; color: #<?= $color2 ?>;"><b>Last Sim's Starters</b></td>
-    </tr>
-    <tr>
+<div class="team-card" style="--team-color-primary: #<?= $color1 ?>; --team-color-secondary: #<?= $color2 ?>;">
+    <div class="team-card__header">
+        <h3 class="team-card__title">Last Sim's Starters</h3>
+    </div>
+    <div class="starters-lineup">
 <?php foreach ($positions as $position):
     $name = $starters[$position]['name'] ?? '';
     $pid = $starters[$position]['pid'] ?? '';
     echo $this->renderPlayerCell($position, $name, $pid);
 endforeach; ?>
-    </tr>
-</table>
+    </div>
+</div>
         <?php
         return ob_get_clean();
     }
-    
+
     /**
      * Render a single player cell
-     * 
+     *
      * @param string $position Position abbreviation (PG, SG, SF, PF, C)
      * @param string $name Player name
      * @param int|string $pid Player ID
@@ -66,10 +66,10 @@ endforeach; ?>
         // Sanitize all output to prevent XSS
         $position = htmlspecialchars($position, ENT_QUOTES, 'UTF-8');
         $name = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
-        
+
         // Use PlayerImageHelper to safely get the image URL
         $playerImageUrl = \Player\PlayerImageHelper::getImageUrl($pid);
-        
+
         $pidEscaped = htmlspecialchars((string)$pid, ENT_QUOTES, 'UTF-8');
         if ($name) {
             $playerLink = "<a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid=$pidEscaped\">$name</a>";
@@ -79,11 +79,11 @@ endforeach; ?>
 
         ob_start();
         ?>
-        <td style="text-align: center;">
-            <b><?= $position ?></b><br>
-            <img src="<?= $playerImageUrl ?>" height="90" width="65"><br>
-            <?= $playerLink ?>
-        </td>
+        <div class="starters-lineup__player">
+            <span class="starters-lineup__position"><?= $position ?></span>
+            <img class="starters-lineup__image" src="<?= $playerImageUrl ?>" height="90" width="65" alt="<?= $name ?>">
+            <span class="starters-lineup__name"><?= $playerLink ?></span>
+        </div>
         <?php
         return ob_get_clean();
     }

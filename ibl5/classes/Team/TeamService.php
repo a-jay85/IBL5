@@ -175,18 +175,56 @@ class TeamService implements TeamServiceInterface
      */
     private function renderTeamInfoRight(object $team): array
     {
-        $output = "<table style=\"background-color: #eeeeee;\" width=\"220\">";
+        $color1 = \UI\TableStyles::sanitizeColor($team->color1);
+        $color2 = \UI\TableStyles::sanitizeColor($team->color2);
+        $teamColorStyle = "--team-color-primary: #$color1; --team-color-secondary: #$color2;";
 
         $teamModules = new \UI\Modules\Team($this->repository);
-        $output .= $teamModules->currentSeason($team);
-        $output .= $teamModules->gmHistory($team);
         $rafters = $teamModules->championshipBanners($team);
-        $output .= $teamModules->teamAccomplishments($team);
-        $output .= $teamModules->resultsRegularSeason($team);
-        $output .= $teamModules->resultsHEAT($team);
-        $output .= $teamModules->resultsPlayoffs($team);
 
-        $output .= "</table>";
+        // Current Season card
+        $currentSeason = $teamModules->currentSeason($team);
+        $output = "<div class=\"team-card\" style=\"$teamColorStyle\">"
+            . '<div class="team-card__header"><h3 class="team-card__title">Current Season</h3></div>'
+            . "<div class=\"team-card__body\">$currentSeason</div>"
+            . '</div>';
+
+        // Awards card — combines GM History and Team Accomplishments
+        $gmHistory = $teamModules->gmHistory($team);
+        $teamAccomplishments = $teamModules->teamAccomplishments($team);
+        if ($gmHistory !== '' || $teamAccomplishments !== '') {
+            $output .= "<div class=\"team-card\" style=\"$teamColorStyle\">"
+                . '<div class="team-card__header"><h3 class="team-card__title">Awards</h3></div>';
+            if ($gmHistory !== '') {
+                $output .= "<div class=\"team-card__body\" style=\"padding-bottom: 0;\">"
+                    . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">GM History</strong>"
+                    . "</div><div class=\"team-card__body\">$gmHistory</div>";
+            }
+            if ($teamAccomplishments !== '') {
+                $output .= "<div class=\"team-card__body\" style=\"padding-bottom: 0; border-top: 1px solid var(--gray-100);\">"
+                    . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">Team Accomplishments</strong>"
+                    . "</div><div class=\"team-card__body\">$teamAccomplishments</div>";
+            }
+            $output .= '</div>';
+        }
+
+        // Franchise History card — consolidates Regular Season, HEAT, and Playoffs
+        $regularSeason = $teamModules->resultsRegularSeason($team);
+        $heatHistory = $teamModules->resultsHEAT($team);
+        $playoffResults = $teamModules->resultsPlayoffs($team);
+
+        $output .= "<div class=\"team-card\" style=\"$teamColorStyle\">"
+            . '<div class="team-card__header"><h3 class="team-card__title">Franchise History</h3></div>'
+            . "<div class=\"team-card__body\" style=\"padding-bottom: 0;\">"
+            . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">Regular Season</strong>"
+            . "</div>$regularSeason"
+            . "<div class=\"team-card__body\" style=\"padding-bottom: 0; border-top: 1px solid var(--gray-100);\">"
+            . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">H.E.A.T.</strong>"
+            . "</div>$heatHistory"
+            . "<div class=\"team-card__body\" style=\"padding-bottom: 0; border-top: 1px solid var(--gray-100);\">"
+            . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">Playoffs</strong>"
+            . "</div>$playoffResults"
+            . '</div>';
 
         return [$output, $rafters];
     }

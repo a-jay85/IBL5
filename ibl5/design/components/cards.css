@@ -266,3 +266,262 @@
 .ibl-alert--error   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
 .ibl-alert--info    { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
 .ibl-alert--warning { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+
+/* ==========================================================================
+   Team Card — team-colored variant of ibl-card
+   Used for Team module sidebar sections and inline components.
+   Requires --team-color-primary and --team-color-secondary custom properties.
+   ========================================================================== */
+
+.team-card {
+    font-family: var(--font-sans);
+    background: white;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+    margin-bottom: var(--space-4);
+}
+
+.team-card__header {
+    background: var(--team-color-primary);
+    padding: var(--space-2) var(--space-4);
+    text-align: center;
+}
+
+@supports (color: color-mix(in lab, red, red)) {
+    .team-card__header {
+        background: linear-gradient(135deg, var(--team-color-primary), color-mix(in srgb, var(--team-color-primary) 85%, black));
+    }
+}
+
+.team-card__title {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--team-color-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.team-card__body {
+    padding: var(--space-3) var(--space-4);
+    font-size: 1rem;
+    color: var(--gray-700);
+}
+
+.team-card__body--flush {
+    padding: 0;
+}
+
+/* Team info list — key/value pairs inside team-card */
+.team-info-list {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-1) var(--space-3);
+    font-size: 1rem;
+    line-height: 1.4;
+}
+
+.team-info-list__label {
+    font-weight: 600;
+    color: var(--gray-600);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.team-info-list__value {
+    color: var(--gray-800);
+}
+
+/* History list — year-linked records with win-loss records */
+.team-history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.9375rem;
+    line-height: 1.3;
+}
+
+.team-history-list li {
+    padding: var(--space-1) 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.team-history-list li:last-child {
+    border-bottom: none;
+}
+
+.team-history-list a {
+    color: var(--gray-800);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color var(--transition-fast);
+}
+
+.team-history-list a:hover {
+    color: var(--team-color-primary, var(--accent-500));
+}
+
+.team-history-list .record {
+    color: var(--gray-500);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Totals footer inside team-card */
+.team-card__footer {
+    padding: var(--space-2) var(--space-4);
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-100);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+/* Awards list — compact year + award pairs */
+.team-awards-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.9375rem;
+}
+
+.team-awards-list li {
+    padding: var(--space-1) 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.team-awards-list li:last-child {
+    border-bottom: none;
+}
+
+.team-awards-list .award-year {
+    font-weight: 700;
+    color: var(--gray-800);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Starters lineup card */
+.starters-lineup {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    flex-wrap: wrap;
+}
+
+.starters-lineup__player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+    text-align: center;
+    flex: 0 1 auto;
+    min-width: 72px;
+}
+
+.starters-lineup__position {
+    font-family: var(--font-display);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--team-color-secondary);
+    background: var(--team-color-primary);
+    padding: 1px var(--space-2);
+    border-radius: var(--radius-sm);
+}
+
+.starters-lineup__image {
+    border-radius: var(--radius-md);
+    border: 2px solid var(--gray-100);
+    display: block;
+}
+
+.starters-lineup__name {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.2;
+    max-width: 80px;
+}
+
+.starters-lineup__name a {
+    color: var(--gray-800);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+
+.starters-lineup__name a:hover {
+    color: var(--team-color-primary, var(--accent-500));
+}
+
+/* Draft picks list */
+.draft-picks-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.draft-picks-list__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--gray-100);
+    transition: background-color var(--transition-fast);
+}
+
+.draft-picks-list__item:last-child {
+    border-bottom: none;
+}
+
+.draft-picks-list__item:hover {
+    background-color: var(--gray-50);
+}
+
+.draft-picks-list__logo {
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+}
+
+.draft-picks-list__info {
+    flex: 1;
+    min-width: 0;
+}
+
+.draft-picks-list__info a {
+    color: var(--gray-800);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9375rem;
+    transition: color var(--transition-fast);
+}
+
+.draft-picks-list__info a:hover {
+    color: var(--team-color-primary, var(--accent-500));
+}
+
+.draft-picks-list__notes {
+    font-size: 0.8125rem;
+    font-style: italic;
+    color: var(--gray-500);
+    margin-top: 2px;
+}
+
+/* Playoff series result line */
+.playoff-result {
+    font-size: 0.9375rem;
+    line-height: 1.3;
+}
+
+.playoff-result--win {
+    font-weight: 600;
+}
+
+/* Team sidebar responsive: give sidebar cards full width on mobile */
+@media (max-width: 768px) {
+    .team-page-sidebar-mobile .team-card {
+        margin-bottom: var(--space-3);
+    }
+}

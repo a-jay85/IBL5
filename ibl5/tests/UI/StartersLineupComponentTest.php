@@ -26,31 +26,30 @@ class StartersLineupComponentTest extends TestCase
             'PF' => ['name' => 'Mike Williams', 'pid' => 4],
             'C' => ['name' => 'Tom Brown', 'pid' => 5]
         ];
-        
+
         $html = $this->component->render($starters, 'FF0000', '0000FF');
-        
-        // Check structure - now uses CSS margin for centering
-        $this->assertStringContainsString('<table style="margin: 0 auto;', $html);
+
+        // Check structure - uses team-card with starters-lineup
+        $this->assertStringContainsString('team-card', $html);
+        $this->assertStringContainsString('starters-lineup', $html);
         $this->assertStringContainsString('Last Sim\'s Starters', $html);
-        
-        // Check team colors - now uses CSS styling
-        $this->assertStringContainsString('background-color: #FF0000', $html);
-        $this->assertStringContainsString('color: #0000FF', $html);
-        
+
+        // Check team colors via CSS custom properties
+        $this->assertStringContainsString('--team-color-primary: #FF0000', $html);
+        $this->assertStringContainsString('--team-color-secondary: #0000FF', $html);
+
         // Check all positions are rendered
-        $this->assertStringContainsString('<b>PG</b>', $html);
-        $this->assertStringContainsString('<b>SG</b>', $html);
-        $this->assertStringContainsString('<b>SF</b>', $html);
-        $this->assertStringContainsString('<b>PF</b>', $html);
-        $this->assertStringContainsString('<b>C</b>', $html);
-        
+        foreach (['PG', 'SG', 'SF', 'PF', 'C'] as $pos) {
+            $this->assertStringContainsString(">$pos</span>", $html);
+        }
+
         // Check all player names
         $this->assertStringContainsString('John Doe', $html);
         $this->assertStringContainsString('Jane Smith', $html);
         $this->assertStringContainsString('Bob Johnson', $html);
         $this->assertStringContainsString('Mike Williams', $html);
         $this->assertStringContainsString('Tom Brown', $html);
-        
+
         // Check player images and links
         $this->assertStringContainsString('./images/player/1.jpg', $html);
         $this->assertStringContainsString('modules.php?name=Player&amp;pa=showpage&amp;pid=1', $html);
@@ -67,16 +66,14 @@ class StartersLineupComponentTest extends TestCase
             'PF' => ['name' => '', 'pid' => ''],
             'C' => ['name' => 'Tom Brown', 'pid' => 5]
         ];
-        
+
         $html = $this->component->render($starters, 'FF0000', '0000FF');
-        
+
         // Should still render structure even with missing players
-        $this->assertStringContainsString('<b>PG</b>', $html);
-        $this->assertStringContainsString('<b>SG</b>', $html);
-        $this->assertStringContainsString('<b>SF</b>', $html);
-        $this->assertStringContainsString('<b>PF</b>', $html);
-        $this->assertStringContainsString('<b>C</b>', $html);
-        
+        foreach (['PG', 'SG', 'SF', 'PF', 'C'] as $pos) {
+            $this->assertStringContainsString(">$pos</span>", $html);
+        }
+
         // Check existing players
         $this->assertStringContainsString('John Doe', $html);
         $this->assertStringContainsString('Bob Johnson', $html);
@@ -92,16 +89,14 @@ class StartersLineupComponentTest extends TestCase
             'PF' => ['name' => '', 'pid' => ''],
             'C' => ['name' => '', 'pid' => '']
         ];
-        
+
         $html = $this->component->render($starters, 'FF0000', '0000FF');
-        
+
         // Should still render complete structure
         $this->assertStringContainsString('Last Sim\'s Starters', $html);
-        $this->assertStringContainsString('<b>PG</b>', $html);
-        $this->assertStringContainsString('<b>SG</b>', $html);
-        $this->assertStringContainsString('<b>SF</b>', $html);
-        $this->assertStringContainsString('<b>PF</b>', $html);
-        $this->assertStringContainsString('<b>C</b>', $html);
+        foreach (['PG', 'SG', 'SF', 'PF', 'C'] as $pos) {
+            $this->assertStringContainsString(">$pos</span>", $html);
+        }
     }
 
     public function testRenderPreservesTeamColors()
@@ -113,12 +108,12 @@ class StartersLineupComponentTest extends TestCase
             'PF' => ['name' => 'Player Four', 'pid' => 4],
             'C' => ['name' => 'Player Five', 'pid' => 5]
         ];
-        
+
         // Test with different color scheme
         $html = $this->component->render($starters, '00FF00', 'FFFFFF');
-        
-        $this->assertStringContainsString('background-color: #00FF00', $html);
-        $this->assertStringContainsString('color: #FFFFFF', $html);
+
+        $this->assertStringContainsString('--team-color-primary: #00FF00', $html);
+        $this->assertStringContainsString('--team-color-secondary: #FFFFFF', $html);
     }
 
     public function testRenderSanitizesPlayerNames()
@@ -149,13 +144,13 @@ class StartersLineupComponentTest extends TestCase
             'PF' => ['name' => 'Player Four', 'pid' => 4],
             'C' => ['name' => 'Player Five', 'pid' => 5]
         ];
-        
+
         // Test with invalid color values
         $html = $this->component->render($starters, 'invalid<script>', 'XYZ');
-        
+
         // Should use default color for invalid values
-        $this->assertStringContainsString('background-color: #000000', $html);
-        $this->assertStringContainsString('color: #000000', $html);
+        $this->assertStringContainsString('--team-color-primary: #000000', $html);
+        $this->assertStringContainsString('--team-color-secondary: #000000', $html);
     }
 
     public function testRenderAcceptsThreeCharacterHexColors()
@@ -167,12 +162,12 @@ class StartersLineupComponentTest extends TestCase
             'PF' => ['name' => 'Player Four', 'pid' => 4],
             'C' => ['name' => 'Player Five', 'pid' => 5]
         ];
-        
+
         // Test with 3-character hex colors
         $html = $this->component->render($starters, 'F00', 'FFF');
-        
-        $this->assertStringContainsString('background-color: #F00', $html);
-        $this->assertStringContainsString('color: #FFF', $html);
+
+        $this->assertStringContainsString('--team-color-primary: #F00', $html);
+        $this->assertStringContainsString('--team-color-secondary: #FFF', $html);
     }
 
     public function testRenderHandlesColorWithHashPrefix()
@@ -184,11 +179,11 @@ class StartersLineupComponentTest extends TestCase
             'PF' => ['name' => 'Player Four', 'pid' => 4],
             'C' => ['name' => 'Player Five', 'pid' => 5]
         ];
-        
+
         // Test with # prefix (should be stripped)
         $html = $this->component->render($starters, '#00FF00', '#FFFFFF');
-        
-        $this->assertStringContainsString('background-color: #00FF00', $html);
-        $this->assertStringContainsString('color: #FFFFFF', $html);
+
+        $this->assertStringContainsString('--team-color-primary: #00FF00', $html);
+        $this->assertStringContainsString('--team-color-secondary: #FFFFFF', $html);
     }
 }

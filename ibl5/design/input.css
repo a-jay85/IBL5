@@ -21,6 +21,26 @@
 /* Tailwind CSS 4 - provides all utility classes */
 @import 'tailwindcss';
 
+/* Tailwind Theme - registers custom values so the compiler generates utility classes
+   (e.g., bg-navy-800, text-accent-500, font-display). These values match what
+   the CDN play script previously provided at runtime. */
+@theme {
+  /* Navy palette (used in navigation, dropdowns) */
+  --color-navy-900: #0a0f1a;
+  --color-navy-800: #111827;
+  --color-navy-700: #1a2234;
+  --color-navy-600: #243044;
+
+  /* Accent palette (orange) */
+  --color-accent-500: #f97316;
+  --color-accent-400: #fb923c;
+  --color-accent-300: #fdba74;
+
+  /* Font families */
+  --font-display: 'Barlow Condensed', sans-serif;
+  --font-sans: 'Barlow', system-ui, sans-serif;
+}
+
 /* Design Tokens (CSS Custom Properties) */
 @import './tokens/colors.css';
 

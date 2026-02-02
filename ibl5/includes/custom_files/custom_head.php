@@ -55,53 +55,6 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
 }
 </script>';
 
-// Tailwind CSS via CDN with custom config
-echo '<script src="https://cdn.tailwindcss.com"></script>';
-echo '<script>
-tailwind.config = {
-    theme: {
-        extend: {
-            fontFamily: {
-                display: ["Barlow Condensed", "sans-serif"],
-                sans: ["Barlow", "system-ui", "sans-serif"],
-            },
-            colors: {
-                navy: {
-                    900: "#0a0f1a",
-                    800: "#111827",
-                    700: "#1a2234",
-                    600: "#243044",
-                },
-                accent: {
-                    500: "#f97316",
-                    400: "#fb923c",
-                    300: "#fdba74",
-                },
-            },
-            animation: {
-                "fade-in": "fadeIn 0.2s ease-out forwards",
-                "slide-up": "slideUp 0.2s ease-out forwards",
-                "slide-in-right": "slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-            },
-            keyframes: {
-                fadeIn: {
-                    "0%": { opacity: "0" },
-                    "100%": { opacity: "1" },
-                },
-                slideUp: {
-                    "0%": { opacity: "0", transform: "translateY(8px)" },
-                    "100%": { opacity: "1", transform: "translateY(0)" },
-                },
-                slideInRight: {
-                    "0%": { transform: "translateX(100%)" },
-                    "100%": { transform: "translateX(0)" },
-                },
-            },
-        },
-    },
-}
-</script>';
-
 // Navigation JavaScript for mobile menu toggle
 echo '<script src="' . ($relativePath ?? '') . 'jslib/navigation.js" defer></script>';
 

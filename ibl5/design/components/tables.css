@@ -1317,3 +1317,37 @@
         max-width: 36px;
     }
 }
+
+/* ==========================================================================
+   League Stats Table
+
+   Overrides for .ibl-data-table specific to League Stats pages.
+   Base styling comes from .ibl-data-table above — only differences listed here.
+   ========================================================================== */
+
+.league-stats-container {
+    text-align: center;
+}
+
+.league-stats-table {
+    margin: 0 auto var(--space-6);
+}
+
+.league-stats-table td {
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.league-stats-user-row {
+    background-color: var(--warning-100) !important;
+}
+
+.league-stats-team-cell {
+    text-align: left !important;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+}
+
+.league-stats-team-cell a {
+    font-weight: 600;
+    text-decoration: none;
+}

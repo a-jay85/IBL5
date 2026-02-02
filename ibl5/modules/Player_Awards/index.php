@@ -2,25 +2,13 @@
 
 declare(strict_types=1);
 
-/************************************************************************/
-/* PHP-NUKE: Web Portal System                                          */
-/* ===========================                                          */
-/*                                                                      */
-/* Copyright (c) 2007 by Francisco Burzi                                */
-/* http://phpnuke.org                                                   */
-/*                                                                      */
-/* This program is free software. You can redistribute it and/or modify */
-/* it under the terms of the GNU General Public License as published by */
-/* the Free Software Foundation; either version 2 of the License.       */
-/************************************************************************/
-
 /**
  * Player Awards Module
- * 
+ *
  * Provides search functionality for player award history.
- * Security: All inputs are validated and queries use prepared statements.
- * 
- * Refactored January 2026 to use Repository/Service/View pattern.
+ *
+ * @see PlayerAwards\PlayerAwardsService For business logic
+ * @see PlayerAwards\PlayerAwardsView For HTML rendering
  */
 
 if (!defined('MODULE_FILE')) {
@@ -45,13 +33,9 @@ $searchResult = $service->search($_POST);
 
 // Render page
 Nuke\Header::header();
-OpenTable();
-UI::playerMenu();
 
-// Render search form with current parameters
+echo '<h2 class="ibl-title">Player Awards</h2>';
 echo $view->renderSearchForm($searchResult['params']);
-
-// Render results table
 echo $view->renderTableHeader();
 
 if ($searchResult['count'] > 0) {
@@ -64,5 +48,4 @@ if ($searchResult['count'] > 0) {
 
 echo $view->renderTableFooter();
 
-CloseTable();
 Nuke\Footer::footer();

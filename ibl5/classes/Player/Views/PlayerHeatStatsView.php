@@ -154,7 +154,7 @@ class PlayerHeatStatsView implements PlayerHeatStatsViewInterface
         <?php
         foreach ($heatStats as $stats) {
             $games = $stats['games'];
-            if ($games == 0) {
+            if ($games === 0) {
                 continue;
             }
 

@@ -400,7 +400,6 @@ define("_WITHOUTEDITOR", "Without Editor (HTML Textareas)");
 define("_WITHEDITOR", "WYSIWYG Editor");
 define("_DISPLAYPHPERR", "Display PHP System Errors");
 define("_THEMECONFIG", "Theme Configuration");
-define("_AUTOTHEMESTATUS", "AutoTheme Module Status");
 define("_LETUSERSCHANGETHM", "Let users to change Themes?");
 define("_ACTIVATED", "Activated");
 define("_DEACTIVATED", "Deactivated");

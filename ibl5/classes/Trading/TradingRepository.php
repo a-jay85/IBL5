@@ -450,14 +450,62 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get all teams with city and name for trading UI
-     * 
+     * Get all teams with city, name, colors and ID for trading UI
+     *
      * @return array Array of team rows ordered by city
      */
     public function getAllTeamsWithCity(): array
     {
         return $this->fetchAll(
-            "SELECT team_name, team_city FROM ibl_team_info ORDER BY team_city ASC"
+            "SELECT teamid, team_name, team_city, color1, color2 FROM ibl_team_info ORDER BY team_city ASC"
         );
+    }
+
+    /**
+     * @see TradingRepositoryInterface::getTeamPlayersForTrading()
+     */
+    public function getTeamPlayersForTrading(int $teamId): array
+    {
+        return $this->fetchAll(
+            "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
+             FROM ibl_plr
+             WHERE tid = ? AND retired = '0'
+             ORDER BY ordinal ASC",
+            "i",
+            $teamId
+        );
+    }
+
+    /**
+     * @see TradingRepositoryInterface::getTeamDraftPicksForTrading()
+     */
+    public function getTeamDraftPicksForTrading(string $teamName): array
+    {
+        return $this->fetchAll(
+            "SELECT * FROM ibl_draft_picks
+             WHERE ownerofpick = ?
+             ORDER BY year, round ASC",
+            "s",
+            $teamName
+        );
+    }
+
+    /**
+     * @see TradingRepositoryInterface::getAllTradeOffers()
+     */
+    public function getAllTradeOffers(): array
+    {
+        return $this->fetchAll(
+            "SELECT * FROM ibl_trade_info ORDER BY tradeofferid ASC"
+        );
+    }
+
+    /**
+     * @see TradingRepositoryInterface::deleteTradeOffer()
+     */
+    public function deleteTradeOffer(int $offerId): void
+    {
+        $this->deleteTradeInfoByOfferId($offerId);
+        $this->deleteTradeCashByOfferId($offerId);
     }
 }

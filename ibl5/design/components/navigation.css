@@ -1,0 +1,674 @@
+/**
+ * IBL5 Navigation Components
+ *
+ * Styles for:
+ * - Main navigation bar
+ * - Mobile navigation
+ * - Breadcrumbs
+ * - Tab navigation
+ * - Pagination
+ */
+
+/* ==========================================================================
+   Main Navigation (handled by NavigationView.php)
+   These are utility classes for nav-related components
+   ========================================================================== */
+
+.ibl-nav-link {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.ibl-nav-link:hover {
+    color: var(--accent-500);
+    background: var(--gray-100);
+}
+
+.ibl-nav-link--active {
+    color: var(--accent-500);
+    background: rgba(249, 115, 22, 0.1);
+}
+
+/* ==========================================================================
+   Breadcrumbs
+   ========================================================================== */
+
+.ibl-breadcrumbs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    font-size: 1rem;
+    color: var(--gray-500);
+    margin-bottom: var(--space-4);
+}
+
+.ibl-breadcrumbs__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.ibl-breadcrumbs__link {
+    color: var(--gray-600);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+
+.ibl-breadcrumbs__link:hover {
+    color: var(--accent-500);
+}
+
+.ibl-breadcrumbs__separator {
+    color: var(--gray-300);
+}
+
+.ibl-breadcrumbs__current {
+    color: var(--navy-800);
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   Tab Navigation
+   ========================================================================== */
+
+.ibl-tabs {
+    display: flex;
+    gap: 0;
+    background: var(--navy-800);
+    padding: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.ibl-tab {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: var(--space-2) var(--space-3);
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: center;
+    text-decoration: none;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.ibl-tab:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.ibl-tab--active {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    border-bottom-color: var(--accent-500);
+}
+
+/* Team-colored tabs: light tint of primary color as background */
+.ibl-tabs[style*="--team-tab-bg-color"] {
+    background: color-mix(in srgb, var(--team-tab-bg-color) 15%, white);
+}
+
+.ibl-tabs[style*="--team-tab-bg-color"] .ibl-tab {
+    color: color-mix(in srgb, var(--team-tab-bg-color) 70%, black);
+}
+
+.ibl-tabs[style*="--team-tab-bg-color"] .ibl-tab:hover {
+    background: color-mix(in srgb, var(--team-tab-bg-color) 25%, white);
+}
+
+.ibl-tabs[style*="--team-tab-bg-color"] .ibl-tab--active {
+    color: color-mix(in srgb, var(--team-tab-bg-color) 85%, black);
+    background: color-mix(in srgb, var(--team-tab-bg-color) 25%, white);
+    border-bottom-color: var(--team-tab-active-color);
+}
+
+/* Team banner row: logo centered with action links flanking */
+.team-banner-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.team-action-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-decoration: none;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-md);
+    border: 2px solid color-mix(in srgb, var(--team-tab-bg-color) 50%, black);
+    background: color-mix(in srgb, var(--team-tab-bg-color) 15%, white) !important;
+    color: color-mix(in srgb, var(--team-tab-bg-color) 75%, black);
+    transition: all var(--transition-fast);
+}
+
+.team-action-link:hover {
+    background: var(--team-tab-bg-color);
+    color: var(--team-tab-active-color);
+    border-color: var(--team-tab-bg-color);
+}
+
+@media (max-width: 768px) {
+    .team-banner-row {
+        flex-wrap: wrap;
+    }
+
+    .team-banner-row > :nth-child(2) {
+        order: -1;
+        flex-basis: 100%;
+        margin-bottom: 1rem;
+    }
+
+    .team-banner-row > :nth-child(2) img {
+        margin: 0 auto !important;
+    }
+}
+
+/* Mobile: wrap tabs to fit viewport width */
+@media (max-width: 768px) {
+    .ibl-tabs {
+        flex-wrap: wrap;
+        border-radius: var(--radius-md);
+    }
+    .ibl-tab {
+        flex: 0 1 auto;
+        padding: var(--space-1) var(--space-2);
+        font-size: 0.85rem;
+    }
+}
+
+/* Caption-hosted tabs (inside <table><caption>) */
+.team-table-caption {
+    padding: 0;
+    text-align: left;
+}
+
+.team-table-caption .ibl-tabs {
+    border-radius: 0;
+}
+
+/* Accent variant tabs */
+.ibl-tabs--accent {
+    background: var(--gradient-accent);
+}
+
+.ibl-tabs--accent .ibl-tab {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.ibl-tabs--accent .ibl-tab:hover {
+    color: white;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.ibl-tabs--accent .ibl-tab--active {
+    color: white;
+    background: rgba(0, 0, 0, 0.15);
+    border-bottom-color: white;
+}
+
+/* ==========================================================================
+   Pagination
+   ========================================================================== */
+
+.ibl-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    margin: var(--space-6) 0;
+}
+
+.ibl-pagination__item {
+    min-width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--navy-800);
+    text-decoration: none;
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.ibl-pagination__item:hover {
+    border-color: var(--accent-500);
+    color: var(--accent-500);
+}
+
+.ibl-pagination__item--active {
+    background: var(--accent-500);
+    border-color: var(--accent-500);
+    color: white;
+}
+
+.ibl-pagination__item--disabled {
+    color: var(--gray-300);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.ibl-pagination__ellipsis {
+    color: var(--gray-400);
+    padding: 0 var(--space-2);
+}
+
+/* ==========================================================================
+   Jump Menu (Month/Season Selector)
+   ========================================================================== */
+
+.ibl-jump-menu {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 2px;
+    padding: 3px;
+    background: var(--gray-100);
+    border-radius: var(--radius-lg);
+}
+
+.ibl-jump-menu__link {
+    flex: 1;
+    min-width: 0;
+    padding: var(--space-2) var(--space-2);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    text-align: center;
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.ibl-jump-menu__link:hover {
+    background: white;
+    color: var(--navy-900);
+    box-shadow: var(--shadow-sm);
+}
+
+.ibl-jump-menu__link--active {
+    background: white;
+    color: var(--accent-500);
+    box-shadow: var(--shadow-sm);
+}
+
+/* ==========================================================================
+   Mobile Navigation Menu
+   ========================================================================== */
+
+/* Hide mobile nav menu when closed to prevent overflow */
+@media (max-width: 1023px) {
+    #nav-mobile-menu {
+        right: 0;
+    }
+
+    #nav-mobile-menu.translate-x-full {
+        display: none;
+    }
+
+    #nav-mobile-menu.translate-x-0 {
+        display: block;
+    }
+}
+
+/* Mobile menu custom scrollbar */
+.mobile-menu-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+
+.mobile-menu-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.mobile-menu-scroll::-webkit-scrollbar-thumb {
+    background: rgba(249, 115, 22, 0.4);
+    border-radius: 4px;
+}
+
+.mobile-menu-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(249, 115, 22, 0.6);
+}
+
+/* Mobile menu section animation */
+.mobile-section {
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.mobile-menu-open .mobile-section:nth-child(1) { transition-delay: 0.05s; }
+.mobile-menu-open .mobile-section:nth-child(2) { transition-delay: 0.1s; }
+.mobile-menu-open .mobile-section:nth-child(3) { transition-delay: 0.15s; }
+.mobile-menu-open .mobile-section:nth-child(4) { transition-delay: 0.2s; }
+.mobile-menu-open .mobile-section:nth-child(5) { transition-delay: 0.25s; }
+.mobile-menu-open .mobile-section:nth-child(6) { transition-delay: 0.3s; }
+.mobile-menu-open .mobile-section:nth-child(7) { transition-delay: 0.35s; }
+.mobile-menu-open .mobile-section:nth-child(8) { transition-delay: 0.4s; }
+.mobile-menu-open .mobile-section:nth-child(9) { transition-delay: 0.45s; }
+
+.mobile-menu-open .mobile-section {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* ==========================================================================
+   Navigation Dropdown Items
+   Staggered reveal with transitions
+   ========================================================================== */
+
+.nav-dropdown-item {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+
+.group:hover .nav-dropdown-item {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.group:hover .nav-dropdown-item:nth-of-type(1) { transition-delay: 0ms; }
+.group:hover .nav-dropdown-item:nth-of-type(2) { transition-delay: 25ms; }
+.group:hover .nav-dropdown-item:nth-of-type(3) { transition-delay: 50ms; }
+.group:hover .nav-dropdown-item:nth-of-type(4) { transition-delay: 75ms; }
+.group:hover .nav-dropdown-item:nth-of-type(5) { transition-delay: 100ms; }
+.group:hover .nav-dropdown-item:nth-of-type(6) { transition-delay: 125ms; }
+.group:hover .nav-dropdown-item:nth-of-type(7) { transition-delay: 150ms; }
+.group:hover .nav-dropdown-item:nth-of-type(8) { transition-delay: 175ms; }
+.group:hover .nav-dropdown-item:nth-of-type(9) { transition-delay: 200ms; }
+.group:hover .nav-dropdown-item:nth-of-type(10) { transition-delay: 225ms; }
+.group:hover .nav-dropdown-item:nth-of-type(11) { transition-delay: 250ms; }
+.group:hover .nav-dropdown-item:nth-of-type(12) { transition-delay: 275ms; }
+.group:hover .nav-dropdown-item:nth-of-type(13) { transition-delay: 300ms; }
+.group:hover .nav-dropdown-item:nth-of-type(14) { transition-delay: 325ms; }
+
+/* ==========================================================================
+   Desktop Dropdown Click-to-Pin State
+   Clicking a column heading keeps its dropdown open;
+   clicking again (or clicking outside) closes it.
+   Hover behavior is preserved independently.
+   ========================================================================== */
+
+.group.nav-pinned > div {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.group.nav-pinned .nav-dropdown-item {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.group.nav-pinned .nav-dropdown-item:nth-of-type(1) { transition-delay: 0ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(2) { transition-delay: 25ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(3) { transition-delay: 50ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(4) { transition-delay: 75ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(5) { transition-delay: 100ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(6) { transition-delay: 125ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(7) { transition-delay: 150ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(8) { transition-delay: 175ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(9) { transition-delay: 200ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(10) { transition-delay: 225ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(11) { transition-delay: 250ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(12) { transition-delay: 275ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(13) { transition-delay: 300ms; }
+.group.nav-pinned .nav-dropdown-item:nth-of-type(14) { transition-delay: 325ms; }
+
+/* ==========================================================================
+   Navigation Link Colors (Accessibility Override)
+   These override browser defaults for proper contrast
+   ========================================================================== */
+
+/* Main nav links (Home link and direct links) */
+nav .group > a:link,
+nav .group > a:visited {
+    color: #e5e7eb !important; /* gray-200 */
+    font-size: 1rem !important;
+    font-weight: 500 !important;
+}
+
+nav .group > a:hover {
+    color: #ffffff !important;
+}
+
+/* Desktop dropdown links */
+.nav-dropdown-item:link {
+    color: #e5e7eb; /* gray-200 */
+    font-family: var(--font-display);
+}
+
+.nav-dropdown-item:visited {
+    color: #fdba74; /* accent-300 - visited state */
+}
+
+.nav-dropdown-item:hover {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Inline links within rawHtml nav items (e.g. "Waivers: Add | Drop") */
+span.nav-dropdown-item a:link {
+    color: #e5e7eb;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+span.nav-dropdown-item a:visited {
+    color: #fdba74;
+}
+span.nav-dropdown-item a:hover {
+    color: #ffffff;
+}
+
+/* Mobile menu links */
+#nav-mobile-menu a:link {
+    color: #e5e7eb; /* gray-200 */
+    font-family: var(--font-display);
+}
+
+#nav-mobile-menu a:visited {
+    color: #fdba74; /* accent-300 */
+}
+
+#nav-mobile-menu a:hover {
+    color: #ffffff !important;
+}
+
+/* Mobile section buttons (not links) */
+#nav-mobile-menu .mobile-dropdown-btn {
+    color: #ffffff;
+}
+
+/* Mobile home link */
+#nav-mobile-menu > div > a:link,
+#nav-mobile-menu > div > a:visited {
+    color: #ffffff;
+}
+
+/* ==========================================================================
+   Player Page Navigation (.plr-nav)
+   Grouped segmented pill navigation for switching between player page views.
+   Uses team color accent via --plr-nav-accent custom property.
+   ========================================================================== */
+
+.plr-nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-4) var(--space-3);
+    margin: var(--space-2) auto 0;
+    max-width: 900px;
+}
+
+/* Group: label + row of pills */
+.plr-nav__group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.plr-nav__group-label {
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray-400);
+    white-space: nowrap;
+    user-select: none;
+}
+
+/* Pill container */
+.plr-nav__pills {
+    display: flex;
+    gap: 1px;
+    background: var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 2px;
+}
+
+/* Individual pill link */
+.plr-nav__pill {
+    display: block;
+    padding: var(--space-1) var(--space-3);
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--gray-600);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    white-space: nowrap;
+    transition: color var(--transition-fast),
+                background var(--transition-fast),
+                box-shadow var(--transition-fast);
+}
+
+.plr-nav__pill:link,
+.plr-nav__pill:visited {
+    color: var(--gray-600);
+}
+
+.plr-nav__pill:hover {
+    color: var(--navy-800);
+    background: white;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Active pill */
+.plr-nav__pill--active,
+.plr-nav__pill--active:link,
+.plr-nav__pill--active:visited {
+    color: white;
+    background: var(--plr-nav-accent, var(--accent-500));
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+}
+
+.plr-nav__pill--active:hover {
+    color: white;
+    background: var(--plr-nav-accent-dark, var(--accent-600));
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.18);
+}
+
+/* Mobile select (hidden on desktop, shown on small screens) */
+.plr-nav__mobile-select {
+    display: none;
+}
+
+/* ----- Responsive: collapse to select on narrow viewports ----- */
+@media (max-width: 640px) {
+    .plr-nav__group {
+        display: none;
+    }
+
+    .plr-nav__mobile-select {
+        display: block;
+        width: 100%;
+        padding: var(--space-2) var(--space-3);
+        font-family: var(--font-display);
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--navy-800);
+        background: white;
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right var(--space-3) center;
+        cursor: pointer;
+        transition: border-color var(--transition-fast);
+    }
+
+    .plr-nav__mobile-select:focus {
+        outline: none;
+        border-color: var(--plr-nav-accent, var(--accent-500));
+    }
+
+    .plr-nav {
+        padding: var(--space-3) var(--space-2);
+    }
+}
+
+/* Mid-size: keep pills but tighten spacing */
+@media (min-width: 641px) and (max-width: 900px) {
+    .plr-nav {
+        gap: var(--space-2);
+        padding: var(--space-3) var(--space-2);
+    }
+
+    .plr-nav__group-label {
+        font-size: 0.65rem;
+    }
+
+    .plr-nav__pill {
+        padding: var(--space-1) var(--space-2);
+        font-size: 0.75rem;
+    }
+}
+
+/* ==========================================================================
+   Grain Texture Overlay (Nav Background Effect)
+   ========================================================================== */
+
+.nav-grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    opacity: 0.03;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+}

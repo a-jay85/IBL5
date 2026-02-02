@@ -218,8 +218,56 @@ interface TradingRepositoryInterface
 
     /**
      * Get the last inserted ID
-     * 
+     *
      * @return int Last insert ID
      */
     public function getLastInsertId(): int;
+
+    /**
+     * Get team players eligible for trading display
+     *
+     * Returns active (non-retired) players for a team, ordered by ordinal.
+     * Includes position, name, contract year data needed by trade form.
+     *
+     * @param int $teamId Team ID
+     * @return array<array{pos: string, name: string, pid: string, ordinal: string, cy: string, cy1: string, cy2: string, cy3: string, cy4: string, cy5: string, cy6: string}> Player rows
+     */
+    public function getTeamPlayersForTrading(int $teamId): array;
+
+    /**
+     * Get team draft picks for trading display
+     *
+     * Returns all draft picks owned by a team, ordered by year and round.
+     *
+     * @param string $teamName Team name (ownerofpick value)
+     * @return array<array> Draft pick rows
+     */
+    public function getTeamDraftPicksForTrading(string $teamName): array;
+
+    /**
+     * Get all trade offers ordered by offer ID
+     *
+     * Returns all rows from ibl_trade_info for the trade review page.
+     *
+     * @return array<array> Trade info rows ordered by tradeofferid ASC
+     */
+    public function getAllTradeOffers(): array;
+
+    /**
+     * Delete a complete trade offer (info rows + cash rows)
+     *
+     * Removes all trade_info and trade_cash records for a given offer ID.
+     * Used when rejecting a trade offer.
+     *
+     * @param int $offerId Trade offer ID
+     * @return void
+     */
+    public function deleteTradeOffer(int $offerId): void;
+
+    /**
+     * Get all teams with city, name, colors and ID for trading UI
+     *
+     * @return array<array{teamid: string, team_name: string, team_city: string, color1: string, color2: string}> Team rows ordered by city
+     */
+    public function getAllTeamsWithCity(): array;
 }

@@ -14,7 +14,7 @@ interface FreeAgencyOfferValidatorInterface
 {
     /**
      * Validate a complete contract offer
-     * 
+     *
      * Performs comprehensive validation in this order:
      * 1. First year must be > 0
      * 2. MLE availability check (if using MLE exception)
@@ -27,10 +27,10 @@ interface FreeAgencyOfferValidatorInterface
      *    - No salary decreases year-over-year
      *    - Raises don't exceed allowed percentage (10% standard, 12.5% with Bird Rights)
      *    - No gaps in contract (once year N is 0, all following years must be 0)
-     * 
+     *
      * **Important**: MLE/LLE checks require team parameter in constructor.
      * Without team, these checks are skipped (treated as valid).
-     * 
+     *
      * @param array<string, mixed> $offerData Contract offer details (should include):
      *                                          - offer1-6: Salary for each year
      *                                          - birdYears: Years of Bird Rights with current team (0 if free agent)
@@ -38,22 +38,10 @@ interface FreeAgencyOfferValidatorInterface
      *                                          - vetmin: Veteran's minimum salary
      *                                          - year1Max: Maximum allowed year 1 salary
      *                                          - amendedCapSpaceYear1: Adjusted soft cap space (original + existing offer)
-     * 
+     *
      * @return array{valid: bool, error?: string} Result with optional error message
      *                                            - valid=true: Offer passes all checks
      *                                            - valid=false: Offer fails, error contains detailed explanation
      */
     public function validateOffer(array $offerData): array;
-
-    /**
-     * Check if a player has already been signed during this free agency period
-     * 
-     * Returns true if player has a non-zero cy1 contract in the database,
-     * indicating they've been signed in the current free agency period.
-     * Used to prevent duplicate signings of same player.
-     * 
-     * @param int $playerId Player ID to check
-     * @return bool True if player was already signed this free agency period
-     */
-    public function isPlayerAlreadySigned(int $playerId): bool;
 }

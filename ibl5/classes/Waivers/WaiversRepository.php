@@ -38,7 +38,6 @@ class WaiversRepository extends BaseMysqliRepository implements WaiversRepositor
             $affectedRows = $this->execute($query, 'ii', $timestamp, $playerID);
             return $affectedRows > 0;
         } catch (\RuntimeException $e) {
-            error_log("Failed to drop player to waivers: " . $e->getMessage());
             return false;
         }
     }

@@ -125,8 +125,8 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
             $ftPct = StatsFormatter::formatPercentage($row['gameFTM'], $row['gameFTA']);
             $tgPct = StatsFormatter::formatPercentage($row['game3GM'], $row['game3GA']);
             
-            $awayTeam = $this->commonRepository->getTeamnameFromTeamID($row['homeTID']);
-            $homeTeam = $this->commonRepository->getTeamnameFromTeamID($row['visitorTID']);
+            $awayTeam = $this->commonRepository->getTeamnameFromTeamID((int) $row['homeTID']);
+            $homeTeam = $this->commonRepository->getTeamnameFromTeamID((int) $row['visitorTID']);
             ?>
     <tr>
         <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($row['Date']) ?></td>

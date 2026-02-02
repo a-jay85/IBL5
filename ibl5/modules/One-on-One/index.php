@@ -53,9 +53,6 @@ function oneonone(): void
         $ownerplaying = '';
     }
 
-    OpenTable();
-    UI::playerMenu();
-
     // Get form inputs
     $player1 = isset($_POST['pid1']) ? (int) $_POST['pid1'] : null;
     $player2 = isset($_POST['pid2']) ? (int) $_POST['pid2'] : null;
@@ -107,6 +104,5 @@ function oneonone(): void
         }
     }
 
-    CloseTable();
     Nuke\Footer::footer();
 }

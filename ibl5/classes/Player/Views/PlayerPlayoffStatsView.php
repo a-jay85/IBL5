@@ -154,7 +154,7 @@ class PlayerPlayoffStatsView implements PlayerPlayoffStatsViewInterface
         <?php
         foreach ($playoffStats as $stats) {
             $games = $stats['games'];
-            if ($games == 0) {
+            if ($games === 0) {
                 continue;
             }
 

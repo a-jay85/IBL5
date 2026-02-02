@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\LeagueStarters;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use LeagueStarters\LeagueStartersView;
 use LeagueStarters\Contracts\LeagueStartersViewInterface;
@@ -17,6 +18,7 @@ use LeagueStarters\Contracts\LeagueStartersViewInterface;
  *
  * @covers \LeagueStarters\LeagueStartersView
  */
+#[AllowMockObjectsWithoutExpectations]
 class LeagueStartersViewTest extends TestCase
 {
     public function testImplementsLeagueStartersViewInterface(): void

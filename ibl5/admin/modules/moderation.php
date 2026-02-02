@@ -118,18 +118,18 @@ if ($row['radminsuper'] == 1) {
         OpenTable2();
         echo "<img src=\"images/topics/" . $topic['topicimage'] . "\" border=\"0\" align=\"right\">";
         themepreview($news['title'], $news['hometext'], $news['bodytext']);
-        CloseTable2();
+        CloseTable();
         if (!empty($reply)) {
             echo "<br><br><center><b>" . _INREPLYTO . "</b></center><br>";
             OpenTable2();
             echo "<b>" . $reply['subject'] . "</b><br>" . _BY . " " . $reply['name'] . "<br><br>" . $reply['comment'] . "";
-            CloseTable2();
+            CloseTable();
         }
         echo "<br><br><center><b>" . _COMMENTAPPPENDING . "</b></center><br>";
         OpenTable2();
         echo "<b>" . $comm['subject'] . "</b><br>" . _BY . " " . $comm['name'] . "<br><br>" . $comm['comment'] . "<br><br>";
         echo "<center><hr size=\"1\" width=\"80%\"><a href=\"" . $admin_file . ".php?op=moderation_approval&section=news&id=$id\"><img src=\"images/karma/approve.gif\" alt=\"" . _APPROVE . "\" title=\"" . _APPROVE . "\" width=\"15\" heigh=\"15\" border=\"0\"></a> &nbsp; <a href=\"" . $admin_file . ".php?op=moderation_reject&section=news&id=$id\"><img src=\"images/karma/reject.gif\" alt=\"" . _REJECT . "\" title=\"" . _REJECT . "\" width=\"15\" heigh=\"15\" border=\"0\"></a></center>";
-        CloseTable2();
+        CloseTable();
         echo "<br>";
         CloseTable();
         include "footer.php";
@@ -190,18 +190,18 @@ if ($row['radminsuper'] == 1) {
         echo "<center><b>" . _COMMENTTOSURVEY . "</b></center><br>";
         OpenTable2();
         echo "<center><i>" . $poll['pollTitle'] . "</i></center>";
-        CloseTable2();
+        CloseTable();
         if (!empty($reply)) {
             echo "<br><br><center><b>" . _INREPLYTO . "</b></center><br>";
             OpenTable2();
             echo "<b>" . $reply['subject'] . "</b><br>" . _BY . " " . $reply['name'] . "<br><br>" . $reply['comment'] . "";
-            CloseTable2();
+            CloseTable();
         }
         echo "<br><br><center><b>" . _COMMENTAPPPENDING . "</b></center><br>";
         OpenTable2();
         echo "<b>" . $comm['subject'] . "</b><br>" . _BY . " " . $comm['name'] . "<br><br>" . $comm['comment'] . "<br><br>";
         echo "<center><hr size=\"1\" width=\"80%\"><a href=\"" . $admin_file . ".php?op=moderation_approval&section=surveys&id=$id\"><img src=\"images/karma/approve.gif\" alt=\"" . _APPROVE . "\" title=\"" . _APPROVE . "\" width=\"15\" heigh=\"15\" border=\"0\"></a> &nbsp; <a href=\"" . $admin_file . ".php?op=moderation_reject&section=surveys&id=$id\"><img src=\"images/karma/reject.gif\" alt=\"" . _REJECT . "\" title=\"" . _REJECT . "\" width=\"15\" heigh=\"15\" border=\"0\"></a></center>";
-        CloseTable2();
+        CloseTable();
         echo "<br>";
         CloseTable();
         include "footer.php";

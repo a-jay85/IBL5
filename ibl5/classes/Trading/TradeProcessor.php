@@ -103,11 +103,11 @@ class TradeProcessor implements TradeProcessorInterface
      */
     protected function processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId)
     {
-        if ($itemType == 'cash') {
+        if ($itemType === 'cash') {
             return $this->processCashTransaction($itemId, $offeringTeamName, $listeningTeamName, $offerId);
-        } elseif ($itemType == 0) {
+        } elseif ($itemType === '0') {
             return $this->processDraftPick($itemId, $offeringTeamName, $listeningTeamName);
-        } elseif ($itemType == 1) {
+        } elseif ($itemType === '1') {
             return $this->processPlayer($itemId, $offeringTeamName, $listeningTeamName);
         }
 
@@ -176,11 +176,7 @@ class TradeProcessor implements TradeProcessorInterface
         
         // Build query string for queue (if needed in certain phases)
         // Note: Query is built for queue storage only - actual execution uses prepared statements in repository
-        if (method_exists($this->db, 'real_escape_string')) {
-            $escapedTeamName = $this->db->real_escape_string($listeningTeamName);
-        } else {
-            $escapedTeamName = \Services\DatabaseService::escapeString($this->db, $listeningTeamName);
-        }
+        $escapedTeamName = $this->db->real_escape_string($listeningTeamName);
         $queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $escapedTeamName . '" WHERE `pickid` = ' . $itemId . ' LIMIT 1';
 
         $this->queueTradeQuery($queryi, $tradeLine);
@@ -222,11 +218,7 @@ class TradeProcessor implements TradeProcessorInterface
         
         // Build query string for queue (if needed in certain phases)
         // Note: Query is built for queue storage only - actual execution uses prepared statements in repository
-        if (method_exists($this->db, 'real_escape_string')) {
-            $escapedTeamName = $this->db->real_escape_string($listeningTeamName);
-        } else {
-            $escapedTeamName = \Services\DatabaseService::escapeString($this->db, $listeningTeamName);
-        }
+        $escapedTeamName = $this->db->real_escape_string($listeningTeamName);
         $queryi = 'UPDATE ibl_plr SET `teamname` = "' . $escapedTeamName . '", `tid` = ' . $listeningTeamId . ' WHERE `pid` = ' . $itemId . ' LIMIT 1';
 
         $this->queueTradeQuery($queryi, $tradeLine);

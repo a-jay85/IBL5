@@ -21,37 +21,16 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
      */
     public function render(array $franchiseData): string
     {
-        $html = $this->getStyleBlock();
+        $html = '';
+        $html .= '<h2 class="ibl-title">Franchise History</h2>';
+        $html .= '<div class="sticky-scroll-wrapper">';
+        $html .= '<div class="sticky-scroll-container">';
         $html .= $this->renderTableHeader();
         $html .= $this->renderTableRows($franchiseData);
-        $html .= '</table>';
+        $html .= '</tbody></table>';
+        $html .= '</div></div>';
 
         return $html;
-    }
-
-    /**
-     * Generate CSS styles for the franchise history table
-     *
-     * @return string CSS style block
-     */
-    private function getStyleBlock(): string
-    {
-        return '<style>
-            .franchise-table {
-                border: 1px solid #000;
-                border-collapse: collapse;
-            }
-            .franchise-table th, .franchise-table td {
-                border: 1px solid #000;
-                padding: 4px;
-            }
-            .franchise-table th {
-                background-color: #ddd;
-            }
-            .last-five-cell {
-                background-color: #ddd;
-            }
-        </style>';
     }
 
     /**
@@ -61,21 +40,24 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
      */
     private function renderTableHeader(): string
     {
-        return '<table class="sortable franchise-table">
+        return '<table class="sortable ibl-data-table sticky-table">
+            <thead>
             <tr>
-                <th>Team</th>
+                <th class="ibl-team-cell--colored sticky-col sticky-corner">Team</th>
                 <th>All-Time<br>Wins</th>
                 <th>All-Time<br>Losses</th>
                 <th>All-Time<br>Pct.</th>
-                <th class="last-five-cell">Last Five<br>Seasons<br>Wins</th>
-                <th class="last-five-cell">Last Five<br>Seasons<br>Losses</th>
-                <th class="last-five-cell">Last Five<br>Seasons<br>Pct.</th>
+                <th>Last Five<br>Seasons<br>Wins</th>
+                <th>Last Five<br>Seasons<br>Losses</th>
+                <th>Last Five<br>Seasons<br>Pct.</th>
                 <th>Playoffs</th>
                 <th>H.E.A.T.<br>Titles</th>
                 <th>Div.<br>Titles</th>
                 <th>Conf.<br>Titles</th>
                 <th>IBL<br>Titles</th>
-            </tr>';
+            </tr>
+            </thead>
+            <tbody>';
     }
 
     /**
@@ -106,15 +88,16 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
         $teamId = (int)$team['teamid'];
         $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
-        $teamCity = HtmlSanitizer::safeHtmlOutput($team['team_city']);
         $teamName = HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
         $html = '<tr>';
 
-        // Team name cell
-        $html .= '<td style="background-color: #' . $color1 . ';">';
+        // Team name cell with logo - sticky column
+        $html .= '<td class="ibl-team-cell--colored sticky-col" style="background-color: #' . $color1 . ';">';
         $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" ';
-        $html .= 'style="color: #' . $color2 . ';">' . $teamCity . ' ' . $teamName . '</a>';
+        $html .= 'class="ibl-team-cell__name" style="color: #' . $color2 . ';">';
+        $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">';
+        $html .= '<span class="ibl-team-cell__text">' . $teamName . '</span></a>';
         $html .= '</td>';
 
         // All-time stats

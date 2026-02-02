@@ -51,6 +51,9 @@ class LeagueStartersService implements LeagueStartersServiceInterface
                 $playerId = $team->getLastSimStarterPlayerIDForPosition($position) ?: 4040404;
                 $player = Player::withPlayerID($this->db, $playerId);
                 $player->teamName = $team->name;
+                $player->teamCity = $team->city;
+                $player->teamColor1 = $team->color1;
+                $player->teamColor2 = $team->color2;
                 $startersByPosition[$position][] = $player;
             }
         }

@@ -377,21 +377,9 @@ class PlayerViewStyles
 
 /* ============================================
    Player Menu Navigation
+   (Styles moved to design/components/navigation.css
+    as .plr-nav component)
    ============================================ */
-
-.player-menu-container {
-    text-align: center;
-}
-
-.player-menu-title {
-    font-weight: bold;
-    margin-bottom: 8px;
-}
-
-.player-menu-links {
-    text-align: center;
-    line-height: 1.8;
-}
 </style>
 CSS;
     }

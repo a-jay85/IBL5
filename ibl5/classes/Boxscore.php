@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 class Boxscore
 {
     public $gameDate;
@@ -141,56 +143,41 @@ class Boxscore
         return $instance;
     }
 
-    public static function deletePreseasonBoxScores($db)
+    /**
+     * Delete preseason boxscores for both players and teams
+     *
+     * @param object $db Active mysqli connection
+     * @return bool True if both deletions succeeded
+     */
+    public static function deletePreseasonBoxScores(object $db): bool
     {
-        $queryDeletePreseasonPlayersBoxScores = "DELETE FROM `ibl_box_scores`
-            WHERE `Date` BETWEEN '" . Season::IBL_PRESEASON_YEAR . "-11-01' AND '" . Season::IBL_PRESEASON_YEAR . "-11-30';";
-        $queryDeletePreseasonTeamsBoxScores = "DELETE FROM `ibl_box_scores_teams`
-            WHERE `Date` BETWEEN '" . Season::IBL_PRESEASON_YEAR . "-11-01' AND '" . Season::IBL_PRESEASON_YEAR . "-11-30';";
-
-        if (
-            $db->sql_query($queryDeletePreseasonPlayersBoxScores, 0) 
-            AND $db->sql_query($queryDeletePreseasonTeamsBoxScores, 0)
-        ) {
-            return TRUE;
-        } else {
-            return FALSE;
-        }
+        $repository = new \Boxscore\BoxscoreRepository($db);
+        return $repository->deletePreseasonBoxScores();
     }
 
-    public static function deleteHEATBoxScores($db, $seasonStartingYear)
+    /**
+     * Delete H.E.A.T. tournament boxscores for both players and teams
+     *
+     * @param object $db Active mysqli connection
+     * @param int $seasonStartingYear The year the season starts
+     * @return bool True if both deletions succeeded
+     */
+    public static function deleteHEATBoxScores(object $db, int $seasonStartingYear): bool
     {
-        $queryDeleteHEATPlayersBoxScores = "DELETE FROM `ibl_box_scores`
-            WHERE `Date` BETWEEN '$seasonStartingYear-" . Season::IBL_HEAT_MONTH . "-01' AND '$seasonStartingYear-" . Season::IBL_HEAT_MONTH . "-31';";
-        $queryDeleteHEATTeamsBoxScores = "DELETE FROM `ibl_box_scores_teams`
-            WHERE `Date` BETWEEN '$seasonStartingYear-" . Season::IBL_HEAT_MONTH . "-01' AND '$seasonStartingYear-" . Season::IBL_HEAT_MONTH . "-31';";
-
-        if (
-            $db->sql_query($queryDeleteHEATPlayersBoxScores, 0) 
-            AND $db->sql_query($queryDeleteHEATTeamsBoxScores, 0)
-        ) {
-            return TRUE;
-        } else {
-            return FALSE;
-        }
+        $repository = new \Boxscore\BoxscoreRepository($db);
+        return $repository->deleteHeatBoxScores($seasonStartingYear);
     }
 
-    public static function deleteRegularSeasonAndPlayoffsBoxScores($db, $seasonStartingYear)
+    /**
+     * Delete regular season and playoff boxscores for both players and teams
+     *
+     * @param object $db Active mysqli connection
+     * @param int $seasonStartingYear The year the season starts
+     * @return bool True if both deletions succeeded
+     */
+    public static function deleteRegularSeasonAndPlayoffsBoxScores(object $db, int $seasonStartingYear): bool
     {
-        $seasonEndingYear = $seasonStartingYear + 1;
-
-        $queryDeleteRegularSeasonAndPlayoffsPlayersBoxScores = "DELETE FROM `ibl_box_scores`
-            WHERE `Date` BETWEEN '$seasonStartingYear-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01' AND '$seasonEndingYear-" . Season::IBL_PLAYOFF_MONTH . "-30';";
-        $queryDeleteRegularSeasonAndPlayoffsTeamsBoxScores = "DELETE FROM `ibl_box_scores_teams`
-            WHERE `Date` BETWEEN '$seasonStartingYear-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01' AND '$seasonEndingYear-" . Season::IBL_PLAYOFF_MONTH . "-30';";
-
-        if (
-            $db->sql_query($queryDeleteRegularSeasonAndPlayoffsPlayersBoxScores, 0) 
-            AND $db->sql_query($queryDeleteRegularSeasonAndPlayoffsTeamsBoxScores, 0)
-        ) {
-            return TRUE;
-        } else {
-            return FALSE;
-        }
+        $repository = new \Boxscore\BoxscoreRepository($db);
+        return $repository->deleteRegularSeasonAndPlayoffsBoxScores($seasonStartingYear);
     }
 }

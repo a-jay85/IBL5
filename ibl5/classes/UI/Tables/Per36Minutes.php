@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace UI\Tables;
 
 use Player\Player;
+use Player\PlayerImageHelper;
 use Player\PlayerStats;
 use BasketballStats\StatsFormatter;
 
@@ -20,14 +23,18 @@ class Per36Minutes
      * @param string $yr Year filter (empty for current season)
      * @return string HTML table
      */
-    public static function render($db, $result, $team, string $yr): string
+    public static function render($db, $result, $team, string $yr, array $starterPids = [], string $moduleName = ""): string
     {
         $playerRows = [];
-        $i = 0;
         foreach ($result as $plrRow) {
             if ($yr == "") {
-                $player = Player::withPlrRow($db, $plrRow);
-                $playerStats = PlayerStats::withPlrRow($db, $plrRow);
+                if ($plrRow instanceof Player) {
+                    $player = $plrRow;
+                    $playerStats = PlayerStats::withPlayerID($db, (int) $player->playerID);
+                } else {
+                    $player = Player::withPlrRow($db, $plrRow);
+                    $playerStats = PlayerStats::withPlrRow($db, $plrRow);
+                }
 
                 $firstCharacterOfPlayerName = substr($player->name, 0, 1);
                 if ($firstCharacterOfPlayerName == '|') {
@@ -38,12 +45,9 @@ class Per36Minutes
                 $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
             }
 
-            $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
-
             $playerRows[] = [
                 'player' => $player,
                 'playerStats' => $playerStats,
-                'bgcolor' => $bgcolor,
                 'stats_fgm' => StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsMade, $playerStats->seasonMinutes),
                 'stats_fga' => StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsAttempted, $playerStats->seasonMinutes),
                 'stats_fgp' => StatsFormatter::formatPercentage($playerStats->seasonFieldGoalsMade, $playerStats->seasonFieldGoalsAttempted),
@@ -64,18 +68,18 @@ class Per36Minutes
                 'stats_fpg' => StatsFormatter::formatPer36Stat($playerStats->seasonPersonalFouls, $playerStats->seasonMinutes),
                 'stats_ppg' => StatsFormatter::formatPer36Stat($playerStats->seasonPoints, $playerStats->seasonMinutes),
             ];
-
-            $i++;
         }
 
         ob_start();
-        echo \UI\TableStyles::render('per36', $team->color1, $team->color2);
         ?>
-<table style="margin: 0 auto;" class="sortable per36">
+<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
-        <tr style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
+        <tr>
+<?php if ($moduleName === "League_Starters"): ?>
+            <th>Team</th>
+<?php endif; ?>
             <th>Pos</th>
-            <th colspan="3">Player</th>
+            <th class="sticky-col">Player</th>
             <th>g</th>
             <th>gs</th>
             <th>mpg</th>
@@ -84,11 +88,11 @@ class Per36Minutes
             <th>fgm</th>
             <th>fga</th>
             <th>fgp</th>
-            <th class="sep-weak"></th>
+            <th class="sep-team"></th>
             <th>ftm</th>
             <th>fta</th>
             <th>ftp</th>
-            <th class="sep-weak"></th>
+            <th class="sep-team"></th>
             <th>3gm</th>
             <th>3ga</th>
             <th>3gp</th>
@@ -108,9 +112,25 @@ class Per36Minutes
     $player = $row['player'];
     $playerStats = $row['playerStats'];
 ?>
-        <tr style="background-color: #<?= $row['bgcolor'] ?>;">
+        <tr>
+<?php if ($moduleName === "League_Starters"):
+    $teamId = (int) ($player->teamID ?? 0);
+    $teamNameStr = htmlspecialchars($player->teamName ?? '');
+    $color1 = htmlspecialchars($player->teamColor1 ?? 'FFFFFF');
+    $color2 = htmlspecialchars($player->teamColor2 ?? '000000');
+    if ($teamId === 0): ?>
+            <td>Free Agent</td>
+    <?php else: ?>
+            <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
+        <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
+            <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+            <span class="ibl-team-cell__text"><?= $teamNameStr ?></span>
+        </a>
+    </td>
+    <?php endif; ?>
+<?php endif; ?>
             <td><?= htmlspecialchars($player->position) ?></td>
-            <td colspan="3"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
+            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName, $starterPids) ?>
             <td style="text-align: center;"><?= (int)$playerStats->seasonGamesPlayed ?></td>
             <td style="text-align: center;"><?= (int)$playerStats->seasonGamesStarted ?></td>
             <td style="text-align: center;"><?= $row['stats_mpg'] ?></td>

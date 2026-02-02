@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use PlayerSearch\PlayerSearchService;
 use PlayerSearch\PlayerSearchValidator;
@@ -12,9 +13,10 @@ use Player\PlayerData;
 
 /**
  * Tests for PlayerSearchView
- * 
+ *
  * Tests HTML rendering functionality for player search.
  */
+#[AllowMockObjectsWithoutExpectations]
 final class PlayerSearchViewTest extends TestCase
 {
     private PlayerSearchView $view;
@@ -122,7 +124,8 @@ final class PlayerSearchViewTest extends TestCase
         $html = $this->view->renderTableHeader();
 
         $this->assertStringContainsString('<table', $html);
-        $this->assertStringContainsString('class="sortable"', $html);
+        $this->assertStringContainsString('sortable', $html);
+        $this->assertStringContainsString('ibl-data-table', $html);
         $this->assertStringContainsString('<tr>', $html);
         $this->assertStringContainsString('<th>', $html);
     }
@@ -141,7 +144,7 @@ final class PlayerSearchViewTest extends TestCase
         $this->assertStringContainsString('>2ga<', $html);
         $this->assertStringContainsString('>2gp<', $html);
         $this->assertStringContainsString('>oo<', $html);
-        $this->assertStringContainsString('>Talent<', $html);
+        $this->assertStringContainsString('>TAL<', $html);
         $this->assertStringContainsString('>College<', $html);
     }
 
@@ -174,25 +177,31 @@ final class PlayerSearchViewTest extends TestCase
 
         $html = $this->view->renderPlayerRow($player, 0);
 
-        $this->assertStringContainsString('href="modules.php?name=Team&op=team&teamID=5"', $html); // I don't know why the test expects & and not &amp;
+        $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamID=5"', $html);
+        $this->assertStringContainsString('ibl-team-cell--colored', $html);
+        $this->assertStringContainsString('ibl-team-cell__name', $html);
+        $this->assertStringContainsString('ibl-team-cell__logo', $html);
         $this->assertStringContainsString('>Test Team<', $html);
     }
 
-    public function testRenderPlayerRowAlternatesRowColors(): void
+    public function testRenderPlayerRowCreatesPlainRows(): void
     {
         $player = $this->createTestPlayer();
 
         $htmlEven = $this->view->renderPlayerRow($player, 0);
         $htmlOdd = $this->view->renderPlayerRow($player, 1);
 
-        $this->assertStringContainsString('#e6e7e2', $htmlEven);
-        $this->assertStringContainsString('#ffffff', $htmlOdd);
+        // Row alternation is now handled by CSS :nth-child, not inline styles
+        $this->assertStringContainsString('<tr>', $htmlEven);
+        $this->assertStringContainsString('<tr>', $htmlOdd);
+        $this->assertStringNotContainsString('<tr style=', $htmlEven);
+        $this->assertStringNotContainsString('<tr style=', $htmlOdd);
     }
 
     public function testRenderPlayerRowShowsRetiredStatus(): void
     {
         $player = $this->createTestPlayer();
-        $player->isRetired = 1;
+        $player->isRetired = '1';
 
         $html = $this->view->renderPlayerRow($player, 0);
 
@@ -256,7 +265,7 @@ final class PlayerSearchViewTest extends TestCase
         $player->position = 'PG';
         $player->teamID = 5;
         $player->teamName = 'Test Team';
-        $player->isRetired = 0;
+        $player->isRetired = '0';
         $player->age = 25;
         $player->yearsOfExperience = 5;
         $player->collegeName = 'UCLA';
@@ -287,7 +296,9 @@ final class PlayerSearchViewTest extends TestCase
         $player->ratingIntangibles = 75;
         $player->ratingClutch = 90;
         $player->ratingConsistency = 85;
-        
+        $player->teamColor1 = 'FF0000';
+        $player->teamColor2 = 'FFFFFF';
+
         return $player;
     }
 }

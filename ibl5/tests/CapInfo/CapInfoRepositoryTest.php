@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\CapInfo;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use CapInfo\CapInfoRepository;
 use CapInfo\Contracts\CapInfoRepositoryInterface;
@@ -16,6 +17,7 @@ use CapInfo\Contracts\CapInfoRepositoryInterface;
  *
  * @covers \CapInfo\CapInfoRepository
  */
+#[AllowMockObjectsWithoutExpectations]
 class CapInfoRepositoryTest extends TestCase
 {
     public function testImplementsCapInfoRepositoryInterface(): void

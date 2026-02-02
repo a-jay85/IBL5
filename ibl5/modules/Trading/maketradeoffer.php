@@ -1,11 +1,5 @@
 <?php
 
-// Enable error reporting for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', '1');
-ini_set('log_errors', '1');
-ini_set('error_log', dirname(__FILE__) . '/make_trade_errors.log');
-
 try {
     require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 } catch (Exception $e) {
@@ -15,7 +9,6 @@ try {
 
 global $mysqli_db;
 
-// Check database connection
 if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
     error_log("Database connection not available");
     die("Error: Database connection failed");
@@ -51,38 +44,19 @@ for ($j = 0; $j < $tradeData['fieldsCounter']; $j++) {
     $tradeData['type'][$j] = $_POST['type' . $j] ?? 0;
 }
 
-// Create trade offer using new class
+// Create trade offer using existing class
 try {
     $tradeOffer = new Trading\TradeOffer($mysqli_db);
     $result = $tradeOffer->createTradeOffer($tradeData);
 } catch (Exception $e) {
     error_log("Failed to create trade offer: " . $e->getMessage());
-    error_log("Stack trace: " . $e->getTraceAsString());
-    die("Error creating trade offer: " . htmlspecialchars($e->getMessage()));
+    $result = ['success' => false, 'error' => $e->getMessage()];
 }
 
-// Display trade cap details
-if (isset($result['capData'])) {
-    echo "Your Payroll this season, if this trade is accepted: {$result['capData']['userPostTradeCapTotal']}<br>";
-    echo "Their Payroll this season, if this trade is accepted: {$result['capData']['partnerPostTradeCapTotal']}<p>";
+if ($result['success']) {
+    header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=offer_sent');
+} else {
+    $error = $result['error'] ?? ($result['errors'] ? implode('; ', $result['errors']) : 'Unknown error');
+    header('Location: /ibl5/modules.php?name=Trading&op=offertrade&partner=' . rawurlencode($tradeData['listeningTeam']) . '&error=' . rawurlencode($error));
 }
-
-// Display any errors and exit if trade creation failed
-if (!$result['success']) {
-    if (isset($result['error'])) {
-        echo $result['error'];
-    } elseif (isset($result['errors'])) {
-        foreach ($result['errors'] as $error) {
-            echo $error . "<br>";
-        }
-    }
-    echo "<p><a href='javascript:history.back()'>Please go back and adjust your trade proposal.</a>";
-    exit;
-}
-
-echo $result['tradeText'] ?? '';
-
-echo "<p>";
-echo "Trade Offer Sent!<br>
-    <a href='/ibl5/modules.php?name=Trading&op=reviewtrade'>Back to Trade Review</a>";
-?>
+exit;

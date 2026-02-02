@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /***************************************************************************
  *                                 sqlite.php
  *                            -------------------
@@ -37,7 +40,7 @@ if (!defined("SQL_LAYER")) {
         public function sql_query($query = "", $transaction = false)
         {
             unset($this->query_result);
-            if ($query != "") {
+            if ($query !== "") {
                 $this->query_result = $this->db_connect_id->query($query);
             }
             return $this->query_result ? $this->query_result : false;
@@ -126,7 +129,7 @@ if (!defined("SQL_LAYER")) {
                     $query_id->reset();
                     for ($i = 0; $i <= $rownum; $i++) {
                         $row = $query_id->fetchArray(SQLITE3_ASSOC);
-                        if ($i == $rownum) {
+                        if ($i === $rownum) {
                             return $row[$field] ?? false;
                         }
                     }

@@ -452,14 +452,14 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
             OpenTable2();
             echo "<center><b>" . _CHANGEKARMA . " <i>" . $userinfo['username'] . "</i></b><br><br>";
             echo "$change_karma</center>";
-            CloseTable2();
+            CloseTable();
             echo "<br>";
             echo "<table border=\"0\" width=\"80%\" cellpadding=\"3\" cellspacing=\"3\" align=\"center\">";
             echo "<tr><td valign=\"middle\"><img src=\"images/karma/0.gif\" border=\"0\" alt=\"" . _KARMAGOOD . "\" title=\"" . _KARMAGOOD . "\"></td><td>" . _KARMAGOODREF . "</td></tr>";
             echo "<tr><td valign=\"middle\"><img src=\"images/karma/1.gif\" border=\"0\" alt=\"" . _KARMALOW . "\" title=\"" . _KARMALOW . "\"></td><td>" . _KARMALOWREF . "</td></tr>";
             echo "<tr><td valign=\"middle\"><img src=\"images/karma/2.gif\" border=\"0\" alt=\"" . _KARMABAD . "\" title=\"" . _KARMABAD . "\"></td><td>" . _KARMABADREF . "</td></tr>";
             echo "<tr><td valign=\"middle\"><img src=\"images/karma/3.gif\" border=\"0\" alt=\"" . _KARMADEVIL . "\" title=\"" . _KARMADEVIL . "\"></td><td>" . _KARMADEVILREF . "</td></tr></table>";
-            CloseTable2();
+            CloseTable();
         }
         echo "</center></font>";
     } else {
@@ -556,11 +556,11 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
                 OpenTable2();
                 echo "<center><b>" . _HEADLINESFROM . " <a href=\"http://$siteurl[0]\" target=\"new\">$title</a></b></center><br>";
                 echo "$content";
-                CloseTable2();
+                CloseTable();
             } elseif (($cont == 0) or (empty($content))) {
                 OpenTable2();
                 echo "<center>" . _RSSPROBLEM . "</center><br>";
-                CloseTable2();
+                CloseTable();
             }
             echo "<br>";
         }
@@ -1526,7 +1526,7 @@ function avatarlist($avatarcategory)
             }
         }
         echo "</center>";
-        CloseTable2();
+        CloseTable();
         echo "<center><br>"
             . "" . _GOBACK . ""
             . "<br></center>";

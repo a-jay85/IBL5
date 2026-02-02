@@ -46,8 +46,8 @@ $searchResult = $service->search($_POST);
 
 // Render page
 Nuke\Header::header();
-OpenTable();
-UI::playerMenu();
+
+echo '<h2 class="ibl-title">Player Search</h2>';
 
 // Render search form with current parameters
 echo $view->renderSearchForm($searchResult['params']);
@@ -67,5 +67,4 @@ if (!empty($_POST)) {
     echo $view->renderTableFooter();
 }
 
-CloseTable();
 Nuke\Footer::footer();

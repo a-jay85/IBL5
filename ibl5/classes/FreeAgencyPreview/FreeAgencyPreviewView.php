@@ -39,7 +39,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
      */
     private function renderTitle(int $seasonEndingYear): string
     {
-        return '<h2 class="ibl-title">Players Currently to be Free Agents at the end of the ' . $seasonEndingYear . ' Season</h2>';
+        return '<h2 class="ibl-title">' . $seasonEndingYear . ' Free Agent Preview</h2>';
     }
 
     /**

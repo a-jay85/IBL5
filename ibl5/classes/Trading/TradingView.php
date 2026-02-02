@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Trading;
 
 use Trading\Contracts\TradingViewInterface;
+use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -137,13 +138,6 @@ class TradingView implements TradingViewInterface
     <tr>
         <td>
             <?= $this->renderTeamSelectionLinks($teams) ?>
-        </td>
-    </tr>
-    <tr>
-        <td style="text-align: center; padding: 1rem;">
-            <a href="modules.php?name=Waivers&amp;action=drop" class="ibl-link">Drop a player to Waivers</a>
-            &nbsp;|&nbsp;
-            <a href="modules.php?name=Waivers&amp;action=add" class="ibl-link">Add a player from Waivers</a>
         </td>
     </tr>
 </table>
@@ -284,7 +278,13 @@ or wait 3 seconds to be redirected automatically!</p>
             $ordinal = (int) $row['ordinal'];
             $contractYear = (int) $row['cy'];
             $playerPosition = HtmlSanitizer::safeHtmlOutput($row['pos']);
-            $playerName = HtmlSanitizer::safeHtmlOutput($row['name']);
+            $rawName = (string) $row['name'];
+            $hasPipe = str_contains($rawName, '|');
+            if ($hasPipe) {
+                $rawName = str_replace('|', '', strip_tags($rawName));
+            }
+            $playerName = HtmlSanitizer::safeHtmlOutput($rawName);
+            $thumbnail = $hasPipe ? '' : PlayerImageHelper::renderThumbnail($pid);
 
             if ($isOffseason) {
                 $contractYear++;
@@ -305,7 +305,7 @@ or wait 3 seconds to be redirected automatically!</p>
     <td align="center"><input type="hidden" name="check<?= $k ?>"></td>
 <?php endif; ?>
     <td><?= $playerPosition ?></td>
-    <td><?= $playerName ?></td>
+    <td class="ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $pid ?>"><?= $thumbnail ?><?= $playerName ?></a></td>
     <td align="right"><?= $contractAmount ?></td>
 </tr>
             <?php
@@ -341,7 +341,8 @@ or wait 3 seconds to be redirected automatically!</p>
         <input type="hidden" name="type<?= $k ?>" value="0">
         <input type="checkbox" name="check<?= $k ?>">
     </td>
-    <td colspan="3">
+    <td colspan="3" class="ibl-player-cell">
+        <img src="images/logo/<?= $pickTeam ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
         <?= $pickYear ?> <?= $pickTeam ?> Round <?= $pickRound ?>
     </td>
 </tr>

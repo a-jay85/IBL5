@@ -268,16 +268,6 @@ class TradingViewTest extends TestCase
         $this->assertStringContainsString('Miami Heat', $html);
     }
 
-    public function testRenderTradeReviewContainsWaiversLinks(): void
-    {
-        $pageData = $this->createTradeReviewPageData();
-
-        $html = $this->view->renderTradeReview($pageData);
-
-        $this->assertStringContainsString('Drop a player to Waivers', $html);
-        $this->assertStringContainsString('Add a player from Waivers', $html);
-    }
-
     public function testRenderTradeReviewEscapesTeamNames(): void
     {
         $pageData = $this->createTradeReviewPageData();

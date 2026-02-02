@@ -77,14 +77,12 @@ A:active,
 A:visited {
     background: none;
     color: #363636;
-    font-family: inherit;
     text-decoration: underline;
 }
 
 A:hover {
     background: none;
     color: #363636;
-    font-family: inherit;
     text-decoration: underline;
 }
 

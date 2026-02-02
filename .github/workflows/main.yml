@@ -18,6 +18,7 @@ jobs:
         script: |
           cd www
           git pull origin
+          find . -name "input.css"
     - name: Bun
       uses: oven-sh/setup-bun@v2
     - run: bunx @tailwindcss/cli -i /design/input.css -o /themes/IBL/style/style.css --minify

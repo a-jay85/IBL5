@@ -48,7 +48,7 @@
     text-transform: uppercase;
     letter-spacing: 0.03em;
     line-height: 1.25rem;
-    padding: 0.75rem 0.25rem;
+    padding: 0.75rem 0.2rem;
     text-align: center;
     white-space: nowrap;
 }
@@ -57,7 +57,7 @@
 .ibl-data-table td {
     color: var(--gray-800, #1f2937);
     font-size: 1rem;
-    padding: 0.5rem 0.25rem;
+    padding: 0.25rem 0.2rem;
     text-align: center;
 }
 

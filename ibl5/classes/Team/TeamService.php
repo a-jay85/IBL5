@@ -225,15 +225,20 @@ class TeamService implements TeamServiceInterface
 
         $franchiseHistoryCard = "<div class=\"team-card\" style=\"$teamColorStyle\">"
             . '<div class="team-card__header"><h3 class="team-card__title">Franchise History</h3></div>'
-            . "<div class=\"team-card__body\" style=\"padding-bottom: 0;\">"
-            . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">Regular Season</strong>"
-            . "</div>$regularSeason"
-            . "<div class=\"team-card__body\" style=\"padding-bottom: 0; border-top: 1px solid var(--gray-100);\">"
-            . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">H.E.A.T.</strong>"
-            . "</div>$heatHistory"
-            . "<div class=\"team-card__body\" style=\"padding-bottom: 0; border-top: 1px solid var(--gray-100);\">"
-            . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">Playoffs</strong>"
-            . "</div>$playoffResults"
+            . '<div class="franchise-history-columns">'
+            . '<div class="franchise-history-column">'
+            . '<h4 class="franchise-history-column__title">H.E.A.T.</h4>'
+            . $heatHistory
+            . '</div>'
+            . '<div class="franchise-history-column">'
+            . '<h4 class="franchise-history-column__title">Regular Season</h4>'
+            . $regularSeason
+            . '</div>'
+            . '<div class="franchise-history-column">'
+            . '<h4 class="franchise-history-column__title">Playoffs</h4>'
+            . $playoffResults
+            . '</div>'
+            . '</div>'
             . '</div>';
 
         return [

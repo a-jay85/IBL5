@@ -21,7 +21,6 @@ class ContactListView implements ContactListViewInterface
     {
         $output = '';
         $output .= $this->renderTitle();
-        $output .= $this->renderDescription();
         $output .= $this->renderTableStart();
         $output .= $this->renderTableRows($contacts);
         $output .= $this->renderTableEnd();
@@ -37,16 +36,6 @@ class ContactListView implements ContactListViewInterface
     private function renderTitle(): string
     {
         return '<h2 class="ibl-title">IBL GM Contact List</h2>';
-    }
-
-    /**
-     * Render the description text.
-     *
-     * @return string HTML description
-     */
-    private function renderDescription(): string
-    {
-        return '<p class="contact-description">Click on a team name to access that team\'s page; click on a GM\'s name to e-mail the GM.</p>';
     }
 
     /**

@@ -116,12 +116,14 @@ function themeheader()
     }
 
     $seasonPhase = '';
+    $allowWaivers = '';
     if ($mysqli_db) {
         $season = new \Season($mysqli_db);
         $seasonPhase = $season->phase;
+        $allowWaivers = $season->allowWaivers;
     }
 
-    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId, $teamsData, $seasonPhase);
+    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId, $teamsData, $seasonPhase, $allowWaivers);
     echo $navView->render();
 
     echo "<body bgcolor=\"$bgcolor1\">";

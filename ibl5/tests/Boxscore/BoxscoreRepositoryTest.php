@@ -16,11 +16,21 @@ class BoxscoreRepositoryTest extends TestCase
 {
     private MockDatabase $mockDb;
     private BoxscoreRepository $repository;
+    private string|false $previousErrorLog = false;
 
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
         $this->repository = new BoxscoreRepository($this->mockDb);
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->previousErrorLog !== false) {
+            ini_set('error_log', $this->previousErrorLog);
+            $this->previousErrorLog = false;
+        }
+        parent::tearDown();
     }
 
     public function testImplementsInterface(): void
@@ -80,6 +90,8 @@ class BoxscoreRepositoryTest extends TestCase
     public function testDeleteThrowsExceptionOnFailure(): void
     {
         $this->mockDb->setReturnTrue(false);
+        $this->previousErrorLog = ini_get('error_log') ?: '';
+        ini_set('error_log', '/dev/null');
 
         $this->expectException(\RuntimeException::class);
         $this->repository->deletePreseasonBoxScores();

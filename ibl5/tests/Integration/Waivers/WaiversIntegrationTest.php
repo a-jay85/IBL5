@@ -159,6 +159,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
         // Simulate database failure: set return to false and affected rows to 0
         $this->mockDb->setReturnTrue(false);
         $this->mockDb->setAffectedRows(0);
+        $this->suppressErrorLog();
 
         // Act
         $result = $this->repository->dropPlayerToWaivers($playerID, $timestamp);

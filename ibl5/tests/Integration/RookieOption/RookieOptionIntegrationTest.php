@@ -366,6 +366,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $draftRound = 1;
         $extensionAmount = 200;
         $this->mockDb->setReturnTrue(false);
+        $this->suppressErrorLog();
 
         // Assert - Expect exception
         $this->expectException(\RuntimeException::class);

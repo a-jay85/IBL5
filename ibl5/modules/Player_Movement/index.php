@@ -57,7 +57,6 @@ $result = $stmt->get_result();
 Nuke\Header::header();
 
 echo '<h2 class="ibl-title">Player Movement</h2>
-<p style="text-align: center;"><em>Click the headings to sort the table</em></p>
 <table class="sortable ibl-data-table">
     <thead>
         <tr>

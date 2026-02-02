@@ -2,19 +2,26 @@
 
 declare(strict_types=1);
 
-namespace UI\Modules;
+namespace Team;
 
-use Team\TeamRepository;
+use Team\Contracts\TeamComponentsViewInterface;
+use Team\Contracts\TeamRepositoryInterface;
 
-class Team
+/**
+ * @see TeamComponentsViewInterface
+ */
+class TeamComponentsView implements TeamComponentsViewInterface
 {
-    private TeamRepository $repository;
+    private TeamRepositoryInterface $repository;
 
-    public function __construct(TeamRepository $repository)
+    public function __construct(TeamRepositoryInterface $repository)
     {
         $this->repository = $repository;
     }
 
+    /**
+     * @see TeamComponentsViewInterface::championshipBanners()
+     */
     public function championshipBanners($team): string
     {
         $banners = $this->repository->getChampionshipBanners($team->name);
@@ -161,6 +168,9 @@ class Team
         return $ultimate_output[1];
     }
 
+    /**
+     * @see TeamComponentsViewInterface::currentSeason()
+     */
     public function currentSeason($team): string
     {
         $powerData = $this->repository->getTeamPowerData($team->name);
@@ -258,6 +268,9 @@ class Team
         };
     }
 
+    /**
+     * @see TeamComponentsViewInterface::draftPicks()
+     */
     public function draftPicks(\Team $team): string
     {
         global $mysqli_db;
@@ -301,6 +314,9 @@ class Team
         return $tableDraftPicks;
     }
 
+    /**
+     * @see TeamComponentsViewInterface::gmHistory()
+     */
     public function gmHistory($team): string
     {
         $gmHistory = $this->repository->getGMHistory($team->ownerName, $team->name);
@@ -323,6 +339,9 @@ class Team
         return $output;
     }
 
+    /**
+     * @see TeamComponentsViewInterface::resultsHEAT()
+     */
     public function resultsHEAT($team): string
     {
         $heatHistory = $this->repository->getHEATHistory($team->name);
@@ -351,6 +370,9 @@ class Team
         return $output;
     }
 
+    /**
+     * @see TeamComponentsViewInterface::resultsPlayoffs()
+     */
     public function resultsPlayoffs($team): string
     {
         $playoffResults = $this->repository->getPlayoffResults();
@@ -436,6 +458,9 @@ class Team
         return $output;
     }
 
+    /**
+     * @see TeamComponentsViewInterface::resultsRegularSeason()
+     */
     public function resultsRegularSeason($team): string
     {
         $regularSeasonHistory = $this->repository->getRegularSeasonHistory($team->name);
@@ -465,6 +490,9 @@ class Team
         return $output;
     }
 
+    /**
+     * @see TeamComponentsViewInterface::teamAccomplishments()
+     */
     public function teamAccomplishments($team): string
     {
         $teamAccomplishments = $this->repository->getTeamAccomplishments($team->name);

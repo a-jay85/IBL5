@@ -94,7 +94,7 @@ class TeamService implements TeamServiceInterface
 
         $isActualTeam = ($teamID !== 0);
 
-        $teamModules = new \UI\Modules\Team($this->repository);
+        $teamModules = new TeamComponentsView($this->repository);
         $draftPicksTable = ($isActualTeam && $team) ? $teamModules->draftPicks($team) : "";
 
         $currentSeasonCard = "";
@@ -188,7 +188,7 @@ class TeamService implements TeamServiceInterface
         $color2 = \UI\TableStyles::sanitizeColor($team->color2);
         $teamColorStyle = "--team-color-primary: #$color1; --team-color-secondary: #$color2;";
 
-        $teamModules = new \UI\Modules\Team($this->repository);
+        $teamModules = new TeamComponentsView($this->repository);
         $rafters = $teamModules->championshipBanners($team);
 
         // Current Season card

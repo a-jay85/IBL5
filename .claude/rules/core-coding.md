@@ -106,3 +106,4 @@ source ~/.zshrc && bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style
 ```
 
 - **NEVER use `--minify` locally.** Minification is handled by GitHub Actions on merge/push.
+- **NEVER commit `themes/IBL/style/style.css`.** It is gitignored and built on production. Only commit the source CSS files in `design/`.

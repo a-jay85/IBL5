@@ -54,7 +54,6 @@ class TradingView implements TradingViewInterface
 <form name="Trade_Offer" method="post" action="/ibl5/modules/Trading/maketradeoffer.php">
     <input type="hidden" name="offeringTeam" value="<?= $userTeam ?>">
     <div style="text-align: center;">
-        <img src="images/logo/<?= $userTeamId ?>.jpg" alt="Team Logo" class="team-logo-banner"><br>
         <h2 class="ibl-title">Trading</h2>
         <table class="trading-layout">
             <tr>
@@ -128,14 +127,14 @@ class TradingView implements TradingViewInterface
         echo $this->renderResultBanner($pageData['result'] ?? null, $pageData['error'] ?? null);
         ?>
 <div style="text-align: center;">
-    <img src="images/logo/<?= $userTeamId ?>.jpg" alt="Team Logo" class="team-logo-banner">
     <h2 class="ibl-title">Trading</h2>
+    <img src="images/logo/<?= $userTeamId ?>.jpg" alt="Team Logo" class="team-logo-banner">
 </div>
 <table class="trading-layout" style="margin: 0 auto;">
     <tr>
         <td style="vertical-align: top;">
 <?php if (empty($tradeOffers)): ?>
-            <p style="padding: 1rem;">No pending trade offers.</p>
+            <p style="padding: 1rem; text-align: center;">No pending trade offers.</p>
 <?php else: ?>
     <?php foreach ($tradeOffers as $offerId => $offer): ?>
             <?= $this->renderTradeOfferCard((int) $offerId, $offer, $userTeam) ?>

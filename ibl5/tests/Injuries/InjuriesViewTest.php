@@ -67,6 +67,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'John Smith',
                 'position' => 'PG',
                 'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
                 'teamID' => 1,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
@@ -91,6 +92,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'Player One',
                 'position' => 'PG',
                 'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
                 'teamID' => 1,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
@@ -102,6 +104,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'Player Two',
                 'position' => 'C',
                 'daysRemaining' => 10,
+                'returnDate' => '2025-02-15',
                 'teamID' => 2,
                 'teamCity' => 'Los Angeles',
                 'teamName' => 'Lakers',
@@ -126,6 +129,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'Player One',
                 'position' => 'PG',
                 'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
                 'teamID' => 1,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
@@ -137,6 +141,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'Player Two',
                 'position' => 'C',
                 'daysRemaining' => 10,
+                'returnDate' => '2025-02-15',
                 'teamID' => 2,
                 'teamCity' => 'Los Angeles',
                 'teamName' => 'Lakers',
@@ -159,6 +164,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'Player<script>alert("xss")</script>',
                 'position' => 'PG',
                 'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
                 'teamID' => 1,
                 'teamCity' => 'Test<script>',
                 'teamName' => 'Team&Name',
@@ -185,6 +191,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'John Smith',
                 'position' => 'PG',
                 'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
                 'teamID' => 1,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
@@ -207,6 +214,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'John Smith',
                 'position' => 'PG',
                 'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
                 'teamID' => 42,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
@@ -219,5 +227,29 @@ class InjuriesViewTest extends TestCase
 
         $this->assertStringContainsString('teamID=42', $result);
         $this->assertStringContainsString('modules.php?name=Team', $result);
+    }
+
+    public function testRenderShowsReturnDateTooltip(): void
+    {
+        $injuredPlayers = [
+            [
+                'playerID' => 1,
+                'name' => 'John Smith',
+                'position' => 'PG',
+                'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
+                'teamID' => 1,
+                'teamCity' => 'Boston',
+                'teamName' => 'Celtics',
+                'teamColor1' => '007A33',
+                'teamColor2' => 'FFFFFF',
+            ],
+        ];
+
+        $result = $this->view->render($injuredPlayers);
+
+        $this->assertStringContainsString('injury-days-tooltip', $result);
+        $this->assertStringContainsString('Returns: 2025-02-10', $result);
+        $this->assertStringContainsString('tabindex="0"', $result);
     }
 }

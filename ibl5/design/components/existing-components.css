@@ -462,6 +462,7 @@
 /* Responsive Table */
 .injury-table {
     width: 100%;
+    border: 1px solid var(--gray-200, #e5e7eb);
     border-collapse: collapse;
 }
 
@@ -874,7 +875,7 @@
 }
 
 .ibl-grid--3col {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
 }
 
 .ibl-grid--2col {
@@ -1844,6 +1845,7 @@ html:has(.depth-chart-form) {
 table.depth-chart-table {
     border-collapse: separate;
     border-spacing: 0;
+    border: 1px solid var(--gray-200, #e5e7eb);
     border-radius: var(--radius-lg);
     overflow: hidden;
     box-shadow: var(--shadow-md);
@@ -1946,6 +1948,7 @@ table.depth-chart-table td:last-child {
 .league-stats-table {
     border-collapse: separate;
     border-spacing: 0;
+    border: 1px solid var(--gray-200, #e5e7eb);
     border-radius: var(--radius-lg);
     overflow: hidden;
     box-shadow: var(--shadow-md);

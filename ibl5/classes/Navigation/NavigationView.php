@@ -20,8 +20,9 @@ class NavigationView
     /** @var array<string, array<string, list<array{teamid: int, team_name: string, team_city: string}>>>|null */
     private ?array $teamsData;
     private string $seasonPhase;
+    private string $allowWaivers;
 
-    public function __construct(bool $isLoggedIn, ?string $username, string $currentLeague, ?int $teamId = null, ?array $teamsData = null, string $seasonPhase = '')
+    public function __construct(bool $isLoggedIn, ?string $username, string $currentLeague, ?int $teamId = null, ?array $teamsData = null, string $seasonPhase = '', string $allowWaivers = '')
     {
         $this->isLoggedIn = $isLoggedIn;
         $this->username = $username;
@@ -29,6 +30,7 @@ class NavigationView
         $this->teamId = $teamId;
         $this->teamsData = $teamsData;
         $this->seasonPhase = $seasonPhase;
+        $this->allowWaivers = $allowWaivers;
     }
 
     /**
@@ -297,10 +299,13 @@ class NavigationView
                 ['label' => 'Next Sim', 'url' => 'modules.php?name=Next_Sim', 'badge' => 'NEW'],
                 ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=Depth_Chart_Entry'],
                 ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
-                ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=drop">Drop</a>'],
                 ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
                 ['label' => 'Draft History', 'url' => 'modules.php?name=Draft_History&teamID=' . $this->teamId],
             ];
+
+            if ($this->allowWaivers === 'Yes') {
+                $links[] = ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=drop">Drop</a>'];
+            }
 
             if ($this->seasonPhase === 'Draft') {
                 array_unshift($links, ['label' => 'Draft', 'url' => 'modules.php?name=Draft', 'badge' => 'LIVE']);

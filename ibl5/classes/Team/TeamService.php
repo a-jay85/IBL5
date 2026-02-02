@@ -97,12 +97,16 @@ class TeamService implements TeamServiceInterface
         $teamModules = new \UI\Modules\Team($this->repository);
         $draftPicksTable = ($isActualTeam && $team) ? $teamModules->draftPicks($team) : "";
 
-        $teamInfoRight = "";
+        $currentSeasonCard = "";
+        $awardsCard = "";
+        $franchiseHistoryCard = "";
         $rafters = "";
         if ($isActualTeam) {
-            $inforight = $this->renderTeamInfoRight($team);
-            $teamInfoRight = $inforight[0];
-            $rafters = $inforight[1];
+            $sidebarData = $this->renderTeamInfoRight($team);
+            $currentSeasonCard = $sidebarData['currentSeasonCard'];
+            $awardsCard = $sidebarData['awardsCard'];
+            $franchiseHistoryCard = $sidebarData['franchiseHistoryCard'];
+            $rafters = $sidebarData['rafters'];
         }
 
         return [
@@ -115,7 +119,9 @@ class TeamService implements TeamServiceInterface
             'isActualTeam' => $isActualTeam,
             'tableOutput' => $tableOutput,
             'draftPicksTable' => $draftPicksTable,
-            'teamInfoRight' => $teamInfoRight,
+            'currentSeasonCard' => $currentSeasonCard,
+            'awardsCard' => $awardsCard,
+            'franchiseHistoryCard' => $franchiseHistoryCard,
             'rafters' => $rafters,
         ];
     }
@@ -187,28 +193,29 @@ class TeamService implements TeamServiceInterface
 
         // Current Season card
         $currentSeason = $teamModules->currentSeason($team);
-        $output = "<div class=\"team-card\" style=\"$teamColorStyle\">"
+        $currentSeasonCard = "<div class=\"team-card\" style=\"$teamColorStyle\">"
             . '<div class="team-card__header"><h3 class="team-card__title">Current Season</h3></div>'
             . "<div class=\"team-card__body\">$currentSeason</div>"
             . '</div>';
 
         // Awards card — combines GM History and Team Accomplishments
+        $awardsCard = '';
         $gmHistory = $teamModules->gmHistory($team);
         $teamAccomplishments = $teamModules->teamAccomplishments($team);
         if ($gmHistory !== '' || $teamAccomplishments !== '') {
-            $output .= "<div class=\"team-card\" style=\"$teamColorStyle\">"
+            $awardsCard = "<div class=\"team-card\" style=\"$teamColorStyle\">"
                 . '<div class="team-card__header"><h3 class="team-card__title">Awards</h3></div>';
             if ($gmHistory !== '') {
-                $output .= "<div class=\"team-card__body\" style=\"padding-bottom: 0;\">"
+                $awardsCard .= "<div class=\"team-card__body\" style=\"padding-bottom: 0;\">"
                     . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">GM History</strong>"
                     . "</div><div class=\"team-card__body\">$gmHistory</div>";
             }
             if ($teamAccomplishments !== '') {
-                $output .= "<div class=\"team-card__body\" style=\"padding-bottom: 0; border-top: 1px solid var(--gray-100);\">"
+                $awardsCard .= "<div class=\"team-card__body\" style=\"padding-bottom: 0; border-top: 1px solid var(--gray-100);\">"
                     . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">Team Accomplishments</strong>"
                     . "</div><div class=\"team-card__body\">$teamAccomplishments</div>";
             }
-            $output .= '</div>';
+            $awardsCard .= '</div>';
         }
 
         // Franchise History card — consolidates Regular Season, HEAT, and Playoffs
@@ -216,7 +223,7 @@ class TeamService implements TeamServiceInterface
         $heatHistory = $teamModules->resultsHEAT($team);
         $playoffResults = $teamModules->resultsPlayoffs($team);
 
-        $output .= "<div class=\"team-card\" style=\"$teamColorStyle\">"
+        $franchiseHistoryCard = "<div class=\"team-card\" style=\"$teamColorStyle\">"
             . '<div class="team-card__header"><h3 class="team-card__title">Franchise History</h3></div>'
             . "<div class=\"team-card__body\" style=\"padding-bottom: 0;\">"
             . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">Regular Season</strong>"
@@ -229,7 +236,12 @@ class TeamService implements TeamServiceInterface
             . "</div>$playoffResults"
             . '</div>';
 
-        return [$output, $rafters];
+        return [
+            'currentSeasonCard' => $currentSeasonCard,
+            'awardsCard' => $awardsCard,
+            'franchiseHistoryCard' => $franchiseHistoryCard,
+            'rafters' => $rafters,
+        ];
     }
 
 }

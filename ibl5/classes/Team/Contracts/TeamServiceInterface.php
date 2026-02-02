@@ -33,7 +33,9 @@ interface TeamServiceInterface
      *     isActualTeam: bool,
      *     tableOutput: string,
      *     draftPicksTable: string,
-     *     teamInfoRight: string,
+     *     currentSeasonCard: string,
+     *     awardsCard: string,
+     *     franchiseHistoryCard: string,
      *     rafters: string
      * }
      */

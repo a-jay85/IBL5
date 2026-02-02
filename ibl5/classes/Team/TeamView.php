@@ -23,13 +23,19 @@ class TeamView implements TeamViewInterface
         $isActualTeam = $pageData['isActualTeam'];
         $tableOutput = $pageData['tableOutput'];
         $draftPicksTable = $pageData['draftPicksTable'];
-        $teamInfoRight = $pageData['teamInfoRight'];
+        $currentSeasonCard = $pageData['currentSeasonCard'];
+        $awardsCard = $pageData['awardsCard'];
+        $franchiseHistoryCard = $pageData['franchiseHistoryCard'];
         $rafters = $pageData['rafters'];
 
         $draftPicksHtml = $isActualTeam ? $this->renderDraftPicksSection($team, $draftPicksTable) : "";
-        $sidebarMobileHtml = $isActualTeam ? "<div class=\"team-page-sidebar-mobile\">$teamInfoRight</div>" : "";
+        $cardsRowHtml = "";
+        if ($isActualTeam) {
+            $cardsRowHtml = "<div class=\"team-cards-row\">$draftPicksHtml$currentSeasonCard$awardsCard</div>";
+            $draftPicksHtml = ""; // already inside cards row
+        }
+        $franchiseHtml = $isActualTeam ? $franchiseHistoryCard : "";
         $raftersHtml = $isActualTeam ? "<div class=\"team-page-rafters\">$rafters</div>" : "";
-        $sidebarDesktopHtml = $isActualTeam ? "<div class=\"team-page-sidebar\">$teamInfoRight</div>" : "";
 
         $yearHeading = ($yr !== null && $yr !== '')
             ? "<h1 class=\"ibl-title\" style=\"margin: 0.5rem 0;\">" . \Utilities\HtmlSanitizer::safeHtmlOutput($yr) . " " . \Utilities\HtmlSanitizer::safeHtmlOutput($team->name) . "</h1>"
@@ -52,10 +58,10 @@ class TeamView implements TeamViewInterface
             </div>
         </div>
         <?= $draftPicksHtml ?>
-        <?= $sidebarMobileHtml ?>
+        <?= $cardsRowHtml ?>
+        <?= $franchiseHtml ?>
         <?= $raftersHtml ?>
     </div>
-    <?= $sidebarDesktopHtml ?>
 </div>
         <?php
         return ob_get_clean();

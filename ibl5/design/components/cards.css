@@ -402,9 +402,17 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* Draft picks card — constrain width since the list doesn't need full width */
-.team-card:has(.draft-picks-list) {
-    max-width: 360px;
+/* Team cards row — flexbox for Draft Picks, Current Season, Awards */
+.team-cards-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+}
+
+.team-cards-row > .team-card {
+    flex: 0 1 360px;
+    margin-bottom: 0;
 }
 
 /* Draft picks list */
@@ -470,9 +478,3 @@
     font-weight: 600;
 }
 
-/* Team sidebar responsive: give sidebar cards full width on mobile */
-@media (max-width: 768px) {
-    .team-page-sidebar-mobile .team-card {
-        margin-bottom: var(--space-3);
-    }
-}

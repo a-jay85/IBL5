@@ -39,7 +39,9 @@ class TeamViewTest extends TestCase
             'isActualTeam' => true,
             'tableOutput' => '<table><caption class="team-table-caption"><div class="ibl-tabs">tabs</div></caption><tbody><tr><td>roster</td></tr></tbody></table>',
             'draftPicksTable' => '<table>picks</table>',
-            'teamInfoRight' => '<div>sidebar</div>',
+            'currentSeasonCard' => '<div class="team-card">current season</div>',
+            'awardsCard' => '<div class="team-card">awards</div>',
+            'franchiseHistoryCard' => '<div class="team-card">franchise history</div>',
             'rafters' => '<div>banners</div>',
         ], $overrides);
     }
@@ -105,15 +107,17 @@ class TeamViewTest extends TestCase
         $this->assertStringNotContainsString('Draft Picks', $output);
     }
 
-    public function testRenderContainsSidebarForActualTeam(): void
+    public function testRenderContainsCardsRowForActualTeam(): void
     {
         $output = $this->view->render($this->createPageData());
 
-        $this->assertStringContainsString('team-page-sidebar', $output);
-        $this->assertStringContainsString('<div>sidebar</div>', $output);
+        $this->assertStringContainsString('team-cards-row', $output);
+        $this->assertStringContainsString('current season', $output);
+        $this->assertStringContainsString('awards', $output);
+        $this->assertStringContainsString('franchise history', $output);
     }
 
-    public function testRenderOmitsSidebarForNonTeam(): void
+    public function testRenderOmitsCardsRowForNonTeam(): void
     {
         $team = new \stdClass();
         $team->name = 'Free Agents';
@@ -126,7 +130,7 @@ class TeamViewTest extends TestCase
             'isActualTeam' => false,
         ]));
 
-        $this->assertStringNotContainsString('team-page-sidebar', $output);
+        $this->assertStringNotContainsString('team-cards-row', $output);
     }
 
     public function testRenderShowsYearHeadingForHistoricalYear(): void

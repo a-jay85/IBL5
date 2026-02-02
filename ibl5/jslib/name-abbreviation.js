@@ -134,10 +134,36 @@
         });
     }
 
+    function processScheduleTeamNames() {
+        const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
+        const spans = document.querySelectorAll('.schedule-game__team-text');
+
+        spans.forEach(span => {
+            if (!span.dataset.fullName) {
+                span.dataset.fullName = span.textContent.trim();
+            }
+
+            const original = span.dataset.fullName;
+            let display = original;
+
+            if (isMobile) {
+                for (const [long, short] of Object.entries(TEAM_ABBREVIATIONS)) {
+                    if (original === long) {
+                        display = short;
+                        break;
+                    }
+                }
+            }
+
+            span.textContent = display;
+        });
+    }
+
     function processAll() {
         processPlayerNames();
         processTeamNames();
         processDraftPickCells();
+        processScheduleTeamNames();
     }
 
     // Debounce resize handling

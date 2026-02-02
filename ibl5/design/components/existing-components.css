@@ -896,7 +896,7 @@ a.schedule-jump-btn:hover {
 /* Game Row - CSS Grid for vertical alignment */
 .schedule-game {
     display: grid;
-    grid-template-columns: 1fr 20px 24px 16px 24px 20px 1fr;
+    grid-template-columns: 1fr 25px 24px 16px 24px 25px 1fr;
     align-items: center;
     gap: 4px;
     padding: 4px 8px;
@@ -958,9 +958,8 @@ a.schedule-jump-btn:hover {
 
 /* Team logo */
 .schedule-game__logo {
-    width: 1rem;
-    height: 1rem;
-    aspect-ratio: 75 / 83;
+    width: 25px;
+    height: 25px;
     object-fit: contain;
     justify-self: center;
 }
@@ -1070,7 +1069,7 @@ a.schedule-jump-btn:hover {
     }
 
     .schedule-game {
-        grid-template-columns: 1fr 16px 20px 12px 20px 16px 1fr;
+        grid-template-columns: 1fr 25px 20px 12px 20px 25px 1fr;
         padding: 3px 4px;
         font-size: 1rem;
     }
@@ -1084,9 +1083,8 @@ a.schedule-jump-btn:hover {
     }
 
     .schedule-game__logo {
-        width: 14px;
-        height: 14px;
-        aspect-ratio: 75 / 83;
+        width: 25px;
+        height: 25px;
     }
 }
 
@@ -1126,7 +1124,7 @@ a.schedule-jump-btn:hover {
 
 /* Team Schedule - Add streak column to grid */
 .schedule-container--team .schedule-game {
-    grid-template-columns: 1fr 20px 24px 16px 24px 20px 1fr 36px;
+    grid-template-columns: 1fr 25px 24px 16px 24px 25px 1fr 36px;
 }
 
 /* Streak column styling */
@@ -1149,7 +1147,7 @@ a.schedule-jump-btn:hover {
 /* Mobile adjustments for team schedule grid with streak */
 @media (max-width: 640px) {
     .schedule-container--team .schedule-game {
-        grid-template-columns: 1fr 16px 20px 12px 20px 16px 1fr 28px;
+        grid-template-columns: 1fr 25px 20px 12px 20px 25px 1fr 28px;
     }
 
     .schedule-game__streak {

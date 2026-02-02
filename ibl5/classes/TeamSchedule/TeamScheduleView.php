@@ -243,13 +243,13 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
         // Visitor team + logo (same as League Schedule)
         $html .= '<a href="' . $visitorUrl . '" class="schedule-game__team-link">';
-        $html .= '<span class="schedule-game__team' . $vWinClass . '">' . HtmlSanitizer::safeHtmlOutput($visitorName);
+        $html .= '<span class="schedule-game__team' . $vWinClass . '"><span class="schedule-game__team-text">' . HtmlSanitizer::safeHtmlOutput($visitorName) . '</span>';
         if ($visitorRecord) {
             $html .= ' <span class="schedule-game__record">(' . HtmlSanitizer::safeHtmlOutput($visitorRecord) . ')</span>';
         }
         $html .= '</span></a>';
         $html .= '<a href="' . $visitorUrl . '" class="schedule-game__logo-link">';
-        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $visitorTeamId . '.png" alt="" width="18" height="18" loading="lazy">';
+        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $visitorTeamId . '.png" alt="" width="25" height="25" loading="lazy">';
         $html .= '</a>';
 
         // Scores + @ (same as League Schedule)
@@ -265,10 +265,10 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
         // Home logo + team (same as League Schedule)
         $html .= '<a href="' . $homeUrl . '" class="schedule-game__logo-link">';
-        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $homeTeamId . '.png" alt="" width="18" height="18" loading="lazy">';
+        $html .= '<img class="schedule-game__logo" src="images/logo/new' . $homeTeamId . '.png" alt="" width="25" height="25" loading="lazy">';
         $html .= '</a>';
         $html .= '<a href="' . $homeUrl . '" class="schedule-game__team-link">';
-        $html .= '<span class="schedule-game__team' . $hWinClass . '">' . HtmlSanitizer::safeHtmlOutput($homeName);
+        $html .= '<span class="schedule-game__team' . $hWinClass . '"><span class="schedule-game__team-text">' . HtmlSanitizer::safeHtmlOutput($homeName) . '</span>';
         if ($homeRecord) {
             $html .= ' <span class="schedule-game__record">(' . HtmlSanitizer::safeHtmlOutput($homeRecord) . ')</span>';
         }

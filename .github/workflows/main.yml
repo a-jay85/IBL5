@@ -17,7 +17,7 @@ jobs:
           node-version: 22
 
       - name: Build CSS
-        run: npx --yes @tailwindcss/cli@4 -i design/input.css -o themes/IBL/style/style.css --minify
+        run: npx --yes @tailwindcss/cli@4 -i ./design/input.css -o ./themes/IBL/style/style.css --minify
         working-directory: ibl5
 
       - name: Pull latest code on server

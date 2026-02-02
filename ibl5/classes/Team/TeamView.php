@@ -31,7 +31,7 @@ class TeamView implements TeamViewInterface
         $draftPicksHtml = $isActualTeam ? $this->renderDraftPicksSection($team, $draftPicksTable) : "";
         $cardsRowHtml = "";
         if ($isActualTeam) {
-            $cardsRowHtml = "<div class=\"team-cards-row\">$draftPicksHtml$currentSeasonCard$awardsCard</div>";
+            $cardsRowHtml = "<div class=\"team-cards-row\">$currentSeasonCard$draftPicksHtml$awardsCard</div>";
             $draftPicksHtml = ""; // already inside cards row
         }
         $franchiseHtml = $isActualTeam ? $franchiseHistoryCard : "";

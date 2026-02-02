@@ -46,7 +46,7 @@ if ($tid == null) {
                 <th>PFW</th>
                 <th>PT</th>
                 <th>Sec</th>
-                <th>Trad</th>
+                <th>Trd</th>
             </tr>";
 
         $query = "SELECT * FROM ibl_plr WHERE retired = 0 ORDER BY ordinal ASC";

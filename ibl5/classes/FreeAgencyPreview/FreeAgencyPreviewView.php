@@ -81,7 +81,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
                     <th>PFW</th>
                     <th>PT</th>
                     <th>Sec</th>
-                    <th>Trad</th>
+                    <th>Trd</th>
                 </tr>
             </thead>
             <tbody>';

@@ -51,4 +51,19 @@ interface PlayerImageHelperInterface
      * @return string Complete <img> HTML tag
      */
     public static function renderThumbnail($playerID, string $basePath = './images/player/'): string;
+
+    /**
+     * Render a complete player name table cell with photo thumbnail
+     *
+     * Returns a <td> element with sticky-col positioning, player photo thumbnail,
+     * linked player name, and optional starter highlighting. Used across all table
+     * types (Ratings, Season Totals, Season Averages, Per 36 Minutes, Sim Averages,
+     * Contracts) for consistent player name cell rendering.
+     *
+     * @param int $playerID The player's ID
+     * @param string $displayName The player's display name (already decorated/sanitized)
+     * @param array<int> $starterPids Array of starter player IDs for highlighting
+     * @return string Complete <td> HTML element
+     */
+    public static function renderPlayerCell(int $playerID, string $displayName, array $starterPids = []): string;
 }

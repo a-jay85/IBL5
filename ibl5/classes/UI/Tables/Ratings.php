@@ -146,7 +146,7 @@ class Ratings
     </td>
     <?php endif; ?>
 <?php endif; ?>
-            <td class="sticky-col ibl-player-cell<?= in_array((int)$player->playerID, $starterPids, true) ? ' is-starter' : '' ?>" style="white-space: nowrap;"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= PlayerImageHelper::renderThumbnail((int)$player->playerID) ?><?= $player->decoratedName ?></a></td>
+            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName, $starterPids) ?>
             <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
             <td style="text-align: center;"><?= (int)$player->age ?></td>
             <td class="sep-team"></td>

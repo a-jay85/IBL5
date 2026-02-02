@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace UI\Tables;
 
 use Player\Player;
+use Player\PlayerImageHelper;
 use Player\PlayerStats;
 use BasketballStats\StatsFormatter;
 
@@ -71,14 +72,14 @@ class Per36Minutes
 
         ob_start();
         ?>
-<table class="ibl-data-table team-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
+<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
 <?php if ($moduleName === "League_Starters"): ?>
             <th>Team</th>
 <?php endif; ?>
             <th>Pos</th>
-            <th colspan="3">Player</th>
+            <th class="sticky-col">Player</th>
             <th>g</th>
             <th>gs</th>
             <th>mpg</th>
@@ -129,7 +130,7 @@ class Per36Minutes
     <?php endif; ?>
 <?php endif; ?>
             <td><?= htmlspecialchars($player->position) ?></td>
-            <td colspan="3"<?= in_array((int)$player->playerID, $starterPids, true) ? ' class="is-starter"' : '' ?>><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
+            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName, $starterPids) ?>
             <td style="text-align: center;"><?= (int)$playerStats->seasonGamesPlayed ?></td>
             <td style="text-align: center;"><?= (int)$playerStats->seasonGamesStarted ?></td>
             <td style="text-align: center;"><?= $row['stats_mpg'] ?></td>

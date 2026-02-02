@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace UI\Tables;
 
 use Player\Player;
+use Player\PlayerImageHelper;
 
 /**
  * Contracts - Displays team contracts table
@@ -72,11 +73,11 @@ class Contracts
 
         ob_start();
         ?>
-<table class="ibl-data-table team-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
+<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
             <th>Pos</th>
-            <th colspan="2">Player</th>
+            <th class="sticky-col">Player</th>
             <th>Age</th>
             <th>Exp</th>
             <th>Bird</th>
@@ -104,7 +105,7 @@ class Contracts
 ?>
         <tr>
             <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
-            <td colspan="2"<?= in_array((int)$player->playerID, $starterPids, true) ? ' class="is-starter"' : '' ?>><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
+            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName, $starterPids) ?>
             <td style="text-align: center;"><?= (int)$player->age ?></td>
             <td style="text-align: center;"><?= (int)$player->yearsOfExperience ?></td>
             <td style="text-align: center;"><?= (int)$player->birdYears ?></td>
@@ -130,7 +131,7 @@ class Contracts
     <tfoot>
         <tr>
             <td></td>
-            <td colspan="2"><b>Cap Totals</b></td>
+            <td><b>Cap Totals</b></td>
             <td></td>
             <td></td>
             <td></td>
@@ -152,7 +153,7 @@ class Contracts
             <td></td>
         </tr>
         <tr>
-            <td colspan="19">
+            <td colspan="21">
                 Key:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>(Waived)*</i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Becomes Free Agent^
             </td>
         </tr>

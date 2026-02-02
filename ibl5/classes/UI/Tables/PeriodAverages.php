@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace UI\Tables;
 
+use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -121,11 +122,11 @@ class PeriodAverages
 
         ob_start();
         ?>
-<table class="ibl-data-table team-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
+<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
             <th>Pos</th>
-            <th colspan="3">Player</th>
+            <th class="sticky-col">Player</th>
             <th>g</th>
             <th>min</th>
             <th class="sep-team"></th>
@@ -155,7 +156,7 @@ class PeriodAverages
 <?php foreach ($playerRows as $row): ?>
         <tr>
             <td><?= htmlspecialchars($row['pos']) ?></td>
-            <td colspan="3"<?= in_array((int)$row['pid'], $starterPids, true) ? ' class="is-starter"' : '' ?>><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$row['pid'] ?>"><?= $row['name'] ?></a></td>
+            <?= PlayerImageHelper::renderPlayerCell((int)$row['pid'], $row['name'], $starterPids) ?>
             <td style="text-align: center;"><?= (int)$row['games'] ?></td>
             <td style="text-align: center;"><?= $row['min'] ?></td>
             <td class="sep-team"></td>

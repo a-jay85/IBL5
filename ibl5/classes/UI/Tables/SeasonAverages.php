@@ -21,7 +21,7 @@ class SeasonAverages
      * @param string $yr Year filter (empty for current season)
      * @return string HTML table
      */
-    public static function render($db, $result, $team, string $yr): string
+    public static function render($db, $result, $team, string $yr, array $starterPids = [], string $moduleName = ""): string
     {
         $playerRows = [];
         foreach ($result as $plrRow) {
@@ -56,6 +56,9 @@ class SeasonAverages
 <table class="ibl-data-table team-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
+<?php if ($moduleName === "League_Starters"): ?>
+            <th>Team</th>
+<?php endif; ?>
             <th>Pos</th>
             <th colspan="3">Player</th>
             <th>g</th>
@@ -90,8 +93,25 @@ class SeasonAverages
     $playerStats = $row['playerStats'];
 ?>
         <tr>
+<?php if ($moduleName === "League_Starters"):
+    $teamId = (int) ($player->teamID ?? 0);
+    $teamCity = htmlspecialchars($player->teamCity ?? '');
+    $teamNameStr = htmlspecialchars($player->teamName ?? '');
+    $color1 = htmlspecialchars($player->teamColor1 ?? 'FFFFFF');
+    $color2 = htmlspecialchars($player->teamColor2 ?? '000000');
+    if ($teamId === 0): ?>
+            <td>Free Agent</td>
+    <?php else: ?>
+            <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
+        <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
+            <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+            <span class="ibl-team-cell__text"><?= $teamCity ?> <?= $teamNameStr ?></span>
+        </a>
+    </td>
+    <?php endif; ?>
+<?php endif; ?>
             <td><?= htmlspecialchars($player->position) ?></td>
-            <td colspan="3"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
+            <td colspan="3"<?= in_array((int)$player->playerID, $starterPids, true) ? ' class="is-starter"' : '' ?>><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
             <td style="text-align: center;"><?= (int)$playerStats->seasonGamesPlayed ?></td>
             <td style="text-align: center;"><?= (int)$playerStats->seasonGamesStarted ?></td>
             <td style="text-align: center;"><?= $playerStats->seasonMinutesPerGame ?></td>
@@ -120,9 +140,11 @@ class SeasonAverages
 <?php endforeach; ?>
     </tbody>
     <tfoot>
-<?php if ($yr == ""): ?>
+<?php if ($yr == ""):
+    $labelColspan = ($moduleName === "League_Starters") ? 5 : 4;
+?>
         <tr>
-            <td colspan="4"><b><?= htmlspecialchars($team->name) ?> Offense</b></td>
+            <td colspan="<?= $labelColspan ?>"><b><?= htmlspecialchars($team->name) ?> Offense</b></td>
             <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseGamesPlayed ?></b></td>
             <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseGamesPlayed ?></b></td>
             <td></td>
@@ -149,7 +171,7 @@ class SeasonAverages
             <td style="text-align: center;"><b><?= $teamStats->seasonOffensePointsPerGame ?></b></td>
         </tr>
         <tr>
-            <td colspan="4"><b><?= htmlspecialchars($team->name) ?> Defense</b></td>
+            <td colspan="<?= $labelColspan ?>"><b><?= htmlspecialchars($team->name) ?> Defense</b></td>
             <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseGamesPlayed ?></b></td>
             <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseGamesPlayed ?></b></td>
             <td></td>

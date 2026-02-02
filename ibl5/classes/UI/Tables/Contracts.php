@@ -20,7 +20,7 @@ class Contracts
      * @param object $sharedFunctions Shared functions object
      * @return string HTML table
      */
-    public static function render($db, $result, $team, $sharedFunctions): string
+    public static function render($db, $result, $team, $sharedFunctions, array $starterPids = []): string
     {
         $season = new \Season($db);
 
@@ -104,7 +104,7 @@ class Contracts
 ?>
         <tr>
             <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
-            <td colspan="2"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
+            <td colspan="2"<?= in_array((int)$player->playerID, $starterPids, true) ? ' class="is-starter"' : '' ?>><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
             <td style="text-align: center;"><?= (int)$player->age ?></td>
             <td style="text-align: center;"><?= (int)$player->yearsOfExperience ?></td>
             <td style="text-align: center;"><?= (int)$player->birdYears ?></td>

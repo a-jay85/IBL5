@@ -18,7 +18,7 @@ interface TeamServiceInterface
      *
      * Initialises Team, Season, and Shared objects, loads the appropriate roster
      * via the repository, and calls private rendering helpers for sub-components
-     * (tabs, table, starters, sidebar).
+     * (tabs, table, sidebar).
      *
      * @param int $teamID Team ID (>0 = specific team, 0 = free agents, -1 = entire league)
      * @param ?string $yr Historical year parameter (null if current season)
@@ -32,7 +32,6 @@ interface TeamServiceInterface
      *     insertyear: string,
      *     isActualTeam: bool,
      *     tableOutput: string,
-     *     startersTable: string,
      *     draftPicksTable: string,
      *     teamInfoRight: string,
      *     rafters: string

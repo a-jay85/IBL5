@@ -38,7 +38,6 @@ class TeamViewTest extends TestCase
             'insertyear' => '',
             'isActualTeam' => true,
             'tableOutput' => '<table><caption class="team-table-caption"><div class="ibl-tabs">tabs</div></caption><tbody><tr><td>roster</td></tr></tbody></table>',
-            'startersTable' => '<table>starters</table>',
             'draftPicksTable' => '<table>picks</table>',
             'teamInfoRight' => '<div>sidebar</div>',
             'rafters' => '<div>banners</div>',
@@ -80,13 +79,6 @@ class TeamViewTest extends TestCase
         $this->assertStringContainsString('<caption class="team-table-caption">', $output);
         $this->assertStringContainsString('<div class="ibl-tabs">tabs</div>', $output);
         $this->assertStringContainsString('roster', $output);
-    }
-
-    public function testRenderContainsStartersTable(): void
-    {
-        $output = $this->view->render($this->createPageData());
-
-        $this->assertStringContainsString('<table>starters</table>', $output);
     }
 
     public function testRenderContainsDraftPicksForActualTeam(): void

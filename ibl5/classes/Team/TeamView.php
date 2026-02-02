@@ -22,7 +22,6 @@ class TeamView implements TeamViewInterface
         $yr = $pageData['yr'];
         $isActualTeam = $pageData['isActualTeam'];
         $tableOutput = $pageData['tableOutput'];
-        $startersTable = $pageData['startersTable'];
         $draftPicksTable = $pageData['draftPicksTable'];
         $teamInfoRight = $pageData['teamInfoRight'];
         $rafters = $pageData['rafters'];
@@ -52,7 +51,6 @@ class TeamView implements TeamViewInterface
                 </div>
             </div>
         </div>
-        <?= $startersTable ?>
         <?= $draftPicksHtml ?>
         <?= $sidebarMobileHtml ?>
         <?= $raftersHtml ?>

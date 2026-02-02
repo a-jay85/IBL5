@@ -22,7 +22,7 @@ class Ratings
      * @param string $moduleName Module name for styling variations
      * @return string HTML table
      */
-    public static function render($db, $data, $team, string $yr, $season, string $moduleName = ""): string
+    public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = []): string
     // TODO: simplify this by refactoring Player initialization logic out of this method
     {
         $playerRows = [];
@@ -146,7 +146,7 @@ class Ratings
     </td>
     <?php endif; ?>
 <?php endif; ?>
-            <td class="sticky-col ibl-player-cell" style="white-space: nowrap;"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><img src="images/player/<?= (int)$player->playerID ?>.jpg" alt="" class="ibl-player-photo" width="24" height="24"><?= $player->decoratedName ?></a></td>
+            <td class="sticky-col ibl-player-cell<?= in_array((int)$player->playerID, $starterPids, true) ? ' is-starter' : '' ?>" style="white-space: nowrap;"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><img src="images/player/<?= (int)$player->playerID ?>.jpg" alt="" class="ibl-player-photo" width="24" height="24"><?= $player->decoratedName ?></a></td>
             <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
             <td style="text-align: center;"><?= (int)$player->age ?></td>
             <td class="sep-team"></td>

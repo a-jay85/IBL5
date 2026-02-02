@@ -22,7 +22,7 @@ class Per36Minutes
      * @param string $yr Year filter (empty for current season)
      * @return string HTML table
      */
-    public static function render($db, $result, $team, string $yr): string
+    public static function render($db, $result, $team, string $yr, array $starterPids = [], string $moduleName = ""): string
     {
         $playerRows = [];
         foreach ($result as $plrRow) {
@@ -74,6 +74,9 @@ class Per36Minutes
 <table class="ibl-data-table team-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
+<?php if ($moduleName === "League_Starters"): ?>
+            <th>Team</th>
+<?php endif; ?>
             <th>Pos</th>
             <th colspan="3">Player</th>
             <th>g</th>
@@ -109,8 +112,25 @@ class Per36Minutes
     $playerStats = $row['playerStats'];
 ?>
         <tr>
+<?php if ($moduleName === "League_Starters"):
+    $teamId = (int) ($player->teamID ?? 0);
+    $teamCity = htmlspecialchars($player->teamCity ?? '');
+    $teamNameStr = htmlspecialchars($player->teamName ?? '');
+    $color1 = htmlspecialchars($player->teamColor1 ?? 'FFFFFF');
+    $color2 = htmlspecialchars($player->teamColor2 ?? '000000');
+    if ($teamId === 0): ?>
+            <td>Free Agent</td>
+    <?php else: ?>
+            <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
+        <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
+            <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+            <span class="ibl-team-cell__text"><?= $teamCity ?> <?= $teamNameStr ?></span>
+        </a>
+    </td>
+    <?php endif; ?>
+<?php endif; ?>
             <td><?= htmlspecialchars($player->position) ?></td>
-            <td colspan="3"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
+            <td colspan="3"<?= in_array((int)$player->playerID, $starterPids, true) ? ' class="is-starter"' : '' ?>><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
             <td style="text-align: center;"><?= (int)$playerStats->seasonGamesPlayed ?></td>
             <td style="text-align: center;"><?= (int)$playerStats->seasonGamesStarted ?></td>
             <td style="text-align: center;"><?= $row['stats_mpg'] ?></td>

@@ -22,7 +22,7 @@ class PeriodAverages
      * @return string HTML table
      * @throws \Exception If database connection is invalid
      */
-    public static function render(\mysqli $db, $team, $season, $startDate = null, $endDate = null): string
+    public static function render(\mysqli $db, $team, $season, $startDate = null, $endDate = null, array $starterPids = []): string
     {
         if ($startDate === null && $endDate === null) {
             // default to last simulated period
@@ -155,7 +155,7 @@ class PeriodAverages
 <?php foreach ($playerRows as $row): ?>
         <tr>
             <td><?= htmlspecialchars($row['pos']) ?></td>
-            <td colspan="3"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$row['pid'] ?>"><?= $row['name'] ?></a></td>
+            <td colspan="3"<?= in_array((int)$row['pid'], $starterPids, true) ? ' class="is-starter"' : '' ?>><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$row['pid'] ?>"><?= $row['name'] ?></a></td>
             <td style="text-align: center;"><?= (int)$row['games'] ?></td>
             <td style="text-align: center;"><?= $row['min'] ?></td>
             <td class="sep-team"></td>

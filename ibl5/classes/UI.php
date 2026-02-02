@@ -54,9 +54,9 @@ class UI
      * @param object $sharedFunctions Shared functions object
      * @return string HTML table
      */
-    public static function contracts($db, $result, $team, $sharedFunctions): string
+    public static function contracts($db, $result, $team, $sharedFunctions, array $starterPids = []): string
     {
-        return UI\Tables\Contracts::render($db, $result, $team, $sharedFunctions);
+        return UI\Tables\Contracts::render($db, $result, $team, $sharedFunctions, $starterPids);
     }
 
     /**
@@ -68,9 +68,9 @@ class UI
      * @param string $yr Year filter (empty for current season)
      * @return string HTML table
      */
-    public static function per36Minutes($db, $result, $team, $yr): string
+    public static function per36Minutes($db, $result, $team, $yr, array $starterPids = [], string $moduleName = ''): string
     {
-        return UI\Tables\Per36Minutes::render($db, $result, $team, (string)$yr);
+        return UI\Tables\Per36Minutes::render($db, $result, $team, (string)$yr, $starterPids, $moduleName);
     }
 
     /**
@@ -84,9 +84,9 @@ class UI
      * @param string $moduleName Module name for styling variations
      * @return string HTML table
      */
-    public static function ratings($db, $data, $team, $yr, $season, $moduleName = ""): string
+    public static function ratings($db, $data, $team, $yr, $season, $moduleName = "", array $starterPids = []): string
     {
-        return UI\Tables\Ratings::render($db, $data, $team, (string)$yr, $season, $moduleName);
+        return UI\Tables\Ratings::render($db, $data, $team, (string)$yr, $season, $moduleName, $starterPids);
     }
 
     /**
@@ -98,9 +98,9 @@ class UI
      * @param string $yr Year filter (empty for current season)
      * @return string HTML table
      */
-    public static function seasonAverages($db, $result, $team, $yr): string
+    public static function seasonAverages($db, $result, $team, $yr, array $starterPids = [], string $moduleName = ''): string
     {
-        return UI\Tables\SeasonAverages::render($db, $result, $team, (string)$yr);
+        return UI\Tables\SeasonAverages::render($db, $result, $team, (string)$yr, $starterPids, $moduleName);
     }
 
     /**
@@ -112,9 +112,9 @@ class UI
      * @param string $yr Year filter (empty for current season)
      * @return string HTML table
      */
-    public static function seasonTotals($db, $result, $team, $yr): string
+    public static function seasonTotals($db, $result, $team, $yr, array $starterPids = [], string $moduleName = ''): string
     {
-        return UI\Tables\SeasonTotals::render($db, $result, $team, (string)$yr);
+        return UI\Tables\SeasonTotals::render($db, $result, $team, (string)$yr, $starterPids, $moduleName);
     }
 
     /**
@@ -127,8 +127,8 @@ class UI
      * @param string|null|\DateTime $endDate End date for the period
      * @return string HTML table
      */
-    public static function periodAverages(\mysqli $db, $team, $season, $startDate = null, $endDate = null): string
+    public static function periodAverages(\mysqli $db, $team, $season, $startDate = null, $endDate = null, array $starterPids = []): string
     {
-        return UI\Tables\PeriodAverages::render($db, $team, $season, $startDate, $endDate);
+        return UI\Tables\PeriodAverages::render($db, $team, $season, $startDate, $endDate, $starterPids);
     }
 }

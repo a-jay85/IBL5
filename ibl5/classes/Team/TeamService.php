@@ -6,7 +6,6 @@ namespace Team;
 
 use Team\Contracts\TeamServiceInterface;
 use Team\Contracts\TeamRepositoryInterface;
-use UI\Components\StartersLineupComponent;
 use UI\Components\TableViewSwitcher;
 
 /**
@@ -79,14 +78,19 @@ class TeamService implements TeamServiceInterface
         $teamColor1 = $teamData['color1'] ?? '000000';
         $teamColor2 = $teamData['color2'] ?? 'FFFFFF';
 
-        $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $teamColor1, $teamColor2);
-        $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $sharedFunctions);
-        $tableOutput = $switcher->wrap($tableHtml);
-
-        $startersTable = "";
+        $starterPids = [];
         if ($teamID > 0 && ($yr === null || $yr === '')) {
-            $startersTable = $this->getLastSimsStarters($result, $team);
+            $starters = $this->extractStartersData($result);
+            foreach ($starters as $data) {
+                if ($data['pid'] !== null) {
+                    $starterPids[] = (int) $data['pid'];
+                }
+            }
         }
+
+        $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $teamColor1, $teamColor2);
+        $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $sharedFunctions, $starterPids);
+        $tableOutput = $switcher->wrap($tableHtml);
 
         $isActualTeam = ($teamID !== 0);
 
@@ -110,7 +114,6 @@ class TeamService implements TeamServiceInterface
             'insertyear' => $insertyear,
             'isActualTeam' => $isActualTeam,
             'tableOutput' => $tableOutput,
-            'startersTable' => $startersTable,
             'draftPicksTable' => $draftPicksTable,
             'teamInfoRight' => $teamInfoRight,
             'rafters' => $rafters,
@@ -148,23 +151,23 @@ class TeamService implements TeamServiceInterface
     /**
      * Render the appropriate table HTML based on display type
      */
-    private function renderTableForDisplay(string $display, mixed $result, object $team, ?string $yr, object $season, object $sharedFunctions): string
+    private function renderTableForDisplay(string $display, mixed $result, object $team, ?string $yr, object $season, object $sharedFunctions, array $starterPids = []): string
     {
         switch ($display) {
             case 'total_s':
-                return \UI::seasonTotals($this->db, $result, $team, $yr);
+                return \UI::seasonTotals($this->db, $result, $team, $yr, $starterPids);
             case 'avg_s':
-                return \UI::seasonAverages($this->db, $result, $team, $yr);
+                return \UI::seasonAverages($this->db, $result, $team, $yr, $starterPids);
             case 'per36mins':
-                return \UI::per36Minutes($this->db, $result, $team, $yr);
+                return \UI::per36Minutes($this->db, $result, $team, $yr, $starterPids);
             case 'chunk':
-                return \UI::periodAverages($this->db, $team, $season);
+                return \UI::periodAverages($this->db, $team, $season, null, null, $starterPids);
             case 'playoffs':
-                return \UI::periodAverages($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate);
+                return \UI::periodAverages($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids);
             case 'contracts':
-                return \UI::contracts($this->db, $result, $team, $sharedFunctions);
+                return \UI::contracts($this->db, $result, $team, $sharedFunctions, $starterPids);
             default:
-                return \UI::ratings($this->db, $result, $team, $yr, $season);
+                return \UI::ratings($this->db, $result, $team, $yr, $season, '', $starterPids);
         }
     }
 
@@ -229,15 +232,4 @@ class TeamService implements TeamServiceInterface
         return [$output, $rafters];
     }
 
-    /**
-     * Render HTML table for team's last simulation starting lineup
-     *
-     * Absorbed from TeamStatsService::getLastSimsStarters()
-     */
-    private function getLastSimsStarters(array $result, object $team): string
-    {
-        $starters = $this->extractStartersData($result);
-        $startersComponent = new StartersLineupComponent();
-        return $startersComponent->render($starters, $team->color1, $team->color2);
-    }
 }

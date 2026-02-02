@@ -41,7 +41,7 @@ class NextSimView implements NextSimViewInterface
     {
         $html = '';
         $html .= '<div class="next-sim-container">';
-        $html .= '<h1 class="next-sim-title">Next Sim</h1>';
+        $html .= '<h2 class="ibl-title">Next Sim</h1>';
 
         if (empty($games)) {
             $html .= '<div class="next-sim-empty">No games projected next sim!</div></div>';

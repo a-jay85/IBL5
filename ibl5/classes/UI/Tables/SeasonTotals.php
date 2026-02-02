@@ -92,7 +92,6 @@ class SeasonTotals
         <tr>
 <?php if ($moduleName === "League_Starters"):
     $teamId = (int) ($player->teamID ?? 0);
-    $teamCity = htmlspecialchars($player->teamCity ?? '');
     $teamNameStr = htmlspecialchars($player->teamName ?? '');
     $color1 = htmlspecialchars($player->teamColor1 ?? 'FFFFFF');
     $color2 = htmlspecialchars($player->teamColor2 ?? '000000');
@@ -102,7 +101,7 @@ class SeasonTotals
             <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
         <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
             <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-            <span class="ibl-team-cell__text"><?= $teamCity ?> <?= $teamNameStr ?></span>
+            <span class="ibl-team-cell__text"><?= $teamNameStr ?></span>
         </a>
     </td>
     <?php endif; ?>

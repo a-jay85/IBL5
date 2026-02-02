@@ -113,6 +113,26 @@ All tests should pass with ✔ marks.
 | `Access denied` | Verify credentials in `ibl5/config.php` (`$dbuname`, `$dbpass`, `$dbname`) |
 | `Can't connect to MySQL server via socket` | Socket path may be different - check `/Applications/MAMP/tmp/mysql/mysql.sock` exists |
 | `PDO default socket wrong` | PHP's default is `/tmp/mysql.sock` but MAMP uses `/Applications/MAMP/tmp/mysql/mysql.sock` |
+| `Authentication plugin 'mysql_native_password' cannot be loaded` | You're using Homebrew's mysql client instead of MAMP's. Use `/Applications/MAMP/Library/bin/mysql80/bin/mysql` |
+
+## Important: Homebrew MySQL Client Incompatibility
+
+**Do NOT use** the Homebrew-installed `mysql` command:
+```bash
+# ❌ WRONG - Will fail with authentication plugin error
+mysql -h 127.0.0.1 -u root -p'root' iblhoops_ibl5
+```
+
+**Always use** MAMP's bundled mysql client:
+```bash
+# ✅ CORRECT - Use MAMP's mysql client with socket
+/Applications/MAMP/Library/bin/mysql80/bin/mysql \
+  --socket=/Applications/MAMP/tmp/mysql/mysql.sock \
+  -u root -p'root' \
+  iblhoops_ibl5
+```
+
+**Why?** Homebrew's MySQL 9.x client expects plugins that MAMP's MySQL 8.0 server doesn't provide. The PHP mysqli extension works fine because it uses a different connection method.
 
 ## Related Documentation
 

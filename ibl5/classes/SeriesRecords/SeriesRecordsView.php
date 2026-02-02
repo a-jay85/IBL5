@@ -33,16 +33,20 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         int $userTeamId,
         int $numTeams
     ): string {
-        $output = '<table border="1" class="sortable">';
+        $output = '<h2 class="ibl-title">Series Records</h2>';
+        $output .= '<div class="sticky-scroll-wrapper">';
+        $output .= '<div class="sticky-scroll-container">';
+        $output .= '<table class="sortable ibl-data-table sticky-table">';
 
         // Header row with team logos
-        $output .= '<tr>';
-        $output .= '<th>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr;&rarr;<br>vs.<br>&uarr;</th>';
+        $output .= '<thead><tr>';
+        $output .= '<th class="sticky-col sticky-corner">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr;&rarr;<br>vs.<br>&uarr;</th>';
 
         for ($i = 1; $i <= $numTeams; $i++) {
             $output .= $this->renderHeaderCell($i);
         }
-        $output .= '</tr>';
+        $output .= '</tr></thead>';
+        $output .= '<tbody>';
 
         // Data rows - one per team
         $teamIndex = 0;
@@ -87,7 +91,8 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
             $teamIndex++;
         }
 
-        $output .= '</table>';
+        $output .= '</tbody></table>';
+        $output .= '</div></div>';
 
         return $output;
     }
@@ -97,8 +102,8 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
      */
     public function renderHeaderCell(int $teamId): string
     {
-        $safeTeamId = HtmlSanitizer::safeHtmlOutput($teamId);
-        return '<th align="center"><img src="images/logo/new' . $safeTeamId . '.png" width="50" height="50" alt="Team ' . $safeTeamId . ' logo"></th>';
+        $safeTeamId = HtmlSanitizer::safeHtmlOutput((string)$teamId);
+        return '<th class="text-center"><img src="images/logo/new' . $safeTeamId . '.png" width="50" height="50" alt="Team ' . $safeTeamId . ' logo"></th>';
     }
 
     /**
@@ -106,20 +111,19 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
      */
     public function renderTeamNameCell(array $team, bool $isUserTeam): string
     {
-        $teamId = HtmlSanitizer::safeHtmlOutput($team['teamid']);
+        $teamId = HtmlSanitizer::safeHtmlOutput((string)$team['teamid']);
         $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
-        $city = HtmlSanitizer::safeHtmlOutput($team['team_city']);
         $name = HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
         $boldOpen = $isUserTeam ? '<strong>' : '';
         $boldClose = $isUserTeam ? '</strong>' : '';
 
-        return '<td bgcolor="' . $color1 . '">'
-            . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '">'
-            . '<span style="color: ' . $color2 . ';">'
-            . $boldOpen . $city . ' ' . $name . $boldClose
-            . '</span></a></td>';
+        return '<td class="ibl-team-cell--colored sticky-col" style="background-color: #' . $color1 . ';">'
+            . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';">'
+            . '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">'
+            . '<span class="ibl-team-cell__text">' . $boldOpen . $name . $boldClose . '</span>'
+            . '</a></td>';
     }
 
     /**
@@ -127,14 +131,14 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
      */
     public function renderRecordCell(int $wins, int $losses, string $backgroundColor, bool $isBold): string
     {
-        $safeWins = HtmlSanitizer::safeHtmlOutput($wins);
-        $safeLosses = HtmlSanitizer::safeHtmlOutput($losses);
+        $safeWins = HtmlSanitizer::safeHtmlOutput((string)$wins);
+        $safeLosses = HtmlSanitizer::safeHtmlOutput((string)$losses);
         $safeBgColor = HtmlSanitizer::safeHtmlOutput($backgroundColor);
 
         $boldOpen = $isBold ? '<strong>' : '';
         $boldClose = $isBold ? '</strong>' : '';
 
-        return '<td align="center" bgcolor="' . $safeBgColor . '">'
+        return '<td class="text-center" style="background-color: ' . $safeBgColor . ';">'
             . $boldOpen . $safeWins . ' - ' . $safeLosses . $boldClose
             . '</td>';
     }
@@ -147,7 +151,7 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         $boldOpen = $isUserTeam ? '<strong>' : '';
         $boldClose = $isUserTeam ? '</strong>' : '';
 
-        return '<td align="center">' . $boldOpen . 'x' . $boldClose . '</td>';
+        return '<td class="text-center">' . $boldOpen . 'x' . $boldClose . '</td>';
     }
 
     /**
@@ -165,13 +169,13 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         $boldClose = $isUserTeamRow ? '</strong>' : '';
 
         $output = '<tr>';
-        $output .= '<td>' . $boldOpen . 'Team ' . $teamId . $boldClose . '</td>';
+        $output .= '<td class="sticky-col">' . $boldOpen . 'Team ' . $teamId . $boldClose . '</td>';
 
         for ($i = 1; $i <= $numTeams; $i++) {
             if ($teamId === $i) {
-                $output .= '<td align="center">' . $boldOpen . 'x' . $boldClose . '</td>';
+                $output .= '<td class="text-center">' . $boldOpen . 'x' . $boldClose . '</td>';
             } else {
-                $output .= '<td align="center">0 - 0</td>';
+                $output .= '<td class="text-center">0 - 0</td>';
             }
         }
 

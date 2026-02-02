@@ -90,8 +90,9 @@ final class VotingResultsServiceTest extends TestCase
 
 /**
  * Lightweight in-memory database stub for deterministic testing.
+ * Extends mysqli to satisfy type hints while providing test functionality.
  */
-final class FakeVotingDatabase
+final class FakeVotingDatabase extends \mysqli
 {
     /** @var array<int, array<int, array{name: string, votes: string}>> */
     private array $resultsQueue = [];
@@ -99,28 +100,58 @@ final class FakeVotingDatabase
     /** @var array<int, string> */
     private array $executedQueries = [];
 
+    public function __construct()
+    {
+        // Don't call parent constructor - we're a fake
+    }
+
     public function queueResults(array $resultsQueue): void
     {
         $this->resultsQueue = $resultsQueue;
         $this->executedQueries = [];
     }
 
-    public function sql_query(string $query): FakeVotingResult
+    #[\ReturnTypeWillChange]
+    public function prepare(string $query): FakeVotingStatement|false
     {
         $this->executedQueries[] = $query;
         $data = array_shift($this->resultsQueue) ?? [];
 
-        return new FakeVotingResult($data);
-    }
-
-    public function sql_fetch_assoc(FakeVotingResult $result): array|false
-    {
-        return $result->fetchAssoc();
+        return new FakeVotingStatement($data);
     }
 
     public function getExecutedQueries(): array
     {
         return $this->executedQueries;
+    }
+}
+
+/**
+ * Fake prepared statement for testing.
+ */
+final class FakeVotingStatement
+{
+    /** @var array<int, array{name: string, votes: string}> */
+    private array $rows;
+
+    public function __construct(array $rows)
+    {
+        $this->rows = array_values($rows);
+    }
+
+    public function execute(): bool
+    {
+        return true;
+    }
+
+    public function get_result(): FakeVotingResult
+    {
+        return new FakeVotingResult($this->rows);
+    }
+
+    public function close(): void
+    {
+        // No-op
     }
 }
 
@@ -136,21 +167,12 @@ final class FakeVotingResult
         $this->rows = array_values($rows);
     }
 
-    public function fetchAssoc(): array|false
+    public function fetch_assoc(): array|false
     {
         if ($this->position >= count($this->rows)) {
             return false;
         }
 
         return $this->rows[$this->position++];
-    }
-
-    /**
-     * Legacy snake_case method for compatibility with legacy database code
-     * @return array|false
-     */
-    public function fetch_assoc()
-    {
-        return $this->fetchAssoc();
     }
 }

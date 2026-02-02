@@ -33,8 +33,6 @@ $service = new VotingResultsService($mysqli_db);
 $renderer = new VotingResultsTableRenderer();
 $controller = new VotingResultsController($service, $renderer, $season);
 
-OpenTable();
 echo $controller->render();
-CloseTable();
 
 Nuke\Footer::footer();

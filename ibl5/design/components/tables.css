@@ -1,0 +1,1488 @@
+/**
+ * IBL5 Table Components
+ *
+ * Consolidated table styles used across all data tables:
+ * - StandingsView, LeagueStatsView, InjuriesView
+ * - SeasonLeadersView, LeaderboardsView, DraftView
+ * - ContractListView, SeasonHighsView, DraftHistoryView
+ * - And all other data display tables
+ *
+ * Classes:
+ * - .ibl-data-table: Primary data table (navy header, alternating rows)
+ */
+
+/* ==========================================================================
+   Primary Data Table (.ibl-data-table)
+
+   The standard table style for all data displays. Features:
+   - Navy gradient header
+   - Alternating row colors
+   - Hover states
+   - Rounded corners with shadow
+   - Responsive sticky columns on mobile
+   ========================================================================== */
+
+.ibl-data-table {
+    font-family: var(--font-sans, 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--gray-200, #e5e7eb);
+    border-radius: var(--radius-lg, 0.5rem);
+    overflow: hidden;
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
+    width: auto;
+    max-width: 1440px;
+    margin: 0 auto;
+}
+
+/* Header row */
+.ibl-data-table thead {
+    background: var(--gradient-navy-header);
+}
+
+.ibl-data-table th {
+    color: white;
+    font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
+    font-weight: 600;
+    font-size: 1.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    line-height: 1.25rem;
+    padding: 0.75rem 0.2rem;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Data cells */
+.ibl-data-table td {
+    color: var(--gray-800, #1f2937);
+    font-size: 1rem;
+    padding: 0.25rem 0.2rem;
+    text-align: center;
+}
+
+/* Row styling */
+.ibl-data-table tbody tr {
+    transition: background-color 150ms ease;
+}
+
+.ibl-data-table tbody tr:nth-child(odd) {
+    background-color: white;
+}
+
+.ibl-data-table tbody tr:nth-child(even) {
+    background-color: var(--gray-50, #f9fafb);
+}
+
+.ibl-data-table tbody tr:hover {
+    background-color: var(--gray-100, #f3f4f6);
+}
+
+/* Links */
+.ibl-data-table a {
+    color: var(--gray-800, #1f2937);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 150ms ease;
+}
+
+.ibl-data-table a:hover {
+    color: var(--accent-500, #f97316);
+}
+
+/* First/last cell padding */
+.ibl-data-table th:first-child,
+.ibl-data-table td:first-child {
+    padding-left: 0.75rem;
+}
+
+.ibl-data-table th:last-child,
+.ibl-data-table td:last-child {
+    padding-right: 0.75rem;
+}
+
+/* Rank cell styling */
+.ibl-data-table .rank-cell {
+    font-weight: 600;
+    color: var(--navy-700, #334155);
+}
+
+/* Date cell styling - prevent wrapping */
+.ibl-data-table .date-cell {
+    white-space: nowrap;
+}
+
+/* Highlight row - use :nth-child for higher specificity without !important */
+.ibl-data-table tbody tr.highlight:nth-child(odd),
+.ibl-data-table tbody tr.highlight:nth-child(even) {
+    background-color: var(--accent-100, #ffedd5);
+}
+
+.ibl-data-table tbody tr.highlight:nth-child(odd):hover,
+.ibl-data-table tbody tr.highlight:nth-child(even):hover {
+    background-color: var(--accent-200, #fed7aa);
+}
+
+/* Drafted/disabled row */
+.ibl-data-table tbody tr.drafted {
+    opacity: 0.5;
+}
+
+.ibl-data-table tbody tr.drafted td {
+    text-decoration: line-through;
+    font-style: italic;
+}
+
+/* Divider column */
+.ibl-data-table .divider {
+    background-color: var(--navy-900, #0f172a);
+    width: 3px;
+    padding: 0;
+}
+
+/* Totals/summary row - use :nth-child for higher specificity without !important */
+.ibl-data-table tbody tr.totals-row:nth-child(odd),
+.ibl-data-table tbody tr.totals-row:nth-child(even) {
+    background-color: var(--accent-100, #ffedd5);
+    font-weight: 600;
+}
+
+.ibl-data-table tbody tr.totals-row:nth-child(odd):hover,
+.ibl-data-table tbody tr.totals-row:nth-child(even):hover {
+    background-color: var(--accent-200, #fed7aa);
+}
+
+/* Table footer summary rows (team totals, cap totals, etc.) */
+.ibl-data-table tfoot tr {
+    background-color: var(--accent-100, #ffedd5);
+    font-weight: 600;
+}
+
+.ibl-data-table tfoot tr:hover {
+    background-color: var(--accent-200, #fed7aa);
+}
+
+/* Top border separating tfoot from tbody */
+.ibl-data-table tfoot tr:first-child td {
+    border-top: 2px solid var(--gray-200, #e5e7eb);
+}
+
+/* Legend/key row — subtle, de-emphasized */
+.ibl-data-table tfoot tr.tfoot-legend {
+    background-color: var(--gray-50, #f9fafb);
+    font-weight: 400;
+    font-size: 0.875rem;
+    color: var(--gray-500, #6b7280);
+}
+
+.ibl-data-table tfoot tr.tfoot-legend:hover {
+    background-color: var(--gray-100, #f3f4f6);
+}
+
+.ibl-data-table tfoot tr.tfoot-legend td {
+    border-top: 1px solid var(--gray-200, #e5e7eb);
+}
+
+/* ==========================================================================
+   Team-Colored Table Modifier (.team-table)
+
+   Adds team-specific colors to .ibl-data-table via CSS custom properties.
+   Set --team-color-primary and --team-color-secondary on the <table> element:
+
+     <table class="ibl-data-table team-table"
+            style="--team-color-primary: #1e3a5f; --team-color-secondary: #D4AF37;">
+
+   Derives hover, highlight, and header colors from --team-color-primary
+   using color-mix().
+   ========================================================================== */
+
+.team-table {
+    --team-row-hover-bg: color-mix(in srgb, var(--team-color-primary) 8%, white);
+    --team-row-highlight-bg: color-mix(in srgb, var(--team-color-primary) 15%, white);
+    --team-row-highlight-hover-bg: color-mix(in srgb, var(--team-color-primary) 22%, white);
+    --team-header-bg: linear-gradient(135deg, var(--team-color-primary), color-mix(in srgb, var(--team-color-primary) 85%, black));
+    --team-sep-color: var(--team-color-primary);
+}
+
+/* Team-colored header */
+.team-table thead {
+    background: var(--team-header-bg);
+}
+
+.team-table th {
+    color: var(--team-color-secondary);
+}
+
+/* Team-colored hover */
+.team-table tbody tr:hover {
+    background-color: var(--team-row-hover-bg) !important;
+}
+
+/* Team-colored link hover */
+.team-table a:hover {
+    color: var(--team-color-primary);
+}
+
+/* Team-colored separators */
+.team-table th.sep-team,
+.team-table td.sep-team {
+    border-left: 0.5px solid var(--team-sep-color);
+    border-right: 0.5px solid var(--team-sep-color);
+    padding: 0 !important;
+}
+
+/* Weak separators (gray, same as before) */
+.team-table th.sep-weak,
+.team-table td.sep-weak {
+    border-left: 0.5px solid var(--gray-200, #e5e7eb);
+    border-right: 0.5px solid var(--gray-200, #e5e7eb);
+    padding: 0 !important;
+}
+
+/* Salary column left alignment */
+.team-table th.salary,
+.team-table td.salary {
+    text-align: left !important;
+}
+
+/* Team-colored tfoot */
+.team-table tfoot tr {
+    background-color: var(--team-row-highlight-bg);
+}
+
+.team-table tfoot tr:hover {
+    background-color: var(--team-row-highlight-hover-bg);
+}
+
+.team-table tfoot tr:first-child td {
+    border-top-color: color-mix(in srgb, var(--team-color-primary) 30%, var(--gray-200, #e5e7eb));
+}
+
+/* Ratings highlight rows (team-colored) */
+.team-table tr.ratings-highlight {
+    background-color: var(--team-row-highlight-bg) !important;
+}
+
+.team-table tr.ratings-highlight:hover {
+    background-color: var(--team-row-highlight-hover-bg) !important;
+}
+
+/* Ratings separator row (zero-padding divider) */
+.team-table tr.ratings-separator td {
+    padding: 0 !important;
+}
+
+/* ==========================================================================
+   Mobile Sticky Column Support
+
+   Use .responsive-table class on tables with sticky columns.
+   Add .sticky-col, .sticky-col-1, .sticky-col-2, .sticky-col-3 to columns that should stick.
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    /* Remove overflow clipping on mobile so position: sticky works.
+       On mobile, tables scroll edge-to-edge and rounded corners
+       are not visible, so clipping is unnecessary. */
+    .ibl-data-table.responsive-table {
+        overflow: visible;
+    }
+
+    /* Single sticky column */
+    .ibl-data-table.responsive-table th.sticky-col,
+    .ibl-data-table.responsive-table td.sticky-col {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+    }
+
+    .ibl-data-table.responsive-table thead th.sticky-col {
+        background: var(--team-header-bg, var(--gradient-navy-header));
+        z-index: 3;
+    }
+
+    /* Sticky column backgrounds - consolidated for all variants */
+    .responsive-table tbody tr:nth-child(odd) td[class*="sticky-col"] {
+        background-color: white;
+    }
+
+    .responsive-table tbody tr:nth-child(even) td[class*="sticky-col"] {
+        background-color: var(--gray-50, #f9fafb);
+    }
+
+    .responsive-table tbody tr:hover td[class*="sticky-col"] {
+        background-color: var(--team-row-hover-bg, var(--gray-100, #f3f4f6));
+    }
+
+    .ibl-data-table.responsive-table td.sticky-col {
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Two sticky columns (rank + name pattern) */
+    .ibl-data-table.responsive-table th.sticky-col-1,
+    .ibl-data-table.responsive-table td.sticky-col-1 {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        min-width: 36px;
+    }
+
+    .ibl-data-table.responsive-table th.sticky-col-2,
+    .ibl-data-table.responsive-table td.sticky-col-2 {
+        position: sticky;
+        left: 36px;
+        z-index: 1;
+        min-width: 36px;
+    }
+
+    /* Three sticky columns (rd + pick + player pattern) */
+    .ibl-data-table.responsive-table th.sticky-col-3,
+    .ibl-data-table.responsive-table td.sticky-col-3 {
+        position: sticky;
+        left: 72px;
+        z-index: 1;
+        min-width: 100px;
+    }
+
+    .ibl-data-table.responsive-table thead th.sticky-col-1,
+    .ibl-data-table.responsive-table thead th.sticky-col-2,
+    .ibl-data-table.responsive-table thead th.sticky-col-3 {
+        background: var(--team-header-bg, var(--gradient-navy-header));
+        z-index: 3;
+    }
+
+    /* Background colors now handled by consolidated rules above */
+
+    /* Shadow only on rightmost sticky column */
+    .ibl-data-table.responsive-table th.sticky-col-1,
+    .ibl-data-table.responsive-table td.sticky-col-1 {
+        box-shadow: none;
+    }
+
+    /* Col-2 gets shadow only for 2-column sticky layouts */
+    .ibl-data-table.responsive-table:not(:has(.sticky-col-3)) td.sticky-col-2 {
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Col-3 gets shadow for 3-column sticky layouts */
+    .ibl-data-table.responsive-table td.sticky-col-3 {
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Drafted row sticky backgrounds - consolidated */
+    .responsive-table tbody tr.drafted td[class*="sticky-col"] {
+        background-color: var(--gray-100, #f3f4f6);
+    }
+
+    /* Ratings highlight row sticky backgrounds (team-colored in Next Sim, League Starters) */
+    .responsive-table tbody tr.ratings-highlight td[class*="sticky-col"] {
+        background-color: var(--team-row-highlight-bg, #FFFFAA);
+    }
+
+    .responsive-table tbody tr.ratings-highlight:hover td[class*="sticky-col"] {
+        background-color: var(--team-row-highlight-hover-bg, var(--gray-100, #f3f4f6));
+    }
+
+    /* Tfoot sticky-col backgrounds (team-colored or accent fallback) */
+    .responsive-table tfoot td[class*="sticky-col"] {
+        background-color: var(--team-row-highlight-bg, var(--accent-100, #ffedd5));
+    }
+
+    .responsive-table tfoot tr:hover td[class*="sticky-col"] {
+        background-color: var(--team-row-highlight-hover-bg, var(--accent-200, #fed7aa));
+    }
+
+    /* Remove first-column left padding on responsive tables -
+       sticky columns sit at the edge, so extra padding looks off */
+    .ibl-data-table.responsive-table th:first-child,
+    .ibl-data-table.responsive-table td:first-child {
+        padding-left: 0;
+    }
+
+    /* Mobile compact sizing - exclude voting tables which stay full size */
+    .ibl-data-table:not(.voting-form-table):not(.voting-results-table) th {
+        font-size: 1rem;
+        padding: 0.5rem 0.25rem;
+    }
+
+    .ibl-data-table:not(.voting-form-table):not(.voting-results-table) td {
+        font-size: 1rem;
+        padding: 0.375rem 0.25rem;
+    }
+}
+
+/* ==========================================================================
+   Table Scroll Wrapper
+
+   Wrapper/container pattern used by responsive-tables.js for tables that
+   overflow on mobile. Provides horizontal scrolling + scroll-shadow indicator.
+
+   Structure:
+     <div class="table-scroll-wrapper">
+       <div class="table-scroll-container">
+         <table class="ibl-data-table responsive-table">…</table>
+       </div>
+     </div>
+   ========================================================================== */
+
+/* Prevent line breaks on hyphens in record data (W-L, etc.) */
+.responsive-table td {
+    white-space: nowrap;
+}
+
+/* Wrapper for scroll container - holds the fixed shadow */
+.table-scroll-wrapper {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+/* On desktop, constrain tables to fit content and center (not full width on ultrawide) */
+@media (min-width: 769px) {
+    .table-scroll-wrapper {
+        width: fit-content;
+        max-width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* Center section titles above centered tables */
+    .table-scroll-wrapper ~ .ibl-title,
+    .ibl-title:has(+ .table-scroll-wrapper),
+    h2.ibl-title {
+        display: block;
+        width: fit-content;
+        margin-top: 0;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+}
+
+/* When a table has a <caption> (team tabs), move the top border-radius
+   from the table to the caption so the tabs get the rounded corners. */
+.ibl-data-table:has(> caption) {
+    border-radius: 0 0 var(--radius-lg, 0.5rem) var(--radius-lg, 0.5rem);
+}
+
+.team-table-caption {
+    border-radius: var(--radius-lg, 0.5rem) var(--radius-lg, 0.5rem) 0 0;
+    overflow: hidden;
+}
+
+/* Scroll container for wide tables on mobile */
+.table-scroll-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    width: 100%;
+}
+
+/* Center section titles on mobile */
+@media (max-width: 768px) {
+    h2.ibl-title {
+        display: block;
+        text-align: center;
+    }
+}
+
+/* On mobile, constrain scroll container to viewport */
+@media (max-width: 768px) {
+    .table-scroll-wrapper {
+        width: 100%;
+        max-width: 100%;
+        padding-left: 0;
+        padding-right: 0;
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .table-scroll-container {
+        display: block;
+        overflow-x: scroll !important;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x pan-y;
+        padding: 0 !important;
+        /* Width set by JavaScript for iOS compatibility */
+    }
+
+    /* Remove border-radius and padding on mobile for edge-to-edge tables */
+    .standings-table-container {
+        border-radius: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    .table-scroll-wrapper {
+        padding: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .standings-table {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+}
+
+/* Scroll indicator shadow on right edge - on wrapper so it doesn't scroll */
+.table-scroll-wrapper::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 24px;
+    background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.08));
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    z-index: 2;
+}
+
+/* Hide scroll indicator when scrolled to the end */
+.table-scroll-wrapper.scrolled-end::after {
+    opacity: 0;
+}
+
+/* ==========================================================================
+   Sticky Header + Column Tables
+
+   For tables that need both a sticky thead AND a sticky first column
+   (grid/matrix tables scrollable in both directions).
+
+   Structure:
+     <div class="sticky-scroll-wrapper">
+       <div class="sticky-scroll-container">
+         <table class="ibl-data-table sticky-table">
+           <thead><tr><th class="sticky-col sticky-corner">…</th>…</tr></thead>
+           <tbody><tr><td class="sticky-col">…</td>…</tr></tbody>
+         </table>
+       </div>
+     </div>
+
+   Classes:
+   - .sticky-scroll-wrapper   Scroll container (max-height, overflow, border-radius, shadow)
+   - .sticky-scroll-container Inner sizing container (inline-block, min-width: 100%)
+   - .sticky-table             Table overrides (visible overflow, no radius/shadow) + sticky thead
+   - .sticky-col               Sticky first column (position: sticky, left: 0)
+   - .sticky-corner            Corner cell at thead/col intersection (highest z-index)
+   ========================================================================== */
+
+/* Scroll wrapper — provides the scrollable viewport */
+.sticky-scroll-wrapper {
+    position: relative;
+    max-height: 80vh;
+    overflow: auto;
+    margin: 0 auto;
+    border: 1px solid var(--gray-200, #e5e7eb);
+    border-radius: var(--radius-lg, 0.5rem);
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
+}
+
+/* Desktop: remove height constraint; fit-content so border-radius
+   hugs the table edges rather than stretching full-width */
+@media (min-width: 1024px) {
+    .sticky-scroll-wrapper {
+        max-height: none;
+        width: fit-content;
+        max-width: calc(100vw - 2.25rem);
+    }
+}
+
+/* Inner container — keeps inline-block sizing so horizontal scroll works */
+.sticky-scroll-container {
+    display: inline-block;
+    min-width: 100%;
+}
+
+/* Disable any injected .table-scroll-wrapper / .table-scroll-container
+   that would add extra overflow:hidden and break sticky positioning */
+.sticky-scroll-wrapper .table-scroll-wrapper {
+    overflow: visible !important;
+}
+
+.sticky-scroll-wrapper .table-scroll-wrapper::after {
+    display: none !important;
+}
+
+.sticky-scroll-wrapper .table-scroll-container {
+    overflow: visible !important;
+}
+
+/* Table — remove the border-radius/shadow/overflow that .ibl-data-table sets,
+   because those are now on .sticky-scroll-wrapper instead */
+.sticky-table {
+    overflow: visible;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Sticky header row */
+.sticky-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.sticky-table thead th {
+    background: var(--gradient-navy-header);
+}
+
+/* Sticky first column */
+.sticky-table .sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+}
+
+/* Corner cell — intersection of sticky header and sticky column */
+.sticky-table .sticky-corner {
+    z-index: 15;
+    background: var(--navy-800, #1e293b);
+}
+
+/* Shadows — column edge, header bottom, corner combined */
+.sticky-table tbody td.sticky-col {
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+}
+
+.sticky-table thead tr th {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sticky-table thead .sticky-corner {
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Sticky-col body cell backgrounds — required so content behind
+   the sticky column doesn't bleed through on scroll */
+.sticky-table tbody tr:nth-child(odd) td.sticky-col {
+    background-color: white;
+}
+
+.sticky-table tbody tr:nth-child(even) td.sticky-col {
+    background-color: var(--gray-50, #f9fafb);
+}
+
+.sticky-table tbody tr:hover td.sticky-col {
+    background-color: var(--gray-100, #f3f4f6);
+}
+
+/* ==========================================================================
+   Table Title (placed above table)
+   ========================================================================== */
+
+.ibl-table-title {
+    font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--navy-900, #0f172a);
+    text-align: center;
+    margin: 0 0 1rem 0;
+}
+
+/* .ibl-table-header removed — use .ibl-card__header (cards.css) instead.
+   For accent variant, use .ibl-card__header--accent.
+   For title, use .ibl-card__title. */
+
+/* ==========================================================================
+   Table Row Variants
+   ========================================================================== */
+
+.ibl-table-row--highlight:nth-child(odd),
+.ibl-table-row--highlight:nth-child(even) {
+    background-color: var(--accent-100);
+}
+
+.ibl-table-row--user-team:nth-child(odd),
+.ibl-table-row--user-team:nth-child(even) {
+    background-color: #ffffcc;
+}
+
+.ibl-table-row--winner {
+    font-weight: 700;
+    color: var(--accent-600);
+}
+
+/* ==========================================================================
+   Stat Value Formatting
+   ========================================================================== */
+
+.ibl-stat-value {
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-align: right;
+}
+
+.ibl-stat-value--highlight {
+    color: var(--accent-500);
+    font-weight: 700;
+}
+
+.ibl-stat-value--positive {
+    color: var(--success-600, #16a34a);
+}
+
+.ibl-stat-value--negative {
+    color: var(--error-600, #dc2626);
+}
+
+/* ==========================================================================
+   Team Name Cell
+   ========================================================================== */
+
+.ibl-team-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.ibl-team-cell__logo {
+    width: 24px;
+    height: 24px;
+    aspect-ratio: 75 / 83;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.ibl-team-cell__name {
+    font-weight: 600;
+    color: var(--navy-900);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color var(--transition-fast);
+}
+
+.ibl-team-cell__name:hover {
+    color: var(--accent-500);
+}
+
+/* Team Cell with Colors - combines logo + team-specific background/text */
+.ibl-team-cell--colored {
+    padding-inline: 0.5rem !important;
+    text-align: left !important;
+}
+
+.ibl-team-cell--colored .ibl-team-cell__logo {
+    width: 24px;
+    height: 24px;
+    aspect-ratio: 75 / 83;
+    object-fit: contain;
+    flex-shrink: 0;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.15));
+}
+
+.ibl-team-cell--colored .ibl-team-cell__name {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ibl-team-cell--colored .ibl-team-cell__name:hover {
+    opacity: 0.85;
+}
+
+@media (max-width: 768px) {
+    .ibl-team-cell__text {
+        display: none;
+    }
+
+    /* Center the logo when text is hidden */
+    .ibl-team-cell--colored {
+        text-align: center !important;
+        padding-left: 0rem !important;
+        padding-right: 0rem !important;
+    }
+
+    .ibl-team-cell--colored .ibl-team-cell__name {
+        justify-content: center;
+    }
+
+    /* Constrain logo-only team columns to free up horizontal space */
+    td.ibl-team-cell--colored,
+    th.ibl-team-cell--colored {
+        width: 24px;
+        min-width: 24px;
+        max-width: 24px;
+    }
+
+    /* Override sticky-col min-width when it's a team cell (logo-only on mobile) */
+    .ibl-data-table.responsive-table td.sticky-col.ibl-team-cell--colored,
+    .ibl-data-table.responsive-table th.sticky-col.ibl-team-cell--colored {
+        min-width: 36px;
+    }
+
+    /* Trading team select table fits on mobile — show full team name and link */
+    .trading-team-select .ibl-team-cell__text {
+        display: inline;
+    }
+
+    .trading-team-select .ibl-team-cell--colored {
+        text-align: left !important;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+
+    .trading-team-select .ibl-team-cell--colored .ibl-team-cell__name {
+        justify-content: flex-start;
+    }
+
+    .trading-team-select td.ibl-team-cell--colored,
+    .trading-team-select th.ibl-team-cell--colored {
+        width: auto;
+        min-width: auto;
+        max-width: none;
+    }
+}
+
+/* ==========================================================================
+   Player Name Cell
+   ========================================================================== */
+
+.ibl-player-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-align: left;
+}
+
+.ibl-player-cell a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ibl-player-cell__img {
+    width: 32px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--gray-200);
+    flex-shrink: 0;
+}
+
+.ibl-player-cell__info {
+    min-width: 0;
+}
+
+.ibl-player-cell__name {
+    font-weight: 600;
+    color: var(--navy-900);
+    text-decoration: none;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color var(--transition-fast);
+}
+
+.ibl-player-cell__name:hover {
+    color: var(--accent-500);
+}
+
+.ibl-player-cell__team {
+    font-size: 1rem;
+    color: var(--gray-500);
+    text-decoration: none;
+}
+
+.ibl-player-cell__team:hover {
+    color: var(--accent-500);
+}
+
+/* Player Photo (circular thumbnail in name cells) */
+.ibl-player-photo {
+    width: 24px;
+    height: 24px;
+    object-fit: cover;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Starter Indicator - orange glow on photo + accent name (matches nav basketball icon) */
+.is-starter .ibl-player-photo {
+    box-shadow: 0 0 8px 2px rgb(249 115 22 / 0.4);
+}
+
+.is-starter a {
+    color: var(--accent-500);
+}
+
+/* ==========================================================================
+   Stat Highlight (orange accent for important values)
+   ========================================================================== */
+
+.ibl-stat-highlight,
+.ibl-data-table td.ibl-stat-highlight {
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--accent-500);
+}
+
+/* ==========================================================================
+   Clinched/Status Indicators
+   ========================================================================== */
+
+.ibl-clinched-indicator {
+    color: var(--accent-600);
+    font-weight: 700;
+}
+
+/* ==========================================================================
+   Season Highs Stat Tables (.stat-table)
+
+   Small tables showing stat leaders with columns: rank, name, date, value.
+   Used in .ibl-grid--3col layouts. Needs min-width to prevent long player
+   names (e.g., "Karl-Anthony Towns", "Anfernee Hardaway") from being clipped.
+   ========================================================================== */
+
+.stat-table-wrapper {
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.stat-table-wrapper .stat-table {
+    width: 100%;
+}
+
+.stat-table .name-cell {
+    text-align: left;
+    white-space: nowrap;
+}
+
+.stat-table .name-cell a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+
+/* ==========================================================================
+   Injury Days Tooltip
+
+   Shows return date on hover (desktop) or tap/focus (mobile).
+   Positioned to the LEFT of the number to avoid table overflow clipping.
+   Uses CSS-only approach for accessibility and mobile support.
+   ========================================================================== */
+
+.injury-days-tooltip {
+    position: relative;
+    cursor: help;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-decoration-color: var(--gray-400, #9ca3af);
+    text-underline-offset: 2px;
+}
+
+/* Hide native title tooltip in favor of CSS tooltip */
+.injury-days-tooltip[title] {
+    position: relative;
+}
+
+.injury-days-tooltip::after {
+    content: attr(title);
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    transform: translateY(-50%);
+    padding: 0.375rem 0.625rem;
+    background-color: var(--navy-900, #0f172a);
+    color: white;
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
+    border-radius: var(--radius-sm, 0.25rem);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 150ms ease, visibility 150ms ease;
+    z-index: 100;
+    pointer-events: none;
+    margin-right: 8px;
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
+}
+
+/* Arrow pointing right */
+.injury-days-tooltip::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    transform: translateY(-50%);
+    border: 5px solid transparent;
+    border-left-color: var(--navy-900, #0f172a);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 150ms ease, visibility 150ms ease;
+    z-index: 100;
+    margin-right: -2px;
+}
+
+/* Show on hover (desktop) */
+.injury-days-tooltip:hover::after,
+.injury-days-tooltip:hover::before {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Show on focus/tap (mobile) */
+.injury-days-tooltip:focus::after,
+.injury-days-tooltip:focus::before {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Remove default focus ring, add subtle highlight */
+.injury-days-tooltip:focus {
+    outline: none;
+    background-color: var(--accent-100, #ffedd5);
+    border-radius: var(--radius-sm, 0.25rem);
+}
+
+/* ==========================================================================
+   Voting Results Table
+
+   Narrower table optimized for vote counts (two columns: Player, Votes).
+   Centers on the page with constrained width.
+   ========================================================================== */
+
+.voting-results-table {
+    max-width: 420px;
+}
+
+.voting-results-table th,
+.voting-results-table td {
+    text-align: left;
+}
+
+.voting-results-table th:last-child,
+.voting-results-table td:last-child {
+    text-align: right;
+}
+
+/* ==========================================================================
+   Voting Form Table
+
+   Wide table for voting ballots with player stats. Features:
+   - Checkbox/radio inputs for vote selection
+   - Sticky name column on mobile for context while scrolling
+   - Collapsible sections for each voting category
+   ========================================================================== */
+
+.voting-form-container {
+    text-align: center;
+    max-width: 100%;
+}
+
+.voting-form-table {
+    margin: 0 auto var(--space-6);
+}
+
+.voting-form-table th,
+.voting-form-table td {
+    text-align: center;
+    white-space: nowrap;
+    padding: 0.5rem 0.375rem;
+}
+
+/* Voting input cells */
+.voting-form-table input[type="checkbox"],
+.voting-form-table input[type="radio"] {
+    width: 1.125rem;
+    height: 1.125rem;
+    accent-color: var(--accent-500);
+    cursor: pointer;
+}
+
+/* Voting category header (collapsible trigger) */
+.voting-category {
+    cursor: pointer;
+    margin: var(--space-4) 0;
+    padding: var(--space-3);
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    transition: background-color var(--transition-fast);
+}
+
+.voting-category:hover {
+    background: var(--gray-100);
+}
+
+.voting-category-title {
+    margin: 0;
+    display: block;
+    text-align: center;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.voting-category-instruction {
+    margin: var(--space-1) 0 0 0;
+    font-size: 1rem;
+    font-style: italic;
+    color: var(--gray-500);
+}
+
+/* .voting-submit-btn removed — use .ibl-btn .ibl-btn--primary .ibl-btn--lg instead */
+
+/* Mobile adjustments for voting form - keep full table display */
+@media (max-width: 768px) {
+    .voting-category {
+        padding: var(--space-2);
+    }
+
+    .voting-category-title {
+        font-size: 1.25rem;
+    }
+
+    /* Override mobile table reductions - keep full size for voting tables */
+    .voting-form-table th,
+    .voting-form-table td {
+        font-size: 1rem;
+        padding: 0.5rem 0.375rem;
+    }
+
+    /* Ensure voting results tables also stay full size */
+    .voting-results-table th,
+    .voting-results-table td {
+        font-size: 1rem;
+        padding: 0.5rem 0.375rem;
+    }
+}
+
+/* ==========================================================================
+   Trading Module Tables
+
+   Specialized tables for the Trading module including:
+   - Team selection list with logos and colors
+   - Roster tables for trade form
+   - Cap totals and cash exchange tables
+   - Trade offer review cards
+   ========================================================================== */
+
+/* Trading layout table - simple layout container, not a data table */
+.trading-layout {
+    border-collapse: separate;
+    border-spacing: var(--space-2);
+    margin: 0 auto;
+}
+
+.trading-layout > tbody > tr > td {
+    vertical-align: top;
+}
+
+/* Team selection table with logos */
+.trading-team-select {
+    min-width: 220px;
+    max-width: 280px;
+    margin: 0 auto;
+}
+
+/* Roster tables for player/pick selection */
+.trading-roster {
+    min-width: 280px;
+    max-width: 450px;
+}
+
+.trading-roster td {
+    text-align: center;
+    padding: 0.375rem 0.5rem;
+}
+
+.trading-roster td:nth-child(3) {
+    text-align: left;
+}
+
+.trading-roster td:nth-child(4) {
+    text-align: right;
+}
+
+/* Player names: no-wrap, abbreviate via JS; draft pick cells: allow wrapping */
+.trading-roster .ibl-player-cell a[href*="pid="] {
+    white-space: nowrap;
+}
+
+/* Cap totals table */
+.trading-cap-totals th {
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.5rem 0.75rem;
+    text-align: center;
+}
+
+.trading-cap-totals td {
+    padding: 0.5rem 0.75rem;
+}
+
+/* Cash exchange table */
+.trading-cash-exchange td {
+    padding: 0.5rem 0.75rem;
+}
+
+.trading-cash-exchange input[type="number"] {
+    width: 80px;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--gray-300, #d1d5db);
+    border-radius: var(--radius-sm, 0.25rem);
+    text-align: right;
+}
+
+/* Trade offer cards */
+.trade-offer-card {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--gray-200, #e5e7eb);
+    border-radius: var(--radius-md, 0.375rem);
+    background: white;
+    box-shadow: var(--shadow-sm, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+}
+
+.trade-offer-card p {
+    margin: 0.25rem 0;
+}
+
+/* Trading button variants (base .ibl-btn defined in forms.css) */
+.ibl-btn--primary {
+    background: var(--gradient-navy-header);
+    color: white;
+}
+
+.ibl-btn--primary:hover {
+    background: linear-gradient(135deg, var(--navy-700, #334155), var(--navy-800, #1e293b));
+}
+
+.ibl-btn--success {
+    background: linear-gradient(135deg, var(--success-500, #22c55e), var(--success-600, #16a34a));
+    color: white;
+}
+
+.ibl-btn--success:hover {
+    background: linear-gradient(135deg, var(--success-400, #4ade80), var(--success-500, #22c55e));
+}
+
+.ibl-btn--danger {
+    background: linear-gradient(135deg, var(--error-500, #ef4444), var(--error-600, #dc2626));
+    color: white;
+}
+
+.ibl-btn--danger:hover {
+    background: linear-gradient(135deg, var(--error-400, #f87171), var(--error-500, #ef4444));
+}
+
+/* Link styling for Trading */
+.ibl-link {
+    color: var(--navy-700, #334155);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 150ms ease;
+}
+
+.ibl-link:hover {
+    color: var(--accent-500, #f97316);
+}
+
+/* ==========================================================================
+   Draft History Table
+   ========================================================================== */
+
+.draft-history-table .name-cell {
+    white-space: nowrap;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.draft-history-table .name-cell a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Constrain Round and Pick columns on mobile */
+@media (max-width: 768px) {
+    .draft-history-table .name-cell {
+        white-space: normal;
+    }
+
+    .draft-history-table th:last-child {
+        text-align: center;
+    }
+
+    .draft-history-table th:nth-child(1),
+    .draft-history-table td:nth-child(1),
+    .draft-history-table th:nth-child(2),
+    .draft-history-table td:nth-child(2) {
+        width: 36px;
+        min-width: 36px;
+        max-width: 36px;
+    }
+}
+
+/* ==========================================================================
+   League Stats Table
+
+   Overrides for .ibl-data-table specific to League Stats pages.
+   Base styling comes from .ibl-data-table above — only differences listed here.
+   ========================================================================== */
+
+.league-stats-container {
+    text-align: center;
+}
+
+.league-stats-table {
+    margin: 0 auto var(--space-6);
+}
+
+.league-stats-table td {
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.league-stats-user-row {
+    background-color: var(--warning-100) !important;
+}
+
+.league-stats-team-cell {
+    text-align: left !important;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+}
+
+.league-stats-team-cell a {
+    font-weight: 600;
+    text-decoration: none;
+}
+
+/* ==========================================================================
+   All-Star Appearances Table
+
+   Overrides for .ibl-data-table on All-Star pages.
+   Source: class="sortable ibl-data-table allstar-table"
+   ========================================================================== */
+
+.allstar-table {
+    max-width: 500px;
+}
+
+.allstar-table td:last-child {
+    font-weight: 600;
+    color: var(--accent-600);
+}
+
+/* ==========================================================================
+   Contact List Table
+
+   Overrides for .ibl-data-table on the Contact List page.
+   Source: class="sortable ibl-data-table contact-table"
+   ========================================================================== */
+
+.contact-table {
+    max-width: 800px;
+}
+
+.contact-table .team-cell {
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+}
+
+.contact-table .team-cell a {
+    font-weight: 600;
+}
+
+.contact-table .gm-cell a {
+    color: var(--gray-700);
+}
+
+.contact-table .gm-cell a:hover {
+    color: var(--accent-600);
+}
+
+/* ==========================================================================
+   Transaction History Table
+
+   Overrides for .ibl-data-table on Transaction History pages.
+   Source: class="ibl-data-table responsive-table txn-table"
+   ========================================================================== */
+
+.txn-table td:nth-child(3) { text-align: left; }
+.txn-table th:nth-child(3) { text-align: left; }
+
+/* ==========================================================================
+   Depth Chart Table
+
+   Overrides for .ibl-data-table on the Depth Chart page.
+   Source: class="depth-chart-table ibl-data-table"
+   Only unique overrides — redundant base-table properties removed.
+   ========================================================================== */
+
+.depth-chart-table {
+    max-width: none;
+}
+
+.depth-chart-table td {
+    padding: 0.25rem;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.depth-chart-table td:first-child,
+.depth-chart-table td:last-child {
+    padding: 0.25rem;
+}
+
+.depth-chart-table select {
+    padding: 0.25rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+}
+
+/* ==========================================================================
+   Draft Pick Locator Table
+
+   Standalone table (NOT .ibl-data-table) for draft pick ownership grid.
+   Source: class="draft-pick-table sticky-table"
+   Properties overridden by .sticky-table (border-radius, overflow,
+   box-shadow) have been removed.
+   ========================================================================== */
+
+.draft-pick-locator-container {
+    text-align: center;
+}
+
+.draft-pick-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 0 auto;
+}
+
+.draft-pick-table th,
+.draft-pick-table td {
+    border: 1px solid var(--gray-200);
+    padding: 0.5rem;
+    text-align: center;
+    font-size: 0.875rem;
+}
+
+.draft-pick-table th {
+    background: var(--gradient-navy-header);
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.draft-pick-own {
+    background-color: var(--gray-100);
+}
+
+.draft-pick-traded {
+    font-weight: 600;
+}

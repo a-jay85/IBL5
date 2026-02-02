@@ -37,30 +37,30 @@ class LeagueStatsView implements LeagueStatsViewInterface
         $league = $data['league'] ?? [];
         $differentials = $data['differentials'] ?? [];
 
-        $html = '<center>';
-        $html .= '<h1>League-wide Statistics</h1>';
+        $html = '<div class="league-stats-container">';
+        $html .= '<h1 class="ibl-title">League-wide Statistics</h1>';
 
         // Team Offense Totals
-        $html .= '<h2>Team Offense Totals</h2>';
+        $html .= '<h2 class="ibl-table-title">Team Offense Totals</h2>';
         $html .= $this->renderTotalsTable($teams, 'offense_totals', 'Offense', $userTeamId, $league['totals'] ?? []);
 
         // Team Defense Totals
-        $html .= '<h2>Team Defense Totals</h2>';
+        $html .= '<h2 class="ibl-table-title">Team Defense Totals</h2>';
         $html .= $this->renderTotalsTable($teams, 'defense_totals', 'Defense', $userTeamId, $league['totals'] ?? []);
 
         // Team Offense Averages
-        $html .= '<h2>Team Offense Averages</h2>';
+        $html .= '<h2 class="ibl-table-title">Team Offense Averages</h2>';
         $html .= $this->renderAveragesTable($teams, 'offense_averages', 'Offense', $userTeamId, $league['averages'] ?? []);
 
         // Team Defense Averages
-        $html .= '<h2>Team Defense Averages</h2>';
+        $html .= '<h2 class="ibl-table-title">Team Defense Averages</h2>';
         $html .= $this->renderAveragesTable($teams, 'defense_averages', 'Defense', $userTeamId, $league['averages'] ?? []);
 
         // Offense/Defense Differentials
-        $html .= '<h2>Team Off/Def Average Differentials</h2>';
+        $html .= '<h2 class="ibl-table-title">Team Off/Def Average Differentials</h2>';
         $html .= $this->renderDifferentialsTable($differentials, $userTeamId);
 
-        $html .= '</center>';
+        $html .= '</div>';
 
         return $html;
     }
@@ -82,7 +82,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
         int $userTeamId,
         array $leagueTotals
     ): string {
-        $html = '<table class="sortable">';
+        $html = '<table class="sortable league-stats-table ibl-data-table">';
         $html .= '<thead>' . $this->getTotalsHeaderRow() . '</thead>';
         $html .= '<tbody>';
 
@@ -115,7 +115,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
         int $userTeamId,
         array $leagueAverages
     ): string {
-        $html = '<table class="sortable">';
+        $html = '<table class="sortable league-stats-table ibl-data-table">';
         $html .= '<thead>' . $this->getAveragesHeaderRow() . '</thead>';
         $html .= '<tbody>';
 
@@ -140,7 +140,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
      */
     private function renderDifferentialsTable(array $differentials, int $userTeamId): string
     {
-        $html = '<table class="sortable">';
+        $html = '<table class="sortable league-stats-table ibl-data-table">';
         $html .= '<thead>' . $this->getAveragesHeaderRow() . '</thead>';
         $html .= '<tbody>';
 
@@ -162,7 +162,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
     private function getTotalsHeaderRow(): string
     {
         return '<tr>
-            <th>Team</th>
+            <th class="ibl-team-cell--colored">Team</th>
             <th>Gm</th>
             <th>FGM</th>
             <th>FGA</th>
@@ -189,7 +189,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
     private function getAveragesHeaderRow(): string
     {
         return '<tr>
-            <th>Team</th>
+            <th class="ibl-team-cell--colored">Team</th>
             <th>FGM</th>
             <th>FGA</th>
             <th>FGP</th>
@@ -324,7 +324,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
     private function renderLeagueTotalsRow(array $totals): string
     {
         return '<tr style="font-weight:bold">
-            <td>LEAGUE TOTALS</td>
+            <td></td>
             <td>' . ($totals['games'] ?? '0') . '</td>
             <td>' . ($totals['fgm'] ?? '0') . '</td>
             <td>' . ($totals['fga'] ?? '0') . '</td>
@@ -352,7 +352,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
     private function renderLeagueAveragesRow(array $averages): string
     {
         return '<tr style="font-weight:bold">
-            <td>LEAGUE AVERAGES</td>
+            <td></td>
             <td>' . ($averages['fgm'] ?? '0.0') . '</td>
             <td>' . ($averages['fga'] ?? '0.0') . '</td>
             <td>' . ($averages['fgp'] ?? '0.000') . '</td>
@@ -383,9 +383,9 @@ class LeagueStatsView implements LeagueStatsViewInterface
     private function getRowTag(int $teamId, int $userTeamId): string
     {
         if ($teamId === $userTeamId) {
-            return '<tr bgcolor="#FFA" align="right">';
+            return '<tr class="league-stats-user-row">';
         }
-        return '<tr align="right">';
+        return '<tr>';
     }
 
     /**
@@ -398,15 +398,12 @@ class LeagueStatsView implements LeagueStatsViewInterface
     private function renderTeamCell(array $team, string $label): string
     {
         $teamId = (int) $team['teamid'];
-        $city = HtmlSanitizer::safeHtmlOutput($team['team_city']);
         $name = HtmlSanitizer::safeHtmlOutput($team['team_name']);
         $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
 
-        return '<td bgcolor="' . $color1 . '">
-            <a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '">
-                <font color="' . $color2 . '">' . $city . ' ' . $name . ' ' . $label . '</font>
-            </a>
+        return '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">
+            <a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';"><img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">' . $name . ' ' . $label . '</span></a>
         </td>';
     }
 }

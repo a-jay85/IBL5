@@ -217,7 +217,7 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
      */
     private function applyModifier(array $baseDemands, float $modifier): array
     {
-        if ($modifier == 0) {
+        if ($modifier === 0.0) {
             $modifier = 0.000001; // Prevent division by zero
         }
         
@@ -239,11 +239,11 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
      */
     private function calculateYearsDemanded(array $demands): int
     {
-        if ($demands['dem6'] != 0) return 6;
-        if ($demands['dem5'] != 0) return 5;
-        if ($demands['dem4'] != 0) return 4;
-        if ($demands['dem3'] != 0) return 3;
-        if ($demands['dem2'] != 0) return 2;
+        if ($demands['dem6'] !== 0) return 6;
+        if ($demands['dem5'] !== 0) return 5;
+        if ($demands['dem4'] !== 0) return 4;
+        if ($demands['dem3'] !== 0) return 3;
+        if ($demands['dem2'] !== 0) return 2;
         return 1;
     }
 }

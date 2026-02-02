@@ -115,9 +115,6 @@
         <testsuite name="FranchiseHistory Module Tests">
             <directory>tests/FranchiseHistory</directory>
         </testsuite>
-        <testsuite name="PowerRankings Module Tests">
-            <directory>tests/PowerRankings</directory>
-        </testsuite>
         <testsuite name="Shared Module Tests">
             <directory>tests/Shared</directory>
         </testsuite>

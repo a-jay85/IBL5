@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Updater;
 
 use Utilities\RecordParser;
@@ -373,7 +376,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
                 }
             }
 
-            if ($teamsEliminated == 6) {
+            if ($teamsEliminated === 6) {
                 $this->execute(
                     "UPDATE ibl_standings SET clinchedPlayoffs = 1 WHERE team_name = ?",
                     "s",

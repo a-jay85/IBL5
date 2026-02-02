@@ -33,9 +33,10 @@ final class PlayerSearchRepositoryTest extends TestCase
             ->method('prepare')
             ->with($this->callback(function ($query) {
                 // Check base query structure
-                return strpos($query, 'SELECT * FROM ibl_plr') !== false
-                    && strpos($query, 'WHERE pid > 0') !== false
-                    && strpos($query, 'ORDER BY retired ASC, ordinal ASC') !== false;
+                return strpos($query, 'SELECT ibl_plr.*') !== false
+                    && strpos($query, 'LEFT JOIN ibl_team_info') !== false
+                    && strpos($query, 'WHERE ibl_plr.pid > 0') !== false
+                    && strpos($query, 'ORDER BY ibl_plr.retired ASC, ibl_plr.ordinal ASC') !== false;
             }))
             ->willReturn($mockStmt);
 

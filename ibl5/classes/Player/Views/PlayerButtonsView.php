@@ -60,7 +60,7 @@ class PlayerButtonsView
         ?>
 <table class="player-button rookie-option-button">
     <tr>
-        <td><a href="modules.php?name=Player&pa=rookieoption&pid=<?= $playerID ?>">ROOKIE<BR>OPTION</a></td>
+        <td><a href="modules.php?name=Player&pa=rookieoption&pid=<?= $playerID ?>&from=player">ROOKIE<BR>OPTION</a></td>
     </tr>
 </table>
         <?php

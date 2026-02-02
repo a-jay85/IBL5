@@ -25,7 +25,7 @@ class LeaderboardsView implements LeaderboardsViewInterface
     {
         $boardTypes = $this->service->getBoardTypes();
         $sortCategories = $this->service->getSortCategories();
-        
+
         $boardsType = $currentFilters['boards_type'] ?? '';
         $sortCat = $currentFilters['sort_cat'] ?? '';
         $active = $currentFilters['active'] ?? '0';
@@ -33,40 +33,41 @@ class LeaderboardsView implements LeaderboardsViewInterface
 
         ob_start();
         ?>
-<form name="Leaderboards" method="post" action="modules.php?name=Leaderboards">
-    <table style="margin: auto;">
-        <tr>
-            <td>
-                Type: <select name="boards_type">
-                    <?php foreach ($boardTypes as $key => $value): ?>
-                        <?php $selected = ($boardsType == $value) ? ' SELECTED' : ''; ?>
-                        <option value="<?= htmlspecialchars($value) ?>"<?= $selected ?>><?= htmlspecialchars($value) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </td>
-            <td>
-                Category: <select name="sort_cat">
-                    <?php foreach ($sortCategories as $key => $value): ?>
-                        <?php $selected = ($sortCat == $value) ? ' SELECTED' : ''; ?>
-                        <option value="<?= htmlspecialchars($value) ?>"<?= $selected ?>><?= htmlspecialchars($value) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </td>
-            <td>
-                Include Retirees: <select name="active">
-                    <option value="0"<?= ($active == '0') ? ' SELECTED' : '' ?>>Yes</option>
-                    <option value="1"<?= ($active == '1') ? ' SELECTED' : '' ?>>No</option>
-                </select>
-            </td>
-            <td>
-                Limit: <input type="number" name="display" style="width: 4em" value="<?= htmlspecialchars((string)$display) ?>"> Records
-            </td>
-            <td>
-                <input type="hidden" name="submitted" value="1">
-                <input type="submit" value="Display Leaderboards">
-            </td>
-        </tr>
-    </table>
+<form name="Leaderboards" method="post" action="modules.php?name=Leaderboards" class="ibl-filter-form">
+    <div class="ibl-filter-form__row">
+        <div class="ibl-filter-form__group">
+            <label class="ibl-filter-form__label">Type:</label>
+            <select name="boards_type">
+                <?php foreach ($boardTypes as $key => $value): ?>
+                    <?php $selected = ($boardsType == $value) ? ' selected' : ''; ?>
+                    <option value="<?= htmlspecialchars($value) ?>"<?= $selected ?>><?= htmlspecialchars($value) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="ibl-filter-form__group">
+            <label class="ibl-filter-form__label">Category:</label>
+            <select name="sort_cat">
+                <?php foreach ($sortCategories as $key => $value): ?>
+                    <?php $selected = ($sortCat == $value) ? ' selected' : ''; ?>
+                    <option value="<?= htmlspecialchars($value) ?>"<?= $selected ?>><?= htmlspecialchars($value) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="ibl-filter-form__group">
+            <label class="ibl-filter-form__label">Include Retirees:</label>
+            <select name="active">
+                <option value="0"<?= ($active == '0') ? ' selected' : '' ?>>Yes</option>
+                <option value="1"<?= ($active == '1') ? ' selected' : '' ?>>No</option>
+            </select>
+        </div>
+        <div class="ibl-filter-form__group">
+            <label class="ibl-filter-form__label">Limit:</label>
+            <input type="number" name="display" value="<?= htmlspecialchars((string)$display) ?>">
+            <span class="ibl-filter-form__label">Records</span>
+        </div>
+        <input type="hidden" name="submitted" value="1">
+        <button type="submit" class="ibl-filter-form__submit">Display Leaderboards</button>
+    </div>
 </form>
         <?php
         return ob_get_clean();
@@ -79,32 +80,34 @@ class LeaderboardsView implements LeaderboardsViewInterface
     {
         ob_start();
         ?>
-<h2 style="text-align: center;">Leaderboards Display</h2>
-<p>
-<table class="sortable">
-    <tr>
-        <th style="text-align: center;">Rank</th>
-        <th style="text-align: center;">Name</th>
-        <th style="text-align: center;">Games</th>
-        <th style="text-align: center;">Minutes</th>
-        <th style="text-align: center;">FGM</th>
-        <th style="text-align: center;">FGA</th>
-        <th style="text-align: center;">FG%</th>
-        <th style="text-align: center;">FTM</th>
-        <th style="text-align: center;">FTA</th>
-        <th style="text-align: center;">FT%</th>
-        <th style="text-align: center;">3GM</th>
-        <th style="text-align: center;">3GA</th>
-        <th style="text-align: center;">3P%</th>
-        <th style="text-align: center;">ORB</th>
-        <th style="text-align: center;">REB</th>
-        <th style="text-align: center;">AST</th>
-        <th style="text-align: center;">STL</th>
-        <th style="text-align: center;">TVR</th>
-        <th style="text-align: center;">BLK</th>
-        <th style="text-align: center;">FOULS</th>
-        <th style="text-align: center;">PTS</th>
-    </tr>
+<div class="table-scroll-container">
+<table class="sortable ibl-data-table responsive-table">
+    <thead>
+        <tr>
+            <th class="sticky-col-1">Rank</th>
+            <th class="sticky-col-2">Name</th>
+            <th>Games</th>
+            <th>Minutes</th>
+            <th>FGM</th>
+            <th>FGA</th>
+            <th>FG%</th>
+            <th>FTM</th>
+            <th>FTA</th>
+            <th>FT%</th>
+            <th>3GM</th>
+            <th>3GA</th>
+            <th>3P%</th>
+            <th>ORB</th>
+            <th>REB</th>
+            <th>AST</th>
+            <th>STL</th>
+            <th>TVR</th>
+            <th>BLK</th>
+            <th>FOULS</th>
+            <th>PTS</th>
+        </tr>
+    </thead>
+    <tbody>
         <?php
         return ob_get_clean();
     }
@@ -117,27 +120,27 @@ class LeaderboardsView implements LeaderboardsViewInterface
         ob_start();
         ?>
 <tr>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$rank) ?></td>
-    <td style="text-align: center;"><a href="modules.php?name=Player&pa=showpage&pid=<?= htmlspecialchars((string)$stats['pid']) ?>"><?= htmlspecialchars($stats['name']) ?></a></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['games']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['minutes']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['fgm']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['fga']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['fgp']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['ftm']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['fta']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['ftp']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['tgm']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['tga']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['tgp']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['orb']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['reb']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['ast']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['stl']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['tvr']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['blk']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['pf']) ?></td>
-    <td style="text-align: center;"><?= htmlspecialchars((string)$stats['pts']) ?></td>
+    <td class="rank-cell sticky-col-1"><?= htmlspecialchars((string)$rank) ?></td>
+    <td class="sticky-col-2"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= htmlspecialchars((string)$stats['pid']) ?>"><?= htmlspecialchars($stats['name']) ?></a></td>
+    <td><?= htmlspecialchars((string)$stats['games']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['minutes']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['fgm']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['fga']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['fgp']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['ftm']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['fta']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['ftp']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['tgm']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['tga']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['tgp']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['orb']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['reb']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['ast']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['stl']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['tvr']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['blk']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['pf']) ?></td>
+    <td><?= htmlspecialchars((string)$stats['pts']) ?></td>
 </tr>
         <?php
         return ob_get_clean();
@@ -148,6 +151,6 @@ class LeaderboardsView implements LeaderboardsViewInterface
      */
     public function renderTableFooter(): string
     {
-        return '</table></center></td></tr>';
+        return '</tbody></table></div>'; // Close table and scroll container
     }
 }

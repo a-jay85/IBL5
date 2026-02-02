@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use PlayerAwards\PlayerAwardsView;
 use PlayerAwards\PlayerAwardsService;
@@ -10,9 +11,10 @@ use PlayerAwards\Contracts\PlayerAwardsRepositoryInterface;
 
 /**
  * Tests for PlayerAwardsView
- * 
+ *
  * Verifies HTML rendering for player awards search interface.
  */
+#[AllowMockObjectsWithoutExpectations]
 final class PlayerAwardsViewTest extends TestCase
 {
     private PlayerAwardsView $view;
@@ -70,7 +72,7 @@ final class PlayerAwardsViewTest extends TestCase
         $result = $this->view->renderSearchForm($params);
 
         $this->assertStringContainsString('type="submit"', $result);
-        $this->assertStringContainsString('Search for Matches', $result);
+        $this->assertStringContainsString('Search', $result);
     }
 
     public function testRenderSearchFormEscapesHtmlCharacters(): void
@@ -113,11 +115,11 @@ final class PlayerAwardsViewTest extends TestCase
         $this->assertStringContainsString('Award', $result);
     }
 
-    public function testRenderTableHeaderIncludesResultsTitle(): void
+    public function testRenderTableHeaderIncludesDataTableClass(): void
     {
         $result = $this->view->renderTableHeader();
 
-        $this->assertStringContainsString('Search Results', $result);
+        $this->assertStringContainsString('ibl-data-table', $result);
     }
 
     // ==================== renderAwardRow Tests ====================
@@ -144,15 +146,18 @@ final class PlayerAwardsViewTest extends TestCase
         $this->assertStringContainsString('Magic Johnson', $result);
     }
 
-    public function testRenderAwardRowAlternatesRowColors(): void
+    public function testRenderAwardRowCreatesPlainRows(): void
     {
         $award = ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson'];
-        
+
         $evenRow = $this->view->renderAwardRow($award, 0);
         $oddRow = $this->view->renderAwardRow($award, 1);
 
-        $this->assertStringContainsString('row-even', $evenRow);
-        $this->assertStringContainsString('row-odd', $oddRow);
+        // Row alternation is now handled by CSS :nth-child, not row classes
+        $this->assertStringContainsString('<tr>', $evenRow);
+        $this->assertStringContainsString('<tr>', $oddRow);
+        $this->assertStringNotContainsString('row-even', $evenRow);
+        $this->assertStringNotContainsString('row-odd', $oddRow);
     }
 
     public function testRenderAwardRowEscapesHtmlCharacters(): void

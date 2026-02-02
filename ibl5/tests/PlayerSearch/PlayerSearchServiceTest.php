@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use PlayerSearch\PlayerSearchService;
 use PlayerSearch\PlayerSearchValidator;
@@ -11,9 +12,10 @@ use Player\PlayerData;
 
 /**
  * Tests for PlayerSearchService
- * 
+ *
  * Tests business logic layer for player search functionality.
  */
+#[AllowMockObjectsWithoutExpectations]
 final class PlayerSearchServiceTest extends TestCase
 {
     private PlayerSearchService $service;

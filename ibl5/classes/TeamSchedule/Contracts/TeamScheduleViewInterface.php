@@ -19,7 +19,8 @@ interface TeamScheduleViewInterface
      * @param \Team $team Team object
      * @param array $games Processed game data
      * @param int $simLengthInDays Simulation length in days
+     * @param string $seasonPhase Current season phase (e.g., 'Regular Season', 'Playoffs')
      * @return string HTML output
      */
-    public function render(\Team $team, array $games, int $simLengthInDays): string;
+    public function render(\Team $team, array $games, int $simLengthInDays, string $seasonPhase): string;
 }

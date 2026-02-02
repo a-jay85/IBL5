@@ -61,14 +61,14 @@ class LeaderboardsRepository extends \BaseMysqliRepository implements Leaderboar
 
         // Build WHERE clause
         $conditions = ["games > 0"];
-        if ($activeOnly == 1) {
+        if ($activeOnly === 1) {
             $conditions[] = "p.retired = '0'";
         }
         $whereClause = implode(' AND ', $conditions);
 
         // Special handling for ibl_hist table (aggregated by player)
         // NOTE: Table name and sort column are whitelisted above
-        if ($tableKey == 'ibl_hist') {
+        if ($tableKey === 'ibl_hist') {
             $query = "SELECT
                 h.pid,
                 h.name,

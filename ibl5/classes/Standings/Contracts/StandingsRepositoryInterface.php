@@ -23,10 +23,10 @@ interface StandingsRepositoryInterface
     public function getStandingsByRegion(string $region): array;
 
     /**
-     * Get streak and last 10 games data for a team
+     * Get streak, last 10 games, and power ranking data for a team
      *
      * @param int $teamId Team ID
-     * @return array|null Streak data or null if not found
+     * @return array|null Array with last_win, last_loss, streak_type, streak, ranking or null if not found
      */
     public function getTeamStreakData(int $teamId): ?array;
 

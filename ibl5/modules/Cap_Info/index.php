@@ -35,7 +35,6 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
 Nuke\Header::header();
-OpenTable();
 
 // Initialize services
 $repository = new CapInfoRepository($mysqli_db);
@@ -54,5 +53,4 @@ echo $view->render(
     $userTeamId
 );
 
-CloseTable();
 Nuke\Footer::footer();

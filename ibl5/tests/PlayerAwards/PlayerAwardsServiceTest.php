@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use PlayerAwards\PlayerAwardsService;
 use PlayerAwards\PlayerAwardsValidator;
@@ -11,10 +12,11 @@ use PlayerAwards\Contracts\PlayerAwardsRepositoryInterface;
 
 /**
  * Tests for PlayerAwardsService
- * 
+ *
  * Verifies business logic for player awards search including validation
  * orchestration and result transformation.
  */
+#[AllowMockObjectsWithoutExpectations]
 final class PlayerAwardsServiceTest extends TestCase
 {
     /** @var PlayerAwardsValidatorInterface&\PHPUnit\Framework\MockObject\MockObject */

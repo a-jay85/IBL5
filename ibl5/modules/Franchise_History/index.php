@@ -25,7 +25,6 @@ global $mysqli_db;
 $season = new Season($mysqli_db);
 
 Nuke\Header::header();
-OpenTable();
 
 // Initialize services
 $repository = new FranchiseHistoryRepository($mysqli_db);
@@ -37,5 +36,4 @@ $franchiseData = $repository->getAllFranchiseHistory($season->endingYear);
 // Render output
 echo $view->render($franchiseData);
 
-CloseTable();
 Nuke\Footer::footer();

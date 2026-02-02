@@ -87,7 +87,8 @@ class Contracts
             <th class="salary"><?= substr((string) ($season->endingYear + 1), -2) ?>-<?= substr((string) ($season->endingYear + 2), -2) ?></th>
             <th class="salary"><?= substr((string) ($season->endingYear + 2), -2) ?>-<?= substr((string) ($season->endingYear + 3), -2) ?></th>
             <th class="salary"><?= substr((string) ($season->endingYear + 3), -2) ?>-<?= substr((string) ($season->endingYear + 4), -2) ?></th>
-            <th class="sep-team salary"><?= substr((string) ($season->endingYear + 4), -2) ?>-<?= substr((string) ($season->endingYear + 5), -2) ?></th>
+            <th class="salary"><?= substr((string) ($season->endingYear + 4), -2) ?>-<?= substr((string) ($season->endingYear + 5), -2) ?></th>
+            <th class="sep-team"></th>
             <th>Tal</th>
             <th>Skl</th>
             <th>Int</th>
@@ -115,7 +116,8 @@ class Contracts
             <td class="salary"><?= (int)$row['con3'] ?></td>
             <td class="salary"><?= (int)$row['con4'] ?></td>
             <td class="salary"><?= (int)$row['con5'] ?></td>
-            <td class="sep-team salary"><?= (int)$row['con6'] ?></td>
+            <td class="salary"><?= (int)$row['con6'] ?></td>
+            <td class="sep-team"></td>
             <td style="text-align: center;"><?= (int)$player->ratingTalent ?></td>
             <td style="text-align: center;"><?= (int)$player->ratingSkill ?></td>
             <td style="text-align: center;"><?= (int)$player->ratingIntangibles ?></td>
@@ -141,11 +143,12 @@ class Contracts
             <td class="salary"><?= (int)$cap3 ?></td>
             <td class="salary"><?= (int)$cap4 ?></td>
             <td class="salary"><?= (int)$cap5 ?></td>
-            <td class="sep-team salary"><?= (int)$cap6 ?></td>
+            <td class="salary"><?= (int)$cap6 ?></td>
+            <td class="sep-team"></td>
             <td></td>
             <td></td>
             <td></td>
-            <td></td>
+            <td class="sep-team"></td>
             <td></td>
             <td></td>
             <td></td>
@@ -153,7 +156,7 @@ class Contracts
             <td></td>
         </tr>
         <tr class="tfoot-legend">
-            <td colspan="21" style="text-align: left;">
+            <td colspan="22" style="text-align: left;">
                 Key: &nbsp; <i>(Waived)*</i> &nbsp; Becomes Free Agent^
             </td>
         </tr>

@@ -240,8 +240,9 @@
 }
 
 /* Salary column left alignment */
-.team-table th.salary {
-    text-align: left;
+.team-table th.salary,
+.team-table td.salary {
+    text-align: left !important;
 }
 
 /* Team-colored tfoot */

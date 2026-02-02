@@ -115,7 +115,13 @@ function themeheader()
         }
     }
 
-    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId, $teamsData);
+    $seasonPhase = '';
+    if ($mysqli_db) {
+        $season = new \Season($mysqli_db);
+        $seasonPhase = $season->phase;
+    }
+
+    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId, $teamsData, $seasonPhase);
     echo $navView->render();
 
     echo "<body bgcolor=\"$bgcolor1\">";

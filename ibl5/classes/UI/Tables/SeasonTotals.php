@@ -68,10 +68,10 @@ class SeasonTotals
             <th class="sep-team"></th>
             <th>fgm</th>
             <th>fga</th>
-            <th class="sep-weak"></th>
+            <th class="sep-team"></th>
             <th>ftm</th>
             <th>fta</th>
-            <th class="sep-weak"></th>
+            <th class="sep-team"></th>
             <th>3gm</th>
             <th>3ga</th>
             <th class="sep-team"></th>

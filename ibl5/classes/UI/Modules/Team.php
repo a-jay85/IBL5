@@ -313,7 +313,8 @@ class Team
 
         foreach ($gmHistory as $record) {
             $year = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags((string) ($record['year'] ?? '')));
-            $award = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags((string) ($record['Award'] ?? '')));
+            $rawAward = preg_replace('/<br\s*\/?>/i', "\n", (string) ($record['Award'] ?? ''));
+            $award = nl2br(\Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($rawAward)));
             $output .= "<li><span class=\"award-year\">$year</span> $award</li>";
         }
 
@@ -476,7 +477,8 @@ class Team
 
         foreach ($teamAccomplishments as $record) {
             $year = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags((string) ($record['year'] ?? '')));
-            $award = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags((string) ($record['Award'] ?? '')));
+            $rawAward = preg_replace('/<br\s*\/?>/i', "\n", (string) ($record['Award'] ?? ''));
+            $award = nl2br(\Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($rawAward)));
             $output .= "<li><span class=\"award-year\">$year</span> $award</li>";
         }
 

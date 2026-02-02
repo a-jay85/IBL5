@@ -516,13 +516,147 @@ span.nav-dropdown-item a:hover {
 }
 
 /* ==========================================================================
-   Player Menu Dropdown
+   Player Page Navigation (.plr-nav)
+   Grouped segmented pill navigation for switching between player page views.
+   Uses team color accent via --plr-nav-accent custom property.
    ========================================================================== */
 
-.player-menu-dropdown {
-    width: 50%;
-    padding: 5px;
-    font-size: 14px;
+.plr-nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-4) var(--space-3);
+    margin: var(--space-2) auto 0;
+    max-width: 900px;
+}
+
+/* Group: label + row of pills */
+.plr-nav__group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.plr-nav__group-label {
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray-400);
+    white-space: nowrap;
+    user-select: none;
+}
+
+/* Pill container */
+.plr-nav__pills {
+    display: flex;
+    gap: 1px;
+    background: var(--gray-200);
+    border-radius: var(--radius-lg);
+    padding: 2px;
+}
+
+/* Individual pill link */
+.plr-nav__pill {
+    display: block;
+    padding: var(--space-1) var(--space-3);
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--gray-600);
+    text-decoration: none;
+    border-radius: var(--radius-md);
+    white-space: nowrap;
+    transition: color var(--transition-fast),
+                background var(--transition-fast),
+                box-shadow var(--transition-fast);
+}
+
+.plr-nav__pill:link,
+.plr-nav__pill:visited {
+    color: var(--gray-600);
+}
+
+.plr-nav__pill:hover {
+    color: var(--navy-800);
+    background: white;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Active pill */
+.plr-nav__pill--active,
+.plr-nav__pill--active:link,
+.plr-nav__pill--active:visited {
+    color: white;
+    background: var(--plr-nav-accent, var(--accent-500));
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+}
+
+.plr-nav__pill--active:hover {
+    color: white;
+    background: var(--plr-nav-accent-dark, var(--accent-600));
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.18);
+}
+
+/* Mobile select (hidden on desktop, shown on small screens) */
+.plr-nav__mobile-select {
+    display: none;
+}
+
+/* ----- Responsive: collapse to select on narrow viewports ----- */
+@media (max-width: 640px) {
+    .plr-nav__group {
+        display: none;
+    }
+
+    .plr-nav__mobile-select {
+        display: block;
+        width: 100%;
+        padding: var(--space-2) var(--space-3);
+        font-family: var(--font-display);
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--navy-800);
+        background: white;
+        border: 2px solid var(--gray-200);
+        border-radius: var(--radius-lg);
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1.5l5 5 5-5' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right var(--space-3) center;
+        cursor: pointer;
+        transition: border-color var(--transition-fast);
+    }
+
+    .plr-nav__mobile-select:focus {
+        outline: none;
+        border-color: var(--plr-nav-accent, var(--accent-500));
+    }
+
+    .plr-nav {
+        padding: var(--space-3) var(--space-2);
+    }
+}
+
+/* Mid-size: keep pills but tighten spacing */
+@media (min-width: 641px) and (max-width: 900px) {
+    .plr-nav {
+        gap: var(--space-2);
+        padding: var(--space-3) var(--space-2);
+    }
+
+    .plr-nav__group-label {
+        font-size: 0.65rem;
+    }
+
+    .plr-nav__pill {
+        padding: var(--space-1) var(--space-2);
+        font-size: 0.75rem;
+    }
 }
 
 /* ==========================================================================

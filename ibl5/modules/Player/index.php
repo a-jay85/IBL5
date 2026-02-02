@@ -80,9 +80,6 @@ function showpage($playerID, $pageView)
     // Include stats card styles AFTER legacy styles to ensure they override
     echo PlayerStatsCardView::getStyles($colorScheme);
     echo PlayerStatsFlipCardView::getFlipStyles($colorScheme);
-    
-    // Render player menu with current page selected
-    echo PlayerMenuView::render($playerID, $pageView);
 
     // Get All-Star Activity data using PlayerRepository
     $playerRepository = new PlayerRepository($mysqli_db);
@@ -120,6 +117,9 @@ function showpage($playerID, $pageView)
     if ($pageService->canShowRookieOptionButton($player, $userTeam, $season)) {
         echo PlayerButtonsView::renderRookieOptionButton($playerID);
     }
+
+    // Render player page navigation menu (between card and stats)
+    echo PlayerMenuView::render($playerID, $pageView, $colorScheme);
 
     // Create view factory with all required dependencies
     $statsRepository = new PlayerStatsRepository($mysqli_db);

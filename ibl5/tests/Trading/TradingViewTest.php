@@ -77,7 +77,7 @@ class TradingViewTest extends TestCase
         $html = $this->view->renderTradeOfferForm($pageData);
 
         $this->assertStringContainsString('2025', $html);
-        $this->assertStringContainsString('Round 1', $html);
+        $this->assertStringContainsString('R1', $html);
     }
 
     public function testRenderTradeOfferFormContainsCapTotals(): void

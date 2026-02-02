@@ -944,17 +944,16 @@
    names (e.g., "Karl-Anthony Towns", "Anfernee Hardaway") from being clipped.
    ========================================================================== */
 
-.stat-table {
+.stat-table-wrapper {
     min-width: 0;
-}
-
-.ibl-grid .stat-table {
-    width: 100%;
     overflow-x: auto;
 }
 
+.stat-table-wrapper .stat-table {
+    width: 100%;
+}
+
 .stat-table .name-cell {
-    white-space: nowrap;
     text-align: left;
 }
 
@@ -964,11 +963,6 @@
     gap: 6px;
 }
 
-@media (max-width: 768px) {
-    .stat-table .name-cell {
-        white-space: normal;
-    }
-}
 
 /* ==========================================================================
    Injury Days Tooltip

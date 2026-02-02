@@ -600,9 +600,7 @@
 
 .news-article {
     background: white;
-    border-radius: 0.75rem;
-    -webkit-border-radius: 0.75rem;
-    -moz-border-radius: 0.75rem;
+    border-radius: var(--radius-xl);
     overflow: hidden;
     box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
     border: 1px solid var(--gray-100, #f3f4f6);
@@ -616,15 +614,14 @@
 
 .news-article__header {
     padding: var(--space-4) var(--space-5);
-    border-bottom: 1px solid var(--gray-100);
-    background: linear-gradient(180deg, var(--gray-50) 0%, white 100%);
+    background: var(--gradient-navy-header);
 }
 
 .news-article__title {
     font-family: var(--font-display);
     font-size: 1.5rem;
     font-weight: 600;
-    color: var(--navy-900);
+    color: white;
     margin: 0 0 var(--space-2);
     line-height: 1.3;
 }
@@ -636,19 +633,13 @@
 }
 
 .news-article__title a:hover {
-    color: var(--accent-500);
-}
-
-.news-category {
-    color: var(--accent-500);
-    font-weight: 700;
-    text-transform: uppercase;
-    font-size: 1.125rem;
-    letter-spacing: 0.05em;
-}
-
-.news-article--transaction .news-category {
     color: var(--accent-400);
+}
+
+.news-article__header .ibl-badge {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--accent-400);
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .news-article__meta {
@@ -656,7 +647,7 @@
     flex-wrap: wrap;
     gap: var(--space-3);
     font-size: 1rem;
-    color: var(--gray-500);
+    color: var(--gray-300);
 }
 
 .news-article__meta-item {
@@ -705,16 +696,7 @@
 
 /* Transaction-specific styling */
 .news-article--transaction .news-article__header {
-    background: var(--gradient-navy-header);
-    border-bottom: none;
-}
-
-.news-article--transaction .news-article__title {
-    color: white;
-}
-
-.news-article--transaction .news-article__meta {
-    color: var(--gray-400);
+    border-bottom: 2px solid var(--accent-500);
 }
 
 /* Topic icon */
@@ -1033,6 +1015,9 @@ a.schedule-jump-btn:hover {
 .schedule-month {
     margin-bottom: var(--space-4);
     scroll-margin-top: 80px; /* Offset for sticky header */
+    border: 1px solid var(--gray-200, #e5e7eb);
+    border-radius: var(--radius-md);
+    overflow: hidden;
 }
 
 .schedule-month__header {

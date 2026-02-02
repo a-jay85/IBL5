@@ -81,7 +81,8 @@ class SeasonHighsView implements SeasonHighsViewInterface
 
         // Use 5 columns for player stats (with Team), 4 columns for team stats
         $colCount = $isPlayerStats ? 5 : 4;
-        $output = '<table class="ibl-data-table stat-table">
+        $output = '<div class="stat-table-wrapper">
+        <table class="ibl-data-table stat-table">
             <thead>
                 <tr><th colspan="' . $colCount . '">' . $safeName . '</th></tr>
             </thead>
@@ -163,7 +164,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
             }
         }
 
-        $output .= '</tbody></table>';
+        $output .= '</tbody></table></div>';
         return $output;
     }
 }

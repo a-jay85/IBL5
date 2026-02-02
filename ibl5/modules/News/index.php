@@ -94,32 +94,37 @@ function theindex($new_topic = "0")
         if (isset($userinfo['umode'])) {$r_options .= "&amp;mode=" . $userinfo['umode'];}
         if (isset($userinfo['uorder'])) {$r_options .= "&amp;order=" . $userinfo['uorder'];}
         if (isset($userinfo['thold'])) {$r_options .= "&amp;thold=" . $userinfo['thold'];}
-        $story_link = "<a class='readmore' href=\"modules.php?name=News&amp;file=article&amp;sid=$s_sid$r_options\">";
-        $morelink = " ";
+        $story_url = "modules.php?name=News&amp;file=article&amp;sid=$s_sid$r_options";
+        $morelink_parts = [];
         if ($fullcount > 0 or $c_count > 0 or $articlecomm == 0 or $acomm == 1) {
-            $morelink .= "$story_link<b>" . _READMORE . "</b></a> | ";
-        } else {
-            $morelink .= "";
+            $morelink_parts[] = "<a class=\"news-article__link\" href=\"$story_url\">" . _READMORE . "</a>";
         }
-        if ($fullcount > 0) {$morelink .= "$totalcount " . _BYTESMORE . " | ";}
+        if ($fullcount > 0) {
+            $morelink_parts[] = "<span class=\"news-article__meta-item\">$totalcount " . _BYTESMORE . "</span>";
+        }
         if ($articlecomm == 1 and $acomm == 0) {
-            if ($c_count == 0) {$morelink .= "$story_link" . _COMMENTSQ . "</a>";} elseif ($c_count == 1) {$morelink .= "$story_link$c_count " . _COMMENT . "</a>";} elseif ($c_count > 1) {$morelink .= "$story_link$c_count " . _COMMENTS . "</a>";}
+            if ($c_count == 0) {
+                $morelink_parts[] = "<a class=\"news-article__link\" href=\"$story_url\">" . _COMMENTSQ . "</a>";
+            } elseif ($c_count == 1) {
+                $morelink_parts[] = "<a class=\"news-article__link\" href=\"$story_url\">$c_count " . _COMMENT . "</a>";
+            } elseif ($c_count > 1) {
+                $morelink_parts[] = "<a class=\"news-article__link\" href=\"$story_url\">$c_count " . _COMMENTS . "</a>";
+            }
         }
         $sid = intval($s_sid);
         if ($catid != 0) {
             $row3 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));
             $title1 = filter($row3['title'], "nohtml");
-            $title = "<a  class='readmore' href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
-            $morelink .= " | <a href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\">$title1</a>";
+            $title = "<a class='readmore' href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
+            $morelink_parts[] = "<a class=\"news-article__link\" href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\">$title1</a>";
         }
         if ($score != 0) {
             $rated = substr($score / $ratings, 0, 4);
         } else {
             $rated = 0;
         }
-        $morelink .= " | " . _SCORE . " $rated";
-        $morelink .= " ";
-        $morelink = str_replace(" |  | ", " | ", $morelink);
+        $morelink_parts[] = "<span class=\"news-article__score\">" . _SCORE . " $rated</span>";
+        $morelink = implode('', $morelink_parts);
         themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
     }
     Nuke\Footer::footer();

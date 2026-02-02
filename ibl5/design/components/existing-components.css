@@ -7,84 +7,6 @@
  */
 
 /* ==========================================================================
-   Modern Block Components
-   ========================================================================== */
-
-/* Leaders Block - Grid Container */
-.leaders-block {
-    width: 100%;
-    max-width: 1400px;
-    margin: 0 auto var(--space-8);
-    font-family: var(--font-sans);
-}
-
-.leaders-block__header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-6);
-    padding-bottom: var(--space-4);
-    border-bottom: 1px solid var(--gray-200);
-}
-
-.leaders-block__icon {
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--gradient-accent);
-    border-radius: var(--radius-lg);
-    color: white;
-    box-shadow: 0 4px 12px rgb(249 115 22 / 0.3);
-}
-
-.leaders-block__title {
-    font-family: var(--font-display);
-    font-size: 2rem;
-    font-weight: 600;
-    color: var(--navy-900);
-    letter-spacing: 0.025em;
-    text-transform: uppercase;
-    margin: 0;
-}
-
-.leaders-block__subtitle {
-    font-size: 1rem;
-    color: var(--gray-500);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-weight: 500;
-}
-
-/* Leaders Grid */
-.leaders-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: var(--space-4);
-}
-
-@media (max-width: 1200px) {
-    .leaders-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-@media (max-width: 768px) {
-    .leaders-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 480px) {
-    .leaders-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* .stat-card tree removed — use .ibl-stat-card (cards.css) instead */
-
-/* ==========================================================================
    Leaders Grid Layout (Side-by-Side on Desktop)
    ========================================================================== */
 
@@ -391,22 +313,6 @@
 }
 
 /* ==========================================================================
-   Legacy Grid Layout (Keep for backwards compatibility)
-   ========================================================================== */
-
-.leaders-block--chunk .ibl-stat-card {
-    border-top: 3px solid var(--accent-500);
-}
-
-.leaders-block--chunk .ibl-stat-card__header {
-    background: var(--gradient-accent);
-}
-
-.leaders-block--chunk .ibl-stat-card__leader-value {
-    color: var(--navy-800);
-}
-
-/* ==========================================================================
    Injury Report Block
    ========================================================================== */
 
@@ -591,13 +497,6 @@
    News/Transactions Block
    ========================================================================== */
 
-.news-block {
-    width: 100%;
-    max-width: 1400px;
-    margin: 0 auto var(--space-8);
-    font-family: var(--font-sans);
-}
-
 .news-article {
     background: white;
     border-radius: var(--radius-xl);
@@ -738,26 +637,6 @@
 }
 
 /* ==========================================================================
-   Utility Classes for Blocks
-   ========================================================================== */
-
-.ibl-container {
-    width: 100%;
-    max-width: 100%;
-    margin: 0 auto;
-    padding: 0;
-    overflow: hidden;
-    box-sizing: border-box;
-}
-
-@media (min-width: 1440px) {
-    .ibl-container {
-        max-width: 1400px;
-        padding: 0 var(--space-4);
-    }
-}
-
-/* ==========================================================================
    Title Hierarchy
 
    Unified title system for all headings:
@@ -815,38 +694,6 @@
 /* .ibl-section-title removed — use .ibl-title--large instead */
 
 /* ==========================================================================
-   Year/Item Navigation (draft years, seasons, etc.)
-   ========================================================================== */
-
-.ibl-year-nav {
-    text-align: center;
-    margin-bottom: var(--space-6);
-    font-family: var(--font-sans);
-    font-size: 1.125rem;
-    line-height: 2;
-}
-
-.ibl-year-nav a {
-    color: var(--gray-600);
-    text-decoration: none;
-    padding: var(--space-1) var(--space-2);
-    margin: 0 2px;
-    border-radius: var(--radius-sm);
-    transition: all var(--transition-fast);
-}
-
-.ibl-year-nav a:hover {
-    color: var(--accent-600);
-    background-color: var(--accent-100);
-}
-
-.ibl-year-nav a.active {
-    color: white;
-    background-color: var(--accent-500);
-    font-weight: 600;
-}
-
-/* ==========================================================================
    Responsive Grid Layouts
    ========================================================================== */
 
@@ -880,13 +727,6 @@
 /* .ibl-empty-state moved to cards.css */
 
 /* Table scroll infrastructure moved to tables.css */
-
-/* Hide less important columns on very small screens */
-@media (max-width: 480px) {
-    .hide-mobile {
-        display: none !important;
-    }
-}
 
 /* ==========================================================================
    Team Page Responsive Layout
@@ -1349,36 +1189,6 @@ a.schedule-jump-btn:hover {
     margin: 0 auto;
 }
 
-.draft-header {
-    text-align: center;
-    margin-bottom: 1.5rem;
-}
-
-.draft-team-logo {
-    display: block;
-    width: 100%;
-    max-width: 415px;
-    aspect-ratio: 415 / 50;
-    height: auto;
-    margin: 0 auto 0.75rem;
-}
-
-.draft-title {
-    font-family: var(--font-display);
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--navy-900);
-    margin: 0;
-}
-
-/* Player image - standard dimensions for CLS prevention */
-.player-image {
-    width: 65px;
-    height: 90px;
-    aspect-ratio: 65 / 90;
-    object-fit: cover;
-}
-
 .draft-error {
     background: var(--error-100);
     border: 1px solid #fecaca;
@@ -1406,72 +1216,7 @@ a.schedule-jump-btn:hover {
 
 /* .draft-submit-btn removed — use .ibl-btn .ibl-btn--primary .ibl-btn--lg instead */
 
-/* ==========================================================================
-   Draft Pick Locator Module
-   ========================================================================== */
-
-.draft-pick-locator-container {
-    text-align: center;
-}
-
-.draft-pick-table {
-    border-collapse: separate;
-    border-spacing: 0;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow: var(--shadow-md);
-    margin: 0 auto;
-}
-
-.draft-pick-table th,
-.draft-pick-table td {
-    border: 1px solid var(--gray-200);
-    padding: 0.5rem;
-    text-align: center;
-    font-size: 0.875rem;
-}
-
-.draft-pick-table th {
-    background: var(--gradient-navy-header);
-    color: white;
-    font-family: var(--font-display);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.draft-pick-own {
-    background-color: var(--gray-100);
-}
-
-.draft-pick-traded {
-    font-weight: 600;
-}
-
-.draft-pick-title {
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--navy-900);
-    text-align: center;
-    margin-bottom: var(--space-2);
-}
-
-.draft-pick-description {
-    text-align: center;
-    color: var(--gray-600);
-    margin-bottom: var(--space-6);
-}
-
-/* Hide header text on mobile - table is self-explanatory */
-@media (max-width: 768px) {
-    .draft-pick-header {
-        display: none;
-    }
-}
-
-
-
+/* Draft Pick Locator table overrides moved to tables.css */
 
 /* ==========================================================================
    Free Agency Preview Module - Unique Overrides
@@ -1486,18 +1231,7 @@ a.schedule-jump-btn:hover {
 }
 
 
-/* ==========================================================================
-   All-Star Appearances Module
-   ========================================================================== */
-
-.allstar-table {
-    max-width: 500px;
-}
-
-.allstar-table td:last-child {
-    font-weight: 600;
-    color: var(--accent-600);
-}
+/* All-Star table overrides moved to tables.css */
 
 /* ==========================================================================
    Draft History Module - Component Styles
@@ -1557,8 +1291,7 @@ a.schedule-jump-btn:hover {
 .txn-badge--10 { background: #f3e5f5; color: #7b1fa2; }
 .txn-badge--14 { background: #e0f7fa; color: #00838f; }
 
-.txn-table td:nth-child(3) { text-align: left; }
-.txn-table th:nth-child(3) { text-align: left; }
+/* Transaction table overrides moved to tables.css */
 
 .txn-reset { margin-left: var(--space-2, 0.5rem); }
 
@@ -1670,76 +1403,7 @@ a.schedule-jump-btn:hover {
     margin: 0 0 1.5rem 0;
 }
 
-.contact-table {
-    max-width: 800px;
-}
-
-.contact-table .team-cell {
-    border-radius: var(--radius-sm);
-    padding: 0.5rem 0.75rem;
-}
-
-.contact-table .team-cell a {
-    font-weight: 600;
-}
-
-.contact-table .gm-cell a {
-    color: var(--gray-700);
-}
-
-.contact-table .gm-cell a:hover {
-    color: var(--accent-600);
-}
-
-/* ==========================================================================
-   Power Rankings Module
-   ========================================================================== */
-
-.power-rankings-wrapper {
-    background: white;
-    border-radius: var(--radius-xl);
-    overflow: hidden;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--gray-100);
-    max-width: 600px;
-    margin: 0 auto 1.5rem;
-}
-
-.power-rankings-title {
-    background: var(--gradient-navy-header);
-    padding: 0.875rem 1rem;
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: white;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    text-align: center;
-}
-
-.power-rank-cell {
-    font-weight: 600;
-    color: var(--navy-700);
-    width: 40px;
-}
-
-.power-logo-cell {
-    width: 50px;
-}
-
-.power-logo-cell img {
-    width: 32px;
-    height: 32px;
-    object-fit: contain;
-    border-radius: var(--radius-sm);
-}
-
-.power-data-cell {
-    text-align: center;
-}
-
-/* .power-rating removed — use .ibl-stat-highlight (tables.css) instead */
+/* Contact table overrides moved to tables.css */
 
 /* ==========================================================================
    Waivers Module
@@ -1827,54 +1491,7 @@ html:has(.depth-chart-form) {
     overflow-x: visible;
 }
 
-table.depth-chart-table {
-    border-collapse: separate;
-    border-spacing: 0;
-    border: 1px solid var(--gray-200, #e5e7eb);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow: var(--shadow-md);
-    margin: 0 auto;
-    width: auto;
-    max-width: none;
-}
-
-.depth-chart-table th {
-    background: var(--gradient-navy-header);
-    color: white;
-    font-family: var(--font-display);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: var(--space-2) var(--space-3);
-    text-align: center;
-}
-
-table.depth-chart-table td {
-    padding: 0.25rem;
-    text-align: center;
-    border-bottom: 1px solid var(--gray-100);
-}
-
-table.depth-chart-table td:first-child,
-table.depth-chart-table td:last-child {
-    padding: 0.25rem;
-}
-
-.depth-chart-table tbody tr:nth-child(odd) {
-    background-color: white;
-}
-
-.depth-chart-table tbody tr:nth-child(even) {
-    background-color: var(--gray-50);
-}
-
-.depth-chart-table select {
-    padding: 0.25rem;
-    border: 1px solid var(--gray-300);
-    border-radius: var(--radius-sm);
-    font-size: 0.875rem;
-}
+/* Depth chart table overrides moved to tables.css */
 
 .depth-chart-buttons {
     text-align: center;
@@ -1919,27 +1536,6 @@ table.depth-chart-table td:last-child {
 
 .player-awards-sort__option input[type="radio"] {
     accent-color: var(--accent-500);
-}
-
-/* ==========================================================================
-   Site Footer
-   ========================================================================== */
-
-.site-footer {
-    text-align: center;
-    padding: var(--space-4) var(--space-2);
-    margin-top: var(--space-4);
-    font-size: 0.875rem;
-    color: var(--gray-600);
-}
-
-.site-footer p {
-    margin: var(--space-1) 0;
-}
-
-.site-footer .page-time {
-    font-size: 0.75rem;
-    color: var(--gray-500);
 }
 
 /* ==========================================================================

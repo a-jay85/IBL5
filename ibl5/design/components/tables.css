@@ -1171,6 +1171,7 @@
 .trading-layout {
     border-collapse: separate;
     border-spacing: var(--space-2);
+    margin: 0 auto;
 }
 
 .trading-layout > tbody > tr > td {
@@ -1181,6 +1182,7 @@
 .trading-team-select {
     min-width: 220px;
     max-width: 280px;
+    margin: 0 auto;
 }
 
 /* Roster tables for player/pick selection */
@@ -1350,4 +1352,131 @@
 .league-stats-team-cell a {
     font-weight: 600;
     text-decoration: none;
+}
+
+/* ==========================================================================
+   All-Star Appearances Table
+
+   Overrides for .ibl-data-table on All-Star pages.
+   Source: class="sortable ibl-data-table allstar-table"
+   ========================================================================== */
+
+.allstar-table {
+    max-width: 500px;
+}
+
+.allstar-table td:last-child {
+    font-weight: 600;
+    color: var(--accent-600);
+}
+
+/* ==========================================================================
+   Contact List Table
+
+   Overrides for .ibl-data-table on the Contact List page.
+   Source: class="sortable ibl-data-table contact-table"
+   ========================================================================== */
+
+.contact-table {
+    max-width: 800px;
+}
+
+.contact-table .team-cell {
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+}
+
+.contact-table .team-cell a {
+    font-weight: 600;
+}
+
+.contact-table .gm-cell a {
+    color: var(--gray-700);
+}
+
+.contact-table .gm-cell a:hover {
+    color: var(--accent-600);
+}
+
+/* ==========================================================================
+   Transaction History Table
+
+   Overrides for .ibl-data-table on Transaction History pages.
+   Source: class="ibl-data-table responsive-table txn-table"
+   ========================================================================== */
+
+.txn-table td:nth-child(3) { text-align: left; }
+.txn-table th:nth-child(3) { text-align: left; }
+
+/* ==========================================================================
+   Depth Chart Table
+
+   Overrides for .ibl-data-table on the Depth Chart page.
+   Source: class="depth-chart-table ibl-data-table"
+   Only unique overrides — redundant base-table properties removed.
+   ========================================================================== */
+
+.depth-chart-table {
+    max-width: none;
+}
+
+.depth-chart-table td {
+    padding: 0.25rem;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.depth-chart-table td:first-child,
+.depth-chart-table td:last-child {
+    padding: 0.25rem;
+}
+
+.depth-chart-table select {
+    padding: 0.25rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+}
+
+/* ==========================================================================
+   Draft Pick Locator Table
+
+   Standalone table (NOT .ibl-data-table) for draft pick ownership grid.
+   Source: class="draft-pick-table sticky-table"
+   Properties overridden by .sticky-table (border-radius, overflow,
+   box-shadow) have been removed.
+   ========================================================================== */
+
+.draft-pick-locator-container {
+    text-align: center;
+}
+
+.draft-pick-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 0 auto;
+}
+
+.draft-pick-table th,
+.draft-pick-table td {
+    border: 1px solid var(--gray-200);
+    padding: 0.5rem;
+    text-align: center;
+    font-size: 0.875rem;
+}
+
+.draft-pick-table th {
+    background: var(--gradient-navy-header);
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.draft-pick-own {
+    background-color: var(--gray-100);
+}
+
+.draft-pick-traded {
+    font-weight: 600;
 }

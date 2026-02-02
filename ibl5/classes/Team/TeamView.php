@@ -34,7 +34,7 @@ class TeamView implements TeamViewInterface
             $cardsRowHtml = "<div class=\"team-cards-row\">$currentSeasonCard$draftPicksHtml$awardsCard</div>";
             $draftPicksHtml = ""; // already inside cards row
         }
-        $franchiseHtml = $isActualTeam ? $franchiseHistoryCard : "";
+        $franchiseHtml = $isActualTeam ? "<div style=\"max-width: 1115px; margin: 0 auto;\">$franchiseHistoryCard</div>" : "";
         $raftersHtml = $isActualTeam ? "<div class=\"team-page-rafters\">$rafters</div>" : "";
 
         $yearHeading = ($yr !== null && $yr !== '')

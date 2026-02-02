@@ -331,7 +331,7 @@ class TradingView implements TradingViewInterface
     <td class="ibl-player-cell">
         <img src="images/logo/<?= $pickTeam ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
         <div>
-            <?= $pickYear ?> <?= $pickTeam ?> Round <?= $pickRound ?>
+            <?= $pickYear ?> <span class="ibl-team-cell__text"><?= $pickTeam ?></span> Round <?= $pickRound ?>
 <?php if ($pickNotes !== null && $pickNotes !== ''): ?>
             <div class="draft-picks-list__notes"><?= HtmlSanitizer::safeHtmlOutput($pickNotes) ?></div>
 <?php endif; ?>

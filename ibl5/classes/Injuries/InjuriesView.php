@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Injuries;
 
 use Injuries\Contracts\InjuriesViewInterface;
+use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -110,11 +111,11 @@ class InjuriesView implements InjuriesViewInterface
         $teamName = HtmlSanitizer::safeHtmlOutput($player['teamName']);
         $color1 = HtmlSanitizer::safeHtmlOutput($player['teamColor1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($player['teamColor2']);
-        $playerImage = "images/player/{$playerID}.jpg";
+        $playerThumbnail = PlayerImageHelper::renderThumbnail($playerID);
 
         return "<tr>
     <td>{$position}</td>
-    <td class=\"ibl-player-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$playerID}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\">{$name}</a></td>
+    <td class=\"ibl-player-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$playerID}\">{$playerThumbnail}{$name}</a></td>
     <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
         <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$teamID}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
             <img src=\"images/logo/new{$teamID}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">

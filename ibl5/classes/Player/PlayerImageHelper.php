@@ -65,6 +65,16 @@ class PlayerImageHelper implements PlayerImageHelperInterface
      * - Numeric (convertible to int)
      * - Greater than zero when converted to int
      */
+    /**
+     * @see PlayerImageHelperInterface::renderThumbnail()
+     */
+    public static function renderThumbnail($playerID, string $basePath = './images/player/'): string
+    {
+        $url = self::getImageUrl($playerID, $basePath);
+
+        return '<img src="' . $url . '" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy">';
+    }
+
     public static function isValidPlayerID($playerID): bool
     {
         // Null or empty string

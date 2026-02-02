@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DraftHistory;
 
 use DraftHistory\Contracts\DraftHistoryViewInterface;
+use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -143,12 +144,12 @@ class DraftHistoryView implements DraftHistoryViewInterface
     </td>";
             }
 
-            $playerImage = "images/player/{$pid}.jpg";
+            $playerThumbnail = PlayerImageHelper::renderThumbnail($pid);
 
             $output .= "<tr>
     <td class=\"sticky-col-1\">{$round}</td>
     <td class=\"sticky-col-2\">{$pickNo}</td>
-    <td class=\"name-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\" loading=\"lazy\">{$name}</a></td>
+    <td class=\"name-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a></td>
     <td>{$pos}</td>
     {$teamCell}
     <td>{$college}</td>
@@ -200,12 +201,12 @@ class DraftHistoryView implements DraftHistoryViewInterface
             $isRetired = (int) ($pick['retired'] ?? 0) === 1;
 
             $retiredBadge = $isRetired ? ' <span class="draft-retired-badge">(ret.)</span>' : '';
-            $playerImage = "images/player/{$pid}.jpg";
+            $playerThumbnail = PlayerImageHelper::renderThumbnail($pid);
 
             $output .= "<tr>
     <td>{$round}</td>
     <td>{$pickNo}</td>
-    <td class=\"name-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\" loading=\"lazy\">{$name}</a>{$retiredBadge}</td>
+    <td class=\"name-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a>{$retiredBadge}</td>
     <td>{$pos}</td>
     <td>{$college}</td>
     <td>{$draftYear}</td>

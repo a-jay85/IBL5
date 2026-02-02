@@ -39,4 +39,16 @@ interface PlayerImageHelperInterface
      * @see https://www.w3schools.com/CSS/css_rwd_images.asp - Responsive images best practices
      */
     public static function getImageUrl($playerID, string $basePath = './images/player/'): string;
+
+    /**
+     * Render a player thumbnail <img> tag with lazy loading
+     *
+     * Returns a complete <img> element with class="ibl-player-photo", 24x24 dimensions,
+     * and loading="lazy". Uses getImageUrl() internally for safe URL generation.
+     *
+     * @param int|string|null $playerID The player's ID
+     * @param string $basePath Optional base path prefix (default: './images/player/')
+     * @return string Complete <img> HTML tag
+     */
+    public static function renderThumbnail($playerID, string $basePath = './images/player/'): string;
 }

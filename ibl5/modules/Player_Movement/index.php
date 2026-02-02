@@ -15,6 +15,8 @@ if (!defined('MODULE_FILE')) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
+use Player\PlayerImageHelper;
+
 global $mysqli_db;
 $season = new Season($mysqli_db);
 
@@ -70,7 +72,7 @@ echo '<h2 class="ibl-title">Player Movement</h2>
 while ($row = $result->fetch_assoc()) {
     $pid = (int) $row['pid'];
     $playerName = Utilities\HtmlSanitizer::safeHtmlOutput($row['name']);
-    $playerImage = "images/player/{$pid}.jpg";
+    $playerThumbnail = PlayerImageHelper::renderThumbnail($pid);
 
     // New team data
     $newTeamId = (int) $row['new_teamid'];
@@ -112,7 +114,7 @@ while ($row = $result->fetch_assoc()) {
     }
 
     echo "<tr>
-        <td class=\"ibl-player-cell\"><a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\">{$playerName}</a></td>
+        <td class=\"ibl-player-cell\"><a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$playerName}</a></td>
         {$oldTeamCell}
         {$newTeamCell}
     </tr>";

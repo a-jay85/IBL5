@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace UI\Tables;
 
 use Player\Player;
+use Player\PlayerImageHelper;
 
 /**
  * Ratings - Displays player ratings table
@@ -131,7 +132,6 @@ class Ratings
         <tr<?= $row['isHighlight'] ? ' class="ratings-highlight"' : '' ?>>
 <?php if ($moduleName == "League_Starters"):
     $teamId = (int) ($player->teamID ?? 0);
-    $teamCity = htmlspecialchars($player->teamCity ?? '');
     $teamNameStr = htmlspecialchars($player->teamName ?? '');
     $color1 = htmlspecialchars($player->teamColor1 ?? 'FFFFFF');
     $color2 = htmlspecialchars($player->teamColor2 ?? '000000');
@@ -141,12 +141,12 @@ class Ratings
             <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
         <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
             <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-            <span class="ibl-team-cell__text"><?= $teamCity ?> <?= $teamNameStr ?></span>
+            <span class="ibl-team-cell__text"><?= $teamNameStr ?></span>
         </a>
     </td>
     <?php endif; ?>
 <?php endif; ?>
-            <td class="sticky-col ibl-player-cell<?= in_array((int)$player->playerID, $starterPids, true) ? ' is-starter' : '' ?>" style="white-space: nowrap;"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><img src="images/player/<?= (int)$player->playerID ?>.jpg" alt="" class="ibl-player-photo" width="24" height="24"><?= $player->decoratedName ?></a></td>
+            <td class="sticky-col ibl-player-cell<?= in_array((int)$player->playerID, $starterPids, true) ? ' is-starter' : '' ?>" style="white-space: nowrap;"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= PlayerImageHelper::renderThumbnail((int)$player->playerID) ?><?= $player->decoratedName ?></a></td>
             <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
             <td style="text-align: center;"><?= (int)$player->age ?></td>
             <td class="sep-team"></td>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AllStarAppearances;
 
 use AllStarAppearances\Contracts\AllStarAppearancesViewInterface;
+use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -68,10 +69,10 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
             $name = HtmlSanitizer::safeHtmlOutput($row['name'] ?? '');
             $pid = (int) ($row['pid'] ?? 0);
             $count = (int) ($row['appearances'] ?? 0);
-            $playerImage = "images/player/{$pid}.jpg";
+            $playerThumbnail = PlayerImageHelper::renderThumbnail($pid);
 
             $output .= "<tr>
-    <td class=\"ibl-player-cell\"><a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\">{$name}</a></td>
+    <td class=\"ibl-player-cell\"><a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a></td>
     <td>{$count}</td>
 </tr>";
         }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SeasonHighs;
 
 use SeasonHighs\Contracts\SeasonHighsViewInterface;
+use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -97,8 +98,8 @@ class SeasonHighsView implements SeasonHighsViewInterface
             // Link player names to their profile page when pid is available
             if (isset($row['pid'])) {
                 $pid = (int) $row['pid'];
-                $playerImage = "images/player/{$pid}.jpg";
-                $name = "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\">{$name}</a>";
+                $playerThumbnail = PlayerImageHelper::renderThumbnail($pid);
+                $name = "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a>";
 
                 // Build team cell for player stats
                 if ($isPlayerStats) {

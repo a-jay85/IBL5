@@ -335,7 +335,7 @@ HTML;
     <!-- Draft Info -->
     <div class="draft-info">
         Drafted by {$draftTeam} · Rd {$draftRound}, Pick #{$draftPick} · 
-        <a href="/ibl5/pages/draftHistory.php?year={$draftYear}">{$draftYear}</a>
+        <a href="/ibl5/modules.php?name=Draft_History&year={$draftYear}">{$draftYear}</a>
     </div>
 HTML;
     }

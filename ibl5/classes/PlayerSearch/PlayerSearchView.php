@@ -330,11 +330,11 @@ function resetPlayerSearch() {
         <th>dd</th>
         <th>pd</th>
         <th>td</th>
-        <th>Talent</th>
-        <th>Skill</th>
-        <th>Intangibles</th>
-        <th>Clutch</th>
-        <th>Consistency</th>
+        <th>TAL</th>
+        <th>SKL</th>
+        <th>INT</th>
+        <th>CLU</th>
+        <th>CON</th>
         <th>College</th>
     </tr>
         <?php

@@ -144,7 +144,7 @@ final class PlayerSearchViewTest extends TestCase
         $this->assertStringContainsString('>2ga<', $html);
         $this->assertStringContainsString('>2gp<', $html);
         $this->assertStringContainsString('>oo<', $html);
-        $this->assertStringContainsString('>Talent<', $html);
+        $this->assertStringContainsString('>TAL<', $html);
         $this->assertStringContainsString('>College<', $html);
     }
 

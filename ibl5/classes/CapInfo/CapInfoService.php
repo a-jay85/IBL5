@@ -94,8 +94,8 @@ class CapInfoService
             'availableSalary' => $availableSalary,
             'positionSalaries' => $positionSalaries,
             'freeAgencySlots' => $freeAgencySlots,
-            'hasMLE' => $team->hasMLE == 1,
-            'hasLLE' => $team->hasLLE == 1,
+            'hasMLE' => $team->hasMLE === 1,
+            'hasLLE' => $team->hasLLE === 1,
         ];
     }
 

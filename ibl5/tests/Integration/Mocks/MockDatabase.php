@@ -5,11 +5,23 @@ namespace Tests\Integration\Mocks;
 /**
  * Mock database class for testing
  * Provides a mock implementation of database operations without requiring actual database connections
+ * Extends mysqli to satisfy type hints in modern code while supporting legacy sql_* methods
  */
-class MockDatabase
+class MockDatabase extends \mysqli
 {
+    /**
+     * Override constructor to prevent actual database connection
+     */
+    public function __construct()
+    {
+        // Don't call parent constructor - we're a mock that doesn't need a real connection
+    }
+
     private array $mockData = [];
     private array $mockTradeInfo = [];
+    private array $mockTeamData = [];
+    private array $mockPythagoreanData = [];
+    private array $votingResultsQueue = [];
     private ?int $numRows = null;
     private bool $returnTrue = true;
     private array $executedQueries = [];
@@ -39,10 +51,45 @@ class MockDatabase
         }
         
         // Special handling for trade info queries (support both direct and prepared statement patterns)
-        if (stripos($query, 'ibl_trade_info') !== false && 
+        if (stripos($query, 'ibl_trade_info') !== false &&
             stripos($query, 'tradeofferid') !== false &&
             !empty($this->mockTradeInfo)) {
             return new MockDatabaseResult($this->mockTradeInfo);
+        }
+
+        // Special handling for team info queries - return mock team data if available
+        if (stripos($query, 'ibl_team_info') !== false && !empty($this->mockTeamData)) {
+            // Try to match by teamid if specified in query
+            if (preg_match('/teamid\s*=\s*[\'"]?(\d+)[\'"]?/i', $query, $matches)) {
+                $searchId = (int)$matches[1];
+                foreach ($this->mockTeamData as $team) {
+                    if (isset($team['teamid']) && (int)$team['teamid'] === $searchId) {
+                        return new MockDatabaseResult([$team]);
+                    }
+                }
+            }
+            // Return all team data if no specific match
+            return new MockDatabaseResult($this->mockTeamData);
+        }
+
+        // Special handling for pythagorean stats queries (offense/defense stats)
+        // Always intercept these queries to avoid returning standings data
+        if (stripos($query, 'ibl_team_offense_stats') !== false ||
+            stripos($query, 'ibl_team_defense_stats') !== false) {
+            if (!empty($this->mockPythagoreanData)) {
+                return new MockDatabaseResult([$this->mockPythagoreanData]);
+            }
+            // Return empty result if no pythagorean data configured
+            return new MockDatabaseResult([]);
+        }
+
+        // Special handling for voting queries (ASG and EOY tables)
+        // Returns results from queue for consecutive queries
+        if ((stripos($query, 'ibl_votes_ASG') !== false ||
+             stripos($query, 'ibl_votes_EOY') !== false) &&
+            !empty($this->votingResultsQueue)) {
+            $data = array_shift($this->votingResultsQueue);
+            return new MockDatabaseResult($data ?? []);
         }
         
         // Smart filtering for player queries with pid/itemid/pickid
@@ -125,6 +172,34 @@ class MockDatabase
         // Also set numRows to match trade info count
         $this->numRows = count($data);
     }
+
+    /**
+     * Set mock team data for team queries (ibl_team_info)
+     * Used when tests need Team::initialize() to return valid team objects
+     */
+    public function setMockTeamData(array $data): void
+    {
+        $this->mockTeamData = $data;
+    }
+
+    /**
+     * Set mock pythagorean stats data for offense/defense stats queries
+     * Used when tests need StandingsRepository::getTeamPythagoreanStats() to return valid data
+     */
+    public function setMockPythagoreanData(array $data): void
+    {
+        $this->mockPythagoreanData = $data;
+    }
+
+    /**
+     * Set voting results queue for ASG/EOY voting queries
+     * Each element is returned for consecutive sql_query() calls to voting tables
+     * Used when tests need VotingResultsService to return voting data
+     */
+    public function setVotingResultsQueue(array $resultsQueue): void
+    {
+        $this->votingResultsQueue = $resultsQueue;
+    }
     
     public function setNumRows(int $numRows): void
     {
@@ -158,9 +233,19 @@ class MockDatabase
     }
 
     /**
+     * Override real_escape_string to work without a real connection
+     * Uses addslashes as a simple substitute for testing
+     */
+    public function real_escape_string(string $string): string
+    {
+        return addslashes($string);
+    }
+
+    /**
      * Mock prepared statement support
      * Returns a MockPreparedStatement that supports bind_param and execute
      */
+    #[\ReturnTypeWillChange]
     public function prepare(string $query): MockPreparedStatement
     {
         return new MockPreparedStatement($this, $query);

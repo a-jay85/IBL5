@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DraftPickLocator;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use DraftPickLocator\DraftPickLocatorService;
 use DraftPickLocator\Contracts\DraftPickLocatorRepositoryInterface;
@@ -11,6 +12,7 @@ use DraftPickLocator\Contracts\DraftPickLocatorRepositoryInterface;
 /**
  * DraftPickLocatorServiceTest - Tests for DraftPickLocatorService
  */
+#[AllowMockObjectsWithoutExpectations]
 class DraftPickLocatorServiceTest extends TestCase
 {
     private object $mockRepository;

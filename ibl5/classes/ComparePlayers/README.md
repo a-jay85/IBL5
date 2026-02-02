@@ -268,8 +268,8 @@ vendor/bin/phpunit tests/ComparePlayers/
 # Run specific test file
 vendor/bin/phpunit tests/ComparePlayers/ComparePlayersRepositoryTest.php
 
-# Run with verbose output
-vendor/bin/phpunit tests/ComparePlayers/ --verbose
+# Run with all issue details shown
+vendor/bin/phpunit tests/ComparePlayers/ --display-all-issues
 ```
 
 ### Test Results

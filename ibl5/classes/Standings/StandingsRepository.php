@@ -62,25 +62,28 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         $columns = $this->getGroupingColumns($region);
 
         $query = "SELECT
-            tid,
-            team_name,
-            leagueRecord,
-            pct,
-            {$columns['gbColumn']} AS gamesBack,
-            confRecord,
-            divRecord,
-            homeRecord,
-            awayRecord,
-            gamesUnplayed,
-            {$columns['magicNumberColumn']} AS magicNumber,
-            clinchedConference,
-            clinchedDivision,
-            clinchedPlayoffs,
-            (homeWins + homeLosses) AS homeGames,
-            (awayWins + awayLosses) AS awayGames
-            FROM ibl_standings
-            WHERE {$columns['grouping']} = ?
-            ORDER BY {$columns['gbColumn']} ASC";
+            s.tid,
+            s.team_name,
+            s.leagueRecord,
+            s.pct,
+            s.{$columns['gbColumn']} AS gamesBack,
+            s.confRecord,
+            s.divRecord,
+            s.homeRecord,
+            s.awayRecord,
+            s.gamesUnplayed,
+            s.{$columns['magicNumberColumn']} AS magicNumber,
+            s.clinchedConference,
+            s.clinchedDivision,
+            s.clinchedPlayoffs,
+            (s.homeWins + s.homeLosses) AS homeGames,
+            (s.awayWins + s.awayLosses) AS awayGames,
+            t.color1,
+            t.color2
+            FROM ibl_standings s
+            JOIN ibl_team_info t ON s.tid = t.teamid
+            WHERE s.{$columns['grouping']} = ?
+            ORDER BY s.{$columns['gbColumn']} ASC";
 
         return $this->fetchAll($query, "s", $region);
     }
@@ -91,7 +94,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     public function getTeamStreakData(int $teamId): ?array
     {
         return $this->fetchOne(
-            "SELECT last_win, last_loss, streak_type, streak FROM ibl_power WHERE TeamID = ?",
+            "SELECT last_win, last_loss, streak_type, streak, ranking FROM ibl_power WHERE TeamID = ?",
             "i",
             $teamId
         );

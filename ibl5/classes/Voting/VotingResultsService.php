@@ -29,9 +29,9 @@ class VotingResultsService implements VotingResultsServiceInterface
         'GM of the Year' => ['GM_1' => 3, 'GM_2' => 2, 'GM_3' => 1],
     ];
 
-    private $db;
+    private \mysqli $db;
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
     }
@@ -111,32 +111,7 @@ class VotingResultsService implements VotingResultsServiceInterface
 
     private function executeVoteQuery(string $query): array
     {
-        // Support both legacy and modern database connections
-        if (method_exists($this->db, 'sql_query')) {
-            // LEGACY: mysql class with sql_* methods
-            $result = $this->db->sql_query($query);
-            if ($result === false) {
-                return [];
-            }
-
-            $rows = [];
-            while ($record = $result->fetch_assoc()) {
-                $name = trim((string) ($record['name'] ?? ''));
-                if ($name === '') {
-                    $name = self::BLANK_BALLOT_LABEL;
-                }
-
-                $votes = (int) ($record['votes'] ?? 0);
-                $rows[] = [
-                    'name' => $name,
-                    'votes' => $votes,
-                ];
-            }
-
-            return $rows;
-        }
-
-        // MODERN: mysqli with prepared statements (no parameters needed for these queries)
+        // Use mysqli with prepared statements (no parameters needed for these queries)
         $stmt = $this->db->prepare($query);
         if ($stmt === false) {
             error_log("VotingResultsService: Failed to prepare query: " . $this->db->error);

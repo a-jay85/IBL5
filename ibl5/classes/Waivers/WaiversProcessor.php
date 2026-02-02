@@ -56,7 +56,7 @@ class WaiversProcessor implements WaiversProcessorInterface
             $experience = $playerData->yearsOfExperience;
         }
         
-        if ($currentSeasonSalary == 0) {
+        if ($currentSeasonSalary === 0) {
             return (string) $this->calculateVeteranMinimumSalary($experience);
         }
         

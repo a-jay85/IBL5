@@ -1,5 +1,6 @@
 <?php
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use RookieOption\RookieOptionValidator;
 
@@ -31,6 +32,7 @@ class MockPlayerClass
 /**
  * Tests for RookieOptionValidator
  */
+#[AllowMockObjectsWithoutExpectations]
 class RookieOptionValidatorTest extends TestCase
 {
     private $validator;

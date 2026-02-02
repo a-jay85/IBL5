@@ -1,0 +1,342 @@
+/**
+ * IBL5 Form Components
+ *
+ * Shared form element styles for:
+ * - Login/Registration forms
+ * - Search forms
+ * - Admin forms
+ * - Settings pages
+ */
+
+/* ==========================================================================
+   Base Form Elements
+   ========================================================================== */
+
+.ibl-input,
+.ibl-select,
+.ibl-textarea {
+    font-family: var(--font-sans);
+    font-size: 1.125rem;
+    color: var(--navy-800);
+    background-color: white;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    width: 100%;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ibl-input:focus,
+.ibl-select:focus,
+.ibl-textarea:focus {
+    outline: none;
+    border-color: var(--accent-500);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.ibl-input::placeholder {
+    color: var(--gray-400);
+}
+
+.ibl-input:disabled,
+.ibl-select:disabled,
+.ibl-textarea:disabled {
+    background-color: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+}
+
+/* Input sizes */
+.ibl-input--sm {
+    font-size: 1rem;
+    padding: var(--space-1) var(--space-2);
+}
+
+.ibl-input--lg {
+    font-size: 1.25rem;
+    padding: var(--space-3) var(--space-4);
+}
+
+/* ==========================================================================
+   Labels
+   ========================================================================== */
+
+.ibl-label {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-2);
+}
+
+.ibl-label--required::after {
+    content: ' *';
+    color: #dc2626;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.ibl-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-decoration: none;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.ibl-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Primary button */
+.ibl-btn--primary {
+    background: var(--gradient-accent);
+    color: white;
+    box-shadow: 0 2px 6px rgb(249 115 22 / 0.3);
+}
+
+.ibl-btn--primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--accent-600), var(--accent-600));
+    box-shadow: 0 4px 12px rgb(249 115 22 / 0.4);
+}
+
+/* Secondary button */
+.ibl-btn--secondary {
+    background: var(--navy-800);
+    color: white;
+}
+
+.ibl-btn--secondary:hover:not(:disabled) {
+    background: var(--navy-900);
+}
+
+/* Ghost button */
+.ibl-btn--ghost {
+    background: transparent;
+    color: var(--navy-800);
+    border: 1px solid var(--gray-300);
+}
+
+.ibl-btn--ghost:hover:not(:disabled) {
+    background: var(--gray-100);
+    border-color: var(--gray-400);
+}
+
+/* Button sizes */
+.ibl-btn--sm {
+    font-size: 1rem;
+    padding: var(--space-1) var(--space-3);
+}
+
+.ibl-btn--lg {
+    font-size: 1.25rem;
+    padding: var(--space-3) var(--space-6);
+}
+
+/* Full-width button */
+.ibl-btn--block {
+    width: 100%;
+}
+
+/* ==========================================================================
+   Form Groups
+   ========================================================================== */
+
+.ibl-form-group {
+    margin-bottom: var(--space-4);
+}
+
+.ibl-form-group--inline {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.ibl-form-help {
+    font-size: 1rem;
+    color: var(--gray-500);
+    margin-top: var(--space-1);
+}
+
+.ibl-form-error {
+    font-size: 1rem;
+    color: #dc2626;
+    margin-top: var(--space-1);
+}
+
+/* ==========================================================================
+   Checkbox & Radio
+   ========================================================================== */
+
+.ibl-checkbox,
+.ibl-radio {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+}
+
+.ibl-checkbox input,
+.ibl-radio input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-500);
+    cursor: pointer;
+}
+
+.ibl-checkbox__label,
+.ibl-radio__label {
+    font-size: 1.125rem;
+    color: var(--gray-700);
+}
+
+/* ==========================================================================
+   Search Form
+   ========================================================================== */
+
+.ibl-search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: white;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-full);
+    padding: var(--space-1) var(--space-3);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ibl-search:focus-within {
+    border-color: var(--accent-500);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.ibl-search__icon {
+    color: var(--gray-400);
+    flex-shrink: 0;
+}
+
+.ibl-search__input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 1.125rem;
+    background: transparent;
+}
+
+.ibl-search__input::placeholder {
+    color: var(--gray-400);
+}
+
+.ibl-search__btn {
+    background: var(--accent-500);
+    color: white;
+    border: none;
+    border-radius: var(--radius-full);
+    padding: var(--space-1) var(--space-3);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.ibl-search__btn:hover {
+    background: var(--accent-600);
+}
+
+/* ==========================================================================
+   Filter Form (for data table filtering)
+
+   Used by LeaderboardsView, SeasonLeadersView, and other pages with
+   filter/search forms above data tables.
+   ========================================================================== */
+
+.ibl-filter-form {
+    background: var(--gray-50, #f9fafb);
+    border: 1px solid var(--gray-200, #e5e7eb);
+    border-radius: var(--radius-lg, 0.5rem);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.ibl-filter-form__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.ibl-filter-form__group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ibl-filter-form__label {
+    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gray-600, #4b5563);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.ibl-filter-form select,
+.ibl-filter-form input[type="text"],
+.ibl-filter-form input[type="number"] {
+    font-family: var(--font-sans, 'Barlow', sans-serif);
+    font-size: 1.125rem;
+    padding: 0.375rem 0.625rem;
+    border: 1px solid var(--gray-300, #d1d5db);
+    border-radius: var(--radius-md, 0.375rem);
+    background: white;
+    color: var(--gray-800, #1f2937);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ibl-filter-form select:focus,
+.ibl-filter-form input:focus {
+    outline: none;
+    border-color: var(--accent-500, #f97316);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+}
+
+.ibl-filter-form input[type="number"] {
+    width: 5rem;
+}
+
+.ibl-filter-form__submit {
+    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.5rem 1rem;
+    background: var(--gradient-navy-header);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md, 0.375rem);
+    cursor: pointer;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ibl-filter-form__submit:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
+}

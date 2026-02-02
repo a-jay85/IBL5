@@ -22,9 +22,14 @@ use DraftPickLocator\DraftPickLocatorRepository;
 use DraftPickLocator\DraftPickLocatorService;
 use DraftPickLocator\DraftPickLocatorView;
 
+$module_name = basename(dirname(__FILE__));
+get_lang($module_name);
+
 global $mysqli_db;
 
 $season = new Season($mysqli_db);
+
+$pagetitle = "- Draft Pick Locator";
 
 // Initialize services
 $repository = new DraftPickLocatorRepository($mysqli_db);
@@ -34,5 +39,9 @@ $view = new DraftPickLocatorView();
 // Get teams with their draft picks
 $teamsWithPicks = $service->getAllTeamsWithPicks();
 
-// Render output
+// Render page
+Nuke\Header::header();
+
 echo $view->render($teamsWithPicks, $season->endingYear);
+
+Nuke\Footer::footer();

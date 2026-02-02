@@ -53,31 +53,31 @@ class DepthChartProcessor implements DepthChartProcessorInterface
             
             $playerData[] = $player;
             
-            if ($player['active'] == 1) {
+            if ($player['active'] === 1) {
                 $activePlayers++;
             }
-            
-            if ($player['pg'] > 0 && $injury == 0) {
+
+            if ($player['pg'] > 0 && $injury === 0) {
                 $pos_1++;
             }
-            if ($player['sg'] > 0 && $injury == 0) {
+            if ($player['sg'] > 0 && $injury === 0) {
                 $pos_2++;
             }
-            if ($player['sf'] > 0 && $injury == 0) {
+            if ($player['sf'] > 0 && $injury === 0) {
                 $pos_3++;
             }
-            if ($player['pf'] > 0 && $injury == 0) {
+            if ($player['pf'] > 0 && $injury === 0) {
                 $pos_4++;
             }
-            if ($player['c'] > 0 && $injury == 0) {
+            if ($player['c'] > 0 && $injury === 0) {
                 $pos_5++;
             }
-            
-            if ($player['pg'] == 1) $startingPositionCount++;
-            if ($player['sg'] == 1) $startingPositionCount++;
-            if ($player['sf'] == 1) $startingPositionCount++;
-            if ($player['pf'] == 1) $startingPositionCount++;
-            if ($player['c'] == 1) $startingPositionCount++;
+
+            if ($player['pg'] === 1) $startingPositionCount++;
+            if ($player['sg'] === 1) $startingPositionCount++;
+            if ($player['sf'] === 1) $startingPositionCount++;
+            if ($player['pf'] === 1) $startingPositionCount++;
+            if ($player['c'] === 1) $startingPositionCount++;
             
             if ($startingPositionCount > 1) {
                 $hasStarterAtMultiplePositions = true;

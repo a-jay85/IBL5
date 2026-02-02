@@ -17,7 +17,7 @@ class Season
     public int $lastSimNumber = 1;
     public string $lastSimStartDate = '2024-01-01';
     public string $lastSimEndDate = '2024-01-02';
-    public string $projectedNextSimEndDate = '2024-01-03';
+    public \DateTimeInterface|string $projectedNextSimEndDate;
     public string $allowTrades = 'Yes';
     public string $allowWaivers = 'Yes';
     public string $freeAgencyNotificationsState = 'Off';
@@ -48,6 +48,7 @@ class Season
         $this->postAllStarStartDate = date_create("2024-02-04");
         $this->playoffsStartDate = date_create("2024-06-01");
         $this->playoffsEndDate = date_create("2024-06-30");
+        $this->projectedNextSimEndDate = date_create("2024-01-10");
     }
     
     // Mock the methods that would normally query the database

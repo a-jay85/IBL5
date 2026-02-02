@@ -1,18 +1,18 @@
 # Strategic Development Priorities for IBL5
 
-**Last Updated:** January 9, 2026  
-**Status:** 22/23 IBL modules refactored (96% complete)
+**Last Updated:** January 25, 2026
+**Status:** 30/30 IBL modules refactored (100% complete) ✅
 
 ## Executive Summary
 
-The One-on-One module is now **complete** ✅, marking a major milestone with **96% of IBL modules refactored**. This interactive basketball simulation game adds 75 comprehensive tests and demonstrates the maturity of our interface-driven architecture pattern.
+All IBL modules are now **complete** ✅, marking a major milestone with **100% of IBL modules refactored**. The test suite has grown to 1484 tests with ~69% coverage.
 
 ### Progress
-- ✅ **22 modules refactored** (up from 21)
-- ✅ **One-on-One complete** - 7 classes, 4 interfaces, 75 tests, game simulation engine
-- ✅ **787 total tests** passing (20 skipped)
-- ✅ **~56% test coverage** (progressing toward 80% goal)
-- ✅ **Only 1 core module remaining:** Cap_Info
+- ✅ **30 modules refactored** (100% complete)
+- ✅ **1484 total tests** passing
+- ✅ **~69% test coverage** (progressing toward 80% goal)
+- ✅ **63 integration test methods** across 6 workflow suites (Draft, Extension, FreeAgency, Negotiation, Trading, Waivers)
+- ✅ **All core and display modules complete**
 
 ### Phase Transition: From Refactoring to Maturation
 
@@ -123,20 +123,25 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 
 ### Priority 1: Test Coverage Push ⭐⭐⭐⭐⭐ (CRITICAL)
 
-**Current Status:** 56% → **Target:** 80%
+**Current Status:** 69% → **Target:** 80%
 
-**Focus Areas:**
-- Add tests for modules with 0-2 tests: Voting (0), Schedule (0), DepthChart (2)
-- Integration tests for complex workflows (trading, free agency, draft)
+**Completed:**
+- ✅ 1484 tests passing
+- ✅ 63 integration test methods across 6 workflow suites
+- ✅ Waivers integration tests (25 test methods) - add/drop workflows, cap validation, timing
+- ✅ Draft, Extension, FreeAgency, Negotiation, Trading integration tests
+
+**Remaining Focus Areas:**
+- Add integration tests for: DepthChart, RookieOption, Standings/Schedule
 - Edge case testing for all validators and processors
 - Security testing (XSS, SQL injection, CSRF)
 
-**Estimated Effort:** 2-3 weeks
+**Estimated Effort:** 1-2 weeks
 
 **Success Metrics:**
 - 80%+ code coverage achieved
 - All public methods have tests
-- Critical paths have integration tests
+- All critical workflows have integration tests
 - Zero skipped tests
 
 ---
@@ -227,23 +232,15 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 
 ---
 
-### Priority 5: Cap_Info Module Refactoring ⭐⭐⭐ (COMPLETION)
+### Priority 5: Cap_Info Module ✅ (COMPLETE)
 
-**Goal:** Complete the final core IBL module
+**Status:** All 30 IBL modules refactored (100% complete) 🎉
 
-**Scope:**
-- 134 lines - salary cap information display
-- Simple refactoring following established patterns
-- Repository/Service/View architecture
-- Comprehensive unit tests
-
-**Estimated Effort:** 1 week
-
-**Success Metrics:**
-- 3+ classes with interfaces
-- 80%+ reduction in module file size
-- 15+ unit tests
-- **Achievement unlocked:** 100% IBL core modules refactored! 🎉
+**Achieved:**
+- ✅ 30/30 modules refactored with Repository/Service/View architecture
+- ✅ Interface-driven design across all modules
+- ✅ Comprehensive unit and integration tests
+- ✅ **Achievement unlocked:** 100% IBL core modules refactored!
 
 ---
 
@@ -251,8 +248,10 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 
 ### Optional Display Modules (Low Priority)
 These simple information display modules may not require full refactoring:
-- Team_Schedule (130 lines), Franchise_History (103 lines), Power_Rankings (90 lines)
+- Franchise_History (103 lines), Power_Rankings (90 lines)
 - Next_Sim (95 lines), League_Starters (85 lines), Draft_Pick_Locator (81 lines), Injuries (57 lines)
+
+Note: Team_Schedule module removed (January 2026) - functionality consolidated into unified Schedule module.
 
 **Recommendation:** Refactor only if time permits after priorities 1-5
 

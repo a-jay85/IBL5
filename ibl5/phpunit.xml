@@ -72,6 +72,9 @@
         <testsuite name="League Module Tests">
             <directory>tests/League</directory>
         </testsuite>
+        <testsuite name="Boxscore Module Tests">
+            <directory>tests/Boxscore</directory>
+        </testsuite>
         <testsuite name="Root Tests">
             <file>tests/ContractRulesTest.php</file>
             <file>tests/GameTest.php</file>
@@ -115,14 +118,14 @@
         <testsuite name="FranchiseHistory Module Tests">
             <directory>tests/FranchiseHistory</directory>
         </testsuite>
-        <testsuite name="PowerRankings Module Tests">
-            <directory>tests/PowerRankings</directory>
-        </testsuite>
         <testsuite name="Shared Module Tests">
             <directory>tests/Shared</directory>
         </testsuite>
         <testsuite name="Statistics Module Tests">
             <directory>tests/Statistics</directory>
+        </testsuite>
+        <testsuite name="Scripts Module Tests">
+            <directory>tests/Scripts</directory>
         </testsuite>
         <testsuite name="Integration Tests">
             <directory>tests/Integration</directory>

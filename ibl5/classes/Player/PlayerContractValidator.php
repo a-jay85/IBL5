@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Player;
 
 use Player\Contracts\PlayerContractValidatorInterface;
@@ -26,11 +28,11 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
         if ($this->wasRookieOptioned($playerData)) {
             $round = $playerData->draftRound;
             // First round: rookie option is year 4
-            if ($round == 1 && $currentYear == 4) {
+            if ($round === 1 && $currentYear === 4) {
                 return false;
             }
             // Second round: rookie option is year 3
-            if ($round == 2 && $currentYear == 3) {
+            if ($round === 2 && $currentYear === 3) {
                 return false;
             }
         }
@@ -43,7 +45,7 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
         // Check if next year has no salary (eligible for renegotiation)
         // Safe to access: currentYear is 0-5, so nextYear is 1-6 which all exist as properties
         $nextYearProperty = "contractYear" . ($currentYear + 1) . "Salary";
-        return $playerData->$nextYearProperty == 0;
+        return $playerData->$nextYearProperty === 0;
     }
 
     /**
@@ -54,7 +56,7 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
         $round = $playerData->draftRound;
         
         // Only first and second round picks are eligible
-        if ($round != 1 && $round != 2) {
+        if ($round !== 1 && $round !== 2) {
             return false;
         }
         
@@ -63,9 +65,9 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
             return false;
         }
         
-        if ($seasonPhase == "Free Agency") {
+        if ($seasonPhase === "Free Agency") {
             return $this->checkRookieOptionEligibility($playerData, $round, $seasonPhase);
-        } elseif ($seasonPhase == "Preseason" || $seasonPhase == "HEAT") {
+        } elseif ($seasonPhase === "Preseason" || $seasonPhase === "HEAT") {
             return $this->checkRookieOptionEligibility($playerData, $round, $seasonPhase);
         }
         
@@ -80,12 +82,12 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
         $round = $playerData->draftRound;
         
         // First round picks have a 3-year contract (cy3 is final year)
-        if ($round == 1) {
+        if ($round === 1) {
             return $playerData->contractYear3Salary;
         }
-        
+
         // Second round picks have a 2-year contract (cy2 is final year)
-        if ($round == 2) {
+        if ($round === 2) {
             return $playerData->contractYear2Salary;
         }
         
@@ -105,20 +107,20 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
         int $round,
         string $seasonPhase
     ): bool {
-        if ($round == 1) {
-            $requiredExperience = ($seasonPhase == "Free Agency") 
-                ? self::ROOKIE_OPTION_ROUND1_FA_EXPERIENCE 
+        if ($round === 1) {
+            $requiredExperience = ($seasonPhase === "Free Agency")
+                ? self::ROOKIE_OPTION_ROUND1_FA_EXPERIENCE
                 : self::ROOKIE_OPTION_ROUND1_INSEASON_EXPERIENCE;
-            return $playerData->yearsOfExperience == $requiredExperience
-                && $playerData->contractYear4Salary == 0;
+            return $playerData->yearsOfExperience === $requiredExperience
+                && $playerData->contractYear4Salary === 0;
         }
-        
-        if ($round == 2) {
-            $requiredExperience = ($seasonPhase == "Free Agency") 
-                ? self::ROOKIE_OPTION_ROUND2_FA_EXPERIENCE 
+
+        if ($round === 2) {
+            $requiredExperience = ($seasonPhase === "Free Agency")
+                ? self::ROOKIE_OPTION_ROUND2_FA_EXPERIENCE
                 : self::ROOKIE_OPTION_ROUND2_INSEASON_EXPERIENCE;
-            return $playerData->yearsOfExperience == $requiredExperience
-                && $playerData->contractYear3Salary == 0;
+            return $playerData->yearsOfExperience === $requiredExperience
+                && $playerData->contractYear3Salary === 0;
         }
         
         return false;
@@ -134,7 +136,7 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
             + $playerData->contractTotalYears 
             - $playerData->contractCurrentYear;
         
-        return $yearPlayerIsFreeAgent == $season->endingYear;
+        return $yearPlayerIsFreeAgent === $season->endingYear;
     }
 
     /**
@@ -146,12 +148,12 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
         $experience = $playerData->yearsOfExperience;
         
         // First round: Check in year 4
-        if ($round == 1 && $experience == 4) {
+        if ($round === 1 && $experience === 4) {
             return $this->isRookieOptionExercised($playerData, 3, 4);
         }
-        
+
         // Second round: Check in year 3
-        if ($round == 2 && $experience == 3) {
+        if ($round === 2 && $experience === 3) {
             return $this->isRookieOptionExercised($playerData, 2, 3);
         }
         
@@ -173,6 +175,6 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
         $baseSalary = $playerData->$baseProperty;
         $optionSalary = $playerData->$optionProperty;
         
-        return $optionSalary != 0 && $baseSalary * 2 == $optionSalary;
+        return $optionSalary !== 0 && $baseSalary * 2 === $optionSalary;
     }
 }

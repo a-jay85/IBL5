@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyOfferValidatorInterface;
@@ -9,13 +11,11 @@ use FreeAgency\Contracts\FreeAgencyOfferValidatorInterface;
  */
 class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
 {
-    private object $mysqli_db;
     private array $offerData = [];
     private $team;
 
-    public function __construct(object $mysqli_db, $team = null)
+    public function __construct($team = null)
     {
-        $this->mysqli_db = $mysqli_db;
         $this->team = $team;
     }
 
@@ -27,7 +27,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         $this->offerData = $offerData;
 
         // Check for zero first year
-        if ($this->offerData['offer1'] == 0) {
+        if ($this->offerData['offer1'] === 0) {
             return [
                 'valid' => false,
                 'error' => 'Sorry, you must enter an amount greater than zero in the first year of a free agency offer. Your offer in Year 1 was zero, so this offer is not valid.'
@@ -60,7 +60,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         }
 
         // Check soft cap space (if no Bird Rights and not using exceptions)
-        if (!\ContractRules::hasBirdRights($this->offerData['birdYears']) && $this->offerData['offerType'] == 0) {
+        if (!\ContractRules::hasBirdRights($this->offerData['birdYears']) && $this->offerData['offerType'] === 0) {
             $softCapValidation = $this->validateSoftCapSpace();
             if (!$softCapValidation['valid']) {
                 return $softCapValidation;
@@ -95,7 +95,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         }
 
         // Check if team has already used their MLE
-        if ($this->team->hasMLE != "1") {
+        if ($this->team->hasMLE !== "1") {
             return [
                 'valid' => false,
                 'error' => "Sorry, your team has already used the Mid-Level Exception this free agency period. You cannot make another MLE offer."
@@ -118,7 +118,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         }
 
         // Check if team has already used their LLE
-        if ($this->team->hasLLE != "1") {
+        if ($this->team->hasLLE !== "1") {
             return [
                 'valid' => false,
                 'error' => "Sorry, your team has already used the Lower-Level Exception this free agency period. You cannot make another LLE offer."
@@ -205,7 +205,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
             $previousOffer = $this->offerData["offer" . ($year - 1)];
             
             // Check if contract ended
-            if ($previousOffer == 0) {
+            if ($previousOffer === 0) {
                 $contractEnded = true;
             }
             
@@ -231,33 +231,4 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         return ['valid' => true];
     }
 
-    /**
-     * @see FreeAgencyOfferValidatorInterface::isPlayerAlreadySigned()
-     */
-    public function isPlayerAlreadySigned(int $playerId): bool
-    {
-        $query = "SELECT cy, cy1 FROM ibl_plr WHERE pid = ?";
-        $stmt = $this->mysqli_db->prepare($query);
-        if ($stmt === false) {
-            throw new \Exception('Prepare failed: ' . $this->mysqli_db->error);
-        }
-        
-        $stmt->bind_param("i", $playerId);
-        if (!$stmt->execute()) {
-            throw new \Exception('Execute failed: ' . $stmt->error);
-        }
-        
-        $result = $stmt->get_result();
-        $stmt->close();
-        
-        if ($result->num_rows === 0) {
-            return false;
-        }
-        
-        $row = $result->fetch_assoc();
-        $currentContractYear = $row['cy'] ?? 0;
-        $year1Contract = $row['cy1'] ?? '0';
-        
-        return ($currentContractYear == 0 && $year1Contract != "0");
-    }
 }

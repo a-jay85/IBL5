@@ -198,17 +198,9 @@ if ($row['radminsuper'] == 1) {
         $row = $db->sql_fetchrow($db->sql_query("SELECT Default_Theme, overwrite_theme from " . $prefix . "_config"));
         $Default_Theme = filter($row['Default_Theme'], "nohtml");
         $overwrite_theme = intval($row['overwrite_theme']);
-        $row = $db->sql_fetchrow($db->sql_query("SELECT active from " . $prefix . "_modules WHERE title='AutoTheme'"));
-        $auto_status = intval($row['active']);
-        if ($auto_status == 1) {
-            $auto_status = _ACTIVATED;
-        } elseif ($auto_status == 0) {
-            $auto_status = _DEACTIVATED;
-        }
         echo "<center><font class='option'><b>" . _THEMECONFIG . "</b></font></center>"
             . "<form action='" . $admin_file . ".php' method='post'>"
-            . "<table border=\"0\" align=\"center\" cellpadding=\"3\"><tr><td>"
-            . "" . _AUTOTHEMESTATUS . ":</td><td><b>$auto_status</b></td></tr>"
+            . "<table border=\"0\" align=\"center\" cellpadding=\"3\">"
             . "<tr><td>" . _DEFAULTTHEME . ":</td><td><select name='xDefault_Theme'>";
         $handle = opendir('themes');
         while ($file = readdir($handle)) {

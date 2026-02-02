@@ -101,7 +101,7 @@ class TradeValidator implements TradeValidatorInterface
         $cy = isset($player['cy']) ? (int) $player['cy'] : 0;
 
         // Player cannot be traded if they are waived (ordinal > JSB::WAIVERS_ORDINAL) or have 0 salary
-        return $cy != 0 && $ordinal <= \JSB::WAIVERS_ORDINAL;
+        return $cy !== 0 && $ordinal <= \JSB::WAIVERS_ORDINAL;
     }
 
     /**

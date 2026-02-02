@@ -39,50 +39,24 @@ class NextSimView implements NextSimViewInterface
      */
     public function render(array $games, int $simLengthInDays): string
     {
-        $html = $this->getStyleBlock();
-        $html .= '<div style="text-align: center;"><h1>Next Sim</h1></div>';
+        $html = '';
+        $html .= '<div class="next-sim-container">';
+        $html .= '<h1 class="next-sim-title">Next Sim</h1>';
 
         if (empty($games)) {
-            $html .= '<div style="text-align: center;">No games projected next sim!</div>';
+            $html .= '<div class="next-sim-empty">No games projected next sim!</div></div>';
             return $html;
         }
-
-        $html .= '<table style="width: 100%;" align="center">';
 
         for ($i = 0; $i < $simLengthInDays; $i++) {
             if (isset($games[$i])) {
                 $html .= $this->renderGameRow($games[$i]);
-                $html .= '<tr style="height: 15px;"></tr>';
             }
         }
 
-        $html .= '</table>';
+        $html .= '</div>';
 
         return $html;
-    }
-
-    /**
-     * Generate CSS styles for the next sim display
-     *
-     * @return string CSS style block
-     */
-    private function getStyleBlock(): string
-    {
-        return '<style>
-            .next-sim-day-label {
-                text-align: right;
-                width: 150px;
-            }
-            .next-sim-logo {
-                text-align: center;
-                padding-left: 4px;
-                padding-right: 4px;
-            }
-            .next-sim-record {
-                text-align: left;
-                width: 150px;
-            }
-        </style>';
     }
 
     /**
@@ -98,31 +72,30 @@ class NextSimView implements NextSimViewInterface
         /** @var \Team $opposingTeam */
         $opposingTeam = $gameData['opposingTeam'];
 
-        $dayLabel = 'Day ' . HtmlSanitizer::safeHtmlOutput($gameData['dayNumber']) . ' ' . 
+        $dayLabel = 'Day ' . HtmlSanitizer::safeHtmlOutput($gameData['dayNumber']) . ' ' .
             HtmlSanitizer::safeHtmlOutput($gameData['locationPrefix']);
         $gameDate = HtmlSanitizer::safeHtmlOutput($game->date);
         $opposingTeamId = (int)$opposingTeam->teamID;
         $seasonRecord = HtmlSanitizer::safeHtmlOutput($opposingTeam->seasonRecord);
 
-        $html = '<tr><td>';
-        $html .= '<table align="center">';
-        $html .= '<tr>';
-        $html .= '<td class="next-sim-day-label"><h2 title="' . $gameDate . '">' . $dayLabel . '</h2></td>';
-        $html .= '<td class="next-sim-logo">';
+        $html = '<div class="next-sim-day-game">';
+        $html .= '<div class="next-sim-day-row">';
+        $html .= '<div class="next-sim-day-label"><h2 title="' . $gameDate . '">' . $dayLabel . '</h2></div>';
+        $html .= '<div class="next-sim-logo">';
         $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $opposingTeamId . '">';
-        $html .= '<img src="./images/logo/' . $opposingTeamId . '.jpg" alt="Team Logo">';
+        $html .= '<img src="./images/logo/' . $opposingTeamId . '.jpg" alt="Team Logo" class="next-sim-banner" width="415" height="50">';
+        $html .= '<img src="./images/logo/new' . $opposingTeamId . '.png" alt="Team Logo" class="next-sim-mobile-logo" width="50" height="50">';
         $html .= '</a>';
-        $html .= '</td>';
-        $html .= '<td class="next-sim-record"><h2>' . $seasonRecord . '</h2></td>';
-        $html .= '</tr>';
-        $html .= '</table>';
-        $html .= '</td></tr>';
-
+        $html .= '</div>';
+        $html .= '<div class="next-sim-record"><h2>' . $seasonRecord . '</h2></div>';
+        $html .= '</div>';
+        
         // Render matchup ratings
-        $html .= '<tr><td>';
+        $html .= '<div>';
         $matchupPlayers = $this->prepareMatchupPlayers($gameData);
         $html .= \UI::ratings($this->db, $matchupPlayers, $opposingTeam, '', $this->season, $this->moduleName);
-        $html .= '</td></tr>';
+        $html .= '</div>';
+        $html .= '</div>';
 
         return $html;
     }

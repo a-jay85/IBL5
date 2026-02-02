@@ -7,19 +7,25 @@ description: PHPUnit 12.4+ test writing with behavior-focused patterns and mock 
 
 Write PHPUnit 12.4+ tests following behavior-focused testing principles.
 
-## PHPUnit 12.4.3 Commands
+## PHPUnit 12.x Commands
 
 ```bash
 # ✅ CORRECT
 vendor/bin/phpunit tests/Module/
 vendor/bin/phpunit --filter testMethodName
 vendor/bin/phpunit --testsuite "Module Tests"
+vendor/bin/phpunit -c phpunit.ci.xml        # Use specific config file
+vendor/bin/phpunit --display-all-issues     # Show ALL issues (deprecations, warnings, etc.)
 
-# ❌ WRONG - These options don't exist
+# ❌ WRONG - These do NOT exist in PHPUnit 12.x
 vendor/bin/phpunit -v
 vendor/bin/phpunit --verbose
-vendor/bin/phpunit -c phpunit.xml
 ```
+
+### Display Issue Details
+PHPUnit 12.x only shows summary counts by default. To see full details:
+- `--display-all-issues` - **Recommended:** shows everything (deprecations, warnings, notices)
+- `--display-deprecations`, `--display-warnings`, `--display-notices` - specific types
 
 ## Test Quality Principles
 

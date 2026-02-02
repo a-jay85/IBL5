@@ -65,6 +65,31 @@ class PlayerImageHelper implements PlayerImageHelperInterface
      * - Numeric (convertible to int)
      * - Greater than zero when converted to int
      */
+    /**
+     * @see PlayerImageHelperInterface::renderThumbnail()
+     */
+    public static function renderThumbnail($playerID, string $basePath = './images/player/'): string
+    {
+        $url = self::getImageUrl($playerID, $basePath);
+
+        return '<img src="' . $url . '" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy">';
+    }
+
+    /**
+     * @see PlayerImageHelperInterface::renderPlayerCell()
+     */
+    public static function renderPlayerCell(int $playerID, string $displayName, array $starterPids = []): string
+    {
+        $starterClass = in_array($playerID, $starterPids, true) ? ' is-starter' : '';
+        $thumbnail = str_contains($displayName, '|') ? '' : self::renderThumbnail($playerID);
+
+        return '<td class="sticky-col ibl-player-cell' . $starterClass . '" style="white-space: nowrap;">'
+            . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'
+            . $thumbnail
+            . $displayName
+            . '</a></td>';
+    }
+
     public static function isValidPlayerID($playerID): bool
     {
         // Null or empty string

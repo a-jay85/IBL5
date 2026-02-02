@@ -104,4 +104,25 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
             $teamName
         );
     }
+
+    /**
+     * @see FreeAgencyRepositoryInterface::isPlayerAlreadySigned()
+     */
+    public function isPlayerAlreadySigned(int $playerId): bool
+    {
+        $row = $this->fetchOne(
+            "SELECT cy, cy1 FROM ibl_plr WHERE pid = ?",
+            "i",
+            $playerId
+        );
+
+        if ($row === null) {
+            return false;
+        }
+
+        $currentContractYear = $row['cy'] ?? 0;
+        $year1Contract = $row['cy1'] ?? '0';
+
+        return ($currentContractYear === 0 && $year1Contract !== "0");
+    }
 }

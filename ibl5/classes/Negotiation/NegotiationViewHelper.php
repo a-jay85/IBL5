@@ -6,7 +6,6 @@ namespace Negotiation;
 
 use Negotiation\Contracts\NegotiationViewHelperInterface;
 use Player\Player;
-use Services\DatabaseService;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -97,19 +96,19 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
     {
         $display = "<td>" . (string)$demands['year1'] . "</td>";
         
-        if ($demands['year2'] != 0) {
+        if ($demands['year2'] !== 0) {
             $display .= "<td>" . $demands['year2'] . "</td>";
         }
-        if ($demands['year3'] != 0) {
+        if ($demands['year3'] !== 0) {
             $display .= "<td>" . $demands['year3'] . "</td>";
         }
-        if ($demands['year4'] != 0) {
+        if ($demands['year4'] !== 0) {
             $display .= "<td>" . $demands['year4'] . "</td>";
         }
-        if ($demands['year5'] != 0) {
+        if ($demands['year5'] !== 0) {
             $display .= "<td>" . $demands['year5'] . "</td>";
         }
-        if ($demands['year6'] != 0) {
+        if ($demands['year6'] !== 0) {
             $display .= "<td>" . $demands['year6'] . "</td>";
         }
         
@@ -145,10 +144,10 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
      */
     private static function renderMaxSalaryFields(int $maxYear1, int $maxRaise, array $demands): string
     {
-        $maxYear2 = ($demands['year2'] != 0) ? $maxYear1 + $maxRaise : 0;
-        $maxYear3 = ($demands['year3'] != 0) ? $maxYear2 + $maxRaise : 0;
-        $maxYear4 = ($demands['year4'] != 0) ? $maxYear3 + $maxRaise : 0;
-        $maxYear5 = ($demands['year5'] != 0) ? $maxYear4 + $maxRaise : 0;
+        $maxYear2 = ($demands['year2'] !== 0) ? $maxYear1 + $maxRaise : 0;
+        $maxYear3 = ($demands['year3'] !== 0) ? $maxYear2 + $maxRaise : 0;
+        $maxYear4 = ($demands['year4'] !== 0) ? $maxYear3 + $maxRaise : 0;
+        $maxYear5 = ($demands['year5'] !== 0) ? $maxYear4 + $maxRaise : 0;
         
         ob_start();
         ?>

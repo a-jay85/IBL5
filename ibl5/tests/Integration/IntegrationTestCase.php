@@ -28,6 +28,7 @@ use Tests\Integration\Mocks\MockDatabase;
 abstract class IntegrationTestCase extends TestCase
 {
     protected ?MockDatabase $mockDb = null;
+    private string|false $previousErrorLog = false;
 
     protected function setUp(): void
     {
@@ -38,9 +39,23 @@ abstract class IntegrationTestCase extends TestCase
 
     protected function tearDown(): void
     {
+        if ($this->previousErrorLog !== false) {
+            ini_set('error_log', $this->previousErrorLog);
+            $this->previousErrorLog = false;
+        }
         $this->mockDb = null;
         unset($GLOBALS['mysqli_db']);
         parent::tearDown();
+    }
+
+    /**
+     * Suppress error_log() output for tests that intentionally trigger database errors.
+     * Automatically restored in tearDown().
+     */
+    protected function suppressErrorLog(): void
+    {
+        $this->previousErrorLog = ini_get('error_log') ?: '';
+        ini_set('error_log', '/dev/null');
     }
 
     /**

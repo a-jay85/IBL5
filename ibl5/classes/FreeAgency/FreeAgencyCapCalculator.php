@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyCapCalculatorInterface;
@@ -88,7 +90,7 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
             if (!$player->isPlayerFreeAgent($this->season)) {
                 // Exclude players whose name starts with '|'
                 $firstChar = substr($player->name, 0, 1);
-                if ($player->teamName == $this->team->name && $firstChar !== '|') {
+                if ($player->teamName === $this->team->name && $firstChar !== '|') {
                     $futureSalaries = $player->getFutureSalaries();
                     $this->decrementRosterSpotsForSalaries($rosterSpots, $futureSalaries);
                 }
@@ -125,7 +127,7 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
             $key = isset($salaries[$year]) ? $year : ('offer' . ($year + 1));
             $salary = isset($salaries[$key]) ? (int) $salaries[$key] : 0;
             
-            if ($salary != 0) {
+            if ($salary !== 0) {
                 $rosterSpots[$year]--;
             }
         }

@@ -61,10 +61,11 @@ class TeamScheduleService implements TeamScheduleServiceInterface
             ];
 
             if ($game->isUnplayed) {
-                // Check if game is projected for next sim
-                $row['highlight'] = ($game->dateObject <= $season->projectedNextSimEndDate) 
-                    ? 'next-sim' 
-                    : '';
+                // Check if game is projected for next sim using shared utility
+                $row['highlight'] = \Utilities\ScheduleHighlighter::isNextSimGame(
+                    $game->dateObject,
+                    $season->projectedNextSimEndDate
+                ) ? 'next-sim' : '';
             } else {
                 if ($teamId === $game->winningTeamID) {
                     $row['gameResult'] = 'W';

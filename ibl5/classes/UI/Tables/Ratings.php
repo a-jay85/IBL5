@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace UI\Tables;
 
 use Player\Player;
+use Player\PlayerImageHelper;
 
 /**
  * Ratings - Displays player ratings table
@@ -20,7 +23,7 @@ class Ratings
      * @param string $moduleName Module name for styling variations
      * @return string HTML table
      */
-    public static function render($db, $data, $team, string $yr, $season, string $moduleName = ""): string
+    public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = []): string
     // TODO: simplify this by refactoring Player initialization logic out of this method
     {
         $playerRows = [];
@@ -30,18 +33,18 @@ class Ratings
                 if ($plrRow instanceof Player) {
                     $player = $plrRow;
                     if ($moduleName == "Next_Sim") {
-                        $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "FFFFAA";
+                        $isHighlight = (($i % 2) !== 0);
                     } elseif ($moduleName == "League_Starters") {
-                        $bgcolor = ($player->teamID == $team->teamID) ? "FFFFAA" : "FFFFFF";
+                        $isHighlight = ($player->teamID == $team->teamID);
                     } else {
-                        $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
+                        $isHighlight = false;
                     }
                 } elseif (is_array($data) AND $plrRow instanceof Player) {
                     $player = Player::withPlrRow($db, $plrRow);
-                    $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
+                    $isHighlight = false;
                 } elseif (is_array($plrRow)) {
                     $player = Player::withPlrRow($db, $plrRow);
-                    $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
+                    $isHighlight = false;
                 } else {
                     continue;
                 }
@@ -52,36 +55,34 @@ class Ratings
                 }
             } else {
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
-                $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
+                $isHighlight = false;
             }
 
-            $injuryInfo = $player->getInjuryReturnDate($season->lastSimEndDate);
-            if ($injuryInfo != "") {
-                $injuryInfo .= " ($player->daysRemainingForInjury days)";
-            }
+            $injuryReturnDate = $player->getInjuryReturnDate($season->lastSimEndDate);
+            $injuryDays = $player->daysRemainingForInjury;
 
             $playerRows[] = [
                 'player' => $player,
-                'bgcolor' => $bgcolor,
-                'injuryInfo' => $injuryInfo,
-                'addSeparator' => (($i % 2) == 0 && $moduleName == "Next_Sim" && $i > 0),
+                'isHighlight' => $isHighlight,
+                'injuryDays' => $injuryDays,
+                'injuryReturnDate' => $injuryReturnDate,
+                'addSeparator' => (($i % 2) === 0 && $moduleName === "Next_Sim" && $i > 0),
             ];
 
             $i++;
         }
 
         ob_start();
-        echo \UI\TableStyles::render('ratings', $team->color1, $team->color2);
         ?>
-<table style="margin: 0 auto;" class="sortable ratings">
+<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
 <colgroup span="2"></colgroup><colgroup span="2"></colgroup><colgroup span="6"></colgroup><colgroup span="6"></colgroup><colgroup span="4"></colgroup><colgroup span="4"></colgroup><colgroup span="1"></colgroup>
-    <thead style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
-        <tr style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
+    <thead>
+        <tr>
 <?php if ($moduleName == "League_Starters"): ?>
             <th>Team</th>
 <?php endif; ?>
+            <th class="sticky-col">Player</th>
             <th>Pos</th>
-            <th>Player</th>
             <th>Age</th>
             <th class="sep-team"></th>
             <th>2ga</th>
@@ -114,7 +115,7 @@ class Ratings
             <th>Clu</th>
             <th>Con</th>
             <th class="sep-team"></th>
-            <th>Injury Return Date</th>
+            <th>Days Injured</th>
         </tr>
     </thead>
     <tbody>
@@ -123,17 +124,30 @@ class Ratings
     // Column count: 35 base + 1 optional Team column = 36 max
     $colCount = ($moduleName == "League_Starters") ? 36 : 35;
     if ($row['addSeparator']): ?>
-        <tr>
-        <td colspan="<?= $colCount ?>" style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
+        <tr class="ratings-separator">
+        <td colspan="<?= $colCount ?>" style="background-color: var(--team-color-primary); height: 3px; padding: 0;">
         </td>
         </tr>
 <?php endif; ?>
-        <tr style="background-color: #<?= $row['bgcolor'] ?>;">
-<?php if ($moduleName == "League_Starters"): ?>
-            <td><?= htmlspecialchars($player->teamName ?? '') ?></td>
+        <tr<?= $row['isHighlight'] ? ' class="ratings-highlight"' : '' ?>>
+<?php if ($moduleName == "League_Starters"):
+    $teamId = (int) ($player->teamID ?? 0);
+    $teamNameStr = htmlspecialchars($player->teamName ?? '');
+    $color1 = htmlspecialchars($player->teamColor1 ?? 'FFFFFF');
+    $color2 = htmlspecialchars($player->teamColor2 ?? '000000');
+    if ($teamId === 0): ?>
+            <td>Free Agent</td>
+    <?php else: ?>
+            <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
+        <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
+            <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+            <span class="ibl-team-cell__text"><?= $teamNameStr ?></span>
+        </a>
+    </td>
+    <?php endif; ?>
 <?php endif; ?>
+            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName, $starterPids) ?>
             <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
-            <td><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
             <td style="text-align: center;"><?= (int)$player->age ?></td>
             <td class="sep-team"></td>
             <td style="text-align: center;"><?= (int)$player->ratingFieldGoalAttempts ?></td>
@@ -166,7 +180,7 @@ class Ratings
             <td style="text-align: center;"><?= (int)$player->ratingClutch ?></td>
             <td style="text-align: center;"><?= (int)$player->ratingConsistency ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= htmlspecialchars($row['injuryInfo']) ?></td>
+            <td style="text-align: center;"><?php if ($row['injuryDays'] > 0): ?><span class="injury-days-tooltip" title="Returns: <?= htmlspecialchars($row['injuryReturnDate']) ?>" tabindex="0"><?= (int)$row['injuryDays'] ?></span><?php endif; ?></td>
         </tr>
 <?php endforeach; ?>
     </tbody>

@@ -18,3 +18,4 @@ jobs:
         script: |
           cd www
           git pull origin
+          bun run css:build

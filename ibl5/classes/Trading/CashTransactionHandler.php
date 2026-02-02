@@ -45,15 +45,15 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
      */
     public function calculateContractTotalYears(array $cashYear): int
     {
-        if (($cashYear[6] ?? 0) != 0) {
+        if (($cashYear[6] ?? 0) !== 0) {
             return 6;
-        } elseif (($cashYear[5] ?? 0) != 0) {
+        } elseif (($cashYear[5] ?? 0) !== 0) {
             return 5;
-        } elseif (($cashYear[4] ?? 0) != 0) {
+        } elseif (($cashYear[4] ?? 0) !== 0) {
             return 4;
-        } elseif (($cashYear[3] ?? 0) != 0) {
+        } elseif (($cashYear[3] ?? 0) !== 0) {
             return 3;
-        } elseif (($cashYear[2] ?? 0) != 0) {
+        } elseif (($cashYear[2] ?? 0) !== 0) {
             return 2;
         } else {
             return 1;

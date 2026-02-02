@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Updater;
 
 use Utilities\UuidGenerator;
@@ -101,7 +104,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 $visitorTID = $this->commonRepository->getTidFromTeamname($visitorName);
                 $homeTID = $this->commonRepository->getTidFromTeamname($homeName);
 
-                if ($vScore != 0 && $hScore != 0 && $boxID == null) {
+                if ($vScore !== 0 && $hScore !== 0 && $boxID === null) {
                     $errorMessage = "Script Error: box scores for games haven't been generated. Please delete and reupload the JSB HTML export with the box scores, then try again.";
                     error_log("[ScheduleUpdater] Box scores missing for game between {$visitorName} and {$homeName}");
                     echo "<b><font color=red>{$errorMessage}</font></b>";

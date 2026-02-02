@@ -79,14 +79,14 @@ class ExtensionValidator implements ExtensionValidatorInterface
      */
     public function validateExtensionEligibility(object $team): array
     {
-        if ($team->hasUsedExtensionThisSeason == 1) {
+        if ($team->hasUsedExtensionThisSeason === 1) {
             return [
                 'valid' => false,
                 'error' => 'Sorry, you have already used your extension for this season.'
             ];
         }
-        
-        if ($team->hasUsedExtensionThisSim == 1) {
+
+        if ($team->hasUsedExtensionThisSim === 1) {
             return [
                 'valid' => false,
                 'error' => 'Sorry, you have already used your extension for this sim.'

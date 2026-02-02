@@ -955,6 +955,7 @@
 
 .stat-table .name-cell {
     text-align: left;
+    white-space: nowrap;
 }
 
 .stat-table .name-cell a {

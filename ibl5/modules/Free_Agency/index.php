@@ -1,8 +1,11 @@
 <?php
 
-use Player\Player;
-use FreeAgency\FreeAgencyDisplayHelper;
-use FreeAgency\FreeAgencyNegotiationHelper;
+use FreeAgency\FreeAgencyRepository;
+use FreeAgency\FreeAgencyDemandRepository;
+use FreeAgency\FreeAgencyService;
+use FreeAgency\FreeAgencyView;
+use FreeAgency\FreeAgencyNegotiationView;
+use FreeAgency\FreeAgencyFormComponents;
 use FreeAgency\FreeAgencyProcessor;
 
 /************************************************************************/
@@ -24,14 +27,10 @@ function main($user)
     global $stop;
     if (!is_user($user)) {
         Nuke\Header::header();
-        OpenTable();
         echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
-        CloseTable();
         echo "<br>";
         if (!is_user($user)) {
-            OpenTable();
             loginbox();
-            CloseTable();
         }
         Nuke\Footer::footer();
     } elseif (is_user($user)) {
@@ -41,29 +40,32 @@ function main($user)
 
 function display()
 {
-    global $db, $mysqli_db, $cookie;
+    global $mysqli_db, $cookie;
     $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
     $season = new Season($mysqli_db);
 
     Nuke\Header::header();
-    OpenTable();
 
     $username = strval($cookie[1] ?? '');
     $teamName = $commonRepository->getTeamnameFromUsername($username);
     $team = Team::initialize($mysqli_db, $teamName);
 
-    UI::displaytopmenu($mysqli_db, $team->teamID);
+    // Service assembles data, view renders it
+    $repository = new FreeAgencyRepository($mysqli_db);
+    $demandRepository = new FreeAgencyDemandRepository($mysqli_db);
+    $service = new FreeAgencyService($repository, $demandRepository, $mysqli_db);
+    $view = new FreeAgencyView($mysqli_db);
 
-    $displayHelper = new FreeAgencyDisplayHelper($mysqli_db, $team, $season);
-    echo $displayHelper->renderMainPage();
+    $mainPageData = $service->getMainPageData($team, $season);
+    $result = $_GET['result'] ?? null;
+    echo $view->render($mainPageData, $result);
 
-    CloseTable();
     Nuke\Footer::footer();
 }
 
 function negotiate($pid)
 {
-    global $db, $cookie, $mysqli_db;
+    global $cookie, $mysqli_db;
     $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 
     $pid = intval($pid);
@@ -74,14 +76,24 @@ function negotiate($pid)
     $teamID = $commonRepository->getTidFromTeamname($userTeamName);
 
     Nuke\Header::header();
-    OpenTable();
 
     $team = \Team::initialize($mysqli_db, $teamID);
     $season = new Season($mysqli_db);
-    $negotiationHelper = new FreeAgencyNegotiationHelper($mysqli_db, $season);
-    echo $negotiationHelper->renderNegotiationPage($pid, $team);
 
-    CloseTable();
+    // Service assembles data, view renders it
+    $repository = new FreeAgencyRepository($mysqli_db);
+    $demandRepository = new FreeAgencyDemandRepository($mysqli_db);
+    $service = new FreeAgencyService($repository, $demandRepository, $mysqli_db);
+
+    $negotiationData = $service->getNegotiationData($pid, $team, $season);
+    $negotiationData['team'] = $team;
+
+    // FormComponents needs the player and team name for rendering
+    $formComponents = new FreeAgencyFormComponents($team->name, $negotiationData['player']);
+    $view = new FreeAgencyNegotiationView($formComponents);
+    $error = $_GET['error'] ?? null;
+    echo $view->render($negotiationData, $error);
+
     Nuke\Footer::footer();
 }
 
@@ -89,7 +101,17 @@ function processOffer()
 {
     global $mysqli_db;
     $processor = new FreeAgencyProcessor($mysqli_db);
-    echo $processor->processOfferSubmission($_POST);
+    $result = $processor->processOfferSubmission($_POST);
+    $pid = $result['playerID'];
+
+    if ($result['success']) {
+        header('Location: modules.php?name=Free_Agency&result=offer_success');
+    } elseif ($result['type'] === 'already_signed') {
+        header('Location: modules.php?name=Free_Agency&result=already_signed');
+    } else {
+        header('Location: modules.php?name=Free_Agency&pa=negotiate&pid=' . $pid . '&error=' . rawurlencode($result['message']));
+    }
+    exit;
 }
 
 function deleteOffer()
@@ -97,7 +119,9 @@ function deleteOffer()
     global $mysqli_db;
     $processor = new FreeAgencyProcessor($mysqli_db);
     $playerID = (int) ($_POST['playerID'] ?? 0);
-    echo $processor->deleteOffers($_POST['teamname'], $playerID);
+    $processor->deleteOffers($_POST['teamname'], $playerID);
+    header('Location: modules.php?name=Free_Agency&result=deleted');
+    exit;
 }
 
 switch ($pa) {

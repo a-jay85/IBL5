@@ -21,41 +21,16 @@ class CapInfoView implements CapInfoViewInterface
      */
     public function render(array $teamsData, int $beginningYear, int $endingYear, ?int $userTeamId): string
     {
-        $html = $this->getStyleBlock();
+        $html = '';
+        $html .= '<h2 class="ibl-title">Cap Info</h2>';
+        $html .= '<div class="sticky-scroll-wrapper">';
+        $html .= '<div class="sticky-scroll-container">';
         $html .= $this->renderTableHeader($beginningYear, $endingYear);
         $html .= $this->renderTableRows($teamsData, $userTeamId);
-        $html .= '</table>';
+        $html .= '</tbody></table>';
+        $html .= '</div></div>';
 
         return $html;
-    }
-
-    /**
-     * Generate CSS styles for the cap info table
-     *
-     * @return string CSS style block
-     */
-    private function getStyleBlock(): string
-    {
-        return '<style>
-            .cap-table {
-                border: 1px solid #000;
-                border-collapse: collapse;
-            }
-            .cap-table th, .cap-table td {
-                border: 1px solid #000;
-                padding: 4px;
-                text-align: center;
-            }
-            .cap-table th {
-                background-color: #ddd;
-            }
-            .cap-divider {
-                background-color: #AAA;
-            }
-            .cap-highlight {
-                background-color: #FFFFAA;
-            }
-        </style>';
     }
 
     /**
@@ -67,9 +42,9 @@ class CapInfoView implements CapInfoViewInterface
      */
     private function renderTableHeader(int $beginningYear, int $endingYear): string
     {
-        $html = '<table class="sortable cap-table">';
-        $html .= '<tr>';
-        $html .= '<th>Team</th>';
+        $html = '<table class="sortable ibl-data-table sticky-table">';
+        $html .= '<thead><tr>';
+        $html .= '<th class="sticky-col sticky-corner">Team</th>';
 
         // Year columns (6 years)
         for ($i = 0; $i < 6; $i++) {
@@ -79,7 +54,7 @@ class CapInfoView implements CapInfoViewInterface
             $html .= HtmlSanitizer::safeHtmlOutput($yearEnd) . '<br>Total</th>';
         }
 
-        $html .= '<td class="cap-divider"></td>';
+        $html .= '<th class="divider"></th>';
 
         // Position columns (current year only)
         foreach (\JSB::PLAYER_POSITIONS as $position) {
@@ -88,11 +63,11 @@ class CapInfoView implements CapInfoViewInterface
             $html .= HtmlSanitizer::safeHtmlOutput($position) . '</th>';
         }
 
-        $html .= '<td class="cap-divider"></td>';
+        $html .= '<th class="divider"></th>';
         $html .= '<th>FA Slots</th>';
         $html .= '<th>Has MLE</th>';
         $html .= '<th>Has LLE</th>';
-        $html .= '</tr>';
+        $html .= '</tr></thead><tbody>';
 
         return $html;
     }
@@ -125,20 +100,21 @@ class CapInfoView implements CapInfoViewInterface
     private function renderTeamRow(array $teamData, ?int $userTeamId): string
     {
         $isUserTeam = ($userTeamId !== null && $teamData['teamId'] === $userTeamId);
-        $highlightClass = $isUserTeam ? ' class="cap-highlight"' : '';
+        $highlightClass = $isUserTeam ? ' class="highlight"' : '';
         
         $color1 = HtmlSanitizer::safeHtmlOutput($teamData['color1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($teamData['color2']);
-        $teamCity = HtmlSanitizer::safeHtmlOutput($teamData['teamCity']);
         $teamName = HtmlSanitizer::safeHtmlOutput($teamData['teamName']);
         $teamId = (int)$teamData['teamId'];
 
         $html = '<tr>';
-        
-        // Team name cell
-        $html .= '<td style="background-color: #' . $color1 . ';">';
+
+        // Team name cell with logo - sticky column
+        $html .= '<td class="ibl-team-cell--colored sticky-col" style="background-color: #' . $color1 . ';">';
         $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '&amp;display=contracts" ';
-        $html .= 'style="color: #' . $color2 . ';">' . $teamCity . ' ' . $teamName . '</a>';
+        $html .= 'class="ibl-team-cell__name" style="color: #' . $color2 . ';">';
+        $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">';
+        $html .= '<span class="ibl-team-cell__text">' . $teamName . '</span></a>';
         $html .= '</td>';
 
         // Available salary columns
@@ -149,7 +125,7 @@ class CapInfoView implements CapInfoViewInterface
             $html .= '</td>';
         }
 
-        $html .= '<td class="cap-divider"></td>';
+        $html .= '<td class="divider"></td>';
 
         // Position salary columns
         foreach (\JSB::PLAYER_POSITIONS as $position) {
@@ -158,7 +134,7 @@ class CapInfoView implements CapInfoViewInterface
             $html .= '</td>';
         }
 
-        $html .= '<td class="cap-divider"></td>';
+        $html .= '<td class="divider"></td>';
 
         // FA Slots
         $html .= '<td' . $highlightClass . '>';

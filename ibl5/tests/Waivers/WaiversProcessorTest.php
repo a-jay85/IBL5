@@ -1,9 +1,11 @@
 <?php
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Waivers\WaiversProcessor;
 use Player\Player;
 
+#[AllowMockObjectsWithoutExpectations]
 class WaiversProcessorTest extends TestCase
 {
     private $processor;

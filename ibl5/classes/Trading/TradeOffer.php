@@ -268,7 +268,7 @@ class TradeOffer implements TradeOfferInterface
         );
 
         $tradeText = "";
-        if ($assetType == 0) {
+        if ($assetType === 0) {
             $tradeText = $this->getPickTradeText($itemId, $offeringTeamName, $listeningTeamName);
         } else {
             $tradeText = $this->getPlayerTradeText($itemId, $offeringTeamName, $listeningTeamName);

@@ -144,6 +144,7 @@ class League extends BaseMysqliRepository
             WHERE ordinal > ?
               AND retired = '0'
               AND name NOT LIKE '%|%'
+              AND name != '(no starter)'
             ORDER BY name ASC",
             "i",
             JSB::WAIVERS_ORDINAL

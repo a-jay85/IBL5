@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SeasonLeaders\Contracts;
 
 /**
@@ -19,6 +21,7 @@ interface SeasonLeadersRepositoryInterface
      *                       - 'year' (string|null): Filter by specific year, empty for all
      *                       - 'team' (int|null): Team ID filter, 0 for all teams
      *                       - 'sortBy' (string): Sort option ID (1-20), defaults to '1' (PPG)
+     * @param int $limit Maximum number of records to return (0 for unlimited)
      * @return array Result with keys:
      *               - 'result' (resource): Database query result
      *               - 'count' (int): Number of rows returned
@@ -33,7 +36,7 @@ interface SeasonLeadersRepositoryInterface
      * - Per-game stats calculated in ORDER BY clause
      * - Invalid sortBy defaults to PPG (option 1)
      */
-    public function getSeasonLeaders(array $filters): array;
+    public function getSeasonLeaders(array $filters, int $limit = 0): array;
 
     /**
      * Get all teams for dropdown

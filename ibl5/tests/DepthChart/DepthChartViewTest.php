@@ -33,8 +33,9 @@ class DepthChartViewTest extends TestCase
         // Check that Submit button is still present
         $this->assertStringContainsString('value="Submit Depth Chart"', $output);
 
-        // Check that buttons have visual differentiation
-        $this->assertStringContainsString('background-color', $output);
+        // Check that buttons have visual differentiation via CSS classes
+        $this->assertStringContainsString('depth-chart-reset-btn', $output);
+        $this->assertStringContainsString('depth-chart-submit-btn', $output);
     }
 
     /**

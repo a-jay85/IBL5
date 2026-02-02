@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\ComparePlayers;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use ComparePlayers\ComparePlayersService;
 use ComparePlayers\Contracts\ComparePlayersRepositoryInterface;
 
+#[AllowMockObjectsWithoutExpectations]
 class ComparePlayersServiceTest extends TestCase
 {
     private ComparePlayersRepositoryInterface $mockRepository;

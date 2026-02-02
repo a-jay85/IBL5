@@ -29,8 +29,8 @@ $filters = [
 
 // Render page
 Nuke\Header::header();
-OpenTable();
-UI::playerMenu();
+
+echo '<h2 class="ibl-title">Leaderboards</h2>';
 
 // Render filter form
 echo $view->renderFilterForm($filters);
@@ -70,5 +70,4 @@ if ($filters['submitted'] != null) {
     }
 }
 
-CloseTable();
 Nuke\Footer::footer();

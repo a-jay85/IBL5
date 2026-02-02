@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 class JSB
 {
     const PLAYER_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];

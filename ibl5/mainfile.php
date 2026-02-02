@@ -341,22 +341,6 @@ if (!defined('FORUM_ADMIN')) {
     }
 }
 
-function makePass()
-{
-    $cons = "bcdfghjklmnpqrstvwxyz";
-    $vocs = "aeiou";
-    for ($x = 0; $x < 6; $x++) {
-        mt_srand((double) microtime() * 1000000);
-        $con[$x] = substr($cons, mt_rand(0, strlen($cons) - 1), 1);
-        $voc[$x] = substr($vocs, mt_rand(0, strlen($vocs) - 1), 1);
-    }
-    mt_srand((double) microtime() * 1000000);
-    $num1 = mt_rand(0, 9);
-    $num2 = mt_rand(0, 9);
-    $makepass = $con[0] . $voc[0] . $con[2] . $num1 . $num2 . $con[3] . $voc[3] . $con[4];
-    return ($makepass);
-}
-
 function get_lang($module)
 {
     global $currentlang, $language;
@@ -800,62 +784,6 @@ function blockfileinc($title, $blockfile, $side = 0)
     }
 }
 
-function selectlanguage()
-{
-    global $useflags, $currentlang;
-    if ($useflags == 1) {
-        $title = _SELECTLANGUAGE;
-        $content = "<center><font class=\"content\">" . _SELECTGUILANG . "<br><br>";
-        $langdir = dir("language");
-        $menulist = "";
-        while ($func = $langdir->read()) {
-            if (substr($func, 0, 5) == "lang-") {
-                $menulist .= "$func ";
-            }
-        }
-        closedir($langdir->handle);
-        $menulist = explode(" ", $menulist);
-        sort($menulist);
-        for ($i = 0; $i < sizeof($menulist); $i++) {
-            if ($menulist[$i] != "") {
-                $tl = str_replace("lang-", "", $menulist[$i]);
-                $tl = str_replace(".php", "", $tl);
-                $altlang = ucfirst($tl);
-                $content .= "<a href=\"index.php?newlang=" . $tl . "\"><img src=\"images/language/flag-" . $tl . ".png\" border=\"0\" alt=\"$altlang\" title=\"$altlang\" hspace=\"3\" vspace=\"3\"></a> ";
-            }
-        }
-        $content .= "</font></center>";
-        themesidebox($title, $content);
-    } else {
-        $title = _SELECTLANGUAGE;
-        $content = "<center><font class=\"content\">" . _SELECTGUILANG . "<br><br></font>";
-        $content .= "<form action=\"index.php\" method=\"get\"><select name=\"newlanguage\" onChange=\"top.location.href=this.options[this.selectedIndex].value\">";
-        $handle = opendir('language');
-        $languageslist = "";
-        while ($file = readdir($handle)) {
-            if (preg_match("/^lang\-(.+)\.php/", $file, $matches)) {
-                $langFound = $matches[1];
-                $languageslist .= "$langFound ";
-            }
-        }
-        closedir($handle);
-        $languageslist = explode(" ", $languageslist);
-        sort($languageslist);
-        for ($i = 0; $i < sizeof($languageslist); $i++) {
-            if ($languageslist[$i] != "") {
-                $content .= "<option value=\"index.php?newlang=$languageslist[$i]\" ";
-                if ($languageslist[$i] == $currentlang) {
-                    $content .= " selected";
-                }
-
-                $content .= ">" . ucfirst($languageslist[$i]) . "</option>\n";
-            }
-        }
-        $content .= "</select></form></center>";
-        themesidebox($title, $content);
-    }
-}
-
 function ultramode()
 {
     global $prefix, $db;
@@ -933,10 +861,6 @@ function FixQuotes($what = "")
     }
     return $what;
 }
-
-/*********************************************************/
-/* text filter                                           */
-/*********************************************************/
 
 function check_words($Message)
 {
@@ -1081,14 +1005,6 @@ function check_html($str, $strip = "")
     /* Squash PHP tags unconditionally */
     $str = mb_ereg_replace("<\?", "", $str);
     return $str;
-}
-
-function filter_text($Message, $strip = "")
-{
-    global $EditedMessage;
-    check_words($Message);
-    $EditedMessage = check_html($EditedMessage, $strip);
-    return ($EditedMessage);
 }
 
 function filter($what, $strip = "", $save = "", $type = "")
@@ -1423,72 +1339,6 @@ if (!function_exists("themecenterbox")) {
     }
 }
 
-function public_message()
-{
-    global $prefix, $user_prefix, $db, $user, $admin, $p_msg, $cookie, $broadcast_msg;
-    if ($broadcast_msg == 1) {
-        if (is_user($user)) {
-            cookiedecode($user);
-            $result = $db->sql_query("SELECT broadcast FROM " . $user_prefix . "_users WHERE username='$cookie[1]'");
-            $row = $db->sql_fetchrow($result);
-            $upref = intval($row['broadcast']);
-            if ($upref == 1) {
-                $t_off = "<br><p align=\"right\">[ <a href=\"modules.php?name=Your_Account&amp;op=edithome\">";
-                $t_off .= "<font size=\"2\">" . _TURNOFFMSG . "</font></a> ]";
-                $pm_show = 1;
-            } else {
-                $pm_show = 0;
-            }
-        } else {
-            $t_off = "";
-        }
-        if (!is_user($user) or (is_user($user) and ($pm_show == 1))) {
-            $c_mid = base64_decode($p_msg);
-            $c_mid = addslashes($c_mid);
-            $c_mid = intval($c_mid);
-            $result2 = $db->sql_query("SELECT mid, content, date, who FROM " . $prefix . "_public_messages WHERE mid > '$c_mid' ORDER BY date ASC LIMIT 1");
-            $row2 = $db->sql_fetchrow($result2);
-            if ($row2 != NULL) {
-                $mid = intval($row2['mid']);
-                $content = filter($row2['content'], "nohtml");
-                $tdate = $row2['date'];
-                $who = filter($row2['who'], "nohtml");
-                if ((!isset($c_mid)) or ($c_mid = $mid)) {
-                    $public_msg = "<br><table width=\"90%\" border=\"1\" cellspacing=\"2\" cellpadding=\"0\" bgcolor=\"FFFFFF\" align=\"center\"><tr><td>\n";
-                    $public_msg .= "<table width=\"100%\" border=\"0\" cellspacing=\"1\" cellpadding=\"2\" bgcolor=\"FF0000\"><tr><td>\n";
-                    $public_msg .= "<font color=\"FFFFFF\" size=\"3\"><b>" . _BROADCASTFROM . " <a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$who\"><font color=\"FFFFFF\" size=\"3\">$who</font></a>: \"$content\"</b>";
-                    $public_msg .= "$t_off";
-                    $public_msg .= "</td></tr></table>";
-                    $public_msg .= "</td></tr></table>";
-                    $ref_date = $tdate + 600;
-                    $actual_date = time();
-                    if ($actual_date >= $ref_date) {
-                        $public_msg = "";
-                        $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_public_messages"));
-                        if ($numrows == 1) {
-                            $db->sql_query("DELETE FROM " . $prefix . "_public_messages");
-                            $mid = 0;
-                        } else {
-                            $db->sql_query("DELETE FROM " . $prefix . "_public_messages WHERE mid='$mid'");
-                        }
-                    }
-                    if ($mid == 0 or empty($mid)) {
-                        setcookie("p_msg");
-                    } else {
-                        $mid = base64_encode($mid);
-                        $mid = addslashes($mid);
-                        setcookie("p_msg", $mid, time() + 600);
-                    }
-                }
-            }
-        }
-    } else {
-        $public_msg = "";
-    }
-    if (empty($public_msg)) {$public_msg = "";}
-    return $public_msg;
-}
-
 function get_theme()
 {
     global $user, $userinfo, $Default_Theme, $name, $op;
@@ -1613,25 +1463,6 @@ function redir($content)
         $content = str_replace("<a href=\"$hrefs[$i]\">", "<a href=\"$nukeurl/index.php?url=$url\" target=\"_blank\">", $content);
     }
     return ($content);
-}
-
-function info_box($graphic, $message)
-{
-    // Function to generate a message box with a graphic inside
-    // $graphic value can be whichever: warning, caution, tip, note.
-    // Then the graphic value with the extension .gif should be present inside /images/system/ folder
-    if (file_exists("images/system/" . $graphic . ".gif") and !empty($message)) {
-        Opentable();
-        $graphic = filter($graphic, "nohtml");
-        $message = filter($message, "");
-        echo "<table align=\"center\" border=\"0\" width=\"80%\" cellpadding=\"10\"><tr>"
-            . "<td valign=\"top\"><img src=\"images/system/" . $graphic . ".gif\" border=\"0\" alt=\"\" title=\"\" width=\"34\" height=\"34\"></td>"
-            . "<td valign=\"top\">$message</td>"
-            . "</tr></table>";
-        CloseTable();
-    } else {
-        return;
-    }
 }
 
 if (isset($gfx)) {

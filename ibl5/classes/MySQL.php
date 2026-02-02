@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /***************************************************************************
  *                                 mysql.php
  *                            -------------------
@@ -23,20 +26,29 @@ if (!defined("SQL_LAYER")) {
     define("SQL_LAYER", "mysql");
 
     /**
-     * @deprecated Use mysqli with prepared statements instead.
-     * 
-     * This legacy wrapper will be removed once all code is migrated.
-     * For new code, use $mysqli_db global with prepared statements:
-     * 
+     * @deprecated This class is for PHP-Nuke module backward compatibility only.
+     *
+     * All IBL5 classes in /ibl5/classes/ and scripts in /ibl5/scripts/ have been
+     * migrated to modern mysqli with prepared statements via BaseMysqliRepository.
+     *
+     * This class is ONLY used by legacy PHP-Nuke code in:
+     * - /ibl5/modules/
+     * - /ibl5/admin/modules/
+     * - /ibl5/blocks/
+     *
+     * DO NOT use this class for new code. Instead:
+     * - Extend BaseMysqliRepository for repository classes
+     * - Use $mysqli_db global with prepared statements
+     *
      * Example:
      *   $stmt = $mysqli_db->prepare("SELECT * FROM table WHERE id = ?");
      *   $stmt->bind_param("i", $id);
      *   $stmt->execute();
      *   $result = $stmt->get_result();
-     * 
-     * Or extend BaseMysqliRepository for repository classes.
-     * 
-     * @see \Repositories\BaseMysqliRepository
+     *
+     * Scheduled for removal once PHP-Nuke modules are deprecated.
+     *
+     * @see \BaseMysqliRepository
      */
     class MySQL
     {
@@ -66,7 +78,7 @@ if (!defined("SQL_LAYER")) {
                 $this->db_connect_id = @mysqli_connect($this->server, $this->user, $this->password);
             }
             if ($this->db_connect_id) {
-                if ($database != "") {
+                if ($database !== "") {
                     $this->dbname = $database;
                     $dbselect = @mysqli_select_db($this->db_connect_id, $this->dbname);
                     if (!$dbselect) {
@@ -105,7 +117,7 @@ if (!defined("SQL_LAYER")) {
         {
             // Remove any pre-existing queries
             unset($this->query_result);
-            if ($query != "") {
+            if ($query !== "") {
                 $this->query_result = @mysqli_query($this->db_connect_id, $query);
             }
             if ($this->query_result) {
@@ -113,7 +125,7 @@ if (!defined("SQL_LAYER")) {
                 unset($this->rowset);
                 return $this->query_result;
             } else {
-                return ($transaction == END_TRANSACTION) ? true : false;
+                return ($transaction === END_TRANSACTION) ? true : false;
             }
         }
 

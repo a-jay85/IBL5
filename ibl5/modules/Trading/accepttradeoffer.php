@@ -1,11 +1,5 @@
 <?php
 
-// Enable error reporting for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', '1');
-ini_set('log_errors', '1');
-ini_set('error_log', dirname(__FILE__) . '/accept_trade_errors.log');
-
 try {
     require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 } catch (Exception $e) {
@@ -15,7 +9,6 @@ try {
 
 global $mysqli_db;
 
-// Check database connection
 if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
     error_log("Database connection not available");
     die("Error: Database connection failed");
@@ -23,33 +16,21 @@ if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
 
 $offerId = $_POST['offer'] ?? null;
 
-if ($offerId != NULL) {
+if ($offerId !== null) {
     try {
         $tradeProcessor = new Trading\TradeProcessor($mysqli_db);
-        $result = $tradeProcessor->processTrade((int)$offerId);
+        $result = $tradeProcessor->processTrade((int) $offerId);
 
         if ($result['success']) {
-            // Trade processed successfully
-            echo "Trade accepted!<p>";
+            header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_accepted');
         } else {
-            echo "Error processing trade: " . htmlspecialchars($result['error'] ?? 'Unknown error');
-            exit;
+            header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($result['error'] ?? 'Unknown error'));
         }
     } catch (Exception $e) {
         error_log("Failed to process trade: " . $e->getMessage());
-        error_log("Stack trace: " . $e->getTraceAsString());
-        die("Error processing trade: " . htmlspecialchars($e->getMessage()));
+        header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($e->getMessage()));
     }
 } else {
-    echo "Nothing to see here!";
-    exit;
+    header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade');
 }
-
-?>
-
-<HTML><HEAD><TITLE>Trade Offer Processing</TITLE>
-<meta http-equiv="refresh" content="3;url=/ibl5/modules.php?name=Trading&op=reviewtrade">
-</HEAD><BODY>
-<a href="/ibl5/modules.php?name=Trading&op=reviewtrade">Click here to go back to the Trade Review page,</a><br>
-or wait 3 seconds to be redirected automatically!
-</BODY></HTML>
+exit;

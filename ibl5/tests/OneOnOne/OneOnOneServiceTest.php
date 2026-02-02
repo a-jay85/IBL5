@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use OneOnOne\OneOnOneService;
 use OneOnOne\OneOnOneRepository;
@@ -11,6 +12,7 @@ use OneOnOne\OneOnOneGameResult;
 /**
  * Tests for OneOnOneService
  */
+#[AllowMockObjectsWithoutExpectations]
 final class OneOnOneServiceTest extends TestCase
 {
     private OneOnOneService $service;

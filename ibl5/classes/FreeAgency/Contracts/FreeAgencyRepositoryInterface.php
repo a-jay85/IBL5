@@ -44,12 +44,24 @@ interface FreeAgencyRepositoryInterface
 
     /**
      * Get all players excluding a specific team
-     * 
+     *
      * Returns all non-retired players not on the specified team, ordered by ordinal.
      * Used for displaying "All Other Free Agents" in the free agency interface.
-     * 
+     *
      * @param string $teamName Team to exclude
      * @return array Array of player rows
      */
     public function getAllPlayersExcludingTeam(string $teamName): array;
+
+    /**
+     * Check if a player has already been signed during this free agency period
+     *
+     * Returns true if player has cy=0 and a non-zero cy1 contract in the database,
+     * indicating they've been signed in the current free agency period.
+     * Used to prevent duplicate signings of same player.
+     *
+     * @param int $playerId Player ID to check
+     * @return bool True if player was already signed this free agency period
+     */
+    public function isPlayerAlreadySigned(int $playerId): bool;
 }

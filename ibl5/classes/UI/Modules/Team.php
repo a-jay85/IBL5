@@ -282,7 +282,7 @@ class Team
                 . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID=$draftPickOriginalTeamID\">"
                 . "<img class=\"draft-picks-list__logo\" src=\"images/logo/$draftPickOriginalTeamName.png\" height=\"33\" width=\"33\" alt=\"$draftPickOriginalTeamName\"></a>"
                 . '<div class="draft-picks-list__info">'
-                . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID=$draftPickOriginalTeamID\">$draftPickYear $draftPickOriginalTeamCity $draftPickOriginalTeamName (Round $draftPickRound)</a>";
+                . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID=$draftPickOriginalTeamID\">$draftPickYear R$draftPickRound $draftPickOriginalTeamCity $draftPickOriginalTeamName</a>";
 
             if ($draftPick->notes !== null && $draftPick->notes !== '') {
                 $tableDraftPicks .= '<div class="draft-picks-list__notes">'

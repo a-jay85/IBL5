@@ -291,12 +291,22 @@ function themecenterbox($title, $content)
 
     if ($hasModernStyling) {
         // Content has its own styling, output directly
-        // Add specific class for leaders blocks to enable side-by-side layout
         $isLeadersBlock = strpos($content, 'leaders-tabbed') !== false;
-        $wrapperClass = $isLeadersBlock ? 'leaders-grid-item' : '';
-        echo '<div class="' . $wrapperClass . '" style="margin-bottom: 1rem; max-width: 100%; overflow: hidden;">'
-            . $content
-            . '</div>';
+        $isInjuryBlock = strpos($content, 'injury-block') !== false;
+
+        if ($isLeadersBlock) {
+            echo '<div class="leaders-grid-item" style="overflow: hidden;">'
+                . $content
+                . '</div>';
+        } elseif ($isInjuryBlock) {
+            echo '<div style="max-width: 100%; overflow: hidden;">'
+                . $content
+                . '</div>';
+        } else {
+            echo '<div style="margin-bottom: 1rem; max-width: 100%; overflow: hidden;">'
+                . $content
+                . '</div>';
+        }
     } else {
         // Legacy content needs the box wrapper
         $safeTitle = \Utilities\HtmlSanitizer::safeHtmlOutput($title);

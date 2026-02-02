@@ -120,8 +120,8 @@ $blockId = 'sim-leaders-' . uniqid();
 $categories = array_keys($statCategories);
 $firstCategory = $categories[0] ?? 'Points';
 
-// Compact tabbed layout with orange variant
-$content = '<div class="leaders-tabbed leaders-tabbed--chunk" id="' . $blockId . '">
+// Compact tabbed layout
+$content = '<div class="leaders-tabbed" id="' . $blockId . '">
     <div class="leaders-tabbed__header">
         <h3 class="leaders-tabbed__title">Sim ' . $simNumber . ' Leaders</h3>
     </div>

@@ -59,4 +59,9 @@
   max-width: 100%;
   padding: 0rem 1rem;
   vertical-align: top;
+  text-align: center;
+}
+
+.site-content > * {
+  text-align: left;
 }

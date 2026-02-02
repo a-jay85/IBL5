@@ -10,15 +10,19 @@
    Leaders Grid Layout (Side-by-Side on Desktop)
    ========================================================================== */
 
-/* Use CSS Grid to display leaders blocks side-by-side on desktop */
+/* Center leaders blocks on mobile */
+.leaders-grid-item {
+    max-width: 680px;
+    margin: 0 auto 1rem;
+}
+
+/* Display leaders blocks side-by-side on desktop */
 @media (min-width: 1024px) {
-    /* Target consecutive leaders-grid-item elements */
     .leaders-grid-item {
         display: inline-block;
         vertical-align: top;
         width: calc(50% - 0.5rem);
-        margin-right: 0.5rem;
-        margin-bottom: 1rem;
+        margin: 0 0.5rem 1rem 0;
     }
 
     .leaders-grid-item:nth-of-type(2n) {
@@ -61,11 +65,6 @@
     color: white;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-}
-
-/* Orange variant header */
-.leaders-tabbed--chunk .leaders-tabbed__header {
-    background: var(--gradient-accent);
 }
 
 /* Tabs Bar */
@@ -288,30 +287,6 @@
     line-height: 1.2;
 }
 
-/* Sim/Chunk Leaders Variant - Orange tabs */
-.leaders-tabbed--chunk .leaders-tabbed__tabs {
-    background: var(--gradient-accent);
-}
-
-.leaders-tabbed--chunk .leaders-tabbed__tab {
-    color: rgba(255, 255, 255, 0.7);
-}
-
-.leaders-tabbed--chunk .leaders-tabbed__tab:hover {
-    color: white;
-    background: rgba(0, 0, 0, 0.1);
-}
-
-.leaders-tabbed--chunk .leaders-tabbed__tab--active {
-    color: white;
-    background: rgba(0, 0, 0, 0.15);
-    border-bottom-color: white;
-}
-
-.leaders-tabbed--chunk .leaders-tabbed__leader-value {
-    color: var(--navy-800);
-}
-
 /* ==========================================================================
    Injury Report Block
    ========================================================================== */
@@ -503,7 +478,9 @@
     overflow: hidden;
     box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
     border: 1px solid var(--gray-100, #f3f4f6);
+    max-width: 1400px;
     margin-bottom: var(--space-4, 1rem);
+    margin-inline: auto;
     transition: box-shadow var(--transition-base, 0.2s ease);
 }
 

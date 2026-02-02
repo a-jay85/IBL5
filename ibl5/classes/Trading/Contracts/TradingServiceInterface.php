@@ -34,7 +34,11 @@ interface TradingServiceInterface
      *     seasonEndingYear: int,
      *     seasonPhase: string,
      *     cashStartYear: int,
-     *     cashEndYear: int
+     *     cashEndYear: int,
+     *     userTeamColor1: string,
+     *     userTeamColor2: string,
+     *     partnerTeamColor1: string,
+     *     partnerTeamColor2: string
      * }
      */
     public function getTradeOfferPageData(string $username, string $partnerTeam): array;

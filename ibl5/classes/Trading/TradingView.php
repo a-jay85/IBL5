@@ -6,6 +6,7 @@ namespace Trading;
 
 use Trading\Contracts\TradingViewInterface;
 use Player\PlayerImageHelper;
+use UI\TableStyles;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -27,6 +28,11 @@ class TradingView implements TradingViewInterface
         $cashStartYear = (int) $pageData['cashStartYear'];
         $cashEndYear = (int) $pageData['cashEndYear'];
 
+        $userColor1 = TableStyles::sanitizeColor($pageData['userTeamColor1'] ?? '000000');
+        $userColor2 = TableStyles::sanitizeColor($pageData['userTeamColor2'] ?? 'ffffff');
+        $partnerColor1 = TableStyles::sanitizeColor($pageData['partnerTeamColor1'] ?? '000000');
+        $partnerColor2 = TableStyles::sanitizeColor($pageData['partnerTeamColor2'] ?? 'ffffff');
+
         // Build player + pick rows for both teams, tracking the form field counter
         $k = 0;
         $userPlayerRows = $this->buildPlayerRows($pageData['userPlayers'], $pageData['seasonPhase'], $k);
@@ -43,6 +49,7 @@ class TradingView implements TradingViewInterface
         $k--;
 
         ob_start();
+        echo $this->renderResultBanner($pageData['result'] ?? null, $pageData['error'] ?? null);
         ?>
 <form name="Trade_Offer" method="post" action="/ibl5/modules/Trading/maketradeoffer.php">
     <input type="hidden" name="offeringTeam" value="<?= $userTeam ?>">
@@ -52,10 +59,10 @@ class TradingView implements TradingViewInterface
         <table class="trading-layout">
             <tr>
                 <td style="vertical-align: top;">
-                    <table class="ibl-data-table trading-roster">
+                    <table class="ibl-data-table trading-roster team-table" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>;">
                         <thead>
                             <tr>
-                                <th colspan="4"><?= $userTeam ?></th>
+                                <th colspan="4"><img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="team-logo-banner" style="margin-bottom: 0;"></th>
                             </tr>
                             <tr>
                                 <th>Select</th>
@@ -73,10 +80,10 @@ class TradingView implements TradingViewInterface
                 <td style="vertical-align: top;">
                     <input type="hidden" name="switchCounter" value="<?= (int) $switchCounter ?>">
                     <input type="hidden" name="listeningTeam" value="<?= $partnerTeam ?>">
-                    <table class="ibl-data-table trading-roster">
+                    <table class="ibl-data-table trading-roster team-table" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>;">
                         <thead>
                             <tr>
-                                <th colspan="4"><?= $partnerTeam ?></th>
+                                <th colspan="4"><img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="team-logo-banner" style="margin-bottom: 0;"></th>
                             </tr>
                             <tr>
                                 <th>Select</th>
@@ -118,6 +125,7 @@ class TradingView implements TradingViewInterface
         $teams = $pageData['teams'];
 
         ob_start();
+        echo $this->renderResultBanner($pageData['result'] ?? null, $pageData['error'] ?? null);
         ?>
 <div style="text-align: center;">
     <img src="images/logo/<?= $userTeamId ?>.jpg" alt="Team Logo" class="team-logo-banner">
@@ -141,67 +149,6 @@ class TradingView implements TradingViewInterface
         </td>
     </tr>
 </table>
-        <?php
-        return ob_get_clean();
-    }
-
-    /**
-     * @see TradingViewInterface::renderTradeResult()
-     */
-    public function renderTradeResult(array $result): string
-    {
-        ob_start();
-
-        if (isset($result['capData'])) {
-            $userCap = (int) $result['capData']['userPostTradeCapTotal'];
-            $partnerCap = (int) $result['capData']['partnerPostTradeCapTotal'];
-            echo "Your Payroll this season, if this trade is accepted: {$userCap}<br>";
-            echo "Their Payroll this season, if this trade is accepted: {$partnerCap}<p>";
-        }
-
-        if (!$result['success']) {
-            if (isset($result['error'])) {
-                echo HtmlSanitizer::safeHtmlOutput($result['error']);
-            } elseif (isset($result['errors'])) {
-                foreach ($result['errors'] as $error) {
-                    echo HtmlSanitizer::safeHtmlOutput($error) . '<br>';
-                }
-            }
-            echo "<p><a href='javascript:history.back()'>Please go back and adjust your trade proposal.</a>";
-        } else {
-            echo HtmlSanitizer::safeHtmlOutput($result['tradeText'] ?? '');
-            echo '<p>';
-            echo "Trade Offer Sent!<br>";
-            echo "<a href='/ibl5/modules.php?name=Trading&amp;op=reviewtrade'>Back to Trade Review</a>";
-        }
-
-        return ob_get_clean();
-    }
-
-    /**
-     * @see TradingViewInterface::renderTradeAccepted()
-     */
-    public function renderTradeAccepted(): string
-    {
-        ob_start();
-        ?>
-<p>Trade accepted!</p>
-<meta http-equiv="refresh" content="3;url=/ibl5/modules.php?name=Trading&amp;op=reviewtrade">
-<p><a href="/ibl5/modules.php?name=Trading&amp;op=reviewtrade">Click here to go back to the Trade Review page,</a><br>
-or wait 3 seconds to be redirected automatically!</p>
-        <?php
-        return ob_get_clean();
-    }
-
-    /**
-     * @see TradingViewInterface::renderTradeRejected()
-     */
-    public function renderTradeRejected(): string
-    {
-        ob_start();
-        ?>
-<meta http-equiv="refresh" content="0;url='/ibl5/modules.php?name=Trading&amp;op=reviewtrade'">
-<p>Trade Offer Rejected. Redirecting you to trade review page...</p>
         <?php
         return ob_get_clean();
     }
@@ -260,6 +207,38 @@ or wait 3 seconds to be redirected automatically!</p>
     }
 
     /**
+     * Render a result banner from PRG redirect query params
+     *
+     * @param string|null $result Result code from query parameter
+     * @param string|null $error Error message from query parameter
+     * @return string HTML alert banner or empty string
+     */
+    private function renderResultBanner(?string $result, ?string $error): string
+    {
+        if ($error !== null) {
+            return '<div class="ibl-alert ibl-alert--error">' . HtmlSanitizer::safeHtmlOutput($error) . '</div>';
+        }
+
+        if ($result === null) {
+            return '';
+        }
+
+        $banners = [
+            'offer_sent' => ['class' => 'ibl-alert--success', 'message' => 'Trade offer sent!'],
+            'trade_accepted' => ['class' => 'ibl-alert--success', 'message' => 'Trade accepted!'],
+            'trade_rejected' => ['class' => 'ibl-alert--info', 'message' => 'Trade offer rejected.'],
+            'accept_error' => ['class' => 'ibl-alert--error', 'message' => 'Error processing trade.'],
+        ];
+
+        if (!isset($banners[$result])) {
+            return '';
+        }
+
+        $banner = $banners[$result];
+        return '<div class="ibl-alert ' . $banner['class'] . '">' . HtmlSanitizer::safeHtmlOutput($banner['message']) . '</div>';
+    }
+
+    /**
      * Build HTML rows for players in the trade form
      *
      * @param array $players Player rows from repository
@@ -300,13 +279,13 @@ or wait 3 seconds to be redirected automatically!</p>
     <input type="hidden" name="contract<?= $k ?>" value="<?= $contractAmount ?>">
     <input type="hidden" name="type<?= $k ?>" value="1">
 <?php if ($contractAmount !== 0 && $ordinal <= \JSB::WAIVERS_ORDINAL): ?>
-    <td align="center"><input type="checkbox" name="check<?= $k ?>"></td>
+    <td><input type="checkbox" name="check<?= $k ?>"></td>
 <?php else: ?>
-    <td align="center"><input type="hidden" name="check<?= $k ?>"></td>
+    <td><input type="hidden" name="check<?= $k ?>"></td>
 <?php endif; ?>
     <td><?= $playerPosition ?></td>
     <td class="ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $pid ?>"><?= $thumbnail ?><?= $playerName ?></a></td>
-    <td align="right"><?= $contractAmount ?></td>
+    <td><?= $contractAmount ?></td>
 </tr>
             <?php
             $k++;
@@ -336,21 +315,23 @@ or wait 3 seconds to be redirected automatically!</p>
             $pickNotes = $row['notes'] ?? null;
             ?>
 <tr>
-    <td align="center">
+    <td>
         <input type="hidden" name="index<?= $k ?>" value="<?= $pickId ?>">
         <input type="hidden" name="type<?= $k ?>" value="0">
         <input type="checkbox" name="check<?= $k ?>">
     </td>
-    <td colspan="3" class="ibl-player-cell">
+    <td></td>
+    <td class="ibl-player-cell">
         <img src="images/logo/<?= $pickTeam ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-        <?= $pickYear ?> <?= $pickTeam ?> Round <?= $pickRound ?>
-    </td>
-</tr>
+        <div>
+            <?= $pickYear ?> <?= $pickTeam ?> Round <?= $pickRound ?>
 <?php if ($pickNotes !== null && $pickNotes !== ''): ?>
-<tr>
-    <td colspan="3" width="150"><?= HtmlSanitizer::safeHtmlOutput($pickNotes) ?></td>
-</tr>
+            <div class="draft-picks-list__notes"><?= HtmlSanitizer::safeHtmlOutput($pickNotes) ?></div>
 <?php endif; ?>
+        </div>
+    </td>
+    <td></td>
+</tr>
             <?php
             $k++;
         }

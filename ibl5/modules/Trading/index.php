@@ -29,6 +29,8 @@ function tradeoffer($username)
     $view = new TradingView();
 
     $pageData = $service->getTradeOfferPageData($username, $partner);
+    $pageData['result'] = $_GET['result'] ?? null;
+    $pageData['error'] = $_GET['error'] ?? null;
 
     Nuke\Header::header();
     echo $view->renderTradeOfferForm($pageData);
@@ -45,6 +47,8 @@ function tradereview($username)
     $view = new TradingView();
 
     $pageData = $service->getTradeReviewPageData($username);
+    $pageData['result'] = $_GET['result'] ?? null;
+    $pageData['error'] = $_GET['error'] ?? null;
 
     Nuke\Header::header();
     echo $view->renderTradeReview($pageData);

@@ -22,15 +22,15 @@ if ($offerId !== null) {
         $result = $tradeProcessor->processTrade((int) $offerId);
 
         if ($result['success']) {
-            $view = new Trading\TradingView();
-            echo $view->renderTradeAccepted();
+            header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_accepted');
         } else {
-            echo "Error processing trade: " . \Utilities\HtmlSanitizer::safeHtmlOutput($result['error'] ?? 'Unknown error');
+            header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($result['error'] ?? 'Unknown error'));
         }
     } catch (Exception $e) {
         error_log("Failed to process trade: " . $e->getMessage());
-        die("Error processing trade: " . \Utilities\HtmlSanitizer::safeHtmlOutput($e->getMessage()));
+        header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($e->getMessage()));
     }
 } else {
-    echo "Nothing to see here!";
+    header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade');
 }
+exit;

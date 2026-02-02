@@ -41,6 +41,18 @@ class TradingViewTest extends TestCase
         $this->assertStringContainsString('Celtics', $html);
     }
 
+    public function testRenderTradeOfferFormContainsTeamColorStyles(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('--team-color-primary: #552583', $html);
+        $this->assertStringContainsString('--team-color-secondary: #FDB927', $html);
+        $this->assertStringContainsString('--team-color-primary: #007A33', $html);
+        $this->assertStringContainsString('team-table', $html);
+    }
+
     public function testRenderTradeOfferFormContainsPlayerRows(): void
     {
         $pageData = $this->createTradeOfferPageData();
@@ -290,82 +302,71 @@ class TradingViewTest extends TestCase
     }
 
     // ============================================
-    // TRADE RESULT TESTS
+    // RESULT BANNER TESTS
     // ============================================
 
-    public function testRenderTradeResultShowsSuccessMessage(): void
+    public function testRenderTradeOfferFormShowsSuccessBanner(): void
     {
-        $result = [
-            'success' => true,
-            'tradeText' => 'Lakers send PG LeBron to Celtics',
-            'capData' => ['userPostTradeCapTotal' => 5000, 'partnerPostTradeCapTotal' => 4500],
-        ];
+        $pageData = $this->createTradeOfferPageData();
+        $pageData['result'] = 'offer_sent';
 
-        $html = $this->view->renderTradeResult($result);
+        $html = $this->view->renderTradeOfferForm($pageData);
 
-        $this->assertStringContainsString('Trade Offer Sent!', $html);
-        $this->assertStringContainsString('Back to Trade Review', $html);
-        $this->assertStringContainsString('5000', $html);
-        $this->assertStringContainsString('4500', $html);
+        $this->assertStringContainsString('ibl-alert--success', $html);
+        $this->assertStringContainsString('Trade offer sent!', $html);
     }
 
-    public function testRenderTradeResultShowsError(): void
+    public function testRenderTradeOfferFormShowsErrorBanner(): void
     {
-        $result = [
-            'success' => false,
-            'error' => 'Trade exceeds salary cap',
-        ];
+        $pageData = $this->createTradeOfferPageData();
+        $pageData['error'] = 'Trade exceeds salary cap';
 
-        $html = $this->view->renderTradeResult($result);
+        $html = $this->view->renderTradeOfferForm($pageData);
 
+        $this->assertStringContainsString('ibl-alert--error', $html);
         $this->assertStringContainsString('Trade exceeds salary cap', $html);
-        $this->assertStringContainsString('go back and adjust', $html);
     }
 
-    public function testRenderTradeResultShowsMultipleErrors(): void
+    public function testRenderTradeOfferFormEscapesErrorBanner(): void
     {
-        $result = [
-            'success' => false,
-            'errors' => ['Error one', 'Error two'],
-        ];
+        $pageData = $this->createTradeOfferPageData();
+        $pageData['error'] = '<script>alert("xss")</script>';
 
-        $html = $this->view->renderTradeResult($result);
+        $html = $this->view->renderTradeOfferForm($pageData);
 
-        $this->assertStringContainsString('Error one', $html);
-        $this->assertStringContainsString('Error two', $html);
+        $this->assertStringNotContainsString('<script>alert', $html);
+        $this->assertStringContainsString('&lt;script&gt;', $html);
     }
 
-    public function testRenderTradeResultEscapesErrorMessage(): void
+    public function testRenderTradeReviewShowsAcceptedBanner(): void
     {
-        $result = [
-            'success' => false,
-            'error' => '<script>alert("xss")</script>',
-        ];
+        $pageData = $this->createTradeReviewPageData();
+        $pageData['result'] = 'trade_accepted';
 
-        $html = $this->view->renderTradeResult($result);
+        $html = $this->view->renderTradeReview($pageData);
 
-        $this->assertStringNotContainsString('<script>', $html);
-    }
-
-    // ============================================
-    // TRADE ACCEPTED / REJECTED TESTS
-    // ============================================
-
-    public function testRenderTradeAcceptedContainsRedirect(): void
-    {
-        $html = $this->view->renderTradeAccepted();
-
+        $this->assertStringContainsString('ibl-alert--success', $html);
         $this->assertStringContainsString('Trade accepted!', $html);
-        $this->assertStringContainsString('meta http-equiv="refresh"', $html);
-        $this->assertStringContainsString('reviewtrade', $html);
     }
 
-    public function testRenderTradeRejectedContainsRedirect(): void
+    public function testRenderTradeReviewShowsRejectedBanner(): void
     {
-        $html = $this->view->renderTradeRejected();
+        $pageData = $this->createTradeReviewPageData();
+        $pageData['result'] = 'trade_rejected';
 
-        $this->assertStringContainsString('Trade Offer Rejected', $html);
-        $this->assertStringContainsString('meta http-equiv="refresh"', $html);
+        $html = $this->view->renderTradeReview($pageData);
+
+        $this->assertStringContainsString('ibl-alert--info', $html);
+        $this->assertStringContainsString('Trade offer rejected.', $html);
+    }
+
+    public function testRenderTradeReviewShowsNoBannerByDefault(): void
+    {
+        $pageData = $this->createTradeReviewPageData();
+
+        $html = $this->view->renderTradeReview($pageData);
+
+        $this->assertStringNotContainsString('ibl-alert', $html);
     }
 
     // ============================================
@@ -446,6 +447,12 @@ class TradingViewTest extends TestCase
             'seasonPhase' => 'Regular Season',
             'cashStartYear' => 1,
             'cashEndYear' => 6,
+            'userTeamColor1' => '552583',
+            'userTeamColor2' => 'FDB927',
+            'partnerTeamColor1' => '007A33',
+            'partnerTeamColor2' => 'FFFFFF',
+            'result' => null,
+            'error' => null,
         ];
     }
 
@@ -456,6 +463,8 @@ class TradingViewTest extends TestCase
             'userTeamId' => 1,
             'tradeOffers' => [],
             'teams' => [],
+            'result' => null,
+            'error' => null,
         ];
     }
 }

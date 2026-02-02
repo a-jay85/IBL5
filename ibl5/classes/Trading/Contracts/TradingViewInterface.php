@@ -35,28 +35,6 @@ interface TradingViewInterface
     public function renderTradeReview(array $pageData): string;
 
     /**
-     * Render trade offer creation result (success or error)
-     *
-     * @param array $result Result array from TradeOffer::createTradeOffer()
-     * @return string HTML for trade result display
-     */
-    public function renderTradeResult(array $result): string;
-
-    /**
-     * Render trade acceptance confirmation with redirect
-     *
-     * @return string HTML with confirmation message and meta-refresh redirect
-     */
-    public function renderTradeAccepted(): string;
-
-    /**
-     * Render trade rejection confirmation with redirect
-     *
-     * @return string HTML with rejection message and meta-refresh redirect
-     */
-    public function renderTradeRejected(): string;
-
-    /**
      * Render the "trades not allowed" message
      *
      * @param \Season $season Season object for checking waiver status

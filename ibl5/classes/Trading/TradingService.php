@@ -37,6 +37,9 @@ class TradingService implements TradingServiceInterface
         $userTeamId = $this->commonRepository->getTidFromTeamname($userTeam) ?? 0;
         $partnerTeamId = $this->commonRepository->getTidFromTeamname($partnerTeam) ?? 0;
 
+        $userTeamData = $this->commonRepository->getTeamByName($userTeam);
+        $partnerTeamData = $this->commonRepository->getTeamByName($partnerTeam);
+
         $userPlayers = $this->repository->getTeamPlayersForTrading($userTeamId);
         $userPicks = $this->repository->getTeamDraftPicksForTrading($userTeam);
         $userFutureSalary = $this->calculateFutureSalaries($userPlayers, $season);
@@ -67,6 +70,10 @@ class TradingService implements TradingServiceInterface
             'seasonPhase' => $season->phase,
             'cashStartYear' => $cashStartYear,
             'cashEndYear' => 6,
+            'userTeamColor1' => $userTeamData['color1'] ?? '000000',
+            'userTeamColor2' => $userTeamData['color2'] ?? 'ffffff',
+            'partnerTeamColor1' => $partnerTeamData['color1'] ?? '000000',
+            'partnerTeamColor2' => $partnerTeamData['color2'] ?? 'ffffff',
         ];
     }
 

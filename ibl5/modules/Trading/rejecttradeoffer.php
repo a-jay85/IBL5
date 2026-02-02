@@ -43,5 +43,5 @@ Go here to make another offer: http://www.iblhoops.net/ibl5/modules.php?name=Tra
     // The trade rejection itself has already succeeded
 }
 
-$view = new Trading\TradingView();
-echo $view->renderTradeRejected();
+header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_rejected');
+exit;

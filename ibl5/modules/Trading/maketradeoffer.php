@@ -53,5 +53,10 @@ try {
     $result = ['success' => false, 'error' => $e->getMessage()];
 }
 
-$view = new Trading\TradingView();
-echo $view->renderTradeResult($result);
+if ($result['success']) {
+    header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=offer_sent');
+} else {
+    $error = $result['error'] ?? ($result['errors'] ? implode('; ', $result['errors']) : 'Unknown error');
+    header('Location: /ibl5/modules.php?name=Trading&op=offertrade&partner=' . rawurlencode($tradeData['listeningTeam']) . '&error=' . rawurlencode($error));
+}
+exit;

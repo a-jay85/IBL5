@@ -1,13 +1,22 @@
 /**
- * Mobile Player Name Abbreviation
+ * Name Abbreviation
  *
- * Abbreviates player names on mobile devices to save horizontal space.
- * Format: "John Paul Jones" -> "J.P. Jones"
+ * Abbreviates player names on mobile devices to save horizontal space,
+ * and shortens long team names in stat tables for compact display.
+ *
+ * Player names: "John Paul Jones" -> "J.P. Jones"
+ * Team names:   "Timberwolves" -> "T-Wolves", "Trailblazers" -> "Blazers"
  */
 (function() {
     'use strict';
 
     const MOBILE_BREAKPOINT = 768;
+
+    /** Long team names mapped to shorter display forms */
+    const TEAM_ABBREVIATIONS = {
+        'Timberwolves': 'T-Wolves',
+        'Trailblazers': 'Blazers'
+    };
 
     /**
      * Abbreviate a full name to initials + last name.
@@ -77,14 +86,42 @@
         });
     }
 
+    function processTeamNames() {
+        const spans = document.querySelectorAll('.stat-table .ibl-team-cell__text');
+
+        spans.forEach(span => {
+            // Store original name on first encounter
+            if (!span.dataset.fullName) {
+                span.dataset.fullName = span.textContent.trim();
+            }
+
+            const original = span.dataset.fullName;
+            let display = original;
+
+            for (const [long, short] of Object.entries(TEAM_ABBREVIATIONS)) {
+                if (original === long) {
+                    display = short;
+                    break;
+                }
+            }
+
+            span.textContent = display;
+        });
+    }
+
+    function processAll() {
+        processPlayerNames();
+        processTeamNames();
+    }
+
     // Debounce resize handling
     let resizeTimer;
     function handleResize() {
         clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(processPlayerNames, 150);
+        resizeTimer = setTimeout(processAll, 150);
     }
 
-    document.addEventListener('DOMContentLoaded', processPlayerNames);
+    document.addEventListener('DOMContentLoaded', processAll);
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleResize);
 })();

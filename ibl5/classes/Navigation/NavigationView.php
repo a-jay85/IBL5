@@ -19,14 +19,16 @@ class NavigationView
     private ?int $teamId;
     /** @var array<string, array<string, list<array{teamid: int, team_name: string, team_city: string}>>>|null */
     private ?array $teamsData;
+    private string $seasonPhase;
 
-    public function __construct(bool $isLoggedIn, ?string $username, string $currentLeague, ?int $teamId = null, ?array $teamsData = null)
+    public function __construct(bool $isLoggedIn, ?string $username, string $currentLeague, ?int $teamId = null, ?array $teamsData = null, string $seasonPhase = '')
     {
         $this->isLoggedIn = $isLoggedIn;
         $this->username = $username;
         $this->currentLeague = $currentLeague;
         $this->teamId = $teamId;
         $this->teamsData = $teamsData;
+        $this->seasonPhase = $seasonPhase;
     }
 
     /**
@@ -289,20 +291,28 @@ class NavigationView
         }
 
         if ($this->currentLeague === 'ibl') {
+            $links = [
+                ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamID=' . $this->teamId],
+                ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule&teamID=' . $this->teamId],
+                ['label' => 'Next Sim', 'url' => 'modules.php?name=Next_Sim', 'badge' => 'NEW'],
+                ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=Depth_Chart_Entry'],
+                ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
+                ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=drop">Drop</a>'],
+                ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
+                ['label' => 'Draft History', 'url' => 'modules.php?name=Draft_History&teamID=' . $this->teamId],
+            ];
+
+            if ($this->seasonPhase === 'Draft') {
+                array_unshift($links, ['label' => 'Draft', 'url' => 'modules.php?name=Draft', 'badge' => 'LIVE']);
+            }
+
+            if ($this->seasonPhase === 'Free Agency') {
+                array_unshift($links, ['label' => 'Free Agency', 'url' => 'modules.php?name=Free_Agency', 'badge' => 'LIVE']);
+            }
+
             return [
                 'icon' => '<img src="/ibl5/images/logo/new' . $this->teamId . '.png" alt="Team Logo" class="w-6 h-6 object-contain">',
-                'links' => [
-                    ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamID=' . $this->teamId],
-                    ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule&teamID=' . $this->teamId],
-                    ['label' => 'Next Sim', 'url' => 'modules.php?name=Next_Sim', 'badge' => 'NEW'],
-                    ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=Depth_Chart_Entry'],
-                    ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
-                    ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=drop">Drop</a>'],
-                    ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
-                    ['label' => 'Draft', 'url' => 'modules.php?name=Draft'],
-                    ['label' => 'Draft History', 'url' => 'modules.php?name=Draft_History&teamID=' . $this->teamId],
-                    ['label' => 'Free Agency', 'url' => 'modules.php?name=Free_Agency'],
-                ]
+                'links' => $links,
             ];
         } elseif ($this->currentLeague === 'olympics') {
             return [

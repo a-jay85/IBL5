@@ -1155,8 +1155,8 @@ a.schedule-jump-btn:hover {
 
 /* Team logo */
 .schedule-game__logo {
-    width: 18px;
-    height: 18px;
+    width: 1rem;
+    height: 1rem;
     aspect-ratio: 75 / 83;
     object-fit: contain;
     justify-self: center;

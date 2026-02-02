@@ -207,10 +207,14 @@ class Team
 
         $output = '<div class="team-info-list">'
             . '<span class="team-info-list__label">Team</span>'
-            . "<span class=\"team-info-list__value\">$teamName</span>"
-            . '<span class="team-info-list__label">f.k.a.</span>'
-            . "<span class=\"team-info-list__value\">$fka</span>"
-            . '<span class="team-info-list__label">Record</span>'
+            . "<span class=\"team-info-list__value\">$teamName</span>";
+
+        if ($team->formerlyKnownAs !== null && $team->formerlyKnownAs !== '') {
+            $output .= '<span class="team-info-list__label">f.k.a.</span>'
+                . "<span class=\"team-info-list__value\">$fka</span>";
+        }
+
+        $output .= '<span class="team-info-list__label">Record</span>'
             . "<span class=\"team-info-list__value\">$win-$loss</span>"
             . '<span class="team-info-list__label">Arena</span>'
             . "<span class=\"team-info-list__value\">$arena</span>";

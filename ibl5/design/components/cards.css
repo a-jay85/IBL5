@@ -415,6 +415,10 @@
     margin-bottom: 0;
 }
 
+.team-cards-row > .team-card:has(.franchise-history-columns) {
+    flex-basis: 100%;
+}
+
 /* Draft picks list */
 .draft-picks-list {
     list-style: none;

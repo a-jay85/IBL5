@@ -18,4 +18,6 @@ jobs:
         script: |
           cd www
           git pull origin
-          bun run css:build
+    - name: Bun
+      uses: oven-sh/setup-bun@v2
+    - run: bun run css:build

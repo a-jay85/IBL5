@@ -6,6 +6,7 @@ namespace Injuries;
 
 use Injuries\Contracts\InjuriesViewInterface;
 use Player\PlayerImageHelper;
+use UI\Components\InjuryDaysLabel;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -65,6 +66,7 @@ class InjuriesView implements InjuriesViewInterface
      *     name: string,
      *     position: string,
      *     daysRemaining: int,
+     *     returnDate: string,
      *     teamID: int,
      *     teamCity: string,
      *     teamName: string,
@@ -92,6 +94,7 @@ class InjuriesView implements InjuriesViewInterface
      *     name: string,
      *     position: string,
      *     daysRemaining: int,
+     *     returnDate: string,
      *     teamID: int,
      *     teamCity: string,
      *     teamName: string,
@@ -108,10 +111,12 @@ class InjuriesView implements InjuriesViewInterface
         $name = HtmlSanitizer::safeHtmlOutput($player['name']);
         $position = HtmlSanitizer::safeHtmlOutput($player['position']);
         $daysRemaining = (int) $player['daysRemaining'];
+        $returnDate = $player['returnDate'] ?? '';
         $teamName = HtmlSanitizer::safeHtmlOutput($player['teamName']);
         $color1 = HtmlSanitizer::safeHtmlOutput($player['teamColor1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($player['teamColor2']);
         $playerThumbnail = PlayerImageHelper::renderThumbnail($playerID);
+        $daysLabel = InjuryDaysLabel::render($daysRemaining, $returnDate) ?: (string) $daysRemaining;
 
         return "<tr>
     <td>{$position}</td>
@@ -122,7 +127,7 @@ class InjuriesView implements InjuriesViewInterface
             <span class=\"ibl-team-cell__text\">{$teamName}</span>
         </a>
     </td>
-    <td class=\"ibl-stat-highlight\">{$daysRemaining}</td>
+    <td class=\"ibl-stat-highlight\">{$daysLabel}</td>
 </tr>";
     }
 

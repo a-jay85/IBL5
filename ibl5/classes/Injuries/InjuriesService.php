@@ -32,6 +32,7 @@ class InjuriesService implements InjuriesServiceInterface
      */
     public function getInjuredPlayersWithTeams(): array
     {
+        $season = new \Season($this->db);
         $injuredPlayers = [];
 
         foreach ($this->league->getInjuredPlayersResult() as $injuredPlayerRow) {
@@ -43,6 +44,7 @@ class InjuriesService implements InjuriesServiceInterface
                 'name' => $player->name,
                 'position' => $player->position,
                 'daysRemaining' => $player->daysRemainingForInjury,
+                'returnDate' => $player->getInjuryReturnDate($season->lastSimEndDate),
                 'teamID' => $player->teamID,
                 'teamCity' => $team->city,
                 'teamName' => $team->name,

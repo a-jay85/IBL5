@@ -19,6 +19,7 @@ interface InjuriesViewInterface
      *     name: string,
      *     position: string,
      *     daysRemaining: int,
+     *     returnDate: string,
      *     teamID: int,
      *     teamCity: string,
      *     teamName: string,

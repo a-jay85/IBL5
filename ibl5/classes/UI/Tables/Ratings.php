@@ -6,6 +6,7 @@ namespace UI\Tables;
 
 use Player\Player;
 use Player\PlayerImageHelper;
+use UI\Components\InjuryDaysLabel;
 
 /**
  * Ratings - Displays player ratings table
@@ -180,7 +181,7 @@ class Ratings
             <td style="text-align: center;"><?= (int)$player->ratingClutch ?></td>
             <td style="text-align: center;"><?= (int)$player->ratingConsistency ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?php if ($row['injuryDays'] > 0): ?><span class="injury-days-tooltip" title="Returns: <?= htmlspecialchars($row['injuryReturnDate']) ?>" tabindex="0"><?= (int)$row['injuryDays'] ?></span><?php endif; ?></td>
+            <td style="text-align: center;"><?= InjuryDaysLabel::render((int)$row['injuryDays'], $row['injuryReturnDate']) ?></td>
         </tr>
 <?php endforeach; ?>
     </tbody>

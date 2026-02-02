@@ -24,24 +24,17 @@ jobs:
         run: npx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --minify
         working-directory: ibl5
 
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+        env:
+          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+
       - name: Pull latest code on server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.PRIVATE_KEY }}
-          port: ${{ secrets.PORT }}
-          script: |
-            cd www
-            git pull origin
+        run: ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} "cd www && git pull origin"
 
       - name: Deploy compiled CSS to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.PRIVATE_KEY }}
-          port: ${{ secrets.PORT }}
-          source: "ibl5/themes/IBL/style/style.css"
-          target: "www"
-          overwrite: true
+        run: scp -P ${{ secrets.PORT }} -i ~/.ssh/id_deploy ibl5/themes/IBL/style/style.css ${{ secrets.USERNAME }}@${{ secrets.HOST }}:www/ibl5/themes/IBL/style/style.css

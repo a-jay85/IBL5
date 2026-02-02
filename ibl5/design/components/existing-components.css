@@ -919,6 +919,14 @@
     max-width: 100%;
 }
 
+@media (min-width: 769px) {
+    .team-stats-block {
+        width: fit-content;
+        max-width: 100%;
+        margin-inline: auto;
+    }
+}
+
 .team-page-rafters {
     margin-top: var(--space-4);
 }

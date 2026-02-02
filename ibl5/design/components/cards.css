@@ -406,6 +406,7 @@
 .team-cards-row {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: var(--space-4);
     margin-top: var(--space-4);
 }
@@ -417,6 +418,7 @@
 
 .team-cards-row > .team-card:has(.franchise-history-columns) {
     flex-basis: 100%;
+    max-width: 1400px;
 }
 
 /* Draft picks list */

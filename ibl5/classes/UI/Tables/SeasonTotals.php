@@ -138,53 +138,52 @@ class SeasonTotals
     $labelColspan = ($moduleName === "League_Starters") ? 3 : 2;
 ?>
         <tr>
-            <td colspan="<?= $labelColspan ?>"><b><?= htmlspecialchars($team->name) ?> Offense</b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseGamesPlayed ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseGamesPlayed ?></b></td>
+            <td colspan="<?= $labelColspan ?>"><?= htmlspecialchars($team->name) ?> Offense</td>
+            <td><?= (int)$teamStats->seasonOffenseGamesPlayed ?></td>
+            <td><?= (int)$teamStats->seasonOffenseGamesPlayed ?></td>
             <td></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalFieldGoalsMade ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalFieldGoalsAttempted ?></b></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalFieldGoalsMade ?></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalFieldGoalsAttempted ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalFreeThrowsMade ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalFreeThrowsAttempted ?></b></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalFreeThrowsMade ?></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalFreeThrowsAttempted ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalThreePointersMade ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalThreePointersAttempted ?></b></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalThreePointersMade ?></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalThreePointersAttempted ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalOffensiveRebounds ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalRebounds ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalAssists ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalSteals ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalTurnovers ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalBlocks ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalPersonalFouls ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseTotalPoints ?></b></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalOffensiveRebounds ?></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalRebounds ?></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalAssists ?></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalSteals ?></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalTurnovers ?></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalBlocks ?></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalPersonalFouls ?></td>
+            <td><?= (int)$teamStats->seasonOffenseTotalPoints ?></td>
         </tr>
         <tr>
-            <td colspan="<?= $labelColspan ?>"><b><?= htmlspecialchars($team->name) ?> Defense</b></td>
-
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseGamesPlayed ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseGamesPlayed ?></b></td>
+            <td colspan="<?= $labelColspan ?>"><?= htmlspecialchars($team->name) ?> Defense</td>
+            <td><?= (int)$teamStats->seasonDefenseGamesPlayed ?></td>
+            <td><?= (int)$teamStats->seasonDefenseGamesPlayed ?></td>
             <td></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalFieldGoalsMade ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalFieldGoalsAttempted ?></b></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalFieldGoalsMade ?></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalFieldGoalsAttempted ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalFreeThrowsMade ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalFreeThrowsAttempted ?></b></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalFreeThrowsMade ?></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalFreeThrowsAttempted ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalThreePointersMade ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalThreePointersAttempted ?></b></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalThreePointersMade ?></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalThreePointersAttempted ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalOffensiveRebounds ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalRebounds ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalAssists ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalSteals ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalTurnovers ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalBlocks ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalPersonalFouls ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseTotalPoints ?></b></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalOffensiveRebounds ?></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalRebounds ?></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalAssists ?></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalSteals ?></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalTurnovers ?></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalBlocks ?></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalPersonalFouls ?></td>
+            <td><?= (int)$teamStats->seasonDefenseTotalPoints ?></td>
         </tr>
 <?php endif; ?>
     </tfoot>

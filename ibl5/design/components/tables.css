@@ -152,6 +152,37 @@
     background-color: var(--accent-200, #fed7aa);
 }
 
+/* Table footer summary rows (team totals, cap totals, etc.) */
+.ibl-data-table tfoot tr {
+    background-color: var(--accent-100, #ffedd5);
+    font-weight: 600;
+}
+
+.ibl-data-table tfoot tr:hover {
+    background-color: var(--accent-200, #fed7aa);
+}
+
+/* Top border separating tfoot from tbody */
+.ibl-data-table tfoot tr:first-child td {
+    border-top: 2px solid var(--gray-200, #e5e7eb);
+}
+
+/* Legend/key row — subtle, de-emphasized */
+.ibl-data-table tfoot tr.tfoot-legend {
+    background-color: var(--gray-50, #f9fafb);
+    font-weight: 400;
+    font-size: 0.875rem;
+    color: var(--gray-500, #6b7280);
+}
+
+.ibl-data-table tfoot tr.tfoot-legend:hover {
+    background-color: var(--gray-100, #f3f4f6);
+}
+
+.ibl-data-table tfoot tr.tfoot-legend td {
+    border-top: 1px solid var(--gray-200, #e5e7eb);
+}
+
 /* ==========================================================================
    Team-Colored Table Modifier (.team-table)
 
@@ -211,6 +242,19 @@
 /* Salary column left alignment */
 .team-table th.salary {
     text-align: left;
+}
+
+/* Team-colored tfoot */
+.team-table tfoot tr {
+    background-color: var(--team-row-highlight-bg);
+}
+
+.team-table tfoot tr:hover {
+    background-color: var(--team-row-highlight-hover-bg);
+}
+
+.team-table tfoot tr:first-child td {
+    border-top-color: color-mix(in srgb, var(--team-color-primary) 30%, var(--gray-200, #e5e7eb));
 }
 
 /* Ratings highlight rows (team-colored) */
@@ -335,6 +379,15 @@
 
     .responsive-table tbody tr.ratings-highlight:hover td[class*="sticky-col"] {
         background-color: var(--team-row-highlight-hover-bg, var(--gray-100, #f3f4f6));
+    }
+
+    /* Tfoot sticky-col backgrounds (team-colored or accent fallback) */
+    .responsive-table tfoot td[class*="sticky-col"] {
+        background-color: var(--team-row-highlight-bg, var(--accent-100, #ffedd5));
+    }
+
+    .responsive-table tfoot tr:hover td[class*="sticky-col"] {
+        background-color: var(--team-row-highlight-hover-bg, var(--accent-200, #fed7aa));
     }
 
     /* Remove first-column left padding on responsive tables -

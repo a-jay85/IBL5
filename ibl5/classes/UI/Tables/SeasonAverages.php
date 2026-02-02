@@ -144,58 +144,58 @@ class SeasonAverages
     $labelColspan = ($moduleName === "League_Starters") ? 3 : 2;
 ?>
         <tr>
-            <td colspan="<?= $labelColspan ?>"><b><?= htmlspecialchars($team->name) ?> Offense</b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseGamesPlayed ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseGamesPlayed ?></b></td>
+            <td colspan="<?= $labelColspan ?>"><?= htmlspecialchars($team->name) ?> Offense</td>
+            <td><?= (int)$teamStats->seasonOffenseGamesPlayed ?></td>
+            <td><?= (int)$teamStats->seasonOffenseGamesPlayed ?></td>
             <td></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseFieldGoalsMadePerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseFieldGoalsAttemptedPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseFieldGoalPercentage ?></b></td>
+            <td><?= $teamStats->seasonOffenseFieldGoalsMadePerGame ?></td>
+            <td><?= $teamStats->seasonOffenseFieldGoalsAttemptedPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseFieldGoalPercentage ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseFreeThrowsMadePerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseFreeThrowsAttemptedPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseFreeThrowPercentage ?></b></td>
+            <td><?= $teamStats->seasonOffenseFreeThrowsMadePerGame ?></td>
+            <td><?= $teamStats->seasonOffenseFreeThrowsAttemptedPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseFreeThrowPercentage ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseThreePointersMadePerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseThreePointersAttemptedPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseThreePointPercentage ?></b></td>
+            <td><?= $teamStats->seasonOffenseThreePointersMadePerGame ?></td>
+            <td><?= $teamStats->seasonOffenseThreePointersAttemptedPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseThreePointPercentage ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseOffensiveReboundsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseTotalReboundsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseAssistsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseStealsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseTurnoversPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseBlocksPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffensePersonalFoulsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffensePointsPerGame ?></b></td>
+            <td><?= $teamStats->seasonOffenseOffensiveReboundsPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseTotalReboundsPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseAssistsPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseStealsPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseTurnoversPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseBlocksPerGame ?></td>
+            <td><?= $teamStats->seasonOffensePersonalFoulsPerGame ?></td>
+            <td><?= $teamStats->seasonOffensePointsPerGame ?></td>
         </tr>
         <tr>
-            <td colspan="<?= $labelColspan ?>"><b><?= htmlspecialchars($team->name) ?> Defense</b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseGamesPlayed ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseGamesPlayed ?></b></td>
+            <td colspan="<?= $labelColspan ?>"><?= htmlspecialchars($team->name) ?> Defense</td>
+            <td><?= (int)$teamStats->seasonDefenseGamesPlayed ?></td>
+            <td><?= (int)$teamStats->seasonDefenseGamesPlayed ?></td>
             <td></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseFieldGoalsMadePerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseFieldGoalsAttemptedPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseFieldGoalPercentage ?></b></td>
+            <td><?= $teamStats->seasonDefenseFieldGoalsMadePerGame ?></td>
+            <td><?= $teamStats->seasonDefenseFieldGoalsAttemptedPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseFieldGoalPercentage ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseFreeThrowsMadePerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseFreeThrowsAttemptedPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseFreeThrowPercentage ?></b></td>
+            <td><?= $teamStats->seasonDefenseFreeThrowsMadePerGame ?></td>
+            <td><?= $teamStats->seasonDefenseFreeThrowsAttemptedPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseFreeThrowPercentage ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseThreePointersMadePerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseThreePointersAttemptedPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseThreePointPercentage ?></b></td>
+            <td><?= $teamStats->seasonDefenseThreePointersMadePerGame ?></td>
+            <td><?= $teamStats->seasonDefenseThreePointersAttemptedPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseThreePointPercentage ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseOffensiveReboundsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseTotalReboundsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseAssistsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseStealsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseTurnoversPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseBlocksPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefensePersonalFoulsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefensePointsPerGame ?></b></td>
+            <td><?= $teamStats->seasonDefenseOffensiveReboundsPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseTotalReboundsPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseAssistsPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseStealsPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseTurnoversPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseBlocksPerGame ?></td>
+            <td><?= $teamStats->seasonDefensePersonalFoulsPerGame ?></td>
+            <td><?= $teamStats->seasonDefensePointsPerGame ?></td>
         </tr>
 <?php endif; ?>
     </tfoot>

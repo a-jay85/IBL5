@@ -131,17 +131,17 @@ class Contracts
     <tfoot>
         <tr>
             <td></td>
-            <td><b>Cap Totals</b></td>
+            <td>Cap Totals</td>
             <td></td>
             <td></td>
             <td></td>
             <td class="sep-team"></td>
-            <td class="salary"><b><?= (int)$cap1 ?></b></td>
-            <td class="salary"><b><?= (int)$cap2 ?></b></td>
-            <td class="salary"><b><?= (int)$cap3 ?></b></td>
-            <td class="salary"><b><?= (int)$cap4 ?></b></td>
-            <td class="salary"><b><?= (int)$cap5 ?></b></td>
-            <td class="sep-team salary"><b><?= (int)$cap6 ?></b></td>
+            <td class="salary"><?= (int)$cap1 ?></td>
+            <td class="salary"><?= (int)$cap2 ?></td>
+            <td class="salary"><?= (int)$cap3 ?></td>
+            <td class="salary"><?= (int)$cap4 ?></td>
+            <td class="salary"><?= (int)$cap5 ?></td>
+            <td class="sep-team salary"><?= (int)$cap6 ?></td>
             <td></td>
             <td></td>
             <td></td>
@@ -152,9 +152,9 @@ class Contracts
             <td></td>
             <td></td>
         </tr>
-        <tr>
-            <td colspan="21">
-                Key:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>(Waived)*</i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Becomes Free Agent^
+        <tr class="tfoot-legend">
+            <td colspan="21" style="text-align: left;">
+                Key: &nbsp; <i>(Waived)*</i> &nbsp; Becomes Free Agent^
             </td>
         </tr>
     </tfoot>

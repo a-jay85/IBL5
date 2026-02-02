@@ -80,7 +80,7 @@ class TeamView implements TeamViewInterface
 <div class="team-banner-row" style="--team-tab-bg-color: #<?= $color1 ?>; --team-tab-active-color: #<?= $color2 ?>;">
     <a href="modules.php?name=Schedule&amp;teamID=<?= $teamID ?>" class="team-action-link">Schedule</a>
     <div style="text-align: center;">
-        <img src="./<?= $imagesPath ?>logo/<?= $teamID ?>.jpg" style="display: block; margin: 0 auto 18px;">
+        <img src="./<?= $imagesPath ?>logo/<?= $teamID ?>.jpg" style="display: block; margin: 0 18px 18px;">
         <?= $yearHeading ?>
     </div>
     <a href="modules.php?name=Draft_History&amp;teamID=<?= $teamID ?>" class="team-action-link">Draft History</a>

@@ -511,7 +511,7 @@ class NavigationView
 
         $icon = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="1.5"/><path stroke-linecap="round" stroke-width="1.5" d="M12 2v20M2 12h20"/><path stroke-width="1.5" d="M4.5 4.5C8 8 8 16 4.5 19.5M19.5 4.5C16 8 16 16 19.5 19.5"/></svg>';
 
-        $html = '<div class="relative group">';
+        $html = '<div class="group">';
         $html .= '<button class="flex items-center gap-2 px-3 py-2.5 text-lg font-semibold font-display text-gray-300 hover:text-white transition-colors duration-200">';
         $html .= '<span class="text-accent-500 group-hover:text-accent-400 transition-colors">' . $icon . '</span>';
         $html .= '<span>Teams</span>';
@@ -519,7 +519,7 @@ class NavigationView
         $html .= '</button>';
 
         // Wider dropdown for the 2-column grid
-        $html .= '<div class="absolute left-0 top-full pt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">';
+        $html .= '<div class="absolute -right-2 top-full pt-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">';
         $html .= '<div class="min-w-[580px] bg-navy-800/95 backdrop-blur-xl rounded-lg shadow-2xl shadow-black/30 border border-white/10 overflow-hidden">';
 
         // 2-column grid: Western on left, Eastern on right
@@ -690,13 +690,14 @@ class NavigationView
                             ) ?>
                         <?php endforeach; ?>
 
-                        <!-- Teams mega-menu -->
-                        <?= $this->renderDesktopTeamsDropdown() ?>
+                        <!-- Teams + My Team wrapper (positioning context for Teams mega-menu) -->
+                        <div class="relative flex items-center">
+                            <?= $this->renderDesktopTeamsDropdown() ?>
 
-                        <!-- My Team dropdown (if user has a team) -->
-                        <?php if ($myTeamMenu): ?>
-                            <?= $this->renderDesktopDropdown('My Team', $myTeamMenu) ?>
-                        <?php endif; ?>
+                            <?php if ($myTeamMenu): ?>
+                                <?= $this->renderDesktopDropdown('My Team', $myTeamMenu) ?>
+                            <?php endif; ?>
+                        </div>
 
                         <!-- Divider -->
                         <div class="w-px h-6 bg-white/10 mx-2"></div>

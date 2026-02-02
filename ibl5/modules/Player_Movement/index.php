@@ -86,24 +86,35 @@ while ($row = $result->fetch_assoc()) {
     $oldColor1 = $row['old_color1'] ?? '333333';
     $oldColor2 = $row['old_color2'] ?? 'FFFFFF';
 
-    // Build team display names (city + name, or just name if city missing)
-    $newTeamDisplay = trim("{$newCity} {$newTeam}");
-    $oldTeamDisplay = trim("{$oldCity} {$oldTeam}");
-
-    echo "<tr>
-        <td class=\"ibl-player-cell\"><a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\">{$playerName}</a></td>
-        <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$oldColor1};\">
+    // Build team cells - free agents get plain text instead of logo
+    if ($oldTeamId === 0) {
+        $oldTeamCell = '<td>Free Agent</td>';
+    } else {
+        $oldTeamDisplay = trim("{$oldCity} {$oldTeam}");
+        $oldTeamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$oldColor1};\">
             <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$oldTeamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$oldColor2};\">
                 <img src=\"images/logo/new{$oldTeamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
                 <span class=\"ibl-team-cell__text\">{$oldTeamDisplay}</span>
             </a>
-        </td>
-        <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$newColor1};\">
+        </td>";
+    }
+
+    if ($newTeamId === 0) {
+        $newTeamCell = '<td>Free Agent</td>';
+    } else {
+        $newTeamDisplay = trim("{$newCity} {$newTeam}");
+        $newTeamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$newColor1};\">
             <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$newTeamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$newColor2};\">
                 <img src=\"images/logo/new{$newTeamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
                 <span class=\"ibl-team-cell__text\">{$newTeamDisplay}</span>
             </a>
-        </td>
+        </td>";
+    }
+
+    echo "<tr>
+        <td class=\"ibl-player-cell\"><a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\"><img src=\"{$playerImage}\" alt=\"\" class=\"ibl-player-photo\" width=\"24\" height=\"24\">{$playerName}</a></td>
+        {$oldTeamCell}
+        {$newTeamCell}
     </tr>";
 }
 

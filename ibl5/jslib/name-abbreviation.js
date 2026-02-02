@@ -87,7 +87,7 @@
     }
 
     function processTeamNames() {
-        const spans = document.querySelectorAll('.stat-table .ibl-team-cell__text');
+        const spans = document.querySelectorAll('.stat-table .ibl-team-cell__text, .draft-pick-table .ibl-team-cell__text');
 
         spans.forEach(span => {
             // Store original name on first encounter
@@ -109,9 +109,35 @@
         });
     }
 
+    function processDraftPickCells() {
+        const cells = document.querySelectorAll('.draft-pick-table .draft-pick-traded, .draft-pick-table .draft-pick-own');
+
+        cells.forEach(cell => {
+            const link = cell.querySelector('a');
+            const target = link || cell;
+
+            if (!target.dataset.fullName) {
+                target.dataset.fullName = target.textContent.trim();
+            }
+
+            const original = target.dataset.fullName;
+            let display = original;
+
+            for (const [long, short] of Object.entries(TEAM_ABBREVIATIONS)) {
+                if (original === long) {
+                    display = short;
+                    break;
+                }
+            }
+
+            target.textContent = display;
+        });
+    }
+
     function processAll() {
         processPlayerNames();
         processTeamNames();
+        processDraftPickCells();
     }
 
     // Debounce resize handling

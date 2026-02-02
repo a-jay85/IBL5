@@ -62,7 +62,10 @@
                 link.dataset.fullName = textNode ? textNode.textContent.trim() : link.textContent.trim();
             }
 
-            const newName = isMobile ? abbreviateName(link.dataset.fullName) : link.dataset.fullName;
+            // Always abbreviate in stat tables (compact grid layout), otherwise only on mobile
+        const inStatTable = link.closest('.stat-table') !== null;
+        const shouldAbbreviate = isMobile || inStatTable;
+        const newName = shouldAbbreviate ? abbreviateName(link.dataset.fullName) : link.dataset.fullName;
 
             if (textNode) {
                 // Preserve images/other elements, only update the text node

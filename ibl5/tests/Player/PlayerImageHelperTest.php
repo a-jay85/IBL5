@@ -201,4 +201,58 @@ class PlayerImageHelperTest extends TestCase
         $this->assertTrue(PlayerImageHelper::isValidPlayerID(1.5));
         $this->assertTrue(PlayerImageHelper::isValidPlayerID(100.9));
     }
+
+    /**
+     * Test that renderPlayerCell includes a photo thumbnail for normal players
+     */
+    public function testRenderPlayerCellIncludesThumbnailForNormalPlayer(): void
+    {
+        $result = PlayerImageHelper::renderPlayerCell(123, 'John Smith');
+
+        $this->assertStringContainsString('<img', $result);
+        $this->assertStringContainsString('ibl-player-photo', $result);
+        $this->assertStringContainsString('John Smith', $result);
+    }
+
+    /**
+     * Test that renderPlayerCell skips the photo for pipe-prefixed names (cash transactions)
+     */
+    public function testRenderPlayerCellSkipsThumbnailForPipePrefixedName(): void
+    {
+        $result = PlayerImageHelper::renderPlayerCell(0, '|Cash');
+
+        $this->assertStringNotContainsString('<img', $result);
+        $this->assertStringContainsString('|Cash', $result);
+    }
+
+    /**
+     * Test that renderPlayerCell skips the photo for waived pipe-prefixed names
+     */
+    public function testRenderPlayerCellSkipsThumbnailForWaivedPipePrefixedName(): void
+    {
+        $result = PlayerImageHelper::renderPlayerCell(0, '(|Cash)*');
+
+        $this->assertStringNotContainsString('<img', $result);
+        $this->assertStringContainsString('(|Cash)*', $result);
+    }
+
+    /**
+     * Test that renderPlayerCell applies starter class when playerID matches
+     */
+    public function testRenderPlayerCellAppliesStarterClass(): void
+    {
+        $result = PlayerImageHelper::renderPlayerCell(123, 'John Smith', [123, 456]);
+
+        $this->assertStringContainsString('is-starter', $result);
+    }
+
+    /**
+     * Test that renderPlayerCell does not apply starter class when playerID does not match
+     */
+    public function testRenderPlayerCellNoStarterClassWhenNotStarter(): void
+    {
+        $result = PlayerImageHelper::renderPlayerCell(123, 'John Smith', [456, 789]);
+
+        $this->assertStringNotContainsString('is-starter', $result);
+    }
 }

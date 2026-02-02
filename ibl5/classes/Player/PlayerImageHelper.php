@@ -81,7 +81,7 @@ class PlayerImageHelper implements PlayerImageHelperInterface
     public static function renderPlayerCell(int $playerID, string $displayName, array $starterPids = []): string
     {
         $starterClass = in_array($playerID, $starterPids, true) ? ' is-starter' : '';
-        $thumbnail = self::renderThumbnail($playerID);
+        $thumbnail = str_contains($displayName, '|') ? '' : self::renderThumbnail($playerID);
 
         return '<td class="sticky-col ibl-player-cell' . $starterClass . '" style="white-space: nowrap;">'
             . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'

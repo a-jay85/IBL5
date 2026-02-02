@@ -1188,6 +1188,7 @@
 /* Roster tables for player/pick selection */
 .trading-roster {
     min-width: 280px;
+    max-width: 450px;
 }
 
 .trading-roster td {
@@ -1201,6 +1202,11 @@
 
 .trading-roster td:nth-child(4) {
     text-align: right;
+}
+
+/* Player names: no-wrap, abbreviate via JS; draft pick cells: allow wrapping */
+.trading-roster .ibl-player-cell a[href*="pid="] {
+    white-space: nowrap;
 }
 
 /* Cap totals table */

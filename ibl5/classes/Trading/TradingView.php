@@ -275,13 +275,20 @@ class TradingView implements TradingViewInterface
             $contractAmount = ($contractYear < 7) ? (int) $row["cy{$contractYear}"] : 0;
             ?>
 <tr>
-    <input type="hidden" name="index<?= $k ?>" value="<?= $pid ?>">
-    <input type="hidden" name="contract<?= $k ?>" value="<?= $contractAmount ?>">
-    <input type="hidden" name="type<?= $k ?>" value="1">
 <?php if ($contractAmount !== 0 && $ordinal <= \JSB::WAIVERS_ORDINAL): ?>
-    <td><input type="checkbox" name="check<?= $k ?>"></td>
+    <td>
+        <input type="hidden" name="index<?= $k ?>" value="<?= $pid ?>">
+        <input type="hidden" name="contract<?= $k ?>" value="<?= $contractAmount ?>">
+        <input type="hidden" name="type<?= $k ?>" value="1">
+        <input type="checkbox" name="check<?= $k ?>">
+    </td>
 <?php else: ?>
-    <td><input type="hidden" name="check<?= $k ?>"></td>
+    <td>
+        <input type="hidden" name="index<?= $k ?>" value="<?= $pid ?>">
+        <input type="hidden" name="contract<?= $k ?>" value="<?= $contractAmount ?>">
+        <input type="hidden" name="type<?= $k ?>" value="1">
+        <input type="hidden" name="check<?= $k ?>">
+    </td>
 <?php endif; ?>
     <td><?= $playerPosition ?></td>
     <td class="ibl-player-cell"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $pid ?>"><?= $thumbnail ?><?= $playerName ?></a></td>

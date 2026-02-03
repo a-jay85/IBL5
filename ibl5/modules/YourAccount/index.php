@@ -897,7 +897,7 @@ function login($username, $user_password, $redirect, $mode, $f, $t, $random_num,
             $db->sql_query("DELETE FROM " . $prefix . "_session WHERE uname='$uname' AND guest='1'");
             $db->sql_query("UPDATE " . $prefix . "_users SET last_ip='$uname' WHERE username='$username'");
         }
-        Header("Location: modules.php?name=Your_Account&op=userinfo&bypass=1&username=$username");
+        Header("Location: modules.php?name=YourAccount&op=userinfo&bypass=1&username=$username");
     } else {
         Header("Location: modules.php?name=$module_name&stop=1");
     }
@@ -1120,7 +1120,7 @@ function edituser()
             . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>"
             . "<tr><td bgcolor='$bgcolor2'><b>Upload Avatar from a URL:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image and click on the submit button below, the Avatar image will be copied to this site.</SPAN></td>"
             . "<td bgcolor='$bgcolor3'><b>Currently Disabled</b></td></tr>";
-        echo "<form action=\"modules.php?name=Your_Account&op=avatarlinksave\" method=\"post\">"
+        echo "<form action=\"modules.php?name=YourAccount&op=avatarlinksave\" method=\"post\">"
             . "<tr><td bgcolor='$bgcolor2'><b>Link to off-site Avatar:</b><br><SPAN class=gensmall>Enter the URL of the location containing the Avatar image you wish to link to and click on the submit button below.</SPAN></td>"
             . "<td bgcolor='$bgcolor3'><INPUT class=post style=\"WIDTH: 200px\" size=40 name=avatar></td></tr>";
         echo "<tr><td bgcolor='$bgcolor3' colspan='2' align='center'>"

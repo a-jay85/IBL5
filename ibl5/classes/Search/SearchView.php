@@ -264,7 +264,7 @@ class SearchView implements SearchViewInterface
             $output .= '<div class="search-result__meta">';
 
             if ($informant !== '') {
-                $output .= '<span class="search-result__meta-item">' . HtmlSanitizer::safeHtmlOutput(_CONTRIBUTEDBY) . ' <a href="modules.php?name=Your_Account&amp;op=userinfo&amp;username=' . $informant . '">' . $informant . '</a></span>';
+                $output .= '<span class="search-result__meta-item">' . HtmlSanitizer::safeHtmlOutput(_CONTRIBUTEDBY) . ' <a href="modules.php?name=YourAccount&amp;op=userinfo&amp;username=' . $informant . '">' . $informant . '</a></span>';
             }
 
             $output .= '<span class="search-result__meta-item">' . HtmlSanitizer::safeHtmlOutput(_POSTEDBY) . ' ' . $aid . ' ' . HtmlSanitizer::safeHtmlOutput(_ON) . ' ' . $time . '</span>';
@@ -323,7 +323,7 @@ class SearchView implements SearchViewInterface
             $output .= '<div class="search-result__meta">';
 
             if ($name !== '') {
-                $output .= '<span class="search-result__meta-item">' . HtmlSanitizer::safeHtmlOutput(_POSTEDBY) . ' <a href="modules.php?name=Your_Account&amp;op=userinfo&amp;username=' . $name . '">' . $name . '</a> ' . HtmlSanitizer::safeHtmlOutput(_ON) . ' ' . $date . '</span>';
+                $output .= '<span class="search-result__meta-item">' . HtmlSanitizer::safeHtmlOutput(_POSTEDBY) . ' <a href="modules.php?name=YourAccount&amp;op=userinfo&amp;username=' . $name . '">' . $name . '</a> ' . HtmlSanitizer::safeHtmlOutput(_ON) . ' ' . $date . '</span>';
             }
 
             if ($articleTitle !== '') {
@@ -357,7 +357,7 @@ class SearchView implements SearchViewInterface
 
             $output .= '<div class="search-result search-result--compact" style="animation-delay: ' . $delay . 'ms">';
             $output .= '<div class="search-result__header">';
-            $output .= '<a href="modules.php?name=Your_Account&amp;op=userinfo&amp;username=' . $username . '" class="search-result__title">' . $username . '</a>';
+            $output .= '<a href="modules.php?name=YourAccount&amp;op=userinfo&amp;username=' . $username . '" class="search-result__title">' . $username . '</a>';
             $output .= '<span class="search-result__subtitle">' . $displayName . '</span>';
             $output .= '</div>';
 

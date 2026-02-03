@@ -258,14 +258,14 @@ class LeagueContextIntegrationTest extends TestCase
 
         $iblOnlyModules = [
             'Draft',
-            'Draft_Pick_Locator',
-            'Free_Agency',
+            'DraftPickLocator',
+            'FreeAgency',
             'Waivers',
             'Trading',
             'Voting',
-            'Voting_Results',
-            'Cap_Info',
-            'Franchise_History',
+            'VotingResults',
+            'CapSpace',
+            'FranchiseHistory',
         ];
 
         foreach ($iblOnlyModules as $module) {
@@ -285,14 +285,14 @@ class LeagueContextIntegrationTest extends TestCase
 
         $iblOnlyModules = [
             'Draft',
-            'Draft_Pick_Locator',
-            'Free_Agency',
+            'DraftPickLocator',
+            'FreeAgency',
             'Waivers',
             'Trading',
             'Voting',
-            'Voting_Results',
-            'Cap_Info',
-            'Franchise_History',
+            'VotingResults',
+            'CapSpace',
+            'FranchiseHistory',
         ];
 
         foreach ($iblOnlyModules as $module) {
@@ -347,14 +347,14 @@ class LeagueContextIntegrationTest extends TestCase
 
         $iblOnlyModules = [
             'Draft',
-            'Draft_Pick_Locator',
-            'Free_Agency',
+            'DraftPickLocator',
+            'FreeAgency',
             'Waivers',
             'Trading',
             'Voting',
-            'Voting_Results',
-            'Cap_Info',
-            'Franchise_History',
+            'VotingResults',
+            'CapSpace',
+            'FranchiseHistory',
         ];
 
         $disabledCount = 0;

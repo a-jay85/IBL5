@@ -48,7 +48,7 @@ define("_READREST", "Read the rest of this comment...");
 define("_REPLY", "Reply to This");
 define("_REPLYMAIN", "Post Comment");
 define("_NOSUBJECT", "No Subject");
-define("_NOANONCOMMENTS", "No Comments Allowed for Anonymous, please <a href=\"modules.php?name=Your_Account&amp;op=new_user\">register</a>");
+define("_NOANONCOMMENTS", "No Comments Allowed for Anonymous, please <a href=\"modules.php?name=YourAccount&amp;op=new_user\">register</a>");
 define("_PARENT", "Parent");
 define("_ROOT", "Root");
 define("_UCOMMENT", "Comment");

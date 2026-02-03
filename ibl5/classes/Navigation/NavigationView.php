@@ -84,34 +84,34 @@ class NavigationView
                     ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule'],
                     ['label' => 'Injuries', 'url' => 'modules.php?name=Injuries'],
                     ['label' => 'Player Database', 'url' => 'modules.php?name=Player_Search'],
-                    ['label' => 'Draft Pick Locator', 'url' => 'modules.php?name=Draft_Pick_Locator'],
+                    ['label' => 'Draft Pick Locator', 'url' => 'modules.php?name=DraftPickLocator'],
                     ['label' => 'Cap Space', 'url' => 'modules.php?name=Cap_Info'],
-                    ['label' => 'Free Agency Preview', 'url' => 'modules.php?name=Free_Agency_Preview'],
+                    ['label' => 'Free Agency Preview', 'url' => 'modules.php?name=FreeAgencyPreview'],
                     ['label' => 'Topics (News)', 'url' => 'modules.php?name=Topics'],
-                    ['label' => 'Contract List', 'url' => 'modules.php?name=Contract_List'],
-                    ['label' => 'Player Movement', 'url' => 'modules.php?name=Player_Movement'],
+                    ['label' => 'Contract List', 'url' => 'modules.php?name=ContractList'],
+                    ['label' => 'Player Movement', 'url' => 'modules.php?name=PlayerMovement'],
                     ['label' => 'JSB Export', 'url' => 'ibl/IBL'],
                 ],
             ],
             'Stats' => [
                 'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>',
                 'links' => [
-                    ['label' => 'League Starters', 'url' => 'modules.php?name=League_Starters', 'badge' => 'NEW'],
-                    ['label' => 'Compare Players', 'url' => 'modules.php?name=Compare_Players'],
-                    ['label' => 'Season Highs', 'url' => 'modules.php?name=Season_Highs'],
-                    ['label' => 'Series Records', 'url' => 'modules.php?name=Series_Records'],
+                    ['label' => 'League Starters', 'url' => 'modules.php?name=LeagueStarters', 'badge' => 'NEW'],
+                    ['label' => 'Compare Players', 'url' => 'modules.php?name=ComparePlayers'],
+                    ['label' => 'Season Highs', 'url' => 'modules.php?name=SeasonHighs'],
+                    ['label' => 'Series Records', 'url' => 'modules.php?name=SeriesRecords'],
                     ['label' => 'Team Off/Def Stats', 'url' => 'modules.php?name=League_Stats'],
                 ],
             ],
             'History' => [
                 'icon' => '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>',
                 'links' => [
-                    ['label' => 'Franchise History', 'url' => 'modules.php?name=Franchise_History'],
-                    ['label' => 'Transaction History', 'url' => 'modules.php?name=Transaction_History'],
-                    ['label' => 'Draft History', 'url' => 'modules.php?name=Draft_History'],
+                    ['label' => 'Franchise History', 'url' => 'modules.php?name=FranchiseHistory'],
+                    ['label' => 'Transaction History', 'url' => 'modules.php?name=TransactionHistory'],
+                    ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory'],
                     ['label' => 'Award History', 'url' => 'modules.php?name=Player_Awards'],
-                    ['label' => 'Record Holders', 'url' => 'modules.php?name=Record_Holders'],
-                    ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=All_Star_Appearances'],
+                    ['label' => 'Record Holders', 'url' => 'modules.php?name=RecordHolders'],
+                    ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=AllStarAppearances'],
                     ['label' => 'Season Leaderboards', 'url' => 'modules.php?name=Season_Leaders'],
                     ['label' => 'Career Leaderboards', 'url' => 'modules.php?name=Leaderboards'],
                     ['label' => 'Season Archive', 'url' => 'modules.php?name=Content&pa=showpage&pid=5'],
@@ -138,14 +138,14 @@ class NavigationView
     {
         if ($this->isLoggedIn) {
             return [
-                ['label' => 'Your Account', 'url' => 'modules.php?name=Your_Account'],
-                ['label' => 'Logout', 'url' => 'modules.php?name=Your_Account&op=logout'],
+                ['label' => 'Your Account', 'url' => 'modules.php?name=YourAccount'],
+                ['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout'],
             ];
         }
 
         return [
             ['label' => 'Topics', 'url' => 'modules.php?name=Topics'],
-            ['label' => 'Create Account', 'url' => 'modules.php?name=Your_Account&op=new_user'],
+            ['label' => 'Create Account', 'url' => 'modules.php?name=YourAccount&op=new_user'],
         ];
     }
 
@@ -157,7 +157,7 @@ class NavigationView
     {
         return '
         <div class="px-4 pt-4 pb-3">
-            <form action="modules.php?name=Your_Account" method="post" class="space-y-3">
+            <form action="modules.php?name=YourAccount" method="post" class="space-y-3">
                 <!-- Username field -->
                 <div>
                     <label for="nav-username" class="block text-base font-semibold tracking-widest uppercase text-gray-400 mb-1.5">Username</label>
@@ -225,7 +225,7 @@ class NavigationView
     {
         return '
         <div class="px-5 pt-4 pb-4 bg-gradient-to-b from-accent-500/10 to-transparent">
-            <form action="modules.php?name=Your_Account" method="post" class="space-y-3">
+            <form action="modules.php?name=YourAccount" method="post" class="space-y-3">
                 <!-- Username field -->
                 <div>
                     <label for="mobile-nav-username" class="block text-base font-semibold tracking-widest uppercase text-gray-400 mb-2">Username</label>
@@ -296,11 +296,11 @@ class NavigationView
             $links = [
                 ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamID=' . $this->teamId],
                 ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule&teamID=' . $this->teamId],
-                ['label' => 'Next Sim', 'url' => 'modules.php?name=Next_Sim', 'badge' => 'NEW'],
+                ['label' => 'Next Sim', 'url' => 'modules.php?name=NextSim', 'badge' => 'NEW'],
                 ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=Depth_Chart_Entry'],
                 ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
                 ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
-                ['label' => 'Draft History', 'url' => 'modules.php?name=Draft_History&teamID=' . $this->teamId],
+                ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory&teamID=' . $this->teamId],
             ];
 
             if ($this->allowWaivers === 'Yes') {
@@ -312,7 +312,7 @@ class NavigationView
             }
 
             if ($this->seasonPhase === 'Free Agency') {
-                array_unshift($links, ['label' => 'Free Agency', 'url' => 'modules.php?name=Free_Agency', 'badge' => 'LIVE']);
+                array_unshift($links, ['label' => 'Free Agency', 'url' => 'modules.php?name=FreeAgency', 'badge' => 'LIVE']);
             }
 
             return [

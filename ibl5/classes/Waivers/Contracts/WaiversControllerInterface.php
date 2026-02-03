@@ -22,7 +22,7 @@ interface WaiversControllerInterface
      * waiver operation. Should check if waivers are currently open before proceeding.
      * 
      * @param mixed $user Current user object (from PhpNuke authentication)
-     * @param string $action Action to perform ('add' or 'drop')
+     * @param string $action Action to perform ('add' or 'waive')
      * @return void Renders appropriate view based on user state and action
      * 
      * **Behaviors:**
@@ -40,7 +40,7 @@ interface WaiversControllerInterface
      * the form with optional result banners.
      *
      * @param string $username Username of the logged-in user
-     * @param string $action Action to perform ('add' or 'drop')
+     * @param string $action Action to perform ('add' or 'waive')
      * @return void On POST: redirects with result/error params. On GET: renders waiver form.
      *
      * **Behaviors:**

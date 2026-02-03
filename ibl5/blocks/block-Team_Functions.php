@@ -23,7 +23,7 @@ if ($currentLeague === 'ibl') {
 
 <li><a href="modules.php?name=Waivers&action=add">Waiver Wire</a> </li>
 
-<li><a href="modules.php?name=Waivers&action=drop">Waive Player</a> </li>
+<li><a href="modules.php?name=Waivers&action=waive">Waive Player</a> </li>
 
 <li><a href="modules.php?name=Voting">ASG/Award Voting</a></li>
 </ul>

@@ -72,7 +72,7 @@ With 96% of IBL modules refactored, the project transitions from **refactoring m
 
 ---
 
-### 20. Player_Awards Module ✅ (January 2026)
+### 20. AwardHistory Module ✅ (January 2026)
 
 **Achievements:**
 - 4 classes + 4 interfaces with separation of concerns
@@ -232,7 +232,7 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 
 ---
 
-### Priority 5: Cap_Info Module ✅ (COMPLETE)
+### Priority 5: CapSpace Module ✅ (COMPLETE)
 
 **Status:** All 30 IBL modules refactored (100% complete) 🎉
 
@@ -265,7 +265,7 @@ Web_Links, Your_Account, News, AutoTheme, Content, etc. (81,000+ lines total)
 **Completed Work (2025-2026):**
 - October 2025: 13 modules refactored (Player, Statistics, Team, Draft, Waivers, Extension, RookieOption, Trading, Negotiation, DepthChart, Voting, Schedule, Season_Leaders)
 - November 2025: Free Agency, Player_Search (SQL injection fixed), Compare_Players, Leaderboards
-- December 2025: Standings, League_Stats, Player_Awards, Series_Records
+- December 2025: Standings, League_Stats, AwardHistory, Series_Records
 - January 9, 2026: **One-on-One complete** (88% code reduction, game simulation)
 - **Current Status:** 22/23 IBL modules refactored (96% complete)
 
@@ -273,7 +273,7 @@ Web_Links, Your_Account, News, AutoTheme, Content, etc. (81,000+ lines total)
 
 **Month 1 (January-February):**
 - Week 1-2: Test coverage push (56% → 70%)
-- Week 3-4: Cap_Info refactoring + remaining test coverage (70% → 80%)
+- Week 3-4: CapSpace refactoring + remaining test coverage (70% → 80%)
 - **Milestone:** 100% IBL modules refactored, 80% test coverage
 
 **Month 2 (February-March):**

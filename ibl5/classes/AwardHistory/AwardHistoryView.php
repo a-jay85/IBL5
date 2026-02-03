@@ -2,34 +2,34 @@
 
 declare(strict_types=1);
 
-namespace PlayerAwards;
+namespace AwardHistory;
 
 use Player\PlayerImageHelper;
-use PlayerAwards\Contracts\PlayerAwardsViewInterface;
+use AwardHistory\Contracts\AwardHistoryViewInterface;
 use Utilities\HtmlSanitizer;
 
 /**
- * PlayerAwardsView - HTML rendering for player awards search interface
+ * AwardHistoryView - HTML rendering for player awards search interface
  *
- * Implements the view contract defined in PlayerAwardsViewInterface.
+ * Implements the view contract defined in AwardHistoryViewInterface.
  * See the interface for detailed behavior documentation.
  *
- * @see PlayerAwardsViewInterface
+ * @see AwardHistoryViewInterface
  */
-class PlayerAwardsView implements PlayerAwardsViewInterface
+class AwardHistoryView implements AwardHistoryViewInterface
 {
-    private PlayerAwardsService $service;
+    private AwardHistoryService $service;
 
     /**
-     * @param PlayerAwardsService $service Service for getting sort options
+     * @param AwardHistoryService $service Service for getting sort options
      */
-    public function __construct(PlayerAwardsService $service)
+    public function __construct(AwardHistoryService $service)
     {
         $this->service = $service;
     }
 
     /**
-     * @see PlayerAwardsViewInterface::renderSearchForm()
+     * @see AwardHistoryViewInterface::renderSearchForm()
      */
     public function renderSearchForm(array $params): string
     {
@@ -40,7 +40,7 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
 
         $sortOptions = $this->service->getSortOptions();
 
-        $output = '<form method="post" action="modules.php?name=Player_Awards" class="ibl-filter-form">';
+        $output = '<form method="post" action="modules.php?name=AwardHistory" class="ibl-filter-form">';
 
         // Input row
         $output .= '<div class="ibl-filter-form__row">';
@@ -83,7 +83,7 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
     }
 
     /**
-     * @see PlayerAwardsViewInterface::renderTableHeader()
+     * @see AwardHistoryViewInterface::renderTableHeader()
      */
     public function renderTableHeader(): string
     {
@@ -101,7 +101,7 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
     }
 
     /**
-     * @see PlayerAwardsViewInterface::renderAwardRow()
+     * @see AwardHistoryViewInterface::renderAwardRow()
      */
     public function renderAwardRow(array $award, int $rowIndex): string
     {
@@ -120,7 +120,7 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
     }
 
     /**
-     * @see PlayerAwardsViewInterface::renderTableFooter()
+     * @see AwardHistoryViewInterface::renderTableFooter()
      */
     public function renderTableFooter(): string
     {

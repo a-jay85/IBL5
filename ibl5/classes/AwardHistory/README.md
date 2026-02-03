@@ -1,4 +1,4 @@
-# PlayerAwards Module
+# AwardHistory Module
 
 Refactored module for searching and displaying player awards history.
 
@@ -7,16 +7,16 @@ Refactored module for searching and displaying player awards history.
 This module follows the **Interface-Driven Repository/Service/View** pattern established in the IBL5 codebase.
 
 ```
-PlayerAwards/
+AwardHistory/
 ├── Contracts/
-│   ├── PlayerAwardsValidatorInterface.php   # Input validation contract
-│   ├── PlayerAwardsRepositoryInterface.php  # Database operations contract
-│   ├── PlayerAwardsServiceInterface.php     # Business logic contract
-│   └── PlayerAwardsViewInterface.php        # HTML rendering contract
-├── PlayerAwardsValidator.php                # Validates search parameters
-├── PlayerAwardsRepository.php               # Database queries (extends BaseMysqliRepository)
-├── PlayerAwardsService.php                  # Orchestrates validation and search
-├── PlayerAwardsView.php                     # Renders HTML output
+│   ├── AwardHistoryValidatorInterface.php   # Input validation contract
+│   ├── AwardHistoryRepositoryInterface.php  # Database operations contract
+│   ├── AwardHistoryServiceInterface.php     # Business logic contract
+│   └── AwardHistoryViewInterface.php        # HTML rendering contract
+├── AwardHistoryValidator.php                # Validates search parameters
+├── AwardHistoryRepository.php               # Database queries (extends BaseMysqliRepository)
+├── AwardHistoryService.php                  # Orchestrates validation and search
+├── AwardHistoryView.php                     # Renders HTML output
 └── README.md                                # This file
 ```
 
@@ -26,10 +26,10 @@ PlayerAwards/
 // In module index.php
 global $mysqli_db;
 
-$validator = new \PlayerAwards\PlayerAwardsValidator();
-$repository = new \PlayerAwards\PlayerAwardsRepository($mysqli_db);
-$service = new \PlayerAwards\PlayerAwardsService($validator, $repository);
-$view = new \PlayerAwards\PlayerAwardsView($service);
+$validator = new \AwardHistory\AwardHistoryValidator();
+$repository = new \AwardHistory\AwardHistoryRepository($mysqli_db);
+$service = new \AwardHistory\AwardHistoryService($validator, $repository);
+$view = new \AwardHistory\AwardHistoryView($service);
 
 // Execute search
 $searchResult = $service->search($_POST);
@@ -74,12 +74,12 @@ Table: `ibl_awards`
 
 ## Testing
 
-Tests are located in `/ibl5/tests/PlayerAwards/`.
+Tests are located in `/ibl5/tests/AwardHistory/`.
 
 Run tests:
 ```bash
 cd ibl5
-vendor/bin/phpunit tests/PlayerAwards/
+vendor/bin/phpunit tests/AwardHistory/
 ```
 
 ## Related Modules

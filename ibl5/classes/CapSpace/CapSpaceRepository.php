@@ -2,22 +2,22 @@
 
 declare(strict_types=1);
 
-namespace CapInfo;
+namespace CapSpace;
 
-use CapInfo\Contracts\CapInfoRepositoryInterface;
+use CapSpace\Contracts\CapSpaceRepositoryInterface;
 
 /**
- * CapInfoRepository - Data access layer for salary cap information
+ * CapSpaceRepository - Data access layer for salary cap information
  *
  * Retrieves team salary and roster data for cap display.
  *
- * @see CapInfoRepositoryInterface For the interface contract
+ * @see CapSpaceRepositoryInterface For the interface contract
  * @see \BaseMysqliRepository For base class documentation
  */
-class CapInfoRepository extends \BaseMysqliRepository implements CapInfoRepositoryInterface
+class CapSpaceRepository extends \BaseMysqliRepository implements CapSpaceRepositoryInterface
 {
     /**
-     * @see CapInfoRepositoryInterface::getAllTeams()
+     * @see CapSpaceRepositoryInterface::getAllTeams()
      */
     public function getAllTeams(): array
     {
@@ -29,7 +29,7 @@ class CapInfoRepository extends \BaseMysqliRepository implements CapInfoReposito
     }
 
     /**
-     * @see CapInfoRepositoryInterface::getPlayersUnderContractAfterSeason()
+     * @see CapSpaceRepositoryInterface::getPlayersUnderContractAfterSeason()
      */
     public function getPlayersUnderContractAfterSeason(int $teamId): array
     {

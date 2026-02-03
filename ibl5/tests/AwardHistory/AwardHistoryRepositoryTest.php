@@ -3,14 +3,14 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
-use PlayerAwards\PlayerAwardsRepository;
+use AwardHistory\AwardHistoryRepository;
 
 /**
- * Tests for PlayerAwardsRepository
+ * Tests for AwardHistoryRepository
  * 
  * Verifies database operations for player awards search using prepared statements.
  */
-final class PlayerAwardsRepositoryTest extends TestCase
+final class AwardHistoryRepositoryTest extends TestCase
 {
     private MockDatabase $mockDb;
 
@@ -28,7 +28,7 @@ final class PlayerAwardsRepositoryTest extends TestCase
             ['year' => 2024, 'Award' => 'MVP', 'name' => 'Smith', 'table_ID' => 2],
         ]);
 
-        $repository = new PlayerAwardsRepository($this->mockDb);
+        $repository = new AwardHistoryRepository($this->mockDb);
         
         $result = $repository->searchAwards([
             'name' => null,
@@ -49,7 +49,7 @@ final class PlayerAwardsRepositoryTest extends TestCase
             ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
         ]);
 
-        $repository = new PlayerAwardsRepository($this->mockDb);
+        $repository = new AwardHistoryRepository($this->mockDb);
         
         $result = $repository->searchAwards([
             'name' => 'Johnson',
@@ -69,7 +69,7 @@ final class PlayerAwardsRepositoryTest extends TestCase
             ['year' => 2024, 'Award' => 'MVP', 'name' => 'Smith', 'table_ID' => 2],
         ]);
 
-        $repository = new PlayerAwardsRepository($this->mockDb);
+        $repository = new AwardHistoryRepository($this->mockDb);
         
         $result = $repository->searchAwards([
             'name' => null,
@@ -88,7 +88,7 @@ final class PlayerAwardsRepositoryTest extends TestCase
             ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
         ]);
 
-        $repository = new PlayerAwardsRepository($this->mockDb);
+        $repository = new AwardHistoryRepository($this->mockDb);
         
         $result = $repository->searchAwards([
             'name' => null,
@@ -107,7 +107,7 @@ final class PlayerAwardsRepositoryTest extends TestCase
             ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
         ]);
 
-        $repository = new PlayerAwardsRepository($this->mockDb);
+        $repository = new AwardHistoryRepository($this->mockDb);
         
         $result = $repository->searchAwards([
             'name' => 'Johnson',
@@ -124,7 +124,7 @@ final class PlayerAwardsRepositoryTest extends TestCase
     {
         $this->mockDb->setMockData([]);
 
-        $repository = new PlayerAwardsRepository($this->mockDb);
+        $repository = new AwardHistoryRepository($this->mockDb);
         
         $result = $repository->searchAwards([
             'name' => 'NonExistent',
@@ -144,7 +144,7 @@ final class PlayerAwardsRepositoryTest extends TestCase
             ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
         ]);
 
-        $repository = new PlayerAwardsRepository($this->mockDb);
+        $repository = new AwardHistoryRepository($this->mockDb);
         
         // Should not throw exception for valid sortby value
         $result = $repository->searchAwards([
@@ -163,7 +163,7 @@ final class PlayerAwardsRepositoryTest extends TestCase
             ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
         ]);
 
-        $repository = new PlayerAwardsRepository($this->mockDb);
+        $repository = new AwardHistoryRepository($this->mockDb);
         
         // Should not throw exception for valid sortby value
         $result = $repository->searchAwards([
@@ -182,7 +182,7 @@ final class PlayerAwardsRepositoryTest extends TestCase
             ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
         ]);
 
-        $repository = new PlayerAwardsRepository($this->mockDb);
+        $repository = new AwardHistoryRepository($this->mockDb);
         
         // Should not throw exception for valid sortby value
         $result = $repository->searchAwards([

@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Tests\CapInfo;
+namespace Tests\CapSpace;
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
-use CapInfo\CapInfoService;
-use CapInfo\Contracts\CapInfoRepositoryInterface;
+use CapSpace\CapSpaceService;
+use CapSpace\Contracts\CapSpaceRepositoryInterface;
 
 /**
  * Testable subclass that exposes protected methods for testing
  */
-class TestableCapInfoService extends CapInfoService
+class TestableCapSpaceService extends CapSpaceService
 {
     public function publicProcessTeamCapData(\Team $team, \Season $season): array
     {
@@ -21,26 +21,26 @@ class TestableCapInfoService extends CapInfoService
 }
 
 /**
- * CapInfoServiceTest - Tests for CapInfoService business logic
+ * CapSpaceServiceTest - Tests for CapSpaceService business logic
  *
- * @covers \CapInfo\CapInfoService
+ * @covers \CapSpace\CapSpaceService
  */
 #[AllowMockObjectsWithoutExpectations]
-class CapInfoServiceTest extends TestCase
+class CapSpaceServiceTest extends TestCase
 {
-    /** @var CapInfoRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
-    private CapInfoRepositoryInterface $mockRepository;
+    /** @var CapSpaceRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private CapSpaceRepositoryInterface $mockRepository;
 
     /** @var object&\PHPUnit\Framework\MockObject\MockObject */
     private object $mockDb;
 
-    private TestableCapInfoService $service;
+    private TestableCapSpaceService $service;
 
     protected function setUp(): void
     {
-        $this->mockRepository = $this->createMock(CapInfoRepositoryInterface::class);
+        $this->mockRepository = $this->createMock(CapSpaceRepositoryInterface::class);
         $this->mockDb = $this->createMock(\mysqli::class);
-        $this->service = new TestableCapInfoService($this->mockRepository, $this->mockDb);
+        $this->service = new TestableCapSpaceService($this->mockRepository, $this->mockDb);
     }
 
     /**

@@ -44,7 +44,7 @@ Quick reference showing the refactoring status of all modules in the codebase.
 | Player_Awards | - | 🔴 | 0 | Low | Award voting/display |
 | One-on-One | 887 | 🔴 | 0 | Low | Challenge system |
 | Power_Rankings | - | 🔴 | 0 | Low | Team rankings |
-| Cap_Info | - | 🔴 | 0 | Medium | Salary cap information |
+| CapSpace | - | 🔴 | 0 | Medium | Salary cap information |
 | Franchise_History | - | 🔴 | 0 | Low | Historical data display |
 
 ### Support/Display Modules
@@ -211,7 +211,7 @@ These handle money, contracts, and core league operations:
 - [x] Extension - Contract extensions ✅
 - [x] Draft - Draft picks ✅
 - [ ] **Free_Agency** - Contract signing ⚠️
-- [ ] **Cap_Info** - Salary calculations
+- [ ] **CapSpace** - Salary calculations
 
 ### High (Should Test Soon)
 

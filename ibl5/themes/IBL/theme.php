@@ -123,7 +123,7 @@ function themeheader()
         $allowWaivers = $season->allowWaivers;
     }
 
-    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId, $teamsData, $seasonPhase, $allowWaivers);
+    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId, $teamsData, $seasonPhase, $allowWaivers, $_SERVER['SERVER_NAME'] ?? null, $_SERVER['REQUEST_URI'] ?? null);
     echo $navView->render();
 
     echo "<body bgcolor=\"$bgcolor1\"" . ($teamId ? " data-user-team-id=\"$teamId\"" : '') . ">";

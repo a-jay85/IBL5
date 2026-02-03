@@ -1506,3 +1506,11 @@ tbody tr.user-team-row:nth-child(even):hover {
 .draft-pick-traded {
     font-weight: 600;
 }
+
+/* Draft Pick Locator: highlight cells containing user's team name in their row */
+.draft-pick-table tbody tr.user-team-row .draft-pick-own {
+    background-color: var(--warning-100, #fef3c7);
+    font-style: italic;
+    color: var(--gray-500);
+}
+

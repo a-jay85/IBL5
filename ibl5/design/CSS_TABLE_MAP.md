@@ -77,7 +77,7 @@ Affects ALL data tables site-wide:
 | `.league-stats-table` | LeagueStatsView |
 | `.depth-chart-table` | DepthChartView |
 | `.draft-pick-table` | DraftPickLocatorView |
-| `.contact-table` | ContactListView |
+| `.contact-table` | GMContactListView |
 | `.voting-form-table` | Voting views |
 | `.trading-*` | Trading/TradingView |
 

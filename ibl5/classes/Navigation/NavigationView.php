@@ -115,7 +115,7 @@ class NavigationView
                     ['label' => 'Season Leaderboards', 'url' => 'modules.php?name=SeasonLeaderboards'],
                     ['label' => 'Career Leaderboards', 'url' => 'modules.php?name=CareerLeaderboards'],
                     ['label' => 'Season Archive', 'url' => 'modules.php?name=Content&pa=showpage&pid=5'],
-                    ['label' => '1-On-1 Game', 'url' => 'modules.php?name=One-on-One'],
+                    ['label' => '1-On-1 Game', 'url' => 'modules.php?name=OneOnOneGame'],
                 ],
             ],
             'Community' => [
@@ -297,7 +297,7 @@ class NavigationView
                 ['label' => 'Team Page', 'url' => 'modules.php?name=Team&op=team&teamID=' . $this->teamId],
                 ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule&teamID=' . $this->teamId],
                 ['label' => 'Next Sim', 'url' => 'modules.php?name=NextSim', 'badge' => 'NEW'],
-                ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=Depth_Chart_Entry'],
+                ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=DepthChartEntry'],
                 ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
                 ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
                 ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory&teamID=' . $this->teamId],
@@ -323,7 +323,7 @@ class NavigationView
             return [
                 'icon' => '<img src="/ibl5/images/logo/new' . $this->teamId . '.png" alt="Team Logo" class="w-6 h-6 object-contain">',
                 'links' => [
-                    ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=Depth_Chart_Entry'],
+                    ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=DepthChartEntry'],
                     ['label' => 'Activity Tracker', 'url' => 'modules.php?name=ActivityTracker'],
                 ]
             ];

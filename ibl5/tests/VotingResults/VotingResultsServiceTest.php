@@ -59,6 +59,33 @@ final class VotingResultsServiceTest extends TestCase
         $this->assertStringContainsString('West_B4', $queries[4]);
     }
 
+    public function testAllStarNamesWithTeamSuffixResolveCorrectly(): void
+    {
+        $this->database->queueResults([
+            // Category 1: vote query returns "Name, Team" format
+            [
+                ['name' => 'LeBron James, Sting', 'votes' => '23'],
+                ['name' => "Jermaine O'Neal, Nets", 'votes' => '25'],
+            ],
+            // Category 1: pid resolution uses extracted player name
+            [
+                ['pid' => 10, 'name' => 'LeBron James'],
+                ['pid' => 11, 'name' => "Jermaine O'Neal"],
+            ],
+            // Categories 2-4: empty
+            [],
+            [],
+            [],
+        ]);
+
+        $results = $this->service->getAllStarResults();
+
+        $this->assertSame([
+            ['name' => 'LeBron James, Sting', 'votes' => 23, 'pid' => 10],
+            ['name' => "Jermaine O'Neal, Nets", 'votes' => 25, 'pid' => 11],
+        ], $results[0]['rows']);
+    }
+
     public function testGetEndOfYearResultsReturnsWeightedTotals(): void
     {
         $this->database->queueResults([

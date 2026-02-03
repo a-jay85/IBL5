@@ -2,6 +2,7 @@
 <?php
 
 use Player\Player;
+use Player\PlayerImageHelper;
 use Player\PlayerStats;
 
 /************************************************************************/
@@ -165,7 +166,8 @@ function userinfo($username)
             }
 
             if ($votingCategory != "GM") {
-                $output .= "<td>$player->name, $player->teamName</td>
+                $playerThumbnail = PlayerImageHelper::renderThumbnail($player->playerID);
+                $output .= "<td class=\"ibl-player-cell\">$playerThumbnail$player->name, $player->teamName</td>
 							<td>$playerStats->seasonGamesPlayed</td>
 							<td>$playerStats->seasonGamesStarted</td>
 							<td>$playerStats->seasonMinutesPerGame</td>

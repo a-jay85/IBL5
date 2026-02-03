@@ -66,4 +66,17 @@ interface PlayerImageHelperInterface
      * @return string Complete <td> HTML element
      */
     public static function renderPlayerCell(int $playerID, string $displayName, array $starterPids = []): string;
+
+    /**
+     * Resolve a player's display name and thumbnail, handling pipe-delimited names.
+     *
+     * Names containing '|' indicate the player should not show a photo thumbnail.
+     * The pipe character and any HTML tags are stripped from the returned display name.
+     * For normal names, a thumbnail is generated via renderThumbnail().
+     *
+     * @param int $playerID The player's ID
+     * @param string $rawName The raw player name (may contain '|' and HTML tags)
+     * @return array{thumbnail: string, name: string} Thumbnail HTML (or '') and cleaned name
+     */
+    public static function resolvePlayerDisplay(int $playerID, string $rawName): array;
 }

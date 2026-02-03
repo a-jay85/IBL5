@@ -123,7 +123,7 @@ class NavigationView
                 'links' => [
                     ['label' => 'Discord Server', 'url' => 'https://discord.com/invite/QXwBQxR', 'external' => true],
                     ['label' => 'Prime Time Football', 'url' => 'http://www.thakfu.com/ptf/index.php', 'external' => true],
-                    ['label' => 'Activity Tracker', 'url' => 'modules.php?name=Depth_Record'],
+                    ['label' => 'Activity Tracker', 'url' => 'modules.php?name=ActivityTracker'],
                     ['label' => 'GM Contact List', 'url' => 'modules.php?name=Contact_List'],
                 ],
             ],
@@ -324,7 +324,7 @@ class NavigationView
                 'icon' => '<img src="/ibl5/images/logo/new' . $this->teamId . '.png" alt="Team Logo" class="w-6 h-6 object-contain">',
                 'links' => [
                     ['label' => 'Depth Chart Entry', 'url' => 'modules.php?name=Depth_Chart_Entry'],
-                    ['label' => 'Activity Tracker', 'url' => 'modules.php?name=Depth_Record'],
+                    ['label' => 'Activity Tracker', 'url' => 'modules.php?name=ActivityTracker'],
                 ]
             ];
         }

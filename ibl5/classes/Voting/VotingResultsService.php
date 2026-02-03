@@ -146,6 +146,48 @@ class VotingResultsService implements VotingResultsServiceInterface
         }
 
         $stmt->close();
+
+        return $this->resolvePlayerIds($rows);
+    }
+
+    /**
+     * Batch-resolve player IDs from names via ibl_plr table.
+     *
+     * @param array $rows Rows with 'name' and 'votes' keys
+     * @return array Same rows with 'pid' added (0 if no match)
+     */
+    private function resolvePlayerIds(array $rows): array
+    {
+        $names = [];
+        foreach ($rows as $row) {
+            if ($row['name'] !== self::BLANK_BALLOT_LABEL) {
+                $names[] = $row['name'];
+            }
+        }
+
+        if (empty($names)) {
+            return array_map(static fn(array $row): array => $row + ['pid' => 0], $rows);
+        }
+
+        $placeholders = implode(',', array_fill(0, count($names), '?'));
+        $stmt = $this->db->prepare("SELECT pid, name FROM ibl_plr WHERE name IN ({$placeholders})");
+        if ($stmt === false) {
+            return array_map(static fn(array $row): array => $row + ['pid' => 0], $rows);
+        }
+
+        $stmt->execute($names);
+        $result = $stmt->get_result();
+
+        $pidMap = [];
+        while ($record = $result->fetch_assoc()) {
+            $pidMap[(string) $record['name']] = (int) $record['pid'];
+        }
+        $stmt->close();
+
+        foreach ($rows as &$row) {
+            $row['pid'] = $pidMap[$row['name']] ?? 0;
+        }
+
         return $rows;
     }
 }

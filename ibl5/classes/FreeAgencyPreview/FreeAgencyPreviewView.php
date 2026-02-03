@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FreeAgencyPreview;
 
 use FreeAgencyPreview\Contracts\FreeAgencyPreviewViewInterface;
+use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -99,8 +100,10 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
 
         foreach ($freeAgents as $player) {
             $pid = (int) ($player['pid'] ?? 0);
+            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $player['name'] ?? '');
+            $playerThumbnail = $resolved['thumbnail'];
             $tid = (int) ($player['tid'] ?? 0);
-            $name = HtmlSanitizer::safeHtmlOutput($player['name'] ?? '');
+            $name = HtmlSanitizer::safeHtmlOutput($resolved['name']);
             $pos = HtmlSanitizer::safeHtmlOutput($player['pos'] ?? '');
             $age = (int) ($player['age'] ?? 0);
 
@@ -122,7 +125,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
             }
 
             $output .= "<tr>
-    <td class=\"sticky-col\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
+    <td class=\"sticky-col ibl-player-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a></td>
     {$teamCell}
     <td class=\"fa-preview-pos-col\">{$pos}</td>
     <td>{$age}</td>

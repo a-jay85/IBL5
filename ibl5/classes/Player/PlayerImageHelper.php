@@ -90,6 +90,18 @@ class PlayerImageHelper implements PlayerImageHelperInterface
             . '</a></td>';
     }
 
+    /**
+     * @see PlayerImageHelperInterface::resolvePlayerDisplay()
+     */
+    public static function resolvePlayerDisplay(int $playerID, string $rawName): array
+    {
+        $hasPipe = str_contains($rawName, '|');
+        $cleanName = $hasPipe ? str_replace('|', '', strip_tags($rawName)) : $rawName;
+        $thumbnail = $hasPipe ? '' : self::renderThumbnail($playerID);
+
+        return ['thumbnail' => $thumbnail, 'name' => $cleanName];
+    }
+
     public static function isValidPlayerID($playerID): bool
     {
         // Null or empty string

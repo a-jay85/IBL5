@@ -24,9 +24,9 @@ class PlayerAwardsRepository extends BaseMysqliRepository implements PlayerAward
      * Maps sortby option to column name
      */
     private const SORT_COLUMN_MAP = [
-        1 => 'name',
-        2 => 'Award',
-        3 => 'year',
+        1 => 'a.name',
+        2 => 'a.Award',
+        3 => 'a.year',
     ];
 
     /**
@@ -53,25 +53,25 @@ class PlayerAwardsRepository extends BaseMysqliRepository implements PlayerAward
 
         // Build WHERE conditions based on provided params
         if ($params['year'] !== null) {
-            $conditions[] = 'year = ?';
+            $conditions[] = 'a.year = ?';
             $bindParams[] = $params['year'];
             $bindTypes .= 'i';
         }
 
         if ($params['award'] !== null) {
-            $conditions[] = 'Award LIKE ?';
+            $conditions[] = 'a.Award LIKE ?';
             $bindParams[] = '%' . $params['award'] . '%';
             $bindTypes .= 's';
         }
 
         if ($params['name'] !== null) {
-            $conditions[] = 'name LIKE ?';
+            $conditions[] = 'a.name LIKE ?';
             $bindParams[] = '%' . $params['name'] . '%';
             $bindTypes .= 's';
         }
 
-        // Build the query
-        $query = 'SELECT year, Award, name, table_ID FROM ibl_awards';
+        // Build the query - LEFT JOIN to get pid for player photos
+        $query = 'SELECT a.year, a.Award, a.name, a.table_ID, p.pid FROM ibl_awards a LEFT JOIN ibl_plr p ON a.name = p.name';
         
         if (!empty($conditions)) {
             $query .= ' WHERE ' . implode(' AND ', $conditions);

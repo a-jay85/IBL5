@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ComparePlayers;
 
 use ComparePlayers\Contracts\ComparePlayersViewInterface;
+use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -93,7 +94,8 @@ class ComparePlayersView implements ComparePlayersViewInterface
         foreach ([$player1, $player2] as $player) {
             $output .= '<tr>';
             $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['pos']) . '</td>';
-            $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['name']) . '</td>';
+            $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$player['pid'], $player['name']);
+            $output .= '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . (int)$player['pid'] . '">' . $resolved['thumbnail'] . HtmlSanitizer::safeHtmlOutput($resolved['name']) . '</a></td>';
             $output .= $this->renderTeamCell($player);
             $output .= '<td>' . (int)$player['age'] . '</td>';
             $output .= '<td>' . (int)$player['r_fga'] . '</td>';
@@ -153,7 +155,8 @@ class ComparePlayersView implements ComparePlayersViewInterface
 
             $output .= '<tr>';
             $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['pos']) . '</td>';
-            $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['name']) . '</td>';
+            $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$player['pid'], $player['name']);
+            $output .= '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . (int)$player['pid'] . '">' . $resolved['thumbnail'] . HtmlSanitizer::safeHtmlOutput($resolved['name']) . '</a></td>';
             $output .= $this->renderTeamCell($player);
             $output .= '<td>' . (int)$player['stats_gm'] . '</td>';
             $output .= '<td>' . (int)$player['stats_gs'] . '</td>';
@@ -203,7 +206,8 @@ class ComparePlayersView implements ComparePlayersViewInterface
         foreach ([$player1, $player2] as $player) {
             $output .= '<tr>';
             $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['pos']) . '</td>';
-            $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['name']) . '</td>';
+            $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$player['pid'], $player['name']);
+            $output .= '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . (int)$player['pid'] . '">' . $resolved['thumbnail'] . HtmlSanitizer::safeHtmlOutput($resolved['name']) . '</a></td>';
             $output .= $this->renderTeamCell($player);
             $output .= '<td>' . (int)$player['car_gm'] . '</td>';
             $output .= '<td>' . (int)$player['car_min'] . '</td>';

@@ -256,13 +256,9 @@ class TradingView implements TradingViewInterface
             $ordinal = (int) $row['ordinal'];
             $contractYear = (int) $row['cy'];
             $playerPosition = HtmlSanitizer::safeHtmlOutput($row['pos']);
-            $rawName = (string) $row['name'];
-            $hasPipe = str_contains($rawName, '|');
-            if ($hasPipe) {
-                $rawName = str_replace('|', '', strip_tags($rawName));
-            }
-            $playerName = HtmlSanitizer::safeHtmlOutput($rawName);
-            $thumbnail = $hasPipe ? '' : PlayerImageHelper::renderThumbnail($pid);
+            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, (string) $row['name']);
+            $playerName = HtmlSanitizer::safeHtmlOutput($resolved['name']);
+            $thumbnail = $resolved['thumbnail'];
 
             if ($isOffseason) {
                 $contractYear++;

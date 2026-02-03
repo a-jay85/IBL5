@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ContractList;
 
 use ContractList\Contracts\ContractListViewInterface;
+use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -77,7 +78,9 @@ class ContractListView implements ContractListViewInterface
 
         foreach ($contracts as $contract) {
             $pid = (int) ($contract['pid'] ?? 0);
-            $name = HtmlSanitizer::safeHtmlOutput($contract['name'] ?? '');
+            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $contract['name'] ?? '');
+            $playerThumbnail = $resolved['thumbnail'];
+            $name = HtmlSanitizer::safeHtmlOutput($resolved['name']);
             $pos = HtmlSanitizer::safeHtmlOutput($contract['pos'] ?? '');
             $tid = (int) ($contract['tid'] ?? 0);
             $bird = HtmlSanitizer::safeHtmlOutput($contract['bird'] ?? '');
@@ -106,7 +109,7 @@ class ContractListView implements ContractListViewInterface
             }
 
             $output .= "<tr>
-    <td class=\"sticky-col\" style=\"white-space: nowrap;\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$name}</a></td>
+    <td class=\"sticky-col ibl-player-cell\" style=\"white-space: nowrap;\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a></td>
     <td>{$pos}</td>
     {$teamCell}
     <td>{$bird}</td>

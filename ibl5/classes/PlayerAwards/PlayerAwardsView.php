@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PlayerAwards;
 
+use Player\PlayerImageHelper;
 use PlayerAwards\Contracts\PlayerAwardsViewInterface;
 use Utilities\HtmlSanitizer;
 
@@ -105,10 +106,17 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
     public function renderAwardRow(array $award, int $rowIndex): string
     {
         $year = HtmlSanitizer::safeHtmlOutput((string)($award['year'] ?? ''));
-        $name = HtmlSanitizer::safeHtmlOutput($award['name'] ?? '');
         $awardName = HtmlSanitizer::safeHtmlOutput($award['Award'] ?? '');
+        $pid = (int)($award['pid'] ?? 0);
 
-        return '<tr><td>' . $year . '</td><td>' . $name . '</td><td>' . $awardName . '</td></tr>';
+        if ($pid > 0) {
+            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $award['name'] ?? '');
+            $playerCell = '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $resolved['thumbnail'] . HtmlSanitizer::safeHtmlOutput($resolved['name']) . '</a></td>';
+        } else {
+            $playerCell = '<td>' . HtmlSanitizer::safeHtmlOutput($award['name'] ?? '') . '</td>';
+        }
+
+        return '<tr><td>' . $year . '</td>' . $playerCell . '<td>' . $awardName . '</td></tr>';
     }
 
     /**

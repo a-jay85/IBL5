@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PlayerSearch;
 
+use Player\PlayerImageHelper;
 use PlayerSearch\Contracts\PlayerSearchViewInterface;
 
 /**
@@ -354,7 +355,8 @@ function resetPlayerSearch() {
             ?>
 <tr>
     <td><?= htmlspecialchars($player->position) ?></td>
-    <td><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= htmlspecialchars($player->name) ?></a></td>
+    <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$player->playerID, $player->name); ?>
+    <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
     <td colspan="30"> --- Retired --- </td>
     <td><?= htmlspecialchars((string)($player->collegeName ?? '')) ?></td>
 </tr>
@@ -363,7 +365,8 @@ function resetPlayerSearch() {
             ?>
 <tr>
     <td><?= htmlspecialchars($player->position) ?></td>
-    <td><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= htmlspecialchars($player->name) ?></a></td>
+    <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$player->playerID, $player->name); ?>
+    <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
     <td><?= $player->age ?></td>
     <?php if ($player->teamColor1 !== null && $player->teamID > 0): ?>
     <td class="ibl-team-cell--colored" style="background-color: #<?= \Utilities\HtmlSanitizer::safeHtmlOutput($player->teamColor1) ?>;">

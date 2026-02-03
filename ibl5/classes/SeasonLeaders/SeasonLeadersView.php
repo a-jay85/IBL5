@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SeasonLeaders;
 
+use Player\PlayerImageHelper;
 use SeasonLeaders\Contracts\SeasonLeadersViewInterface;
 
 /**
@@ -182,7 +183,8 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
 <tr>
     <td class="rank-cell sticky-col-1"><?= htmlspecialchars((string)$rank) ?>.</td>
     <td><?= htmlspecialchars((string)$stats['year']) ?></td>
-    <td class="sticky-col-2"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= htmlspecialchars((string)$stats['pid']) ?>"><?= htmlspecialchars($stats['name']) ?></a></td>
+    <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$stats['pid'], $stats['name']); ?>
+    <td class="sticky-col-2 ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= htmlspecialchars((string)$stats['pid']) ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
     <?= $teamCell ?>
     <td><?= htmlspecialchars((string)$stats['games']) ?></td>
     <td><?= htmlspecialchars((string)$stats['mpg']) ?></td>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Voting;
 
+use Player\PlayerImageHelper;
 use Voting\Contracts\VotingResultsTableRendererInterface;
 
 /**
@@ -36,9 +37,17 @@ class VotingResultsTableRenderer implements VotingResultsTableRendererInterface
         foreach ($rows as $row) {
             $name = htmlspecialchars((string) ($row['name'] ?? ''), \ENT_QUOTES, 'UTF-8');
             $votes = (int) ($row['votes'] ?? 0);
+            $pid = (int) ($row['pid'] ?? 0);
+
+            if ($pid > 0) {
+                $nameCell = '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . PlayerImageHelper::renderThumbnail($pid) . $name . '</a></td>';
+            } else {
+                $nameCell = '<td>' . $name . '</td>';
+            }
+
             $rowsHtml[] = sprintf(
-                '        <tr><td>%s</td><td>%d</td></tr>',
-                $name,
+                '        <tr>%s<td>%d</td></tr>',
+                $nameCell,
                 $votes
             );
         }

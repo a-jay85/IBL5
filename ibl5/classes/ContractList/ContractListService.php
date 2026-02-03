@@ -45,6 +45,7 @@ class ContractListService implements ContractListServiceInterface
             $contractYears = $this->calculateContractYears($player);
 
             $contracts[] = [
+                'pid' => (int) ($player['pid'] ?? 0),
                 'name' => $player['name'],
                 'pos' => $player['pos'],
                 'teamname' => $player['teamname'],

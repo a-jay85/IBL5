@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace CapInfo\Contracts;
+namespace CapSpace\Contracts;
 
 /**
- * CapInfoViewInterface - Contract for salary cap view rendering
+ * CapSpaceViewInterface - Contract for salary cap view rendering
  *
  * Defines methods for generating HTML output for salary cap information.
  *
- * @see \CapInfo\CapInfoView For the concrete implementation
+ * @see \CapSpace\CapSpaceView For the concrete implementation
  */
-interface CapInfoViewInterface
+interface CapSpaceViewInterface
 {
     /**
      * Render the complete cap info table

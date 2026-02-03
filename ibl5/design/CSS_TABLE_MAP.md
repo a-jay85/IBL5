@@ -64,7 +64,7 @@ Affects ALL data tables site-wide:
 ### `.sticky-table` — Low impact (5 views)
 
 - DraftPickLocatorView
-- CapInfoView
+- CapSpaceView
 - SeriesRecordsView
 - FranchiseHistoryView
 - FreeAgencyPreviewView

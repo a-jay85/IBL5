@@ -56,7 +56,7 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 **Summary:** Refactored 8 display modules to interface-driven architecture in a single PR, completing all IBL5 module refactoring (100% complete).
 
 **Modules Refactored:**
-1. **Cap_Info** - Salary cap information and team cap scenarios
+1. **CapSpace** - Salary cap information and team cap scenarios
 2. **Draft_Pick_Locator** - Locate players by draft position and year
 3. **Franchise_History** - Historical franchise records and championships
 4. **Injuries** - Current injury list and timeline
@@ -75,7 +75,7 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 - Database query optimization where applicable
 
 **Classes Created (Summary):**
-- **CapInfoRepository, CapInfoService, CapInfoView** - Cap scenarios and free agency slots
+- **CapSpaceRepository, CapSpaceService, CapSpaceView** - Cap scenarios and free agency slots
 - **DraftPickLocatorRepository, DraftPickLocatorService, DraftPickLocatorView** - Draft history lookup
 - **FranchiseHistoryRepository, FranchiseHistoryView** - Team records with dynamic title calculation
 - **InjuriesService, InjuriesView** - Injury status display with timeline
@@ -85,7 +85,7 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 - **TeamScheduleService, TeamScheduleView** - Schedule with game results and team stats
 
 **Test Coverage:**
-- CapInfo: 16 tests (MLE/LLE flags, FA slots, salary calculations)
+- CapSpace: 16 tests (MLE/LLE flags, FA slots, salary calculations)
 - DraftPickLocator: 7 tests (draft year/position lookup)
 - FranchiseHistory: 12 tests (championship counts, title calculations from awards)
 - Injuries: 8 tests (injury filtering, timeline generation)
@@ -96,7 +96,7 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 - **UI Tables/Ratings:** 15+ tests (shared UI components)
 
 **Key Fixes:**
-- CapInfo: Fixed MLE/LLE flag conversion from string to integer comparison
+- CapSpace: Fixed MLE/LLE flag conversion from string to integer comparison
 - FranchiseHistory: Fixed title counts to calculate dynamically from ibl_team_awards instead of reading stale columns
 - NextSim: Fixed empty separator row rendering at beginning
 - All modules: Applied consistent HTML escaping and security patterns
@@ -122,9 +122,9 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 ---
 
-### 20. Player_Awards Module (January 2026)
+### 20. AwardHistory Module (January 2026)
 
-**Summary:** Refactored Player_Awards module with interface-driven architecture.
+**Summary:** Refactored AwardHistory module with interface-driven architecture.
 
 **Key Improvements:**
 - Created 4 classes + 4 interfaces
@@ -593,8 +593,8 @@ All IBL5 modules have been refactored to the interface-driven architecture patte
 
 - **November 2025:** Player, Season Leaders, Free Agency, Player_Search modules complete
 - **December 2025:** Compare_Players, Leaderboards, Standings modules complete
-- **January 5, 2026:** League_Stats, Player_Awards, Series_Records, One-on-One modules complete
-- **January 9, 2026:** 8 Display modules refactored (Cap_Info, Draft_Pick_Locator, Franchise_History, Injuries, League_Starters, Next_Sim, Power_Rankings, Team_Schedule) - **30/30 modules complete (100%)** ✅
+- **January 5, 2026:** League_Stats, AwardHistory, Series_Records, One-on-One modules complete
+- **January 9, 2026:** 8 Display modules refactored (CapSpace, Draft_Pick_Locator, Franchise_History, Injuries, League_Starters, Next_Sim, Power_Rankings, Team_Schedule) - **30/30 modules complete (100%)** ✅
 - **Target:** 80% test coverage by Q2 2026
 
 ---

@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace PlayerAwards\Contracts;
+namespace AwardHistory\Contracts;
 
 /**
- * PlayerAwardsValidatorInterface - Contract for player awards search validation
+ * AwardHistoryValidatorInterface - Contract for player awards search validation
  * 
  * Defines the validation methods for sanitizing and validating user input
  * for player award searches. All validation methods prevent SQL injection
  * and ensure data integrity.
  */
-interface PlayerAwardsValidatorInterface
+interface AwardHistoryValidatorInterface
 {
     /**
      * Validate all search parameters from form submission

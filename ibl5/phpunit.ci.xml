@@ -103,11 +103,11 @@
         <testsuite name="Injuries Module Tests">
             <directory>tests/Injuries</directory>
         </testsuite>
-        <testsuite name="CapInfo Module Tests">
-            <directory>tests/CapInfo</directory>
+        <testsuite name="CapSpace Module Tests">
+            <directory>tests/CapSpace</directory>
         </testsuite>
-        <testsuite name="PlayerAwards Module Tests">
-            <directory>tests/PlayerAwards</directory>
+        <testsuite name="AwardHistory Module Tests">
+            <directory>tests/AwardHistory</directory>
         </testsuite>
         <testsuite name="Standings Module Tests">
             <directory>tests/Standings</directory>

@@ -86,7 +86,7 @@ class WaiversController implements WaiversControllerInterface
         }
 
         // PRG: Process POST submission, then redirect
-        if (isset($_POST['Action']) && ($_POST['Action'] === 'add' || $_POST['Action'] === 'drop')) {
+        if (isset($_POST['Action']) && ($_POST['Action'] === 'add' || $_POST['Action'] === 'waive')) {
             $result = $this->processWaiverSubmission($_POST);
             $postAction = $_POST['Action'];
             if ($result['success']) {
@@ -112,13 +112,13 @@ class WaiversController implements WaiversControllerInterface
         $rosterSlots = isset($postData['rosterslots']) ? (int) $postData['rosterslots'] : 0;
         $healthyRosterSlots = isset($postData['healthyrosterslots']) ? (int) $postData['healthyrosterslots'] : 0;
 
-        if (empty($teamName) || !in_array($action, ['add', 'drop'])) {
+        if (empty($teamName) || !in_array($action, ['add', 'waive'])) {
             return ['success' => false, 'error' => 'Invalid submission data.'];
         }
 
         $totalSalary = $this->commonRepository->getTeamTotalSalary($teamName);
 
-        if ($action === 'drop') {
+        if ($action === 'waive') {
             return $this->processDrop($playerID, $teamName, $rosterSlots, $totalSalary);
         } else {
             return $this->processAdd($playerID, $teamName, $healthyRosterSlots, $totalSalary);
@@ -150,7 +150,7 @@ class WaiversController implements WaiversControllerInterface
         }
 
         // Create news story
-        $this->createWaiverNewsStory($teamName, $player['name'], 'drop', '');
+        $this->createWaiverNewsStory($teamName, $player['name'], 'waive', '');
 
         // Send Discord notification
         $hometext = "The " . $teamName . " cut " . $player['name'] . " to waivers.";
@@ -208,7 +208,7 @@ class WaiversController implements WaiversControllerInterface
     {
         $this->newsService->incrementCategoryCounter(self::WAIVER_POOL_MOVES_CATEGORY);
         
-        if ($action === 'drop') {
+        if ($action === 'waive') {
             $topicID = 32;
             $storytitle = $teamName . " make waiver cuts";
             $hometext = "The " . $teamName . " cut " . $playerName . " to waivers.";
@@ -255,7 +255,7 @@ class WaiversController implements WaiversControllerInterface
         // Display player table with view switcher
         $league = new \League($this->db);
 
-        if ($action === 'drop') {
+        if ($action === 'waive') {
             $result = $team->getHealthyAndInjuredPlayersOrderedByNameResult($season);
             $styleTeam = $team;
         } elseif ($season->phase === 'Free Agency') {
@@ -305,7 +305,7 @@ class WaiversController implements WaiversControllerInterface
         $timeNow = time();
         $players = [];
         
-        if ($action === 'drop') {
+        if ($action === 'waive') {
             $result = $team->getHealthyAndInjuredPlayersOrderedByNameResult();
         } elseif ($season->phase === 'Free Agency') {
             $result = $league->getFreeAgentsResult($season);

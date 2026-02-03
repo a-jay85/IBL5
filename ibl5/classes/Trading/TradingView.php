@@ -161,7 +161,7 @@ class TradingView implements TradingViewInterface
         echo 'Sorry, but trades are not allowed right now.';
         if ($season->allowWaivers === 'Yes') {
             echo '<br>Players may still be <a href="modules.php?name=Waivers&amp;action=add">Added From Waivers</a>';
-            echo ' or they may be <a href="modules.php?name=Waivers&amp;action=drop">Dropped to Waivers</a>.';
+            echo ' or they may be <a href="modules.php?name=Waivers&amp;action=waive">Waived</a>.';
         } else {
             echo '<br>The waiver wire is also closed.';
         }

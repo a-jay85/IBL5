@@ -1388,63 +1388,6 @@ a.schedule-jump-btn:hover {
 
 /* Contact table overrides moved to tables.css */
 
-/* ==========================================================================
-   Waivers Module
-   ========================================================================== */
-
-.waivers-error {
-    color: var(--error-600);
-    font-weight: 700;
-    text-align: center;
-    margin-bottom: var(--space-4);
-}
-
-.waivers-form {
-    max-width: 600px;
-    margin: 0 auto;
-}
-
-.waivers-form-card {
-    background: white;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--gray-100);
-}
-
-.waivers-form-header {
-    background: var(--gradient-navy-header);
-    padding: var(--space-3) var(--space-4);
-    color: white;
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    text-align: center;
-}
-
-.waivers-form-body {
-    padding: var(--space-4);
-}
-
-.waivers-team-title {
-    font-weight: 700;
-    text-decoration: underline;
-    margin-bottom: var(--space-2);
-    text-align: center;
-}
-
-.waivers-select {
-    width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--gray-300);
-    border-radius: var(--radius-md);
-    font-size: 1rem;
-    margin-bottom: var(--space-4);
-}
-
-/* .waivers-submit-btn removed — use .ibl-btn .ibl-btn--primary .ibl-btn--block instead */
 
 /* ==========================================================================
    Depth Chart Module

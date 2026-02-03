@@ -15,7 +15,7 @@ if ($currentLeague === 'ibl') {
 <ul>
 <li><a href="modules.php?name=NextSim" style="color: red">Next Sim (NEW!)</a> </li>
 
-<li><a href="modules.php?name=Depth_Chart_Entry">Depth Chart Form</a> </li>
+<li><a href="modules.php?name=DepthChartEntry">Depth Chart Form</a> </li>
 
 <li><a href="modules.php?name=ActivityTracker">Depth Chart Tracker</a> </li>
 
@@ -40,7 +40,7 @@ if ($currentLeague === 'ibl') {
     $content = '
 <strong>Management</strong>
 <ul>
-<li><a href="modules.php?name=Depth_Chart_Entry">Depth Chart Form</a> </li>
+<li><a href="modules.php?name=DepthChartEntry">Depth Chart Form</a> </li>
 
 <li><a href="modules.php?name=ActivityTracker">Depth Chart Tracker</a> </li>
 </ul>

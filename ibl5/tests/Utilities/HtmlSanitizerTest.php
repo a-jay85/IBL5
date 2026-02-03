@@ -132,7 +132,7 @@ class HtmlSanitizerTest extends TestCase
         $dbValue = "Shaquille O\\'Neal";
         $safeName = HtmlSanitizer::safeHtmlOutput($dbValue);
         
-        // Construct HTML like DepthChartView does
+        // Construct HTML like DepthChartEntryView does
         $html = "<input type=\"hidden\" name=\"Name1\" value=\"$safeName\">";
         
         // Verify the HTML is well-formed

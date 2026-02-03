@@ -21,8 +21,8 @@
         <testsuite name="UpdateAllTheThings Tests">
             <directory>tests/UpdateAllTheThings</directory>
         </testsuite>
-        <testsuite name="DepthChart Module Tests">
-            <directory>tests/DepthChart</directory>
+        <testsuite name="DepthChartEntry Module Tests">
+            <directory>tests/DepthChartEntry</directory>
         </testsuite>
         <testsuite name="Waivers Module Tests">
             <directory>tests/Waivers</directory>
@@ -85,8 +85,8 @@
         <testsuite name="SeriesRecords Module Tests">
             <directory>tests/SeriesRecords</directory>
         </testsuite>
-        <testsuite name="OneOnOne Module Tests">
-            <directory>tests/OneOnOne</directory>
+        <testsuite name="OneOnOneGame Module Tests">
+            <directory>tests/OneOnOneGame</directory>
         </testsuite>
         <testsuite name="DraftPickLocator Module Tests">
             <directory>tests/DraftPickLocator</directory>

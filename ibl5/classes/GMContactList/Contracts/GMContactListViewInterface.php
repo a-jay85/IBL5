@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace ContactList\Contracts;
+namespace GMContactList\Contracts;
 
 /**
- * View interface for Contact List module rendering.
+ * View interface for GM Contact List module rendering.
  *
  * Provides method to render the GM contact list table.
  */
-interface ContactListViewInterface
+interface GMContactListViewInterface
 {
     /**
      * Render the GM contact list table.

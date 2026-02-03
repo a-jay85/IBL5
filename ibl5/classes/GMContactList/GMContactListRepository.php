@@ -2,22 +2,22 @@
 
 declare(strict_types=1);
 
-namespace ContactList;
+namespace GMContactList;
 
-use ContactList\Contracts\ContactListRepositoryInterface;
+use GMContactList\Contracts\GMContactListRepositoryInterface;
 
 /**
- * ContactListRepository - Data access layer for GM contact information
+ * GMContactListRepository - Data access layer for GM contact information
  *
  * Retrieves team and GM contact info from the ibl_team_info table.
  *
- * @see ContactListRepositoryInterface For the interface contract
+ * @see GMContactListRepositoryInterface For the interface contract
  * @see \BaseMysqliRepository For base class documentation
  */
-class ContactListRepository extends \BaseMysqliRepository implements ContactListRepositoryInterface
+class GMContactListRepository extends \BaseMysqliRepository implements GMContactListRepositoryInterface
 {
     /**
-     * @see ContactListRepositoryInterface::getAllTeamContacts()
+     * @see GMContactListRepositoryInterface::getAllTeamContacts()
      */
     public function getAllTeamContacts(): array
     {

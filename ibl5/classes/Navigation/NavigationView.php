@@ -21,8 +21,10 @@ class NavigationView
     private ?array $teamsData;
     private string $seasonPhase;
     private string $allowWaivers;
+    private ?string $serverName;
+    private ?string $requestUri;
 
-    public function __construct(bool $isLoggedIn, ?string $username, string $currentLeague, ?int $teamId = null, ?array $teamsData = null, string $seasonPhase = '', string $allowWaivers = '')
+    public function __construct(bool $isLoggedIn, ?string $username, string $currentLeague, ?int $teamId = null, ?array $teamsData = null, string $seasonPhase = '', string $allowWaivers = '', ?string $serverName = null, ?string $requestUri = null)
     {
         $this->isLoggedIn = $isLoggedIn;
         $this->username = $username;
@@ -31,6 +33,8 @@ class NavigationView
         $this->teamsData = $teamsData;
         $this->seasonPhase = $seasonPhase;
         $this->allowWaivers = $allowWaivers;
+        $this->serverName = $serverName;
+        $this->requestUri = $requestUri;
     }
 
     /**
@@ -654,6 +658,40 @@ class NavigationView
     }
 
     /**
+     * Render the localhost/production switch button for the developer.
+     * Absolutely positioned so it has zero impact on layout.
+     */
+    private function renderDevSwitch(): string
+    {
+        if ($this->username !== 'A-Jay' || $this->serverName === null || $this->requestUri === null) {
+            return '';
+        }
+
+        if ($this->serverName !== 'localhost') {
+            $url = 'http://localhost' . $this->requestUri;
+            $title = 'Switch to localhost';
+        } else {
+            $url = 'https://www.iblhoops.net' . $this->requestUri;
+            $title = 'Switch to production';
+        }
+
+        /** @var string $safeUrl */
+        $safeUrl = HtmlSanitizer::safeHtmlOutput($url);
+        /** @var string $safeTitle */
+        $safeTitle = HtmlSanitizer::safeHtmlOutput($title);
+
+        return '<a href="' . $safeUrl . '" class="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full opacity-40 hover:opacity-100 transition-opacity duration-200 overflow-visible" title="' . $safeTitle . '" style="color: #0EA5E9; contain: layout;">'
+            . '<svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">'
+            . '<circle cx="12" cy="12" r="10"/>'
+            . '<ellipse cx="12" cy="12" rx="4" ry="10"/>'
+            . '<path d="M2 12h20"/>'
+            . '<path d="M5 7h14"/>'
+            . '<path d="M5 17h14"/>'
+            . '</svg>'
+            . '</a>';
+    }
+
+    /**
      * Render the complete navigation bar
      */
     public function render(): string
@@ -670,6 +708,8 @@ class NavigationView
             <div class="absolute inset-0" style="background: #1e293b;"></div>
             <!-- Bottom accent line -->
             <div class="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-accent-500/50 to-transparent"></div>
+
+            <?= $this->renderDevSwitch() ?>
 
             <div class="relative max-w-7xl mx-auto px-4 sm:px-6">
                 <div class="flex items-center justify-between">

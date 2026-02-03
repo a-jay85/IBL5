@@ -35,12 +35,3 @@ if (
 $boxstuff .= "</span>";
 
 $content = $boxstuff;
-
-// A-Jay's localhost/production switch for development
-if ($cookie[1] == "A-Jay") {
-    if ($_SERVER['SERVER_NAME'] != "localhost") {
-        echo "<a href=\"http://localhost$url\">switch to localhost</a>";
-    } elseif ($_SERVER['SERVER_NAME'] == "localhost") {
-        echo "<a href=\"https://www.iblhoops.net$url\">switch to production</a>";
-    }
-}

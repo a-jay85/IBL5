@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Leaderboards;
 
 use Leaderboards\Contracts\LeaderboardsViewInterface;
+use Player\PlayerImageHelper;
 
 /**
  * @see LeaderboardsViewInterface
@@ -121,7 +122,8 @@ class LeaderboardsView implements LeaderboardsViewInterface
         ?>
 <tr>
     <td class="rank-cell sticky-col-1"><?= htmlspecialchars((string)$rank) ?></td>
-    <td class="sticky-col-2"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= htmlspecialchars((string)$stats['pid']) ?>"><?= htmlspecialchars($stats['name']) ?></a></td>
+    <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$stats['pid'], $stats['name']); ?>
+    <td class="sticky-col-2 ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= htmlspecialchars((string)$stats['pid']) ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
     <td><?= htmlspecialchars((string)$stats['games']) ?></td>
     <td><?= htmlspecialchars((string)$stats['minutes']) ?></td>
     <td><?= htmlspecialchars((string)$stats['fgm']) ?></td>

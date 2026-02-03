@@ -6,6 +6,7 @@ namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyViewInterface;
 use Player\Player;
+use Player\PlayerImageHelper;
 
 /**
  * @see FreeAgencyViewInterface
@@ -113,7 +114,8 @@ class FreeAgencyView implements FreeAgencyViewInterface
                 <?php endif; ?>
             </td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <td style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>"><?= htmlspecialchars($playerName ?? '') ?></a></td>
+            <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int) $player->playerID, $playerName ?? ''); ?>
+            <td class="ibl-player-cell" style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
             <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
                 <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
                     <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
@@ -175,7 +177,8 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <tr>
             <td><a href="modules.php?name=Free_Agency&amp;pa=negotiate&amp;pid=<?= (int) $player->playerID ?>">Negotiate</a></td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <td style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>"><?= htmlspecialchars($player->name ?? '') ?></a></td>
+            <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int) $player->playerID, $player->name ?? ''); ?>
+            <td class="ibl-player-cell" style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
             <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
                 <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
                     <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
@@ -246,11 +249,13 @@ class FreeAgencyView implements FreeAgencyViewInterface
                 <?php endif; ?>
             </td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <td style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>">
+            <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int) $player->playerID, $player->name ?? ''); ?>
+            <td class="ibl-player-cell" style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>">
+                <?= $resolved['thumbnail'] ?>
                 <?php if ($player->birdYears >= 3): ?>
-                    *<em><?= htmlspecialchars($player->name ?? '') ?></em>*
+                    *<em><?= htmlspecialchars($resolved['name']) ?></em>*
                 <?php else: ?>
-                    <?= htmlspecialchars($player->name ?? '') ?>
+                    <?= htmlspecialchars($resolved['name']) ?>
                 <?php endif; ?>
             </a></td>
             <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
@@ -301,7 +306,8 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <tr>
             <td><a href="modules.php?name=Free_Agency&amp;pa=negotiate&amp;pid=<?= (int) $player->playerID ?>">Negotiate</a></td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <td style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>"><?= htmlspecialchars($player->name ?? '') ?></a></td>
+            <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int) $player->playerID, $player->name ?? ''); ?>
+            <td class="ibl-player-cell" style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
             <?= $this->renderTeamCell($player) ?>
             <td class="sep-team"></td>
             <td><?= (int) $player->age ?></td>

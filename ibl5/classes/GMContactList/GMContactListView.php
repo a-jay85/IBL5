@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-namespace ContactList;
+namespace GMContactList;
 
-use ContactList\Contracts\ContactListViewInterface;
+use GMContactList\Contracts\GMContactListViewInterface;
 use Utilities\HtmlSanitizer;
 
 /**
  * View class for rendering GM contact list table.
  *
- * @see ContactListViewInterface
+ * @see GMContactListViewInterface
  */
-class ContactListView implements ContactListViewInterface
+class GMContactListView implements GMContactListViewInterface
 {
     /**
-     * @see ContactListViewInterface::render()
+     * @see GMContactListViewInterface::render()
      */
     public function render(array $contacts): string
     {

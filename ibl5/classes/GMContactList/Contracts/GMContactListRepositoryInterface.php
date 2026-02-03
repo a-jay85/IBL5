@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace ContactList\Contracts;
+namespace GMContactList\Contracts;
 
 /**
- * Repository interface for Contact List module.
+ * Repository interface for GM Contact List module.
  *
  * Provides method to retrieve GM contact information from the database.
  */
-interface ContactListRepositoryInterface
+interface GMContactListRepositoryInterface
 {
     /**
      * Get all team contact information ordered by city.

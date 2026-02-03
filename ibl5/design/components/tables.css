@@ -712,13 +712,13 @@
 }
 
 /* User team highlighting (applied by user-team-highlighter.js) */
-.ibl-data-table tbody tr.user-team-row:nth-child(odd),
-.ibl-data-table tbody tr.user-team-row:nth-child(even) {
+tbody tr.user-team-row:nth-child(odd),
+tbody tr.user-team-row:nth-child(even) {
     background-color: var(--warning-100, #fef3c7);
 }
 
-.ibl-data-table tbody tr.user-team-row:nth-child(odd):hover,
-.ibl-data-table tbody tr.user-team-row:nth-child(even):hover {
+tbody tr.user-team-row:nth-child(odd):hover,
+tbody tr.user-team-row:nth-child(even):hover {
     background-color: var(--warning-200, #fde68a);
 }
 

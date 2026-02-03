@@ -75,7 +75,7 @@ class StandingsViewTest extends TestCase
 
         $result = $this->view->renderRegion('Eastern');
 
-        $this->assertStringContainsString('<table class="sortable ibl-data-table responsive-table">', $result);
+        $this->assertStringContainsString('<table class="sortable ibl-data-table">', $result);
         $this->assertStringContainsString('Team', $result);
         $this->assertStringContainsString('W-L', $result);
         $this->assertStringContainsString('Win%', $result);

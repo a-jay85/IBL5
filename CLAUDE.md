@@ -32,6 +32,8 @@ cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary -c php
 
 **Note:** PHPUnit 12.x has no `-v`/`--verbose`. Use `--display-all-issues` instead. See `phpunit-tests.md` for full testing rules and completion criteria.
 
+**Post-change test rule:** After making ANY code changes (source or test files), always run the **full** test suite (`vendor/bin/phpunit --no-progress --no-output --testdox-summary`), not just the tests for the module you changed. Changes in one module can break tests in other modules that depend on the same code.
+
 ## Architecture
 
 ### Interface-Driven Modules

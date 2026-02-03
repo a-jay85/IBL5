@@ -252,7 +252,7 @@ if ($currentLeague === 'ibl') {
     <INPUT type='submit' name='query' value='Set Season Phase'><p>";
 }
 
-echo "<A HREF=\"/ibl5/modules.php?name=Season_Highs\">Season Highs</A><p>";
+echo "<A HREF=\"/ibl5/modules.php?name=SeasonHighs\">Season Highs</A><p>";
 
 switch ($season->phase) {
     case 'Preseason':

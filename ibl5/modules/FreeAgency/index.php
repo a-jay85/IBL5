@@ -105,11 +105,11 @@ function processOffer()
     $pid = $result['playerID'];
 
     if ($result['success']) {
-        header('Location: modules.php?name=Free_Agency&result=offer_success');
+        header('Location: modules.php?name=FreeAgency&result=offer_success');
     } elseif ($result['type'] === 'already_signed') {
-        header('Location: modules.php?name=Free_Agency&result=already_signed');
+        header('Location: modules.php?name=FreeAgency&result=already_signed');
     } else {
-        header('Location: modules.php?name=Free_Agency&pa=negotiate&pid=' . $pid . '&error=' . rawurlencode($result['message']));
+        header('Location: modules.php?name=FreeAgency&pa=negotiate&pid=' . $pid . '&error=' . rawurlencode($result['message']));
     }
     exit;
 }
@@ -120,7 +120,7 @@ function deleteOffer()
     $processor = new FreeAgencyProcessor($mysqli_db);
     $playerID = (int) ($_POST['playerID'] ?? 0);
     $processor->deleteOffers($_POST['teamname'], $playerID);
-    header('Location: modules.php?name=Free_Agency&result=deleted');
+    header('Location: modules.php?name=FreeAgency&result=deleted');
     exit;
 }
 

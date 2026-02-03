@@ -81,7 +81,7 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
             </div>
         </div>
 
-        <form name="FAOffer" method="post" action="modules.php?name=Free_Agency&pa=processoffer">
+        <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer">
             <div style="margin-bottom: 1rem;">
                 <span class="ibl-label">Your Custom Offer:</span>
                 <div style="margin-top: 0.25rem;">
@@ -114,7 +114,7 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
 <?php // Delete Offer (conditional) ?>
 <?php if ($hasExistingOffer): ?>
 <div style="margin-top: 1rem;">
-    <form method="post" action="modules.php?name=Free_Agency&pa=deleteoffer">
+    <form method="post" action="modules.php?name=FreeAgency&pa=deleteoffer">
         <input type="hidden" name="teamname" value="<?= htmlspecialchars($team->name) ?>">
         <input type="hidden" name="playerID" value="<?= (int) $player->playerID ?>">
         <button type="submit" class="ibl-btn" style="background-color: #dc2626; color: white; border: none;">Delete This Offer</button>

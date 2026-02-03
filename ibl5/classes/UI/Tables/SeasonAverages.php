@@ -57,7 +57,7 @@ class SeasonAverages
 <table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
-<?php if ($moduleName === "League_Starters"): ?>
+<?php if ($moduleName === "LeagueStarters"): ?>
             <th>Team</th>
 <?php endif; ?>
             <th>Pos</th>
@@ -94,7 +94,7 @@ class SeasonAverages
     $playerStats = $row['playerStats'];
 ?>
         <tr>
-<?php if ($moduleName === "League_Starters"):
+<?php if ($moduleName === "LeagueStarters"):
     $teamId = (int) ($player->teamID ?? 0);
     $teamNameStr = htmlspecialchars($player->teamName ?? '');
     $color1 = htmlspecialchars($player->teamColor1 ?? 'FFFFFF');
@@ -141,7 +141,7 @@ class SeasonAverages
     </tbody>
     <tfoot>
 <?php if ($yr == ""):
-    $labelColspan = ($moduleName === "League_Starters") ? 3 : 2;
+    $labelColspan = ($moduleName === "LeagueStarters") ? 3 : 2;
 ?>
         <tr>
             <td colspan="<?= $labelColspan ?>"><?= htmlspecialchars($team->name) ?> Offense</td>

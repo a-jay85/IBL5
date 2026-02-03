@@ -318,7 +318,7 @@ function processrookieoption()
 
     if ($result['success'] && $from === 'fa') {
         // Came from Free Agency — redirect back there with result banner
-        header('Location: modules.php?name=Free_Agency&result=' . $resultParam);
+        header('Location: modules.php?name=FreeAgency&result=' . $resultParam);
     } elseif ($result['success']) {
         // Came from Player page (or unknown) — redirect to player page with result banner
         header('Location: modules.php?name=Player&pa=showpage&pid=' . $playerID . '&result=' . $resultParam);

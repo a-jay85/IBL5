@@ -143,7 +143,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     {
         ob_start();
         ?>
-<form name="FAOffer" method="post" action="modules.php?name=Free_Agency&pa=processoffer" style="display: inline;">
+<form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" style="display: inline;">
     <?= $this->renderHiddenFields($offers, $offerType) ?>
     <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary"><?= (int) $offers[$finalYear - 1] ?></button>
 </form>

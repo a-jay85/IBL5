@@ -208,9 +208,9 @@ function navbar($sid, $title, $thold, $mode, $order)
     if ($title) {
         echo "<tr><td bgcolor=\"$bgcolor2\" align=\"center\"><font class=\"content\" color=\"$textcolor1\">\"$un_title\" | ";
         if (is_user($user)) {
-            echo "<a href=\"modules.php?name=Your_Account&amp;op=editcomm\"><font color=\"$textcolor1\">" . _CONFIGURE . "</font></a>";
+            echo "<a href=\"modules.php?name=YourAccount&amp;op=editcomm\"><font color=\"$textcolor1\">" . _CONFIGURE . "</font></a>";
         } else {
-            echo "<a href=\"modules.php?name=Your_Account\"><font color=\"$textcolor1\">" . _LOGINCREATE . "</font></a>";
+            echo "<a href=\"modules.php?name=YourAccount\"><font color=\"$textcolor1\">" . _LOGINCREATE . "</font></a>";
         }
         if (($count == 1)) {
             echo " | <B>$count</B> " . _COMMENT . "";
@@ -333,7 +333,7 @@ function DisplayKids($tid, $mode, $order = 0, $thold = 0, $level = 0, $dummy = 0
                 if ($r_name != $anonymous) {
                     $row2 = $db->sql_fetchrow($db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='$r_name'"));
                     $r_uid = intval($row2['user_id']);
-                    echo "<br>(<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$r_name\">" . _USERINFO . "</a>)";
+                    echo "<br>(<a href=\"modules.php?name=YourAccount&amp;op=userinfo&amp;username=$r_name\">" . _USERINFO . "</a>)";
                 }
                 $row_url = $db->sql_fetchrow($db->sql_query("SELECT user_website FROM " . $user_prefix . "_users WHERE username='$r_name'"));
                 $url = filter($row_url['user_website'], "nohtml");
@@ -411,7 +411,7 @@ function DisplayKids($tid, $mode, $order = 0, $thold = 0, $level = 0, $dummy = 0
                 if ($r_name != $anonymous) {
                     $row3 = $db->sql_fetchrow($db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='$r_name'"));
                     $ruid = intval($row3['user_id']);
-                    echo "<br>(<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$r_name\">" . _USERINFO . "</a>)";
+                    echo "<br>(<a href=\"modules.php?name=YourAccount&amp;op=userinfo&amp;username=$r_name\">" . _USERINFO . "</a>)";
                 }
                 $row_url2 = $db->sql_fetchrow($db->sql_query("SELECT user_website FROM " . $user_prefix . "_users WHERE username='$r_name'"));
                 $url = filter($row_url2['user_website'], "nohtml");
@@ -629,7 +629,7 @@ function DisplayTopic($sid, $pid = 0, $tid = 0, $mode = "thread", $order = 0, $t
         if ($c_name != $anonymous) {
             $row2 = $db->sql_fetchrow($db->sql_query("SELECT user_id FROM " . $user_prefix . "_users WHERE username='$c_name'"));
             $r_uid = intval($row2['user_id']);
-            echo "<br>(<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$c_name\">" . _USERINFO . "</a>)";
+            echo "<br>(<a href=\"modules.php?name=YourAccount&amp;op=userinfo&amp;username=$c_name\">" . _USERINFO . "</a>)";
         }
         $row_url = $db->sql_fetchrow($db->sql_query("SELECT user_website FROM " . $user_prefix . "_users WHERE username='$c_name'"));
         $url = filter($row_url['user_website'], "nohtml");
@@ -823,10 +823,10 @@ function reply($pid, $sid, $mode, $order, $thold)
         echo "<font class=option><b>" . _YOURNAME . ":</b></font> ";
         if (is_user($user)) {
             cookiedecode($user);
-            echo "<a href=\"modules.php?name=Your_Account\">$cookie[1]</a> <font class=\"content\">[ <a href=\"modules.php?name=Your_Account&amp;op=logout\">" . _LOGOUT . "</a> ]</font><br><br>";
+            echo "<a href=\"modules.php?name=YourAccount\">$cookie[1]</a> <font class=\"content\">[ <a href=\"modules.php?name=YourAccount&amp;op=logout\">" . _LOGOUT . "</a> ]</font><br><br>";
         } else {
             echo "<font class=\"content\">$anonymous";
-            echo " [ <a href=\"modules.php?name=Your_Account\">" . _NEWUSER . "</a> ]<br><br>";
+            echo " [ <a href=\"modules.php?name=YourAccount\">" . _NEWUSER . "</a> ]<br><br>";
         }
         echo "<font class=\"option\"><b>" . _SUBJECT . ":</b></font><br>";
         if (!stripos_clone($subject, "Re:")) {
@@ -915,7 +915,7 @@ function replyPreview($pid, $sid, $subject, $comment, $xanonpost, $mode, $order,
     OpenTable();
     echo "<form action=\"modules.php?name=$module_name&amp;file=comments\" method=\"post\"><font class=\"option\"><b>" . _YOURNAME . ":</b></font> ";
     if (is_user($user)) {
-        echo "<a href=\"modules.php?name=Your_Account\">$cookie[1]</a> <font class=\"content\">[ <a href=\"modules.php?name=Your_Account&amp;op=logout\">" . _LOGOUT . "</a> ]</font><br><br>";
+        echo "<a href=\"modules.php?name=YourAccount\">$cookie[1]</a> <font class=\"content\">[ <a href=\"modules.php?name=YourAccount&amp;op=logout\">" . _LOGOUT . "</a> ]</font><br><br>";
     } else {
         echo "<font class=\"content\">$anonymous<br><br>";
     }

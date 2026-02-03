@@ -32,7 +32,7 @@ class ComparePlayersView implements ComparePlayersViewInterface
         }
         $datalistHtml .= '</datalist>';
 
-        $output .= '<form action="modules.php?name=Compare_Players" method="POST" class="ibl-filter-form">';
+        $output .= '<form action="modules.php?name=ComparePlayers" method="POST" class="ibl-filter-form">';
         $output .= '<div class="ibl-filter-form__row">';
 
         $output .= '<div class="ibl-filter-form__group">';

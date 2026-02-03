@@ -87,7 +87,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             </select>
         </div>
         <button type="submit" class="ibl-filter-form__submit">Filter</button>
-        <a href="modules.php?name=Transaction_History" class="ibl-btn ibl-btn--ghost ibl-btn--sm txn-reset">Reset</a>
+        <a href="modules.php?name=TransactionHistory" class="ibl-btn ibl-btn--ghost ibl-btn--sm txn-reset">Reset</a>
     </div>
 </form>
         <?php

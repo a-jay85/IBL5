@@ -75,7 +75,7 @@ class Per36Minutes
 <table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
-<?php if ($moduleName === "League_Starters"): ?>
+<?php if ($moduleName === "LeagueStarters"): ?>
             <th>Team</th>
 <?php endif; ?>
             <th>Pos</th>
@@ -113,7 +113,7 @@ class Per36Minutes
     $playerStats = $row['playerStats'];
 ?>
         <tr>
-<?php if ($moduleName === "League_Starters"):
+<?php if ($moduleName === "LeagueStarters"):
     $teamId = (int) ($player->teamID ?? 0);
     $teamNameStr = htmlspecialchars($player->teamName ?? '');
     $color1 = htmlspecialchars($player->teamColor1 ?? 'FFFFFF');

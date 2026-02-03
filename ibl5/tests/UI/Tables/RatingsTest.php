@@ -96,7 +96,7 @@ class RatingsTest extends TestCase
             $this->createMockPlayer('Player 2', 2),
         ];
 
-        $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, 'Next_Sim');
+        $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, 'NextSim');
 
         // Find the opening <tbody> tag and get content after it
         $tableStart = strpos($html, '<tbody>');
@@ -150,7 +150,7 @@ class RatingsTest extends TestCase
             $this->createMockPlayer('Player 4', 4),
         ];
 
-        $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, 'Next_Sim');
+        $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, 'NextSim');
 
         // Count separator rows (rows with class="ratings-separator")
         $separatorCount = preg_match_all(
@@ -211,7 +211,7 @@ class RatingsTest extends TestCase
 
         $team = $this->createMockTeam();
 
-        $html = Ratings::render($mockDb, [], $team, '', $mockSeason, 'Next_Sim');
+        $html = Ratings::render($mockDb, [], $team, '', $mockSeason, 'NextSim');
 
         $this->assertIsString($html);
         $this->assertStringContainsString('<tbody>', $html);
@@ -234,7 +234,7 @@ class RatingsTest extends TestCase
             $this->createMockPlayer('Test Player Two', 200),
         ];
 
-        $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, 'Next_Sim');
+        $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, 'NextSim');
 
         // Verify first player name appears in the table
         $this->assertStringContainsString('Test Player One', $html);

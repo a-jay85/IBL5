@@ -66,7 +66,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
     private function renderTitleWithYearSelect(int $startYear, int $endYear, int $selectedYear): string
     {
         $output = '<h2 class="ibl-title">';
-        $output .= '<select id="draft-year-select" class="draft-year-select" onchange="window.location.href=\'./modules.php?name=Draft_History&amp;year=\' + this.value">';
+        $output .= '<select id="draft-year-select" class="draft-year-select" onchange="window.location.href=\'./modules.php?name=DraftHistory&amp;year=\' + this.value">';
 
         for ($year = $endYear; $year >= $startYear; $year--) {
             $selected = ($year === $selectedYear) ? ' selected' : '';

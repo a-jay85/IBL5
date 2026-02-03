@@ -16,7 +16,7 @@ if (!defined('ADMIN_FILE')) {
     die("Access Denied");
 }
 
-$module_name = "Your_Account";
+$module_name = "YourAccount";
 include_secure("modules/$module_name/admin/language/lang-" . $currentlang . ".php");
 
 switch ($op) {

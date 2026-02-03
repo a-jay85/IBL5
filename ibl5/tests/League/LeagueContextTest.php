@@ -138,7 +138,7 @@ class LeagueContextTest extends TestCase
         $_SESSION['current_league'] = 'ibl';
         
         $this->assertTrue($this->leagueContext->isModuleEnabled('Draft'));
-        $this->assertTrue($this->leagueContext->isModuleEnabled('Free_Agency'));
+        $this->assertTrue($this->leagueContext->isModuleEnabled('FreeAgency'));
         $this->assertTrue($this->leagueContext->isModuleEnabled('Trading'));
         $this->assertTrue($this->leagueContext->isModuleEnabled('Other_Module'));
     }
@@ -154,23 +154,23 @@ class LeagueContextTest extends TestCase
     }
 
     /**
-     * Test isModuleEnabled returns false for Draft_Pick_Locator in Olympics
+     * Test isModuleEnabled returns false for DraftPickLocator in Olympics
      */
     public function testIsModuleEnabledOlympicsDisablesDraftPickLocator(): void
     {
         $_SESSION['current_league'] = 'olympics';
-        
-        $this->assertFalse($this->leagueContext->isModuleEnabled('Draft_Pick_Locator'));
+
+        $this->assertFalse($this->leagueContext->isModuleEnabled('DraftPickLocator'));
     }
 
     /**
-     * Test isModuleEnabled returns false for Free_Agency in Olympics
+     * Test isModuleEnabled returns false for FreeAgency in Olympics
      */
     public function testIsModuleEnabledOlympicsDisablesFreeAgency(): void
     {
         $_SESSION['current_league'] = 'olympics';
-        
-        $this->assertFalse($this->leagueContext->isModuleEnabled('Free_Agency'));
+
+        $this->assertFalse($this->leagueContext->isModuleEnabled('FreeAgency'));
     }
 
     /**
@@ -204,33 +204,33 @@ class LeagueContextTest extends TestCase
     }
 
     /**
-     * Test isModuleEnabled returns false for Voting_Results in Olympics
+     * Test isModuleEnabled returns false for VotingResults in Olympics
      */
     public function testIsModuleEnabledOlympicsDisablesVotingResults(): void
     {
         $_SESSION['current_league'] = 'olympics';
-        
-        $this->assertFalse($this->leagueContext->isModuleEnabled('Voting_Results'));
+
+        $this->assertFalse($this->leagueContext->isModuleEnabled('VotingResults'));
     }
 
     /**
-     * Test isModuleEnabled returns false for Cap_Info in Olympics
+     * Test isModuleEnabled returns false for CapSpace in Olympics
      */
     public function testIsModuleEnabledOlympicsDisablesCapInfo(): void
     {
         $_SESSION['current_league'] = 'olympics';
-        
-        $this->assertFalse($this->leagueContext->isModuleEnabled('Cap_Info'));
+
+        $this->assertFalse($this->leagueContext->isModuleEnabled('CapSpace'));
     }
 
     /**
-     * Test isModuleEnabled returns false for Franchise_History in Olympics
+     * Test isModuleEnabled returns false for FranchiseHistory in Olympics
      */
     public function testIsModuleEnabledOlympicsDisablesFranchiseHistory(): void
     {
         $_SESSION['current_league'] = 'olympics';
-        
-        $this->assertFalse($this->leagueContext->isModuleEnabled('Franchise_History'));
+
+        $this->assertFalse($this->leagueContext->isModuleEnabled('FranchiseHistory'));
     }
 
     /**

@@ -18,7 +18,7 @@ if (!defined('ADMIN_FILE')) {
 
 global $prefix, $db, $admin_file;
 $aid = substr("$aid", 0, 25);
-$row = $db->sql_fetchrow($db->sql_query("SELECT title, admins FROM " . $prefix . "_modules WHERE title='Your_Account'"));
+$row = $db->sql_fetchrow($db->sql_query("SELECT title, admins FROM " . $prefix . "_modules WHERE title='YourAccount'"));
 $row2 = $db->sql_fetchrow($db->sql_query("SELECT name, radminsuper FROM " . $prefix . "_authors WHERE aid='$aid'"));
 $admins = explode(",", $row['admins']);
 $auth_user = 0;

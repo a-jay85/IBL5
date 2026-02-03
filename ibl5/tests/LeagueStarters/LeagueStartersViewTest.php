@@ -26,7 +26,7 @@ class LeagueStartersViewTest extends TestCase
         $mockDb = $this->createMock(\mysqli::class);
         $mockSeason = $this->createMock(\Season::class);
 
-        $view = new LeagueStartersView($mockDb, $mockSeason, 'League_Starters');
+        $view = new LeagueStartersView($mockDb, $mockSeason, 'LeagueStarters');
 
         $this->assertInstanceOf(LeagueStartersViewInterface::class, $view);
     }

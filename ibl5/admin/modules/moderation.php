@@ -76,7 +76,7 @@ if ($row['radminsuper'] == 1) {
             $row['subject'] = filter($row['subject'], "nohtml");
             $row['name'] = filter($row['name'], "nohtml");
             echo "<td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"" . $admin_file . ".php?op=moderation_news_view&id=" . intval($row['tid']) . "\">" . $row['subject'] . "</a>&nbsp;</td>";
-            echo "<td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"modules.php?name=Your_Account&op=userinfo&username=" . $row['name'] . "\" target=\"_blank\">" . $row['name'] . "</a>&nbsp;</td>";
+            echo "<td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"modules.php?name=YourAccount&op=userinfo&username=" . $row['name'] . "\" target=\"_blank\">" . $row['name'] . "</a>&nbsp;</td>";
             echo "<td bgcolor=\"$bgcolor1\" align=\"center\">&nbsp;<a href=\"" . $admin_file . ".php?op=moderation_approval&section=news&id=" . intval($row['tid']) . "\"><img src=\"images/karma/approve.gif\" alt=\"" . _APPROVE . "\" title=\"" . _APPROVE . "\" width=\"15\" heigh=\"15\" border=\"0\"></a> &nbsp; <a href=\"" . $admin_file . ".php?op=moderation_reject&section=news&id=" . intval($row['tid']) . "\"><img src=\"images/karma/reject.gif\" alt=\"" . _REJECT . "\" title=\"" . _REJECT . "\" width=\"15\" heigh=\"15\" border=\"0\"></a>&nbsp;</td></tr>";
             $a = 1;
         }
@@ -153,7 +153,7 @@ if ($row['radminsuper'] == 1) {
             $row['subject'] = filter($row['subject'], "nohtml");
             $row['name'] = filter($row['name'], "nohtml");
             echo "<td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"" . $admin_file . ".php?op=moderation_surveys_view&id=" . $row['tid'] . "\">" . $row['subject'] . "</a>&nbsp;</td>";
-            echo "<td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"modules.php?name=Your_Account&op=userinfo&username=" . $row['name'] . "\" target=\"_blank\">" . $row['name'] . "</a>&nbsp;</td>";
+            echo "<td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"modules.php?name=YourAccount&op=userinfo&username=" . $row['name'] . "\" target=\"_blank\">" . $row['name'] . "</a>&nbsp;</td>";
             echo "<td bgcolor=\"$bgcolor1\" align=\"center\">&nbsp;<a href=\"" . $admin_file . ".php?op=moderation_approval&section=surveys&id=" . $row['tid'] . "\"><img src=\"images/karma/approve.gif\" alt=\"" . _APPROVE . "\" title=\"" . _APPROVE . "\" width=\"15\" heigh=\"15\" border=\"0\"></a> &nbsp; <a href=\"" . $admin_file . ".php?op=moderation_reject&section=surveys&id=" . $row['tid'] . "\"><img src=\"images/karma/reject.gif\" alt=\"" . _REJECT . "\" title=\"" . _REJECT . "\" width=\"15\" heigh=\"15\" border=\"0\"></a>&nbsp;</td></tr>";
             $a = 1;
         }
@@ -256,7 +256,7 @@ if ($row['radminsuper'] == 1) {
         echo "<td bgcolor=\"$bgcolor2\" width=\"100%\">&nbsp;<b>" . _USERNAME . "</b></td>";
         echo "<td bgcolor=\"$bgcolor2\" align=\"center\" nowrap>&nbsp;<b>" . _CURRENTKARMA . "</b>&nbsp;</td></tr>";
         while ($row = $db->sql_fetchrow($sql)) {
-            echo "<tr><td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"modules.php?name=Your_Account&op=userinfo&username=" . $row['username'] . "\" target=\"_blank\">" . $row['username'] . "</a>&nbsp;</td>";
+            echo "<tr><td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"modules.php?name=YourAccount&op=userinfo&username=" . $row['username'] . "\" target=\"_blank\">" . $row['username'] . "</a>&nbsp;</td>";
             echo "<td bgcolor=\"$bgcolor1\" align=\"center\">&nbsp;<img src=\"images/karma/" . $row['karma'] . ".gif\" border=\"0\" alt=\"" . _KARMALOW . "\" title=\"" . _KARMALOW . "\">&nbsp;</td></tr>";
             $a = 1;
         }
@@ -271,7 +271,7 @@ if ($row['radminsuper'] == 1) {
         echo "<td bgcolor=\"$bgcolor2\" width=\"100%\">&nbsp;<b>" . _USERNAME . "</b></td>";
         echo "<td bgcolor=\"$bgcolor2\" align=\"center\" nowrap>&nbsp;<b>" . _CURRENTKARMA . "</b>&nbsp;</td></tr>";
         while ($row = $db->sql_fetchrow($sql)) {
-            echo "<tr><td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"modules.php?name=Your_Account&op=userinfo&username=" . $row['username'] . "\" target=\"_blank\">" . $row['username'] . "</a>&nbsp;</td>";
+            echo "<tr><td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"modules.php?name=YourAccount&op=userinfo&username=" . $row['username'] . "\" target=\"_blank\">" . $row['username'] . "</a>&nbsp;</td>";
             echo "<td bgcolor=\"$bgcolor1\" align=\"center\">&nbsp;<img src=\"images/karma/" . $row['karma'] . ".gif\" border=\"0\" alt=\"" . _KARMABAD . "\" title=\"" . _KARMABAD . "\">&nbsp;</td></tr>";
             $a = 1;
         }
@@ -286,7 +286,7 @@ if ($row['radminsuper'] == 1) {
         echo "<td bgcolor=\"$bgcolor2\" width=\"100%\">&nbsp;<b>" . _USERNAME . "</b></td>";
         echo "<td bgcolor=\"$bgcolor2\" align=\"center\" nowrap>&nbsp;<b>" . _CURRENTKARMA . "</b>&nbsp;</td></tr>";
         while ($row = $db->sql_fetchrow($sql)) {
-            echo "<tr><td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"modules.php?name=Your_Account&op=userinfo&username=" . $row['username'] . "\" target=\"_blank\">" . $row['username'] . "</a>&nbsp;</td>";
+            echo "<tr><td bgcolor=\"$bgcolor1\">&nbsp;<a href=\"modules.php?name=YourAccount&op=userinfo&username=" . $row['username'] . "\" target=\"_blank\">" . $row['username'] . "</a>&nbsp;</td>";
             echo "<td bgcolor=\"$bgcolor1\" align=\"center\">&nbsp;<img src=\"images/karma/" . $row['karma'] . ".gif\" border=\"0\" alt=\"" . _KARMADEVIL . "\" title=\"" . _KARMADEVIL . "\">&nbsp;</td></tr>";
             $a = 1;
         }

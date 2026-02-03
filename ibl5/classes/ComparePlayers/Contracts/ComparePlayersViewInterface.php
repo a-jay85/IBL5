@@ -18,7 +18,7 @@ interface ComparePlayersViewInterface
      * 
      * Displays a form with two autocomplete text inputs for selecting players.
      * Uses jQuery UI autocomplete widget for player name suggestions.
-     * Submits via POST to modules.php?name=Compare_Players.
+     * Submits via POST to modules.php?name=ComparePlayers.
      * 
      * The form includes:
      * - jQuery UI CSS/JS dependencies
@@ -44,7 +44,7 @@ interface ComparePlayersViewInterface
      * 
      * FORM BEHAVIOR:
      *  - Method: POST
-     *  - Action: modules.php?name=Compare_Players
+     *  - Action: modules.php?name=ComparePlayers
      *  - Fields: Player1 (text), Player2 (text)
      *  - Submit button label: "Compare"
      *  - No validation (server-side handles it)

@@ -56,7 +56,7 @@ class LeagueStartersView implements LeagueStartersViewInterface
             'per36mins' => 'Per 36 Minutes',
         ];
 
-        $baseUrl = 'modules.php?name=League_Starters';
+        $baseUrl = 'modules.php?name=LeagueStarters';
         $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $userTeam->color1, $userTeam->color2);
 
         $html = '<div class="text-center"><h2 class="ibl-title">League Starters</h1></div>';

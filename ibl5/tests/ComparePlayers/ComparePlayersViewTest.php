@@ -41,7 +41,7 @@ class ComparePlayersViewTest extends TestCase
 
         $this->assertStringContainsString('<form', $result);
         $this->assertStringContainsString('method="POST"', $result);
-        $this->assertStringContainsString('modules.php?name=Compare_Players', $result);
+        $this->assertStringContainsString('modules.php?name=ComparePlayers', $result);
         $this->assertStringContainsString('Player1', $result);
         $this->assertStringContainsString('Player2', $result);
         $this->assertStringContainsString('type="submit"', $result);

@@ -24,7 +24,7 @@ class NextSimViewTest extends TestCase
         $mockDb = $this->createMock(\mysqli::class);
         $mockSeason = $this->createMock(\Season::class);
 
-        $view = new NextSimView($mockDb, $mockSeason, 'Next_Sim');
+        $view = new NextSimView($mockDb, $mockSeason, 'NextSim');
 
         $this->assertInstanceOf(NextSimViewInterface::class, $view);
     }
@@ -34,7 +34,7 @@ class NextSimViewTest extends TestCase
         $mockDb = $this->createMock(\mysqli::class);
         $mockSeason = $this->createMock(\Season::class);
 
-        $view = new NextSimView($mockDb, $mockSeason, 'Next_Sim');
+        $view = new NextSimView($mockDb, $mockSeason, 'NextSim');
         $result = $view->render([], 7);
 
         $this->assertIsString($result);
@@ -45,7 +45,7 @@ class NextSimViewTest extends TestCase
         $mockDb = $this->createMock(\mysqli::class);
         $mockSeason = $this->createMock(\Season::class);
 
-        $view = new NextSimView($mockDb, $mockSeason, 'Next_Sim');
+        $view = new NextSimView($mockDb, $mockSeason, 'NextSim');
         $result = $view->render([], 7);
 
         $this->assertStringContainsString('Next Sim', $result);
@@ -56,7 +56,7 @@ class NextSimViewTest extends TestCase
         $mockDb = $this->createMock(\mysqli::class);
         $mockSeason = $this->createMock(\Season::class);
 
-        $view = new NextSimView($mockDb, $mockSeason, 'Next_Sim');
+        $view = new NextSimView($mockDb, $mockSeason, 'NextSim');
         $result = $view->render([], 7);
 
         $this->assertStringContainsString('No games projected next sim', $result);

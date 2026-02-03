@@ -45,9 +45,9 @@ $i = 1;
 while (list($uname, $guest) = $db->sql_fetchrow($result)) {
     if (isset($guest) and $guest == 0) {
         if ($i < 10) {
-            $who_online_now .= "0" . $i . " :&nbsp;<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$uname\">$uname</a><br>\n";
+            $who_online_now .= "0" . $i . " :&nbsp;<a href=\"modules.php?name=YourAccount&amp;op=userinfo&amp;username=$uname\">$uname</a><br>\n";
         } else {
-            $who_online_now .= $i . ":&nbsp;<a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$uname\">$uname</a><br>\n";
+            $who_online_now .= $i . ":&nbsp;<a href=\"modules.php?name=YourAccount&amp;op=userinfo&amp;username=$uname\">$uname</a><br>\n";
         }
         $who_online_now .= ($i != $member_online_num ? "  " : "");
         $i++;
@@ -89,7 +89,7 @@ $member_online_num = intval($member_online_row);
 
 $who_online_num = $guest_online_num + $member_online_num;
 $who_online_num = intval($who_online_num);
-$content .= "<form onsubmit=\"this.submit.disabled='true'\" action=\"modules.php?name=Your_Account\" method=\"post\">";
+$content .= "<form onsubmit=\"this.submit.disabled='true'\" action=\"modules.php?name=YourAccount\" method=\"post\">";
 
 if (is_user($user)) {
     $uname = $cookie[1];
@@ -107,10 +107,10 @@ if (is_user($user)) {
         $content .= "<input type=\"hidden\" name=\"gfx_check\" value=\"$code\">";
     }
     $content .= "<input type=\"hidden\" name=\"op\" value=\"login\">";
-    $content .= "<input type=\"submit\" value=\"" . _LOGIN . "\">\n (<a href=\"modules.php?name=Your_Account&amp;op=new_user\">" . _BREG . "</a>)<hr>";
+    $content .= "<input type=\"submit\" value=\"" . _LOGIN . "\">\n (<a href=\"modules.php?name=YourAccount&amp;op=new_user\">" . _BREG . "</a>)<hr>";
 }
 $content .= "<img src=\"images/blocks/group-2.gif\" height=\"14\" width=\"17\"> <b><u>" . _BMEMP . ":</u></b><br>\n";
-$content .= "<img src=\"images/blocks/ur-moderator.gif\" height=\"14\" width=\"17\"> " . _BLATEST . ": <a href=\"modules.php?name=Your_Account&amp;op=userinfo&amp;username=$lastuser\"><b>$lastuser</b></a><br>\n";
+$content .= "<img src=\"images/blocks/ur-moderator.gif\" height=\"14\" width=\"17\"> " . _BLATEST . ": <a href=\"modules.php?name=YourAccount&amp;op=userinfo&amp;username=$lastuser\"><b>$lastuser</b></a><br>\n";
 $content .= "<img src=\"images/blocks/ur-author.gif\" height=\"14\" width=\"17\"> " . _BTD . ": <b>$userCount</b><br>\n";
 $content .= "<img src=\"images/blocks/ur-admin.gif\" height=\"14\" width=\"17\"> " . _BYD . ": <b>$userCount2</b><br>\n";
 $content .= "<img src=\"images/blocks/ur-guest.gif\" height=\"14\" width=\"17\"> " . _BOVER . ": <b>$numrows</b><br>\n<hr>\n";

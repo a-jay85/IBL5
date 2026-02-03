@@ -78,7 +78,7 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
     public function isFreeAgencyModuleActive(): ?int
     {
         $result = $this->fetchOne(
-            "SELECT active FROM nuke_modules WHERE title = 'Free_Agency' LIMIT 1",
+            "SELECT active FROM nuke_modules WHERE title = 'FreeAgency' LIMIT 1",
             "",
         );
 

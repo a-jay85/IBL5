@@ -1133,7 +1133,7 @@ function loginbox()
     $code = substr($rcode, 2, 6);
     if (!is_user($user)) {
         $title = _LOGIN;
-        $boxstuff = "<form action=\"modules.php?name=Your_Account\" method=\"post\">";
+        $boxstuff = "<form action=\"modules.php?name=YourAccount\" method=\"post\">";
         $boxstuff .= "<center><font class=\"content\">" . _NICKNAME . "<br>";
         $boxstuff .= "<input type=\"text\" name=\"username\" size=\"8\" maxlength=\"25\"><br>";
         $boxstuff .= "" . _PASSWORD . "<br>";
@@ -1346,7 +1346,7 @@ function get_theme()
         return $ThemeSelSave;
     }
 
-    if (is_user($user) && ($name != "Your_Account" or $op != "logout")) {
+    if (is_user($user) && ($name != "YourAccount" or $op != "logout")) {
         getusrinfo($user);
         if (empty($userinfo['theme'])) {
             $userinfo['theme'] = $Default_Theme;

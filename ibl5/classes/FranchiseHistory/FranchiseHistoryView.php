@@ -90,7 +90,7 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
         $teamName = HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
-        $html = '<tr>';
+        $html = '<tr data-team-id="' . $teamId . '">';
 
         // Team name cell with logo - sticky column
         $html .= '<td class="ibl-team-cell--colored sticky-col" style="background-color: #' . $color1 . ';">';

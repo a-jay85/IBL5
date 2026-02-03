@@ -221,7 +221,7 @@ function renderLeagueSchedule(
                 $visitorTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitor']);
                 $homeTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['home']);
 
-                echo '<div class="' . $gameClass . '" id="' . $gameId . '">';
+                echo '<div class="' . $gameClass . '" id="' . $gameId . '" data-home-team-id="' . (int)$game['home'] . '" data-visitor-team-id="' . (int)$game['visitor'] . '">';
 
                 // Visitor team + logo (links to team page)
                 $vClass = $game['visitorWon'] ? ' schedule-game__team--win' : '';

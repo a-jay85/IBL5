@@ -934,6 +934,14 @@ a.schedule-jump-btn:hover {
     background: var(--accent-300);
 }
 
+.schedule-game.user-team-game {
+    background: var(--warning-100, #fef3c7);
+}
+
+.schedule-game.user-team-game:hover {
+    background: var(--warning-200, #fde68a);
+}
+
 /* Team name */
 .schedule-game__team {
     font-weight: 500;

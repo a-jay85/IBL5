@@ -24,15 +24,14 @@ interface LeagueStatsViewInterface
      * Render the complete league statistics display
      *
      * Generates five sortable HTML tables with team statistics.
-     * Highlights the current user's team row with bgcolor=#FFA.
+     * User's team rows are highlighted client-side via user-team-highlighter.js.
      * Applies HtmlSanitizer::safeHtmlOutput() to team_city and team_name.
      *
      * @param array $data Combined data structure containing:
      *                    - 'teams': Processed team statistics
      *                    - 'league': League totals and averages
      *                    - 'differentials': Team differentials
-     * @param int $userTeamId The current user's team ID for row highlighting
      * @return string Complete HTML output for the league stats page
      */
-    public function render(array $data, int $userTeamId): string;
+    public function render(array $data): string;
 }

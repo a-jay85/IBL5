@@ -29,14 +29,14 @@ class CapInfoViewTest extends TestCase
 
     public function testRenderReturnsString(): void
     {
-        $result = $this->view->render([], 2024, 2025, null);
+        $result = $this->view->render([], 2024, 2025);
 
         $this->assertIsString($result);
     }
 
     public function testRenderContainsTableStructure(): void
     {
-        $result = $this->view->render([], 2024, 2025, null);
+        $result = $this->view->render([], 2024, 2025);
 
         $this->assertStringContainsString('<table', $result);
         $this->assertStringContainsString('</table>', $result);
@@ -44,7 +44,7 @@ class CapInfoViewTest extends TestCase
 
     public function testRenderContainsTableHeaders(): void
     {
-        $result = $this->view->render([], 2024, 2025, null);
+        $result = $this->view->render([], 2024, 2025);
 
         $this->assertStringContainsString('Team', $result);
         $this->assertStringContainsString('MLE', $result);
@@ -94,7 +94,7 @@ class CapInfoViewTest extends TestCase
             ],
         ];
 
-        $result = $this->view->render($teams, 2024, 2025, null);
+        $result = $this->view->render($teams, 2024, 2025);
 
         // Should escape HTML entities - verify the escaped versions appear
         $this->assertStringContainsString('Team&amp;Name', $result);

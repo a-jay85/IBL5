@@ -48,8 +48,8 @@
         <testsuite name="Leaderboards Module Tests">
             <directory>tests/Leaderboards</directory>
         </testsuite>
-        <testsuite name="Season Leaders Module Tests">
-            <directory>tests/SeasonLeaders</directory>
+        <testsuite name="SeasonLeaderboards Module Tests">
+            <directory>tests/SeasonLeaderboards</directory>
         </testsuite>
         <testsuite name="Utilities Tests">
             <directory>tests/Utilities</directory>
@@ -108,6 +108,9 @@
         </testsuite>
         <testsuite name="AwardHistory Module Tests">
             <directory>tests/AwardHistory</directory>
+        </testsuite>
+        <testsuite name="TeamOffDefStats Module Tests">
+            <directory>tests/TeamOffDefStats</directory>
         </testsuite>
         <testsuite name="Standings Module Tests">
             <directory>tests/Standings</directory>

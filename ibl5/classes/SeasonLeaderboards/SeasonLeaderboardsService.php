@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace SeasonLeaders;
+namespace SeasonLeaderboards;
 
 use BasketballStats\StatsFormatter;
-use SeasonLeaders\Contracts\SeasonLeadersServiceInterface;
+use SeasonLeaderboards\Contracts\SeasonLeaderboardsServiceInterface;
 
 /**
- * @see SeasonLeadersServiceInterface
+ * @see SeasonLeaderboardsServiceInterface
  */
-class SeasonLeadersService implements SeasonLeadersServiceInterface
+class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
 {
     /**
-     * @see SeasonLeadersServiceInterface::processPlayerRow()
+     * @see SeasonLeaderboardsServiceInterface::processPlayerRow()
      */
     public function processPlayerRow(array $row): array
     {
@@ -99,7 +99,7 @@ class SeasonLeadersService implements SeasonLeadersServiceInterface
     }
 
     /**
-     * @see SeasonLeadersServiceInterface::getSortOptions()
+     * @see SeasonLeaderboardsServiceInterface::getSortOptions()
      */
     public function getSortOptions(): array
     {

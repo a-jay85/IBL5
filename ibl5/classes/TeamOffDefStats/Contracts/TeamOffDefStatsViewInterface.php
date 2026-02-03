@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LeagueStats\Contracts;
+namespace TeamOffDefStats\Contracts;
 
 /**
  * Interface for League Stats HTML rendering
@@ -16,9 +16,9 @@ namespace LeagueStats\Contracts;
  *
  * Uses HtmlSanitizer::safeHtmlOutput() for XSS protection on team names.
  *
- * @see \LeagueStats\LeagueStatsView for implementation
+ * @see \TeamOffDefStats\TeamOffDefStatsView for implementation
  */
-interface LeagueStatsViewInterface
+interface TeamOffDefStatsViewInterface
 {
     /**
      * Render the complete league statistics display

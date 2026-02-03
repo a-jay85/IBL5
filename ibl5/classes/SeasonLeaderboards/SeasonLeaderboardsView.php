@@ -2,31 +2,31 @@
 
 declare(strict_types=1);
 
-namespace SeasonLeaders;
+namespace SeasonLeaderboards;
 
 use Player\PlayerImageHelper;
-use SeasonLeaders\Contracts\SeasonLeadersViewInterface;
+use SeasonLeaderboards\Contracts\SeasonLeaderboardsViewInterface;
 
 /**
- * @see SeasonLeadersViewInterface
+ * @see SeasonLeaderboardsViewInterface
  */
-class SeasonLeadersView implements SeasonLeadersViewInterface
+class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
 {
     private $service;
 
-    public function __construct(SeasonLeadersService $service)
+    public function __construct(SeasonLeaderboardsService $service)
     {
         $this->service = $service;
     }
 
     /**
-     * @see SeasonLeadersViewInterface::renderFilterForm()
+     * @see SeasonLeaderboardsViewInterface::renderFilterForm()
      */
     public function renderFilterForm(array $teams, array $years, array $currentFilters): string
     {
         ob_start();
         ?>
-<form name="Leaderboards" method="post" action="modules.php?name=Season_Leaders" class="ibl-filter-form">
+<form name="Leaderboards" method="post" action="modules.php?name=SeasonLeaderboards" class="ibl-filter-form">
     <div class="ibl-filter-form__row">
         <div class="ibl-filter-form__group">
             <label class="ibl-filter-form__label">Team:</label>
@@ -115,7 +115,7 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
     }
 
     /**
-     * @see SeasonLeadersViewInterface::renderTableHeader()
+     * @see SeasonLeaderboardsViewInterface::renderTableHeader()
      */
     public function renderTableHeader(): string
     {
@@ -157,7 +157,7 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
     }
 
     /**
-     * @see SeasonLeadersViewInterface::renderPlayerRow()
+     * @see SeasonLeaderboardsViewInterface::renderPlayerRow()
      */
     public function renderPlayerRow(array $stats, int $rank): string
     {
@@ -212,7 +212,7 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
     }
 
     /**
-     * @see SeasonLeadersViewInterface::renderTableFooter()
+     * @see SeasonLeaderboardsViewInterface::renderTableFooter()
      */
     public function renderTableFooter(): string
     {

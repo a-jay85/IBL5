@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Tests\SeasonLeaders;
+namespace Tests\SeasonLeaderboards;
 
 use PHPUnit\Framework\TestCase;
-use SeasonLeaders\SeasonLeadersRepository;
+use SeasonLeaderboards\SeasonLeaderboardsRepository;
 
 /**
- * SeasonLeadersRepositoryTest - Tests for SeasonLeadersRepository database operations
+ * SeasonLeaderboardsRepositoryTest - Tests for SeasonLeaderboardsRepository database operations
  */
-class SeasonLeadersRepositoryTest extends TestCase
+class SeasonLeaderboardsRepositoryTest extends TestCase
 {
     private \MockDatabase $mockDb;
     private object $mockMysqliDb;
@@ -63,24 +63,24 @@ class SeasonLeadersRepositoryTest extends TestCase
 
     public function testRepositoryCanBeInstantiated(): void
     {
-        $repository = new SeasonLeadersRepository($this->mockMysqliDb);
+        $repository = new SeasonLeaderboardsRepository($this->mockMysqliDb);
         
-        $this->assertInstanceOf(SeasonLeadersRepository::class, $repository);
+        $this->assertInstanceOf(SeasonLeaderboardsRepository::class, $repository);
     }
 
     public function testRepositoryImplementsCorrectInterface(): void
     {
-        $repository = new SeasonLeadersRepository($this->mockMysqliDb);
+        $repository = new SeasonLeaderboardsRepository($this->mockMysqliDb);
         
         $this->assertInstanceOf(
-            \SeasonLeaders\Contracts\SeasonLeadersRepositoryInterface::class,
+            \SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface::class,
             $repository
         );
     }
 
     public function testRepositoryExtendsBaseMysqliRepository(): void
     {
-        $repository = new SeasonLeadersRepository($this->mockMysqliDb);
+        $repository = new SeasonLeaderboardsRepository($this->mockMysqliDb);
         
         $this->assertInstanceOf(\BaseMysqliRepository::class, $repository);
     }
@@ -89,8 +89,8 @@ class SeasonLeadersRepositoryTest extends TestCase
 
     public function testMultipleRepositoriesCanBeInstantiated(): void
     {
-        $repo1 = new SeasonLeadersRepository($this->mockMysqliDb);
-        $repo2 = new SeasonLeadersRepository($this->mockMysqliDb);
+        $repo1 = new SeasonLeaderboardsRepository($this->mockMysqliDb);
+        $repo2 = new SeasonLeaderboardsRepository($this->mockMysqliDb);
         
         $this->assertNotSame($repo1, $repo2);
     }

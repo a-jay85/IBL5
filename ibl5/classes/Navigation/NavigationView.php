@@ -100,7 +100,7 @@ class NavigationView
                     ['label' => 'Compare Players', 'url' => 'modules.php?name=ComparePlayers'],
                     ['label' => 'Season Highs', 'url' => 'modules.php?name=SeasonHighs'],
                     ['label' => 'Series Records', 'url' => 'modules.php?name=SeriesRecords'],
-                    ['label' => 'Team Off/Def Stats', 'url' => 'modules.php?name=League_Stats'],
+                    ['label' => 'Team Off/Def Stats', 'url' => 'modules.php?name=TeamOffDefStats'],
                 ],
             ],
             'History' => [
@@ -112,7 +112,7 @@ class NavigationView
                     ['label' => 'Award History', 'url' => 'modules.php?name=AwardHistory'],
                     ['label' => 'Record Holders', 'url' => 'modules.php?name=RecordHolders'],
                     ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=AllStarAppearances'],
-                    ['label' => 'Season Leaderboards', 'url' => 'modules.php?name=Season_Leaders'],
+                    ['label' => 'Season Leaderboards', 'url' => 'modules.php?name=SeasonLeaderboards'],
                     ['label' => 'Career Leaderboards', 'url' => 'modules.php?name=Leaderboards'],
                     ['label' => 'Season Archive', 'url' => 'modules.php?name=Content&pa=showpage&pid=5'],
                     ['label' => '1-On-1 Game', 'url' => 'modules.php?name=One-on-One'],

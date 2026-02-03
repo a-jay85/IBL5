@@ -305,7 +305,7 @@
 - Contract rules: ContractRulesTest (42 CBA salary cap tests)
 - Module processors: FreeAgency (5), Negotiation (5), Extension (4), Trading (4)
 - Controllers: Waivers (4), DepthChart (3+5), RookieOption (3), Team (3), SeriesRecords (4)
-- Repositories: Trading (10), FreeAgency (7), Negotiation (7), SeasonLeaders (4), SeriesRecords (4), OneOnOne (4)
+- Repositories: Trading (10), FreeAgency (7), Negotiation (7), SeasonLeaderboards (4), SeriesRecords (4), OneOnOne (4)
 - Services: CommonValidator (6), PlayerDataConverter (13), ExtensionOfferEvaluator (17), CashTransactionHandler (11)
 - Display modules: DraftPickLocator (112), Injuries (111), LeagueStarters (129), NextSim (96), TeamSchedule (96+9+186)
 - Utilities: DateParser (15), UuidGenerator (11), RecordParser, ScheduleParser, SeasonPhaseHelper, StandingsGrouper

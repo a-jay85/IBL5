@@ -1,8 +1,8 @@
 <?php
 
-use SeasonLeaders\SeasonLeadersRepository;
-use SeasonLeaders\SeasonLeadersService;
-use SeasonLeaders\SeasonLeadersView;
+use SeasonLeaderboards\SeasonLeaderboardsRepository;
+use SeasonLeaderboards\SeasonLeaderboardsService;
+use SeasonLeaderboards\SeasonLeaderboardsView;
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
@@ -14,9 +14,9 @@ get_lang($module_name);
 $pagetitle = "Season Stats";
 
 // Initialize classes
-$repository = new SeasonLeadersRepository($mysqli_db);
-$service = new SeasonLeadersService();
-$view = new SeasonLeadersView($service);
+$repository = new SeasonLeaderboardsRepository($mysqli_db);
+$service = new SeasonLeaderboardsService();
+$view = new SeasonLeaderboardsView($service);
 
 // Get filter parameters from POST
 $filters = [

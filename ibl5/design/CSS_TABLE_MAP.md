@@ -74,7 +74,7 @@ Affects ALL data tables site-wide:
 | Selector | View |
 |----------|------|
 | `.injury-table` | InjuriesView |
-| `.league-stats-table` | LeagueStatsView |
+| `.league-stats-table` | TeamOffDefStatsView |
 | `.depth-chart-table` | DepthChartView |
 | `.draft-pick-table` | DraftPickLocatorView |
 | `.contact-table` | GMContactListView |

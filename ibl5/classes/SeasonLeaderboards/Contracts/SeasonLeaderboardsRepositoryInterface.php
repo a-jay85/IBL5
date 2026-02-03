@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace SeasonLeaders\Contracts;
+namespace SeasonLeaderboards\Contracts;
 
 /**
- * SeasonLeadersRepositoryInterface - Season leaders database operations
+ * SeasonLeaderboardsRepositoryInterface - Season leaders database operations
  *
  * Handles all database operations for historical season statistics.
  */
-interface SeasonLeadersRepositoryInterface
+interface SeasonLeaderboardsRepositoryInterface
 {
     /**
      * Get season leaders based on filters

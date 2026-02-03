@@ -85,6 +85,6 @@ See [templates/](./templates/) for starter files:
 
 ## Reference Implementations
 
-- `ibl5/classes/PlayerSearch/` - 4 interfaces, 4 classes, 54 tests
+- `ibl5/classes/PlayerDatabase/` - 4 interfaces, 4 classes, 54 tests
 - `ibl5/classes/FreeAgency/` - 7 interfaces, 6 classes, 11 tests
 - `ibl5/classes/Player/` - 9 interfaces, 8 classes, 84 tests

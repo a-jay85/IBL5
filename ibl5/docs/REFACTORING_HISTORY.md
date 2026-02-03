@@ -47,7 +47,7 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 - OneOnOneGameResultTest: 4 tests (DTO validation)
 - OneOnOnePlayerStatsTest: 4 tests (stats tracking)
 
-**Documentation:** `ibl5/classes/OneOnOne/README.md`
+**Documentation:** `ibl5/classes/OneOnOneGame/README.md`
 
 ---
 
@@ -437,13 +437,13 @@ $stmt->bind_param('ss', $searchTerm, $searchTerm);
 
 ---
 
-### 4. DepthChart Module
+### 4. DepthChartEntry Module
 
 **Status:** ✅ Complete (6 classes, 2 tests)
 
 **Documentation:**
-- `ibl5/classes/DepthChart/README.md`
-- `ibl5/classes/DepthChart/SECURITY.md` - Security best practices
+- `ibl5/classes/DepthChartEntry/README.md`
+- `ibl5/classes/DepthChartEntry/SECURITY.md` - Security best practices
 
 ---
 
@@ -609,7 +609,7 @@ All IBL5 modules have been refactored to the interface-driven architecture patte
 ### Component Documentation
 - [Statistics README](../classes/Statistics/README.md) - StatsFormatter usage
 - [Player README](../classes/Player/README.md) - Player module architecture
-- [DepthChart SECURITY](../classes/DepthChart/SECURITY.md) - Security patterns
+- [DepthChartEntry SECURITY](../classes/DepthChartEntry/SECURITY.md) - Security patterns
 - [ComparePlayers README](../classes/ComparePlayers/README.md) - Compare module architecture
 - [Standings README](../classes/Standings/README.md) - Standings module architecture
 

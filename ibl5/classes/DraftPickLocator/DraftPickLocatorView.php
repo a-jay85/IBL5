@@ -129,7 +129,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
         $teamName = HtmlSanitizer::safeHtmlOutput($team['teamName']);
 
-        $html = '<tr>';
+        $html = '<tr data-team-id="' . $teamId . '">';
 
         // Team name cell with team colors and logo - sticky column
         $html .= '<td class="ibl-team-cell--colored sticky-col" style="background-color: #' . $color1 . ';">';

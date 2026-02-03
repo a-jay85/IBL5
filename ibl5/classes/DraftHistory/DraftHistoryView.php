@@ -146,7 +146,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
 
             $playerThumbnail = PlayerImageHelper::renderThumbnail($pid);
 
-            $output .= "<tr>
+            $output .= "<tr data-team-id=\"{$teamId}\">
     <td class=\"sticky-col-1\">{$round}</td>
     <td class=\"sticky-col-2\">{$pickNo}</td>
     <td class=\"name-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a></td>

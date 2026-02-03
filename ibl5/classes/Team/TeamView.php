@@ -83,7 +83,7 @@ class TeamView implements TeamViewInterface
         <img src="./<?= $imagesPath ?>logo/<?= $teamID ?>.jpg" style="display: block; margin: 0 18px;">
         <?= $yearHeading ?>
     </div>
-    <a href="modules.php?name=Draft_History&amp;teamID=<?= $teamID ?>" class="team-action-link">Draft History</a>
+    <a href="modules.php?name=DraftHistory&amp;teamID=<?= $teamID ?>" class="team-action-link">Draft History</a>
 </div>
         <?php
         return ob_get_clean();

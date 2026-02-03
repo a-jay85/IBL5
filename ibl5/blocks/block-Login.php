@@ -23,7 +23,7 @@ mt_srand((double) microtime() * 1000000);
 $maxran = 1000000;
 $random_num = mt_rand(0, $maxran);
 $content .= "<div id='login'>";
-$content .= "<form onsubmit=\"this.submit.disabled='true'\" action=\"modules.php?name=Your_Account\" method=\"post\">";
+$content .= "<form onsubmit=\"this.submit.disabled='true'\" action=\"modules.php?name=YourAccount\" method=\"post\">";
 $content .= "" . _NICKNAME . "<br>";
 $content .= "<input type=\"text\" name=\"username\" size=\"10\" maxlength=\"25\" class='inputLogin'><br>";
 $content .= "" . _PASSWORD . "<br>";

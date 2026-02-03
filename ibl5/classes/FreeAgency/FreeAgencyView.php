@@ -175,7 +175,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             $player = Player::withPlayerID($this->mysqli_db, $playerID);
             ?>
         <tr>
-            <td><a href="modules.php?name=Free_Agency&amp;pa=negotiate&amp;pid=<?= (int) $player->playerID ?>">Negotiate</a></td>
+            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= (int) $player->playerID ?>">Negotiate</a></td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int) $player->playerID, $player->name ?? ''); ?>
             <td class="ibl-player-cell" style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
@@ -245,7 +245,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <tr>
             <td>
                 <?php if ($capMetrics['rosterSpots'][0] > 0): ?>
-                    <a href="modules.php?name=Free_Agency&amp;pa=negotiate&amp;pid=<?= (int) $player->playerID ?>">Negotiate</a>
+                    <a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= (int) $player->playerID ?>">Negotiate</a>
                 <?php endif; ?>
             </td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
@@ -304,7 +304,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
                 $demands = $player->getFreeAgencyDemands();
         ?>
         <tr>
-            <td><a href="modules.php?name=Free_Agency&amp;pa=negotiate&amp;pid=<?= (int) $player->playerID ?>">Negotiate</a></td>
+            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= (int) $player->playerID ?>">Negotiate</a></td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int) $player->playerID, $player->name ?? ''); ?>
             <td class="ibl-player-cell" style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int) $player->playerID ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>

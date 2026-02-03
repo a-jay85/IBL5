@@ -111,7 +111,7 @@ vendor/bin/phpunit tests/SiteStatistics/
 
 - **BasketballStats** - For basketball statistics formatting ([README](../BasketballStats/README.md))
 - **Player Module** - For player statistics and data
-- **LeagueStats Module** - For team statistics
+- **TeamOffDefStats Module** - For team statistics
 
 ## Migration Notes
 

@@ -2,26 +2,26 @@
 
 declare(strict_types=1);
 
-namespace Tests\LeagueStats;
+namespace Tests\TeamOffDefStats;
 
 use PHPUnit\Framework\TestCase;
-use LeagueStats\LeagueStatsService;
-use LeagueStats\Contracts\LeagueStatsServiceInterface;
+use TeamOffDefStats\TeamOffDefStatsService;
+use TeamOffDefStats\Contracts\TeamOffDefStatsServiceInterface;
 use BasketballStats\StatsFormatter;
 
 /**
- * Tests for LeagueStatsService
+ * Tests for TeamOffDefStatsService
  *
  * Verifies team statistics processing, league totals calculation,
  * and offense/defense differential computation.
  */
-class LeagueStatsServiceTest extends TestCase
+class TeamOffDefStatsServiceTest extends TestCase
 {
-    private LeagueStatsService $service;
+    private TeamOffDefStatsService $service;
 
     protected function setUp(): void
     {
-        $this->service = new LeagueStatsService();
+        $this->service = new TeamOffDefStatsService();
     }
 
     /**
@@ -29,7 +29,7 @@ class LeagueStatsServiceTest extends TestCase
      */
     public function testImplementsInterface(): void
     {
-        $this->assertInstanceOf(LeagueStatsServiceInterface::class, $this->service);
+        $this->assertInstanceOf(TeamOffDefStatsServiceInterface::class, $this->service);
     }
 
     // ========================================

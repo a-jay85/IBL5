@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LeagueStats\Contracts;
+namespace TeamOffDefStats\Contracts;
 
 /**
  * Interface for League Stats data access
@@ -11,9 +11,9 @@ namespace LeagueStats\Contracts;
  * Implementations should use bulk queries rather than per-team queries
  * for performance optimization.
  *
- * @see \LeagueStats\LeagueStatsRepository for implementation
+ * @see \TeamOffDefStats\TeamOffDefStatsRepository for implementation
  */
-interface LeagueStatsRepositoryInterface
+interface TeamOffDefStatsRepositoryInterface
 {
     /**
      * Get all team statistics (offense and defense) in a single bulk query

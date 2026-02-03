@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace LeagueStats;
+namespace TeamOffDefStats;
 
-use LeagueStats\Contracts\LeagueStatsRepositoryInterface;
+use TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface;
 
 /**
  * Repository for fetching league-wide team statistics
@@ -14,9 +14,9 @@ use LeagueStats\Contracts\LeagueStatsRepositoryInterface;
  *
  * Performance improvement: 30 queries → 1 query
  *
- * @see LeagueStatsRepositoryInterface for method documentation
+ * @see TeamOffDefStatsRepositoryInterface for method documentation
  */
-class LeagueStatsRepository extends \BaseMysqliRepository implements LeagueStatsRepositoryInterface
+class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOffDefStatsRepositoryInterface
 {
     /**
      * @param object $db Database connection (mysqli wrapper)
@@ -29,7 +29,7 @@ class LeagueStatsRepository extends \BaseMysqliRepository implements LeagueStats
     /**
      * Get all team statistics (offense and defense) in a single bulk query
      *
-     * @see LeagueStatsRepositoryInterface::getAllTeamStats()
+     * @see TeamOffDefStatsRepositoryInterface::getAllTeamStats()
      * @return array<int, array> Array of team statistics rows ordered by team name
      */
     public function getAllTeamStats(): array
@@ -82,7 +82,7 @@ class LeagueStatsRepository extends \BaseMysqliRepository implements LeagueStats
     /**
      * Get team offense statistics by team name
      *
-     * @see LeagueStatsRepositoryInterface::getTeamOffenseStats()
+     * @see TeamOffDefStatsRepositoryInterface::getTeamOffenseStats()
      * @param string $teamName Team name
      * @return array|null Team offense statistics
      */
@@ -98,7 +98,7 @@ class LeagueStatsRepository extends \BaseMysqliRepository implements LeagueStats
     /**
      * Get team defense statistics by team name
      *
-     * @see LeagueStatsRepositoryInterface::getTeamDefenseStats()
+     * @see TeamOffDefStatsRepositoryInterface::getTeamDefenseStats()
      * @param string $teamName Team name
      * @return array|null Team defense statistics
      */

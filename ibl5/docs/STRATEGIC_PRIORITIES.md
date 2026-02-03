@@ -83,7 +83,7 @@ With 96% of IBL modules refactored, the project transitions from **refactoring m
 
 ## Earlier Completed Refactorings
 
-### 15. Player_Search Module ✅ (November 28, 2025)
+### 15. PlayerDatabase Module ✅ (November 28, 2025)
 
 **Achievements:**
 - 4 classes created with separation of concerns
@@ -104,12 +104,12 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 ```
 
 **Classes Created:**
-1. PlayerSearchValidator - Input validation, sanitization, whitelist enforcement
-2. PlayerSearchRepository - Database queries with 100% prepared statements
-3. PlayerSearchService - Business logic, data transformation
-4. PlayerSearchView - HTML rendering with output buffering
+1. PlayerDatabaseValidator - Input validation, sanitization, whitelist enforcement
+2. PlayerDatabaseRepository - Database queries with 100% prepared statements
+3. PlayerDatabaseService - Business logic, data transformation
+4. PlayerDatabaseView - HTML rendering with output buffering
 
-**Documentation:** `ibl5/classes/PlayerSearch/README.md`
+**Documentation:** `ibl5/classes/PlayerDatabase/README.md`
 
 ### 14. Free Agency Module ✅ (November 21, 2025)
 
@@ -264,7 +264,7 @@ Web_Links, Your_Account, News, AutoTheme, Content, etc. (81,000+ lines total)
 
 **Completed Work (2025-2026):**
 - October 2025: 13 modules refactored (Player, Statistics, Team, Draft, Waivers, Extension, RookieOption, Trading, Negotiation, DepthChart, Voting, Schedule, Season_Leaders)
-- November 2025: Free Agency, Player_Search (SQL injection fixed), Compare_Players, Leaderboards
+- November 2025: Free Agency, PlayerDatabase (SQL injection fixed), Compare_Players, Leaderboards
 - December 2025: Standings, League_Stats, AwardHistory, Series_Records
 - January 9, 2026: **One-on-One complete** (88% code reduction, game simulation)
 - **Current Status:** 22/23 IBL modules refactored (96% complete)

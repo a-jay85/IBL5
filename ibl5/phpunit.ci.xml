@@ -45,8 +45,8 @@
         <testsuite name="Negotiation Module Tests">
             <directory>tests/Negotiation</directory>
         </testsuite>
-        <testsuite name="Leaderboards Module Tests">
-            <directory>tests/Leaderboards</directory>
+        <testsuite name="CareerLeaderboards Module Tests">
+            <directory>tests/CareerLeaderboards</directory>
         </testsuite>
         <testsuite name="SeasonLeaderboards Module Tests">
             <directory>tests/SeasonLeaderboards</directory>
@@ -58,7 +58,7 @@
             <directory>tests/VotingResults</directory>
         </testsuite>
         <testsuite name="Player Search Module Tests">
-            <directory>tests/PlayerSearch</directory>
+            <directory>tests/PlayerDatabase</directory>
         </testsuite>
         <testsuite name="FreeAgency Module Tests">
             <directory>tests/FreeAgency</directory>

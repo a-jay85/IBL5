@@ -211,9 +211,9 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 ---
 
-### 15. Player_Search Module (November 28, 2025)
+### 15. PlayerDatabase Module (November 28, 2025)
 
-**Summary:** Refactored Player_Search module to fix **critical SQL injection vulnerability**. Achieved 84% code reduction (462 → 73 lines) while adding comprehensive security and 54 unit tests.
+**Summary:** Refactored PlayerDatabase module to fix **critical SQL injection vulnerability**. Achieved 84% code reduction (462 → 73 lines) while adding comprehensive security and 54 unit tests.
 
 **Security Issue Fixed:**
 ```php
@@ -236,13 +236,13 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 - Input validation with whitelist for positions and type checking
 
 **Classes Created:**
-1. **PlayerSearchValidator** - Input validation, sanitization, whitelist enforcement
-2. **PlayerSearchRepository** - Database queries with 100% prepared statements
-3. **PlayerSearchService** - Business logic, data transformation, orchestration
-4. **PlayerSearchView** - HTML rendering with output buffering pattern
+1. **PlayerDatabaseValidator** - Input validation, sanitization, whitelist enforcement
+2. **PlayerDatabaseRepository** - Database queries with 100% prepared statements
+3. **PlayerDatabaseService** - Business logic, data transformation, orchestration
+4. **PlayerDatabaseView** - HTML rendering with output buffering pattern
 
 **Files Refactored:**
-- `modules/Player_Search/index.php`: 462 → 73 lines (-84%)
+- `modules/PlayerDatabase/index.php`: 462 → 73 lines (-84%)
 
 **Security Hardening:**
 - All database operations via prepared statements
@@ -252,12 +252,12 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 - HTML escaping on all output with htmlspecialchars()
 
 **Test Coverage:**
-- PlayerSearchValidatorTest: 20 tests (validation, sanitization, security)
-- PlayerSearchRepositoryTest: 9 tests (query building, prepared statements)
-- PlayerSearchServiceTest: 7 tests (business logic, data transformation)
-- PlayerSearchViewTest: 18 tests (HTML rendering, XSS prevention)
+- PlayerDatabaseValidatorTest: 20 tests (validation, sanitization, security)
+- PlayerDatabaseRepositoryTest: 9 tests (query building, prepared statements)
+- PlayerDatabaseServiceTest: 7 tests (business logic, data transformation)
+- PlayerDatabaseViewTest: 18 tests (HTML rendering, XSS prevention)
 
-**Documentation:** `ibl5/classes/PlayerSearch/README.md`
+**Documentation:** `ibl5/classes/PlayerDatabase/README.md`
 
 ---
 
@@ -591,7 +591,7 @@ All IBL5 modules have been refactored to the interface-driven architecture patte
 
 ## Timeline
 
-- **November 2025:** Player, Season Leaders, Free Agency, Player_Search modules complete
+- **November 2025:** Player, Season Leaders, Free Agency, PlayerDatabase modules complete
 - **December 2025:** Compare_Players, Leaderboards, Standings modules complete
 - **January 5, 2026:** League_Stats, AwardHistory, Series_Records, One-on-One modules complete
 - **January 9, 2026:** 8 Display modules refactored (CapSpace, Draft_Pick_Locator, Franchise_History, Injuries, League_Starters, Next_Sim, Power_Rankings, Team_Schedule) - **30/30 modules complete (100%)** ✅

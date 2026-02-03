@@ -767,8 +767,8 @@ class StandingsIntegrationTest extends IntegrationTestCase
         // Act
         $html = $this->view->render();
 
-        // Assert - Should have responsive classes for mobile
-        $this->assertStringContainsString('responsive-table', $html);
+        // Assert - Should have table structure for responsive JS detection
+        $this->assertStringContainsString('ibl-data-table', $html);
         $this->assertStringContainsString('sticky-col', $html);
         $this->assertStringContainsString('table-scroll-container', $html);
     }

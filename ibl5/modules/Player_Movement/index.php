@@ -113,7 +113,8 @@ while ($row = $result->fetch_assoc()) {
         </td>";
     }
 
-    echo "<tr>
+    $teamIds = implode(',', array_unique(array_filter([$oldTeamId, $newTeamId])));
+    echo "<tr data-team-ids=\"{$teamIds}\">
         <td class=\"ibl-player-cell\"><a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$playerName}</a></td>
         {$oldTeamCell}
         {$newTeamCell}

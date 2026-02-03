@@ -35,8 +35,6 @@ class Ratings
                     $player = $plrRow;
                     if ($moduleName == "Next_Sim") {
                         $isHighlight = (($i % 2) !== 0);
-                    } elseif ($moduleName == "League_Starters") {
-                        $isHighlight = ($player->teamID == $team->teamID);
                     } else {
                         $isHighlight = false;
                     }
@@ -130,7 +128,7 @@ class Ratings
         </td>
         </tr>
 <?php endif; ?>
-        <tr<?= $row['isHighlight'] ? ' class="ratings-highlight"' : '' ?>>
+        <tr<?= $row['isHighlight'] ? ' class="ratings-highlight"' : '' ?><?php if ($moduleName == "League_Starters"): ?> data-team-id="<?= (int) ($player->teamID ?? 0) ?>"<?php endif; ?>>
 <?php if ($moduleName == "League_Starters"):
     $teamId = (int) ($player->teamID ?? 0);
     $teamNameStr = htmlspecialchars($player->teamName ?? '');

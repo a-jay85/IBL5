@@ -39,6 +39,7 @@ class Header
         echo "<script src=\"{$relativePath}jslib/sorttable.js\"></script>";
         echo "<script src=\"{$relativePath}jslib/responsive-tables.js\"></script>";
         echo "<script src=\"{$relativePath}jslib/name-abbreviation.js\"></script>";
+        echo "<script src=\"{$relativePath}jslib/user-team-highlighter.js\"></script>";
 
         include "includes/meta.php";
         include "includes/javascript.php";

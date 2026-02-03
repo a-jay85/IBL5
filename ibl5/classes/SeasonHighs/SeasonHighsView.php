@@ -93,6 +93,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
             $name = HtmlSanitizer::safeHtmlOutput($row['name'] ?? '');
             $date = HtmlSanitizer::safeHtmlOutput($row['date'] ?? '');
             $value = (int) ($row['value'] ?? 0);
+            $tid = 0;
             $teamCell = '';
             $isTeamStat = false;
 
@@ -142,7 +143,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
                 $color1 = HtmlSanitizer::safeHtmlOutput($row['color1'] ?? 'FFFFFF');
                 $color2 = HtmlSanitizer::safeHtmlOutput($row['color2'] ?? '000000');
 
-                $output .= "<tr>
+                $output .= "<tr data-team-id=\"{$teamId}\">
     <td class=\"rank-cell\">{$rank}</td>
     <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
         <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$teamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
@@ -154,7 +155,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
     <td class=\"value-cell\">{$value}</td>
 </tr>";
             } else {
-                $output .= "<tr>
+                $output .= "<tr data-team-id=\"{$tid}\">
     <td class=\"rank-cell\">{$rank}</td>
     <td class=\"name-cell\">{$name}</td>
     {$teamCell}

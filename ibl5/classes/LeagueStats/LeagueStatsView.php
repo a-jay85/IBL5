@@ -28,10 +28,9 @@ class LeagueStatsView implements LeagueStatsViewInterface
      *
      * @see LeagueStatsViewInterface::render()
      * @param array $data Combined data structure
-     * @param int $userTeamId The current user's team ID for row highlighting
      * @return string Complete HTML output
      */
-    public function render(array $data, int $userTeamId): string
+    public function render(array $data): string
     {
         $teams = $data['teams'] ?? [];
         $league = $data['league'] ?? [];
@@ -42,23 +41,23 @@ class LeagueStatsView implements LeagueStatsViewInterface
 
         // Team Offense Totals
         $html .= '<h2 class="ibl-table-title">Team Offense Totals</h2>';
-        $html .= $this->renderTotalsTable($teams, 'offense_totals', 'Offense', $userTeamId, $league['totals'] ?? []);
+        $html .= $this->renderTotalsTable($teams, 'offense_totals', 'Offense', $league['totals'] ?? []);
 
         // Team Defense Totals
         $html .= '<h2 class="ibl-table-title">Team Defense Totals</h2>';
-        $html .= $this->renderTotalsTable($teams, 'defense_totals', 'Defense', $userTeamId, $league['totals'] ?? []);
+        $html .= $this->renderTotalsTable($teams, 'defense_totals', 'Defense', $league['totals'] ?? []);
 
         // Team Offense Averages
         $html .= '<h2 class="ibl-table-title">Team Offense Averages</h2>';
-        $html .= $this->renderAveragesTable($teams, 'offense_averages', 'Offense', $userTeamId, $league['averages'] ?? []);
+        $html .= $this->renderAveragesTable($teams, 'offense_averages', 'Offense', $league['averages'] ?? []);
 
         // Team Defense Averages
         $html .= '<h2 class="ibl-table-title">Team Defense Averages</h2>';
-        $html .= $this->renderAveragesTable($teams, 'defense_averages', 'Defense', $userTeamId, $league['averages'] ?? []);
+        $html .= $this->renderAveragesTable($teams, 'defense_averages', 'Defense', $league['averages'] ?? []);
 
         // Offense/Defense Differentials
         $html .= '<h2 class="ibl-table-title">Team Off/Def Average Differentials</h2>';
-        $html .= $this->renderDifferentialsTable($differentials, $userTeamId);
+        $html .= $this->renderDifferentialsTable($differentials);
 
         $html .= '</div>';
 
@@ -71,7 +70,6 @@ class LeagueStatsView implements LeagueStatsViewInterface
      * @param array $teams Processed team data
      * @param string $statsKey Key for stats array ('offense_totals' or 'defense_totals')
      * @param string $label Label suffix ('Offense' or 'Defense')
-     * @param int $userTeamId User's team ID for highlighting
      * @param array $leagueTotals League totals for footer
      * @return string HTML table
      */
@@ -79,7 +77,6 @@ class LeagueStatsView implements LeagueStatsViewInterface
         array $teams,
         string $statsKey,
         string $label,
-        int $userTeamId,
         array $leagueTotals
     ): string {
         $html = '<table class="sortable league-stats-table ibl-data-table">';
@@ -88,7 +85,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
 
         foreach ($teams as $team) {
             $stats = $team[$statsKey] ?? [];
-            $html .= $this->renderTotalsRow($team, $stats, $label, $userTeamId);
+            $html .= $this->renderTotalsRow($team, $stats, $label);
         }
 
         $html .= '</tbody>';
@@ -104,7 +101,6 @@ class LeagueStatsView implements LeagueStatsViewInterface
      * @param array $teams Processed team data
      * @param string $statsKey Key for stats array ('offense_averages' or 'defense_averages')
      * @param string $label Label suffix ('Offense' or 'Defense')
-     * @param int $userTeamId User's team ID for highlighting
      * @param array $leagueAverages League averages for footer
      * @return string HTML table
      */
@@ -112,7 +108,6 @@ class LeagueStatsView implements LeagueStatsViewInterface
         array $teams,
         string $statsKey,
         string $label,
-        int $userTeamId,
         array $leagueAverages
     ): string {
         $html = '<table class="sortable league-stats-table ibl-data-table">';
@@ -121,7 +116,7 @@ class LeagueStatsView implements LeagueStatsViewInterface
 
         foreach ($teams as $team) {
             $stats = $team[$statsKey] ?? [];
-            $html .= $this->renderAveragesRow($team, $stats, $label, $userTeamId);
+            $html .= $this->renderAveragesRow($team, $stats, $label);
         }
 
         $html .= '</tbody>';
@@ -135,17 +130,16 @@ class LeagueStatsView implements LeagueStatsViewInterface
      * Render the differentials table
      *
      * @param array $differentials Differential data for each team
-     * @param int $userTeamId User's team ID for highlighting
      * @return string HTML table
      */
-    private function renderDifferentialsTable(array $differentials, int $userTeamId): string
+    private function renderDifferentialsTable(array $differentials): string
     {
         $html = '<table class="sortable league-stats-table ibl-data-table">';
         $html .= '<thead>' . $this->getAveragesHeaderRow() . '</thead>';
         $html .= '<tbody>';
 
         foreach ($differentials as $team) {
-            $html .= $this->renderDifferentialsRow($team, $userTeamId);
+            $html .= $this->renderDifferentialsRow($team);
         }
 
         $html .= '</tbody>';
@@ -216,15 +210,14 @@ class LeagueStatsView implements LeagueStatsViewInterface
      * @param array $team Team data
      * @param array $stats Stats array
      * @param string $label Label suffix
-     * @param int $userTeamId User's team ID for highlighting
      * @return string HTML row
      */
-    private function renderTotalsRow(array $team, array $stats, string $label, int $userTeamId): string
+    private function renderTotalsRow(array $team, array $stats, string $label): string
     {
-        $trTag = $this->getRowTag($team['teamid'], $userTeamId);
+        $teamId = (int) $team['teamid'];
         $teamCell = $this->renderTeamCell($team, $label);
 
-        return "{$trTag}
+        return "<tr data-team-id=\"{$teamId}\">
             {$teamCell}
             <td>{$stats['games']}</td>
             <td>{$stats['fgm']}</td>
@@ -250,15 +243,14 @@ class LeagueStatsView implements LeagueStatsViewInterface
      * @param array $team Team data
      * @param array $stats Stats array
      * @param string $label Label suffix
-     * @param int $userTeamId User's team ID for highlighting
      * @return string HTML row
      */
-    private function renderAveragesRow(array $team, array $stats, string $label, int $userTeamId): string
+    private function renderAveragesRow(array $team, array $stats, string $label): string
     {
-        $trTag = $this->getRowTag($team['teamid'], $userTeamId);
+        $teamId = (int) $team['teamid'];
         $teamCell = $this->renderTeamCell($team, $label);
 
-        return "{$trTag}
+        return "<tr data-team-id=\"{$teamId}\">
             {$teamCell}
             <td>{$stats['fgm']}</td>
             <td>{$stats['fga']}</td>
@@ -284,16 +276,15 @@ class LeagueStatsView implements LeagueStatsViewInterface
      * Render a single differentials row for a team
      *
      * @param array $team Team differential data
-     * @param int $userTeamId User's team ID for highlighting
      * @return string HTML row
      */
-    private function renderDifferentialsRow(array $team, int $userTeamId): string
+    private function renderDifferentialsRow(array $team): string
     {
-        $trTag = $this->getRowTag($team['teamid'], $userTeamId);
+        $teamId = (int) $team['teamid'];
         $teamCell = $this->renderTeamCell($team, 'Diff');
         $diffs = $team['differentials'];
 
-        return "{$trTag}
+        return "<tr data-team-id=\"{$teamId}\">
             {$teamCell}
             <td>{$diffs['fgm']}</td>
             <td>{$diffs['fga']}</td>
@@ -371,21 +362,6 @@ class LeagueStatsView implements LeagueStatsViewInterface
             <td>' . ($averages['pf'] ?? '0.0') . '</td>
             <td>' . ($averages['pts'] ?? '0.0') . '</td>
         </tr>';
-    }
-
-    /**
-     * Get the opening TR tag with optional highlighting
-     *
-     * @param int $teamId Current team's ID
-     * @param int $userTeamId User's team ID
-     * @return string HTML TR tag
-     */
-    private function getRowTag(int $teamId, int $userTeamId): string
-    {
-        if ($teamId === $userTeamId) {
-            return '<tr class="league-stats-user-row">';
-        }
-        return '<tr>';
     }
 
     /**

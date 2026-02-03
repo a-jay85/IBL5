@@ -172,7 +172,7 @@ class StandingsView implements StandingsViewInterface
 
         ob_start();
         ?>
-        <tr>
+        <tr data-team-id="<?= $teamId; ?>">
             <td class="sticky-col ibl-team-cell--colored" style="background-color: #<?= $color1; ?>;"><a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId; ?>" class="ibl-team-cell__name" style="color: #<?= $color2; ?>;"><img src="images/logo/new<?= $teamId; ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text"><?= $teamName; ?></span></a></td>
             <td><?= $team['leagueRecord']; ?></td>
             <td><?= $team['pct']; ?></td>

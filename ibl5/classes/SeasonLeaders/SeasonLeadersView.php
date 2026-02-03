@@ -180,7 +180,7 @@ class SeasonLeadersView implements SeasonLeadersViewInterface
 
         ob_start();
         ?>
-<tr>
+<tr data-team-id="<?= $teamId ?>">
     <td class="rank-cell sticky-col-1"><?= htmlspecialchars((string)$rank) ?>.</td>
     <td><?= htmlspecialchars((string)$stats['year']) ?></td>
     <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$stats['pid'], $stats['name']); ?>

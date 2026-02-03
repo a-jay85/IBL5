@@ -382,6 +382,17 @@
         background-color: var(--team-row-highlight-hover-bg, var(--gray-100, #f3f4f6));
     }
 
+    /* User team highlight sticky backgrounds */
+    .responsive-table tbody tr.user-team-row td[class*="sticky-col"],
+    .sticky-table tbody tr.user-team-row td.sticky-col {
+        background-color: var(--warning-100, #fef3c7);
+    }
+
+    .responsive-table tbody tr.user-team-row:hover td[class*="sticky-col"],
+    .sticky-table tbody tr.user-team-row:hover td.sticky-col {
+        background-color: var(--warning-200, #fde68a);
+    }
+
     /* Tfoot sticky-col backgrounds (team-colored or accent fallback) */
     .responsive-table tfoot td[class*="sticky-col"] {
         background-color: var(--team-row-highlight-bg, var(--accent-100, #ffedd5));
@@ -698,6 +709,17 @@
 .ibl-table-row--user-team:nth-child(odd),
 .ibl-table-row--user-team:nth-child(even) {
     background-color: #ffffcc;
+}
+
+/* User team highlighting (applied by user-team-highlighter.js) */
+.ibl-data-table tbody tr.user-team-row:nth-child(odd),
+.ibl-data-table tbody tr.user-team-row:nth-child(even) {
+    background-color: var(--warning-100, #fef3c7);
+}
+
+.ibl-data-table tbody tr.user-team-row:nth-child(odd):hover,
+.ibl-data-table tbody tr.user-team-row:nth-child(even):hover {
+    background-color: var(--warning-200, #fde68a);
 }
 
 .ibl-table-row--winner {
@@ -1345,9 +1367,7 @@
     border-bottom: 1px solid var(--gray-100);
 }
 
-.league-stats-user-row {
-    background-color: var(--warning-100) !important;
-}
+/* .league-stats-user-row replaced by .user-team-row (user-team-highlighter.js) */
 
 .league-stats-team-cell {
     text-align: left !important;

@@ -19,8 +19,7 @@ interface CapInfoViewInterface
      * @param array $teamsData Processed team cap data
      * @param int $beginningYear Starting year for headers
      * @param int $endingYear Ending year for headers
-     * @param int|null $userTeamId Current user's team ID (for highlighting)
      * @return string HTML output
      */
-    public function render(array $teamsData, int $beginningYear, int $endingYear, ?int $userTeamId): string;
+    public function render(array $teamsData, int $beginningYear, int $endingYear): string;
 }

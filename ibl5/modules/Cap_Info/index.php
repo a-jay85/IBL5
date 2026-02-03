@@ -22,14 +22,9 @@ use CapInfo\CapInfoRepository;
 use CapInfo\CapInfoService;
 use CapInfo\CapInfoView;
 
-global $cookie, $mysqli_db;
+global $mysqli_db;
 
-$commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 $season = new Season($mysqli_db);
-
-$username = strval($cookie[1] ?? '');
-$userTeamName = $commonRepository->getTeamnameFromUsername($username);
-$userTeamId = $userTeamName ? $commonRepository->getTidFromTeamname($userTeamName) : null;
 
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
@@ -49,8 +44,7 @@ $displayYears = $service->getDisplayYears($season);
 echo $view->render(
     $teamsData,
     $displayYears['beginningYear'],
-    $displayYears['endingYear'],
-    $userTeamId
+    $displayYears['endingYear']
 );
 
 Nuke\Footer::footer();

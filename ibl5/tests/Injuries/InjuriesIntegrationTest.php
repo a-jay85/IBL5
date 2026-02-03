@@ -575,8 +575,8 @@ class InjuriesIntegrationTest extends IntegrationTestCase
 
         $result = $this->view->render($injuredPlayers);
 
-        // Count table rows (tr tags in tbody)
-        $trCount = substr_count($result, '<tr>');
+        // Count table rows (all <tr tags including those with attributes)
+        $trCount = preg_match_all('/<tr[\s>]/', $result);
         // One header row + 20 data rows
         $this->assertEquals(21, $trCount);
     }

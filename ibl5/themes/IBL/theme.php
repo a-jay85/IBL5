@@ -126,7 +126,7 @@ function themeheader()
     $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId, $teamsData, $seasonPhase, $allowWaivers);
     echo $navView->render();
 
-    echo "<body bgcolor=\"$bgcolor1\">";
+    echo "<body bgcolor=\"$bgcolor1\"" . ($teamId ? " data-user-team-id=\"$teamId\"" : '') . ">";
     echo "<div class=\"site-content\">\n";
 }
 

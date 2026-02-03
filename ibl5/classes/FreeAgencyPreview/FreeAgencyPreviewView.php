@@ -124,7 +124,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
     </td>";
             }
 
-            $output .= "<tr>
+            $output .= "<tr data-team-id=\"{$tid}\">
     <td class=\"sticky-col ibl-player-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a></td>
     {$teamCell}
     <td class=\"fa-preview-pos-col\">{$pos}</td>

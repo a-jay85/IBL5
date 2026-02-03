@@ -19,14 +19,14 @@ class CapInfoView implements CapInfoViewInterface
     /**
      * @see CapInfoViewInterface::render()
      */
-    public function render(array $teamsData, int $beginningYear, int $endingYear, ?int $userTeamId): string
+    public function render(array $teamsData, int $beginningYear, int $endingYear): string
     {
         $html = '';
         $html .= '<h2 class="ibl-title">Cap Info</h2>';
         $html .= '<div class="sticky-scroll-wrapper">';
         $html .= '<div class="sticky-scroll-container">';
         $html .= $this->renderTableHeader($beginningYear, $endingYear);
-        $html .= $this->renderTableRows($teamsData, $userTeamId);
+        $html .= $this->renderTableRows($teamsData);
         $html .= '</tbody></table>';
         $html .= '</div></div>';
 
@@ -76,15 +76,14 @@ class CapInfoView implements CapInfoViewInterface
      * Render all team rows
      *
      * @param array $teamsData Array of processed team data
-     * @param int|null $userTeamId User's team ID for highlighting
      * @return string HTML for all team rows
      */
-    private function renderTableRows(array $teamsData, ?int $userTeamId): string
+    private function renderTableRows(array $teamsData): string
     {
         $html = '';
 
         foreach ($teamsData as $teamData) {
-            $html .= $this->renderTeamRow($teamData, $userTeamId);
+            $html .= $this->renderTeamRow($teamData);
         }
 
         return $html;
@@ -94,20 +93,16 @@ class CapInfoView implements CapInfoViewInterface
      * Render a single team row
      *
      * @param array $teamData Team's cap data
-     * @param int|null $userTeamId User's team ID for highlighting
      * @return string HTML for team row
      */
-    private function renderTeamRow(array $teamData, ?int $userTeamId): string
+    private function renderTeamRow(array $teamData): string
     {
-        $isUserTeam = ($userTeamId !== null && $teamData['teamId'] === $userTeamId);
-        $highlightClass = $isUserTeam ? ' class="highlight"' : '';
-        
         $color1 = HtmlSanitizer::safeHtmlOutput($teamData['color1']);
         $color2 = HtmlSanitizer::safeHtmlOutput($teamData['color2']);
         $teamName = HtmlSanitizer::safeHtmlOutput($teamData['teamName']);
         $teamId = (int)$teamData['teamId'];
 
-        $html = '<tr>';
+        $html = '<tr data-team-id="' . $teamId . '">';
 
         // Team name cell with logo - sticky column
         $html .= '<td class="ibl-team-cell--colored sticky-col" style="background-color: #' . $color1 . ';">';
@@ -120,7 +115,7 @@ class CapInfoView implements CapInfoViewInterface
         // Available salary columns
         $years = ['year1', 'year2', 'year3', 'year4', 'year5', 'year6'];
         foreach ($years as $year) {
-            $html .= '<td' . $highlightClass . '>';
+            $html .= '<td>';
             $html .= HtmlSanitizer::safeHtmlOutput($teamData['availableSalary'][$year]);
             $html .= '</td>';
         }
@@ -129,7 +124,7 @@ class CapInfoView implements CapInfoViewInterface
 
         // Position salary columns
         foreach (\JSB::PLAYER_POSITIONS as $position) {
-            $html .= '<td' . $highlightClass . '>';
+            $html .= '<td>';
             $html .= HtmlSanitizer::safeHtmlOutput($teamData['positionSalaries'][$position] ?? 0);
             $html .= '</td>';
         }
@@ -137,7 +132,7 @@ class CapInfoView implements CapInfoViewInterface
         $html .= '<td class="divider"></td>';
 
         // FA Slots
-        $html .= '<td' . $highlightClass . '>';
+        $html .= '<td>';
         $html .= HtmlSanitizer::safeHtmlOutput($teamData['freeAgencySlots']);
         $html .= '</td>';
 
@@ -145,8 +140,8 @@ class CapInfoView implements CapInfoViewInterface
         $mleIcon = $teamData['hasMLE'] ? "\u{2705}" : "\u{274C}";
         $lleIcon = $teamData['hasLLE'] ? "\u{2705}" : "\u{274C}";
 
-        $html .= '<td' . $highlightClass . '>' . $mleIcon . '</td>';
-        $html .= '<td' . $highlightClass . '>' . $lleIcon . '</td>';
+        $html .= '<td>' . $mleIcon . '</td>';
+        $html .= '<td>' . $lleIcon . '</td>';
 
         $html .= '</tr>';
 

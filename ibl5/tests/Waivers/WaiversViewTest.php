@@ -57,7 +57,7 @@ class WaiversViewTest extends TestCase
         $this->view->renderWaiverForm(
             'Test Team',
             1,
-            'drop',
+            'waive',
             [],
             5,
             5
@@ -73,7 +73,7 @@ class WaiversViewTest extends TestCase
         $this->view->renderWaiverForm(
             'Boston Celtics',
             1,
-            'drop',
+            'waive',
             [],
             5,
             5
@@ -89,7 +89,7 @@ class WaiversViewTest extends TestCase
         $this->view->renderWaiverForm(
             'Test Team',
             1,
-            'drop',
+            'waive',
             [],
             5,
             5
@@ -105,7 +105,7 @@ class WaiversViewTest extends TestCase
         $this->view->renderWaiverForm(
             'Test Team',
             1,
-            'drop',
+            'waive',
             [],
             3,
             2
@@ -122,7 +122,7 @@ class WaiversViewTest extends TestCase
         $this->view->renderWaiverForm(
             'Test Team',
             1,
-            'drop',
+            'waive',
             [],
             5,
             5,
@@ -159,7 +159,7 @@ class WaiversViewTest extends TestCase
         $this->view->renderWaiverForm(
             'Test Team',
             1,
-            'drop',
+            'waive',
             [],
             5,
             5,
@@ -177,7 +177,7 @@ class WaiversViewTest extends TestCase
         $this->view->renderWaiverForm(
             '<script>alert("xss")</script>',
             1,
-            'drop',
+            'waive',
             [],
             5,
             5
@@ -193,7 +193,7 @@ class WaiversViewTest extends TestCase
         $this->view->renderWaiverForm(
             'Test Team',
             1,
-            'drop',
+            'waive',
             [],
             5,
             5
@@ -213,7 +213,7 @@ class WaiversViewTest extends TestCase
         $this->view->renderWaiverForm(
             'Test Team',
             1,
-            'drop',
+            'waive',
             [],
             5,
             5

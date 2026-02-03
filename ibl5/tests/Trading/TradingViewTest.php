@@ -392,7 +392,7 @@ class TradingViewTest extends TestCase
         $html = $this->view->renderTradesClosed($season);
 
         $this->assertStringContainsString('Added From Waivers', $html);
-        $this->assertStringContainsString('Dropped to Waivers', $html);
+        $this->assertStringContainsString('Waived', $html);
     }
 
     // ============================================

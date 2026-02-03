@@ -124,7 +124,7 @@ class NavigationView
                     ['label' => 'Discord Server', 'url' => 'https://discord.com/invite/QXwBQxR', 'external' => true],
                     ['label' => 'Prime Time Football', 'url' => 'http://www.thakfu.com/ptf/index.php', 'external' => true],
                     ['label' => 'Activity Tracker', 'url' => 'modules.php?name=ActivityTracker'],
-                    ['label' => 'GM Contact List', 'url' => 'modules.php?name=Contact_List'],
+                    ['label' => 'GM Contact List', 'url' => 'modules.php?name=GMContactList'],
                 ],
             ],
         ];

@@ -17,7 +17,7 @@ if ($currentLeague === 'ibl') {
 
 <li><a href="modules.php?name=Depth_Chart_Entry">Depth Chart Form</a> </li>
 
-<li><a href="modules.php?name=Depth_Record">Depth Chart Tracker</a> </li>
+<li><a href="modules.php?name=ActivityTracker">Depth Chart Tracker</a> </li>
 
 <li><a href="modules.php?name=Trading&op=reviewtrade">Offer Trade</a> </li>
 
@@ -42,7 +42,7 @@ if ($currentLeague === 'ibl') {
 <ul>
 <li><a href="modules.php?name=Depth_Chart_Entry">Depth Chart Form</a> </li>
 
-<li><a href="modules.php?name=Depth_Record">Depth Chart Tracker</a> </li>
+<li><a href="modules.php?name=ActivityTracker">Depth Chart Tracker</a> </li>
 </ul>
 ';
 }

@@ -4,35 +4,35 @@ declare(strict_types=1);
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
-use PlayerAwards\PlayerAwardsService;
-use PlayerAwards\PlayerAwardsValidator;
-use PlayerAwards\PlayerAwardsRepository;
-use PlayerAwards\Contracts\PlayerAwardsValidatorInterface;
-use PlayerAwards\Contracts\PlayerAwardsRepositoryInterface;
+use AwardHistory\AwardHistoryService;
+use AwardHistory\AwardHistoryValidator;
+use AwardHistory\AwardHistoryRepository;
+use AwardHistory\Contracts\AwardHistoryValidatorInterface;
+use AwardHistory\Contracts\AwardHistoryRepositoryInterface;
 
 /**
- * Tests for PlayerAwardsService
+ * Tests for AwardHistoryService
  *
  * Verifies business logic for player awards search including validation
  * orchestration and result transformation.
  */
 #[AllowMockObjectsWithoutExpectations]
-final class PlayerAwardsServiceTest extends TestCase
+final class AwardHistoryServiceTest extends TestCase
 {
-    /** @var PlayerAwardsValidatorInterface&\PHPUnit\Framework\MockObject\MockObject */
-    private PlayerAwardsValidatorInterface $mockValidator;
+    /** @var AwardHistoryValidatorInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private AwardHistoryValidatorInterface $mockValidator;
     
-    /** @var PlayerAwardsRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
-    private PlayerAwardsRepositoryInterface $mockRepository;
+    /** @var AwardHistoryRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private AwardHistoryRepositoryInterface $mockRepository;
     
-    private PlayerAwardsService $service;
+    private AwardHistoryService $service;
 
     protected function setUp(): void
     {
-        $this->mockValidator = $this->createMock(PlayerAwardsValidatorInterface::class);
-        $this->mockRepository = $this->createMock(PlayerAwardsRepositoryInterface::class);
+        $this->mockValidator = $this->createMock(AwardHistoryValidatorInterface::class);
+        $this->mockRepository = $this->createMock(AwardHistoryRepositoryInterface::class);
         
-        $this->service = new PlayerAwardsService($this->mockValidator, $this->mockRepository);
+        $this->service = new AwardHistoryService($this->mockValidator, $this->mockRepository);
     }
 
     // ==================== search Tests ====================

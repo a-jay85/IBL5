@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace PlayerAwards\Contracts;
+namespace AwardHistory\Contracts;
 
 /**
- * PlayerAwardsViewInterface - Contract for player awards view rendering
+ * AwardHistoryViewInterface - Contract for player awards view rendering
  * 
  * Defines the HTML rendering methods for the player awards search interface.
  * All methods return HTML strings that can be echoed directly to the page.
  * All output is properly escaped to prevent XSS attacks.
  */
-interface PlayerAwardsViewInterface
+interface AwardHistoryViewInterface
 {
     /**
      * Render the search form with current parameter values
@@ -35,7 +35,7 @@ interface PlayerAwardsViewInterface
      * 
      * IMPORTANT BEHAVIORS:
      *  - All output values are HTML escaped
-     *  - Form submits to modules.php?name=Player_Awards via POST
+     *  - Form submits to modules.php?name=AwardHistory via POST
      *  - Sort option defaults to 3 (year) if not set
      */
     public function renderSearchForm(array $params): string;

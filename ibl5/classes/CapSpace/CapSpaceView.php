@@ -2,22 +2,22 @@
 
 declare(strict_types=1);
 
-namespace CapInfo;
+namespace CapSpace;
 
-use CapInfo\Contracts\CapInfoViewInterface;
+use CapSpace\Contracts\CapSpaceViewInterface;
 use Utilities\HtmlSanitizer;
 
 /**
- * CapInfoView - HTML rendering for salary cap information
+ * CapSpaceView - HTML rendering for salary cap information
  *
  * Generates sortable HTML table displaying team salary cap data.
  *
- * @see CapInfoViewInterface For the interface contract
+ * @see CapSpaceViewInterface For the interface contract
  */
-class CapInfoView implements CapInfoViewInterface
+class CapSpaceView implements CapSpaceViewInterface
 {
     /**
-     * @see CapInfoViewInterface::render()
+     * @see CapSpaceViewInterface::render()
      */
     public function render(array $teamsData, int $beginningYear, int $endingYear): string
     {

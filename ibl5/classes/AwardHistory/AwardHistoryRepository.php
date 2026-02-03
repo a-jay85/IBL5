@@ -2,22 +2,22 @@
 
 declare(strict_types=1);
 
-namespace PlayerAwards;
+namespace AwardHistory;
 
 use BaseMysqliRepository;
-use PlayerAwards\Contracts\PlayerAwardsRepositoryInterface;
+use AwardHistory\Contracts\AwardHistoryRepositoryInterface;
 
 /**
- * PlayerAwardsRepository - Database operations for player awards search
+ * AwardHistoryRepository - Database operations for player awards search
  * 
  * Extends BaseMysqliRepository for standardized prepared statement handling.
- * Implements the repository contract defined in PlayerAwardsRepositoryInterface.
+ * Implements the repository contract defined in AwardHistoryRepositoryInterface.
  * See the interface for detailed behavior documentation.
  * 
  * @see BaseMysqliRepository For base class documentation and error codes
- * @see PlayerAwardsRepositoryInterface For method contracts
+ * @see AwardHistoryRepositoryInterface For method contracts
  */
-class PlayerAwardsRepository extends BaseMysqliRepository implements PlayerAwardsRepositoryInterface
+class AwardHistoryRepository extends BaseMysqliRepository implements AwardHistoryRepositoryInterface
 {
     /**
      * Whitelist of valid sort columns to prevent SQL injection
@@ -43,7 +43,7 @@ class PlayerAwardsRepository extends BaseMysqliRepository implements PlayerAward
     }
 
     /**
-     * @see PlayerAwardsRepositoryInterface::searchAwards()
+     * @see AwardHistoryRepositoryInterface::searchAwards()
      */
     public function searchAwards(array $params): array
     {

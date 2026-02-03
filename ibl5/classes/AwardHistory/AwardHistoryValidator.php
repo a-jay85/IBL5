@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace PlayerAwards;
+namespace AwardHistory;
 
-use PlayerAwards\Contracts\PlayerAwardsValidatorInterface;
+use AwardHistory\Contracts\AwardHistoryValidatorInterface;
 
 /**
- * PlayerAwardsValidator - Validates and sanitizes player awards search parameters
+ * AwardHistoryValidator - Validates and sanitizes player awards search parameters
  * 
- * Implements the validation contract defined in PlayerAwardsValidatorInterface.
+ * Implements the validation contract defined in AwardHistoryValidatorInterface.
  * See the interface for detailed behavior documentation.
  * 
- * @see PlayerAwardsValidatorInterface
+ * @see AwardHistoryValidatorInterface
  */
-class PlayerAwardsValidator implements PlayerAwardsValidatorInterface
+class AwardHistoryValidator implements AwardHistoryValidatorInterface
 {
     /**
      * Valid sort options for award search
@@ -22,7 +22,7 @@ class PlayerAwardsValidator implements PlayerAwardsValidatorInterface
     private const VALID_SORT_OPTIONS = [1, 2, 3];
 
     /**
-     * @see PlayerAwardsValidatorInterface::validateSearchParams()
+     * @see AwardHistoryValidatorInterface::validateSearchParams()
      */
     public function validateSearchParams(array $params): array
     {
@@ -35,7 +35,7 @@ class PlayerAwardsValidator implements PlayerAwardsValidatorInterface
     }
 
     /**
-     * @see PlayerAwardsValidatorInterface::validateStringParam()
+     * @see AwardHistoryValidatorInterface::validateStringParam()
      */
     public function validateStringParam(mixed $value): ?string
     {
@@ -54,7 +54,7 @@ class PlayerAwardsValidator implements PlayerAwardsValidatorInterface
     }
 
     /**
-     * @see PlayerAwardsValidatorInterface::validateYearParam()
+     * @see AwardHistoryValidatorInterface::validateYearParam()
      */
     public function validateYearParam(mixed $value): ?int
     {
@@ -73,7 +73,7 @@ class PlayerAwardsValidator implements PlayerAwardsValidatorInterface
     }
 
     /**
-     * @see PlayerAwardsValidatorInterface::validateSortParam()
+     * @see AwardHistoryValidatorInterface::validateSortParam()
      */
     public function validateSortParam(mixed $value): int
     {

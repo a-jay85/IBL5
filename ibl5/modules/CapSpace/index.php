@@ -3,24 +3,24 @@
 declare(strict_types=1);
 
 /**
- * Cap_Info Module - Salary cap information display
+ * CapSpace Module - Salary cap information display
  *
  * Displays salary cap availability and roster slots for all teams.
  *
  * Refactored to use the interface-driven architecture pattern.
  *
- * @see CapInfo\CapInfoService For business logic
- * @see CapInfo\CapInfoRepository For database operations
- * @see CapInfo\CapInfoView For HTML rendering
+ * @see CapSpace\CapSpaceService For business logic
+ * @see CapSpace\CapSpaceRepository For database operations
+ * @see CapSpace\CapSpaceView For HTML rendering
  */
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use CapInfo\CapInfoRepository;
-use CapInfo\CapInfoService;
-use CapInfo\CapInfoView;
+use CapSpace\CapSpaceRepository;
+use CapSpace\CapSpaceService;
+use CapSpace\CapSpaceView;
 
 global $mysqli_db;
 
@@ -32,9 +32,9 @@ get_lang($module_name);
 Nuke\Header::header();
 
 // Initialize services
-$repository = new CapInfoRepository($mysqli_db);
-$service = new CapInfoService($repository, $mysqli_db);
-$view = new CapInfoView();
+$repository = new CapSpaceRepository($mysqli_db);
+$service = new CapSpaceService($repository, $mysqli_db);
+$view = new CapSpaceView();
 
 // Get data
 $teamsData = $service->getTeamsCapData($season);

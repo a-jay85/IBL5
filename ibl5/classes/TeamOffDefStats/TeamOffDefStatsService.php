@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace LeagueStats;
+namespace TeamOffDefStats;
 
-use LeagueStats\Contracts\LeagueStatsServiceInterface;
+use TeamOffDefStats\Contracts\TeamOffDefStatsServiceInterface;
 use BasketballStats\StatsFormatter;
 
 /**
@@ -17,9 +17,9 @@ use BasketballStats\StatsFormatter;
  *
  * Uses Statistics\StatsFormatter for consistent formatting across the application.
  *
- * @see LeagueStatsServiceInterface for method documentation
+ * @see TeamOffDefStatsServiceInterface for method documentation
  */
-class LeagueStatsService implements LeagueStatsServiceInterface
+class TeamOffDefStatsService implements TeamOffDefStatsServiceInterface
 {
     /**
      * Stat keys for offense/defense data (excluding games)
@@ -29,7 +29,7 @@ class LeagueStatsService implements LeagueStatsServiceInterface
     /**
      * Process raw team statistics into formatted data
      *
-     * @see LeagueStatsServiceInterface::processTeamStats()
+     * @see TeamOffDefStatsServiceInterface::processTeamStats()
      * @param array $rawStats Raw statistics from repository
      * @return array Processed team statistics with formatted values
      */
@@ -88,7 +88,7 @@ class LeagueStatsService implements LeagueStatsServiceInterface
     /**
      * Calculate league-wide totals and averages
      *
-     * @see LeagueStatsServiceInterface::calculateLeagueTotals()
+     * @see TeamOffDefStatsServiceInterface::calculateLeagueTotals()
      * @param array $processedStats Processed team statistics from processTeamStats()
      * @return array League totals and averages
      */
@@ -130,7 +130,7 @@ class LeagueStatsService implements LeagueStatsServiceInterface
     /**
      * Calculate offense/defense differentials for each team
      *
-     * @see LeagueStatsServiceInterface::calculateDifferentials()
+     * @see TeamOffDefStatsServiceInterface::calculateDifferentials()
      * @param array $processedStats Processed team statistics from processTeamStats()
      * @return array Differential data for each team
      */

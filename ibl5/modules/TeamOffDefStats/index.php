@@ -7,9 +7,9 @@
  * averages, and differentials for all teams.
  *
  * Refactored to use:
- * - LeagueStats\LeagueStatsRepository for bulk data fetching (1 query vs 30)
- * - LeagueStats\LeagueStatsService for statistics processing
- * - LeagueStats\LeagueStatsView for HTML rendering
+ * - TeamOffDefStats\TeamOffDefStatsRepository for bulk data fetching (1 query vs 30)
+ * - TeamOffDefStats\TeamOffDefStatsService for statistics processing
+ * - TeamOffDefStats\TeamOffDefStatsView for HTML rendering
  * - BasketballStats\StatsFormatter for consistent number formatting
  * - Utilities\HtmlSanitizer for XSS protection
  */
@@ -27,9 +27,9 @@ get_lang($module_name);
 $pagetitle = "- $module_name";
 
 // Initialize components
-$repository = new LeagueStats\LeagueStatsRepository($mysqli_db);
-$service = new LeagueStats\LeagueStatsService();
-$view = new LeagueStats\LeagueStatsView();
+$repository = new TeamOffDefStats\TeamOffDefStatsRepository($mysqli_db);
+$service = new TeamOffDefStats\TeamOffDefStatsService();
+$view = new TeamOffDefStats\TeamOffDefStatsView();
 
 // Fetch and process data
 $rawStats = $repository->getAllTeamStats();

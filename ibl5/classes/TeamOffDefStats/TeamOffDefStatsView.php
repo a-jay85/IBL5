@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace LeagueStats;
+namespace TeamOffDefStats;
 
-use LeagueStats\Contracts\LeagueStatsViewInterface;
+use TeamOffDefStats\Contracts\TeamOffDefStatsViewInterface;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -19,14 +19,14 @@ use Utilities\HtmlSanitizer;
  *
  * Uses HtmlSanitizer::safeHtmlOutput() for XSS protection on team names.
  *
- * @see LeagueStatsViewInterface for method documentation
+ * @see TeamOffDefStatsViewInterface for method documentation
  */
-class LeagueStatsView implements LeagueStatsViewInterface
+class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
 {
     /**
      * Render the complete league statistics display
      *
-     * @see LeagueStatsViewInterface::render()
+     * @see TeamOffDefStatsViewInterface::render()
      * @param array $data Combined data structure
      * @return string Complete HTML output
      */

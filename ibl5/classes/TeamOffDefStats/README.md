@@ -1,4 +1,4 @@
-# LeagueStats Module
+# TeamOffDefStats Module
 
 League-wide team statistics display module, refactored to use the interface-driven architecture pattern.
 
@@ -22,14 +22,14 @@ This represents a **~97% reduction** in database calls, significantly improving 
 ## Architecture
 
 ```
-LeagueStats/
+TeamOffDefStats/
 ├── Contracts/
-│   ├── LeagueStatsRepositoryInterface.php
-│   ├── LeagueStatsServiceInterface.php
-│   └── LeagueStatsViewInterface.php
-├── LeagueStatsRepository.php
-├── LeagueStatsService.php
-├── LeagueStatsView.php
+│   ├── TeamOffDefStatsRepositoryInterface.php
+│   ├── TeamOffDefStatsServiceInterface.php
+│   └── TeamOffDefStatsViewInterface.php
+├── TeamOffDefStatsRepository.php
+├── TeamOffDefStatsService.php
+├── TeamOffDefStatsView.php
 └── README.md
 ```
 
@@ -37,9 +37,9 @@ LeagueStats/
 
 | Component | Responsibility |
 |-----------|----------------|
-| `LeagueStatsRepository` | Bulk data fetching with single JOIN query |
-| `LeagueStatsService` | Statistics processing, formatting, calculations |
-| `LeagueStatsView` | HTML rendering with XSS protection |
+| `TeamOffDefStatsRepository` | Bulk data fetching with single JOIN query |
+| `TeamOffDefStatsService` | Statistics processing, formatting, calculations |
+| `TeamOffDefStatsView` | HTML rendering with XSS protection |
 
 ## Usage
 
@@ -48,9 +48,9 @@ LeagueStats/
 ```php
 <?php
 // Initialize components
-$repository = new LeagueStats\LeagueStatsRepository($mysqli_db);
-$service = new LeagueStats\LeagueStatsService();
-$view = new LeagueStats\LeagueStatsView();
+$repository = new TeamOffDefStats\TeamOffDefStatsRepository($mysqli_db);
+$service = new TeamOffDefStats\TeamOffDefStatsService();
+$view = new TeamOffDefStats\TeamOffDefStatsView();
 
 // Fetch and process data
 $rawStats = $repository->getAllTeamStats();
@@ -141,19 +141,19 @@ The database uses `tvr` for turnovers (not `to`, which is a SQL reserved word). 
 
 ## Tests
 
-Located in `tests/LeagueStats/`:
+Located in `tests/TeamOffDefStats/`:
 
 | Test File | Coverage |
 |-----------|----------|
-| `LeagueStatsRepositoryTest.php` | Query structure, null handling, empty results |
-| `LeagueStatsServiceTest.php` | Calculations, formatting, zero-division, differentials |
-| `LeagueStatsViewTest.php` | HTML structure, highlighting, sanitization |
+| `TeamOffDefStatsRepositoryTest.php` | Query structure, null handling, empty results |
+| `TeamOffDefStatsServiceTest.php` | Calculations, formatting, zero-division, differentials |
+| `TeamOffDefStatsViewTest.php` | HTML structure, highlighting, sanitization |
 
 Run tests:
 
 ```bash
 cd ibl5
-vendor/bin/phpunit tests/LeagueStats/
+vendor/bin/phpunit tests/TeamOffDefStats/
 ```
 
 ## Dependencies
@@ -167,7 +167,7 @@ vendor/bin/phpunit tests/LeagueStats/
 When migrating from the old procedural code:
 
 1. The old code used `TeamStats::withTeamName()` in a loop (N+1 queries)
-2. The new code uses `LeagueStatsRepository::getAllTeamStats()` (1 query)
+2. The new code uses `TeamOffDefStatsRepository::getAllTeamStats()` (1 query)
 3. Points are now calculated via `StatsFormatter::calculatePoints()` instead of relying on `TeamStats` properties
 4. All output is now sanitized via `HtmlSanitizer::safeHtmlOutput()`
 

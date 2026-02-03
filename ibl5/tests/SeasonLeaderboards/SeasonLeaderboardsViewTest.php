@@ -3,19 +3,19 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
-use SeasonLeaders\SeasonLeadersView;
-use SeasonLeaders\SeasonLeadersService;
+use SeasonLeaderboards\SeasonLeaderboardsView;
+use SeasonLeaderboards\SeasonLeaderboardsService;
 
-final class SeasonLeadersViewTest extends TestCase
+final class SeasonLeaderboardsViewTest extends TestCase
 {
-    private SeasonLeadersView $view;
-    private SeasonLeadersService $service;
+    private SeasonLeaderboardsView $view;
+    private SeasonLeaderboardsService $service;
 
     protected function setUp(): void
     {
-        $this->service = new SeasonLeadersService();
+        $this->service = new SeasonLeaderboardsService();
         
-        $this->view = new SeasonLeadersView($this->service);
+        $this->view = new SeasonLeaderboardsView($this->service);
     }
 
     public function testRenderTableHeaderContainsAllColumns(): void

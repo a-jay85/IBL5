@@ -3,15 +3,15 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
-use SeasonLeaders\SeasonLeadersService;
+use SeasonLeaderboards\SeasonLeaderboardsService;
 
-final class SeasonLeadersServiceTest extends TestCase
+final class SeasonLeaderboardsServiceTest extends TestCase
 {
-    private SeasonLeadersService $service;
+    private SeasonLeaderboardsService $service;
 
     protected function setUp(): void
     {
-        $this->service = new SeasonLeadersService();
+        $this->service = new SeasonLeaderboardsService();
     }
 
     public function testProcessPlayerRowCalculatesCorrectly(): void

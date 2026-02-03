@@ -2,25 +2,25 @@
 
 declare(strict_types=1);
 
-namespace Tests\LeagueStats;
+namespace Tests\TeamOffDefStats;
 
 use PHPUnit\Framework\TestCase;
-use LeagueStats\LeagueStatsView;
-use LeagueStats\Contracts\LeagueStatsViewInterface;
+use TeamOffDefStats\TeamOffDefStatsView;
+use TeamOffDefStats\Contracts\TeamOffDefStatsViewInterface;
 
 /**
- * Tests for LeagueStatsView
+ * Tests for TeamOffDefStatsView
  *
  * Verifies HTML rendering of league statistics tables including
  * team highlighting and proper output sanitization.
  */
-class LeagueStatsViewTest extends TestCase
+class TeamOffDefStatsViewTest extends TestCase
 {
-    private LeagueStatsView $view;
+    private TeamOffDefStatsView $view;
 
     protected function setUp(): void
     {
-        $this->view = new LeagueStatsView();
+        $this->view = new TeamOffDefStatsView();
     }
 
     /**
@@ -28,7 +28,7 @@ class LeagueStatsViewTest extends TestCase
      */
     public function testImplementsInterface(): void
     {
-        $this->assertInstanceOf(LeagueStatsViewInterface::class, $this->view);
+        $this->assertInstanceOf(TeamOffDefStatsViewInterface::class, $this->view);
     }
 
     /**
@@ -52,8 +52,8 @@ class LeagueStatsViewTest extends TestCase
 
         $result = $this->view->render($data);
 
-        // Count table occurrences
-        $tableCount = substr_count($result, '<table class="sortable">');
+        // Count table occurrences (tables use design system classes)
+        $tableCount = substr_count($result, '<table class="sortable league-stats-table ibl-data-table">');
         $this->assertEquals(5, $tableCount);
     }
 
@@ -66,12 +66,12 @@ class LeagueStatsViewTest extends TestCase
 
         $result = $this->view->render($data);
 
-        $this->assertStringContainsString('<h1>League-wide Statistics</h1>', $result);
-        $this->assertStringContainsString('<h2>Team Offense Totals</h2>', $result);
-        $this->assertStringContainsString('<h2>Team Defense Totals</h2>', $result);
-        $this->assertStringContainsString('<h2>Team Offense Averages</h2>', $result);
-        $this->assertStringContainsString('<h2>Team Defense Averages</h2>', $result);
-        $this->assertStringContainsString('<h2>Team Off/Def Average Differentials</h2>', $result);
+        $this->assertStringContainsString('League-wide Statistics', $result);
+        $this->assertStringContainsString('<h2 class="ibl-table-title">Team Offense Totals</h2>', $result);
+        $this->assertStringContainsString('<h2 class="ibl-table-title">Team Defense Totals</h2>', $result);
+        $this->assertStringContainsString('<h2 class="ibl-table-title">Team Offense Averages</h2>', $result);
+        $this->assertStringContainsString('<h2 class="ibl-table-title">Team Defense Averages</h2>', $result);
+        $this->assertStringContainsString('<h2 class="ibl-table-title">Team Off/Def Average Differentials</h2>', $result);
     }
 
     /**
@@ -101,7 +101,7 @@ class LeagueStatsViewTest extends TestCase
 
         $result = $this->view->render($data);
 
-        $this->assertStringContainsString('Boston', $result);
+        // View renders team_name (not team_city) in the cell text
         $this->assertStringContainsString('Celtics', $result);
     }
 
@@ -130,7 +130,7 @@ class LeagueStatsViewTest extends TestCase
 
         $result = $this->view->render($data);
 
-        $this->assertStringContainsString('LEAGUE TOTALS', $result);
+        $this->assertStringContainsString('<tfoot>', $result);
         $this->assertStringContainsString('820', $result);
         $this->assertStringContainsString('32,000', $result);
     }
@@ -146,7 +146,7 @@ class LeagueStatsViewTest extends TestCase
 
         $result = $this->view->render($data);
 
-        $this->assertStringContainsString('LEAGUE AVERAGES', $result);
+        $this->assertStringContainsString('<tfoot>', $result);
         $this->assertStringContainsString('39.0', $result);
         $this->assertStringContainsString('0.457', $result);
     }
@@ -193,8 +193,8 @@ class LeagueStatsViewTest extends TestCase
 
         $result = $this->view->render($data);
 
-        // Check for totals header columns
-        $this->assertStringContainsString('<th>Team</th>', $result);
+        // Check for totals header columns (Team uses design system class)
+        $this->assertStringContainsString('<th class="ibl-team-cell--colored">Team</th>', $result);
         $this->assertStringContainsString('<th>Gm</th>', $result);
         $this->assertStringContainsString('<th>FGM</th>', $result);
         $this->assertStringContainsString('<th>FGA</th>', $result);

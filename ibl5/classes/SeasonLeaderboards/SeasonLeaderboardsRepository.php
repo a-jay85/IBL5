@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace SeasonLeaders;
+namespace SeasonLeaderboards;
 
-use SeasonLeaders\Contracts\SeasonLeadersRepositoryInterface;
+use SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface;
 
 /**
- * @see SeasonLeadersRepositoryInterface
+ * @see SeasonLeaderboardsRepositoryInterface
  * @extends \BaseMysqliRepository
  */
-class SeasonLeadersRepository extends \BaseMysqliRepository implements SeasonLeadersRepositoryInterface
+class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements SeasonLeaderboardsRepositoryInterface
 {
     public function __construct(object $db)
     {
@@ -18,7 +18,7 @@ class SeasonLeadersRepository extends \BaseMysqliRepository implements SeasonLea
     }
 
     /**
-     * @see SeasonLeadersRepositoryInterface::getSeasonLeaders()
+     * @see SeasonLeaderboardsRepositoryInterface::getSeasonLeaders()
      *
      * SECURITY NOTE: $sortBy is validated and mapped to whitelisted SQL expressions
      * in getSortColumn() method. Dynamic ORDER BY clause is acceptable here because
@@ -64,7 +64,7 @@ class SeasonLeadersRepository extends \BaseMysqliRepository implements SeasonLea
     }
 
     /**
-     * @see SeasonLeadersRepositoryInterface::getTeams()
+     * @see SeasonLeaderboardsRepositoryInterface::getTeams()
      */
     public function getTeams(): array
     {
@@ -72,7 +72,7 @@ class SeasonLeadersRepository extends \BaseMysqliRepository implements SeasonLea
     }
 
     /**
-     * @see SeasonLeadersRepositoryInterface::getYears()
+     * @see SeasonLeaderboardsRepositoryInterface::getYears()
      */
     public function getYears(): array
     {

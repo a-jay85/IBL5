@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace SeasonLeaders\Contracts;
+namespace SeasonLeaderboards\Contracts;
 
 /**
- * SeasonLeadersServiceInterface - Season leaders business logic
+ * SeasonLeaderboardsServiceInterface - Season leaders business logic
  *
  * Handles data transformation and calculations for season statistics.
  */
-interface SeasonLeadersServiceInterface
+interface SeasonLeaderboardsServiceInterface
 {
     /**
      * Process a player row from database into formatted statistics

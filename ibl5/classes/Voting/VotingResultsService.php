@@ -158,24 +158,29 @@ class VotingResultsService implements VotingResultsServiceInterface
      */
     private function resolvePlayerIds(array $rows): array
     {
-        $names = [];
+        // Vote names are stored as "Player Name, Team" — extract player name for lookup
+        $playerNames = [];
+        $voteToPlayer = [];
         foreach ($rows as $row) {
             if ($row['name'] !== self::BLANK_BALLOT_LABEL) {
-                $names[] = $row['name'];
+                $playerName = self::extractPlayerName($row['name']);
+                $voteToPlayer[$row['name']] = $playerName;
+                $playerNames[$playerName] = true;
             }
         }
 
-        if (empty($names)) {
+        if (empty($playerNames)) {
             return array_map(static fn(array $row): array => $row + ['pid' => 0], $rows);
         }
 
-        $placeholders = implode(',', array_fill(0, count($names), '?'));
+        $uniqueNames = array_keys($playerNames);
+        $placeholders = implode(',', array_fill(0, count($uniqueNames), '?'));
         $stmt = $this->db->prepare("SELECT pid, name FROM ibl_plr WHERE name IN ({$placeholders})");
         if ($stmt === false) {
             return array_map(static fn(array $row): array => $row + ['pid' => 0], $rows);
         }
 
-        $stmt->execute($names);
+        $stmt->execute($uniqueNames);
         $result = $stmt->get_result();
 
         $pidMap = [];
@@ -185,9 +190,26 @@ class VotingResultsService implements VotingResultsServiceInterface
         $stmt->close();
 
         foreach ($rows as &$row) {
-            $row['pid'] = $pidMap[$row['name']] ?? 0;
+            $playerName = $voteToPlayer[$row['name']] ?? '';
+            $row['pid'] = $pidMap[$playerName] ?? 0;
         }
 
         return $rows;
+    }
+
+    /**
+     * Extract the player name from a vote entry like "LeBron James, Sting".
+     *
+     * Strips the trailing ", TeamName" portion. If there is no comma, returns
+     * the full string (handles GM names and other non-player entries).
+     */
+    private static function extractPlayerName(string $voteName): string
+    {
+        $lastComma = strrpos($voteName, ',');
+        if ($lastComma === false) {
+            return trim($voteName);
+        }
+
+        return trim(substr($voteName, 0, $lastComma));
     }
 }

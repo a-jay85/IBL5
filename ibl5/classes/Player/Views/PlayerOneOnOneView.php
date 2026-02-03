@@ -65,7 +65,7 @@ class PlayerOneOnOneView implements PlayerOneOnOneViewInterface
             $lossScore = (int)$game['lossscore'];
             
             // Create game link
-            $gameLink = "modules.php?name=One-on-One&amp;gameid={$gameId}";
+            $gameLink = "modules.php?name=OneOnOneGame&amp;gameid={$gameId}";
             
             // Create opponent link if we have a player ID
             $opponentLink = $loserPid 
@@ -84,7 +84,7 @@ class PlayerOneOnOneView implements PlayerOneOnOneViewInterface
             $lossScore = (int)$game['lossscore'];
             
             // Create game link
-            $gameLink = "modules.php?name=One-on-One&amp;gameid={$gameId}";
+            $gameLink = "modules.php?name=OneOnOneGame&amp;gameid={$gameId}";
             
             // Create opponent link if we have a player ID
             $opponentLink = $winnerPid 

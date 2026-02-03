@@ -189,7 +189,7 @@ private InterfaceName $mockObject;
 ```
 
 **Examples in codebase:**
-- `tests/PlayerSearch/PlayerSearchServiceTest.php` (lines 21-24)
+- `tests/PlayerDatabase/PlayerDatabaseServiceTest.php` (lines 21-24)
 - `tests/Shared/SharedTest.php` (line 17)
 - `tests/Standings/StandingsViewTest.php` (line 21)
 

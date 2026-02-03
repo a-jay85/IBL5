@@ -1,0 +1,12 @@
+includes:
+    - phar://phpstan.phar/conf/bleedingEdge.neon
+    - phpstan-baseline.neon
+
+parameters:
+    level: max
+    paths:
+        - classes
+    excludePaths:
+        - classes/SiteStatistics
+    phpVersion: 80300
+    treatPhpDocTypesAsCertain: false

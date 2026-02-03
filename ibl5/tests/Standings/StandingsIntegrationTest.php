@@ -602,7 +602,7 @@ class StandingsIntegrationTest extends TestCase
         $view = new StandingsView($mockRepository);
         $result = $view->render();
 
-        $this->assertStringContainsString('responsive-table', $result);
+        $this->assertStringContainsString('ibl-data-table', $result);
         $this->assertStringContainsString('sticky-col', $result);
         $this->assertStringContainsString('table-scroll-wrapper', $result);
     }

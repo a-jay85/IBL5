@@ -97,7 +97,7 @@ class StandingsView implements StandingsViewInterface
         <h2 class="ibl-title"><?= $title; ?></h2>
         <div class="table-scroll-wrapper">
         <div class="table-scroll-container">
-        <table class="sortable ibl-data-table responsive-table">
+        <table class="sortable ibl-data-table">
             <thead>
                 <tr>
                     <th class="sticky-col">Team</th>

@@ -38,7 +38,7 @@ class LeagueStatsViewTest extends TestCase
     {
         $data = $this->createMinimalViewData();
 
-        $result = $this->view->render($data, 0);
+        $result = $this->view->render($data);
 
         $this->assertIsString($result);
     }
@@ -50,7 +50,7 @@ class LeagueStatsViewTest extends TestCase
     {
         $data = $this->createMinimalViewData();
 
-        $result = $this->view->render($data, 0);
+        $result = $this->view->render($data);
 
         // Count table occurrences
         $tableCount = substr_count($result, '<table class="sortable">');
@@ -64,7 +64,7 @@ class LeagueStatsViewTest extends TestCase
     {
         $data = $this->createMinimalViewData();
 
-        $result = $this->view->render($data, 0);
+        $result = $this->view->render($data);
 
         $this->assertStringContainsString('<h1>League-wide Statistics</h1>', $result);
         $this->assertStringContainsString('<h2>Team Offense Totals</h2>', $result);
@@ -75,36 +75,19 @@ class LeagueStatsViewTest extends TestCase
     }
 
     /**
-     * Test that user's team row is highlighted
+     * Test that team rows include data-team-id for client-side highlighting
      */
-    public function testRenderHighlightsUserTeamRow(): void
+    public function testRenderIncludesDataTeamIdAttribute(): void
     {
         $data = $this->createViewDataWithTeams([
             ['teamid' => 1, 'team_city' => 'Boston', 'team_name' => 'Celtics'],
             ['teamid' => 2, 'team_city' => 'Los Angeles', 'team_name' => 'Lakers'],
         ]);
 
-        $result = $this->view->render($data, 1);
+        $result = $this->view->render($data);
 
-        // Team 1 should be highlighted
-        $this->assertStringContainsString('bgcolor="#FFA"', $result);
-    }
-
-    /**
-     * Test that non-user team rows are not highlighted
-     */
-    public function testRenderDoesNotHighlightOtherTeams(): void
-    {
-        $data = $this->createViewDataWithTeams([
-            ['teamid' => 1, 'team_city' => 'Boston', 'team_name' => 'Celtics'],
-            ['teamid' => 2, 'team_city' => 'Los Angeles', 'team_name' => 'Lakers'],
-        ]);
-
-        // User's team is 99 (doesn't exist)
-        $result = $this->view->render($data, 99);
-
-        // No rows should be highlighted
-        $this->assertStringNotContainsString('bgcolor="#FFA"', $result);
+        $this->assertStringContainsString('data-team-id="1"', $result);
+        $this->assertStringContainsString('data-team-id="2"', $result);
     }
 
     /**
@@ -116,7 +99,7 @@ class LeagueStatsViewTest extends TestCase
             ['teamid' => 1, 'team_city' => 'Boston', 'team_name' => 'Celtics'],
         ]);
 
-        $result = $this->view->render($data, 0);
+        $result = $this->view->render($data);
 
         $this->assertStringContainsString('Boston', $result);
         $this->assertStringContainsString('Celtics', $result);
@@ -131,7 +114,7 @@ class LeagueStatsViewTest extends TestCase
             ['teamid' => 1, 'team_city' => 'Boston', 'team_name' => 'Celtics'],
         ]);
 
-        $result = $this->view->render($data, 0);
+        $result = $this->view->render($data);
 
         $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=1', $result);
     }
@@ -145,7 +128,7 @@ class LeagueStatsViewTest extends TestCase
         $data['league']['totals']['games'] = '820';
         $data['league']['totals']['fgm'] = '32,000';
 
-        $result = $this->view->render($data, 0);
+        $result = $this->view->render($data);
 
         $this->assertStringContainsString('LEAGUE TOTALS', $result);
         $this->assertStringContainsString('820', $result);
@@ -161,7 +144,7 @@ class LeagueStatsViewTest extends TestCase
         $data['league']['averages']['fgm'] = '39.0';
         $data['league']['averages']['fgp'] = '0.457';
 
-        $result = $this->view->render($data, 0);
+        $result = $this->view->render($data);
 
         $this->assertStringContainsString('LEAGUE AVERAGES', $result);
         $this->assertStringContainsString('39.0', $result);
@@ -179,7 +162,7 @@ class LeagueStatsViewTest extends TestCase
             'differentials' => [],
         ];
 
-        $result = $this->view->render($data, 0);
+        $result = $this->view->render($data);
 
         $this->assertIsString($result);
         $this->assertStringContainsString('League-wide Statistics', $result);
@@ -194,7 +177,7 @@ class LeagueStatsViewTest extends TestCase
             ['teamid' => 1, 'team_city' => 'Test<script>', 'team_name' => 'Team"Alert"'],
         ]);
 
-        $result = $this->view->render($data, 0);
+        $result = $this->view->render($data);
 
         // Script tags and quotes should be escaped
         $this->assertStringNotContainsString('<script>', $result);
@@ -208,7 +191,7 @@ class LeagueStatsViewTest extends TestCase
     {
         $data = $this->createMinimalViewData();
 
-        $result = $this->view->render($data, 0);
+        $result = $this->view->render($data);
 
         // Check for totals header columns
         $this->assertStringContainsString('<th>Team</th>', $result);
@@ -225,7 +208,7 @@ class LeagueStatsViewTest extends TestCase
     {
         $data = $this->createMinimalViewData();
 
-        $result = $this->view->render($data, 0);
+        $result = $this->view->render($data);
 
         // Check for percentage columns in averages header
         $this->assertStringContainsString('<th>FGP</th>', $result);
@@ -270,7 +253,7 @@ class LeagueStatsViewTest extends TestCase
             ],
         ];
 
-        $result = $this->view->render($data, 0);
+        $result = $this->view->render($data);
 
         $this->assertStringContainsString('Diff', $result);
         $this->assertStringContainsString('5.00', $result);

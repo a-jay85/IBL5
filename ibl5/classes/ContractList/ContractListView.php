@@ -108,7 +108,7 @@ class ContractListView implements ContractListViewInterface
     </td>";
             }
 
-            $output .= "<tr>
+            $output .= "<tr data-team-id=\"{$tid}\">
     <td class=\"sticky-col ibl-player-cell\" style=\"white-space: nowrap;\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a></td>
     <td>{$pos}</td>
     {$teamCell}

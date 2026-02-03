@@ -118,7 +118,7 @@ class InjuriesView implements InjuriesViewInterface
         $playerThumbnail = PlayerImageHelper::renderThumbnail($playerID);
         $daysLabel = InjuryDaysLabel::render($daysRemaining, $returnDate) ?: (string) $daysRemaining;
 
-        return "<tr>
+        return "<tr data-team-id=\"{$teamID}\">
     <td>{$position}</td>
     <td class=\"ibl-player-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$playerID}\">{$playerThumbnail}{$name}</a></td>
     <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">

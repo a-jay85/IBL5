@@ -60,8 +60,7 @@ class WaiversViewTest extends TestCase
             'drop',
             [],
             5,
-            5,
-            ''
+            5
         );
         $output = ob_get_clean();
 
@@ -77,8 +76,7 @@ class WaiversViewTest extends TestCase
             'drop',
             [],
             5,
-            5,
-            ''
+            5
         );
         $output = ob_get_clean();
 
@@ -94,8 +92,7 @@ class WaiversViewTest extends TestCase
             'drop',
             [],
             5,
-            5,
-            ''
+            5
         );
         $output = ob_get_clean();
 
@@ -111,8 +108,7 @@ class WaiversViewTest extends TestCase
             'drop',
             [],
             3,
-            2,
-            ''
+            2
         );
         $output = ob_get_clean();
 
@@ -130,11 +126,49 @@ class WaiversViewTest extends TestCase
             [],
             5,
             5,
+            null,
             'Player cannot be dropped'
         );
         $output = ob_get_clean();
 
         $this->assertStringContainsString('Player cannot be dropped', $output);
+        $this->assertStringContainsString('ibl-alert--error', $output);
+    }
+
+    public function testRenderWaiverFormShowsSuccessAddBanner(): void
+    {
+        ob_start();
+        $this->view->renderWaiverForm(
+            'Test Team',
+            1,
+            'add',
+            [],
+            5,
+            5,
+            'player_added'
+        );
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('ibl-alert--success', $output);
+        $this->assertStringContainsString('Player successfully signed from waivers.', $output);
+    }
+
+    public function testRenderWaiverFormShowsSuccessDropBanner(): void
+    {
+        ob_start();
+        $this->view->renderWaiverForm(
+            'Test Team',
+            1,
+            'drop',
+            [],
+            5,
+            5,
+            'player_dropped'
+        );
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('ibl-alert--success', $output);
+        $this->assertStringContainsString('Player successfully dropped to waivers.', $output);
     }
 
     public function testRenderWaiverFormEscapesTeamName(): void
@@ -146,11 +180,50 @@ class WaiversViewTest extends TestCase
             'drop',
             [],
             5,
-            5,
-            ''
+            5
         );
         $output = ob_get_clean();
 
         $this->assertStringNotContainsString('<script>', $output);
+    }
+
+    public function testRenderWaiverFormUsesDesignSystemClasses(): void
+    {
+        ob_start();
+        $this->view->renderWaiverForm(
+            'Test Team',
+            1,
+            'drop',
+            [],
+            5,
+            5
+        );
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('ibl-card', $output);
+        $this->assertStringContainsString('ibl-card__header', $output);
+        $this->assertStringContainsString('ibl-card__body', $output);
+        $this->assertStringContainsString('ibl-select', $output);
+        $this->assertStringContainsString('ibl-label', $output);
+    }
+
+    public function testRenderWaiverFormNoCustomWaiversClasses(): void
+    {
+        ob_start();
+        $this->view->renderWaiverForm(
+            'Test Team',
+            1,
+            'drop',
+            [],
+            5,
+            5
+        );
+        $output = ob_get_clean();
+
+        $this->assertStringNotContainsString('waivers-form-card', $output);
+        $this->assertStringNotContainsString('waivers-form-header', $output);
+        $this->assertStringNotContainsString('waivers-form-body', $output);
+        $this->assertStringNotContainsString('waivers-select', $output);
+        $this->assertStringNotContainsString('waivers-team-title', $output);
     }
 }

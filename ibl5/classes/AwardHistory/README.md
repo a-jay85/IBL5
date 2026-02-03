@@ -84,6 +84,6 @@ vendor/bin/phpunit tests/AwardHistory/
 
 ## Related Modules
 
-- [PlayerSearch](../PlayerSearch/README.md) - Similar search pattern
+- [PlayerDatabase](../PlayerDatabase/README.md) - Similar search pattern
 - [Leaderboards](../Leaderboards/) - Similar table display pattern
 - [Player](../Player/) - Reference implementation for interface-driven architecture

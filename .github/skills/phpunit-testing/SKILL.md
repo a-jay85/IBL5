@@ -258,7 +258,7 @@ See [templates/BaseTestCase.php](./templates/BaseTestCase.php) for starter templ
 ## Reference Test Suites
 
 ### Unit Tests
-- `tests/PlayerSearch/` - 54 tests, comprehensive validation
+- `tests/PlayerDatabase/` - 54 tests, comprehensive validation
 - `tests/Player/` - 84 tests, service and calculator coverage
 - `tests/Waivers/` - Good edge case coverage
 

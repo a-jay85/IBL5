@@ -59,7 +59,7 @@ With 96% of IBL modules refactored, the project transitions from **refactoring m
 6. OneOnOneGameResult - Game result DTO
 7. OneOnOnePlayerStats - Player statistics DTO
 
-**Documentation:** `ibl5/classes/OneOnOne/README.md`
+**Documentation:** `ibl5/classes/OneOnOneGame/README.md`
 
 ---
 
@@ -132,7 +132,7 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 - ✅ Draft, Extension, FreeAgency, Negotiation, Trading integration tests
 
 **Remaining Focus Areas:**
-- Add integration tests for: DepthChart, RookieOption, Standings/Schedule
+- Add integration tests for: DepthChartEntry, RookieOption, Standings/Schedule
 - Edge case testing for all validators and processors
 - Security testing (XSS, SQL injection, CSRF)
 
@@ -263,7 +263,7 @@ Web_Links, Your_Account, News, AutoTheme, Content, etc. (81,000+ lines total)
 ## Development Timeline
 
 **Completed Work (2025-2026):**
-- October 2025: 13 modules refactored (Player, Statistics, Team, Draft, Waivers, Extension, RookieOption, Trading, Negotiation, DepthChart, Voting, Schedule, Season_Leaders)
+- October 2025: 13 modules refactored (Player, Statistics, Team, Draft, Waivers, Extension, RookieOption, Trading, Negotiation, DepthChartEntry, Voting, Schedule, Season_Leaders)
 - November 2025: Free Agency, PlayerDatabase (SQL injection fixed), Compare_Players, Leaderboards
 - December 2025: Standings, League_Stats, AwardHistory, Series_Records
 - January 9, 2026: **One-on-One complete** (88% code reduction, game simulation)

@@ -108,5 +108,5 @@ See [examples/](./examples/) for before/after patterns:
 
 ## Secured Reference Modules
 
-- `ibl5/classes/PlayerSearch/` - 15+ injection points fixed
+- `ibl5/classes/PlayerDatabase/` - 15+ injection points fixed
 - `ibl5/classes/DepthChart/SECURITY.md` - Security patterns documented

@@ -9,7 +9,7 @@ tools: ['search', 'search/usages']
 
 Validate that all implementations in `ibl5/classes/` properly implement their interface contracts.
 
-## Check the following for ${input:moduleName:Enter module name to check (e.g., PlayerSearch)}:
+## Check the following for ${input:moduleName:Enter module name to check (e.g., PlayerDatabase)}:
 
 ### 1. Interface Files Exist
 Verify `ibl5/classes/${input:moduleName}/Contracts/` contains:

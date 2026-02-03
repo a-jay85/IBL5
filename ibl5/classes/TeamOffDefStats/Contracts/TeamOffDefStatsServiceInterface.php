@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace LeagueStats\Contracts;
+namespace TeamOffDefStats\Contracts;
 
 /**
  * Interface for League Stats business logic
@@ -14,9 +14,9 @@ namespace LeagueStats\Contracts;
  *
  * Uses Statistics\StatsFormatter for consistent formatting.
  *
- * @see \LeagueStats\LeagueStatsService for implementation
+ * @see \TeamOffDefStats\TeamOffDefStatsService for implementation
  */
-interface LeagueStatsServiceInterface
+interface TeamOffDefStatsServiceInterface
 {
     /**
      * Process raw team statistics into formatted data

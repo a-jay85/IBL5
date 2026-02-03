@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace SeasonLeaders\Contracts;
+namespace SeasonLeaderboards\Contracts;
 
 /**
- * SeasonLeadersViewInterface - Season leaders HTML rendering
+ * SeasonLeaderboardsViewInterface - Season leaders HTML rendering
  *
  * Handles HTML rendering for the season leaders page using
  * output buffering pattern for clean, maintainable HTML.
  */
-interface SeasonLeadersViewInterface
+interface SeasonLeaderboardsViewInterface
 {
     /**
      * Render the filter form
@@ -31,7 +31,7 @@ interface SeasonLeadersViewInterface
      * - sortby: Dropdown with sort options (PPG, REB, etc.)
      *
      * **Behaviors:**
-     * - Form submits to modules.php?name=Season_Leaders
+     * - Form submits to modules.php?name=SeasonLeaderboards
      * - Pre-selects current filter values
      * - HTML-escapes all values for XSS protection
      */

@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Tests\LeagueStats;
+namespace Tests\TeamOffDefStats;
 
 use PHPUnit\Framework\TestCase;
-use LeagueStats\LeagueStatsRepository;
-use LeagueStats\Contracts\LeagueStatsRepositoryInterface;
+use TeamOffDefStats\TeamOffDefStatsRepository;
+use TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface;
 
 /**
- * Tests for LeagueStatsRepository
+ * Tests for TeamOffDefStatsRepository
  *
  * Verifies bulk query functionality for fetching all team statistics
  * in a single database query.
  */
-class LeagueStatsRepositoryTest extends TestCase
+class TeamOffDefStatsRepositoryTest extends TestCase
 {
     /**
      * Test that repository implements the interface
@@ -22,9 +22,9 @@ class LeagueStatsRepositoryTest extends TestCase
     public function testImplementsInterface(): void
     {
         $mockDb = $this->createMockDatabase([]);
-        $repository = new LeagueStatsRepository($mockDb);
+        $repository = new TeamOffDefStatsRepository($mockDb);
 
-        $this->assertInstanceOf(LeagueStatsRepositoryInterface::class, $repository);
+        $this->assertInstanceOf(TeamOffDefStatsRepositoryInterface::class, $repository);
     }
 
     /**
@@ -33,7 +33,7 @@ class LeagueStatsRepositoryTest extends TestCase
     public function testGetAllTeamStatsReturnsArray(): void
     {
         $mockDb = $this->createMockDatabase([]);
-        $repository = new LeagueStatsRepository($mockDb);
+        $repository = new TeamOffDefStatsRepository($mockDb);
 
         $result = $repository->getAllTeamStats();
 
@@ -51,7 +51,7 @@ class LeagueStatsRepositoryTest extends TestCase
         ];
 
         $mockDb = $this->createMockDatabase($testData);
-        $repository = new LeagueStatsRepository($mockDb);
+        $repository = new TeamOffDefStatsRepository($mockDb);
 
         $result = $repository->getAllTeamStats();
 
@@ -77,7 +77,7 @@ class LeagueStatsRepositoryTest extends TestCase
     public function testEmptyResultSet(): void
     {
         $mockDb = $this->createMockDatabase([]);
-        $repository = new LeagueStatsRepository($mockDb);
+        $repository = new TeamOffDefStatsRepository($mockDb);
 
         $result = $repository->getAllTeamStats();
 
@@ -131,7 +131,7 @@ class LeagueStatsRepositoryTest extends TestCase
         ];
 
         $mockDb = $this->createMockDatabase($testData);
-        $repository = new LeagueStatsRepository($mockDb);
+        $repository = new TeamOffDefStatsRepository($mockDb);
 
         $result = $repository->getAllTeamStats();
 

@@ -34,6 +34,27 @@ cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary -c php
 
 **Post-change test rule:** After making ANY code changes (source or test files), always run the **full** test suite (`vendor/bin/phpunit --no-progress --no-output --testdox-summary`), not just the tests for the module you changed. Changes in one module can break tests in other modules that depend on the same code.
 
+### Static Analysis (PHPStan)
+
+```bash
+# Run PHPStan (level max + strict-rules + bleedingEdge)
+cd ibl5 && composer run analyse
+```
+
+**PHPStan gate rule:** Run `composer run analyse` **before** creating or running unit tests. If your changes introduce new errors above the baseline, fix them before proceeding. The only exception: errors clearly caused by another Claude instance's simultaneous changes to files you did not touch — those may be ignored.
+
+**Write PHPStan-clean code proactively.** Don't rely on the analyser to catch mistakes. The project runs level `max` with `phpstan-strict-rules` and `bleedingEdge`, which means:
+
+- **No `mixed` leakage:** Never pass, return, or operate on `mixed`. Narrow types from database results, arrays, and function returns before use — via type checks, assertions, or PHPDoc `@var` annotations on fetched rows.
+- **Explicit return types & parameter types:** Every method/function must have complete native type declarations. Use union types (`int|string`) or generics (`array<int, Player>`) where needed.
+- **No loose comparisons:** `===`/`!==` only. `in_array()` must pass `true` as the third argument. Never use `empty()` — check the specific condition instead (`=== ''`, `=== []`, `=== null`).
+- **Null safety:** Never call methods or access properties on possibly-null values without a null check. Use `?->`, `??`, or explicit guards.
+- **No dead code:** Don't write always-true/false conditions, unreachable branches, or unused variables/parameters.
+- **Strict boolean context:** Never use non-boolean expressions (int, string, array) as bare if-conditions. Write explicit comparisons (`$count > 0`, `$name !== ''`, `$items !== []`).
+- **Array shapes:** Use PHPDoc `array{key: type, ...}` shapes for structured arrays (especially database rows) so PHPStan can verify field access.
+- **No deprecated APIs:** Don't use deprecated PHP functions, class methods, or constants.
+- **PHPUnit awareness:** The `phpstan-phpunit` extension understands `assertSame`, `expectException`, etc. — write assertions that align with PHPStan's type narrowing (e.g., `assertInstanceOf` narrows the type in subsequent code).
+
 ## Architecture
 
 ### Interface-Driven Modules

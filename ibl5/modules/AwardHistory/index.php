@@ -3,12 +3,12 @@
 declare(strict_types=1);
 
 /**
- * Player Awards Module
+ * Award History Module
  *
  * Provides search functionality for player award history.
  *
- * @see PlayerAwards\PlayerAwardsService For business logic
- * @see PlayerAwards\PlayerAwardsView For HTML rendering
+ * @see AwardHistory\AwardHistoryService For business logic
+ * @see AwardHistory\AwardHistoryView For HTML rendering
  */
 
 if (!defined('MODULE_FILE')) {
@@ -23,10 +23,10 @@ $pagetitle = "- $module_name";
 global $mysqli_db;
 
 // Initialize classes
-$validator = new \PlayerAwards\PlayerAwardsValidator();
-$repository = new \PlayerAwards\PlayerAwardsRepository($mysqli_db);
-$service = new \PlayerAwards\PlayerAwardsService($validator, $repository);
-$view = new \PlayerAwards\PlayerAwardsView($service);
+$validator = new \AwardHistory\AwardHistoryValidator();
+$repository = new \AwardHistory\AwardHistoryRepository($mysqli_db);
+$service = new \AwardHistory\AwardHistoryService($validator, $repository);
+$view = new \AwardHistory\AwardHistoryView($service);
 
 // Get and validate search parameters from POST
 $searchResult = $service->search($_POST);

@@ -2,29 +2,29 @@
 
 declare(strict_types=1);
 
-namespace Tests\CapInfo;
+namespace Tests\CapSpace;
 
 use PHPUnit\Framework\TestCase;
-use CapInfo\CapInfoView;
-use CapInfo\Contracts\CapInfoViewInterface;
+use CapSpace\CapSpaceView;
+use CapSpace\Contracts\CapSpaceViewInterface;
 
 /**
- * CapInfoViewTest - Tests for CapInfoView HTML rendering
+ * CapSpaceViewTest - Tests for CapSpaceView HTML rendering
  *
- * @covers \CapInfo\CapInfoView
+ * @covers \CapSpace\CapSpaceView
  */
-class CapInfoViewTest extends TestCase
+class CapSpaceViewTest extends TestCase
 {
-    private CapInfoViewInterface $view;
+    private CapSpaceViewInterface $view;
 
     protected function setUp(): void
     {
-        $this->view = new CapInfoView();
+        $this->view = new CapSpaceView();
     }
 
-    public function testImplementsCapInfoViewInterface(): void
+    public function testImplementsCapSpaceViewInterface(): void
     {
-        $this->assertInstanceOf(CapInfoViewInterface::class, $this->view);
+        $this->assertInstanceOf(CapSpaceViewInterface::class, $this->view);
     }
 
     public function testRenderReturnsString(): void

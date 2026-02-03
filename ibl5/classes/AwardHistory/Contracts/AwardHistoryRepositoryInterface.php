@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace PlayerAwards\Contracts;
+namespace AwardHistory\Contracts;
 
 /**
- * PlayerAwardsRepositoryInterface - Contract for player awards database operations
+ * AwardHistoryRepositoryInterface - Contract for player awards database operations
  * 
  * Defines the database operations for searching and retrieving player awards.
  * All methods use prepared statements to prevent SQL injection.
  */
-interface PlayerAwardsRepositoryInterface
+interface AwardHistoryRepositoryInterface
 {
     /**
      * Search for awards based on validated criteria
@@ -23,7 +23,7 @@ interface PlayerAwardsRepositoryInterface
      *     award: string|null,
      *     year: int|null,
      *     sortby: int
-     * } $params Validated parameters from PlayerAwardsValidatorInterface
+     * } $params Validated parameters from AwardHistoryValidatorInterface
      * @return array{
      *     results: array<int, array{year: int, Award: string, name: string, table_ID: int}>,
      *     count: int

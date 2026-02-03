@@ -2,41 +2,41 @@
 
 declare(strict_types=1);
 
-namespace PlayerAwards;
+namespace AwardHistory;
 
-use PlayerAwards\Contracts\PlayerAwardsServiceInterface;
-use PlayerAwards\Contracts\PlayerAwardsValidatorInterface;
-use PlayerAwards\Contracts\PlayerAwardsRepositoryInterface;
+use AwardHistory\Contracts\AwardHistoryServiceInterface;
+use AwardHistory\Contracts\AwardHistoryValidatorInterface;
+use AwardHistory\Contracts\AwardHistoryRepositoryInterface;
 
 /**
- * PlayerAwardsService - Business logic for player awards search
+ * AwardHistoryService - Business logic for player awards search
  * 
- * Implements the service contract defined in PlayerAwardsServiceInterface.
+ * Implements the service contract defined in AwardHistoryServiceInterface.
  * See the interface for detailed behavior documentation.
  * 
- * @see PlayerAwardsServiceInterface
+ * @see AwardHistoryServiceInterface
  */
-class PlayerAwardsService implements PlayerAwardsServiceInterface
+class AwardHistoryService implements AwardHistoryServiceInterface
 {
-    private PlayerAwardsValidatorInterface $validator;
-    private PlayerAwardsRepositoryInterface $repository;
+    private AwardHistoryValidatorInterface $validator;
+    private AwardHistoryRepositoryInterface $repository;
 
     /**
      * Constructor with dependency injection
      * 
-     * @param PlayerAwardsValidatorInterface $validator Validator for search params
-     * @param PlayerAwardsRepositoryInterface $repository Repository for database operations
+     * @param AwardHistoryValidatorInterface $validator Validator for search params
+     * @param AwardHistoryRepositoryInterface $repository Repository for database operations
      */
     public function __construct(
-        PlayerAwardsValidatorInterface $validator,
-        PlayerAwardsRepositoryInterface $repository
+        AwardHistoryValidatorInterface $validator,
+        AwardHistoryRepositoryInterface $repository
     ) {
         $this->validator = $validator;
         $this->repository = $repository;
     }
 
     /**
-     * @see PlayerAwardsServiceInterface::search()
+     * @see AwardHistoryServiceInterface::search()
      */
     public function search(array $rawParams): array
     {
@@ -63,7 +63,7 @@ class PlayerAwardsService implements PlayerAwardsServiceInterface
     }
 
     /**
-     * @see PlayerAwardsServiceInterface::getSortOptions()
+     * @see AwardHistoryServiceInterface::getSortOptions()
      */
     public function getSortOptions(): array
     {

@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace CapInfo\Contracts;
+namespace CapSpace\Contracts;
 
 /**
- * CapInfoRepositoryInterface - Contract for salary cap data access
+ * CapSpaceRepositoryInterface - Contract for salary cap data access
  *
  * Defines methods for retrieving team salary cap information from the database.
  *
- * @see \CapInfo\CapInfoRepository For the concrete implementation
+ * @see \CapSpace\CapSpaceRepository For the concrete implementation
  */
-interface CapInfoRepositoryInterface
+interface CapSpaceRepositoryInterface
 {
     /**
      * Get all teams for salary cap display

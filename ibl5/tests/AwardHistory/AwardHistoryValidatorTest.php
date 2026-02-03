@@ -3,20 +3,20 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
-use PlayerAwards\PlayerAwardsValidator;
+use AwardHistory\AwardHistoryValidator;
 
 /**
- * Tests for PlayerAwardsValidator
+ * Tests for AwardHistoryValidator
  * 
  * Verifies input validation and sanitization for player awards search.
  */
-final class PlayerAwardsValidatorTest extends TestCase
+final class AwardHistoryValidatorTest extends TestCase
 {
-    private PlayerAwardsValidator $validator;
+    private AwardHistoryValidator $validator;
 
     protected function setUp(): void
     {
-        $this->validator = new PlayerAwardsValidator();
+        $this->validator = new AwardHistoryValidator();
     }
 
     // ==================== validateSearchParams Tests ====================

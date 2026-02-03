@@ -2,22 +2,22 @@
 
 declare(strict_types=1);
 
-namespace PlayerAwards\Contracts;
+namespace AwardHistory\Contracts;
 
 /**
- * PlayerAwardsServiceInterface - Contract for the player awards business logic
+ * AwardHistoryServiceInterface - Contract for the player awards business logic
  * 
  * Defines the public API for the player awards service. This is the main entry point
  * that orchestrates validation, database search, and data transformation.
  */
-interface PlayerAwardsServiceInterface
+interface AwardHistoryServiceInterface
 {
     /**
      * Execute an award search based on form parameters
      * 
      * Orchestrates the complete search workflow:
-     * 1. Validates all parameters using PlayerAwardsValidatorInterface
-     * 2. Executes search using PlayerAwardsRepositoryInterface
+     * 1. Validates all parameters using AwardHistoryValidatorInterface
+     * 2. Executes search using AwardHistoryRepositoryInterface
      * 3. Returns results with validated parameters for form repopulation
      * 
      * @param array<string, mixed> $rawParams Raw POST parameters from form

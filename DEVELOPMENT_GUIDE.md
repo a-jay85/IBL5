@@ -344,7 +344,7 @@
 
 **Core Modules (22):** Player • Statistics • Team • Draft • Waivers • Extension • RookieOption • Trading • Negotiation • DepthChart • Voting • Schedule • Season Leaders • Free Agency • Player_Search • Compare_Players • Leaderboards • Standings • League_Stats • Player_Awards • Series_Records • One-on-One
 
-**Display Modules (8):** Cap_Info • Draft_Pick_Locator • Franchise_History • Injuries • League_Starters • Next_Sim • Power_Rankings • Team_Schedule
+**Display Modules (8):** CapSpace • Draft_Pick_Locator • Franchise_History • Injuries • League_Starters • Next_Sim • Power_Rankings • Team_Schedule
 
 ---
 

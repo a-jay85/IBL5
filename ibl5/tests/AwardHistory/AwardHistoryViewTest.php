@@ -4,29 +4,29 @@ declare(strict_types=1);
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
-use PlayerAwards\PlayerAwardsView;
-use PlayerAwards\PlayerAwardsService;
-use PlayerAwards\Contracts\PlayerAwardsValidatorInterface;
-use PlayerAwards\Contracts\PlayerAwardsRepositoryInterface;
+use AwardHistory\AwardHistoryView;
+use AwardHistory\AwardHistoryService;
+use AwardHistory\Contracts\AwardHistoryValidatorInterface;
+use AwardHistory\Contracts\AwardHistoryRepositoryInterface;
 
 /**
- * Tests for PlayerAwardsView
+ * Tests for AwardHistoryView
  *
  * Verifies HTML rendering for player awards search interface.
  */
 #[AllowMockObjectsWithoutExpectations]
-final class PlayerAwardsViewTest extends TestCase
+final class AwardHistoryViewTest extends TestCase
 {
-    private PlayerAwardsView $view;
+    private AwardHistoryView $view;
 
     protected function setUp(): void
     {
         // Create real validator and mock repository for the service
-        $mockValidator = $this->createMock(PlayerAwardsValidatorInterface::class);
-        $mockRepository = $this->createMock(PlayerAwardsRepositoryInterface::class);
+        $mockValidator = $this->createMock(AwardHistoryValidatorInterface::class);
+        $mockRepository = $this->createMock(AwardHistoryRepositoryInterface::class);
         
-        $service = new PlayerAwardsService($mockValidator, $mockRepository);
-        $this->view = new PlayerAwardsView($service);
+        $service = new AwardHistoryService($mockValidator, $mockRepository);
+        $this->view = new AwardHistoryView($service);
     }
 
     // ==================== renderSearchForm Tests ====================

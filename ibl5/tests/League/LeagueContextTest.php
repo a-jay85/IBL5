@@ -216,7 +216,7 @@ class LeagueContextTest extends TestCase
     /**
      * Test isModuleEnabled returns false for CapSpace in Olympics
      */
-    public function testIsModuleEnabledOlympicsDisablesCapInfo(): void
+    public function testIsModuleEnabledOlympicsDisablesCapSpace(): void
     {
         $_SESSION['current_league'] = 'olympics';
 

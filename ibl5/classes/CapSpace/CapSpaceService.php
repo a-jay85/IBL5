@@ -2,29 +2,29 @@
 
 declare(strict_types=1);
 
-namespace CapInfo;
+namespace CapSpace;
 
-use CapInfo\Contracts\CapInfoRepositoryInterface;
+use CapSpace\Contracts\CapSpaceRepositoryInterface;
 
 /**
- * CapInfoService - Business logic for salary cap information
+ * CapSpaceService - Business logic for salary cap information
  *
  * Processes team salary data and calculates available cap space.
  *
- * @see CapInfoRepositoryInterface For data access
+ * @see CapSpaceRepositoryInterface For data access
  */
-class CapInfoService
+class CapSpaceService
 {
-    private CapInfoRepositoryInterface $repository;
+    private CapSpaceRepositoryInterface $repository;
     private object $db;
 
     /**
      * Constructor
      *
-     * @param CapInfoRepositoryInterface $repository Data repository
+     * @param CapSpaceRepositoryInterface $repository Data repository
      * @param object $db Database connection for Team initialization
      */
-    public function __construct(CapInfoRepositoryInterface $repository, object $db)
+    public function __construct(CapSpaceRepositoryInterface $repository, object $db)
     {
         $this->repository = $repository;
         $this->db = $db;

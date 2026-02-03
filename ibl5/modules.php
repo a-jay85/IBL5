@@ -16,33 +16,33 @@ define('MODULE_FILE', true);
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 if (isset($name) && $name == $_REQUEST['name']) {
-    $name = addslashes(trim($name));
-    $modstring = strtolower($_SERVER['QUERY_STRING']);
-    if (stripos_clone($name, "..") or ((stripos_clone($modstring, "&file=nickpage") || stripos_clone($modstring, "&user=")) and ($name == "Forums" or $name == "MembersList"))) {
+    $name = trim($name);
+    if (stripos_clone($name, "..")) {
         header("Location: index.php");
+        exit;
     }
 
-    global $nukeuser, $db, $prefix, $user;
+    global $nukeuser, $db, $mysqli_db, $prefix, $user;
     if (is_user($user)) {
         $nukeuser = base64_decode($user);
         $nukeuser = addslashes($nukeuser);
     } else {
         $nukeuser = "";
     }
-    $result = $db->sql_query("SELECT active, view FROM " . $prefix . "_modules WHERE title='" . addslashes($name) . "'");
-    list($mod_active, $view) = $db->sql_fetchrow($result);
-    $mod_active = intval($mod_active);
-    $view = intval($view);
+    $stmt = $mysqli_db->prepare("SELECT active, view FROM " . $prefix . "_modules WHERE title = ?");
+    $stmt->bind_param('s', $name);
+    $stmt->execute();
+    $modResult = $stmt->get_result();
+    $modRow = $modResult->fetch_row();
+    $mod_active = (int)($modRow[0] ?? 0);
+    $view = (int)($modRow[1] ?? 0);
+    $stmt->close();
     if (($mod_active == 1) or ($mod_active == 0 and is_admin($admin))) {
-        if (!isset($mop) or $mop != $_REQUEST['mop']) {
-            $mop = "modload";
-        }
-
         if (!isset($file) or $file != $_REQUEST['file']) {
             $file = "index";
         }
 
-        if (stripos_clone($file, "..") or stripos_clone($mop, "..")) {
+        if (stripos_clone($file, "..")) {
             die("You are so cool...");
         }
 
@@ -88,12 +88,21 @@ if (isset($name) && $name == $_REQUEST['name']) {
             title($sitename . ": " . _ACCESSDENIED);
             OpenTable();
             echo "<center><strong>" . _RESTRICTEDAREA . "</strong><br><br>" . _MODULEUSERS;
-            $result2 = $db->sql_query("SELECT mod_group FROM " . $prefix . "_modules WHERE title='" . addslashes($name) . "'");
-            list($mod_group) = $db->sql_fetchrow($result2);
-            if ($mod_group != 0) {
-                $result3 = $db->sql_query("SELECT name FROM " . $prefix . "_groups WHERE id='" . intval($mod_group) . "'");
-                $row3 = $db->sql_fetchrow($result3);
-                echo _ADDITIONALYGRP . ": <b>" . $row3['name'] . "</b><br><br>";
+            $stmt2 = $mysqli_db->prepare("SELECT mod_group FROM " . $prefix . "_modules WHERE title = ?");
+            $stmt2->bind_param('s', $name);
+            $stmt2->execute();
+            $modGroupResult = $stmt2->get_result();
+            $modGroupRow = $modGroupResult->fetch_row();
+            $mod_group = (int)($modGroupRow[0] ?? 0);
+            $stmt2->close();
+            if ($mod_group !== 0) {
+                $stmt3 = $mysqli_db->prepare("SELECT name FROM " . $prefix . "_groups WHERE id = ?");
+                $stmt3->bind_param('i', $mod_group);
+                $stmt3->execute();
+                $groupResult = $stmt3->get_result();
+                $row3 = $groupResult->fetch_assoc();
+                $stmt3->close();
+                echo _ADDITIONALYGRP . ": <b>" . \Utilities\HtmlSanitizer::safeHtmlOutput($row3['name']) . "</b><br><br>";
             }
             echo _GOBACK;
             CloseTable();

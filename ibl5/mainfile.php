@@ -419,7 +419,7 @@ function is_user($user)
 
 function is_group($user, $name)
 {
-    global $prefix, $db, $user_prefix, $cookie, $user;
+    global $prefix, $db, $mysqli_db, $user_prefix, $cookie, $user;
     if (is_user($user)) {
         if (!is_array($user)) {
             $cookie = cookiedecode($user);
@@ -431,10 +431,13 @@ function is_group($user, $name)
         $row = $db->sql_fetchrow($result);
         $points = intval($row['points']);
         $db->sql_freeresult($result);
-        $result2 = $db->sql_query("SELECT mod_group FROM " . $prefix . "_modules WHERE title='$name'");
-        $row2 = $db->sql_fetchrow($result2);
-        $mod_group = intval($row2['mod_group']);
-        $db->sql_freeresult($result2);
+        $stmt_grp = $mysqli_db->prepare("SELECT mod_group FROM " . $prefix . "_modules WHERE title = ?");
+        $stmt_grp->bind_param('s', $name);
+        $stmt_grp->execute();
+        $grpResult = $stmt_grp->get_result();
+        $grpRow = $grpResult->fetch_assoc();
+        $mod_group = (int)($grpRow['mod_group'] ?? 0);
+        $stmt_grp->close();
         $result3 = $db->sql_query("SELECT points FROM " . $prefix . "_groups WHERE id='$mod_group'");
         $row3 = $db->sql_fetchrow($result3);
         $grp = intval($row3['points']);

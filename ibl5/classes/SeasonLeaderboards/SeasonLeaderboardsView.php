@@ -103,9 +103,9 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     {
         $html = '<option value="">All</option>' . "\n";
         foreach ($years as $year) {
-            $escapedYear = htmlspecialchars($year);
-            $selected = ($selectedYear === $year) ? ' selected' : '';
-            $html .= '<option value="' . $escapedYear . '"' . $selected . '>' . $escapedYear . '</option>' . "\n";
+            $yearInt = (int) $year;
+            $selected = ($selectedYear === (string) $yearInt) ? ' selected' : '';
+            $html .= '<option value="' . $yearInt . '"' . $selected . '>' . $yearInt . '</option>' . "\n";
         }
         return $html;
     }

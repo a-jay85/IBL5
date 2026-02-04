@@ -10,7 +10,7 @@ namespace SeasonLeaderboards\Contracts;
  * Handles all database operations for historical season statistics.
  *
  * @phpstan-type LeaderboardFilters array{year?: string, team?: int|string, sortby?: string, limit?: int|string}
- * @phpstan-type HistRow array{pid: int, name: string, year: string, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, team_city: string|null, color1: string|null, color2: string|null}
+ * @phpstan-type HistRow array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, team_city: string|null, color1: string|null, color2: string|null}
  * @phpstan-type LeaderboardResult array{result: list<HistRow>, count: int}
  * @phpstan-type TeamRow array{TeamID: int, Team: string}
  */
@@ -60,7 +60,7 @@ interface SeasonLeaderboardsRepositoryInterface
      *
      * Retrieves unique years that have historical data.
      *
-     * @return list<string> Array of year values ordered DESC (newest first)
+     * @return list<int> Array of year values ordered DESC (newest first)
      */
     public function getYears(): array;
 }

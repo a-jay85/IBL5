@@ -88,11 +88,11 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
     /**
      * @see SeasonLeaderboardsRepositoryInterface::getYears()
      *
-     * @return list<string>
+     * @return list<int>
      */
     public function getYears(): array
     {
-        /** @var list<array{year: string}> $rows */
+        /** @var list<array{year: int}> $rows */
         $rows = $this->fetchAll("SELECT DISTINCT year FROM ibl_hist ORDER BY year DESC");
 
         $years = [];

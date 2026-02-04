@@ -138,8 +138,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         $playerData->ratingPostDefense = $plrRow['pd'];
         $playerData->ratingTransitionOffense = $plrRow['to'];
         $playerData->ratingTransitionDefense = $plrRow['td'];
-        $playerData->ratingClutch = $plrRow['Clutch'] !== null && $plrRow['Clutch'] !== '' ? (int) $plrRow['Clutch'] : null;
-        $playerData->ratingConsistency = $plrRow['Consistency'] !== null && $plrRow['Consistency'] !== '' ? (int) $plrRow['Consistency'] : null;
+        $playerData->ratingClutch = $plrRow['Clutch'];
+        $playerData->ratingConsistency = $plrRow['Consistency'];
         $playerData->ratingTalent = $plrRow['talent'];
         $playerData->ratingSkill = $plrRow['skill'];
         $playerData->ratingIntangibles = $plrRow['intangibles'];
@@ -152,11 +152,11 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     private function mapFreeAgencyFields(PlayerData $playerData, array $plrRow): void
     {
-        $playerData->freeAgencyLoyalty = $plrRow['loyalty'] !== null && $plrRow['loyalty'] !== '' ? (int) $plrRow['loyalty'] : null;
-        $playerData->freeAgencyPlayingTime = $plrRow['playingTime'] !== null && $plrRow['playingTime'] !== '' ? (int) $plrRow['playingTime'] : null;
-        $playerData->freeAgencyPlayForWinner = $plrRow['winner'] !== null && $plrRow['winner'] !== '' ? (int) $plrRow['winner'] : null;
-        $playerData->freeAgencyTradition = $plrRow['tradition'] !== null && $plrRow['tradition'] !== '' ? (int) $plrRow['tradition'] : null;
-        $playerData->freeAgencySecurity = $plrRow['security'] !== null && $plrRow['security'] !== '' ? (int) $plrRow['security'] : null;
+        $playerData->freeAgencyLoyalty = $plrRow['loyalty'];
+        $playerData->freeAgencyPlayingTime = $plrRow['playingTime'];
+        $playerData->freeAgencyPlayForWinner = $plrRow['winner'];
+        $playerData->freeAgencyTradition = $plrRow['tradition'];
+        $playerData->freeAgencySecurity = $plrRow['security'];
     }
 
     /**

@@ -41,10 +41,10 @@ class WaiversRepositoryTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         
         $team = [
-            'teamname' => 'Boston Celtics',
+            'team_name' => 'Boston Celtics',
             'teamid' => 2
         ];
-        
+
         $contractData = [
             'hasExistingContract' => false,
             'salary' => 103
@@ -76,10 +76,10 @@ class WaiversRepositoryTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         
         $team = [
-            'teamname' => 'Boston Celtics',
+            'team_name' => 'Boston Celtics',
             'teamid' => 2
         ];
-        
+
         $contractData = [
             'hasExistingContract' => true,
             'salary' => 500
@@ -106,7 +106,7 @@ class WaiversRepositoryTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         
         $team = [
-            'teamname' => 'Los Angeles Lakers',
+            'team_name' => 'Los Angeles Lakers',
             'teamid' => 14
         ];
         

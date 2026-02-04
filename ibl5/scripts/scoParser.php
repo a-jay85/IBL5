@@ -8,7 +8,7 @@ use Player\PlayerStats;
 
 function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeasonPhase)
 {
-    global $db, $mysqli_db;
+    global $mysqli_db;
     $season = new Season($mysqli_db);
 
     $scoFilePath = ($uploadedFilePath) ? $uploadedFilePath : $_SERVER['DOCUMENT_ROOT'] . "/ibl5/IBL5.sco";
@@ -23,24 +23,24 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
     fseek($scoFile, 1000000);
 
     if ($operatingSeasonPhase == "Preseason") {
-        if (Boxscore::deletePreseasonBoxScores($db, $operatingSeasonStartingYear)) {
+        if (Boxscore::deletePreseasonBoxScores($mysqli_db, $operatingSeasonStartingYear)) {
             echo "Deleted any existing Preseason box scores." . "<p>";
         } else {
             echo "<b><font color=#F00>Failed to delete existing Preseason box scores!</font></b>";
         }
     } elseif ($operatingSeasonPhase == "HEAT") {
-        if (Boxscore::deletePreseasonBoxScores($db, $operatingSeasonStartingYear)) {
+        if (Boxscore::deletePreseasonBoxScores($mysqli_db, $operatingSeasonStartingYear)) {
             echo "Deleted any existing Preseason box scores." . "<p>";
         } else {
             echo "<b><font color=#F00>Failed to delete existing Preseason box scores!</font></b>";
         }
-        if (Boxscore::deleteHEATBoxScores($db, $operatingSeasonStartingYear)) {
+        if (Boxscore::deleteHEATBoxScores($mysqli_db, $operatingSeasonStartingYear)) {
             echo "Deleted any existing HEAT box scores." . "<p>";
         } else {
             echo "<b><font color=#F00>Failed to delete existing HEAT box scores!</font></b>";
         }
     } else {
-        if (Boxscore::deleteRegularSeasonAndPlayoffsBoxScores($db, $operatingSeasonStartingYear)) {
+        if (Boxscore::deleteRegularSeasonAndPlayoffsBoxScores($mysqli_db, $operatingSeasonStartingYear)) {
             echo "Deleted any existing regular season and playoffs box scores." . "<p>";
         } else {
             echo "<b><font color=#F00>Failed to delete existing regular season and playoffs box scores!</font></b>";
@@ -143,7 +143,7 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
         for ($i = 0; $i < 30; $i++) {
             $x = $i * 53; // 53 = amount of characters to skip to get to the next player's/team's data line
             $playerInfoLine = substr($line, 58 + $x, 53);
-            $playerStats = PlayerStats::withBoxscoreInfoLine($db, $playerInfoLine);
+            $playerStats = PlayerStats::withBoxscoreInfoLine($mysqli_db, $playerInfoLine);
 
             $name = mb_convert_encoding($playerStats->name, 'UTF-8', 'ISO-8859-1');
             $position = $playerStats->position;
@@ -209,7 +209,7 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
         if ($insertNewSimDates) {
             echo "<p>Added box scores from $newSimStartDate through $newSimEndDate.";
         } else {
-            die('Invalid query: ' . $db->sql_error());
+            die('Invalid query: ' . $mysqli_db->error);
         }
     } else {
         echo "<p>Preseason box scores added. Sim Start/End Dates not updated during Preseason.";

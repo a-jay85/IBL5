@@ -88,9 +88,12 @@ class TableViewSwitcher
     private function buildTab(string $tabKey, string $tabLabel): string
     {
         $activeClass = ($this->activeTab === $tabKey) ? ' ibl-tab--active' : '';
+        /** @var string $href */
         $href = HtmlSanitizer::safeHtmlOutput($this->baseUrl . '&display=' . $tabKey);
+        /** @var string $safeLabel */
+        $safeLabel = HtmlSanitizer::safeHtmlOutput($tabLabel);
 
-        return '<a href="' . $href . '" class="ibl-tab' . $activeClass . '">' . HtmlSanitizer::safeHtmlOutput($tabLabel) . '</a>';
+        return '<a href="' . $href . '" class="ibl-tab' . $activeClass . '">' . $safeLabel . '</a>';
     }
 
     /**
@@ -101,11 +104,13 @@ class TableViewSwitcher
      */
     private function injectCaption(string $tableHtml, string $tabsHtml): string
     {
-        return preg_replace(
+        $result = preg_replace(
             '/(<table\b[^>]*>)/i',
             '$1<caption class="team-table-caption">' . $tabsHtml . '</caption>',
             $tableHtml,
             1
         );
+
+        return $result ?? $tableHtml;
     }
 }

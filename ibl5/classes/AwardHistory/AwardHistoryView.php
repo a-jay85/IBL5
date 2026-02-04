@@ -30,14 +30,22 @@ class AwardHistoryView implements AwardHistoryViewInterface
 
     /**
      * @see AwardHistoryViewInterface::renderSearchForm()
+     *
+     * @param array{name: string|null, award: string|null, year: int|null, sortby: int} $params
      */
     public function renderSearchForm(array $params): string
     {
+        /** @var string $name */
         $name = HtmlSanitizer::safeHtmlOutput($params['name'] ?? '');
+        /** @var string $award */
         $award = HtmlSanitizer::safeHtmlOutput($params['award'] ?? '');
-        $year = HtmlSanitizer::safeHtmlOutput((string)($params['year'] ?? ''));
+        $yearRaw = $params['year'];
+        $yearStr = $yearRaw !== null ? (string) $yearRaw : '';
+        /** @var string $year */
+        $year = HtmlSanitizer::safeHtmlOutput($yearStr);
         $sortby = $params['sortby'] ?? 3;
 
+        /** @var array<int, string> $sortOptions */
         $sortOptions = $this->service->getSortOptions();
 
         $output = '<form method="post" action="modules.php?name=AwardHistory" class="ibl-filter-form">';
@@ -69,7 +77,7 @@ class AwardHistoryView implements AwardHistoryViewInterface
             $id = 'sort-' . $value;
             $output .= '<label class="player-awards-sort__option" for="' . $id . '">';
             $output .= '<input type="radio" name="aw_sortby" value="' . $value . '" id="' . $id . '"' . $checked . '>';
-            $output .= ' <span>' . HtmlSanitizer::safeHtmlOutput($label) . '</span>';
+            $output .= ' <span>' . (string) HtmlSanitizer::safeHtmlOutput($label) . '</span>';
             $output .= '</label>';
         }
         $output .= '</div>';
@@ -102,18 +110,27 @@ class AwardHistoryView implements AwardHistoryViewInterface
 
     /**
      * @see AwardHistoryViewInterface::renderAwardRow()
+     *
+     * @param array{year: int, Award: string, name: string, pid?: int} $award
      */
     public function renderAwardRow(array $award, int $rowIndex): string
     {
+        /** @var string $year */
         $year = HtmlSanitizer::safeHtmlOutput((string)($award['year'] ?? ''));
+        /** @var string $awardName */
         $awardName = HtmlSanitizer::safeHtmlOutput($award['Award'] ?? '');
         $pid = (int)($award['pid'] ?? 0);
 
         if ($pid > 0) {
+            /** @var array{thumbnail: string, name: string} $resolved */
             $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $award['name'] ?? '');
-            $playerCell = '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $resolved['thumbnail'] . HtmlSanitizer::safeHtmlOutput($resolved['name']) . '</a></td>';
+            /** @var string $resolvedName */
+            $resolvedName = HtmlSanitizer::safeHtmlOutput($resolved['name']);
+            $playerCell = '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $resolved['thumbnail'] . $resolvedName . '</a></td>';
         } else {
-            $playerCell = '<td>' . HtmlSanitizer::safeHtmlOutput($award['name'] ?? '') . '</td>';
+            /** @var string $escapedName */
+            $escapedName = HtmlSanitizer::safeHtmlOutput($award['name'] ?? '');
+            $playerCell = '<td>' . $escapedName . '</td>';
         }
 
         return '<tr><td>' . $year . '</td>' . $playerCell . '<td>' . $awardName . '</td></tr>';

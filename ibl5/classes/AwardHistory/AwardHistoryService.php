@@ -44,7 +44,7 @@ class AwardHistoryService implements AwardHistoryServiceInterface
         $params = $this->validator->validateSearchParams($rawParams);
 
         // If no form submission (empty POST), return empty results with default params
-        if (empty($rawParams)) {
+        if ($rawParams === []) {
             return [
                 'awards' => [],
                 'count' => 0,

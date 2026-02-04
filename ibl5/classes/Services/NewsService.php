@@ -18,12 +18,12 @@ namespace Services;
  */
 class NewsService
 {
-    private object $db;
-    
+    private \mysqli $db;
+
     /**
-     * @param object $db mysqli connection or duck-typed mock for testing
+     * @param \mysqli $db mysqli connection
      */
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
     }
@@ -102,13 +102,17 @@ class NewsService
         
         $row = $result->fetch_assoc();
         $stmt->close();
-        
-        return isset($row['topicid']) ? (int) $row['topicid'] : null;
+
+        if (!is_array($row) || !isset($row['topicid'])) {
+            return null;
+        }
+
+        return (int) $row['topicid'];
     }
-    
+
     /**
      * Gets category ID by category title
-     * 
+     *
      * @param string $categoryTitle Category title
      * @return int|null Category ID or null if not found
      */
@@ -120,24 +124,28 @@ class NewsService
             error_log("NewsService: Failed to prepare getCategoryIDByTitle: " . $this->db->error);
             return null;
         }
-        
+
         $stmt->bind_param('s', $categoryTitle);
         if (!$stmt->execute()) {
             error_log("NewsService: Failed to execute getCategoryIDByTitle: " . $stmt->error);
             $stmt->close();
             return null;
         }
-        
+
         $result = $stmt->get_result();
         if ($result === false || $result->num_rows === 0) {
             $stmt->close();
             return null;
         }
-        
+
         $row = $result->fetch_assoc();
         $stmt->close();
-        
-        return isset($row['catid']) ? (int) $row['catid'] : null;
+
+        if (!is_array($row) || !isset($row['catid'])) {
+            return null;
+        }
+
+        return (int) $row['catid'];
     }
     
     /**

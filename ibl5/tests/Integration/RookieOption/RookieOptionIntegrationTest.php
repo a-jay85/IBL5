@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Integration\RookieOption;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use Tests\Integration\IntegrationTestCase;
 use Tests\Integration\Mocks\TestDataFactory;
+use Player\Player;
 use RookieOption\RookieOptionRepository;
 use RookieOption\RookieOptionValidator;
 
@@ -22,6 +24,7 @@ use RookieOption\RookieOptionValidator;
  * @covers \RookieOption\RookieOptionRepository
  * @covers \RookieOption\RookieOptionValidator
  */
+#[AllowMockObjectsWithoutExpectations]
 class RookieOptionIntegrationTest extends IntegrationTestCase
 {
     private RookieOptionRepository $repository;
@@ -669,7 +672,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
     // ========== HELPER METHODS ==========
 
     /**
-     * Create a mock player object for testing
+     * Create a mock Player object for testing
      */
     private function createMockPlayerObject(
         string $teamName,
@@ -679,45 +682,19 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         int $cy3Salary,
         string $position = 'G',
         string $name = 'Test Rookie'
-    ): object {
-        return new class($teamName, $canRookieOption, $draftRound, $cy2Salary, $cy3Salary, $position, $name) {
-            public string $teamName;
-            public string $position;
-            public string $name;
-            public int $draftRound;
-            private bool $canOption;
-            private int $cy2Salary;
-            private int $cy3Salary;
+    ): Player {
+        $finalYearSalary = ($draftRound === 1) ? $cy3Salary : $cy2Salary;
 
-            public function __construct(
-                string $teamName,
-                bool $canRookieOption,
-                int $draftRound,
-                int $cy2Salary,
-                int $cy3Salary,
-                string $position,
-                string $name
-            ) {
-                $this->teamName = $teamName;
-                $this->canOption = $canRookieOption;
-                $this->draftRound = $draftRound;
-                $this->cy2Salary = $cy2Salary;
-                $this->cy3Salary = $cy3Salary;
-                $this->position = $position;
-                $this->name = $name;
-            }
+        $mockPlayer = $this->createMock(Player::class);
+        $mockPlayer->teamName = $teamName;
+        $mockPlayer->position = $position;
+        $mockPlayer->name = $name;
+        $mockPlayer->draftRound = $draftRound;
+        $mockPlayer->method('canRookieOption')
+            ->willReturn($canRookieOption);
+        $mockPlayer->method('getFinalYearRookieContractSalary')
+            ->willReturn($finalYearSalary);
 
-            public function canRookieOption(string $seasonPhase): bool
-            {
-                return $this->canOption;
-            }
-
-            public function getFinalYearRookieContractSalary(): int
-            {
-                // First round: cy3 is final year of 3-year contract
-                // Second round: cy2 is final year of 2-year contract
-                return ($this->draftRound == 1) ? $this->cy3Salary : $this->cy2Salary;
-            }
-        };
+        return $mockPlayer;
     }
 }

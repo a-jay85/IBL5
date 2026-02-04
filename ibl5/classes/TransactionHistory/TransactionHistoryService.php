@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace TransactionHistory;
 
 use TransactionHistory\Contracts\TransactionHistoryRepositoryInterface;
+use TransactionHistory\Contracts\TransactionHistoryViewInterface;
 
 /**
  * Service layer for Transaction History module.
  *
  * Handles filter extraction, category/month mappings, and orchestrates
  * repository calls to assemble page data.
+ *
+ * @phpstan-import-type PageData from TransactionHistoryViewInterface
  */
 class TransactionHistoryService
 {
@@ -72,15 +75,7 @@ class TransactionHistoryService
      * Assemble all data needed to render the page.
      *
      * @param array<string, string> $queryParams Raw $_GET parameters
-     * @return array{
-     *     transactions: array,
-     *     categories: array<int, string>,
-     *     availableYears: array<int, int>,
-     *     monthNames: array<int, string>,
-     *     selectedCategory: int,
-     *     selectedYear: int,
-     *     selectedMonth: int
-     * }
+     * @return PageData
      */
     public function getPageData(array $queryParams): array
     {

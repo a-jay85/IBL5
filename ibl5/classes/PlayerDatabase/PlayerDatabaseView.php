@@ -12,60 +12,76 @@ use PlayerDatabase\Contracts\PlayerDatabaseViewInterface;
  */
 class PlayerDatabaseView implements PlayerDatabaseViewInterface
 {
-    private PlayerDatabaseService $service;
-
+    /** @phpstan-ignore-next-line constructor.unusedParameter */
     public function __construct(PlayerDatabaseService $service)
     {
-        $this->service = $service;
     }
 
     /**
      * @see PlayerDatabaseViewInterface::renderSearchForm()
+     *
+     * @param array<string, mixed> $params
      */
     public function renderSearchForm(array $params): string
     {
         $positions = \JSB::PLAYER_POSITIONS;
 
+        /**
+         * Helper to extract a form field value as string for HTML display
+         *
+         * @param mixed $value
+         * @return string
+         */
+        $str = static function (mixed $value): string {
+            if ($value === null) {
+                return '';
+            }
+            if (is_int($value) || is_string($value)) {
+                return (string) $value;
+            }
+            return '';
+        };
+
         // Extract form parameters with defaults
-        $pos = $params['pos'] ?? '';
-        $age = $params['age'] ?? '';
-        $talent = $params['talent'] ?? '';
-        $skill = $params['skill'] ?? '';
-        $intangibles = $params['intangibles'] ?? '';
-        $Clutch = $params['Clutch'] ?? '';
-        $Consistency = $params['Consistency'] ?? '';
-        $college = $params['college'] ?? '';
-        $active = $params['active'] ?? '';
-        $exp = $params['exp'] ?? '';
-        $exp_max = $params['exp_max'] ?? '';
-        $bird = $params['bird'] ?? '';
-        $bird_max = $params['bird_max'] ?? '';
-        $search_name = $params['search_name'] ?? '';
+        $pos = $str($params['pos'] ?? null);
+        $age = $str($params['age'] ?? null);
+        $talent = $str($params['talent'] ?? null);
+        $skill = $str($params['skill'] ?? null);
+        $intangibles = $str($params['intangibles'] ?? null);
+        $Clutch = $str($params['Clutch'] ?? null);
+        $Consistency = $str($params['Consistency'] ?? null);
+        $college = $str($params['college'] ?? null);
+        $active = $params['active'] ?? null;
+        $exp = $str($params['exp'] ?? null);
+        $exp_max = $str($params['exp_max'] ?? null);
+        $bird = $str($params['bird'] ?? null);
+        $bird_max = $str($params['bird_max'] ?? null);
+        $search_name = $str($params['search_name'] ?? null);
 
         // Rating values
-        $r_fga = $params['r_fga'] ?? '';
-        $r_fgp = $params['r_fgp'] ?? '';
-        $r_fta = $params['r_fta'] ?? '';
-        $r_ftp = $params['r_ftp'] ?? '';
-        $r_tga = $params['r_tga'] ?? '';
-        $r_tgp = $params['r_tgp'] ?? '';
-        $r_orb = $params['r_orb'] ?? '';
-        $r_drb = $params['r_drb'] ?? '';
-        $r_ast = $params['r_ast'] ?? '';
-        $r_stl = $params['r_stl'] ?? '';
-        $r_blk = $params['r_blk'] ?? '';
-        $r_to = $params['r_to'] ?? '';
-        $r_foul = $params['r_foul'] ?? '';
+        $r_fga = $str($params['r_fga'] ?? null);
+        $r_fgp = $str($params['r_fgp'] ?? null);
+        $r_fta = $str($params['r_fta'] ?? null);
+        $r_ftp = $str($params['r_ftp'] ?? null);
+        $r_tga = $str($params['r_tga'] ?? null);
+        $r_tgp = $str($params['r_tgp'] ?? null);
+        $r_orb = $str($params['r_orb'] ?? null);
+        $r_drb = $str($params['r_drb'] ?? null);
+        $r_ast = $str($params['r_ast'] ?? null);
+        $r_stl = $str($params['r_stl'] ?? null);
+        $r_blk = $str($params['r_blk'] ?? null);
+        $r_to = $str($params['r_to'] ?? null);
+        $r_foul = $str($params['r_foul'] ?? null);
 
         // Skill values
-        $oo = $params['oo'] ?? '';
-        $do = $params['do'] ?? '';
-        $po = $params['po'] ?? '';
-        $to = $params['to'] ?? '';
-        $od = $params['od'] ?? '';
-        $dd = $params['dd'] ?? '';
-        $pd = $params['pd'] ?? '';
-        $td = $params['td'] ?? '';
+        $oo = $str($params['oo'] ?? null);
+        $do = $str($params['do'] ?? null);
+        $po = $str($params['po'] ?? null);
+        $to = $str($params['to'] ?? null);
+        $od = $str($params['od'] ?? null);
+        $dd = $str($params['dd'] ?? null);
+        $pd = $str($params['pd'] ?? null);
+        $td = $str($params['td'] ?? null);
 
         ob_start();
         ?>
@@ -79,7 +95,7 @@ class PlayerDatabaseView implements PlayerDatabaseViewInterface
         <div class="ibl-filter-form__row">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="search_name">Name:</label>
-                <input id="search_name" type="text" name="search_name" style="width: 10rem;" value="<?= htmlspecialchars((string)$search_name) ?>">
+                <input id="search_name" type="text" name="search_name" style="width: 10rem;" value="<?= htmlspecialchars($search_name) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="pos">Position:</label>
@@ -105,23 +121,23 @@ class PlayerDatabaseView implements PlayerDatabaseViewInterface
         <div class="ibl-filter-form__row">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="age">Max Age:</label>
-                <input id="age" type="text" name="age" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$age) ?>">
+                <input id="age" type="text" name="age" style="width: 3.5rem;" value="<?= htmlspecialchars($age) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="exp">Min Exp:</label>
-                <input id="exp" type="text" name="exp" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$exp) ?>">
+                <input id="exp" type="text" name="exp" style="width: 3.5rem;" value="<?= htmlspecialchars($exp) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="exp_max">Max Exp:</label>
-                <input id="exp_max" type="text" name="exp_max" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$exp_max) ?>">
+                <input id="exp_max" type="text" name="exp_max" style="width: 3.5rem;" value="<?= htmlspecialchars($exp_max) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="bird">Min Bird:</label>
-                <input id="bird" type="text" name="bird" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$bird) ?>">
+                <input id="bird" type="text" name="bird" style="width: 3.5rem;" value="<?= htmlspecialchars($bird) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="bird_max">Max Bird:</label>
-                <input id="bird_max" type="text" name="bird_max" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$bird_max) ?>">
+                <input id="bird_max" type="text" name="bird_max" style="width: 3.5rem;" value="<?= htmlspecialchars($bird_max) ?>">
             </div>
         </div>
     </fieldset>
@@ -131,57 +147,57 @@ class PlayerDatabaseView implements PlayerDatabaseViewInterface
         <div class="ibl-filter-form__row" style="margin-bottom: 0.5rem;">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_fga">2ga:</label>
-                <input id="r_fga" type="text" name="r_fga" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$r_fga) ?>">
+                <input id="r_fga" type="text" name="r_fga" style="width: 3.5rem;" value="<?= htmlspecialchars($r_fga) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_fgp">2gp:</label>
-                <input id="r_fgp" type="text" name="r_fgp" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$r_fgp) ?>">
+                <input id="r_fgp" type="text" name="r_fgp" style="width: 3.5rem;" value="<?= htmlspecialchars($r_fgp) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_fta">fta:</label>
-                <input id="r_fta" type="text" name="r_fta" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$r_fta) ?>">
+                <input id="r_fta" type="text" name="r_fta" style="width: 3.5rem;" value="<?= htmlspecialchars($r_fta) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_ftp">ftp:</label>
-                <input id="r_ftp" type="text" name="r_ftp" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$r_ftp) ?>">
+                <input id="r_ftp" type="text" name="r_ftp" style="width: 3.5rem;" value="<?= htmlspecialchars($r_ftp) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_tga">3ga:</label>
-                <input id="r_tga" type="text" name="r_tga" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$r_tga) ?>">
+                <input id="r_tga" type="text" name="r_tga" style="width: 3.5rem;" value="<?= htmlspecialchars($r_tga) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_tgp">3gp:</label>
-                <input id="r_tgp" type="text" name="r_tgp" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$r_tgp) ?>">
+                <input id="r_tgp" type="text" name="r_tgp" style="width: 3.5rem;" value="<?= htmlspecialchars($r_tgp) ?>">
             </div>
         </div>
         <div class="ibl-filter-form__row">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_orb">orb:</label>
-                <input id="r_orb" type="text" name="r_orb" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$r_orb) ?>">
+                <input id="r_orb" type="text" name="r_orb" style="width: 3.5rem;" value="<?= htmlspecialchars($r_orb) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_drb">drb:</label>
-                <input id="r_drb" type="text" name="r_drb" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$r_drb) ?>">
+                <input id="r_drb" type="text" name="r_drb" style="width: 3.5rem;" value="<?= htmlspecialchars($r_drb) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_ast">ast:</label>
-                <input id="r_ast" type="text" name="r_ast" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$r_ast) ?>">
+                <input id="r_ast" type="text" name="r_ast" style="width: 3.5rem;" value="<?= htmlspecialchars($r_ast) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_stl">stl:</label>
-                <input id="r_stl" type="text" name="r_stl" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$r_stl) ?>">
+                <input id="r_stl" type="text" name="r_stl" style="width: 3.5rem;" value="<?= htmlspecialchars($r_stl) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_blk">blk:</label>
-                <input id="r_blk" type="text" name="r_blk" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$r_blk) ?>">
+                <input id="r_blk" type="text" name="r_blk" style="width: 3.5rem;" value="<?= htmlspecialchars($r_blk) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_to">tvr:</label>
-                <input id="r_to" type="text" name="r_to" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$r_to) ?>">
+                <input id="r_to" type="text" name="r_to" style="width: 3.5rem;" value="<?= htmlspecialchars($r_to) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_foul">foul:</label>
-                <input id="r_foul" type="text" name="r_foul" style="width: 3.5rem;" value="<?= htmlspecialchars((string)$r_foul) ?>">
+                <input id="r_foul" type="text" name="r_foul" style="width: 3.5rem;" value="<?= htmlspecialchars($r_foul) ?>">
             </div>
         </div>
     </fieldset>
@@ -191,37 +207,37 @@ class PlayerDatabaseView implements PlayerDatabaseViewInterface
         <div class="ibl-filter-form__row" style="margin-bottom: 0.5rem;">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="oo">oo:</label>
-                <input id="oo" type="text" name="oo" style="width: 3rem;" value="<?= htmlspecialchars((string)$oo) ?>">
+                <input id="oo" type="text" name="oo" style="width: 3rem;" value="<?= htmlspecialchars($oo) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="do">do:</label>
-                <input id="do" type="text" name="do" style="width: 3rem;" value="<?= htmlspecialchars((string)$do) ?>">
+                <input id="do" type="text" name="do" style="width: 3rem;" value="<?= htmlspecialchars($do) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="po">po:</label>
-                <input id="po" type="text" name="po" style="width: 3rem;" value="<?= htmlspecialchars((string)$po) ?>">
+                <input id="po" type="text" name="po" style="width: 3rem;" value="<?= htmlspecialchars($po) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="to">to:</label>
-                <input id="to" type="text" name="to" style="width: 3rem;" value="<?= htmlspecialchars((string)$to) ?>">
+                <input id="to" type="text" name="to" style="width: 3rem;" value="<?= htmlspecialchars($to) ?>">
             </div>
         </div>
         <div class="ibl-filter-form__row">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="od">od:</label>
-                <input id="od" type="text" name="od" style="width: 3rem;" value="<?= htmlspecialchars((string)$od) ?>">
+                <input id="od" type="text" name="od" style="width: 3rem;" value="<?= htmlspecialchars($od) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="dd">dd:</label>
-                <input id="dd" type="text" name="dd" style="width: 3rem;" value="<?= htmlspecialchars((string)$dd) ?>">
+                <input id="dd" type="text" name="dd" style="width: 3rem;" value="<?= htmlspecialchars($dd) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="pd">pd:</label>
-                <input id="pd" type="text" name="pd" style="width: 3rem;" value="<?= htmlspecialchars((string)$pd) ?>">
+                <input id="pd" type="text" name="pd" style="width: 3rem;" value="<?= htmlspecialchars($pd) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="td">td:</label>
-                <input id="td" type="text" name="td" style="width: 3rem;" value="<?= htmlspecialchars((string)$td) ?>">
+                <input id="td" type="text" name="td" style="width: 3rem;" value="<?= htmlspecialchars($td) ?>">
             </div>
         </div>
     </fieldset>
@@ -231,29 +247,29 @@ class PlayerDatabaseView implements PlayerDatabaseViewInterface
         <div class="ibl-filter-form__row" style="margin-bottom: 0.5rem;">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="talent">Talent:</label>
-                <input id="talent" type="text" name="talent" style="width: 3rem;" value="<?= htmlspecialchars((string)$talent) ?>">
+                <input id="talent" type="text" name="talent" style="width: 3rem;" value="<?= htmlspecialchars($talent) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="skill">Skill:</label>
-                <input id="skill" type="text" name="skill" style="width: 3rem;" value="<?= htmlspecialchars((string)$skill) ?>">
+                <input id="skill" type="text" name="skill" style="width: 3rem;" value="<?= htmlspecialchars($skill) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="intangibles">Intangibles:</label>
-                <input id="intangibles" type="text" name="intangibles" style="width: 3rem;" value="<?= htmlspecialchars((string)$intangibles) ?>">
+                <input id="intangibles" type="text" name="intangibles" style="width: 3rem;" value="<?= htmlspecialchars($intangibles) ?>">
             </div>
         </div>
         <div class="ibl-filter-form__row">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="Clutch">Clutch:</label>
-                <input id="Clutch" type="text" name="Clutch" style="width: 3rem;" value="<?= htmlspecialchars((string)$Clutch) ?>">
+                <input id="Clutch" type="text" name="Clutch" style="width: 3rem;" value="<?= htmlspecialchars($Clutch) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="Consistency">Consistency:</label>
-                <input id="Consistency" type="text" name="Consistency" style="width: 3rem;" value="<?= htmlspecialchars((string)$Consistency) ?>">
+                <input id="Consistency" type="text" name="Consistency" style="width: 3rem;" value="<?= htmlspecialchars($Consistency) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="college">College:</label>
-                <input id="college" type="text" name="college" style="width: 10rem;" value="<?= htmlspecialchars((string)$college) ?>">
+                <input id="college" type="text" name="college" style="width: 10rem;" value="<?= htmlspecialchars($college) ?>">
             </div>
         </div>
     </fieldset>
@@ -292,7 +308,7 @@ function resetPlayerDatabase() {
 }
 </script>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -339,7 +355,7 @@ function resetPlayerDatabase() {
         <th>College</th>
     </tr>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -347,71 +363,76 @@ function resetPlayerDatabase() {
      */
     public function renderPlayerRow(\Player\PlayerData $player, int $rowIndex): string
     {
-        $retired = (int)$player->isRetired;
+        $retired = $player->isRetired !== null ? (int) $player->isRetired : 0;
+        $pid = (int) $player->playerID;
+        $playerName = $player->name ?? '';
+        $position = $player->position ?? '';
+        $college = $player->collegeName ?? '';
 
         ob_start();
 
         if ($retired === 1) {
+            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $playerName);
             ?>
 <tr>
-    <td><?= htmlspecialchars($player->position) ?></td>
-    <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$player->playerID, $player->name); ?>
-    <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
+    <td><?= htmlspecialchars($position) ?></td>
+    <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $pid ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
     <td colspan="30"> --- Retired --- </td>
-    <td><?= htmlspecialchars((string)($player->collegeName ?? '')) ?></td>
+    <td><?= htmlspecialchars($college) ?></td>
 </tr>
             <?php
         } else {
+            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $playerName);
+            $teamID = (int) $player->teamID;
             ?>
 <tr>
-    <td><?= htmlspecialchars($player->position) ?></td>
-    <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$player->playerID, $player->name); ?>
-    <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
-    <td><?= $player->age ?></td>
-    <?php if ($player->teamColor1 !== null && $player->teamID > 0): ?>
+    <td><?= htmlspecialchars($position) ?></td>
+    <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $pid ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
+    <td><?= $player->age !== null ? (string) $player->age : '' ?></td>
+    <?php if ($player->teamColor1 !== null && $teamID > 0): ?>
     <td class="ibl-team-cell--colored" style="background-color: #<?= \Utilities\HtmlSanitizer::safeHtmlOutput($player->teamColor1) ?>;">
-        <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $player->teamID ?>" class="ibl-team-cell__name" style="color: #<?= \Utilities\HtmlSanitizer::safeHtmlOutput($player->teamColor2 ?? '') ?>;">
-            <img src="images/logo/new<?= $player->teamID ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-            <span class="ibl-team-cell__text"><?= htmlspecialchars($player->teamName) ?></span>
+        <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamID ?>" class="ibl-team-cell__name" style="color: #<?= \Utilities\HtmlSanitizer::safeHtmlOutput($player->teamColor2 ?? '') ?>;">
+            <img src="images/logo/new<?= $teamID ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
+            <span class="ibl-team-cell__text"><?= htmlspecialchars($player->teamName ?? '') ?></span>
         </a>
     </td>
     <?php else: ?>
     <td><?= htmlspecialchars($player->teamName ?? '') ?></td>
     <?php endif; ?>
-    <td><?= $player->yearsOfExperience ?></td>
-    <td><?= $player->birdYears ?></td>
-    <td><?= $player->ratingFieldGoalAttempts ?></td>
-    <td><?= $player->ratingFieldGoalPercentage ?></td>
-    <td><?= $player->ratingFreeThrowAttempts ?></td>
-    <td><?= $player->ratingFreeThrowPercentage ?></td>
-    <td><?= $player->ratingThreePointAttempts ?></td>
-    <td><?= $player->ratingThreePointPercentage ?></td>
-    <td><?= $player->ratingOffensiveRebounds ?></td>
-    <td><?= $player->ratingDefensiveRebounds ?></td>
-    <td><?= $player->ratingAssists ?></td>
-    <td><?= $player->ratingSteals ?></td>
-    <td><?= $player->ratingTurnovers ?></td>
-    <td><?= $player->ratingBlocks ?></td>
-    <td><?= $player->ratingFouls ?></td>
-    <td><?= $player->ratingOutsideOffense ?></td>
-    <td><?= $player->ratingOutsideDefense ?></td>
-    <td><?= $player->ratingDriveOffense ?></td>
-    <td><?= $player->ratingDriveDefense ?></td>
-    <td><?= $player->ratingPostOffense ?></td>
-    <td><?= $player->ratingPostDefense ?></td>
-    <td><?= $player->ratingTransitionOffense ?></td>
-    <td><?= $player->ratingTransitionDefense ?></td>
-    <td><?= $player->ratingTalent ?></td>
-    <td><?= $player->ratingSkill ?></td>
-    <td><?= $player->ratingIntangibles ?></td>
-    <td><?= $player->ratingClutch ?></td>
-    <td><?= $player->ratingConsistency ?></td>
-    <td><?= htmlspecialchars((string)($player->collegeName ?? '')) ?></td>
+    <td><?= (int) $player->yearsOfExperience ?></td>
+    <td><?= (int) $player->birdYears ?></td>
+    <td><?= (int) $player->ratingFieldGoalAttempts ?></td>
+    <td><?= (int) $player->ratingFieldGoalPercentage ?></td>
+    <td><?= (int) $player->ratingFreeThrowAttempts ?></td>
+    <td><?= (int) $player->ratingFreeThrowPercentage ?></td>
+    <td><?= (int) $player->ratingThreePointAttempts ?></td>
+    <td><?= (int) $player->ratingThreePointPercentage ?></td>
+    <td><?= (int) $player->ratingOffensiveRebounds ?></td>
+    <td><?= (int) $player->ratingDefensiveRebounds ?></td>
+    <td><?= (int) $player->ratingAssists ?></td>
+    <td><?= (int) $player->ratingSteals ?></td>
+    <td><?= (int) $player->ratingTurnovers ?></td>
+    <td><?= (int) $player->ratingBlocks ?></td>
+    <td><?= (int) $player->ratingFouls ?></td>
+    <td><?= (int) $player->ratingOutsideOffense ?></td>
+    <td><?= (int) $player->ratingOutsideDefense ?></td>
+    <td><?= (int) $player->ratingDriveOffense ?></td>
+    <td><?= (int) $player->ratingDriveDefense ?></td>
+    <td><?= (int) $player->ratingPostOffense ?></td>
+    <td><?= (int) $player->ratingPostDefense ?></td>
+    <td><?= (int) $player->ratingTransitionOffense ?></td>
+    <td><?= (int) $player->ratingTransitionDefense ?></td>
+    <td><?= (int) $player->ratingTalent ?></td>
+    <td><?= (int) $player->ratingSkill ?></td>
+    <td><?= (int) $player->ratingIntangibles ?></td>
+    <td><?= (int) $player->ratingClutch ?></td>
+    <td><?= (int) $player->ratingConsistency ?></td>
+    <td><?= htmlspecialchars($college) ?></td>
 </tr>
             <?php
         }
 
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**

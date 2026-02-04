@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FranchiseHistory;
 
+use FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface;
 use FranchiseHistory\Contracts\FranchiseHistoryViewInterface;
 use Utilities\HtmlSanitizer;
 
@@ -12,12 +13,16 @@ use Utilities\HtmlSanitizer;
  *
  * Generates sortable HTML table displaying franchise history data.
  *
+ * @phpstan-import-type FranchiseRow from FranchiseHistoryRepositoryInterface
+ *
  * @see FranchiseHistoryViewInterface For the interface contract
  */
 class FranchiseHistoryView implements FranchiseHistoryViewInterface
 {
     /**
      * @see FranchiseHistoryViewInterface::render()
+     *
+     * @param array<int, FranchiseRow> $franchiseData
      */
     public function render(array $franchiseData): string
     {
@@ -63,7 +68,7 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
     /**
      * Render all team rows
      *
-     * @param array $franchiseData Array of franchise data
+     * @param array<int, FranchiseRow> $franchiseData Array of franchise data
      * @return string HTML for all team rows
      */
     private function renderTableRows(array $franchiseData): string
@@ -80,14 +85,17 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
     /**
      * Render a single team row
      *
-     * @param array $team Team franchise data
+     * @param FranchiseRow $team Team franchise data
      * @return string HTML for team row
      */
     private function renderTeamRow(array $team): string
     {
         $teamId = (int)$team['teamid'];
+        /** @var string $color1 */
         $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
+        /** @var string $color2 */
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
+        /** @var string $teamName */
         $teamName = HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
         $html = '<tr data-team-id="' . $teamId . '">';
@@ -101,21 +109,25 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
         $html .= '</td>';
 
         // All-time stats
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['totwins']) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['totloss']) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['winpct']) . '</td>';
+        $html .= '<td>' . (int)$team['totwins'] . '</td>';
+        $html .= '<td>' . (int)$team['totloss'] . '</td>';
+        /** @var string $winpct */
+        $winpct = HtmlSanitizer::safeHtmlOutput($team['winpct']);
+        $html .= '<td>' . $winpct . '</td>';
 
         // Last five seasons stats
-        $html .= '<td class="last-five-cell">' . HtmlSanitizer::safeHtmlOutput($team['five_season_wins']) . '</td>';
-        $html .= '<td class="last-five-cell">' . HtmlSanitizer::safeHtmlOutput($team['five_season_losses']) . '</td>';
-        $html .= '<td class="last-five-cell">' . HtmlSanitizer::safeHtmlOutput($team['five_season_winpct']) . '</td>';
+        $html .= '<td class="last-five-cell">' . (int)$team['five_season_wins'] . '</td>';
+        $html .= '<td class="last-five-cell">' . (int)$team['five_season_losses'] . '</td>';
+        /** @var string $fiveSeasonWinpct */
+        $fiveSeasonWinpct = HtmlSanitizer::safeHtmlOutput($team['five_season_winpct'] ?? '');
+        $html .= '<td class="last-five-cell">' . $fiveSeasonWinpct . '</td>';
 
         // Titles and playoffs
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['playoffs']) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['heat_titles']) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['div_titles']) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['conf_titles']) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['ibl_titles']) . '</td>';
+        $html .= '<td>' . (int)$team['playoffs'] . '</td>';
+        $html .= '<td>' . $team['heat_titles'] . '</td>';
+        $html .= '<td>' . $team['div_titles'] . '</td>';
+        $html .= '<td>' . $team['conf_titles'] . '</td>';
+        $html .= '<td>' . $team['ibl_titles'] . '</td>';
 
         $html .= '</tr>';
 

@@ -12,17 +12,22 @@ use Utilities\HtmlSanitizer;
  * View class for rendering draft history page.
  *
  * @see DraftHistoryViewInterface
+ *
+ * @phpstan-import-type DraftPickByYearRow from Contracts\DraftHistoryRepositoryInterface
+ * @phpstan-import-type DraftPickByTeamRow from Contracts\DraftHistoryRepositoryInterface
  */
 class DraftHistoryView implements DraftHistoryViewInterface
 {
     /**
      * @see DraftHistoryViewInterface::render()
+     *
+     * @param list<DraftPickByYearRow> $draftPicks
      */
     public function render(int $selectedYear, int $startYear, int $endYear, array $draftPicks): string
     {
         $output = $this->renderTitleWithYearSelect($startYear, $endYear, $selectedYear);
 
-        if (empty($draftPicks)) {
+        if ($draftPicks === []) {
             $output .= $this->renderNoDataMessage();
         } else {
             $output .= $this->renderTableStart();
@@ -35,16 +40,19 @@ class DraftHistoryView implements DraftHistoryViewInterface
 
     /**
      * @see DraftHistoryViewInterface::renderTeamHistory()
+     *
+     * @param list<DraftPickByTeamRow> $draftPicks
      */
     public function renderTeamHistory(\Team $team, array $draftPicks): string
     {
+        /** @var string $teamName */
         $teamName = HtmlSanitizer::safeHtmlOutput($team->name);
-        $teamId = (int) $team->teamID;
+        $teamId = $team->teamID;
 
         $output = "<h2 class=\"ibl-title\">{$teamName} Draft History</h2>";
         $output .= "<img src=\"images/logo/{$teamId}.jpg\" alt=\"\" class=\"team-logo-banner\">";
 
-        if (empty($draftPicks)) {
+        if ($draftPicks === []) {
             $output .= '<p class="draft-no-data">No draft history found.</p>';
         } else {
             $output .= $this->renderTeamTableStart();
@@ -111,7 +119,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
     /**
      * Render all table rows.
      *
-     * @param array $draftPicks Array of draft pick data
+     * @param list<DraftPickByYearRow> $draftPicks Array of draft pick data
      * @return string HTML table rows
      */
     private function renderTableRows(array $draftPicks): string
@@ -119,17 +127,23 @@ class DraftHistoryView implements DraftHistoryViewInterface
         $output = '';
 
         foreach ($draftPicks as $pick) {
-            $pid = (int) ($pick['pid'] ?? 0);
-            $name = HtmlSanitizer::safeHtmlOutput($pick['name'] ?? '');
-            $pos = HtmlSanitizer::safeHtmlOutput($pick['pos'] ?? '');
-            $round = (int) ($pick['draftround'] ?? 0);
-            $pickNo = (int) ($pick['draftpickno'] ?? 0);
-            $college = HtmlSanitizer::safeHtmlOutput($pick['college'] ?? '');
+            $pid = $pick['pid'];
+            /** @var string $name */
+            $name = HtmlSanitizer::safeHtmlOutput($pick['name']);
+            /** @var string $pos */
+            $pos = HtmlSanitizer::safeHtmlOutput($pick['pos']);
+            $round = $pick['draftround'];
+            $pickNo = $pick['draftpickno'];
+            /** @var string $college */
+            $college = HtmlSanitizer::safeHtmlOutput($pick['college']);
 
             // Team cell styling
-            $teamId = (int) ($pick['teamid'] ?? 0);
-            $teamName = HtmlSanitizer::safeHtmlOutput($pick['draftedby'] ?? '');
+            $teamId = $pick['teamid'] ?? 0;
+            /** @var string $teamName */
+            $teamName = HtmlSanitizer::safeHtmlOutput($pick['draftedby']);
+            /** @var string $color1 */
             $color1 = HtmlSanitizer::safeHtmlOutput($pick['color1'] ?? 'FFFFFF');
+            /** @var string $color2 */
             $color2 = HtmlSanitizer::safeHtmlOutput($pick['color2'] ?? '000000');
 
             // Handle unknown teams (no match found) gracefully
@@ -183,7 +197,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
     /**
      * Render team history table rows.
      *
-     * @param array $draftPicks Array of team draft pick data
+     * @param list<DraftPickByTeamRow> $draftPicks Array of team draft pick data
      * @return string HTML table rows
      */
     private function renderTeamTableRows(array $draftPicks): string
@@ -191,14 +205,17 @@ class DraftHistoryView implements DraftHistoryViewInterface
         $output = '';
 
         foreach ($draftPicks as $pick) {
-            $pid = (int) ($pick['pid'] ?? 0);
-            $name = HtmlSanitizer::safeHtmlOutput($pick['name'] ?? '');
-            $pos = HtmlSanitizer::safeHtmlOutput($pick['pos'] ?? '');
-            $round = (int) ($pick['draftround'] ?? 0);
-            $pickNo = (int) ($pick['draftpickno'] ?? 0);
-            $draftYear = (int) ($pick['draftyear'] ?? 0);
-            $college = HtmlSanitizer::safeHtmlOutput($pick['college'] ?? '');
-            $isRetired = (int) ($pick['retired'] ?? 0) === 1;
+            $pid = $pick['pid'];
+            /** @var string $name */
+            $name = HtmlSanitizer::safeHtmlOutput($pick['name']);
+            /** @var string $pos */
+            $pos = HtmlSanitizer::safeHtmlOutput($pick['pos']);
+            $round = $pick['draftround'];
+            $pickNo = $pick['draftpickno'];
+            $draftYear = $pick['draftyear'];
+            /** @var string $college */
+            $college = HtmlSanitizer::safeHtmlOutput($pick['college']);
+            $isRetired = $pick['retired'] !== '0';
 
             $retiredBadge = $isRetired ? ' <span class="draft-retired-badge">(ret.)</span>' : '';
             $playerThumbnail = PlayerImageHelper::renderThumbnail($pid);

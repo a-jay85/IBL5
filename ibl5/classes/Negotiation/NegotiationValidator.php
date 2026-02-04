@@ -13,26 +13,29 @@ use Services\CommonValidator;
 
 /**
  * @see NegotiationValidatorInterface
+ *
+ * @phpstan-import-type ValidationResult from NegotiationValidatorInterface
  */
 class NegotiationValidator implements NegotiationValidatorInterface
 {
-    private object $db;
     private NegotiationRepositoryInterface $repository;
     private PlayerContractValidator $contractValidator;
-    
+
     public function __construct(object $db)
     {
-        $this->db = $db;
         $this->repository = new NegotiationRepository($db);
         $this->contractValidator = new PlayerContractValidator();
     }
     
     /**
      * @see NegotiationValidatorInterface::validateNegotiationEligibility()
+     *
+     * @return ValidationResult
      */
     public function validateNegotiationEligibility(Player $player, string $userTeamName): array
     {
         // Check if player is on user's team using common validator
+        /** @var array{valid: bool, error?: string} $ownershipResult */
         $ownershipResult = CommonValidator::validatePlayerOwnership($player, $userTeamName);
         if (!$ownershipResult['valid']) {
             return $ownershipResult;
@@ -54,6 +57,8 @@ class NegotiationValidator implements NegotiationValidatorInterface
     
     /**
      * @see NegotiationValidatorInterface::validateFreeAgencyNotActive()
+     *
+     * @return ValidationResult
      */
     public function validateFreeAgencyNotActive(): array
     {   

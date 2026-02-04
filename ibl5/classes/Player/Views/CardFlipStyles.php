@@ -124,8 +124,8 @@ CSS;
 
     /**
      * Get flip icon/button CSS
-     * 
-     * @param array $colorScheme Color scheme from TeamColorHelper
+     *
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string} $colorScheme Color scheme from TeamColorHelper
      * @param string $iconClass CSS class for the flip icon
      * @param bool $isButton Whether it's a button (stats) or icon (trading card)
      * @return string CSS rules
@@ -288,8 +288,8 @@ CSS;
 
     /**
      * Get pulse animation CSS
-     * 
-     * @param array $colorScheme Color scheme from TeamColorHelper
+     *
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string} $colorScheme Color scheme from TeamColorHelper
      * @param string $iconClass CSS class for the flip icon
      * @param string $animationName Name for the keyframes animation
      * @return string CSS rules
@@ -401,8 +401,8 @@ HTML;
 
     /**
      * Get complete flip styles for stats cards (X-axis rotation)
-     * 
-     * @param array|null $colorScheme Optional color scheme
+     *
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme
      * @return string Complete CSS and JS in HTML tags
      */
     public static function getStatsCardFlipStyles(?array $colorScheme = null): string

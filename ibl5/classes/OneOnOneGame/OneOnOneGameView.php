@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OneOnOneGame;
 
+use OneOnOneGame\Contracts\OneOnOneGameRepositoryInterface;
 use OneOnOneGame\Contracts\OneOnOneGameViewInterface;
 use Utilities\HtmlSanitizer;
 
@@ -14,6 +15,7 @@ use Utilities\HtmlSanitizer;
  * and ibl-data-table for stats display.
  *
  * @see OneOnOneGameViewInterface For method contracts
+ * @phpstan-import-type GameRecord from OneOnOneGameRepositoryInterface
  */
 class OneOnOneGameView implements OneOnOneGameViewInterface
 {
@@ -38,10 +40,11 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
         $html .= '<select name="pid1" id="pid1" class="ibl-select">' . "\n";
 
         foreach ($players as $player) {
-            $pid = (int) $player['pid'];
+            $pid = $player['pid'];
+            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($player['name']);
             $selected = ($pid === $selectedPlayer1) ? ' selected' : '';
-            $html .= "<option value=\"$pid\"$selected>$name</option>\n";
+            $html .= '<option value="' . $pid . '"' . $selected . '>' . $name . '</option>' . "\n";
         }
 
         $html .= '</select>' . "\n";
@@ -52,10 +55,11 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
         $html .= '<select name="pid2" id="pid2" class="ibl-select">' . "\n";
 
         foreach ($players as $player) {
-            $pid = (int) $player['pid'];
+            $pid = $player['pid'];
+            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($player['name']);
             $selected = ($pid === $selectedPlayer2) ? ' selected' : '';
-            $html .= "<option value=\"$pid\"$selected>$name</option>\n";
+            $html .= '<option value="' . $pid . '"' . $selected . '>' . $name . '</option>' . "\n";
         }
 
         $html .= '</select>' . "\n";
@@ -90,13 +94,15 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
      */
     public function renderErrors(array $errors): string
     {
-        if (empty($errors)) {
+        if ($errors === []) {
             return '';
         }
 
         $html = '<div class="ibl-alert ibl-alert--error">';
         foreach ($errors as $error) {
-            $html .= HtmlSanitizer::safeHtmlOutput($error) . "<br>\n";
+            /** @var string $sanitizedError */
+            $sanitizedError = HtmlSanitizer::safeHtmlOutput($error);
+            $html .= $sanitizedError . "<br>\n";
         }
         $html .= '</div>';
 
@@ -118,17 +124,22 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
 
     /**
      * @see OneOnOneGameViewInterface::renderGameReplay()
+     *
+     * @param GameRecord $gameData
      */
     public function renderGameReplay(array $gameData): string
     {
-        $gameId = (int) $gameData['gameid'];
+        $gameId = $gameData['gameid'];
+        /** @var string $winner */
         $winner = HtmlSanitizer::safeHtmlOutput($gameData['winner']);
+        /** @var string $loser */
         $loser = HtmlSanitizer::safeHtmlOutput($gameData['loser']);
-        $winScore = (int) $gameData['winscore'];
-        $lossScore = (int) $gameData['lossscore'];
+        $winScore = $gameData['winscore'];
+        $lossScore = $gameData['lossscore'];
+        /** @var string $owner */
         $owner = HtmlSanitizer::safeHtmlOutput($gameData['owner']);
         // Play-by-play is already sanitized when generated, don't double-escape
-        $playByPlay = (string) $gameData['playbyplay'];
+        $playByPlay = $gameData['playbyplay'];
 
         return '<div class="ibl-card">'
             . '<div class="ibl-card__header"><h2 class="ibl-card__title">Replay of Game Number ' . $gameId . '</h2></div>'

@@ -6,9 +6,13 @@ namespace Statistics;
 
 /**
  * TeamStatsCalculator - Calculate team statistics from game data
- * 
+ *
  * Computes wins, losses, home/away splits, streaks, and ranking scores
  * from game result data for power rankings updates.
+ *
+ * @phpstan-type GameRow array{Visitor: int, VScore: int, Home: int, HScore: int}
+ * @phpstan-type NormalizedGame array{awayTeam: int, awayScore: int, homeTeam: int, homeScore: int}
+ * @phpstan-type TeamStats array{wins: int, losses: int, homeWins: int, homeLosses: int, awayWins: int, awayLosses: int, winPoints: int, lossPoints: int, winsInLast10Games: int, lossesInLast10Games: int, streak: int, streakType: string}
  */
 class TeamStatsCalculator
 {
@@ -21,23 +25,10 @@ class TeamStatsCalculator
 
     /**
      * Calculate team statistics from an array of games
-     * 
-     * @param array $games Array of game data with Visitor, VScore, Home, HScore
+     *
+     * @param list<GameRow> $games Array of game data with Visitor, VScore, Home, HScore
      * @param int $tid Team ID to calculate stats for
-     * @return array{
-     *     wins: int,
-     *     losses: int,
-     *     homeWins: int,
-     *     homeLosses: int,
-     *     awayWins: int,
-     *     awayLosses: int,
-     *     winPoints: int,
-     *     lossPoints: int,
-     *     winsInLast10Games: int,
-     *     lossesInLast10Games: int,
-     *     streak: int,
-     *     streakType: string
-     * }
+     * @return TeamStats
      */
     public function calculate(array $games, int $tid): array
     {
@@ -57,6 +48,8 @@ class TeamStatsCalculator
 
     /**
      * Initialize empty stats array
+     *
+     * @return TeamStats
      */
     private function initializeStats(): array
     {
@@ -78,6 +71,9 @@ class TeamStatsCalculator
 
     /**
      * Normalize game data to standard format
+     *
+     * @param GameRow $gameData
+     * @return NormalizedGame
      */
     private function normalizeGameData(array $gameData): array
     {
@@ -91,10 +87,13 @@ class TeamStatsCalculator
 
     /**
      * Update stats based on a single game result
+     *
+     * @param TeamStats $stats
+     * @param NormalizedGame $game
      */
     private function updateGameStats(array &$stats, array $game, int $currentGame, int $totalGames, int $tid): void
     {
-        if ($tid == $game['awayTeam']) {
+        if ($tid === $game['awayTeam']) {
             $opponentTeam = $game['homeTeam'];
             $isWin = $game['awayScore'] > $game['homeScore'];
             $isHome = false;
@@ -139,11 +138,14 @@ class TeamStatsCalculator
 
     /**
      * Get opponent's record from database
+     *
+     * @return array{win: int, loss: int}
      */
     private function getOpponentRecord(int $teamId): array
     {
         // Use method_exists for duck-typing compatibility with MockDatabase and real db
         if (method_exists($this->db, 'fetchOne')) {
+            /** @var array{win: int, loss: int}|null $result */
             $result = $this->db->fetchOne(
                 "SELECT win, loss FROM ibl_power WHERE TeamID = ?",
                 "i",

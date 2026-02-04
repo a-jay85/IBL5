@@ -10,24 +10,32 @@ use Player\Player;
 
 /**
  * @see NegotiationDemandCalculatorInterface
+ *
+ * @phpstan-import-type TeamFactors from NegotiationDemandCalculatorInterface
+ * @phpstan-import-type DemandResult from NegotiationDemandCalculatorInterface
+ * @phpstan-type RatingMap array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, tov: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, to: int, td: int}
+ * @phpstan-type MarketMaximums array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, td: int}
+ * @phpstan-type BaseDemands array{dem1: float, dem2: float, dem3: float, dem4: float, dem5: float, dem6: int}
  */
 class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterface
 {
-    private object $db;
     private NegotiationRepositoryInterface $repository;
-    
+
     // Constants for demand calculation
     private const RAW_SCORE_BASELINE = 700; // Sam Mack's baseline score
     private const DEMANDS_FACTOR = 3; // Trial-and-error multiplier
-    
+
     public function __construct(object $db)
     {
-        $this->db = $db;
         $this->repository = new NegotiationRepository($db);
     }
     
     /**
      * @see NegotiationDemandCalculatorInterface::calculateDemands()
+     *
+     * @param Player $player The player object with ratings and stats
+     * @param TeamFactors $teamFactors Team factors affecting demands
+     * @return DemandResult Demand information
      */
     public function calculateDemands(Player $player, array $teamFactors): array
     {
@@ -59,9 +67,9 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
     
     /**
      * Calculate base contract demands from player ratings
-     * 
+     *
      * @param Player $player The player object
-     * @return array Base demand amounts for each year
+     * @return BaseDemands Base demand amounts for each year
      */
     private function calculateBaseDemands(Player $player): array
     {
@@ -102,9 +110,9 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
     
     /**
      * Get player ratings for demand calculation
-     * 
+     *
      * @param Player $player The player object
-     * @return array Player ratings
+     * @return RatingMap Player ratings
      */
     private function getPlayerRatings(Player $player): array
     {
@@ -135,8 +143,8 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
     
     /**
      * Get market maximum values for each rating category
-     * 
-     * @return array Market maximums
+     *
+     * @return MarketMaximums Market maximums
      */
     private function getMarketMaximums(): array
     {
@@ -145,9 +153,9 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
     
     /**
      * Calculate raw score from player ratings and market maximums
-     * 
-     * @param array $playerRatings Player's rating values
-     * @param array $marketMaximums Market maximum values
+     *
+     * @param RatingMap $playerRatings Player's rating values
+     * @param MarketMaximums $marketMaximums Market maximum values
      * @return int Total raw score
      */
     private function calculateRawScore(array $playerRatings, array $marketMaximums): int
@@ -166,9 +174,9 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
     
     /**
      * Calculate modifier based on team factors and player preferences
-     * 
+     *
      * @param Player $player The player object
-     * @param array $teamFactors Team factors
+     * @param TeamFactors $teamFactors Team factors
      * @return float Modifier value
      */
     private function calculateModifier(Player $player, array $teamFactors): float
@@ -210,10 +218,10 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
     
     /**
      * Apply modifier to base demands
-     * 
-     * @param array $baseDemands Base demand amounts
+     *
+     * @param BaseDemands $baseDemands Base demand amounts
      * @param float $modifier Modifier to apply
-     * @return array Adjusted demands
+     * @return BaseDemands Adjusted demands
      */
     private function applyModifier(array $baseDemands, float $modifier): array
     {
@@ -233,8 +241,8 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
     
     /**
      * Calculate number of years demanded based on demand amounts
-     * 
-     * @param array $demands Demand amounts
+     *
+     * @param BaseDemands $demands Demand amounts
      * @return int Number of years
      */
     private function calculateYearsDemanded(array $demands): int

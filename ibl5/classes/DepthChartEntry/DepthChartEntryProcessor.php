@@ -7,12 +7,17 @@ namespace DepthChartEntry;
 use DepthChartEntry\Contracts\DepthChartEntryProcessorInterface;
 
 /**
+ * @phpstan-import-type ProcessedPlayerData from Contracts\DepthChartEntryProcessorInterface
+ * @phpstan-import-type ProcessedSubmission from Contracts\DepthChartEntryProcessorInterface
+ *
  * @see DepthChartEntryProcessorInterface
  */
 class DepthChartEntryProcessor implements DepthChartEntryProcessorInterface
 {
     /**
      * @see DepthChartEntryProcessorInterface::processSubmission()
+     * @param array<string, mixed> $postData
+     * @return ProcessedSubmission
      */
     public function processSubmission(array $postData, int $maxPlayers = 15): array
     {
@@ -32,22 +37,24 @@ class DepthChartEntryProcessor implements DepthChartEntryProcessorInterface
             }
             
             $startingPositionCount = 0;
-            $injury = (int) ($postData['Injury' . $i] ?? 0);
-            
+            $injury = $this->extractIntValue($postData, 'Injury' . $i);
+
+            /** @var string $rawName */
+            $rawName = $postData['Name' . $i];
             $player = [
-                'name' => $this->sanitizePlayerName($postData['Name' . $i]),
-                'pg' => $this->sanitizeDepthValue($postData['pg' . $i] ?? 0),
-                'sg' => $this->sanitizeDepthValue($postData['sg' . $i] ?? 0),
-                'sf' => $this->sanitizeDepthValue($postData['sf' . $i] ?? 0),
-                'pf' => $this->sanitizeDepthValue($postData['pf' . $i] ?? 0),
-                'c' => $this->sanitizeDepthValue($postData['c' . $i] ?? 0),
-                'active' => $this->sanitizeActiveValue($postData['active' . $i] ?? 0),
-                'min' => $this->sanitizeMinutesValue($postData['min' . $i] ?? 0),
-                'of' => $this->sanitizeFocusValue($postData['OF' . $i] ?? 0),
-                'df' => $this->sanitizeFocusValue($postData['DF' . $i] ?? 0),
-                'oi' => $this->sanitizeSettingValue($postData['OI' . $i] ?? 0),
-                'di' => $this->sanitizeSettingValue($postData['DI' . $i] ?? 0),
-                'bh' => $this->sanitizeSettingValue($postData['BH' . $i] ?? 0),
+                'name' => $this->sanitizePlayerName($rawName),
+                'pg' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'pg' . $i)),
+                'sg' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'sg' . $i)),
+                'sf' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'sf' . $i)),
+                'pf' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'pf' . $i)),
+                'c' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'c' . $i)),
+                'active' => $this->sanitizeActiveValue($this->extractIntValue($postData, 'active' . $i)),
+                'min' => $this->sanitizeMinutesValue($this->extractIntValue($postData, 'min' . $i)),
+                'of' => $this->sanitizeFocusValue($this->extractIntValue($postData, 'OF' . $i)),
+                'df' => $this->sanitizeFocusValue($this->extractIntValue($postData, 'DF' . $i)),
+                'oi' => $this->sanitizeSettingValue($this->extractIntValue($postData, 'OI' . $i)),
+                'di' => $this->sanitizeSettingValue($this->extractIntValue($postData, 'DI' . $i)),
+                'bh' => $this->sanitizeSettingValue($this->extractIntValue($postData, 'BH' . $i)),
                 'injury' => $injury
             ];
             
@@ -98,42 +105,56 @@ class DepthChartEntryProcessor implements DepthChartEntryProcessorInterface
         ];
     }
     
+    /**
+     * Extract an integer value from POST data by key
+     *
+     * @param array<string, mixed> $postData
+     */
+    private function extractIntValue(array $postData, string $key): int
+    {
+        $value = $postData[$key] ?? 0;
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+        return 0;
+    }
+
     private function sanitizePlayerName(string $name): string
     {
         return trim(strip_tags($name));
     }
     
-    private function sanitizeDepthValue($value): int
+    private function sanitizeDepthValue(int $value): int
     {
-        $value = (int) $value;
         return max(0, min(5, $value));
     }
-    
-    private function sanitizeActiveValue($value): int
+
+    private function sanitizeActiveValue(int $value): int
     {
-        return ((int) $value) === 1 ? 1 : 0;
+        return $value === 1 ? 1 : 0;
     }
-    
-    private function sanitizeMinutesValue($value): int
+
+    private function sanitizeMinutesValue(int $value): int
     {
-        $value = (int) $value;
         return max(0, min(40, $value));
     }
-    
-    private function sanitizeFocusValue($value): int
+
+    private function sanitizeFocusValue(int $value): int
     {
-        $value = (int) $value;
         return max(0, min(3, $value));
     }
-    
-    private function sanitizeSettingValue($value): int
+
+    private function sanitizeSettingValue(int $value): int
     {
-        $value = (int) $value;
         return max(-2, min(2, $value));
     }
     
     /**
      * @see DepthChartEntryProcessorInterface::generateCsvContent()
+     * @param list<ProcessedPlayerData> $playerData
      */
     public function generateCsvContent(array $playerData): string
     {

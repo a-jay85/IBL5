@@ -8,7 +8,9 @@ use CareerLeaderboards\Contracts\CareerLeaderboardsRepositoryInterface;
 
 /**
  * @see CareerLeaderboardsRepositoryInterface
- * @extends \BaseMysqliRepository
+ *
+ * @phpstan-import-type CareerStatsRow from CareerLeaderboardsRepositoryInterface
+ * @phpstan-import-type LeaderboardResult from CareerLeaderboardsRepositoryInterface
  */
 class CareerLeaderboardsRepository extends \BaseMysqliRepository implements CareerLeaderboardsRepositoryInterface
 {
@@ -38,10 +40,12 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
 
     /**
      * @see CareerLeaderboardsRepositoryInterface::getLeaderboards()
-     * 
+     *
      * SECURITY NOTE: $tableKey and $sortColumn are validated against whitelists
      * (VALID_TABLES and VALID_SORT_COLUMNS) before being used in SQL.
      * String concatenation is acceptable here because all values are validated.
+     *
+     * @return LeaderboardResult
      */
     public function getLeaderboards(
         string $tableKey,
@@ -50,12 +54,12 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
         int $limit
     ): array {
         // Validate table name
-        if (!in_array($tableKey, self::VALID_TABLES)) {
+        if (!in_array($tableKey, self::VALID_TABLES, true)) {
             throw new \InvalidArgumentException("Invalid table name: $tableKey");
         }
 
         // Validate sort column
-        if (!in_array($sortColumn, self::VALID_SORT_COLUMNS)) {
+        if (!in_array($sortColumn, self::VALID_SORT_COLUMNS, true)) {
             throw new \InvalidArgumentException("Invalid sort column: $sortColumn");
         }
 
@@ -93,7 +97,7 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
                 LEFT JOIN ibl_plr p ON h.pid = p.pid
                 WHERE $whereClause
                 GROUP BY pid
-                ORDER BY $sortColumn DESC" 
+                ORDER BY $sortColumn DESC"
                 . ($limit > 0 ? " LIMIT $limit" : "") . ";";
         } else {
             $query = "SELECT h.*, p.retired
@@ -104,6 +108,7 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
                 . ($limit > 0 ? " LIMIT $limit" : "") . ";";
         }
 
+        /** @var list<CareerStatsRow> $rows */
         $rows = $this->fetchAll($query);
 
         return [
@@ -124,6 +129,6 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
             'ibl_olympics_career_avgs',
         ];
 
-        return in_array($tableKey, $avgTables) ? 'averages' : 'totals';
+        return in_array($tableKey, $avgTables, true) ? 'averages' : 'totals';
     }
 }

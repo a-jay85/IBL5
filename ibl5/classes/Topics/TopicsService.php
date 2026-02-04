@@ -13,6 +13,9 @@ use Topics\Contracts\TopicsServiceInterface;
  * Queries the nuke_topics and nuke_stories tables to build a complete
  * view of all active topics with their story counts and recent articles.
  *
+ * @phpstan-type TopicDbRow array{topicid: int|string, topicname: string, topicimage: string, topictext: string, stories: int|string, total_reads: int|string}
+ * @phpstan-type ArticleDbRow array{sid: int|string, catid: int|string, title: string, cat_title: string}
+ *
  * @see TopicsServiceInterface
  */
 class TopicsService extends BaseMysqliRepository implements TopicsServiceInterface
@@ -39,6 +42,7 @@ class TopicsService extends BaseMysqliRepository implements TopicsServiceInterfa
         $topics = [];
 
         foreach ($topicsData as $row) {
+            /** @var TopicDbRow $row */
             $topicId = (int) $row['topicid'];
             $storyCount = (int) $row['stories'];
 
@@ -49,9 +53,9 @@ class TopicsService extends BaseMysqliRepository implements TopicsServiceInterfa
 
             $topics[] = [
                 'topicId' => $topicId,
-                'topicName' => (string) $row['topicname'],
-                'topicImage' => (string) $row['topicimage'],
-                'topicText' => (string) $row['topictext'],
+                'topicName' => $row['topicname'],
+                'topicImage' => $row['topicimage'],
+                'topicText' => $row['topictext'],
                 'storyCount' => $storyCount,
                 'totalReads' => (int) $row['total_reads'],
                 'recentArticles' => $recentArticles,
@@ -64,7 +68,7 @@ class TopicsService extends BaseMysqliRepository implements TopicsServiceInterfa
     /**
      * Fetch all topics with aggregate story counts.
      *
-     * @return array<int, array<string, mixed>>
+     * @return array<int, TopicDbRow>
      */
     private function fetchAllTopicsWithCounts(): array
     {
@@ -76,6 +80,7 @@ class TopicsService extends BaseMysqliRepository implements TopicsServiceInterfa
                 GROUP BY t.topicid, t.topicname, t.topicimage, t.topictext
                 ORDER BY t.topictext";
 
+        /** @var array<int, TopicDbRow> */
         return $this->fetchAll($sql);
     }
 
@@ -98,11 +103,12 @@ class TopicsService extends BaseMysqliRepository implements TopicsServiceInterfa
         $articles = [];
 
         foreach ($rows as $row) {
+            /** @var ArticleDbRow $row */
             $articles[] = [
                 'sid' => (int) $row['sid'],
-                'title' => (string) $row['title'],
+                'title' => $row['title'],
                 'catId' => (int) $row['catid'],
-                'catTitle' => (string) $row['cat_title'],
+                'catTitle' => $row['cat_title'],
             ];
         }
 

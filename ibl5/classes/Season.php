@@ -11,10 +11,10 @@ declare(strict_types=1);
  * @property string $phase Current season phase
  * @property int $beginningYear Season beginning year
  * @property int $endingYear Season ending year
- * @property \DateTimeInterface $regularSeasonStartDate Regular season start date
- * @property \DateTimeInterface $postAllStarStartDate Post All-Star start date
- * @property \DateTimeInterface $playoffsStartDate Playoffs start date
- * @property \DateTimeInterface $playoffsEndDate Playoffs end date
+ * @property \DateTime $regularSeasonStartDate Regular season start date
+ * @property \DateTime $postAllStarStartDate Post All-Star start date
+ * @property \DateTime $playoffsStartDate Playoffs start date
+ * @property \DateTime $playoffsEndDate Playoffs end date
  * @property int $lastSimNumber Last simulation number
  * @property string $lastSimStartDate Last sim start date (YYYY-MM-DD from DATE column)
  * @property string $lastSimEndDate Last sim end date (YYYY-MM-DD from DATE column)
@@ -27,26 +27,26 @@ declare(strict_types=1);
  */
 class Season extends BaseMysqliRepository
 {
-    public $phase;
+    public string $phase;
 
-    public $beginningYear;
-    public $endingYear;
+    public int $beginningYear;
+    public int $endingYear;
 
-    public $regularSeasonStartDate;
-    public $postAllStarStartDate;
-    public $playoffsStartDate;
-    public $playoffsEndDate;
+    public \DateTime $regularSeasonStartDate;
+    public \DateTime $postAllStarStartDate;
+    public \DateTime $playoffsStartDate;
+    public \DateTime $playoffsEndDate;
 
-    public $lastSimNumber;
-    public $lastSimStartDate;
-    public $lastSimEndDate;
+    public int $lastSimNumber;
+    public string $lastSimStartDate;
+    public string $lastSimEndDate;
 
-    public $projectedNextSimEndDate;
+    public \DateTimeInterface $projectedNextSimEndDate;
 
-    public $allowTrades;
-    public $allowWaivers;
+    public string $allowTrades;
+    public string $allowWaivers;
 
-    public $freeAgencyNotificationsState;
+    public string $freeAgencyNotificationsState;
 
     const IBL_PRESEASON_YEAR = 9998;
     const IBL_OLYMPICS_MONTH = 8;
@@ -71,10 +71,10 @@ class Season extends BaseMysqliRepository
         $this->endingYear = (int)$this->getSeasonEndingYear(); // Cast to integer since column type is VARCHAR
         $this->beginningYear = $this->endingYear - 1;
 
-        $this->regularSeasonStartDate = date_create("$this->beginningYear-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01");
-        $this->postAllStarStartDate = date_create("$this->endingYear-" . Season::IBL_ALL_STAR_MONTH . "-04");
-        $this->playoffsStartDate = date_create("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-01");
-        $this->playoffsEndDate = date_create("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-30");
+        $this->regularSeasonStartDate = new \DateTime("$this->beginningYear-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01");
+        $this->postAllStarStartDate = new \DateTime("$this->endingYear-" . Season::IBL_ALL_STAR_MONTH . "-04");
+        $this->playoffsStartDate = new \DateTime("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-01");
+        $this->playoffsEndDate = new \DateTime("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-30");
 
         $arrayLastSimDates = $this->getLastSimDatesArray();
         $this->lastSimNumber = $arrayLastSimDates["Sim"];
@@ -96,6 +96,7 @@ class Season extends BaseMysqliRepository
      */
     public function getSeasonPhase(): string
     {
+        /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
             "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
             "s",
@@ -112,6 +113,7 @@ class Season extends BaseMysqliRepository
      */
     public function getSeasonEndingYear(): string
     {
+        /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
             "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
             "s",
@@ -128,6 +130,7 @@ class Season extends BaseMysqliRepository
      */
     public function getFirstBoxScoreDate(): string
     {
+        /** @var array{Date: string}|null $result */
         $result = $this->fetchOne(
             "SELECT Date FROM ibl_box_scores ORDER BY Date ASC LIMIT 1"
         );
@@ -142,6 +145,7 @@ class Season extends BaseMysqliRepository
      */
     public function getLastBoxScoreDate(): string
     {
+        /** @var array{Date: string}|null $result */
         $result = $this->fetchOne(
             "SELECT Date FROM ibl_box_scores ORDER BY Date DESC LIMIT 1"
         );
@@ -151,19 +155,20 @@ class Season extends BaseMysqliRepository
 
     /**
      * Get last sim dates array
-     * 
+     *
      * Returns the most recent simulation date range from ibl_sim_dates.
      * Note: 'Start Date' and 'End Date' columns are DATE type in schema.
-     * 
-     * @return array Array with keys: Sim (int), 'Start Date' (string YYYY-MM-DD), 'End Date' (string YYYY-MM-DD)
+     *
+     * @return array{Sim: int, 'Start Date': string, 'End Date': string}
      */
     public function getLastSimDatesArray(): array
     {
+        /** @var array{Sim: int, 'Start Date': string, 'End Date': string}|null $result */
         $result = $this->fetchOne(
             "SELECT * FROM ibl_sim_dates ORDER BY sim DESC LIMIT 1"
         );
 
-        return $result ?? [];
+        return $result ?? ['Sim' => 0, 'Start Date' => '', 'End Date' => ''];
     }
 
     /**
@@ -198,16 +203,20 @@ class Season extends BaseMysqliRepository
     {
         $league = new League($this->db);
         $simLengthInDays = $league->getSimLengthInDays();
-        
-        $lastSimEndDate = date_create($lastSimEndDate);
-        $projectedNextSimEndDate = date_add($lastSimEndDate, date_interval_create_from_date_string($simLengthInDays . ' days'));
-    
+
+        $lastSimEndDateObj = new \DateTime($lastSimEndDate);
+        $interval = new \DateInterval('P' . $simLengthInDays . 'D');
+        $projectedNextSimEndDate = date_add($lastSimEndDateObj, $interval);
+
         // override $projectedNextSimEndDate to account for the All-Star Break
+        $allStarBreakStart = new \DateTime("$this->endingYear-01-31");
+        $allStarBreakEnd = new \DateTime("$this->endingYear-02-05");
         if (
-            $projectedNextSimEndDate > date_create("$this->endingYear-01-31")
-            AND $projectedNextSimEndDate <= date_create("$this->endingYear-02-05")
+            $projectedNextSimEndDate > $allStarBreakStart
+            && $projectedNextSimEndDate <= $allStarBreakEnd
         ) {
-            $projectedNextSimEndDate = date_add($this->postAllStarStartDate, date_interval_create_from_date_string($simLengthInDays . ' days'));
+            $postAllStarStart = new \DateTime("$this->endingYear-" . self::IBL_ALL_STAR_MONTH . "-04");
+            $projectedNextSimEndDate = date_add($postAllStarStart, new \DateInterval('P' . $simLengthInDays . 'D'));
         }
 
         return $projectedNextSimEndDate;
@@ -220,6 +229,7 @@ class Season extends BaseMysqliRepository
      */
     public function getAllowTradesStatus(): string
     {
+        /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
             "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
             "s",
@@ -236,6 +246,7 @@ class Season extends BaseMysqliRepository
      */
     public function getAllowWaiversStatus(): string
     {
+        /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
             "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
             "s",
@@ -252,6 +263,7 @@ class Season extends BaseMysqliRepository
      */
     public function getFreeAgencyNotificationsState(): string
     {
+        /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
             "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
             "s",

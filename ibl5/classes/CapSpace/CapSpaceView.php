@@ -12,12 +12,16 @@ use Utilities\HtmlSanitizer;
  *
  * Generates sortable HTML table displaying team salary cap data.
  *
+ * @phpstan-import-type CapSpaceTeamData from CapSpaceService
+ *
  * @see CapSpaceViewInterface For the interface contract
  */
 class CapSpaceView implements CapSpaceViewInterface
 {
     /**
      * @see CapSpaceViewInterface::render()
+     *
+     * @param list<CapSpaceTeamData> $teamsData
      */
     public function render(array $teamsData, int $beginningYear, int $endingYear): string
     {
@@ -50,17 +54,23 @@ class CapSpaceView implements CapSpaceViewInterface
         for ($i = 0; $i < 6; $i++) {
             $yearStart = $beginningYear + $i;
             $yearEnd = $endingYear + $i;
-            $html .= '<th>' . HtmlSanitizer::safeHtmlOutput($yearStart) . '-<br>';
-            $html .= HtmlSanitizer::safeHtmlOutput($yearEnd) . '<br>Total</th>';
+            $html .= '<th>' . $yearStart . '-<br>';
+            $html .= $yearEnd . '<br>Total</th>';
         }
 
         $html .= '<th class="divider"></th>';
 
         // Position columns (current year only)
         foreach (\JSB::PLAYER_POSITIONS as $position) {
-            $html .= '<th>' . HtmlSanitizer::safeHtmlOutput($beginningYear) . '-<br>';
-            $html .= HtmlSanitizer::safeHtmlOutput($endingYear) . '<br>';
-            $html .= HtmlSanitizer::safeHtmlOutput($position) . '</th>';
+            /** @var string $safeBeginningYear */
+            $safeBeginningYear = HtmlSanitizer::safeHtmlOutput($beginningYear);
+            /** @var string $safeEndingYear */
+            $safeEndingYear = HtmlSanitizer::safeHtmlOutput($endingYear);
+            /** @var string $safePosition */
+            $safePosition = HtmlSanitizer::safeHtmlOutput($position);
+            $html .= '<th>' . $safeBeginningYear . '-<br>';
+            $html .= $safeEndingYear . '<br>';
+            $html .= $safePosition . '</th>';
         }
 
         $html .= '<th class="divider"></th>';
@@ -75,7 +85,7 @@ class CapSpaceView implements CapSpaceViewInterface
     /**
      * Render all team rows
      *
-     * @param array $teamsData Array of processed team data
+     * @param list<CapSpaceTeamData> $teamsData Array of processed team data
      * @return string HTML for all team rows
      */
     private function renderTableRows(array $teamsData): string
@@ -92,15 +102,18 @@ class CapSpaceView implements CapSpaceViewInterface
     /**
      * Render a single team row
      *
-     * @param array $teamData Team's cap data
+     * @param CapSpaceTeamData $teamData Team's cap data
      * @return string HTML for team row
      */
     private function renderTeamRow(array $teamData): string
     {
+        /** @var string $color1 */
         $color1 = HtmlSanitizer::safeHtmlOutput($teamData['color1']);
+        /** @var string $color2 */
         $color2 = HtmlSanitizer::safeHtmlOutput($teamData['color2']);
+        /** @var string $teamName */
         $teamName = HtmlSanitizer::safeHtmlOutput($teamData['teamName']);
-        $teamId = (int)$teamData['teamId'];
+        $teamId = $teamData['teamId'];
 
         $html = '<tr data-team-id="' . $teamId . '">';
 
@@ -116,7 +129,9 @@ class CapSpaceView implements CapSpaceViewInterface
         $years = ['year1', 'year2', 'year3', 'year4', 'year5', 'year6'];
         foreach ($years as $year) {
             $html .= '<td>';
-            $html .= HtmlSanitizer::safeHtmlOutput($teamData['availableSalary'][$year]);
+            /** @var string $safeSalary */
+            $safeSalary = HtmlSanitizer::safeHtmlOutput($teamData['availableSalary'][$year]);
+            $html .= $safeSalary;
             $html .= '</td>';
         }
 
@@ -125,7 +140,9 @@ class CapSpaceView implements CapSpaceViewInterface
         // Position salary columns
         foreach (\JSB::PLAYER_POSITIONS as $position) {
             $html .= '<td>';
-            $html .= HtmlSanitizer::safeHtmlOutput($teamData['positionSalaries'][$position] ?? 0);
+            /** @var string $safePositionSalary */
+            $safePositionSalary = HtmlSanitizer::safeHtmlOutput($teamData['positionSalaries'][$position] ?? 0);
+            $html .= $safePositionSalary;
             $html .= '</td>';
         }
 
@@ -133,7 +150,9 @@ class CapSpaceView implements CapSpaceViewInterface
 
         // FA Slots
         $html .= '<td>';
-        $html .= HtmlSanitizer::safeHtmlOutput($teamData['freeAgencySlots']);
+        /** @var string $safeFaSlots */
+        $safeFaSlots = HtmlSanitizer::safeHtmlOutput($teamData['freeAgencySlots']);
+        $html .= $safeFaSlots;
         $html .= '</td>';
 
         // MLE/LLE icons

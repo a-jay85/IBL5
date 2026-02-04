@@ -21,8 +21,8 @@ class PlayerTradingCardFrontView
 {
     /**
      * Get scoped custom styles for trading card with team colors
-     * 
-     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
+     *
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string HTML style tag with scoped CSS
      */
     public static function getStyles(?array $colorScheme = null): string
@@ -30,10 +30,10 @@ class PlayerTradingCardFrontView
         if ($colorScheme === null) {
             $colorScheme = TeamColorHelper::getDefaultColorScheme();
         }
-        
+
         // Get shared base styles from CardBaseStyles
         $baseStyles = CardBaseStyles::getStyles($colorScheme);
-        
+
         // Add front-card-specific styles only
         $borderRgb = $colorScheme['border_rgb'];
         $accent = $colorScheme['accent'];
@@ -129,12 +129,13 @@ HTML;
     public static function render(Player $player, int $playerID, string $contractDisplay, ?\mysqli $db = null): string
     {
         // Get color scheme and prepare player data
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, (int)$player->teamID);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->teamID ?? 0);
         $playerData = CardBaseStyles::preparePlayerData($player, $playerID);
         
         // Additional front-card specific data
-        $expYears = HtmlSanitizer::safeHtmlOutput((string)$player->yearsOfExperience);
-        $birdYears = HtmlSanitizer::safeHtmlOutput((string)$player->birdYears);
+        $expYears = (string) ($player->yearsOfExperience ?? 0);
+        $birdYears = (string) ($player->birdYears ?? 0);
+        /** @var string $contractSafe */
         $contractSafe = HtmlSanitizer::safeHtmlOutput($contractDisplay);
 
         ob_start();
@@ -217,15 +218,15 @@ HTML;
     </div>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * Render a single rating cell
      */
-    private static function renderRatingCell(string $label, $value): string
+    private static function renderRatingCell(string $label, ?int $value): string
     {
-        $safeValue = HtmlSanitizer::safeHtmlOutput((string)$value);
+        $safeValue = (string) ($value ?? 0);
         return <<<HTML
 <div class="rating-cell">
     <div class="rating-label">{$label}</div>
@@ -237,9 +238,9 @@ HTML;
     /**
      * Render a stat pill
      */
-    private static function renderPill(string $label, $value, bool $isPreference = false): string
+    private static function renderPill(string $label, ?int $value, bool $isPreference = false): string
     {
-        $safeValue = HtmlSanitizer::safeHtmlOutput((string)$value);
+        $safeValue = (string) ($value ?? 0);
         $class = $isPreference ? 'stat-pill preference' : 'stat-pill intangible';
         return <<<HTML
 <div class="{$class}">

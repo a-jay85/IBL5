@@ -18,6 +18,8 @@ class CapSpaceRepository extends \BaseMysqliRepository implements CapSpaceReposi
 {
     /**
      * @see CapSpaceRepositoryInterface::getAllTeams()
+     *
+     * @return array<int, array<string, mixed>>
      */
     public function getAllTeams(): array
     {
@@ -30,14 +32,16 @@ class CapSpaceRepository extends \BaseMysqliRepository implements CapSpaceReposi
 
     /**
      * @see CapSpaceRepositoryInterface::getPlayersUnderContractAfterSeason()
+     *
+     * @return array<int, array<string, mixed>>
      */
     public function getPlayersUnderContractAfterSeason(int $teamId): array
     {
         return $this->fetchAll(
-            "SELECT cy, cyt FROM ibl_plr 
-             WHERE retired = 0 
-               AND tid = ? 
-               AND cy <> cyt 
+            "SELECT cy, cyt FROM ibl_plr
+             WHERE retired = 0
+               AND tid = ?
+               AND cy <> cyt
                AND name NOT LIKE '%|%'",
             "i",
             $teamId

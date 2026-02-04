@@ -4,34 +4,34 @@ declare(strict_types=1);
 
 class Boxscore
 {
-    public $gameDate;
-    public $gameYear;
-    public $gameMonth;
-    public $gameDay;
-    public $gameOfThatDay;
+    public string $gameDate;
+    public int $gameYear;
+    public string $gameMonth;
+    public string $gameDay;
+    public int $gameOfThatDay;
 
-    public $visitorTeamID;
-    public $homeTeamID;
+    public int $visitorTeamID;
+    public int $homeTeamID;
 
-    public $attendance;
-    public $capacity;
+    public string $attendance;
+    public string $capacity;
 
-    public $visitorWins;
-    public $visitorLosses;
-    public $homeWins;
-    public $homeLosses;
+    public string $visitorWins;
+    public string $visitorLosses;
+    public string $homeWins;
+    public string $homeLosses;
 
-    public $visitorQ1points;
-    public $visitorQ2points;
-    public $visitorQ3points;
-    public $visitorQ4points;
-    public $visitorOTpoints;
+    public string $visitorQ1points;
+    public string $visitorQ2points;
+    public string $visitorQ3points;
+    public string $visitorQ4points;
+    public string $visitorOTpoints;
 
-    public $homeQ1points;
-    public $homeQ2points;
-    public $homeQ3points;
-    public $homeQ4points;
-    public $homeOTpoints;
+    public string $homeQ1points;
+    public string $homeQ2points;
+    public string $homeQ3points;
+    public string $homeQ4points;
+    public string $homeOTpoints;
 
     const PLAYERSTATEMENT_PREPARE = "INSERT INTO ibl_box_scores (
         Date,
@@ -96,7 +96,7 @@ class Boxscore
     )
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
-    protected function fillGameInfo($gameInfoLine, $seasonEndingYear, $seasonPhase)
+    protected function fillGameInfo(string $gameInfoLine, int $seasonEndingYear, string $seasonPhase): void
     {
         $this->gameYear = $seasonEndingYear;
         $this->gameMonth = sprintf("%02u", intval(substr($gameInfoLine, 0, 2)) + 10); // sprintf() prepends 0 if the result isn't in double-digits
@@ -122,21 +122,21 @@ class Boxscore
         $this->homeOTpoints = substr($gameInfoLine, 55, 3);
 
         $seasonStartingYear = $seasonEndingYear - 1;
-        if ($this->gameMonth > 12 and $this->gameMonth != JSB::PLAYOFF_MONTH) {
-            $this->gameMonth = sprintf("%02u", $this->gameMonth - 12);
-        } elseif ($this->gameMonth == JSB::PLAYOFF_MONTH) {
-            $this->gameMonth = sprintf("%02u", $this->gameMonth - 16); // This hacks the Playoffs to be in "June"
-        } elseif ($this->gameMonth > 10) {
+        if ((int)$this->gameMonth > 12 && (int)$this->gameMonth !== JSB::PLAYOFF_MONTH) {
+            $this->gameMonth = sprintf("%02u", (int)$this->gameMonth - 12);
+        } elseif ((int)$this->gameMonth === JSB::PLAYOFF_MONTH) {
+            $this->gameMonth = sprintf("%02u", (int)$this->gameMonth - 16); // This hacks the Playoffs to be in "June"
+        } elseif ((int)$this->gameMonth > 10) {
             $this->gameYear = $seasonStartingYear;
-            if ($seasonPhase == "HEAT") {
-                $this->gameMonth = Season::IBL_HEAT_MONTH;
+            if ($seasonPhase === "HEAT") {
+                $this->gameMonth = (string) Season::IBL_HEAT_MONTH;
             }
         }
 
         $this->gameDate = $this->gameYear . '-' . $this->gameMonth . '-' . $this->gameDay;
     }
 
-    public static function withGameInfoLine($gameInfoLine, $seasonEndingYear, $seasonPhase)
+    public static function withGameInfoLine(string $gameInfoLine, int $seasonEndingYear, string $seasonPhase): self
     {
         $instance = new self();
         $instance->fillGameInfo($gameInfoLine, $seasonEndingYear, $seasonPhase);

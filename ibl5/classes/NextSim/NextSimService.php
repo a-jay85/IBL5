@@ -13,16 +13,20 @@ use Schedule\TeamSchedule;
  *
  * Processes upcoming game data and starting lineups.
  *
+ * @phpstan-import-type NextSimGameData from \NextSim\Contracts\NextSimServiceInterface
+ *
  * @see NextSimServiceInterface For the interface contract
  */
 class NextSimService implements NextSimServiceInterface
 {
+    /** @phpstan-var \mysqli */
     private object $db;
 
     /**
      * Constructor
      *
      * @param object $db Database connection
+     * @phpstan-param \mysqli $db
      */
     public function __construct(object $db)
     {
@@ -31,6 +35,8 @@ class NextSimService implements NextSimServiceInterface
 
     /**
      * @see NextSimServiceInterface::getNextSimGames()
+     *
+     * @return array<int, NextSimGameData>
      */
     public function getNextSimGames(int $teamId, \Season $season): array
     {
@@ -44,6 +50,7 @@ class NextSimService implements NextSimServiceInterface
         $games = [];
 
         foreach ($projectedGames as $gameRow) {
+            /** @var array{Date: string, BoxID: int, Visitor: int, Home: int, VScore: int, HScore: int} $gameRow */
             $game = new \Game($gameRow);
             $gameDate = new \DateTime($game->date);
             $dayNumber = $gameDate->diff($lastSimEndDateObject)->format('%a');
@@ -65,6 +72,8 @@ class NextSimService implements NextSimServiceInterface
 
     /**
      * @see NextSimServiceInterface::getUserStartingLineup()
+     *
+     * @return array<string, Player>
      */
     public function getUserStartingLineup(\Team $team): array
     {
@@ -72,7 +81,7 @@ class NextSimService implements NextSimServiceInterface
         $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
 
         foreach ($positions as $position) {
-            $playerId = $team->getCurrentlySetStarterPlayerIDForPosition($position) ?? 4040404;
+            $playerId = $team->getCurrentlySetStarterPlayerIDForPosition($position);
             $starters[$position] = Player::withPlayerID($this->db, $playerId);
         }
 
@@ -83,7 +92,7 @@ class NextSimService implements NextSimServiceInterface
      * Get opposing team's starting lineup
      *
      * @param \Team $opposingTeam Opposing team
-     * @return array Starting players by position
+     * @return array<string, Player> Starting players by position
      */
     private function getOpposingStartingLineup(\Team $opposingTeam): array
     {
@@ -91,7 +100,7 @@ class NextSimService implements NextSimServiceInterface
         $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
 
         foreach ($positions as $position) {
-            $playerId = $opposingTeam->getLastSimStarterPlayerIDForPosition($position) ?? 4040404;
+            $playerId = $opposingTeam->getLastSimStarterPlayerIDForPosition($position);
             $starters[$position] = Player::withPlayerID($this->db, $playerId);
         }
 

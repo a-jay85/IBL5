@@ -8,11 +8,13 @@ use Draft\Contracts\DraftRepositoryInterface;
 
 /**
  * @see DraftRepositoryInterface
- * @extends \BaseMysqliRepository
+ *
+ * @phpstan-import-type DraftClassPlayerRow from DraftRepositoryInterface
+ * @phpstan-import-type DraftPickRow from DraftRepositoryInterface
  */
 class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryInterface
 {
-    private $commonRepository;
+    private \Services\CommonMysqliRepository $commonRepository;
 
     // Constants for player name matching
     const IBL_PLR_NAME_MAX_LENGTH = 32;  // Matches varchar(32) in ibl_plr.name
@@ -29,14 +31,15 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
      */
     public function getCurrentDraftSelection(int $draftRound, int $draftPick): ?string
     {
+        /** @var array{player: string}|null $row */
         $row = $this->fetchOne(
             "SELECT `player` FROM ibl_draft WHERE `round` = ? AND `pick` = ?",
             "ii",
             $draftRound,
             $draftPick
         );
-        
-        return $row ? $row['player'] : null;
+
+        return $row !== null ? $row['player'] : null;
     }
 
     /**
@@ -74,18 +77,21 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
     private function getNextAvailablePid(): int
     {
         $draftPidStart = 90000;
-        
+
+        /** @var array{max_pid: int|null}|null $row */
         $row = $this->fetchOne(
             "SELECT MAX(pid) as max_pid FROM ibl_plr WHERE pid >= ?",
             "i",
             $draftPidStart
         );
-        
-        $maxPid = $row['max_pid'] ?? null;
-        if ($row && $maxPid !== null && $maxPid !== '' && $maxPid >= $draftPidStart) {
-            return (int) $maxPid + 1;
+
+        if ($row !== null && array_key_exists('max_pid', $row)) {
+            $maxPid = $row['max_pid'];
+            if ($maxPid !== null && $maxPid >= $draftPidStart) {
+                return $maxPid + 1;
+            }
         }
-        
+
         return $draftPidStart; // Start at 90000 if no draft PIDs exist yet
     }
 
@@ -98,36 +104,36 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
         if ($teamId === null) {
             return false;
         }
-        $teamId = (int) $teamId;
-        
+
+        /** @var DraftClassPlayerRow|null $draftClassPlayer */
         $draftClassPlayer = $this->fetchOne(
             "SELECT * FROM ibl_draft_class WHERE name = ? LIMIT 1",
             "s",
             $playerName
         );
-        
-        if (!$draftClassPlayer) {
+
+        if ($draftClassPlayer === null) {
             return false;
         }
-        
+
         $pid = $this->getNextAvailablePid();
         $name = substr($playerName, 0, self::IBL_PLR_NAME_MAX_LENGTH);
         $pos = $draftClassPlayer['pos'];
-        $oo = (int) $draftClassPlayer['oo'];
-        $od = (int) $draftClassPlayer['od'];
-        $po = (int) $draftClassPlayer['po'];
-        $to = (int) $draftClassPlayer['to'];
-        $do = (int) $draftClassPlayer['do'];
-        $dd = (int) $draftClassPlayer['dd'];
-        $pd = (int) $draftClassPlayer['pd'];
-        $td = (int) $draftClassPlayer['td'];
-        
-        $age = (int) $draftClassPlayer['age'];
-        $sta = (int) $draftClassPlayer['sta'];
-        $talent = (int) $draftClassPlayer['talent'];
-        $skill = (int) $draftClassPlayer['skill'];
-        $intangibles = (int) $draftClassPlayer['intangibles'];
-        
+        $oo = $draftClassPlayer['oo'];
+        $od = $draftClassPlayer['od'];
+        $po = $draftClassPlayer['po'];
+        $to = $draftClassPlayer['to'];
+        $do = $draftClassPlayer['do'];
+        $dd = $draftClassPlayer['dd'];
+        $pd = $draftClassPlayer['pd'];
+        $td = $draftClassPlayer['td'];
+
+        $age = $draftClassPlayer['age'];
+        $sta = $draftClassPlayer['sta'] ?? 0;
+        $talent = $draftClassPlayer['talent'];
+        $skill = $draftClassPlayer['skill'];
+        $intangibles = $draftClassPlayer['intangibles'];
+
         // Insert new player into ibl_plr
         $affected = $this->execute(
             "INSERT INTO ibl_plr (
@@ -146,7 +152,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
             $sta, $oo, $od, $po, $to, $do, $dd, $pd, $td,
             $talent, $skill, $intangibles
         );
-        
+
         return $affected > 0;
     }
 
@@ -161,10 +167,10 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
             $playerName
         );
         
-        if ($row) {
-            return $row['drafted'] == '1' || $row['drafted'] === 1;
+        if ($row !== null) {
+            return $row['drafted'] === '1' || $row['drafted'] === 1;
         }
-        
+
         return false;
     }
 
@@ -173,11 +179,12 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
      */
     public function getNextTeamOnClock(): ?string
     {
+        /** @var array{team: string}|null $row */
         $row = $this->fetchOne(
             "SELECT team FROM ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1"
         );
-        
-        return $row ? $row['team'] : null;
+
+        return $row !== null ? $row['team'] : null;
     }
 
     /**
@@ -185,6 +192,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
      */
     public function getAllDraftClassPlayers(): array
     {
+        /** @var list<DraftClassPlayerRow> */
         return $this->fetchAll("SELECT * FROM ibl_draft_class ORDER BY drafted, name");
     }
 
@@ -193,18 +201,19 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
      */
     public function getCurrentDraftPick(): ?array
     {
+        /** @var array{team: string, round: int, pick: int, player: string}|null $row */
         $row = $this->fetchOne(
             "SELECT * FROM ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1"
         );
-        
-        if ($row) {
+
+        if ($row !== null) {
             return [
                 'team' => $row['team'],
                 'round' => $row['round'],
-                'pick' => $row['pick']
+                'pick' => $row['pick'],
             ];
         }
-        
+
         return null;
     }
 }

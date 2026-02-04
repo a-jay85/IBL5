@@ -78,8 +78,8 @@ interface FreeAgencyDemandCalculatorInterface
      * 
      * @param string $playerName Player name (used to look up demands in database)
      * 
-     * @return array<int, int> Demands array with keys dem1-dem6, each an integer salary
-     *                         Indexed as: dem1, dem2, dem3, dem4, dem5, dem6
+     * @return array<string, int> Demands array with keys dem1-dem6, each an integer salary
+     *                            Indexed as: dem1, dem2, dem3, dem4, dem5, dem6
      */
     public function getPlayerDemands(string $playerName): array;
 }

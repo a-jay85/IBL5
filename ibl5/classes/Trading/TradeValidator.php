@@ -26,7 +26,9 @@ class TradeValidator implements TradeValidatorInterface
         $this->db = $db;
         $this->repository = new TradingRepository($db);
         $this->sharedFunctions = new \Shared($db);
-        $this->season = new \Season($db);
+        /** @var \mysqli $mysqliDb */
+        $mysqliDb = $db;
+        $this->season = new \Season($mysqliDb);
     }
 
     /**
@@ -34,17 +36,17 @@ class TradeValidator implements TradeValidatorInterface
      */
     public function validateMinimumCashAmounts(array $userSendsCash, array $partnerSendsCash): array
     {
-        $filteredUserSendsCash = array_filter($userSendsCash);
-        $filteredPartnerSendsCash = array_filter($partnerSendsCash);
+        $filteredUserSendsCash = array_filter($userSendsCash, static fn (int $amount): bool => $amount !== 0);
+        $filteredPartnerSendsCash = array_filter($partnerSendsCash, static fn (int $amount): bool => $amount !== 0);
 
-        if (!empty($filteredUserSendsCash) && min($filteredUserSendsCash) < 100) {
+        if ($filteredUserSendsCash !== [] && min($filteredUserSendsCash) < 100) {
             return [
                 'valid' => false,
                 'error' => 'This trade is illegal: the minimum amount of cash that your team can send in any one season is 100.'
             ];
         }
 
-        if (!empty($filteredPartnerSendsCash) && min($filteredPartnerSendsCash) < 100) {
+        if ($filteredPartnerSendsCash !== [] && min($filteredPartnerSendsCash) < 100) {
             return [
                 'valid' => false,
                 'error' => 'This trade is illegal: the minimum amount of cash that the other team can send in any one season is 100.'
@@ -78,7 +80,7 @@ class TradeValidator implements TradeValidatorInterface
         }
 
         return [
-            'valid' => empty($errors),
+            'valid' => $errors === [],
             'errors' => $errors,
             'userPostTradeCapTotal' => $userPostTradeCapTotal,
             'partnerPostTradeCapTotal' => $partnerPostTradeCapTotal
@@ -92,13 +94,13 @@ class TradeValidator implements TradeValidatorInterface
     {
         $player = $this->repository->getPlayerForTradeValidation($playerId);
 
-        if (!$player) {
+        if ($player === null) {
             return false;
         }
 
         // Extract ordinal and cy from the associative array
-        $ordinal = isset($player['ordinal']) ? (int) $player['ordinal'] : 99999;
-        $cy = isset($player['cy']) ? (int) $player['cy'] : 0;
+        $ordinal = $player['ordinal'] ?? 99999;
+        $cy = $player['cy'] ?? 0;
 
         // Player cannot be traded if they are waived (ordinal > JSB::WAIVERS_ORDINAL) or have 0 salary
         return $cy !== 0 && $ordinal <= \JSB::WAIVERS_ORDINAL;
@@ -111,9 +113,9 @@ class TradeValidator implements TradeValidatorInterface
     {
         // If the current season phase shifts cap situations to next season, evaluate next season's cap limits.
         if (
-            $this->season->phase == "Playoffs"
-            || $this->season->phase == "Draft"
-            || $this->season->phase == "Free Agency"
+            $this->season->phase === "Playoffs"
+            || $this->season->phase === "Draft"
+            || $this->season->phase === "Free Agency"
         ) {
             $cashSentToThemThisSeason = $userSendsCash[2] ?? 0;
             $cashSentToMeThisSeason = $partnerSendsCash[2] ?? 0;

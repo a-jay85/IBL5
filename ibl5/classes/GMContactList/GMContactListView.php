@@ -102,14 +102,21 @@ class GMContactListView implements GMContactListViewInterface
      */
     private function renderContactRow(array $contact): string
     {
-        $teamId = (int) ($contact['teamid'] ?? 0);
-        $teamName = HtmlSanitizer::safeHtmlOutput($contact['team_name'] ?? '');
-        $color1 = HtmlSanitizer::safeHtmlOutput($contact['color1'] ?? '');
-        $color2 = HtmlSanitizer::safeHtmlOutput($contact['color2'] ?? '');
-        $ownerName = HtmlSanitizer::safeHtmlOutput($contact['owner_name'] ?? '');
-        $ownerEmail = HtmlSanitizer::safeHtmlOutput($contact['owner_email'] ?? '');
-        $skype = HtmlSanitizer::safeHtmlOutput($contact['skype'] ?? '');
-        $aim = HtmlSanitizer::safeHtmlOutput($contact['aim'] ?? '');
+        $teamId = (int) $contact['teamid'];
+        /** @var string $teamName */
+        $teamName = HtmlSanitizer::safeHtmlOutput($contact['team_name']);
+        /** @var string $color1 */
+        $color1 = HtmlSanitizer::safeHtmlOutput($contact['color1']);
+        /** @var string $color2 */
+        $color2 = HtmlSanitizer::safeHtmlOutput($contact['color2']);
+        /** @var string $ownerName */
+        $ownerName = HtmlSanitizer::safeHtmlOutput($contact['owner_name']);
+        /** @var string $ownerEmail */
+        $ownerEmail = HtmlSanitizer::safeHtmlOutput($contact['owner_email']);
+        /** @var string $skype */
+        $skype = HtmlSanitizer::safeHtmlOutput($contact['skype']);
+        /** @var string $aim */
+        $aim = HtmlSanitizer::safeHtmlOutput($contact['aim']);
 
         return "<tr data-team-id=\"{$teamId}\">
     <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">

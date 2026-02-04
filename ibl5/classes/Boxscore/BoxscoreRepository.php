@@ -71,12 +71,12 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
      *
      * @param string $startDate Start date in Y-m-d format
      * @param string $endDate End date in Y-m-d format
-     * @return bool True if both deletions succeeded
+     * @return true Always returns true since execute() returns int on success
      */
-    private function deleteBoxScoresForDateRange(string $startDate, string $endDate): bool
+    private function deleteBoxScoresForDateRange(string $startDate, string $endDate): true
     {
         // Delete player boxscores
-        $playerResult = $this->execute(
+        $this->execute(
             "DELETE FROM ibl_box_scores WHERE Date BETWEEN ? AND ?",
             "ss",
             $startDate,
@@ -84,14 +84,13 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         );
 
         // Delete team boxscores
-        $teamResult = $this->execute(
+        $this->execute(
             "DELETE FROM ibl_box_scores_teams WHERE Date BETWEEN ? AND ?",
             "ss",
             $startDate,
             $endDate
         );
 
-        // Both queries must succeed (return value >= 0 means success, even if 0 rows deleted)
-        return $playerResult !== false && $teamResult !== false;
+        return true;
     }
 }

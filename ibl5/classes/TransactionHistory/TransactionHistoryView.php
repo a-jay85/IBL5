@@ -13,19 +13,24 @@ use Utilities\HtmlSanitizer;
  * Uses the IBL design system (.ibl-data-table, .ibl-filter-form, etc.)
  * with category-specific badge colors for transaction types.
  *
+ * @phpstan-import-type PageData from TransactionHistoryViewInterface
+ * @phpstan-import-type TransactionRow from TransactionHistoryViewInterface
+ *
  * @see TransactionHistoryViewInterface
  */
 class TransactionHistoryView implements TransactionHistoryViewInterface
 {
     /**
      * @see TransactionHistoryViewInterface::render()
+     *
+     * @param PageData $data
      */
     public function render(array $data): string
     {
         $output = $this->renderTitle();
         $output .= $this->renderFilterForm($data);
 
-        if (count($data['transactions']) > 0) {
+        if ($data['transactions'] !== []) {
             $output .= '<div class="table-scroll-wrapper">';
             $output .= '<div class="table-scroll-container">';
             $output .= $this->renderTable($data['transactions'], $data['categories']);
@@ -44,15 +49,17 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
 
     /**
      * Render the filter form with Category, Year, and Month dropdowns.
+     *
+     * @param PageData $data
      */
     private function renderFilterForm(array $data): string
     {
         $categories = $data['categories'];
         $availableYears = $data['availableYears'];
         $monthNames = $data['monthNames'];
-        $selectedCategory = (int) $data['selectedCategory'];
-        $selectedYear = (int) $data['selectedYear'];
-        $selectedMonth = (int) $data['selectedMonth'];
+        $selectedCategory = $data['selectedCategory'];
+        $selectedYear = $data['selectedYear'];
+        $selectedMonth = $data['selectedMonth'];
 
         ob_start();
         ?>
@@ -64,7 +71,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             <select name="cat">
                 <option value="0">All Categories</option>
                 <?php foreach ($categories as $catId => $catName): ?>
-                    <option value="<?= (int) $catId ?>"<?= $selectedCategory === (int) $catId ? ' selected' : '' ?>><?= HtmlSanitizer::safeHtmlOutput($catName) ?></option>
+                    <option value="<?= $catId ?>"<?= $selectedCategory === $catId ? ' selected' : '' ?>><?php /** @var string $catNameSafe */ $catNameSafe = HtmlSanitizer::safeHtmlOutput($catName); echo $catNameSafe; ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -73,7 +80,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             <select name="year">
                 <option value="0">All Years</option>
                 <?php foreach ($availableYears as $year): ?>
-                    <option value="<?= (int) $year ?>"<?= $selectedYear === (int) $year ? ' selected' : '' ?>><?= (int) $year ?></option>
+                    <option value="<?= $year ?>"<?= $selectedYear === $year ? ' selected' : '' ?>><?= $year ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -82,7 +89,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             <select name="month">
                 <option value="0">All Months</option>
                 <?php foreach ($monthNames as $num => $name): ?>
-                    <option value="<?= (int) $num ?>"<?= $selectedMonth === (int) $num ? ' selected' : '' ?>><?= HtmlSanitizer::safeHtmlOutput($name) ?></option>
+                    <option value="<?= $num ?>"<?= $selectedMonth === $num ? ' selected' : '' ?>><?php /** @var string $nameSafe */ $nameSafe = HtmlSanitizer::safeHtmlOutput($name); echo $nameSafe; ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -91,13 +98,13 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
     </div>
 </form>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * Render the transactions data table.
      *
-     * @param array $transactions Transaction rows from repository
+     * @param array<int, TransactionRow> $transactions Transaction rows from repository
      * @param array<int, string> $categories Category ID to label map
      */
     private function renderTable(array $transactions, array $categories): string
@@ -117,18 +124,25 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             <?php
             $catId = (int) $row['catid'];
             $catName = $categories[$catId] ?? 'Unknown';
-            $date = date('M j, Y', strtotime($row['time']));
+            $timestamp = strtotime($row['time']);
+            $date = date('M j, Y', $timestamp !== false ? $timestamp : 0);
+            /** @var string $dateSafe */
+            $dateSafe = HtmlSanitizer::safeHtmlOutput($date);
+            /** @var string $catNameSafe */
+            $catNameSafe = HtmlSanitizer::safeHtmlOutput($catName);
+            /** @var string $titleSafe */
+            $titleSafe = HtmlSanitizer::safeHtmlOutput($row['title']);
             ?>
             <tr>
-                <td class="date-cell"><?= HtmlSanitizer::safeHtmlOutput($date) ?></td>
-                <td><span class="txn-badge txn-badge--<?= $catId ?>"><?= HtmlSanitizer::safeHtmlOutput($catName) ?></span></td>
-                <td><?= HtmlSanitizer::safeHtmlOutput($row['title']) ?></td>
+                <td class="date-cell"><?= $dateSafe ?></td>
+                <td><span class="txn-badge txn-badge--<?= $catId ?>"><?= $catNameSafe ?></span></td>
+                <td><?= $titleSafe ?></td>
             </tr>
         <?php endforeach; ?>
     </tbody>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**

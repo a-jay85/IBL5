@@ -9,6 +9,10 @@ namespace SeasonLeaderboards\Contracts;
  *
  * Handles HTML rendering for the season leaders page using
  * output buffering pattern for clean, maintainable HTML.
+ *
+ * @phpstan-import-type TeamRow from SeasonLeaderboardsRepositoryInterface
+ * @phpstan-import-type LeaderboardFilters from SeasonLeaderboardsRepositoryInterface
+ * @phpstan-import-type ProcessedStats from SeasonLeaderboardsServiceInterface
  */
 interface SeasonLeaderboardsViewInterface
 {
@@ -17,12 +21,9 @@ interface SeasonLeaderboardsViewInterface
      *
      * Generates HTML form with dropdowns for team, year, and sort options.
      *
-     * @param array $teams Array of team data with keys 'TeamID' and 'Team'
-     * @param array $years Array of available years
-     * @param array $currentFilters Current filter values with keys:
-     *                              - 'team' (int): Selected team ID (0 for all)
-     *                              - 'year' (string): Selected year (empty for all)
-     *                              - 'sortby' (string): Selected sort option (1-20)
+     * @param list<TeamRow> $teams Array of team data
+     * @param list<string> $years Array of available years
+     * @param LeaderboardFilters $currentFilters Current filter values
      * @return string HTML form output
      *
      * **Form Fields:**
@@ -59,7 +60,7 @@ interface SeasonLeaderboardsViewInterface
      *
      * Generates table row with all player statistics.
      *
-     * @param array $stats Formatted player statistics from processPlayerRow()
+     * @param ProcessedStats $stats Formatted player statistics from processPlayerRow()
      * @param int $rank Player's rank in the leaderboard (1-based)
      * @return string HTML table row
      *

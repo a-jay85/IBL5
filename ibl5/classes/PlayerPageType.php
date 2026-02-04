@@ -21,7 +21,7 @@ class PlayerPageType
     /**
      * Get a human-readable description of the page type
      */
-    public static function getDescription($pageView): string
+    public static function getDescription(?int $pageView): string
     {
         switch ($pageView) {
             case self::OVERVIEW:
@@ -58,7 +58,7 @@ class PlayerPageType
     /**
      * Get the URL for a specific page type
      */
-    public static function getUrl($playerID, $pageView): string
+    public static function getUrl(int $playerID, ?int $pageView): string
     {
         return "modules.php?name=Player&pa=showpage&pid=$playerID" . ($pageView !== self::OVERVIEW ? "&pageView=$pageView" : "");
     }

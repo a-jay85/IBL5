@@ -183,7 +183,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $contractData = ['hasExistingContract' => true, 'salary' => 500];
 
         $this->mockDb->setMockData([
-            $this->getBasePlayerData(['pid' => $playerID, 'cy1' => '500', 'cy' => 1])
+            $this->getBasePlayerData(['pid' => $playerID, 'cy1' => 500, 'cy' => 1])
         ]);
         $this->mockDb->setAffectedRows(1);
 
@@ -214,7 +214,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $contractData = ['hasExistingContract' => false, 'salary' => 103];
 
         $this->mockDb->setMockData([
-            $this->getBasePlayerData(['pid' => $playerID, 'cy1' => '0', 'cy' => 0])
+            $this->getBasePlayerData(['pid' => $playerID, 'cy1' => 0, 'cy' => 0])
         ]);
         $this->mockDb->setAffectedRows(1);
 
@@ -404,9 +404,9 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $playerData = TestDataFactory::createPlayer([
             'cy' => 1,
             'cyt' => 3,
-            'cy1' => '500',
-            'cy2' => '550',
-            'cy3' => '600',
+            'cy1' => 500,
+            'cy2' => 550,
+            'cy3' => 600,
             'exp' => 5,
         ]);
         $season = $this->createMockSeason('Regular Season');
@@ -430,9 +430,9 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $playerData = TestDataFactory::createPlayer([
             'cy' => 0,
             'cyt' => 0,
-            'cy1' => '0',
-            'cy2' => '0',
-            'cy3' => '0',
+            'cy1' => 0,
+            'cy2' => 0,
+            'cy3' => 0,
             'exp' => 3,
         ]);
         $season = $this->createMockSeason('Regular Season');
@@ -458,9 +458,9 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $playerData = TestDataFactory::createPlayer([
             'cy' => 1,
             'cyt' => 2,
-            'cy1' => '400', // Current season salary
-            'cy2' => '450', // Next season salary
-            'cy3' => '0',
+            'cy1' => 400, // Current season salary
+            'cy2' => 450, // Next season salary
+            'cy3' => 0,
             'exp' => 4,
         ]);
         $season = $this->createMockSeason('Free Agency');
@@ -639,12 +639,12 @@ class WaiversIntegrationTest extends IntegrationTestCase
             'bird_years' => 0,
             'bird' => 0,
             'cy' => 0,
-            'cy1' => '0',
-            'cy2' => '0',
-            'cy3' => '0',
-            'cy4' => '0',
-            'cy5' => '0',
-            'cy6' => '0',
+            'cy1' => 0,
+            'cy2' => 0,
+            'cy3' => 0,
+            'cy4' => 0,
+            'cy5' => 0,
+            'cy6' => 0,
             'cyt' => 0,
         ], $overrides));
     }

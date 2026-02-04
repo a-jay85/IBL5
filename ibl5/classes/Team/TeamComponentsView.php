@@ -8,6 +8,15 @@ use Team\Contracts\TeamComponentsViewInterface;
 use Team\Contracts\TeamRepositoryInterface;
 
 /**
+ * @phpstan-import-type PowerRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type BannerRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type GMHistoryRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type TeamAwardRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type WinLossRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type HEATWinLossRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type PlayoffResultRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type TeamInfoRow from \Services\CommonMysqliRepository
+ *
  * @see TeamComponentsViewInterface
  */
 class TeamComponentsView implements TeamComponentsViewInterface
@@ -22,12 +31,13 @@ class TeamComponentsView implements TeamComponentsViewInterface
     /**
      * @see TeamComponentsViewInterface::championshipBanners()
      */
-    public function championshipBanners($team): string
+    public function championshipBanners(object $team): string
     {
-        $banners = $this->repository->getChampionshipBanners($team->name);
-        $numbanner = count($banners);
-
-        $j = 0;
+        /** @var \Team $team */
+        $teamName = $team->name;
+        $teamColor1 = $team->color1;
+        $teamColor2 = $team->color2;
+        $banners = $this->repository->getChampionshipBanners($teamName);
 
         $championships = 0;
         $conference_titles = 0;
@@ -42,15 +52,15 @@ class TeamComponentsView implements TeamComponentsViewInterface
         $div_banner = "";
 
         foreach ($banners as $banner) {
-            $banneryear = $banner['year'] ?? '';
-            $bannername = $banner['bannername'] ?? '';
-            $bannertype = $banner['bannertype'] ?? 0;
+            $banneryear = $banner['year'];
+            $bannername = $banner['bannername'];
+            $bannertype = $banner['bannertype'];
 
             if ($bannertype === 1) {
                 if ($championships % 5 === 0) {
                     $ibl_banner .= "<tr><td align=\"center\"><table><tr>";
                 }
-                $ibl_banner .= "<td><table><tr bgcolor=$team->color1><td valign=top height=80 width=120 background=\"./images/banners/banner1.gif\"><font color=#$team->color2>
+                $ibl_banner .= "<td><table><tr bgcolor=$teamColor1><td valign=top height=80 width=120 background=\"./images/banners/banner1.gif\"><font color=#$teamColor2>
                     <center><b>$banneryear<br>
                     $bannername<br>IBL Champions</b></center></td></tr></table></td>";
 
@@ -61,19 +71,19 @@ class TeamComponentsView implements TeamComponentsViewInterface
                 }
 
                 if ($champ_text === "") {
-                    $champ_text = "$banneryear";
+                    $champ_text = (string) $banneryear;
                 } else {
                     $champ_text .= ", $banneryear";
                 }
-                if ($bannername !== $team->name) {
+                if ($bannername !== $teamName) {
                     $champ_text .= " (as $bannername)";
                 }
-            } else if ($bannertype === 2 or $bannertype === 3) {
+            } elseif ($bannertype === 2 || $bannertype === 3) {
                 if ($conference_titles % 5 === 0) {
                     $conf_banner .= "<tr><td align=\"center\"><table><tr>";
                 }
 
-                $conf_banner .= "<td><table><tr bgcolor=$team->color1><td valign=top height=80 width=120 background=\"./images/banners/banner2.gif\"><font color=#$team->color2>
+                $conf_banner .= "<td><table><tr bgcolor=$teamColor1><td valign=top height=80 width=120 background=\"./images/banners/banner2.gif\"><font color=#$teamColor2>
                     <center><b>$banneryear<br>
                     $bannername<br>";
                 if ($bannertype === 2) {
@@ -89,27 +99,27 @@ class TeamComponentsView implements TeamComponentsViewInterface
                 }
 
                 if ($conf_text === "") {
-                    $conf_text = "$banneryear";
+                    $conf_text = (string) $banneryear;
                 } else {
                     $conf_text .= ", $banneryear";
                 }
-                if ($bannername !== $team->name) {
+                if ($bannername !== $teamName) {
                     $conf_text .= " (as $bannername)";
                 }
-            } else if ($bannertype === 4 or $bannertype === 5 or $bannertype === 6 or $bannertype === 7) {
+            } elseif ($bannertype >= 4 && $bannertype <= 7) {
                 if ($division_titles % 5 === 0) {
                     $div_banner .= "<tr><td align=\"center\"><table><tr>";
                 }
-                $div_banner .= "<td><table><tr bgcolor=$team->color1><td valign=top height=80 width=120><font color=#$team->color2>
+                $div_banner .= "<td><table><tr bgcolor=$teamColor1><td valign=top height=80 width=120><font color=#$teamColor2>
                     <center><b>$banneryear<br>
                     $bannername<br>";
                 if ($bannertype === 4) {
                     $div_banner .= "Atlantic Div. Champions</b></center></td></tr></table></td>";
-                } else if ($bannertype === 5) {
+                } elseif ($bannertype === 5) {
                     $div_banner .= "Central Div. Champions</b></center></td></tr></table></td>";
-                } else if ($bannertype === 6) {
+                } elseif ($bannertype === 6) {
                     $div_banner .= "Midwest Div. Champions</b></center></td></tr></table></td>";
-                } else if ($bannertype === 7) {
+                } else {
                     $div_banner .= "Pacific Div. Champions</b></center></td></tr></table></td>";
                 }
 
@@ -120,24 +130,23 @@ class TeamComponentsView implements TeamComponentsViewInterface
                 }
 
                 if ($div_text === "") {
-                    $div_text = "$banneryear";
+                    $div_text = (string) $banneryear;
                 } else {
                     $div_text .= ", $banneryear";
                 }
-                if ($bannername !== $team->team_name) {
+                if ($bannername !== $teamName) {
                     $div_text .= " (as $bannername)";
                 }
             }
-            $j++;
         }
 
-        if (substr($ibl_banner, -23) !== "</tr></table></td></tr>" and $ibl_banner !== "") {
+        if (substr($ibl_banner, -23) !== "</tr></table></td></tr>" && $ibl_banner !== "") {
             $ibl_banner .= "</tr></table></td></tr>";
         }
-        if (substr($conf_banner, -23) !== "</tr></table></td></tr>" and $conf_banner !== "") {
+        if (substr($conf_banner, -23) !== "</tr></table></td></tr>" && $conf_banner !== "") {
             $conf_banner .= "</tr></table></td></tr>";
         }
-        if (substr($div_banner, -23) !== "</tr></table></td></tr>" and $div_banner !== "") {
+        if (substr($div_banner, -23) !== "</tr></table></td></tr>" && $div_banner !== "") {
             $div_banner .= "</tr></table></td></tr>";
         }
 
@@ -152,67 +161,63 @@ class TeamComponentsView implements TeamComponentsViewInterface
             $banner_output .= $div_banner;
         }
         if ($banner_output !== "") {
-            $banner_output = "<center><table><tr><td bgcolor=\"#$team->color1\" align=\"center\"><font color=\"#$team->color2\"><h2>$team->team_name Banners</h2></font></td></tr>" . $banner_output . "</table></center>";
+            $banner_output = "<center><table><tr><td bgcolor=\"#$teamColor1\" align=\"center\"><font color=\"#$teamColor2\"><h2>$teamName Banners</h2></font></td></tr>" . $banner_output . "</table></center>";
         }
 
-        $ultimate_output[1] = $banner_output;
-
-        /*
-        $output=$output."<tr bgcolor=\"#$team->color1\"><td align=center><font color=\"#$team->color2\"<b>Team Banners</b></font></td></tr>
-        <tr><td>$championships IBL Championships: $champ_text</td></tr>
-        <tr><td>$conference_titles Conference Championships: $conf_text</td></tr>
-        <tr><td>$division_titles Division Titles: $div_text</td></tr>
-        ";
-        */
-
-        return $ultimate_output[1];
+        return $banner_output;
     }
 
     /**
      * @see TeamComponentsViewInterface::currentSeason()
      */
-    public function currentSeason($team): string
+    public function currentSeason(object $team): string
     {
+        /** @var \Team $team */
         $powerData = $this->repository->getTeamPowerData($team->name);
-        if (!$powerData) {
+        if ($powerData === null) {
             return '';
         }
 
-        $win = $powerData['win'] ?? 0;
-        $loss = $powerData['loss'] ?? 0;
-        $gb = $powerData['gb'] ?? 0;
-        $division = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['Division'] ?? '');
-        $conference = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['Conference'] ?? '');
-        $home_win = $powerData['home_win'] ?? 0;
-        $home_loss = $powerData['home_loss'] ?? 0;
-        $road_win = $powerData['road_win'] ?? 0;
-        $road_loss = $powerData['road_loss'] ?? 0;
-        $last_win = $powerData['last_win'] ?? 0;
-        $last_loss = $powerData['last_loss'] ?? 0;
+        $win = $powerData['win'];
+        $loss = $powerData['loss'];
+        $gb = $powerData['gb'];
+        /** @var string $division */
+        $division = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['Division']);
+        /** @var string $conference */
+        $conference = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['Conference']);
+        $home_win = $powerData['home_win'];
+        $home_loss = $powerData['home_loss'];
+        $road_win = $powerData['road_win'];
+        $road_loss = $powerData['road_loss'];
+        $last_win = $powerData['last_win'];
+        $last_loss = $powerData['last_loss'];
 
-        $divisionStandings = $this->repository->getDivisionStandings($powerData['Division'] ?? '');
-        $gbbase = $divisionStandings[0]['gb'] ?? 0;
+        $divisionStandings = $this->repository->getDivisionStandings($powerData['Division']);
+        $gbbase = $divisionStandings[0]['gb'] ?? 0.0;
         $gb = $gbbase - $gb;
 
         $Div_Pos = 1;
         foreach ($divisionStandings as $index => $standing) {
-            if ($standing['Team'] == $team->name) {
+            if ($standing['Team'] === $team->name) {
                 $Div_Pos = $index + 1;
                 break;
             }
         }
 
-        $conferenceStandings = $this->repository->getConferenceStandings($powerData['Conference'] ?? '');
+        $conferenceStandings = $this->repository->getConferenceStandings($powerData['Conference']);
         $Conf_Pos = 1;
         foreach ($conferenceStandings as $index => $standing) {
-            if ($standing['Team'] == $team->name) {
+            if ($standing['Team'] === $team->name) {
                 $Conf_Pos = $index + 1;
                 break;
             }
         }
 
+        /** @var string $teamName */
         $teamName = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
-        $fka = \Utilities\HtmlSanitizer::safeHtmlOutput($team->formerlyKnownAs);
+        /** @var string $fka */
+        $fka = \Utilities\HtmlSanitizer::safeHtmlOutput($team->formerlyKnownAs ?? '');
+        /** @var string $arena */
         $arena = \Utilities\HtmlSanitizer::safeHtmlOutput($team->arena);
 
         $output = '<div class="team-info-list">'
@@ -230,7 +235,7 @@ class TeamComponentsView implements TeamComponentsViewInterface
             . "<span class=\"team-info-list__value\">$arena</span>";
 
         if ($team->capacity !== 0) {
-            $capacity = (int) $team->capacity;
+            $capacity = $team->capacity;
             $output .= '<span class="team-info-list__label">Capacity</span>'
                 . "<span class=\"team-info-list__value\">$capacity</span>";
         }
@@ -274,14 +279,19 @@ class TeamComponentsView implements TeamComponentsViewInterface
     public function draftPicks(\Team $team): string
     {
         global $mysqli_db;
+        /** @var \mysqli $mysqli_db */
 
         $resultPicks = $team->getDraftPicksResult();
 
         $league = new \League($mysqli_db);
         $allTeamsResult = $league->getAllTeamsResult();
 
+        /** @var array<string, \Team> $teamsArray */
+        $teamsArray = [];
         foreach ($allTeamsResult as $teamRow) {
-            $teamsArray[$teamRow['team_name']] = \Team::initialize($mysqli_db, $teamRow);
+            /** @var TeamInfoRow $teamRow */
+            $teamRowName = $teamRow['team_name'];
+            $teamsArray[$teamRowName] = \Team::initialize($mysqli_db, $teamRow);
         }
 
         $tableDraftPicks = '<ul class="draft-picks-list">';
@@ -289,11 +299,14 @@ class TeamComponentsView implements TeamComponentsViewInterface
         foreach ($resultPicks as $draftPickRow) {
             $draftPick = new \DraftPick($draftPickRow);
 
-            $draftPickOriginalTeamID = (int) $teamsArray[$draftPick->originalTeam]->teamID;
+            $draftPickOriginalTeamID = $teamsArray[$draftPick->originalTeam]->teamID;
+            /** @var string $draftPickOriginalTeamCity */
             $draftPickOriginalTeamCity = \Utilities\HtmlSanitizer::safeHtmlOutput($teamsArray[$draftPick->originalTeam]->city);
+            /** @var string $draftPickYear */
             $draftPickYear = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $draftPick->year);
+            /** @var string $draftPickOriginalTeamName */
             $draftPickOriginalTeamName = \Utilities\HtmlSanitizer::safeHtmlOutput($draftPick->originalTeam);
-            $draftPickRound = (int) $draftPick->round;
+            $draftPickRound = $draftPick->round;
 
             $tableDraftPicks .= '<li class="draft-picks-list__item">'
                 . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID=$draftPickOriginalTeamID\">"
@@ -302,8 +315,10 @@ class TeamComponentsView implements TeamComponentsViewInterface
                 . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID=$draftPickOriginalTeamID\">$draftPickYear R$draftPickRound $draftPickOriginalTeamCity $draftPickOriginalTeamName</a>";
 
             if ($draftPick->notes !== null && $draftPick->notes !== '') {
+                /** @var string $notesSafe */
+                $notesSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($draftPick->notes);
                 $tableDraftPicks .= '<div class="draft-picks-list__notes">'
-                    . \Utilities\HtmlSanitizer::safeHtmlOutput($draftPick->notes) . '</div>';
+                    . $notesSafe . '</div>';
             }
 
             $tableDraftPicks .= '</div></li>';
@@ -317,20 +332,24 @@ class TeamComponentsView implements TeamComponentsViewInterface
     /**
      * @see TeamComponentsViewInterface::gmHistory()
      */
-    public function gmHistory($team): string
+    public function gmHistory(object $team): string
     {
+        /** @var \Team $team */
         $gmHistory = $this->repository->getGMHistory($team->ownerName, $team->name);
 
-        if (empty($gmHistory)) {
+        if ($gmHistory === []) {
             return '';
         }
 
         $output = '<ul class="team-awards-list">';
 
         foreach ($gmHistory as $record) {
-            $year = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags((string) ($record['year'] ?? '')));
-            $rawAward = preg_replace('/<br\s*\/?>/i', "\n", (string) ($record['Award'] ?? ''));
-            $award = nl2br(\Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($rawAward)));
+            /** @var string $year */
+            $year = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($record['year']));
+            $rawAward = preg_replace('/<br\s*\/?>/i', "\n", $record['Award']) ?? $record['Award'];
+            /** @var string $sanitizedAward */
+            $sanitizedAward = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($rawAward));
+            $award = nl2br($sanitizedAward);
             $output .= "<li><span class=\"award-year\">$year</span> $award</li>";
         }
 
@@ -342,8 +361,9 @@ class TeamComponentsView implements TeamComponentsViewInterface
     /**
      * @see TeamComponentsViewInterface::resultsHEAT()
      */
-    public function resultsHEAT($team): string
+    public function resultsHEAT(object $team): string
     {
+        /** @var \Team $team */
         $heatHistory = $this->repository->getHEATHistory($team->name);
         $wintot = 0;
         $lostot = 0;
@@ -351,20 +371,21 @@ class TeamComponentsView implements TeamComponentsViewInterface
         $output = '<ul class="team-history-list">';
 
         foreach ($heatHistory as $record) {
-            $yearwl = \Utilities\HtmlSanitizer::safeHtmlOutput((string) ($record['year'] ?? ''));
-            $namewl = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear'] ?? '');
-            $wins = $record['wins'] ?? 0;
-            $losses = $record['losses'] ?? 0;
+            $yearwl = $record['year'];
+            /** @var string $namewl */
+            $namewl = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
+            $wins = $record['wins'];
+            $losses = $record['losses'];
             $wintot += $wins;
             $lostot += $losses;
-            $winpct = ($wins + $losses) ? number_format($wins / ($wins + $losses), 3) : "0.000";
-            $teamID = (int) $team->teamID;
+            $winpct = ($wins + $losses > 0) ? number_format($wins / ($wins + $losses), 3) : "0.000";
+            $teamID = $team->teamID;
             $output .= "<li><a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$yearwl\">$yearwl $namewl</a> <span class=\"record\">$wins-$losses ($winpct)</span></li>";
         }
 
         $output .= '</ul>';
 
-        $wlpct = ($wintot + $lostot) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
+        $wlpct = ($wintot + $lostot > 0) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
         $output .= "<div class=\"team-card__footer\">Totals: $wintot-$lostot ($wlpct)</div>";
 
         return $output;
@@ -373,11 +394,14 @@ class TeamComponentsView implements TeamComponentsViewInterface
     /**
      * @see TeamComponentsViewInterface::resultsPlayoffs()
      */
-    public function resultsPlayoffs($team): string
+    public function resultsPlayoffs(object $team): string
     {
+        /** @var \Team $team */
         $playoffResults = $this->repository->getPlayoffResults();
-        $totalplayoffwins = $totalplayofflosses = 0;
+        $totalplayoffwins = 0;
+        $totalplayofflosses = 0;
 
+        /** @var array<int, array{name: string, wins: int, losses: int, series_w: int, series_l: int, results: list<string>}> $rounds */
         $rounds = [
             1 => ['name' => 'First Round', 'wins' => 0, 'losses' => 0, 'series_w' => 0, 'series_l' => 0, 'results' => []],
             2 => ['name' => 'Conference Semis', 'wins' => 0, 'losses' => 0, 'series_w' => 0, 'series_l' => 0, 'results' => []],
@@ -388,11 +412,12 @@ class TeamComponentsView implements TeamComponentsViewInterface
         $teamName = $team->name;
 
         foreach ($playoffResults as $playoff) {
-            $round = $playoff['round'] ?? 0;
-            $year = \Utilities\HtmlSanitizer::safeHtmlOutput((string) ($playoff['year'] ?? ''));
-            $winner = $playoff['winner'] ?? '';
-            $loser = $playoff['loser'] ?? '';
-            $loserGames = $playoff['loser_games'] ?? 0;
+            $round = $playoff['round'];
+            /** @var string $year */
+            $year = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $playoff['year']);
+            $winner = $playoff['winner'];
+            $loser = $playoff['loser'];
+            $loserGames = $playoff['loser_games'];
 
             if (!isset($rounds[$round])) {
                 continue;
@@ -405,7 +430,9 @@ class TeamComponentsView implements TeamComponentsViewInterface
                 continue;
             }
 
+            /** @var string $winnerSafe */
             $winnerSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($winner);
+            /** @var string $loserSafe */
             $loserSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($loser);
 
             if ($isWin) {
@@ -430,13 +457,13 @@ class TeamComponentsView implements TeamComponentsViewInterface
         $totalSeriesL = 0;
 
         foreach ($rounds as $r) {
-            if (empty($r['results'])) {
+            if ($r['results'] === []) {
                 continue;
             }
             $totalSeriesW += $r['series_w'];
             $totalSeriesL += $r['series_l'];
-            $gamePct = ($r['wins'] + $r['losses']) ? number_format($r['wins'] / ($r['wins'] + $r['losses']), 3) : "0.000";
-            $seriesPct = ($r['series_w'] + $r['series_l']) ? number_format($r['series_w'] / ($r['series_w'] + $r['series_l']), 3) : "0.000";
+            $gamePct = ($r['wins'] + $r['losses'] > 0) ? number_format($r['wins'] / ($r['wins'] + $r['losses']), 3) : "0.000";
+            $seriesPct = ($r['series_w'] + $r['series_l'] > 0) ? number_format($r['series_w'] / ($r['series_w'] + $r['series_l']), 3) : "0.000";
             $roundName = $r['name'];
 
             $output .= "<div class=\"team-card__body\" style=\"padding-bottom: 0;\">"
@@ -448,9 +475,9 @@ class TeamComponentsView implements TeamComponentsViewInterface
                 . "<div class=\"team-card__footer\">Games: {$r['wins']}-{$r['losses']} ($gamePct) &middot; Series: {$r['series_w']}-{$r['series_l']} ($seriesPct)</div>";
         }
 
-        $pwlpct = ($totalplayoffwins + $totalplayofflosses !== 0)
+        $pwlpct = ($totalplayoffwins + $totalplayofflosses > 0)
             ? number_format($totalplayoffwins / ($totalplayoffwins + $totalplayofflosses), 3) : "0.000";
-        $swlpct = ($totalSeriesW + $totalSeriesL)
+        $swlpct = ($totalSeriesW + $totalSeriesL > 0)
             ? number_format($totalSeriesW / ($totalSeriesW + $totalSeriesL), 3) : "0.000";
 
         $output .= "<div class=\"team-card__footer\" style=\"font-weight: 700;\">Post-Season: $totalplayoffwins-$totalplayofflosses ($pwlpct) &middot; Series: $totalSeriesW-$totalSeriesL ($swlpct)</div>";
@@ -461,8 +488,9 @@ class TeamComponentsView implements TeamComponentsViewInterface
     /**
      * @see TeamComponentsViewInterface::resultsRegularSeason()
      */
-    public function resultsRegularSeason($team): string
+    public function resultsRegularSeason(object $team): string
     {
+        /** @var \Team $team */
         $regularSeasonHistory = $this->repository->getRegularSeasonHistory($team->name);
         $wintot = 0;
         $lostot = 0;
@@ -470,21 +498,23 @@ class TeamComponentsView implements TeamComponentsViewInterface
         $output = '<ul class="team-history-list">';
 
         foreach ($regularSeasonHistory as $record) {
-            $yearwl = $record['year'] ?? 0;
-            $namewl = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear'] ?? '');
-            $wins = $record['wins'] ?? 0;
-            $losses = $record['losses'] ?? 0;
+            $yearwl = $record['year'];
+            $yearwlInt = (int) $yearwl;
+            /** @var string $namewl */
+            $namewl = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
+            $wins = (int) $record['wins'];
+            $losses = (int) $record['losses'];
             $wintot += $wins;
             $lostot += $losses;
-            $winpct = ($wins + $losses) ? number_format($wins / ($wins + $losses), 3) : "0.000";
-            $teamID = (int) $team->teamID;
-            $prevYear = $yearwl - 1;
+            $winpct = ($wins + $losses > 0) ? number_format($wins / ($wins + $losses), 3) : "0.000";
+            $teamID = $team->teamID;
+            $prevYear = $yearwlInt - 1;
             $output .= "<li><a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$yearwl\">$prevYear-$yearwl $namewl</a> <span class=\"record\">$wins-$losses ($winpct)</span></li>";
         }
 
         $output .= '</ul>';
 
-        $wlpct = ($wintot + $lostot) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
+        $wlpct = ($wintot + $lostot > 0) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
         $output .= "<div class=\"team-card__footer\">Totals: $wintot-$lostot ($wlpct)</div>";
 
         return $output;
@@ -493,20 +523,24 @@ class TeamComponentsView implements TeamComponentsViewInterface
     /**
      * @see TeamComponentsViewInterface::teamAccomplishments()
      */
-    public function teamAccomplishments($team): string
+    public function teamAccomplishments(object $team): string
     {
+        /** @var \Team $team */
         $teamAccomplishments = $this->repository->getTeamAccomplishments($team->name);
 
-        if (empty($teamAccomplishments)) {
+        if ($teamAccomplishments === []) {
             return '';
         }
 
         $output = '<ul class="team-awards-list">';
 
         foreach ($teamAccomplishments as $record) {
-            $year = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags((string) ($record['year'] ?? '')));
-            $rawAward = preg_replace('/<br\s*\/?>/i', "\n", (string) ($record['Award'] ?? ''));
-            $award = nl2br(\Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($rawAward)));
+            /** @var string $year */
+            $year = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($record['year']));
+            $rawAward = preg_replace('/<br\s*\/?>/i', "\n", $record['Award']) ?? $record['Award'];
+            /** @var string $sanitizedAward */
+            $sanitizedAward = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($rawAward));
+            $award = nl2br($sanitizedAward);
             $output .= "<li><span class=\"award-year\">$year</span> $award</li>";
         }
 

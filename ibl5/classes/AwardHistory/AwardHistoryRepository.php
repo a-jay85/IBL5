@@ -73,7 +73,7 @@ class AwardHistoryRepository extends BaseMysqliRepository implements AwardHistor
         // Build the query - LEFT JOIN to get pid for player photos
         $query = 'SELECT a.year, a.Award, a.name, a.table_ID, p.pid FROM ibl_awards a LEFT JOIN ibl_plr p ON a.name = p.name';
         
-        if (!empty($conditions)) {
+        if ($conditions !== []) {
             $query .= ' WHERE ' . implode(' AND ', $conditions);
         }
 
@@ -82,12 +82,13 @@ class AwardHistoryRepository extends BaseMysqliRepository implements AwardHistor
         $query .= ' ORDER BY ' . $sortColumn . ' ASC';
 
         // Execute query
-        if (empty($bindParams)) {
+        if ($bindParams === []) {
             $results = $this->fetchAll($query);
         } else {
             $results = $this->fetchAll($query, $bindTypes, ...$bindParams);
         }
 
+        /** @var array<int, array{year: int, Award: string, name: string, table_ID: int}> $results */
         return [
             'results' => $results,
             'count' => count($results),

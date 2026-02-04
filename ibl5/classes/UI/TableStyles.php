@@ -36,7 +36,7 @@ class TableStyles
     public static function sanitizeColor(string $color): string
     {
         $color = ltrim($color, '#');
-        if (preg_match('/^[0-9A-Fa-f]{3}$|^[0-9A-Fa-f]{6}$/', $color)) {
+        if (preg_match('/^[0-9A-Fa-f]{3}$|^[0-9A-Fa-f]{6}$/', $color) === 1) {
             return $color;
         }
         return '000000';

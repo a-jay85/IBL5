@@ -8,9 +8,11 @@ use Player\PlayerData;
 
 /**
  * PlayerRepositoryInterface - Contract for Player data access
- * 
+ *
  * Defines the interface for loading and persisting player data from/to the database.
  * Handles all data transformation from raw database rows to PlayerData objects.
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 interface PlayerRepositoryInterface
 {
@@ -28,7 +30,7 @@ interface PlayerRepositoryInterface
 
     /**
      * Fill a PlayerData object from a current player database row
-     * 
+     *
      * Transforms a raw database row from ibl_plr table into a PlayerData object.
      * Maps all database columns to PlayerData properties, including:
      * - Basic fields: pid, name, nickname, position, etc.
@@ -36,8 +38,8 @@ interface PlayerRepositoryInterface
      * - Contract: years and salaries for years 1-6
      * - Draft info: year, round, pick number, college, team
      * - Physical: height, weight
-     * 
-     * @param array<string, mixed> $plrRow Database row from ibl_plr
+     *
+     * @param PlayerRow $plrRow Database row from ibl_plr
      * @return PlayerData Fully populated PlayerData object
      */
     public function fillFromCurrentRow(array $plrRow): PlayerData;
@@ -73,7 +75,7 @@ interface PlayerRepositoryInterface
      * Returns raw database row with all statistics columns.
      *
      * @param int $playerID Player ID
-     * @return array|null Player statistics row or null if not found
+     * @return PlayerRow|null Player statistics row or null if not found
      */
     public function getPlayerStats(int $playerID): ?array;
 

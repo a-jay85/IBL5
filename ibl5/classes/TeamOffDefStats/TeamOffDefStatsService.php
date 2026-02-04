@@ -18,6 +18,15 @@ use BasketballStats\StatsFormatter;
  * Uses Statistics\StatsFormatter for consistent formatting across the application.
  *
  * @see TeamOffDefStatsServiceInterface for method documentation
+ *
+ * @phpstan-import-type AllTeamStatsRow from Contracts\TeamOffDefStatsRepositoryInterface
+ * @phpstan-import-type RawStatValues from Contracts\TeamOffDefStatsServiceInterface
+ * @phpstan-import-type FormattedStatTotals from Contracts\TeamOffDefStatsServiceInterface
+ * @phpstan-import-type FormattedStatAverages from Contracts\TeamOffDefStatsServiceInterface
+ * @phpstan-import-type ProcessedTeamStats from Contracts\TeamOffDefStatsServiceInterface
+ * @phpstan-import-type LeagueTotals from Contracts\TeamOffDefStatsServiceInterface
+ * @phpstan-import-type DifferentialTeam from Contracts\TeamOffDefStatsServiceInterface
+ * @phpstan-import-type DifferentialStats from Contracts\TeamOffDefStatsServiceInterface
  */
 class TeamOffDefStatsService implements TeamOffDefStatsServiceInterface
 {
@@ -30,8 +39,8 @@ class TeamOffDefStatsService implements TeamOffDefStatsServiceInterface
      * Process raw team statistics into formatted data
      *
      * @see TeamOffDefStatsServiceInterface::processTeamStats()
-     * @param array $rawStats Raw statistics from repository
-     * @return array Processed team statistics with formatted values
+     * @param list<AllTeamStatsRow> $rawStats Raw statistics from repository
+     * @return list<ProcessedTeamStats> Processed team statistics with formatted values
      */
     public function processTeamStats(array $rawStats): array
     {
@@ -65,7 +74,8 @@ class TeamOffDefStatsService implements TeamOffDefStatsServiceInterface
             $offenseAverages = $this->formatAverages($rawOffense, $offenseGames);
             $defenseAverages = $this->formatAverages($rawDefense, $defenseGames);
 
-            $processed[] = [
+            /** @var ProcessedTeamStats $processedTeam */
+            $processedTeam = [
                 'teamid' => (int) $row['teamid'],
                 'team_city' => $row['team_city'],
                 'team_name' => $row['team_name'],
@@ -80,6 +90,7 @@ class TeamOffDefStatsService implements TeamOffDefStatsServiceInterface
                 'offense_games' => $offenseGames,
                 'defense_games' => $defenseGames,
             ];
+            $processed[] = $processedTeam;
         }
 
         return $processed;
@@ -89,8 +100,8 @@ class TeamOffDefStatsService implements TeamOffDefStatsServiceInterface
      * Calculate league-wide totals and averages
      *
      * @see TeamOffDefStatsServiceInterface::calculateLeagueTotals()
-     * @param array $processedStats Processed team statistics from processTeamStats()
-     * @return array League totals and averages
+     * @param list<ProcessedTeamStats> $processedStats Processed team statistics from processTeamStats()
+     * @return LeagueTotals League totals and averages
      */
     public function calculateLeagueTotals(array $processedStats): array
     {
@@ -117,6 +128,8 @@ class TeamOffDefStatsService implements TeamOffDefStatsServiceInterface
         }
         $formattedTotals['pts'] = StatsFormatter::formatTotal($leagueTotals['pts']);
 
+        /** @var FormattedStatTotals $formattedTotals */
+
         // Calculate league averages (per-game and percentages)
         $formattedAverages = $this->formatAverages($leagueTotals, $totalGames);
 
@@ -131,8 +144,8 @@ class TeamOffDefStatsService implements TeamOffDefStatsServiceInterface
      * Calculate offense/defense differentials for each team
      *
      * @see TeamOffDefStatsServiceInterface::calculateDifferentials()
-     * @param array $processedStats Processed team statistics from processTeamStats()
-     * @return array Differential data for each team
+     * @param list<ProcessedTeamStats> $processedStats Processed team statistics from processTeamStats()
+     * @return list<DifferentialTeam> Differential data for each team
      */
     public function calculateDifferentials(array $processedStats): array
     {
@@ -196,7 +209,7 @@ class TeamOffDefStatsService implements TeamOffDefStatsServiceInterface
     /**
      * Extract raw stat values from a row with a given prefix
      *
-     * @param array $row Database row
+     * @param AllTeamStatsRow $row Database row
      * @param string $prefix Column prefix (e.g., 'offense_', 'defense_')
      * @return array<string, int> Raw stat values
      */
@@ -212,9 +225,9 @@ class TeamOffDefStatsService implements TeamOffDefStatsServiceInterface
     /**
      * Format totals with games count
      *
-     * @param array $rawStats Raw stat values
+     * @param array<string, int> $rawStats Raw stat values
      * @param int $games Number of games played
-     * @return array<string, string> Formatted totals
+     * @return FormattedStatTotals Formatted totals
      */
     private function formatTotals(array $rawStats, int $games): array
     {
@@ -228,18 +241,20 @@ class TeamOffDefStatsService implements TeamOffDefStatsServiceInterface
 
         $formatted['pts'] = StatsFormatter::formatTotal($rawStats['pts'] ?? 0);
 
+        /** @var FormattedStatTotals $formatted */
         return $formatted;
     }
 
     /**
      * Format per-game averages and shooting percentages
      *
-     * @param array $rawStats Raw stat values
+     * @param array<string, int> $rawStats Raw stat values
      * @param int $games Number of games played
-     * @return array<string, string> Formatted averages
+     * @return FormattedStatAverages Formatted averages
      */
     private function formatAverages(array $rawStats, int $games): array
     {
+        /** @var FormattedStatAverages */
         return [
             'fgm' => StatsFormatter::formatPerGameAverage($rawStats['fgm'] ?? 0, $games),
             'fga' => StatsFormatter::formatPerGameAverage($rawStats['fga'] ?? 0, $games),

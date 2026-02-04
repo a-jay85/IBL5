@@ -11,6 +11,9 @@ use Player\Player;
  *
  * Calculates contract demands based on player ratings and statistics
  * using market-based analysis to determine fair contract values.
+ *
+ * @phpstan-type TeamFactors array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}
+ * @phpstan-type DemandResult array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, modifier: float}
  */
 interface NegotiationDemandCalculatorInterface
 {
@@ -21,17 +24,8 @@ interface NegotiationDemandCalculatorInterface
      * fair contract demands including yearly amounts and modifiers.
      *
      * @param Player $player The player object with ratings and stats
-     * @param array $teamFactors Team factors affecting demands with keys:
-     *                           - 'wins' (int): Team current season wins
-     *                           - 'losses' (int): Team current season losses
-     *                           - 'tradition_wins' (int): Historical average wins
-     *                           - 'tradition_losses' (int): Historical average losses
-     *                           - 'money_committed_at_position' (int): Salary committed at position
-     * @return array Demand information with keys:
-     *               - 'year1' through 'year6' (int): Yearly demand amounts
-     *               - 'years' (int): Total years demanded (1-6)
-     *               - 'total' (int): Sum of all year amounts
-     *               - 'modifier' (float): Applied modifier value
+     * @param TeamFactors $teamFactors Team factors affecting demands
+     * @return DemandResult Demand information
      *
      * **Calculation Overview:**
      * 1. Calculate raw score from player ratings vs market maximums

@@ -9,10 +9,10 @@ use Services\CommonContractValidator;
 
 /**
  * ExtensionValidator - Validates contract extension offers
- * 
+ *
  * Delegates common validation logic to CommonContractValidator while
  * handling Extension-specific validation (team eligibility flags).
- * 
+ *
  * @see ExtensionValidatorInterface
  */
 class ExtensionValidator implements ExtensionValidatorInterface
@@ -26,17 +26,17 @@ class ExtensionValidator implements ExtensionValidatorInterface
 
     /**
      * @see ExtensionValidatorInterface::validateOfferAmounts()
-     * 
+     *
      * Extension-specific validation - NOT delegated to CommonContractValidator
      * because Free Agency, Rookie Options, and Waivers do not have this requirement
      */
     public function validateOfferAmounts(array $offer): array
     {
         $requiredYears = ['year1', 'year2', 'year3'];
-        
+
         foreach ($requiredYears as $year) {
             $value = $offer[$year] ?? 0;
-            if (empty($value) || $value <= 0) {
+            if ($value === 0 || $value <= 0) {
                 $yearLabel = ucfirst($year);
                 return [
                     'valid' => false,
@@ -44,7 +44,7 @@ class ExtensionValidator implements ExtensionValidatorInterface
                 ];
             }
         }
-        
+
         return ['valid' => true, 'error' => null];
     }
 
@@ -74,11 +74,14 @@ class ExtensionValidator implements ExtensionValidatorInterface
 
     /**
      * @see ExtensionValidatorInterface::validateExtensionEligibility()
-     * 
+     *
      * Extension-specific validation - NOT delegated to CommonContractValidator
+     *
+     * @return array{valid: bool, error: string|null}
      */
     public function validateExtensionEligibility(object $team): array
     {
+        /** @var \Team $team */
         if ($team->hasUsedExtensionThisSeason === 1) {
             return [
                 'valid' => false,
@@ -92,7 +95,7 @@ class ExtensionValidator implements ExtensionValidatorInterface
                 'error' => 'Sorry, you have already used your extension for this sim.'
             ];
         }
-        
+
         return ['valid' => true, 'error' => null];
     }
 }

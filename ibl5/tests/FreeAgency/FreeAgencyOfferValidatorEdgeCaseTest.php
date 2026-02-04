@@ -193,17 +193,17 @@ class FreeAgencyOfferValidatorEdgeCaseTest extends TestCase
     }
 
     // ============================================
-    // TYPE COERCION TESTS (MLE/LLE)
+    // MLE/LLE AVAILABILITY TESTS
     // ============================================
 
     /**
-     * Test MLE check with string "1" for hasMLE
+     * Test MLE check with integer 1 for hasMLE
      */
-    public function testAcceptsMLEWithStringOne(): void
+    public function testAcceptsMLEWithIntOne(): void
     {
         $mockTeam = (object)[
-            'hasMLE' => "1", // String
-            'hasLLE' => "1"
+            'hasMLE' => 1,
+            'hasLLE' => 1
         ];
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
@@ -215,13 +215,13 @@ class FreeAgencyOfferValidatorEdgeCaseTest extends TestCase
     }
 
     /**
-     * Test MLE check with string "0" for hasMLE
+     * Test MLE check with integer 0 for hasMLE
      */
-    public function testRejectsMLEWithStringZero(): void
+    public function testRejectsMLEWithIntZero(): void
     {
         $mockTeam = (object)[
-            'hasMLE' => "0", // String zero
-            'hasLLE' => "1"
+            'hasMLE' => 0,
+            'hasLLE' => 1
         ];
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
@@ -234,13 +234,13 @@ class FreeAgencyOfferValidatorEdgeCaseTest extends TestCase
     }
 
     /**
-     * Test LLE check with string "1" for hasLLE
+     * Test LLE check with integer 1 for hasLLE
      */
-    public function testAcceptsLLEWithStringOne(): void
+    public function testAcceptsLLEWithIntOne(): void
     {
         $mockTeam = (object)[
-            'hasMLE' => "1",
-            'hasLLE' => "1" // String
+            'hasMLE' => 1,
+            'hasLLE' => 1
         ];
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
@@ -252,13 +252,13 @@ class FreeAgencyOfferValidatorEdgeCaseTest extends TestCase
     }
 
     /**
-     * Test LLE check with string "0" for hasLLE
+     * Test LLE check with integer 0 for hasLLE
      */
-    public function testRejectsLLEWithStringZero(): void
+    public function testRejectsLLEWithIntZero(): void
     {
         $mockTeam = (object)[
-            'hasMLE' => "1",
-            'hasLLE' => "0" // String zero
+            'hasMLE' => 1,
+            'hasLLE' => 0
         ];
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();

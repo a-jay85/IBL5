@@ -27,6 +27,7 @@ class GMContactListRepository extends \BaseMysqliRepository implements GMContact
             WHERE teamid > 0
             ORDER BY team_city ASC";
 
+        /** @var array<int, array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, owner_name: string, owner_email: string, skype: string, aim: string}> */
         return $this->fetchAll($query);
     }
 }

@@ -11,6 +11,8 @@ use FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface;
  *
  * Retrieves franchise history and win/loss records from the database.
  *
+ * @phpstan-import-type FranchiseRow from \FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface
+ *
  * @see FranchiseHistoryRepositoryInterface For the interface contract
  * @see \BaseMysqliRepository For base class documentation
  */
@@ -18,12 +20,14 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
 {
     /**
      * @see FranchiseHistoryRepositoryInterface::getAllFranchiseHistory()
+     *
+     * @return array<int, FranchiseRow>
      */
     public function getAllFranchiseHistory(int $currentEndingYear): array
     {
         $fiveSeasonsAgoEndingYear = $currentEndingYear - 4;
 
-        $query = "SELECT 
+        $query = "SELECT
             ibl_team_history.*,
             SUM(ibl_team_win_loss.wins) as five_season_wins,
             SUM(ibl_team_win_loss.losses) as five_season_losses,
@@ -36,6 +40,7 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
             GROUP BY currentname
             ORDER BY teamid ASC";
 
+        /** @var array<int, array{team_name: string, teamid: int|string, color1: string, color2: string, totwins: int|string, totloss: int|string, winpct: string, five_season_wins: int|string, five_season_losses: int|string, five_season_winpct: string|null, totalgames: int|string, playoffs: int|string}> $teams */
         $teams = $this->fetchAll(
             $query,
             "iii",
@@ -46,12 +51,14 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
 
         // Dynamically calculate title counts from ibl_team_awards table
         foreach ($teams as &$team) {
-            $team['heat_titles'] = $this->getNumberOfTitles($team['team_name'], 'HEAT');
-            $team['div_titles'] = $this->getNumberOfTitles($team['team_name'], 'Division');
-            $team['conf_titles'] = $this->getNumberOfTitles($team['team_name'], 'Conference');
-            $team['ibl_titles'] = $this->getNumberOfTitles($team['team_name'], 'IBL Champions');
+            $teamName = $team['team_name'];
+            $team['heat_titles'] = $this->getNumberOfTitles($teamName, 'HEAT');
+            $team['div_titles'] = $this->getNumberOfTitles($teamName, 'Division');
+            $team['conf_titles'] = $this->getNumberOfTitles($teamName, 'Conference');
+            $team['ibl_titles'] = $this->getNumberOfTitles($teamName, 'IBL Champions');
         }
 
+        /** @var array<int, FranchiseRow> $teams */
         return $teams;
     }
 
@@ -73,6 +80,13 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
             "%{$titleName}%"
         );
 
-        return $result ? (int) ($result['count'] ?? 0) : 0;
+        if ($result === null) {
+            return 0;
+        }
+
+        /** @var int|string $count */
+        $count = $result['count'] ?? 0;
+
+        return (int) $count;
     }
 }

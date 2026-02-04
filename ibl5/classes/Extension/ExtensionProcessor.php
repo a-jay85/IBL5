@@ -10,26 +10,36 @@ use Extension\Contracts\ExtensionProcessorInterface;
 
 /**
  * ExtensionProcessor - Processes contract extension offers
- * 
+ *
  * Orchestrates the complete extension offer lifecycle: validation, evaluation,
  * database updates, and notifications.
- * 
+ *
+ * @phpstan-import-type ExtensionOffer from Contracts\ExtensionDatabaseOperationsInterface
+ * @phpstan-import-type ExtensionData from Contracts\ExtensionProcessorInterface
+ * @phpstan-import-type ExtensionResult from Contracts\ExtensionProcessorInterface
+ *
+ * @phpstan-type TraditionData array{currentSeasonWins: int, currentSeasonLosses: int, tradition_wins: int, tradition_losses: int}
+ * @phpstan-type TeamTraditionDbRow array{Contract_Wins: int, Contract_Losses: int, Contract_AvgW: int, Contract_AvgL: int}
+ * @phpstan-type MoneyCommittedDbRow array{money_committed_at_position: int}
+ *
  * @see ExtensionProcessorInterface
  */
 class ExtensionProcessor implements ExtensionProcessorInterface
 {
-    private object $db;
+    /** @var \mysqli */
+    private \mysqli $db;
     private ExtensionValidator $validator;
     private ExtensionOfferEvaluator $evaluator;
     private ExtensionDatabaseOperations $dbOps;
 
     /**
      * Constructor
-     * 
-     * @param object $db mysqli connection or duck-typed mock for testing
+     *
+     * @param \mysqli $db mysqli connection
      */
     public function __construct(object $db)
     {
+        /** @var \mysqli $db */
         $this->db = $db;
         $this->validator = new ExtensionValidator();
         $this->evaluator = new ExtensionOfferEvaluator();
@@ -37,6 +47,9 @@ class ExtensionProcessor implements ExtensionProcessorInterface
     }
 
     /**
+     * @param ExtensionData $extensionData
+     * @return ExtensionResult
+     *
      * @see ExtensionProcessorInterface::processExtension()
      */
     public function processExtension($extensionData)
@@ -44,7 +57,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         $offer = $extensionData['offer'];
         $demands = $extensionData['demands'] ?? null;
         $player = $this->getPlayerObject($extensionData);
-        if (!$player) {
+        if ($player === null) {
             return [
                 'success' => false,
                 'error' => 'Player not found in database.'
@@ -52,7 +65,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         }
 
         $team = $this->getTeamObject($extensionData, $player);
-        if (!$team) {
+        if ($team === null) {
             return [
                 'success' => false,
                 'error' => 'Team not found in database.'
@@ -60,42 +73,42 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         }
 
         $amountValidation = $this->validator->validateOfferAmounts($offer);
-        if (!$amountValidation['valid']) {
+        if ($amountValidation['valid'] !== true) {
             return [
                 'success' => false,
-                'error' => $amountValidation['error']
+                'error' => (string) $amountValidation['error']
             ];
         }
 
         $eligibilityValidation = $this->validator->validateExtensionEligibility($team);
-        if (!$eligibilityValidation['valid']) {
+        if ($eligibilityValidation['valid'] !== true) {
             return [
                 'success' => false,
-                'error' => $eligibilityValidation['error']
+                'error' => (string) $eligibilityValidation['error']
             ];
         }
 
-        $maxOfferValidation = $this->validator->validateMaximumYearOneOffer($offer, $player->yearsOfExperience);
-        if (!$maxOfferValidation['valid']) {
+        $maxOfferValidation = $this->validator->validateMaximumYearOneOffer($offer, $player->yearsOfExperience ?? 0);
+        if ($maxOfferValidation['valid'] !== true) {
             return [
                 'success' => false,
-                'error' => $maxOfferValidation['error']
+                'error' => (string) $maxOfferValidation['error']
             ];
         }
 
-        $raisesValidation = $this->validator->validateRaises($offer, $player->birdYears);
-        if (!$raisesValidation['valid']) {
+        $raisesValidation = $this->validator->validateRaises($offer, $player->birdYears ?? 0);
+        if ($raisesValidation['valid'] !== true) {
             return [
                 'success' => false,
-                'error' => $raisesValidation['error']
+                'error' => (string) $raisesValidation['error']
             ];
         }
 
         $decreasesValidation = $this->validator->validateSalaryDecreases($offer);
-        if (!$decreasesValidation['valid']) {
+        if ($decreasesValidation['valid'] !== true) {
             return [
                 'success' => false,
-                'error' => $decreasesValidation['error']
+                'error' => (string) $decreasesValidation['error']
             ];
         }
 
@@ -118,28 +131,31 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             'playing_time' => $player->freeAgencyPlayingTime ?? 3
         ];
 
-        if (!$demands) {
+        if ($demands === null) {
             $offerData = $this->evaluator->calculateOfferValue($offer);
             $offerAvg = $offerData['averagePerYear'];
             $demandAvg = $offerAvg * 0.85;
             $demands = [
-                'year1' => $demandAvg,
-                'year2' => $demandAvg,
-                'year3' => $demandAvg,
-                'year4' => $offerData['years'] > 3 ? $demandAvg : 0,
-                'year5' => $offerData['years'] > 4 ? $demandAvg : 0
+                'year1' => (int) $demandAvg,
+                'year2' => (int) $demandAvg,
+                'year3' => (int) $demandAvg,
+                'year4' => $offerData['years'] > 3 ? (int) $demandAvg : 0,
+                'year5' => $offerData['years'] > 4 ? (int) $demandAvg : 0
             ];
         } elseif (isset($demands['total']) && isset($demands['years'])) {
-            $demandAvg = $demands['total'] / $demands['years'];
+            /** @var array{total: int, years: int} $totalYearsDemands */
+            $totalYearsDemands = $demands;
+            $demandAvg = $totalYearsDemands['total'] / $totalYearsDemands['years'];
             $demands = [
-                'year1' => $demandAvg,
-                'year2' => $demandAvg,
-                'year3' => $demandAvg,
-                'year4' => $demands['years'] > 3 ? $demandAvg : 0,
-                'year5' => $demands['years'] > 4 ? $demandAvg : 0
+                'year1' => (int) $demandAvg,
+                'year2' => (int) $demandAvg,
+                'year3' => (int) $demandAvg,
+                'year4' => $totalYearsDemands['years'] > 3 ? (int) $demandAvg : 0,
+                'year5' => $totalYearsDemands['years'] > 4 ? (int) $demandAvg : 0
             ];
         }
 
+        /** @var ExtensionOffer $demands */
         $evaluation = $this->evaluator->evaluateOffer($offer, $demands, $teamFactors, $playerPreferences);
 
         $offerData = $this->evaluator->calculateOfferValue($offer);
@@ -148,23 +164,26 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         $offerInMillions = SalaryConverter::convertToMillions($offerTotal);
         $offerDetails = $offer['year1'] . " " . $offer['year2'] . " " . $offer['year3'] . " " . $offer['year4'] . " " . $offer['year5'];
 
+        $playerName = $player->name ?? '';
+        $teamName = $team->name;
+
         if ($evaluation['accepted']) {
             $currentSalary = $player->currentSeasonSalary ?? 0;
-            $this->dbOps->updatePlayerContract($player->name, $offer, $currentSalary);
-            $this->dbOps->markExtensionUsedThisSeason($team->name);
-            $this->dbOps->createAcceptedExtensionStory($player->name, $team->name, $offerInMillions, $offerYears, $offerDetails);
-            
+            $this->dbOps->updatePlayerContract($playerName, $offer, $currentSalary);
+            $this->dbOps->markExtensionUsedThisSeason($teamName);
+            $this->dbOps->createAcceptedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears, $offerDetails);
+
             // Send Discord notification
             if (class_exists('Discord')) {
-                $hometext = "{$player->name} today accepted a contract extension offer from the {$team->name} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
+                $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
                 \Discord::postToChannel('#extensions', $hometext);
             }
-            
+
             // Send email notification (only on non-localhost)
-            if (isset($_SERVER['SERVER_NAME']) && $_SERVER['SERVER_NAME'] != "localhost") {
+            if (isset($_SERVER['SERVER_NAME']) && $_SERVER['SERVER_NAME'] !== "localhost") {
                 $recipient = 'ibldepthcharts@gmail.com';
-                $emailsubject = "Successful Extension - " . $player->name;
-                $filetext = "{$player->name} accepts an extension offer from the {$team->name} of $offerTotal for $offerYears years.\n";
+                $emailsubject = "Successful Extension - " . $playerName;
+                $filetext = "{$playerName} accepts an extension offer from the {$teamName} of $offerTotal for $offerYears years.\n";
                 $filetext .= "For reference purposes: the offer was " . $offerDetails;
                 $filetext .= " and the offer value was thus considered to be " . $evaluation['offerValue'];
                 $filetext .= "; the player wanted an offer with a value of " . $evaluation['demandValue'];
@@ -174,7 +193,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             return [
                 'success' => true,
                 'accepted' => true,
-                'message' => "{$player->name} accepts your extension offer of $offerInMillions million dollars over $offerYears years. Thank you! (Can't believe you gave me that much... sucker!)",
+                'message' => "{$playerName} accepts your extension offer of $offerInMillions million dollars over $offerYears years. Thank you! (Can't believe you gave me that much... sucker!)",
                 'offerValue' => $evaluation['offerValue'],
                 'demandValue' => $evaluation['demandValue'],
                 'modifier' => $evaluation['modifier'],
@@ -186,18 +205,18 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             ];
         } else {
             // Create news story for rejection
-            $this->dbOps->createRejectedExtensionStory($player->name, $team->name, $offerInMillions, $offerYears);
-            
+            $this->dbOps->createRejectedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears);
+
             // Send Discord notification
             if (class_exists('Discord')) {
-                $hometext = "{$player->name} today rejected a contract extension offer from the {$team->name} worth $offerInMillions million dollars over $offerYears years.";
+                $hometext = "{$playerName} today rejected a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years.";
                 \Discord::postToChannel('#extensions', $hometext);
             }
-            
+
             // Send email notification
             $recipient = 'ibldepthcharts@gmail.com';
-            $emailsubject = "Unsuccessful Extension - " . $player->name;
-            $filetext = "{$player->name} refuses an extension offer from the {$team->name} of $offerTotal for $offerYears years.\n";
+            $emailsubject = "Unsuccessful Extension - " . $playerName;
+            $filetext = "{$playerName} refuses an extension offer from the {$teamName} of $offerTotal for $offerYears years.\n";
             $filetext .= "For reference purposes: the offer was " . $offerDetails;
             $filetext .= " and the offer value was thus considered to be " . $evaluation['offerValue'] . ".";
             mail($recipient, $emailsubject, $filetext, "From: rejected-extensions@iblhoops.net");
@@ -219,18 +238,22 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         }
     }
 
-    private function getPlayerObject($extensionData)
+    /**
+     * @param ExtensionData $extensionData
+     * @return Player|null
+     */
+    private function getPlayerObject(array $extensionData): ?Player
     {
         // If Player object already provided, return it
-        if (isset($extensionData['player']) && $extensionData['player'] instanceof \Player) {
+        if (isset($extensionData['player']) && $extensionData['player'] instanceof Player) {
             return $extensionData['player'];
         }
 
         // Load player by playerID if provided
         $playerID = $extensionData['playerID'] ?? null;
-        if ($playerID) {
+        if ($playerID !== null) {
             try {
-                return Player::withPlayerID($this->db, (int)$playerID);
+                return Player::withPlayerID($this->db, $playerID);
             } catch (\Exception $e) {
                 return null;
             }
@@ -239,7 +262,12 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         return null;
     }
 
-    private function getTeamObject($extensionData, $player)
+    /**
+     * @param ExtensionData $extensionData
+     * @param Player $player
+     * @return \Team|null
+     */
+    private function getTeamObject(array $extensionData, Player $player): ?\Team
     {
         // If Team object already provided, return it
         if (isset($extensionData['team']) && $extensionData['team'] instanceof \Team) {
@@ -248,7 +276,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
 
         // Try to get team name from extension data or Player object
         $teamName = $extensionData['teamName'] ?? $player->teamName ?? null;
-        if (!$teamName) {
+        if ($teamName === null) {
             return null;
         }
 
@@ -259,58 +287,42 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         }
     }
 
-    private function calculateMoneyCommittedAtPosition($team, $position)
+    /**
+     * @param \Team $team
+     * @param string|null $position
+     * @return int
+     */
+    private function calculateMoneyCommittedAtPosition(\Team $team, ?string $position): int
     {
         try {
-            // First, try to get from mock database (for tests)
-            // Check if team_info has money_committed_at_position field
-            if ($this->db instanceof \mysqli) {
-                $stmt = $this->db->prepare("SELECT money_committed_at_position FROM ibl_team_info WHERE team_name = ? LIMIT 1");
-                $stmt->bind_param('s', $team->name);
-                $stmt->execute();
-                $result = $stmt->get_result();
-                
-                if ($result->num_rows > 0) {
-                    $row = $result->fetch_assoc();
-                    $stmt->close();
-                    if (isset($row['money_committed_at_position']) && $row['money_committed_at_position'] > 0) {
-                        // Mock data is available, use it
-                        return (int) $row['money_committed_at_position'];
-                    }
-                }
+            $stmt = $this->db->prepare("SELECT money_committed_at_position FROM ibl_team_info WHERE team_name = ? LIMIT 1");
+            if ($stmt === false) {
+                return 0;
+            }
+            $stmt->bind_param('s', $team->name);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result !== false && $result->num_rows > 0) {
+                /** @var MoneyCommittedDbRow|null $row */
+                $row = $result->fetch_assoc();
                 $stmt->close();
-            } else {
-                // Mock database for tests
-                $query = "SELECT money_committed_at_position FROM ibl_team_info WHERE team_name = ? LIMIT 1";
-                $stmt = $this->db->prepare($query);
-                if ($stmt) {
-                    $stmt->bind_param('s', $team->name);
-                    $stmt->execute();
-                    $result = $stmt->get_result();
-                    
-                    if ($result->num_rows > 0) {
-                        $row = $result->fetch_assoc();
-                        if (isset($row['money_committed_at_position']) && $row['money_committed_at_position'] > 0) {
-                            // Mock data is available, use it
-                            $stmt->close();
-                            return (int) $row['money_committed_at_position'];
-                        }
-                    }
-                    $stmt->close();
+                if ($row !== null && $row['money_committed_at_position'] > 0) {
+                    return $row['money_committed_at_position'];
                 }
+            } else {
+                $stmt->close();
             }
-            
+
             // Production: Use Team methods to calculate
-            if (method_exists($team, 'getPlayersUnderContractByPositionResult') && $position) {
+            if ($position !== null) {
                 // Get players under contract at this position
-                $result = $team->getPlayersUnderContractByPositionResult($position);
-                
+                $posResult = $team->getPlayersUnderContractByPositionResult($position);
+
                 // Calculate total next season salaries
-                $totalSalaries = $team->getTotalNextSeasonSalariesFromPlrResult($result);
-                
-                return (int) $totalSalaries;
+                return $team->getTotalNextSeasonSalariesFromPlrResult($posResult);
             }
-            
+
             return 0;
         } catch (\Exception $e) {
             // If there's an error, return 0 as a safe default
@@ -318,52 +330,45 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         }
     }
 
-    private function getTeamTraditionData($teamName)
+    /**
+     * @param string $teamName
+     * @return TraditionData
+     */
+    private function getTeamTraditionData(string $teamName): array
     {
         try {
-            if ($this->db instanceof \mysqli) {
-                $stmt = $this->db->prepare("SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL FROM ibl_team_info WHERE team_name = ? LIMIT 1");
-                $stmt->bind_param('s', $teamName);
-                $stmt->execute();
-                $result = $stmt->get_result();
-                
-                if ($result->num_rows > 0) {
-                    $row = $result->fetch_assoc();
-                    $stmt->close();
+            $stmt = $this->db->prepare("SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL FROM ibl_team_info WHERE team_name = ? LIMIT 1");
+            if ($stmt === false) {
+                return [
+                    'currentSeasonWins' => 41,
+                    'currentSeasonLosses' => 41,
+                    'tradition_wins' => 41,
+                    'tradition_losses' => 41
+                ];
+            }
+            $stmt->bind_param('s', $teamName);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result !== false && $result->num_rows > 0) {
+                /** @var TeamTraditionDbRow|null $row */
+                $row = $result->fetch_assoc();
+                $stmt->close();
+                if ($row !== null) {
                     return [
-                        'currentSeasonWins' => isset($row['Contract_Wins']) ? (int) $row['Contract_Wins'] : 41,
-                        'currentSeasonLosses' => isset($row['Contract_Losses']) ? (int) $row['Contract_Losses'] : 41,
-                        'tradition_wins' => isset($row['Contract_AvgW']) ? (int) $row['Contract_AvgW'] : 41,
-                        'tradition_losses' => isset($row['Contract_AvgL']) ? (int) $row['Contract_AvgL'] : 41
+                        'currentSeasonWins' => $row['Contract_Wins'],
+                        'currentSeasonLosses' => $row['Contract_Losses'],
+                        'tradition_wins' => $row['Contract_AvgW'],
+                        'tradition_losses' => $row['Contract_AvgL']
                     ];
                 }
-                $stmt->close();
             } else {
-                // Mock database for tests
-                $query = "SELECT Contract_Wins, Contract_Losses, Contract_AvgW, Contract_AvgL FROM ibl_team_info WHERE team_name = ? LIMIT 1";
-                $stmt = $this->db->prepare($query);
-                if ($stmt) {
-                    $stmt->bind_param('s', $teamName);
-                    $stmt->execute();
-                    $result = $stmt->get_result();
-                    
-                    if ($result->num_rows > 0) {
-                        $row = $result->fetch_assoc();
-                        $stmt->close();
-                        return [
-                            'currentSeasonWins' => isset($row['Contract_Wins']) ? (int) $row['Contract_Wins'] : 41,
-                            'currentSeasonLosses' => isset($row['Contract_Losses']) ? (int) $row['Contract_Losses'] : 41,
-                            'tradition_wins' => isset($row['Contract_AvgW']) ? (int) $row['Contract_AvgW'] : 41,
-                            'tradition_losses' => isset($row['Contract_AvgL']) ? (int) $row['Contract_AvgL'] : 41
-                        ];
-                    }
-                    $stmt->close();
-                }
+                $stmt->close();
             }
         } catch (\Exception $e) {
             // Log error if needed
         }
-        
+
         return [
             'currentSeasonWins' => 41,
             'currentSeasonLosses' => 41,

@@ -43,9 +43,11 @@ class AwardHistoryValidator implements AwardHistoryValidatorInterface
             return null;
         }
 
-        // Cast to string and remove HTML tags
-        $cleaned = strip_tags((string)$value);
-        
+        // Narrow to string and remove HTML tags
+        /** @var string $stringValue */
+        $stringValue = $value;
+        $cleaned = strip_tags($stringValue);
+
         // Trim whitespace
         $cleaned = trim($cleaned);
 

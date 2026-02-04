@@ -6,58 +6,71 @@ namespace Trading\Contracts;
 
 /**
  * TradingRepositoryInterface - Contract for trading database operations
- * 
+ *
  * Defines methods for accessing and modifying trade-related data in the database.
  * All implementations must use prepared statements for SQL injection protection.
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ *
+ * @phpstan-type TradeValidationRow array{ordinal: ?int, cy: ?int}
+ * @phpstan-type TeamNameRow array{team_name: string}
+ * @phpstan-type TeamWithCityRow array{teamid: int, team_name: string, team_city: string, color1: string, color2: string}
+ * @phpstan-type TradingPlayerRow array{pos: string, name: string, pid: int, ordinal: ?int, cy: ?int, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
+ * @phpstan-type TradeInfoRow array{tradeofferid: int, itemid: int, itemtype: string, from: string, to: string, approval: string, created_at: string, updated_at: string}
+ * @phpstan-type TradeCashRow array{tradeOfferID: int, sendingTeam: string, receivingTeam: string, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
+ * @phpstan-type DraftPickRow array{pickid: int, ownerofpick: string, teampick: string, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
+ * @phpstan-type CashTransactionData array{teamname: string, year1: int, year2: int, year3: int, year4: int, year5: int, year6: int, row: int}
+ * @phpstan-type CashPlayerData array{ordinal: int, pid: int, name: string, tid: int, teamname: string, exp: int, cy: int, cyt: string, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, retired: int}
+ * @phpstan-type TradeAutocounterRow array{counter: int}
  */
 interface TradingRepositoryInterface
 {
     /**
      * Get player data for trade validation
-     * 
+     *
      * @param int $playerId Player ID
-     * @return array|null Player data with 'ordinal' and 'cy' fields, or null if not found
+     * @return TradeValidationRow|null Player data with 'ordinal' and 'cy' fields, or null if not found
      */
     public function getPlayerForTradeValidation(int $playerId): ?array;
 
     /**
      * Get all teams for UI display
-     * 
-     * @return array<array> List of teams with 'team_name' field
+     *
+     * @return list<TeamNameRow> List of teams with 'team_name' field
      */
     public function getAllTeams(): array;
 
     /**
      * Get trade rows from trade info table
-     * 
-     * @return array<array> Trade rows
+     *
+     * @return list<TradeInfoRow> Trade rows
      */
     public function getTradeRows(): array;
 
     /**
      * Get cash transaction details for a specific team and row
-     * 
+     *
      * @param string $teamName Team name
      * @param int $row Row number
-     * @return array|null Cash details or null if not found
+     * @return TradeCashRow|null Cash details or null if not found
      */
     public function getCashDetails(string $teamName, int $row): ?array;
 
     /**
      * Get players involved in a trade
-     * 
+     *
      * @param string $teamName Team name
      * @param int $row Row number
-     * @return array<array> Player data
+     * @return list<array<string, mixed>> Player data from ibl_trade_players
      */
     public function getTradePlayers(string $teamName, int $row): array;
 
     /**
      * Get draft picks involved in a trade
-     * 
+     *
      * @param string $teamName Team name
      * @param int $row Row number
-     * @return array<array> Draft pick data
+     * @return list<array<string, mixed>> Draft pick data from ibl_trade_picks
      */
     public function getTradePicks(string $teamName, int $row): array;
 
@@ -105,16 +118,16 @@ interface TradingRepositoryInterface
 
     /**
      * Insert positive cash transaction (team receiving cash)
-     * 
-     * @param array $data Cash transaction data with keys: teamname, year1-6, row
+     *
+     * @param CashTransactionData $data Cash transaction data with keys: teamname, year1-6, row
      * @return int Number of rows affected
      */
     public function insertPositiveCashTransaction(array $data): int;
 
     /**
      * Insert negative cash transaction (team sending cash)
-     * 
-     * @param array $data Cash transaction data with keys: teamname, year1-6, row
+     *
+     * @param CashTransactionData $data Cash transaction data with keys: teamname, year1-6, row
      * @return int Number of rows affected
      */
     public function insertNegativeCashTransaction(array $data): int;
@@ -130,7 +143,7 @@ interface TradingRepositoryInterface
 
     /**
      * Insert a trade item (player, pick, or cash consideration)
-     * 
+     *
      * @param int $tradeOfferId Trade offer ID
      * @param int $itemId Item ID (player pid, pick pickid, or composite for cash)
      * @param int|string $itemType Item type (1=player, 0=pick, 'cash'=cash)
@@ -143,34 +156,34 @@ interface TradingRepositoryInterface
 
     /**
      * Get trade items by offer ID
-     * 
+     *
      * @param int $offerId Trade offer ID
-     * @return array<array> Trade items with itemid, itemtype, from, to fields
+     * @return list<TradeInfoRow> Trade items with itemid, itemtype, from, to fields
      */
     public function getTradesByOfferId(int $offerId): array;
 
     /**
      * Get cash transaction by offer ID and sending team
-     * 
+     *
      * @param int $offerId Trade offer ID
      * @param string $sendingTeam Sending team name
-     * @return array|null Cash details with cy1-cy6 fields, or null if not found
+     * @return TradeCashRow|null Cash details with cy1-cy6 fields, or null if not found
      */
     public function getCashTransactionByOffer(int $offerId, string $sendingTeam): ?array;
 
     /**
      * Get draft pick by pick ID
-     * 
+     *
      * @param int $pickId Pick ID
-     * @return array|null Pick data with year, teampick, round, notes fields, or null if not found
+     * @return DraftPickRow|null Pick data with year, teampick, round, notes fields, or null if not found
      */
     public function getDraftPickById(int $pickId): ?array;
 
     /**
      * Get player by player ID
-     * 
+     *
      * @param int $playerId Player ID
-     * @return array|null Player data with pos, name fields, or null if not found
+     * @return PlayerRow|null Full player data, or null if not found
      */
     public function getPlayerById(int $playerId): ?array;
 
@@ -230,7 +243,7 @@ interface TradingRepositoryInterface
      * Includes position, name, contract year data needed by trade form.
      *
      * @param int $teamId Team ID
-     * @return array<array{pos: string, name: string, pid: string, ordinal: string, cy: string, cy1: string, cy2: string, cy3: string, cy4: string, cy5: string, cy6: string}> Player rows
+     * @return list<TradingPlayerRow> Player rows
      */
     public function getTeamPlayersForTrading(int $teamId): array;
 
@@ -240,7 +253,7 @@ interface TradingRepositoryInterface
      * Returns all draft picks owned by a team, ordered by year and round.
      *
      * @param string $teamName Team name (ownerofpick value)
-     * @return array<array> Draft pick rows
+     * @return list<DraftPickRow> Draft pick rows
      */
     public function getTeamDraftPicksForTrading(string $teamName): array;
 
@@ -249,7 +262,7 @@ interface TradingRepositoryInterface
      *
      * Returns all rows from ibl_trade_info for the trade review page.
      *
-     * @return array<array> Trade info rows ordered by tradeofferid ASC
+     * @return list<TradeInfoRow> Trade info rows ordered by tradeofferid ASC
      */
     public function getAllTradeOffers(): array;
 
@@ -267,7 +280,7 @@ interface TradingRepositoryInterface
     /**
      * Get all teams with city, name, colors and ID for trading UI
      *
-     * @return array<array{teamid: string, team_name: string, team_city: string, color1: string, color2: string}> Team rows ordered by city
+     * @return list<TeamWithCityRow> Team rows ordered by city
      */
     public function getAllTeamsWithCity(): array;
 }

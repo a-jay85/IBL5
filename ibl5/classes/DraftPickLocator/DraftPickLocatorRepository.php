@@ -18,13 +18,16 @@ class DraftPickLocatorRepository extends \BaseMysqliRepository implements DraftP
 {
     /**
      * @see DraftPickLocatorRepositoryInterface::getAllTeams()
+     *
+     * @return list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string}>
      */
     public function getAllTeams(): array
     {
+        /** @var list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string}> */
         return $this->fetchAll(
-            "SELECT teamid, team_city, team_name, color1, color2 
-             FROM ibl_team_info 
-             WHERE teamid != ? 
+            "SELECT teamid, team_city, team_name, color1, color2
+             FROM ibl_team_info
+             WHERE teamid != ?
              ORDER BY teamid ASC",
             "i",
             \League::FREE_AGENTS_TEAMID
@@ -33,13 +36,16 @@ class DraftPickLocatorRepository extends \BaseMysqliRepository implements DraftP
 
     /**
      * @see DraftPickLocatorRepositoryInterface::getDraftPicksForTeam()
+     *
+     * @return list<array{ownerofpick: string, year: int, round: int}>
      */
     public function getDraftPicksForTeam(string $teamName): array
     {
+        /** @var list<array{ownerofpick: string, year: int, round: int}> */
         return $this->fetchAll(
-            "SELECT ownerofpick, year, round 
-             FROM ibl_draft_picks 
-             WHERE teampick = ? 
+            "SELECT ownerofpick, year, round
+             FROM ibl_draft_picks
+             WHERE teampick = ?
              ORDER BY year, round ASC",
             "s",
             $teamName

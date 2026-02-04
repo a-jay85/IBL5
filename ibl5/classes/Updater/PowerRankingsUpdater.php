@@ -7,17 +7,20 @@ namespace Updater;
 use Statistics\TeamStatsCalculator;
 use Utilities\SeasonPhaseHelper;
 
+/**
+ * @phpstan-import-type TeamStats from TeamStatsCalculator
+ */
 class PowerRankingsUpdater extends \BaseMysqliRepository {
-    private $season;
+    private \Season $season;
     private TeamStatsCalculator $statsCalculator;
 
-    public function __construct(object $db, $season, ?TeamStatsCalculator $statsCalculator = null) {
+    public function __construct(object $db, \Season $season, ?TeamStatsCalculator $statsCalculator = null) {
         parent::__construct($db);
         $this->season = $season;
         $this->statsCalculator = $statsCalculator ?? new TeamStatsCalculator($db);
     }
 
-    public function update() {
+    public function update(): void {
         echo '<p>Updating the ibl_power database table...<p>';
 
         $log = '';
@@ -31,8 +34,10 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         );
 
         for ($i = 0; $i < count($teams); $i++) {
-            $tid = $teams[$i]['TeamID'];
-            $teamName = $teams[$i]['Team'];
+            /** @var array{TeamID: int, Team: string, streak_type: string, streak: int} $teamRow */
+            $teamRow = $teams[$i];
+            $tid = $teamRow['TeamID'];
+            $teamName = $teamRow['Team'];
 
             $month = $this->determineMonth();
             $games = $this->buildGamesQuery($tid, $month);
@@ -56,10 +61,14 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         return SeasonPhaseHelper::getMonthForPhase($this->season->phase);
     }
 
-    private function buildGamesQuery($tid, $month) {
+    /**
+     * @return list<array{Visitor: int, VScore: int, Home: int, HScore: int}>
+     */
+    private function buildGamesQuery(int $tid, int $month): array {
         $startDate = $this->season->beginningYear . "-$month-01";
         $endDate = $this->season->endingYear . "-05-30";
-        
+
+        /** @var list<array{Visitor: int, VScore: int, Home: int, HScore: int}> */
         return $this->fetchAll(
             "SELECT Visitor, VScore, Home, HScore
             FROM ibl_schedule
@@ -75,18 +84,26 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         );
     }
 
+    /**
+     * @param list<array{Visitor: int, VScore: int, Home: int, HScore: int}> $games
+     * @return TeamStats
+     */
     protected function calculateTeamStats(array $games, int $tid): array {
         return $this->statsCalculator->calculate($games, $tid);
     }
 
-    private function updateTeamStats($tid, $teamName, $stats) {
+    /**
+     * @param TeamStats $stats
+     */
+    private function updateTeamStats(int $tid, string $teamName, array $stats): string {
         $log = '';
 
-        $gb = ($stats['wins'] / 2) - ($stats['losses'] / 2);
-        $stats['winPoints'] += $stats['wins'];
-        $stats['lossPoints'] += $stats['losses'];
-        $ranking = ($stats['winPoints'] + $stats['lossPoints']) 
-            ? round(($stats['winPoints'] / ($stats['winPoints'] + $stats['lossPoints'])) * 100, 1) 
+        $gb = $stats['wins'] / 2 - $stats['losses'] / 2;
+        $winPoints = $stats['winPoints'] + $stats['wins'];
+        $lossPoints = $stats['lossPoints'] + $stats['losses'];
+        $totalPoints = $winPoints + $lossPoints;
+        $ranking = ($totalPoints > 0)
+            ? round(($winPoints / $totalPoints) * 100, 1)
             : 0;
 
         // Update ibl_power
@@ -121,12 +138,12 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
             $tid
         );
 
-        $log .= "Updating $teamName: {$stats['wins']} wins, {$stats['losses']} losses, $gb games back, 
-            {$stats['homeWins']} home wins, {$stats['homeLosses']} home losses, 
-            {$stats['awayWins']} away wins, {$stats['awayLosses']} away losses, 
-            streak = {$stats['streakType']}{$stats['streak']}, 
-            last 10 = {$stats['winsInLast10Games']}-{$stats['lossesInLast10Games']}, 
-            ranking score = $ranking<br>";
+        $log .= "Updating {$teamName}: {$stats['wins']} wins, {$stats['losses']} losses, {$gb} games back,
+            {$stats['homeWins']} home wins, {$stats['homeLosses']} home losses,
+            {$stats['awayWins']} away wins, {$stats['awayLosses']} away losses,
+            streak = {$stats['streakType']}{$stats['streak']},
+            last 10 = {$stats['winsInLast10Games']}-{$stats['lossesInLast10Games']},
+            ranking score = {$ranking}<br>";
 
         if ($this->season->phase === "HEAT" && $stats['wins'] !== 0 && $stats['losses'] !== 0) {
             $this->updateHeatRecords($teamName);
@@ -139,36 +156,36 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         return $log;
     }
 
-    private function updateSeasonRecords($teamName) {
+    private function updateSeasonRecords(string $teamName): void {
         $this->execute(
             "UPDATE ibl_team_win_loss a, ibl_power b
             SET a.wins = b.win,
                 a.losses = b.loss
-            WHERE a.currentname = b.Team 
+            WHERE a.currentname = b.Team
             AND a.year = ?",
             "i",
             $this->season->endingYear
         );
     }
 
-    private function updateHeatRecords($teamName) {
+    private function updateHeatRecords(string $teamName): void {
         try {
             $this->execute(
                 "UPDATE ibl_heat_win_loss a, ibl_power b
                 SET a.wins = b.win,
                     a.losses = b.loss
-                WHERE a.currentname = b.Team 
+                WHERE a.currentname = b.Team
                 AND a.year = ?",
                 "i",
                 $this->season->beginningYear
             );
             echo "Updated HEAT records for {$this->season->beginningYear}<p>";
         } catch (\Exception $e) {
-            echo "<b>`ibl_heat_win_loss` update FAILED for $teamName! Have you <A HREF=\"leagueControlPanel.php\">inserted new database rows</A> for the new HEAT season?</b><p>";
+            echo "<b>`ibl_heat_win_loss` update FAILED for {$teamName}! Have you <A HREF=\"leagueControlPanel.php\">inserted new database rows</A> for the new HEAT season?</b><p>";
         }
     }
 
-    private function updateHistoricalRecords() {
+    private function updateHistoricalRecords(): void {
         // Update total wins
         $this->execute(
             "UPDATE ibl_team_history a
@@ -195,7 +212,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
 
         // Update win percentage
         $this->execute(
-            "UPDATE ibl_team_history a 
+            "UPDATE ibl_team_history a
             SET winpct = a.totwins / (a.totwins + a.totloss)
             WHERE a.team_name != 'Free Agents'",
             ""

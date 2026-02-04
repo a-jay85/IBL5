@@ -44,23 +44,23 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
             </tr>
             <tr>
                 <td class="text-bold">All Star Games:</td>
-                <td><?= HtmlSanitizer::safeHtmlOutput((string)$allStarGames) ?></td>
+                <td><?= $allStarGames ?></td>
             </tr>
             <tr>
                 <td class="text-bold">Three-Point<br>Contests:</td>
-                <td><?= HtmlSanitizer::safeHtmlOutput((string)$threePointContests) ?></td>
+                <td><?= $threePointContests ?></td>
             </tr>
             <tr>
                 <td class="text-bold">Slam Dunk<br>Competitions:</td>
-                <td><?= HtmlSanitizer::safeHtmlOutput((string)$dunkContests) ?></td>
+                <td><?= $dunkContests ?></td>
             </tr>
             <tr>
                 <td class="text-bold">Rookie-Sophomore<br>Challenges:</td>
-                <td><?= HtmlSanitizer::safeHtmlOutput((string)$rookieSophChallenges) ?></td>
+                <td><?= $rookieSophChallenges ?></td>
             </tr>
         </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -79,7 +79,9 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
     </tr>
         <?php
         foreach ($awards as $award) {
+            /** @var string $year */
             $year = HtmlSanitizer::safeHtmlOutput($award['year']);
+            /** @var string $awardName */
             $awardName = HtmlSanitizer::safeHtmlOutput($award['Award']);
             ?>
     <tr>
@@ -91,6 +93,6 @@ class PlayerAwardsView implements PlayerAwardsViewInterface
         ?>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

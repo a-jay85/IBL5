@@ -48,10 +48,11 @@ class UI
     /**
      * Render the contracts table
      *
-     * @param object $db Database connection
-     * @param iterable $result Player result set
-     * @param object $team Team object
-     * @param object $sharedFunctions Shared functions object
+     * @param \mysqli $db Database connection
+     * @param iterable<int, array<string, mixed>> $result Player result set
+     * @param \Team $team Team object
+     * @param \Shared $sharedFunctions Shared functions object
+     * @param list<int> $starterPids Starter player IDs
      * @return string HTML table
      */
     public static function contracts($db, $result, $team, $sharedFunctions, array $starterPids = []): string
@@ -62,10 +63,12 @@ class UI
     /**
      * Render the per-36-minute statistics table
      *
-     * @param object $db Database connection
-     * @param iterable $result Player result set
-     * @param object $team Team object
+     * @param \mysqli $db Database connection
+     * @param iterable<int, \Player\Player|array<string, mixed>> $result Player result set
+     * @param \Team $team Team object
      * @param string $yr Year filter (empty for current season)
+     * @param list<int> $starterPids Starter player IDs
+     * @param string $moduleName Module name
      * @return string HTML table
      */
     public static function per36Minutes($db, $result, $team, $yr, array $starterPids = [], string $moduleName = ''): string
@@ -76,12 +79,13 @@ class UI
     /**
      * Render the ratings table
      *
-     * @param object $db Database connection
-     * @param iterable $data Player data
-     * @param object $team Team object
+     * @param \mysqli $db Database connection
+     * @param iterable<int, \Player\Player|array<string, mixed>> $data Player data
+     * @param \Team $team Team object
      * @param string $yr Year filter (empty for current season)
-     * @param object $season Season object
+     * @param \Season $season Season object
      * @param string $moduleName Module name for styling variations
+     * @param list<int> $starterPids Starter player IDs
      * @return string HTML table
      */
     public static function ratings($db, $data, $team, $yr, $season, $moduleName = "", array $starterPids = []): string
@@ -92,10 +96,12 @@ class UI
     /**
      * Render the season averages table
      *
-     * @param object $db Database connection
-     * @param iterable $result Player result set
-     * @param object $team Team object
+     * @param \mysqli $db Database connection
+     * @param iterable<int, \Player\Player|array<string, mixed>> $result Player result set
+     * @param \Team $team Team object
      * @param string $yr Year filter (empty for current season)
+     * @param list<int> $starterPids Starter player IDs
+     * @param string $moduleName Module name
      * @return string HTML table
      */
     public static function seasonAverages($db, $result, $team, $yr, array $starterPids = [], string $moduleName = ''): string
@@ -106,10 +112,12 @@ class UI
     /**
      * Render the season totals table
      *
-     * @param object $db Database connection
-     * @param iterable $result Player result set
-     * @param object $team Team object
+     * @param \mysqli $db Database connection
+     * @param iterable<int, \Player\Player|array<string, mixed>> $result Player result set
+     * @param \Team $team Team object
      * @param string $yr Year filter (empty for current season)
+     * @param list<int> $starterPids Starter player IDs
+     * @param string $moduleName Module name
      * @return string HTML table
      */
     public static function seasonTotals($db, $result, $team, $yr, array $starterPids = [], string $moduleName = ''): string
@@ -120,11 +128,12 @@ class UI
     /**
      * Render the period averages table
      *
-     * @param \mysqli $db Modern mysqli database connection (required)
-     * @param object $team Team object
-     * @param object $season Season object
+     * @param \mysqli $db Database connection
+     * @param \Team $team Team object
+     * @param \Season $season Season object
      * @param string|null|\DateTime $startDate Start date for the period
      * @param string|null|\DateTime $endDate End date for the period
+     * @param list<int> $starterPids Starter player IDs
      * @return string HTML table
      */
     public static function periodAverages(\mysqli $db, $team, $season, $startDate = null, $endDate = null, array $starterPids = []): string

@@ -17,9 +17,12 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
 {
     /**
      * @see MaintenanceRepositoryInterface::getAllTeams()
+     *
+     * @return array<int, array{team_name: string}>
      */
     public function getAllTeams(): array
     {
+        /** @var array<int, array{team_name: string}> */
         return $this->fetchAll(
             "SELECT team_name FROM ibl_team_info WHERE teamid != ?",
             "i",
@@ -29,9 +32,12 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
 
     /**
      * @see MaintenanceRepositoryInterface::getTeamRecentCompleteSeasons()
+     *
+     * @return array<int, array{wins: int, losses: int}>
      */
     public function getTeamRecentCompleteSeasons(string $teamName, int $limit = 5): array
     {
+        /** @var array<int, array{wins: int, losses: int}> */
         return $this->fetchAll(
             "SELECT wins, losses FROM ibl_team_win_loss
              WHERE currentname = ? AND (wins + losses = 82)
@@ -48,7 +54,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
      */
     public function updateTeamTradition(string $teamName, int $avgWins, int $avgLosses): bool
     {
-        $result = $this->execute(
+        $this->execute(
             "UPDATE ibl_team_info SET Contract_AvgW = ?, Contract_AvgL = ? WHERE team_name = ?",
             "iis",
             $avgWins,
@@ -56,7 +62,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
             $teamName
         );
 
-        return $result !== false;
+        return true;
     }
 
     /**
@@ -64,7 +70,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
      */
     public function updateDivisionTitles(): bool
     {
-        $result = $this->execute(
+        $this->execute(
             "UPDATE ibl_team_history SET div_titles = (
                 SELECT COUNT(*) FROM ibl_team_awards
                 WHERE ibl_team_awards.Award LIKE '%Div.%'
@@ -73,7 +79,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
             ""
         );
 
-        return $result !== false;
+        return true;
     }
 
     /**
@@ -81,7 +87,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
      */
     public function updateConferenceTitles(): bool
     {
-        $result = $this->execute(
+        $this->execute(
             "UPDATE ibl_team_history SET conf_titles = (
                 SELECT COUNT(*) FROM ibl_team_awards
                 WHERE ibl_team_awards.Award LIKE '%Conf.%'
@@ -90,7 +96,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
             ""
         );
 
-        return $result !== false;
+        return true;
     }
 
     /**
@@ -98,7 +104,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
      */
     public function updateIblTitles(): bool
     {
-        $result = $this->execute(
+        $this->execute(
             "UPDATE ibl_team_history SET ibl_titles = (
                 SELECT COUNT(*) FROM ibl_team_awards
                 WHERE ibl_team_awards.Award LIKE '%World%'
@@ -107,7 +113,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
             ""
         );
 
-        return $result !== false;
+        return true;
     }
 
     /**
@@ -115,7 +121,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
      */
     public function updateHeatTitles(): bool
     {
-        $result = $this->execute(
+        $this->execute(
             "UPDATE ibl_team_history SET heat_titles = (
                 SELECT COUNT(*) FROM ibl_team_awards
                 WHERE ibl_team_awards.Award LIKE '%H.E.A.T.%'
@@ -124,7 +130,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
             ""
         );
 
-        return $result !== false;
+        return true;
     }
 
     /**
@@ -132,7 +138,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
      */
     public function updatePlayoffAppearances(): bool
     {
-        $result = $this->execute(
+        $this->execute(
             "UPDATE ibl_team_history SET playoffs = (
                 SELECT COUNT(*) FROM ibl_playoff_results
                 WHERE (ibl_playoff_results.winner = ibl_team_history.team_name
@@ -143,7 +149,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
             ""
         );
 
-        return $result !== false;
+        return true;
     }
 
     /**
@@ -157,6 +163,12 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
             $name
         );
 
-        return $result !== null ? (string) $result['value'] : null;
+        if ($result === null) {
+            return null;
+        }
+
+        /** @var string $value */
+        $value = $result['value'];
+        return $value;
     }
 }

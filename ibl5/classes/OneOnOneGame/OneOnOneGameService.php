@@ -10,11 +10,12 @@ use OneOnOneGame\Contracts\OneOnOneGameEngineInterface;
 
 /**
  * OneOnOneGameService - Business logic coordinator for One-on-One games
- * 
+ *
  * Acts as the main entry point for the One-on-One module, orchestrating
  * repository and game engine interactions.
- * 
+ *
  * @see OneOnOneGameServiceInterface For method contracts
+ * @phpstan-import-type GameRecord from OneOnOneGameRepositoryInterface
  */
 class OneOnOneGameService implements OneOnOneGameServiceInterface
 {
@@ -31,6 +32,8 @@ class OneOnOneGameService implements OneOnOneGameServiceInterface
 
     /**
      * @see OneOnOneGameServiceInterface::getActivePlayers()
+     *
+     * @return array<int, array{pid: int, name: string}>
      */
     public function getActivePlayers(): array
     {
@@ -44,7 +47,7 @@ class OneOnOneGameService implements OneOnOneGameServiceInterface
     {
         // Validate selection
         $errors = $this->validatePlayerSelection($player1Id, $player2Id);
-        if (!empty($errors)) {
+        if ($errors !== []) {
             throw new \InvalidArgumentException(implode(' ', $errors));
         }
 
@@ -74,6 +77,8 @@ class OneOnOneGameService implements OneOnOneGameServiceInterface
 
     /**
      * @see OneOnOneGameServiceInterface::validatePlayerSelection()
+     *
+     * @return array<string>
      */
     public function validatePlayerSelection(?int $player1Id, ?int $player2Id): array
     {
@@ -96,6 +101,8 @@ class OneOnOneGameService implements OneOnOneGameServiceInterface
 
     /**
      * @see OneOnOneGameServiceInterface::getGameReplay()
+     *
+     * @return GameRecord|null
      */
     public function getGameReplay(int $gameId): ?array
     {

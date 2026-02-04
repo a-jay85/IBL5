@@ -12,16 +12,20 @@ use Schedule\TeamSchedule as ScheduleTeamSchedule;
  *
  * Processes schedule data and calculates win/loss records and streaks.
  *
+ * @phpstan-import-type ScheduleGameRow from TeamScheduleServiceInterface
+ *
  * @see TeamScheduleServiceInterface For the interface contract
  */
 class TeamScheduleService implements TeamScheduleServiceInterface
 {
+    /** @phpstan-var \mysqli */
     private object $db;
 
     /**
      * Constructor
      *
      * @param object $db Database connection
+     * @phpstan-param \mysqli $db
      */
     public function __construct(object $db)
     {
@@ -30,11 +34,14 @@ class TeamScheduleService implements TeamScheduleServiceInterface
 
     /**
      * @see TeamScheduleServiceInterface::getProcessedSchedule()
+     *
+     * @return list<ScheduleGameRow>
      */
     public function getProcessedSchedule(int $teamId, \Season $season): array
     {
         $teamSchedule = ScheduleTeamSchedule::getSchedule($this->db, $teamId);
 
+        /** @var list<ScheduleGameRow> $rows */
         $rows = [];
         $wins = 0;
         $losses = 0;
@@ -42,15 +49,18 @@ class TeamScheduleService implements TeamScheduleServiceInterface
         $lossStreak = 0;
 
         foreach ($teamSchedule as $gameRow) {
+            /** @var array{Date: string, BoxID: int, Visitor: int, Home: int, VScore: int, HScore: int} $gameRow */
             $game = new \Game($gameRow);
             $opposingTeam = \Team::initialize($this->db, $game->getOpposingTeamID($teamId));
 
+            $dateFormat = $game->dateObject instanceof \DateTime ? $game->dateObject->format('F') : '';
+
             $row = [
                 'game' => $game,
-                'currentMonth' => $game->dateObject->format('F'),
+                'currentMonth' => $dateFormat,
                 'opposingTeam' => $opposingTeam,
-                'opponentText' => $game->getUserTeamLocationPrefix($teamId) . ' ' . 
-                    $opposingTeam->name . ' (' . $opposingTeam->seasonRecord . ')',
+                'opponentText' => $game->getUserTeamLocationPrefix($teamId) . ' ' .
+                    $opposingTeam->name . ' (' . ($opposingTeam->seasonRecord ?? '') . ')',
                 'highlight' => '',
                 'gameResult' => '',
                 'wins' => 0,
@@ -62,10 +72,11 @@ class TeamScheduleService implements TeamScheduleServiceInterface
 
             if ($game->isUnplayed) {
                 // Check if game is projected for next sim using shared utility
-                $row['highlight'] = \Utilities\ScheduleHighlighter::isNextSimGame(
-                    $game->dateObject,
+                $gameDate = $game->dateObject;
+                $row['highlight'] = ($gameDate instanceof \DateTimeInterface && \Utilities\ScheduleHighlighter::isNextSimGame(
+                    $gameDate,
                     $season->projectedNextSimEndDate
-                ) ? 'next-sim' : '';
+                )) ? 'next-sim' : '';
             } else {
                 if ($teamId === $game->winningTeamID) {
                     $row['gameResult'] = 'W';
@@ -83,8 +94,8 @@ class TeamScheduleService implements TeamScheduleServiceInterface
 
                 $row['wins'] = $wins;
                 $row['losses'] = $losses;
-                $row['streak'] = ($winStreak > $lossStreak) 
-                    ? 'W ' . $winStreak 
+                $row['streak'] = ($winStreak > $lossStreak)
+                    ? 'W ' . $winStreak
                     : 'L ' . $lossStreak;
             }
 

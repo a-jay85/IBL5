@@ -6,39 +6,46 @@ use Player\Player;
 
 /**
  * Team - IBL team information and operations
- * 
+ *
  * Extends BaseMysqliRepository for standardized database access.
  * Provides team data, roster queries, and cap calculations.
- * 
+ *
  * @see BaseMysqliRepository For base class documentation and error codes
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type TeamInfoRow from \Services\CommonMysqliRepository
+ *
+ * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discordID: ?int, formerly_known_as: ?string, Used_Extension_This_Chunk: int, Used_Extension_This_Season: ?int, HasMLE: int, HasLLE: int, leagueRecord: ?string, ...}
+ * @phpstan-type DraftPickRow array{pickid: int, ownerofpick: string, teampick: string, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
+ * @phpstan-type FreeAgencyOfferRow array{team: string, name: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, ...}
  */
 class Team extends BaseMysqliRepository
 {
-    public $teamID;
+    public int $teamID;
 
-    public $city;
-    public $name;
-    public $color1;
-    public $color2;
-    public $arena;
-    public $capacity;
-    public $formerlyKnownAs;
+    public string $city;
+    public string $name;
+    public string $color1;
+    public string $color2;
+    public string $arena;
+    public int $capacity;
+    public ?string $formerlyKnownAs;
 
-    public $ownerName;
-    public $ownerEmail;
-    public $discordID;
+    public string $ownerName;
+    public string $ownerEmail;
+    public int|string|null $discordID;
 
-    public $hasUsedExtensionThisSim;
-    public $hasUsedExtensionThisSeason;
-    public $hasMLE;
-    public $hasLLE;
+    public int $hasUsedExtensionThisSim = 0;
+    public int $hasUsedExtensionThisSeason = 0;
+    public int $hasMLE = 0;
+    public int $hasLLE = 0;
 
-    public $numberOfPlayers;
-    public $numberOfHealthyPlayers;
-    public $numberOfOpenRosterSpots;
-    public $numberOfHealthyOpenRosterSpots;
+    public int $numberOfPlayers;
+    public int $numberOfHealthyPlayers;
+    public int $numberOfOpenRosterSpots;
+    public int $numberOfHealthyOpenRosterSpots;
 
-    public $seasonRecord;
+    public ?string $seasonRecord;
 
     const BUYOUT_PERCENTAGE_MAX = 0.40;
     const ROSTER_SPOTS_MAX = 15;
@@ -56,12 +63,12 @@ class Team extends BaseMysqliRepository
 
     /**
      * Factory method to initialize a Team instance
-     * 
+     *
      * @param object $db Active mysqli connection
-     * @param int|string|array $identifier Team ID (int), team name (string), or team data array
+     * @param int|string|array<string, mixed> $identifier Team ID (int), team name (string), or team data array
      * @return self Initialized Team instance
      */
-    public static function initialize(object $db, $identifier): self
+    public static function initialize(object $db, int|string|array $identifier): self
     {
         $instance = new self($db);
         $instance->load($identifier);
@@ -70,30 +77,35 @@ class Team extends BaseMysqliRepository
 
     /**
      * Load team data from database
-     * 
-     * @param int|string|array $identifier Team ID (int), team name (string), or team data array
+     *
+     * @param int|string|array<string, mixed> $identifier Team ID (int), team name (string), or team data array
      * @return void
      */
-    protected function load($identifier): void
+    protected function load(int|string|array $identifier): void
     {
-        ($identifier) ? $identifier : $identifier = League::FREE_AGENTS_TEAMID;
+        if (is_int($identifier) && $identifier === 0) {
+            $identifier = League::FREE_AGENTS_TEAMID;
+        } elseif (is_string($identifier) && $identifier === '') {
+            $identifier = League::FREE_AGENTS_TEAMID;
+        }
 
         if (is_array($identifier)) {
+            /** @var TeamWithStandingsRow $identifier */
             $this->fill($identifier);
             return;
         }
 
-        if (is_numeric($identifier)) {
-            $teamID = (int) $identifier;
+        if (is_int($identifier)) {
             $query = "SELECT ibl_team_info.*,
-                     ibl_standings.leagueRecord 
+                     ibl_standings.leagueRecord
                 FROM ibl_team_info
                     LEFT JOIN ibl_standings
                     ON ibl_team_info.teamid = ibl_standings.tid
                 WHERE ibl_team_info.teamid = ?
                 LIMIT 1";
-            $teamRow = $this->fetchOne($query, "i", $teamID);
-        } elseif (is_string($identifier)) {
+            /** @var TeamWithStandingsRow|null $teamRow */
+            $teamRow = $this->fetchOne($query, "i", $identifier);
+        } else {
             $query = "SELECT ibl_team_info.*,
                      ibl_standings.leagueRecord
                 FROM ibl_team_info
@@ -101,11 +113,12 @@ class Team extends BaseMysqliRepository
                     ON ibl_team_info.teamid = ibl_standings.tid
                 WHERE ibl_team_info.team_name = ?
                 LIMIT 1";
+            /** @var TeamWithStandingsRow|null $teamRow */
             $teamRow = $this->fetchOne($query, "s", $identifier);
         }
 
         if ($teamRow === null) {
-            throw new \RuntimeException("Team not found: " . $identifier);
+            throw new \RuntimeException("Team not found: " . (is_int($identifier) ? (string) $identifier : $identifier));
         }
 
         $this->fill($teamRow);
@@ -114,13 +127,13 @@ class Team extends BaseMysqliRepository
 
     /**
      * Fill team properties from array data
-     * 
-     * @param array $teamRow Team data from database
+     *
+     * @param TeamWithStandingsRow $teamRow Team data from database
      * @return void
      */
     protected function fill(array $teamRow): void
     {
-        $this->teamID = (int) $teamRow['teamid'];
+        $this->teamID = $teamRow['teamid'];
 
         $this->city = $teamRow['team_city'];
         $this->name = $teamRow['team_name'];
@@ -128,27 +141,31 @@ class Team extends BaseMysqliRepository
         $this->color2 = $teamRow['color2'];
         $this->arena = $teamRow['arena'];
         $this->capacity = $teamRow['capacity'];
-        $this->formerlyKnownAs = $teamRow['formerly_known_as'];
-    
+        $this->formerlyKnownAs = $teamRow['formerly_known_as'] ?? null;
+
         $this->ownerName = $teamRow['owner_name'];
         $this->ownerEmail = $teamRow['owner_email'];
-        $this->discordID = $teamRow['discordID'];
-    
-        $this->hasUsedExtensionThisSim = $teamRow['Used_Extension_This_Chunk'];
-        $this->hasUsedExtensionThisSeason = $teamRow['Used_Extension_This_Season'];
-        $this->hasMLE = $teamRow['HasMLE'];
-        $this->hasLLE = $teamRow['HasLLE'];
+        $discordID = $teamRow['discordID'] ?? null;
+        $this->discordID = $discordID;
 
-        $this->seasonRecord = $teamRow['leagueRecord'] ?? null;
+        $this->hasUsedExtensionThisSim = (int) $teamRow['Used_Extension_This_Chunk'];
+        $this->hasUsedExtensionThisSeason = (int) ($teamRow['Used_Extension_This_Season'] ?? 0);
+        $this->hasMLE = (int) $teamRow['HasMLE'];
+        $this->hasLLE = (int) $teamRow['HasLLE'];
+
+        /** @var string|null $leagueRecord */
+        $leagueRecord = $teamRow['leagueRecord'] ?? null;
+        $this->seasonRecord = $leagueRecord;
     }
 
     /**
      * Get buyout players for this team
-     * 
-     * @return array<int, array> Array of buyout player rows
+     *
+     * @return list<PlayerRow> Array of buyout player rows
      */
     public function getBuyoutsResult(): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
@@ -162,11 +179,12 @@ class Team extends BaseMysqliRepository
     
     /**
      * Get draft history for this team
-     * 
-     * @return array<int, array> Array of drafted player rows
+     *
+     * @return list<PlayerRow> Array of drafted player rows
      */
     public function getDraftHistoryResult(): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
@@ -181,11 +199,12 @@ class Team extends BaseMysqliRepository
 
     /**
      * Get draft picks owned by this team
-     * 
-     * @return array<int, array> Array of draft pick rows
+     *
+     * @return list<DraftPickRow> Array of draft pick rows
      */
     public function getDraftPicksResult(): array
     {
+        /** @var list<DraftPickRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_draft_picks
@@ -198,11 +217,12 @@ class Team extends BaseMysqliRepository
 
     /**
      * Get free agency offers made by this team
-     * 
-     * @return array<int, array> Array of offer rows
+     *
+     * @return list<FreeAgencyOfferRow> Array of offer rows
      */
     public function getFreeAgencyOffersResult(): array
     {
+        /** @var list<FreeAgencyOfferRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_fa_offers
@@ -215,11 +235,12 @@ class Team extends BaseMysqliRepository
 
     /**
      * Get free agency roster ordered by name
-     * 
-     * @return array<int, array> Array of player rows
+     *
+     * @return list<PlayerRow> Array of player rows
      */
     public function getFreeAgencyRosterOrderedByNameResult(): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
@@ -235,14 +256,14 @@ class Team extends BaseMysqliRepository
 
     /**
      * Get healthy and injured players ordered by name
-     * 
+     *
      * @param Season|null $season Season object for free agency filtering
-     * @return array<int, array> Array of player rows
+     * @return list<PlayerRow> Array of player rows
      */
-    public function getHealthyAndInjuredPlayersOrderedByNameResult($season = null): array
+    public function getHealthyAndInjuredPlayersOrderedByNameResult(?Season $season = null): array
     {
         $freeAgencyCondition = '';
-        if ($season && $season->phase === 'Free Agency') {
+        if ($season !== null && $season->phase === 'Free Agency') {
             // During Free Agency, only count players who have a salary for next year
             $freeAgencyCondition = " AND (
                 (cy = 0 AND cy1 > 0) OR
@@ -254,7 +275,8 @@ class Team extends BaseMysqliRepository
                 (cy = 5 AND cy6 > 0)
             )";
         }
-        
+
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
@@ -271,14 +293,14 @@ class Team extends BaseMysqliRepository
 
     /**
      * Get healthy players ordered by name
-     * 
+     *
      * @param Season|null $season Season object for free agency filtering
-     * @return array<int, array> Array of player rows
+     * @return list<PlayerRow> Array of player rows
      */
-    public function getHealthyPlayersOrderedByNameResult($season = null): array
+    public function getHealthyPlayersOrderedByNameResult(?Season $season = null): array
     {
         $freeAgencyCondition = '';
-        if ($season && $season->phase === 'Free Agency') {
+        if ($season !== null && $season->phase === 'Free Agency') {
             // During Free Agency, only count players who have a salary for next year
             $freeAgencyCondition = " AND (
                 (cy = 0 AND cy1 > 0) OR
@@ -291,6 +313,7 @@ class Team extends BaseMysqliRepository
             )";
         }
         
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
@@ -314,6 +337,7 @@ class Team extends BaseMysqliRepository
      */
     public function getLastSimStarterPlayerIDForPosition(string $position): int
     {
+        /** @var array{pid: int}|null $result */
         $result = $this->fetchOne(
             "SELECT pid
             FROM ibl_plr
@@ -323,7 +347,7 @@ class Team extends BaseMysqliRepository
             "i",
             $this->teamID
         );
-        return $result ? (int) $result['pid'] : 0;
+        return $result !== null ? $result['pid'] : 0;
     }
 
     /**
@@ -334,6 +358,7 @@ class Team extends BaseMysqliRepository
      */
     public function getCurrentlySetStarterPlayerIDForPosition(string $position): int
     {
+        /** @var array{pid: int}|null $result */
         $result = $this->fetchOne(
             "SELECT pid
             FROM ibl_plr
@@ -343,17 +368,18 @@ class Team extends BaseMysqliRepository
             "i",
             $this->teamID
         );
-        return $result ? (int) $result['pid'] : 0;
+        return $result !== null ? $result['pid'] : 0;
     }
 
     /**
      * Get players under contract by position
-     * 
+     *
      * @param string $position Position code (e.g., 'PG', 'SG', 'SF', 'PF', 'C')
-     * @return array<int, array> Array of player rows
+     * @return list<PlayerRow> Array of player rows
      */
     public function getPlayersUnderContractByPositionResult(string $position): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT * 
             FROM ibl_plr
@@ -369,11 +395,12 @@ class Team extends BaseMysqliRepository
 
     /**
      * Get roster under contract ordered by name
-     * 
-     * @return array<int, array> Array of player rows
+     *
+     * @return list<PlayerRow> Array of player rows
      */
     public function getRosterUnderContractOrderedByNameResult(): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
@@ -387,11 +414,12 @@ class Team extends BaseMysqliRepository
 
     /**
      * Get roster under contract ordered by ordinal
-     * 
-     * @return array<int, array> Array of player rows
+     *
+     * @return list<PlayerRow> Array of player rows
      */
     public function getRosterUnderContractOrderedByOrdinalResult(): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
@@ -406,25 +434,31 @@ class Team extends BaseMysqliRepository
 
     /**
      * Get salary cap array for all contract years
-     * 
+     *
      * @param Season $season Season object for free agency handling
      * @return array<string, int> Array of salary cap spent by year
      */
     public function getSalaryCapArray(Season $season): array
-    {  
-        $salaryCapSpent[] = 0;
+    {
+        /** @var array<string, int> $salaryCapSpent */
+        $salaryCapSpent = [];
         $resultContracts = $this->getRosterUnderContractOrderedByNameResult();
-    
+
         foreach ($resultContracts as $contract) {
-            $yearUnderContract = $contract['cy'];
-            if ($season->phase == "Free Agency") {
+            $yearUnderContract = (int) ($contract['cy'] ?? 0);
+            if ($season->phase === "Free Agency") {
                 $yearUnderContract++;
             }
-            
+
+            $cyt = (int) ($contract['cyt'] ?? 0);
             $i = 1;
-            while ($yearUnderContract <= $contract['cyt']) {
+            while ($yearUnderContract <= $cyt) {
                 $fieldString = "cy" . $yearUnderContract;
-                $salaryCapSpent["year" . $i] += $contract["$fieldString"];
+                $key = "year" . $i;
+                if (!isset($salaryCapSpent[$key])) {
+                    $salaryCapSpent[$key] = 0;
+                }
+                $salaryCapSpent[$key] += (int) ($contract[$fieldString] ?? 0);
                 $yearUnderContract++;
                 $i++;
             }
@@ -435,8 +469,8 @@ class Team extends BaseMysqliRepository
 
     /**
      * Get total current season salaries from player result array
-     * 
-     * @param array<int, array> $result Array of player rows
+     *
+     * @param list<PlayerRow> $result Array of player rows
      * @return int Total current season salaries
      */
     public function getTotalCurrentSeasonSalariesFromPlrResult(array $result): int
@@ -452,8 +486,8 @@ class Team extends BaseMysqliRepository
 
     /**
      * Get total next season salaries from player result array
-     * 
-     * @param array<int, array> $result Array of player rows
+     *
+     * @param list<PlayerRow> $result Array of player rows
      * @return int Total next season salaries
      */
     public function getTotalNextSeasonSalariesFromPlrResult(array $result): int
@@ -506,15 +540,15 @@ class Team extends BaseMysqliRepository
 
     /**
      * Convert player result array into Player objects
-     * 
-     * @param array<int, array> $result Array of player rows
+     *
+     * @param list<PlayerRow> $result Array of player rows
      * @return array<int, Player> Array of Player objects indexed by player ID
      */
     public function convertPlrResultIntoPlayerArray(array $result): array
     {
-        $array = array();
+        $array = [];
         foreach ($result as $plrRow) {
-            $playerID = $plrRow['pid'];
+            $playerID = (int) $plrRow['pid'];
             $array[$playerID] = Player::withPlayerID($this->db, $playerID);
         }
         return $array;

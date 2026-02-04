@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 class Discord
 {
-    /** @var \mysqli|MockDatabase Database connection (mysqli in production, MockDatabase in tests) */
-    private $db;
+    private \mysqli $db;
 
     /** @var array<string, string> Discord webhook URLs loaded from config */
     private static array $webhooks = [];
@@ -14,9 +13,9 @@ class Discord
     private static bool $configLoaded = false;
 
     /**
-     * @param \mysqli|object $db Database connection (accepts MockDatabase for testing)
+     * @param \mysqli $db Database connection
      */
-    public function __construct($db)
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
         self::loadConfig();
@@ -40,9 +39,11 @@ class Discord
         $examplePath = __DIR__ . '/../config/discord.config.example.php';
 
         if (file_exists($configPath)) {
+            /** @var array{webhooks?: array<string, string>} $config */
             $config = require $configPath;
         } elseif (file_exists($examplePath)) {
             // Fallback to example config (e.g., in development without secrets set up)
+            /** @var array{webhooks?: array<string, string>} $config */
             $config = require $examplePath;
         } else {
             throw new \RuntimeException(
@@ -67,20 +68,31 @@ class Discord
         if ($stmt === false) {
             throw new \Exception('Prepare failed: ' . $this->db->error);
         }
-        
+
         $stmt->bind_param('s', $teamname);
         if (!$stmt->execute()) {
             throw new \Exception('Execute failed: ' . $stmt->error);
         }
-        
+
         $result = $stmt->get_result();
+        if ($result === false) {
+            $stmt->close();
+            throw new \Exception('Failed to get result: ' . $stmt->error);
+        }
         $row = $result->fetch_assoc();
         $stmt->close();
-        
+
         return (string)($row['discordID'] ?? '');
     }
 
-    public static function sendCurlPOST($url, $arrayContent)
+    /**
+     * Send a POST request to a Discord webhook URL
+     *
+     * @param string $url Webhook URL
+     * @param string $arrayContent Message content
+     * @return string|null Response body or null if skipped
+     */
+    public static function sendCurlPOST(string $url, string $arrayContent): ?string
     {
         // Defensive check: only send if Discord class exists (allows graceful degradation)
         if (!class_exists('Discord', false)) {
@@ -92,35 +104,49 @@ class Discord
             return null;
         }
 
-        $payload = json_encode(array("content" => $arrayContent));
-        
+        $payload = json_encode(["content" => $arrayContent]);
+        if ($payload === false) {
+            throw new \Exception('Failed to encode JSON payload');
+        }
+
+        if ($url === '') {
+            throw new \Exception('Discord webhook URL cannot be empty');
+        }
+
         $curl = curl_init();
 
-        curl_setopt_array($curl, array(
+        curl_setopt_array($curl, [
             CURLOPT_URL => $url,
             CURLOPT_POSTFIELDS => $payload,
             CURLOPT_HEADER => false,
-            CURLOPT_HTTPHEADER => array('Content-Type: application/json'),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_RETURNTRANSFER => true,
-        ));
+        ]);
 
         $response = curl_exec($curl);
         $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
 
-        if ($error = curl_error($curl)) {
+        $error = curl_error($curl);
+        if ($error !== '') {
             throw new \Exception('cURL error: ' . $error);
         }
-        
+
         // Discord webhook should return 204 No Content on success
         if ($httpCode < 200 || $httpCode >= 300) {
-            throw new \Exception('Discord webhook failed with HTTP ' . $httpCode . ': ' . $response);
+            throw new \Exception('Discord webhook failed with HTTP ' . $httpCode . ': ' . (is_string($response) ? $response : ''));
         }
-        
+
         // Note: curl_close() is deprecated in PHP 8.0+ - handle is automatically closed
-        return $response;
+        return is_string($response) ? $response : null;
     }
 
-    public static function postToChannel($channelName, $messageContent)
+    /**
+     * Post a message to a Discord channel via webhook
+     *
+     * @param string $channelName Channel name (with or without # prefix)
+     * @param string $messageContent Message content to post
+     */
+    public static function postToChannel(string $channelName, string $messageContent): void
     {
         // Defensive check: only send if Discord class exists (allows graceful degradation)
         if (!class_exists('Discord', false)) {
@@ -146,7 +172,7 @@ class Discord
             $url = self::$webhooks[$channelKey] ?? null;
         }
 
-        if ($url) {
+        if ($url !== null) {
             $messageContent = str_replace('<br>', "\n", $messageContent);
             Discord::sendCurlPOST($url, $messageContent);
         }

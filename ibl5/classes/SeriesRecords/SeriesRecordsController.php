@@ -9,15 +9,15 @@ use Services\CommonMysqliRepository;
 
 /**
  * SeriesRecordsController - Main controller for Series Records module
- * 
+ *
  * Coordinates between Repository, Service, and View components following
  * the MVC pattern used in other refactored modules.
- * 
+ *
  * @see SeriesRecordsControllerInterface
  */
 class SeriesRecordsController implements SeriesRecordsControllerInterface
 {
-    private object $db;
+    private \mysqli $db;
     private SeriesRecordsRepository $repository;
     private SeriesRecordsService $service;
     private SeriesRecordsView $view;
@@ -58,11 +58,14 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
      */
     public function displayLoginPrompt(): void
     {
+        /** @var bool $stop */
         global $stop;
 
         \Nuke\Header::header();
+        /** @var string $loginMessage */
+        $loginMessage = $stop === true ? _LOGININCOR : _USERREGLOGIN;
         echo '<div style="text-align: center;"><strong class="title">'
-            . ($stop ? _LOGININCOR : _USERREGLOGIN)
+            . $loginMessage
             . '</strong></div>';
         echo '<br>';
         loginbox();
@@ -74,16 +77,18 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
      */
     public function displayForUser(string $username): void
     {
+        /** @var string $user_prefix */
         global $user_prefix;
 
         // Get user's team from user table
         $userInfo = $this->fetchUserInfo($username, $user_prefix);
 
-        if (!$userInfo) {
+        if ($userInfo === null) {
             $this->displayLoginPrompt();
             return;
         }
 
+        /** @var string $teamName */
         $teamName = $userInfo['user_ibl_team'] ?? '';
         $teamId = $this->commonRepository->getTidFromTeamname($teamName) ?? 0;
 
@@ -92,7 +97,7 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
 
     /**
      * Fetch user information from the users table
-     * 
+     *
      * @param string $username The username to look up
      * @param string $userPrefix The table prefix for users table
      * @return array<string, mixed>|null User info or null if not found
@@ -100,23 +105,35 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
     private function fetchUserInfo(string $username, string $userPrefix): ?array
     {
         $stmt = $this->db->prepare("SELECT * FROM " . $userPrefix . "_users WHERE username = ?");
+        if ($stmt === false) {
+            return null;
+        }
         $stmt->bind_param('s', $username);
         $stmt->execute();
         $result = $stmt->get_result();
+        if ($result === false) {
+            $stmt->close();
+            return null;
+        }
         $userInfo = $result->fetch_assoc();
         $stmt->close();
 
-        return $userInfo ?: null;
+        if ($userInfo === null || $userInfo === false) {
+            return null;
+        }
+
+        return $userInfo;
     }
 
     /**
      * Main entry point - handles authentication and routing
-     * 
+     *
      * @param mixed $user The global $user cookie array
      * @return void
      */
-    public function main($user): void
+    public function main(mixed $user): void
     {
+        /** @var array<int, string> $cookie */
         global $cookie;
 
         if (!is_user($user)) {
@@ -127,7 +144,7 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
         cookiedecode($user);
         $username = $cookie[1] ?? '';
 
-        if (empty($username)) {
+        if ($username === '') {
             $this->displayLoginPrompt();
             return;
         }

@@ -13,6 +13,10 @@ use Standings\Contracts\StandingsViewInterface;
  * Generates sortable HTML tables for conference and division standings.
  * Handles clinched indicators (X/Y/Z) and team streak display.
  *
+ * @phpstan-import-type StandingsRow from StandingsRepositoryInterface
+ * @phpstan-import-type StreakRow from StandingsRepositoryInterface
+ * @phpstan-import-type PythagoreanStats from StandingsRepositoryInterface
+ *
  * @see StandingsViewInterface For the interface contract
  * @see StandingsRepository For data access
  */
@@ -89,6 +93,7 @@ class StandingsView implements StandingsViewInterface
      */
     private function renderHeader(string $region, string $groupingType): string
     {
+        /** @var string $safeRegion */
         $safeRegion = \Utilities\HtmlSanitizer::safeHtmlOutput($region);
         $title = $safeRegion . ' ' . $groupingType;
 
@@ -120,13 +125,13 @@ class StandingsView implements StandingsViewInterface
             </thead>
             <tbody>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * Render all team rows for a standings table
      *
-     * @param array $standings Array of team standings data
+     * @param list<StandingsRow> $standings Array of team standings data
      * @return string HTML for all team rows
      */
     private function renderRows(array $standings): string
@@ -143,22 +148,25 @@ class StandingsView implements StandingsViewInterface
     /**
      * Render a single team row
      *
-     * @param array $team Team standings data
+     * @param StandingsRow $team Team standings data
      * @return string HTML for team row
      */
     private function renderTeamRow(array $team): string
     {
-        $teamId = (int) $team['tid'];
+        $teamId = $team['tid'];
         $teamName = $this->formatTeamName($team);
-        $color1 = \Utilities\HtmlSanitizer::safeHtmlOutput($team['color1'] ?? '');
-        $color2 = \Utilities\HtmlSanitizer::safeHtmlOutput($team['color2'] ?? '');
+        /** @var string $color1 */
+        $color1 = \Utilities\HtmlSanitizer::safeHtmlOutput($team['color1']);
+        /** @var string $color2 */
+        $color2 = \Utilities\HtmlSanitizer::safeHtmlOutput($team['color2']);
         $streakData = $this->repository->getTeamStreakData($teamId);
 
         $lastWin = $streakData['last_win'] ?? 0;
         $lastLoss = $streakData['last_loss'] ?? 0;
+        /** @var string $streakType */
         $streakType = \Utilities\HtmlSanitizer::safeHtmlOutput($streakData['streak_type'] ?? '');
         $streak = $streakData['streak'] ?? 0;
-        $rating = \Utilities\HtmlSanitizer::safeHtmlOutput((string) ($streakData['ranking'] ?? 0));
+        $rating = $streakData['ranking'] ?? 0;
 
         // Get Pythagorean win percentage
         $pythagoreanStats = $this->repository->getTeamPythagoreanStats($teamId);
@@ -170,38 +178,51 @@ class StandingsView implements StandingsViewInterface
             );
         }
 
+        $leagueRecord = $team['leagueRecord'];
+        $pct = $team['pct'];
+        $gamesBack = $team['gamesBack'];
+        $magicNumber = $team['magicNumber'];
+        $gamesUnplayed = $team['gamesUnplayed'];
+        $confRecord = $team['confRecord'];
+        $divRecord = $team['divRecord'];
+        $homeRecord = $team['homeRecord'];
+        $awayRecord = $team['awayRecord'];
+        $homeGames = $team['homeGames'];
+        $awayGames = $team['awayGames'];
+
         ob_start();
         ?>
         <tr data-team-id="<?= $teamId; ?>">
             <td class="sticky-col ibl-team-cell--colored" style="background-color: #<?= $color1; ?>;"><a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId; ?>" class="ibl-team-cell__name" style="color: #<?= $color2; ?>;"><img src="images/logo/new<?= $teamId; ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text"><?= $teamName; ?></span></a></td>
-            <td><?= $team['leagueRecord']; ?></td>
-            <td><?= $team['pct']; ?></td>
+            <td><?= $leagueRecord; ?></td>
+            <td><?= $pct; ?></td>
             <td><?= $pythagoreanPct; ?></td>
-            <td><?= $team['gamesBack']; ?></td>
-            <td><?= $team['magicNumber']; ?></td>
-            <td><?= $team['gamesUnplayed']; ?></td>
-            <td><?= $team['confRecord']; ?></td>
-            <td><?= $team['divRecord']; ?></td>
-            <td><?= $team['homeRecord']; ?></td>
-            <td><?= $team['awayRecord']; ?></td>
-            <td><?= $team['homeGames']; ?></td>
-            <td><?= $team['awayGames']; ?></td>
+            <td><?= $gamesBack; ?></td>
+            <td><?= $magicNumber; ?></td>
+            <td><?= $gamesUnplayed; ?></td>
+            <td><?= $confRecord; ?></td>
+            <td><?= $divRecord; ?></td>
+            <td><?= $homeRecord; ?></td>
+            <td><?= $awayRecord; ?></td>
+            <td><?= $homeGames; ?></td>
+            <td><?= $awayGames; ?></td>
             <td><?= $lastWin; ?>-<?= $lastLoss; ?></td>
             <td><?= $streakType; ?> <?= $streak; ?></td>
             <td><span class="ibl-stat-highlight"><?= $rating; ?></span></td>
         </tr>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * Format team name with clinched indicator
      *
-     * @param array $team Team standings data
+     * @param StandingsRow $team Team standings data
      * @return string Formatted team name with clinched prefix if applicable
      */
     private function formatTeamName(array $team): string
     {
+        /** @var string $teamName */
         $teamName = \Utilities\HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
         if ($team['clinchedConference'] === 1) {

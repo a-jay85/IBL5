@@ -9,14 +9,20 @@ use Team\Contracts\TeamRepositoryInterface;
 use UI\Components\TableViewSwitcher;
 
 /**
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type TeamInfoRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type TeamPageData from Contracts\TeamServiceInterface
+ * @phpstan-import-type StartersData from Contracts\TeamServiceInterface
+ * @phpstan-import-type SidebarData from Contracts\TeamServiceInterface
+ *
  * @see TeamServiceInterface
  */
 class TeamService implements TeamServiceInterface
 {
-    private object $db;
+    private \mysqli $db;
     private TeamRepositoryInterface $repository;
 
-    public function __construct(object $db, TeamRepositoryInterface $repository)
+    public function __construct(\mysqli $db, TeamRepositoryInterface $repository)
     {
         $this->db = $db;
         $this->repository = $repository;
@@ -24,12 +30,15 @@ class TeamService implements TeamServiceInterface
 
     /**
      * @see TeamServiceInterface::getTeamPageData()
+     * @return TeamPageData
      */
     public function getTeamPageData(int $teamID, ?string $yr, string $display): array
     {
         global $leagueContext;
+        /** @var \League\LeagueContext $leagueContext */
 
         $leagueConfig = $leagueContext->getConfig();
+        /** @var string $imagesPath */
         $imagesPath = $leagueConfig['images_path'];
 
         $team = \Team::initialize($this->db, $teamID);
@@ -67,7 +76,7 @@ class TeamService implements TeamServiceInterface
             'chunk' => 'Sim Averages',
         ];
 
-        if (in_array($season->phase, ["Playoffs", "Draft", "Free Agency"])) {
+        if (in_array($season->phase, ["Playoffs", "Draft", "Free Agency"], true)) {
             $tabDefinitions['playoffs'] = 'Playoffs Averages';
         }
 
@@ -78,12 +87,13 @@ class TeamService implements TeamServiceInterface
         $teamColor1 = $teamData['color1'] ?? '000000';
         $teamColor2 = $teamData['color2'] ?? 'FFFFFF';
 
+        /** @var list<int> $starterPids */
         $starterPids = [];
         if ($teamID > 0 && ($yr === null || $yr === '')) {
             $starters = $this->extractStartersData($result);
             foreach ($starters as $data) {
                 if ($data['pid'] !== null) {
-                    $starterPids[] = (int) $data['pid'];
+                    $starterPids[] = $data['pid'];
                 }
             }
         }
@@ -95,7 +105,7 @@ class TeamService implements TeamServiceInterface
         $isActualTeam = ($teamID !== 0);
 
         $teamModules = new TeamComponentsView($this->repository);
-        $draftPicksTable = ($isActualTeam && $team) ? $teamModules->draftPicks($team) : "";
+        $draftPicksTable = $isActualTeam ? $teamModules->draftPicks($team) : "";
 
         $currentSeasonCard = "";
         $awardsCard = "";
@@ -128,6 +138,8 @@ class TeamService implements TeamServiceInterface
 
     /**
      * @see TeamServiceInterface::extractStartersData()
+     * @param list<array<string, mixed>> $roster
+     * @return StartersData
      */
     public function extractStartersData(array $roster): array
     {
@@ -144,28 +156,37 @@ class TeamService implements TeamServiceInterface
         foreach ($roster as $player) {
             foreach ($positions as $position) {
                 $depthField = $position . 'Depth';
-                if (isset($player[$depthField]) && (int) $player[$depthField] === 1) {
-                    $starters[$position]['name'] = $player['name'] ?? null;
-                    $starters[$position]['pid'] = $player['pid'] ?? null;
+                $depthValue = $player[$depthField] ?? null;
+                $depthInt = is_int($depthValue) ? $depthValue : (is_string($depthValue) ? (int) $depthValue : 0);
+                if ($depthInt === 1) {
+                    $nameValue = $player['name'] ?? null;
+                    $pidValue = $player['pid'] ?? null;
+                    $starters[$position]['name'] = is_string($nameValue) ? $nameValue : null;
+                    $starters[$position]['pid'] = is_int($pidValue) ? $pidValue : null;
                 }
             }
         }
 
+        /** @var StartersData $starters */
         return $starters;
     }
 
     /**
      * Render the appropriate table HTML based on display type
+     *
+     * @param list<PlayerRow>|list<array<string, mixed>> $result
+     * @param list<int> $starterPids
      */
-    private function renderTableForDisplay(string $display, mixed $result, object $team, ?string $yr, object $season, object $sharedFunctions, array $starterPids = []): string
+    private function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, \Shared $sharedFunctions, array $starterPids = []): string
     {
+        $yrStr = $yr ?? '';
         switch ($display) {
             case 'total_s':
-                return \UI::seasonTotals($this->db, $result, $team, $yr, $starterPids);
+                return \UI::seasonTotals($this->db, $result, $team, $yrStr, $starterPids);
             case 'avg_s':
-                return \UI::seasonAverages($this->db, $result, $team, $yr, $starterPids);
+                return \UI::seasonAverages($this->db, $result, $team, $yrStr, $starterPids);
             case 'per36mins':
-                return \UI::per36Minutes($this->db, $result, $team, $yr, $starterPids);
+                return \UI::per36Minutes($this->db, $result, $team, $yrStr, $starterPids);
             case 'chunk':
                 return \UI::periodAverages($this->db, $team, $season, null, null, $starterPids);
             case 'playoffs':
@@ -173,7 +194,7 @@ class TeamService implements TeamServiceInterface
             case 'contracts':
                 return \UI::contracts($this->db, $result, $team, $sharedFunctions, $starterPids);
             default:
-                return \UI::ratings($this->db, $result, $team, $yr, $season, '', $starterPids);
+                return \UI::ratings($this->db, $result, $team, $yrStr, $season, '', $starterPids);
         }
     }
 
@@ -181,8 +202,10 @@ class TeamService implements TeamServiceInterface
      * Render team information right sidebar
      *
      * Absorbed from TeamUIService::renderTeamInfoRight()
+     *
+     * @return SidebarData
      */
-    private function renderTeamInfoRight(object $team): array
+    private function renderTeamInfoRight(\Team $team): array
     {
         $color1 = \UI\TableStyles::sanitizeColor($team->color1);
         $color2 = \UI\TableStyles::sanitizeColor($team->color2);

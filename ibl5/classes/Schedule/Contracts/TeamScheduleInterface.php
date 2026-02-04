@@ -19,7 +19,10 @@ interface TeamScheduleInterface
      *
      * @param object $db Database connection
      * @param int $teamID Team ID to get schedule for
-     * @return mixed Query result resource containing schedule rows
+     * @return \mysqli_result<int, array<string, mixed>>|object Query result resource containing schedule rows
+     *
+     * @phpstan-param \mysqli $db
+     * @phpstan-return \mysqli_result<int, array<string, mixed>>
      *
      * **Query Details:**
      * - Table: ibl_schedule
@@ -29,7 +32,7 @@ interface TeamScheduleInterface
      * **Returned Columns:**
      * All columns from ibl_schedule including Date, Visitor, Home, etc.
      */
-    public static function getSchedule($db, int $teamID);
+    public static function getSchedule(object $db, int $teamID): object;
 
     /**
      * Get projected games for next simulation result
@@ -40,7 +43,10 @@ interface TeamScheduleInterface
      * @param object $db Database connection
      * @param int $teamID Team ID to get schedule for
      * @param string $lastSimEndDate Date string (YYYY-MM-DD) of last sim end
-     * @return mixed Query result resource containing upcoming game rows
+     * @return \mysqli_result<int, array<string, mixed>>|object Query result resource containing upcoming game rows
+     *
+     * @phpstan-param \mysqli $db
+     * @phpstan-return \mysqli_result<int, array<string, mixed>>
      *
      * **Query Details:**
      * - Table: ibl_schedule
@@ -51,5 +57,5 @@ interface TeamScheduleInterface
      * - Uses League::getSimLengthInDays() to determine sim period length
      * - ADDDATE function used for date arithmetic
      */
-    public static function getProjectedGamesNextSimResult($db, int $teamID, string $lastSimEndDate);
+    public static function getProjectedGamesNextSimResult(object $db, int $teamID, string $lastSimEndDate): object;
 }

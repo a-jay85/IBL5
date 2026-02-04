@@ -9,6 +9,8 @@ namespace CapSpace\Contracts;
  *
  * Defines methods for generating HTML output for salary cap information.
  *
+ * @phpstan-import-type CapSpaceTeamData from \CapSpace\CapSpaceService
+ *
  * @see \CapSpace\CapSpaceView For the concrete implementation
  */
 interface CapSpaceViewInterface
@@ -16,7 +18,7 @@ interface CapSpaceViewInterface
     /**
      * Render the complete cap info table
      *
-     * @param array $teamsData Processed team cap data
+     * @param list<CapSpaceTeamData> $teamsData Processed team cap data
      * @param int $beginningYear Starting year for headers
      * @param int $endingYear Ending year for headers
      * @return string HTML output

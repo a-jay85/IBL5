@@ -7,8 +7,10 @@ namespace DepthChartEntry;
 use DepthChartEntry\Contracts\DepthChartEntryRepositoryInterface;
 
 /**
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type DepthChartValues from Contracts\DepthChartEntryRepositoryInterface
+ *
  * @see DepthChartEntryRepositoryInterface
- * @extends \BaseMysqliRepository
  */
 class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthChartEntryRepositoryInterface
 {
@@ -19,9 +21,11 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
 
     /**
      * @see DepthChartEntryRepositoryInterface::getPlayersOnTeam()
+     * @return list<PlayerRow>
      */
     public function getPlayersOnTeam(string $teamName, int $teamID): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_plr WHERE teamname = ? AND tid = ? AND retired = '0' AND ordinal <= ? ORDER BY ordinal ASC",
             "sii",
@@ -33,21 +37,22 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
     
     /**
      * @see DepthChartEntryRepositoryInterface::updatePlayerDepthChart()
+     * @param DepthChartValues $depthChartValues
      */
     public function updatePlayerDepthChart(string $playerName, array $depthChartValues): bool
     {
-        $pg = (int) $depthChartValues['pg'];
-        $sg = (int) $depthChartValues['sg'];
-        $sf = (int) $depthChartValues['sf'];
-        $pf = (int) $depthChartValues['pf'];
-        $c = (int) $depthChartValues['c'];
-        $active = (int) $depthChartValues['active'];
-        $min = (int) $depthChartValues['min'];
-        $of = (int) $depthChartValues['of'];
-        $df = (int) $depthChartValues['df'];
-        $oi = (int) $depthChartValues['oi'];
-        $di = (int) $depthChartValues['di'];
-        $bh = (int) $depthChartValues['bh'];
+        $pg = $depthChartValues['pg'];
+        $sg = $depthChartValues['sg'];
+        $sf = $depthChartValues['sf'];
+        $pf = $depthChartValues['pf'];
+        $c = $depthChartValues['c'];
+        $active = $depthChartValues['active'];
+        $min = $depthChartValues['min'];
+        $of = $depthChartValues['of'];
+        $df = $depthChartValues['df'];
+        $oi = $depthChartValues['oi'];
+        $di = $depthChartValues['di'];
+        $bh = $depthChartValues['bh'];
         
         // Use a single UPDATE statement to update all depth chart columns at once
         // This is more efficient and handles the case where values don't change

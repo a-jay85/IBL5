@@ -25,12 +25,12 @@ interface TradingServiceInterface
      *     userTeamId: int,
      *     partnerTeam: string,
      *     partnerTeamId: int,
-     *     userPlayers: array,
-     *     userPicks: array,
-     *     userFutureSalary: array,
-     *     partnerPlayers: array,
-     *     partnerPicks: array,
-     *     partnerFutureSalary: array,
+     *     userPlayers: list<array<string, mixed>>,
+     *     userPicks: list<array<string, mixed>>,
+     *     userFutureSalary: array{player: array<int, int>, hold: array<int, int>},
+     *     partnerPlayers: list<array<string, mixed>>,
+     *     partnerPicks: list<array<string, mixed>>,
+     *     partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>},
      *     seasonEndingYear: int,
      *     seasonPhase: string,
      *     cashStartYear: int,
@@ -61,7 +61,7 @@ interface TradingServiceInterface
      *         hasHammer: bool,
      *         items: array<array{description: string, notes: string|null}>
      *     }>,
-     *     teams: array
+     *     teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>
      * }
      */
     public function getTradeReviewPageData(string $username): array;
@@ -72,7 +72,7 @@ interface TradingServiceInterface
      * Extracts the salary calculation logic that was previously in UIHelper.
      * Computes per-year salary totals and player counts for up to 6 future years.
      *
-     * @param array $players Array of player rows from repository
+     * @param list<array<string, mixed>> $players Array of player rows from repository
      * @param \Season $season Season object for phase-based contract year adjustment
      * @return array{player: array<int, int>, hold: array<int, int>} Future salary data:
      *         - 'player': Salary totals by future year index (0-5)

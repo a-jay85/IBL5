@@ -31,7 +31,7 @@ class PlayerStatsFlipCardView
     /**
      * Get styles and scripts for stats flip functionality
      * 
-     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string HTML with CSS and JavaScript
      */
     public static function getFlipStyles(?array $colorScheme = null): string
@@ -50,7 +50,7 @@ class PlayerStatsFlipCardView
      * @param string $totalsHtml HTML content for the totals view
      * @param string $statsCategory Category name (e.g., "Regular Season", "Playoffs")
      * @param bool $showAveragesFirst Whether to show averages first (default: true)
-     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string Complete HTML for flippable stats card
      */
     public static function render(
@@ -104,7 +104,7 @@ class PlayerStatsFlipCardView
     </div>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**

@@ -25,10 +25,10 @@ interface FreeAgencyServiceInterface
      * @param \Team $team Team object
      * @param \Season $season Current season
      * @return array{
-     *     capMetrics: array{totalSalaries: array, softCapSpace: array, hardCapSpace: array, rosterSpots: array},
+     *     capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>},
      *     team: \Team,
      *     season: \Season,
-     *     allOtherPlayers: array
+     *     allOtherPlayers: list<array<string, mixed>>
      * }
      */
     public function getMainPageData(\Team $team, \Season $season): array;
@@ -45,7 +45,7 @@ interface FreeAgencyServiceInterface
      * @param \Season $season Current season
      * @return array{
      *     player: \Player\Player,
-     *     capMetrics: array{totalSalaries: array, softCapSpace: array, hardCapSpace: array, rosterSpots: array},
+     *     capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>},
      *     demands: array<string, int>,
      *     existingOffer: array<string, int>,
      *     amendedCapSpace: int,

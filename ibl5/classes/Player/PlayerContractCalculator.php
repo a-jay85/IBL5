@@ -16,7 +16,7 @@ class PlayerContractCalculator implements PlayerContractCalculatorInterface
      */
     public function getCurrentSeasonSalary(PlayerData $playerData): int
     {
-        return $this->getSalaryForYear($playerData, $playerData->contractCurrentYear);
+        return $this->getSalaryForYear($playerData, $playerData->contractCurrentYear ?? 0);
     }
 
     /**
@@ -24,7 +24,7 @@ class PlayerContractCalculator implements PlayerContractCalculatorInterface
      */
     public function getNextSeasonSalary(PlayerData $playerData): int
     {
-        return $this->getSalaryForYear($playerData, $playerData->contractCurrentYear + 1);
+        return $this->getSalaryForYear($playerData, ($playerData->contractCurrentYear ?? 0) + 1);
     }
 
     /**
@@ -36,15 +36,23 @@ class PlayerContractCalculator implements PlayerContractCalculatorInterface
         if ($year === 0) {
             return $playerData->contractYear1Salary ?? 0;
         }
-        
+
         // Year 7 or beyond means no salary (off the books)
         if ($year >= 7) {
             return 0;
         }
-        
-        // Dynamically access the contract year property (years 1-6)
-        $propertyName = "contractYear" . $year . "Salary";
-        return $playerData->$propertyName ?? 0;
+
+        // Map contract year to specific property (years 1-6)
+        $salaryMap = [
+            1 => $playerData->contractYear1Salary,
+            2 => $playerData->contractYear2Salary,
+            3 => $playerData->contractYear3Salary,
+            4 => $playerData->contractYear4Salary,
+            5 => $playerData->contractYear5Salary,
+            6 => $playerData->contractYear6Salary,
+        ];
+
+        return $salaryMap[$year] ?? 0;
     }
 
     /**
@@ -53,16 +61,16 @@ class PlayerContractCalculator implements PlayerContractCalculatorInterface
     public function getFutureSalaries(PlayerData $playerData): array
     {
         $contractYears = [
-            $playerData->contractYear1Salary,
-            $playerData->contractYear2Salary,
-            $playerData->contractYear3Salary,
-            $playerData->contractYear4Salary,
-            $playerData->contractYear5Salary,
-            $playerData->contractYear6Salary,
+            $playerData->contractYear1Salary ?? 0,
+            $playerData->contractYear2Salary ?? 0,
+            $playerData->contractYear3Salary ?? 0,
+            $playerData->contractYear4Salary ?? 0,
+            $playerData->contractYear5Salary ?? 0,
+            $playerData->contractYear6Salary ?? 0,
         ];
-        
+
         // Slice from current year offset and pad with zeros to maintain 6-year array
-        $remainingYears = array_slice($contractYears, $playerData->contractCurrentYear);
+        $remainingYears = array_slice($contractYears, $playerData->contractCurrentYear ?? 0);
         return array_pad($remainingYears, 6, 0);
     }
 
@@ -71,8 +79,10 @@ class PlayerContractCalculator implements PlayerContractCalculatorInterface
      */
     public function getRemainingContractArray(PlayerData $playerData): array
     {
-        $contractCurrentYear = ($playerData->contractCurrentYear !== 0) ? $playerData->contractCurrentYear : 1;
-        $contractTotalYears = ($playerData->contractTotalYears !== 0) ? $playerData->contractTotalYears : 1;
+        $currentYear = $playerData->contractCurrentYear ?? 0;
+        $totalYears = $playerData->contractTotalYears ?? 0;
+        $contractCurrentYear = ($currentYear !== 0) ? $currentYear : 1;
+        $contractTotalYears = ($totalYears !== 0) ? $totalYears : 1;
 
         $contractArray = [];
         $remainingContractYear = 1;
@@ -85,7 +95,7 @@ class PlayerContractCalculator implements PlayerContractCalculatorInterface
         }
 
         // Ensure year 1 always exists in array
-        return $contractArray ?: [1 => 0];
+        return $contractArray !== [] ? $contractArray : [1 => 0];
     }
 
     /**
@@ -115,12 +125,15 @@ class PlayerContractCalculator implements PlayerContractCalculatorInterface
 
     /**
      * Calculate buyout terms spread over specified number of years
+     *
+     * @return array<int, int>
      */
     private function getBuyoutArray(PlayerData $playerData, int $years): array
     {
         $totalRemainingSalary = $this->getTotalRemainingSalary($playerData);
-        $salaryPerYear = round($totalRemainingSalary / $years);
-        
+        $salaryPerYear = (int) round($totalRemainingSalary / $years);
+
+        /** @var array<int, int> */
         return array_fill(1, $years, $salaryPerYear);
     }
 }

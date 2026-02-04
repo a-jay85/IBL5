@@ -9,17 +9,17 @@ use Team\Contracts\TeamServiceInterface;
 use Team\Contracts\TeamViewInterface;
 
 /**
+ * @phpstan-import-type TeamPageData from Contracts\TeamServiceInterface
+ *
  * @see TeamControllerInterface
  */
 class TeamController implements TeamControllerInterface
 {
-    private object $db;
     private TeamServiceInterface $service;
     private TeamViewInterface $view;
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
-        $this->db = $db;
         $repository = new TeamRepository($db);
         $this->service = new TeamService($db, $repository);
         $this->view = new TeamView();
@@ -30,8 +30,14 @@ class TeamController implements TeamControllerInterface
      */
     public function displayTeamPage(int $teamID): void
     {
-        $yr = $_REQUEST['yr'] ?? null;
-        $display = $_REQUEST['display'] ?? 'ratings';
+        $yr = null;
+        if (isset($_REQUEST['yr']) && is_string($_REQUEST['yr'])) {
+            $yr = $_REQUEST['yr'];
+        }
+        $display = 'ratings';
+        if (isset($_REQUEST['display']) && is_string($_REQUEST['display'])) {
+            $display = $_REQUEST['display'];
+        }
 
         \Nuke\Header::header();
 

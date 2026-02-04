@@ -83,7 +83,7 @@ abstract class BaseMysqliRepository
 {
     /**
      * @var object Database connection (mysqli or duck-typed mock for testing)
-     * 
+     *
      * TEMPORARY: During mysqli migration, we accept duck-typed objects in tests.
      * This allows integration tests to work while we migrate from legacy MySQL to mysqli.
      * Once migration is complete, this should be strictly typed as \mysqli only.
@@ -102,7 +102,7 @@ abstract class BaseMysqliRepository
     public function __construct(object $db)
     {
         // For mysqli objects, validate connection
-        if ($db instanceof \mysqli && $db->connect_errno) {
+        if ($db instanceof \mysqli && $db->connect_errno !== 0) {
             $this->logError('Connection error in constructor', $db->connect_error ?? 'Unknown error');
             throw new \RuntimeException(
                 'Invalid mysqli connection: ' . ($db->connect_error ?? 'Unknown error'),
@@ -126,6 +126,7 @@ abstract class BaseMysqliRepository
      * @param string $types Type specification string (default '' for no parameters)
      * @param mixed  ...$params Parameters to bind (must match $types length)
      * @return \mysqli_stmt Prepared and executed statement (caller must close)
+     * @phpstan-return \mysqli_stmt
      *
      * @throws \RuntimeException Error 1001 if type/param count mismatch
      * @throws \RuntimeException Error 1002 if prepare fails
@@ -157,17 +158,23 @@ abstract class BaseMysqliRepository
             throw new \RuntimeException($message, 1001);
         }
         // Prepare statement
-        $stmt = $this->db->prepare($query);
+        /** @var \mysqli $db */
+        $db = $this->db;
+        $stmt = $db->prepare($query);
         if ($stmt === false) {
-            $message = 'Failed to prepare query: ' . $this->db->error;
+            /** @var string $dbError */
+            $dbError = $db->error;
+            $message = 'Failed to prepare query: ' . $dbError;
             $this->logError($message, $query);
             throw new \RuntimeException($message, 1002);
         }
 
         // Bind parameters if provided
         if ($typeCount > 0) {
-            if (!$stmt->bind_param($types, ...$params)) {
-                $message = 'Failed to bind parameters: ' . $stmt->error;
+            if ($stmt->bind_param($types, ...$params) === false) {
+                /** @var string $stmtError */
+                $stmtError = $stmt->error;
+                $message = 'Failed to bind parameters: ' . $stmtError;
                 $this->logError($message, $query);
                 $stmt->close();
                 throw new \RuntimeException($message, 1002);
@@ -175,8 +182,10 @@ abstract class BaseMysqliRepository
         }
 
         // Execute statement
-        if (!$stmt->execute()) {
-            $message = 'Failed to execute query: ' . $stmt->error;
+        if ($stmt->execute() === false) {
+            /** @var string $stmtError */
+            $stmtError = $stmt->error;
+            $message = 'Failed to execute query: ' . $stmtError;
             $this->logError($message, $query);
             $stmt->close();
             throw new \RuntimeException($message, 1003);
@@ -217,7 +226,7 @@ abstract class BaseMysqliRepository
         $row = $result->fetch_assoc();
         $stmt->close();
 
-        return $row ?: null;
+        return is_array($row) && $row !== [] ? $row : null;
     }
 
     /**
@@ -253,7 +262,11 @@ abstract class BaseMysqliRepository
         }
 
         $rows = [];
-        while ($row = $result->fetch_assoc()) {
+        while (true) {
+            $row = $result->fetch_assoc();
+            if (!is_array($row) || $row === []) {
+                break;
+            }
             $rows[] = $row;
         }
 
@@ -280,7 +293,7 @@ abstract class BaseMysqliRepository
     protected function execute(string $query, string $types = '', mixed ...$params): int
     {
         $stmt = $this->executeQuery($query, $types, ...$params);
-        $affectedRows = $stmt->affected_rows;
+        $affectedRows = (int) $stmt->affected_rows;
         $stmt->close();
 
         return $affectedRows;
@@ -299,7 +312,9 @@ abstract class BaseMysqliRepository
      */
     protected function getLastInsertId(): int
     {
-        return (int) $this->db->insert_id;
+        /** @var \mysqli $db */
+        $db = $this->db;
+        return (int) $db->insert_id;
     }
 
     /**

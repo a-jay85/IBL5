@@ -10,10 +10,10 @@ use Utilities\HtmlSanitizer;
 
 /**
  * PlayerPlayoffTotalsView - Renders playoff totals table
- * 
+ *
  * Shows year-by-year playoff statistics totals with career totals row.
  * Uses PlayerRepository for all database access.
- * 
+ *
  * @see PlayerPlayoffTotalsViewInterface
  */
 class PlayerPlayoffTotalsView implements PlayerPlayoffTotalsViewInterface
@@ -72,24 +72,26 @@ class PlayerPlayoffTotalsView implements PlayerPlayoffTotalsViewInterface
     </tr>
         <?php
         foreach ($playoffStats as $row) {
-            $year = (int)$row['year'];
+            /** @var array{team: string, year: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $row */
+            $year = $row['year'];
+            /** @var string $team */
             $team = HtmlSanitizer::safeHtmlOutput($row['team']);
-            $gm = (int)$row['games'];
-            $min = (int)$row['minutes'];
-            $fgm = (int)$row['fgm'];
-            $fga = (int)$row['fga'];
-            $ftm = (int)$row['ftm'];
-            $fta = (int)$row['fta'];
-            $tgm = (int)$row['tgm'];
-            $tga = (int)$row['tga'];
-            $orb = (int)$row['orb'];
-            $reb = (int)$row['reb'];
-            $ast = (int)$row['ast'];
-            $stl = (int)$row['stl'];
-            $tvr = (int)$row['tvr'];
-            $blk = (int)$row['blk'];
-            $pf = (int)$row['pf'];
-            // Calculate points: 2*fgm + ftm + 3*tgm (original code has a bug)
+            $gm = $row['games'];
+            $min = $row['minutes'];
+            $fgm = $row['fgm'];
+            $fga = $row['fga'];
+            $ftm = $row['ftm'];
+            $fta = $row['fta'];
+            $tgm = $row['tgm'];
+            $tga = $row['tga'];
+            $orb = $row['orb'];
+            $reb = $row['reb'];
+            $ast = $row['ast'];
+            $stl = $row['stl'];
+            $tvr = $row['tvr'];
+            $blk = $row['blk'];
+            $pf = $row['pf'];
+            // Calculate points: 2*fgm + ftm + tgm
             $pts = $fgm + $fgm + $ftm + $tgm;
 
             // Accumulate career totals
@@ -148,6 +150,6 @@ class PlayerPlayoffTotalsView implements PlayerPlayoffTotalsViewInterface
     </tr>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

@@ -71,7 +71,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         echo PlayerStatsCardView::render($this->renderGameLog($playerID, $startDate, $endDate));
         echo '</td></tr>';
         
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -116,47 +116,54 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
 </style>
         <?php
         foreach ($boxScores as $row) {
+            /** @var array{Date: string, homeTID: int, visitorTID: int, gameMIN: int, game2GM: int, game2GA: int, game3GM: int, game3GA: int, gameFTM: int, gameFTA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int} $row */
             $fgm = $row['game2GM'] + $row['game3GM'];
             $fga = $row['game2GA'] + $row['game3GA'];
             $pts = (2 * $row['game2GM']) + (3 * $row['game3GM']) + $row['gameFTM'];
             $reb = $row['gameORB'] + $row['gameDRB'];
-            
+
             $fgPct = StatsFormatter::formatPercentage($fgm, $fga);
             $ftPct = StatsFormatter::formatPercentage($row['gameFTM'], $row['gameFTA']);
             $tgPct = StatsFormatter::formatPercentage($row['game3GM'], $row['game3GA']);
-            
-            $awayTeam = $this->commonRepository->getTeamnameFromTeamID((int) $row['homeTID']);
-            $homeTeam = $this->commonRepository->getTeamnameFromTeamID((int) $row['visitorTID']);
+
+            $awayTeam = $this->commonRepository->getTeamnameFromTeamID($row['homeTID']);
+            $homeTeam = $this->commonRepository->getTeamnameFromTeamID($row['visitorTID']);
+            /** @var string $safeDate */
+            $safeDate = HtmlSanitizer::safeHtmlOutput($row['Date']);
+            /** @var string $safeAwayTeam */
+            $safeAwayTeam = HtmlSanitizer::safeHtmlOutput($awayTeam);
+            /** @var string $safeHomeTeam */
+            $safeHomeTeam = HtmlSanitizer::safeHtmlOutput($homeTeam);
             ?>
     <tr>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($row['Date']) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($awayTeam) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($homeTeam) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameMIN']) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$pts) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$fgm) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$fga) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($fgPct) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameFTM']) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameFTA']) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($ftPct) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['game3GM']) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['game3GA']) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput($tgPct) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameORB']) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameDRB']) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$reb) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameAST']) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameSTL']) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameTOV']) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gameBLK']) ?></td>
-        <td class="gamelog"><?= HtmlSanitizer::safeHtmlOutput((string)$row['gamePF']) ?></td>
+        <td class="gamelog"><?= $safeDate ?></td>
+        <td class="gamelog"><?= $safeAwayTeam ?></td>
+        <td class="gamelog"><?= $safeHomeTeam ?></td>
+        <td class="gamelog"><?= $row['gameMIN'] ?></td>
+        <td class="gamelog"><?= $pts ?></td>
+        <td class="gamelog"><?= $fgm ?></td>
+        <td class="gamelog"><?= $fga ?></td>
+        <td class="gamelog"><?= $fgPct ?></td>
+        <td class="gamelog"><?= $row['gameFTM'] ?></td>
+        <td class="gamelog"><?= $row['gameFTA'] ?></td>
+        <td class="gamelog"><?= $ftPct ?></td>
+        <td class="gamelog"><?= $row['game3GM'] ?></td>
+        <td class="gamelog"><?= $row['game3GA'] ?></td>
+        <td class="gamelog"><?= $tgPct ?></td>
+        <td class="gamelog"><?= $row['gameORB'] ?></td>
+        <td class="gamelog"><?= $row['gameDRB'] ?></td>
+        <td class="gamelog"><?= $reb ?></td>
+        <td class="gamelog"><?= $row['gameAST'] ?></td>
+        <td class="gamelog"><?= $row['gameSTL'] ?></td>
+        <td class="gamelog"><?= $row['gameTOV'] ?></td>
+        <td class="gamelog"><?= $row['gameBLK'] ?></td>
+        <td class="gamelog"><?= $row['gamePF'] ?></td>
     </tr>
             <?php
         }
         ?>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

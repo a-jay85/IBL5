@@ -134,10 +134,11 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
         ];
 
         foreach ($greaterThanFilters as $filter) {
-            if (isset($params[$filter]) && $params[$filter] !== null) {
-                $column = self::COLUMN_MAP[$filter] ?? $filter;
+            $filterValue = $params[$filter] ?? null;
+            if ($filterValue !== null) {
+                $column = self::COLUMN_MAP[$filter];
                 $conditions[] = "ibl_plr.$column >= ?";
-                $bindParams[] = $params[$filter];
+                $bindParams[] = $filterValue;
                 $bindTypes .= 'i';
             }
         }
@@ -160,16 +161,19 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
         }
 
         $players = [];
-        while ($row = $result->fetch_assoc()) {
+        while (true) {
+            $row = $result->fetch_assoc();
+            if (!is_array($row)) {
+                break;
+            }
             $players[] = $row;
         }
 
-        $count = count($players);
         $stmt->close();
 
         return [
             'results' => $players,
-            'count' => $count
+            'count' => count($players)
         ];
     }
 

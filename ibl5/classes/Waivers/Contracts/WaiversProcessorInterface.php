@@ -89,13 +89,13 @@ interface WaiversProcessorInterface
      * Analyzes a player's existing contract situation to determine what
      * contract terms apply when signing them from waivers.
      * 
-     * @param array $playerData Player data array with keys:
+     * @param array{cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, exp: int} $playerData Player data array with keys:
      *   - 'cy': int - Current contract year (0-based)
      *   - 'cyt': int - Total contract years
      *   - 'cy1'-'cy6': int - Salary for each contract year
      *   - 'exp': int - Years of experience
      * @param Season $season Season object for phase determination
-     * @return array Contract determination result:
+     * @return array{hasExistingContract: bool, salary: int} Contract determination result:
      *   - 'hasExistingContract': bool - Whether player has remaining contract
      *   - 'salary': int - Salary amount (existing or calculated vet min)
      * 

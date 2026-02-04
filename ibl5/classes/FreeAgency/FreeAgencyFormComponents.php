@@ -86,7 +86,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     </tbody>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -101,13 +101,13 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         <?php if ($demands["dem{$i}"] !== 0): ?>
         <div style="text-align: center;">
             <div class="ibl-label" style="font-size: 0.75rem;">Yr <?= $i ?></div>
-            <div style="font-weight: 600;"><?= (int) $demands["dem{$i}"] ?></div>
+            <div style="font-weight: 600;"><?= $demands["dem{$i}"] ?></div>
         </div>
         <?php endif; ?>
     <?php endfor; ?>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -121,12 +121,12 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     <?php for ($i = 1; $i <= 6; $i++): ?>
     <div style="text-align: center;">
         <label class="ibl-label" style="font-size: 0.75rem; display: block;">Yr <?= $i ?></label>
-        <input type="number" class="ibl-input ibl-input--sm" style="width: 4.5rem;" name="offeryear<?= $i ?>" value="<?= $prefills["offer{$i}"] ?: '' ?>" min="0" max="9999">
+        <input type="number" class="ibl-input ibl-input--sm" style="width: 4.5rem;" name="offeryear<?= $i ?>" value="<?= $prefills["offer{$i}"] !== 0 ? $prefills["offer{$i}"] : '' ?>" min="0" max="9999">
     </div>
     <?php endfor; ?>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -148,7 +148,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary"><?= (int) $offers[$finalYear - 1] ?></button>
 </form>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -173,7 +173,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         echo "<input type=\"hidden\" name=\"playerID\" value=\"" . (int) $this->player->playerID . "\">\n";
         echo "<input type=\"hidden\" name=\"offerType\" value=\"" . (int) $offerType . "\">\n";
 
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -189,7 +189,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         }
 
         $raisePercentage = \ContractRules::getMaxRaisePercentage($birdYears);
-        $raisePercentageDisplay = (int)($raisePercentage * 100);
+        $raisePercentageDisplay = (int) round($raisePercentage * 100);
         $hasBirdRights = \ContractRules::hasBirdRights($birdYears);
         $birdRightsText = $hasBirdRights ? ' with Bird Rights' : '';
 
@@ -217,7 +217,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
             $this->renderVetMinButton();
         }
 
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -272,7 +272,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     {
         $contractOfferConfigs = [
             [
-                'offers' => [\ContractRules::getVeteranMinimumSalary($this->player->yearsOfExperience)],
+                'offers' => [\ContractRules::getVeteranMinimumSalary($this->player->yearsOfExperience ?? 0)],
                 'offerType' => (string) OfferType::VETERAN_MINIMUM,
             ],
         ];
@@ -309,6 +309,6 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     </div>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

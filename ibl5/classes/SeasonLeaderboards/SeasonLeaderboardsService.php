@@ -5,101 +5,159 @@ declare(strict_types=1);
 namespace SeasonLeaderboards;
 
 use BasketballStats\StatsFormatter;
+use SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface;
 use SeasonLeaderboards\Contracts\SeasonLeaderboardsServiceInterface;
 
 /**
  * @see SeasonLeaderboardsServiceInterface
+ *
+ * @phpstan-import-type HistRow from SeasonLeaderboardsRepositoryInterface
+ * @phpstan-import-type ProcessedStats from SeasonLeaderboardsServiceInterface
  */
 class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
 {
     /**
      * @see SeasonLeaderboardsServiceInterface::processPlayerRow()
+     *
+     * @param HistRow $row Database row from ibl_hist table
+     * @return ProcessedStats Formatted player statistics
      */
     public function processPlayerRow(array $row): array
     {
-        $stats = [];
+        $pid = $row['pid'];
+        $name = $row['name'];
+        $year = $row['year'];
+        $teamname = $row['team'];
+        $teamid = $row['teamid'];
+        $teamCity = $row['team_city'] ?? '';
+        $color1 = $row['color1'] ?? 'FFFFFF';
+        $color2 = $row['color2'] ?? '000000';
 
-        // Basic info
-        $stats['pid'] = $row['pid'];
-        $stats['name'] = $row['name'];
-        $stats['year'] = $row['year'];
-        $stats['teamname'] = $row['team'];
-        $stats['teamid'] = $row['teamid'];
+        $games = $row['games'];
+        $minutes = $row['minutes'];
+        $fgm = $row['fgm'];
+        $fga = $row['fga'];
+        $ftm = $row['ftm'];
+        $fta = $row['fta'];
+        $tgm = $row['tgm'];
+        $tga = $row['tga'];
+        $orb = $row['orb'];
+        $reb = $row['reb'];
+        $ast = $row['ast'];
+        $stl = $row['stl'];
+        $tvr = $row['tvr'];
+        $blk = $row['blk'];
+        $pf = $row['pf'];
 
-        // Team styling data
-        $stats['team_city'] = $row['team_city'] ?? '';
-        $stats['color1'] = $row['color1'] ?? 'FFFFFF';
-        $stats['color2'] = $row['color2'] ?? '000000';
-        
-        // Raw stats
-        $stats['games'] = $row['games'];
-        $stats['minutes'] = $row['minutes'];
-        $stats['fgm'] = $row['fgm'];
-        $stats['fga'] = $row['fga'];
-        $stats['ftm'] = $row['ftm'];
-        $stats['fta'] = $row['fta'];
-        $stats['tgm'] = $row['tgm'];
-        $stats['tga'] = $row['tga'];
-        $stats['orb'] = $row['orb'];
-        $stats['reb'] = $row['reb'];
-        $stats['ast'] = $row['ast'];
-        $stats['stl'] = $row['stl'];
-        $stats['tvr'] = $row['tvr'];
-        $stats['blk'] = $row['blk'];
-        $stats['pf'] = $row['pf'];
-        
         // Calculate totals
-        $stats['points'] = StatsFormatter::calculatePoints($stats['fgm'], $stats['ftm'], $stats['tgm']);
-        
+        $points = StatsFormatter::calculatePoints($fgm, $ftm, $tgm);
+
         // Format percentages
-        $stats['fgp'] = StatsFormatter::formatPercentage($stats['fgm'], $stats['fga']);
-        $stats['ftp'] = StatsFormatter::formatPercentage($stats['ftm'], $stats['fta']);
-        $stats['tgp'] = StatsFormatter::formatPercentage($stats['tgm'], $stats['tga']);
-        
+        $fgp = StatsFormatter::formatPercentage($fgm, $fga);
+        $ftp = StatsFormatter::formatPercentage($ftm, $fta);
+        $tgp = StatsFormatter::formatPercentage($tgm, $tga);
+
         // Format per-game averages
-        $stats['mpg'] = StatsFormatter::formatPerGameAverage($stats['minutes'], $stats['games']);
-        $stats['fgmpg'] = StatsFormatter::formatPerGameAverage($stats['fgm'], $stats['games']);
-        $stats['fgapg'] = StatsFormatter::formatPerGameAverage($stats['fga'], $stats['games']);
-        $stats['ftmpg'] = StatsFormatter::formatPerGameAverage($stats['ftm'], $stats['games']);
-        $stats['ftapg'] = StatsFormatter::formatPerGameAverage($stats['fta'], $stats['games']);
-        $stats['tgmpg'] = StatsFormatter::formatPerGameAverage($stats['tgm'], $stats['games']);
-        $stats['tgapg'] = StatsFormatter::formatPerGameAverage($stats['tga'], $stats['games']);
-        $stats['orbpg'] = StatsFormatter::formatPerGameAverage($stats['orb'], $stats['games']);
-        $stats['rpg'] = StatsFormatter::formatPerGameAverage($stats['reb'], $stats['games']);
-        $stats['apg'] = StatsFormatter::formatPerGameAverage($stats['ast'], $stats['games']);
-        $stats['spg'] = StatsFormatter::formatPerGameAverage($stats['stl'], $stats['games']);
-        $stats['tpg'] = StatsFormatter::formatPerGameAverage($stats['tvr'], $stats['games']);
-        $stats['bpg'] = StatsFormatter::formatPerGameAverage($stats['blk'], $stats['games']);
-        $stats['fpg'] = StatsFormatter::formatPerGameAverage($stats['pf'], $stats['games']);
-        $stats['ppg'] = StatsFormatter::formatPerGameAverage($stats['points'], $stats['games']);
-        
+        $mpg = StatsFormatter::formatPerGameAverage($minutes, $games);
+        $fgmpg = StatsFormatter::formatPerGameAverage($fgm, $games);
+        $fgapg = StatsFormatter::formatPerGameAverage($fga, $games);
+        $ftmpg = StatsFormatter::formatPerGameAverage($ftm, $games);
+        $ftapg = StatsFormatter::formatPerGameAverage($fta, $games);
+        $tgmpg = StatsFormatter::formatPerGameAverage($tgm, $games);
+        $tgapg = StatsFormatter::formatPerGameAverage($tga, $games);
+        $orbpg = StatsFormatter::formatPerGameAverage($orb, $games);
+        $rpg = StatsFormatter::formatPerGameAverage($reb, $games);
+        $apg = StatsFormatter::formatPerGameAverage($ast, $games);
+        $spg = StatsFormatter::formatPerGameAverage($stl, $games);
+        $tpg = StatsFormatter::formatPerGameAverage($tvr, $games);
+        $bpg = StatsFormatter::formatPerGameAverage($blk, $games);
+        $fpg = StatsFormatter::formatPerGameAverage($pf, $games);
+        $ppg = StatsFormatter::formatPerGameAverage($points, $games);
+
         // Calculate Quality Assessment (QA)
-        $stats['qa'] = $this->calculateQualityAssessment($stats);
-        
-        return $stats;
+        $qa = $this->calculateQualityAssessment($games, $points, $reb, $ast, $stl, $blk, $fga, $fgm, $fta, $ftm, $tvr, $pf);
+
+        return [
+            'pid' => $pid,
+            'name' => $name,
+            'year' => $year,
+            'teamname' => $teamname,
+            'teamid' => $teamid,
+            'team_city' => $teamCity,
+            'color1' => $color1,
+            'color2' => $color2,
+            'games' => $games,
+            'minutes' => $minutes,
+            'fgm' => $fgm,
+            'fga' => $fga,
+            'ftm' => $ftm,
+            'fta' => $fta,
+            'tgm' => $tgm,
+            'tga' => $tga,
+            'orb' => $orb,
+            'reb' => $reb,
+            'ast' => $ast,
+            'stl' => $stl,
+            'tvr' => $tvr,
+            'blk' => $blk,
+            'pf' => $pf,
+            'points' => $points,
+            'fgp' => $fgp,
+            'ftp' => $ftp,
+            'tgp' => $tgp,
+            'mpg' => $mpg,
+            'fgmpg' => $fgmpg,
+            'fgapg' => $fgapg,
+            'ftmpg' => $ftmpg,
+            'ftapg' => $ftapg,
+            'tgmpg' => $tgmpg,
+            'tgapg' => $tgapg,
+            'orbpg' => $orbpg,
+            'rpg' => $rpg,
+            'apg' => $apg,
+            'spg' => $spg,
+            'tpg' => $tpg,
+            'bpg' => $bpg,
+            'fpg' => $fpg,
+            'ppg' => $ppg,
+            'qa' => $qa,
+        ];
     }
 
     /**
      * Calculate Quality Assessment metric
-     * 
-     * @param array $stats Player statistics array
+     *
      * @return string Formatted QA value (1 decimal place)
      */
-    private function calculateQualityAssessment(array $stats): string
-    {
-        if ($stats['games'] === 0) {
+    private function calculateQualityAssessment(
+        int $games,
+        int $points,
+        int $reb,
+        int $ast,
+        int $stl,
+        int $blk,
+        int $fga,
+        int $fgm,
+        int $fta,
+        int $ftm,
+        int $tvr,
+        int $pf
+    ): string {
+        if ($games === 0) {
             return "0.0";
         }
-        
-        $positives = $stats['points'] + $stats['reb'] + (2 * $stats['ast']) + (2 * $stats['stl']) + (2 * $stats['blk']);
-        $negatives = ($stats['fga'] - $stats['fgm']) + ($stats['fta'] - $stats['ftm']) + $stats['tvr'] + $stats['pf'];
-        $qa = ($positives - $negatives) / $stats['games'];
-        
+
+        $positives = $points + $reb + (2 * $ast) + (2 * $stl) + (2 * $blk);
+        $negatives = ($fga - $fgm) + ($fta - $ftm) + $tvr + $pf;
+        $qa = ($positives - $negatives) / $games;
+
         return number_format($qa, 1);
     }
 
     /**
      * @see SeasonLeaderboardsServiceInterface::getSortOptions()
+     *
+     * @return list<string>
      */
     public function getSortOptions(): array
     {

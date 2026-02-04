@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TeamSchedule;
 
 use TeamSchedule\Contracts\TeamScheduleViewInterface;
+use TeamSchedule\Contracts\TeamScheduleServiceInterface;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -13,18 +14,27 @@ use Utilities\HtmlSanitizer;
  * Generates HTML displaying a team's game schedule using the shared schedule
  * layout with team-specific color theming.
  *
+ * @phpstan-import-type ScheduleGameRow from TeamScheduleServiceInterface
+ *
+ * @phpstan-type MonthData array{label: string, dates: array<string, list<ScheduleGameRow>>}
+ *
  * @see TeamScheduleViewInterface For the interface contract
  */
 class TeamScheduleView implements TeamScheduleViewInterface
 {
     /**
      * @see TeamScheduleViewInterface::render()
+     *
+     * @param list<ScheduleGameRow> $games
      */
     public function render(\Team $team, array $games, int $simLengthInDays, string $seasonPhase): string
     {
+        /** @var string $color1 */
         $color1 = HtmlSanitizer::safeHtmlOutput($team->color1);
+        /** @var string $color2 */
         $color2 = HtmlSanitizer::safeHtmlOutput($team->color2);
-        $teamId = (int)$team->teamID;
+        $teamId = $team->teamID;
+        /** @var string $teamName */
         $teamName = HtmlSanitizer::safeHtmlOutput($team->name);
 
         // Organize games by month and date
@@ -36,7 +46,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $playoffMonthKey = null;
         if ($isPlayoffPhase) {
             foreach (array_keys($gamesByMonth) as $key) {
-                if ((int)date('n', strtotime($key . '-01')) === \Season::IBL_PLAYOFF_MONTH) {
+                $monthTimestamp = strtotime($key . '-01');
+                if ($monthTimestamp !== false && (int)date('n', $monthTimestamp) === \Season::IBL_PLAYOFF_MONTH) {
                     $playoffMonthKey = $key;
                     break;
                 }
@@ -114,10 +125,10 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $html = '<div class="schedule-header">';
         $html .= '<div class="schedule-header__left">';
         $html .= '<h1 class="schedule-title">Schedule</h1>';
-        $html .= '<p class="schedule-highlight-note">Next sim: ' . HtmlSanitizer::safeHtmlOutput($simLengthInDays) . ' days</p>';
+        $html .= '<p class="schedule-highlight-note">Next sim: ' . $simLengthInDays . ' days</p>';
         $html .= '</div>';
 
-        if ($firstUpcomingId) {
+        if ($firstUpcomingId !== null && $firstUpcomingId !== '') {
             $html .= '<a href="#' . $firstUpcomingId . '" class="schedule-jump-btn" onclick="scrollToNextGames(event)">';
             $html .= '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
             $html .= 'Next Games';
@@ -130,6 +141,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
     /**
      * Render month navigation
+     *
+     * @param array<string, MonthData> $gamesByMonth
      */
     private function renderMonthNav(array $gamesByMonth, bool $isPlayoffPhase, ?string $playoffMonthKey): string
     {
@@ -139,10 +152,15 @@ class TeamScheduleView implements TeamScheduleViewInterface
                 continue;
             }
             $monthLabel = $data['label'];
-            $abbrev = date('M', strtotime($monthKey . '-01'));
+            $monthTimestamp = strtotime($monthKey . '-01');
+            $abbrev = (is_int($monthTimestamp) && $monthTimestamp !== 0) ? date('M', $monthTimestamp) : '';
+            /** @var string $safeLabel */
+            $safeLabel = HtmlSanitizer::safeHtmlOutput($monthLabel);
+            /** @var string $safeAbbrev */
+            $safeAbbrev = HtmlSanitizer::safeHtmlOutput($abbrev);
             $html .= '<a href="#team-month-' . $monthKey . '" class="ibl-jump-menu__link schedule-months__link" onclick="scrollToMonth(event, \'' . $monthKey . '\')">';
-            $html .= '<span class="schedule-months__full">' . HtmlSanitizer::safeHtmlOutput($monthLabel) . '</span>';
-            $html .= '<span class="schedule-months__abbr">' . HtmlSanitizer::safeHtmlOutput($abbrev) . '</span>';
+            $html .= '<span class="schedule-months__full">' . $safeLabel . '</span>';
+            $html .= '<span class="schedule-months__abbr">' . $safeAbbrev . '</span>';
             $html .= '</a>';
         }
         $html .= '</nav>';
@@ -151,6 +169,9 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
     /**
      * Render all games organized by month using same layout as Schedule module
+     *
+     * @param array<string, MonthData> $gamesByMonth
+     * @param list<ScheduleGameRow> $allGames
      */
     private function renderGamesByMonth(array $gamesByMonth, array $allGames, int $userTeamId, string $userTeamName, bool $isPlayoffPhase, ?string $playoffMonthKey): string
     {
@@ -161,10 +182,13 @@ class TeamScheduleView implements TeamScheduleViewInterface
             if ($isPlayoffPhase && $monthKey === $playoffMonthKey) {
                 $headerClass .= ' schedule-month__header--playoffs';
             }
-            $html .= '<div class="' . $headerClass . '">' . HtmlSanitizer::safeHtmlOutput($data['label']) . '</div>';
+            /** @var string $safeLabel */
+            $safeLabel = HtmlSanitizer::safeHtmlOutput($data['label']);
+            $html .= '<div class="' . $headerClass . '">' . $safeLabel . '</div>';
 
             foreach ($data['dates'] as $date => $games) {
-                $dayNum = date('j', strtotime($date));
+                $dateTimestamp = strtotime($date);
+                $dayNum = $dateTimestamp !== false ? date('j', $dateTimestamp) : '';
 
                 $html .= '<div class="schedule-day">';
                 $html .= '<div class="schedule-day__header">';
@@ -187,12 +211,12 @@ class TeamScheduleView implements TeamScheduleViewInterface
     /**
      * Render a single game row matching Schedule module format exactly
      * Same layout as League Schedule, plus streak column on the right
+     *
+     * @param ScheduleGameRow $row
      */
     private function renderGameRow(array $row, int $userTeamId, string $userTeamName): string
     {
-        /** @var \Game $game */
         $game = $row['game'];
-        /** @var \Team $opposingTeam */
         $opposingTeam = $row['opposingTeam'];
 
         $isUpcoming = ($row['highlight'] === 'next-sim');
@@ -201,10 +225,10 @@ class TeamScheduleView implements TeamScheduleViewInterface
             $gameClass .= ' schedule-game--upcoming';
         }
 
-        $gameId = 'team-game-' . (int)$game->boxScoreID;
-        $visitorTeamId = (int)$game->visitorTeamID;
-        $homeTeamId = (int)$game->homeTeamID;
-        $boxScoreUrl = './ibl/IBL/box' . (int)$game->boxScoreID . '.htm';
+        $gameId = 'team-game-' . $game->boxScoreID;
+        $visitorTeamId = $game->visitorTeamID;
+        $homeTeamId = $game->homeTeamID;
+        $boxScoreUrl = './ibl/IBL/box' . $game->boxScoreID . '.htm';
 
         // Determine which team is visitor/home
         $isUserHome = ($homeTeamId === $userTeamId);
@@ -213,14 +237,14 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $userRecord = $row['isUnplayed'] ? '' : $row['wins'] . '-' . $row['losses'];
         if ($isUserHome) {
             $visitorName = $opposingTeam->name;
-            $visitorRecord = $opposingTeam->seasonRecord;
+            $visitorRecord = $opposingTeam->seasonRecord ?? '';
             $homeName = $userTeamName;
             $homeRecord = $userRecord;
         } else {
             $visitorName = $userTeamName;
             $visitorRecord = $userRecord;
             $homeName = $opposingTeam->name;
-            $homeRecord = $opposingTeam->seasonRecord;
+            $homeRecord = $opposingTeam->seasonRecord ?? '';
         }
 
         $visitorUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $visitorTeamId;
@@ -242,10 +266,14 @@ class TeamScheduleView implements TeamScheduleViewInterface
         }
 
         // Visitor team + logo (same as League Schedule)
+        /** @var string $safeVisitorName */
+        $safeVisitorName = HtmlSanitizer::safeHtmlOutput($visitorName);
+        /** @var string $safeVisitorRecord */
+        $safeVisitorRecord = HtmlSanitizer::safeHtmlOutput($visitorRecord);
         $html .= '<a href="' . $visitorUrl . '" class="schedule-game__team-link">';
-        $html .= '<span class="schedule-game__team' . $vWinClass . '"><span class="schedule-game__team-text">' . HtmlSanitizer::safeHtmlOutput($visitorName) . '</span>';
-        if ($visitorRecord) {
-            $html .= ' <span class="schedule-game__record">(' . HtmlSanitizer::safeHtmlOutput($visitorRecord) . ')</span>';
+        $html .= '<span class="schedule-game__team' . $vWinClass . '"><span class="schedule-game__team-text">' . $safeVisitorName . '</span>';
+        if ($visitorRecord !== '') {
+            $html .= ' <span class="schedule-game__record">(' . $safeVisitorRecord . ')</span>';
         }
         $html .= '</span></a>';
         $html .= '<a href="' . $visitorUrl . '" class="schedule-game__logo-link">';
@@ -258,19 +286,23 @@ class TeamScheduleView implements TeamScheduleViewInterface
             $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
             $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link">–</a>';
         } else {
-            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vWinClass . '">' . HtmlSanitizer::safeHtmlOutput($game->visitorScore) . '</a>';
+            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vWinClass . '">' . $game->visitorScore . '</a>';
             $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
-            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hWinClass . '">' . HtmlSanitizer::safeHtmlOutput($game->homeScore) . '</a>';
+            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hWinClass . '">' . $game->homeScore . '</a>';
         }
 
         // Home logo + team (same as League Schedule)
+        /** @var string $safeHomeName */
+        $safeHomeName = HtmlSanitizer::safeHtmlOutput($homeName);
+        /** @var string $safeHomeRecord */
+        $safeHomeRecord = HtmlSanitizer::safeHtmlOutput($homeRecord);
         $html .= '<a href="' . $homeUrl . '" class="schedule-game__logo-link">';
         $html .= '<img class="schedule-game__logo" src="images/logo/new' . $homeTeamId . '.png" alt="" width="25" height="25" loading="lazy">';
         $html .= '</a>';
         $html .= '<a href="' . $homeUrl . '" class="schedule-game__team-link">';
-        $html .= '<span class="schedule-game__team' . $hWinClass . '"><span class="schedule-game__team-text">' . HtmlSanitizer::safeHtmlOutput($homeName) . '</span>';
-        if ($homeRecord) {
-            $html .= ' <span class="schedule-game__record">(' . HtmlSanitizer::safeHtmlOutput($homeRecord) . ')</span>';
+        $html .= '<span class="schedule-game__team' . $hWinClass . '"><span class="schedule-game__team-text">' . $safeHomeName . '</span>';
+        if ($homeRecord !== '') {
+            $html .= ' <span class="schedule-game__record">(' . $safeHomeRecord . ')</span>';
         }
         $html .= '</span></a>';
 
@@ -283,6 +315,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
     /**
      * Render the streak column on the right side of the game row (single line)
+     *
+     * @param ScheduleGameRow $row
      */
     private function renderStreakColumn(array $row): string
     {
@@ -302,13 +336,16 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
     /**
      * Organize games by month for easier rendering
+     *
+     * @param list<ScheduleGameRow> $games
+     * @return array<string, MonthData>
      */
     private function organizeGamesByMonth(array $games): array
     {
+        /** @var array<string, MonthData> $byMonth */
         $byMonth = [];
 
         foreach ($games as $row) {
-            /** @var \Game $game */
             $game = $row['game'];
             $date = $game->date;
             $monthKey = date('Y-m', strtotime($date));
@@ -333,14 +370,15 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
     /**
      * Find the first upcoming game ID for the jump button
+     *
+     * @param list<ScheduleGameRow> $games
      */
     private function findFirstUpcomingGameId(array $games): ?string
     {
         foreach ($games as $row) {
             if ($row['highlight'] === 'next-sim') {
-                /** @var \Game $game */
                 $game = $row['game'];
-                return 'team-game-' . (int)$game->boxScoreID;
+                return 'team-game-' . $game->boxScoreID;
             }
         }
         return null;

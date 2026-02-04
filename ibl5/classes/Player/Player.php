@@ -13,6 +13,7 @@ use Player\Contracts\PlayerInterface;
  * delegating to specialized calculator and validator classes for business logic.
  *
  * @see PlayerInterface
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class Player implements PlayerInterface
 {
@@ -276,7 +277,7 @@ class Player implements PlayerInterface
      * Create a Player instance from a player row array
      *
      * @param object $db Database connection
-     * @param array<string, mixed> $plrRow Player row data from database
+     * @param PlayerRow $plrRow Player row data from database
      * @return self Populated Player instance
      */
     public static function withPlrRow(object $db, array $plrRow): self
@@ -299,6 +300,7 @@ class Player implements PlayerInterface
     {
         $instance = new self();
         $instance->initialize($db);
+        /** @phpstan-ignore argument.type (HistoricalRow from SELECT * has all required fields) */
         $instance->playerData = $instance->repository->fillFromHistoricalRow($plrRow);
         $instance->syncPropertiesFromPlayerData();
         return $instance;
@@ -322,9 +324,9 @@ class Player implements PlayerInterface
         } else {
             // Legacy path: try global mysqli_db
             global $mysqli_db;
-            if (isset($mysqli_db) && $mysqli_db instanceof \mysqli) {
+            if ($mysqli_db instanceof \mysqli) {
                 $this->repository = new PlayerRepository($mysqli_db);
-            } elseif (isset($mysqli_db)) {
+            } elseif (is_object($mysqli_db)) {
                 // Test environment: global $mysqli_db exists but is a mock duck-type
                 // Temporarily accept duck-typed objects during mysqli migration
                 $this->repository = new PlayerRepository($mysqli_db);
@@ -340,6 +342,10 @@ class Player implements PlayerInterface
      */
     protected function syncPropertiesFromPlayerData(): void
     {
+        if ($this->playerData === null) {
+            return;
+        }
+
         $this->playerID = $this->playerData->playerID;
         $this->ordinal = $this->playerData->ordinal;
         $this->name = $this->playerData->name;
@@ -418,11 +424,24 @@ class Player implements PlayerInterface
     }
 
     /**
+     * Get the PlayerData object, throwing if not initialized
+     *
+     * @throws \RuntimeException If player data has not been loaded
+     */
+    private function getPlayerData(): PlayerData
+    {
+        if ($this->playerData === null) {
+            throw new \RuntimeException('Player data has not been loaded');
+        }
+        return $this->playerData;
+    }
+
+    /**
      * @see PlayerInterface::decoratePlayerName()
      */
     public function decoratePlayerName(): string
     {
-        return $this->nameDecorator->decoratePlayerName($this->playerData);
+        return $this->nameDecorator->decoratePlayerName($this->getPlayerData());
     }
 
     /**
@@ -430,7 +449,7 @@ class Player implements PlayerInterface
      */
     public function getCurrentSeasonSalary(): int
     {
-        return $this->contractCalculator->getCurrentSeasonSalary($this->playerData);
+        return $this->contractCalculator->getCurrentSeasonSalary($this->getPlayerData());
     }
 
     /**
@@ -448,7 +467,7 @@ class Player implements PlayerInterface
      */
     public function getInjuryReturnDate(string $rawLastSimEndDate): string
     {
-        return $this->injuryCalculator->getInjuryReturnDate($this->playerData, $rawLastSimEndDate);
+        return $this->injuryCalculator->getInjuryReturnDate($this->getPlayerData(), $rawLastSimEndDate);
     }
 
     /**
@@ -456,27 +475,23 @@ class Player implements PlayerInterface
      */
     public function getNextSeasonSalary(): int
     {
-        return $this->contractCalculator->getNextSeasonSalary($this->playerData);
+        return $this->contractCalculator->getNextSeasonSalary($this->getPlayerData());
     }
 
     /**
      * @see PlayerInterface::getLongBuyoutArray()
-     *
-     * @return array<int, int>
      */
     public function getLongBuyoutArray(): array
     {
-        return $this->contractCalculator->getLongBuyoutArray($this->playerData);
+        return $this->contractCalculator->getLongBuyoutArray($this->getPlayerData());
     }
 
     /**
      * @see PlayerInterface::getShortBuyoutArray()
-     *
-     * @return array<int, int>
      */
     public function getShortBuyoutArray(): array
     {
-        return $this->contractCalculator->getShortBuyoutArray($this->playerData);
+        return $this->contractCalculator->getShortBuyoutArray($this->getPlayerData());
     }
 
     /**
@@ -486,7 +501,7 @@ class Player implements PlayerInterface
      */
     public function getRemainingContractArray(): array
     {
-        return $this->contractCalculator->getRemainingContractArray($this->playerData);
+        return $this->contractCalculator->getRemainingContractArray($this->getPlayerData());
     }
 
     /**
@@ -494,7 +509,7 @@ class Player implements PlayerInterface
      */
     public function getTotalRemainingSalary(): int
     {
-        return $this->contractCalculator->getTotalRemainingSalary($this->playerData);
+        return $this->contractCalculator->getTotalRemainingSalary($this->getPlayerData());
     }
 
     /**
@@ -502,7 +517,7 @@ class Player implements PlayerInterface
      */
     public function getFutureSalaries(): array
     {
-        return $this->contractCalculator->getFutureSalaries($this->playerData);
+        return $this->contractCalculator->getFutureSalaries($this->getPlayerData());
     }
 
     /**
@@ -510,7 +525,7 @@ class Player implements PlayerInterface
      */
     public function canRenegotiateContract(): bool
     {
-        return $this->contractValidator->canRenegotiateContract($this->playerData);
+        return $this->contractValidator->canRenegotiateContract($this->getPlayerData());
     }
 
     /**
@@ -518,7 +533,7 @@ class Player implements PlayerInterface
      */
     public function canRookieOption(string $seasonPhase): bool
     {
-        return $this->contractValidator->canRookieOption($this->playerData, $seasonPhase);
+        return $this->contractValidator->canRookieOption($this->getPlayerData(), $seasonPhase);
     }
 
     /**
@@ -526,7 +541,7 @@ class Player implements PlayerInterface
      */
     public function getFinalYearRookieContractSalary(): int
     {
-        return $this->contractValidator->getFinalYearRookieContractSalary($this->playerData);
+        return $this->contractValidator->getFinalYearRookieContractSalary($this->getPlayerData());
     }
 
     /**
@@ -536,7 +551,18 @@ class Player implements PlayerInterface
      */
     public function isPlayerFreeAgent(int|\Season $season): bool
     {
-        return $this->contractValidator->isPlayerFreeAgent($this->playerData, $season);
+        if ($season instanceof \Season) {
+            return $this->contractValidator->isPlayerFreeAgent($this->getPlayerData(), $season);
+        }
+
+        // For int argument, calculate directly: int represents the ending year
+        $playerData = $this->getPlayerData();
+        $yearPlayerIsFreeAgent = ($playerData->draftYear ?? 0)
+            + ($playerData->yearsOfExperience ?? 0)
+            + ($playerData->contractTotalYears ?? 0)
+            - ($playerData->contractCurrentYear ?? 0);
+
+        return $yearPlayerIsFreeAgent === $season;
     }
 
     /**
@@ -544,6 +570,6 @@ class Player implements PlayerInterface
      */
     public function wasRookieOptioned(): bool
     {
-        return $this->contractValidator->wasRookieOptioned($this->playerData);
+        return $this->contractValidator->wasRookieOptioned($this->getPlayerData());
     }
 }

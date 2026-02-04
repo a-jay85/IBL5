@@ -15,7 +15,7 @@ interface LeaderboardRepositoryInterface
     /**
      * Get all players from the database
      *
-     * @return array Array of players with 'pid' and 'name' keys
+     * @return array<int, array{pid: int, name: string}> Array of players with 'pid' and 'name' keys
      */
     public function getAllPlayers(): array;
 
@@ -24,7 +24,7 @@ interface LeaderboardRepositoryInterface
      *
      * @param string $playerName Player name to look up
      * @param string $statsTable Source table (ibl_heat_stats, ibl_playoff_stats, etc.)
-     * @return array Array of stat rows for the player
+     * @return array<int, array<string, mixed>> Array of stat rows for the player
      */
     public function getPlayerStats(string $playerName, string $statsTable): array;
 
@@ -32,7 +32,7 @@ interface LeaderboardRepositoryInterface
      * Get player career stats from ibl_plr table
      *
      * @param string $playerName Player name to look up
-     * @return array|null Player career stats or null if not found
+     * @return array<string, mixed>|null Player career stats or null if not found
      */
     public function getPlayerCareerStats(string $playerName): ?array;
 
@@ -49,7 +49,7 @@ interface LeaderboardRepositoryInterface
      * Insert player career totals
      *
      * @param string $table Target table
-     * @param array $data Associative array of column => value
+     * @param array<string, string|int|float> $data Associative array of column => value
      * @return bool True on success
      */
     public function insertPlayerCareerTotals(string $table, array $data): bool;
@@ -67,7 +67,7 @@ interface LeaderboardRepositoryInterface
      * Insert player career averages
      *
      * @param string $table Target table
-     * @param array $data Associative array of column => value
+     * @param array<string, string|int|float> $data Associative array of column => value
      * @return bool True on success
      */
     public function insertPlayerCareerAvgs(string $table, array $data): bool;

@@ -17,8 +17,8 @@ class PlayerDataConverter
 {
     /**
      * Convert player array data to PlayerData object
-     * 
-     * @param array $playerData Raw player data array from database
+     *
+     * @param array<string, mixed> $playerData Raw player data array from database
      * @return PlayerData PlayerData object with contract and salary data
      */
     public static function arrayToPlayerData(array $playerData): PlayerData

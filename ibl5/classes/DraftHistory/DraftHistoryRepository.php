@@ -13,6 +13,9 @@ use DraftHistory\Contracts\DraftHistoryRepositoryInterface;
  *
  * @see DraftHistoryRepositoryInterface For the interface contract
  * @see \BaseMysqliRepository For base class documentation
+ *
+ * @phpstan-import-type DraftPickByYearRow from DraftHistoryRepositoryInterface
+ * @phpstan-import-type DraftPickByTeamRow from DraftHistoryRepositoryInterface
  */
 class DraftHistoryRepository extends \BaseMysqliRepository implements DraftHistoryRepositoryInterface
 {
@@ -34,14 +37,22 @@ class DraftHistoryRepository extends \BaseMysqliRepository implements DraftHisto
             "SELECT draftyear FROM ibl_plr ORDER BY draftyear DESC LIMIT 1"
         );
 
-        return (int) ($result['draftyear'] ?? 1988);
+        if ($result === null) {
+            return 1988;
+        }
+
+        /** @var array{draftyear: int} $result */
+        return $result['draftyear'];
     }
 
     /**
      * @see DraftHistoryRepositoryInterface::getDraftPicksByYear()
+     *
+     * @return list<DraftPickByYearRow>
      */
     public function getDraftPicksByYear(int $year): array
     {
+        /** @var list<DraftPickByYearRow> */
         return $this->fetchAll(
             "SELECT p.pid, p.name, p.pos, p.draftround, p.draftpickno, p.draftedby, p.college,
                     t.teamid, t.team_city, t.color1, t.color2
@@ -56,9 +67,12 @@ class DraftHistoryRepository extends \BaseMysqliRepository implements DraftHisto
 
     /**
      * @see DraftHistoryRepositoryInterface::getDraftPicksByTeam()
+     *
+     * @return list<DraftPickByTeamRow>
      */
     public function getDraftPicksByTeam(string $teamName): array
     {
+        /** @var list<DraftPickByTeamRow> */
         return $this->fetchAll(
             "SELECT p.pid, p.name, p.pos, p.draftround, p.draftpickno, p.draftyear, p.college, p.retired
             FROM ibl_plr p

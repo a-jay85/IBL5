@@ -6,9 +6,12 @@ namespace DepthChartEntry\Contracts;
 
 /**
  * DepthChartEntryProcessorInterface - Contract for depth chart data processing
- * 
+ *
  * Transforms raw POST data into structured player data and statistics,
  * including sanitization, validation bounds checking, and aggregation.
+ *
+ * @phpstan-type ProcessedPlayerData array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, active: int, min: int, of: int, df: int, oi: int, di: int, bh: int, injury: int}
+ * @phpstan-type ProcessedSubmission array{playerData: list<ProcessedPlayerData>, activePlayers: int, pos_1: int, pos_2: int, pos_3: int, pos_4: int, pos_5: int, hasStarterAtMultiplePositions: bool, nameOfProblemStarter: string}
  */
 interface DepthChartEntryProcessorInterface
 {
@@ -35,27 +38,9 @@ interface DepthChartEntryProcessorInterface
      * - Settings (OI/DI/BH): clamped to -2 to 2 range
      * - Injury flag: converted to int (0 or 1)
      * 
-     * @param array $postData Raw POST data from form submission ($_POST)
+     * @param array<string, mixed> $postData Raw POST data from form submission ($_POST)
      * @param int $maxPlayers Maximum number of players to process (default 15)
-     * @return array<string, mixed> Processed data with these keys:
-     *     - playerData: array<int, array> Array of processed player arrays
-     *     - activePlayers: int (count of players with active=1)
-     *     - pos_1: int (count of PG slot assignments, excluding injured)
-     *     - pos_2: int (count of SG slot assignments, excluding injured)
-     *     - pos_3: int (count of SF slot assignments, excluding injured)
-     *     - pos_4: int (count of PF slot assignments, excluding injured)
-     *     - pos_5: int (count of C slot assignments, excluding injured)
-     *     - hasStarterAtMultiplePositions: bool (true if conflict detected)
-     *     - nameOfProblemStarter: string (player name if conflict detected, empty string otherwise)
-     * 
-     * **Player Array Structure (within playerData):**
-     *     - name: Sanitized player name
-     *     - pg, sg, sf, pf, c: Position depths (0-5)
-     *     - active: Active status (0 or 1)
-     *     - min: Projected minutes (0-40)
-     *     - of, df: Offensive/Defensive focus (0-3)
-     *     - oi, di, bh: Intensity/handling settings (-2 to 2)
-     *     - injury: Injury flag (0 or 1)
+     * @return ProcessedSubmission
      * 
      * **Important Behaviors:**
      * - Empty POST data results in empty playerData array
@@ -73,7 +58,7 @@ interface DepthChartEntryProcessorInterface
      * Header row includes position slot names from JSB::PLAYER_POSITIONS constant.
      * One data row per player in the order provided.
      * 
-     * @param array<int, array<string, mixed>> $playerData Array of processed player arrays (from processSubmission)
+     * @param list<ProcessedPlayerData> $playerData Array of processed player arrays (from processSubmission)
      * @return string CSV-formatted content with header row and data rows
      * 
      * **CSV Format:**

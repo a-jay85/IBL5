@@ -9,6 +9,8 @@ namespace TeamSchedule\Contracts;
  *
  * Defines methods for generating HTML output for a team's schedule.
  *
+ * @phpstan-import-type ScheduleGameRow from \TeamSchedule\Contracts\TeamScheduleServiceInterface
+ *
  * @see \TeamSchedule\TeamScheduleView For the concrete implementation
  */
 interface TeamScheduleViewInterface
@@ -17,7 +19,7 @@ interface TeamScheduleViewInterface
      * Render the complete team schedule
      *
      * @param \Team $team Team object
-     * @param array $games Processed game data
+     * @param list<ScheduleGameRow> $games Processed game data
      * @param int $simLengthInDays Simulation length in days
      * @param string $seasonPhase Current season phase (e.g., 'Regular Season', 'Playoffs')
      * @return string HTML output

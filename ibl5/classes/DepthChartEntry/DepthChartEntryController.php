@@ -8,15 +8,17 @@ use DepthChartEntry\Contracts\DepthChartEntryControllerInterface;
 use UI\Components\TableViewSwitcher;
 
 /**
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ *
  * @see DepthChartEntryControllerInterface
  */
 class DepthChartEntryController implements DepthChartEntryControllerInterface
 {
-    private $db;
-    private $repository;
-    private $processor;
-    private $view;
-    private $commonRepository;
+    private \mysqli $db;
+    private DepthChartEntryRepository $repository;
+    private DepthChartEntryProcessor $processor;
+    private DepthChartEntryView $view;
+    private \Services\CommonMysqliRepository $commonRepository;
     
     public function __construct(\mysqli $db)
     {
@@ -32,11 +34,12 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
      */
     public function displayForm(string $username): void
     {
+        /** @var string $display */
         $display = $_REQUEST['display'] ?? 'ratings';
         $season = new \Season($this->db);
 
         $teamName = $this->getUserTeamName($username);
-        $teamID = $this->commonRepository->getTidFromTeamname($teamName);
+        $teamID = $this->commonRepository->getTidFromTeamname($teamName) ?? 0;
         $team = \Team::initialize($this->db, $teamID);
 
         \Nuke\Header::header();
@@ -76,8 +79,10 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     
     /**
      * Render the appropriate table HTML based on display type
+     *
+     * @param list<PlayerRow> $result
      */
-    private function renderTableForDisplay(string $display, array $result, object $team, object $season): string
+    private function renderTableForDisplay(string $display, array $result, \Team $team, \Season $season): string
     {
         switch ($display) {
             case 'total_s':

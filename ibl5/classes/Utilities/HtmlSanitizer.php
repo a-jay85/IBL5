@@ -50,10 +50,14 @@ class HtmlSanitizer
         // Arrays and objects: JSON-encode and sanitize the resulting string
         if (is_array($value) || is_object($value)) {
             $json = json_encode($value);
+            if ($json === false) {
+                return '';
+            }
             return htmlspecialchars($json, $flags, 'UTF-8');
         }
 
         // Fallback for any other type: cast to string and HTML-escape
-        return htmlspecialchars((string)$value, $flags, 'UTF-8');
+        $stringValue = (string) $value;
+        return htmlspecialchars($stringValue, $flags, 'UTF-8');
     }
 }

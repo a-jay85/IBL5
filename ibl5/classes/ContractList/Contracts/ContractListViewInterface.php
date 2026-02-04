@@ -16,16 +16,21 @@ interface ContractListViewInterface
      *
      * @param array{
      *     contracts: array<int, array{
+     *         pid: int,
      *         name: string,
      *         pos: string,
      *         teamname: string,
+     *         tid: int,
+     *         team_city: string,
+     *         color1: string,
+     *         color2: string,
      *         bird: string,
-     *         con1: float,
-     *         con2: float,
-     *         con3: float,
-     *         con4: float,
-     *         con5: float,
-     *         con6: float
+     *         con1: int,
+     *         con2: int,
+     *         con3: int,
+     *         con4: int,
+     *         con5: int,
+     *         con6: int
      *     }>,
      *     capTotals: array{cap1: float, cap2: float, cap3: float, cap4: float, cap5: float, cap6: float},
      *     avgCaps: array{acap1: float, acap2: float, acap3: float, acap4: float, acap5: float, acap6: float}

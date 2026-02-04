@@ -6,10 +6,14 @@ namespace DepthChartEntry\Contracts;
 
 /**
  * DepthChartEntryValidatorInterface - Contract for depth chart submission validation
- * 
+ *
  * Validates complete depth chart submissions against business rules,
  * including position depth requirements, active player counts, and constraints.
  * All validation errors are collected internally and can be retrieved for display.
+ *
+ * @phpstan-import-type ProcessedSubmission from DepthChartEntryProcessorInterface
+ *
+ * @phpstan-type ValidationError array{type: string, message: string, detail: string}
  */
 interface DepthChartEntryValidatorInterface
 {
@@ -31,15 +35,7 @@ interface DepthChartEntryValidatorInterface
      * 
      * All errors are collected internally and can be retrieved via getErrors() or getErrorMessagesHtml().
      * 
-     * @param array $depthChartData Processed depth chart data with these keys:
-     *                              - activePlayers: int (total count)
-     *                              - pos_1: int (PG slot count)
-     *                              - pos_2: int (SG slot count)
-     *                              - pos_3: int (SF slot count)
-     *                              - pos_4: int (PF slot count)
-     *                              - pos_5: int (C slot count)
-     *                              - hasStarterAtMultiplePositions: bool
-     *                              - nameOfProblemStarter: string (player name if above is true)
+     * @param ProcessedSubmission $depthChartData Processed depth chart data
      * @param string $phase Season phase ('Playoffs' or 'Regular Season')
      * @return bool True if all validations pass, false if any violation detected
      * 
@@ -59,7 +55,7 @@ interface DepthChartEntryValidatorInterface
      * - message: User-facing error summary (HTML may be present, not yet escaped)
      * - detail: Actionable guidance for user (HTML may be present, not yet escaped)
      * 
-     * @return array<int, array{type: string, message: string, detail: string}> Array of error arrays (empty if no errors)
+     * @return list<ValidationError> Array of error arrays (empty if no errors)
      * 
      * **Important Behaviors:**
      * - Returns empty array if validate() returned true

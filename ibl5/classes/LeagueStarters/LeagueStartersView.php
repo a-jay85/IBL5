@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace LeagueStarters;
 
 use LeagueStarters\Contracts\LeagueStartersViewInterface;
+use Player\Player;
 use UI\Components\TableViewSwitcher;
 use Utilities\HtmlSanitizer;
 
@@ -46,6 +47,8 @@ class LeagueStartersView implements LeagueStartersViewInterface
 
     /**
      * @see LeagueStartersViewInterface::render()
+     *
+     * @param array<string, array<int, Player>> $startersByPosition
      */
     public function render(array $startersByPosition, \Team $userTeam, string $display = 'ratings'): string
     {
@@ -63,8 +66,10 @@ class LeagueStartersView implements LeagueStartersViewInterface
         $html .= '<table style="width: 100%; margin: 0 auto;">';
 
         foreach (self::POSITION_LABELS as $position => $label) {
+            /** @var string $labelSafe */
+            $labelSafe = HtmlSanitizer::safeHtmlOutput($label);
             $html .= '<tr><td>';
-            $html .= '<h2 class="ibl-table-title">' . HtmlSanitizer::safeHtmlOutput($label) . '</h2>';
+            $html .= '<h2 class="ibl-table-title">' . $labelSafe . '</h2>';
             $tableHtml = $this->renderTableForDisplay($display, $startersByPosition[$position], $userTeam);
             $html .= $switcher->wrap($tableHtml);
             $html .= '</td></tr>';
@@ -78,18 +83,22 @@ class LeagueStartersView implements LeagueStartersViewInterface
 
     /**
      * Render the appropriate table HTML based on display type
+     *
+     * @param array<int, Player> $result
      */
     private function renderTableForDisplay(string $display, array $result, \Team $team): string
     {
+        /** @var \mysqli $db */
+        $db = $this->db;
         switch ($display) {
             case 'total_s':
-                return \UI::seasonTotals($this->db, $result, $team, '', [], $this->moduleName);
+                return \UI::seasonTotals($db, $result, $team, '', [], $this->moduleName);
             case 'avg_s':
-                return \UI::seasonAverages($this->db, $result, $team, '', [], $this->moduleName);
+                return \UI::seasonAverages($db, $result, $team, '', [], $this->moduleName);
             case 'per36mins':
-                return \UI::per36Minutes($this->db, $result, $team, '', [], $this->moduleName);
+                return \UI::per36Minutes($db, $result, $team, '', [], $this->moduleName);
             default:
-                return \UI::ratings($this->db, $result, $team, '', $this->season, $this->moduleName);
+                return \UI::ratings($db, $result, $team, '', $this->season, $this->moduleName);
         }
     }
 }

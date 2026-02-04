@@ -18,7 +18,7 @@ interface TradingViewInterface
      * Displays both teams' rosters with checkboxes, cap totals,
      * cash exchange inputs, and submit button.
      *
-     * @param array $pageData Pre-computed data from TradingService::getTradeOfferPageData()
+     * @param array<string, mixed> $pageData Pre-computed data from TradingService::getTradeOfferPageData()
      * @return string Complete HTML for trade offer form
      */
     public function renderTradeOfferForm(array $pageData): string;
@@ -29,7 +29,7 @@ interface TradingViewInterface
      * Displays pending trade offer cards with item details and
      * accept/reject buttons, plus team selection links and waivers links.
      *
-     * @param array $pageData Pre-computed data from TradingService::getTradeReviewPageData()
+     * @param array<string, mixed> $pageData Pre-computed data from TradingService::getTradeReviewPageData()
      * @return string Complete HTML for trade review page
      */
     public function renderTradeReview(array $pageData): string;
@@ -45,7 +45,7 @@ interface TradingViewInterface
     /**
      * Render team selection links for trading partner selection
      *
-     * @param array $teams Array of team data from TradingService
+     * @param list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}> $teams Array of team data from TradingService
      * @return string HTML table of team links
      */
     public function renderTeamSelectionLinks(array $teams): string;

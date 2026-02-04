@@ -8,10 +8,12 @@ use OneOnOneGame\OneOnOneGameResult;
 
 /**
  * OneOnOneGameServiceInterface - Contract for One-on-One game business logic
- * 
+ *
  * Defines the interface for coordinating One-on-One game operations.
  * Acts as the main entry point for the module, orchestrating repository
  * and game engine interactions.
+ *
+ * @phpstan-import-type GameRecord from OneOnOneGameRepositoryInterface
  */
 interface OneOnOneGameServiceInterface
 {
@@ -52,11 +54,11 @@ interface OneOnOneGameServiceInterface
 
     /**
      * Get a previously played game for replay
-     * 
+     *
      * Retrieves a stored game by its ID for display.
-     * 
+     *
      * @param int $gameId The game ID to retrieve
-     * @return array<string, mixed>|null Game data or null if not found
+     * @return GameRecord|null Game data or null if not found
      */
     public function getGameReplay(int $gameId): ?array;
 

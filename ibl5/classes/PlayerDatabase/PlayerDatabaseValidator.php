@@ -71,8 +71,12 @@ class PlayerDatabaseValidator implements PlayerDatabaseValidatorInterface
         if ($value === null || $value === '') {
             return null;
         }
-        
-        $position = strtoupper(trim((string)$value));
+
+        if (!is_string($value) && !is_int($value)) {
+            return null;
+        }
+
+        $position = strtoupper(trim((string) $value));
         return in_array($position, \JSB::PLAYER_POSITIONS, true) ? $position : null;
     }
 
@@ -101,8 +105,12 @@ class PlayerDatabaseValidator implements PlayerDatabaseValidatorInterface
         if ($value === null || $value === '') {
             return null;
         }
-        
-        $sanitized = trim((string)$value);
+
+        if (!is_string($value) && !is_int($value) && !is_float($value)) {
+            return null;
+        }
+
+        $sanitized = trim((string) $value);
         return $sanitized === '' ? null : mb_substr($sanitized, 0, 64);
     }
 

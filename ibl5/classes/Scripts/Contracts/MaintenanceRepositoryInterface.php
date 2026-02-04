@@ -15,7 +15,7 @@ interface MaintenanceRepositoryInterface
     /**
      * Get all teams (excluding free agents)
      *
-     * @return array Array of teams with 'team_name' key
+     * @return array<int, array{team_name: string}> Array of teams with 'team_name' key
      */
     public function getAllTeams(): array;
 
@@ -24,7 +24,7 @@ interface MaintenanceRepositoryInterface
      *
      * @param string $teamName Team name
      * @param int $limit Number of seasons to retrieve
-     * @return array Array of season records with 'wins' and 'losses'
+     * @return array<int, array{wins: int, losses: int}> Array of season records with 'wins' and 'losses'
      */
     public function getTeamRecentCompleteSeasons(string $teamName, int $limit = 5): array;
 

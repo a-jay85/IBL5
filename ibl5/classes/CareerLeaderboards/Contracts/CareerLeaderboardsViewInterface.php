@@ -9,6 +9,9 @@ namespace CareerLeaderboards\Contracts;
  *
  * Handles HTML rendering for the leaderboards page using
  * output buffering pattern for clean, maintainable HTML.
+ *
+ * @phpstan-import-type FormattedPlayerStats from CareerLeaderboardsServiceInterface
+ * @phpstan-type FilterParams array{boards_type?: string, sort_cat?: string, active?: string, display?: int|string}
  */
 interface CareerLeaderboardsViewInterface
 {
@@ -18,11 +21,7 @@ interface CareerLeaderboardsViewInterface
      * Generates HTML form with dropdowns for board type, sort category,
      * active/retired filter, and record limit.
      *
-     * @param array $currentFilters Current filter values with keys:
-     *                              - 'boards_type' (string): Selected board display name
-     *                              - 'sort_cat' (string): Selected sort category display name
-     *                              - 'active' (string): '0' include retirees, '1' exclude
-     *                              - 'display' (int|string): Record limit
+     * @param FilterParams $currentFilters Current filter values
      * @return string HTML form output
      *
      * **Form Fields:**
@@ -63,7 +62,7 @@ interface CareerLeaderboardsViewInterface
      *
      * Generates table row with all player statistics.
      *
-     * @param array $stats Formatted player statistics from processPlayerRow()
+     * @param FormattedPlayerStats $stats Formatted player statistics from processPlayerRow()
      * @param int $rank Player's rank in the leaderboard (1-based)
      * @return string HTML table row
      *

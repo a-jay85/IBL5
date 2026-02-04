@@ -8,15 +8,15 @@ use DepthChartEntry\Contracts\DepthChartEntryViewInterface;
 use Utilities\HtmlSanitizer;
 
 /**
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type ProcessedPlayerData from Contracts\DepthChartEntryProcessorInterface
+ *
  * @see DepthChartEntryViewInterface
  */
 class DepthChartEntryView implements DepthChartEntryViewInterface
 {
-    private $processor;
-
-    public function __construct(DepthChartEntryProcessor $processor)
+    public function __construct(private readonly DepthChartEntryProcessor $processor)
     {
-        $this->processor = $processor;
     }
 
     /**
@@ -24,14 +24,14 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
      */
     public function renderTeamLogo(int $teamID): void
     {
+        /** @var \League\LeagueContext $leagueContext */
         global $leagueContext;
 
         $leagueConfig = $leagueContext->getConfig();
+        /** @var string $imagesPath */
         $imagesPath = $leagueConfig['images_path'];
 
         echo '<div class="depth-chart-logo"><img src="./' . $imagesPath . 'logo/' . $teamID . '.jpg" alt="Team Logo"></div>';
-
-        return;
     }
 
     /**
@@ -49,7 +49,7 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         ];
 
         foreach ($options as $value => $label) {
-            $selected = ($selectedValue == $value) ? ' SELECTED' : '';
+            $selected = ($selectedValue === $value) ? ' SELECTED' : '';
             echo "<option value=\"$value\"$selected>$label</option>";
         }
     }
@@ -67,7 +67,7 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         ];
 
         foreach ($options as $value => $label) {
-            $selected = ($selectedValue == $value) ? ' SELECTED' : '';
+            $selected = ($selectedValue === $value) ? ' SELECTED' : '';
             echo "<option value=\"$value\"$selected>$label</option>";
         }
     }
@@ -116,7 +116,18 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
      */
     public function renderFormHeader(string $teamLogo, int $teamID, array $slotNames): void
     {
+        /** @var string $teamLogoEscaped */
         $teamLogoEscaped = HtmlSanitizer::safeHtmlOutput($teamLogo);
+        /** @var string $slot0 */
+        $slot0 = HtmlSanitizer::safeHtmlOutput($slotNames[0]);
+        /** @var string $slot1 */
+        $slot1 = HtmlSanitizer::safeHtmlOutput($slotNames[1]);
+        /** @var string $slot2 */
+        $slot2 = HtmlSanitizer::safeHtmlOutput($slotNames[2]);
+        /** @var string $slot3 */
+        $slot3 = HtmlSanitizer::safeHtmlOutput($slotNames[3]);
+        /** @var string $slot4 */
+        $slot4 = HtmlSanitizer::safeHtmlOutput($slotNames[4]);
         echo '<form name="DepthChartEntry" method="post" action="modules.php?name=DepthChartEntry&amp;op=submit" class="depth-chart-form">
             <input type="hidden" name="Team_Name" value="' . $teamLogoEscaped . '">';
 
@@ -125,11 +136,11 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
                 <tr>
                     <th>Pos</th>
                     <th>Player</th>
-                    <th>' . HtmlSanitizer::safeHtmlOutput($slotNames[0]) . '</th>
-                    <th>' . HtmlSanitizer::safeHtmlOutput($slotNames[1]) . '</th>
-                    <th>' . HtmlSanitizer::safeHtmlOutput($slotNames[2]) . '</th>
-                    <th>' . HtmlSanitizer::safeHtmlOutput($slotNames[3]) . '</th>
-                    <th>' . HtmlSanitizer::safeHtmlOutput($slotNames[4]) . '</th>
+                    <th>' . $slot0 . '</th>
+                    <th>' . $slot1 . '</th>
+                    <th>' . $slot2 . '</th>
+                    <th>' . $slot3 . '</th>
+                    <th>' . $slot4 . '</th>
                     <th>active</th>
                     <th>min</th>
                     <th>OF</th>
@@ -144,27 +155,29 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
 
     /**
      * @see DepthChartEntryViewInterface::renderPlayerRow()
+     * @param PlayerRow $player
      */
     public function renderPlayerRow(array $player, int $depthCount): void
     {
         $player_pid = $player['pid'];
         $player_pos = $player['pos'];
         $player_name = $player['name'];
-        $player_inj = $player['injured'];
+        $player_inj = $player['injured'] ?? 0;
 
+        /** @var string $player_name_html */
         $player_name_html = HtmlSanitizer::safeHtmlOutput($player_name);
 
-        $player_staminacap = (int)$player['sta'] + 40;
+        $player_staminacap = ($player['sta'] ?? 0) + 40;
         if ($player_staminacap > 40) {
             $player_staminacap = 40;
         }
 
         echo "<tr>
-            <td>$player_pos</td>
+            <td>{$player_pos}</td>
             <td nowrap>
-                <input type=\"hidden\" name=\"Injury$depthCount\" value=\"$player_inj\">
-                <input type=\"hidden\" name=\"Name$depthCount\" value=\"$player_name_html\">
-                <a href=\"./modules.php?name=Player&pa=showpage&pid=$player_pid\">$player_name_html</a>
+                <input type=\"hidden\" name=\"Injury{$depthCount}\" value=\"{$player_inj}\">
+                <input type=\"hidden\" name=\"Name{$depthCount}\" value=\"{$player_name_html}\">
+                <a href=\"./modules.php?name=Player&pa=showpage&pid={$player_pid}\">{$player_name_html}</a>
             </td>";
 
         $positions = ['pg', 'sg', 'sf', 'pf', 'c'];
@@ -172,42 +185,54 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
             $this->renderPositionCell($player, $posKey, $depthCount);
         }
 
-        echo "<td><select name=\"active$depthCount\">";
-        $this->renderActiveOptions((int)$player['dc_active']);
+        $dcActive = $player['dc_active'] ?? 0;
+        $dcMinutes = $player['dc_minutes'] ?? 0;
+        $dcOf = $player['dc_of'] ?? 0;
+        $dcDf = $player['dc_df'] ?? 0;
+        $dcOi = $player['dc_oi'] ?? 0;
+        $dcDi = $player['dc_di'] ?? 0;
+        $dcBh = $player['dc_bh'] ?? 0;
+
+        echo "<td><select name=\"active{$depthCount}\">";
+        $this->renderActiveOptions($dcActive);
         echo "</select></td>";
 
-        echo "<td><select name=\"min$depthCount\">";
-        $this->renderMinutesOptions((int)$player['dc_minutes'], $player_staminacap);
+        echo "<td><select name=\"min{$depthCount}\">";
+        $this->renderMinutesOptions($dcMinutes, $player_staminacap);
         echo "</select></td>";
 
-        echo "<td><select name=\"OF$depthCount\">";
-        $this->renderOffDefOptions((int)$player['dc_of']);
+        echo "<td><select name=\"OF{$depthCount}\">";
+        $this->renderOffDefOptions($dcOf);
         echo "</select></td>";
 
-        echo "<td><select name=\"DF$depthCount\">";
-        $this->renderOffDefOptions((int)$player['dc_df']);
+        echo "<td><select name=\"DF{$depthCount}\">";
+        $this->renderOffDefOptions($dcDf);
         echo "</select></td>";
 
-        echo "<td><select name=\"OI$depthCount\">";
-        $this->renderSettingOptions((int)$player['dc_oi']);
+        echo "<td><select name=\"OI{$depthCount}\">";
+        $this->renderSettingOptions($dcOi);
         echo "</select></td>";
 
-        echo "<td><select name=\"DI$depthCount\">";
-        $this->renderSettingOptions((int)$player['dc_di']);
+        echo "<td><select name=\"DI{$depthCount}\">";
+        $this->renderSettingOptions($dcDi);
         echo "</select></td>";
 
-        echo "<td><select name=\"BH$depthCount\">";
-        $this->renderSettingOptions((int)$player['dc_bh']);
+        echo "<td><select name=\"BH{$depthCount}\">";
+        $this->renderSettingOptions($dcBh);
         echo "</select></td></tr>";
     }
 
+    /**
+     * @param PlayerRow $player
+     */
     private function renderPositionCell(array $player, string $posKey, int $depthCount): void
     {
         $fieldName = $posKey . $depthCount;
         $dcField = 'dc_' . strtoupper($posKey) . 'Depth';
-        $currentValue = (int)$player[$dcField];
+        /** @var int $currentValue */
+        $currentValue = $player[$dcField];
 
-        echo "<td><select name=\"$fieldName\">";
+        echo "<td><select name=\"{$fieldName}\">";
         $this->renderPositionOptions($currentValue);
         echo "</select></td>";
     }
@@ -268,6 +293,7 @@ JAVASCRIPT;
 
     /**
      * @see DepthChartEntryViewInterface::renderSubmissionResult()
+     * @param list<ProcessedPlayerData> $playerData
      */
     public function renderSubmissionResult(
         string $teamName,
@@ -282,11 +308,15 @@ JAVASCRIPT;
             echo '<div class="text-center"><span class="underline">Your depth chart has been submitted and e-mailed successfully. Thank you.</span></div><p>';
         }
 
-        echo HtmlSanitizer::safeHtmlOutput($teamName) . ' Depth Chart Submission<br><table class="ibl-data-table">';
+        /** @var string $teamNameHtml */
+        $teamNameHtml = HtmlSanitizer::safeHtmlOutput($teamName);
+        echo $teamNameHtml . ' Depth Chart Submission<br><table class="ibl-data-table">';
         echo '<thead><tr>
             <th>Name</th>';
         foreach (\JSB::PLAYER_POSITIONS as $position) {
-            echo '<th>' . HtmlSanitizer::safeHtmlOutput($position) . '</th>';
+            /** @var string $posHtml */
+            $posHtml = HtmlSanitizer::safeHtmlOutput($position);
+            echo '<th>' . $posHtml . '</th>';
         }
         echo '<th>Active</th>
             <th>Min</th>
@@ -298,19 +328,21 @@ JAVASCRIPT;
         </tr></thead><tbody>';
 
         foreach ($playerData as $player) {
+            /** @var string $nameHtml */
+            $nameHtml = HtmlSanitizer::safeHtmlOutput($player['name']);
             echo '<tr>
-                <td>' . HtmlSanitizer::safeHtmlOutput($player['name']) . '</td>';
+                <td>' . $nameHtml . '</td>';
             foreach (\JSB::PLAYER_POSITIONS as $position) {
                 $posKey = strtolower($position);
-                echo '<td>' . HtmlSanitizer::safeHtmlOutput((string)$player[$posKey]) . '</td>';
+                echo '<td>' . $player[$posKey] . '</td>';
             }
-            echo '<td>' . HtmlSanitizer::safeHtmlOutput((string)$player['active']) . '</td>
-                <td>' . HtmlSanitizer::safeHtmlOutput((string)$player['min']) . '</td>
-                <td>' . HtmlSanitizer::safeHtmlOutput((string)$player['of']) . '</td>
-                <td>' . HtmlSanitizer::safeHtmlOutput((string)$player['df']) . '</td>
-                <td>' . HtmlSanitizer::safeHtmlOutput((string)$player['oi']) . '</td>
-                <td>' . HtmlSanitizer::safeHtmlOutput((string)$player['di']) . '</td>
-                <td>' . HtmlSanitizer::safeHtmlOutput((string)$player['bh']) . '</td>
+            echo '<td>' . $player['active'] . '</td>
+                <td>' . $player['min'] . '</td>
+                <td>' . $player['of'] . '</td>
+                <td>' . $player['df'] . '</td>
+                <td>' . $player['oi'] . '</td>
+                <td>' . $player['di'] . '</td>
+                <td>' . $player['bh'] . '</td>
             </tr>';
         }
 

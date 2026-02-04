@@ -57,7 +57,7 @@ class TradingViewTest extends TestCase
     {
         $pageData = $this->createTradeOfferPageData();
         $pageData['userPlayers'] = [
-            ['pos' => 'PG', 'name' => 'LeBron James', 'pid' => '1', 'ordinal' => '5', 'cy' => '1', 'cy1' => '500', 'cy2' => '600', 'cy3' => '0', 'cy4' => '0', 'cy5' => '0', 'cy6' => '0'],
+            ['pos' => 'PG', 'name' => 'LeBron James', 'pid' => 1, 'ordinal' => 5, 'cy' => 1, 'cy1' => 500, 'cy2' => 600, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
         ];
 
         $html = $this->view->renderTradeOfferForm($pageData);
@@ -71,7 +71,7 @@ class TradingViewTest extends TestCase
     {
         $pageData = $this->createTradeOfferPageData();
         $pageData['userPicks'] = [
-            ['pickid' => '10', 'year' => '2025', 'teampick' => 'Lakers', 'round' => '1', 'notes' => null],
+            ['pickid' => 10, 'year' => '2025', 'teampick' => 'Lakers', 'round' => '1', 'notes' => null, 'ownerofpick' => 'Lakers', 'created_at' => '', 'updated_at' => ''],
         ];
 
         $html = $this->view->renderTradeOfferForm($pageData);
@@ -136,7 +136,7 @@ class TradingViewTest extends TestCase
     {
         $pageData = $this->createTradeOfferPageData();
         $pageData['userPlayers'] = [
-            ['pos' => 'PG', 'name' => 'Waived Player', 'pid' => '1', 'ordinal' => '999', 'cy' => '1', 'cy1' => '500', 'cy2' => '0', 'cy3' => '0', 'cy4' => '0', 'cy5' => '0', 'cy6' => '0'],
+            ['pos' => 'PG', 'name' => 'Waived Player', 'pid' => 1, 'ordinal' => 999, 'cy' => 1, 'cy1' => 500, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
         ];
 
         $html = $this->view->renderTradeOfferForm($pageData);

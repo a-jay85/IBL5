@@ -14,6 +14,8 @@ use Utilities\HtmlSanitizer;
  * Uses the IBL5 design system with ibl-filter-form for search
  * and ibl-data-table for comparison tables.
  *
+ * @phpstan-type ComparePlayerRow array{pid: int, name: string, pos: string, age: ?int, tid: int, teamname: ?string, color1: ?string, color2: ?string, team_city: ?string, r_fga: ?int, r_fgp: ?int, r_fta: ?int, r_ftp: ?int, r_tga: ?int, r_tgp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_to: ?int, r_blk: ?int, r_foul: ?int, oo: ?int, do: ?int, po: ?int, to: ?int, od: ?int, dd: ?int, pd: ?int, td: ?int, stats_gm: ?int, stats_gs: ?int, stats_min: ?int, stats_fgm: ?int, stats_fga: ?int, stats_ftm: ?int, stats_fta: ?int, stats_3gm: ?int, stats_3ga: ?int, stats_orb: ?int, stats_drb: ?int, stats_ast: ?int, stats_stl: ?int, stats_to: ?int, stats_blk: ?int, stats_pf: ?int, car_gm: ?int, car_min: ?int, car_fgm: ?int, car_fga: ?int, car_ftm: ?int, car_fta: ?int, car_tgm: ?int, car_tga: ?int, car_orb: ?int, car_drb: ?int, car_reb: ?int, car_ast: ?int, car_stl: ?int, car_to: ?int, car_blk: ?int, car_pf: ?int, car_pts: ?int}
+ *
  * @see ComparePlayersViewInterface
  */
 class ComparePlayersView implements ComparePlayersViewInterface
@@ -28,7 +30,9 @@ class ComparePlayersView implements ComparePlayersViewInterface
         // Build datalist options for autocomplete
         $datalistHtml = '<datalist id="player-names">';
         foreach ($playerNames as $name) {
-            $datalistHtml .= '<option value="' . HtmlSanitizer::safeHtmlOutput(stripslashes($name)) . '">';
+            /** @var string $nameSafe */
+            $nameSafe = HtmlSanitizer::safeHtmlOutput(stripslashes($name));
+            $datalistHtml .= '<option value="' . $nameSafe . '">';
         }
         $datalistHtml .= '</datalist>';
 
@@ -59,7 +63,9 @@ class ComparePlayersView implements ComparePlayersViewInterface
      */
     public function renderComparisonResults(array $comparisonData): string
     {
+        /** @var ComparePlayerRow $player1 */
         $player1 = $comparisonData['player1'];
+        /** @var ComparePlayerRow $player2 */
         $player2 = $comparisonData['player2'];
 
         $output = '';
@@ -72,6 +78,9 @@ class ComparePlayersView implements ComparePlayersViewInterface
 
     /**
      * Render the Current Ratings comparison table.
+     *
+     * @param ComparePlayerRow $player1
+     * @param ComparePlayerRow $player2
      */
     private function renderRatingsTable(array $player1, array $player2): string
     {
@@ -87,39 +96,14 @@ class ComparePlayersView implements ComparePlayersViewInterface
         $output .= '<table class="sortable ibl-data-table responsive-table">';
         $output .= '<thead><tr>';
         foreach ($headers as $h) {
-            $output .= '<th>' . HtmlSanitizer::safeHtmlOutput($h) . '</th>';
+            /** @var string $hSafe */
+            $hSafe = HtmlSanitizer::safeHtmlOutput($h);
+            $output .= '<th>' . $hSafe . '</th>';
         }
         $output .= '</tr></thead><tbody>';
 
         foreach ([$player1, $player2] as $player) {
-            $output .= '<tr>';
-            $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['pos']) . '</td>';
-            $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$player['pid'], $player['name']);
-            $output .= '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . (int)$player['pid'] . '">' . $resolved['thumbnail'] . HtmlSanitizer::safeHtmlOutput($resolved['name']) . '</a></td>';
-            $output .= $this->renderTeamCell($player);
-            $output .= '<td>' . (int)$player['age'] . '</td>';
-            $output .= '<td>' . (int)$player['r_fga'] . '</td>';
-            $output .= '<td>' . (int)$player['r_fgp'] . '</td>';
-            $output .= '<td>' . (int)$player['r_fta'] . '</td>';
-            $output .= '<td>' . (int)$player['r_ftp'] . '</td>';
-            $output .= '<td>' . (int)$player['r_tga'] . '</td>';
-            $output .= '<td>' . (int)$player['r_tgp'] . '</td>';
-            $output .= '<td>' . (int)$player['r_orb'] . '</td>';
-            $output .= '<td>' . (int)$player['r_drb'] . '</td>';
-            $output .= '<td>' . (int)$player['r_ast'] . '</td>';
-            $output .= '<td>' . (int)$player['r_stl'] . '</td>';
-            $output .= '<td>' . (int)$player['r_to'] . '</td>';
-            $output .= '<td>' . (int)$player['r_blk'] . '</td>';
-            $output .= '<td>' . (int)$player['r_foul'] . '</td>';
-            $output .= '<td>' . (int)$player['oo'] . '</td>';
-            $output .= '<td>' . (int)$player['do'] . '</td>';
-            $output .= '<td>' . (int)$player['po'] . '</td>';
-            $output .= '<td>' . (int)$player['to'] . '</td>';
-            $output .= '<td>' . (int)$player['od'] . '</td>';
-            $output .= '<td>' . (int)$player['dd'] . '</td>';
-            $output .= '<td>' . (int)$player['pd'] . '</td>';
-            $output .= '<td>' . (int)$player['td'] . '</td>';
-            $output .= '</tr>';
+            $output .= $this->renderRatingsRow($player);
         }
 
         $output .= '</tbody></table></div></div>';
@@ -128,7 +112,57 @@ class ComparePlayersView implements ComparePlayersViewInterface
     }
 
     /**
+     * Render a single ratings row for a player.
+     *
+     * @param ComparePlayerRow $player
+     */
+    private function renderRatingsRow(array $player): string
+    {
+        $pid = $player['pid'];
+        $name = $player['name'];
+        /** @var string $posSafe */
+        $posSafe = HtmlSanitizer::safeHtmlOutput($player['pos']);
+        /** @var array{name: string, thumbnail: string} $resolved */
+        $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $name);
+        /** @var string $resolvedNameSafe */
+        $resolvedNameSafe = HtmlSanitizer::safeHtmlOutput($resolved['name']);
+
+        $output = '<tr>';
+        $output .= '<td>' . $posSafe . '</td>';
+        $output .= '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $resolved['thumbnail'] . $resolvedNameSafe . '</a></td>';
+        $output .= $this->renderTeamCell($player);
+        $output .= '<td>' . (int)$player['age'] . '</td>';
+        $output .= '<td>' . (int)$player['r_fga'] . '</td>';
+        $output .= '<td>' . (int)$player['r_fgp'] . '</td>';
+        $output .= '<td>' . (int)$player['r_fta'] . '</td>';
+        $output .= '<td>' . (int)$player['r_ftp'] . '</td>';
+        $output .= '<td>' . (int)$player['r_tga'] . '</td>';
+        $output .= '<td>' . (int)$player['r_tgp'] . '</td>';
+        $output .= '<td>' . (int)$player['r_orb'] . '</td>';
+        $output .= '<td>' . (int)$player['r_drb'] . '</td>';
+        $output .= '<td>' . (int)$player['r_ast'] . '</td>';
+        $output .= '<td>' . (int)$player['r_stl'] . '</td>';
+        $output .= '<td>' . (int)$player['r_to'] . '</td>';
+        $output .= '<td>' . (int)$player['r_blk'] . '</td>';
+        $output .= '<td>' . (int)$player['r_foul'] . '</td>';
+        $output .= '<td>' . (int)$player['oo'] . '</td>';
+        $output .= '<td>' . (int)$player['do'] . '</td>';
+        $output .= '<td>' . (int)$player['po'] . '</td>';
+        $output .= '<td>' . (int)$player['to'] . '</td>';
+        $output .= '<td>' . (int)$player['od'] . '</td>';
+        $output .= '<td>' . (int)$player['dd'] . '</td>';
+        $output .= '<td>' . (int)$player['pd'] . '</td>';
+        $output .= '<td>' . (int)$player['td'] . '</td>';
+        $output .= '</tr>';
+
+        return $output;
+    }
+
+    /**
      * Render the Current Season Stats comparison table.
+     *
+     * @param ComparePlayerRow $player1
+     * @param ComparePlayerRow $player2
      */
     private function renderSeasonStatsTable(array $player1, array $player2): string
     {
@@ -143,39 +177,14 @@ class ComparePlayersView implements ComparePlayersViewInterface
         $output .= '<table class="sortable ibl-data-table responsive-table">';
         $output .= '<thead><tr>';
         foreach ($headers as $h) {
-            $output .= '<th>' . HtmlSanitizer::safeHtmlOutput($h) . '</th>';
+            /** @var string $hSafe */
+            $hSafe = HtmlSanitizer::safeHtmlOutput($h);
+            $output .= '<th>' . $hSafe . '</th>';
         }
         $output .= '</tr></thead><tbody>';
 
         foreach ([$player1, $player2] as $player) {
-            $fgm = (int)$player['stats_fgm'];
-            $ftm = (int)$player['stats_ftm'];
-            $tgm = (int)$player['stats_3gm'];
-            $pts = 2 * $fgm + $ftm + $tgm;
-
-            $output .= '<tr>';
-            $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['pos']) . '</td>';
-            $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$player['pid'], $player['name']);
-            $output .= '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . (int)$player['pid'] . '">' . $resolved['thumbnail'] . HtmlSanitizer::safeHtmlOutput($resolved['name']) . '</a></td>';
-            $output .= $this->renderTeamCell($player);
-            $output .= '<td>' . (int)$player['stats_gm'] . '</td>';
-            $output .= '<td>' . (int)$player['stats_gs'] . '</td>';
-            $output .= '<td>' . (int)$player['stats_min'] . '</td>';
-            $output .= '<td>' . $fgm . '</td>';
-            $output .= '<td>' . (int)$player['stats_fga'] . '</td>';
-            $output .= '<td>' . $ftm . '</td>';
-            $output .= '<td>' . (int)$player['stats_fta'] . '</td>';
-            $output .= '<td>' . $tgm . '</td>';
-            $output .= '<td>' . (int)$player['stats_3ga'] . '</td>';
-            $output .= '<td>' . (int)$player['stats_orb'] . '</td>';
-            $output .= '<td>' . (int)$player['stats_drb'] . '</td>';
-            $output .= '<td>' . (int)$player['stats_ast'] . '</td>';
-            $output .= '<td>' . (int)$player['stats_stl'] . '</td>';
-            $output .= '<td>' . (int)$player['stats_to'] . '</td>';
-            $output .= '<td>' . (int)$player['stats_blk'] . '</td>';
-            $output .= '<td>' . (int)$player['stats_pf'] . '</td>';
-            $output .= '<td>' . $pts . '</td>';
-            $output .= '</tr>';
+            $output .= $this->renderSeasonStatsRow($player);
         }
 
         $output .= '</tbody></table></div></div>';
@@ -184,7 +193,57 @@ class ComparePlayersView implements ComparePlayersViewInterface
     }
 
     /**
+     * Render a single season stats row for a player.
+     *
+     * @param ComparePlayerRow $player
+     */
+    private function renderSeasonStatsRow(array $player): string
+    {
+        $pid = $player['pid'];
+        $name = $player['name'];
+        $fgm = (int)$player['stats_fgm'];
+        $ftm = (int)$player['stats_ftm'];
+        $tgm = (int)$player['stats_3gm'];
+        $pts = 2 * $fgm + $ftm + $tgm;
+
+        /** @var string $posSafe */
+        $posSafe = HtmlSanitizer::safeHtmlOutput($player['pos']);
+        /** @var array{name: string, thumbnail: string} $resolved */
+        $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $name);
+        /** @var string $resolvedNameSafe */
+        $resolvedNameSafe = HtmlSanitizer::safeHtmlOutput($resolved['name']);
+
+        $output = '<tr>';
+        $output .= '<td>' . $posSafe . '</td>';
+        $output .= '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $resolved['thumbnail'] . $resolvedNameSafe . '</a></td>';
+        $output .= $this->renderTeamCell($player);
+        $output .= '<td>' . (int)$player['stats_gm'] . '</td>';
+        $output .= '<td>' . (int)$player['stats_gs'] . '</td>';
+        $output .= '<td>' . (int)$player['stats_min'] . '</td>';
+        $output .= '<td>' . $fgm . '</td>';
+        $output .= '<td>' . (int)$player['stats_fga'] . '</td>';
+        $output .= '<td>' . $ftm . '</td>';
+        $output .= '<td>' . (int)$player['stats_fta'] . '</td>';
+        $output .= '<td>' . $tgm . '</td>';
+        $output .= '<td>' . (int)$player['stats_3ga'] . '</td>';
+        $output .= '<td>' . (int)$player['stats_orb'] . '</td>';
+        $output .= '<td>' . (int)$player['stats_drb'] . '</td>';
+        $output .= '<td>' . (int)$player['stats_ast'] . '</td>';
+        $output .= '<td>' . (int)$player['stats_stl'] . '</td>';
+        $output .= '<td>' . (int)$player['stats_to'] . '</td>';
+        $output .= '<td>' . (int)$player['stats_blk'] . '</td>';
+        $output .= '<td>' . (int)$player['stats_pf'] . '</td>';
+        $output .= '<td>' . $pts . '</td>';
+        $output .= '</tr>';
+
+        return $output;
+    }
+
+    /**
      * Render the Career Stats comparison table.
+     *
+     * @param ComparePlayerRow $player1
+     * @param ComparePlayerRow $player2
      */
     private function renderCareerStatsTable(array $player1, array $player2): string
     {
@@ -199,34 +258,14 @@ class ComparePlayersView implements ComparePlayersViewInterface
         $output .= '<table class="sortable ibl-data-table responsive-table">';
         $output .= '<thead><tr>';
         foreach ($headers as $h) {
-            $output .= '<th>' . HtmlSanitizer::safeHtmlOutput($h) . '</th>';
+            /** @var string $hSafe */
+            $hSafe = HtmlSanitizer::safeHtmlOutput($h);
+            $output .= '<th>' . $hSafe . '</th>';
         }
         $output .= '</tr></thead><tbody>';
 
         foreach ([$player1, $player2] as $player) {
-            $output .= '<tr>';
-            $output .= '<td>' . HtmlSanitizer::safeHtmlOutput($player['pos']) . '</td>';
-            $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$player['pid'], $player['name']);
-            $output .= '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . (int)$player['pid'] . '">' . $resolved['thumbnail'] . HtmlSanitizer::safeHtmlOutput($resolved['name']) . '</a></td>';
-            $output .= $this->renderTeamCell($player);
-            $output .= '<td>' . (int)$player['car_gm'] . '</td>';
-            $output .= '<td>' . (int)$player['car_min'] . '</td>';
-            $output .= '<td>' . (int)$player['car_fgm'] . '</td>';
-            $output .= '<td>' . (int)$player['car_fga'] . '</td>';
-            $output .= '<td>' . (int)$player['car_ftm'] . '</td>';
-            $output .= '<td>' . (int)$player['car_fta'] . '</td>';
-            $output .= '<td>' . (int)$player['car_tgm'] . '</td>';
-            $output .= '<td>' . (int)$player['car_tga'] . '</td>';
-            $output .= '<td>' . (int)$player['car_orb'] . '</td>';
-            $output .= '<td>' . (int)$player['car_drb'] . '</td>';
-            $output .= '<td>' . (int)$player['car_reb'] . '</td>';
-            $output .= '<td>' . (int)$player['car_ast'] . '</td>';
-            $output .= '<td>' . (int)$player['car_stl'] . '</td>';
-            $output .= '<td>' . (int)$player['car_to'] . '</td>';
-            $output .= '<td>' . (int)$player['car_blk'] . '</td>';
-            $output .= '<td>' . (int)$player['car_pf'] . '</td>';
-            $output .= '<td>' . (int)$player['car_pts'] . '</td>';
-            $output .= '</tr>';
+            $output .= $this->renderCareerStatsRow($player);
         }
 
         $output .= '</tbody></table></div></div>';
@@ -235,13 +274,61 @@ class ComparePlayersView implements ComparePlayersViewInterface
     }
 
     /**
+     * Render a single career stats row for a player.
+     *
+     * @param ComparePlayerRow $player
+     */
+    private function renderCareerStatsRow(array $player): string
+    {
+        $pid = $player['pid'];
+        $name = $player['name'];
+
+        /** @var string $posSafe */
+        $posSafe = HtmlSanitizer::safeHtmlOutput($player['pos']);
+        /** @var array{name: string, thumbnail: string} $resolved */
+        $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $name);
+        /** @var string $resolvedNameSafe */
+        $resolvedNameSafe = HtmlSanitizer::safeHtmlOutput($resolved['name']);
+
+        $output = '<tr>';
+        $output .= '<td>' . $posSafe . '</td>';
+        $output .= '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $resolved['thumbnail'] . $resolvedNameSafe . '</a></td>';
+        $output .= $this->renderTeamCell($player);
+        $output .= '<td>' . (int)$player['car_gm'] . '</td>';
+        $output .= '<td>' . (int)$player['car_min'] . '</td>';
+        $output .= '<td>' . (int)$player['car_fgm'] . '</td>';
+        $output .= '<td>' . (int)$player['car_fga'] . '</td>';
+        $output .= '<td>' . (int)$player['car_ftm'] . '</td>';
+        $output .= '<td>' . (int)$player['car_fta'] . '</td>';
+        $output .= '<td>' . (int)$player['car_tgm'] . '</td>';
+        $output .= '<td>' . (int)$player['car_tga'] . '</td>';
+        $output .= '<td>' . (int)$player['car_orb'] . '</td>';
+        $output .= '<td>' . (int)$player['car_drb'] . '</td>';
+        $output .= '<td>' . (int)$player['car_reb'] . '</td>';
+        $output .= '<td>' . (int)$player['car_ast'] . '</td>';
+        $output .= '<td>' . (int)$player['car_stl'] . '</td>';
+        $output .= '<td>' . (int)$player['car_to'] . '</td>';
+        $output .= '<td>' . (int)$player['car_blk'] . '</td>';
+        $output .= '<td>' . (int)$player['car_pf'] . '</td>';
+        $output .= '<td>' . (int)$player['car_pts'] . '</td>';
+        $output .= '</tr>';
+
+        return $output;
+    }
+
+    /**
      * Render a team cell with team colors and logo.
+     *
+     * @param ComparePlayerRow $player
      */
     private function renderTeamCell(array $player): string
     {
-        $tid = (int)($player['tid'] ?? 0);
+        $tid = $player['tid'];
+        /** @var string $teamName */
         $teamName = HtmlSanitizer::safeHtmlOutput($player['teamname'] ?? '');
+        /** @var string $color1 */
         $color1 = HtmlSanitizer::safeHtmlOutput($player['color1'] ?? 'FFFFFF');
+        /** @var string $color2 */
         $color2 = HtmlSanitizer::safeHtmlOutput($player['color2'] ?? '000000');
 
         if ($tid === 0) {

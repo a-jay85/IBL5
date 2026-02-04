@@ -9,6 +9,9 @@ use Player\PlayerImageHelper;
 
 /**
  * @see CareerLeaderboardsViewInterface
+ *
+ * @phpstan-import-type FormattedPlayerStats from Contracts\CareerLeaderboardsServiceInterface
+ * @phpstan-import-type FilterParams from Contracts\CareerLeaderboardsViewInterface
  */
 class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
 {
@@ -21,6 +24,8 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
 
     /**
      * @see CareerLeaderboardsViewInterface::renderFilterForm()
+     *
+     * @param FilterParams $currentFilters
      */
     public function renderFilterForm(array $currentFilters): string
     {
@@ -30,7 +35,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
         $boardsType = $currentFilters['boards_type'] ?? '';
         $sortCat = $currentFilters['sort_cat'] ?? '';
         $active = $currentFilters['active'] ?? '0';
-        $display = $currentFilters['display'] ?? '';
+        $display = (string) ($currentFilters['display'] ?? '');
 
         ob_start();
         ?>
@@ -40,7 +45,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
             <label class="ibl-filter-form__label">Type:</label>
             <select name="boards_type">
                 <?php foreach ($boardTypes as $key => $value): ?>
-                    <?php $selected = ($boardsType == $value) ? ' selected' : ''; ?>
+                    <?php $selected = ($boardsType === $value) ? ' selected' : ''; ?>
                     <option value="<?= htmlspecialchars($value) ?>"<?= $selected ?>><?= htmlspecialchars($value) ?></option>
                 <?php endforeach; ?>
             </select>
@@ -49,7 +54,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
             <label class="ibl-filter-form__label">Category:</label>
             <select name="sort_cat">
                 <?php foreach ($sortCategories as $key => $value): ?>
-                    <?php $selected = ($sortCat == $value) ? ' selected' : ''; ?>
+                    <?php $selected = ($sortCat === $value) ? ' selected' : ''; ?>
                     <option value="<?= htmlspecialchars($value) ?>"<?= $selected ?>><?= htmlspecialchars($value) ?></option>
                 <?php endforeach; ?>
             </select>
@@ -57,13 +62,13 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
         <div class="ibl-filter-form__group">
             <label class="ibl-filter-form__label">Include Retirees:</label>
             <select name="active">
-                <option value="0"<?= ($active == '0') ? ' selected' : '' ?>>Yes</option>
-                <option value="1"<?= ($active == '1') ? ' selected' : '' ?>>No</option>
+                <option value="0"<?= ($active === '0') ? ' selected' : '' ?>>Yes</option>
+                <option value="1"<?= ($active === '1') ? ' selected' : '' ?>>No</option>
             </select>
         </div>
         <div class="ibl-filter-form__group">
             <label class="ibl-filter-form__label">Limit:</label>
-            <input type="number" name="display" value="<?= htmlspecialchars((string)$display) ?>">
+            <input type="number" name="display" value="<?= htmlspecialchars($display) ?>">
             <span class="ibl-filter-form__label">Records</span>
         </div>
         <input type="hidden" name="submitted" value="1">
@@ -71,7 +76,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
     </div>
 </form>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -110,42 +115,51 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
     </thead>
     <tbody>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * @see CareerLeaderboardsViewInterface::renderPlayerRow()
+     *
+     * @param FormattedPlayerStats $stats
      */
     public function renderPlayerRow(array $stats, int $rank): string
     {
+        $pid = $stats['pid'];
+        $name = $stats['name'];
+        $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $name);
+        /** @var string $resolvedName */
+        $resolvedName = $resolved['name'];
+        /** @var string $resolvedThumbnail */
+        $resolvedThumbnail = $resolved['thumbnail'];
+
         ob_start();
         ?>
 <tr>
-    <td class="rank-cell sticky-col-1"><?= htmlspecialchars((string)$rank) ?></td>
-    <?php $resolved = PlayerImageHelper::resolvePlayerDisplay((int)$stats['pid'], $stats['name']); ?>
-    <td class="sticky-col-2 ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= htmlspecialchars((string)$stats['pid']) ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
-    <td><?= htmlspecialchars((string)$stats['games']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['minutes']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['fgm']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['fga']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['fgp']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['ftm']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['fta']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['ftp']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['tgm']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['tga']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['tgp']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['orb']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['reb']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['ast']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['stl']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['tvr']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['blk']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['pf']) ?></td>
-    <td><?= htmlspecialchars((string)$stats['pts']) ?></td>
+    <td class="rank-cell sticky-col-1"><?= $rank ?></td>
+    <td class="sticky-col-2 ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $pid ?>"><?= $resolvedThumbnail ?><?= htmlspecialchars($resolvedName) ?></a></td>
+    <td><?= htmlspecialchars((string) $stats['games']) ?></td>
+    <td><?= htmlspecialchars($stats['minutes']) ?></td>
+    <td><?= htmlspecialchars($stats['fgm']) ?></td>
+    <td><?= htmlspecialchars($stats['fga']) ?></td>
+    <td><?= htmlspecialchars($stats['fgp']) ?></td>
+    <td><?= htmlspecialchars($stats['ftm']) ?></td>
+    <td><?= htmlspecialchars($stats['fta']) ?></td>
+    <td><?= htmlspecialchars($stats['ftp']) ?></td>
+    <td><?= htmlspecialchars($stats['tgm']) ?></td>
+    <td><?= htmlspecialchars($stats['tga']) ?></td>
+    <td><?= htmlspecialchars($stats['tgp']) ?></td>
+    <td><?= htmlspecialchars($stats['orb']) ?></td>
+    <td><?= htmlspecialchars($stats['reb']) ?></td>
+    <td><?= htmlspecialchars($stats['ast']) ?></td>
+    <td><?= htmlspecialchars($stats['stl']) ?></td>
+    <td><?= htmlspecialchars($stats['tvr']) ?></td>
+    <td><?= htmlspecialchars($stats['blk']) ?></td>
+    <td><?= htmlspecialchars($stats['pf']) ?></td>
+    <td><?= htmlspecialchars($stats['pts']) ?></td>
 </tr>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**

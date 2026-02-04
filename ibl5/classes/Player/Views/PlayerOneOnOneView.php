@@ -58,39 +58,45 @@ class PlayerOneOnOneView implements PlayerOneOnOneViewInterface
         <?php
         // Show wins
         foreach ($wins as $game) {
-            $gameId = (int)$game['gameid'];
+            /** @var array{gameid: int, winner: string, loser: string, winscore: int, lossscore: int, loser_pid: int|null} $game */
+            $gameId = $game['gameid'];
+            /** @var string $loser */
             $loser = HtmlSanitizer::safeHtmlOutput($game['loser']);
-            $loserPid = isset($game['loser_pid']) ? (int)$game['loser_pid'] : null;
-            $winScore = (int)$game['winscore'];
-            $lossScore = (int)$game['lossscore'];
-            
+            $loserPid = $game['loser_pid'];
+            $winScore = $game['winscore'];
+            $lossScore = $game['lossscore'];
+
             // Create game link
             $gameLink = "modules.php?name=OneOnOneGame&amp;gameid={$gameId}";
-            
+
             // Create opponent link if we have a player ID
-            $opponentLink = $loserPid 
+            /** @var string $opponentLink */
+            $opponentLink = $loserPid !== null
                 ? "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$loserPid}\" style=\"font-family: inherit; font-size: inherit;\">{$loser}</a>"
                 : $loser;
-            
+
             echo "* def. {$opponentLink}, {$winScore}-{$lossScore} (<a href=\"{$gameLink}\" style=\"font-family: inherit; font-size: inherit;\">Game #{$gameId}</a>)<br>";
         }
-        
+
         // Show losses
         foreach ($losses as $game) {
-            $gameId = (int)$game['gameid'];
+            /** @var array{gameid: int, winner: string, loser: string, winscore: int, lossscore: int, winner_pid: int|null} $game */
+            $gameId = $game['gameid'];
+            /** @var string $winner */
             $winner = HtmlSanitizer::safeHtmlOutput($game['winner']);
-            $winnerPid = isset($game['winner_pid']) ? (int)$game['winner_pid'] : null;
-            $winScore = (int)$game['winscore'];
-            $lossScore = (int)$game['lossscore'];
-            
+            $winnerPid = $game['winner_pid'];
+            $winScore = $game['winscore'];
+            $lossScore = $game['lossscore'];
+
             // Create game link
             $gameLink = "modules.php?name=OneOnOneGame&amp;gameid={$gameId}";
-            
+
             // Create opponent link if we have a player ID
-            $opponentLink = $winnerPid 
+            /** @var string $opponentLink */
+            $opponentLink = $winnerPid !== null
                 ? "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$winnerPid}\" style=\"font-family: inherit; font-size: inherit;\">{$winner}</a>"
                 : $winner;
-            
+
             echo "* lost to {$opponentLink}, {$lossScore}-{$winScore} (<a href=\"{$gameLink}\" style=\"font-family: inherit; font-size: inherit;\">Game #{$gameId}</a>)<br>";
         }
         ?>
@@ -99,6 +105,6 @@ class PlayerOneOnOneView implements PlayerOneOnOneViewInterface
     </tr>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

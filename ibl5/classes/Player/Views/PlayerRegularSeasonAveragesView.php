@@ -74,6 +74,7 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
         <?php
         foreach ($historicalStats as $row) {
             $year = (int)$row['year'];
+            /** @var string $team */
             $team = HtmlSanitizer::safeHtmlOutput($row['team']);
             $teamId = (int)$row['teamid'];
             $gm = (int)$row['games'];
@@ -136,7 +137,7 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
         }
 
         // Career averages row
-        if ($careerAverages) {
+        if ($careerAverages !== null) {
             $carFgp = StatsFormatter::formatPercentageWithDecimals((float)$careerAverages['fgm'], (float)$careerAverages['fga']);
             $carFtp = StatsFormatter::formatPercentageWithDecimals((float)$careerAverages['ftm'], (float)$careerAverages['fta']);
             $carTgp = StatsFormatter::formatPercentageWithDecimals((float)$careerAverages['tgm'], (float)$careerAverages['tga']);
@@ -168,6 +169,6 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
         ?>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

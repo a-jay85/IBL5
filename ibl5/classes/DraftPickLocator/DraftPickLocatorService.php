@@ -11,6 +11,8 @@ use DraftPickLocator\Contracts\DraftPickLocatorRepositoryInterface;
  *
  * Processes draft pick data for display.
  *
+ * @phpstan-import-type TeamWithPicks from Contracts\DraftPickLocatorViewInterface
+ *
  * @see DraftPickLocatorRepositoryInterface For data access
  */
 class DraftPickLocatorService
@@ -30,7 +32,7 @@ class DraftPickLocatorService
     /**
      * Get all teams with their draft picks
      *
-     * @return array Teams with draft pick data
+     * @return list<array{teamId: int, teamCity: string, teamName: string, color1: string, color2: string, picks: list<array{ownerofpick: string, year: int, round: int}>}>
      */
     public function getAllTeamsWithPicks(): array
     {
@@ -42,7 +44,7 @@ class DraftPickLocatorService
             $picks = $this->repository->getDraftPicksForTeam($teamName);
 
             $teamsWithPicks[] = [
-                'teamId' => (int)$team['teamid'],
+                'teamId' => $team['teamid'],
                 'teamCity' => $team['team_city'],
                 'teamName' => $teamName,
                 'color1' => $team['color1'],

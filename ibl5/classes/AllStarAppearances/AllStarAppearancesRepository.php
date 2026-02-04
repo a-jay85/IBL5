@@ -28,6 +28,7 @@ class AllStarAppearancesRepository extends \BaseMysqliRepository implements AllS
             GROUP BY a.name, h.pid
             ORDER BY appearances DESC, a.name ASC";
 
+        /** @var array<int, array{name: string, pid: int|null, appearances: int}> */
         return $this->fetchAll($query);
     }
 }

@@ -83,8 +83,8 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
                     $output .= $this->renderDiagonalCell($isUserTeamRow);
                 } else {
                     $record = $this->service->getRecordFromMatrix($seriesMatrix, $rowTeamId, $colTeamId);
-                    $wins = $record['wins'];
-                    $losses = $record['losses'];
+                    $wins = (int) $record['wins'];
+                    $losses = (int) $record['losses'];
                     $bgColor = $this->service->getRecordBackgroundColor($wins, $losses);
                     $isBold = ($isUserTeamRow || $userTeamId === $colTeamId);
 

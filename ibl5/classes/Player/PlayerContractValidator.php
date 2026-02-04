@@ -22,8 +22,8 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
      */
     public function canRenegotiateContract(PlayerData $playerData): bool
     {
-        $currentYear = $playerData->contractCurrentYear;
-        
+        $currentYear = $playerData->contractCurrentYear ?? 0;
+
         // Check if player was rookie optioned and is currently in the rookie option year
         if ($this->wasRookieOptioned($playerData)) {
             $round = $playerData->draftRound;
@@ -36,16 +36,15 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
                 return false;
             }
         }
-        
+
         // In final year (year 6) or beyond - always eligible
         if ($currentYear >= 6) {
             return true;
         }
-        
+
         // Check if next year has no salary (eligible for renegotiation)
-        // Safe to access: currentYear is 0-5, so nextYear is 1-6 which all exist as properties
-        $nextYearProperty = "contractYear" . ($currentYear + 1) . "Salary";
-        return $playerData->$nextYearProperty === 0;
+        $nextYearSalary = $this->getContractYearSalary($playerData, $currentYear + 1);
+        return $nextYearSalary === 0;
     }
 
     /**
@@ -80,17 +79,17 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
     public function getFinalYearRookieContractSalary(PlayerData $playerData): int
     {
         $round = $playerData->draftRound;
-        
+
         // First round picks have a 3-year contract (cy3 is final year)
         if ($round === 1) {
-            return $playerData->contractYear3Salary;
+            return $playerData->contractYear3Salary ?? 0;
         }
 
         // Second round picks have a 2-year contract (cy2 is final year)
         if ($round === 2) {
-            return $playerData->contractYear2Salary;
+            return $playerData->contractYear2Salary ?? 0;
         }
-        
+
         // Not a draft pick
         return 0;
     }
@@ -131,11 +130,11 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
      */
     public function isPlayerFreeAgent(PlayerData $playerData, \Season $season): bool
     {
-        $yearPlayerIsFreeAgent = $playerData->draftYear 
-            + $playerData->yearsOfExperience 
-            + $playerData->contractTotalYears 
-            - $playerData->contractCurrentYear;
-        
+        $yearPlayerIsFreeAgent = ($playerData->draftYear ?? 0)
+            + ($playerData->yearsOfExperience ?? 0)
+            + ($playerData->contractTotalYears ?? 0)
+            - ($playerData->contractCurrentYear ?? 0);
+
         return $yearPlayerIsFreeAgent === $season->endingYear;
     }
 
@@ -169,12 +168,29 @@ class PlayerContractValidator implements PlayerContractValidatorInterface
      */
     private function isRookieOptionExercised(PlayerData $playerData, int $baseYear, int $optionYear): bool
     {
-        $baseProperty = "contractYear" . $baseYear . "Salary";
-        $optionProperty = "contractYear" . $optionYear . "Salary";
-        
-        $baseSalary = $playerData->$baseProperty;
-        $optionSalary = $playerData->$optionProperty;
-        
+        $baseSalary = $this->getContractYearSalary($playerData, $baseYear);
+        $optionSalary = $this->getContractYearSalary($playerData, $optionYear);
+
         return $optionSalary !== 0 && $baseSalary * 2 === $optionSalary;
+    }
+
+    /**
+     * Get the salary for a specific contract year from PlayerData
+     *
+     * @param PlayerData $playerData The player data
+     * @param int $year Contract year number (1-6)
+     * @return int Salary for the specified year, or 0 if not set
+     */
+    private function getContractYearSalary(PlayerData $playerData, int $year): int
+    {
+        return match ($year) {
+            1 => $playerData->contractYear1Salary ?? 0,
+            2 => $playerData->contractYear2Salary ?? 0,
+            3 => $playerData->contractYear3Salary ?? 0,
+            4 => $playerData->contractYear4Salary ?? 0,
+            5 => $playerData->contractYear5Salary ?? 0,
+            6 => $playerData->contractYear6Salary ?? 0,
+            default => 0,
+        };
     }
 }

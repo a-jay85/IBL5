@@ -291,7 +291,7 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange
         $offerId = 127;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 1001, 'itemtype' => 1, 'from' => 'Rockets', 'to' => 'Mavs']
+            ['itemid' => 1001, 'itemtype' => '1', 'from' => 'Rockets', 'to' => 'Mavs']
         ]);
         $this->mockDb->setMockData([
             ['pos' => 'C', 'name' => 'Hakeem Olajuwon']
@@ -316,7 +316,7 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange
         $offerId = 128;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 1001, 'itemtype' => 1, 'from' => 'Jazz', 'to' => 'Suns']
+            ['itemid' => 1001, 'itemtype' => '1', 'from' => 'Jazz', 'to' => 'Suns']
         ]);
         $this->mockDb->setMockData([
             ['pos' => 'PF', 'name' => 'Karl Malone']

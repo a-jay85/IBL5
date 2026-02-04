@@ -40,9 +40,12 @@ class LeaderboardRepository extends \BaseMysqliRepository implements Leaderboard
 
     /**
      * @see LeaderboardRepositoryInterface::getAllPlayers()
+     *
+     * @return array<int, array{pid: int, name: string}>
      */
     public function getAllPlayers(): array
     {
+        /** @var array<int, array{pid: int, name: string}> */
         return $this->fetchAll(
             "SELECT pid, name FROM ibl_plr",
             ""
@@ -51,6 +54,8 @@ class LeaderboardRepository extends \BaseMysqliRepository implements Leaderboard
 
     /**
      * @see LeaderboardRepositoryInterface::getPlayerStats()
+     *
+     * @return array<int, array<string, mixed>>
      */
     public function getPlayerStats(string $playerName, string $statsTable): array
     {
@@ -65,6 +70,8 @@ class LeaderboardRepository extends \BaseMysqliRepository implements Leaderboard
 
     /**
      * @see LeaderboardRepositoryInterface::getPlayerCareerStats()
+     *
+     * @return array<string, mixed>|null
      */
     public function getPlayerCareerStats(string $playerName): ?array
     {
@@ -85,31 +92,33 @@ class LeaderboardRepository extends \BaseMysqliRepository implements Leaderboard
     {
         $this->validateCareerTable($table);
 
-        $result = $this->execute(
+        $this->execute(
             "DELETE FROM {$table} WHERE name = ?",
             "s",
             $playerName
         );
 
-        return $result !== false;
+        return true;
     }
 
     /**
      * @see LeaderboardRepositoryInterface::insertPlayerCareerTotals()
+     *
+     * @param array<string, string|int|float> $data
      */
     public function insertPlayerCareerTotals(string $table, array $data): bool
     {
         $this->validateCareerTable($table);
 
-        $columns = implode(', ', array_map(fn($col) => "`{$col}`", array_keys($data)));
+        $columns = implode(', ', array_map(fn(string $col): string => "`{$col}`", array_keys($data)));
         $placeholders = implode(', ', array_fill(0, count($data), '?'));
         $types = $this->buildTypeString($data);
 
         $query = "INSERT INTO {$table} ({$columns}) VALUES ({$placeholders})";
 
-        $result = $this->execute($query, $types, ...array_values($data));
+        $this->execute($query, $types, ...array_values($data));
 
-        return $result !== false;
+        return true;
     }
 
     /**
@@ -122,6 +131,8 @@ class LeaderboardRepository extends \BaseMysqliRepository implements Leaderboard
 
     /**
      * @see LeaderboardRepositoryInterface::insertPlayerCareerAvgs()
+     *
+     * @param array<string, string|int|float> $data
      */
     public function insertPlayerCareerAvgs(string $table, array $data): bool
     {
@@ -157,7 +168,7 @@ class LeaderboardRepository extends \BaseMysqliRepository implements Leaderboard
     /**
      * Build mysqli type string from data array
      *
-     * @param array $data Data array
+     * @param array<string, string|int|float> $data Data array
      * @return string Type string (e.g., "issd")
      */
     private function buildTypeString(array $data): string

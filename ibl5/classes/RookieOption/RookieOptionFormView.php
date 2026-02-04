@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RookieOption;
 
+use Player\Player;
 use Utilities\HtmlSanitizer;
 use Player\PlayerImageHelper;
 use RookieOption\Contracts\RookieOptionFormViewInterface;
@@ -16,21 +17,31 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
     /**
      * @see RookieOptionFormViewInterface::renderForm()
      */
-    public function renderForm(object $player, string $teamName, int $rookieOptionValue, ?string $error = null, ?string $result = null, ?string $from = null): string
+    public function renderForm(Player $player, string $teamName, int $rookieOptionValue, ?string $error = null, ?string $result = null, ?string $from = null): string
     {
-        $playerID = (int) $player->playerID;
-        $playerPosition = HtmlSanitizer::safeHtmlOutput($player->position);
-        $playerName = HtmlSanitizer::safeHtmlOutput($player->name);
+        $playerID = $player->playerID ?? 0;
+        /** @var string $playerPosition */
+        $playerPosition = HtmlSanitizer::safeHtmlOutput($player->position ?? '');
+        /** @var string $playerName */
+        $playerName = HtmlSanitizer::safeHtmlOutput($player->name ?? '');
+        /** @var string $teamNameEscaped */
         $teamNameEscaped = HtmlSanitizer::safeHtmlOutput($teamName);
         $playerImageUrl = PlayerImageHelper::getImageUrl($playerID);
-        $fromEscaped = ($from !== null) ? HtmlSanitizer::safeHtmlOutput($from) : '';
+        if ($from !== null) {
+            /** @var string $fromEscaped */
+            $fromEscaped = HtmlSanitizer::safeHtmlOutput($from);
+        } else {
+            $fromEscaped = '';
+        }
 
         ob_start();
 
         // Error banner from PRG redirect
         if ($error !== null) {
+            /** @var string $safeError */
+            $safeError = HtmlSanitizer::safeHtmlOutput($error);
             ?>
-<div class="ibl-alert ibl-alert--error"><?= HtmlSanitizer::safeHtmlOutput($error) ?></div>
+<div class="ibl-alert ibl-alert--error"><?= $safeError ?></div>
             <?php
         }
 
@@ -49,7 +60,7 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
             <div>
                 <div style="margin-bottom: 0.5rem;">
                     <span class="ibl-label">Rookie Option Value:</span>
-                    <strong style="font-weight: bold;"><?= (int) $rookieOptionValue ?></strong>
+                    <strong style="font-weight: bold;"><?= $rookieOptionValue ?></strong>
                 </div>
             </div>
         </div>
@@ -68,14 +79,14 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
         <form name="RookieExtend" method="post" action="modules.php?name=Player&amp;pa=processrookieoption">
             <input type="hidden" name="teamname" value="<?= $teamNameEscaped ?>">
             <input type="hidden" name="playerID" value="<?= $playerID ?>">
-            <input type="hidden" name="rookieOptionValue" value="<?= (int) $rookieOptionValue ?>">
+            <input type="hidden" name="rookieOptionValue" value="<?= $rookieOptionValue ?>">
             <input type="hidden" name="from" value="<?= $fromEscaped ?>">
             <button type="submit" class="ibl-btn ibl-btn--primary">Exercise Rookie Option</button>
         </form>
     </div>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     private function renderResultBanner(?string $result): string
@@ -94,6 +105,8 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
         }
 
         $banner = $banners[$result];
-        return '<div class="ibl-alert ' . $banner['class'] . '">' . HtmlSanitizer::safeHtmlOutput($banner['message']) . '</div>';
+        /** @var string $safeMessage */
+        $safeMessage = HtmlSanitizer::safeHtmlOutput($banner['message']);
+        return '<div class="ibl-alert ' . $banner['class'] . '">' . $safeMessage . '</div>';
     }
 }

@@ -8,6 +8,9 @@ namespace CareerLeaderboards\Contracts;
  * CareerLeaderboardsServiceInterface - Career Leaderboards business logic
  *
  * Handles data transformation and calculations for career statistics.
+ *
+ * @phpstan-import-type CareerStatsRow from CareerLeaderboardsRepositoryInterface
+ * @phpstan-type FormattedPlayerStats array{pid: int, name: string, games: string|float, minutes: string, fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, reb: string, ast: string, stl: string, tvr: string, blk: string, pf: string, pts: string}
  */
 interface CareerLeaderboardsServiceInterface
 {
@@ -17,15 +20,9 @@ interface CareerLeaderboardsServiceInterface
      * Transforms raw database row into formatted statistics array,
      * with formatting varying based on whether table contains totals or averages.
      *
-     * @param array $row Database row from statistics table
+     * @param CareerStatsRow $row Database row from statistics table
      * @param string $tableType 'totals' or 'averages' to determine formatting
-     * @return array Formatted player statistics with keys:
-     *               - pid (int): Player ID
-     *               - name (string): Player name with '*' suffix if retired
-     *               - games (string|int): Formatted game count
-     *               - minutes, fgm, fga, ftm, fta, tgm, tga (string): Formatted stats
-     *               - fgp, ftp, tgp (string): Formatted percentages
-     *               - orb, reb, ast, stl, tvr, blk, pf, pts (string): Formatted stats
+     * @return FormattedPlayerStats Formatted player statistics
      *
      * **Totals Formatting:**
      * - Uses StatsFormatter::formatTotal() for comma-separated integers
@@ -46,15 +43,7 @@ interface CareerLeaderboardsServiceInterface
      *
      * Returns mapping of database table names to display labels.
      *
-     * @return array Associative array [table_name => display_label]:
-     *               - 'ibl_hist' => 'Regular Season Totals'
-     *               - 'ibl_season_career_avgs' => 'Regular Season Averages'
-     *               - 'ibl_playoff_career_totals' => 'Playoff Totals'
-     *               - 'ibl_playoff_career_avgs' => 'Playoff Averages'
-     *               - 'ibl_heat_career_totals' => 'H.E.A.T. Totals'
-     *               - 'ibl_heat_career_avgs' => 'H.E.A.T. Averages'
-     *               - 'ibl_olympics_career_totals' => 'Olympic Totals'
-     *               - 'ibl_olympics_career_avgs' => 'Olympic Averages'
+     * @return array<string, string> Associative array [table_name => display_label]
      */
     public function getBoardTypes(): array;
 
@@ -63,11 +52,7 @@ interface CareerLeaderboardsServiceInterface
      *
      * Returns mapping of database columns to display labels for sort dropdown.
      *
-     * @return array Associative array [column_name => display_label]:
-     *               - 'pts' => 'Points'
-     *               - 'games' => 'Games'
-     *               - 'minutes' => 'Minutes'
-     *               - etc. (19 total sort options)
+     * @return array<string, string> Associative array [column_name => display_label]
      *
      * **Note:** Percentage columns (fgpct, ftpct, tpct) only work correctly
      * with average tables, not totals tables.

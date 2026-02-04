@@ -13,6 +13,9 @@ use FreeAgencyPreview\Contracts\FreeAgencyPreviewRepositoryInterface;
  * Calculates which players will become free agents at the end of the season.
  *
  * @see FreeAgencyPreviewServiceInterface For the interface contract
+ *
+ * @phpstan-import-type ActivePlayerRow from Contracts\FreeAgencyPreviewRepositoryInterface
+ * @phpstan-import-type FreeAgentRow from Contracts\FreeAgencyPreviewServiceInterface
  */
 class FreeAgencyPreviewService implements FreeAgencyPreviewServiceInterface
 {
@@ -25,58 +28,61 @@ class FreeAgencyPreviewService implements FreeAgencyPreviewServiceInterface
 
     /**
      * @see FreeAgencyPreviewServiceInterface::getUpcomingFreeAgents()
+     *
+     * @return list<FreeAgentRow>
      */
     public function getUpcomingFreeAgents(int $seasonEndingYear): array
     {
         $players = $this->repository->getActivePlayers();
+        /** @var list<FreeAgentRow> $freeAgents */
         $freeAgents = [];
 
         foreach ($players as $player) {
-            $draftyear = (int) ($player['draftyear'] ?? 0);
-            $exp = (int) ($player['exp'] ?? 0);
-            $cy = (int) ($player['cy'] ?? 0);
-            $cyt = (int) ($player['cyt'] ?? 0);
+            $draftyear = $player['draftyear'];
+            $exp = $player['exp'];
+            $cy = $player['cy'];
+            $cyt = $player['cyt'];
 
             // Calculate year of free agency
             $yearOfFreeAgency = $draftyear + $exp + $cyt - $cy;
 
             if ($yearOfFreeAgency === $seasonEndingYear) {
                 $freeAgents[] = [
-                    'pid' => (int) ($player['pid'] ?? 0),
-                    'tid' => (int) ($player['tid'] ?? 0),
-                    'name' => $player['name'] ?? '',
-                    'teamname' => $player['teamname'] ?? '',
+                    'pid' => $player['pid'],
+                    'tid' => $player['tid'],
+                    'name' => $player['name'],
+                    'teamname' => $player['teamname'],
                     'team_city' => $player['team_city'] ?? '',
                     'color1' => $player['color1'] ?? 'FFFFFF',
                     'color2' => $player['color2'] ?? '000000',
-                    'pos' => $player['pos'] ?? '',
-                    'age' => (int) ($player['age'] ?? 0),
-                    'r_fga' => (int) ($player['r_fga'] ?? 0),
-                    'r_fgp' => (int) ($player['r_fgp'] ?? 0),
-                    'r_fta' => (int) ($player['r_fta'] ?? 0),
-                    'r_ftp' => (int) ($player['r_ftp'] ?? 0),
-                    'r_tga' => (int) ($player['r_tga'] ?? 0),
-                    'r_tgp' => (int) ($player['r_tgp'] ?? 0),
-                    'r_orb' => (int) ($player['r_orb'] ?? 0),
-                    'r_drb' => (int) ($player['r_drb'] ?? 0),
-                    'r_ast' => (int) ($player['r_ast'] ?? 0),
-                    'r_stl' => (int) ($player['r_stl'] ?? 0),
-                    'r_blk' => (int) ($player['r_blk'] ?? 0),
-                    'r_to' => (int) ($player['r_to'] ?? 0),
-                    'r_foul' => (int) ($player['r_foul'] ?? 0),
-                    'oo' => (int) ($player['oo'] ?? 0),
-                    'do' => (int) ($player['do'] ?? 0),
-                    'po' => (int) ($player['po'] ?? 0),
-                    'to' => (int) ($player['to'] ?? 0),
-                    'od' => (int) ($player['od'] ?? 0),
-                    'dd' => (int) ($player['dd'] ?? 0),
-                    'pd' => (int) ($player['pd'] ?? 0),
-                    'td' => (int) ($player['td'] ?? 0),
-                    'loyalty' => (int) ($player['loyalty'] ?? 0),
-                    'winner' => (int) ($player['winner'] ?? 0),
-                    'playingTime' => (int) ($player['playingTime'] ?? 0),
-                    'security' => (int) ($player['security'] ?? 0),
-                    'tradition' => (int) ($player['tradition'] ?? 0),
+                    'pos' => $player['pos'],
+                    'age' => $player['age'],
+                    'r_fga' => $player['r_fga'],
+                    'r_fgp' => $player['r_fgp'],
+                    'r_fta' => $player['r_fta'],
+                    'r_ftp' => $player['r_ftp'],
+                    'r_tga' => $player['r_tga'],
+                    'r_tgp' => $player['r_tgp'],
+                    'r_orb' => $player['r_orb'],
+                    'r_drb' => $player['r_drb'],
+                    'r_ast' => $player['r_ast'],
+                    'r_stl' => $player['r_stl'],
+                    'r_blk' => $player['r_blk'],
+                    'r_to' => $player['r_to'],
+                    'r_foul' => $player['r_foul'],
+                    'oo' => $player['oo'],
+                    'do' => $player['do'],
+                    'po' => $player['po'],
+                    'to' => $player['to'],
+                    'od' => $player['od'],
+                    'dd' => $player['dd'],
+                    'pd' => $player['pd'],
+                    'td' => $player['td'],
+                    'loyalty' => $player['loyalty'],
+                    'winner' => $player['winner'],
+                    'playingTime' => $player['playingTime'],
+                    'security' => $player['security'],
+                    'tradition' => $player['tradition'],
                 ];
             }
         }

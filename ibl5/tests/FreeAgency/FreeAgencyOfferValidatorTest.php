@@ -230,8 +230,8 @@ class FreeAgencyOfferValidatorTest extends TestCase
     {
         // Arrange
         $mockTeam = (object)[
-            'hasMLE' => "0", // Team has already used MLE
-            'hasLLE' => "1"
+            'hasMLE' => 0, // Team has already used MLE
+            'hasLLE' => 1
         ];
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
@@ -254,8 +254,8 @@ class FreeAgencyOfferValidatorTest extends TestCase
     {
         // Arrange
         $mockTeam = (object)[
-            'hasMLE' => "1",
-            'hasLLE' => "0" // Team has already used LLE
+            'hasMLE' => 1,
+            'hasLLE' => 0 // Team has already used LLE
         ];
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
@@ -278,8 +278,8 @@ class FreeAgencyOfferValidatorTest extends TestCase
     {
         // Arrange
         $mockTeam = (object)[
-            'hasMLE' => "1", // Team has MLE available
-            'hasLLE' => "1"
+            'hasMLE' => 1, // Team has MLE available
+            'hasLLE' => 1
         ];
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
@@ -300,8 +300,8 @@ class FreeAgencyOfferValidatorTest extends TestCase
     {
         // Arrange
         $mockTeam = (object)[
-            'hasMLE' => "1",
-            'hasLLE' => "1" // Team has LLE available
+            'hasMLE' => 1,
+            'hasLLE' => 1 // Team has LLE available
         ];
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();
@@ -340,8 +340,8 @@ class FreeAgencyOfferValidatorTest extends TestCase
     {
         // Arrange
         $mockTeam = (object)[
-            'hasMLE' => "0", // Team out of MLE
-            'hasLLE' => "1"
+            'hasMLE' => 0, // Team out of MLE
+            'hasLLE' => 1
         ];
         $validator = new FreeAgencyOfferValidator($mockTeam);
         $offerData = $this->createValidOffer();

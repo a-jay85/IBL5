@@ -9,6 +9,8 @@ use TransactionHistory\Contracts\TransactionHistoryRepositoryInterface;
 /**
  * Repository for querying transaction history from nuke_stories.
  *
+ * @phpstan-import-type TransactionRow from \TransactionHistory\Contracts\TransactionHistoryViewInterface
+ *
  * @see TransactionHistoryRepositoryInterface
  */
 class TransactionHistoryRepository extends \BaseMysqliRepository implements TransactionHistoryRepositoryInterface
@@ -28,7 +30,9 @@ class TransactionHistoryRepository extends \BaseMysqliRepository implements Tran
 
         $years = [];
         foreach ($rows as $row) {
-            $years[] = (int) $row['year'];
+            /** @var int|string $yearValue */
+            $yearValue = $row['year'];
+            $years[] = (int) $yearValue;
         }
 
         return $years;
@@ -64,6 +68,7 @@ class TransactionHistoryRepository extends \BaseMysqliRepository implements Tran
         $whereClause = implode(' AND ', $conditions);
         $query = "SELECT sid, catid, title, time FROM nuke_stories WHERE {$whereClause} ORDER BY time DESC LIMIT 500";
 
+        /** @var array<int, array{sid: string, catid: string, title: string, time: string}> */
         return $this->fetchAll($query, $types, ...$params);
     }
 }

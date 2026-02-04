@@ -8,10 +8,10 @@ use SeriesRecords\Contracts\SeriesRecordsServiceInterface;
 
 /**
  * SeriesRecordsService - Business logic for series records
- * 
+ *
  * Handles transformation of raw series records data into structured formats
  * and provides logic for determining record status for display styling.
- * 
+ *
  * @see SeriesRecordsServiceInterface
  */
 class SeriesRecordsService implements SeriesRecordsServiceInterface
@@ -27,22 +27,25 @@ class SeriesRecordsService implements SeriesRecordsServiceInterface
 
     /**
      * @see SeriesRecordsServiceInterface::buildSeriesMatrix()
+     *
+     * @param list<array{self: int, opponent: int, wins: int, losses: int}> $seriesRecords
+     * @return array<int, array<int, array{wins: int, losses: int}>>
      */
     public function buildSeriesMatrix(array $seriesRecords): array
     {
         $matrix = [];
 
         foreach ($seriesRecords as $record) {
-            $self = (int) $record['self'];
-            $opponent = (int) $record['opponent'];
+            $self = $record['self'];
+            $opponent = $record['opponent'];
 
             if (!isset($matrix[$self])) {
                 $matrix[$self] = [];
             }
 
             $matrix[$self][$opponent] = [
-                'wins' => (int) $record['wins'],
-                'losses' => (int) $record['losses'],
+                'wins' => $record['wins'],
+                'losses' => $record['losses'],
             ];
         }
 
@@ -78,11 +81,11 @@ class SeriesRecordsService implements SeriesRecordsServiceInterface
 
     /**
      * Get the record for a specific matchup from the matrix
-     * 
-     * @param array<int, array<int, array<string, int>>> $matrix Series matrix
+     *
+     * @param array<int, array<int, array{wins: int, losses: int}>> $matrix Series matrix
      * @param int $selfTeamId Team ID for the "self" team
      * @param int $opponentTeamId Team ID for the opponent team
-     * @return array<string, int> Array with 'wins' and 'losses' keys
+     * @return array{wins: int, losses: int} Array with 'wins' and 'losses' keys
      */
     public function getRecordFromMatrix(array $matrix, int $selfTeamId, int $opponentTeamId): array
     {

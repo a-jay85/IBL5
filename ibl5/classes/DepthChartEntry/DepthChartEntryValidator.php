@@ -7,14 +7,19 @@ namespace DepthChartEntry;
 use DepthChartEntry\Contracts\DepthChartEntryValidatorInterface;
 
 /**
+ * @phpstan-import-type ProcessedSubmission from Contracts\DepthChartEntryProcessorInterface
+ * @phpstan-import-type ValidationError from Contracts\DepthChartEntryValidatorInterface
+ *
  * @see DepthChartEntryValidatorInterface
  */
 class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
 {
-    private $errors = [];
+    /** @var list<ValidationError> */
+    private array $errors = [];
     
     /**
      * @see DepthChartEntryValidatorInterface::validate()
+     * @param ProcessedSubmission $depthChartData
      */
     public function validate(array $depthChartData, string $phase): bool
     {
@@ -48,7 +53,7 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
             $depthChartData['nameOfProblemStarter'] ?? ''
         );
         
-        return empty($this->errors);
+        return $this->errors === [];
     }
     
     private function validateActivePlayerCount(int $activePlayers, int $min, int $max): void
@@ -94,6 +99,7 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
     
     /**
      * @see DepthChartEntryValidatorInterface::getErrors()
+     * @return list<ValidationError>
      */
     public function getErrors(): array
     {

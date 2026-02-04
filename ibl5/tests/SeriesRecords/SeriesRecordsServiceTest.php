@@ -64,10 +64,10 @@ class SeriesRecordsServiceTest extends TestCase
         $this->assertEquals(['wins' => 12, 'losses' => 3], $result[2][3]);
     }
 
-    public function testBuildSeriesMatrixConvertsTypesToInt(): void
+    public function testBuildSeriesMatrixPreservesIntTypes(): void
     {
         $records = [
-            ['self' => '1', 'opponent' => '2', 'wins' => '10', 'losses' => '5'],
+            ['self' => 1, 'opponent' => 2, 'wins' => 10, 'losses' => 5],
         ];
 
         $result = $this->service->buildSeriesMatrix($records);

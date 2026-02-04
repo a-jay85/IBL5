@@ -9,10 +9,12 @@ use Utilities\HtmlSanitizer;
 
 /**
  * SeriesRecordsView - View rendering for series records
- * 
+ *
  * Handles all HTML generation for the series records grid table display.
  * Uses HtmlSanitizer for XSS protection on all output.
- * 
+ *
+ * @phpstan-import-type SeriesTeamRow from Contracts\SeriesRecordsRepositoryInterface
+ *
  * @see SeriesRecordsViewInterface
  */
 class SeriesRecordsView implements SeriesRecordsViewInterface
@@ -26,6 +28,9 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
 
     /**
      * @see SeriesRecordsViewInterface::renderSeriesRecordsTable()
+     *
+     * @param list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string}> $teams
+     * @param array<int, array<int, array{wins: int, losses: int}>> $seriesMatrix
      */
     public function renderSeriesRecordsTable(
         array $teams,
@@ -55,13 +60,13 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
             $team = $teams[$teamIndex] ?? null;
 
             // Skip if team data doesn't match expected team ID
-            if ($team && (int) $team['teamid'] !== $rowTeamId) {
+            if ($team !== null && $team['teamid'] !== $rowTeamId) {
                 // Team ID mismatch - might be skipped team, output empty row
                 $output .= $this->renderEmptyRow($rowTeamId, $numTeams, $userTeamId);
                 continue;
             }
 
-            if (!$team) {
+            if ($team === null) {
                 $output .= $this->renderEmptyRow($rowTeamId, $numTeams, $userTeamId);
                 continue;
             }
@@ -102,18 +107,24 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
      */
     public function renderHeaderCell(int $teamId): string
     {
+        /** @var string $safeTeamId */
         $safeTeamId = HtmlSanitizer::safeHtmlOutput((string)$teamId);
         return '<th class="text-center"><img src="images/logo/new' . $safeTeamId . '.png" width="50" height="50" alt="Team ' . $safeTeamId . ' logo"></th>';
     }
 
     /**
      * @see SeriesRecordsViewInterface::renderTeamNameCell()
+     *
+     * @param array{teamid: int, team_city: string, team_name: string, color1: string, color2: string} $team
      */
     public function renderTeamNameCell(array $team, bool $isUserTeam): string
     {
-        $teamId = HtmlSanitizer::safeHtmlOutput((string)$team['teamid']);
+        $teamId = $team['teamid'];
+        /** @var string $color1 */
         $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
+        /** @var string $color2 */
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
+        /** @var string $name */
         $name = HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
         $boldOpen = $isUserTeam ? '<strong>' : '';
@@ -131,8 +142,11 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
      */
     public function renderRecordCell(int $wins, int $losses, string $backgroundColor, bool $isBold): string
     {
+        /** @var string $safeWins */
         $safeWins = HtmlSanitizer::safeHtmlOutput((string)$wins);
+        /** @var string $safeLosses */
         $safeLosses = HtmlSanitizer::safeHtmlOutput((string)$losses);
+        /** @var string $safeBgColor */
         $safeBgColor = HtmlSanitizer::safeHtmlOutput($backgroundColor);
 
         $boldOpen = $isBold ? '<strong>' : '';
@@ -156,7 +170,7 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
 
     /**
      * Render an empty row for missing team data
-     * 
+     *
      * @param int $teamId The team ID for this row
      * @param int $numTeams Total number of teams
      * @param int $userTeamId The user's team ID for highlighting

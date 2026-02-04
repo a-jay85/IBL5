@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace NextSim;
 
+use NextSim\Contracts\NextSimServiceInterface;
 use NextSim\Contracts\NextSimViewInterface;
 use Utilities\HtmlSanitizer;
 
@@ -11,6 +12,8 @@ use Utilities\HtmlSanitizer;
  * NextSimView - HTML rendering for next simulation games
  *
  * Generates HTML display for upcoming games and matchups.
+ *
+ * @phpstan-import-type NextSimGameData from NextSimServiceInterface
  *
  * @see NextSimViewInterface For the interface contract
  */
@@ -36,6 +39,8 @@ class NextSimView implements NextSimViewInterface
 
     /**
      * @see NextSimViewInterface::render()
+     *
+     * @param array<int, NextSimGameData> $games Processed game data
      */
     public function render(array $games, int $simLengthInDays): string
     {
@@ -43,7 +48,7 @@ class NextSimView implements NextSimViewInterface
         $html .= '<div class="next-sim-container">';
         $html .= '<h2 class="ibl-title">Next Sim</h1>';
 
-        if (empty($games)) {
+        if ($games === []) {
             $html .= '<div class="next-sim-empty">No games projected next sim!</div></div>';
             return $html;
         }
@@ -62,21 +67,24 @@ class NextSimView implements NextSimViewInterface
     /**
      * Render a single game row
      *
-     * @param array $gameData Game data
+     * @param NextSimGameData $gameData Game data
      * @return string HTML for game row
      */
     private function renderGameRow(array $gameData): string
     {
-        /** @var \Game $game */
         $game = $gameData['game'];
-        /** @var \Team $opposingTeam */
         $opposingTeam = $gameData['opposingTeam'];
 
-        $dayLabel = 'Day ' . HtmlSanitizer::safeHtmlOutput($gameData['dayNumber']) . ' ' .
-            HtmlSanitizer::safeHtmlOutput($gameData['locationPrefix']);
+        /** @var string $dayNumberSafe */
+        $dayNumberSafe = HtmlSanitizer::safeHtmlOutput((string)$gameData['dayNumber']);
+        /** @var string $locationPrefixSafe */
+        $locationPrefixSafe = HtmlSanitizer::safeHtmlOutput($gameData['locationPrefix']);
+        $dayLabel = 'Day ' . $dayNumberSafe . ' ' . $locationPrefixSafe;
+        /** @var string $gameDate */
         $gameDate = HtmlSanitizer::safeHtmlOutput($game->date);
-        $opposingTeamId = (int)$opposingTeam->teamID;
-        $seasonRecord = HtmlSanitizer::safeHtmlOutput($opposingTeam->seasonRecord);
+        $opposingTeamId = $opposingTeam->teamID;
+        /** @var string $seasonRecord */
+        $seasonRecord = HtmlSanitizer::safeHtmlOutput($opposingTeam->seasonRecord ?? '');
 
         $html = '<div class="next-sim-day-game">';
         $html .= '<div class="next-sim-day-row">';
@@ -89,11 +97,13 @@ class NextSimView implements NextSimViewInterface
         $html .= '</div>';
         $html .= '<div class="next-sim-record"><h2>' . $seasonRecord . '</h2></div>';
         $html .= '</div>';
-        
+
         // Render matchup ratings
         $html .= '<div>';
         $matchupPlayers = $this->prepareMatchupPlayers($gameData);
-        $html .= \UI::ratings($this->db, $matchupPlayers, $opposingTeam, '', $this->season, $this->moduleName);
+        /** @var \mysqli $db */
+        $db = $this->db;
+        $html .= \UI::ratings($db, $matchupPlayers, $opposingTeam, '', $this->season, $this->moduleName);
         $html .= '</div>';
         $html .= '</div>';
 
@@ -105,22 +115,23 @@ class NextSimView implements NextSimViewInterface
      *
      * Formats players as: Opponent PG, User PG, Opponent SG, User SG, etc.
      *
-     * @param array $gameData Game data containing starting lineups
-     * @return array Alternating opponent and user starters
+     * @param array<string, mixed> $gameData Game data containing starting lineups
+     * @return array<int, \Player\Player> Alternating opponent and user starters
      */
     private function prepareMatchupPlayers(array $gameData): array
     {
         $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+        /** @var array<int, \Player\Player> $matchupPlayers */
         $matchupPlayers = [];
 
         foreach ($positions as $position) {
             $userKey = 'userStarting' . $position;
             $oppKey = 'opposingStarting' . $position;
 
-            if (isset($gameData[$oppKey])) {
+            if (isset($gameData[$oppKey]) && $gameData[$oppKey] instanceof \Player\Player) {
                 $matchupPlayers[] = $gameData[$oppKey];
             }
-            if (isset($gameData[$userKey])) {
+            if (isset($gameData[$userKey]) && $gameData[$userKey] instanceof \Player\Player) {
                 $matchupPlayers[] = $gameData[$userKey];
             }
         }

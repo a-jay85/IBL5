@@ -34,6 +34,7 @@ class InjuryDaysLabel
             return (string) $daysRemaining;
         }
 
+        /** @var string $safeReturnDate */
         $safeReturnDate = HtmlSanitizer::safeHtmlOutput($returnDate);
 
         return '<span class="injury-days-tooltip" title="Returns: '

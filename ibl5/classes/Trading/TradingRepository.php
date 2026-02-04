@@ -9,12 +9,24 @@ use Trading\Contracts\TradingRepositoryInterface;
 
 /**
  * TradingRepository - Database operations for trading system
- * 
+ *
  * Extends BaseMysqliRepository for standardized prepared statement handling.
  * Centralizes all database queries for the Trading module.
- * 
+ *
  * @see TradingRepositoryInterface For method contracts
  * @see BaseMysqliRepository For base class documentation and error codes
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type TradeValidationRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TeamNameRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TeamWithCityRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type CashTransactionData from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type CashPlayerData from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradeAutocounterRow from \Trading\Contracts\TradingRepositoryInterface
  */
 class TradingRepository extends BaseMysqliRepository implements TradingRepositoryInterface
 {
@@ -37,6 +49,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getPlayerForTradeValidation(int $playerId): ?array
     {
+        /** @var TradeValidationRow|null */
         return $this->fetchOne(
             "SELECT ordinal, cy FROM ibl_plr WHERE pid = ?",
             "i",
@@ -49,6 +62,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getAllTeams(): array
     {
+        /** @var list<TeamNameRow> */
         return $this->fetchAll(
             "SELECT team_name FROM ibl_team_info ORDER BY team_name"
         );
@@ -59,6 +73,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getTradeRows(): array
     {
+        /** @var list<TradeInfoRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_trade_info"
         );
@@ -69,6 +84,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getCashDetails(string $teamName, int $row): ?array
     {
+        /** @var TradeCashRow|null */
         return $this->fetchOne(
             "SELECT * FROM ibl_trade_cash WHERE teamname = ? AND row = ?",
             "si",
@@ -82,6 +98,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getTradePlayers(string $teamName, int $row): array
     {
+        /** @var list<array<string, mixed>> */
         return $this->fetchAll(
             "SELECT * FROM ibl_trade_players WHERE teamname = ? AND row = ?",
             "si",
@@ -95,6 +112,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getTradePicks(string $teamName, int $row): array
     {
+        /** @var list<array<string, mixed>> */
         return $this->fetchAll(
             "SELECT * FROM ibl_trade_picks WHERE teamname = ? AND row = ?",
             "si",
@@ -243,6 +261,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getTradesByOfferId(int $offerId): array
     {
+        /** @var list<TradeInfoRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_trade_info WHERE tradeofferid = ?",
             "i",
@@ -255,6 +274,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getCashTransactionByOffer(int $offerId, string $sendingTeam): ?array
     {
+        /** @var TradeCashRow|null */
         return $this->fetchOne(
             "SELECT * FROM ibl_trade_cash WHERE tradeOfferID = ? AND sendingTeam = ?",
             "is",
@@ -268,6 +288,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getDraftPickById(int $pickId): ?array
     {
+        /** @var DraftPickRow|null */
         return $this->fetchOne(
             "SELECT * FROM ibl_draft_picks WHERE pickid = ?",
             "i",
@@ -280,6 +301,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getPlayerById(int $playerId): ?array
     {
+        /** @var PlayerRow|null */
         return $this->fetchOne(
             "SELECT * FROM ibl_plr WHERE pid = ?",
             "i",
@@ -355,16 +377,20 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getLastInsertId(): int
     {
-        return $this->db->insert_id;
+        /** @var \mysqli $db */
+        $db = $this->db;
+        $insertId = $db->insert_id;
+        return is_int($insertId) ? $insertId : (int) $insertId;
     }
 
     /**
      * Get the current trade autocounter value
-     * 
-     * @return array|null Row with 'counter' column, or null if no rows
+     *
+     * @return TradeAutocounterRow|null Row with 'counter' column, or null if no rows
      */
     public function getTradeAutocounter(): ?array
     {
+        /** @var TradeAutocounterRow|null */
         return $this->fetchOne(
             "SELECT counter FROM ibl_trade_autocounter ORDER BY counter DESC LIMIT 1"
         );
@@ -387,8 +413,8 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
 
     /**
      * Insert a cash player record (positive or negative cash transaction)
-     * 
-     * @param array $data Associative array with keys: ordinal, pid, name, tid, teamname, exp, cy, cyt, cy1-cy6, retired
+     *
+     * @param CashPlayerData $data Associative array with keys: ordinal, pid, name, tid, teamname, exp, cy, cyt, cy1-cy6, retired
      * @return int Number of affected rows
      */
     public function insertCashPlayerRecord(array $data): int
@@ -452,10 +478,11 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     /**
      * Get all teams with city, name, colors and ID for trading UI
      *
-     * @return array Array of team rows ordered by city
+     * @return list<TeamWithCityRow> Team rows ordered by city
      */
     public function getAllTeamsWithCity(): array
     {
+        /** @var list<TeamWithCityRow> */
         return $this->fetchAll(
             "SELECT teamid, team_name, team_city, color1, color2 FROM ibl_team_info ORDER BY team_city ASC"
         );
@@ -466,6 +493,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getTeamPlayersForTrading(int $teamId): array
     {
+        /** @var list<TradingPlayerRow> */
         return $this->fetchAll(
             "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
              FROM ibl_plr
@@ -481,6 +509,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getTeamDraftPicksForTrading(string $teamName): array
     {
+        /** @var list<DraftPickRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_draft_picks
              WHERE ownerofpick = ?
@@ -495,6 +524,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getAllTradeOffers(): array
     {
+        /** @var list<TradeInfoRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_trade_info ORDER BY tradeofferid ASC"
         );

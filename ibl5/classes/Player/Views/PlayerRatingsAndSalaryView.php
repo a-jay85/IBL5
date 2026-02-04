@@ -75,28 +75,29 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
     </tr>
         <?php
         foreach ($historicalStats as $row) {
-            $year = (int)$row['year'];
-            $r_2ga = (int)$row['r_2ga'];
-            $r_2gp = (int)$row['r_2gp'];
-            $r_fta = (int)$row['r_fta'];
-            $r_ftp = (int)$row['r_ftp'];
-            $r_3ga = (int)$row['r_3ga'];
-            $r_3gp = (int)$row['r_3gp'];
-            $r_orb = (int)$row['r_orb'];
-            $r_drb = (int)$row['r_drb'];
-            $r_ast = (int)$row['r_ast'];
-            $r_stl = (int)$row['r_stl'];
-            $r_blk = (int)$row['r_blk'];
-            $r_tvr = (int)$row['r_tvr'];
-            $r_oo = (int)$row['r_oo'];
-            $r_do = (int)$row['r_do'];
-            $r_po = (int)$row['r_po'];
-            $r_to = (int)$row['r_to'];
-            $r_od = (int)$row['r_od'];
-            $r_dd = (int)$row['r_dd'];
-            $r_pd = (int)$row['r_pd'];
-            $r_td = (int)$row['r_td'];
-            $salary = (int)$row['salary'];
+            /** @var array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, r_2ga: int, r_2gp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_oo: int, r_do: int, r_po: int, r_to: int, r_od: int, r_dd: int, r_pd: int, r_td: int, salary: int} $row */
+            $year = $row['year'];
+            $r_2ga = $row['r_2ga'];
+            $r_2gp = $row['r_2gp'];
+            $r_fta = $row['r_fta'];
+            $r_ftp = $row['r_ftp'];
+            $r_3ga = $row['r_3ga'];
+            $r_3gp = $row['r_3gp'];
+            $r_orb = $row['r_orb'];
+            $r_drb = $row['r_drb'];
+            $r_ast = $row['r_ast'];
+            $r_stl = $row['r_stl'];
+            $r_blk = $row['r_blk'];
+            $r_tvr = $row['r_tvr'];
+            $r_oo = $row['r_oo'];
+            $r_do = $row['r_do'];
+            $r_po = $row['r_po'];
+            $r_to = $row['r_to'];
+            $r_od = $row['r_od'];
+            $r_dd = $row['r_dd'];
+            $r_pd = $row['r_pd'];
+            $r_td = $row['r_td'];
+            $salary = $row['salary'];
 
             $r_Off = $r_oo + $r_do + $r_po + $r_to;
             $r_Def = $r_od + $r_dd + $r_pd + $r_td;
@@ -139,6 +140,6 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
     </tr>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

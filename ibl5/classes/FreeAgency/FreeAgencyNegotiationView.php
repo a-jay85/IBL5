@@ -10,6 +10,9 @@ use Player\PlayerImageHelper;
 
 /**
  * @see FreeAgencyNegotiationViewInterface
+ *
+ * @phpstan-type CapMetrics array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}
+ * @phpstan-type NegotiationData array{player: Player, capMetrics: CapMetrics, demands: array<string, int>, existingOffer: array<string, int>, amendedCapSpace: int, hasExistingOffer: bool, veteranMinimum: int, maxContract: int, team: \Team}
  */
 class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
 {
@@ -22,6 +25,8 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
 
     /**
      * @see FreeAgencyNegotiationViewInterface::render()
+     *
+     * @param NegotiationData $negotiationData
      */
     public function render(array $negotiationData, ?string $error = null): string
     {
@@ -41,8 +46,10 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
 
         // Error banner from PRG redirect
         if ($error !== null) {
+            /** @var string $sanitizedError */
+            $sanitizedError = \Utilities\HtmlSanitizer::safeHtmlOutput($error);
             ?>
-<div class="ibl-alert ibl-alert--error"><?= \Utilities\HtmlSanitizer::safeHtmlOutput($error) ?></div>
+<div class="ibl-alert ibl-alert--error"><?= $sanitizedError ?></div>
             <?php
         }
 
@@ -51,18 +58,18 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
             ?>
 <div class="ibl-alert ibl-alert--warning">Sorry, you have no roster spots remaining and cannot offer a contract to this player.</div>
             <?php
-            return ob_get_clean();
+            return (string) ob_get_clean();
         }
 
         // Card 1: Player Info
         ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
-        <h2 class="ibl-card__title"><?= htmlspecialchars($player->position) ?> <?= htmlspecialchars($player->name) ?> - Contract Negotiation</h2>
+        <h2 class="ibl-card__title"><?= htmlspecialchars($player->position ?? '') ?> <?= htmlspecialchars($player->name ?? '') ?> - Contract Negotiation</h2>
     </div>
     <div class="ibl-card__body">
         <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
-            <img src="<?= htmlspecialchars(PlayerImageHelper::getImageUrl($player->playerID)) ?>" alt="<?= htmlspecialchars($player->name) ?>" style="max-width: 120px; border-radius: 0.375rem;">
+            <img src="<?= htmlspecialchars(PlayerImageHelper::getImageUrl($player->playerID)) ?>" alt="<?= htmlspecialchars($player->name ?? '') ?>" style="max-width: 120px; border-radius: 0.375rem;">
             <?= $this->formComponents->renderPlayerRatings() ?>
         </div>
     </div>
@@ -109,7 +116,7 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
 </div>
 
 <?php // Card 4: Notes & Reminders ?>
-<?= $this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capMetrics, $player->birdYears) ?>
+<?= $this->renderNotesReminders($maxContract, $veteranMinimum, $amendedCapSpace, $capMetrics, $player->birdYears ?? 0) ?>
 
 <?php // Delete Offer (conditional) ?>
 <?php if ($hasExistingOffer): ?>
@@ -122,7 +129,7 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
 </div>
 <?php endif; ?>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -134,8 +141,8 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
     private function renderOfferButtons(Player $player): string
     {
         // Calculate max contract salary and raises based on bird years
-        $maxContract = \ContractRules::getMaxContractSalary($player->yearsOfExperience);
-        $raisePercentage = \ContractRules::getMaxRaisePercentage($player->birdYears);
+        $maxContract = \ContractRules::getMaxContractSalary($player->yearsOfExperience ?? 0);
+        $raisePercentage = \ContractRules::getMaxRaisePercentage($player->birdYears ?? 0);
         $maxRaise = (int) round($maxContract * $raisePercentage);
 
         $maxSalaries = [
@@ -148,11 +155,11 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
         ];
 
         ob_start();
-        echo $this->formComponents->renderMaxContractButtons($maxSalaries, $player->birdYears);
+        echo $this->formComponents->renderMaxContractButtons($maxSalaries, $player->birdYears ?? 0);
         echo $this->formComponents->renderExceptionButtons('MLE');
         echo $this->formComponents->renderExceptionButtons('LLE');
         echo $this->formComponents->renderExceptionButtons('VET');
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -161,7 +168,7 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
      * @param int $maxContract Maximum contract value
      * @param int $veteranMinimum Veteran minimum salary
      * @param int $amendedCapSpace Amended cap space for year 1
-     * @param array<string, mixed> $capMetrics Cap space data
+     * @param CapMetrics $capMetrics Cap space data
      * @param int $birdYears Bird rights years
      * @return string HTML card
      */
@@ -196,22 +203,22 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
     </div>
     <div class="ibl-card__body">
         <ul style="margin: 0; padding-left: 1.25rem; line-height: 1.75;">
-            <li>The maximum contract permitted for this player (based on years of service) starts at <?= (int) $maxContract ?> in Year 1.</li>
-            <li>You have <strong><?= (int) $amendedCapSpace ?></strong> in <strong>soft cap</strong> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>
+            <li>The maximum contract permitted for this player (based on years of service) starts at <?= $maxContract ?> in Year 1.</li>
+            <li>You have <strong><?= $amendedCapSpace ?></strong> in <strong>soft cap</strong> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>
             <?php for ($year = 1; $year < 6; $year++): ?>
-            <li>You have <strong><?= (int) $softCapSpace[$year] ?></strong> in <strong>soft cap</strong> space available; the amount you offer in year <?= $year + 1 ?> cannot exceed this unless you are using one of the exceptions.</li>
+            <li>You have <strong><?= $softCapSpace[$year] ?></strong> in <strong>soft cap</strong> space available; the amount you offer in year <?= $year + 1 ?> cannot exceed this unless you are using one of the exceptions.</li>
             <?php endfor; ?>
             <?php for ($year = 0; $year < 6; $year++): ?>
-            <li>You have <strong><?= (int) $hardCapSpace[$year] ?></strong> in <strong>hard cap</strong> space available; the amount you offer in year <?= $year + 1 ?> cannot exceed this.</li>
+            <li>You have <strong><?= $hardCapSpace[$year] ?></strong> in <strong>hard cap</strong> space available; the amount you offer in year <?= $year + 1 ?> cannot exceed this.</li>
             <?php endfor; ?>
             <li>Enter "0" for years you do not want to offer a contract.</li>
             <li>The amounts offered each year must equal or exceed the previous year.</li>
-            <li>The first year of the contract must be at least the veteran's minimum (<?= (int) $veteranMinimum ?> for this player).</li>
+            <li>The first year of the contract must be at least the veteran's minimum (<?= $veteranMinimum ?> for this player).</li>
             <li><?= $birdRightsText ?></li>
         </ul>
     </div>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

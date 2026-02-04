@@ -13,6 +13,21 @@ use Search\Contracts\SearchServiceInterface;
  * Uses prepared statements for all database queries. Handles filtering
  * by topic, category, author, and date range for story searches.
  *
+ * @phpstan-import-type StorySearchResult from Contracts\SearchServiceInterface
+ * @phpstan-import-type CommentSearchResult from Contracts\SearchServiceInterface
+ * @phpstan-import-type UserSearchResult from Contracts\SearchServiceInterface
+ * @phpstan-import-type TopicRow from Contracts\SearchServiceInterface
+ * @phpstan-import-type CategoryRow from Contracts\SearchServiceInterface
+ * @phpstan-import-type TopicInfoRow from Contracts\SearchServiceInterface
+ *
+ * @phpstan-type StoryDbRow array{sid: int, aid: string, informant: string, title: string, time: string, hometext: string, bodytext: string, comments: int, topic: int, topictext: string|null}
+ * @phpstan-type CommentDbRow array{tid: int, sid: int, subject: string, date: string, name: string, article_title: string|null, reply_count: int}
+ * @phpstan-type UserDbRow array{user_id: int, username: string, name: string}
+ * @phpstan-type TopicDbRow array{topicid: int, topictext: string}
+ * @phpstan-type CategoryDbRow array{catid: int, title: string}
+ * @phpstan-type AuthorDbRow array{aid: string}
+ * @phpstan-type TopicInfoDbRow array{topicimage: string, topictext: string}
+ *
  * @see SearchServiceInterface
  */
 class SearchService extends BaseMysqliRepository implements SearchServiceInterface
@@ -37,6 +52,7 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
 
     /**
      * @see SearchServiceInterface::searchStories()
+     * @return StorySearchResult
      */
     public function searchStories(
         string $query,
@@ -92,6 +108,7 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
         $params[] = $offset;
         $params[] = $limit + 1;
 
+        /** @var list<StoryDbRow> $rows */
         $rows = $this->fetchAll($sql, $types, ...$params);
         $hasMore = count($rows) > $limit;
 
@@ -102,14 +119,14 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
         $results = [];
         foreach ($rows as $row) {
             $results[] = [
-                'sid' => (int) $row['sid'],
-                'aid' => (string) $row['aid'],
-                'informant' => (string) $row['informant'],
-                'title' => (string) $row['title'],
-                'time' => (string) $row['time'],
-                'comments' => (int) $row['comments'],
-                'topicId' => (int) $row['topic'],
-                'topicText' => (string) ($row['topictext'] ?? ''),
+                'sid' => $row['sid'],
+                'aid' => $row['aid'],
+                'informant' => $row['informant'],
+                'title' => $row['title'],
+                'time' => $row['time'],
+                'comments' => $row['comments'],
+                'topicId' => $row['topic'],
+                'topicText' => $row['topictext'] ?? '',
             ];
         }
 
@@ -118,6 +135,7 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
 
     /**
      * @see SearchServiceInterface::searchComments()
+     * @return CommentSearchResult
      */
     public function searchComments(string $query, int $offset = 0, int $limit = 10): array
     {
@@ -135,6 +153,7 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
                 ORDER BY c.date DESC
                 LIMIT ?, ?";
 
+        /** @var list<CommentDbRow> $rows */
         $rows = $this->fetchAll($sql, 'ssii', $likeQuery, $likeQuery, $offset, $limit + 1);
         $hasMore = count($rows) > $limit;
 
@@ -145,13 +164,13 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
         $results = [];
         foreach ($rows as $row) {
             $results[] = [
-                'tid' => (int) $row['tid'],
-                'sid' => (int) $row['sid'],
-                'subject' => (string) $row['subject'],
-                'date' => (string) $row['date'],
-                'name' => (string) $row['name'],
-                'articleTitle' => (string) ($row['article_title'] ?? ''),
-                'replyCount' => (int) $row['reply_count'],
+                'tid' => $row['tid'],
+                'sid' => $row['sid'],
+                'subject' => $row['subject'],
+                'date' => $row['date'],
+                'name' => $row['name'],
+                'articleTitle' => $row['article_title'] ?? '',
+                'replyCount' => $row['reply_count'],
             ];
         }
 
@@ -160,6 +179,7 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
 
     /**
      * @see SearchServiceInterface::searchUsers()
+     * @return UserSearchResult
      */
     public function searchUsers(string $query, int $offset = 0, int $limit = 10): array
     {
@@ -174,6 +194,7 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
                 ORDER BY username ASC
                 LIMIT ?, ?";
 
+        /** @var list<UserDbRow> $rows */
         $rows = $this->fetchAll($sql, 'sssii', $likeQuery, $likeQuery, $likeQuery, $offset, $limit + 1);
         $hasMore = count($rows) > $limit;
 
@@ -184,9 +205,9 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
         $results = [];
         foreach ($rows as $row) {
             $results[] = [
-                'userId' => (int) $row['user_id'],
-                'username' => (string) $row['username'],
-                'name' => (string) $row['name'],
+                'userId' => $row['user_id'],
+                'username' => $row['username'],
+                'name' => $row['name'],
             ];
         }
 
@@ -195,9 +216,11 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
 
     /**
      * @see SearchServiceInterface::getTopics()
+     * @return list<TopicRow>
      */
     public function getTopics(): array
     {
+        /** @var list<TopicDbRow> $rows */
         $rows = $this->fetchAll(
             "SELECT topicid, topictext FROM {$this->prefix}_topics ORDER BY topictext"
         );
@@ -205,8 +228,8 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
         $topics = [];
         foreach ($rows as $row) {
             $topics[] = [
-                'topicId' => (int) $row['topicid'],
-                'topicText' => (string) $row['topictext'],
+                'topicId' => $row['topicid'],
+                'topicText' => $row['topictext'],
             ];
         }
 
@@ -215,9 +238,11 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
 
     /**
      * @see SearchServiceInterface::getCategories()
+     * @return list<CategoryRow>
      */
     public function getCategories(): array
     {
+        /** @var list<CategoryDbRow> $rows */
         $rows = $this->fetchAll(
             "SELECT catid, title FROM {$this->prefix}_stories_cat ORDER BY title"
         );
@@ -225,8 +250,8 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
         $categories = [];
         foreach ($rows as $row) {
             $categories[] = [
-                'catId' => (int) $row['catid'],
-                'title' => (string) $row['title'],
+                'catId' => $row['catid'],
+                'title' => $row['title'],
             ];
         }
 
@@ -238,13 +263,14 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
      */
     public function getAuthors(): array
     {
+        /** @var list<AuthorDbRow> $rows */
         $rows = $this->fetchAll(
             "SELECT aid FROM {$this->prefix}_authors ORDER BY aid"
         );
 
         $authors = [];
         foreach ($rows as $row) {
-            $authors[] = (string) $row['aid'];
+            $authors[] = $row['aid'];
         }
 
         return $authors;
@@ -252,9 +278,11 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
 
     /**
      * @see SearchServiceInterface::getTopicInfo()
+     * @return TopicInfoRow|null
      */
     public function getTopicInfo(int $topicId): ?array
     {
+        /** @var TopicInfoDbRow|null $row */
         $row = $this->fetchOne(
             "SELECT topicimage, topictext FROM {$this->prefix}_topics WHERE topicid = ?",
             'i',
@@ -266,8 +294,8 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
         }
 
         return [
-            'topicImage' => (string) $row['topicimage'],
-            'topicText' => (string) $row['topictext'],
+            'topicImage' => $row['topicimage'],
+            'topicText' => $row['topictext'],
         ];
     }
 

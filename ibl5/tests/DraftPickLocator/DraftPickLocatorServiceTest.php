@@ -85,7 +85,7 @@ class DraftPickLocatorServiceTest extends TestCase
     public function testGetAllTeamsWithPicksConvertsTeamIdToInt(): void
     {
         $teams = [
-            ['teamid' => '5', 'team_city' => 'Test', 'team_name' => 'Test Team', 'color1' => '000', 'color2' => 'FFF'],
+            ['teamid' => 5, 'team_city' => 'Test', 'team_name' => 'Test Team', 'color1' => '000', 'color2' => 'FFF'],
         ];
 
         $this->mockRepository->method('getAllTeams')->willReturn($teams);
@@ -94,7 +94,7 @@ class DraftPickLocatorServiceTest extends TestCase
         $result = $this->service->getAllTeamsWithPicks();
 
         $this->assertIsInt($result[0]['teamId']);
-        $this->assertEquals(5, $result[0]['teamId']);
+        $this->assertSame(5, $result[0]['teamId']);
     }
 
     public function testGetAllTeamsWithPicksCallsRepositoryForEachTeam(): void

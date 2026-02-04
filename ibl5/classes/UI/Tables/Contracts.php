@@ -9,16 +9,19 @@ use Player\PlayerImageHelper;
 
 /**
  * Contracts - Displays team contracts table
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class Contracts
 {
     /**
      * Render the contracts table
      *
-     * @param object $db Database connection
-     * @param iterable $result Player result set
-     * @param object $team Team object
-     * @param object $sharedFunctions Shared functions object
+     * @param \mysqli $db Database connection
+     * @param iterable<int, array<string, mixed>> $result Player result set
+     * @param \Team $team Team object
+     * @param \Shared $sharedFunctions Shared functions object
+     * @param list<int> $starterPids Starter player IDs
      * @return string HTML table
      */
     public static function render($db, $result, $team, $sharedFunctions, array $starterPids = []): string
@@ -30,23 +33,37 @@ class Contracts
         }
 
         $cap1 = $cap2 = $cap3 = $cap4 = $cap5 = $cap6 = 0;
+        /** @var list<array{player: Player, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}> $playerRows */
         $playerRows = [];
 
         foreach ($result as $plrRow) {
+            /** @var PlayerRow $plrRow */
             $player = Player::withPlrRow($db, $plrRow);
 
             // Calculate contract year offset based on free agency status
             $yearOffset = ($sharedFunctions->isFreeAgencyModuleActive() === 0) ? 0 : 1;
 
+            // Build salary lookup from explicit properties
+            $salaryByYear = [
+                1 => $player->contractYear1Salary ?? 0,
+                2 => $player->contractYear2Salary ?? 0,
+                3 => $player->contractYear3Salary ?? 0,
+                4 => $player->contractYear4Salary ?? 0,
+                5 => $player->contractYear5Salary ?? 0,
+                6 => $player->contractYear6Salary ?? 0,
+            ];
+
             // Calculate contract values for each year
+            /** @var array<int, int> $contracts */
             $contracts = [];
             for ($y = 1; $y <= 6; $y++) {
-                $yearNum = $player->contractCurrentYear + ($y - 1) + $yearOffset;
+                $contractCurrentYear = $player->contractCurrentYear ?? 0;
+                $yearNum = $contractCurrentYear + ($y - 1) + $yearOffset;
                 if ($yearNum < 7) {
-                    if ($player->contractCurrentYear === 0) {
-                        $contracts[$y] = $player->{'contractYear' . $y . 'Salary'};
+                    if ($contractCurrentYear === 0) {
+                        $contracts[$y] = $salaryByYear[$y];
                     } else {
-                        $contracts[$y] = $player->{'contractYear' . $yearNum . 'Salary'};
+                        $contracts[$y] = $salaryByYear[$yearNum] ?? 0;
                     }
                 } else {
                     $contracts[$y] = 0;
@@ -105,18 +122,18 @@ class Contracts
     $player = $row['player'];
 ?>
         <tr>
-            <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
-            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName, $starterPids) ?>
+            <td style="text-align: center;"><?= htmlspecialchars($player->position ?? '') ?></td>
+            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids) ?>
             <td style="text-align: center;"><?= (int)$player->age ?></td>
             <td style="text-align: center;"><?= (int)$player->yearsOfExperience ?></td>
             <td style="text-align: center;"><?= (int)$player->birdYears ?></td>
             <td class="sep-team"></td>
-            <td class="salary"><?= (int)$row['con1'] ?></td>
-            <td class="salary"><?= (int)$row['con2'] ?></td>
-            <td class="salary"><?= (int)$row['con3'] ?></td>
-            <td class="salary"><?= (int)$row['con4'] ?></td>
-            <td class="salary"><?= (int)$row['con5'] ?></td>
-            <td class="salary"><?= (int)$row['con6'] ?></td>
+            <td class="salary"><?= $row['con1'] ?></td>
+            <td class="salary"><?= $row['con2'] ?></td>
+            <td class="salary"><?= $row['con3'] ?></td>
+            <td class="salary"><?= $row['con4'] ?></td>
+            <td class="salary"><?= $row['con5'] ?></td>
+            <td class="salary"><?= $row['con6'] ?></td>
             <td class="sep-team"></td>
             <td style="text-align: center;"><?= (int)$player->ratingTalent ?></td>
             <td style="text-align: center;"><?= (int)$player->ratingSkill ?></td>
@@ -138,12 +155,12 @@ class Contracts
             <td></td>
             <td></td>
             <td class="sep-team"></td>
-            <td class="salary"><?= (int)$cap1 ?></td>
-            <td class="salary"><?= (int)$cap2 ?></td>
-            <td class="salary"><?= (int)$cap3 ?></td>
-            <td class="salary"><?= (int)$cap4 ?></td>
-            <td class="salary"><?= (int)$cap5 ?></td>
-            <td class="salary"><?= (int)$cap6 ?></td>
+            <td class="salary"><?= $cap1 ?></td>
+            <td class="salary"><?= $cap2 ?></td>
+            <td class="salary"><?= $cap3 ?></td>
+            <td class="salary"><?= $cap4 ?></td>
+            <td class="salary"><?= $cap5 ?></td>
+            <td class="salary"><?= $cap6 ?></td>
             <td class="sep-team"></td>
             <td></td>
             <td></td>
@@ -163,6 +180,6 @@ class Contracts
     </tfoot>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

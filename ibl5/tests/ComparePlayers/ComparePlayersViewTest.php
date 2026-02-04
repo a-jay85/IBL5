@@ -262,6 +262,7 @@ class ComparePlayersViewTest extends TestCase
     {
         return [
             'pid' => 1,
+            'tid' => 1,
             'name' => 'Test Player',
             'pos' => 'PG',
             'age' => 25,

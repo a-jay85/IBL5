@@ -22,8 +22,8 @@ class PlayerTradingCardBackView
 {
     /**
      * Get scoped custom styles for trading card back with team colors
-     * 
-     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
+     *
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string HTML style tag with scoped CSS
      */
     public static function getStyles(?array $colorScheme = null): string
@@ -31,10 +31,10 @@ class PlayerTradingCardBackView
         if ($colorScheme === null) {
             $colorScheme = TeamColorHelper::getDefaultColorScheme();
         }
-        
+
         // Get shared base styles from CardBaseStyles
         $baseStyles = CardBaseStyles::getStyles($colorScheme);
-        
+
         // Add back-card-specific styles only
         $borderRgb = $colorScheme['border_rgb'];
         $accent = $colorScheme['accent'];
@@ -146,7 +146,7 @@ HTML;
         ?\mysqli $db = null
     ): string {
         // Get color scheme and prepare player data using shared helpers
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, (int)$player->teamID);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->teamID ?? 0);
         $playerData = CardBaseStyles::preparePlayerData($player, $playerID);
 
         ob_start();
@@ -228,7 +228,7 @@ HTML;
     </div>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -241,10 +241,10 @@ HTML;
         ?int $playoffSeasonValue,
         ?int $playoffCareerValue
     ): string {
-        $regSeason = HtmlSanitizer::safeHtmlOutput((string)($regSeasonValue ?? 0));
-        $regCareer = HtmlSanitizer::safeHtmlOutput((string)($regCareerValue ?? 0));
-        $playoffSeason = HtmlSanitizer::safeHtmlOutput((string)($playoffSeasonValue ?? 0));
-        $playoffCareer = HtmlSanitizer::safeHtmlOutput((string)($playoffCareerValue ?? 0));
+        $regSeason = (string) ($regSeasonValue ?? 0);
+        $regCareer = (string) ($regCareerValue ?? 0);
+        $playoffSeason = (string) ($playoffSeasonValue ?? 0);
+        $playoffCareer = (string) ($playoffCareerValue ?? 0);
         
         return <<<HTML
 <tr>
@@ -262,7 +262,8 @@ HTML;
      */
     private static function renderAllStarPill(string $label, int $value): string
     {
-        $safeValue = HtmlSanitizer::safeHtmlOutput((string)$value);
+        $safeValue = (string) $value;
+        /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
         
         return <<<HTML

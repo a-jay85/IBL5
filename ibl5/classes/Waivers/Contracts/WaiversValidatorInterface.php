@@ -18,7 +18,7 @@ interface WaiversValidatorInterface
     /**
      * Gets validation errors from the last validation operation
      * 
-     * @return array Array of error message strings (empty if validation passed)
+     * @return array<int, string> Array of error message strings (empty if validation passed)
      * 
      * **Usage:**
      * ```php

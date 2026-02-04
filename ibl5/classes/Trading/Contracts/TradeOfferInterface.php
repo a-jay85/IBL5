@@ -20,7 +20,7 @@ interface TradeOfferInterface
      * Validates trade data, checks salary caps, inserts trade records,
      * and sends notifications to the receiving team.
      *
-     * @param array{offeringTeam: string, listeningTeam: string, switchCounter: int, fieldsCounter: int, check: array, index: array, type: array, contract: array, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>} $tradeData
+     * @param array{offeringTeam: string, listeningTeam: string, switchCounter: int, fieldsCounter: int, check: array<int, string|null>, index: array<int, string>, type: array<int, string>, contract: array<int, string>, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>} $tradeData
      *        Trade data from form submission containing:
      *        - 'offeringTeam': string - Name of team making offer
      *        - 'listeningTeam': string - Name of team receiving offer
@@ -32,7 +32,7 @@ interface TradeOfferInterface
      *        - 'contract': array - Contract amounts for salary calc
      *        - 'userSendsCash': array - Cash amounts user sends (indexed 1-6)
      *        - 'partnerSendsCash': array - Cash amounts partner sends (indexed 1-6)
-     * @return array{success: bool, error?: string, errors?: array<string>, capData?: array, tradeText?: string, tradeOfferId?: int}
+     * @return array{success: bool, error?: string, errors?: array<string>, capData?: array{valid: bool, errors: array<string>, userPostTradeCapTotal: int, partnerPostTradeCapTotal: int}, tradeText?: string, tradeOfferId?: int}
      *         Result:
      *         - 'success': bool - Whether offer was created successfully
      *         - 'error': string - Error message if validation failed

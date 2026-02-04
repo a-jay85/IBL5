@@ -8,6 +8,8 @@ namespace SeasonHighs\Contracts;
  * Repository interface for Season Highs module.
  *
  * Provides method to retrieve season high stats from box scores.
+ *
+ * @phpstan-import-type SeasonHighEntry from SeasonHighsServiceInterface
  */
 interface SeasonHighsRepositoryInterface
 {
@@ -20,7 +22,7 @@ interface SeasonHighsRepositoryInterface
      * @param string $startDate Start date for the query (YYYY-MM-DD)
      * @param string $endDate End date for the query (YYYY-MM-DD)
      * @param int $limit Number of results to return
-     * @return array<int, array{name: string, date: string, value: int}> Array of season highs
+     * @return list<SeasonHighEntry> Array of season highs
      */
     public function getSeasonHighs(
         string $statExpression,

@@ -15,6 +15,16 @@ namespace TeamOffDefStats\Contracts;
  * Uses Statistics\StatsFormatter for consistent formatting.
  *
  * @see \TeamOffDefStats\TeamOffDefStatsService for implementation
+ *
+ * @phpstan-import-type AllTeamStatsRow from TeamOffDefStatsRepositoryInterface
+ *
+ * @phpstan-type RawStatValues array{fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}
+ * @phpstan-type FormattedStatTotals array{games: string, fgm: string, fga: string, ftm: string, fta: string, tgm: string, tga: string, orb: string, reb: string, ast: string, stl: string, tvr: string, blk: string, pf: string, pts: string}
+ * @phpstan-type FormattedStatAverages array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, reb: string, ast: string, stl: string, tvr: string, blk: string, pf: string, pts: string}
+ * @phpstan-type DifferentialStats array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, reb: string, ast: string, stl: string, tvr: string, blk: string, pf: string, pts: string}
+ * @phpstan-type ProcessedTeamStats array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: FormattedStatTotals, offense_averages: FormattedStatAverages, defense_totals: FormattedStatTotals, defense_averages: FormattedStatAverages, raw_offense: RawStatValues, raw_defense: RawStatValues, offense_games: int, defense_games: int}
+ * @phpstan-type LeagueTotals array{totals: FormattedStatTotals, averages: FormattedStatAverages, games: int}
+ * @phpstan-type DifferentialTeam array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: DifferentialStats}
  */
 interface TeamOffDefStatsServiceInterface
 {
@@ -27,20 +37,8 @@ interface TeamOffDefStatsServiceInterface
      * - Shooting percentages using StatsFormatter::formatPercentage()
      * - Formatted totals using StatsFormatter::formatTotal()
      *
-     * @param array $rawStats Raw statistics from repository
-     * @return array<int, array{
-     *     teamid: int,
-     *     team_city: string,
-     *     team_name: string,
-     *     color1: string,
-     *     color2: string,
-     *     offense_totals: array<string, string>,
-     *     offense_averages: array<string, string>,
-     *     defense_totals: array<string, string>,
-     *     defense_averages: array<string, string>,
-     *     raw_offense: array<string, int|float>,
-     *     raw_defense: array<string, int|float>
-     * }> Processed team statistics
+     * @param list<AllTeamStatsRow> $rawStats Raw statistics from repository
+     * @return list<ProcessedTeamStats> Processed team statistics
      */
     public function processTeamStats(array $rawStats): array;
 
@@ -50,12 +48,8 @@ interface TeamOffDefStatsServiceInterface
      * Sums all team offense statistics and calculates league-wide averages.
      * Uses the same formatting as individual team stats for consistency.
      *
-     * @param array $processedStats Processed team statistics from processTeamStats()
-     * @return array{
-     *     totals: array<string, string>,
-     *     averages: array<string, string>,
-     *     games: int
-     * } League totals and averages
+     * @param list<ProcessedTeamStats> $processedStats Processed team statistics from processTeamStats()
+     * @return LeagueTotals League totals and averages
      */
     public function calculateLeagueTotals(array $processedStats): array;
 
@@ -65,15 +59,8 @@ interface TeamOffDefStatsServiceInterface
      * Subtracts defense per-game values from offense per-game values.
      * Positive values indicate offensive strength, negative indicate weakness.
      *
-     * @param array $processedStats Processed team statistics from processTeamStats()
-     * @return array<int, array{
-     *     teamid: int,
-     *     team_city: string,
-     *     team_name: string,
-     *     color1: string,
-     *     color2: string,
-     *     differentials: array<string, string>
-     * }> Differential data for each team
+     * @param list<ProcessedTeamStats> $processedStats Processed team statistics from processTeamStats()
+     * @return list<DifferentialTeam> Differential data for each team
      */
     public function calculateDifferentials(array $processedStats): array;
 }

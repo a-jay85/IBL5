@@ -29,7 +29,7 @@ class DateParser
         int $endingYear,
         string $league = 'IBL'
     ): ?array {
-        if (empty($rawDate)) {
+        if ($rawDate === '') {
             return null;
         }
 

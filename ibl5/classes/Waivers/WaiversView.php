@@ -13,6 +13,8 @@ class WaiversView implements WaiversViewInterface
 {
     /**
      * @see WaiversViewInterface::renderWaiverForm()
+     *
+     * @param array<int, string> $players
      */
     public function renderWaiverForm(
         string $teamName,
@@ -24,7 +26,9 @@ class WaiversView implements WaiversViewInterface
         ?string $result = null,
         ?string $error = null
     ): void {
+        /** @var string $teamNameEscaped */
         $teamNameEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($teamName);
+        /** @var string $actionEscaped */
         $actionEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($action);
 
         ob_start();
@@ -60,13 +64,18 @@ class WaiversView implements WaiversViewInterface
             </div>
         </form>
         <?php
-        echo ob_get_clean();
+        $output = ob_get_clean();
+        if ($output !== false) {
+            echo $output;
+        }
     }
 
     private function renderResultBanner(?string $result, ?string $error): string
     {
         if ($error !== null) {
-            return '<div class="ibl-alert ibl-alert--error">' . \Utilities\HtmlSanitizer::safeHtmlOutput($error) . '</div>';
+            /** @var string $errorEscaped */
+            $errorEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($error);
+            return '<div class="ibl-alert ibl-alert--error">' . $errorEscaped . '</div>';
         }
 
         if ($result === null) {
@@ -83,7 +92,9 @@ class WaiversView implements WaiversViewInterface
         }
 
         $banner = $banners[$result];
-        return '<div class="ibl-alert ' . $banner['class'] . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($banner['message']) . '</div>';
+        /** @var string $messageEscaped */
+        $messageEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($banner['message']);
+        return '<div class="ibl-alert ' . $banner['class'] . '">' . $messageEscaped . '</div>';
     }
     
     /**
@@ -95,16 +106,19 @@ class WaiversView implements WaiversViewInterface
         string $contract,
         string $waitTime = ''
     ): string {
+        /** @var string $playerNameEscaped */
         $playerNameEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($playerName);
+        /** @var string $contractEscaped */
         $contractEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($contract);
+        /** @var string $waitTimeEscaped */
         $waitTimeEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($waitTime);
-        
-        $displayText = "$playerNameEscaped $contractEscaped";
-        if ($waitTime) {
-            $displayText .= " $waitTimeEscaped";
+
+        $displayText = "{$playerNameEscaped} {$contractEscaped}";
+        if ($waitTime !== '') {
+            $displayText .= " {$waitTimeEscaped}";
         }
-        
-        return "<option value=\"$playerID\">$displayText</option>";
+
+        return "<option value=\"{$playerID}\">{$displayText}</option>";
     }
     
     /**
@@ -113,7 +127,9 @@ class WaiversView implements WaiversViewInterface
     public function renderNotLoggedIn(string $message): void
     {
         \Nuke\Header::header();
-        echo '<div class="text-center"><strong class="ibl-title">' . \Utilities\HtmlSanitizer::safeHtmlOutput($message) . '</strong></div>';
+        /** @var string $messageEscaped */
+        $messageEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($message);
+        echo '<div class="text-center"><strong class="ibl-title">' . $messageEscaped . '</strong></div>';
         loginbox();
         \Nuke\Footer::footer();
     }

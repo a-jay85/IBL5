@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\RookieOption;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
+use Player\Player;
 use RookieOption\RookieOptionFormView;
 
 /**
  * Tests for RookieOptionFormView
  */
+#[AllowMockObjectsWithoutExpectations]
 class RookieOptionFormViewTest extends TestCase
 {
     private RookieOptionFormView $view;
@@ -20,14 +23,24 @@ class RookieOptionFormViewTest extends TestCase
     }
 
     /**
+     * Create a mock Player with the given properties.
+     */
+    private function createPlayerMock(int $playerID = 123, string $position = 'PG', string $name = 'Test Player'): Player
+    {
+        $mockPlayer = $this->createMock(Player::class);
+        $mockPlayer->playerID = $playerID;
+        $mockPlayer->position = $position;
+        $mockPlayer->name = $name;
+
+        return $mockPlayer;
+    }
+
+    /**
      * Test rendering form returns string with proper HTML escaping
      */
     public function testRenderFormReturnsStringWithEscapedHtml(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
@@ -46,10 +59,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormEscapesMaliciousHtml(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = '<script>alert("xss")</script>';
+        $mockPlayer = $this->createPlayerMock(123, 'PG', '<script>alert("xss")</script>');
 
         $output = $this->view->renderForm($mockPlayer, '<script>bad</script>', 500);
 
@@ -63,10 +73,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormUsesDesignSystemClasses(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
@@ -82,10 +89,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormHasNoDeprecatedHtml(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
@@ -100,10 +104,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormActionUsesModuleHandler(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
@@ -116,10 +117,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormIncludesWarningCard(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
@@ -133,10 +131,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormShowsErrorBanner(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500, 'Something went wrong');
 
@@ -149,10 +144,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormErrorBannerEscapesHtml(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500, '<script>xss</script>');
 
@@ -165,10 +157,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormShowsSuccessBanner(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500, null, 'rookie_option_success');
 
@@ -181,10 +170,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormShowsEmailFailedBanner(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500, null, 'email_failed');
 
@@ -197,10 +183,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormNoBannerWithoutParams(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
@@ -214,10 +197,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormUnknownResultNoBanner(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500, null, 'unknown_result');
 
@@ -231,10 +211,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormUsesFlexLayout(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
@@ -247,10 +224,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormIncludesFromField(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500, null, null, 'fa');
 
@@ -263,10 +237,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormIncludesEmptyFromFieldWhenNull(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
@@ -278,10 +249,7 @@ class RookieOptionFormViewTest extends TestCase
      */
     public function testRenderFormFromFieldEscapesHtml(): void
     {
-        $mockPlayer = new \stdClass();
-        $mockPlayer->playerID = 123;
-        $mockPlayer->position = 'PG';
-        $mockPlayer->name = 'Test Player';
+        $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500, null, null, '<script>xss</script>');
 

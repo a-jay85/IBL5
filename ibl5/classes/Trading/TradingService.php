@@ -98,8 +98,12 @@ class TradingService implements TradingServiceInterface
         $userTeam = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
         $userTeamId = $this->commonRepository->getTidFromTeamname($userTeam) ?? 0;
 
+        /** @var \mysqli $mysqliDb */
+        $mysqliDb = $this->mysqli_db;
+        $season = new \Season($mysqliDb);
+
         $allTradeRows = $this->repository->getAllTradeOffers();
-        $tradeOffers = $this->groupTradeOffers($allTradeRows, $userTeam);
+        $tradeOffers = $this->groupTradeOffers($allTradeRows, $userTeam, $season->endingYear);
 
         // Get teams for the team selection sidebar
         $allTeams = $this->repository->getAllTeamsWithCity();
@@ -161,9 +165,10 @@ class TradingService implements TradingServiceInterface
      *
      * @param list<TradeInfoRow> $allTradeRows Raw trade info rows
      * @param string $userTeam Current user's team name
+     * @param int $seasonEndingYear Season ending year for cash season labels
      * @return array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>}> Grouped trade offers with resolved item descriptions
      */
-    private function groupTradeOffers(array $allTradeRows, string $userTeam): array
+    private function groupTradeOffers(array $allTradeRows, string $userTeam, int $seasonEndingYear): array
     {
         $tradeOffers = [];
 
@@ -191,34 +196,33 @@ class TradingService implements TradingServiceInterface
                 ];
             }
 
-            $tradeOffers[$offerId]['items'][] = $this->resolveTradeItem(
-                $itemId,
-                $itemType,
-                $from,
-                $to,
-                $offerId
-            );
+            if ($itemType === 'cash') {
+                $cashItems = $this->resolveCashItems($from, $to, $offerId, $seasonEndingYear);
+                array_push($tradeOffers[$offerId]['items'], ...$cashItems);
+            } else {
+                $tradeOffers[$offerId]['items'][] = $this->resolveTradeItem(
+                    $itemId,
+                    $itemType,
+                    $from,
+                    $to
+                );
+            }
         }
 
         return $tradeOffers;
     }
 
     /**
-     * Resolve a trade item into a displayable description
+     * Resolve a non-cash trade item into a displayable description
      *
      * @param int $itemId Item ID
-     * @param string $itemType Item type ('cash', '0' for pick, '1' for player)
+     * @param string $itemType Item type ('0' for pick, '1' for player)
      * @param string $from Sending team
      * @param string $to Receiving team
-     * @param int $offerId Trade offer ID
      * @return array{type: string, description: string, notes: string|null, from: string, to: string}
      */
-    private function resolveTradeItem(int $itemId, string $itemType, string $from, string $to, int $offerId): array
+    private function resolveTradeItem(int $itemId, string $itemType, string $from, string $to): array
     {
-        if ($itemType === 'cash') {
-            return $this->resolveCashItem($from, $to, $offerId);
-        }
-
         if ($itemType === '0') {
             return $this->resolvePickItem($itemId, $from, $to);
         }
@@ -228,40 +232,38 @@ class TradingService implements TradingServiceInterface
     }
 
     /**
-     * Resolve a cash trade item
+     * Resolve a cash trade item into per-year line items with season labels
      *
-     * @return array{type: string, description: string, notes: string|null, from: string, to: string}
+     * @return list<array{type: string, description: string, notes: string|null, from: string, to: string}>
      */
-    private function resolveCashItem(string $from, string $to, int $offerId): array
+    private function resolveCashItems(string $from, string $to, int $offerId, int $seasonEndingYear): array
     {
         $cashDetails = $this->repository->getCashTransactionByOffer($offerId, $from);
-        $cashAmounts = [];
+        $items = [];
 
         if ($cashDetails !== null) {
-            $cyValues = [
-                $cashDetails['cy1'],
-                $cashDetails['cy2'],
-                $cashDetails['cy3'],
-                $cashDetails['cy4'],
-                $cashDetails['cy5'],
-                $cashDetails['cy6'],
-            ];
-            foreach ($cyValues as $cyValue) {
-                if ($cyValue !== null && $cyValue > 0) {
-                    $cashAmounts[] = $cyValue;
+            for ($y = 1; $y <= 6; $y++) {
+                $cyKey = "cy{$y}";
+                $amount = $cashDetails[$cyKey];
+                if ($amount === null || $amount <= 0) {
+                    continue;
                 }
+
+                $startYear = $seasonEndingYear - 2 + $y;
+                $endYear = $seasonEndingYear - 1 + $y;
+                $yearLabel = "{$startYear}-{$endYear}";
+
+                $items[] = [
+                    'type' => 'cash',
+                    'description' => "The {$from} send {$amount} in cash to the {$to} for {$yearLabel}.",
+                    'notes' => null,
+                    'from' => $from,
+                    'to' => $to,
+                ];
             }
         }
 
-        $cashStr = implode(', ', $cashAmounts);
-
-        return [
-            'type' => 'cash',
-            'description' => "The {$from} send {$cashStr} in cash to the {$to}.",
-            'notes' => null,
-            'from' => $from,
-            'to' => $to,
-        ];
+        return $items;
     }
 
     /**

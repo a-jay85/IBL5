@@ -270,6 +270,169 @@ class TradingServiceTest extends TestCase
     }
 
     // ============================================
+    // CASH RESOLUTION TESTS (per-year lines)
+    // ============================================
+
+    public function testCashWithMultipleYearsProducesMultipleItems(): void
+    {
+        $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
+
+        $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $mockCommon->method('getTidFromTeamname')->willReturn(1);
+        $mockRepo->method('getAllTradeOffers')->willReturn([
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+        ]);
+        $mockRepo->method('getCashTransactionByOffer')->willReturn([
+            'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
+            'cy1' => 100, 'cy2' => 200, 'cy3' => 150, 'cy4' => null, 'cy5' => null, 'cy6' => null,
+        ]);
+        $mockRepo->method('getAllTeamsWithCity')->willReturn([]);
+
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $result = $service->getTradeReviewPageData('testuser');
+
+        $items = $result['tradeOffers'][1]['items'];
+        $this->assertCount(3, $items);
+        $this->assertSame('cash', $items[0]['type']);
+        $this->assertSame('cash', $items[1]['type']);
+        $this->assertSame('cash', $items[2]['type']);
+    }
+
+    public function testCashZeroAmountYearsAreOmitted(): void
+    {
+        $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
+
+        $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $mockCommon->method('getTidFromTeamname')->willReturn(1);
+        $mockRepo->method('getAllTradeOffers')->willReturn([
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+        ]);
+        $mockRepo->method('getCashTransactionByOffer')->willReturn([
+            'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
+            'cy1' => 0, 'cy2' => 200, 'cy3' => 0, 'cy4' => 0, 'cy5' => 300, 'cy6' => 0,
+        ]);
+        $mockRepo->method('getAllTeamsWithCity')->willReturn([]);
+
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $result = $service->getTradeReviewPageData('testuser');
+
+        $items = $result['tradeOffers'][1]['items'];
+        $this->assertCount(2, $items);
+        $this->assertStringContainsString('200', $items[0]['description']);
+        $this->assertStringContainsString('300', $items[1]['description']);
+    }
+
+    public function testCashYearLabelsAreCorrectlyComputed(): void
+    {
+        $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
+
+        $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $mockCommon->method('getTidFromTeamname')->willReturn(1);
+        $mockRepo->method('getAllTradeOffers')->willReturn([
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+        ]);
+        $mockRepo->method('getCashTransactionByOffer')->willReturn([
+            'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
+            'cy1' => 100, 'cy2' => 200, 'cy3' => 0, 'cy4' => 150, 'cy5' => null, 'cy6' => null,
+        ]);
+        $mockRepo->method('getAllTeamsWithCity')->willReturn([]);
+
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $result = $service->getTradeReviewPageData('testuser');
+
+        $items = $result['tradeOffers'][1]['items'];
+        $this->assertCount(3, $items);
+
+        // Extract year labels from descriptions using regex
+        $yearPattern = '/for (\d+)-(\d+)\.$/';
+
+        $this->assertSame(1, preg_match($yearPattern, $items[0]['description'], $m1));
+        $this->assertSame(1, preg_match($yearPattern, $items[1]['description'], $m2));
+        $this->assertSame(1, preg_match($yearPattern, $items[2]['description'], $m3));
+
+        // Each label spans exactly one year
+        $this->assertSame((int) $m1[1] + 1, (int) $m1[2]);
+        $this->assertSame((int) $m2[1] + 1, (int) $m2[2]);
+        $this->assertSame((int) $m3[1] + 1, (int) $m3[2]);
+
+        // cy2 label is 1 year after cy1, cy4 label is 3 years after cy1
+        $this->assertSame((int) $m1[1] + 1, (int) $m2[1]);
+        $this->assertSame((int) $m1[1] + 3, (int) $m3[1]);
+    }
+
+    public function testCashAllZeroProducesNoItems(): void
+    {
+        $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
+
+        $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $mockCommon->method('getTidFromTeamname')->willReturn(1);
+        $mockRepo->method('getAllTradeOffers')->willReturn([
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+        ]);
+        $mockRepo->method('getCashTransactionByOffer')->willReturn([
+            'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
+            'cy1' => 0, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0,
+        ]);
+        $mockRepo->method('getAllTeamsWithCity')->willReturn([]);
+
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $result = $service->getTradeReviewPageData('testuser');
+
+        $items = $result['tradeOffers'][1]['items'];
+        $this->assertCount(0, $items);
+    }
+
+    public function testCashNullDetailsProducesNoItems(): void
+    {
+        $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
+
+        $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $mockCommon->method('getTidFromTeamname')->willReturn(1);
+        $mockRepo->method('getAllTradeOffers')->willReturn([
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+        ]);
+        $mockRepo->method('getCashTransactionByOffer')->willReturn(null);
+        $mockRepo->method('getAllTeamsWithCity')->willReturn([]);
+
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $result = $service->getTradeReviewPageData('testuser');
+
+        $items = $result['tradeOffers'][1]['items'];
+        $this->assertCount(0, $items);
+    }
+
+    public function testCashDescriptionIncludesTeamNames(): void
+    {
+        $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
+
+        $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $mockCommon->method('getTidFromTeamname')->willReturn(1);
+        $mockRepo->method('getAllTradeOffers')->willReturn([
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+        ]);
+        $mockRepo->method('getCashTransactionByOffer')->willReturn([
+            'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
+            'cy1' => 500, 'cy2' => null, 'cy3' => null, 'cy4' => null, 'cy5' => null, 'cy6' => null,
+        ]);
+        $mockRepo->method('getAllTeamsWithCity')->willReturn([]);
+
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $result = $service->getTradeReviewPageData('testuser');
+
+        $items = $result['tradeOffers'][1]['items'];
+        $this->assertCount(1, $items);
+        $this->assertStringContainsString('The Lakers send 500 in cash to the Celtics', $items[0]['description']);
+        $this->assertSame('Lakers', $items[0]['from']);
+        $this->assertSame('Celtics', $items[0]['to']);
+    }
+
+    // ============================================
     // HELPERS
     // ============================================
 

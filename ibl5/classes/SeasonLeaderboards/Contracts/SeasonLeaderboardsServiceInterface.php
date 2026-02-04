@@ -10,7 +10,7 @@ namespace SeasonLeaderboards\Contracts;
  * Handles data transformation and calculations for season statistics.
  *
  * @phpstan-import-type HistRow from SeasonLeaderboardsRepositoryInterface
- * @phpstan-type ProcessedStats array{pid: int, name: string, year: string, teamname: string, teamid: int, team_city: string, color1: string, color2: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, points: int, fgp: string, ftp: string, tgp: string, mpg: string, fgmpg: string, fgapg: string, ftmpg: string, ftapg: string, tgmpg: string, tgapg: string, orbpg: string, rpg: string, apg: string, spg: string, tpg: string, bpg: string, fpg: string, ppg: string, qa: string}
+ * @phpstan-type ProcessedStats array{pid: int, name: string, year: int, teamname: string, teamid: int, team_city: string, color1: string, color2: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, points: int, fgp: string, ftp: string, tgp: string, mpg: string, fgmpg: string, fgapg: string, ftmpg: string, ftapg: string, tgmpg: string, tgapg: string, orbpg: string, rpg: string, apg: string, spg: string, tpg: string, bpg: string, fpg: string, ppg: string, qa: string}
  */
 interface SeasonLeaderboardsServiceInterface
 {

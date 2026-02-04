@@ -22,7 +22,7 @@ interface SeasonLeaderboardsViewInterface
      * Generates HTML form with dropdowns for team, year, and sort options.
      *
      * @param list<TeamRow> $teams Array of team data
-     * @param list<string> $years Array of available years
+     * @param list<int> $years Array of available years
      * @param LeaderboardFilters $currentFilters Current filter values
      * @return string HTML form output
      *

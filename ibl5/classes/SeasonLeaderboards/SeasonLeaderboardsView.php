@@ -29,7 +29,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
      * @see SeasonLeaderboardsViewInterface::renderFilterForm()
      *
      * @param list<TeamRow> $teams Array of team data
-     * @param list<string> $years Array of available years
+     * @param list<int> $years Array of available years
      * @param LeaderboardFilters $currentFilters Current filter values
      */
     public function renderFilterForm(array $teams, array $years, array $currentFilters): string
@@ -63,7 +63,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
         </div>
         <div class="ibl-filter-form__group">
             <label class="ibl-filter-form__label">Limit:</label>
-            <input type="number" name="limit" value="<?= htmlspecialchars($limitValue) ?>" min="1" placeholder="50">
+            <input type="number" name="limit" value="<?= htmlspecialchars($limitValue, ENT_QUOTES | ENT_HTML5) ?>" min="1" placeholder="50">
             <span class="ibl-filter-form__label">Records</span>
         </div>
         <button type="submit" class="ibl-filter-form__submit">Search Season Data</button>
@@ -87,7 +87,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
             $tid = $team['TeamID'];
             $teamName = $team['Team'];
             $selected = ($selectedTeam === $tid) ? ' selected' : '';
-            $html .= '<option value="' . $tid . '"' . $selected . '>' . htmlspecialchars($teamName) . '</option>' . "\n";
+            $html .= '<option value="' . $tid . '"' . $selected . '>' . htmlspecialchars($teamName, ENT_QUOTES | ENT_HTML5) . '</option>' . "\n";
         }
         return $html;
     }
@@ -95,7 +95,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     /**
      * Render year dropdown options
      *
-     * @param list<string> $years Available years
+     * @param list<int> $years Available years
      * @param string $selectedYear Selected year
      * @return string HTML options
      */
@@ -103,9 +103,8 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     {
         $html = '<option value="">All</option>' . "\n";
         foreach ($years as $year) {
-            $yearInt = (int) $year;
-            $selected = ($selectedYear === (string) $yearInt) ? ' selected' : '';
-            $html .= '<option value="' . $yearInt . '"' . $selected . '>' . $yearInt . '</option>' . "\n";
+            $selected = ($selectedYear === (string) $year) ? ' selected' : '';
+            $html .= '<option value="' . $year . '"' . $selected . '>' . $year . '</option>' . "\n";
         }
         return $html;
     }
@@ -123,7 +122,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
         $i = 1;
         foreach ($sortOptions as $label) {
             $selected = ($i === (int)$selectedSort) ? ' selected' : '';
-            $html .= '<option value="' . htmlspecialchars((string)$i) . '"' . $selected . '>' . htmlspecialchars($label) . '</option>' . "\n";
+            $html .= '<option value="' . $i . '"' . $selected . '>' . htmlspecialchars($label, ENT_QUOTES | ENT_HTML5) . '</option>' . "\n";
             $i++;
         }
         return $html;
@@ -179,9 +178,9 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     public function renderPlayerRow(array $stats, int $rank): string
     {
         $teamId = $stats['teamid'];
-        $teamName = htmlspecialchars($stats['teamname']);
-        $color1 = htmlspecialchars($stats['color1']);
-        $color2 = htmlspecialchars($stats['color2']);
+        $teamName = htmlspecialchars($stats['teamname'], ENT_QUOTES | ENT_HTML5);
+        $color1 = htmlspecialchars($stats['color1'], ENT_QUOTES | ENT_HTML5);
+        $color2 = htmlspecialchars($stats['color2'], ENT_QUOTES | ENT_HTML5);
 
         // Handle free agents (tid=0) gracefully
         if ($teamId === 0) {
@@ -199,30 +198,33 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
         ?>
 <tr data-team-id="<?= $teamId ?>">
     <td class="rank-cell sticky-col-1"><?= $rank ?>.</td>
-    <td><?= htmlspecialchars($stats['year']) ?></td>
-    <?php $resolved = PlayerImageHelper::resolvePlayerDisplay($stats['pid'], $stats['name']); ?>
-    <td class="sticky-col-2 ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $stats['pid'] ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
+    <td><?= $stats['year'] ?></td>
+    <?php
+    /** @var array{thumbnail: string, name: string} $resolved */
+    $resolved = PlayerImageHelper::resolvePlayerDisplay($stats['pid'], $stats['name']);
+    ?>
+    <td class="sticky-col-2 ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $stats['pid'] ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name'], ENT_QUOTES | ENT_HTML5) ?></a></td>
     <?= $teamCell ?>
     <td><?= $stats['games'] ?></td>
-    <td><?= htmlspecialchars($stats['mpg']) ?></td>
-    <td><?= htmlspecialchars($stats['fgmpg']) ?></td>
-    <td><?= htmlspecialchars($stats['fgapg']) ?></td>
-    <td><?= htmlspecialchars($stats['fgp']) ?></td>
-    <td><?= htmlspecialchars($stats['ftmpg']) ?></td>
-    <td><?= htmlspecialchars($stats['ftapg']) ?></td>
-    <td><?= htmlspecialchars($stats['ftp']) ?></td>
-    <td><?= htmlspecialchars($stats['tgmpg']) ?></td>
-    <td><?= htmlspecialchars($stats['tgapg']) ?></td>
-    <td><?= htmlspecialchars($stats['tgp']) ?></td>
-    <td><?= htmlspecialchars($stats['orbpg']) ?></td>
-    <td><?= htmlspecialchars($stats['rpg']) ?></td>
-    <td><?= htmlspecialchars($stats['apg']) ?></td>
-    <td><?= htmlspecialchars($stats['spg']) ?></td>
-    <td><?= htmlspecialchars($stats['tpg']) ?></td>
-    <td><?= htmlspecialchars($stats['bpg']) ?></td>
-    <td><?= htmlspecialchars($stats['fpg']) ?></td>
-    <td><?= htmlspecialchars($stats['ppg']) ?></td>
-    <td><?= htmlspecialchars($stats['qa']) ?></td>
+    <td><?= $stats['mpg'] ?></td>
+    <td><?= $stats['fgmpg'] ?></td>
+    <td><?= $stats['fgapg'] ?></td>
+    <td><?= $stats['fgp'] ?></td>
+    <td><?= $stats['ftmpg'] ?></td>
+    <td><?= $stats['ftapg'] ?></td>
+    <td><?= $stats['ftp'] ?></td>
+    <td><?= $stats['tgmpg'] ?></td>
+    <td><?= $stats['tgapg'] ?></td>
+    <td><?= $stats['tgp'] ?></td>
+    <td><?= $stats['orbpg'] ?></td>
+    <td><?= $stats['rpg'] ?></td>
+    <td><?= $stats['apg'] ?></td>
+    <td><?= $stats['spg'] ?></td>
+    <td><?= $stats['tpg'] ?></td>
+    <td><?= $stats['bpg'] ?></td>
+    <td><?= $stats['fpg'] ?></td>
+    <td><?= $stats['ppg'] ?></td>
+    <td><?= $stats['qa'] ?></td>
 </tr>
         <?php
         return (string) ob_get_clean();

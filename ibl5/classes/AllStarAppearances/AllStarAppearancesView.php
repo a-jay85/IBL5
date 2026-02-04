@@ -58,7 +58,7 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
     /**
      * Render all table rows.
      *
-     * @param array<int, array{name: string, pid: int, appearances: int}> $appearances Array of appearance data
+     * @param array<int, array{name: string, appearances: int, pid?: int}> $appearances Array of appearance data
      * @return string HTML table rows
      */
     private function renderTableRows(array $appearances): string
@@ -66,6 +66,7 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
         $output = '';
 
         foreach ($appearances as $row) {
+            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($row['name'] ?? '');
             $pid = (int) ($row['pid'] ?? 0);
             $count = (int) ($row['appearances'] ?? 0);

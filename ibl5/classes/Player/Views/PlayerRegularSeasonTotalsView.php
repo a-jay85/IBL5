@@ -73,6 +73,7 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
         <?php
         foreach ($historicalStats as $row) {
             $year = (int)$row['year'];
+            /** @var string $team */
             $team = HtmlSanitizer::safeHtmlOutput($row['team']);
             $teamId = (int)$row['teamid'];
             $gm = (int)$row['games'];
@@ -157,6 +158,6 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
     </tr>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

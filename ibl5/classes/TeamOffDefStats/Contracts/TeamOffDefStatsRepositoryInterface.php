@@ -12,6 +12,10 @@ namespace TeamOffDefStats\Contracts;
  * for performance optimization.
  *
  * @see \TeamOffDefStats\TeamOffDefStatsRepository for implementation
+ *
+ * @phpstan-type TeamOffenseStatsRow array{teamID: int, name: string, games: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, minutes: int|null, ...}
+ * @phpstan-type TeamDefenseStatsRow array{teamID: int, name: string, games: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, minutes: int|null, ...}
+ * @phpstan-type AllTeamStatsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_games: int|null, offense_fgm: int|null, offense_fga: int|null, offense_ftm: int|null, offense_fta: int|null, offense_tgm: int|null, offense_tga: int|null, offense_orb: int|null, offense_reb: int|null, offense_ast: int|null, offense_stl: int|null, offense_tvr: int|null, offense_blk: int|null, offense_pf: int|null, defense_games: int|null, defense_fgm: int|null, defense_fga: int|null, defense_ftm: int|null, defense_fta: int|null, defense_tgm: int|null, defense_tga: int|null, defense_orb: int|null, defense_reb: int|null, defense_ast: int|null, defense_stl: int|null, defense_tvr: int|null, defense_blk: int|null, defense_pf: int|null}
  */
 interface TeamOffDefStatsRepositoryInterface
 {
@@ -22,41 +26,7 @@ interface TeamOffDefStatsRepositoryInterface
      * ibl_team_defense_stats to fetch all data in one query instead of
      * 30 individual queries.
      *
-     * @return array<int, array{
-     *     teamid: int,
-     *     team_city: string,
-     *     team_name: string,
-     *     color1: string,
-     *     color2: string,
-     *     offense_games: int|null,
-     *     offense_fgm: int|null,
-     *     offense_fga: int|null,
-     *     offense_ftm: int|null,
-     *     offense_fta: int|null,
-     *     offense_tgm: int|null,
-     *     offense_tga: int|null,
-     *     offense_orb: int|null,
-     *     offense_reb: int|null,
-     *     offense_ast: int|null,
-     *     offense_stl: int|null,
-     *     offense_tvr: int|null,
-     *     offense_blk: int|null,
-     *     offense_pf: int|null,
-     *     defense_games: int|null,
-     *     defense_fgm: int|null,
-     *     defense_fga: int|null,
-     *     defense_ftm: int|null,
-     *     defense_fta: int|null,
-     *     defense_tgm: int|null,
-     *     defense_tga: int|null,
-     *     defense_orb: int|null,
-     *     defense_reb: int|null,
-     *     defense_ast: int|null,
-     *     defense_stl: int|null,
-     *     defense_tvr: int|null,
-     *     defense_blk: int|null,
-     *     defense_pf: int|null
-     * }> Array of team statistics rows ordered by team city
+     * @return list<AllTeamStatsRow> Array of team statistics rows ordered by team city
      */
     public function getAllTeamStats(): array;
 
@@ -64,7 +34,7 @@ interface TeamOffDefStatsRepositoryInterface
      * Get team offense statistics by team name
      *
      * @param string $teamName Team name
-     * @return array|null Team offense statistics
+     * @return TeamOffenseStatsRow|null Team offense statistics
      */
     public function getTeamOffenseStats(string $teamName): ?array;
 
@@ -72,7 +42,7 @@ interface TeamOffDefStatsRepositoryInterface
      * Get team defense statistics by team name
      *
      * @param string $teamName Team name
-     * @return array|null Team defense statistics
+     * @return TeamDefenseStatsRow|null Team defense statistics
      */
     public function getTeamDefenseStats(string $teamName): ?array;
 }

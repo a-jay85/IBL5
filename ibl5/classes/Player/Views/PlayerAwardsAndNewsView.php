@@ -48,8 +48,11 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
         <td class="player-table-header">AWARDS</td>
     </tr>
         <?php
+        /** @var list<array{year: int, name: string, Award: string, prim: int}> $awards */
         foreach ($awards as $award) {
-            $year = HtmlSanitizer::safeHtmlOutput((string)$award['year']);
+            /** @var string $year */
+            $year = HtmlSanitizer::safeHtmlOutput((string) $award['year']);
+            /** @var string $type */
             $type = HtmlSanitizer::safeHtmlOutput($award['Award']);
             ?>
     <tr>
@@ -64,10 +67,14 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
     <tr>
         <td>
             <small>
-            <?php foreach ($articles as $article): ?>
+            <?php
+            /** @var list<array{sid: int, title: string, time: string}> $articles */
+            foreach ($articles as $article): ?>
                 <?php
-                $sid = (int)$article['sid'];
+                $sid = $article['sid'];
+                /** @var string $title */
                 $title = HtmlSanitizer::safeHtmlOutput($article['title']);
+                /** @var string $time */
                 $time = HtmlSanitizer::safeHtmlOutput($article['time']);
                 ?>
                 * <a href="modules.php?name=News&file=article&sid=<?= $sid ?>&mode=&order=0&thold=0"><?= $title ?></a> (<?= $time ?>)<br>
@@ -77,6 +84,6 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
     </tr>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

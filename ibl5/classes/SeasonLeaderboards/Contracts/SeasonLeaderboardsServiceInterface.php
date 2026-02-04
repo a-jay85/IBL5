@@ -8,6 +8,9 @@ namespace SeasonLeaderboards\Contracts;
  * SeasonLeaderboardsServiceInterface - Season leaders business logic
  *
  * Handles data transformation and calculations for season statistics.
+ *
+ * @phpstan-import-type HistRow from SeasonLeaderboardsRepositoryInterface
+ * @phpstan-type ProcessedStats array{pid: int, name: string, year: string, teamname: string, teamid: int, team_city: string, color1: string, color2: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, points: int, fgp: string, ftp: string, tgp: string, mpg: string, fgmpg: string, fgapg: string, ftmpg: string, ftapg: string, tgmpg: string, tgapg: string, orbpg: string, rpg: string, apg: string, spg: string, tpg: string, bpg: string, fpg: string, ppg: string, qa: string}
  */
 interface SeasonLeaderboardsServiceInterface
 {
@@ -17,14 +20,8 @@ interface SeasonLeaderboardsServiceInterface
      * Transforms raw database row into formatted statistics array with
      * calculated values, percentages, and per-game averages.
      *
-     * @param array $row Database row from ibl_hist table
-     * @return array Formatted player statistics with keys:
-     *               - Basic: pid, name, year, teamname, teamid
-     *               - Raw: games, minutes, fgm, fga, ftm, fta, tgm, tga, orb, reb, ast, stl, tvr, blk, pf
-     *               - Calculated: points
-     *               - Percentages (3 decimals): fgp, ftp, tgp
-     *               - Per-game (1 decimal): mpg, fgmpg, fgapg, ftmpg, ftapg, tgmpg, tgapg, orbpg, rpg, apg, spg, tpg, bpg, fpg, ppg
-     *               - Quality Assessment: qa (1 decimal)
+     * @param HistRow $row Database row from ibl_hist table
+     * @return ProcessedStats Formatted player statistics
      *
      * **QA Formula:**
      * (pts + reb + 2*ast + 2*stl + 2*blk - (fga-fgm) - (fta-ftm) - tvr - pf) / games
@@ -41,10 +38,7 @@ interface SeasonLeaderboardsServiceInterface
      *
      * Returns array of human-readable labels for sort dropdown options.
      *
-     * @return array Array of 20 sort option labels in order:
-     *               ["PPG", "REB", "OREB", "AST", "STL", "BLK", "TO", "FOUL",
-     *                "QA", "FGM", "FGA", "FG%", "FTM", "FTA", "FT%",
-     *                "TGM", "TGA", "TG%", "GAMES", "MIN"]
+     * @return list<string> Array of 20 sort option labels
      */
     public function getSortOptions(): array;
 }

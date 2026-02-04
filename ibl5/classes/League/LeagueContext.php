@@ -30,18 +30,21 @@ class LeagueContext
     public function getCurrentLeague(): string
     {
         // Check URL override first
-        if (isset($_GET['league']) && $this->isValidLeague($_GET['league'])) {
-            return $_GET['league'];
+        $getLeague = $_GET['league'] ?? null;
+        if (is_string($getLeague) && $this->isValidLeague($getLeague)) {
+            return $getLeague;
         }
 
         // Check session
-        if (isset($_SESSION['current_league']) && $this->isValidLeague($_SESSION['current_league'])) {
-            return $_SESSION['current_league'];
+        $sessionLeague = $_SESSION['current_league'] ?? null;
+        if (is_string($sessionLeague) && $this->isValidLeague($sessionLeague)) {
+            return $sessionLeague;
         }
 
         // Check cookie
-        if (isset($_COOKIE[self::COOKIE_NAME]) && $this->isValidLeague($_COOKIE[self::COOKIE_NAME])) {
-            return $_COOKIE[self::COOKIE_NAME];
+        $cookieLeague = $_COOKIE[self::COOKIE_NAME] ?? null;
+        if (is_string($cookieLeague) && $this->isValidLeague($cookieLeague)) {
+            return $cookieLeague;
         }
 
         // Default to IBL
@@ -112,8 +115,8 @@ class LeagueContext
 
     /**
      * Get configuration for the current league
-     * 
-     * @return array Associative array with title, short_name, primary_color, logo_path
+     *
+     * @return array<string, string> Associative array with title, short_name, primary_color, logo_path
      */
     public function getConfig(): array
     {

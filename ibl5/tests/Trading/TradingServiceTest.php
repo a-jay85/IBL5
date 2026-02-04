@@ -204,8 +204,8 @@ class TradingServiceTest extends TestCase
             ->willReturn(1);
         $mockRepo->expects($this->once())->method('getAllTradeOffers')
             ->willReturn([
-                ['tradeofferid' => '1', 'itemid' => '100', 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics'],
-                ['tradeofferid' => '2', 'itemid' => '200', 'itemtype' => '1', 'from' => 'Heat', 'to' => 'Bulls', 'approval' => 'Bulls'],
+                ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+                ['tradeofferid' => 2, 'itemid' => 200, 'itemtype' => '1', 'from' => 'Heat', 'to' => 'Bulls', 'approval' => 'Bulls', 'created_at' => '', 'updated_at' => ''],
             ]);
         $mockRepo->method('getPlayerById')
             ->willReturn(['name' => 'Test Player', 'pos' => 'PG']);
@@ -230,8 +230,8 @@ class TradingServiceTest extends TestCase
             ->willReturn(1);
         $mockRepo->expects($this->once())->method('getAllTradeOffers')
             ->willReturn([
-                ['tradeofferid' => '1', 'itemid' => '100', 'itemtype' => '1', 'from' => 'Celtics', 'to' => 'Lakers', 'approval' => 'Lakers'],
-                ['tradeofferid' => '2', 'itemid' => '200', 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Heat', 'approval' => 'Heat'],
+                ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'from' => 'Celtics', 'to' => 'Lakers', 'approval' => 'Lakers', 'created_at' => '', 'updated_at' => ''],
+                ['tradeofferid' => 2, 'itemid' => 200, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Heat', 'approval' => 'Heat', 'created_at' => '', 'updated_at' => ''],
             ]);
         $mockRepo->method('getPlayerById')
             ->willReturn(['name' => 'Test Player', 'pos' => 'PG']);
@@ -258,8 +258,8 @@ class TradingServiceTest extends TestCase
             ->willReturn([]);
         $mockRepo->expects($this->once())->method('getAllTeamsWithCity')
             ->willReturn([
-                ['teamid' => '1', 'team_name' => 'Lakers', 'team_city' => 'Los Angeles', 'color1' => '552583', 'color2' => 'FDB927'],
-                ['teamid' => '0', 'team_name' => 'Free Agents', 'team_city' => '', 'color1' => '333333', 'color2' => 'FFFFFF'],
+                ['teamid' => 1, 'team_name' => 'Lakers', 'team_city' => 'Los Angeles', 'color1' => '552583', 'color2' => 'FDB927'],
+                ['teamid' => 0, 'team_name' => 'Free Agents', 'team_city' => '', 'color1' => '333333', 'color2' => 'FFFFFF'],
             ]);
 
         $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
@@ -302,15 +302,15 @@ class TradingServiceTest extends TestCase
         return [
             'pos' => 'PG',
             'name' => 'Test Player',
-            'pid' => '1',
-            'ordinal' => '5',
-            'cy' => (string) $cy,
-            'cy1' => (string) $cy1,
-            'cy2' => (string) $cy2,
-            'cy3' => (string) $cy3,
-            'cy4' => (string) $cy4,
-            'cy5' => (string) $cy5,
-            'cy6' => (string) $cy6,
+            'pid' => 1,
+            'ordinal' => 5,
+            'cy' => $cy,
+            'cy1' => $cy1,
+            'cy2' => $cy2,
+            'cy3' => $cy3,
+            'cy4' => $cy4,
+            'cy5' => $cy5,
+            'cy6' => $cy6,
         ];
     }
 }

@@ -66,7 +66,7 @@ class InjuriesView implements InjuriesViewInterface
      *     name: string,
      *     position: string,
      *     daysRemaining: int,
-     *     returnDate: string,
+     *     returnDate: ?string,
      *     teamID: int,
      *     teamCity: string,
      *     teamName: string,
@@ -94,7 +94,7 @@ class InjuriesView implements InjuriesViewInterface
      *     name: string,
      *     position: string,
      *     daysRemaining: int,
-     *     returnDate: string,
+     *     returnDate: ?string,
      *     teamID: int,
      *     teamCity: string,
      *     teamName: string,
@@ -106,17 +106,23 @@ class InjuriesView implements InjuriesViewInterface
     private function renderPlayerRow(array $player): string
     {
         // Sanitize all output for XSS protection
-        $playerID = (int) $player['playerID'];
-        $teamID = (int) $player['teamID'];
+        $playerID = $player['playerID'];
+        $teamID = $player['teamID'];
+        /** @var string $name */
         $name = HtmlSanitizer::safeHtmlOutput($player['name']);
+        /** @var string $position */
         $position = HtmlSanitizer::safeHtmlOutput($player['position']);
-        $daysRemaining = (int) $player['daysRemaining'];
+        $daysRemaining = $player['daysRemaining'];
         $returnDate = $player['returnDate'] ?? '';
+        /** @var string $teamName */
         $teamName = HtmlSanitizer::safeHtmlOutput($player['teamName']);
+        /** @var string $color1 */
         $color1 = HtmlSanitizer::safeHtmlOutput($player['teamColor1']);
+        /** @var string $color2 */
         $color2 = HtmlSanitizer::safeHtmlOutput($player['teamColor2']);
         $playerThumbnail = PlayerImageHelper::renderThumbnail($playerID);
-        $daysLabel = InjuryDaysLabel::render($daysRemaining, $returnDate) ?: (string) $daysRemaining;
+        $renderedLabel = InjuryDaysLabel::render($daysRemaining, $returnDate);
+        $daysLabel = $renderedLabel !== '' ? $renderedLabel : (string) $daysRemaining;
 
         return "<tr data-team-id=\"{$teamID}\">
     <td>{$position}</td>

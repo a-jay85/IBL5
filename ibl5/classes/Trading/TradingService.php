@@ -9,6 +9,13 @@ use Trading\Contracts\TradingRepositoryInterface;
 
 /**
  * @see TradingServiceInterface
+ *
+ * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TeamWithCityRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class TradingService implements TradingServiceInterface
 {
@@ -28,10 +35,14 @@ class TradingService implements TradingServiceInterface
 
     /**
      * @see TradingServiceInterface::getTradeOfferPageData()
+     *
+     * @return array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<DraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<DraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string}
      */
     public function getTradeOfferPageData(string $username, string $partnerTeam): array
     {
-        $season = new \Season($this->mysqli_db);
+        /** @var \mysqli $mysqliDb */
+        $mysqliDb = $this->mysqli_db;
+        $season = new \Season($mysqliDb);
 
         $userTeam = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
         $userTeamId = $this->commonRepository->getTidFromTeamname($userTeam) ?? 0;
@@ -70,15 +81,17 @@ class TradingService implements TradingServiceInterface
             'seasonPhase' => $season->phase,
             'cashStartYear' => $cashStartYear,
             'cashEndYear' => 6,
-            'userTeamColor1' => $userTeamData['color1'] ?? '000000',
-            'userTeamColor2' => $userTeamData['color2'] ?? 'ffffff',
-            'partnerTeamColor1' => $partnerTeamData['color1'] ?? '000000',
-            'partnerTeamColor2' => $partnerTeamData['color2'] ?? 'ffffff',
+            'userTeamColor1' => $userTeamData !== null ? $userTeamData['color1'] : '000000',
+            'userTeamColor2' => $userTeamData !== null ? $userTeamData['color2'] : 'ffffff',
+            'partnerTeamColor1' => $partnerTeamData !== null ? $partnerTeamData['color1'] : '000000',
+            'partnerTeamColor2' => $partnerTeamData !== null ? $partnerTeamData['color2'] : 'ffffff',
         ];
     }
 
     /**
      * @see TradingServiceInterface::getTradeReviewPageData()
+     *
+     * @return array{userTeam: string, userTeamId: int, tradeOffers: array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>}>, teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>}
      */
     public function getTradeReviewPageData(string $username): array
     {
@@ -102,6 +115,9 @@ class TradingService implements TradingServiceInterface
 
     /**
      * @see TradingServiceInterface::calculateFutureSalaries()
+     *
+     * @param list<array<string, mixed>> $players Player rows from repository
+     * @return array{player: array<int, int>, hold: array<int, int>}
      */
     public function calculateFutureSalaries(array $players, \Season $season): array
     {
@@ -111,7 +127,8 @@ class TradingService implements TradingServiceInterface
         ];
 
         foreach ($players as $playerRow) {
-            $contractYear = (int) $playerRow['cy'];
+            $contractYearRaw = $playerRow['cy'] ?? 0;
+            $contractYear = is_int($contractYearRaw) ? $contractYearRaw : 0;
 
             // Adjust contract year based on season phase
             if ($this->isOffseasonPhase($season->phase)) {
@@ -125,8 +142,10 @@ class TradingService implements TradingServiceInterface
             $i = 0;
             $cy = $contractYear;
             while ($cy < 7) {
-                $futureSalary['player'][$i] += (int) $playerRow["cy{$cy}"];
-                if ((int) $playerRow["cy{$cy}"] > 0) {
+                $cyRawValue = $playerRow["cy{$cy}"] ?? 0;
+                $cyValue = is_int($cyRawValue) ? $cyRawValue : 0;
+                $futureSalary['player'][$i] += $cyValue;
+                if ($cyValue > 0) {
                     $futureSalary['hold'][$i]++;
                 }
                 $cy++;
@@ -140,20 +159,20 @@ class TradingService implements TradingServiceInterface
     /**
      * Group trade offer rows by offer ID and resolve item details
      *
-     * @param array $allTradeRows Raw trade info rows
+     * @param list<TradeInfoRow> $allTradeRows Raw trade info rows
      * @param string $userTeam Current user's team name
-     * @return array<int, array> Grouped trade offers with resolved item descriptions
+     * @return array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>}> Grouped trade offers with resolved item descriptions
      */
     private function groupTradeOffers(array $allTradeRows, string $userTeam): array
     {
         $tradeOffers = [];
 
         foreach ($allTradeRows as $row) {
-            $offerId = (int) $row['tradeofferid'];
+            $offerId = $row['tradeofferid'];
             $from = $row['from'];
             $to = $row['to'];
             $approval = $row['approval'];
-            $itemId = (int) $row['itemid'];
+            $itemId = $row['itemid'];
             $itemType = $row['itemtype'];
 
             $isInvolved = ($from === $userTeam || $to === $userTeam);
@@ -210,6 +229,8 @@ class TradingService implements TradingServiceInterface
 
     /**
      * Resolve a cash trade item
+     *
+     * @return array{type: string, description: string, notes: string|null, from: string, to: string}
      */
     private function resolveCashItem(string $from, string $to, int $offerId): array
     {
@@ -217,9 +238,17 @@ class TradingService implements TradingServiceInterface
         $cashAmounts = [];
 
         if ($cashDetails !== null) {
-            for ($y = 1; $y <= 6; $y++) {
-                if (isset($cashDetails["cy{$y}"]) && (int) $cashDetails["cy{$y}"] > 0) {
-                    $cashAmounts[] = (int) $cashDetails["cy{$y}"];
+            $cyValues = [
+                $cashDetails['cy1'],
+                $cashDetails['cy2'],
+                $cashDetails['cy3'],
+                $cashDetails['cy4'],
+                $cashDetails['cy5'],
+                $cashDetails['cy6'],
+            ];
+            foreach ($cyValues as $cyValue) {
+                if ($cyValue !== null && $cyValue > 0) {
+                    $cashAmounts[] = $cyValue;
                 }
             }
         }
@@ -237,6 +266,8 @@ class TradingService implements TradingServiceInterface
 
     /**
      * Resolve a draft pick trade item
+     *
+     * @return array{type: string, description: string, notes: string|null, from: string, to: string}
      */
     private function resolvePickItem(int $itemId, string $from, string $to): array
     {
@@ -266,6 +297,8 @@ class TradingService implements TradingServiceInterface
 
     /**
      * Resolve a player trade item
+     *
+     * @return array{type: string, description: string, notes: string|null, from: string, to: string}
      */
     private function resolvePlayerItem(int $itemId, string $from, string $to): array
     {
@@ -300,8 +333,8 @@ class TradingService implements TradingServiceInterface
     /**
      * Build filtered team list for team selection UI (excludes Free Agents)
      *
-     * @param array $allTeams Raw team rows from repository
-     * @return array<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>
+     * @param list<TeamWithCityRow> $allTeams Raw team rows from repository
+     * @return list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>
      */
     private function buildTeamList(array $allTeams): array
     {
@@ -318,9 +351,9 @@ class TradingService implements TradingServiceInterface
                 'name' => $teamName,
                 'city' => $teamCity,
                 'fullName' => "{$teamCity} {$teamName}",
-                'teamid' => (int) $row['teamid'],
-                'color1' => $row['color1'] ?? '333333',
-                'color2' => $row['color2'] ?? 'FFFFFF',
+                'teamid' => $row['teamid'],
+                'color1' => $row['color1'],
+                'color2' => $row['color2'],
             ];
         }
 

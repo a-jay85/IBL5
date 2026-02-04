@@ -12,9 +12,11 @@ use PlayerDatabase\Contracts\PlayerDatabaseRepositoryInterface;
 
 /**
  * PlayerDatabaseService - Business logic for player search
- * 
+ *
  * Implements the service contract defined in PlayerDatabaseServiceInterface.
  * See the interface for detailed behavior documentation.
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class PlayerDatabaseService implements PlayerDatabaseServiceInterface
 {
@@ -39,7 +41,7 @@ class PlayerDatabaseService implements PlayerDatabaseServiceInterface
     {
         $params = $this->validator->validateSearchParams($rawParams);
 
-        if (empty($rawParams)) {
+        if ($rawParams === []) {
             return [
                 'players' => [],
                 'count' => 0,
@@ -50,7 +52,11 @@ class PlayerDatabaseService implements PlayerDatabaseServiceInterface
         $searchResult = $this->repository->searchPlayers($params);
 
         $playerDataObjects = array_map(
-            fn(array $playerRow) => $this->playerRepository->fillFromCurrentRow($playerRow),
+            function (array $playerRow): PlayerData {
+                /** @var PlayerRow $typedRow */
+                $typedRow = $playerRow;
+                return $this->playerRepository->fillFromCurrentRow($typedRow);
+            },
             $searchResult['results']
         );
 

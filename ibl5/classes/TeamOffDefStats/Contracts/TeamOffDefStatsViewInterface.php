@@ -17,6 +17,12 @@ namespace TeamOffDefStats\Contracts;
  * Uses HtmlSanitizer::safeHtmlOutput() for XSS protection on team names.
  *
  * @see \TeamOffDefStats\TeamOffDefStatsView for implementation
+ *
+ * @phpstan-import-type ProcessedTeamStats from TeamOffDefStatsServiceInterface
+ * @phpstan-import-type LeagueTotals from TeamOffDefStatsServiceInterface
+ * @phpstan-import-type DifferentialTeam from TeamOffDefStatsServiceInterface
+ *
+ * @phpstan-type RenderData array{teams: list<ProcessedTeamStats>, league: LeagueTotals, differentials: list<DifferentialTeam>}
  */
 interface TeamOffDefStatsViewInterface
 {
@@ -27,10 +33,10 @@ interface TeamOffDefStatsViewInterface
      * User's team rows are highlighted client-side via user-team-highlighter.js.
      * Applies HtmlSanitizer::safeHtmlOutput() to team_city and team_name.
      *
-     * @param array $data Combined data structure containing:
-     *                    - 'teams': Processed team statistics
-     *                    - 'league': League totals and averages
-     *                    - 'differentials': Team differentials
+     * @param RenderData $data Combined data structure containing:
+     *                         - 'teams': Processed team statistics
+     *                         - 'league': League totals and averages
+     *                         - 'differentials': Team differentials
      * @return string Complete HTML output for the league stats page
      */
     public function render(array $data): string;

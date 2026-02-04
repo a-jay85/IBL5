@@ -7,17 +7,21 @@ namespace Team;
 use Team\Contracts\TeamViewInterface;
 
 /**
+ * @phpstan-import-type TeamPageData from Contracts\TeamServiceInterface
+ *
  * @see TeamViewInterface
  */
 class TeamView implements TeamViewInterface
 {
     /**
      * @see TeamViewInterface::render()
+     * @param TeamPageData $pageData
      */
     public function render(array $pageData): string
     {
-        $teamID = (int) $pageData['teamID'];
+        $teamID = $pageData['teamID'];
         $team = $pageData['team'];
+        /** @var string $imagesPath */
         $imagesPath = \Utilities\HtmlSanitizer::safeHtmlOutput($pageData['imagesPath']);
         $yr = $pageData['yr'];
         $isActualTeam = $pageData['isActualTeam'];
@@ -37,8 +41,12 @@ class TeamView implements TeamViewInterface
         $franchiseHtml = $isActualTeam ? "<div style=\"max-width: 1115px; margin: 0 auto;\">$franchiseHistoryCard</div>" : "";
         $raftersHtml = $isActualTeam ? "<div class=\"team-page-rafters\">$rafters</div>" : "";
 
+        /** @var string $yrSafe */
+        $yrSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($yr ?? '');
+        /** @var string $teamNameSafe */
+        $teamNameSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
         $yearHeading = ($yr !== null && $yr !== '')
-            ? "<h1 class=\"ibl-title\" style=\"margin: 0.5rem 0;\">" . \Utilities\HtmlSanitizer::safeHtmlOutput($yr) . " " . \Utilities\HtmlSanitizer::safeHtmlOutput($team->name) . "</h1>"
+            ? "<h1 class=\"ibl-title\" style=\"margin: 0.5rem 0;\">$yrSafe $teamNameSafe</h1>"
             : "";
 
         $bannerHtml = $isActualTeam
@@ -64,14 +72,17 @@ class TeamView implements TeamViewInterface
     </div>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * Render the team banner row with logo centered and action links flanking it
+     *
+     * @param \Team $team Team object with color1, color2 properties
      */
     private function renderTeamBanner(int $teamID, object $team, string $imagesPath, string $yearHeading): string
     {
+        /** @var \Team $team */
         $color1 = \UI\TableStyles::sanitizeColor($team->color1);
         $color2 = \UI\TableStyles::sanitizeColor($team->color2);
 
@@ -86,14 +97,17 @@ class TeamView implements TeamViewInterface
     <a href="modules.php?name=DraftHistory&amp;teamID=<?= $teamID ?>" class="team-action-link">Draft History</a>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * Render the draft picks section with team-colored header
+     *
+     * @param \Team $team Team object with color1, color2 properties
      */
     private function renderDraftPicksSection(object $team, string $draftPicksTable): string
     {
+        /** @var \Team $team */
         $color1 = \UI\TableStyles::sanitizeColor($team->color1);
         $color2 = \UI\TableStyles::sanitizeColor($team->color2);
 
@@ -108,6 +122,6 @@ class TeamView implements TeamViewInterface
     </div>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

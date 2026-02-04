@@ -11,6 +11,11 @@ use CapSpace\Contracts\CapSpaceRepositoryInterface;
  *
  * Processes team salary data and calculates available cap space.
  *
+ * @phpstan-type AvailableSalary array{year1: int, year2: int, year3: int, year4: int, year5: int, year6: int}
+ * @phpstan-type PositionSalaries array<string, int>
+ * @phpstan-type CapSpaceTeamData array{team: \Team, teamId: int, teamName: string, teamCity: string, color1: string, color2: string, availableSalary: AvailableSalary, positionSalaries: PositionSalaries, freeAgencySlots: int, hasMLE: bool, hasLLE: bool}
+ * @phpstan-type DisplayYears array{beginningYear: int, endingYear: int}
+ *
  * @see CapSpaceRepositoryInterface For data access
  */
 class CapSpaceService
@@ -34,7 +39,7 @@ class CapSpaceService
      * Get processed cap data for all teams
      *
      * @param \Season $season Current season
-     * @return array Processed team cap data
+     * @return list<CapSpaceTeamData> Processed team cap data
      */
     public function getTeamsCapData(\Season $season): array
     {
@@ -54,7 +59,7 @@ class CapSpaceService
      *
      * @param \Team $team Team object
      * @param \Season $season Current season
-     * @return array Processed cap data for the team
+     * @return CapSpaceTeamData Processed cap data for the team
      */
     protected function processTeamCapData(\Team $team, \Season $season): array
     {
@@ -80,7 +85,7 @@ class CapSpaceService
 
         // Calculate roster slots used
         $contractData = $this->repository->getPlayersUnderContractAfterSeason($team->teamID);
-        
+
         // Calculate FA slots from roster - players with contracts beyond current season take up slots
         $freeAgencySlots = $freeAgencySlots - count($contractData);
 
@@ -103,15 +108,15 @@ class CapSpaceService
      * Get adjusted years for header display based on season phase
      *
      * @param \Season $season Current season
-     * @return array Beginning and ending years
+     * @return DisplayYears Beginning and ending years
      */
     public function getDisplayYears(\Season $season): array
     {
-        $beginningYear = ($season->phase === 'Free Agency') 
-            ? $season->beginningYear + 1 
+        $beginningYear = ($season->phase === 'Free Agency')
+            ? $season->beginningYear + 1
             : $season->beginningYear;
-        $endingYear = ($season->phase === 'Free Agency') 
-            ? $season->endingYear + 1 
+        $endingYear = ($season->phase === 'Free Agency')
+            ? $season->endingYear + 1
             : $season->endingYear;
 
         return [

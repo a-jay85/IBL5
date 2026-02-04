@@ -12,6 +12,8 @@ use SeasonHighs\Contracts\SeasonHighsRepositoryInterface;
  *
  * Calculates date ranges and retrieves season high stats.
  *
+ * @phpstan-import-type SeasonHighsData from SeasonHighsServiceInterface
+ *
  * @see SeasonHighsServiceInterface For the interface contract
  */
 class SeasonHighsService implements SeasonHighsServiceInterface
@@ -21,6 +23,8 @@ class SeasonHighsService implements SeasonHighsServiceInterface
 
     /**
      * Stat definitions with SQL expressions and display names.
+     *
+     * @var array<string, string>
      */
     private const STATS = [
         'POINTS' => '(`game2GM`*2) + `gameFTM` + (`game3GM`*3)',
@@ -42,6 +46,8 @@ class SeasonHighsService implements SeasonHighsServiceInterface
 
     /**
      * @see SeasonHighsServiceInterface::getSeasonHighsData()
+     *
+     * @return SeasonHighsData
      */
     public function getSeasonHighsData(string $seasonPhase): array
     {

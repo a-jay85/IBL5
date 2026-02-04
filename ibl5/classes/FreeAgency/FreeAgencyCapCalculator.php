@@ -9,6 +9,7 @@ use Player\Player;
 
 /**
  * @see FreeAgencyCapCalculatorInterface
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
 {
@@ -26,10 +27,10 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
     /**
      * Calculate total salaries from contracts and offers
      * 
-     * @param array<array> $rosterData Roster data from getRosterUnderContractOrderedByOrdinalResult()
-     * @param array<array> $offersData Offers data from getFreeAgencyOffersResult()
+     * @param array<int, array<string, mixed>> $rosterData Roster data from getRosterUnderContractOrderedByOrdinalResult()
+     * @param array<int, array<string, mixed>> $offersData Offers data from getFreeAgencyOffersResult()
      * @param string|null $excludeOfferPlayerName Player name to exclude from offer calculations
-     * @return array<string, int> Total salaries for years 1-6
+     * @return array<int, int> Total salaries for years 1-6
      */
     private function calculateTotalSalaries(array $rosterData, array $offersData, ?string $excludeOfferPlayerName = null): array
     {
@@ -37,11 +38,12 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
 
         // Add salaries from players under contract
         foreach ($rosterData as $playerRow) {
+            /** @var PlayerRow $playerRow */
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
-            
+
             if (!$player->isPlayerFreeAgent($this->season)) {
                 $futureSalaries = $player->getFutureSalaries();
-                
+
                 for ($year = 0; $year < 6; $year++) {
                     $totalSalaries[$year] += $futureSalaries[$year];
                 }
@@ -57,7 +59,9 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
             
             for ($year = 0; $year < 6; $year++) {
                 $offerKey = 'offer' . ($year + 1);
-                $totalSalaries[$year] += (int) $offerRow[$offerKey];
+                /** @var int $offerValue */
+                $offerValue = $offerRow[$offerKey] ?? 0;
+                $totalSalaries[$year] += $offerValue;
             }
         }
 
@@ -67,29 +71,31 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
     /**
      * Calculate available roster spots for all contract years
      * 
-     * @param array<array> $rosterData Roster data from getRosterUnderContractOrderedByOrdinalResult()
-     * @param array<array> $offersData Offers data from getFreeAgencyOffersResult()
+     * @param array<int, array<string, mixed>> $rosterData Roster data from getRosterUnderContractOrderedByOrdinalResult()
+     * @param array<int, array<string, mixed>> $offersData Offers data from getFreeAgencyOffersResult()
      * @param string|null $excludeOfferPlayerName Player name to exclude from offer calculations
-     * @return array<int> Available roster spots for years 1-6 (indexed 0-5)
+     * @return array<int, int> Available roster spots for years 1-6 (indexed 0-5)
      */
     private function calculateRosterSpots(array $rosterData, array $offersData, ?string $excludeOfferPlayerName = null): array
     {
+        /** @var array<int, int> $rosterSpots */
         $rosterSpots = [
-            \Team::ROSTER_SPOTS_MAX,
-            \Team::ROSTER_SPOTS_MAX,
-            \Team::ROSTER_SPOTS_MAX,
-            \Team::ROSTER_SPOTS_MAX,
-            \Team::ROSTER_SPOTS_MAX,
-            \Team::ROSTER_SPOTS_MAX,
+            0 => \Team::ROSTER_SPOTS_MAX,
+            1 => \Team::ROSTER_SPOTS_MAX,
+            2 => \Team::ROSTER_SPOTS_MAX,
+            3 => \Team::ROSTER_SPOTS_MAX,
+            4 => \Team::ROSTER_SPOTS_MAX,
+            5 => \Team::ROSTER_SPOTS_MAX,
         ];
 
         // Count players under contract
         foreach ($rosterData as $playerRow) {
+            /** @var PlayerRow $playerRow */
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
             
             if (!$player->isPlayerFreeAgent($this->season)) {
                 // Exclude players whose name starts with '|'
-                $firstChar = substr($player->name, 0, 1);
+                $firstChar = substr($player->name ?? '', 0, 1);
                 if ($player->teamName === $this->team->name && $firstChar !== '|') {
                     $futureSalaries = $player->getFutureSalaries();
                     $this->decrementRosterSpotsForSalaries($rosterSpots, $futureSalaries);
@@ -117,7 +123,7 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
      * Works with both player future salaries array and contract offer arrays.
      * 
      * @param array<int> $rosterSpots Roster spots array (indexed 0-5), passed by reference
-     * @param array<int|string> $salaries Salary values (array indices 0-5 or keys offer1-6)
+     * @param array<int|string, int|string|mixed> $salaries Salary values (array indices 0-5 or keys offer1-6)
      * @return void
      */
     private function decrementRosterSpotsForSalaries(array &$rosterSpots, array $salaries): void
@@ -125,7 +131,9 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
         for ($year = 0; $year < 6; $year++) {
             // Handle both numeric indices (player salaries) and string keys (offer1-6)
             $key = isset($salaries[$year]) ? $year : ('offer' . ($year + 1));
-            $salary = isset($salaries[$key]) ? (int) $salaries[$key] : 0;
+            /** @var int $salaryValue */
+            $salaryValue = $salaries[$key] ?? 0;
+            $salary = $salaryValue;
             
             if ($salary !== 0) {
                 $rosterSpots[$year]--;

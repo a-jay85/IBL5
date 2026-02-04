@@ -12,7 +12,6 @@ use FreeAgency\Contracts\FreeAgencyProcessorInterface;
 class FreeAgencyProcessor implements FreeAgencyProcessorInterface
 {
     private object $mysqli_db;
-    private FreeAgencyOfferValidator $validator;
     private FreeAgencyDemandCalculator $calculator;
     private FreeAgencyRepository $repository;
     private \Season $season;
@@ -20,10 +19,11 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     public function __construct(object $mysqli_db)
     {
         $this->mysqli_db = $mysqli_db;
-        $this->season = new \Season($this->mysqli_db);
+        /** @var \mysqli $mysqliDb */
+        $mysqliDb = $this->mysqli_db;
+        $this->season = new \Season($mysqliDb);
 
         $demandRepository = new FreeAgencyDemandRepository($this->mysqli_db);
-        $this->validator = new FreeAgencyOfferValidator();
         $this->calculator = new FreeAgencyDemandCalculator($demandRepository);
         $this->repository = new FreeAgencyRepository($this->mysqli_db);
     }
@@ -34,8 +34,10 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     public function processOfferSubmission(array $postData): array
     {
         // Extract and sanitize input
+        /** @var string $teamName */
         $teamName = $postData['teamname'] ?? '';
-        $playerID = (int) ($postData['playerID'] ?? 0);
+        /** @var int $playerID */
+        $playerID = $postData['playerID'] ?? 0;
 
         // Load player object
         $player = \Player\Player::withPlayerID($this->mysqli_db, $playerID);
@@ -66,7 +68,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
             return [
                 'success' => false,
                 'type' => 'validation_error',
-                'message' => $validationResult['error'],
+                'message' => $validationResult['error'] ?? 'Validation failed.',
                 'playerID' => $playerID,
             ];
         }
@@ -100,25 +102,28 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
      * @param \Player\Player $player Player object
      * @param array<string, mixed> $postData POST data from offer form
      * @param \Team $team Team object (provides team name and cap data)
-     * @return array<string, mixed> Parsed offer data
+     * @return array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int} Parsed offer data
      */
     private function parseOfferData(\Player\Player $player, array $postData, \Team $team): array
     {
         // Reconstruct derived values from player object
-        $birdYears = $player->teamName === $team->name ? $player->birdYears : 0;
-        $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience);
-        $maxContractYear1 = \ContractRules::getMaxContractSalary($player->yearsOfExperience);
+        $birdYears = $player->teamName === $team->name ? ($player->birdYears ?? 0) : 0;
+        $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience ?? 0);
+        $maxContractYear1 = \ContractRules::getMaxContractSalary($player->yearsOfExperience ?? 0);
 
         // Reconstruct cap space data using provided team object
         $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $team, $this->season);
-        $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
+        $playerName = $player->name ?? '';
+        $capMetrics = $capCalculator->calculateTeamCapMetrics($playerName);
 
         // Get existing offer to calculate amended cap space
-        $existingOfferRow = $this->repository->getExistingOffer($team->name, $player->name);
-        $existingOfferYear1 = $existingOfferRow !== null ? (int) ($existingOfferRow['offer1'] ?? 0) : 0;
+        $existingOfferRow = $this->repository->getExistingOffer($team->name, $playerName);
+        $existingOfferYear1 = $existingOfferRow !== null ? $existingOfferRow['offer1'] : 0;
+        /** @var array{softCapSpace: array<int, int>, hardCapSpace: array<int, int>, totalSalaries: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
         $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0] + $existingOfferYear1;
 
-        $offerType = (int) ($postData['offerType'] ?? 0);
+        /** @var int $offerType */
+        $offerType = $postData['offerType'] ?? 0;
 
         // Parse offer amounts based on exception type
         if (OfferType::isVeteranMinimum($offerType)) {
@@ -148,12 +153,18 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
             $offer6 = $offerType >= 6 ? $mleOffers[5] : 0;
         } else {
             // Custom offer
-            $offer1 = (int) ($postData['offeryear1'] ?? 0);
-            $offer2 = (int) ($postData['offeryear2'] ?? 0);
-            $offer3 = (int) ($postData['offeryear3'] ?? 0);
-            $offer4 = (int) ($postData['offeryear4'] ?? 0);
-            $offer5 = (int) ($postData['offeryear5'] ?? 0);
-            $offer6 = (int) ($postData['offeryear6'] ?? 0);
+            /** @var int $offer1 */
+            $offer1 = $postData['offeryear1'] ?? 0;
+            /** @var int $offer2 */
+            $offer2 = $postData['offeryear2'] ?? 0;
+            /** @var int $offer3 */
+            $offer3 = $postData['offeryear3'] ?? 0;
+            /** @var int $offer4 */
+            $offer4 = $postData['offeryear4'] ?? 0;
+            /** @var int $offer5 */
+            $offer5 = $postData['offeryear5'] ?? 0;
+            /** @var int $offer6 */
+            $offer6 = $postData['offeryear6'] ?? 0;
         }
 
         return [
@@ -176,7 +187,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
      *
      * @param string $teamName Offering team
      * @param \Player\Player $player Player object
-     * @param array<string, mixed> $offerData Offer details
+     * @param array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int} $offerData Offer details
      * @return bool True if saved successfully
      */
     private function saveOffer(string $teamName, \Player\Player $player, array $offerData): bool
@@ -197,13 +208,15 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $lle = OfferType::isLLE($offerData['offerType']) ? 1 : 0;
 
         // Calculate modifier and random for storage (extract from perceived value calculation)
-        $modifier = $perceivedValue / $offerAverage; // Approximate
+        $modifier = (int) ($perceivedValue / $offerAverage); // Approximate
         $random = 0; // Will be recalculated on acceptance
+
+        $playerName = $player->name ?? '';
 
         // Save the offer using repository
         $saved = $this->repository->saveOffer([
             'teamName' => $teamName,
-            'playerName' => $player->name,
+            'playerName' => $playerName,
             'offer1' => $offerData['offer1'],
             'offer2' => $offerData['offer2'],
             'offer3' => $offerData['offer3'],
@@ -229,14 +242,23 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     /**
      * Calculate number of years in an offer
      *
-     * @param array<string, mixed> $offerData Offer data
+     * @param array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int} $offerData Offer data
      * @return int Number of years
      */
     private function calculateYearsInOffer(array $offerData): int
     {
+        $offers = [
+            1 => $offerData['offer1'],
+            2 => $offerData['offer2'],
+            3 => $offerData['offer3'],
+            4 => $offerData['offer4'],
+            5 => $offerData['offer5'],
+            6 => $offerData['offer6'],
+        ];
+
         $years = 6;
         for ($i = 6; $i >= 1; $i--) {
-            if ($offerData["offer{$i}"] === 0) {
+            if ($offers[$i] === 0) {
                 $years = $i - 1;
             } else {
                 break;
@@ -248,7 +270,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     /**
      * Calculate average salary per year
      *
-     * @param array<string, mixed> $offerData Offer data
+     * @param array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int} $offerData Offer data
      * @param int $yearsInOffer Years in offer
      * @return int Average salary
      */
@@ -269,14 +291,17 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
      */
     private function postOfferToDiscord(string $teamName, \Player\Player $player): void
     {
-        $season = new \Season($this->mysqli_db);
+        /** @var \mysqli $mysqliDb */
+        $mysqliDb = $this->mysqli_db;
+        $season = new \Season($mysqliDb);
 
         if ($season->freeAgencyNotificationsState !== "On") {
             return;
         }
 
-        $discord = new \Discord($this->mysqli_db);
-        $playerTeamDiscordID = $discord->getDiscordIDFromTeamname($player->teamName);
+        $discord = new \Discord($mysqliDb);
+        $playerTeamName = $player->teamName ?? '';
+        $playerTeamDiscordID = $discord->getDiscordIDFromTeamname($playerTeamName);
 
         if ($teamName === $player->teamName) {
             $message = "Free agent **{$player->name}** has been offered a contract to _stay_ with the **{$player->teamName}**.
@@ -296,7 +321,7 @@ _**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for co
     {
         $player = \Player\Player::withPlayerID($this->mysqli_db, $playerID);
 
-        $this->repository->deleteOffer($teamName, $player->name);
+        $this->repository->deleteOffer($teamName, $player->name ?? '');
 
         return ['success' => true];
     }

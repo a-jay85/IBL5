@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace SeasonHighs;
 
 use SeasonHighs\Contracts\SeasonHighsViewInterface;
+use SeasonHighs\Contracts\SeasonHighsServiceInterface;
 use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 
 /**
  * View class for rendering season highs page.
+ *
+ * @phpstan-import-type SeasonHighEntry from SeasonHighsServiceInterface
+ * @phpstan-import-type SeasonHighsData from SeasonHighsServiceInterface
  *
  * @see SeasonHighsViewInterface
  */
@@ -17,12 +21,16 @@ class SeasonHighsView implements SeasonHighsViewInterface
 {
     /**
      * @see SeasonHighsViewInterface::render()
+     *
+     * @param SeasonHighsData $data
      */
     public function render(string $seasonPhase, array $data): string
     {
+        /** @var string $safePhase */
+        $safePhase = HtmlSanitizer::safeHtmlOutput($seasonPhase);
         $output = '<h2 class="ibl-title">Season Highs</h2>';
-        $output .= $this->renderPlayerHighs($seasonPhase, $data['playerHighs']);
-        $output .= $this->renderTeamHighs($seasonPhase, $data['teamHighs']);
+        $output .= $this->renderPlayerHighs($safePhase, $data['playerHighs']);
+        $output .= $this->renderTeamHighs($safePhase, $data['teamHighs']);
 
         return $output;
     }
@@ -30,13 +38,13 @@ class SeasonHighsView implements SeasonHighsViewInterface
     /**
      * Render player season highs.
      *
-     * @param string $seasonPhase Season phase
-     * @param array $playerHighs Player highs data
+     * @param string $seasonPhase Season phase (already HTML-escaped)
+     * @param array<string, list<SeasonHighEntry>> $playerHighs Player highs data
      * @return string HTML output
      */
     private function renderPlayerHighs(string $seasonPhase, array $playerHighs): string
     {
-        $output = '<h2 class="ibl-table-title">Players\' ' . HtmlSanitizer::safeHtmlOutput($seasonPhase) . ' Highs</h1>';
+        $output = '<h2 class="ibl-table-title">Players\' ' . $seasonPhase . ' Highs</h1>';
         $output .= '<div class="ibl-grid ibl-grid--3col">';
 
         foreach ($playerHighs as $statName => $stats) {
@@ -50,13 +58,13 @@ class SeasonHighsView implements SeasonHighsViewInterface
     /**
      * Render team season highs.
      *
-     * @param string $seasonPhase Season phase
-     * @param array $teamHighs Team highs data
+     * @param string $seasonPhase Season phase (already HTML-escaped)
+     * @param array<string, list<SeasonHighEntry>> $teamHighs Team highs data
      * @return string HTML output
      */
     private function renderTeamHighs(string $seasonPhase, array $teamHighs): string
     {
-        $output = '<h2 class="ibl-table-title">Teams\' ' . HtmlSanitizer::safeHtmlOutput($seasonPhase) . ' Highs</h1>';
+        $output = '<h2 class="ibl-table-title">Teams\' ' . $seasonPhase . ' Highs</h1>';
         $output .= '<div class="ibl-grid ibl-grid--3col">';
 
         foreach ($teamHighs as $statName => $stats) {
@@ -71,12 +79,13 @@ class SeasonHighsView implements SeasonHighsViewInterface
      * Render a single stat table.
      *
      * @param string $statName Stat name
-     * @param array $stats Stat data
+     * @param list<SeasonHighEntry> $stats Stat data
      * @param bool $isPlayerStats Whether this is a player stats table (adds Team column)
      * @return string HTML table
      */
     private function renderStatTable(string $statName, array $stats, bool $isPlayerStats = false): string
     {
+        /** @var string $safeName */
         $safeName = HtmlSanitizer::safeHtmlOutput($statName);
 
         // Use 5 columns for player stats (with Team), 4 columns for team stats
@@ -90,9 +99,11 @@ class SeasonHighsView implements SeasonHighsViewInterface
 
         foreach ($stats as $index => $row) {
             $rank = $index + 1;
-            $name = HtmlSanitizer::safeHtmlOutput($row['name'] ?? '');
-            $date = HtmlSanitizer::safeHtmlOutput($row['date'] ?? '');
-            $value = (int) ($row['value'] ?? 0);
+            /** @var string $name */
+            $name = HtmlSanitizer::safeHtmlOutput($row['name']);
+            /** @var string $date */
+            $date = HtmlSanitizer::safeHtmlOutput($row['date']);
+            $value = $row['value'];
             $tid = 0;
             $teamCell = '';
             $isTeamStat = false;
@@ -101,13 +112,17 @@ class SeasonHighsView implements SeasonHighsViewInterface
             if (isset($row['pid'])) {
                 $pid = (int) $row['pid'];
                 $playerThumbnail = PlayerImageHelper::renderThumbnail($pid);
+                /** @var string $name */
                 $name = "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a>";
 
                 // Build team cell for player stats
                 if ($isPlayerStats) {
-                    $tid = (int) ($row['tid'] ?? 0);
+                    $tid = $row['tid'] ?? 0;
+                    /** @var string $teamName */
                     $teamName = HtmlSanitizer::safeHtmlOutput($row['teamname'] ?? '');
+                    /** @var string $color1 */
                     $color1 = HtmlSanitizer::safeHtmlOutput($row['color1'] ?? 'FFFFFF');
+                    /** @var string $color2 */
                     $color2 = HtmlSanitizer::safeHtmlOutput($row['color2'] ?? '000000');
 
                     if ($tid === 0) {
@@ -123,24 +138,22 @@ class SeasonHighsView implements SeasonHighsViewInterface
                 }
             } elseif (isset($row['teamid'])) {
                 // Style team names with colored cell for team stats
-                $teamId = (int) $row['teamid'];
-                $color1 = HtmlSanitizer::safeHtmlOutput($row['color1'] ?? 'FFFFFF');
-                $color2 = HtmlSanitizer::safeHtmlOutput($row['color2'] ?? '000000');
-
-                // For team stats, we'll use a special flag to render differently
                 $isTeamStat = true;
             }
 
             // Link dates to box score when boxId is available
             if (isset($row['boxId'])) {
                 $boxId = (int) $row['boxId'];
+                /** @var string $date */
                 $date = "<a href=\"./ibl/IBL/box{$boxId}.htm\">{$date}</a>";
             }
 
             // Render row differently for team stats (styled team cell) vs player stats
             if ($isTeamStat) {
-                $teamId = (int) $row['teamid'];
+                $teamId = (int) ($row['teamid'] ?? 0);
+                /** @var string $color1 */
                 $color1 = HtmlSanitizer::safeHtmlOutput($row['color1'] ?? 'FFFFFF');
+                /** @var string $color2 */
                 $color2 = HtmlSanitizer::safeHtmlOutput($row['color2'] ?? '000000');
 
                 $output .= "<tr data-team-id=\"{$teamId}\">

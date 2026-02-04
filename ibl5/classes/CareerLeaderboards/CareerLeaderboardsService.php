@@ -9,69 +9,98 @@ use CareerLeaderboards\Contracts\CareerLeaderboardsServiceInterface;
 
 /**
  * @see CareerLeaderboardsServiceInterface
+ *
+ * @phpstan-import-type CareerStatsRow from Contracts\CareerLeaderboardsRepositoryInterface
+ * @phpstan-import-type FormattedPlayerStats from Contracts\CareerLeaderboardsServiceInterface
  */
 class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
 {
     /**
      * @see CareerLeaderboardsServiceInterface::processPlayerRow()
+     *
+     * @param CareerStatsRow $row
+     * @return FormattedPlayerStats
      */
     public function processPlayerRow(array $row, string $tableType): array
     {
-        $stats = [];
-        
-        // Basic info
-        $stats['pid'] = $row['pid'];
-        $stats['name'] = $row['name'] . ($row['retired'] ? '*' : '');
-        
+        $pid = $row['pid'];
+        $retired = $row['retired'];
+        $isRetired = ($retired !== '0' && $retired !== 0);
+        $name = $row['name'] . ($isRetired ? '*' : '');
+
         // Process based on table type
         if ($tableType === 'averages') {
-            $stats['games'] = round((float)$row['games']);
-            $stats['minutes'] = StatsFormatter::formatAverage($row['minutes']);
-            $stats['fgm'] = StatsFormatter::formatAverage($row['fgm']);
-            $stats['fga'] = StatsFormatter::formatAverage($row['fga']);
-            $stats['fgp'] = StatsFormatter::formatPercentageWithDecimals($row['fgpct'], 1, 3);
-            $stats['ftm'] = StatsFormatter::formatAverage($row['ftm']);
-            $stats['fta'] = StatsFormatter::formatAverage($row['fta']);
-            $stats['ftp'] = StatsFormatter::formatPercentageWithDecimals($row['ftpct'], 1, 3);
-            $stats['tgm'] = StatsFormatter::formatAverage($row['tgm']);
-            $stats['tga'] = StatsFormatter::formatAverage($row['tga']);
-            $stats['tgp'] = StatsFormatter::formatPercentageWithDecimals($row['tpct'], 1, 3);
-            $stats['orb'] = StatsFormatter::formatAverage($row['orb']);
-            $stats['reb'] = StatsFormatter::formatAverage($row['reb']);
-            $stats['ast'] = StatsFormatter::formatAverage($row['ast']);
-            $stats['stl'] = StatsFormatter::formatAverage($row['stl']);
-            $stats['tvr'] = StatsFormatter::formatAverage($row['tvr']);
-            $stats['blk'] = StatsFormatter::formatAverage($row['blk']);
-            $stats['pf'] = StatsFormatter::formatAverage($row['pf']);
-            $stats['pts'] = StatsFormatter::formatAverage($row['pts']);
+            $games = round((float) $row['games']);
+            $minutes = StatsFormatter::formatAverage($row['minutes']);
+            $fgm = StatsFormatter::formatAverage($row['fgm']);
+            $fga = StatsFormatter::formatAverage($row['fga']);
+            $fgp = StatsFormatter::formatPercentageWithDecimals($row['fgpct'] ?? null, 1, 3);
+            $ftm = StatsFormatter::formatAverage($row['ftm']);
+            $fta = StatsFormatter::formatAverage($row['fta']);
+            $ftp = StatsFormatter::formatPercentageWithDecimals($row['ftpct'] ?? null, 1, 3);
+            $tgm = StatsFormatter::formatAverage($row['tgm']);
+            $tga = StatsFormatter::formatAverage($row['tga']);
+            $tgp = StatsFormatter::formatPercentageWithDecimals($row['tpct'] ?? null, 1, 3);
+            $orb = StatsFormatter::formatAverage($row['orb']);
+            $reb = StatsFormatter::formatAverage($row['reb']);
+            $ast = StatsFormatter::formatAverage($row['ast']);
+            $stl = StatsFormatter::formatAverage($row['stl']);
+            $tvr = StatsFormatter::formatAverage($row['tvr']);
+            $blk = StatsFormatter::formatAverage($row['blk']);
+            $pf = StatsFormatter::formatAverage($row['pf']);
+            $pts = StatsFormatter::formatAverage($row['pts']);
         } else {
             // Totals
-            $stats['games'] = StatsFormatter::formatTotal($row['games']);
-            $stats['minutes'] = StatsFormatter::formatTotal($row['minutes']);
-            $stats['fgm'] = StatsFormatter::formatTotal($row['fgm']);
-            $stats['fga'] = StatsFormatter::formatTotal($row['fga']);
-            $stats['fgp'] = StatsFormatter::formatPercentage($row['fgm'], $row['fga']);
-            $stats['ftm'] = StatsFormatter::formatTotal($row['ftm']);
-            $stats['fta'] = StatsFormatter::formatTotal($row['fta']);
-            $stats['ftp'] = StatsFormatter::formatPercentage($row['ftm'], $row['fta']);
-            $stats['tgm'] = StatsFormatter::formatTotal($row['tgm']);
-            $stats['tga'] = StatsFormatter::formatTotal($row['tga']);
-            $stats['tgp'] = StatsFormatter::formatPercentage($row['tgm'], $row['tga']);
-            $stats['orb'] = StatsFormatter::formatTotal($row['orb']);
-            $stats['reb'] = StatsFormatter::formatTotal($row['reb']);
-            $stats['ast'] = StatsFormatter::formatTotal($row['ast']);
-            $stats['stl'] = StatsFormatter::formatTotal($row['stl']);
-            $stats['tvr'] = StatsFormatter::formatTotal($row['tvr']);
-            $stats['blk'] = StatsFormatter::formatTotal($row['blk']);
-            $stats['pf'] = StatsFormatter::formatTotal($row['pf']);
-            $stats['pts'] = StatsFormatter::formatTotal($row['pts']);
+            $games = StatsFormatter::formatTotal($row['games']);
+            $minutes = StatsFormatter::formatTotal($row['minutes']);
+            $fgm = StatsFormatter::formatTotal($row['fgm']);
+            $fga = StatsFormatter::formatTotal($row['fga']);
+            $fgp = StatsFormatter::formatPercentage($row['fgm'], $row['fga']);
+            $ftm = StatsFormatter::formatTotal($row['ftm']);
+            $fta = StatsFormatter::formatTotal($row['fta']);
+            $ftp = StatsFormatter::formatPercentage($row['ftm'], $row['fta']);
+            $tgm = StatsFormatter::formatTotal($row['tgm']);
+            $tga = StatsFormatter::formatTotal($row['tga']);
+            $tgp = StatsFormatter::formatPercentage($row['tgm'], $row['tga']);
+            $orb = StatsFormatter::formatTotal($row['orb']);
+            $reb = StatsFormatter::formatTotal($row['reb']);
+            $ast = StatsFormatter::formatTotal($row['ast']);
+            $stl = StatsFormatter::formatTotal($row['stl']);
+            $tvr = StatsFormatter::formatTotal($row['tvr']);
+            $blk = StatsFormatter::formatTotal($row['blk']);
+            $pf = StatsFormatter::formatTotal($row['pf']);
+            $pts = StatsFormatter::formatTotal($row['pts']);
         }
-        
-        return $stats;
+
+        return [
+            'pid' => $pid,
+            'name' => $name,
+            'games' => $games,
+            'minutes' => $minutes,
+            'fgm' => $fgm,
+            'fga' => $fga,
+            'fgp' => $fgp,
+            'ftm' => $ftm,
+            'fta' => $fta,
+            'ftp' => $ftp,
+            'tgm' => $tgm,
+            'tga' => $tga,
+            'tgp' => $tgp,
+            'orb' => $orb,
+            'reb' => $reb,
+            'ast' => $ast,
+            'stl' => $stl,
+            'tvr' => $tvr,
+            'blk' => $blk,
+            'pf' => $pf,
+            'pts' => $pts,
+        ];
     }
 
     /**
      * @see CareerLeaderboardsServiceInterface::getBoardTypes()
+     *
+     * @return array<string, string>
      */
     public function getBoardTypes(): array
     {
@@ -89,6 +118,8 @@ class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
 
     /**
      * @see CareerLeaderboardsServiceInterface::getSortCategories()
+     *
+     * @return array<string, string>
      */
     public function getSortCategories(): array
     {

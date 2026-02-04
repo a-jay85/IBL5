@@ -7,6 +7,9 @@ namespace Voting;
 use Voting\Contracts\VotingResultsServiceInterface;
 
 /**
+ * @phpstan-import-type VoteRow from VotingResultsServiceInterface
+ * @phpstan-import-type VoteTable from VotingResultsServiceInterface
+ *
  * @see VotingResultsServiceInterface
  */
 class VotingResultsService implements VotingResultsServiceInterface
@@ -15,6 +18,7 @@ class VotingResultsService implements VotingResultsServiceInterface
     private const EOY_TABLE = 'ibl_votes_EOY';
     public const BLANK_BALLOT_LABEL = '(No Selection Recorded)';
 
+    /** @var array<string, list<string>> */
     private const ALL_STAR_CATEGORIES = [
         'Eastern Conference Frontcourt' => ['East_F1', 'East_F2', 'East_F3', 'East_F4'],
         'Eastern Conference Backcourt' => ['East_B1', 'East_B2', 'East_B3', 'East_B4'],
@@ -22,6 +26,7 @@ class VotingResultsService implements VotingResultsServiceInterface
         'Western Conference Backcourt' => ['West_B1', 'West_B2', 'West_B3', 'West_B4'],
     ];
 
+    /** @var array<string, array<string, int>> */
     private const END_OF_YEAR_CATEGORIES = [
         'Most Valuable Player' => ['MVP_1' => 3, 'MVP_2' => 2, 'MVP_3' => 1],
         'Sixth Man of the Year' => ['Six_1' => 3, 'Six_2' => 2, 'Six_3' => 1],
@@ -38,6 +43,8 @@ class VotingResultsService implements VotingResultsServiceInterface
 
     /**
      * @see VotingResultsServiceInterface::getAllStarResults()
+     *
+     * @return list<VoteTable>
      */
     public function getAllStarResults(): array
     {
@@ -53,6 +60,8 @@ class VotingResultsService implements VotingResultsServiceInterface
 
     /**
      * @see VotingResultsServiceInterface::getEndOfYearResults()
+     *
+     * @return list<VoteTable>
      */
     public function getEndOfYearResults(): array
     {
@@ -67,6 +76,10 @@ class VotingResultsService implements VotingResultsServiceInterface
         return $results;
     }
 
+    /**
+     * @param list<string> $ballotColumns
+     * @return list<VoteRow>
+     */
     private function fetchAllStarTotals(array $ballotColumns): array
     {
         $query = $this->buildAllStarQuery($ballotColumns);
@@ -74,6 +87,10 @@ class VotingResultsService implements VotingResultsServiceInterface
         return $this->executeVoteQuery($query);
     }
 
+    /**
+     * @param array<string, int> $ballotColumnsWithWeights
+     * @return list<VoteRow>
+     */
     private function fetchEndOfYearTotals(array $ballotColumnsWithWeights): array
     {
         $query = $this->buildEndOfYearQuery($ballotColumnsWithWeights);
@@ -81,6 +98,9 @@ class VotingResultsService implements VotingResultsServiceInterface
         return $this->executeVoteQuery($query);
     }
 
+    /**
+     * @param list<string> $ballotColumns
+     */
     private function buildAllStarQuery(array $ballotColumns): string
     {
         $selectStatements = [];
@@ -95,6 +115,9 @@ class VotingResultsService implements VotingResultsServiceInterface
         return $query;
     }
 
+    /**
+     * @param array<string, int> $ballotColumnsWithWeights
+     */
     private function buildEndOfYearQuery(array $ballotColumnsWithWeights): string
     {
         $selectStatements = [];
@@ -109,6 +132,9 @@ class VotingResultsService implements VotingResultsServiceInterface
         return $query;
     }
 
+    /**
+     * @return list<VoteRow>
+     */
     private function executeVoteQuery(string $query): array
     {
         // Use mysqli with prepared statements (no parameters needed for these queries)
@@ -131,8 +157,13 @@ class VotingResultsService implements VotingResultsServiceInterface
             return [];
         }
 
+        /** @var list<VoteRow> $rows */
         $rows = [];
-        while ($record = $result->fetch_assoc()) {
+        while (true) {
+            $record = $result->fetch_assoc();
+            if (!is_array($record)) {
+                break;
+            }
             $name = trim((string) ($record['name'] ?? ''));
             if ($name === '') {
                 $name = self::BLANK_BALLOT_LABEL;
@@ -142,6 +173,7 @@ class VotingResultsService implements VotingResultsServiceInterface
             $rows[] = [
                 'name' => $name,
                 'votes' => $votes,
+                'pid' => 0,
             ];
         }
 
@@ -153,14 +185,16 @@ class VotingResultsService implements VotingResultsServiceInterface
     /**
      * Batch-resolve player IDs from names via ibl_plr table.
      *
-     * @param array $rows Rows with 'name' and 'votes' keys
-     * @return array Same rows with 'pid' added (0 if no match)
+     * @param list<VoteRow> $rows Rows with 'name' and 'votes' keys
+     * @return list<VoteRow> Same rows with 'pid' resolved
      */
     private function resolvePlayerIds(array $rows): array
     {
-        // Vote names are stored as "Player Name, Team" — extract player name for lookup
-        $playerNames = [];
+        // Vote names are stored as "Player Name, Team" -- extract player name for lookup
+        /** @var array<string, string> $voteToPlayer */
         $voteToPlayer = [];
+        /** @var array<string, true> $playerNames */
+        $playerNames = [];
         foreach ($rows as $row) {
             if ($row['name'] !== self::BLANK_BALLOT_LABEL) {
                 $playerName = self::extractPlayerName($row['name']);
@@ -169,22 +203,32 @@ class VotingResultsService implements VotingResultsServiceInterface
             }
         }
 
-        if (empty($playerNames)) {
-            return array_map(static fn(array $row): array => $row + ['pid' => 0], $rows);
+        if ($playerNames === []) {
+            return $rows;
         }
 
         $uniqueNames = array_keys($playerNames);
         $placeholders = implode(',', array_fill(0, count($uniqueNames), '?'));
         $stmt = $this->db->prepare("SELECT pid, name FROM ibl_plr WHERE name IN ({$placeholders})");
         if ($stmt === false) {
-            return array_map(static fn(array $row): array => $row + ['pid' => 0], $rows);
+            return $rows;
         }
 
         $stmt->execute($uniqueNames);
         $result = $stmt->get_result();
 
+        if ($result === false) {
+            $stmt->close();
+            return $rows;
+        }
+
+        /** @var array<string, int> $pidMap */
         $pidMap = [];
-        while ($record = $result->fetch_assoc()) {
+        while (true) {
+            $record = $result->fetch_assoc();
+            if (!is_array($record)) {
+                break;
+            }
             $pidMap[(string) $record['name']] = (int) $record['pid'];
         }
         $stmt->close();

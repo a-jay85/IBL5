@@ -11,6 +11,8 @@ use ContractList\Contracts\ContractListRepositoryInterface;
  *
  * Retrieves player contract information from the ibl_plr table.
  *
+ * @phpstan-type ContractPlayerRow array{pid: int, name: string, pos: string, teamname: string, tid: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, bird: string, team_city: string|null, color1: string|null, color2: string|null}
+ *
  * @see ContractListRepositoryInterface For the interface contract
  * @see \BaseMysqliRepository For base class documentation
  */
@@ -28,6 +30,7 @@ class ContractListRepository extends \BaseMysqliRepository implements ContractLi
             WHERE p.retired = 0
             ORDER BY p.ordinal ASC";
 
+        /** @var list<array{name: string, pos: string, teamname: string, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, bird: string, pid: int, tid: int, team_city: string|null, color1: string|null, color2: string|null}> */
         return $this->fetchAll($query);
     }
 }

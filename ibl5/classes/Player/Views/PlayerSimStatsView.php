@@ -7,7 +7,6 @@ namespace Player\Views;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerSimStatsViewInterface;
 use BasketballStats\StatsFormatter;
-use Utilities\HtmlSanitizer;
 
 /**
  * PlayerSimStatsView - Renders sim-by-sim statistics
@@ -41,7 +40,7 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
     public function renderSimStats(int $playerID): string
     {
         $simDates = $this->repository->getSimDates(20);
-        
+
         ob_start();
         ?>
 <table class="sortable player-table sim-stats-table">
@@ -66,6 +65,7 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
     </tr>
         <?php
         foreach ($simDates as $simDate) {
+            /** @var array{Sim: int, 'Start Date': string, 'End Date': string} $simDate */
             $simNumber = $simDate['Sim'];
             $simStartDate = $simDate['Start Date'];
             $simEndDate = $simDate['End Date'];
@@ -78,8 +78,8 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
             }
 
             // Calculate totals
-            $totals = $this->calculateSimTotals($boxScores);
-            
+            $totals = $this->calculateSimTotals(array_values($boxScores));
+
             // Calculate averages
             $avgMinutes = sprintf('%01.1f', $totals['minutes'] / $numberOfGames);
             $avgFGP = StatsFormatter::formatPercentageWithDecimals($totals['fgm'], $totals['fga']);
@@ -95,31 +95,34 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
             $avgPTS = sprintf('%01.1f', $totals['pts'] / $numberOfGames);
             ?>
     <tr>
-        <td><?= HtmlSanitizer::safeHtmlOutput((string)$simNumber) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput((string)$numberOfGames) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput($avgMinutes) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput($avgFGP) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput($avgFTP) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput($avg3GP) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput($avgORB) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput($avgREB) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput($avgAST) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput($avgSTL) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput($avgTO) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput($avgBLK) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput($avgPF) ?></td>
-        <td><?= HtmlSanitizer::safeHtmlOutput($avgPTS) ?></td>
+        <td><?= $simNumber ?></td>
+        <td><?= $numberOfGames ?></td>
+        <td><?= $avgMinutes ?></td>
+        <td><?= $avgFGP ?></td>
+        <td><?= $avgFTP ?></td>
+        <td><?= $avg3GP ?></td>
+        <td><?= $avgORB ?></td>
+        <td><?= $avgREB ?></td>
+        <td><?= $avgAST ?></td>
+        <td><?= $avgSTL ?></td>
+        <td><?= $avgTO ?></td>
+        <td><?= $avgBLK ?></td>
+        <td><?= $avgPF ?></td>
+        <td><?= $avgPTS ?></td>
     </tr>
             <?php
         }
         ?>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * Calculate totals from box scores
+     *
+     * @param list<array<string, mixed>> $boxScores Box score rows from repository
+     * @return array{minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, pf: int, pts: int}
      */
     private function calculateSimTotals(array $boxScores): array
     {
@@ -131,6 +134,7 @@ class PlayerSimStatsView implements PlayerSimStatsViewInterface
         ];
 
         foreach ($boxScores as $row) {
+            /** @var array{gameMIN: int, game2GM: int, game2GA: int, game3GM: int, game3GA: int, gameFTM: int, gameFTA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int} $row */
             $totals['minutes'] += $row['gameMIN'];
             $totals['fgm'] += $row['game2GM'] + $row['game3GM'];
             $totals['fga'] += $row['game2GA'] + $row['game3GA'];

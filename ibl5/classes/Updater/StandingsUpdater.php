@@ -8,9 +8,9 @@ use Utilities\RecordParser;
 use Utilities\StandingsGrouper;
 
 class StandingsUpdater extends \BaseMysqliRepository {
-    private $commonRepository;
+    private \Services\CommonMysqliRepository $commonRepository;
 
-    public function __construct(object $db, $commonRepository) {
+    public function __construct(object $db, \Services\CommonMysqliRepository $commonRepository) {
         parent::__construct($db);
         $this->commonRepository = $commonRepository;
     }
@@ -23,109 +23,125 @@ class StandingsUpdater extends \BaseMysqliRepository {
         return RecordParser::extractLosses($record);
     }
 
+    /**
+     * @return array{0: string, 1: string, 2: string}
+     */
     protected function assignGroupingsFor(string $region): array {
         $groupings = StandingsGrouper::getGroupingsFor($region);
         // Return as indexed array for backwards compatibility with list() destructuring
         return [$groupings['grouping'], $groupings['groupingGB'], $groupings['groupingMagicNumber']];
     }
 
-    public function update() {
+    public function update(): void {
         echo '<p>Updating the ibl_standings database table...<p>';
         $this->execute('TRUNCATE TABLE ibl_standings', '');
         echo 'TRUNCATE TABLE ibl_standings<p>';
 
         $this->extractStandingsValues();
-        
+
         $this->updateMagicNumbers('Eastern');
         $this->updateMagicNumbers('Western');
         $this->updateMagicNumbers('Atlantic');
         $this->updateMagicNumbers('Central');
         $this->updateMagicNumbers('Midwest');
         $this->updateMagicNumbers('Pacific');
-        
+
         echo '<p>Magic numbers for all teams have been updated.<p>';
         echo '<p>The ibl_standings table has been updated.<p>';
     }
 
-    protected function extractStandingsValues() {
+    protected function extractStandingsValues(): void {
         echo '<p>Updating the conference standings for all teams...<p>';
 
-        $standingsFilePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5/ibl/IBL/Standings.htm';
+        /** @var string $documentRoot */
+        $documentRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
+        $standingsFilePath = $documentRoot . '/ibl5/ibl/IBL/Standings.htm';
         $standings = new \DOMDocument();
         $standings->loadHTMLFile($standingsFilePath);
         $standings->preserveWhiteSpace = false;
 
         $getRows = $standings->getElementsByTagName('tr');
-        
+
         // Safely navigate the DOM tree with null checks
         $firstRow = $getRows->item(0);
-        if (!$firstRow) {
+        if ($firstRow === null) {
             echo '<p>Error: Unable to find standings table rows</p>';
             return;
         }
-        
+
         $conferenceContainer = $firstRow->childNodes->item(0);
-        if (!$conferenceContainer || !$conferenceContainer->childNodes) {
+        if ($conferenceContainer === null) {
             echo '<p>Error: Unable to find conference container in standings</p>';
             return;
         }
-        
+
         $conferenceContent = $conferenceContainer->childNodes->item(0);
-        if (!$conferenceContent || !$conferenceContent->childNodes) {
+        if ($conferenceContent === null) {
             echo '<p>Error: Unable to find conference content in standings</p>';
             return;
         }
-        
+
         $rowsByConference = $conferenceContent->childNodes;
-        
+
         $divisionContainer = $firstRow->childNodes->item(1);
-        if (!$divisionContainer || !$divisionContainer->childNodes) {
+        if ($divisionContainer === null) {
             echo '<p>Error: Unable to find division container in standings</p>';
             return;
         }
-        
+
         $divisionContent = $divisionContainer->childNodes->item(0);
-        if (!$divisionContent || !$divisionContent->childNodes) {
+        if ($divisionContent === null) {
             echo '<p>Error: Unable to find division content in standings</p>';
             return;
         }
-        
+
         $rowsByDivision = $divisionContent->childNodes;
 
         \UI::displayDebugOutput($this->processConferenceRows($rowsByConference), 'Conference Standings');
         \UI::displayDebugOutput($this->processDivisionRows($rowsByDivision), 'Division Standings');
     }
 
-    private function processConferenceRows($rowsByConference) {
+    /**
+     * @param \DOMNodeList<\DOMNode> $rowsByConference
+     */
+    private function processConferenceRows(\DOMNodeList $rowsByConference): string {
         $log = '';
+        $conference = '';
 
         foreach ($rowsByConference as $row) {
-            if (!is_null($row->childNodes)) {
-                $firstChild = $row->childNodes->item(0);
-                $teamName = $firstChild ? $firstChild->nodeValue : '';
-                if (in_array($teamName, array("Eastern", "Western"))) {
-                    $conference = $teamName;
-                }
-                if (!in_array($teamName, array("Eastern", "Western", "team", ""))) {
-                    $log .= $this->processTeamStandings($row, $conference);
-                }
+            $firstChild = $row->childNodes->item(0);
+            $teamName = ($firstChild !== null) ? ($firstChild->nodeValue ?? '') : '';
+            if (in_array($teamName, ['Eastern', 'Western'], true)) {
+                $conference = $teamName;
+            }
+            if (!in_array($teamName, ['Eastern', 'Western', 'team', ''], true)) {
+                $log .= $this->processTeamStandings($row, $conference);
             }
         }
 
         return $log;
     }
 
-    private function processTeamStandings($row, $conference) {
+    private function processTeamStandings(\DOMNode $row, string $conference): string {
         $log = '';
 
-        $teamID = $this->commonRepository->getTidFromTeamname($row->childNodes->item(0)->nodeValue); // This function now returns an integer
-        $leagueRecord = $row->childNodes->item(1)->nodeValue;
-        $pct = $row->childNodes->item(2)->nodeValue;
-        $confGB = $row->childNodes->item(3)->nodeValue;
-        $confRecord = $row->childNodes->item(4)->nodeValue;
-        $divRecord = $row->childNodes->item(5)->nodeValue;
-        $homeRecord = $row->childNodes->item(6)->nodeValue;
-        $awayRecord = $row->childNodes->item(7)->nodeValue;
+        $nodeValue0 = $row->childNodes->item(0) !== null ? ($row->childNodes->item(0)->nodeValue ?? '') : '';
+        $nodeValue1 = $row->childNodes->item(1) !== null ? ($row->childNodes->item(1)->nodeValue ?? '') : '';
+        $nodeValue2 = $row->childNodes->item(2) !== null ? ($row->childNodes->item(2)->nodeValue ?? '') : '';
+        $nodeValue3 = $row->childNodes->item(3) !== null ? ($row->childNodes->item(3)->nodeValue ?? '') : '';
+        $nodeValue4 = $row->childNodes->item(4) !== null ? ($row->childNodes->item(4)->nodeValue ?? '') : '';
+        $nodeValue5 = $row->childNodes->item(5) !== null ? ($row->childNodes->item(5)->nodeValue ?? '') : '';
+        $nodeValue6 = $row->childNodes->item(6) !== null ? ($row->childNodes->item(6)->nodeValue ?? '') : '';
+        $nodeValue7 = $row->childNodes->item(7) !== null ? ($row->childNodes->item(7)->nodeValue ?? '') : '';
+
+        $teamID = $this->commonRepository->getTidFromTeamname($nodeValue0);
+        $leagueRecord = $nodeValue1;
+        $pct = $nodeValue2;
+        $confGB = $nodeValue3;
+        $confRecord = $nodeValue4;
+        $divRecord = $nodeValue5;
+        $homeRecord = $nodeValue6;
+        $awayRecord = $nodeValue7;
 
         $confWins = $this->extractWins($confRecord);
         $confLosses = $this->extractLosses($confRecord);
@@ -137,6 +153,8 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $awayLosses = $this->extractLosses($awayRecord);
 
         $gamesUnplayed = 82 - $homeWins - $homeLosses - $awayWins - $awayLosses;
+
+        $teamNameTrimmed = rtrim($nodeValue0);
 
         $this->execute(
             "INSERT INTO ibl_standings (
@@ -162,7 +180,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             "isssissssssiiiiiiii",
             $teamID,
-            rtrim($row->childNodes->item(0)->nodeValue),
+            $teamNameTrimmed,
             $leagueRecord,
             $pct,
             $gamesUnplayed,
@@ -182,36 +200,41 @@ class StandingsUpdater extends \BaseMysqliRepository {
             $awayLosses
         );
 
-        $log .= "Inserted standings for team: " . rtrim($row->childNodes->item(0)->nodeValue) . '<br>';
+        $log .= "Inserted standings for team: {$teamNameTrimmed}<br>";
         return $log;
     }
 
-    private function processDivisionRows($rowsByDivision) {
+    /**
+     * @param \DOMNodeList<\DOMNode> $rowsByDivision
+     */
+    private function processDivisionRows(\DOMNodeList $rowsByDivision): string {
         $log = '';
+        $division = '';
 
         foreach ($rowsByDivision as $row) {
-            if (!is_null($row->childNodes)) {
-                $firstChild = $row->childNodes->item(0);
-                $teamName = $firstChild ? $firstChild->nodeValue : '';
-                
-                if (in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific"))) {
-                    $division = $teamName;
-                }
-                if (!in_array($teamName, array("Atlantic", "Central", "Midwest", "Pacific", "team", ""))) {
-                    $log .= $this->updateTeamDivision($row, $division);
-                }
+            $firstChild = $row->childNodes->item(0);
+            $teamName = ($firstChild !== null) ? ($firstChild->nodeValue ?? '') : '';
+
+            if (in_array($teamName, ['Atlantic', 'Central', 'Midwest', 'Pacific'], true)) {
+                $division = $teamName;
+            }
+            if (!in_array($teamName, ['Atlantic', 'Central', 'Midwest', 'Pacific', 'team', ''], true)) {
+                $log .= $this->updateTeamDivision($row, $division);
             }
         }
 
         return $log;
     }
 
-    private function updateTeamDivision($row, $division) {
+    private function updateTeamDivision(\DOMNode $row, string $division): string {
         $log = '';
-        
-        $teamName = $row->childNodes->item(0)->nodeValue;
+
+        $nodeValue0 = $row->childNodes->item(0) !== null ? ($row->childNodes->item(0)->nodeValue ?? '') : '';
+        $teamName = $nodeValue0;
         $teamID = $this->commonRepository->getTidFromTeamname($teamName);
-        $divGB = $row->childNodes->item(3)->nodeValue;
+
+        $nodeValue3 = $row->childNodes->item(3) !== null ? ($row->childNodes->item(3)->nodeValue ?? '') : '';
+        $divGB = $nodeValue3;
 
         $this->execute(
             "UPDATE ibl_standings SET division = ?, divGB = ? WHERE tid = ?",
@@ -225,14 +248,14 @@ class StandingsUpdater extends \BaseMysqliRepository {
         return $log;
     }
 
-    private function updateMagicNumbers($region) {
-        echo "<p>Updating the magic numbers for the $region...<br>";
+    private function updateMagicNumbers(string $region): void {
+        echo "<p>Updating the magic numbers for the {$region}...<br>";
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
 
         $teams = $this->fetchAll(
             "SELECT tid, team_name, homeWins, homeLosses, awayWins, awayLosses
             FROM ibl_standings
-            WHERE $grouping = ?
+            WHERE {$grouping} = ?
             ORDER BY pct DESC",
             "s",
             $region
@@ -242,34 +265,38 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $numTeams = count($teams);
 
         for ($i = 0; $i < $numTeams; $i++) {
-            $teamID = $teams[$i]['tid'];
-            $teamName = $teams[$i]['team_name'];
-            $teamTotalWins = $teams[$i]['homeWins'] + $teams[$i]['awayWins'];
-            
-            if ($i + 1 != $numTeams) {
-                $belowTeamTotalLosses = $teams[$i + 1]['homeLosses'] + $teams[$i + 1]['awayLosses'];
+            /** @var array{tid: int, team_name: string, homeWins: int, homeLosses: int, awayWins: int, awayLosses: int} $teamRow */
+            $teamRow = $teams[$i];
+            $teamID = $teamRow['tid'];
+            $teamName = $teamRow['team_name'];
+            $teamTotalWins = $teamRow['homeWins'] + $teamRow['awayWins'];
+
+            if ($i + 1 !== $numTeams) {
+                /** @var array{tid: int, team_name: string, homeWins: int, homeLosses: int, awayWins: int, awayLosses: int} $belowTeamRow */
+                $belowTeamRow = $teams[$i + 1];
+                $belowTeamTotalLosses = $belowTeamRow['homeLosses'] + $belowTeamRow['awayLosses'];
             } else {
                 $belowTeamTotalLosses = 0;
             }
-            
+
             $magicNumber = 82 + 1 - $teamTotalWins - $belowTeamTotalLosses;
 
             $log .= $this->updateTeamMagicNumber($teamID, $teamName, $magicNumber, $groupingMagicNumber);
         }
 
-        \UI::displayDebugOutput($log, "$region Magic Number Update Log");
+        \UI::displayDebugOutput($log, "{$region} Magic Number Update Log");
 
         $this->checkIfRegionIsClinched($region);
-        if ($grouping == 'conference') {
+        if ($grouping === 'conference') {
             $this->checkIfPlayoffsClinched($region);
         }
     }
 
-    private function updateTeamMagicNumber($teamID, $teamName, $magicNumber, $groupingMagicNumber) {
+    private function updateTeamMagicNumber(int $teamID, string $teamName, int $magicNumber, string $groupingMagicNumber): string {
         $log = '';
 
         $this->execute(
-            "UPDATE ibl_standings SET $groupingMagicNumber = ? WHERE tid = ?",
+            "UPDATE ibl_standings SET {$groupingMagicNumber} = ? WHERE tid = ?",
             "ii",
             $magicNumber,
             $teamID
@@ -280,31 +307,33 @@ class StandingsUpdater extends \BaseMysqliRepository {
         return $log;
     }
 
-    private function checkIfRegionIsClinched($region) {
+    private function checkIfRegionIsClinched(string $region): void {
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
-        echo "<p>Checking if the $region $grouping has been clinched...<br>";
+        echo "<p>Checking if the {$region} {$grouping} has been clinched...<br>";
 
         $winningestTeam = $this->fetchOne(
             "SELECT team_name, homeWins + awayWins AS wins
             FROM ibl_standings
-            WHERE $grouping = ?
+            WHERE {$grouping} = ?
             ORDER BY wins DESC
             LIMIT 1",
             "s",
             $region
         );
-        
-        if (!$winningestTeam) {
+
+        if ($winningestTeam === null) {
             return;
         }
-        
+
+        /** @var string $winningestTeamName */
         $winningestTeamName = $winningestTeam['team_name'];
+        /** @var int $winningestTeamWins */
         $winningestTeamWins = $winningestTeam['wins'];
 
         $leastLosingestTeam = $this->fetchOne(
             "SELECT homeLosses + awayLosses AS losses
             FROM ibl_standings
-            WHERE $grouping = ?
+            WHERE {$grouping} = ?
                 AND team_name != ?
             ORDER BY losses ASC
             LIMIT 1",
@@ -312,11 +341,12 @@ class StandingsUpdater extends \BaseMysqliRepository {
             $region,
             $winningestTeamName
         );
-        
-        if (!$leastLosingestTeam) {
+
+        if ($leastLosingestTeam === null) {
             return;
         }
-        
+
+        /** @var int $leastLosingestTeamLosses */
         $leastLosingestTeamLosses = $leastLosingestTeam['losses'];
 
         $magicNumber = 82 + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
@@ -327,12 +357,12 @@ class StandingsUpdater extends \BaseMysqliRepository {
                 "s",
                 $winningestTeamName
             );
-            echo "The $winningestTeamName have clinched the $region $grouping!";
+            echo "The {$winningestTeamName} have clinched the {$region} {$grouping}!";
         }
     }
 
-    private function checkIfPlayoffsClinched($conference) {
-        echo "<p>Checking if any teams have clinched playoff spots in the $conference Conference...<br>";
+    private function checkIfPlayoffsClinched(string $conference): void {
+        echo "<p>Checking if any teams have clinched playoff spots in the {$conference} Conference...<br>";
 
         $eightWinningestTeams = $this->fetchAll(
             "SELECT team_name, homeWins + awayWins AS wins
@@ -358,8 +388,10 @@ class StandingsUpdater extends \BaseMysqliRepository {
             if (!isset($eightWinningestTeams[$i])) {
                 continue;
             }
-            
+
+            /** @var string $contendingTeamName */
             $contendingTeamName = $eightWinningestTeams[$i]['team_name'];
+            /** @var int $contendingTeamWins */
             $contendingTeamWins = $eightWinningestTeams[$i]['wins'];
             $teamsEliminated = 0;
 
@@ -367,7 +399,8 @@ class StandingsUpdater extends \BaseMysqliRepository {
                 if (!isset($sixLosingestTeams[$j])) {
                     continue;
                 }
-                
+
+                /** @var int $bottomTeamLosses */
                 $bottomTeamLosses = $sixLosingestTeams[$j]['losses'];
                 $magicNumber = 82 + 1 - $contendingTeamWins - $bottomTeamLosses;
 
@@ -382,7 +415,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
                     "s",
                     $contendingTeamName
                 );
-                echo "The $contendingTeamName have clinched a playoff spot!<br>";
+                echo "The {$contendingTeamName} have clinched a playoff spot!<br>";
             }
         }
     }

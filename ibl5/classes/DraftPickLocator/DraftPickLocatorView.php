@@ -12,12 +12,16 @@ use Utilities\HtmlSanitizer;
  *
  * Generates HTML table displaying draft pick ownership.
  *
+ * @phpstan-import-type TeamWithPicks from DraftPickLocatorViewInterface
+ *
  * @see DraftPickLocatorViewInterface For the interface contract
  */
 class DraftPickLocatorView implements DraftPickLocatorViewInterface
 {
     /**
      * @see DraftPickLocatorViewInterface::render()
+     *
+     * @param list<array{teamId: int, teamCity: string, teamName: string, color1: string, color2: string, picks: list<array{ownerofpick: string, year: int, round: int}>}> $teamsWithPicks
      */
     public function render(array $teamsWithPicks, int $currentEndingYear): string
     {
@@ -61,7 +65,9 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
         $html .= '<tr><th rowspan="2" class="sticky-col sticky-corner">Team</th>';
         for ($i = 0; $i < 6; $i++) {
             $year = $currentEndingYear + $i;
-            $html .= '<th colspan="2">' . HtmlSanitizer::safeHtmlOutput((string)$year) . '</th>';
+            /** @var string $safeYear */
+            $safeYear = HtmlSanitizer::safeHtmlOutput((string)$year);
+            $html .= '<th colspan="2">' . $safeYear . '</th>';
         }
         $html .= '</tr>';
 
@@ -80,7 +86,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
     /**
      * Build a lookup map of team name to team info (colors, ID)
      *
-     * @param array $teamsWithPicks Teams with draft pick data
+     * @param list<array{teamId: int, teamCity: string, teamName: string, color1: string, color2: string, picks: list<array{ownerofpick: string, year: int, round: int}>}> $teamsWithPicks Teams with draft pick data
      * @return array<string, array{color1: string, color2: string, teamId: int}> Map of team name to info
      */
     private function buildTeamColorMap(array $teamsWithPicks): array
@@ -90,7 +96,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
             $map[$team['teamName']] = [
                 'color1' => $team['color1'],
                 'color2' => $team['color2'],
-                'teamId' => (int)$team['teamId'],
+                'teamId' => $team['teamId'],
             ];
         }
 
@@ -100,8 +106,8 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
     /**
      * Render all team rows
      *
-     * @param array $teamsWithPicks Teams with draft pick data
-     * @param array<string, array{color1: string, color2: string}> $teamColorMap Team color lookup
+     * @param list<array{teamId: int, teamCity: string, teamName: string, color1: string, color2: string, picks: list<array{ownerofpick: string, year: int, round: int}>}> $teamsWithPicks Teams with draft pick data
+     * @param array<string, array{color1: string, color2: string, teamId: int}> $teamColorMap Team color lookup
      * @return string HTML for all team rows
      */
     private function renderTableRows(array $teamsWithPicks, array $teamColorMap): string
@@ -118,15 +124,18 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
     /**
      * Render a single team row
      *
-     * @param array $team Team with draft pick data
-     * @param array<string, array{color1: string, color2: string}> $teamColorMap Team color lookup
+     * @param array{teamId: int, teamCity: string, teamName: string, color1: string, color2: string, picks: list<array{ownerofpick: string, year: int, round: int}>} $team Team with draft pick data
+     * @param array<string, array{color1: string, color2: string, teamId: int}> $teamColorMap Team color lookup
      * @return string HTML for team row
      */
     private function renderTeamRow(array $team, array $teamColorMap): string
     {
-        $teamId = (int)$team['teamId'];
+        $teamId = $team['teamId'];
+        /** @var string $color1 */
         $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
+        /** @var string $color2 */
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
+        /** @var string $teamName */
         $teamName = HtmlSanitizer::safeHtmlOutput($team['teamName']);
 
         $html = '<tr data-team-id="' . $teamId . '">';
@@ -141,7 +150,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
 
         // Pick cells - color traded picks with owning team's colors
         foreach ($team['picks'] as $pick) {
-            $ownerOfPick = $pick['ownerofpick'] ?? '';
+            $ownerOfPick = $pick['ownerofpick'];
             $isOwn = ($ownerOfPick === $team['teamName']);
             $ownerInfo = $teamColorMap[$ownerOfPick] ?? null;
 
@@ -149,7 +158,9 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
                 $html .= '<td class="draft-pick-own">';
             } else {
                 if ($ownerInfo !== null) {
+                    /** @var string $bgColor */
                     $bgColor = HtmlSanitizer::safeHtmlOutput($ownerInfo['color1']);
+                    /** @var string $textColor */
                     $textColor = HtmlSanitizer::safeHtmlOutput($ownerInfo['color2']);
                     $html .= '<td class="draft-pick-traded" style="background-color: #' . $bgColor . '; color: #' . $textColor . ';">';
                 } else {
@@ -157,6 +168,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
                 }
             }
 
+            /** @var string $escapedOwner */
             $escapedOwner = HtmlSanitizer::safeHtmlOutput($ownerOfPick);
             if ($ownerInfo !== null) {
                 $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $ownerInfo['teamId'] . '" style="color: inherit; text-decoration: none;">';

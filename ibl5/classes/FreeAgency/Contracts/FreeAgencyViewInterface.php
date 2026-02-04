@@ -10,6 +10,10 @@ namespace FreeAgency\Contracts;
  * Pure renderer that receives pre-computed data from FreeAgencyService.
  * Renders comprehensive display of team's free agency status including
  * players under contract, pending offers, and available free agents.
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-type CapMetrics array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}
+ * @phpstan-type MainPageData array{team: \Team, season: \Season, capMetrics: CapMetrics, allOtherPlayers: list<PlayerRow>}
  */
 interface FreeAgencyViewInterface
 {
@@ -25,7 +29,7 @@ interface FreeAgencyViewInterface
      * - Other free agents table (all other available free agents)
      * - Cap metrics (soft cap space, hard cap space, available roster spots)
      *
-     * @param array $mainPageData Pre-computed data from FreeAgencyService::getMainPageData()
+     * @param MainPageData $mainPageData Pre-computed data from FreeAgencyService::getMainPageData()
      * @param string|null $result PRG result code (e.g. 'offer_success', 'deleted', 'already_signed')
      * @return string Complete HTML page content (not including HTML/body tags)
      */

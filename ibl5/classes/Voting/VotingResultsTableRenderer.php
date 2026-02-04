@@ -6,8 +6,12 @@ namespace Voting;
 
 use Player\PlayerImageHelper;
 use Voting\Contracts\VotingResultsTableRendererInterface;
+use Voting\Contracts\VotingResultsServiceInterface;
 
 /**
+ * @phpstan-import-type VoteRow from VotingResultsServiceInterface
+ * @phpstan-import-type VoteTable from VotingResultsServiceInterface
+ *
  * @see VotingResultsTableRendererInterface
  */
 class VotingResultsTableRenderer implements VotingResultsTableRendererInterface
@@ -16,28 +20,34 @@ class VotingResultsTableRenderer implements VotingResultsTableRendererInterface
 
     /**
      * @see VotingResultsTableRendererInterface::renderTables()
+     *
+     * @param list<VoteTable> $tables
      */
     public function renderTables(array $tables): string
     {
         $output = '';
         foreach ($tables as $table) {
-            $title = $table['title'] ?? '';
-            $rows = $table['rows'] ?? [];
+            $title = $table['title'];
+            $rows = $table['rows'];
             $output .= $this->renderTable($title, $rows);
         }
 
         return $output;
     }
 
+    /**
+     * @param list<VoteRow> $rows
+     */
     private function renderTable(string $title, array $rows): string
     {
         $escapedTitle = htmlspecialchars($title, \ENT_QUOTES, 'UTF-8');
 
+        /** @var list<string> $rowsHtml */
         $rowsHtml = [];
         foreach ($rows as $row) {
-            $name = htmlspecialchars((string) ($row['name'] ?? ''), \ENT_QUOTES, 'UTF-8');
-            $votes = (int) ($row['votes'] ?? 0);
-            $pid = (int) ($row['pid'] ?? 0);
+            $name = htmlspecialchars($row['name'], \ENT_QUOTES, 'UTF-8');
+            $votes = $row['votes'];
+            $pid = $row['pid'] ?? 0;
 
             if ($pid > 0) {
                 $nameCell = '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . PlayerImageHelper::renderThumbnail($pid) . $name . '</a></td>';
@@ -52,7 +62,7 @@ class VotingResultsTableRenderer implements VotingResultsTableRendererInterface
             );
         }
 
-        $tableRowsHtml = $rowsHtml ? "\n" . implode("\n", $rowsHtml) . "\n    " : "\n    ";
+        $tableRowsHtml = $rowsHtml !== [] ? "\n" . implode("\n", $rowsHtml) . "\n    " : "\n    ";
 
         $html = '<h2 class="ibl-title">' . $escapedTitle . '</h2>
 <table class="sortable ibl-data-table voting-results-table">

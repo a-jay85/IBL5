@@ -9,18 +9,22 @@ use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 
 /**
  * FreeAgencyRepository - Database operations for free agency module
- * 
+ *
  * Extends BaseMysqliRepository for standardized prepared statement handling.
  * Centralizes all database queries for the FreeAgency module.
- * 
+ *
  * @see FreeAgencyRepositoryInterface For method contracts
  * @see BaseMysqliRepository For base class documentation and error codes
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type OfferRow from \FreeAgency\Contracts\FreeAgencyRepositoryInterface
+ * @phpstan-import-type OfferData from \FreeAgency\Contracts\FreeAgencyRepositoryInterface
  */
 class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRepositoryInterface
 {
     /**
      * Constructor - inherits from BaseMysqliRepository
-     * 
+     *
      * @param object $db Active mysqli connection (or duck-typed mock during migration)
      * @throws \RuntimeException If connection is invalid (error code 1002)
      */
@@ -31,18 +35,21 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
 
     /**
      * @see FreeAgencyRepositoryInterface::getExistingOffer()
+     *
+     * @return OfferRow|null
      */
     public function getExistingOffer(string $teamName, string $playerName): ?array
     {
+        /** @var OfferRow|null $result */
         $result = $this->fetchOne(
-            "SELECT offer1, offer2, offer3, offer4, offer5, offer6 
-             FROM ibl_fa_offers 
+            "SELECT offer1, offer2, offer3, offer4, offer5, offer6
+             FROM ibl_fa_offers
              WHERE team = ? AND name = ?",
             "ss",
             $teamName,
             $playerName
         );
-        
+
         return $result;
     }
 
@@ -61,17 +68,19 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
 
     /**
      * @see FreeAgencyRepositoryInterface::saveOffer()
+     *
+     * @param OfferData $offerData
      */
     public function saveOffer(array $offerData): bool
     {
         // First delete any existing offer
         $this->deleteOffer($offerData['teamName'], $offerData['playerName']);
-        
+
         // Insert the new offer
         $affected = $this->execute(
-            "INSERT INTO ibl_fa_offers 
-             (name, team, offer1, offer2, offer3, offer4, offer5, offer6, 
-              modifier, random, perceivedvalue, mle, lle, offer_type) 
+            "INSERT INTO ibl_fa_offers
+             (name, team, offer1, offer2, offer3, offer4, offer5, offer6,
+              modifier, random, perceivedvalue, mle, lle, offer_type)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             "ssiiiiiiiidiii",
             $offerData['playerName'],
@@ -89,15 +98,18 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
             $offerData['lle'],
             $offerData['offerType']
         );
-        
+
         return $affected > 0;
     }
 
     /**
      * @see FreeAgencyRepositoryInterface::getAllPlayersExcludingTeam()
+     *
+     * @return list<PlayerRow>
      */
     public function getAllPlayersExcludingTeam(string $teamName): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_plr WHERE teamname != ? AND retired = '0' ORDER BY ordinal ASC",
             "s",
@@ -110,6 +122,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
      */
     public function isPlayerAlreadySigned(int $playerId): bool
     {
+        /** @var array{cy: int|null, cy1: int|null}|null $row */
         $row = $this->fetchOne(
             "SELECT cy, cy1 FROM ibl_plr WHERE pid = ?",
             "i",
@@ -121,8 +134,8 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
         }
 
         $currentContractYear = $row['cy'] ?? 0;
-        $year1Contract = $row['cy1'] ?? '0';
+        $year1Contract = $row['cy1'] ?? 0;
 
-        return ($currentContractYear === 0 && $year1Contract !== "0");
+        return ($currentContractYear === 0 && $year1Contract !== 0);
     }
 }

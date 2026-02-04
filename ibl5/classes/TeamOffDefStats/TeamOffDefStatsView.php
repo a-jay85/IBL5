@@ -20,6 +20,14 @@ use Utilities\HtmlSanitizer;
  * Uses HtmlSanitizer::safeHtmlOutput() for XSS protection on team names.
  *
  * @see TeamOffDefStatsViewInterface for method documentation
+ *
+ * @phpstan-import-type RenderData from Contracts\TeamOffDefStatsViewInterface
+ * @phpstan-import-type ProcessedTeamStats from Contracts\TeamOffDefStatsServiceInterface
+ * @phpstan-import-type LeagueTotals from Contracts\TeamOffDefStatsServiceInterface
+ * @phpstan-import-type DifferentialTeam from Contracts\TeamOffDefStatsServiceInterface
+ * @phpstan-import-type FormattedStatTotals from Contracts\TeamOffDefStatsServiceInterface
+ * @phpstan-import-type FormattedStatAverages from Contracts\TeamOffDefStatsServiceInterface
+ * @phpstan-import-type DifferentialStats from Contracts\TeamOffDefStatsServiceInterface
  */
 class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
 {
@@ -27,7 +35,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
      * Render the complete league statistics display
      *
      * @see TeamOffDefStatsViewInterface::render()
-     * @param array $data Combined data structure
+     * @param RenderData $data Combined data structure
      * @return string Complete HTML output
      */
     public function render(array $data): string
@@ -67,10 +75,10 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
     /**
      * Render a totals table (offense or defense)
      *
-     * @param array $teams Processed team data
+     * @param list<ProcessedTeamStats> $teams Processed team data
      * @param string $statsKey Key for stats array ('offense_totals' or 'defense_totals')
      * @param string $label Label suffix ('Offense' or 'Defense')
-     * @param array $leagueTotals League totals for footer
+     * @param FormattedStatTotals $leagueTotals League totals for footer
      * @return string HTML table
      */
     private function renderTotalsTable(
@@ -84,6 +92,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
         $html .= '<tbody>';
 
         foreach ($teams as $team) {
+            /** @var FormattedStatTotals $stats */
             $stats = $team[$statsKey] ?? [];
             $html .= $this->renderTotalsRow($team, $stats, $label);
         }
@@ -98,10 +107,10 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
     /**
      * Render an averages table (offense or defense)
      *
-     * @param array $teams Processed team data
+     * @param list<ProcessedTeamStats> $teams Processed team data
      * @param string $statsKey Key for stats array ('offense_averages' or 'defense_averages')
      * @param string $label Label suffix ('Offense' or 'Defense')
-     * @param array $leagueAverages League averages for footer
+     * @param FormattedStatAverages $leagueAverages League averages for footer
      * @return string HTML table
      */
     private function renderAveragesTable(
@@ -115,6 +124,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
         $html .= '<tbody>';
 
         foreach ($teams as $team) {
+            /** @var FormattedStatAverages $stats */
             $stats = $team[$statsKey] ?? [];
             $html .= $this->renderAveragesRow($team, $stats, $label);
         }
@@ -129,7 +139,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
     /**
      * Render the differentials table
      *
-     * @param array $differentials Differential data for each team
+     * @param list<DifferentialTeam> $differentials Differential data for each team
      * @return string HTML table
      */
     private function renderDifferentialsTable(array $differentials): string
@@ -207,8 +217,8 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
     /**
      * Render a single totals row for a team
      *
-     * @param array $team Team data
-     * @param array $stats Stats array
+     * @param ProcessedTeamStats $team Team data
+     * @param FormattedStatTotals $stats Stats array
      * @param string $label Label suffix
      * @return string HTML row
      */
@@ -240,8 +250,8 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
     /**
      * Render a single averages row for a team
      *
-     * @param array $team Team data
-     * @param array $stats Stats array
+     * @param ProcessedTeamStats $team Team data
+     * @param FormattedStatAverages $stats Stats array
      * @param string $label Label suffix
      * @return string HTML row
      */
@@ -275,7 +285,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
     /**
      * Render a single differentials row for a team
      *
-     * @param array $team Team differential data
+     * @param DifferentialTeam $team Team differential data
      * @return string HTML row
      */
     private function renderDifferentialsRow(array $team): string
@@ -309,7 +319,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
     /**
      * Render the league totals footer row
      *
-     * @param array $totals League totals
+     * @param FormattedStatTotals $totals League totals
      * @return string HTML row
      */
     private function renderLeagueTotalsRow(array $totals): string
@@ -337,7 +347,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
     /**
      * Render the league averages footer row
      *
-     * @param array $averages League averages
+     * @param FormattedStatAverages $averages League averages
      * @return string HTML row
      */
     private function renderLeagueAveragesRow(array $averages): string
@@ -367,15 +377,18 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
     /**
      * Render the team name cell with link and colors
      *
-     * @param array $team Team data
+     * @param array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, ...} $team Team data
      * @param string $label Label suffix ('Offense', 'Defense', or 'Diff')
      * @return string HTML TD element
      */
     private function renderTeamCell(array $team, string $label): string
     {
         $teamId = (int) $team['teamid'];
+        /** @var string $name */
         $name = HtmlSanitizer::safeHtmlOutput($team['team_name']);
+        /** @var string $color1 */
         $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
+        /** @var string $color2 */
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
 
         return '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">

@@ -10,18 +10,21 @@ use UI\Components\InjuryDaysLabel;
 
 /**
  * Ratings - Displays player ratings table
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class Ratings
 {
     /**
      * Render the ratings table
      *
-     * @param object $db Database connection
-     * @param iterable $data Player data (result set or array of Player objects)
-     * @param object $team Team object
+     * @param \mysqli $db Database connection
+     * @param iterable<int, \Player\Player|array<string, mixed>> $data Player data
+     * @param \Team $team Team object
      * @param string $yr Year filter (empty for current season)
-     * @param object $season Season object
+     * @param \Season $season Season object
      * @param string $moduleName Module name for styling variations
+     * @param list<int> $starterPids Starter player IDs
      * @return string HTML table
      */
     public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = []): string
@@ -30,29 +33,31 @@ class Ratings
         $playerRows = [];
         $i = 0;
         foreach ($data as $plrRow) {
-            if ($yr == "") {
+            if ($yr === "") {
                 if ($plrRow instanceof Player) {
                     $player = $plrRow;
-                    if ($moduleName == "NextSim") {
+                    if ($moduleName === "NextSim") {
                         $isHighlight = (($i % 2) !== 0);
                     } else {
                         $isHighlight = false;
                     }
-                } elseif (is_array($data) AND $plrRow instanceof Player) {
-                    $player = Player::withPlrRow($db, $plrRow);
-                    $isHighlight = false;
                 } elseif (is_array($plrRow)) {
+                    /** @var PlayerRow $plrRow */
                     $player = Player::withPlrRow($db, $plrRow);
                     $isHighlight = false;
                 } else {
                     continue;
                 }
 
-                $firstCharacterOfPlayerName = substr($player->name, 0, 1);
-                if ($firstCharacterOfPlayerName == '|') {
+                $playerName = $player->name ?? '';
+                $firstCharacterOfPlayerName = substr($playerName, 0, 1);
+                if ($firstCharacterOfPlayerName === '|') {
                     continue;
                 }
             } else {
+                if (!is_array($plrRow)) {
+                    continue;
+                }
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
                 $isHighlight = false;
             }
@@ -77,7 +82,7 @@ class Ratings
 <colgroup span="2"></colgroup><colgroup span="2"></colgroup><colgroup span="6"></colgroup><colgroup span="6"></colgroup><colgroup span="4"></colgroup><colgroup span="4"></colgroup><colgroup span="1"></colgroup>
     <thead>
         <tr>
-<?php if ($moduleName == "LeagueStarters"): ?>
+<?php if ($moduleName === "LeagueStarters"): ?>
             <th>Team</th>
 <?php endif; ?>
             <th class="sticky-col">Player</th>
@@ -121,16 +126,16 @@ class Ratings
 <?php foreach ($playerRows as $row):
     $player = $row['player'];
     // Column count: 35 base + 1 optional Team column = 36 max
-    $colCount = ($moduleName == "LeagueStarters") ? 36 : 35;
+    $colCount = ($moduleName === "LeagueStarters") ? 36 : 35;
     if ($row['addSeparator']): ?>
         <tr class="ratings-separator">
         <td colspan="<?= $colCount ?>" style="background-color: var(--team-color-primary); height: 3px; padding: 0;">
         </td>
         </tr>
 <?php endif; ?>
-        <tr<?= $row['isHighlight'] ? ' class="ratings-highlight"' : '' ?><?php if ($moduleName == "LeagueStarters"): ?> data-team-id="<?= (int) ($player->teamID ?? 0) ?>"<?php endif; ?>>
-<?php if ($moduleName == "LeagueStarters"):
-    $teamId = (int) ($player->teamID ?? 0);
+        <tr<?= $row['isHighlight'] ? ' class="ratings-highlight"' : '' ?><?php if ($moduleName === "LeagueStarters"): ?> data-team-id="<?= $player->teamID ?? 0 ?>"<?php endif; ?>>
+<?php if ($moduleName === "LeagueStarters"):
+    $teamId = $player->teamID ?? 0;
     $teamNameStr = htmlspecialchars($player->teamName ?? '');
     $color1 = htmlspecialchars($player->teamColor1 ?? 'FFFFFF');
     $color2 = htmlspecialchars($player->teamColor2 ?? '000000');
@@ -145,8 +150,8 @@ class Ratings
     </td>
     <?php endif; ?>
 <?php endif; ?>
-            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName, $starterPids) ?>
-            <td style="text-align: center;"><?= htmlspecialchars($player->position) ?></td>
+            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids) ?>
+            <td style="text-align: center;"><?= htmlspecialchars($player->position ?? '') ?></td>
             <td style="text-align: center;"><?= (int)$player->age ?></td>
             <td class="sep-team"></td>
             <td style="text-align: center;"><?= (int)$player->ratingFieldGoalAttempts ?></td>
@@ -185,6 +190,6 @@ class Ratings
     </tbody>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

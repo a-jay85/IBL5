@@ -15,6 +15,10 @@ use TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface;
  * Performance improvement: 30 queries → 1 query
  *
  * @see TeamOffDefStatsRepositoryInterface for method documentation
+ *
+ * @phpstan-import-type AllTeamStatsRow from Contracts\TeamOffDefStatsRepositoryInterface
+ * @phpstan-import-type TeamOffenseStatsRow from Contracts\TeamOffDefStatsRepositoryInterface
+ * @phpstan-import-type TeamDefenseStatsRow from Contracts\TeamOffDefStatsRepositoryInterface
  */
 class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOffDefStatsRepositoryInterface
 {
@@ -30,7 +34,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
      * Get all team statistics (offense and defense) in a single bulk query
      *
      * @see TeamOffDefStatsRepositoryInterface::getAllTeamStats()
-     * @return array<int, array> Array of team statistics rows ordered by team name
+     * @return list<AllTeamStatsRow> Array of team statistics rows ordered by team name
      */
     public function getAllTeamStats(): array
     {
@@ -76,6 +80,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
             ORDER BY ti.team_city
         ";
 
+        /** @var list<AllTeamStatsRow> */
         return $this->fetchAll($query);
     }
 
@@ -84,10 +89,11 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
      *
      * @see TeamOffDefStatsRepositoryInterface::getTeamOffenseStats()
      * @param string $teamName Team name
-     * @return array|null Team offense statistics
+     * @return TeamOffenseStatsRow|null Team offense statistics
      */
     public function getTeamOffenseStats(string $teamName): ?array
     {
+        /** @var TeamOffenseStatsRow|null */
         return $this->fetchOne(
             "SELECT * FROM ibl_team_offense_stats WHERE name = ? LIMIT 1",
             "s",
@@ -100,10 +106,11 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
      *
      * @see TeamOffDefStatsRepositoryInterface::getTeamDefenseStats()
      * @param string $teamName Team name
-     * @return array|null Team defense statistics
+     * @return TeamDefenseStatsRow|null Team defense statistics
      */
     public function getTeamDefenseStats(string $teamName): ?array
     {
+        /** @var TeamDefenseStatsRow|null */
         return $this->fetchOne(
             "SELECT * FROM ibl_team_defense_stats WHERE name = ? LIMIT 1",
             "s",

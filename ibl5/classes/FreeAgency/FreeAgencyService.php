@@ -30,10 +30,13 @@ class FreeAgencyService implements FreeAgencyServiceInterface
 
     /**
      * @see FreeAgencyServiceInterface::getMainPageData()
+     *
+     * @return array{capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, team: \Team, season: \Season, allOtherPlayers: list<array<string, mixed>>}
      */
     public function getMainPageData(\Team $team, \Season $season): array
     {
         $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $team, $season);
+        /** @var array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
         $capMetrics = $capCalculator->calculateTeamCapMetrics();
 
         $allOtherPlayers = $this->repository->getAllPlayersExcludingTeam($team->name);
@@ -48,24 +51,27 @@ class FreeAgencyService implements FreeAgencyServiceInterface
 
     /**
      * @see FreeAgencyServiceInterface::getNegotiationData()
+     *
+     * @return array{player: Player, capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, demands: array<string, int>, existingOffer: array<string, int>, amendedCapSpace: int, hasExistingOffer: bool, veteranMinimum: int, maxContract: int}
      */
     public function getNegotiationData(int $playerID, \Team $team, \Season $season): array
     {
         $player = Player::withPlayerID($this->mysqli_db, $playerID);
 
         $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $team, $season);
+        /** @var array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
         $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
 
         $calculator = new FreeAgencyDemandCalculator($this->demandRepository);
-        $demands = $calculator->getPlayerDemands($player->name);
+        $demands = $calculator->getPlayerDemands($player->name ?? '');
 
-        $existingOffer = $this->getExistingOffer($team->name, $player->name);
+        $existingOffer = $this->getExistingOffer($team->name, $player->name ?? '');
 
         $amendedCapSpace = $capMetrics['softCapSpace'][0] + $existingOffer['offer1'];
         $hasExistingOffer = $existingOffer['offer1'] > 0;
 
-        $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience);
-        $maxContract = \ContractRules::getMaxContractSalary($player->yearsOfExperience);
+        $veteranMinimum = \ContractRules::getVeteranMinimumSalary($player->yearsOfExperience ?? 0);
+        $maxContract = \ContractRules::getMaxContractSalary($player->yearsOfExperience ?? 0);
 
         return [
             'player' => $player,

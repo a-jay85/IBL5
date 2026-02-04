@@ -102,7 +102,7 @@ class PlayerImageHelper implements PlayerImageHelperInterface
         return ['thumbnail' => $thumbnail, 'name' => $cleanName];
     }
 
-    public static function isValidPlayerID($playerID): bool
+    public static function isValidPlayerID(int|float|string|null $playerID): bool
     {
         // Null or empty string
         if ($playerID === null || $playerID === '') {

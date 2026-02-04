@@ -13,11 +13,15 @@ use FreeAgencyPreview\Contracts\FreeAgencyPreviewRepositoryInterface;
  *
  * @see FreeAgencyPreviewRepositoryInterface For the interface contract
  * @see \BaseMysqliRepository For base class documentation
+ *
+ * @phpstan-import-type ActivePlayerRow from FreeAgencyPreviewRepositoryInterface
  */
 class FreeAgencyPreviewRepository extends \BaseMysqliRepository implements FreeAgencyPreviewRepositoryInterface
 {
     /**
      * @see FreeAgencyPreviewRepositoryInterface::getActivePlayers()
+     *
+     * @return list<ActivePlayerRow>
      */
     public function getActivePlayers(): array
     {
@@ -32,6 +36,7 @@ class FreeAgencyPreviewRepository extends \BaseMysqliRepository implements FreeA
             WHERE p.retired = 0
             ORDER BY p.ordinal ASC";
 
+        /** @var list<ActivePlayerRow> */
         return $this->fetchAll($query);
     }
 }

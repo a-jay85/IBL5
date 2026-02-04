@@ -8,7 +8,11 @@ use SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface;
 
 /**
  * @see SeasonLeaderboardsRepositoryInterface
- * @extends \BaseMysqliRepository
+ *
+ * @phpstan-import-type LeaderboardFilters from SeasonLeaderboardsRepositoryInterface
+ * @phpstan-import-type HistRow from SeasonLeaderboardsRepositoryInterface
+ * @phpstan-import-type LeaderboardResult from SeasonLeaderboardsRepositoryInterface
+ * @phpstan-import-type TeamRow from SeasonLeaderboardsRepositoryInterface
  */
 class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements SeasonLeaderboardsRepositoryInterface
 {
@@ -23,30 +27,35 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
      * SECURITY NOTE: $sortBy is validated and mapped to whitelisted SQL expressions
      * in getSortColumn() method. Dynamic ORDER BY clause is acceptable here because
      * the sort expression is generated from a strict whitelist.
+     *
+     * @param LeaderboardFilters $filters Filter parameters
+     * @return LeaderboardResult Result with rows and count
      */
     public function getSeasonLeaders(array $filters, int $limit = 0): array
     {
         $conditions = ["h.name IS NOT NULL"];
+        /** @var list<string|int> $params */
         $params = [];
         $types = "";
 
         // Add year filter if specified
-        if (!empty($filters['year'])) {
+        $yearFilter = (string) ($filters['year'] ?? '');
+        if ($yearFilter !== '') {
             $conditions[] = "h.year = ?";
             $types .= "s";
-            $params[] = $filters['year'];
+            $params[] = $yearFilter;
         }
 
         // Add team filter if specified and not "All"
-        $teamId = (int)($filters['team'] ?? 0);
-        if (!empty($teamId) && $teamId !== 0) {
+        $teamId = (int) ($filters['team'] ?? 0);
+        if ($teamId !== 0) {
             $conditions[] = "h.teamid = ?";
             $types .= "i";
             $params[] = $teamId;
         }
 
         $whereClause = implode(' AND ', $conditions);
-        $sortBy = $this->getSortColumn($filters['sortby'] ?? '1');
+        $sortBy = $this->getSortColumn((string) ($filters['sortby'] ?? '1'));
 
         // NOTE: $sortBy is validated in getSortColumn() against a strict whitelist
         $query = "SELECT h.*, t.team_city, t.color1, t.color2
@@ -55,6 +64,7 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
             WHERE $whereClause ORDER BY $sortBy DESC"
             . ($limit > 0 ? " LIMIT $limit" : "");
 
+        /** @var list<HistRow> $rows */
         $rows = $this->fetchAll($query, $types, ...$params);
 
         return [
@@ -65,24 +75,31 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
 
     /**
      * @see SeasonLeaderboardsRepositoryInterface::getTeams()
+     *
+     * @return list<TeamRow>
      */
     public function getTeams(): array
     {
-        return $this->fetchAll("SELECT * FROM ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC");
+        /** @var list<TeamRow> $rows */
+        $rows = $this->fetchAll("SELECT * FROM ibl_power WHERE TeamID BETWEEN 1 AND 32 ORDER BY TeamID ASC");
+        return $rows;
     }
 
     /**
      * @see SeasonLeaderboardsRepositoryInterface::getYears()
+     *
+     * @return list<string>
      */
     public function getYears(): array
     {
+        /** @var list<array{year: string}> $rows */
         $rows = $this->fetchAll("SELECT DISTINCT year FROM ibl_hist ORDER BY year DESC");
-        
+
         $years = [];
         foreach ($rows as $row) {
             $years[] = $row['year'];
         }
-        
+
         return $years;
     }
 

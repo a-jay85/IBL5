@@ -12,6 +12,11 @@ use ContractList\Contracts\ContractListRepositoryInterface;
  *
  * Calculates contract year values and cap totals.
  *
+ * @phpstan-type ProcessedContract array{pid: int, name: string, pos: string, teamname: string, tid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}
+ * @phpstan-type CapTotals array{cap1: float, cap2: float, cap3: float, cap4: float, cap5: float, cap6: float}
+ * @phpstan-type AvgCaps array{acap1: float, acap2: float, acap3: float, acap4: float, acap5: float, acap6: float}
+ * @phpstan-type ContractCalculations array{contracts: list<ProcessedContract>, capTotals: CapTotals, avgCaps: AvgCaps}
+ *
  * @see ContractListServiceInterface For the interface contract
  */
 class ContractListService implements ContractListServiceInterface
@@ -106,7 +111,7 @@ class ContractListService implements ContractListServiceInterface
      */
     private function calculateContractYears(array $player): array
     {
-        $cy = (int) ($player['cy'] ?? 0);
+        $cy = $player['cy'];
 
         // Free agency offset is always 0 (original code's $faon was undefined)
         $year1 = $cy;
@@ -116,26 +121,36 @@ class ContractListService implements ContractListServiceInterface
         $year5 = $cy + 4;
         $year6 = $cy + 5;
 
+        /** @var array{cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int} $cyValues */
+        $cyValues = [
+            'cy1' => $player['cy1'],
+            'cy2' => $player['cy2'],
+            'cy3' => $player['cy3'],
+            'cy4' => $player['cy4'],
+            'cy5' => $player['cy5'],
+            'cy6' => $player['cy6'],
+        ];
+
         if ($cy === 0) {
             // Direct mapping when cy is 0
             return [
-                'con1' => ($year1 < 7) ? (int) ($player['cy1'] ?? 0) : 0,
-                'con2' => ($year2 < 7) ? (int) ($player['cy2'] ?? 0) : 0,
-                'con3' => ($year3 < 7) ? (int) ($player['cy3'] ?? 0) : 0,
-                'con4' => ($year4 < 7) ? (int) ($player['cy4'] ?? 0) : 0,
-                'con5' => ($year5 < 7) ? (int) ($player['cy5'] ?? 0) : 0,
-                'con6' => ($year6 < 7) ? (int) ($player['cy6'] ?? 0) : 0,
+                'con1' => ($year1 < 7) ? $cyValues['cy1'] : 0,
+                'con2' => ($year2 < 7) ? $cyValues['cy2'] : 0,
+                'con3' => ($year3 < 7) ? $cyValues['cy3'] : 0,
+                'con4' => ($year4 < 7) ? $cyValues['cy4'] : 0,
+                'con5' => ($year5 < 7) ? $cyValues['cy5'] : 0,
+                'con6' => ($year6 < 7) ? $cyValues['cy6'] : 0,
             ];
         }
 
         // Dynamic mapping based on current year
         return [
-            'con1' => ($year1 < 7) ? (int) ($player['cy' . $year1] ?? 0) : 0,
-            'con2' => ($year2 < 7) ? (int) ($player['cy' . $year2] ?? 0) : 0,
-            'con3' => ($year3 < 7) ? (int) ($player['cy' . $year3] ?? 0) : 0,
-            'con4' => ($year4 < 7) ? (int) ($player['cy' . $year4] ?? 0) : 0,
-            'con5' => ($year5 < 7) ? (int) ($player['cy' . $year5] ?? 0) : 0,
-            'con6' => ($year6 < 7) ? (int) ($player['cy' . $year6] ?? 0) : 0,
+            'con1' => ($year1 < 7) ? ($cyValues['cy' . $year1] ?? 0) : 0,
+            'con2' => ($year2 < 7) ? ($cyValues['cy' . $year2] ?? 0) : 0,
+            'con3' => ($year3 < 7) ? ($cyValues['cy' . $year3] ?? 0) : 0,
+            'con4' => ($year4 < 7) ? ($cyValues['cy' . $year4] ?? 0) : 0,
+            'con5' => ($year5 < 7) ? ($cyValues['cy' . $year5] ?? 0) : 0,
+            'con6' => ($year6 < 7) ? ($cyValues['cy' . $year6] ?? 0) : 0,
         ];
     }
 }

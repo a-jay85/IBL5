@@ -10,6 +10,10 @@ use Utilities\HtmlSanitizer;
  * Renders the main navigation bar with premium sports editorial design
  * Desktop: Elegant hover dropdowns with staggered animations
  * Mobile: Full-height sliding panel with refined aesthetics
+ *
+ * @phpstan-type NavLink array{label?: string, url?: string, external?: bool, badge?: string, rawHtml?: string}
+ * @phpstan-type NavMenuData array{links: list<NavLink>, icon?: string}
+ * @phpstan-type NavTeamsData array<string, array<string, list<array{teamid: int, team_name: string, team_city: string}>>>
  */
 class NavigationView
 {
@@ -24,6 +28,9 @@ class NavigationView
     private ?string $serverName;
     private ?string $requestUri;
 
+    /**
+     * @param array<string, array<string, list<array{teamid: int, team_name: string, team_city: string}>>>|null $teamsData
+     */
     public function __construct(bool $isLoggedIn, ?string $username, string $currentLeague, ?int $teamId = null, ?array $teamsData = null, string $seasonPhase = '', string $allowWaivers = '', ?string $serverName = null, ?string $requestUri = null)
     {
         $this->isLoggedIn = $isLoggedIn;
@@ -44,17 +51,22 @@ class NavigationView
     public static function resolveTeamId(\mysqli $db, string $username): ?int
     {
         $stmt = $db->prepare("SELECT user_ibl_team FROM nuke_users WHERE username = ?");
-        if (!$stmt) {
+        if ($stmt === false) {
             return null;
         }
         $stmt->bind_param('s', $username);
         $stmt->execute();
         $result = $stmt->get_result();
-        if (!($row = $result->fetch_assoc())) {
+        if ($result === false) {
             $stmt->close();
             return null;
         }
-        $teamName = trim($row['user_ibl_team']);
+        $row = $result->fetch_assoc();
+        if ($row === null || $row === false) {
+            $stmt->close();
+            return null;
+        }
+        $teamName = trim((string) $row['user_ibl_team']);
         $stmt->close();
 
         if ($teamName === '' || $teamName === '0') {
@@ -62,13 +74,18 @@ class NavigationView
         }
 
         $stmt2 = $db->prepare("SELECT teamid FROM ibl_team_info WHERE team_name = ?");
-        if (!$stmt2) {
+        if ($stmt2 === false) {
             return null;
         }
         $stmt2->bind_param('s', $teamName);
         $stmt2->execute();
         $result2 = $stmt2->get_result();
-        $teamId = ($row2 = $result2->fetch_assoc()) ? (int)$row2['teamid'] : null;
+        if ($result2 === false) {
+            $stmt2->close();
+            return null;
+        }
+        $row2 = $result2->fetch_assoc();
+        $teamId = ($row2 !== null && $row2 !== false) ? (int) $row2['teamid'] : null;
         $stmt2->close();
 
         return $teamId;
@@ -76,7 +93,8 @@ class NavigationView
 
     /**
      * Get the navigation menu structure
-     * @return array<string, array{links: array, icon?: string}>
+     *
+     * @return array<string, array{links: list<array{label?: string, url?: string, external?: bool, badge?: string, rawHtml?: string}>, icon?: string}>
      */
     private function getMenuStructure(): array
     {
@@ -136,7 +154,8 @@ class NavigationView
 
     /**
      * Get account menu items based on login state
-     * @return array
+     *
+     * @return list<array{label: string, url: string}>
      */
     private function getAccountMenu(): array
     {
@@ -288,11 +307,12 @@ class NavigationView
 
     /**
      * Get My Team menu based on current league
-     * @return array|null
+     *
+     * @return array{icon: string, links: list<array{label?: string, url?: string, external?: bool, badge?: string, rawHtml?: string}>}|null
      */
     private function getMyTeamMenu(): ?array
     {
-        if (!$this->isLoggedIn || !$this->teamId) {
+        if (!$this->isLoggedIn || $this->teamId === null) {
             return null;
         }
 
@@ -338,6 +358,8 @@ class NavigationView
 
     /**
      * Render a dropdown link item with stagger animation class
+     *
+     * @param array{label?: string, url?: string, external?: bool, badge?: string, rawHtml?: string} $link
      */
     private function renderDropdownLink(array $link): string
     {
@@ -347,14 +369,18 @@ class NavigationView
                 . '</span>';
         }
 
-        $label = HtmlSanitizer::safeHtmlOutput($link['label']);
-        $url = HtmlSanitizer::safeHtmlOutput($link['url']);
+        /** @var string $label */
+        $label = HtmlSanitizer::safeHtmlOutput($link['label'] ?? '');
+        /** @var string $url */
+        $url = HtmlSanitizer::safeHtmlOutput($link['url'] ?? '');
         $external = $link['external'] ?? false;
         $badge = $link['badge'] ?? null;
 
         $target = $external ? ' target="_blank" rel="noopener noreferrer"' : '';
         $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
-        $badgeHtml = $badge ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2 tracking-wide">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
+        /** @var string $safeBadge */
+        $safeBadge = $badge !== null ? HtmlSanitizer::safeHtmlOutput($badge) : '';
+        $badgeHtml = $badge !== null ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2 tracking-wide">' . $safeBadge . '</span>' : '';
 
         return '<a href="' . $url . '"' . $target . ' class="nav-dropdown-item block px-4 py-2.5 text-base font-display text-gray-300 hover:text-white hover:bg-white/5 transition-all duration-150 border-l-2 border-transparent hover:border-accent-500">'
             . '<span class="flex items-center justify-between">'
@@ -366,8 +392,9 @@ class NavigationView
 
     /**
      * Render a desktop dropdown menu
+     *
      * @param string $title Menu title
-     * @param array $data Menu data with links and optional icon
+     * @param array{links: list<array{label?: string, url?: string, external?: bool, badge?: string, rawHtml?: string}>, icon?: string} $data Menu data with links and optional icon
      * @param bool $includeLoginForm Whether to include login form at top (for Login menu when logged out)
      * @param bool $includeLeagueSwitcher Whether to include league switcher at bottom
      * @param bool $alignRight Whether to align dropdown to the right edge (for rightmost menu items)
@@ -379,10 +406,12 @@ class NavigationView
 
         $html = '<div class="relative group">';
         $html .= '<button class="flex items-center gap-2 px-3 py-2.5 text-lg font-semibold font-display text-gray-300 hover:text-white transition-colors duration-200">';
-        if ($icon) {
+        if ($icon !== '') {
             $html .= '<span class="text-accent-500 group-hover:text-accent-400 transition-colors">' . $icon . '</span>';
         }
-        $html .= '<span>' . HtmlSanitizer::safeHtmlOutput($title) . '</span>';
+        /** @var string $safeTitle */
+        $safeTitle = HtmlSanitizer::safeHtmlOutput($title);
+        $html .= '<span>' . $safeTitle . '</span>';
         $html .= '<svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
         $html .= '</button>';
 
@@ -435,8 +464,9 @@ class NavigationView
 
     /**
      * Render the mobile menu dropdown section
+     *
      * @param string $title Menu title
-     * @param array $data Menu data with links and optional icon
+     * @param array{links: list<array{label?: string, url?: string, external?: bool, badge?: string, rawHtml?: string}>, icon?: string} $data Menu data with links and optional icon
      * @param int $index Stagger animation index
      * @param bool $includeLoginForm Whether to include login form at top (for Login menu when logged out)
      * @param bool $includeLeagueSwitcher Whether to include league switcher at bottom
@@ -449,10 +479,12 @@ class NavigationView
         $html = '<div class="mobile-section">';
         $html .= '<button class="mobile-dropdown-btn w-full flex items-center justify-between px-5 py-3.5 text-white hover:bg-white/5 transition-colors">';
         $html .= '<span class="flex items-center gap-3">';
-        if ($icon) {
+        if ($icon !== '') {
             $html .= '<span class="text-accent-500">' . $icon . '</span>';
         }
-        $html .= '<span class="font-display text-lg font-semibold">' . HtmlSanitizer::safeHtmlOutput($title) . '</span>';
+        /** @var string $safeMobileTitle */
+        $safeMobileTitle = HtmlSanitizer::safeHtmlOutput($title);
+        $html .= '<span class="font-display text-lg font-semibold">' . $safeMobileTitle . '</span>';
         $html .= '</span>';
         $html .= '<svg class="dropdown-arrow w-4 h-4 text-gray-500 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
         $html .= '</button>';
@@ -474,14 +506,18 @@ class NavigationView
                 continue;
             }
 
-            $label = HtmlSanitizer::safeHtmlOutput($link['label']);
-            $url = HtmlSanitizer::safeHtmlOutput($link['url']);
+            /** @var string $label */
+            $label = HtmlSanitizer::safeHtmlOutput($link['label'] ?? '');
+            /** @var string $url */
+            $url = HtmlSanitizer::safeHtmlOutput($link['url'] ?? '');
             $external = $link['external'] ?? false;
             $badge = $link['badge'] ?? null;
 
             $target = $external ? ' target="_blank" rel="noopener noreferrer"' : '';
             $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
-            $badgeHtml = $badge ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2">' . HtmlSanitizer::safeHtmlOutput($badge) . '</span>' : '';
+            /** @var string $safeMobileBadge */
+            $safeMobileBadge = $badge !== null ? HtmlSanitizer::safeHtmlOutput($badge) : '';
+            $badgeHtml = $badge !== null ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2">' . $safeMobileBadge . '</span>' : '';
 
             $html .= '<a href="' . $url . '"' . $target . ' class="flex items-center justify-between px-5 py-3 pl-14 text-base font-display text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">'
                 . '<span>' . $label . $badgeHtml . '</span>'
@@ -548,7 +584,9 @@ class NavigationView
         $conferenceOrder = ['Western', 'Eastern'];
         foreach ($conferenceOrder as $conference) {
             $html .= '<div>';
-            $html .= '<div class="uppercase font-display text-xs tracking-wider text-accent-400 mb-3">' . HtmlSanitizer::safeHtmlOutput($conference) . ' Conference</div>';
+            /** @var string $safeConference */
+            $safeConference = HtmlSanitizer::safeHtmlOutput($conference);
+            $html .= '<div class="uppercase font-display text-xs tracking-wider text-accent-400 mb-3">' . $safeConference . ' Conference</div>';
 
             $divisions = $this->teamsData[$conference] ?? [];
             ksort($divisions); // Alphabetical: Atlantic/Central, Midwest/Pacific
@@ -557,9 +595,12 @@ class NavigationView
                 if ($divIndex > 0) {
                     $html .= '<div class="mt-3"></div>';
                 }
-                $html .= '<div class="uppercase font-display text-xs tracking-wider text-gray-400 mb-1.5">' . HtmlSanitizer::safeHtmlOutput($division) . '</div>';
+                /** @var string $safeDivision */
+                $safeDivision = HtmlSanitizer::safeHtmlOutput($division);
+                $html .= '<div class="uppercase font-display text-xs tracking-wider text-gray-400 mb-1.5">' . $safeDivision . '</div>';
                 foreach ($teams as $team) {
-                    $teamId = (int)$team['teamid'];
+                    $teamId = $team['teamid'];
+                    /** @var string $teamName */
                     $teamName = HtmlSanitizer::safeHtmlOutput($team['team_city'] . ' ' . $team['team_name']);
                     $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="nav-dropdown-item flex items-center gap-2 px-2 py-1.5 text-sm font-display text-gray-300 hover:text-white hover:bg-white/5 rounded transition-all duration-150">';
                     $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="w-6 h-6 object-contain" loading="lazy">';
@@ -627,7 +668,9 @@ class NavigationView
         // Conference -> Division -> Teams
         foreach ($conferenceOrder as $conference) {
             $html .= '<div class="px-5 pt-3 pb-1">';
-            $html .= '<div class="uppercase font-display text-xs tracking-wider text-accent-400">' . HtmlSanitizer::safeHtmlOutput($conference) . ' Conference</div>';
+            /** @var string $safeMobileConf */
+            $safeMobileConf = HtmlSanitizer::safeHtmlOutput($conference);
+            $html .= '<div class="uppercase font-display text-xs tracking-wider text-accent-400">' . $safeMobileConf . ' Conference</div>';
             $html .= '</div>';
 
             $divisions = $this->teamsData[$conference] ?? [];
@@ -640,10 +683,13 @@ class NavigationView
             }
             foreach ($divisions as $division => $teams) {
                 $html .= '<div class="px-5 pt-2 pb-1">';
-                $html .= '<div class="uppercase font-display text-xs tracking-wider text-gray-400">' . HtmlSanitizer::safeHtmlOutput($division) . '</div>';
+                /** @var string $safeMobileDiv */
+                $safeMobileDiv = HtmlSanitizer::safeHtmlOutput($division);
+                $html .= '<div class="uppercase font-display text-xs tracking-wider text-gray-400">' . $safeMobileDiv . '</div>';
                 $html .= '</div>';
                 foreach ($teams as $team) {
-                    $teamId = (int)$team['teamid'];
+                    $teamId = $team['teamid'];
+                    /** @var string $teamName */
                     $teamName = HtmlSanitizer::safeHtmlOutput($team['team_city'] . ' ' . $team['team_name']);
                     $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="flex items-center gap-2.5 px-5 py-2.5 pl-10 text-base font-display text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">';
                     $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="w-6 h-6 object-contain" loading="lazy">';
@@ -749,7 +795,7 @@ class NavigationView
                         <div class="relative flex items-center">
                             <?= $this->renderDesktopTeamsDropdown() ?>
 
-                            <?php if ($myTeamMenu): ?>
+                            <?php if ($myTeamMenu !== null): ?>
                                 <?= $this->renderDesktopDropdown('My Team', $myTeamMenu) ?>
                             <?php endif; ?>
                         </div>
@@ -807,7 +853,7 @@ class NavigationView
 
             <div class="relative h-full flex flex-col mobile-menu-scroll overflow-y-auto">
                 <!-- User greeting -->
-                <?php if ($this->isLoggedIn && $this->username): ?>
+                <?php if ($this->isLoggedIn && $this->username !== null): ?>
                     <div class="mobile-section px-5 py-4 border-b border-white/5">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-full bg-accent-500/20 flex items-center justify-center">
@@ -815,7 +861,8 @@ class NavigationView
                             </div>
                             <div>
                                 <div class="text-xs text-gray-500 uppercase tracking-wide">Welcome back</div>
-                                <div class="text-white font-semibold"><?= HtmlSanitizer::safeHtmlOutput($this->username) ?></div>
+                                <?php /** @var string $safeUsername */ $safeUsername = HtmlSanitizer::safeHtmlOutput($this->username); ?>
+                                <div class="text-white font-semibold"><?= $safeUsername ?></div>
                             </div>
                         </div>
                     </div>
@@ -823,7 +870,7 @@ class NavigationView
 
                 <!-- My Team section first for thumb reachability (if user has a team) -->
                 <?php $index = 2; ?>
-                <?php if ($myTeamMenu): ?>
+                <?php if ($myTeamMenu !== null): ?>
                     <?= $this->renderMobileDropdown('My Team', $myTeamMenu, $index++) ?>
                 <?php endif; ?>
 
@@ -854,6 +901,6 @@ class NavigationView
             </div>
         </nav>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

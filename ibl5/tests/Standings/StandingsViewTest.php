@@ -103,6 +103,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -141,6 +143,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -178,6 +182,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -214,6 +220,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 1,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -249,6 +257,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 1,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -284,6 +294,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 1,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -319,6 +331,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -355,6 +369,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 

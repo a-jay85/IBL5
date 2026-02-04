@@ -8,9 +8,11 @@ use OneOnOneGame\OneOnOneGameResult;
 
 /**
  * OneOnOneGameViewInterface - Contract for One-on-One game view rendering
- * 
+ *
  * Defines the interface for rendering all HTML output for the One-on-One
  * game module, including forms, game results, and replays.
+ *
+ * @phpstan-import-type GameRecord from OneOnOneGameRepositoryInterface
  */
 interface OneOnOneGameViewInterface
 {
@@ -69,10 +71,10 @@ interface OneOnOneGameViewInterface
 
     /**
      * Render a game replay
-     * 
+     *
      * Displays a previously played game retrieved from the database.
-     * 
-     * @param array<string, mixed> $gameData The stored game data
+     *
+     * @param GameRecord $gameData The stored game data
      * @return string HTML for the replay display
      */
     public function renderGameReplay(array $gameData): string;

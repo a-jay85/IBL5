@@ -11,27 +11,36 @@ use Utilities\HtmlSanitizer;
 
 /**
  * @see TradingViewInterface
+ *
+ * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
  */
 class TradingView implements TradingViewInterface
 {
     /**
      * @see TradingViewInterface::renderTradeOfferForm()
+     *
+     * @param array<string, mixed> $pageData
      */
     public function renderTradeOfferForm(array $pageData): string
     {
-        $userTeam = HtmlSanitizer::safeHtmlOutput($pageData['userTeam']);
-        $userTeamId = (int) $pageData['userTeamId'];
-        $partnerTeam = HtmlSanitizer::safeHtmlOutput($pageData['partnerTeam']);
-        $partnerTeamId = (int) $pageData['partnerTeamId'];
-        $seasonEndingYear = (int) $pageData['seasonEndingYear'];
-        $seasonPhase = $pageData['seasonPhase'];
-        $cashStartYear = (int) $pageData['cashStartYear'];
-        $cashEndYear = (int) $pageData['cashEndYear'];
+        /** @var array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<DraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<DraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string, result?: string, error?: string} $pageData */
 
-        $userColor1 = TableStyles::sanitizeColor($pageData['userTeamColor1'] ?? '000000');
-        $userColor2 = TableStyles::sanitizeColor($pageData['userTeamColor2'] ?? 'ffffff');
-        $partnerColor1 = TableStyles::sanitizeColor($pageData['partnerTeamColor1'] ?? '000000');
-        $partnerColor2 = TableStyles::sanitizeColor($pageData['partnerTeamColor2'] ?? 'ffffff');
+        /** @var string $userTeam */
+        $userTeam = HtmlSanitizer::safeHtmlOutput($pageData['userTeam']);
+        $userTeamId = $pageData['userTeamId'];
+        /** @var string $partnerTeam */
+        $partnerTeam = HtmlSanitizer::safeHtmlOutput($pageData['partnerTeam']);
+        $partnerTeamId = $pageData['partnerTeamId'];
+        $seasonEndingYear = $pageData['seasonEndingYear'];
+        $seasonPhase = $pageData['seasonPhase'];
+        $cashStartYear = $pageData['cashStartYear'];
+        $cashEndYear = $pageData['cashEndYear'];
+
+        $userColor1 = TableStyles::sanitizeColor($pageData['userTeamColor1']);
+        $userColor2 = TableStyles::sanitizeColor($pageData['userTeamColor2']);
+        $partnerColor1 = TableStyles::sanitizeColor($pageData['partnerTeamColor1']);
+        $partnerColor2 = TableStyles::sanitizeColor($pageData['partnerTeamColor2']);
 
         // Build player + pick rows for both teams, tracking the form field counter
         $k = 0;
@@ -110,16 +119,21 @@ class TradingView implements TradingViewInterface
     </div>
 </form>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * @see TradingViewInterface::renderTradeReview()
+     *
+     * @param array<string, mixed> $pageData
      */
     public function renderTradeReview(array $pageData): string
     {
+        /** @var array{userTeam: string, userTeamId: int, tradeOffers: array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>}>, teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>, result?: string, error?: string} $pageData */
+
+        /** @var string $userTeam */
         $userTeam = HtmlSanitizer::safeHtmlOutput($pageData['userTeam']);
-        $userTeamId = (int) $pageData['userTeamId'];
+        $userTeamId = $pageData['userTeamId'];
         $tradeOffers = $pageData['tradeOffers'];
         $teams = $pageData['teams'];
 
@@ -133,7 +147,7 @@ class TradingView implements TradingViewInterface
 <table class="trading-layout" style="margin: 0 auto;">
     <tr>
         <td style="vertical-align: top;">
-<?php if (empty($tradeOffers)): ?>
+<?php if ($tradeOffers === []): ?>
             <p style="padding: 1rem; text-align: center;">No pending trade offers.</p>
 <?php else: ?>
     <?php foreach ($tradeOffers as $offerId => $offer): ?>
@@ -149,7 +163,7 @@ class TradingView implements TradingViewInterface
     </tr>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -165,14 +179,17 @@ class TradingView implements TradingViewInterface
         } else {
             echo '<br>The waiver wire is also closed.';
         }
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * @see TradingViewInterface::renderTeamSelectionLinks()
+     *
+     * @param list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}> $teams
      */
     public function renderTeamSelectionLinks(array $teams): string
     {
+        /** @var list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}> $teams */
         ob_start();
         ?>
 <table class="ibl-data-table trading-team-select">
@@ -184,10 +201,14 @@ class TradingView implements TradingViewInterface
     <tbody>
 <?php foreach ($teams as $team): ?>
         <?php
-        $teamId = (int) $team['teamid'];
+        $teamId = $team['teamid'];
+        /** @var string $teamName */
         $teamName = HtmlSanitizer::safeHtmlOutput($team['name']);
+        /** @var string $fullName */
         $fullName = HtmlSanitizer::safeHtmlOutput($team['fullName']);
+        /** @var string $color1 */
         $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
+        /** @var string $color2 */
         $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
         ?>
         <tr>
@@ -202,7 +223,7 @@ class TradingView implements TradingViewInterface
     </tbody>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -215,7 +236,9 @@ class TradingView implements TradingViewInterface
     private function renderResultBanner(?string $result, ?string $error): string
     {
         if ($error !== null) {
-            return '<div class="ibl-alert ibl-alert--error">' . HtmlSanitizer::safeHtmlOutput($error) . '</div>';
+            /** @var string $errorEscaped */
+            $errorEscaped = HtmlSanitizer::safeHtmlOutput($error);
+            return '<div class="ibl-alert ibl-alert--error">' . $errorEscaped . '</div>';
         }
 
         if ($result === null) {
@@ -234,13 +257,15 @@ class TradingView implements TradingViewInterface
         }
 
         $banner = $banners[$result];
-        return '<div class="ibl-alert ' . $banner['class'] . '">' . HtmlSanitizer::safeHtmlOutput($banner['message']) . '</div>';
+        /** @var string $messageEscaped */
+        $messageEscaped = HtmlSanitizer::safeHtmlOutput($banner['message']);
+        return '<div class="ibl-alert ' . $banner['class'] . '">' . $messageEscaped . '</div>';
     }
 
     /**
      * Build HTML rows for players in the trade form
      *
-     * @param array $players Player rows from repository
+     * @param list<TradingPlayerRow> $players Player rows from repository
      * @param string $seasonPhase Current season phase
      * @param int $startK Starting form field counter
      * @return array{html: string, nextK: int}
@@ -252,12 +277,15 @@ class TradingView implements TradingViewInterface
 
         ob_start();
         foreach ($players as $row) {
-            $pid = (int) $row['pid'];
-            $ordinal = (int) $row['ordinal'];
-            $contractYear = (int) $row['cy'];
+            $pid = $row['pid'];
+            $ordinal = $row['ordinal'] ?? 0;
+            $contractYear = $row['cy'] ?? 0;
+            /** @var string $playerPosition */
             $playerPosition = HtmlSanitizer::safeHtmlOutput($row['pos']);
-            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, (string) $row['name']);
-            $playerName = HtmlSanitizer::safeHtmlOutput($resolved['name']);
+            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $row['name']);
+            /** @var string $playerName */
+            $playerName = HtmlSanitizer::safeHtmlOutput((string) $resolved['name']);
+            /** @var string $thumbnail */
             $thumbnail = $resolved['thumbnail'];
 
             if ($isOffseason) {
@@ -267,7 +295,8 @@ class TradingView implements TradingViewInterface
                 $contractYear = 1;
             }
 
-            $contractAmount = ($contractYear < 7) ? (int) $row["cy{$contractYear}"] : 0;
+            /** @var int $contractAmount */
+            $contractAmount = ($contractYear < 7) ? ($row["cy{$contractYear}"] ?? 0) : 0;
             ?>
 <tr>
 <?php if ($contractAmount !== 0 && $ordinal <= \JSB::WAIVERS_ORDINAL): ?>
@@ -292,7 +321,7 @@ class TradingView implements TradingViewInterface
             <?php
             $k++;
         }
-        $html = ob_get_clean();
+        $html = (string) ob_get_clean();
 
         return ['html' => $html, 'nextK' => $k];
     }
@@ -300,7 +329,7 @@ class TradingView implements TradingViewInterface
     /**
      * Build HTML rows for draft picks in the trade form
      *
-     * @param array $picks Draft pick rows from repository
+     * @param list<DraftPickRow> $picks Draft pick rows from repository
      * @param int $startK Starting form field counter
      * @return array{html: string, nextK: int}
      */
@@ -310,11 +339,12 @@ class TradingView implements TradingViewInterface
 
         ob_start();
         foreach ($picks as $row) {
-            $pickId = (int) $row['pickid'];
-            $pickYear = (int) $row['year'];
+            $pickId = $row['pickid'];
+            $pickYear = $row['year'];
+            /** @var string $pickTeam */
             $pickTeam = HtmlSanitizer::safeHtmlOutput($row['teampick']);
-            $pickRound = (int) $row['round'];
-            $pickNotes = $row['notes'] ?? null;
+            $pickRound = $row['round'];
+            $pickNotes = $row['notes'];
             ?>
 <tr>
     <td>
@@ -327,8 +357,11 @@ class TradingView implements TradingViewInterface
         <img src="images/logo/<?= $pickTeam ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
         <div>
             <?= $pickYear ?> R<?= $pickRound ?> <span class="ibl-team-cell__text"><?= $pickTeam ?></span>
-<?php if ($pickNotes !== null && $pickNotes !== ''): ?>
-            <div class="draft-picks-list__notes"><?= HtmlSanitizer::safeHtmlOutput($pickNotes) ?></div>
+<?php if ($pickNotes !== null && $pickNotes !== ''):
+    /** @var string $pickNotesEscaped */
+    $pickNotesEscaped = HtmlSanitizer::safeHtmlOutput($pickNotes);
+?>
+            <div class="draft-picks-list__notes"><?= $pickNotesEscaped ?></div>
 <?php endif; ?>
         </div>
     </td>
@@ -337,13 +370,15 @@ class TradingView implements TradingViewInterface
             <?php
             $k++;
         }
-        $html = ob_get_clean();
+        $html = (string) ob_get_clean();
 
         return ['html' => $html, 'nextK' => $k];
     }
 
     /**
      * Render the cap totals section of the trade form
+     *
+     * @param array{userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonPhase: string} $pageData
      */
     private function renderCapTotals(array $pageData, int $seasonEndingYear, string $userTeam, string $partnerTeam): string
     {
@@ -364,17 +399,20 @@ class TradingView implements TradingViewInterface
 <tr><td colspan="2"><table class="ibl-data-table trading-cap-totals" data-no-responsive style="width: 100%; margin-top: 1rem;">
     <thead><tr><th colspan="2">Cap Totals</th></tr></thead>
     <tbody>
-<?php for ($z = 0; $z < $seasonsToDisplay; $z++): ?>
-    <?php $yearLabel = ($displayEndingYear + $z - 1) . '-' . ($displayEndingYear + $z); ?>
+<?php for ($z = 0; $z < $seasonsToDisplay; $z++):
+    $yearLabel = ($displayEndingYear + $z - 1) . '-' . ($displayEndingYear + $z);
+    /** @var string $yearLabelEscaped */
+    $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
+?>
     <tr>
-        <td style="text-align: left;"><strong><?= $userTeam ?></strong> in <?= HtmlSanitizer::safeHtmlOutput($yearLabel) ?>: <?= (int) $userFutureSalary['player'][$z] ?></td>
-        <td style="text-align: right;"><strong><?= $partnerTeam ?></strong> in <?= HtmlSanitizer::safeHtmlOutput($yearLabel) ?>: <?= (int) $partnerFutureSalary['player'][$z] ?></td>
+        <td style="text-align: left;"><strong><?= $userTeam ?></strong> in <?= $yearLabelEscaped ?>: <?= $userFutureSalary['player'][$z] ?></td>
+        <td style="text-align: right;"><strong><?= $partnerTeam ?></strong> in <?= $yearLabelEscaped ?>: <?= $partnerFutureSalary['player'][$z] ?></td>
     </tr>
 <?php endfor; ?>
     </tbody>
 </table></td></tr>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -387,32 +425,38 @@ class TradingView implements TradingViewInterface
 <tr><td colspan="2"><table class="ibl-data-table trading-cash-exchange" data-no-responsive style="width: 100%; margin-top: 1rem;">
     <thead><tr><th colspan="2">Cash Exchange</th></tr></thead>
     <tbody>
-<?php for ($i = $cashStartYear; $i <= $cashEndYear; $i++): ?>
-    <?php $yearLabel = ($seasonEndingYear - 2 + $i) . '-' . ($seasonEndingYear - 1 + $i); ?>
+<?php for ($i = $cashStartYear; $i <= $cashEndYear; $i++):
+    $yearLabel = ($seasonEndingYear - 2 + $i) . '-' . ($seasonEndingYear - 1 + $i);
+    /** @var string $yearLabelEscaped */
+    $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
+?>
     <tr>
         <td style="text-align: left;">
             <strong><?= $userTeam ?></strong> send
             <input type="number" name="userSendsCash<?= $i ?>" value="0" min="0" max="2000" style="width: 80px;">
-            for <?= HtmlSanitizer::safeHtmlOutput($yearLabel) ?>
+            for <?= $yearLabelEscaped ?>
         </td>
         <td style="text-align: right;">
             <strong><?= $partnerTeam ?></strong> send
             <input type="number" name="partnerSendsCash<?= $i ?>" value="0" min="0" max="2000" style="width: 80px;">
-            for <?= HtmlSanitizer::safeHtmlOutput($yearLabel) ?>
+            for <?= $yearLabelEscaped ?>
         </td>
     </tr>
 <?php endfor; ?>
     </tbody>
 </table></td></tr>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * Render a single trade offer card with items and action buttons
+     *
+     * @param array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>} $offer
      */
     private function renderTradeOfferCard(int $offerId, array $offer, string $userTeam): string
     {
+        /** @var string $oppositeTeam */
         $oppositeTeam = HtmlSanitizer::safeHtmlOutput($offer['oppositeTeam']);
 
         ob_start();
@@ -439,16 +483,22 @@ class TradingView implements TradingViewInterface
     </div>
     <div class="trade-offer-items">
 <?php foreach ($offer['items'] as $item): ?>
-    <?php if ($item['description'] !== ''): ?>
-        <p><?= HtmlSanitizer::safeHtmlOutput($item['description']) ?></p>
-        <?php if ($item['notes'] !== null): ?>
-            <p style="margin-left: 1rem; font-style: italic; color: var(--gray-600);"><?= HtmlSanitizer::safeHtmlOutput($item['notes']) ?></p>
+    <?php if ($item['description'] !== ''):
+        /** @var string $descriptionEscaped */
+        $descriptionEscaped = HtmlSanitizer::safeHtmlOutput($item['description']);
+    ?>
+        <p><?= $descriptionEscaped ?></p>
+        <?php if ($item['notes'] !== null):
+            /** @var string $notesEscaped */
+            $notesEscaped = HtmlSanitizer::safeHtmlOutput($item['notes']);
+        ?>
+            <p style="margin-left: 1rem; font-style: italic; color: var(--gray-600);"><?= $notesEscaped ?></p>
         <?php endif; ?>
     <?php endif; ?>
 <?php endforeach; ?>
     </div>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

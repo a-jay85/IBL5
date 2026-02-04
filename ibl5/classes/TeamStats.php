@@ -5,90 +5,105 @@ declare(strict_types=1);
 use BasketballStats\StatsFormatter;
 use TeamOffDefStats\TeamOffDefStatsRepository;
 
+/**
+ * Team statistics container for offense and defense season stats
+ *
+ * Loads team offense/defense totals from the database and computes
+ * per-game averages and shooting percentages using StatsFormatter.
+ *
+ * @phpstan-import-type TeamOffenseStatsRow from \TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface
+ * @phpstan-import-type TeamDefenseStatsRow from \TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface
+ */
 class TeamStats
 {
     protected TeamOffDefStatsRepository $repository;
 
-    public $seasonOffenseGamesPlayed;
-    public $seasonOffenseTotalFieldGoalsMade;
-    public $seasonOffenseTotalFieldGoalsAttempted;
-    public $seasonOffenseTotalFreeThrowsMade;
-    public $seasonOffenseTotalFreeThrowsAttempted;
-    public $seasonOffenseTotalThreePointersMade;
-    public $seasonOffenseTotalThreePointersAttempted;
-    public $seasonOffenseTotalOffensiveRebounds;
-    public $seasonOffenseTotalDefensiveRebounds;
-    public $seasonOffenseTotalRebounds;
-    public $seasonOffenseTotalAssists;
-    public $seasonOffenseTotalSteals;
-    public $seasonOffenseTotalTurnovers;
-    public $seasonOffenseTotalBlocks;
-    public $seasonOffenseTotalPersonalFouls;
-    public $seasonOffenseTotalPoints;
-    
-    public $seasonOffenseFieldGoalsMadePerGame;
-    public $seasonOffenseFieldGoalsAttemptedPerGame;
-    public $seasonOffenseFreeThrowsMadePerGame;
-    public $seasonOffenseFreeThrowsAttemptedPerGame;
-    public $seasonOffenseThreePointersMadePerGame;
-    public $seasonOffenseThreePointersAttemptedPerGame;
-    public $seasonOffenseOffensiveReboundsPerGame;
-    public $seasonOffenseDefensiveReboundsPerGame;
-    public $seasonOffenseTotalReboundsPerGame;
-    public $seasonOffenseAssistsPerGame;
-    public $seasonOffenseStealsPerGame;
-    public $seasonOffenseTurnoversPerGame;
-    public $seasonOffenseBlocksPerGame;
-    public $seasonOffensePersonalFoulsPerGame;
-    public $seasonOffensePointsPerGame;
+    // Offense totals (from database, int columns with native types)
+    public int $seasonOffenseGamesPlayed = 0;
+    public int $seasonOffenseTotalFieldGoalsMade = 0;
+    public int $seasonOffenseTotalFieldGoalsAttempted = 0;
+    public int $seasonOffenseTotalFreeThrowsMade = 0;
+    public int $seasonOffenseTotalFreeThrowsAttempted = 0;
+    public int $seasonOffenseTotalThreePointersMade = 0;
+    public int $seasonOffenseTotalThreePointersAttempted = 0;
+    public int $seasonOffenseTotalOffensiveRebounds = 0;
+    public int $seasonOffenseTotalDefensiveRebounds = 0;
+    public int $seasonOffenseTotalRebounds = 0;
+    public int $seasonOffenseTotalAssists = 0;
+    public int $seasonOffenseTotalSteals = 0;
+    public int $seasonOffenseTotalTurnovers = 0;
+    public int $seasonOffenseTotalBlocks = 0;
+    public int $seasonOffenseTotalPersonalFouls = 0;
+    public int $seasonOffenseTotalPoints = 0;
 
-    public $seasonOffenseFieldGoalPercentage;
-    public $seasonOffenseFreeThrowPercentage;
-    public $seasonOffenseThreePointPercentage;
+    // Offense per-game averages (formatted strings from StatsFormatter)
+    public string $seasonOffenseFieldGoalsMadePerGame = '0.0';
+    public string $seasonOffenseFieldGoalsAttemptedPerGame = '0.0';
+    public string $seasonOffenseFreeThrowsMadePerGame = '0.0';
+    public string $seasonOffenseFreeThrowsAttemptedPerGame = '0.0';
+    public string $seasonOffenseThreePointersMadePerGame = '0.0';
+    public string $seasonOffenseThreePointersAttemptedPerGame = '0.0';
+    public string $seasonOffenseOffensiveReboundsPerGame = '0.0';
+    public string $seasonOffenseDefensiveReboundsPerGame = '0.0';
+    public string $seasonOffenseTotalReboundsPerGame = '0.0';
+    public string $seasonOffenseAssistsPerGame = '0.0';
+    public string $seasonOffenseStealsPerGame = '0.0';
+    public string $seasonOffenseTurnoversPerGame = '0.0';
+    public string $seasonOffenseBlocksPerGame = '0.0';
+    public string $seasonOffensePersonalFoulsPerGame = '0.0';
+    public string $seasonOffensePointsPerGame = '0.0';
 
-    public $seasonDefenseGamesPlayed;
-    public $seasonDefenseTotalFieldGoalsMade;
-    public $seasonDefenseTotalFieldGoalsAttempted;
-    public $seasonDefenseTotalFreeThrowsMade;
-    public $seasonDefenseTotalFreeThrowsAttempted;
-    public $seasonDefenseTotalThreePointersMade;
-    public $seasonDefenseTotalThreePointersAttempted;
-    public $seasonDefenseTotalOffensiveRebounds;
-    public $seasonDefenseTotalDefensiveRebounds;
-    public $seasonDefenseTotalRebounds;
-    public $seasonDefenseTotalAssists;
-    public $seasonDefenseTotalSteals;
-    public $seasonDefenseTotalTurnovers;
-    public $seasonDefenseTotalBlocks;
-    public $seasonDefenseTotalPersonalFouls;
-    public $seasonDefenseTotalPoints;
-    
-    public $seasonDefenseFieldGoalsMadePerGame;
-    public $seasonDefenseFieldGoalsAttemptedPerGame;
-    public $seasonDefenseFreeThrowsMadePerGame;
-    public $seasonDefenseFreeThrowsAttemptedPerGame;
-    public $seasonDefenseThreePointersMadePerGame;
-    public $seasonDefenseThreePointersAttemptedPerGame;
-    public $seasonDefenseOffensiveReboundsPerGame;
-    public $seasonDefenseDefensiveReboundsPerGame;
-    public $seasonDefenseTotalReboundsPerGame;
-    public $seasonDefenseAssistsPerGame;
-    public $seasonDefenseStealsPerGame;
-    public $seasonDefenseTurnoversPerGame;
-    public $seasonDefenseBlocksPerGame;
-    public $seasonDefensePersonalFoulsPerGame;
-    public $seasonDefensePointsPerGame;
+    // Offense shooting percentages (formatted strings from StatsFormatter)
+    public string $seasonOffenseFieldGoalPercentage = '0.000';
+    public string $seasonOffenseFreeThrowPercentage = '0.000';
+    public string $seasonOffenseThreePointPercentage = '0.000';
 
-    public $seasonDefenseFieldGoalPercentage;
-    public $seasonDefenseFreeThrowPercentage;
-    public $seasonDefenseThreePointPercentage;
+    // Defense totals (from database, int columns with native types)
+    public int $seasonDefenseGamesPlayed = 0;
+    public int $seasonDefenseTotalFieldGoalsMade = 0;
+    public int $seasonDefenseTotalFieldGoalsAttempted = 0;
+    public int $seasonDefenseTotalFreeThrowsMade = 0;
+    public int $seasonDefenseTotalFreeThrowsAttempted = 0;
+    public int $seasonDefenseTotalThreePointersMade = 0;
+    public int $seasonDefenseTotalThreePointersAttempted = 0;
+    public int $seasonDefenseTotalOffensiveRebounds = 0;
+    public int $seasonDefenseTotalDefensiveRebounds = 0;
+    public int $seasonDefenseTotalRebounds = 0;
+    public int $seasonDefenseTotalAssists = 0;
+    public int $seasonDefenseTotalSteals = 0;
+    public int $seasonDefenseTotalTurnovers = 0;
+    public int $seasonDefenseTotalBlocks = 0;
+    public int $seasonDefenseTotalPersonalFouls = 0;
+    public int $seasonDefenseTotalPoints = 0;
+
+    // Defense per-game averages (formatted strings from StatsFormatter)
+    public string $seasonDefenseFieldGoalsMadePerGame = '0.0';
+    public string $seasonDefenseFieldGoalsAttemptedPerGame = '0.0';
+    public string $seasonDefenseFreeThrowsMadePerGame = '0.0';
+    public string $seasonDefenseFreeThrowsAttemptedPerGame = '0.0';
+    public string $seasonDefenseThreePointersMadePerGame = '0.0';
+    public string $seasonDefenseThreePointersAttemptedPerGame = '0.0';
+    public string $seasonDefenseOffensiveReboundsPerGame = '0.0';
+    public string $seasonDefenseDefensiveReboundsPerGame = '0.0';
+    public string $seasonDefenseTotalReboundsPerGame = '0.0';
+    public string $seasonDefenseAssistsPerGame = '0.0';
+    public string $seasonDefenseStealsPerGame = '0.0';
+    public string $seasonDefenseTurnoversPerGame = '0.0';
+    public string $seasonDefenseBlocksPerGame = '0.0';
+    public string $seasonDefensePersonalFoulsPerGame = '0.0';
+    public string $seasonDefensePointsPerGame = '0.0';
+
+    // Defense shooting percentages (formatted strings from StatsFormatter)
+    public string $seasonDefenseFieldGoalPercentage = '0.000';
+    public string $seasonDefenseFreeThrowPercentage = '0.000';
+    public string $seasonDefenseThreePointPercentage = '0.000';
 
     public function __construct(TeamOffDefStatsRepository $repository)
     {
         $this->repository = $repository;
     }
 
-    public static function withTeamName($db, string $teamName): self
+    public static function withTeamName(object $db, string $teamName): self
     {
         $repository = new TeamOffDefStatsRepository($db);
         $instance = new self($repository);
@@ -99,17 +114,20 @@ class TeamStats
     protected function loadByTeamName(string $teamName): void
     {
         $offenseTotalsRow = $this->repository->getTeamOffenseStats($teamName);
-        if ($offenseTotalsRow) {
+        if ($offenseTotalsRow !== null) {
             $this->fillOffenseTotals($offenseTotalsRow);
         }
 
         $defenseTotalsRow = $this->repository->getTeamDefenseStats($teamName);
-        if ($defenseTotalsRow) {
+        if ($defenseTotalsRow !== null) {
             $this->fillDefenseTotals($defenseTotalsRow);
         }
     }
 
-    protected function fillOffenseTotals(array $offenseTotalsRow)
+    /**
+     * @param TeamOffenseStatsRow $offenseTotalsRow
+     */
+    protected function fillOffenseTotals(array $offenseTotalsRow): void
     {
         $this->seasonOffenseGamesPlayed = $offenseTotalsRow['games'];
         $this->seasonOffenseTotalFieldGoalsMade = $offenseTotalsRow['fgm'];
@@ -149,7 +167,10 @@ class TeamStats
         $this->seasonOffenseThreePointPercentage = StatsFormatter::formatPercentage($this->seasonOffenseTotalThreePointersMade, $this->seasonOffenseTotalThreePointersAttempted);
     }
 
-    protected function fillDefenseTotals(array $defenseTotalsRow)
+    /**
+     * @param TeamDefenseStatsRow $defenseTotalsRow
+     */
+    protected function fillDefenseTotals(array $defenseTotalsRow): void
     {
         $this->seasonDefenseGamesPlayed = $defenseTotalsRow['games'];
         $this->seasonDefenseTotalFieldGoalsMade = $defenseTotalsRow['fgm'];

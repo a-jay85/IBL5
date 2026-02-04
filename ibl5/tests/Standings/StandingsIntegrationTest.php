@@ -335,6 +335,8 @@ class StandingsIntegrationTest extends TestCase
                 'clinchedConference' => 1,
                 'clinchedDivision' => 1, // Also has division clinched
                 'clinchedPlayoffs' => 1, // Also has playoffs clinched
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ]);
         $mockRepository->method('getTeamStreakData')->willReturn(null);
@@ -373,6 +375,8 @@ class StandingsIntegrationTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 1,
                 'clinchedPlayoffs' => 1, // Also has playoffs clinched
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ]);
         $mockRepository->method('getTeamStreakData')->willReturn(null);
@@ -410,6 +414,8 @@ class StandingsIntegrationTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ]);
         $mockRepository->method('getTeamStreakData')->willReturn(null);
@@ -698,6 +704,8 @@ class StandingsIntegrationTest extends TestCase
             'clinchedConference' => 0,
             'clinchedDivision' => 0,
             'clinchedPlayoffs' => 0,
+            'color1' => '000000',
+            'color2' => 'FFFFFF',
         ];
     }
 

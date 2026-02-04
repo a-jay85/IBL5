@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace SeasonHighs;
 
 use SeasonHighs\Contracts\SeasonHighsRepositoryInterface;
+use SeasonHighs\Contracts\SeasonHighsServiceInterface;
 
 /**
  * SeasonHighsRepository - Data access layer for season highs
  *
  * Retrieves season high stats from box score tables.
+ *
+ * @phpstan-import-type SeasonHighEntry from SeasonHighsServiceInterface
  *
  * @see SeasonHighsRepositoryInterface For the interface contract
  * @see \BaseMysqliRepository For base class documentation
@@ -18,6 +21,8 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
 {
     /**
      * @see SeasonHighsRepositoryInterface::getSeasonHighs()
+     *
+     * @return list<SeasonHighEntry>
      */
     public function getSeasonHighs(
         string $statExpression,
@@ -29,6 +34,9 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
     ): array {
         // Sanitize the stat name for use as column alias
         $safeStatName = preg_replace('/[^a-zA-Z0-9_]/', '', $statName);
+        if ($safeStatName === null) {
+            $safeStatName = $statName;
+        }
 
         // For player stats (no suffix), JOIN with ibl_plr to get full names
         // The ibl_box_scores.name field is varchar(16) which truncates longer names
@@ -62,11 +70,13 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         $results = $this->fetchAll($query, "ss", $startDate, $endDate);
 
         // Normalize the results
+        /** @var list<SeasonHighEntry> $normalized */
         $normalized = [];
         foreach ($results as $row) {
+            /** @var array<string, int|float|string|null> $row */
             $entry = [
-                'name' => $row['name'] ?? '',
-                'date' => $row['date'] ?? '',
+                'name' => (string) ($row['name'] ?? ''),
+                'date' => (string) ($row['date'] ?? ''),
                 'value' => (int) ($row[$safeStatName] ?? 0),
             ];
             // Include pid for player stats (used for profile links)
@@ -76,17 +86,17 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
             // Include team data for player stats (used for styled team cell)
             if (isset($row['tid'])) {
                 $entry['tid'] = (int) $row['tid'];
-                $entry['teamname'] = $row['teamname'] ?? '';
-                $entry['team_city'] = $row['team_city'] ?? '';
-                $entry['color1'] = $row['color1'] ?? 'FFFFFF';
-                $entry['color2'] = $row['color2'] ?? '000000';
+                $entry['teamname'] = (string) ($row['teamname'] ?? '');
+                $entry['team_city'] = (string) ($row['team_city'] ?? '');
+                $entry['color1'] = (string) ($row['color1'] ?? 'FFFFFF');
+                $entry['color2'] = (string) ($row['color2'] ?? '000000');
             }
             // Include teamid and colors for team stats (used for styled team cell)
             if (isset($row['teamid'])) {
                 $entry['teamid'] = (int) $row['teamid'];
-                $entry['team_city'] = $row['team_city'] ?? '';
-                $entry['color1'] = $row['color1'] ?? 'FFFFFF';
-                $entry['color2'] = $row['color2'] ?? '000000';
+                $entry['team_city'] = (string) ($row['team_city'] ?? '');
+                $entry['color1'] = (string) ($row['color1'] ?? 'FFFFFF');
+                $entry['color2'] = (string) ($row['color2'] ?? '000000');
             }
             // Include BoxID for linking dates to box scores
             if (isset($row['BoxID'])) {

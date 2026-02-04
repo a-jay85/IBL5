@@ -9,6 +9,8 @@ use Utilities\HtmlSanitizer;
 
 /**
  * @see DraftViewInterface
+ *
+ * @phpstan-import-type DraftClassPlayerRow from Contracts\DraftRepositoryInterface
  */
 class DraftView implements DraftViewInterface
 {
@@ -17,6 +19,7 @@ class DraftView implements DraftViewInterface
      */
     public function renderValidationError(string $errorMessage): string
     {
+        /** @var string $errorMessage */
         $errorMessage = HtmlSanitizer::safeHtmlOutput($errorMessage);
         $retryInstructions = $this->getRetryInstructions($errorMessage);
 
@@ -28,6 +31,8 @@ class DraftView implements DraftViewInterface
 
     /**
      * @see DraftViewInterface::renderDraftInterface()
+     *
+     * @param list<DraftClassPlayerRow> $players
      */
     public function renderDraftInterface(array $players, string $teamLogo, ?string $pickOwner, ?int $draftRound, ?int $draftPick, int $seasonYear, int $tid): string
     {
@@ -37,12 +42,14 @@ class DraftView implements DraftViewInterface
         $html .= '<img src="images/logo/' . $tid . '.jpg" alt="Team Logo" class="team-logo-banner">';
 
         $html .= "<form name='draft_form' action='/ibl5/modules/Draft/draft_selection.php' method='POST'>";
-        $html .= "<input type='hidden' name='teamname' value='" . HtmlSanitizer::safeHtmlOutput($teamLogo) . "'>";
+        /** @var string $safeTeamLogo */
+        $safeTeamLogo = HtmlSanitizer::safeHtmlOutput($teamLogo);
+        $html .= "<input type='hidden' name='teamname' value='" . $safeTeamLogo . "'>";
         $html .= "<input type='hidden' name='draft_round' value='$draftRound'>";
         $html .= "<input type='hidden' name='draft_pick' value='$draftPick'>";
 
         $html .= $this->renderPlayerTable($players, $teamLogo, $pickOwner);
-        if ($teamLogo == $pickOwner && $this->hasUndraftedPlayers($players)) {
+        if ($teamLogo === $pickOwner && $this->hasUndraftedPlayers($players)) {
             $html .= '<div class="draft-submit-container"><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg" onclick="this.disabled=true;this.textContent=\'Submitting...\'; this.form.submit();">Draft Player</button></div>';
         }
 
@@ -53,6 +60,8 @@ class DraftView implements DraftViewInterface
 
     /**
      * @see DraftViewInterface::renderPlayerTable()
+     *
+     * @param list<DraftClassPlayerRow> $players
      */
     public function renderPlayerTable(array $players, string $teamLogo, ?string $pickOwner): string
     {
@@ -94,8 +103,9 @@ class DraftView implements DraftViewInterface
 
         foreach ($players as $player) {
             $isPlayerDrafted = $player['drafted'];
+            /** @var string $playerName */
             $playerName = HtmlSanitizer::safeHtmlOutput($player['name']);
-            $rowClass = $isPlayerDrafted ? ' class="drafted"' : '';
+            $rowClass = ($isPlayerDrafted !== 0 && $isPlayerDrafted !== null) ? ' class="drafted"' : '';
 
             if ($teamLogo === $pickOwner && $isPlayerDrafted === 0) {
                 $html .= '<tr' . $rowClass . '>
@@ -111,33 +121,37 @@ class DraftView implements DraftViewInterface
                     <td class="sticky-col-2" style="white-space: nowrap;">' . $playerName . '</td>';
             }
 
+            /** @var string $safePos */
+            $safePos = HtmlSanitizer::safeHtmlOutput($player['pos']);
+            /** @var string $safeTeam */
+            $safeTeam = HtmlSanitizer::safeHtmlOutput($player['team']);
             $html .= '
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['pos']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['team']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['age']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['fga']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['fgp']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['fta']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['ftp']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['tga']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['tgp']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['orb']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['drb']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['ast']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['stl']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['tvr']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['blk']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['oo']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['do']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['po']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['to']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['od']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['dd']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['pd']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['td']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['talent']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['skill']) . '</td>
-            <td>' . HtmlSanitizer::safeHtmlOutput($player['intangibles']) . '</td>
+            <td>' . $safePos . '</td>
+            <td>' . $safeTeam . '</td>
+            <td>' . (int) $player['age'] . '</td>
+            <td>' . (int) $player['fga'] . '</td>
+            <td>' . (int) $player['fgp'] . '</td>
+            <td>' . (int) $player['fta'] . '</td>
+            <td>' . (int) $player['ftp'] . '</td>
+            <td>' . (int) $player['tga'] . '</td>
+            <td>' . (int) $player['tgp'] . '</td>
+            <td>' . (int) $player['orb'] . '</td>
+            <td>' . (int) $player['drb'] . '</td>
+            <td>' . (int) $player['ast'] . '</td>
+            <td>' . (int) $player['stl'] . '</td>
+            <td>' . (int) $player['tvr'] . '</td>
+            <td>' . (int) $player['blk'] . '</td>
+            <td>' . (int) $player['oo'] . '</td>
+            <td>' . (int) $player['do'] . '</td>
+            <td>' . (int) $player['po'] . '</td>
+            <td>' . (int) $player['to'] . '</td>
+            <td>' . (int) $player['od'] . '</td>
+            <td>' . (int) $player['dd'] . '</td>
+            <td>' . (int) $player['pd'] . '</td>
+            <td>' . (int) $player['td'] . '</td>
+            <td>' . (int) $player['talent'] . '</td>
+            <td>' . (int) $player['skill'] . '</td>
+            <td>' . (int) $player['intangibles'] . '</td>
             </tr>';
         }
 
@@ -160,6 +174,8 @@ class DraftView implements DraftViewInterface
 
     /**
      * @see DraftViewInterface::hasUndraftedPlayers()
+     *
+     * @param list<DraftClassPlayerRow> $players
      */
     public function hasUndraftedPlayers(array $players): bool
     {

@@ -10,6 +10,8 @@ use Player\PlayerStats;
 
 /**
  * SeasonAverages - Displays season averages statistics table
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class SeasonAverages
 {
@@ -17,30 +19,40 @@ class SeasonAverages
      * Render the season averages table
      *
      * @param object $db Database connection
-     * @param iterable $result Player result set
-     * @param object $team Team object
+     * @param iterable<int, Player|array<string, mixed>> $result Player result set
+     * @param \Team $team Team object
      * @param string $yr Year filter (empty for current season)
+     * @param list<int> $starterPids Starter player IDs
+     * @param string $moduleName Module name
      * @return string HTML table
      */
-    public static function render($db, $result, $team, string $yr, array $starterPids = [], string $moduleName = ""): string
+    public static function render(object $db, $result, \Team $team, string $yr, array $starterPids = [], string $moduleName = ""): string
     {
         $playerRows = [];
         foreach ($result as $plrRow) {
-            if ($yr == "") {
+            if ($yr === "") {
                 if ($plrRow instanceof Player) {
                     $player = $plrRow;
-                    $playerStats = PlayerStats::withPlayerID($db, (int) $player->playerID);
-                } else {
+                    /** @var PlayerStats $playerStats */
+                    $playerStats = PlayerStats::withPlayerID($db, $player->playerID ?? 0);
+                } elseif (is_array($plrRow)) {
+                    /** @var PlayerRow $plrRow */
                     $player = Player::withPlrRow($db, $plrRow);
+                    /** @var PlayerStats $playerStats */
                     $playerStats = PlayerStats::withPlrRow($db, $plrRow);
+                } else {
+                    continue;
                 }
 
-                $firstCharacterOfPlayerName = substr($player->name, 0, 1);
-                if ($firstCharacterOfPlayerName == '|') {
+                $playerName = $player->name ?? '';
+                $firstCharacterOfPlayerName = substr($playerName, 0, 1);
+                if ($firstCharacterOfPlayerName === '|') {
                     continue;
                 }
             } else {
+                /** @var array<string, mixed> $plrRow */
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
+                /** @var PlayerStats $playerStats */
                 $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
             }
 
@@ -90,12 +102,14 @@ class SeasonAverages
     </thead>
     <tbody>
 <?php foreach ($playerRows as $row):
+    /** @var Player $player */
     $player = $row['player'];
+    /** @var PlayerStats $playerStats */
     $playerStats = $row['playerStats'];
 ?>
         <tr>
 <?php if ($moduleName === "LeagueStarters"):
-    $teamId = (int) ($player->teamID ?? 0);
+    $teamId = $player->teamID ?? 0;
     $teamNameStr = htmlspecialchars($player->teamName ?? '');
     $color1 = htmlspecialchars($player->teamColor1 ?? 'FFFFFF');
     $color2 = htmlspecialchars($player->teamColor2 ?? '000000');
@@ -110,10 +124,10 @@ class SeasonAverages
     </td>
     <?php endif; ?>
 <?php endif; ?>
-            <td><?= htmlspecialchars($player->position) ?></td>
-            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName, $starterPids) ?>
-            <td style="text-align: center;"><?= (int)$playerStats->seasonGamesPlayed ?></td>
-            <td style="text-align: center;"><?= (int)$playerStats->seasonGamesStarted ?></td>
+            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', $starterPids) ?>
+            <td style="text-align: center;"><?= $playerStats->seasonGamesPlayed ?></td>
+            <td style="text-align: center;"><?= $playerStats->seasonGamesStarted ?></td>
             <td style="text-align: center;"><?= $playerStats->seasonMinutesPerGame ?></td>
             <td class="sep-team"></td>
             <td style="text-align: center;"><?= $playerStats->seasonFieldGoalsMadePerGame ?></td>
@@ -140,13 +154,13 @@ class SeasonAverages
 <?php endforeach; ?>
     </tbody>
     <tfoot>
-<?php if ($yr == ""):
+<?php if ($yr === ""):
     $labelColspan = ($moduleName === "LeagueStarters") ? 3 : 2;
 ?>
         <tr>
             <td colspan="<?= $labelColspan ?>"><?= htmlspecialchars($team->name) ?> Offense</td>
-            <td><?= (int)$teamStats->seasonOffenseGamesPlayed ?></td>
-            <td><?= (int)$teamStats->seasonOffenseGamesPlayed ?></td>
+            <td><?= $teamStats->seasonOffenseGamesPlayed ?></td>
+            <td><?= $teamStats->seasonOffenseGamesPlayed ?></td>
             <td></td>
             <td class="sep-team"></td>
             <td><?= $teamStats->seasonOffenseFieldGoalsMadePerGame ?></td>
@@ -172,8 +186,8 @@ class SeasonAverages
         </tr>
         <tr>
             <td colspan="<?= $labelColspan ?>"><?= htmlspecialchars($team->name) ?> Defense</td>
-            <td><?= (int)$teamStats->seasonDefenseGamesPlayed ?></td>
-            <td><?= (int)$teamStats->seasonDefenseGamesPlayed ?></td>
+            <td><?= $teamStats->seasonDefenseGamesPlayed ?></td>
+            <td><?= $teamStats->seasonDefenseGamesPlayed ?></td>
             <td></td>
             <td class="sep-team"></td>
             <td><?= $teamStats->seasonDefenseFieldGoalsMadePerGame ?></td>
@@ -201,6 +215,6 @@ class SeasonAverages
     </tfoot>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

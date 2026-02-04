@@ -6,9 +6,13 @@ namespace DepthChartEntry\Contracts;
 
 /**
  * DepthChartEntryRepositoryInterface - Contract for depth chart data access
- * 
+ *
  * Defines database operations for reading and updating depth chart data,
  * including player positions, team history, and submission tracking.
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ *
+ * @phpstan-type DepthChartValues array{pg: int, sg: int, sf: int, pf: int, c: int, active: int, min: int, of: int, df: int, oi: int, di: int, bh: int}
  */
 interface DepthChartEntryRepositoryInterface
 {
@@ -22,7 +26,7 @@ interface DepthChartEntryRepositoryInterface
      * 
      * @param string $teamName Team name for lookup
      * @param int $teamID Team ID for database query
-     * @return mixed Database result resource (varies by database abstraction layer)
+     * @return list<PlayerRow>
      * 
      * **Important Behaviors:**
      * - Filters out retired players automatically
@@ -41,19 +45,7 @@ interface DepthChartEntryRepositoryInterface
      * Returns success/failure status for all updates combined.
      * 
      * @param string $playerName Player name (used as lookup key in WHERE clause)
-     * @param array $depthChartValues Validated depth chart values with these keys:
-     *                                - pg: Position depth for PG (0-5)
-     *                                - sg: Position depth for SG (0-5)
-     *                                - sf: Position depth for SF (0-5)
-     *                                - pf: Position depth for PF (0-5)
-     *                                - c: Position depth for C (0-5)
-     *                                - active: Active status (0 or 1)
-     *                                - min: Projected minutes (0-40)
-     *                                - of: Offensive focus (0-3: Auto/Outside/Drive/Post)
-     *                                - df: Defensive focus (0-3: Auto/Outside/Drive/Post)
-     *                                - oi: Offensive intensity (-2 to 2)
-     *                                - di: Defensive intensity (-2 to 2)
-     *                                - bh: Ball handling (-2 to 2)
+     * @param DepthChartValues $depthChartValues Validated depth chart values
      * 
      * @return bool True if all 12 updates succeeded, false if any update failed
      * 

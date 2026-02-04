@@ -23,7 +23,7 @@ interface PlayerOverviewViewInterface extends PlayerViewInterface
      * 
      * @param int $playerID Player ID for game log queries
      * @param Player $player Player object with all data
-     * @param \PlayerStats $playerStats Player stats object
+     * @param PlayerStats $playerStats Player stats object
      * @param \Season $season Season object for date calculations
      * @param \Shared $sharedFunctions Shared utility functions
      * @return string Rendered HTML content

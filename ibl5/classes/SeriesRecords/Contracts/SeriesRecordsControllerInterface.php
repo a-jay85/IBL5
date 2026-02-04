@@ -62,7 +62,6 @@ interface SeriesRecordsControllerInterface
      * - Delegating to displayForUser() / displaySeriesRecords() for authenticated users
      *
      * @param mixed $user The global $user cookie array
-     * @return void Outputs HTML directly
      */
-    public function main($user): void;
+    public function main(mixed $user): void;
 }

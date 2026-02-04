@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace FreeAgencyPreview;
 
+use FreeAgencyPreview\Contracts\FreeAgencyPreviewServiceInterface;
 use FreeAgencyPreview\Contracts\FreeAgencyPreviewViewInterface;
 use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
@@ -12,11 +13,15 @@ use Utilities\HtmlSanitizer;
  * View class for rendering free agency preview table.
  *
  * @see FreeAgencyPreviewViewInterface
+ *
+ * @phpstan-import-type FreeAgentRow from FreeAgencyPreviewServiceInterface
  */
 class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
 {
     /**
      * @see FreeAgencyPreviewViewInterface::render()
+     *
+     * @param list<FreeAgentRow> $freeAgents
      */
     public function render(int $seasonEndingYear, array $freeAgents): string
     {
@@ -91,7 +96,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
     /**
      * Render all table rows.
      *
-     * @param array $freeAgents Array of free agent data
+     * @param list<FreeAgentRow> $freeAgents Array of free agent data
      * @return string HTML table rows
      */
     private function renderTableRows(array $freeAgents): string
@@ -99,18 +104,23 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
         $output = '';
 
         foreach ($freeAgents as $player) {
-            $pid = (int) ($player['pid'] ?? 0);
-            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $player['name'] ?? '');
+            $pid = $player['pid'];
+            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $player['name']);
             $playerThumbnail = $resolved['thumbnail'];
-            $tid = (int) ($player['tid'] ?? 0);
+            $tid = $player['tid'];
+            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($resolved['name']);
-            $pos = HtmlSanitizer::safeHtmlOutput($player['pos'] ?? '');
-            $age = (int) ($player['age'] ?? 0);
+            /** @var string $pos */
+            $pos = HtmlSanitizer::safeHtmlOutput($player['pos']);
+            $age = $player['age'];
 
             // Team cell styling
-            $teamName = HtmlSanitizer::safeHtmlOutput($player['teamname'] ?? '');
-            $color1 = HtmlSanitizer::safeHtmlOutput($player['color1'] ?? 'FFFFFF');
-            $color2 = HtmlSanitizer::safeHtmlOutput($player['color2'] ?? '000000');
+            /** @var string $teamName */
+            $teamName = HtmlSanitizer::safeHtmlOutput($player['teamname']);
+            /** @var string $color1 */
+            $color1 = HtmlSanitizer::safeHtmlOutput($player['color1']);
+            /** @var string $color2 */
+            $color2 = HtmlSanitizer::safeHtmlOutput($player['color2']);
 
             // Handle free agents (tid=0) gracefully
             if ($tid === 0) {

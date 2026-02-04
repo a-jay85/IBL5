@@ -11,6 +11,10 @@ use Utilities\HtmlSanitizer;
 /**
  * View class for rendering master contract list table.
  *
+ * @phpstan-type ViewContract array{pid: int, name: string, pos: string, teamname: string, tid: int, team_city: string, color1: string, color2: string, bird: string, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}
+ * @phpstan-type CapTotals array{cap1: float, cap2: float, cap3: float, cap4: float, cap5: float, cap6: float}
+ * @phpstan-type AvgCaps array{acap1: float, acap2: float, acap3: float, acap4: float, acap5: float, acap6: float}
+ *
  * @see ContractListViewInterface
  */
 class ContractListView implements ContractListViewInterface
@@ -69,7 +73,7 @@ class ContractListView implements ContractListViewInterface
     /**
      * Render all contract rows.
      *
-     * @param array $contracts Array of contract data
+     * @param array<int, ViewContract> $contracts Array of contract data
      * @return string HTML table rows
      */
     private function renderTableRows(array $contracts): string
@@ -77,24 +81,30 @@ class ContractListView implements ContractListViewInterface
         $output = '';
 
         foreach ($contracts as $contract) {
-            $pid = (int) ($contract['pid'] ?? 0);
-            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $contract['name'] ?? '');
+            $pid = $contract['pid'];
+            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $contract['name']);
             $playerThumbnail = $resolved['thumbnail'];
+            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($resolved['name']);
-            $pos = HtmlSanitizer::safeHtmlOutput($contract['pos'] ?? '');
-            $tid = (int) ($contract['tid'] ?? 0);
-            $bird = HtmlSanitizer::safeHtmlOutput($contract['bird'] ?? '');
-            $con1 = (int) ($contract['con1'] ?? 0);
-            $con2 = (int) ($contract['con2'] ?? 0);
-            $con3 = (int) ($contract['con3'] ?? 0);
-            $con4 = (int) ($contract['con4'] ?? 0);
-            $con5 = (int) ($contract['con5'] ?? 0);
-            $con6 = (int) ($contract['con6'] ?? 0);
+            /** @var string $pos */
+            $pos = HtmlSanitizer::safeHtmlOutput($contract['pos']);
+            $tid = $contract['tid'];
+            /** @var string $bird */
+            $bird = HtmlSanitizer::safeHtmlOutput($contract['bird']);
+            $con1 = $contract['con1'];
+            $con2 = $contract['con2'];
+            $con3 = $contract['con3'];
+            $con4 = $contract['con4'];
+            $con5 = $contract['con5'];
+            $con6 = $contract['con6'];
 
             // Team cell styling
-            $teamName = HtmlSanitizer::safeHtmlOutput($contract['teamname'] ?? '');
-            $color1 = HtmlSanitizer::safeHtmlOutput($contract['color1'] ?? 'FFFFFF');
-            $color2 = HtmlSanitizer::safeHtmlOutput($contract['color2'] ?? '000000');
+            /** @var string $teamName */
+            $teamName = HtmlSanitizer::safeHtmlOutput($contract['teamname']);
+            /** @var string $color1 */
+            $color1 = HtmlSanitizer::safeHtmlOutput($contract['color1']);
+            /** @var string $color2 */
+            $color2 = HtmlSanitizer::safeHtmlOutput($contract['color2']);
 
             // Handle free agents (tid=0) gracefully
             if ($tid === 0) {
@@ -128,7 +138,7 @@ class ContractListView implements ContractListViewInterface
     /**
      * Render cap totals row.
      *
-     * @param array{cap1: float, cap2: float, cap3: float, cap4: float, cap5: float, cap6: float} $capTotals Cap totals
+     * @param CapTotals $capTotals Cap totals
      * @return string HTML table row
      */
     private function renderCapTotals(array $capTotals): string
@@ -158,7 +168,7 @@ class ContractListView implements ContractListViewInterface
     /**
      * Render average team cap row.
      *
-     * @param array{acap1: float, acap2: float, acap3: float, acap4: float, acap5: float, acap6: float} $avgCaps Average caps
+     * @param AvgCaps $avgCaps Average caps
      * @return string HTML table row
      */
     private function renderAvgCaps(array $avgCaps): string

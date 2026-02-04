@@ -160,7 +160,7 @@ class CommonContractValidator implements CommonContractValidatorInterface
         return [
             'total' => $total,
             'years' => $years,
-            'averagePerYear' => $years > 0 ? (float) ($total / $years) : 0.0
+            'averagePerYear' => (float) ($total / $years)
         ];
     }
 }

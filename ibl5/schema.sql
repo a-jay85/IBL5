@@ -1306,6 +1306,7 @@ CREATE TABLE `ibl_team_info` (
   `color1` varchar(6) NOT NULL DEFAULT '',
   `color2` varchar(6) NOT NULL DEFAULT '',
   `arena` varchar(255) NOT NULL DEFAULT '',
+  `capacity` int NOT NULL DEFAULT 0,
   `owner_name` varchar(32) NOT NULL DEFAULT '',
   `owner_email` varchar(48) NOT NULL DEFAULT '',
   `discordID` bigint(20) unsigned DEFAULT NULL,

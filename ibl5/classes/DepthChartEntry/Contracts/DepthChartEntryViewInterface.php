@@ -6,9 +6,12 @@ namespace DepthChartEntry\Contracts;
 
 /**
  * DepthChartEntryViewInterface - Contract for depth chart view rendering
- * 
+ *
  * Renders all HTML components for depth chart entry forms and submission results.
  * Uses output buffering for form rendering, direct echo for option rendering.
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type ProcessedPlayerData from DepthChartEntryProcessorInterface
  */
 interface DepthChartEntryViewInterface
 {
@@ -153,20 +156,7 @@ interface DepthChartEntryViewInterface
     /**
      * Render a single player row in the depth chart form
      * 
-     * @param array<string, mixed> $player Player data from database with these keys:
-     *                                      - pid: Player ID
-     *                                      - pos: Player position
-     *                                      - name: Player name (will be HTML escaped)
-     *                                      - injured: Injury status (0 or 1)
-     *                                      - sta: Player stamina rating
-     *                                      - dc_active: Current active setting (0 or 1)
-     *                                      - dc_minutes: Current minute setting (0-40)
-     *                                      - dc_of: Current offensive focus setting (0-3)
-     *                                      - dc_df: Current defensive focus setting (0-3)
-     *                                      - dc_oi: Current offensive intensity setting (-2 to 2)
-     *                                      - dc_di: Current defensive intensity setting (-2 to 2)
-     *                                      - dc_bh: Current ball handling setting (-2 to 2)
-     *                                      - dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth: Position depths
+     * @param PlayerRow $player Player data from database
      * @param int $depthCount Row counter/ordinal used in form field names (Name{depthCount}, pg{depthCount}, etc.)
      * @return void Echoes HTML table row with player data and form controls
      * 
@@ -219,7 +209,7 @@ interface DepthChartEntryViewInterface
      * Render depth chart submission result page with success or error status
      * 
      * @param string $teamName Team name displayed at top of result
-     * @param array<int, array<string, mixed>> $playerData Player data submitted (for display in confirmation table)
+     * @param list<ProcessedPlayerData> $playerData Player data submitted (for display in confirmation table)
      * @param bool $success True if submission succeeded, false for error display
      * @param string $errorHtml Error messages HTML (if $success is false, displayed instead of success message)
      * @return void Echoes HTML result page

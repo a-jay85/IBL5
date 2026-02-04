@@ -17,8 +17,8 @@ class PlayerStatsCardView
 {
     /**
      * Get scoped custom styles for stats cards with team colors
-     * 
-     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
+     *
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string HTML style tag with scoped CSS
      */
     public static function getStyles(?array $colorScheme = null): string
@@ -27,7 +27,7 @@ class PlayerStatsCardView
         if ($colorScheme === null) {
             $colorScheme = TeamColorHelper::getDefaultColorScheme();
         }
-        
+
         $gradStart = $colorScheme['gradient_start'];
         $gradMid = $colorScheme['gradient_mid'];
         $gradEnd = $colorScheme['gradient_end'];
@@ -237,11 +237,11 @@ HTML;
 
     /**
      * Wrap stats table content in a styled card
-     * 
+     *
      * @param string $tableContent The inner table HTML content
      * @param string $title Optional card title (overrides table header)
      * @param string $statsType Optional stats type badge (e.g., "Averages", "Totals")
-     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string Complete HTML for the stats card
      */
     public static function wrap(string $tableContent, string $title = '', string $statsType = '', ?array $colorScheme = null): string
@@ -249,13 +249,13 @@ HTML;
         ob_start();
         ?>
 <div class="player-stats-card">
-    <?php if ($statsType): ?>
+    <?php if ($statsType !== ''): ?>
     <div class="stats-type-indicator"><?= htmlspecialchars($statsType, ENT_QUOTES, 'UTF-8') ?></div>
     <?php endif; ?>
     <?= $tableContent ?>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
@@ -301,10 +301,10 @@ HTML;
 
     /**
      * Render a complete stats card with automatic table styling
-     * 
+     *
      * @param string $tableHtml Raw table HTML from a stats view
      * @param string $statsType Optional stats type indicator
-     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string Complete styled stats card HTML
      */
     public static function render(string $tableHtml, string $statsType = '', ?array $colorScheme = null): string

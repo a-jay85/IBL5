@@ -64,7 +64,7 @@ class PlayerViewFactory
     public function createOverviewView(): PlayerOverviewView
     {
         $commonRepo = $this->commonRepository;
-        if ($commonRepo === null && isset($GLOBALS['mysqli_db'])) {
+        if ($commonRepo === null && isset($GLOBALS['mysqli_db']) && is_object($GLOBALS['mysqli_db'])) {
             $commonRepo = new CommonMysqliRepository($GLOBALS['mysqli_db']);
         }
         

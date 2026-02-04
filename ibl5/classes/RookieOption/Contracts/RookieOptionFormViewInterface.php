@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace RookieOption\Contracts;
 
+use Player\Player;
+
 /**
  * RookieOptionFormViewInterface - Contract for rookie option form rendering
  *
@@ -21,14 +23,12 @@ interface RookieOptionFormViewInterface
      * including player image, option value, and warning text.
      * Uses design system classes (ibl-card, ibl-alert, ibl-btn).
      *
-     * @param object $player Player object with properties:
-     *   - 'playerID': int - Player ID for form submission
-     *   - 'position': string - Player position (PG, SG, etc.)
-     *   - 'name': string - Player's full name
+     * @param Player $player Player object
      * @param string $teamName User's team name for form submission
      * @param int $rookieOptionValue Calculated rookie option value in thousands
      * @param string|null $error Error message from PRG redirect (via ?error= param)
      * @param string|null $result Result type from PRG redirect (via ?result= param)
+     * @param string|null $from Origin page for redirect
      * @return string Rendered HTML
      *
      * **HTML Structure:**
@@ -48,5 +48,5 @@ interface RookieOptionFormViewInterface
      * - All output HTML-escaped via safeHtmlOutput()
      * - Player ID cast to integer
      */
-    public function renderForm(object $player, string $teamName, int $rookieOptionValue, ?string $error = null, ?string $result = null, ?string $from = null): string;
+    public function renderForm(Player $player, string $teamName, int $rookieOptionValue, ?string $error = null, ?string $result = null, ?string $from = null): string;
 }

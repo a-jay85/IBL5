@@ -54,27 +54,28 @@ class RookieOptionController implements RookieOptionControllerInterface
         }
 
         // Update player's contract
-        if (!$this->repository->updatePlayerRookieOption($playerID, (int) $player->draftRound, $extensionAmount)) {
+        if (!$this->repository->updatePlayerRookieOption($playerID, $player->draftRound, $extensionAmount)) {
             $errorMessage = "Failed to update player contract. Please contact the commissioner.";
             error_log("[RookieOption] Database update failed for player ID {$playerID}, draft round {$player->draftRound}, extension amount {$extensionAmount}");
             return ['success' => false, 'type' => 'database_error', 'message' => $errorMessage, 'playerID' => $playerID];
         }
 
         // Get team ID for redirect link
-        $teamID = $commonRepository->getTidFromTeamname($teamName);
+        $teamID = $commonRepository->getTidFromTeamname($teamName) ?? 0;
 
         // Send Discord notification
-        $discordMessage = $teamName . " exercise the rookie extension option on " . $player->name . " in the amount of " . $extensionAmount . ".";
+        $playerName = $player->name ?? 'Unknown';
+        $discordMessage = $teamName . " exercise the rookie extension option on " . $playerName . " in the amount of " . $extensionAmount . ".";
         \Discord::postToChannel(self::DISCORD_CHANNEL, $discordMessage);
 
         // Send email notification
-        $emailSubject = "Rookie Extension Option - " . $player->name;
+        $emailSubject = "Rookie Extension Option - " . $playerName;
         $emailBody = $discordMessage;
         $emailSuccess = mail(self::NOTIFICATION_EMAIL_RECIPIENT, $emailSubject, $emailBody, "From: " . self::NOTIFICATION_EMAIL_SENDER);
 
         // Create news story if email succeeded
         if ($emailSuccess) {
-            $this->createRookieOptionNewsStory($teamName, $player->name, $extensionAmount);
+            $this->createRookieOptionNewsStory($teamName, $playerName, $extensionAmount);
         }
 
         return [

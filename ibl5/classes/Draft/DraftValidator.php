@@ -11,7 +11,8 @@ use Draft\Contracts\DraftValidatorInterface;
  */
 class DraftValidator implements DraftValidatorInterface
 {
-    private $errors = [];
+    /** @var array<int, string> */
+    private array $errors = [];
 
     /**
      * @see DraftValidatorInterface::validateDraftSelection()

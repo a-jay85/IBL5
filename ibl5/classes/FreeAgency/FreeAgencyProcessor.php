@@ -118,7 +118,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
 
         // Get existing offer to calculate amended cap space
         $existingOfferRow = $this->repository->getExistingOffer($team->name, $playerName);
-        $existingOfferYear1 = $existingOfferRow !== null ? $existingOfferRow['offer1'] : 0;
+        $existingOfferYear1 = $existingOfferRow !== null ? ($existingOfferRow['offer1'] ?? 0) : 0;
         /** @var array{softCapSpace: array<int, int>, hardCapSpace: array<int, int>, totalSalaries: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
         $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0] + $existingOfferYear1;
 

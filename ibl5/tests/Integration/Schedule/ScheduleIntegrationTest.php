@@ -185,7 +185,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $teamId = 5;
         $lastSimEndDate = '2025-01-14';
         $this->mockDb->setMockData([
-            ['simLength' => 7] // Mock League data
+            ['value' => '7'] // Mock League data (matches ibl_settings.value column)
         ]);
 
         // Act - This will throw because League requires more data, but we can verify the query structure

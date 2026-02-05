@@ -36,10 +36,26 @@ if ($year > 0) {
     if ($seasonData !== null) {
         echo $view->renderSeasonDetail($seasonData);
     } else {
-        echo $view->renderIndex($service->getAllSeasons());
+        $seasons = $service->getAllSeasons();
+        $teamColors = $repository->getTeamColors();
+        $teamIds = [];
+        foreach ($teamColors as $name => $data) {
+            $teamIds[$name] = $data['teamid'];
+        }
+        $mvpNames = array_values(array_filter(array_column($seasons, 'mvp'), static fn(string $n): bool => $n !== ''));
+        $playerIds = $repository->getPlayerIdsByNames($mvpNames);
+        echo $view->renderIndex($seasons, $teamColors, $playerIds, $teamIds);
     }
 } else {
-    echo $view->renderIndex($service->getAllSeasons());
+    $seasons = $service->getAllSeasons();
+    $teamColors = $repository->getTeamColors();
+    $teamIds = [];
+    foreach ($teamColors as $name => $data) {
+        $teamIds[$name] = $data['teamid'];
+    }
+    $mvpNames = array_values(array_filter(array_column($seasons, 'mvp'), static fn(string $n): bool => $n !== ''));
+    $playerIds = $repository->getPlayerIdsByNames($mvpNames);
+    echo $view->renderIndex($seasons, $teamColors, $playerIds, $teamIds);
 }
 
 Nuke\Footer::footer();

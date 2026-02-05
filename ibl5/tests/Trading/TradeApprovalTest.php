@@ -10,10 +10,10 @@ class TradeApprovalTest extends TestCase
     {
         $this->db = new MockDatabase();
         
-        // Set up mock data for team ID lookups and player data
+        // Set up mock data for team ID lookups, player data, and roster counts
         $this->db->setMockData([
-            ['counter' => 1000],
-            ['name' => 'Test Player', 'pos' => 'PG']
+            ['counter' => 1000, 'cnt' => 10],
+            ['name' => 'Test Player', 'pos' => 'PG', 'cnt' => 10]
         ]);
         
         // Prevent Discord notifications and set SERVER_NAME for TradingRepository
@@ -292,6 +292,10 @@ class QueryAwareMockDatabase extends MockDatabase
         }
         
         if (stripos($query, 'ibl_plr') !== false) {
+            // Return roster count for COUNT queries
+            if (stripos($query, 'COUNT(*)') !== false) {
+                return new MockDatabaseResult([['cnt' => 10]]);
+            }
             // Return player data
             return new MockDatabaseResult([
                 ['name' => 'Test Player', 'pos' => 'PG']

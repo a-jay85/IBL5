@@ -246,4 +246,125 @@ class TradeValidatorTest extends TestCase
             ]
         ];
     }
+
+    /**
+     * @group validation
+     * @group roster-limits
+     */
+    public function testValidatesRosterLimitsWithBothTeamsWithinLimit(): void
+    {
+        // Both teams have 13 players, user sends 1, partner sends 2
+        // User: 13 - 1 + 2 = 14, Partner: 13 - 2 + 1 = 12
+        $this->mockDb->setMockData([['cnt' => 13]]);
+
+        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 1, 2);
+
+        $this->assertTrue($result['valid'], 'Both teams within roster limit should pass');
+        $this->assertSame([], $result['errors']);
+    }
+
+    /**
+     * @group validation
+     * @group roster-limits
+     */
+    public function testRejectsTradeWhenUserTeamExceedsRosterLimit(): void
+    {
+        // Both teams have 14 players, user sends 0, partner sends 2
+        // User: 14 - 0 + 2 = 16 (exceeds 15), Partner: 14 - 2 + 0 = 12
+        $this->mockDb->setMockData([['cnt' => 14]]);
+
+        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 0, 2);
+
+        $this->assertFalse($result['valid']);
+        $this->assertCount(1, $result['errors']);
+        $this->assertStringContainsString('your team', $result['errors'][0]);
+        $this->assertStringContainsString('roster limit', $result['errors'][0]);
+    }
+
+    /**
+     * @group validation
+     * @group roster-limits
+     */
+    public function testRejectsTradeWhenPartnerTeamExceedsRosterLimit(): void
+    {
+        // Both teams have 14 players, user sends 2, partner sends 0
+        // User: 14 - 2 + 0 = 12, Partner: 14 - 0 + 2 = 16 (exceeds 15)
+        $this->mockDb->setMockData([['cnt' => 14]]);
+
+        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 2, 0);
+
+        $this->assertFalse($result['valid']);
+        $this->assertCount(1, $result['errors']);
+        $this->assertStringContainsString('other team', $result['errors'][0]);
+        $this->assertStringContainsString('roster limit', $result['errors'][0]);
+    }
+
+    /**
+     * @group validation
+     * @group roster-limits
+     */
+    public function testRejectsTradeWhenBothTeamsExceedRosterLimit(): void
+    {
+        // Both teams have 15 players, user sends 1, partner sends 2
+        // User: 15 - 1 + 2 = 16 (exceeds), Partner: 15 - 2 + 1 = 14 (OK)
+        // Need both to exceed: both at 15, user sends 0, partner sends 1 => user 16, partner 14 (only one)
+        // Both exceed: both at 16 (impossible normally, but mock allows), user sends 0, partner sends 0
+        // Actually: both at 14, user sends 0, partner sends 2 => user=16, partner=12 (only user)
+        // For BOTH to exceed with same base count: both at 15, user sends 2, partner sends 3
+        // User: 15 - 2 + 3 = 16 (exceeds), Partner: 15 - 3 + 2 = 14 (no)
+        // Try: both at 14, user sends 0, partner sends 2 => user 16 (yes), partner 16 (14-2+0=12, no)
+        // Both exceed requires net gain > 1 for BOTH teams — impossible if both start the same.
+        // With same mock count, only one team can exceed per test. Let's test with 15:
+        // both at 15, user sends 0, partner sends 1 => user 16 (yes), partner 14 (no)
+        // The only way both exceed is if currentRoster + netGain > 15 for BOTH.
+        // netGain for user = partnerSent - userSent; netGain for partner = userSent - partnerSent
+        // These sum to 0, so if both start at same count, only one can net-gain.
+        // Both can exceed only if both already > 15 (which our mock allows).
+        $this->mockDb->setMockData([['cnt' => 16]]);
+
+        // Both at 16, user sends 1, partner sends 2
+        // User: 16 - 1 + 2 = 17 (exceeds), Partner: 16 - 2 + 1 = 15 (OK)
+        // Still only one. Need both at 16, equal swap but both net zero:
+        // User: 16 - 0 + 1 = 17, Partner: 16 - 1 + 0 = 15 — no.
+        // Both already over: both at 16, user sends 0, partner sends 0
+        // User: 16, Partner: 16 — both exceed!
+        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 0, 0);
+
+        $this->assertFalse($result['valid']);
+        $this->assertCount(2, $result['errors']);
+        $this->assertStringContainsString('your team', $result['errors'][0]);
+        $this->assertStringContainsString('other team', $result['errors'][1]);
+    }
+
+    /**
+     * @group validation
+     * @group roster-limits
+     */
+    public function testAllowsEqualPlayerSwapAtRosterLimit(): void
+    {
+        // Both teams have 15 players, user sends 2, partner sends 2
+        // User: 15 - 2 + 2 = 15, Partner: 15 - 2 + 2 = 15
+        $this->mockDb->setMockData([['cnt' => 15]]);
+
+        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 2, 2);
+
+        $this->assertTrue($result['valid'], 'Equal swap at roster limit should be valid');
+        $this->assertSame([], $result['errors']);
+    }
+
+    /**
+     * @group validation
+     * @group roster-limits
+     */
+    public function testAllowsTradeResultingInExactlyMaxRoster(): void
+    {
+        // Both teams have 14 players, user sends 0, partner sends 1
+        // User: 14 - 0 + 1 = 15 (exactly at limit), Partner: 14 - 1 + 0 = 13
+        $this->mockDb->setMockData([['cnt' => 14]]);
+
+        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 0, 1);
+
+        $this->assertTrue($result['valid'], 'Exactly at 15-player limit should be valid');
+        $this->assertSame([], $result['errors']);
+    }
 }

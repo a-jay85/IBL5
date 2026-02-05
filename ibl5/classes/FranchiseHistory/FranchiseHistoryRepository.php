@@ -49,9 +49,13 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
             $currentEndingYear
         );
 
-        // Dynamically calculate title counts from ibl_team_awards table
+        // Dynamically calculate title counts and HEAT record from database
         foreach ($teams as &$team) {
             $teamName = $team['team_name'];
+            $heatTotals = $this->getHEATTotals($teamName);
+            $team['heat_total_wins'] = $heatTotals['wins'];
+            $team['heat_total_losses'] = $heatTotals['losses'];
+            $team['heat_winpct'] = $heatTotals['winpct'];
             $team['heat_titles'] = $this->getNumberOfTitles($teamName, 'HEAT');
             $team['div_titles'] = $this->getNumberOfTitles($teamName, 'Division');
             $team['conf_titles'] = $this->getNumberOfTitles($teamName, 'Conference');
@@ -60,6 +64,31 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
 
         /** @var array<int, FranchiseRow> $teams */
         return $teams;
+    }
+
+    /**
+     * Get aggregated HEAT wins and losses for a team
+     *
+     * @param string $teamName Team name to look up
+     * @return array{wins: int, losses: int, winpct: string} HEAT win/loss totals and win percentage
+     */
+    private function getHEATTotals(string $teamName): array
+    {
+        $result = $this->fetchOne(
+            "SELECT SUM(wins) as total_wins, SUM(losses) as total_losses FROM ibl_heat_win_loss WHERE currentname = ?",
+            "s",
+            $teamName
+        );
+
+        /** @var array{total_wins: int|null, total_losses: int|null} $result */
+        $wins = $result['total_wins'] ?? 0;
+        $losses = $result['total_losses'] ?? 0;
+        $totalGames = $wins + $losses;
+        $winpct = $totalGames > 0
+            ? number_format($wins / $totalGames, 3)
+            : '.000';
+
+        return ['wins' => $wins, 'losses' => $losses, 'winpct' => $winpct];
     }
 
     /**

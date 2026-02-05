@@ -2,6 +2,15 @@
 error_reporting(E_ALL);
 libxml_use_internal_errors(true);
 
+// Load mainfile first for authentication
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+
+// SECURITY: Admin-only script - check authentication before proceeding
+if (!function_exists('is_admin') || !is_admin()) {
+    header('HTTP/1.1 403 Forbidden');
+    die('Access denied. This script requires administrator privileges.');
+}
+
 // Set up error handler to catch all errors
 set_error_handler(function ($errno, $errstr, $errfile, $errline) {
     echo "<p style='color: red;'><b>ERROR [$errno]:</b> $errstr in $errfile on line $errline</p>";
@@ -15,7 +24,7 @@ set_exception_handler(function ($exception) {
 });
 
 try {
-    require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+    // mainfile.php already loaded above for auth check
 
     global $mysqli_db;
 

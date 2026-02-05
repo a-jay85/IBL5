@@ -88,6 +88,37 @@ class TradeValidator implements TradeValidatorInterface
     }
 
     /**
+     * @see TradeValidatorInterface::validateRosterLimits()
+     */
+    public function validateRosterLimits(
+        string $userTeamName,
+        string $partnerTeamName,
+        int $userPlayersSent,
+        int $partnerPlayersSent
+    ): array {
+        $userCurrentRoster = $this->repository->getTeamPlayerCount($userTeamName);
+        $partnerCurrentRoster = $this->repository->getTeamPlayerCount($partnerTeamName);
+
+        $userPostTradeRoster = $userCurrentRoster - $userPlayersSent + $partnerPlayersSent;
+        $partnerPostTradeRoster = $partnerCurrentRoster - $partnerPlayersSent + $userPlayersSent;
+
+        $errors = [];
+
+        if ($userPostTradeRoster > \Team::ROSTER_SPOTS_MAX) {
+            $errors[] = 'This trade is illegal since it puts your team over the ' . \Team::ROSTER_SPOTS_MAX . '-player roster limit.';
+        }
+
+        if ($partnerPostTradeRoster > \Team::ROSTER_SPOTS_MAX) {
+            $errors[] = 'This trade is illegal since it puts the other team over the ' . \Team::ROSTER_SPOTS_MAX . '-player roster limit.';
+        }
+
+        return [
+            'valid' => $errors === [],
+            'errors' => $errors,
+        ];
+    }
+
+    /**
      * @see TradeValidatorInterface::canPlayerBeTraded()
      */
     public function canPlayerBeTraded(int $playerId): bool

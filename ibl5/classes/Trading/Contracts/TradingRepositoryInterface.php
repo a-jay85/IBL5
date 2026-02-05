@@ -322,6 +322,14 @@ interface TradingRepositoryInterface
     public function deleteTradeOffer(int $offerId): void;
 
     /**
+     * Count active roster players for a team (excludes retired and cash placeholders)
+     *
+     * @param string $teamName Team name
+     * @return int Number of active players on the team's roster
+     */
+    public function getTeamPlayerCount(string $teamName): int;
+
+    /**
      * Get all teams with city, name, colors and ID for trading UI
      *
      * @return list<TeamWithCityRow> Team rows ordered by city

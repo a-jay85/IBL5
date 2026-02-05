@@ -44,6 +44,7 @@ interface TradeOfferInterface
      * IMPORTANT BEHAVIORS:
      *  - Validates minimum cash amounts (100 per year minimum)
      *  - Validates both teams stay under hard cap post-trade
+     *  - Validates neither team exceeds the 15-player roster limit post-trade
      *  - Creates ibl_trade_info records for each item
      *  - Creates ibl_trade_cash records for cash considerations
      *  - Sends Discord DM notification to receiving team

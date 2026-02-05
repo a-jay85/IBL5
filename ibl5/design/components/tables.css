@@ -782,10 +782,18 @@ tbody tr.user-team-row:nth-child(even):hover {
     color: var(--accent-500);
 }
 
-/* Team Cell with Colors - combines logo + team-specific background/text */
+/* Team Cell with Colors - combines logo + team-specific background/text.
+   padding-inline !important is needed: .ibl-data-table th/td (0,1,1) outspecifies
+   this class (0,1,0), so the shorthand `padding` would win without it. */
 .ibl-team-cell--colored {
     padding-inline: 0.5rem !important;
-    text-align: left !important;
+}
+
+/* Left-align td cells only; th cells keep the default center from .ibl-data-table th.
+   No !important needed: td.ibl-team-cell--colored (0,1,1) ties .ibl-data-table td
+   (0,1,1) and wins by source order. */
+td.ibl-team-cell--colored {
+    text-align: left;
 }
 
 .ibl-team-cell--colored .ibl-team-cell__logo {

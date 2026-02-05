@@ -49,9 +49,13 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
             $currentEndingYear
         );
 
-        // Dynamically calculate title counts and HEAT record from database
+        // Dynamically calculate title counts, HEAT record, and playoff record from database
         foreach ($teams as &$team) {
             $teamName = $team['team_name'];
+            $playoffTotals = $this->getPlayoffTotals($teamName);
+            $team['playoff_total_wins'] = $playoffTotals['wins'];
+            $team['playoff_total_losses'] = $playoffTotals['losses'];
+            $team['playoff_winpct'] = $playoffTotals['winpct'];
             $heatTotals = $this->getHEATTotals($teamName);
             $team['heat_total_wins'] = $heatTotals['wins'];
             $team['heat_total_losses'] = $heatTotals['losses'];
@@ -64,6 +68,42 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
 
         /** @var array<int, FranchiseRow> $teams */
         return $teams;
+    }
+
+    /**
+     * Get aggregated playoff game wins and losses for a team
+     *
+     * Derives game-level records from series results in ibl_playoff_results:
+     * - When team is the winner: +4 wins, +loser_games losses
+     * - When team is the loser: +loser_games wins, +4 losses
+     *
+     * @param string $teamName Team name to look up
+     * @return array{wins: int, losses: int, winpct: string} Playoff win/loss totals and win percentage
+     */
+    private function getPlayoffTotals(string $teamName): array
+    {
+        $result = $this->fetchOne(
+            "SELECT
+                SUM(CASE WHEN winner = ? THEN 4 ELSE loser_games END) as total_wins,
+                SUM(CASE WHEN winner = ? THEN loser_games ELSE 4 END) as total_losses
+            FROM ibl_playoff_results
+            WHERE winner = ? OR loser = ?",
+            "ssss",
+            $teamName,
+            $teamName,
+            $teamName,
+            $teamName
+        );
+
+        /** @var array{total_wins: int|null, total_losses: int|null} $result */
+        $wins = $result['total_wins'] ?? 0;
+        $losses = $result['total_losses'] ?? 0;
+        $totalGames = $wins + $losses;
+        $winpct = $totalGames > 0
+            ? number_format($wins / $totalGames, 3)
+            : '.000';
+
+        return ['wins' => $wins, 'losses' => $losses, 'winpct' => $winpct];
     }
 
     /**

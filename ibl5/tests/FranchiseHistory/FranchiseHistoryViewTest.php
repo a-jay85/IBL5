@@ -77,6 +77,9 @@ class FranchiseHistoryViewTest extends TestCase
                 'five_season_winpct' => 0.0,
                 'playoff_appearances' => 0,
                 'playoffs' => 0,
+                'playoff_total_wins' => 0,
+                'playoff_total_losses' => 0,
+                'playoff_winpct' => '.000',
                 'heat_total_wins' => 0,
                 'heat_total_losses' => 0,
                 'heat_winpct' => '0.000',
@@ -114,6 +117,9 @@ class FranchiseHistoryViewTest extends TestCase
                 'five_season_losses' => 25,
                 'five_season_winpct' => 0.667,
                 'playoffs' => 10,
+                'playoff_total_wins' => 32,
+                'playoff_total_losses' => 20,
+                'playoff_winpct' => '0.615',
                 'heat_total_wins' => 80,
                 'heat_total_losses' => 40,
                 'heat_winpct' => '0.667',
@@ -125,6 +131,9 @@ class FranchiseHistoryViewTest extends TestCase
         ];
 
         $result = $this->view->render($franchises);
+
+        // Verify playoff record is rendered
+        $this->assertStringContainsString('32-20 (0.615)', $result, 'Playoff record should be displayed');
 
         // Verify all title types are rendered
         $this->assertStringContainsString('>2<', $result, 'HEAT titles should be displayed');
@@ -149,6 +158,9 @@ class FranchiseHistoryViewTest extends TestCase
                 'five_season_losses' => 30,
                 'five_season_winpct' => 0.250,
                 'playoffs' => 0,
+                'playoff_total_wins' => 0,
+                'playoff_total_losses' => 0,
+                'playoff_winpct' => '.000',
                 'heat_total_wins' => 5,
                 'heat_total_losses' => 15,
                 'heat_winpct' => '0.250',

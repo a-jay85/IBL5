@@ -75,6 +75,22 @@ interface TradeValidatorInterface
     public function canPlayerBeTraded(int $playerId): bool;
 
     /**
+     * Validate that neither team exceeds the maximum roster size after the trade
+     *
+     * @param string $userTeamName User's team name
+     * @param string $partnerTeamName Partner's team name
+     * @param int $userPlayersSent Number of players user is sending
+     * @param int $partnerPlayersSent Number of players partner is sending
+     * @return array{valid: bool, errors: array<string>}
+     */
+    public function validateRosterLimits(
+        string $userTeamName,
+        string $partnerTeamName,
+        int $userPlayersSent,
+        int $partnerPlayersSent
+    ): array;
+
+    /**
      * Get cash considerations for current season based on phase
      *
      * Determines which year's cash values to use for cap calculations

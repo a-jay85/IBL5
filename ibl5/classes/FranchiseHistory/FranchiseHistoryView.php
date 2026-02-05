@@ -51,9 +51,9 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
                 <th class="ibl-team-cell--colored sticky-col sticky-corner">Team</th>
                 <th>All-Time<br>Record</th>
                 <th>Last Five<br>Seasons</th>
-                <th>Playoffs</th>
                 <th>All-Time<br>Playoffs Record</th>
                 <th>All-Time<br>HEAT Record</th>
+                <th>Playoff<br>Berths</th>
                 <th>H.E.A.T.<br>Titles</th>
                 <th>Div.<br>Titles</th>
                 <th>Conf.<br>Titles</th>
@@ -120,8 +120,7 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
         $fiveSeasonWinpct = HtmlSanitizer::safeHtmlOutput($team['five_season_winpct'] ?? '');
         $html .= '<td style="white-space: nowrap;" sorttable_customkey="' . $fiveSeasonWinpct . '">' . $fiveSeasonWins . '-' . $fiveSeasonLosses . ' (' . $fiveSeasonWinpct . ')</td>';
 
-        // Titles and playoffs
-        $html .= '<td>' . (int)$team['playoffs'] . '</td>';
+        // Record columns
         $playoffWins = (int)$team['playoff_total_wins'];
         $playoffLosses = (int)$team['playoff_total_losses'];
         /** @var string $playoffWinpct */
@@ -132,6 +131,9 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
         /** @var string $heatWinpct */
         $heatWinpct = HtmlSanitizer::safeHtmlOutput($team['heat_winpct']);
         $html .= '<td style="white-space: nowrap;" sorttable_customkey="' . $heatWinpct . '">' . $heatWins . '-' . $heatLosses . ' (' . $heatWinpct . ')</td>';
+
+        // Titles and playoff berths
+        $html .= '<td>' . (int)$team['playoffs'] . '</td>';
         $html .= '<td>' . $team['heat_titles'] . '</td>';
         $html .= '<td>' . $team['div_titles'] . '</td>';
         $html .= '<td>' . $team['conf_titles'] . '</td>';

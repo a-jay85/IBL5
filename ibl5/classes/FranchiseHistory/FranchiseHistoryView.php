@@ -56,6 +56,7 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
                 <th>Last Five<br>Seasons<br>Losses</th>
                 <th>Last Five<br>Seasons<br>Pct.</th>
                 <th>Playoffs</th>
+                <th>All-Time<br>HEAT Record</th>
                 <th>H.E.A.T.<br>Titles</th>
                 <th>Div.<br>Titles</th>
                 <th>Conf.<br>Titles</th>
@@ -124,6 +125,11 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
 
         // Titles and playoffs
         $html .= '<td>' . (int)$team['playoffs'] . '</td>';
+        $heatWins = (int)$team['heat_total_wins'];
+        $heatLosses = (int)$team['heat_total_losses'];
+        /** @var string $heatWinpct */
+        $heatWinpct = HtmlSanitizer::safeHtmlOutput($team['heat_winpct']);
+        $html .= '<td style="white-space: nowrap;">' . $heatWins . '-' . $heatLosses . ' (' . $heatWinpct . ')</td>';
         $html .= '<td>' . $team['heat_titles'] . '</td>';
         $html .= '<td>' . $team['div_titles'] . '</td>';
         $html .= '<td>' . $team['conf_titles'] . '</td>';

@@ -96,7 +96,10 @@ class SeasonArchiveServiceTest extends TestCase
             ['year' => 1988, 'currentname' => 'Clippers', 'namethatyear' => 'Clippers', 'wins' => 10, 'losses' => 2, 'table_ID' => 13],
         ]);
         $this->mockRepository->method('getTeamColors')->willReturn([
-            'Clippers' => ['color1' => 'C8102E', 'color2' => 'FFFFFF'],
+            'Clippers' => ['color1' => 'C8102E', 'color2' => 'FFFFFF', 'teamid' => 5],
+        ]);
+        $this->mockRepository->method('getPlayerIdsByNames')->willReturn([
+            'Arvydas Sabonis' => 100,
         ]);
 
         $result = $this->service->getSeasonDetail(1989);
@@ -109,6 +112,12 @@ class SeasonArchiveServiceTest extends TestCase
         $this->assertSame('Clippers', $result['tournaments']['iblFinalsWinner']);
         $this->assertSame('Raptors', $result['tournaments']['iblFinalsLoser']);
         $this->assertSame(3, $result['tournaments']['iblFinalsLoserGames']);
+
+        // Verify new fields exist
+        $this->assertArrayHasKey('playerIds', $result);
+        $this->assertArrayHasKey('teamIds', $result);
+        $this->assertSame(100, $result['playerIds']['Arvydas Sabonis']);
+        $this->assertSame(5, $result['teamIds']['Clippers']);
     }
 
     public function testGetSeasonDetailUsesHeatYearMinusOne(): void
@@ -120,6 +129,7 @@ class SeasonArchiveServiceTest extends TestCase
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
         $this->mockRepository->method('getAllGmHistory')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
+        $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
 
         // Verify that getHeatWinLossByYear is called with year - 1
         $this->mockRepository->expects($this->once())
@@ -141,6 +151,7 @@ class SeasonArchiveServiceTest extends TestCase
         $this->mockRepository->method('getAllGmHistory')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
+        $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
 
         $result = $this->service->getSeasonDetail(1989);
         $this->assertNotNull($result);
@@ -164,10 +175,11 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
+        $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
 
         $result = $this->service->getSeasonDetail(1990);
         $this->assertNotNull($result);
-        $this->assertSame('Ross Gates', $result['majorAwards']['gmOfYear']);
+        $this->assertSame(['name' => 'Ross Gates', 'team' => 'Bulls'], $result['majorAwards']['gmOfYear']);
     }
 
     public function testGmOfYearReturnsEmptyWhenNotFound(): void
@@ -187,10 +199,11 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
+        $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
 
         $result = $this->service->getSeasonDetail(1989);
         $this->assertNotNull($result);
-        $this->assertSame('', $result['majorAwards']['gmOfYear']);
+        $this->assertSame(['name' => '', 'team' => ''], $result['majorAwards']['gmOfYear']);
     }
 
     public function testTeamAwardsHtmlStrippedAndCategorized(): void
@@ -206,6 +219,7 @@ class SeasonArchiveServiceTest extends TestCase
         $this->mockRepository->method('getAllGmHistory')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
+        $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
 
         $result = $this->service->getSeasonDetail(1989);
         $this->assertNotNull($result);
@@ -225,6 +239,7 @@ class SeasonArchiveServiceTest extends TestCase
         $this->mockRepository->method('getAllGmHistory')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
+        $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
 
         // Season I (1989): HEAT year = 1988
         $result = $this->service->getSeasonDetail(1989);
@@ -243,6 +258,7 @@ class SeasonArchiveServiceTest extends TestCase
         $this->mockRepository->method('getAllGmHistory')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
+        $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
 
         // Season VII (1995): HEAT year = 1994, uses lowercase
         $result = $this->service->getSeasonDetail(1995);
@@ -299,6 +315,7 @@ class SeasonArchiveServiceTest extends TestCase
         $this->mockRepository->method('getAllGmHistory')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
+        $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
 
         $result = $this->service->getSeasonDetail(1989);
         $this->assertNotNull($result);
@@ -327,11 +344,40 @@ class SeasonArchiveServiceTest extends TestCase
         $this->mockRepository->method('getAllGmHistory')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
+        $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
 
         $result = $this->service->getSeasonDetail(1989);
         $this->assertNotNull($result);
         $this->assertCount(2, $result['allStarRosters']['east']);
         $this->assertCount(1, $result['allStarRosters']['west']);
         $this->assertSame('Player East 1', $result['allStarRosters']['east'][0]);
+    }
+
+    public function testPlayerIdsCollectedFromAllSources(): void
+    {
+        $this->mockRepository->method('getAwardsByYear')->willReturn([
+            ['year' => 1989, 'Award' => 'Most Valuable Player (1st)', 'name' => 'MVP Player', 'table_ID' => 1],
+            ['year' => 1989, 'Award' => 'All-League First Team', 'name' => 'Team Player', 'table_ID' => 2],
+            ['year' => 1989, 'Award' => 'IBL Champion', 'name' => 'Roster Player', 'table_ID' => 3],
+        ]);
+        $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
+        $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
+        $this->mockRepository->method('getAllGmHistory')->willReturn([]);
+        $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
+        $this->mockRepository->method('getTeamColors')->willReturn([]);
+
+        // Verify that getPlayerIdsByNames is called with all collected names
+        $this->mockRepository->expects($this->once())
+            ->method('getPlayerIdsByNames')
+            ->with($this->callback(static function (array $names): bool {
+                return in_array('MVP Player', $names, true)
+                    && in_array('Team Player', $names, true)
+                    && in_array('Roster Player', $names, true);
+            }))
+            ->willReturn(['MVP Player' => 1, 'Team Player' => 2, 'Roster Player' => 3]);
+
+        $result = $this->service->getSeasonDetail(1989);
+        $this->assertNotNull($result);
+        $this->assertSame(1, $result['playerIds']['MVP Player']);
     }
 }

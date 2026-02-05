@@ -149,7 +149,14 @@ Commit body format — use `## Section` headers with bullet points:
 - Detail 2
 ```
 
-**Multiple Claude Instances Warning:** Other Claude instances may have unstaged changes in the working tree. Only stage files YOU modified in this session; leave other unstaged files alone. If unsure, ask the user.
+### Multiple Claude Instances Protocol
+
+Other Claude instances may be working in this directory simultaneously.
+
+1. **Before editing a file:** Run `git status`. If the file has unstaged changes you didn't make, alert the user before proceeding.
+2. **Scope discipline:** Only modify files directly related to your task. If you need to change a shared file, confirm with the user first.
+3. **Before staging:** Run `git diff --name-only` and only stage files you personally modified. Never use `git add .` or `git add -A`.
+4. **Testing:** If other instances may have partial work in progress, prefer running your module's test suite over the full suite.
 
 ## Mandatory Rules
 

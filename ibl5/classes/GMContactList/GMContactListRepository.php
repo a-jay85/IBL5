@@ -21,13 +21,14 @@ class GMContactListRepository extends \BaseMysqliRepository implements GMContact
      */
     public function getAllTeamContacts(): array
     {
-        $query = "SELECT teamid, team_city, team_name, color1, color2,
-                         owner_name, owner_email, skype, aim
-            FROM ibl_team_info
-            WHERE teamid > 0
-            ORDER BY team_city ASC";
+        $query = "SELECT ti.teamid, ti.team_city, ti.team_name, ti.color1, ti.color2,
+                         ti.owner_name, nu.discordID
+            FROM ibl_team_info ti
+            LEFT JOIN nuke_users nu ON nu.user_ibl_team = ti.team_name
+            WHERE ti.teamid > 0
+            ORDER BY ti.team_city ASC";
 
-        /** @var array<int, array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, owner_name: string, owner_email: string, skype: string, aim: string}> */
+        /** @var array<int, array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, owner_name: string, discordID: int|null}> */
         return $this->fetchAll($query);
     }
 }

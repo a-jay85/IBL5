@@ -600,7 +600,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
             $formatted[] = [
                 'teamAbbr' => $this->getTeamAbbreviationByName($record['team_name']),
                 'amount' => (string) $record['count'],
-                'years' => $record['years'],
+                'years' => strip_tags($record['years']),
             ];
         }
         return $formatted;

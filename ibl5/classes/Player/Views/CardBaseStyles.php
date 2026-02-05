@@ -128,10 +128,16 @@ class CardBaseStyles
 .trading-card-back .quick-stats {
     flex: 1;
     font-size: 14px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
 }
 
 .trading-card .stats-grid,
 .trading-card-back .stats-grid {
+    flex: 1;
+    min-width: 0;
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 4px 8px;
@@ -161,6 +167,23 @@ class CardBaseStyles
 .trading-card .stats-grid a:hover,
 .trading-card-back .stats-grid a:hover {
     color: #{$accent};
+}
+
+/* Team Logo */
+.trading-card .card-team-logo,
+.trading-card-back .card-team-logo {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.trading-card .card-team-logo img,
+.trading-card-back .card-team-logo img {
+    max-width: 75px;
+    max-height: 83px;
+    object-fit: contain;
+    opacity: 0.85;
 }
 
 /* Draft Info */
@@ -258,6 +281,12 @@ class CardBaseStyles
         height: 96px;
     }
     
+    .trading-card .card-team-logo img,
+    .trading-card-back .card-team-logo img {
+        max-width: 50px;
+        max-height: 56px;
+    }
+
     .trading-card-back .allstar-pill {
         padding: 3px 6px;
         font-size: 10px;
@@ -296,6 +325,14 @@ HTML;
         $draftPick = $playerData['draftPick'];
         $draftYear = $playerData['draftYear'];
 
+        $teamLogoHtml = '';
+        if ($teamID > 0) {
+            $teamLogoHtml = '<div class="card-team-logo">'
+                . '<img src="images/logo/new' . $teamID . '.png"'
+                . ' alt="" width="75" height="83" loading="lazy">'
+                . '</div>';
+        }
+
         return <<<HTML
     <!-- Card Header: Name & Position -->
     <div class="card-header">
@@ -309,7 +346,7 @@ HTML;
     <!-- Player Photo & Quick Stats -->
     <div class="photo-stats-row">
         <div class="player-photo-frame">
-            <img src="{$imageUrl}" 
+            <img src="{$imageUrl}"
                  alt="{$name}"
                  onerror="this.style.display='none'">
         </div>
@@ -317,19 +354,20 @@ HTML;
             <div class="stats-grid">
                 <span class="label">Team</span>
                 <a href="modules.php?name=Team&op=team&teamID={$teamID}">{$teamName}</a>
-                
+
                 <span class="label">Age</span>
                 <span class="value">{$age}</span>
-                
+
                 <span class="label">Height</span>
                 <span class="value">{$height}</span>
-                
+
                 <span class="label">Weight</span>
                 <span class="value">{$weight} lbs</span>
-                
+
                 <span class="label">College</span>
                 <span class="value">{$college}</span>
             </div>
+            {$teamLogoHtml}
         </div>
     </div>
 

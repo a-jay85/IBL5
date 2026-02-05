@@ -75,7 +75,15 @@ interface SeasonArchiveRepositoryInterface
     /**
      * Get team colors for all active teams
      *
-     * @return array<string, array{color1: string, color2: string}> Map of team_name => colors
+     * @return array<string, array{color1: string, color2: string, teamid: int}> Map of team_name => colors + teamid
      */
     public function getTeamColors(): array;
+
+    /**
+     * Batch-lookup player IDs by name
+     *
+     * @param list<string> $names Player names to look up
+     * @return array<string, int> Map of player name => pid (only found names included)
+     */
+    public function getPlayerIdsByNames(array $names): array;
 }

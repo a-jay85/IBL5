@@ -328,11 +328,10 @@ class RecordHoldersView implements RecordHoldersViewInterface
                 $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
                 /** @var string $safeYears */
                 $safeYears = HtmlSanitizer::safeHtmlOutput($record['years']);
-                $years = str_replace(', ', '<br>', $safeYears);
                 $output .= '<tr class="text-center">';
                 $output .= '<td><strong style="font-weight: bold;"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></strong></td>';
                 $output .= '<td><strong style="font-weight: bold;">' . $safeAmount . '</strong></td>';
-                $output .= '<td colspan="2"><strong style="font-weight: bold;">' . $years . '</strong></td>';
+                $output .= '<td colspan="2"><strong style="font-weight: bold;">' . $safeYears . '</strong></td>';
                 $output .= '</tr>';
             }
         }

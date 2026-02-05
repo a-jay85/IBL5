@@ -133,5 +133,11 @@
         <testsuite name="Integration Tests">
             <directory>tests/Integration</directory>
         </testsuite>
+        <testsuite name="GMContactList Module Tests">
+            <directory>tests/GMContactList</directory>
+        </testsuite>
+        <testsuite name="SeasonArchive Module Tests">
+            <directory>tests/SeasonArchive</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

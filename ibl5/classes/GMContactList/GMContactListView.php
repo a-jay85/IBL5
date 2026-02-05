@@ -50,8 +50,6 @@ class GMContactListView implements GMContactListViewInterface
                 <tr>
                     <th>Team</th>
                     <th>Name</th>
-                    <th>AIM</th>
-                    <th>Skype</th>
                 </tr>
             </thead>
             <tbody>';
@@ -67,9 +65,7 @@ class GMContactListView implements GMContactListViewInterface
      *     color1: string,
      *     color2: string,
      *     owner_name: string,
-     *     owner_email: string,
-     *     skype: string,
-     *     aim: string
+     *     discordID: int|null
      * }> $contacts Array of contact data
      * @return string HTML table rows
      */
@@ -94,9 +90,7 @@ class GMContactListView implements GMContactListViewInterface
      *     color1: string,
      *     color2: string,
      *     owner_name: string,
-     *     owner_email: string,
-     *     skype: string,
-     *     aim: string
+     *     discordID: int|null
      * } $contact Contact data array
      * @return string HTML for one contact row
      */
@@ -111,12 +105,13 @@ class GMContactListView implements GMContactListViewInterface
         $color2 = HtmlSanitizer::safeHtmlOutput($contact['color2']);
         /** @var string $ownerName */
         $ownerName = HtmlSanitizer::safeHtmlOutput($contact['owner_name']);
-        /** @var string $ownerEmail */
-        $ownerEmail = HtmlSanitizer::safeHtmlOutput($contact['owner_email']);
-        /** @var string $skype */
-        $skype = HtmlSanitizer::safeHtmlOutput($contact['skype']);
-        /** @var string $aim */
-        $aim = HtmlSanitizer::safeHtmlOutput($contact['aim']);
+        $discordID = $contact['discordID'];
+
+        if ($discordID !== null) {
+            $gmCell = "<a href=\"https://discord.com/users/{$discordID}\">{$ownerName}</a>";
+        } else {
+            $gmCell = $ownerName;
+        }
 
         return "<tr data-team-id=\"{$teamId}\">
     <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
@@ -126,10 +121,8 @@ class GMContactListView implements GMContactListViewInterface
         </a>
     </td>
     <td class=\"gm-cell\">
-        <a href=\"mailto:{$ownerEmail}\">{$ownerName}</a>
+        {$gmCell}
     </td>
-    <td>{$aim}</td>
-    <td>{$skype}</td>
 </tr>";
     }
 

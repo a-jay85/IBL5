@@ -21,9 +21,7 @@ interface GMContactListViewInterface
      *     color1: string,
      *     color2: string,
      *     owner_name: string,
-     *     owner_email: string,
-     *     skype: string,
-     *     aim: string
+     *     discordID: int|null
      * }> $contacts Array of team contact data
      * @return string HTML output for the contact list table
      */

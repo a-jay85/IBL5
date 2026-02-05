@@ -129,7 +129,7 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
         $heatLosses = (int)$team['heat_total_losses'];
         /** @var string $heatWinpct */
         $heatWinpct = HtmlSanitizer::safeHtmlOutput($team['heat_winpct']);
-        $html .= '<td style="white-space: nowrap;">' . $heatWins . '-' . $heatLosses . ' (' . $heatWinpct . ')</td>';
+        $html .= '<td style="white-space: nowrap;" sorttable_customkey="' . $heatWinpct . '">' . $heatWins . '-' . $heatLosses . ' (' . $heatWinpct . ')</td>';
         $html .= '<td>' . $team['heat_titles'] . '</td>';
         $html .= '<td>' . $team['div_titles'] . '</td>';
         $html .= '<td>' . $team['conf_titles'] . '</td>';

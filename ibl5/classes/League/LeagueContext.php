@@ -70,9 +70,18 @@ class LeagueContext
         $_SESSION['current_league'] = $league;
 
         // Set cookie with 30-day expiry (skip in CLI/test mode to avoid header errors)
+        // SECURITY: Use secure cookie options
         if (php_sapi_name() !== 'cli' && !headers_sent()) {
             $expiry = time() + (30 * 24 * 60 * 60);
-            setcookie(self::COOKIE_NAME, $league, $expiry, '/');
+            $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+            setcookie(self::COOKIE_NAME, $league, [
+                'expires' => $expiry,
+                'path' => '/',
+                'secure' => $isHttps,
+                'httponly' => true,
+                'samesite' => 'Lax',  // Lax for league switching via links
+            ]);
         }
     }
 

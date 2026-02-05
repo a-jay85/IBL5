@@ -107,7 +107,16 @@ if ((isset($aid)) && (isset($pwd)) && (isset($op)) && ($op == "login")) {
         $admlanguage = addslashes($admlanguage);
         if ($rpwd == $pwd) {
             $admin = base64_encode("$aid:$pwd:$admlanguage");
-            setcookie("admin", $admin, time() + 2592000);
+            // SECURITY: Use secure cookie options
+            $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+            setcookie("admin", $admin, [
+                'expires' => time() + 2592000,
+                'path' => '/',
+                'secure' => $isHttps,
+                'httponly' => true,
+                'samesite' => 'Strict',
+            ]);
             unset($op);
         }
     }
@@ -466,7 +475,14 @@ if ($admintest) {
             break;
 
         case "logout":
-            setcookie("admin", false);
+            // SECURITY: Clear cookie with proper options
+            setcookie("admin", "", [
+                'expires' => 1,
+                'path' => '/',
+                'secure' => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+                'httponly' => true,
+                'samesite' => 'Strict',
+            ]);
             $admin = "";
             Nuke\Header::header();
             OpenTable();

@@ -86,6 +86,39 @@ class TradeOffer implements TradeOfferInterface
             ];
         }
 
+        // Count players being sent by each side
+        $userPlayersSent = 0;
+        $partnerPlayersSent = 0;
+        $switchCounter = $tradeData['switchCounter'];
+        $fieldsCounter = $tradeData['fieldsCounter'];
+
+        for ($i = 0; $i < $switchCounter; $i++) {
+            if (($tradeData['check'][$i] ?? null) === 'on' && ($tradeData['type'][$i] ?? '') === '1') {
+                $userPlayersSent++;
+            }
+        }
+
+        for ($i = $switchCounter; $i < $fieldsCounter; $i++) {
+            if (($tradeData['check'][$i] ?? null) === 'on' && ($tradeData['type'][$i] ?? '') === '1') {
+                $partnerPlayersSent++;
+            }
+        }
+
+        // Validate roster limits
+        $rosterValidation = $this->validator->validateRosterLimits(
+            $tradeData['offeringTeam'],
+            $tradeData['listeningTeam'],
+            $userPlayersSent,
+            $partnerPlayersSent
+        );
+
+        if ($rosterValidation['valid'] !== true) {
+            return [
+                'success' => false,
+                'errors' => $rosterValidation['errors'],
+            ];
+        }
+
         // Process the trade offer creation
         $result = $this->insertTradeOfferData($tradeOfferId, $tradeData);
         

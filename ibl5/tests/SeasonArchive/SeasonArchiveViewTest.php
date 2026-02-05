@@ -337,6 +337,62 @@ class SeasonArchiveViewTest extends TestCase
         $this->assertStringContainsString('Bulls', $result);
     }
 
+    public function testRenderIndexUsesTeamCellsForChampions(): void
+    {
+        $seasons = [
+            ['year' => 1989, 'label' => 'Season I (1988-89)', 'iblChampion' => 'Clippers', 'heatChampion' => 'Rockets', 'mvp' => 'Arvydas Sabonis'],
+        ];
+        $teamColors = [
+            'Clippers' => ['color1' => 'C8102E', 'color2' => 'FFFFFF', 'teamid' => 5],
+            'Rockets' => ['color1' => 'CE1141', 'color2' => '000000', 'teamid' => 12],
+        ];
+
+        $result = $this->view->renderIndex($seasons, $teamColors);
+
+        $this->assertStringContainsString('ibl-team-cell--colored', $result);
+        $this->assertStringContainsString('C8102E', $result);
+        $this->assertStringContainsString('CE1141', $result);
+        $this->assertStringContainsString('teamID=5', $result);
+        $this->assertStringContainsString('teamID=12', $result);
+        $this->assertStringContainsString('new5.png', $result);
+        $this->assertStringContainsString('new12.png', $result);
+    }
+
+    public function testRenderIndexUsesPlayerCellForMvp(): void
+    {
+        $seasons = [
+            ['year' => 1989, 'label' => 'Season I (1988-89)', 'iblChampion' => 'Clippers', 'heatChampion' => 'Rockets', 'mvp' => 'Arvydas Sabonis'],
+        ];
+        $playerIds = ['Arvydas Sabonis' => 100];
+
+        $result = $this->view->renderIndex($seasons, [], $playerIds);
+
+        $this->assertStringContainsString('ibl-player-cell', $result);
+        $this->assertStringContainsString('pid=100', $result);
+        $this->assertStringContainsString('Arvydas Sabonis', $result);
+    }
+
+    public function testRenderIndexEmitsStylesWhenEnrichmentDataProvided(): void
+    {
+        $seasons = [
+            ['year' => 1989, 'label' => 'Season I (1988-89)', 'iblChampion' => 'Clippers', 'heatChampion' => 'Rockets', 'mvp' => 'Arvydas Sabonis'],
+        ];
+        $teamColors = [
+            'Clippers' => ['color1' => 'C8102E', 'color2' => 'FFFFFF', 'teamid' => 5],
+        ];
+
+        $result = $this->view->renderIndex($seasons, $teamColors);
+
+        $this->assertStringContainsString('<style>', $result);
+    }
+
+    public function testRenderIndexWithoutEnrichmentDataOmitsStyles(): void
+    {
+        $result = $this->view->renderIndex([]);
+
+        $this->assertStringNotContainsString('<style>', $result);
+    }
+
     public function testTeamAwardsUseTeamCells(): void
     {
         $seasonData = $this->createMinimalSeasonData();

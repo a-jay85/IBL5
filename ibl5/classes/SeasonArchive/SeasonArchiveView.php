@@ -34,10 +34,21 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
      * @see SeasonArchiveViewInterface::renderIndex()
      *
      * @param list<SeasonSummary> $seasons
+     * @param array<string, array{color1: string, color2: string, teamid: int}> $teamColors
+     * @param array<string, int> $playerIds
+     * @param array<string, int> $teamIds
      */
-    public function renderIndex(array $seasons): string
-    {
-        $html = '<h2 class="ibl-title">IBL Season Archive</h2>';
+    public function renderIndex(
+        array $seasons,
+        array $teamColors = [],
+        array $playerIds = [],
+        array $teamIds = []
+    ): string {
+        $html = '';
+        if ($teamColors !== [] || $playerIds !== []) {
+            $html .= $this->renderStyles();
+        }
+        $html .= '<h2 class="ibl-title">IBL Season Archive</h2>';
         $html .= '<table class="sortable ibl-data-table">';
         $html .= '<thead><tr><th>Season</th><th>IBL Champion</th><th>HEAT Champion</th><th>MVP</th></tr></thead>';
         $html .= '<tbody>';
@@ -46,15 +57,12 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
             /** @var array{year: int, label: string, iblChampion: string, heatChampion: string, mvp: string} $season */
             $year = $season['year'];
             $label = self::esc($season['label']);
-            $iblChamp = self::esc($season['iblChampion']);
-            $heatChamp = self::esc($season['heatChampion']);
-            $mvp = self::esc($season['mvp']);
 
             $html .= '<tr>';
             $html .= '<td><a href="modules.php?name=SeasonArchive&amp;year=' . $year . '">' . $label . '</a></td>';
-            $html .= '<td>' . $iblChamp . '</td>';
-            $html .= '<td>' . $heatChamp . '</td>';
-            $html .= '<td>' . $mvp . '</td>';
+            $html .= self::renderTeamCell($season['iblChampion'], $teamColors, $year);
+            $html .= self::renderTeamCell($season['heatChampion'], $teamColors, $year);
+            $html .= '<td>' . self::renderPlayerName($season['mvp'], $playerIds) . '</td>';
             $html .= '</tr>';
         }
 

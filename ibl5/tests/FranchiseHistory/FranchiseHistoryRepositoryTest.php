@@ -113,6 +113,40 @@ class FranchiseHistoryRepositoryTest extends TestCase
     }
 
     /**
+     * Verify that getPlayoffTotals method exists and queries ibl_playoff_results
+     *
+     * This test documents the expected behavior: playoff game records must be
+     * derived from series results in ibl_playoff_results using CASE expressions.
+     */
+    public function testRepositoryQueriesPlayoffResultsForPlayoffTotals(): void
+    {
+        $reflectionClass = new \ReflectionClass($this->repository);
+
+        // Verify the private getPlayoffTotals method exists
+        $this->assertTrue(
+            $reflectionClass->hasMethod('getPlayoffTotals'),
+            'Repository must have getPlayoffTotals method to calculate playoff records from ibl_playoff_results'
+        );
+
+        $fileName = $reflectionClass->getFileName();
+        $sourceCode = file_get_contents($fileName);
+
+        // Verify that the repository queries ibl_playoff_results table
+        $this->assertStringContainsString(
+            'ibl_playoff_results',
+            $sourceCode,
+            'Repository must query ibl_playoff_results table to calculate playoff records'
+        );
+
+        // Verify that playoff fields are assigned in the foreach loop
+        $this->assertMatchesRegularExpression(
+            '/\$team\[[\'"]playoff_total_wins[\'"]\]\s*=/',
+            $sourceCode,
+            'Repository must assign calculated playoff wins to team array'
+        );
+    }
+
+    /**
      * Regression test: Verify that title fields are overwritten
      *
      * This test documents that the repository MUST overwrite the title fields

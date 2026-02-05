@@ -23,9 +23,17 @@ interface SeasonArchiveViewInterface
      * Displays a table of all seasons with links to detail pages.
      *
      * @param list<SeasonSummary> $seasons Array of season summaries
+     * @param array<string, array{color1: string, color2: string, teamid: int}> $teamColors
+     * @param array<string, int> $playerIds
+     * @param array<string, int> $teamIds
      * @return string HTML output
      */
-    public function renderIndex(array $seasons): string;
+    public function renderIndex(
+        array $seasons,
+        array $teamColors = [],
+        array $playerIds = [],
+        array $teamIds = []
+    ): string;
 
     /**
      * Render a single season detail page

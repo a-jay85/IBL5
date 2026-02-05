@@ -49,12 +49,8 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
             <thead>
             <tr>
                 <th class="ibl-team-cell--colored sticky-col sticky-corner">Team</th>
-                <th>All-Time<br>Wins</th>
-                <th>All-Time<br>Losses</th>
-                <th>All-Time<br>Pct.</th>
-                <th>Last Five<br>Seasons<br>Wins</th>
-                <th>Last Five<br>Seasons<br>Losses</th>
-                <th>Last Five<br>Seasons<br>Pct.</th>
+                <th>All-Time<br>Record</th>
+                <th>Last Five<br>Seasons</th>
                 <th>Playoffs</th>
                 <th>All-Time<br>Playoffs Record</th>
                 <th>All-Time<br>HEAT Record</th>
@@ -110,19 +106,19 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
         $html .= '<span class="ibl-team-cell__text">' . $teamName . '</span></a>';
         $html .= '</td>';
 
-        // All-time stats
-        $html .= '<td>' . (int)$team['totwins'] . '</td>';
-        $html .= '<td>' . (int)$team['totloss'] . '</td>';
-        /** @var string $winpct */
-        $winpct = HtmlSanitizer::safeHtmlOutput($team['winpct']);
-        $html .= '<td>' . $winpct . '</td>';
+        // All-time record
+        $allTimeWins = (int)$team['totwins'];
+        $allTimeLosses = (int)$team['totloss'];
+        /** @var string $allTimeWinpct */
+        $allTimeWinpct = HtmlSanitizer::safeHtmlOutput($team['winpct']);
+        $html .= '<td style="white-space: nowrap;" sorttable_customkey="' . $allTimeWinpct . '">' . $allTimeWins . '-' . $allTimeLosses . ' (' . $allTimeWinpct . ')</td>';
 
-        // Last five seasons stats
-        $html .= '<td class="last-five-cell">' . (int)$team['five_season_wins'] . '</td>';
-        $html .= '<td class="last-five-cell">' . (int)$team['five_season_losses'] . '</td>';
+        // Last five seasons record
+        $fiveSeasonWins = (int)$team['five_season_wins'];
+        $fiveSeasonLosses = (int)$team['five_season_losses'];
         /** @var string $fiveSeasonWinpct */
         $fiveSeasonWinpct = HtmlSanitizer::safeHtmlOutput($team['five_season_winpct'] ?? '');
-        $html .= '<td class="last-five-cell">' . $fiveSeasonWinpct . '</td>';
+        $html .= '<td style="white-space: nowrap;" sorttable_customkey="' . $fiveSeasonWinpct . '">' . $fiveSeasonWins . '-' . $fiveSeasonLosses . ' (' . $fiveSeasonWinpct . ')</td>';
 
         // Titles and playoffs
         $html .= '<td>' . (int)$team['playoffs'] . '</td>';

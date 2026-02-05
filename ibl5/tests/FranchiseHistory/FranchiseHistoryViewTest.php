@@ -50,12 +50,12 @@ class FranchiseHistoryViewTest extends TestCase
         $this->assertStringContainsString('Titles', $result);
     }
 
-    public function testRenderContainsWinLossHeaders(): void
+    public function testRenderContainsRecordHeaders(): void
     {
         $result = $this->view->render([]);
 
-        $this->assertStringContainsString('Win', $result);
-        $this->assertStringContainsString('Loss', $result);
+        $this->assertStringContainsString('All-Time<br>Record', $result);
+        $this->assertStringContainsString('Last Five<br>Seasons', $result);
     }
 
     public function testRenderEscapesHtmlEntities(): void
@@ -132,7 +132,9 @@ class FranchiseHistoryViewTest extends TestCase
 
         $result = $this->view->render($franchises);
 
-        // Verify playoff record is rendered
+        // Verify merged record columns are rendered
+        $this->assertStringContainsString('100-50 (0.667)', $result, 'All-time record should be displayed');
+        $this->assertStringContainsString('50-25 (0.667)', $result, 'Last five seasons record should be displayed');
         $this->assertStringContainsString('32-20 (0.615)', $result, 'Playoff record should be displayed');
 
         // Verify all title types are rendered

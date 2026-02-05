@@ -372,17 +372,26 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         $records[$this->addTieLabel('Fewest Points in a Single Game', $fewestWithTies)] = $fewestWithTies;
 
         // Half scores
-        $mostHalf = $this->repository->getTopTeamHalfScore('first', 'DESC');
-        $records['Most Points in a Single Half'] = $this->formatTeamGameRecords($mostHalf);
-        $fewestHalf = $this->repository->getTopTeamHalfScore('second', 'ASC');
-        $records['Fewest Points in a Single Half'] = $this->formatTeamGameRecords($fewestHalf);
+        $mostHalf = $this->formatTeamGameRecords($this->repository->getTopTeamHalfScore('first', 'DESC'));
+        /** @var list<FormattedTeamGameRecord> $mostHalfTies */
+        $mostHalfTies = $this->detectTies($mostHalf);
+        $records[$this->addTieLabel('Most Points in a Single Half', $mostHalfTies)] = $mostHalfTies;
+
+        $fewestHalf = $this->formatTeamGameRecords($this->repository->getTopTeamHalfScore('second', 'ASC'));
+        /** @var list<FormattedTeamGameRecord> $fewestHalfTies */
+        $fewestHalfTies = $this->detectTies($fewestHalf);
+        $records[$this->addTieLabel('Fewest Points in a Single Half', $fewestHalfTies)] = $fewestHalfTies;
 
         // Margin of victory (overall and playoffs)
-        $marginOverall = $this->repository->getLargestMarginOfVictory('1=1');
-        $records['Largest Margin of Victory [overall]'] = $this->formatMarginRecords($marginOverall);
+        $marginOverall = $this->formatMarginRecords($this->repository->getLargestMarginOfVictory('1=1'));
+        /** @var list<FormattedTeamGameRecord> $marginOverallTies */
+        $marginOverallTies = $this->detectTies($marginOverall);
+        $records[$this->addTieLabel('Largest Margin of Victory [overall]', $marginOverallTies)] = $marginOverallTies;
 
-        $marginPlayoffs = $this->repository->getLargestMarginOfVictory('MONTH(bs.Date) = 6');
-        $records['Largest Margin of Victory [playoffs]'] = $this->formatMarginRecords($marginPlayoffs);
+        $marginPlayoffs = $this->formatMarginRecords($this->repository->getLargestMarginOfVictory('MONTH(bs.Date) = 6'));
+        /** @var list<FormattedTeamGameRecord> $marginPlayoffTies */
+        $marginPlayoffTies = $this->detectTies($marginPlayoffs);
+        $records[$this->addTieLabel('Largest Margin of Victory [playoffs]', $marginPlayoffTies)] = $marginPlayoffTies;
 
         return $records;
     }

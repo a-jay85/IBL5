@@ -26,17 +26,42 @@ class TeamController implements TeamControllerInterface
     }
 
     /**
+     * Valid display modes for team page
+     */
+    private const VALID_DISPLAY_MODES = [
+        'ratings',
+        'total_s',
+        'avg_s',
+        'per36mins',
+        'chunk',
+        'playoffs',
+        'contracts',
+    ];
+
+    /**
      * @see TeamControllerInterface::displayTeamPage()
      */
     public function displayTeamPage(int $teamID): void
     {
+        // Validate and sanitize year parameter
         $yr = null;
-        if (isset($_REQUEST['yr']) && is_string($_REQUEST['yr'])) {
-            $yr = $_REQUEST['yr'];
+        if (isset($_REQUEST['yr']) && is_string($_REQUEST['yr']) && $_REQUEST['yr'] !== '') {
+            // Year should be a 4-digit year or a season range like "2024-25"
+            $rawYr = $_REQUEST['yr'];
+            if (preg_match('/^\d{4}(-\d{2})?$/', $rawYr) === 1) {
+                $yr = $rawYr;
+            }
+            // Invalid year format is silently ignored (falls back to current season)
         }
+
+        // Validate display parameter against whitelist
         $display = 'ratings';
         if (isset($_REQUEST['display']) && is_string($_REQUEST['display'])) {
-            $display = $_REQUEST['display'];
+            $rawDisplay = $_REQUEST['display'];
+            if (in_array($rawDisplay, self::VALID_DISPLAY_MODES, true)) {
+                $display = $rawDisplay;
+            }
+            // Invalid display value is silently ignored (falls back to 'ratings')
         }
 
         \Nuke\Header::header();

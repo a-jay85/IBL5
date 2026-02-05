@@ -182,7 +182,8 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             // Send email notification (only on non-localhost)
             if (isset($_SERVER['SERVER_NAME']) && $_SERVER['SERVER_NAME'] !== "localhost") {
                 $recipient = 'ibldepthcharts@gmail.com';
-                $emailsubject = "Successful Extension - " . $playerName;
+                // SECURITY: Sanitize email subject to prevent header injection
+                $emailsubject = \Utilities\EmailSanitizer::sanitizeSubject("Successful Extension - " . $playerName);
                 $filetext = "{$playerName} accepts an extension offer from the {$teamName} of $offerTotal for $offerYears years.\n";
                 $filetext .= "For reference purposes: the offer was " . $offerDetails;
                 $filetext .= " and the offer value was thus considered to be " . $evaluation['offerValue'];
@@ -215,7 +216,8 @@ class ExtensionProcessor implements ExtensionProcessorInterface
 
             // Send email notification
             $recipient = 'ibldepthcharts@gmail.com';
-            $emailsubject = "Unsuccessful Extension - " . $playerName;
+            // SECURITY: Sanitize email subject to prevent header injection
+            $emailsubject = \Utilities\EmailSanitizer::sanitizeSubject("Unsuccessful Extension - " . $playerName);
             $filetext = "{$playerName} refuses an extension offer from the {$teamName} of $offerTotal for $offerYears years.\n";
             $filetext .= "For reference purposes: the offer was " . $offerDetails;
             $filetext .= " and the offer value was thus considered to be " . $evaluation['offerValue'] . ".";

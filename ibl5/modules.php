@@ -17,6 +17,16 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 if (isset($name) && $name == $_REQUEST['name']) {
     $name = trim($name);
+
+    // SECURITY: Validate module name - must be alphanumeric with underscores only
+    // Also use basename() to strip any path components
+    $name = basename($name);
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $name)) {
+        header("Location: index.php");
+        exit;
+    }
+
+    // Legacy check for path traversal (kept for defense in depth)
     if (stripos_clone($name, "..")) {
         header("Location: index.php");
         exit;
@@ -42,6 +52,14 @@ if (isset($name) && $name == $_REQUEST['name']) {
             $file = "index";
         }
 
+        // SECURITY: Validate file name - must be alphanumeric with underscores only
+        // Also use basename() to strip any path components
+        $file = basename($file);
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $file)) {
+            die("Invalid file name");
+        }
+
+        // Legacy check for path traversal (kept for defense in depth)
         if (stripos_clone($file, "..")) {
             die("You are so cool...");
         }

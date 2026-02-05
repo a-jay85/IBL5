@@ -26,11 +26,35 @@ if (!defined('END_TRANSACTION')) {
 // Get php version
 $phpver = phpversion();
 
-// convert superglobals if php is lower then 4.1.0
+// SECURITY: Safe include function with path traversal protection
+// Note: This function is legacy. New code should use explicit includes with verified paths.
 function include_secure($file_name)
 {
+    // Remove any path traversal attempts
     $file_name = preg_replace("/\.[\.\/]*\//", "", $file_name);
-    include_once $file_name;
+
+    // Additional protection: use basename to strip directory components
+    // and verify the file exists in expected location
+    $base_name = basename($file_name);
+
+    // Only allow alphanumeric, underscore, dash, and .php extension
+    if (!preg_match('/^[a-zA-Z0-9_\-]+\.php$/', $base_name)) {
+        return;
+    }
+
+    // Reconstruct with just the directory and safe basename
+    $dir = dirname($file_name);
+    if ($dir === '.' || $dir === '') {
+        $safe_path = $base_name;
+    } else {
+        // Validate directory doesn't contain traversal
+        $dir = str_replace(['..', "\0"], '', $dir);
+        $safe_path = $dir . '/' . $base_name;
+    }
+
+    if (file_exists($safe_path)) {
+        include_once $safe_path;
+    }
 }
 if ($phpver < '4.1.0') {
     $_GET = $HTTP_GET_VARS;
@@ -102,9 +126,46 @@ if ($phpver >= '4.0.4pl1' && isset($_SERVER['HTTP_USER_AGENT']) && strstr($_SERV
 // Load the autoloader for IBL5 classes (must be before League\LeagueContext usage)
 require_once __DIR__ . '/autoloader.php';
 
-// League context session initialization
+// SECURITY: Configure secure session cookie parameters before session_start()
 if (session_status() === PHP_SESSION_NONE) {
+    // Detect HTTPS
+    $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+        || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] === 443);
+
+    // Set secure session cookie options
+    session_set_cookie_params([
+        'lifetime' => 0,               // Session cookie (expires on browser close)
+        'path' => '/',
+        'domain' => '',
+        'secure' => $isHttps,          // Only HTTPS
+        'httponly' => true,            // Prevent JavaScript access
+        'samesite' => 'Lax',           // CSRF protection (Lax for login redirects)
+    ]);
+
     session_start();
+}
+
+// SECURITY: Set HTTP security headers (only if headers haven't been sent)
+if (!headers_sent()) {
+    // Prevent MIME-sniffing attacks
+    header('X-Content-Type-Options: nosniff');
+
+    // Prevent clickjacking by disallowing framing
+    header('X-Frame-Options: SAMEORIGIN');
+
+    // Control referrer information leakage
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+
+    // Basic Content Security Policy (allows inline scripts/styles for legacy compatibility)
+    // Note: A stricter CSP with nonces would require refactoring all inline scripts
+    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; frame-src https://www.google.com; connect-src 'self'");
+
+    // Enable HTTPS-only in production (HSTS)
+    $isProduction = ($_SERVER['SERVER_NAME'] ?? '') !== 'localhost';
+    if ($isProduction && isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    }
 }
 
 // Hydrate session from cookie if not set
@@ -123,8 +184,31 @@ if (isset($_GET['league']) && in_array($_GET['league'], [\League\LeagueContext::
     $leagueContext->setLeague($_GET['league']);
 }
 
+// SECURITY: Denylist of critical globals that MUST NEVER be overwritten via $_REQUEST
+// These include database credentials, connection objects, and authentication variables
+$_protected_globals = [
+    // Database credentials (from config.php)
+    'dbhost', 'dbuname', 'dbpass', 'dbname', 'prefix', 'user_prefix',
+    // Database connection objects
+    'db', 'mysqli_db',
+    // Authentication state
+    'admin', 'user', 'cookie', 'userinfo',
+    // PHP-Nuke core configuration
+    'nukeurl', 'sitename', 'adminmail', 'admin_file',
+    // Session/superglobals
+    '_SESSION', '_COOKIE', '_SERVER', '_ENV', '_FILES', '_GET', '_POST', '_REQUEST',
+    // Internal PHP
+    'GLOBALS', 'this',
+    // League context
+    'leagueContext',
+];
+
 $sanitize_rules = array("newlang" => "/[a-z][a-z]/i", "redirect" => "/[a-z0-9]*/i");
 foreach ($_REQUEST as $key => $value) {
+    // Skip protected globals entirely
+    if (in_array($key, $_protected_globals, true)) {
+        continue;
+    }
     if (!isset($sanitize_rules[$key]) || preg_match($sanitize_rules[$key], $value)) {
         $GLOBALS[$key] = $value;
     }

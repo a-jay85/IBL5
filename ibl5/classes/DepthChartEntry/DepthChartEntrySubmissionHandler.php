@@ -113,9 +113,8 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             $bytesWritten = file_put_contents($filename, $convertedContent);
             if ($bytesWritten !== false && $bytesWritten > 0) {
                 if (isset($_SERVER['SERVER_NAME']) && $_SERVER['SERVER_NAME'] !== "localhost") {
-                    $rawSubject = $teamName . " Depth Chart";
-                    $emailSubject = filter_var($rawSubject, FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_LOW | FILTER_FLAG_STRIP_HIGH);
-                    $emailSubject = strip_tags((string) $emailSubject);
+                    // SECURITY: Sanitize email subject to prevent header injection
+                    $emailSubject = \Utilities\EmailSanitizer::sanitizeSubject($teamName . " Depth Chart");
                     $recipient = 'ibldepthcharts@gmail.com';
 
                     $headers = "From: ibldepthcharts@gmail.com\r\n";

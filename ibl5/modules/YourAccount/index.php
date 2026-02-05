@@ -772,7 +772,14 @@ function logout()
     cookiedecode($user);
     $r_uid = $cookie[0];
     $r_username = $cookie[1];
-    setcookie("user", false, 1);
+    // SECURITY: Clear user cookie with secure options
+    setcookie("user", "", [
+        'expires' => 1,
+        'path' => '/',
+        'secure' => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
     $db->sql_query("DELETE FROM " . $prefix . "_session WHERE uname='$r_username'");
     $user = "";
     $cookie = "";
@@ -857,28 +864,55 @@ function mail_password($username, $code)
 function docookie($setuid, $setusername, $setpass, $setstorynum, $setumode, $setuorder, $setthold, $setnoscore, $setublockon, $settheme, $setcommentmax)
 {
     $info = base64_encode("$setuid:$setusername:$setpass:$setstorynum:$setumode:$setuorder:$setthold:$setnoscore:$setublockon:$settheme:$setcommentmax");
-    setcookie("user", "$info", time() + 2592000);
+    // SECURITY: Set user cookie with secure options
+    $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+    setcookie("user", "$info", [
+        'expires' => time() + 2592000,
+        'path' => '/',
+        'secure' => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
 }
 
 function login($username, $user_password, $redirect, $mode, $f, $t, $random_num, $gfx_check)
 {
-    global $setinfo, $user_prefix, $db, $module_name, $pm_login, $prefix;
+    global $setinfo, $user_prefix, $db, $mysqli_db, $module_name, $pm_login, $prefix;
     $user_password = htmlspecialchars(stripslashes($user_password));
     include "config.php";
-    $sql = "SELECT user_password, user_id, storynum, umode, uorder, thold, noscore, ublockon, theme, commentmax FROM " . $user_prefix . "_users WHERE username='$username'";
-    $result = $db->sql_query($sql);
-    $setinfo = $db->sql_fetchrow($result);
+
+    // SECURITY: Use prepared statement for user lookup
+    $stmt = $mysqli_db->prepare(
+        "SELECT user_password, user_id, storynum, umode, uorder, thold, noscore, ublockon, theme, commentmax
+         FROM " . $user_prefix . "_users WHERE username = ?"
+    );
+    $stmt->bind_param('s', $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $setinfo = $result->fetch_assoc();
+    $numRows = $result->num_rows;
+    $stmt->close();
+
     $forward = mb_ereg_replace("redirect=", "", "$redirect");
-    if (($db->sql_numrows($result) == 1) and ($setinfo['user_id'] != 1) and (!empty($setinfo['user_password']))) {
+    if (($numRows == 1) and ($setinfo['user_id'] != 1) and (!empty($setinfo['user_password']))) {
         $dbpass = $setinfo['user_password'];
         $non_crypt_pass = $user_password;
         $old_crypt_pass = crypt($user_password, substr($dbpass, 0, 2));
         $new_pass = md5($user_password);
         if (($dbpass == $non_crypt_pass) or ($dbpass == $old_crypt_pass)) {
-            $db->sql_query("UPDATE " . $user_prefix . "_users SET user_password='$new_pass' WHERE username='$username'");
-            $sql = "SELECT user_password FROM " . $user_prefix . "_users WHERE username='$username'";
-            $result = $db->sql_query($sql);
-            $row = $db->sql_fetchrow($result);
+            // SECURITY: Use prepared statement for password update
+            $stmtUpdate = $mysqli_db->prepare("UPDATE " . $user_prefix . "_users SET user_password = ? WHERE username = ?");
+            $stmtUpdate->bind_param('ss', $new_pass, $username);
+            $stmtUpdate->execute();
+            $stmtUpdate->close();
+
+            // Re-fetch the password
+            $stmtPass = $mysqli_db->prepare("SELECT user_password FROM " . $user_prefix . "_users WHERE username = ?");
+            $stmtPass->bind_param('s', $username);
+            $stmtPass->execute();
+            $passResult = $stmtPass->get_result();
+            $row = $passResult->fetch_assoc();
+            $stmtPass->close();
             $dbpass = $row['user_password'];
         }
         if ($dbpass != $new_pass) {
@@ -892,10 +926,24 @@ function login($username, $user_password, $redirect, $mode, $f, $t, $random_num,
             Header("Location: modules.php?name=$module_name&stop=1");
             die();
         } else {
+            // SECURITY: Regenerate session ID to prevent session fixation
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_regenerate_id(true);
+            }
+
             docookie($setinfo['user_id'], $username, $new_pass, $setinfo['storynum'], $setinfo['umode'], $setinfo['uorder'], $setinfo['thold'], $setinfo['noscore'], $setinfo['ublockon'], $setinfo['theme'], $setinfo['commentmax']);
             $uname = $_SERVER['REMOTE_ADDR'];
-            $db->sql_query("DELETE FROM " . $prefix . "_session WHERE uname='$uname' AND guest='1'");
-            $db->sql_query("UPDATE " . $prefix . "_users SET last_ip='$uname' WHERE username='$username'");
+
+            // SECURITY: Use prepared statements for session cleanup
+            $stmtDelSession = $mysqli_db->prepare("DELETE FROM " . $prefix . "_session WHERE uname = ? AND guest = '1'");
+            $stmtDelSession->bind_param('s', $uname);
+            $stmtDelSession->execute();
+            $stmtDelSession->close();
+
+            $stmtUpdateIp = $mysqli_db->prepare("UPDATE " . $prefix . "_users SET last_ip = ? WHERE username = ?");
+            $stmtUpdateIp->bind_param('ss', $uname, $username);
+            $stmtUpdateIp->execute();
+            $stmtUpdateIp->close();
         }
         Header("Location: modules.php?name=YourAccount&op=userinfo&bypass=1&username=$username");
     } else {

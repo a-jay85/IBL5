@@ -113,10 +113,9 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
 
         $this->newsService->incrementCategoryCounter('Contract Extensions');
 
-        $playerNameEscaped = $this->db->real_escape_string($playerName);
-        $teamNameEscaped = $this->db->real_escape_string($teamName);
-        $title = "{$playerNameEscaped} extends their contract with the {$teamNameEscaped}";
-        $hometext = "{$playerNameEscaped} today accepted a contract extension offer from the {$teamNameEscaped} worth {$offerInMillions} million dollars over {$offerYears} years";
+        // NewsService uses prepared statements - no escaping needed here
+        $title = "{$playerName} extends their contract with the {$teamName}";
+        $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth {$offerInMillions} million dollars over {$offerYears} years";
         if ($offerDetails !== '') {
             $hometext .= ":<br>" . $offerDetails;
         }
@@ -142,10 +141,9 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
 
         $this->newsService->incrementCategoryCounter('Contract Extensions');
 
-        $playerNameEscaped = $this->db->real_escape_string($playerName);
-        $teamNameEscaped = $this->db->real_escape_string($teamName);
-        $title = "{$playerNameEscaped} turns down an extension offer from the {$teamNameEscaped}";
-        $hometext = "{$playerNameEscaped} today rejected a contract extension offer from the {$teamNameEscaped} worth {$offerInMillions} million dollars over {$offerYears} years.";
+        // NewsService uses prepared statements - no escaping needed here
+        $title = "{$playerName} turns down an extension offer from the {$teamName}";
+        $hometext = "{$playerName} today rejected a contract extension offer from the {$teamName} worth {$offerInMillions} million dollars over {$offerYears} years.";
 
         return $this->newsService->createNewsStory($categoryID, $topicID, $title, $hometext);
     }

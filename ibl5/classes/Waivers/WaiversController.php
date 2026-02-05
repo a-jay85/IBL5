@@ -211,7 +211,8 @@ class WaiversController implements WaiversControllerInterface
         $this->createWaiverNewsStory($teamName, $player['name'], 'add', $salaryStr);
 
         // Send email notification
-        $storytitle = $teamName . " make waiver additions";
+        // SECURITY: Sanitize email subject to prevent header injection
+        $storytitle = \Utilities\EmailSanitizer::sanitizeSubject($teamName . " make waiver additions");
         $hometext = "The " . $teamName . " sign " . $player['name'] . " from waivers for " . $salaryStr . ".";
         mail(self::NOTIFICATION_EMAIL_RECIPIENT, $storytitle, $hometext, "From: " . self::NOTIFICATION_EMAIL_SENDER);
 

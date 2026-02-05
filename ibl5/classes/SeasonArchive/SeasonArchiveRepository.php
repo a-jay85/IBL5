@@ -118,13 +118,54 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
 
         $colors = [];
         foreach ($rows as $row) {
-            /** @var array{team_name: string, color1: string, color2: string} $row */
+            /** @var array{teamid: int, team_name: string, color1: string, color2: string} $row */
             $colors[$row['team_name']] = [
                 'color1' => $row['color1'],
                 'color2' => $row['color2'],
+                'teamid' => $row['teamid'],
             ];
         }
 
         return $colors;
+    }
+
+    /**
+     * @see SeasonArchiveRepositoryInterface::getPlayerIdsByNames()
+     */
+    public function getPlayerIdsByNames(array $names): array
+    {
+        if ($names === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($names), '?'));
+
+        /** @var \mysqli $db */
+        $db = $this->db;
+        $stmt = $db->prepare("SELECT pid, name FROM ibl_plr WHERE name IN ({$placeholders})");
+        if ($stmt === false) {
+            return [];
+        }
+
+        $stmt->execute($names);
+        $result = $stmt->get_result();
+
+        if ($result === false) {
+            $stmt->close();
+            return [];
+        }
+
+        /** @var array<string, int> $map */
+        $map = [];
+        while (true) {
+            $row = $result->fetch_assoc();
+            if (!is_array($row)) {
+                break;
+            }
+            $map[(string) $row['name']] = (int) $row['pid'];
+        }
+        $stmt->close();
+
+        return $map;
     }
 }

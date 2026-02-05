@@ -128,7 +128,14 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
             ];
         }
 
-        return [
+        // Build teamIds map from teamColors (which now includes teamid)
+        $teamIds = [];
+        foreach ($teamColors as $teamName => $colorData) {
+            $teamIds[$teamName] = $colorData['teamid'];
+        }
+
+        // Assemble the season data first, then collect all player names
+        $seasonData = [
             'year' => $year,
             'label' => $this->buildSeasonLabel($year),
             'tournaments' => [
@@ -193,7 +200,15 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
                 'west' => $this->extractAwardList($awards, 'Western Conference All-Star'),
             ],
             'teamColors' => $teamColors,
+            'playerIds' => [],
+            'teamIds' => $teamIds,
         ];
+
+        // Collect all unique player names from the assembled data
+        $playerNames = $this->collectPlayerNames($seasonData);
+        $seasonData['playerIds'] = $this->repository->getPlayerIdsByNames($playerNames);
+
+        return $seasonData;
     }
 
     /**
@@ -259,9 +274,9 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
      *
      * @param list<GmHistoryRow> $gmHistory All GM history records
      * @param int $year Season ending year to find
-     * @return string GM name (from the name column), or empty string if not found
+     * @return array{name: string, team: string} GM name and team, or empty strings if not found
      */
-    private function getGmOfTheYear(array $gmHistory, int $year): string
+    private function getGmOfTheYear(array $gmHistory, int $year): array
     {
         $yearStr = (string) $year;
 
@@ -271,17 +286,23 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
             if (preg_match('/GM of the Year:\s*([0-9, ]+)/i', $awardText, $matches) === 1) {
                 $yearsInRecord = preg_split('/\s*,\s*/', trim($matches[1]));
                 if (is_array($yearsInRecord) && in_array($yearStr, $yearsInRecord, true)) {
-                    // Return the name column, stripping any HTML and team info in parentheses
                     $name = $gm['name'];
-                    // The name field looks like "Ross Gates (Bulls)" — extract just the name
-                    $nameOnly = preg_replace('/\s*\(.*?\)\s*$/', '', $name);
+                    // The name field looks like "Ross Gates (Bulls)" — extract name and team
+                    $gmName = $name;
+                    $gmTeam = '';
+                    if (preg_match('/^(.+?)\s*\((.+?)\)\s*$/', $name, $nameMatches) === 1) {
+                        $gmName = trim($nameMatches[1]);
+                        $gmTeam = trim($nameMatches[2]);
+                    } else {
+                        $gmName = trim(preg_replace('/\s*\(.*?\)\s*$/', '', $name) ?? $name);
+                    }
 
-                    return trim($nameOnly ?? $name);
+                    return ['name' => $gmName, 'team' => $gmTeam];
                 }
             }
         }
 
-        return '';
+        return ['name' => '', 'team' => ''];
     }
 
     /**
@@ -319,6 +340,87 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
         }
 
         return $awards;
+    }
+
+    /**
+     * Collect all unique player names from assembled season data for batch ID lookup
+     *
+     * @param array<string, mixed> $data Assembled season data
+     * @return list<string> Unique non-empty player names
+     */
+    private function collectPlayerNames(array $data): array
+    {
+        /** @var array<string, true> $names */
+        $names = [];
+
+        // Major Awards (single player names)
+        /** @var array{mvp: string, dpoy: string, roy: string, sixthMan: string, gmOfYear: array{name: string, team: string}, finalsMvp: string} $awards */
+        $awards = $data['majorAwards'];
+        foreach ([$awards['mvp'], $awards['dpoy'], $awards['roy'], $awards['sixthMan'], $awards['finalsMvp']] as $name) {
+            if ($name !== '') {
+                $names[$name] = true;
+            }
+        }
+
+        // Statistical Leaders
+        /** @var array{scoring: string, rebounds: string, assists: string, steals: string, blocks: string} $leaders */
+        $leaders = $data['statisticalLeaders'];
+        foreach ([$leaders['scoring'], $leaders['rebounds'], $leaders['assists'], $leaders['steals'], $leaders['blocks']] as $name) {
+            if ($name !== '') {
+                $names[$name] = true;
+            }
+        }
+
+        // All-Star Weekend winners
+        /** @var array{gameMvp: string, slamDunkWinner: string, threePointWinner: string, rookieSophomoreMvp: string, slamDunkParticipants: list<string>, threePointParticipants: list<string>, rookieSophomoreParticipants: list<string>} $asw */
+        $asw = $data['allStarWeekend'];
+        foreach ([$asw['gameMvp'], $asw['slamDunkWinner'], $asw['threePointWinner'], $asw['rookieSophomoreMvp']] as $name) {
+            if ($name !== '') {
+                $names[$name] = true;
+            }
+        }
+
+        // Tournament player winners
+        /** @var array{heatChampion: string, heatUrl: string, oneOnOneChampion: string, rookieOneOnOneChampion: string, oneOnOneUrl: string, iblFinalsWinner: string, iblFinalsLoser: string, iblFinalsLoserGames: int, playoffsUrl: string} $tournaments */
+        $tournaments = $data['tournaments'];
+        foreach ([$tournaments['oneOnOneChampion'], $tournaments['rookieOneOnOneChampion']] as $name) {
+            if ($name !== '') {
+                $names[$name] = true;
+            }
+        }
+
+        // All-League/Defensive/Rookie teams (lists of player names)
+        foreach (['allLeagueTeams', 'allDefensiveTeams', 'allRookieTeams'] as $teamKey) {
+            /** @var array{first: list<string>, second: list<string>, third: list<string>} $teamSet */
+            $teamSet = $data[$teamKey];
+            foreach (['first', 'second', 'third'] as $tier) {
+                foreach ($teamSet[$tier] as $name) {
+                    if ($name !== '') {
+                        $names[$name] = true;
+                    }
+                }
+            }
+        }
+
+        // Championship Rosters
+        /** @var array{ibl: list<string>, heat: list<string>} $championRosters */
+        $championRosters = $data['championRosters'];
+        foreach (array_merge($championRosters['ibl'], $championRosters['heat']) as $name) {
+            if ($name !== '') {
+                $names[$name] = true;
+            }
+        }
+
+        // All-Star Rosters
+        /** @var array{east: list<string>, west: list<string>} $allStarRosters */
+        $allStarRosters = $data['allStarRosters'];
+        foreach (array_merge($allStarRosters['east'], $allStarRosters['west']) as $name) {
+            if ($name !== '') {
+                $names[$name] = true;
+            }
+        }
+
+        return array_keys($names);
     }
 
     /**

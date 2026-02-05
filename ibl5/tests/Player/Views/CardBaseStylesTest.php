@@ -45,6 +45,7 @@ class CardBaseStylesTest extends TestCase
 
         $this->assertStringContainsString('card-team-logo', $html);
         $this->assertStringContainsString('images/logo/new7.png', $html);
+        $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamID=7"', $html);
     }
 
     public function testRenderCardTopOmitsTeamLogoForFreeAgent(): void
@@ -97,5 +98,17 @@ class CardBaseStylesTest extends TestCase
         $this->assertStringContainsString('.card-team-logo', $css);
         $this->assertStringContainsString('object-fit: contain', $css);
         $this->assertStringContainsString('opacity: 0.85', $css);
+    }
+
+    public function testGetStylesContainsLabelAndValueAlignment(): void
+    {
+        $colorScheme = TeamColorHelper::getDefaultColorScheme();
+
+        $css = CardBaseStyles::getStyles($colorScheme);
+
+        $this->assertStringContainsString('.stats-grid .label', $css);
+        $this->assertStringContainsString('text-align: right', $css);
+        $this->assertStringContainsString('.stats-grid .value', $css);
+        $this->assertStringContainsString('text-align: left', $css);
     }
 }

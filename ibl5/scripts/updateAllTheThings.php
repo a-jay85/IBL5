@@ -69,6 +69,25 @@ try {
     $sharedFunctions->resetSimContractExtensionAttempts();
     echo "<p>✓ Extension attempts reset</p>";
 
+    // Check for broken all-time records
+    echo "<p>Checking for broken records...</p>";
+    $recordHoldersRepository = new \RecordHolders\RecordHoldersRepository($mysqli_db);
+    $recordDetector = new \RecordHolders\RecordBreakingDetector($recordHoldersRepository);
+    $latestGameDate = $season->getLastBoxScoreDate();
+    if ($latestGameDate !== '') {
+        $brokenRecords = $recordDetector->detectAndAnnounce($latestGameDate);
+        if ($brokenRecords !== []) {
+            echo "<p>✓ " . count($brokenRecords) . " record(s) broken!</p>";
+            foreach ($brokenRecords as $record) {
+                echo "<p>" . htmlspecialchars($record) . "</p>";
+            }
+        } else {
+            echo "<p>✓ No records broken</p>";
+        }
+    } else {
+        echo "<p>✓ No box score data to check</p>";
+    }
+
     echo '<p><b>All the things have been updated!</b></p>';
 
 } catch (Exception $e) {

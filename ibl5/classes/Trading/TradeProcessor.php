@@ -161,7 +161,7 @@ class TradeProcessor implements TradeProcessorInterface
     /**
      * Process draft pick transfer
      *
-     * Updates pick ownership and queues the query if during certain season phases.
+     * Updates pick ownership and queues the operation if during certain season phases.
      *
      * @param int $itemId Pick ID
      * @param string $offeringTeamName Offering team
@@ -176,21 +176,17 @@ class TradeProcessor implements TradeProcessorInterface
         if ($pickData === null) {
             return ['success' => false, 'tradeLine' => ''];
         }
-        
-        $tradeLine = "The $offeringTeamName send the " . 
-                    $pickData['year'] . " " . 
-                    $pickData['teampick'] . " Round " . 
+
+        $tradeLine = "The $offeringTeamName send the " .
+                    $pickData['year'] . " " .
+                    $pickData['teampick'] . " Round " .
                     $pickData['round'] . " draft pick to the $listeningTeamName.<br>";
 
         // Update pick ownership using repository
         $affectedRows = $this->repository->updateDraftPickOwnerById($itemId, $listeningTeamName);
-        
-        // Build query string for queue (if needed in certain phases)
-        // Note: Query is built for queue storage only - actual execution uses prepared statements in repository
-        $escapedTeamName = $this->db->real_escape_string($listeningTeamName);
-        $queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $escapedTeamName . '" WHERE `pickid` = ' . $itemId . ' LIMIT 1';
 
-        $this->queueTradeQuery($queryi, $tradeLine);
+        // Queue structured data for deferred execution during certain season phases
+        $this->queuePickTransfer($itemId, $listeningTeamName, $tradeLine);
 
         return [
             'success' => ($affectedRows > 0),
@@ -201,7 +197,7 @@ class TradeProcessor implements TradeProcessorInterface
     /**
      * Process player transfer
      *
-     * Updates player's team assignment and queues the query if during certain season phases.
+     * Updates player's team assignment and queues the operation if during certain season phases.
      *
      * @param int $itemId Player ID
      * @param string $offeringTeamName Offering team
@@ -219,19 +215,15 @@ class TradeProcessor implements TradeProcessorInterface
             return ['success' => false, 'tradeLine' => ''];
         }
 
-        $tradeLine = "The $offeringTeamName send " . 
-                    $playerData['pos'] . " " . 
+        $tradeLine = "The $offeringTeamName send " .
+                    $playerData['pos'] . " " .
                     $playerData['name'] . " to the $listeningTeamName.<br>";
 
         // Update player team using repository
         $affectedRows = $this->repository->updatePlayerTeam($itemId, $listeningTeamName, $listeningTeamId);
-        
-        // Build query string for queue (if needed in certain phases)
-        // Note: Query is built for queue storage only - actual execution uses prepared statements in repository
-        $escapedTeamName = $this->db->real_escape_string($listeningTeamName);
-        $queryi = 'UPDATE ibl_plr SET `teamname` = "' . $escapedTeamName . '", `tid` = ' . $listeningTeamId . ' WHERE `pid` = ' . $itemId . ' LIMIT 1';
 
-        $this->queueTradeQuery($queryi, $tradeLine);
+        // Queue structured data for deferred execution during certain season phases
+        $this->queuePlayerTransfer($itemId, $listeningTeamName, $listeningTeamId, $tradeLine);
 
         return [
             'success' => ($affectedRows > 0),
@@ -240,23 +232,57 @@ class TradeProcessor implements TradeProcessorInterface
     }
 
     /**
-     * Queue trade query for later execution if in certain season phases
-     * 
-     * During Playoffs, Draft, or Free Agency phases, queries are queued
+     * Check if we should queue trades for later execution
+     *
+     * During Playoffs, Draft, or Free Agency phases, trades are queued
      * instead of executed immediately to prevent roster conflicts.
-     * 
-     * @param string $query SQL query to execute later
+     *
+     * @return bool True if in a phase that requires queueing
+     */
+    protected function shouldQueueTrades(): bool
+    {
+        return $this->season->phase === "Playoffs"
+            || $this->season->phase === "Draft"
+            || $this->season->phase === "Free Agency";
+    }
+
+    /**
+     * Queue player transfer for later execution if in certain season phases
+     *
+     * @param int $playerId Player ID
+     * @param string $teamName New team name
+     * @param int $teamId New team ID
      * @param string $tradeLine Trade description for tracking
      * @return void
      */
-    protected function queueTradeQuery(string $query, string $tradeLine): void
+    protected function queuePlayerTransfer(int $playerId, string $teamName, int $teamId, string $tradeLine): void
     {
-        if (
-            $this->season->phase === "Playoffs"
-            || $this->season->phase === "Draft"
-            || $this->season->phase === "Free Agency"
-        ) {
-            $this->repository->insertTradeQueue($query, $tradeLine);
+        if ($this->shouldQueueTrades()) {
+            $params = [
+                'player_id' => $playerId,
+                'team_name' => $teamName,
+                'team_id' => $teamId,
+            ];
+            $this->repository->insertTradeQueue('player_transfer', $params, $tradeLine);
+        }
+    }
+
+    /**
+     * Queue pick transfer for later execution if in certain season phases
+     *
+     * @param int $pickId Pick ID
+     * @param string $newOwner New owner team name
+     * @param string $tradeLine Trade description for tracking
+     * @return void
+     */
+    protected function queuePickTransfer(int $pickId, string $newOwner, string $tradeLine): void
+    {
+        if ($this->shouldQueueTrades()) {
+            $params = [
+                'pick_id' => $pickId,
+                'new_owner' => $newOwner,
+            ];
+            $this->repository->insertTradeQueue('pick_transfer', $params, $tradeLine);
         }
     }
 
@@ -283,7 +309,9 @@ class TradeProcessor implements TradeProcessorInterface
         // Send email notification
         if ($_SERVER['SERVER_NAME'] !== "localhost") {
             $recipient = 'ibldepthcharts@gmail.com';
-            mail($recipient, $storytitle, $storytext, "From: trades@iblhoops.net");
+            // SECURITY: Sanitize email subject to prevent header injection
+            $safeSubject = \Utilities\EmailSanitizer::sanitizeSubject($storytitle);
+            mail($recipient, $safeSubject, $storytext, "From: trades@iblhoops.net");
         }
     }
 

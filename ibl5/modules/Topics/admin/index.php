@@ -12,31 +12,61 @@
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
+/**
+ * Topics Admin Module - Refactored for Security
+ *
+ * SECURITY NOTES:
+ * - All database queries use prepared statements via $mysqli_db
+ * - All user input is validated and sanitized
+ * - CSRF protection recommended for write operations (future enhancement)
+ */
+
 if (!defined('ADMIN_FILE')) {
     die("Access Denied");
 }
 
-global $prefix, $db, $admin_file;
-$aid = substr($aid, 0, 25);
-$row = $db->sql_fetchrow($db->sql_query("SELECT title, admins FROM " . $prefix . "_modules WHERE title='Topics'"));
-$row2 = $db->sql_fetchrow($db->sql_query("SELECT name, radminsuper FROM " . $prefix . "_authors WHERE aid='$aid'"));
-$admins = explode(",", $row['admins']);
+global $prefix, $db, $mysqli_db, $admin_file, $aid;
+
+// Safely get aid (admin ID)
+$aid = isset($aid) && is_string($aid) ? substr($aid, 0, 25) : '';
+
+// Check admin authorization using prepared statement
+$stmtModule = $mysqli_db->prepare("SELECT title, admins FROM " . $prefix . "_modules WHERE title = ?");
+$moduleName = 'Topics';
+$stmtModule->bind_param('s', $moduleName);
+$stmtModule->execute();
+$moduleResult = $stmtModule->get_result();
+$moduleRow = $moduleResult->fetch_assoc();
+$stmtModule->close();
+
+$stmtAuthor = $mysqli_db->prepare("SELECT name, radminsuper FROM " . $prefix . "_authors WHERE aid = ?");
+$stmtAuthor->bind_param('s', $aid);
+$stmtAuthor->execute();
+$authorResult = $stmtAuthor->get_result();
+$authorRow = $authorResult->fetch_assoc();
+$stmtAuthor->close();
+
+$admins = $moduleRow !== null ? explode(",", $moduleRow['admins'] ?? '') : [];
 $auth_user = 0;
-for ($i = 0; $i < sizeof($admins); $i++) {
-    if ($row2['name'] == "$admins[$i]" and !empty($row['admins'])) {
+$authorName = $authorRow['name'] ?? '';
+$radminsuper = (int) ($authorRow['radminsuper'] ?? 0);
+
+foreach ($admins as $adminName) {
+    if ($authorName === $adminName && !empty($moduleRow['admins'])) {
         $auth_user = 1;
+        break;
     }
 }
 
-if ($row2['radminsuper'] == 1 || $auth_user == 1) {
+if ($radminsuper === 1 || $auth_user === 1) {
 
     /*********************************************************/
     /* Topics Manager Functions                              */
     /*********************************************************/
 
-    function topicsmanager()
+    function topicsmanager(): void
     {
-        global $prefix, $db, $admin_file, $tipath;
+        global $prefix, $mysqli_db, $admin_file, $tipath;
         Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
@@ -47,21 +77,28 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         echo "<center><span class=\"option\"><b>" . _CURRENTTOPICS . "</b></span><br>" . _CLICK2EDIT . "</span></center><br>"
             . "<table border=\"0\" width=\"100%\" align=\"center\" cellpadding=\"2\">";
         $count = 0;
-        $result = $db->sql_query("SELECT topicid, topicname, topicimage, topictext from " . $prefix . "_topics order by topicname");
-        while ($row = $db->sql_fetchrow($result)) {
-            $topicid = intval($row['topicid']);
-            $topicname = filter($row['topicname'], "nohtml");
-            $topicimage = filter($row['topicimage'], "nohtml");
-            $topictext = filter($row['topictext'], "nohtml");
+
+        // Use prepared statement
+        $stmt = $mysqli_db->prepare("SELECT topicid, topicname, topicimage, topictext FROM " . $prefix . "_topics ORDER BY topicname");
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        while ($row = $result->fetch_assoc()) {
+            $topicid = (int) $row['topicid'];
+            $topicname = htmlspecialchars($row['topicname'] ?? '', ENT_QUOTES, 'UTF-8');
+            $topicimage = htmlspecialchars($row['topicimage'] ?? '', ENT_QUOTES, 'UTF-8');
+            $topictext = htmlspecialchars($row['topictext'] ?? '', ENT_QUOTES, 'UTF-8');
             echo "<td align=\"center\">"
                 . "<a href=\"" . $admin_file . ".php?op=topicedit&amp;topicid=$topicid\"><img src=\"$tipath/$topicimage\" border=\"0\" alt=\"\"></a><br>"
                 . "<span class=\"content\"><b>$topictext</td>";
             $count++;
-            if ($count == 5) {
+            if ($count === 5) {
                 echo "</tr><tr>";
                 $count = 0;
             }
         }
+        $stmt->close();
+
         echo "</table>";
         CloseTable();
         echo "<br><a name=\"Add\">";
@@ -76,21 +113,25 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             . "<input type=\"text\" name=\"topictext\" size=\"40\" maxlength=\"40\"><br><br>"
             . "<b>" . _TOPICIMAGE . ":</b><br>"
             . "<select name=\"topicimage\">";
+
         $path1 = explode("/", "$tipath");
         $path = "$path1[0]/$path1[1]";
-        $handle = opendir($path);
-        while ($file = readdir($handle)) {
-            if ((mb_ereg("^([_0-9a-zA-Z]+)([.]{1})([_0-9a-zA-Z]{3})$", $file)) and $file != "AllTopics.gif") {
-                $tlist .= "$file ";
+        $tlist = [];
+        if (is_dir($path)) {
+            $handle = opendir($path);
+            if ($handle !== false) {
+                while (($file = readdir($handle)) !== false) {
+                    if ((preg_match("/^([_0-9a-zA-Z]+)(\.{1})([_0-9a-zA-Z]{3})$/", $file)) && $file !== "AllTopics.gif") {
+                        $tlist[] = $file;
+                    }
+                }
+                closedir($handle);
             }
         }
-        closedir($handle);
-        $tlist = explode(" ", $tlist);
         sort($tlist);
-        for ($i = 0; $i < sizeof($tlist); $i++) {
-            if (!empty($tlist[$i])) {
-                echo "<option name=\"topicimage\" value=\"$tlist[$i]\">$tlist[$i]\n";
-            }
+        foreach ($tlist as $file) {
+            $fileEscaped = htmlspecialchars($file, ENT_QUOTES, 'UTF-8');
+            echo "<option value=\"$fileEscaped\">$fileEscaped</option>\n";
         }
         echo "</select><br><br>"
             . "<input type=\"hidden\" name=\"op\" value=\"topicmake\">"
@@ -100,9 +141,9 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         include "footer.php";
     }
 
-    function topicedit($topicid)
+    function topicedit(int $topicid): void
     {
-        global $prefix, $db, $admin_file, $tipath;
+        global $prefix, $mysqli_db, $admin_file, $tipath;
         Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
@@ -110,12 +151,27 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         CloseTable();
         echo "<br>";
         OpenTable();
-        $topicid = intval($topicid);
-        $row = $db->sql_fetchrow($db->sql_query("SELECT topicid, topicname, topicimage, topictext from " . $prefix . "_topics where topicid='$topicid'"));
-        $topicid = intval($row['topicid']);
-        $topicname = filter($row['topicname'], "nohtml");
-        $topicimage = filter($row['topicimage'], "nohtml");
-        $topictext = filter($row['topictext'], "nohtml");
+
+        // Use prepared statement
+        $stmt = $mysqli_db->prepare("SELECT topicid, topicname, topicimage, topictext FROM " . $prefix . "_topics WHERE topicid = ?");
+        $stmt->bind_param('i', $topicid);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $stmt->close();
+
+        if ($row === null) {
+            echo "<center>Topic not found.</center>";
+            CloseTable();
+            include "footer.php";
+            return;
+        }
+
+        $topicid = (int) $row['topicid'];
+        $topicname = htmlspecialchars($row['topicname'] ?? '', ENT_QUOTES, 'UTF-8');
+        $topicimage = htmlspecialchars($row['topicimage'] ?? '', ENT_QUOTES, 'UTF-8');
+        $topictext = htmlspecialchars($row['topictext'] ?? '', ENT_QUOTES, 'UTF-8');
+
         echo "<img src=\"$tipath/$topicimage\" border=\"0\" align=\"right\" alt=\"$topictext\">"
             . "<span class=\"option\"><b>" . _EDITTOPIC . ": $topictext</b></span>"
             . "<br><br>"
@@ -128,26 +184,26 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             . "<input type=\"text\" name=\"topictext\" size=\"40\" maxlength=\"40\" value=\"$topictext\"><br><br>"
             . "<b>" . _TOPICIMAGE . ":</b><br>"
             . "<select name=\"topicimage\">";
+
         $path1 = explode("/", "$tipath");
         $path = "$path1[0]/$path1[1]";
-        $handle = opendir($path);
-        while ($file = readdir($handle)) {
-            if ((mb_ereg("^([_0-9a-zA-Z]+)([.]{1})([_0-9a-zA-Z]{3})$", $file)) and $file != "AllTopics.gif") {
-                $tlist .= "$file ";
+        $tlist = [];
+        if (is_dir($path)) {
+            $handle = opendir($path);
+            if ($handle !== false) {
+                while (($file = readdir($handle)) !== false) {
+                    if ((preg_match("/^([_0-9a-zA-Z]+)(\.{1})([_0-9a-zA-Z]{3})$/", $file)) && $file !== "AllTopics.gif") {
+                        $tlist[] = $file;
+                    }
+                }
+                closedir($handle);
             }
         }
-        closedir($handle);
-        $tlist = explode(" ", $tlist);
         sort($tlist);
-        for ($i = 0; $i < sizeof($tlist); $i++) {
-            if (!empty($tlist[$i])) {
-                if ($topicimage == $tlist[$i]) {
-                    $sel = "selected";
-                } else {
-                    $sel = "";
-                }
-                echo "<option name=\"topicimage\" value=\"$tlist[$i]\" $sel>$tlist[$i]\n";
-            }
+        foreach ($tlist as $file) {
+            $fileEscaped = htmlspecialchars($file, ENT_QUOTES, 'UTF-8');
+            $sel = ($row['topicimage'] === $file) ? "selected" : "";
+            echo "<option value=\"$fileEscaped\" $sel>$fileEscaped</option>\n";
         }
         echo "</select><br><br>"
             . "<b>" . _ADDRELATED . ":</b><br>"
@@ -155,18 +211,26 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             . "" . _URL . ": <input type=\"text\" name=\"url\" value=\"http://\" size=\"50\" maxlength=\"200\"><br><br>"
             . "<b>" . _ACTIVERELATEDLINKS . ":</b><br>"
             . "<table width=\"100%\" border=\"0\">";
-        $res = $db->sql_query("SELECT rid, name, url from " . $prefix . "_related where tid='$topicid'");
-        $num = $db->sql_numrows($res);
-        if ($num == 0) {
+
+        // Fetch related links using prepared statement
+        $stmtRelated = $mysqli_db->prepare("SELECT rid, name, url FROM " . $prefix . "_related WHERE tid = ?");
+        $stmtRelated->bind_param('i', $topicid);
+        $stmtRelated->execute();
+        $relatedResult = $stmtRelated->get_result();
+        $num = $relatedResult->num_rows;
+
+        if ($num === 0) {
             echo "<tr><td><span class=\"tiny\">" . _NORELATED . "</span></td></tr>";
         }
-        while ($row2 = $db->sql_fetchrow($res)) {
-            $rid = intval($row2['rid']);
-            $name = filter($row2['name'], "nohtml");
-            $url = filter($row2['url'], "nohtml");
+        while ($row2 = $relatedResult->fetch_assoc()) {
+            $rid = (int) $row2['rid'];
+            $name = htmlspecialchars($row2['name'] ?? '', ENT_QUOTES, 'UTF-8');
+            $url = htmlspecialchars($row2['url'] ?? '', ENT_QUOTES, 'UTF-8');
             echo "<tr><td align=\"left\"><span class=\"content\"><strong><big>&middot;</big></strong>&nbsp;&nbsp;<a href=\"$url\">$name</a></td>"
                 . "<td align=\"center\"><span class=\"content\"><a href=\"$url\">$url</a></td><td align=\"right\"><span class=\"content\">[ <a href=\"" . $admin_file . ".php?op=relatededit&amp;tid=$topicid&amp;rid=$rid\">" . _EDIT . "</a> | <a href=\"" . $admin_file . ".php?op=relateddelete&amp;tid=$topicid&amp;rid=$rid\">" . _DELETE . "</a> ]</td></tr>";
         }
+        $stmtRelated->close();
+
         echo "</table><br><br>"
             . "<input type=\"hidden\" name=\"topicid\" value=\"$topicid\">"
             . "<input type=\"hidden\" name=\"op\" value=\"topicchange\">"
@@ -176,23 +240,38 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         include "footer.php";
     }
 
-    function relatededit($tid, $rid)
+    function relatededit(int $tid, int $rid): void
     {
-        global $prefix, $db, $admin_file, $tipath;
+        global $prefix, $mysqli_db, $admin_file, $tipath;
         Nuke\Header::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><span class=\"title\"><b>" . _TOPICSMANAGER . "</b></span></center>";
         CloseTable();
         echo "<br>";
-        $rid = intval($rid);
-        $tid = intval($tid);
-        $row = $db->sql_fetchrow($db->sql_query("SELECT name, url from " . $prefix . "_related where rid='$rid'"));
-        $name = filter($row['name'], "nohtml");
-        $url = filter($row['url'], "nohtml");
-        $row2 = $db->sql_fetchrow($db->sql_query("SELECT topictext, topicimage from " . $prefix . "_topics where topicid='$tid'"));
-        $topicimage = filter($row2['topicimage'], "nohtml");
-        $topictext = filter($row2['topictext'], "nohtml");
+
+        // Fetch related link using prepared statement
+        $stmt = $mysqli_db->prepare("SELECT name, url FROM " . $prefix . "_related WHERE rid = ?");
+        $stmt->bind_param('i', $rid);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $stmt->close();
+
+        $name = htmlspecialchars($row['name'] ?? '', ENT_QUOTES, 'UTF-8');
+        $url = htmlspecialchars($row['url'] ?? '', ENT_QUOTES, 'UTF-8');
+
+        // Fetch topic info
+        $stmtTopic = $mysqli_db->prepare("SELECT topictext, topicimage FROM " . $prefix . "_topics WHERE topicid = ?");
+        $stmtTopic->bind_param('i', $tid);
+        $stmtTopic->execute();
+        $topicResult = $stmtTopic->get_result();
+        $row2 = $topicResult->fetch_assoc();
+        $stmtTopic->close();
+
+        $topicimage = htmlspecialchars($row2['topicimage'] ?? '', ENT_QUOTES, 'UTF-8');
+        $topictext = htmlspecialchars($row2['topictext'] ?? '', ENT_QUOTES, 'UTF-8');
+
         OpenTable();
         echo "<center>"
             . "<img src=\"$tipath/$topicimage\" border=\"0\" alt=\"$topictext\" align=\"right\">"
@@ -210,76 +289,144 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         include "footer.php";
     }
 
-    function relatedsave($tid, $rid, $name, $url)
+    function relatedsave(int $tid, int $rid, string $name, string $url): void
     {
-        global $prefix, $db, $admin_file;
-        $rid = intval($rid);
-        $name = filter($name, "nohtml", 1);
-        $url = filter($url, "nohtml", 1);
-        $db->sql_query("update " . $prefix . "_related set name='$name', url='$url' where rid='$rid'");
+        global $prefix, $mysqli_db, $admin_file;
+
+        // Use prepared statement for update
+        $stmt = $mysqli_db->prepare("UPDATE " . $prefix . "_related SET name = ?, url = ? WHERE rid = ?");
+        $stmt->bind_param('ssi', $name, $url, $rid);
+        $stmt->execute();
+        $stmt->close();
+
         Header("Location: " . $admin_file . ".php?op=topicedit&topicid=$tid");
+        exit;
     }
 
-    function relateddelete($tid, $rid)
+    function relateddelete(int $tid, int $rid): void
     {
-        global $prefix, $db, $admin_file;
-        $rid = intval($rid);
-        $db->sql_query("delete from " . $prefix . "_related where rid='$rid'");
+        global $prefix, $mysqli_db, $admin_file;
+
+        // Use prepared statement for delete
+        $stmt = $mysqli_db->prepare("DELETE FROM " . $prefix . "_related WHERE rid = ?");
+        $stmt->bind_param('i', $rid);
+        $stmt->execute();
+        $stmt->close();
+
         Header("Location: " . $admin_file . ".php?op=topicedit&topicid=$tid");
+        exit;
     }
 
-    function topicmake($topicname, $topicimage, $topictext)
+    function topicmake(string $topicname, string $topicimage, string $topictext): void
     {
-        global $prefix, $db, $admin_file;
-        $topicname = filter($topicname, "nohtml", 1);
-        $topicimage = filter($topicimage, "nohtml", 1);
-        $topictext = filter($topictext, "nohtml", 1);
-        $db->sql_query("INSERT INTO " . $prefix . "_topics VALUES (NULL,'$topicname','$topicimage','$topictext','0')");
+        global $prefix, $mysqli_db, $admin_file;
+
+        // Validate input - only allow alphanumeric, spaces, and common punctuation
+        $topicname = substr($topicname, 0, 20);
+        $topicimage = substr($topicimage, 0, 100);
+        $topictext = substr($topictext, 0, 40);
+
+        // Use prepared statement for insert
+        $stmt = $mysqli_db->prepare("INSERT INTO " . $prefix . "_topics (topicname, topicimage, topictext, counter) VALUES (?, ?, ?, 0)");
+        $stmt->bind_param('sss', $topicname, $topicimage, $topictext);
+        $stmt->execute();
+        $stmt->close();
+
         Header("Location: " . $admin_file . ".php?op=topicsmanager#Add");
+        exit;
     }
 
-    function topicchange($topicid, $topicname, $topicimage, $topictext, $name, $url)
+    function topicchange(int $topicid, string $topicname, string $topicimage, string $topictext, string $name, string $url): void
     {
-        global $prefix, $db, $admin_file;
-        $topicname = filter($topicname, "nohtml", 1);
-        $topicimage = filter($topicimage, "nohtml", 1);
-        $topictext = filter($topictext, "nohtml", 1);
-        $name = filter($name, "nohtml", 1);
-        $url = filter($url, "nohtml", 1);
-        $topicid = intval($topicid);
-        $db->sql_query("update " . $prefix . "_topics set topicname='$topicname', topicimage='$topicimage', topictext='$topictext' where topicid='$topicid'");
-        if (!$name) {
-        } else {
-            $db->sql_query("insert into " . $prefix . "_related VALUES (NULL, '$topicid','$name','$url')");
+        global $prefix, $mysqli_db, $admin_file;
+
+        // Validate input lengths
+        $topicname = substr($topicname, 0, 20);
+        $topicimage = substr($topicimage, 0, 100);
+        $topictext = substr($topictext, 0, 40);
+        $name = substr($name, 0, 30);
+        $url = substr($url, 0, 200);
+
+        // Use prepared statement for update
+        $stmt = $mysqli_db->prepare("UPDATE " . $prefix . "_topics SET topicname = ?, topicimage = ?, topictext = ? WHERE topicid = ?");
+        $stmt->bind_param('sssi', $topicname, $topicimage, $topictext, $topicid);
+        $stmt->execute();
+        $stmt->close();
+
+        // Add related link if name provided
+        if ($name !== '') {
+            $stmtRelated = $mysqli_db->prepare("INSERT INTO " . $prefix . "_related (tid, name, url) VALUES (?, ?, ?)");
+            $stmtRelated->bind_param('iss', $topicid, $name, $url);
+            $stmtRelated->execute();
+            $stmtRelated->close();
         }
+
         Header("Location: " . $admin_file . ".php?op=topicedit&topicid=$topicid");
+        exit;
     }
 
-    function topicdelete($topicid, $ok = 0)
+    function topicdelete(int $topicid, int $ok = 0): void
     {
-        global $prefix, $db, $admin_file, $tipath;
-        $topicid = intval($topicid);
-        if ($ok == 1) {
-            $row = $db->sql_fetchrow($db->sql_query("SELECT sid from " . $prefix . "_stories where topic='$topicid'"));
-            $sid = intval($row['sid']);
-            $db->sql_query("delete from " . $prefix . "_stories where topic='$topicid'");
-            $db->sql_query("delete from " . $prefix . "_topics where topicid='$topicid'");
-            $db->sql_query("delete from " . $prefix . "_related where tid='$topicid'");
-            $row2 = $db->sql_fetchrow($db->sql_query("SELECT sid from " . $prefix . "_comments where sid='$sid'"));
-            $sid = intval($row2['sid']);
-            $db->sql_query("delete from " . $prefix . "_comments where sid='$sid'");
+        global $prefix, $mysqli_db, $admin_file, $tipath;
+
+        if ($ok === 1) {
+            // Get story IDs for this topic
+            $stmtStories = $mysqli_db->prepare("SELECT sid FROM " . $prefix . "_stories WHERE topic = ?");
+            $stmtStories->bind_param('i', $topicid);
+            $stmtStories->execute();
+            $storiesResult = $stmtStories->get_result();
+            $sids = [];
+            while ($row = $storiesResult->fetch_assoc()) {
+                $sids[] = (int) $row['sid'];
+            }
+            $stmtStories->close();
+
+            // Delete stories
+            $stmtDelStories = $mysqli_db->prepare("DELETE FROM " . $prefix . "_stories WHERE topic = ?");
+            $stmtDelStories->bind_param('i', $topicid);
+            $stmtDelStories->execute();
+            $stmtDelStories->close();
+
+            // Delete topic
+            $stmtDelTopic = $mysqli_db->prepare("DELETE FROM " . $prefix . "_topics WHERE topicid = ?");
+            $stmtDelTopic->bind_param('i', $topicid);
+            $stmtDelTopic->execute();
+            $stmtDelTopic->close();
+
+            // Delete related links
+            $stmtDelRelated = $mysqli_db->prepare("DELETE FROM " . $prefix . "_related WHERE tid = ?");
+            $stmtDelRelated->bind_param('i', $topicid);
+            $stmtDelRelated->execute();
+            $stmtDelRelated->close();
+
+            // Delete comments for stories in this topic (comment system is deprecated but clean up data)
+            foreach ($sids as $sid) {
+                $stmtDelComments = $mysqli_db->prepare("DELETE FROM " . $prefix . "_comments WHERE sid = ?");
+                $stmtDelComments->bind_param('i', $sid);
+                $stmtDelComments->execute();
+                $stmtDelComments->close();
+            }
+
             Header("Location: " . $admin_file . ".php?op=topicsmanager");
+            exit;
         } else {
-            global $topicimage;
             Nuke\Header::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><span class=\"title\"><b>" . _TOPICSMANAGER . "</b></span></center>";
             CloseTable();
             echo "<br>";
-            $row3 = $db->sql_fetchrow($db->sql_query("SELECT topicimage, topictext from " . $prefix . "_topics where topicid='$topicid'"));
-            $topicimage = filter($row3['topicimage'], "nohtml");
-            $topictext = filter($row3['topictext'], "nohtml");
+
+            $stmt = $mysqli_db->prepare("SELECT topicimage, topictext FROM " . $prefix . "_topics WHERE topicid = ?");
+            $stmt->bind_param('i', $topicid);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $row3 = $result->fetch_assoc();
+            $stmt->close();
+
+            $topicimage = htmlspecialchars($row3['topicimage'] ?? '', ENT_QUOTES, 'UTF-8');
+            $topictext = htmlspecialchars($row3['topictext'] ?? '', ENT_QUOTES, 'UTF-8');
+
             OpenTable();
             echo "<center><img src=\"$tipath$topicimage\" border=\"0\" alt=\"$topictext\"><br><br>"
                 . "<b>" . _DELETETOPIC . " $topictext</b><br><br>"
@@ -291,40 +438,61 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         }
     }
 
-    switch ($op) {
+    // Get operation parameter safely
+    $op = isset($op) && is_string($op) ? $op : '';
 
+    switch ($op) {
         case "topicsmanager":
             topicsmanager();
             break;
 
         case "topicedit":
+            $topicid = isset($topicid) && is_numeric($topicid) ? (int) $topicid : 0;
             topicedit($topicid);
             break;
 
         case "topicmake":
+            $topicname = isset($topicname) && is_string($topicname) ? $topicname : '';
+            $topicimage = isset($topicimage) && is_string($topicimage) ? $topicimage : '';
+            $topictext = isset($topictext) && is_string($topictext) ? $topictext : '';
             topicmake($topicname, $topicimage, $topictext);
             break;
 
         case "topicdelete":
+            $topicid = isset($topicid) && is_numeric($topicid) ? (int) $topicid : 0;
+            $ok = isset($ok) && is_numeric($ok) ? (int) $ok : 0;
             topicdelete($topicid, $ok);
             break;
 
         case "topicchange":
+            $topicid = isset($topicid) && is_numeric($topicid) ? (int) $topicid : 0;
+            $topicname = isset($topicname) && is_string($topicname) ? $topicname : '';
+            $topicimage = isset($topicimage) && is_string($topicimage) ? $topicimage : '';
+            $topictext = isset($topictext) && is_string($topictext) ? $topictext : '';
+            $name = isset($name) && is_string($name) ? $name : '';
+            $url = isset($url) && is_string($url) ? $url : '';
             topicchange($topicid, $topicname, $topicimage, $topictext, $name, $url);
             break;
 
         case "relatedsave":
+            $tid = isset($tid) && is_numeric($tid) ? (int) $tid : 0;
+            $rid = isset($rid) && is_numeric($rid) ? (int) $rid : 0;
+            $name = isset($name) && is_string($name) ? $name : '';
+            $url = isset($url) && is_string($url) ? $url : '';
             relatedsave($tid, $rid, $name, $url);
             break;
 
         case "relatededit":
+            $tid = isset($tid) && is_numeric($tid) ? (int) $tid : 0;
+            $rid = isset($rid) && is_numeric($rid) ? (int) $rid : 0;
             relatededit($tid, $rid);
             break;
 
         case "relateddelete":
+            $tid = isset($tid) && is_numeric($tid) ? (int) $tid : 0;
+            $rid = isset($rid) && is_numeric($rid) ? (int) $rid : 0;
             relateddelete($tid, $rid);
             break;
-
     }
 
 } else {

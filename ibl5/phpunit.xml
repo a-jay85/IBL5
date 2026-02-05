@@ -139,5 +139,8 @@
         <testsuite name="SeasonArchive Module Tests">
             <directory>tests/SeasonArchive</directory>
         </testsuite>
+        <testsuite name="RecordHolders Module Tests">
+            <directory>tests/RecordHolders</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

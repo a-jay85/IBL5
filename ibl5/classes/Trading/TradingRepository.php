@@ -536,6 +536,23 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
+     * @see TradingRepositoryInterface::getTeamPlayerCount()
+     */
+    public function getTeamPlayerCount(string $teamName): int
+    {
+        /** @var array{cnt: int}|null $result */
+        $result = $this->fetchOne(
+            "SELECT COUNT(*) AS cnt FROM ibl_plr WHERE teamname = ? AND retired = '0' AND ordinal < 100000",
+            "s",
+            $teamName
+        );
+        if ($result === null) {
+            return 0;
+        }
+        return $result['cnt'];
+    }
+
+    /**
      * Get all teams with city, name, colors and ID for trading UI
      *
      * @return list<TeamWithCityRow> Team rows ordered by city

@@ -136,7 +136,7 @@ class NavigationView
                     ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=AllStarAppearances'],
                     ['label' => 'Season Leaderboards', 'url' => 'modules.php?name=SeasonLeaderboards'],
                     ['label' => 'Career Leaderboards', 'url' => 'modules.php?name=CareerLeaderboards'],
-                    ['label' => 'Season Archive', 'url' => 'modules.php?name=Content&pa=showpage&pid=5'],
+                    ['label' => 'Season Archive', 'url' => 'modules.php?name=SeasonArchive'],
                     ['label' => '1-On-1 Game', 'url' => 'modules.php?name=OneOnOneGame'],
                 ],
             ],

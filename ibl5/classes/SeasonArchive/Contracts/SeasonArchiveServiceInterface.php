@@ -17,7 +17,7 @@ namespace SeasonArchive\Contracts;
  *     label: string,
  *     tournaments: array{heatChampion: string, heatUrl: string, oneOnOneChampion: string, rookieOneOnOneChampion: string, oneOnOneUrl: string, iblFinalsWinner: string, iblFinalsLoser: string, iblFinalsLoserGames: int, playoffsUrl: string},
  *     allStarWeekend: array{gameMvp: string, slamDunkWinner: string, threePointWinner: string, rookieSophomoreMvp: string, slamDunkParticipants: list<string>, threePointParticipants: list<string>, rookieSophomoreParticipants: list<string>},
- *     majorAwards: array{mvp: string, dpoy: string, roy: string, sixthMan: string, gmOfYear: string, finalsMvp: string},
+ *     majorAwards: array{mvp: string, dpoy: string, roy: string, sixthMan: string, gmOfYear: array{name: string, team: string}, finalsMvp: string},
  *     allLeagueTeams: array{first: list<string>, second: list<string>, third: list<string>},
  *     allDefensiveTeams: array{first: list<string>, second: list<string>, third: list<string>},
  *     allRookieTeams: array{first: list<string>, second: list<string>, third: list<string>},
@@ -27,7 +27,9 @@ namespace SeasonArchive\Contracts;
  *     teamAwards: array<string, string>,
  *     championRosters: array{ibl: list<string>, heat: list<string>},
  *     allStarRosters: array{east: list<string>, west: list<string>},
- *     teamColors: array<string, array{color1: string, color2: string}>
+ *     teamColors: array<string, array{color1: string, color2: string, teamid: int}>,
+ *     playerIds: array<string, int>,
+ *     teamIds: array<string, int>
  * }
  *
  * @see \SeasonArchive\SeasonArchiveService For the concrete implementation

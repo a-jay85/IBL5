@@ -140,4 +140,25 @@ class SeasonArchiveRepositoryTest extends TestCase
             'Repository must exclude anomalous year=1 rows from playoff results'
         );
     }
+
+    public function testGetPlayerIdsByNamesQueriesPlayerTable(): void
+    {
+        $reflectionClass = new \ReflectionClass($this->repository);
+        $fileName = $reflectionClass->getFileName();
+        $this->assertIsString($fileName);
+        $sourceCode = file_get_contents($fileName);
+        $this->assertIsString($sourceCode);
+
+        $this->assertStringContainsString(
+            'ibl_plr',
+            $sourceCode,
+            'getPlayerIdsByNames must query ibl_plr table'
+        );
+    }
+
+    public function testGetPlayerIdsByNamesReturnsEmptyForEmptyInput(): void
+    {
+        $result = $this->repository->getPlayerIdsByNames([]);
+        $this->assertSame([], $result);
+    }
 }

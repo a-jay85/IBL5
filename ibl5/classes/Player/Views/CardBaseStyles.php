@@ -148,17 +148,20 @@ class CardBaseStyles
 .trading-card-back .stats-grid .label {
     color: #{$accent};
     font-weight: 600;
+    text-align: right;
 }
 
 .trading-card .stats-grid .value,
 .trading-card-back .stats-grid .value {
     color: #{$text};
+    text-align: left;
 }
 
 .trading-card .stats-grid a,
 .trading-card-back .stats-grid a {
     color: #{$text};
     text-decoration: none;
+    text-align: left;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -328,9 +331,10 @@ HTML;
         $teamLogoHtml = '';
         if ($teamID > 0) {
             $teamLogoHtml = '<div class="card-team-logo">'
+                . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamID . '">'
                 . '<img src="images/logo/new' . $teamID . '.png"'
                 . ' alt="" width="75" height="83" loading="lazy">'
-                . '</div>';
+                . '</a></div>';
         }
 
         return <<<HTML

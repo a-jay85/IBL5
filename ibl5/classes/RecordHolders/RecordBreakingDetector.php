@@ -25,12 +25,12 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
      * @var array<string, array{expression: string, label: string, unit: string}>
      */
     private const PLAYER_STATS = [
-        'points' => ['expression' => '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)', 'label' => 'points', 'unit' => 'points'],
-        'rebounds' => ['expression' => '(bs.gameORB + bs.gameDRB)', 'label' => 'rebounds', 'unit' => 'rebounds'],
+        'points' => ['expression' => 'bs.calc_points', 'label' => 'points', 'unit' => 'points'],
+        'rebounds' => ['expression' => 'bs.calc_rebounds', 'label' => 'rebounds', 'unit' => 'rebounds'],
         'assists' => ['expression' => 'bs.gameAST', 'label' => 'assists', 'unit' => 'assists'],
         'steals' => ['expression' => 'bs.gameSTL', 'label' => 'steals', 'unit' => 'steals'],
         'blocks' => ['expression' => 'bs.gameBLK', 'label' => 'blocks', 'unit' => 'blocks'],
-        'fg_made' => ['expression' => '(bs.game2GM + bs.game3GM)', 'label' => 'field goals made', 'unit' => 'field goals'],
+        'fg_made' => ['expression' => 'bs.calc_fg_made', 'label' => 'field goals made', 'unit' => 'field goals'],
         'ft_made' => ['expression' => 'bs.gameFTM', 'label' => 'free throws made', 'unit' => 'free throws'],
         '3pt_made' => ['expression' => 'bs.game3GM', 'label' => 'three pointers made', 'unit' => 'three pointers'],
     ];
@@ -173,9 +173,9 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     private function getDateFilterForType(string $gameType): string
     {
         $filters = [
-            'regularSeason' => 'MONTH(bs.Date) IN (11, 12, 1, 2, 3, 4, 5)',
-            'playoffs' => 'MONTH(bs.Date) = 6',
-            'heat' => 'MONTH(bs.Date) = 10',
+            'regularSeason' => 'bs.game_type = 1',
+            'playoffs' => 'bs.game_type = 2',
+            'heat' => 'bs.game_type = 3',
         ];
 
         return $filters[$gameType] ?? $filters['regularSeason'];

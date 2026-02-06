@@ -72,4 +72,6 @@ echo '<style>
 </style>';
 
 // Load the compiled CSS from the design system
-echo '<link rel="stylesheet" href="' . ($relativePath ?? '') . 'themes/IBL/style/style.css">';
+$cssFile = 'themes/IBL/style/style.css';
+$cssVer = file_exists($cssFile) ? (string) filemtime($cssFile) : '';
+echo '<link rel="stylesheet" href="' . ($relativePath ?? '') . $cssFile . '?v=' . $cssVer . '">';

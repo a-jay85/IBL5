@@ -183,7 +183,11 @@ The integration test suite includes a complete mock database system in `tests/In
 - **MockDatabase** - Main mock database class with query tracking
 - **MockPreparedStatement** - Mock prepared statements with parameter binding
 - **MockDatabaseResult** - Mock result sets with row fetching
+- **MockMysqliResult** - Mock mysqli result wrapper
 - **TestDataFactory** - Fixture creation factory for players, teams, seasons
+- **Discord** - Mock Discord notification service
+- **Season** - Mock season data provider
+- **UI** - Mock UI rendering
 
 Key features:
 - Tracks all executed queries for assertion
@@ -258,13 +262,14 @@ See [templates/BaseTestCase.php](./templates/BaseTestCase.php) for starter templ
 ## Reference Test Suites
 
 ### Unit Tests
-- `tests/PlayerDatabase/` - 54 tests, comprehensive validation
-- `tests/Player/` - 84 tests, service and calculator coverage
-- `tests/Waivers/` - Good edge case coverage
+- `tests/PlayerDatabase/` - 48 tests, comprehensive validation
+- `tests/Player/` - 205 tests, service, calculator, and view coverage
+- `tests/FreeAgency/` - 94 tests, offer validation and cap calculations
+- `tests/Waivers/` - 82 tests, good edge case coverage
 
 ### Integration Tests
-- `tests/Integration/Draft/` - Draft selection workflows with player creation
-- `tests/Integration/Extension/` - Contract extension complete workflows
-- `tests/Integration/Negotiation/` - Free agent negotiation processes
-- `tests/Integration/Trading/` - Trade validation and processing
-- `tests/Integration/FreeAgency/` - Free agency offer workflows
+- `tests/Integration/Draft/` - 6 tests, draft selection workflows with player creation
+- `tests/Integration/Extension/` - 12 tests, contract extension complete workflows
+- `tests/Integration/Negotiation/` - 4 tests, free agent negotiation processes
+- `tests/Integration/Trading/` - 9 tests, trade validation and processing
+- `tests/Integration/FreeAgency/` - 7 tests, free agency offer workflows

@@ -27,7 +27,7 @@ Module/
 
 1. **Analyze** - Identify responsibilities in existing module
 2. **Design interfaces** - Define contracts in `Contracts/` subdirectory
-3. **Extract Repository** - Database operations with dual-implementation support
+3. **Extract Repository** - Database operations extending `BaseMysqliRepository`
 4. **Extract Validator** - Input validation with whitelist patterns
 5. **Extract Service** - Business logic and orchestration
 6. **Extract View** - HTML rendering with output buffering
@@ -49,22 +49,15 @@ Each interface MUST contain comprehensive PHPDoc:
 3. **Class constants for domain values** (not function arguments)
 4. **Strict types**: `declare(strict_types=1);` in every file
 
-## Database Dual-Implementation
+## Database Access
 
-ALWAYS support both database implementations:
+All repositories extend `BaseMysqliRepository` and use prepared statements:
 
 ```php
-if (method_exists($this->db, 'sql_escape_string')) {
-    // LEGACY: Use sql_* methods with DatabaseService::escapeString()
-    $escaped = \Services\DatabaseService::escapeString($this->db, $input);
-    $result = $this->db->sql_query("SELECT * FROM table WHERE col = '$escaped'");
-} else {
-    // MODERN: Use prepared statements (preferred)
-    $stmt = $this->db->prepare("SELECT * FROM table WHERE col = ?");
-    $stmt->bind_param('s', $input);
-    $stmt->execute();
-    $result = $stmt->get_result();
-}
+// Use BaseMysqliRepository helper methods
+return $this->fetchOne("SELECT * FROM table WHERE col = ?", "s", $value);
+return $this->fetchAll("SELECT * FROM table WHERE tid = ?", "i", $teamId);
+return $this->execute("UPDATE table SET col = ? WHERE id = ?", "si", $value, $id);
 ```
 
 ## Production Validation
@@ -85,6 +78,6 @@ See [templates/](./templates/) for starter files:
 
 ## Reference Implementations
 
-- `ibl5/classes/PlayerDatabase/` - 4 interfaces, 4 classes, 54 tests
-- `ibl5/classes/FreeAgency/` - 7 interfaces, 6 classes, 11 tests
-- `ibl5/classes/Player/` - 9 interfaces, 8 classes, 84 tests
+- `ibl5/classes/PlayerDatabase/` - 4 interfaces, 4 classes, 48 tests
+- `ibl5/classes/FreeAgency/` - 11 interfaces, 12 classes, 94 tests
+- `ibl5/classes/Player/` - 30 interfaces, 35 classes, 205 tests

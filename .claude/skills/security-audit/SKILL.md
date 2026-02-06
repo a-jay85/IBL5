@@ -20,12 +20,14 @@ $query = "SELECT * FROM table WHERE name = '$name'";
 
 **Secure patterns:**
 ```php
-// ✅ SECURE - Prepared statements (modern mysqli)
+// ✅ SECURE - Prepared statements via BaseMysqliRepository
+return $this->fetchOne("SELECT * FROM table WHERE id = ?", "i", $id);
+return $this->fetchAll("SELECT * FROM table WHERE name = ?", "s", $name);
+return $this->execute("UPDATE table SET col = ? WHERE id = ?", "si", $val, $id);
+
+// ✅ SECURE - Direct prepared statements (when not using BaseMysqliRepository)
 $stmt = $db->prepare("SELECT * FROM table WHERE id = ?");
 $stmt->bind_param('i', $id);
-
-// ✅ SECURE - Escaped strings (legacy sql_* methods)
-$escaped = \Services\DatabaseService::escapeString($db, $input);
 ```
 
 ### 2. XSS (Cross-Site Scripting)
@@ -109,4 +111,4 @@ See [examples/](./examples/) for before/after patterns:
 ## Secured Reference Modules
 
 - `ibl5/classes/PlayerDatabase/` - 15+ injection points fixed
-- `ibl5/classes/DepthChart/SECURITY.md` - Security patterns documented
+- `ibl5/classes/DepthChartEntry/` - Fully refactored with prepared statements

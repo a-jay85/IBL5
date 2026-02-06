@@ -198,11 +198,15 @@ Context-aware rules auto-load when relevant:
 - `phpunit-tests.md` → editing `ibl5/tests/**/*.php`
 - `view-rendering.md` → editing `**/*View.php`
 
-**Task-Discovery** (`.github/skills/`):
+**Task-Discovery** (`.claude/skills/`):
 - `refactoring-workflow/` - Module refactoring with templates
 - `security-audit/` - XSS/SQL injection patterns
 - `phpunit-testing/` - Test patterns and mocking
 - `basketball-stats/` - StatsFormatter usage
+- `contract-rules/` - CBA salary cap rules
+- `database-repository/` - BaseMysqliRepository patterns
+- `code-review/` - PR validation checklist
+- `documentation-updates/` - Doc update workflow
 
 ## Key References
 

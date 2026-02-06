@@ -139,7 +139,7 @@ ibl5/bin/db-query "DESCRIBE ibl_plr"
 
 ## Git Workflow
 
-**After committing:** Always suggest the `/mergeAndPush` slash command (not a bare `git push`). Present it as a clickable suggestion so the user can invoke it directly.
+**After committing:** Always suggest `/mergeAndPush` (not a bare `git push`). Only suggest it as a clickable inline prompt — do NOT mention it in your text messages.
 
 ## Git Commit Conventions
 

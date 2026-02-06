@@ -14,6 +14,16 @@ final class RecordBreakingDetectorTest extends TestCase
     private RecordHoldersRepositoryInterface $mockRepository;
     private RecordBreakingDetector $detector;
 
+    /**
+     * Stat keys used by RecordBreakingDetector::PLAYER_STATS.
+     *
+     * @var list<string>
+     */
+    private const STAT_KEYS = [
+        'points', 'rebounds', 'assists', 'steals',
+        'blocks', 'fg_made', 'ft_made', '3pt_made',
+    ];
+
     protected function setUp(): void
     {
         $this->mockRepository = $this->createStub(RecordHoldersRepositoryInterface::class);
@@ -46,8 +56,8 @@ final class RecordBreakingDetectorTest extends TestCase
             'value' => 80,
         ];
 
-        $this->mockRepository->method('getTopPlayerSingleGame')
-            ->willReturn([$newRecord, $previousRecord]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($this->buildBatchResult([$newRecord, $previousRecord]));
 
         $result = $this->detector->detectAndAnnounce('2007-01-15');
 
@@ -85,8 +95,8 @@ final class RecordBreakingDetectorTest extends TestCase
             'value' => 60,
         ];
 
-        $this->mockRepository->method('getTopPlayerSingleGame')
-            ->willReturn([$existingRecord, $newEntry]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($this->buildBatchResult([$existingRecord, $newEntry]));
 
         $result = $this->detector->detectAndAnnounce('2007-01-15');
 
@@ -95,8 +105,8 @@ final class RecordBreakingDetectorTest extends TestCase
 
     public function testNoDetectionWhenNoRecordsExist(): void
     {
-        $this->mockRepository->method('getTopPlayerSingleGame')
-            ->willReturn([]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($this->buildBatchResult([]));
 
         $result = $this->detector->detectAndAnnounce('2007-01-15');
 
@@ -129,8 +139,8 @@ final class RecordBreakingDetectorTest extends TestCase
             'value' => 65,
         ];
 
-        $this->mockRepository->method('getTopPlayerSingleGame')
-            ->willReturn([$newRecord, $previousRecord]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($this->buildBatchResult([$newRecord, $previousRecord]));
 
         $result = $this->detector->detectAndAnnounce('2007-06-15');
 
@@ -164,8 +174,8 @@ final class RecordBreakingDetectorTest extends TestCase
             'value' => 65,
         ];
 
-        $this->mockRepository->method('getTopPlayerSingleGame')
-            ->willReturn([$newRecord, $previousRecord]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($this->buildBatchResult([$newRecord, $previousRecord]));
 
         $result = $this->detector->detectAndAnnounce('2006-10-10');
 
@@ -199,11 +209,26 @@ final class RecordBreakingDetectorTest extends TestCase
             'value' => 80,
         ];
 
-        $this->mockRepository->method('getTopPlayerSingleGame')
-            ->willReturn([$newRecord, $previousRecord]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($this->buildBatchResult([$newRecord, $previousRecord]));
 
         $result = $this->detector->detectAndAnnounce('2007-01-15');
 
         $this->assertStringContainsString('Heat', $result[0]);
+    }
+
+    /**
+     * Build a batch result keyed by all PLAYER_STATS keys, each containing the same records.
+     *
+     * @param list<array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int}> $records
+     * @return array<string, list<array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int}>>
+     */
+    private function buildBatchResult(array $records): array
+    {
+        $result = [];
+        foreach (self::STAT_KEYS as $key) {
+            $result[$key] = $records;
+        }
+        return $result;
     }
 }

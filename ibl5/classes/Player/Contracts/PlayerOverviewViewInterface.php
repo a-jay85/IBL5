@@ -18,21 +18,23 @@ interface PlayerOverviewViewInterface extends PlayerViewInterface
 {
     /**
      * Render the complete overview page
-     * 
+     *
      * Includes player ratings, free agency preferences, and game log.
-     * 
+     *
      * @param int $playerID Player ID for game log queries
      * @param Player $player Player object with all data
      * @param PlayerStats $playerStats Player stats object
      * @param \Season $season Season object for date calculations
      * @param \Shared $sharedFunctions Shared utility functions
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Team color scheme for stats card styling
      * @return string Rendered HTML content
      */
     public function renderOverview(
         int $playerID,
-        Player $player, 
+        Player $player,
         PlayerStats $playerStats,
         \Season $season,
-        \Shared $sharedFunctions
+        \Shared $sharedFunctions,
+        ?array $colorScheme = null
     ): string;
 }

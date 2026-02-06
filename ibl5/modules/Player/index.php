@@ -122,12 +122,12 @@ function showpage($playerID, $pageView)
     
     if ($pageView === PlayerPageType::OVERVIEW) {
         $view = $viewFactory->createView($pageView);
-        echo $view->renderOverview($playerID, $player, $playerStats, $season, $sharedFunctions);
+        echo $view->renderOverview($playerID, $player, $playerStats, $season, $sharedFunctions, $colorScheme);
     } elseif ($pageView === PlayerPageType::SIM_STATS) {
         // Sim stats - single view with stats card wrapper
         $view = $viewFactory->createSimStatsView();
         echo '<tr><td colspan="2">';
-        echo PlayerStatsCardView::render($view->renderSimStats($playerID));
+        echo PlayerStatsCardView::render($view->renderSimStats($playerID), '', $colorScheme);
         echo '</td></tr>';
     } elseif ($pageView === PlayerPageType::REGULAR_SEASON_TOTALS || $pageView === PlayerPageType::REGULAR_SEASON_AVERAGES) {
         // Regular Season - flip card with Averages/Totals toggle
@@ -189,22 +189,22 @@ function showpage($playerID, $pageView)
         // Ratings and Salary - single view with stats card wrapper
         $view = $viewFactory->createRatingsAndSalaryView();
         echo '<tr><td colspan="2">';
-        echo PlayerStatsCardView::wrap($view->renderRatingsAndSalary($playerID));
+        echo PlayerStatsCardView::wrap($view->renderRatingsAndSalary($playerID), '', '', $colorScheme);
         echo '</td></tr>';
     } elseif ($pageView === PlayerPageType::AWARDS_AND_NEWS) {
         $view = $viewFactory->createView($pageView);
         echo '<tr><td colspan="2">';
-        echo PlayerStatsCardView::render($view->renderAwardsAndNews($player->name));
+        echo PlayerStatsCardView::render($view->renderAwardsAndNews($player->name), '', $colorScheme);
         echo '</td></tr>';
     } elseif ($pageView === PlayerPageType::ONE_ON_ONE) {
         $view = $viewFactory->createView($pageView);
         echo '<tr><td colspan="2">';
-        echo PlayerStatsCardView::render($view->renderOneOnOneResults($player->name));
+        echo PlayerStatsCardView::render($view->renderOneOnOneResults($player->name), '', $colorScheme);
         echo '</td></tr>';
     } else {
         // Default to overview
         $view = $viewFactory->createOverviewView();
-        echo $view->renderOverview($playerID, $player, $playerStats, $season, $sharedFunctions);
+        echo $view->renderOverview($playerID, $player, $playerStats, $season, $sharedFunctions, $colorScheme);
     }
 
     Nuke\Footer::footer();

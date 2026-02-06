@@ -11,9 +11,9 @@ Rules auto-load based on file paths being worked on.
 - Always loaded: `core-coding.md` (no `paths` frontmatter)
 - Conditional: Other rules load only when touching matching files
 
-### `.github/skills/` - Task-Discovery Skills
+### `.claude/skills/` - Task-Discovery Skills
 Skills auto-load based on task intent detected in your prompt.
-- Copilot reads `name` and `description` from YAML frontmatter
+- Claude Code reads `name` and `description` from YAML frontmatter in each `SKILL.md`
 - When your request matches a skill's description, the full instructions load
 - Resources (templates, examples) load only when referenced
 
@@ -22,7 +22,7 @@ Skills auto-load based on task intent detected in your prompt.
 ### 1. Create Directory Structure
 
 ```
-.github/skills/
+.claude/skills/
 └── skill-name/           # kebab-case directory name
     ├── SKILL.md          # Required: skill definition
     ├── templates/        # Optional: starter code files
@@ -173,7 +173,7 @@ Example prompts:
 # Shows:
 # - Project memory: CLAUDE.md
 # - Rules: .claude/rules/*.md (matching current file)
-# - Skills: .github/skills/*/SKILL.md (matching task)
+# - Skills: .claude/skills/*/SKILL.md (matching task)
 ```
 
 ## Benefits

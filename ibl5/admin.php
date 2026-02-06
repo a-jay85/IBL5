@@ -26,12 +26,12 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 //Uncomment the following lines after setting the site url in the Administration
 //global $nukeurl;
-//if (!stripos_clone($_SERVER['HTTP_HOST'], $nukeurl)) {
+//if (!str_contains($_SERVER['HTTP_HOST'], $nukeurl)) {
 //  die("Access denied");
 //}
 
 $checkurl = $_SERVER['REQUEST_URI'];
-if ((stripos_clone($checkurl, 'AddAuthor')) or (stripos_clone($checkurl, 'VXBkYXRlQXV0aG9y')) or (stripos_clone($checkurl, 'QWRkQXV0aG9y')) or (stripos_clone($checkurl, 'UpdateAuthor')) or (stripos_clone($checkurl, "?admin")) or (stripos_clone($checkurl, "&admin"))) {
+if ((str_contains($checkurl, 'AddAuthor')) or (str_contains($checkurl, 'VXBkYXRlQXV0aG9y')) or (str_contains($checkurl, 'QWRkQXV0aG9y')) or (str_contains($checkurl, 'UpdateAuthor')) or (str_contains($checkurl, "?admin")) or (str_contains($checkurl, "&admin"))) {
     die("Illegal Operation");
 }
 
@@ -87,7 +87,7 @@ if ($the_first == 0) {
     die();
 }
 
-if (isset($aid) && (mb_ereg("[^a-zA-Z0-9_-]", trim($aid)))) {
+if (isset($aid) && (preg_match('/[^a-zA-Z0-9_-]/', trim($aid)))) {
     die("Begone");
 }
 if (isset($aid)) {$aid = substr($aid, 0, 25);}
@@ -265,7 +265,7 @@ function GraphicAdmin()
     $handle = opendir('modules');
     $modlist = "";
     while ($file = readdir($handle)) {
-        if ((!mb_ereg("[.]", $file))) {
+        if ((!str_contains($file, '.'))) {
             $modlist .= "$file ";
         }
     }

@@ -301,7 +301,7 @@ if ($row['radminsuper'] == 1) {
     function grp_add($name, $description, $points)
     {
         global $prefix, $db, $admin_file;
-        if (!is_numeric($points) || mb_ereg("-", $points)) {
+        if (!is_numeric($points) || str_contains($points, '-')) {
             Nuke\Header::header();
             GraphicAdmin();
             title("" . _GROUPSADMIN . "");

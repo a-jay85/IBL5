@@ -20,283 +20,38 @@ use Utilities\HtmlSanitizer;
 class CardBaseStyles
 {
     /**
-     * Get complete shared CSS for trading cards (front and back)
+     * Get CSS custom properties inline style string for card containers
      *
-     * Returns all base styles that are identical between front and back trading cards.
-     * Use this as the primary method - front/back views only add their unique styles.
+     * Sets the custom properties that player-cards.css references.
+     * Apply this as a style attribute on the outermost card container.
      *
      * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string} $colorScheme Color scheme from TeamColorHelper
-     * @return string HTML style tag with all base CSS
+     * @return string Inline style value (without style="" wrapper)
+     */
+    public static function getCardCssProperties(array $colorScheme): string
+    {
+        return '--card-grad-start:#' . $colorScheme['gradient_start']
+            . ';--card-grad-mid:#' . $colorScheme['gradient_mid']
+            . ';--card-grad-end:#' . $colorScheme['gradient_end']
+            . ';--card-border:#' . $colorScheme['border']
+            . ';--card-border-rgb:' . $colorScheme['border_rgb']
+            . ';--card-accent:#' . $colorScheme['accent']
+            . ';--card-text:#' . $colorScheme['text']
+            . ';--card-text-muted:#' . $colorScheme['text_muted'];
+    }
+
+    /**
+     * Get complete shared CSS for trading cards (front and back)
+     *
+     * @deprecated CSS is now centralized in design/components/player-cards.css.
+     *             Use getCardCssProperties() to set custom properties on container elements.
+     *
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string} $colorScheme Color scheme from TeamColorHelper
+     * @return string Empty string — styles are in centralized CSS
      */
     public static function getStyles(array $colorScheme): string
     {
-        $gradStart = $colorScheme['gradient_start'];
-        $gradMid = $colorScheme['gradient_mid'];
-        $gradEnd = $colorScheme['gradient_end'];
-        $border = $colorScheme['border'];
-        $borderRgb = $colorScheme['border_rgb'];
-        $accent = $colorScheme['accent'];
-        $text = $colorScheme['text'];
-        $textMuted = $colorScheme['text_muted'];
-
-        return <<<HTML
-<style>
-/* Trading Card Base Styles - Shared between front (.trading-card) and back (.trading-card-back) */
-.trading-card,
-.trading-card-back {
-    background: linear-gradient(145deg, #{$gradStart} 0%, #{$gradMid} 20%, #{$gradMid} 80%, #{$gradEnd} 100%);
-    border: 4px solid #{$border};
-    border-radius: 16px;
-    box-shadow: 
-        0 0 0 2px #{$gradMid},
-        0 0 0 4px #{$border},
-        0 10px 40px rgba(0,0,0,0.4);
-    max-width: 420px;
-    margin: 0 auto;
-    padding: 16px 16px 50px 16px;
-    color: #{$text};
-}
-
-.trading-card *,
-.trading-card-back * {
-    box-sizing: border-box;
-}
-
-/* Card Header */
-.trading-card .card-header,
-.trading-card-back .card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-}
-
-.trading-card .card-header h2,
-.trading-card-back .card-header h2 {
-    font-size: 20px;
-    font-weight: bold;
-    color: #{$text};
-    line-height: 1.2;
-    margin: 0;
-}
-
-.trading-card .card-header .nickname,
-.trading-card-back .card-header .nickname {
-    color: #{$accent};
-    font-size: 14px;
-    font-style: italic;
-    margin: 2px 0 0 0;
-}
-
-.trading-card .meta-badge,
-.trading-card-back .meta-badge {
-    background: linear-gradient(135deg, #{$border} 0%, #{$accent} 100%);
-    color: #{$gradMid};
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-}
-
-/* Photo and Stats Row */
-.trading-card .photo-stats-row,
-.trading-card-back .photo-stats-row {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 16px;
-}
-
-.trading-card .player-photo-frame,
-.trading-card-back .player-photo-frame {
-    border: 3px solid #{$border};
-    border-radius: 8px;
-    background: linear-gradient(135deg, #{$gradMid} 0%, #{$gradStart} 100%);
-    padding: 4px;
-    flex-shrink: 0;
-}
-
-.trading-card .player-photo-frame img,
-.trading-card-back .player-photo-frame img {
-    width: 96px;
-    height: 112px;
-    object-fit: cover;
-    border-radius: 4px;
-    display: block;
-}
-
-.trading-card .quick-stats,
-.trading-card-back .quick-stats {
-    flex: 1;
-    font-size: 14px;
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    min-width: 0;
-}
-
-.trading-card .stats-grid,
-.trading-card-back .stats-grid {
-    flex: 1;
-    min-width: 0;
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 4px 8px;
-    color: #{$textMuted};
-}
-
-.trading-card .stats-grid .label,
-.trading-card-back .stats-grid .label {
-    color: #{$accent};
-    font-weight: 600;
-    text-align: right;
-}
-
-.trading-card .stats-grid .value,
-.trading-card-back .stats-grid .value {
-    color: #{$text};
-    text-align: left;
-}
-
-.trading-card .stats-grid a,
-.trading-card-back .stats-grid a {
-    color: #{$text};
-    text-decoration: none;
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.trading-card .stats-grid a:hover,
-.trading-card-back .stats-grid a:hover {
-    color: #{$accent};
-}
-
-/* Team Logo */
-.trading-card .card-team-logo,
-.trading-card-back .card-team-logo {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.trading-card .card-team-logo img,
-.trading-card-back .card-team-logo img {
-    max-width: 75px;
-    max-height: 83px;
-    object-fit: contain;
-    opacity: 0.85;
-}
-
-/* Draft Info */
-.trading-card .draft-info,
-.trading-card-back .draft-info {
-    text-align: center;
-    font-size: 12px;
-    color: #{$textMuted};
-    margin-bottom: 12px;
-    font-style: italic;
-}
-
-.trading-card .draft-info a,
-.trading-card-back .draft-info a {
-    color: #{$accent};
-    text-decoration: none;
-}
-
-.trading-card .draft-info a:hover,
-.trading-card-back .draft-info a:hover {
-    text-decoration: underline;
-}
-
-/* Section Title */
-.trading-card .section-title,
-.trading-card-back .section-title {
-    color: #{$accent};
-    font-size: 12px;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 8px;
-    text-align: center;
-}
-
-/* Shared Pill Styles */
-.trading-card .pills-row,
-.trading-card-back .pills-row,
-.trading-card-back .allstar-row {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-    font-size: 12px;
-}
-
-.trading-card .stat-pill,
-.trading-card-back .stat-pill,
-.trading-card-back .allstar-pill {
-    background: rgba({$borderRgb}, 0.15);
-    border: 1px solid rgba({$borderRgb}, 0.3);
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-family: 'Monaco', 'Menlo', monospace;
-    display: inline-block;
-    text-align: center;
-}
-
-.trading-card .stat-pill .pill-label,
-.trading-card-back .stat-pill .pill-label,
-.trading-card-back .allstar-pill .pill-label {
-    color: #{$accent};
-}
-
-.trading-card .stat-pill .pill-value,
-.trading-card-back .stat-pill .pill-value,
-.trading-card-back .allstar-pill .pill-value {
-    color: #{$text};
-    font-weight: bold;
-}
-
-.trading-card .stat-pill.preference .pill-label {
-    color: #{$textMuted};
-}
-
-/* Mobile Responsiveness */
-@media (max-width: 480px) {
-    .trading-card,
-    .trading-card-back {
-        max-width: 100%;
-        margin: 8px;
-        border-radius: 12px;
-        padding: 12px;
-    }
-    
-    .trading-card .photo-stats-row,
-    .trading-card-back .photo-stats-row {
-        gap: 12px;
-    }
-    
-    .trading-card .player-photo-frame img,
-    .trading-card-back .player-photo-frame img {
-        width: 80px;
-        height: 96px;
-    }
-    
-    .trading-card .card-team-logo img,
-    .trading-card-back .card-team-logo img {
-        max-width: 50px;
-        max-height: 56px;
-    }
-
-    .trading-card-back .allstar-pill {
-        padding: 3px 6px;
-        font-size: 10px;
-    }
-}
-</style>
-HTML;
+        return '';
     }
 
     /**

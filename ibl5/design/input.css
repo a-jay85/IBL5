@@ -53,6 +53,9 @@
 @import './components/cards.css';
 @import './components/forms.css';
 @import './components/navigation.css';
+@import './components/player-views.css';
+@import './components/player-cards.css';
+@import './components/season-archive.css';
 
 /* Site-wide layout wrapper (replaces legacy themeheader table) */
 .site-content {

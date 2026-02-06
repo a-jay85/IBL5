@@ -18,221 +18,15 @@ class PlayerStatsCardView
     /**
      * Get scoped custom styles for stats cards with team colors
      *
+     * @deprecated CSS is now centralized in design/components/player-cards.css.
+     *             Custom properties are set inline on the container element in wrap().
+     *
      * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
-     * @return string HTML style tag with scoped CSS
+     * @return string Empty string — styles are in centralized CSS
      */
     public static function getStyles(?array $colorScheme = null): string
     {
-        // Use default colors if no scheme provided
-        if ($colorScheme === null) {
-            $colorScheme = TeamColorHelper::getDefaultColorScheme();
-        }
-
-        $gradStart = $colorScheme['gradient_start'];
-        $gradMid = $colorScheme['gradient_mid'];
-        $gradEnd = $colorScheme['gradient_end'];
-        $border = $colorScheme['border'];
-        $borderRgb = $colorScheme['border_rgb'];
-        $accent = $colorScheme['accent'];
-        $text = $colorScheme['text'];
-        $textMuted = $colorScheme['text_muted'];
-        
-        return <<<HTML
-<style>
-/* Player Stats Card - Horizontal Layout
-   Uses !important to override legacy .player-table styles */
-.player-stats-card {
-    background: linear-gradient(145deg, #{$gradStart} 0%, #{$gradMid} 20%, #{$gradMid} 80%, #{$gradEnd} 100%) !important;
-    border: 3px solid #{$border} !important;
-    border-radius: 12px !important;
-    box-shadow: 
-        0 0 0 1px #{$gradMid},
-        0 0 0 3px #{$border},
-        0 8px 32px rgba(0,0,0,0.3) !important;
-    margin: 16px auto !important;
-    padding: 16px !important;
-    color: #{$text} !important;
-    overflow-x: auto;
-    position: relative;
-}
-
-.player-stats-card * {
-    box-sizing: border-box;
-}
-
-/* Stats Table Styling - Override legacy .player-table and .sortable styles */
-.player-stats-card table,
-.player-stats-card .stats-table,
-.player-stats-card table.sortable,
-.player-stats-card table.player-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    table-layout: auto !important;
-    font-size: 13px !important;
-    border: none !important;
-    background: transparent !important;
-    margin: 0 !important;
-}
-
-/* Table header - gold gradient */
-.player-stats-card .stats-table-header,
-.player-stats-card .player-table-header,
-.player-stats-card td.player-table-header,
-.player-stats-card td.stats-table-header {
-    background: linear-gradient(135deg, #{$border} 0%, #{$accent} 100%) !important;
-    color: #{$gradMid} !important;
-    font-weight: 700 !important;
-    font-size: 14px !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-    padding: 10px 16px !important;
-    text-align: center !important;
-    border: none !important;
-    border-radius: 8px 8px 0 0;
-}
-
-/* Column headers */
-.player-stats-card table th,
-.player-stats-card .stats-table th {
-    background: rgba({$borderRgb}, 0.15) !important;
-    color: #{$accent} !important;
-    font-weight: 600 !important;
-    font-size: 11px !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.3px !important;
-    padding: 8px 6px !important;
-    text-align: center !important;
-    border: none !important;
-    border-bottom: 1px solid rgba({$borderRgb}, 0.3) !important;
-    white-space: nowrap;
-}
-
-/* Table cells */
-.player-stats-card table td,
-.player-stats-card .stats-table td {
-    padding: 6px 6px !important;
-    text-align: center !important;
-    border: none !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-    color: #{$textMuted} !important;
-    font-family: 'Monaco', 'Menlo', 'Consolas', monospace !important;
-    font-size: 12px !important;
-    white-space: nowrap;
-    background: transparent !important;
-}
-
-/* Row hover effect */
-.player-stats-card table tbody tr:hover td,
-.player-stats-card .stats-table tbody tr:hover td {
-    background: rgba({$borderRgb}, 0.08) !important;
-}
-
-/* Alternating row colors */
-.player-stats-card table tbody tr:nth-child(even) td,
-.player-stats-card .stats-table tbody tr:nth-child(even) td {
-    background: rgba(0, 0, 0, 0.15) !important;
-}
-
-.player-stats-card table tbody tr:nth-child(even):hover td,
-.player-stats-card .stats-table tbody tr:nth-child(even):hover td {
-    background: rgba({$borderRgb}, 0.12) !important;
-}
-
-/* Career/Total Row Styling */
-.player-stats-card .career-row td,
-.player-stats-card tr.player-table-row-bold td,
-.player-stats-card .stats-table .career-row td,
-.player-stats-card .stats-table tr.player-table-row-bold td {
-    background: linear-gradient(90deg, rgba({$borderRgb}, 0.2) 0%, rgba({$borderRgb}, 0.1) 100%) !important;
-    font-weight: 700 !important;
-    color: #{$text} !important;
-    border-top: 2px solid #{$border} !important;
-}
-
-/* Footer Row (e.g., Total Salary) */
-.player-stats-card .footer-row td,
-.player-stats-card .stats-table .footer-row td {
-    background: rgba(0, 0, 0, 0.3) !important;
-    color: #{$accent} !important;
-    font-weight: 600 !important;
-    font-style: italic;
-    padding: 12px !important;
-    text-align: center !important;
-    border-top: 2px solid rgba({$borderRgb}, 0.3) !important;
-}
-
-/* Team Links */
-.player-stats-card table a,
-.player-stats-card .stats-table a {
-    color: #{$accent} !important;
-    text-decoration: none !important;
-    transition: color 0.2s ease;
-}
-
-.player-stats-card table a:hover,
-.player-stats-card .stats-table a:hover {
-    color: #{$text} !important;
-    text-decoration: underline !important;
-}
-
-/* Responsive: Horizontal scroll on small screens */
-@media (max-width: 768px) {
-    .player-stats-card {
-        margin: 12px 8px !important;
-        padding: 12px !important;
-        border-radius: 8px !important;
-    }
-    
-    .player-stats-card table th,
-    .player-stats-card table td,
-    .player-stats-card .stats-table th,
-    .player-stats-card .stats-table td {
-        padding: 4px 4px !important;
-        font-size: 10px !important;
-    }
-    
-    .player-stats-card .stats-table-header,
-    .player-stats-card .player-table-header {
-        font-size: 12px !important;
-        padding: 8px 12px !important;
-    }
-}
-
-/* Card Title Badge */
-.player-stats-card .card-title-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.player-stats-card .card-title-badge .badge {
-    background: rgba(0, 0, 0, 0.3);
-    color: #fff;
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-weight: 400;
-    text-transform: none;
-    letter-spacing: normal;
-}
-
-/* Stats Type Indicator */
-.player-stats-card .stats-type-indicator {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: rgba({$borderRgb}, 0.9);
-    color: #{$gradMid};
-    font-size: 9px;
-    font-weight: 700;
-    padding: 3px 8px;
-    border-radius: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    z-index: 5;
-}
-</style>
-HTML;
+        return '';
     }
 
     /**
@@ -246,9 +40,14 @@ HTML;
      */
     public static function wrap(string $tableContent, string $title = '', string $statsType = '', ?array $colorScheme = null): string
     {
+        if ($colorScheme === null) {
+            $colorScheme = TeamColorHelper::getDefaultColorScheme();
+        }
+        $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);
+
         ob_start();
         ?>
-<div class="player-stats-card">
+<div class="player-stats-card" style="<?= $cssProps ?>">
     <?php if ($statsType !== ''): ?>
     <div class="stats-type-indicator"><?= htmlspecialchars($statsType, ENT_QUOTES, 'UTF-8') ?></div>
     <?php endif; ?>

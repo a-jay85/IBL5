@@ -368,9 +368,30 @@ class TeamComponentsView implements TeamComponentsViewInterface
         $wintot = 0;
         $lostot = 0;
 
+        // Find the best record by win percentage (most wins as tiebreaker)
+        $bestPct = -1.0;
+        $bestWins = -1;
+        $bestIndex = -1;
+        foreach ($heatHistory as $index => $record) {
+            $w = $record['wins'];
+            $l = $record['losses'];
+            $total = $w + $l;
+            if ($total > 0) {
+                $pct = $w / $total;
+                if ($pct > $bestPct) {
+                    $bestPct = $pct;
+                    $bestWins = $w;
+                    $bestIndex = $index;
+                } elseif ($pct === $bestPct && $w > $bestWins) {
+                    $bestWins = $w;
+                    $bestIndex = $index;
+                }
+            }
+        }
+
         $output = '<ul class="team-history-list">';
 
-        foreach ($heatHistory as $record) {
+        foreach ($heatHistory as $index => $record) {
             $yearwl = $record['year'];
             /** @var string $namewl */
             $namewl = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
@@ -380,7 +401,10 @@ class TeamComponentsView implements TeamComponentsViewInterface
             $lostot += $losses;
             $winpct = ($wins + $losses > 0) ? number_format($wins / ($wins + $losses), 3) : "0.000";
             $teamID = $team->teamID;
-            $output .= "<li><a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$yearwl\">$yearwl $namewl</a> <span class=\"record\">$wins-$losses ($winpct)</span></li>";
+            $isBest = ($index === $bestIndex);
+            $boldOpen = $isBest ? '<strong>' : '';
+            $boldClose = $isBest ? '</strong>' : '';
+            $output .= "<li>{$boldOpen}<a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$yearwl\">$yearwl $namewl</a> <span class=\"record\">$wins-$losses ($winpct)</span>{$boldClose}</li>";
         }
 
         $output .= '</ul>';
@@ -495,9 +519,30 @@ class TeamComponentsView implements TeamComponentsViewInterface
         $wintot = 0;
         $lostot = 0;
 
+        // Find the best record by win percentage (most wins as tiebreaker)
+        $bestPct = -1.0;
+        $bestWins = -1;
+        $bestIndex = -1;
+        foreach ($regularSeasonHistory as $index => $record) {
+            $w = (int) $record['wins'];
+            $l = (int) $record['losses'];
+            $total = $w + $l;
+            if ($total > 0) {
+                $pct = $w / $total;
+                if ($pct > $bestPct) {
+                    $bestPct = $pct;
+                    $bestWins = $w;
+                    $bestIndex = $index;
+                } elseif ($pct === $bestPct && $w > $bestWins) {
+                    $bestWins = $w;
+                    $bestIndex = $index;
+                }
+            }
+        }
+
         $output = '<ul class="team-history-list">';
 
-        foreach ($regularSeasonHistory as $record) {
+        foreach ($regularSeasonHistory as $index => $record) {
             $yearwl = $record['year'];
             $yearwlInt = (int) $yearwl;
             /** @var string $namewl */
@@ -509,7 +554,10 @@ class TeamComponentsView implements TeamComponentsViewInterface
             $winpct = ($wins + $losses > 0) ? number_format($wins / ($wins + $losses), 3) : "0.000";
             $teamID = $team->teamID;
             $prevYear = $yearwlInt - 1;
-            $output .= "<li><a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$yearwl\">$prevYear-$yearwl $namewl</a> <span class=\"record\">$wins-$losses ($winpct)</span></li>";
+            $isBest = ($index === $bestIndex);
+            $boldOpen = $isBest ? '<strong>' : '';
+            $boldClose = $isBest ? '</strong>' : '';
+            $output .= "<li>{$boldOpen}<a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$yearwl\">$prevYear-$yearwl $namewl</a> <span class=\"record\">$wins-$losses ($winpct)</span>{$boldClose}</li>";
         }
 
         $output .= '</ul>';

@@ -145,6 +145,30 @@ class SeasonArchiveViewTest extends TestCase
         $this->assertStringNotContainsString('<script>', $result);
     }
 
+    public function testAllStarGameMvpShowsSingleMvp(): void
+    {
+        $seasonData = $this->createMinimalSeasonData();
+        $seasonData['allStarWeekend']['gameMvps'] = ['Armon Gilliam'];
+
+        $result = $this->view->renderSeasonDetail($seasonData);
+
+        $this->assertStringContainsString('All-Star Game MVP', $result);
+        $this->assertStringNotContainsString('Co-MVPs', $result);
+        $this->assertStringContainsString('Armon Gilliam', $result);
+    }
+
+    public function testAllStarGameCoMvpsShowsBothPlayers(): void
+    {
+        $seasonData = $this->createMinimalSeasonData();
+        $seasonData['allStarWeekend']['gameMvps'] = ['Kobe Bryant', 'Michael Jordan'];
+
+        $result = $this->view->renderSeasonDetail($seasonData);
+
+        $this->assertStringContainsString('All-Star Game Co-MVPs', $result);
+        $this->assertStringContainsString('Kobe Bryant', $result);
+        $this->assertStringContainsString('Michael Jordan', $result);
+    }
+
     public function testRenderSeasonDetailShowsPlayoffBracket(): void
     {
         $seasonData = $this->createMinimalSeasonData();
@@ -491,7 +515,7 @@ class SeasonArchiveViewTest extends TestCase
      *     year: int,
      *     label: string,
      *     tournaments: array{heatChampion: string, heatUrl: string, oneOnOneChampion: string, rookieOneOnOneChampion: string, oneOnOneUrl: string, iblFinalsWinner: string, iblFinalsLoser: string, iblFinalsLoserGames: int, playoffsUrl: string},
-     *     allStarWeekend: array{gameMvp: string, slamDunkWinner: string, threePointWinner: string, rookieSophomoreMvp: string, slamDunkParticipants: list<string>, threePointParticipants: list<string>, rookieSophomoreParticipants: list<string>},
+     *     allStarWeekend: array{gameMvps: list<string>, slamDunkWinner: string, threePointWinner: string, rookieSophomoreMvp: string, slamDunkParticipants: list<string>, threePointParticipants: list<string>, rookieSophomoreParticipants: list<string>},
      *     majorAwards: array{mvp: string, dpoy: string, roy: string, sixthMan: string, gmOfYear: array{name: string, team: string}, finalsMvp: string},
      *     allLeagueTeams: array{first: list<string>, second: list<string>, third: list<string>},
      *     allDefensiveTeams: array{first: list<string>, second: list<string>, third: list<string>},
@@ -526,7 +550,7 @@ class SeasonArchiveViewTest extends TestCase
                 'playoffsUrl' => 'https://challonge.com/iblplayoffs1989',
             ],
             'allStarWeekend' => [
-                'gameMvp' => 'Test ASG MVP',
+                'gameMvps' => ['Test ASG MVP'],
                 'slamDunkWinner' => 'Test Dunker',
                 'threePointWinner' => 'Test Shooter',
                 'rookieSophomoreMvp' => 'Test RS MVP',

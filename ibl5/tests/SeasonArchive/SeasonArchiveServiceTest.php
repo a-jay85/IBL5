@@ -25,6 +25,7 @@ class SeasonArchiveServiceTest extends TestCase
     protected function setUp(): void
     {
         $this->mockRepository = $this->createMock(SeasonArchiveRepositoryInterface::class);
+        $this->mockRepository->method('getTeamConferences')->willReturn([]);
         $this->service = new SeasonArchiveService($this->mockRepository);
     }
 
@@ -116,6 +117,7 @@ class SeasonArchiveServiceTest extends TestCase
         // Verify new fields exist
         $this->assertArrayHasKey('playerIds', $result);
         $this->assertArrayHasKey('teamIds', $result);
+        $this->assertArrayHasKey('allStarCoaches', $result);
         $this->assertSame(100, $result['playerIds']['Arvydas Sabonis']);
         $this->assertSame(5, $result['teamIds']['Clippers']);
     }
@@ -379,5 +381,221 @@ class SeasonArchiveServiceTest extends TestCase
         $result = $this->service->getSeasonDetail(1989);
         $this->assertNotNull($result);
         $this->assertSame(1, $result['playerIds']['MVP Player']);
+    }
+
+    public function testAllStarCoachesIncludedInSeasonDetail(): void
+    {
+        $this->mockRepository->method('getAwardsByYear')->willReturn([
+            ['year' => 1990, 'Award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_ID' => 1],
+        ]);
+        $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
+        $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
+        $this->mockRepository->method('getAllGmHistory')->willReturn([
+            [
+                'year' => '<B>1988-Present:</b>',
+                'name' => 'Ross Gates (Bulls)',
+                'Award' => '<B>Ross Gates</B><BR>GM of the Year: 1990, 1993<BR>ASG Head Coach: 1990, 1993, 1996',
+                'prim' => 1,
+            ],
+            [
+                'year' => '<B>1988-Present:</b>',
+                'name' => 'Brandon Tomyoy (Clippers)',
+                'Award' => '<B>Brandon Tomyoy</B><BR>ASG Head Coach: 1990, 2001',
+                'prim' => 2,
+            ],
+        ]);
+        $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
+        $this->mockRepository->method('getTeamColors')->willReturn([]);
+        $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
+
+        // Override the default empty getTeamConferences with actual data
+        // Since setUp already set willReturn([]), we need a new mock for this test
+        $mockRepo = $this->createMock(SeasonArchiveRepositoryInterface::class);
+        $mockRepo->method('getTeamConferences')->willReturn([
+            'Bulls' => 'Eastern',
+            'Clippers' => 'Western',
+        ]);
+        $mockRepo->method('getAwardsByYear')->willReturn([
+            ['year' => 1990, 'Award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_ID' => 1],
+        ]);
+        $mockRepo->method('getPlayoffResultsByYear')->willReturn([]);
+        $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
+        $mockRepo->method('getAllGmHistory')->willReturn([
+            [
+                'year' => '<B>1988-Present:</b>',
+                'name' => 'Ross Gates (Bulls)',
+                'Award' => '<B>Ross Gates</B><BR>GM of the Year: 1990, 1993<BR>ASG Head Coach: 1990, 1993, 1996',
+                'prim' => 1,
+            ],
+            [
+                'year' => '<B>1988-Present:</b>',
+                'name' => 'Brandon Tomyoy (Clippers)',
+                'Award' => '<B>Brandon Tomyoy</B><BR>ASG Head Coach: 1990, 2001',
+                'prim' => 2,
+            ],
+        ]);
+        $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
+        $mockRepo->method('getTeamColors')->willReturn([]);
+        $mockRepo->method('getPlayerIdsByNames')->willReturn([]);
+
+        $service = new SeasonArchiveService($mockRepo);
+        $result = $service->getSeasonDetail(1990);
+        $this->assertNotNull($result);
+        $this->assertArrayHasKey('allStarCoaches', $result);
+        $this->assertSame(['Ross Gates'], $result['allStarCoaches']['east']);
+        $this->assertSame(['Brandon Tomyoy'], $result['allStarCoaches']['west']);
+    }
+
+    public function testAllStarCoachesHandlesCoHeadCoach(): void
+    {
+        $mockRepo = $this->createMock(SeasonArchiveRepositoryInterface::class);
+        $mockRepo->method('getTeamConferences')->willReturn([
+            'Grizzlies' => 'Western',
+            'Sting' => 'Eastern',
+        ]);
+        $mockRepo->method('getAwardsByYear')->willReturn([
+            ['year' => 2003, 'Award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_ID' => 1],
+        ]);
+        $mockRepo->method('getPlayoffResultsByYear')->willReturn([]);
+        $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
+        $mockRepo->method('getAllGmHistory')->willReturn([
+            [
+                'year' => '<B>1988-Present:</b>',
+                'name' => 'RJ Lilley (Grizzlies)',
+                'Award' => '<B>RJ Lilley</B><BR>ASG Co-Head Coach: 2003<BR>ASG Head Coach: 1996',
+                'prim' => 1,
+            ],
+            [
+                'year' => '<B>1988-Present:</b>',
+                'name' => 'Spec-Bob (Sting)',
+                'Award' => '<B>Mel Baltazar</B><BR>ASG Head Coach: 2003',
+                'prim' => 2,
+            ],
+        ]);
+        $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
+        $mockRepo->method('getTeamColors')->willReturn([]);
+        $mockRepo->method('getPlayerIdsByNames')->willReturn([]);
+
+        $service = new SeasonArchiveService($mockRepo);
+        $result = $service->getSeasonDetail(2003);
+        $this->assertNotNull($result);
+        // Mel Baltazar is head coach of Sting (Eastern), RJ Lilley is co-head coach of Grizzlies (Western)
+        $this->assertSame(['Mel Baltazar'], $result['allStarCoaches']['east']);
+        $this->assertSame(['RJ Lilley'], $result['allStarCoaches']['west']);
+    }
+
+    public function testAllStarCoachesEmptyWhenNoCoachesForYear(): void
+    {
+        $result = $this->service->getSeasonDetail(1989);
+        // With default empty mocks, no coaches should be found
+        // But we need awards to not return null
+        $mockRepo = $this->createMock(SeasonArchiveRepositoryInterface::class);
+        $mockRepo->method('getTeamConferences')->willReturn([]);
+        $mockRepo->method('getAwardsByYear')->willReturn([
+            ['year' => 1989, 'Award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_ID' => 1],
+        ]);
+        $mockRepo->method('getPlayoffResultsByYear')->willReturn([]);
+        $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
+        $mockRepo->method('getAllGmHistory')->willReturn([]);
+        $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
+        $mockRepo->method('getTeamColors')->willReturn([]);
+        $mockRepo->method('getPlayerIdsByNames')->willReturn([]);
+
+        $service = new SeasonArchiveService($mockRepo);
+        $result = $service->getSeasonDetail(1989);
+        $this->assertNotNull($result);
+        $this->assertSame([], $result['allStarCoaches']['east']);
+        $this->assertSame([], $result['allStarCoaches']['west']);
+    }
+
+    public function testIblChampionCoachFoundByTeamAndTenure(): void
+    {
+        $mockRepo = $this->createMock(SeasonArchiveRepositoryInterface::class);
+        $mockRepo->method('getTeamConferences')->willReturn([]);
+        $mockRepo->method('getAwardsByYear')->willReturn([
+            ['year' => 1989, 'Award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_ID' => 1],
+        ]);
+        $mockRepo->method('getPlayoffResultsByYear')->willReturn([
+            ['year' => 1989, 'round' => 4, 'winner' => 'Clippers', 'loser' => 'Raptors', 'loser_games' => 3, 'id' => 15],
+        ]);
+        $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
+        $mockRepo->method('getAllGmHistory')->willReturn([
+            [
+                'year' => '<B>1988-Present:</b>',
+                'name' => 'Brandon Tomyoy (Clippers)',
+                'Award' => '<B>Brandon Tomyoy</B><BR>GM of the Year: 1989',
+                'prim' => 1,
+            ],
+            [
+                'year' => '<B>1988-Present:</b>',
+                'name' => 'Ross Gates (Bulls)',
+                'Award' => '<B>Ross Gates</B><BR>GM of the Year: 1990',
+                'prim' => 2,
+            ],
+        ]);
+        $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
+        $mockRepo->method('getTeamColors')->willReturn([]);
+        $mockRepo->method('getPlayerIdsByNames')->willReturn([]);
+
+        $service = new SeasonArchiveService($mockRepo);
+        $result = $service->getSeasonDetail(1989);
+        $this->assertNotNull($result);
+        $this->assertSame('Brandon Tomyoy', $result['iblChampionCoach']);
+    }
+
+    public function testIblChampionCoachRespectsYearTenure(): void
+    {
+        $mockRepo = $this->createMock(SeasonArchiveRepositoryInterface::class);
+        $mockRepo->method('getTeamConferences')->willReturn([]);
+        $mockRepo->method('getAwardsByYear')->willReturn([
+            ['year' => 2000, 'Award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_ID' => 1],
+        ]);
+        $mockRepo->method('getPlayoffResultsByYear')->willReturn([
+            ['year' => 2000, 'round' => 4, 'winner' => 'Lakers', 'loser' => 'Raptors', 'loser_games' => 2, 'id' => 15],
+        ]);
+        $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
+        $mockRepo->method('getAllGmHistory')->willReturn([
+            [
+                'year' => '<B>1988-1999:</b>',
+                'name' => 'Andre Ivarsson (Lakers)',
+                'Award' => '<B>Tony (Tek)</B><BR>GM of the Year: 1991',
+                'prim' => 1,
+            ],
+            [
+                'year' => '<B>1999-Present:</B>',
+                'name' => 'Andre Ivarsson (Lakers)',
+                'Award' => '<B>Andre Ivarsson</B><BR>ASG Co-Head Coach: 2003',
+                'prim' => 2,
+            ],
+        ]);
+        $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
+        $mockRepo->method('getTeamColors')->willReturn([]);
+        $mockRepo->method('getPlayerIdsByNames')->willReturn([]);
+
+        $service = new SeasonArchiveService($mockRepo);
+        $result = $service->getSeasonDetail(2000);
+        $this->assertNotNull($result);
+        // Year 2000 falls in "1999-Present" tenure, so Andre Ivarsson is the coach
+        $this->assertSame('Andre Ivarsson', $result['iblChampionCoach']);
+    }
+
+    public function testIblChampionCoachEmptyWhenNoChampion(): void
+    {
+        $mockRepo = $this->createMock(SeasonArchiveRepositoryInterface::class);
+        $mockRepo->method('getTeamConferences')->willReturn([]);
+        $mockRepo->method('getAwardsByYear')->willReturn([
+            ['year' => 1989, 'Award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_ID' => 1],
+        ]);
+        $mockRepo->method('getPlayoffResultsByYear')->willReturn([]);
+        $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
+        $mockRepo->method('getAllGmHistory')->willReturn([]);
+        $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
+        $mockRepo->method('getTeamColors')->willReturn([]);
+        $mockRepo->method('getPlayerIdsByNames')->willReturn([]);
+
+        $service = new SeasonArchiveService($mockRepo);
+        $result = $service->getSeasonDetail(1989);
+        $this->assertNotNull($result);
+        $this->assertSame('', $result['iblChampionCoach']);
     }
 }

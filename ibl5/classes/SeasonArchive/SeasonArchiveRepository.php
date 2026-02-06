@@ -168,4 +168,22 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
 
         return $map;
     }
+
+    /**
+     * @see SeasonArchiveRepositoryInterface::getTeamConferences()
+     */
+    public function getTeamConferences(): array
+    {
+        $rows = $this->fetchAll(
+            "SELECT team_name, conference FROM ibl_standings WHERE conference != ''"
+        );
+
+        $map = [];
+        foreach ($rows as $row) {
+            /** @var array{team_name: string, conference: string} $row */
+            $map[$row['team_name']] = $row['conference'];
+        }
+
+        return $map;
+    }
 }

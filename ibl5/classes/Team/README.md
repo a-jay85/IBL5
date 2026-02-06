@@ -124,7 +124,8 @@ Key tables referenced:
 - `ibl_team_win_loss` - Regular season history
 - `ibl_heat_win_loss` - HEAT tournament results
 - `ibl_playoff_results` - Playoff results
-- `ibl_gm_history` - GM history records
+- `ibl_gm_awards` - GM awards (normalized, one row per award per year)
+- `ibl_gm_tenures` - GM tenure periods per franchise
 
 ## Testing
 

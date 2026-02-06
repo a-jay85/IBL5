@@ -37,10 +37,10 @@ interface TeamComponentsViewInterface
     public function draftPicks(\Team $team): string;
 
     /**
-     * Render GM history awards
+     * Render GM history: tenures for the franchise and current GM's awards
      *
-     * @param object $team Team object with ownerName, name
-     * @return string HTML awards list, or empty string if no history
+     * @param object $team Team object with ownerName, teamID
+     * @return string HTML with tenure list and awards list, or empty string if no data
      */
     public function gmHistory(object $team): string;
 

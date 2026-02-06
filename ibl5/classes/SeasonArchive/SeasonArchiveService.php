@@ -18,7 +18,8 @@ use SeasonArchive\Contracts\SeasonArchiveServiceInterface;
  * @phpstan-import-type SeasonDetail from SeasonArchiveServiceInterface
  * @phpstan-import-type PlayoffSeries from SeasonArchiveServiceInterface
  * @phpstan-import-type AwardRow from SeasonArchiveRepositoryInterface
- * @phpstan-import-type GmHistoryRow from SeasonArchiveRepositoryInterface
+ * @phpstan-import-type GmAwardWithTeamRow from SeasonArchiveRepositoryInterface
+ * @phpstan-import-type GmTenureWithTeamRow from SeasonArchiveRepositoryInterface
  * @phpstan-import-type TeamAwardRow from SeasonArchiveRepositoryInterface
  *
  * @see SeasonArchiveServiceInterface For the interface contract
@@ -50,7 +51,6 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     public function getAllSeasons(): array
     {
         $years = $this->repository->getAllSeasonYears();
-        $gmHistory = $this->repository->getAllGmHistory();
         $seasons = [];
 
         foreach ($years as $year) {
@@ -104,7 +104,8 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
 
         $playoffResults = $this->repository->getPlayoffResultsByYear($year);
         $teamAwards = $this->repository->getTeamAwardsByYear($year);
-        $gmHistory = $this->repository->getAllGmHistory();
+        $gmAwards = $this->repository->getAllGmAwardsWithTeams();
+        $gmTenures = $this->repository->getAllGmTenuresWithTeams();
         $heatYear = $year - 1;
         $heatStandingsRaw = $this->repository->getHeatWinLossByYear($heatYear);
         $teamColors = $this->repository->getTeamColors();
@@ -167,7 +168,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
                 'dpoy' => $this->extractAward($awards, 'Defensive Player of the Year (1st)'),
                 'roy' => $this->extractAward($awards, 'Rookie of the Year (1st)'),
                 'sixthMan' => $this->extractAward($awards, '6th Man Award (1st)'),
-                'gmOfYear' => $this->getGmOfTheYear($gmHistory, $year),
+                'gmOfYear' => $this->getGmOfTheYear($gmAwards, $year),
                 'finalsMvp' => $this->extractAward($awards, 'IBL Finals MVP'),
             ],
             'allLeagueTeams' => [
@@ -203,8 +204,8 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
                 'east' => $this->extractAwardList($awards, 'Eastern Conference All-Star'),
                 'west' => $this->extractAwardList($awards, 'Western Conference All-Star'),
             ],
-            'allStarCoaches' => $this->getAllStarCoaches($gmHistory, $year, $teamConferences),
-            'iblChampionCoach' => $this->getIblChampionCoach($gmHistory, $iblFinals['winner'], $year),
+            'allStarCoaches' => $this->getAllStarCoaches($gmAwards, $year, $teamConferences),
+            'iblChampionCoach' => $this->getIblChampionCoach($gmTenures, $iblFinals['winner'], $year),
             'teamColors' => $teamColors,
             'playerIds' => [],
             'teamIds' => $teamIds,
@@ -272,39 +273,17 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     }
 
     /**
-     * Parse GM of the Year from GM history HTML
+     * Find GM of the Year from normalized GM awards data
      *
-     * The Award field contains HTML like:
-     * "<B>Name</B><BR>GM of the Year: 1990, 1993<BR>ASG Head Coach: ..."
-     * We regex-match "GM of the Year:" lines and check if the year appears.
-     *
-     * @param list<GmHistoryRow> $gmHistory All GM history records
+     * @param list<GmAwardWithTeamRow> $gmAwards All GM award records with team names
      * @param int $year Season ending year to find
      * @return array{name: string, team: string} GM name and team, or empty strings if not found
      */
-    private function getGmOfTheYear(array $gmHistory, int $year): array
+    private function getGmOfTheYear(array $gmAwards, int $year): array
     {
-        $yearStr = (string) $year;
-
-        foreach ($gmHistory as $gm) {
-            $awardText = $gm['Award'];
-            // Match "GM of the Year: YYYY, YYYY, ..." pattern
-            if (preg_match('/GM of the Year:\s*([0-9, ]+)/i', $awardText, $matches) === 1) {
-                $yearsInRecord = preg_split('/\s*,\s*/', trim($matches[1]));
-                if (is_array($yearsInRecord) && in_array($yearStr, $yearsInRecord, true)) {
-                    $name = $gm['name'];
-                    // The name field looks like "Ross Gates (Bulls)" — extract name and team
-                    $gmName = $name;
-                    $gmTeam = '';
-                    if (preg_match('/^(.+?)\s*\((.+?)\)\s*$/', $name, $nameMatches) === 1) {
-                        $gmName = trim($nameMatches[1]);
-                        $gmTeam = trim($nameMatches[2]);
-                    } else {
-                        $gmName = trim(preg_replace('/\s*\(.*?\)\s*$/', '', $name) ?? $name);
-                    }
-
-                    return ['name' => $gmName, 'team' => $gmTeam];
-                }
+        foreach ($gmAwards as $award) {
+            if ($award['Award'] === 'GM of the Year' && $award['year'] === $year) {
+                return ['name' => $award['gm_username'], 'team' => $award['team_name']];
             }
         }
 
@@ -314,72 +293,36 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     /**
      * Get All-Star Game head coaches for a given year, split by conference
      *
-     * Parses "ASG Head Coach:" and "ASG Co-Head Coach:" lines from GM history
-     * Award field HTML. Determines conference by extracting team name from the
-     * `name` field (e.g., "Ross Gates (Bulls)") and looking it up in standings.
+     * Matches 'ASG Head Coach' and 'ASG Co-Head Coach' awards for the given year.
+     * Uses the team_name from the JOIN to determine conference.
      *
-     * @param list<GmHistoryRow> $gmHistory All GM history records
+     * @param list<GmAwardWithTeamRow> $gmAwards All GM award records with team names
      * @param int $year Season ending year
      * @param array<string, string> $teamConferences Map of team_name => 'Eastern'|'Western'
      * @return array{east: list<string>, west: list<string>}
      */
-    private function getAllStarCoaches(array $gmHistory, int $year, array $teamConferences): array
+    private function getAllStarCoaches(array $gmAwards, int $year, array $teamConferences): array
     {
-        $yearStr = (string) $year;
         /** @var list<string> $east */
         $east = [];
         /** @var list<string> $west */
         $west = [];
 
-        foreach ($gmHistory as $gm) {
-            $awardText = $gm['Award'];
-            $isCoach = false;
-
-            // Check "ASG Head Coach:" line
-            if (preg_match('/ASG Head Coach:\s*([0-9, ]+)/i', $awardText, $matches) === 1) {
-                $yearsInRecord = preg_split('/\s*,\s*/', trim($matches[1]));
-                if (is_array($yearsInRecord) && in_array($yearStr, $yearsInRecord, true)) {
-                    $isCoach = true;
-                }
-            }
-
-            // Check "ASG Co-Head Coach:" line
-            if (!$isCoach && preg_match('/ASG Co-Head Coach:\s*([0-9, ]+)/i', $awardText, $matches) === 1) {
-                $yearsInRecord = preg_split('/\s*,\s*/', trim($matches[1]));
-                if (is_array($yearsInRecord) && in_array($yearStr, $yearsInRecord, true)) {
-                    $isCoach = true;
-                }
-            }
-
-            if (!$isCoach) {
+        foreach ($gmAwards as $award) {
+            if ($award['year'] !== $year) {
                 continue;
             }
 
-            // Extract display name from <B>Name</B> in Award field
-            $displayName = '';
-            if (preg_match('/<B>([^<]+)<\/B>/i', $awardText, $nameMatch) === 1) {
-                $displayName = trim($nameMatch[1]);
+            if ($award['Award'] !== 'ASG Head Coach' && $award['Award'] !== 'ASG Co-Head Coach') {
+                continue;
             }
 
-            // Extract team from name field: "Ross Gates (Bulls)" => "Bulls"
-            $teamName = '';
-            if (preg_match('/\(([^)]+)\)\s*$/', $gm['name'], $teamMatch) === 1) {
-                $teamName = trim($teamMatch[1]);
-            }
-
-            // Fall back to name field itself if no display name found
-            if ($displayName === '') {
-                $displayName = preg_replace('/\s*\(.*?\)\s*$/', '', $gm['name']) ?? $gm['name'];
-                $displayName = trim($displayName);
-            }
-
-            // Determine conference from team
-            $conference = $teamConferences[$teamName] ?? '';
+            $conference = $teamConferences[$award['team_name']] ?? '';
 
             if ($conference === 'Eastern') {
-                $east[] = $displayName;
+                $east[] = $award['gm_username'];
             } elseif ($conference === 'Western') {
-                $west[] = $displayName;
+                $west[] = $award['gm_username'];
             }
         }
 
@@ -389,54 +332,33 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     /**
      * Get the head coach (GM) of the IBL champion team for a given year
      *
-     * Parses the `year` field tenure range (e.g., "<B>1988-Present:</b>") and matches
-     * the team from the `name` field against the IBL Finals winner. Returns the display
-     * name from `<B>Name</B>` in the Award field.
+     * Finds the GM whose team_name matches the champion and whose tenure covers the year.
      *
-     * @param list<GmHistoryRow> $gmHistory All GM history records
+     * @param list<GmTenureWithTeamRow> $gmTenures All GM tenure records with team names
      * @param string $championTeam IBL Finals winner team name
      * @param int $year Season ending year
-     * @return string Coach display name, or empty string if not found
+     * @return string GM username, or empty string if not found
      */
-    private function getIblChampionCoach(array $gmHistory, string $championTeam, int $year): string
+    private function getIblChampionCoach(array $gmTenures, string $championTeam, int $year): string
     {
         if ($championTeam === '') {
             return '';
         }
 
-        foreach ($gmHistory as $gm) {
-            // Extract team from name field: "Brandon Tomyoy (Clippers)" => "Clippers"
-            $teamName = '';
-            if (preg_match('/\(([^)]+)\)\s*$/', $gm['name'], $teamMatch) === 1) {
-                $teamName = trim($teamMatch[1]);
-            }
-
-            if ($teamName !== $championTeam) {
+        foreach ($gmTenures as $tenure) {
+            if ($tenure['team_name'] !== $championTeam) {
                 continue;
             }
 
-            // Parse tenure range from year field: "<B>1988-Present:</b>" or "<B>1990-1997:</b>"
-            $yearField = strip_tags($gm['year']);
-            if (preg_match('/(\d{4})\s*-\s*(\w+)/', $yearField, $tenureMatch) !== 1) {
+            if ($year < $tenure['start_season_year']) {
                 continue;
             }
 
-            $startYear = (int) $tenureMatch[1];
-            $endPart = $tenureMatch[2];
-            $endYear = strtolower($endPart) === 'present' ? 9999 : (int) $endPart;
-
-            if ($year < $startYear || $year > $endYear) {
+            if ($tenure['end_season_year'] !== null && $year > $tenure['end_season_year']) {
                 continue;
             }
 
-            // Extract display name from <B>Name</B> in Award field
-            if (preg_match('/<B>([^<]+)<\/B>/i', $gm['Award'], $nameMatch) === 1) {
-                return trim($nameMatch[1]);
-            }
-
-            // Fall back to name field without team suffix
-            $displayName = preg_replace('/\s*\(.*?\)\s*$/', '', $gm['name']) ?? $gm['name'];
-            return trim($displayName);
+            return $tenure['gm_username'];
         }
 
         return '';

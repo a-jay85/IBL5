@@ -27,7 +27,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
     }
 
     // Legacy check for path traversal (kept for defense in depth)
-    if (stripos_clone($name, "..")) {
+    if (str_contains($name, "..")) {
         header("Location: index.php");
         exit;
     }
@@ -60,7 +60,7 @@ if (isset($name) && $name == $_REQUEST['name']) {
         }
 
         // Legacy check for path traversal (kept for defense in depth)
-        if (stripos_clone($file, "..")) {
+        if (str_contains($file, "..")) {
             die("You are so cool...");
         }
 

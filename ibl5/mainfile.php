@@ -23,9 +23,6 @@ if (!defined('END_TRANSACTION')) {
     define('END_TRANSACTION', 2);
 }
 
-// Get php version
-$phpver = phpversion();
-
 // SECURITY: Safe include function with path traversal protection
 // Note: This function is legacy. New code should use explicit includes with verified paths.
 function include_secure($file_name)
@@ -56,67 +53,26 @@ function include_secure($file_name)
         include_once $safe_path;
     }
 }
-if ($phpver < '4.1.0') {
-    $_GET = $HTTP_GET_VARS;
-    $_POST = $HTTP_POST_VARS;
-    $_SERVER = $HTTP_SERVER_VARS;
-    $_FILES = $HTTP_POST_FILES;
-    $_ENV = $HTTP_ENV_VARS;
-    if ($_SERVER['REQUEST_METHOD'] == "POST") {
-        $_REQUEST = $_POST;
-    } elseif ($_SERVER['REQUEST_METHOD'] == "GET") {
-        $_REQUEST = $_GET;
-    }
-    if (isset($HTTP_COOKIE_VARS)) {
-        $_COOKIE = $HTTP_COOKIE_VARS;
-    }
-    if (isset($HTTP_SESSION_VARS)) {
-        $_SESSION = $HTTP_SESSION_VARS;
-    }
-}
 
-// override old superglobals if php is higher then 4.1.0
-if ($phpver >= '4.1.0') {
-    $HTTP_GET_VARS = $_GET;
-    $HTTP_POST_VARS = $_POST;
-    $HTTP_SERVER_VARS = $_SERVER;
-    $HTTP_POST_FILES = $_FILES;
-    $HTTP_ENV_VARS = $_ENV;
-    $PHP_SELF = $_SERVER['PHP_SELF'];
-    if (isset($_SESSION)) {
-        $HTTP_SESSION_VARS = $_SESSION;
-    }
-    if (isset($_COOKIE)) {
-        $HTTP_COOKIE_VARS = $_COOKIE;
-    }
-}
-
-// After doing those superglobals we can now use one
-// and check if this file isnt being accessed directly
+// Check if this file isn't being accessed directly
 
 if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
     header("Location: index.php");
     exit();
 }
 
-if (!function_exists("floatval")) {
-    function floatval($inputval)
-    {
-        return (float) $inputval;
-    }
-}
-if ($phpver >= '4.0.4pl1' && isset($_SERVER['HTTP_USER_AGENT']) && strstr($_SERVER['HTTP_USER_AGENT'], 'compatible')) {
+if (isset($_SERVER['HTTP_USER_AGENT']) && strstr($_SERVER['HTTP_USER_AGENT'], 'compatible')) {
     if (extension_loaded('zlib')) {
         @ob_end_clean();
         ob_start('ob_gzhandler');
     }
-} elseif ($phpver > '4.0' && isset($_SERVER['HTTP_ACCEPT_ENCODING']) && !empty($_SERVER['HTTP_ACCEPT_ENCODING'])) {
+} elseif (isset($_SERVER['HTTP_ACCEPT_ENCODING']) && $_SERVER['HTTP_ACCEPT_ENCODING'] !== '') {
     if (strstr($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip')) {
         if (extension_loaded('zlib')) {
             $do_gzip_compress = true;
             ob_start('ob_gzhandler', 5);
             ob_implicit_flush(0);
-            if (mb_ereg("MSIE", $_SERVER['HTTP_USER_AGENT'])) {
+            if (str_contains($_SERVER['HTTP_USER_AGENT'], 'MSIE')) {
                 header('Content-Encoding: gzip');
             }
         }
@@ -219,28 +175,6 @@ if ((isset($admin) && $admin != $_COOKIE['admin']) or (isset($user) && $user != 
     die("Illegal Operation");
 }
 
-if (!function_exists('stripos')) {
-    function stripos_clone($haystack, $needle, $offset = 0)
-    {
-        $return = strpos(strtoupper($haystack), strtoupper($needle), $offset);
-        if ($return === false) {
-            return false;
-        } else {
-            return true;
-        }
-    }
-} else {
-// But when this is PHP5, we use the original function
-    function stripos_clone($haystack, $needle, $offset = 0)
-    {
-        $return = stripos($haystack, $needle, $offset = 0);
-        if ($return === false) {
-            return false;
-        } else {
-            return true;
-        }
-    }
-}
 
 if (isset($_COOKIE['admin'])) {
     $admin = base64_decode($_COOKIE['admin']);
@@ -261,20 +195,20 @@ $htmltags .= "[ <a href=\"javascript:history.go(-1)\"><b>Go Back</b></a> ]</cent
 if (!defined('ADMIN_FILE')) {
     foreach ($_GET as $sec_key => $secvalue) {
         if (
-            (mb_eregi("<[^>]*script*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*object*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*iframe*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*applet*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*meta*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*style*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*form*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*img*\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*onmouseover *\"?[^>]*", $secvalue)) ||
-            (mb_eregi("<[^>]*body *\"?[^>]*", $secvalue)) ||
-            (mb_eregi("\([^>]*\"?[^)]*\)", $secvalue)) ||
-            (mb_eregi("\"", $secvalue)) ||
-            (mb_eregi("forum_admin", $sec_key)) ||
-            (mb_eregi("inside_mod", $sec_key))
+            (preg_match('/<[^>]*script*"?[^>]*/i', $secvalue)) ||
+            (preg_match('/<[^>]*object*"?[^>]*/i', $secvalue)) ||
+            (preg_match('/<[^>]*iframe*"?[^>]*/i', $secvalue)) ||
+            (preg_match('/<[^>]*applet*"?[^>]*/i', $secvalue)) ||
+            (preg_match('/<[^>]*meta*"?[^>]*/i', $secvalue)) ||
+            (preg_match('/<[^>]*style*"?[^>]*/i', $secvalue)) ||
+            (preg_match('/<[^>]*form*"?[^>]*/i', $secvalue)) ||
+            (preg_match('/<[^>]*img*"?[^>]*/i', $secvalue)) ||
+            (preg_match('/<[^>]*onmouseover *"?[^>]*/i', $secvalue)) ||
+            (preg_match('/<[^>]*body *"?[^>]*/i', $secvalue)) ||
+            (preg_match('/\([^>]*"?[^)]*\)/i', $secvalue)) ||
+            (preg_match('/"/i', $secvalue)) ||
+            (preg_match('/forum_admin/i', $sec_key)) ||
+            (preg_match('/inside_mod/i', $sec_key))
         ) {
             die($htmltags);
         }
@@ -284,32 +218,31 @@ if (!defined('ADMIN_FILE')) {
         if (is_array($secvalue)) {
             foreach ($secvalue as $arrayElementValue) {
                 if (
-                    (mb_eregi("<[^>]*iframe*\"?[^>]*", $arrayElementValue)) ||
-                    (mb_eregi("<[^>]*object*\"?[^>]*", $arrayElementValue)) ||
-                    (mb_eregi("<[^>]*applet*\"?[^>]*", $arrayElementValue)) ||
-                    (mb_eregi("<[^>]*meta*\"?[^>]*", $arrayElementValue)) ||
-                    (mb_eregi("<[^>]*onmouseover*\"?[^>]*", $arrayElementValue)) ||
-                    (mb_eregi("<[^>]script*\"?[^>]*", $arrayElementValue)) ||
-                    (mb_eregi("<[^>]*body*\"?[^>]*", $arrayElementValue)) ||
-                    (mb_eregi("<[^>]style*\"?[^>]*", $arrayElementValue))
+                    (preg_match('/<[^>]*iframe*"?[^>]*/i', $arrayElementValue)) ||
+                    (preg_match('/<[^>]*object*"?[^>]*/i', $arrayElementValue)) ||
+                    (preg_match('/<[^>]*applet*"?[^>]*/i', $arrayElementValue)) ||
+                    (preg_match('/<[^>]*meta*"?[^>]*/i', $arrayElementValue)) ||
+                    (preg_match('/<[^>]*onmouseover*"?[^>]*/i', $arrayElementValue)) ||
+                    (preg_match('/<[^>]script*"?[^>]*/i', $arrayElementValue)) ||
+                    (preg_match('/<[^>]*body*"?[^>]*/i', $arrayElementValue)) ||
+                    (preg_match('/<[^>]style*"?[^>]*/i', $arrayElementValue))
                 ) {
                     die($htmltags);
                 }
             }
         } else {
             if (
-                (mb_eregi("<[^>]*iframe*\"?[^>]*", $secvalue)) ||
-                (mb_eregi("<[^>]*object*\"?[^>]*", $secvalue)) ||
-                (mb_eregi("<[^>]*applet*\"?[^>]*", $secvalue)) ||
-                (mb_eregi("<[^>]*meta*\"?[^>]*", $secvalue)) ||
-                (mb_eregi("<[^>]*onmouseover*\"?[^>]*", $secvalue)) ||
-                (mb_eregi("<[^>]script*\"?[^>]*", $secvalue)) ||
-                (mb_eregi("<[^>]*body*\"?[^>]*", $secvalue)) ||
-                (mb_eregi("<[^>]style*\"?[^>]*", $secvalue))
+                (preg_match('/<[^>]*iframe*"?[^>]*/i', $secvalue)) ||
+                (preg_match('/<[^>]*object*"?[^>]*/i', $secvalue)) ||
+                (preg_match('/<[^>]*applet*"?[^>]*/i', $secvalue)) ||
+                (preg_match('/<[^>]*meta*"?[^>]*/i', $secvalue)) ||
+                (preg_match('/<[^>]*onmouseover*"?[^>]*/i', $secvalue)) ||
+                (preg_match('/<[^>]script*"?[^>]*/i', $secvalue)) ||
+                (preg_match('/<[^>]*body*"?[^>]*/i', $secvalue)) ||
+                (preg_match('/<[^>]style*"?[^>]*/i', $secvalue))
             ) {
                 die($htmltags);
-            } 
-            
+            }
         }
     }
 }
@@ -317,18 +250,18 @@ if (!defined('ADMIN_FILE')) {
 // Include the required files - Load appropriate config based on league selection
 $currentLeague = $_SESSION['current_league'] ?? $_COOKIE[\League\LeagueContext::COOKIE_NAME] ?? 'ibl';
 if ($currentLeague === 'olympics') {
-    @require_once __DIR__ . '/configOlympics.php';
+    require_once __DIR__ . '/configOlympics.php';
 } else {
-    @require_once __DIR__ . '/config.php';
+    require_once __DIR__ . '/config.php';
 }
 
 if (!$dbname) {
     die("<br><br><center><img src=images/logo.gif><br><br><b>There seems that PHP-Nuke isn't installed yet.<br>(The values in config.php file are the default ones)<br><br>You can proceed with the <a href='./install/index.php'>web installation</a> now.</center></b>");
 }
 
-@require_once __DIR__ . "/db/db.php";
+require_once __DIR__ . "/db/db.php";
 
-@require_once __DIR__ . "/includes/ipban.php";
+require_once __DIR__ . "/includes/ipban.php";
 if (file_exists(__DIR__ . "/includes/custom_files/custom_mainfile.php")) {
     @include_once __DIR__ . "/includes/custom_files/custom_mainfile.php";
 }
@@ -832,9 +765,11 @@ function online()
         $uname = $ip;
         $guest = 1;
     }
-    $past = time() - 3600;
-    $sql = "DELETE FROM " . $prefix . "_session WHERE time < '$past'";
-    $db->sql_query($sql);
+    if (mt_rand(1, 100) === 1) {
+        $past = time() - 3600;
+        $sql = "DELETE FROM " . $prefix . "_session WHERE time < '$past'";
+        $db->sql_query($sql);
+    }
     $sql = "SELECT time FROM " . $prefix . "_session WHERE uname='" . addslashes($uname) . "'";
     $result = $db->sql_query($sql);
     $ctime = time();
@@ -871,31 +806,6 @@ function blockfileinc($title, $blockfile, $side = 0)
     }
 }
 
-function ultramode()
-{
-    global $prefix, $db;
-    $ultra = "ultramode.txt";
-    $file = fopen($ultra, "w");
-    fwrite($file, "General purpose self-explanatory file with news headlines\n");
-    $sql = "SELECT s.sid, s.catid, s.aid, s.title, s.time, s.hometext, s.comments, s.topic, t.topictext, t.topicimage FROM " . $prefix . "_stories s LEFT JOIN " . $prefix . "_topics t ON t.topicid = s.topic WHERE s.ihome = '0' ORDER BY s.time DESC LIMIT 0,10";
-    $result = $db->sql_query($sql);
-    while ($row = $db->sql_fetchrow($result)) {
-        $rsid = intval($row['sid']);
-        $raid = filter($row['aid'], "nohtml");
-        $rtitle = filter($row['title'], "nohtml");
-        $rtime = $row['time'];
-        $rhometext = filter(stripslashes($row['hometext']), "nohtml");
-        $rcomments = intval($row['comments']);
-        $rtopic = intval($row['topic']);
-        $row2 = $db->sql_fetchrow($db->sql_query("select topictext, topicimage from " . $prefix . "_topics where topicid='$rtopic'"));
-        $topictext = filter($row2['topictext'], "nohtml");
-        $topicimage = filter($row2['topicimage'], "nohtml");
-        $content = "%%\n" . $rtitle . "\n/modules.php?name=News&amp;file=article&amp;sid=" . $rsid . "\n" . $rtime . "\n" . $raid . "\n" . $topictext . "\n" . $rcomments . "\n" . $topicimage . "\n";
-        fwrite($file, $content);
-    }
-    fclose($file);
-    $db->sql_freeresult($result);
-}
 
 function cookiedecode($user)
 {
@@ -951,23 +861,22 @@ function FixQuotes($what = "")
 
 function check_words($Message)
 {
-    global $CensorMode, $CensorReplace, $EditedMessage;
-    include "config.php";
+    global $CensorMode, $CensorReplace, $EditedMessage, $CensorList;
     $EditedMessage = $Message;
     if ($CensorMode != 0) {
         if (is_array($CensorList)) {
             $Replace = $CensorReplace;
             if ($CensorMode == 1) {
                 for ($i = 0; $i < count($CensorList); $i++) {
-                    $EditedMessage = mb_eregi_replace("$CensorList[$i]([^a-zA-Z0-9])", "$Replace\\1", $EditedMessage);
+                    $EditedMessage = preg_replace('/' . $CensorList[$i] . '([^a-zA-Z0-9])/i', $Replace . '\\1', $EditedMessage);
                 }
             } elseif ($CensorMode == 2) {
                 for ($i = 0; $i < count($CensorList); $i++) {
-                    $EditedMessage = mb_eregi_replace("(^|[^[:alnum:]])$CensorList[$i]", "\\1$Replace", $EditedMessage);
+                    $EditedMessage = preg_replace('/(^|[^a-zA-Z0-9])' . $CensorList[$i] . '/i', '\\1' . $Replace, $EditedMessage);
                 }
             } elseif ($CensorMode == 3) {
                 for ($i = 0; $i < count($CensorList); $i++) {
-                    $EditedMessage = mb_eregi_replace("$CensorList[$i]", "$Replace", $EditedMessage);
+                    $EditedMessage = preg_replace('/' . $CensorList[$i] . '/i', $Replace, $EditedMessage);
                 }
             }
         }
@@ -1041,22 +950,22 @@ function check_html($str, $strip = "")
 {
     /* The core of this code has been lifted from phpslash */
     /* which is licenced under the GPL. */
-    include "config.php";
+    global $AllowableHTML;
     if ($strip == "nohtml") {
         $AllowableHTML = array('');
     }
 
     $str = stripslashes($str);
-    $str = mb_eregi_replace("<[[:space:]]*([^>]*)[[:space:]]*>", '<\\1>', $str);
+    $str = preg_replace('/<\s*([^>]*)\s*>/i', '<\\1>', $str);
     // Delete all spaces from html tags .
-    $str = mb_eregi_replace("<a[^>]*href[[:space:]]*=[[:space:]]*\"?[[:space:]]*([^\" >]*)[[:space:]]*\"?[^>]*>", '<a href="\\1">', $str);
+    $str = preg_replace('/<a[^>]*href\s*=\s*"?\s*([^" >]*)\s*"?[^>]*>/i', '<a href="\\1">', $str);
     // Delete all attribs from Anchor, except an href, double quoted.
-    $str = mb_eregi_replace("<[[:space:]]* img[[:space:]]*([^>]*)[[:space:]]*>", '', $str);
+    $str = preg_replace('/<\s* img\s*([^>]*)\s*>/i', '', $str);
     // Delete all img tags
-    $str = mb_eregi_replace("<a[^>]*href[[:space:]]*=[[:space:]]*\"?javascript[[:punct:]]*\"?[^>]*>", '', $str);
+    $str = preg_replace('/<a[^>]*href\s*=\s*"?javascript[[:punct:]]*"?[^>]*>/i', '', $str);
     // Delete javascript code from a href tags -- Zhen-Xjell @ http://nukecops.com
     $tmp = "";
-    while (mb_ereg("<(/?[[:alpha:]]*)[[:space:]]*([^>]*)>", $str, $reg)) {
+    while (preg_match('/<(\/?[a-zA-Z]*)\s*([^>]*)>/', $str, $reg)) {
         $i = strpos($str, $reg[0]);
         $l = strlen($reg[0]);
         if ($reg[1][0] == "/") {
@@ -1065,7 +974,7 @@ function check_html($str, $strip = "")
             $tag = strtolower($reg[1]);
         }
 
-        if ($a = $AllowableHTML[$tag]) {
+        if ($a = $AllowableHTML[$tag] ?? 0) {
             if ($reg[1][0] == "/") {
                 $tag = "</$tag>";
             } elseif (($a == 1) || ($reg[2] == "")) {
@@ -1074,7 +983,7 @@ function check_html($str, $strip = "")
                 # Place here the double quote fix function.
                 $attrb_list = delQuotes($reg[2]);
                 // A VER
-                //$attrb_list = mb_ereg_replace("&","&amp;",$attrb_list);
+                //$attrb_list = preg_replace("/&/","&amp;",$attrb_list);
                 $tag = "<$tag" . $attrb_list . ">";
             }
         }
@@ -1087,10 +996,6 @@ function check_html($str, $strip = "")
         $str = substr($str, $i + $l);
     }
     $str = $tmp . $str;
-    return $str;
-    exit;
-    /* Squash PHP tags unconditionally */
-    $str = mb_ereg_replace("<\?", "", $str);
     return $str;
 }
 
@@ -1314,10 +1219,10 @@ function headlines($bid, $cenbox = 0)
             $items = explode("</item>", $string);
             $content = "<font class=\"content\">";
             for ($i = 0; $i < 10; $i++) {
-                $link = mb_ereg_replace(".*<link>", "", $items[$i]);
-                $link = mb_ereg_replace("</link>.*", "", $link);
-                $title2 = mb_ereg_replace(".*<title>", "", $items[$i]);
-                $title2 = mb_ereg_replace("</title>.*", "", $title2);
+                $link = preg_replace('/.*<link>/', '', $items[$i]);
+                $link = preg_replace('/<\/link>.*/', '', $link);
+                $title2 = preg_replace('/.*<title>/', '', $items[$i]);
+                $title2 = preg_replace('/<\/title>.*/', '', $title2);
                 $title2 = stripslashes($title2);
                 if (empty($items[$i]) and $cont != 1) {
                     $content = "";
@@ -1379,7 +1284,7 @@ function automated_news()
     while ($row = $db->sql_fetchrow($result)) {
         $anid = intval($row['anid']);
         $time = $row['time'];
-        mb_ereg("([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})", $time, $date);
+        preg_match('/([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})/', $time, $date);
         if (($date[1] <= $year) and ($date[2] <= $month) and ($date[3] <= $day)) {
             if (($date[4] < $hour) and ($date[5] >= $min) or ($date[4] <= $hour) and ($date[5] <= $min)) {
                 $result2 = $db->sql_query("SELECT * FROM " . $prefix . "_autonews WHERE anid='$anid'");
@@ -1462,7 +1367,7 @@ function removecrlf($str)
 
 function validate_mail($email)
 {
-    if (strlen($email) < 7 || !mb_eregi("^[_\.0-9a-z-]+@([0-9a-z][0-9a-z-]+\.)+[a-z]{2,6}$", $email)) {
+    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
         OpenTable();
         echo _ERRORINVEMAIL;
         CloseTable();
@@ -1474,6 +1379,10 @@ function validate_mail($email)
 
 function paid()
 {
+    static $result = null;
+    if ($result !== null) {
+        return $result;
+    }
     global $db, $user, $cookie, $adminmail, $sitename, $nukeurl, $subscription_url, $user_prefix, $prefix;
     if (is_user($user)) {
         if (!empty($subscription_url)) {
@@ -1487,7 +1396,7 @@ function paid()
         $numrows = $db->sql_numrows($result);
         $row = $db->sql_fetchrow($result);
         if ($numrows == 0) {
-            return 0;
+            return $result = 0;
         } elseif ($numrows != 0) {
             $time = time();
             if ($row['subscription_expire'] <= $time) {
@@ -1498,10 +1407,10 @@ function paid()
                 $row = $db->sql_fetchrow($db->sql_query("SELECT user_email FROM " . $user_prefix . "_users WHERE id='$cookie[0]' AND nickname='$cookie[1]' AND password='$cookie[2]'"));
                 mail($row['user_email'], $subject, $body, "From: $from\nX-Mailer: PHP/" . phpversion());
             }
-            return 1;
+            return $result = 1;
         }
     } else {
-        return 0;
+        return $result = 0;
     }
 }
 
@@ -1529,8 +1438,8 @@ function redir($content)
             $pos = $endpos + 1;
         } else {
             if (!strcasecmp(strtok($tag, " "), "A")) {
-                if (mb_eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*\"([^\"]*)\"", $tag, $regs));
-                elseif (mb_eregi("HREF[ \t\n\r\v]*=[ \t\n\r\v]*([^ \t\n\r\v]*)", $tag, $regs));
+                if (preg_match('/HREF[ \t\n\r\v]*=[ \t\n\r\v]*"([^"]*)"/i', $tag, $regs));
+                elseif (preg_match('/HREF[ \t\n\r\v]*=[ \t\n\r\v]*([^ \t\n\r\v]*)/i', $tag, $regs));
                 else{
                     $regs[1] = "";
                 }

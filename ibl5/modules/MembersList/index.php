@@ -18,7 +18,7 @@
  *   (at your option) any later version.
  *
  ***************************************************************************/
-if (!mb_eregi("modules.php", $_SERVER['SCRIPT_NAME'])) {
+if (stripos($_SERVER['SCRIPT_NAME'], "modules.php") === false) {
     die("You can't access this file directly...");
 }
 $module_name = basename(dirname(__FILE__));

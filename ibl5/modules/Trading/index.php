@@ -4,7 +4,7 @@ use Trading\TradingRepository;
 use Trading\TradingService;
 use Trading\TradingView;
 
-if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
+if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
     die("You can't access this file directly...");
 }
 

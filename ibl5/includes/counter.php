@@ -25,21 +25,21 @@ global $prefix, $db;
 
 /* Get the Browser data */
 
-if ((mb_ereg("Nav", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("Gold", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("X11", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("Mozilla", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("Netscape", $_SERVER["HTTP_USER_AGENT"])) and (!mb_ereg("MSIE", $_SERVER["HTTP_USER_AGENT"])) and (!mb_ereg("Konqueror", $_SERVER["HTTP_USER_AGENT"])) and (!mb_ereg("Yahoo", $_SERVER["HTTP_USER_AGENT"])) and (!mb_ereg("Firefox", $_SERVER["HTTP_USER_AGENT"]))) {
+if ((str_contains($_SERVER["HTTP_USER_AGENT"], "Nav")) || (str_contains($_SERVER["HTTP_USER_AGENT"], "Gold")) || (str_contains($_SERVER["HTTP_USER_AGENT"], "X11")) || (str_contains($_SERVER["HTTP_USER_AGENT"], "Mozilla")) || (str_contains($_SERVER["HTTP_USER_AGENT"], "Netscape")) and (!str_contains($_SERVER["HTTP_USER_AGENT"], "MSIE")) and (!str_contains($_SERVER["HTTP_USER_AGENT"], "Konqueror")) and (!str_contains($_SERVER["HTTP_USER_AGENT"], "Yahoo")) and (!str_contains($_SERVER["HTTP_USER_AGENT"], "Firefox"))) {
     $browser = "Netscape";
-} elseif (mb_ereg("Firefox", $_SERVER["HTTP_USER_AGENT"])) {
+} elseif (str_contains($_SERVER["HTTP_USER_AGENT"], "Firefox")) {
     $browser = "FireFox";
-} elseif (mb_ereg("MSIE", $_SERVER["HTTP_USER_AGENT"])) {
+} elseif (str_contains($_SERVER["HTTP_USER_AGENT"], "MSIE")) {
     $browser = "MSIE";
-} elseif (mb_ereg("Lynx", $_SERVER["HTTP_USER_AGENT"])) {
+} elseif (str_contains($_SERVER["HTTP_USER_AGENT"], "Lynx")) {
     $browser = "Lynx";
-} elseif (mb_ereg("Opera", $_SERVER["HTTP_USER_AGENT"])) {
+} elseif (str_contains($_SERVER["HTTP_USER_AGENT"], "Opera")) {
     $browser = "Opera";
-} elseif (mb_ereg("WebTV", $_SERVER["HTTP_USER_AGENT"])) {
+} elseif (str_contains($_SERVER["HTTP_USER_AGENT"], "WebTV")) {
     $browser = "WebTV";
-} elseif (mb_ereg("Konqueror", $_SERVER["HTTP_USER_AGENT"])) {
+} elseif (str_contains($_SERVER["HTTP_USER_AGENT"], "Konqueror")) {
     $browser = "Konqueror";
-} elseif ((mb_eregi("bot", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("Google", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("Slurp", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("Scooter", $_SERVER["HTTP_USER_AGENT"])) || (mb_eregi("Spider", $_SERVER["HTTP_USER_AGENT"])) || (mb_eregi("Infoseek", $_SERVER["HTTP_USER_AGENT"]))) {
+} elseif ((stripos($_SERVER["HTTP_USER_AGENT"], "bot") !== false) || (str_contains($_SERVER["HTTP_USER_AGENT"], "Google")) || (str_contains($_SERVER["HTTP_USER_AGENT"], "Slurp")) || (str_contains($_SERVER["HTTP_USER_AGENT"], "Scooter")) || (stripos($_SERVER["HTTP_USER_AGENT"], "Spider") !== false) || (stripos($_SERVER["HTTP_USER_AGENT"], "Infoseek") !== false)) {
     $browser = "Bot";
 } else {
     $browser = "Other";
@@ -47,23 +47,23 @@ if ((mb_ereg("Nav", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("Gold", $_SERVER["
 
 /* Get the Operating System data */
 
-if (mb_ereg("Win", $_SERVER["HTTP_USER_AGENT"])) {
+if (str_contains($_SERVER["HTTP_USER_AGENT"], "Win")) {
     $os = "Windows";
-} elseif ((mb_ereg("Mac", $_SERVER["HTTP_USER_AGENT"])) || (mb_ereg("PPC", $_SERVER["HTTP_USER_AGENT"]))) {
+} elseif ((str_contains($_SERVER["HTTP_USER_AGENT"], "Mac")) || (str_contains($_SERVER["HTTP_USER_AGENT"], "PPC"))) {
     $os = "Mac";
-} elseif (mb_ereg("Linux", $_SERVER["HTTP_USER_AGENT"])) {
+} elseif (str_contains($_SERVER["HTTP_USER_AGENT"], "Linux")) {
     $os = "Linux";
-} elseif (mb_ereg("FreeBSD", $_SERVER["HTTP_USER_AGENT"])) {
+} elseif (str_contains($_SERVER["HTTP_USER_AGENT"], "FreeBSD")) {
     $os = "FreeBSD";
-} elseif (mb_ereg("SunOS", $_SERVER["HTTP_USER_AGENT"])) {
+} elseif (str_contains($_SERVER["HTTP_USER_AGENT"], "SunOS")) {
     $os = "SunOS";
-} elseif (mb_ereg("IRIX", $_SERVER["HTTP_USER_AGENT"])) {
+} elseif (str_contains($_SERVER["HTTP_USER_AGENT"], "IRIX")) {
     $os = "IRIX";
-} elseif (mb_ereg("BeOS", $_SERVER["HTTP_USER_AGENT"])) {
+} elseif (str_contains($_SERVER["HTTP_USER_AGENT"], "BeOS")) {
     $os = "BeOS";
-} elseif (mb_ereg("OS/2", $_SERVER["HTTP_USER_AGENT"])) {
+} elseif (str_contains($_SERVER["HTTP_USER_AGENT"], "OS/2")) {
     $os = "OS/2";
-} elseif (mb_ereg("AIX", $_SERVER["HTTP_USER_AGENT"])) {
+} elseif (str_contains($_SERVER["HTTP_USER_AGENT"], "AIX")) {
     $os = "AIX";
 } else {
     $os = "Other";

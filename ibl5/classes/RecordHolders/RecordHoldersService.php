@@ -70,13 +70,13 @@ class RecordHoldersService implements RecordHoldersServiceInterface
      * @var array<string, string>
      */
     private const PLAYER_STAT_EXPRESSIONS = [
-        'Most Points in a Single Game' => '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)',
-        'Most Rebounds in a Single Game' => '(bs.gameORB + bs.gameDRB)',
+        'Most Points in a Single Game' => 'bs.calc_points',
+        'Most Rebounds in a Single Game' => 'bs.calc_rebounds',
         'Most Assists in a Single Game' => 'bs.gameAST',
         'Most Steals in a Single Game' => 'bs.gameSTL',
         'Most Blocks in a Single Game' => 'bs.gameBLK',
         'Most Turnovers in a Single Game' => 'bs.gameTOV',
-        'Most Field Goals in a Single Game' => '(bs.game2GM + bs.game3GM)',
+        'Most Field Goals in a Single Game' => 'bs.calc_fg_made',
         'Most Free Throws in a Single Game' => 'bs.gameFTM',
         'Most Three Pointers in a Single Game' => 'bs.game3GM',
     ];
@@ -87,12 +87,12 @@ class RecordHoldersService implements RecordHoldersServiceInterface
      * @var array<string, string>
      */
     private const TEAM_STAT_EXPRESSIONS = [
-        'Most Points in a Single Game' => '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)',
-        'Most Rebounds in a Single Game' => '(bs.gameORB + bs.gameDRB)',
+        'Most Points in a Single Game' => 'bs.calc_points',
+        'Most Rebounds in a Single Game' => 'bs.calc_rebounds',
         'Most Assists in a Single Game' => 'bs.gameAST',
         'Most Steals in a Single Game' => 'bs.gameSTL',
         'Most Blocks in a Single Game' => 'bs.gameBLK',
-        'Most Field Goals in a Single Game' => '(bs.game2GM + bs.game3GM)',
+        'Most Field Goals in a Single Game' => 'bs.calc_fg_made',
         'Most Free Throws in a Single Game' => 'bs.gameFTM',
         'Most Three Pointers in a Single Game' => 'bs.game3GM',
     ];
@@ -120,9 +120,9 @@ class RecordHoldersService implements RecordHoldersServiceInterface
      * @var array<string, string>
      */
     private const DATE_FILTERS = [
-        'regularSeason' => 'MONTH(bs.Date) IN (11, 12, 1, 2, 3, 4, 5)',
-        'playoffs' => 'MONTH(bs.Date) = 6',
-        'heat' => 'MONTH(bs.Date) = 10',
+        'regularSeason' => 'bs.game_type = 1',
+        'playoffs' => 'bs.game_type = 2',
+        'heat' => 'bs.game_type = 3',
     ];
 
     public function __construct(RecordHoldersRepositoryInterface $repository)
@@ -353,7 +353,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
             $batchConfig[$category] = ['expression' => $expression, 'order' => 'DESC'];
         }
         $batchConfig['Fewest Points in a Single Game'] = [
-            'expression' => '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)',
+            'expression' => 'bs.calc_points',
             'order' => 'ASC',
         ];
 
@@ -384,7 +384,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         $marginOverallTies = $this->detectTies($marginOverall);
         $records[$this->addTieLabel('Largest Margin of Victory [overall]', $marginOverallTies)] = $marginOverallTies;
 
-        $marginPlayoffs = $this->formatMarginRecords($this->repository->getLargestMarginOfVictory('MONTH(bs.Date) = 6'));
+        $marginPlayoffs = $this->formatMarginRecords($this->repository->getLargestMarginOfVictory('bs.game_type = 2'));
         /** @var list<FormattedTeamGameRecord> $marginPlayoffTies */
         $marginPlayoffTies = $this->detectTies($marginPlayoffs);
         $records[$this->addTieLabel('Largest Margin of Victory [playoffs]', $marginPlayoffTies)] = $marginPlayoffTies;

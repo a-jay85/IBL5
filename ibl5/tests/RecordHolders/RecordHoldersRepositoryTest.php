@@ -197,4 +197,127 @@ final class RecordHoldersRepositoryTest extends IntegrationTestCase
         $this->assertSame('Heat', $result[0]['team_name']);
         $this->assertSame('Nets', $result[1]['team_name']);
     }
+
+    public function testGetTopPlayerSingleGameBatchUsesUnionAll(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $expressions = [
+            'points' => '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)',
+            'rebounds' => '(bs.gameORB + bs.gameDRB)',
+        ];
+
+        $result = $this->repository->getTopPlayerSingleGameBatch(
+            $expressions,
+            'MONTH(bs.Date) IN (11, 12, 1, 2, 3, 4, 5)'
+        );
+
+        $this->assertQueryExecuted('UNION ALL');
+        $this->assertArrayHasKey('points', $result);
+        $this->assertArrayHasKey('rebounds', $result);
+    }
+
+    public function testGetTopPlayerSingleGameBatchReturnsEmptyForEmptyInput(): void
+    {
+        $result = $this->repository->getTopPlayerSingleGameBatch([], '1=1');
+
+        $this->assertSame([], $result);
+    }
+
+    public function testGetTopPlayerSingleGameBatchGroupsResultsByStatType(): void
+    {
+        $this->mockDb->setMockData([
+            [
+                'stat_type' => 'points',
+                'pid' => 927,
+                'name' => 'Bob Pettit',
+                'tid' => 14,
+                'team_name' => 'Timberwolves',
+                'date' => '1996-01-16',
+                'BoxID' => 0,
+                'oppTid' => 20,
+                'opp_team_name' => 'Grizzlies',
+                'value' => 80,
+            ],
+            [
+                'stat_type' => 'rebounds',
+                'pid' => 100,
+                'name' => 'Wilt Chamberlain',
+                'tid' => 1,
+                'team_name' => 'Celtics',
+                'date' => '1995-02-10',
+                'BoxID' => 5,
+                'oppTid' => 2,
+                'opp_team_name' => 'Heat',
+                'value' => 30,
+            ],
+        ]);
+
+        $result = $this->repository->getTopPlayerSingleGameBatch(
+            ['points' => 'expr1', 'rebounds' => 'expr2'],
+            '1=1'
+        );
+
+        $this->assertCount(1, $result['points']);
+        $this->assertSame(927, $result['points'][0]['pid']);
+        $this->assertCount(1, $result['rebounds']);
+        $this->assertSame(100, $result['rebounds'][0]['pid']);
+    }
+
+    public function testGetTopTeamSingleGameBatchUsesUnionAll(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $expressions = [
+            'points' => ['expression' => '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)', 'order' => 'DESC'],
+            'fewest' => ['expression' => '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)', 'order' => 'ASC'],
+        ];
+
+        $result = $this->repository->getTopTeamSingleGameBatch($expressions, '1=1');
+
+        $this->assertQueryExecuted('UNION ALL');
+        $this->assertArrayHasKey('points', $result);
+        $this->assertArrayHasKey('fewest', $result);
+    }
+
+    public function testGetTopTeamSingleGameBatchReturnsEmptyForEmptyInput(): void
+    {
+        $result = $this->repository->getTopTeamSingleGameBatch([], '1=1');
+
+        $this->assertSame([], $result);
+    }
+
+    public function testGetTopSeasonAverageBatchUsesUnionAll(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $columns = [
+            'scoring' => ['statColumn' => 'pts', 'gamesColumn' => 'games'],
+            'rebounds' => ['statColumn' => 'reb', 'gamesColumn' => 'games'],
+        ];
+
+        $result = $this->repository->getTopSeasonAverageBatch($columns, 50);
+
+        $this->assertQueryExecuted('UNION ALL');
+        $this->assertArrayHasKey('scoring', $result);
+        $this->assertArrayHasKey('rebounds', $result);
+    }
+
+    public function testGetTopSeasonAverageBatchReturnsEmptyForEmptyInput(): void
+    {
+        $result = $this->repository->getTopSeasonAverageBatch([], 50);
+
+        $this->assertSame([], $result);
+    }
+
+    public function testGetTopSeasonAverageBatchRejectsFullyInvalidColumns(): void
+    {
+        $columns = [
+            'bad' => ['statColumn' => '; --', 'gamesColumn' => 'games'],
+        ];
+
+        $result = $this->repository->getTopSeasonAverageBatch($columns, 50);
+
+        $this->assertSame([], $result);
+    }
 }

@@ -50,7 +50,8 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         Player $player,
         PlayerStats $playerStats,
         \Season $season,
-        \Shared $sharedFunctions
+        \Shared $sharedFunctions,
+        ?array $colorScheme = null
     ): string {
         // Calculate date range based on season phase
         if ($season->phase === "Preseason") {
@@ -68,7 +69,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         
         // Render game log with stats card styling
         echo '<tr><td colspan="2">';
-        echo PlayerStatsCardView::render($this->renderGameLog($playerID, $startDate, $endDate));
+        echo PlayerStatsCardView::render($this->renderGameLog($playerID, $startDate, $endDate), '', $colorScheme);
         echo '</td></tr>';
         
         return (string) ob_get_clean();

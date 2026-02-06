@@ -591,7 +591,7 @@ class NavigationView
                     /** @var string $teamName */
                     $teamName = HtmlSanitizer::safeHtmlOutput($team['team_city'] . ' ' . $team['team_name']);
                     $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="nav-dropdown-item flex items-center gap-2 px-2 py-1.5 text-sm font-display text-gray-300 hover:text-white hover:bg-white/5 rounded transition-all duration-150">';
-                    $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="w-6 h-6 object-contain" loading="lazy">';
+                    $html .= '<span class="inline-flex items-center justify-center" style="width:27px;height:27px;flex-shrink:0"><img src="images/logo/new' . $teamId . '.png" alt="" style="max-height:27px;max-width:27px;width:auto;height:auto" loading="lazy"></span>';
                     $html .= '<span>' . $teamName . '</span>';
                     $html .= '</a>';
                 }
@@ -680,7 +680,7 @@ class NavigationView
                     /** @var string $teamName */
                     $teamName = HtmlSanitizer::safeHtmlOutput($team['team_city'] . ' ' . $team['team_name']);
                     $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="flex items-center gap-2.5 px-5 py-2.5 pl-10 text-base font-display text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">';
-                    $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="w-6 h-6 object-contain" loading="lazy">';
+                    $html .= '<span class="inline-flex items-center justify-center" style="width:27px;height:27px;flex-shrink:0"><img src="images/logo/new' . $teamId . '.png" alt="" style="max-height:27px;max-width:27px;width:auto;height:auto" loading="lazy"></span>';
                     $html .= '<span>' . $teamName . '</span>';
                     $html .= '</a>';
                 }

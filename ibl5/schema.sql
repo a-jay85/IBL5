@@ -126,11 +126,11 @@ CREATE TABLE `ibl_box_scores` (
   `gameTOV` tinyint(3) unsigned DEFAULT NULL COMMENT 'Turnovers',
   `gameBLK` tinyint(3) unsigned DEFAULT NULL COMMENT 'Blocks',
   `gamePF` tinyint(3) unsigned DEFAULT NULL COMMENT 'Personal fouls',
-  `game_type` tinyint(3) unsigned GENERATED ALWAYS AS (CASE WHEN MONTH(`Date`) = 6 THEN 2 WHEN MONTH(`Date`) = 10 THEN 3 WHEN MONTH(`Date`) = 0 THEN 0 ELSE 1 END) STORED COMMENT '1=regular, 2=playoffs, 3=HEAT, 0=unknown',
-  `season_year` smallint(5) unsigned GENERATED ALWAYS AS (CASE WHEN YEAR(`Date`) = 0 THEN 0 WHEN MONTH(`Date`) >= 10 THEN YEAR(`Date`) + 1 ELSE YEAR(`Date`) END) STORED COMMENT 'IBL season ending year',
-  `calc_points` smallint(5) unsigned GENERATED ALWAYS AS (`game2GM` * 2 + `gameFTM` + `game3GM` * 3) STORED COMMENT 'Total points',
-  `calc_rebounds` tinyint(3) unsigned GENERATED ALWAYS AS (`gameORB` + `gameDRB`) STORED COMMENT 'Total rebounds',
-  `calc_fg_made` tinyint(3) unsigned GENERATED ALWAYS AS (`game2GM` + `game3GM`) STORED COMMENT 'Total field goals made',
+  `game_type` tinyint(3) unsigned GENERATED ALWAYS AS (case when month(`Date`) = 6 then 2 when month(`Date`) = 10 then 3 when month(`Date`) = 0 then 0 else 1 end) STORED,
+  `season_year` smallint(5) unsigned GENERATED ALWAYS AS (case when year(`Date`) = 0 then 0 when month(`Date`) >= 10 then year(`Date`) + 1 else year(`Date`) end) STORED,
+  `calc_points` smallint(5) unsigned GENERATED ALWAYS AS (`game2GM` * 2 + `gameFTM` + `game3GM` * 3) STORED,
+  `calc_rebounds` tinyint(3) unsigned GENERATED ALWAYS AS (`gameORB` + `gameDRB`) STORED,
+  `calc_fg_made` tinyint(3) unsigned GENERATED ALWAYS AS (`game2GM` + `game3GM`) STORED,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `uuid` char(36) NOT NULL,
@@ -201,16 +201,15 @@ CREATE TABLE `ibl_box_scores_teams` (
   `gameTOV` int(11) DEFAULT NULL,
   `gameBLK` int(11) DEFAULT NULL,
   `gamePF` int(11) DEFAULT NULL,
-  `game_type` tinyint(3) unsigned GENERATED ALWAYS AS (CASE WHEN MONTH(`Date`) = 6 THEN 2 WHEN MONTH(`Date`) = 10 THEN 3 WHEN MONTH(`Date`) = 0 THEN 0 ELSE 1 END) STORED COMMENT '1=regular, 2=playoffs, 3=HEAT, 0=unknown',
-  `calc_points` smallint(5) unsigned GENERATED ALWAYS AS (`game2GM` * 2 + `gameFTM` + `game3GM` * 3) STORED COMMENT 'Total points',
-  `calc_rebounds` smallint(5) unsigned GENERATED ALWAYS AS (`gameORB` + `gameDRB`) STORED COMMENT 'Total rebounds',
-  `calc_fg_made` smallint(5) unsigned GENERATED ALWAYS AS (`game2GM` + `game3GM`) STORED COMMENT 'Total field goals made',
+  `game_type` tinyint(3) unsigned GENERATED ALWAYS AS (case when month(`Date`) = 6 then 2 when month(`Date`) = 10 then 3 when month(`Date`) = 0 then 0 else 1 end) STORED,
+  `calc_points` smallint(5) unsigned GENERATED ALWAYS AS (`game2GM` * 2 + `gameFTM` + `game3GM` * 3) STORED,
+  `calc_rebounds` smallint(5) unsigned GENERATED ALWAYS AS (`gameORB` + `gameDRB`) STORED,
+  `calc_fg_made` smallint(5) unsigned GENERATED ALWAYS AS (`game2GM` + `game3GM`) STORED,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   KEY `idx_date` (`Date`),
   KEY `idx_visitor_team` (`visitorTeamID`),
   KEY `idx_home_team` (`homeTeamID`),
-  KEY `idx_date_visitor_home` (`Date`,`visitorTeamID`,`homeTeamID`),
   KEY `idx_gt_points` (`game_type`,`calc_points`),
   KEY `idx_gt_rebounds` (`game_type`,`calc_rebounds`),
   KEY `idx_gt_fg_made` (`game_type`,`calc_fg_made`),
@@ -579,7 +578,7 @@ CREATE TABLE `ibl_hist` (
   KEY `idx_year` (`year`),
   KEY `idx_pid_year_team` (`pid`,`year`,`team`),
   CONSTRAINT `fk_hist_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=27101 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=29729 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -780,9 +779,7 @@ CREATE TABLE `ibl_playoff_results` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`id`),
   KEY `idx_year` (`year`),
-  KEY `idx_round` (`round`),
-  KEY `idx_winner` (`winner`),
-  KEY `idx_loser` (`loser`)
+  KEY `idx_round` (`round`)
 ) ENGINE=InnoDB AUTO_INCREMENT=281 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -846,8 +843,8 @@ CREATE TABLE `ibl_plr` (
   `pd` tinyint(3) unsigned DEFAULT 0 COMMENT 'Post defense rating',
   `to` tinyint(3) unsigned DEFAULT 0 COMMENT 'Transition offense rating',
   `td` tinyint(3) unsigned DEFAULT 0 COMMENT 'Transition defense rating',
-  `Clutch` tinyint DEFAULT NULL COMMENT 'Clutch rating',
-  `Consistency` tinyint DEFAULT NULL COMMENT 'Consistency rating',
+  `Clutch` tinyint(4) DEFAULT NULL,
+  `Consistency` tinyint(4) DEFAULT NULL,
   `PGDepth` tinyint(3) unsigned DEFAULT 0 COMMENT 'Point guard depth',
   `SGDepth` tinyint(3) unsigned DEFAULT 0 COMMENT 'Shooting guard depth',
   `SFDepth` tinyint(3) unsigned DEFAULT 0 COMMENT 'Small forward depth',
@@ -886,11 +883,11 @@ CREATE TABLE `ibl_plr` (
   `skill` tinyint(3) unsigned DEFAULT 0 COMMENT 'Skill rating',
   `intangibles` tinyint(3) unsigned DEFAULT 0 COMMENT 'Intangibles rating',
   `coach` varchar(16) DEFAULT '',
-  `loyalty` tinyint DEFAULT NULL COMMENT 'Free agency loyalty preference',
-  `playingTime` tinyint DEFAULT NULL COMMENT 'Free agency playing time preference',
-  `winner` tinyint DEFAULT NULL COMMENT 'Free agency winner preference',
-  `tradition` tinyint DEFAULT NULL COMMENT 'Free agency tradition preference',
-  `security` tinyint DEFAULT NULL COMMENT 'Free agency security preference',
+  `loyalty` tinyint(4) DEFAULT NULL,
+  `playingTime` tinyint(4) DEFAULT NULL,
+  `winner` tinyint(4) DEFAULT NULL,
+  `tradition` tinyint(4) DEFAULT NULL,
+  `security` tinyint(4) DEFAULT NULL,
   `exp` tinyint(3) unsigned DEFAULT 0 COMMENT 'Years of experience',
   `bird` tinyint(1) DEFAULT NULL,
   `cy` int(11) DEFAULT 0,
@@ -1124,7 +1121,6 @@ CREATE TABLE `ibl_schedule` (
   KEY `idx_visitor` (`Visitor`),
   KEY `idx_home` (`Home`),
   KEY `idx_year_date` (`Year`,`Date`),
-  KEY `idx_date_visitor_home` (`Date`,`Visitor`,`Home`),
   CONSTRAINT `chk_schedule_visitor_id` CHECK (`Visitor` >= 1 and `Visitor` <= 32),
   CONSTRAINT `chk_schedule_home_id` CHECK (`Home` >= 1 and `Home` <= 32),
   CONSTRAINT `chk_schedule_vscore` CHECK (`VScore` >= 0 and `VScore` <= 200),
@@ -1193,7 +1189,7 @@ CREATE TABLE `ibl_sim_dates` (
   `Start Date` date DEFAULT NULL,
   `End Date` date DEFAULT NULL,
   PRIMARY KEY (`Sim`)
-) ENGINE=InnoDB AUTO_INCREMENT=678 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=682 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1260,9 +1256,7 @@ CREATE TABLE `ibl_team_awards` (
   `name` varchar(35) NOT NULL,
   `Award` varchar(350) NOT NULL,
   `ID` int(11) NOT NULL,
-  PRIMARY KEY (`ID`),
-  KEY `idx_award` (`Award`(50)),
-  KEY `idx_name` (`name`)
+  PRIMARY KEY (`ID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1339,7 +1333,7 @@ CREATE TABLE `ibl_team_info` (
   `color1` varchar(6) NOT NULL DEFAULT '',
   `color2` varchar(6) NOT NULL DEFAULT '',
   `arena` varchar(255) NOT NULL DEFAULT '',
-  `capacity` int NOT NULL DEFAULT 0,
+  `capacity` int(11) NOT NULL DEFAULT 0,
   `owner_name` varchar(32) NOT NULL DEFAULT '',
   `owner_email` varchar(48) NOT NULL DEFAULT '',
   `discordID` bigint(20) unsigned DEFAULT NULL,
@@ -1413,8 +1407,7 @@ CREATE TABLE `ibl_team_win_loss` (
   `wins` varchar(75) NOT NULL DEFAULT '0',
   `losses` varchar(75) NOT NULL DEFAULT '0',
   `table_ID` int(11) NOT NULL AUTO_INCREMENT,
-  PRIMARY KEY (`table_ID`),
-  KEY `idx_currentname` (`currentname`)
+  PRIMARY KEY (`table_ID`)
 ) ENGINE=InnoDB AUTO_INCREMENT=859 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1428,7 +1421,7 @@ DROP TABLE IF EXISTS `ibl_trade_autocounter`;
 CREATE TABLE `ibl_trade_autocounter` (
   `counter` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`counter`)
-) ENGINE=InnoDB AUTO_INCREMENT=11985 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11998 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2219,7 +2212,7 @@ CREATE TABLE `nuke_modules` (
   PRIMARY KEY (`mid`),
   KEY `title` (`title`(250)),
   KEY `custom_title` (`custom_title`(250))
-) ENGINE=MyISAM AUTO_INCREMENT=142 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=155 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2360,7 +2353,7 @@ CREATE TABLE `nuke_public_messages` (
   `date` varchar(14) DEFAULT NULL,
   `who` varchar(25) NOT NULL DEFAULT '',
   PRIMARY KEY (`mid`)
-) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2397,7 +2390,7 @@ CREATE TABLE `nuke_referer` (
   `rid` int(11) NOT NULL AUTO_INCREMENT,
   `url` varchar(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`rid`)
-) ENGINE=MyISAM AUTO_INCREMENT=40380 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=40415 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2525,7 +2518,7 @@ CREATE TABLE `nuke_stories` (
   KEY `catid` (`catid`),
   KEY `counter` (`counter`),
   KEY `topic` (`topic`)
-) ENGINE=MyISAM AUTO_INCREMENT=4245 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=4251 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2672,7 +2665,7 @@ CREATE TABLE `nuke_users_temp` (
   `check_num` varchar(50) NOT NULL DEFAULT '',
   `time` varchar(14) NOT NULL DEFAULT '',
   PRIMARY KEY (`user_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=11202 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=11592 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2847,4 +2840,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-01-26 15:22:56
+-- Dump completed on 2026-02-05 23:14:57

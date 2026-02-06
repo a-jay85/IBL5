@@ -308,7 +308,181 @@ final class RecordHoldersViewTest extends TestCase
         $html = $this->view->render($records);
 
         $this->assertStringContainsString('<style>', $html);
-        $this->assertStringContainsString('.record-holders-page', $html);
+        $this->assertStringContainsString('.record-section', $html);
+    }
+
+    public function testRenderUsesCardWrapperPerSection(): void
+    {
+        $records = $this->createMinimalRecords();
+
+        $html = $this->view->render($records);
+
+        $this->assertSame(5, substr_count($html, 'ibl-card__header'));
+    }
+
+    public function testRenderCategoryHasOwnTable(): void
+    {
+        $records = $this->createMinimalRecords();
+        $records['playerSingleGame']['regularSeason'] = [
+            'Most Points in a Single Game' => [
+                $this->createPlayerRecord(),
+            ],
+            'Most Rebounds in a Single Game' => [
+                $this->createPlayerRecord(),
+            ],
+        ];
+
+        $html = $this->view->render($records);
+
+        // Each category gets its own <table> — the two regular season categories
+        // plus Quadruple Doubles and All-Star = 4 tables in section 1 alone
+        $this->assertGreaterThanOrEqual(4, substr_count($html, '<table'));
+    }
+
+    public function testRenderStatValueUsesHighlightClass(): void
+    {
+        $records = $this->createMinimalRecords();
+        $records['playerSingleGame']['regularSeason'] = [
+            'Most Points in a Single Game' => [
+                $this->createPlayerRecord(),
+            ],
+        ];
+
+        $html = $this->view->render($records);
+
+        $this->assertStringContainsString('ibl-stat-highlight', $html);
+    }
+
+    public function testRenderNoBoldStyleWrappers(): void
+    {
+        $records = $this->createMinimalRecords();
+        $records['playerSingleGame']['regularSeason'] = [
+            'Most Points in a Single Game' => [
+                $this->createPlayerRecord(),
+            ],
+        ];
+        $records['playerFullSeason'] = [
+            'Highest Scoring Average in a Regular Season' => [
+                [
+                    'pid' => 304,
+                    'name' => 'Mitch Richmond',
+                    'teamAbbr' => 'mia',
+                    'teamTid' => 2,
+                    'teamYr' => '1994',
+                    'season' => '1993-94',
+                    'amount' => '34.2',
+                ],
+            ],
+        ];
+        $records['teamGameRecords'] = [
+            'Most Points in a Single Game' => [
+                [
+                    'teamAbbr' => 'uta',
+                    'teamTid' => 13,
+                    'boxScoreUrl' => '',
+                    'dateDisplay' => 'November 30, 1999',
+                    'oppAbbr' => 'gsw',
+                    'oppTid' => 24,
+                    'amount' => '180',
+                ],
+            ],
+        ];
+
+        $html = $this->view->render($records);
+
+        $this->assertStringNotContainsString('<strong style="font-weight: bold;">', $html);
+    }
+
+    public function testRenderColumnHeadersAreThElements(): void
+    {
+        $records = $this->createMinimalRecords();
+        $records['playerSingleGame']['regularSeason'] = [
+            'Most Points in a Single Game' => [
+                $this->createPlayerRecord(),
+            ],
+        ];
+
+        $html = $this->view->render($records);
+
+        $this->assertStringContainsString('<th>Player</th>', $html);
+        $this->assertStringContainsString('<th>Team</th>', $html);
+        $this->assertStringContainsString('<th>Date</th>', $html);
+        $this->assertStringContainsString('<th>Opponent</th>', $html);
+    }
+
+    public function testRenderStatSpecificColumnLabel(): void
+    {
+        $records = $this->createMinimalRecords();
+        $records['playerSingleGame']['regularSeason'] = [
+            'Most Points in a Single Game' => [
+                $this->createPlayerRecord(),
+            ],
+            'Most Rebounds in a Single Game' => [
+                $this->createPlayerRecord(),
+            ],
+        ];
+
+        $html = $this->view->render($records);
+
+        $this->assertStringContainsString('<th>Pts</th>', $html);
+        $this->assertStringContainsString('<th>Reb</th>', $html);
+    }
+
+    public function testRenderCategoryHeadingsAreH3Elements(): void
+    {
+        $records = $this->createMinimalRecords();
+        $records['playerSingleGame']['regularSeason'] = [
+            'Most Points in a Single Game' => [
+                $this->createPlayerRecord(),
+            ],
+        ];
+
+        $html = $this->view->render($records);
+
+        $this->assertStringContainsString('<h3 class="record-category__title">', $html);
+        $this->assertStringContainsString('Most Points in a Single Game</h3>', $html);
+    }
+
+    public function testRenderTeamRecordsHasSubsectionHeadings(): void
+    {
+        $records = $this->createMinimalRecords();
+        $records['teamGameRecords'] = [
+            'Most Points in a Single Game' => [
+                [
+                    'teamAbbr' => 'uta',
+                    'teamTid' => 13,
+                    'boxScoreUrl' => '',
+                    'dateDisplay' => 'November 30, 1999',
+                    'oppAbbr' => 'gsw',
+                    'oppTid' => 24,
+                    'amount' => '180',
+                ],
+            ],
+        ];
+        $records['teamSeasonRecords'] = [
+            'Best Season Record' => [
+                [
+                    'teamAbbr' => 'chi',
+                    'season' => '1992-93',
+                    'amount' => '71-11',
+                ],
+            ],
+        ];
+        $records['teamFranchise'] = [
+            'Most Playoff Appearances' => [
+                [
+                    'teamAbbr' => 'bkn',
+                    'amount' => '7',
+                    'years' => '1989, 1990, 1991',
+                ],
+            ],
+        ];
+
+        $html = $this->view->render($records);
+
+        $this->assertStringContainsString('Game Records</h4>', $html);
+        $this->assertStringContainsString('Season Records</h4>', $html);
+        $this->assertStringContainsString('Franchise Records</h4>', $html);
     }
 
     /**
@@ -338,6 +512,28 @@ final class RecordHoldersViewTest extends TestCase
             'teamGameRecords' => [],
             'teamSeasonRecords' => [],
             'teamFranchise' => [],
+        ];
+    }
+
+    /**
+     * Create a sample player record for testing.
+     *
+     * @return array{pid: int, name: string, teamAbbr: string, teamTid: int, teamYr: string, boxScoreUrl: string, dateDisplay: string, oppAbbr: string, oppTid: int, oppYr: string, amount: string}
+     */
+    private function createPlayerRecord(): array
+    {
+        return [
+            'pid' => 927,
+            'name' => 'Bob Pettit',
+            'teamAbbr' => 'min',
+            'teamTid' => 14,
+            'teamYr' => '1996',
+            'boxScoreUrl' => '',
+            'dateDisplay' => 'January 16, 1996',
+            'oppAbbr' => 'van',
+            'oppTid' => 20,
+            'oppYr' => '1996',
+            'amount' => '80',
         ];
     }
 }

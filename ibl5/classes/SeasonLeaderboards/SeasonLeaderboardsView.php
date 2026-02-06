@@ -6,6 +6,7 @@ namespace SeasonLeaderboards;
 
 use Player\PlayerImageHelper;
 use SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface;
+use UI\TeamCellHelper;
 use SeasonLeaderboards\Contracts\SeasonLeaderboardsServiceInterface;
 use SeasonLeaderboards\Contracts\SeasonLeaderboardsViewInterface;
 
@@ -178,32 +179,15 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     public function renderPlayerRow(array $stats, int $rank): string
     {
         $teamId = $stats['teamid'];
-        $teamName = htmlspecialchars($stats['teamname'], ENT_QUOTES | ENT_HTML5);
-        $color1 = htmlspecialchars($stats['color1'], ENT_QUOTES | ENT_HTML5);
-        $color2 = htmlspecialchars($stats['color2'], ENT_QUOTES | ENT_HTML5);
-
-        // Handle free agents (tid=0) gracefully
-        if ($teamId === 0) {
-            $teamCell = '<td>Free Agent</td>';
-        } else {
-            $teamCell = '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">
-        <a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';">
-            <img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-            <span class="ibl-team-cell__text">' . $teamName . '</span>
-        </a>
-    </td>';
-        }
+        $teamCell = TeamCellHelper::renderTeamCellOrFreeAgent($teamId, $stats['teamname'], $stats['color1'], $stats['color2']);
+        $playerCell = PlayerImageHelper::renderFlexiblePlayerCell($stats['pid'], $stats['name'], 'sticky-col-2');
 
         ob_start();
         ?>
 <tr data-team-id="<?= $teamId ?>">
     <td class="rank-cell sticky-col-1"><?= $rank ?>.</td>
     <td><?= $stats['year'] ?></td>
-    <?php
-    /** @var array{thumbnail: string, name: string} $resolved */
-    $resolved = PlayerImageHelper::resolvePlayerDisplay($stats['pid'], $stats['name']);
-    ?>
-    <td class="sticky-col-2 ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $stats['pid'] ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name'], ENT_QUOTES | ENT_HTML5) ?></a></td>
+    <?= $playerCell ?>
     <?= $teamCell ?>
     <td><?= $stats['games'] ?></td>
     <td><?= $stats['mpg'] ?></td>

@@ -6,6 +6,7 @@ namespace PlayerDatabase;
 
 use Player\PlayerImageHelper;
 use PlayerDatabase\Contracts\PlayerDatabaseViewInterface;
+use UI\TeamCellHelper;
 
 /**
  * @see PlayerDatabaseViewInterface
@@ -372,33 +373,22 @@ function resetPlayerDatabase() {
         ob_start();
 
         if ($retired === 1) {
-            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $playerName);
             ?>
 <tr>
     <td><?= htmlspecialchars($position) ?></td>
-    <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $pid ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
+    <?= PlayerImageHelper::renderFlexiblePlayerCell($pid, $playerName) ?>
     <td colspan="30"> --- Retired --- </td>
     <td><?= htmlspecialchars($college) ?></td>
 </tr>
             <?php
         } else {
-            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $playerName);
             $teamID = (int) $player->teamID;
             ?>
 <tr>
     <td><?= htmlspecialchars($position) ?></td>
-    <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $pid ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
+    <?= PlayerImageHelper::renderFlexiblePlayerCell($pid, $playerName) ?>
     <td><?= $player->age !== null ? (string) $player->age : '' ?></td>
-    <?php if ($player->teamColor1 !== null && $teamID > 0): ?>
-    <td class="ibl-team-cell--colored" style="background-color: #<?= \Utilities\HtmlSanitizer::safeHtmlOutput($player->teamColor1) ?>;">
-        <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamID ?>" class="ibl-team-cell__name" style="color: #<?= \Utilities\HtmlSanitizer::safeHtmlOutput($player->teamColor2 ?? '') ?>;">
-            <img src="images/logo/new<?= $teamID ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-            <span class="ibl-team-cell__text"><?= htmlspecialchars($player->teamName ?? '') ?></span>
-        </a>
-    </td>
-    <?php else: ?>
-    <td><?= htmlspecialchars($player->teamName ?? '') ?></td>
-    <?php endif; ?>
+    <?= TeamCellHelper::renderTeamCellOrFreeAgent($teamID, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000') ?>
     <td><?= (int) $player->yearsOfExperience ?></td>
     <td><?= (int) $player->birdYears ?></td>
     <td><?= (int) $player->ratingFieldGoalAttempts ?></td>

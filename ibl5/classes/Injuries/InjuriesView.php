@@ -7,6 +7,7 @@ namespace Injuries;
 use Injuries\Contracts\InjuriesViewInterface;
 use Player\PlayerImageHelper;
 use UI\Components\InjuryDaysLabel;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -105,36 +106,24 @@ class InjuriesView implements InjuriesViewInterface
      */
     private function renderPlayerRow(array $player): string
     {
-        // Sanitize all output for XSS protection
         $playerID = $player['playerID'];
         $teamID = $player['teamID'];
-        /** @var string $name */
-        $name = HtmlSanitizer::safeHtmlOutput($player['name']);
         /** @var string $position */
         $position = HtmlSanitizer::safeHtmlOutput($player['position']);
         $daysRemaining = $player['daysRemaining'];
         $returnDate = $player['returnDate'] ?? '';
-        /** @var string $teamName */
-        $teamName = HtmlSanitizer::safeHtmlOutput($player['teamName']);
-        /** @var string $color1 */
-        $color1 = HtmlSanitizer::safeHtmlOutput($player['teamColor1']);
-        /** @var string $color2 */
-        $color2 = HtmlSanitizer::safeHtmlOutput($player['teamColor2']);
-        $playerThumbnail = PlayerImageHelper::renderThumbnail($playerID);
         $renderedLabel = InjuryDaysLabel::render($daysRemaining, $returnDate);
         $daysLabel = $renderedLabel !== '' ? $renderedLabel : (string) $daysRemaining;
 
-        return "<tr data-team-id=\"{$teamID}\">
-    <td>{$position}</td>
-    <td class=\"ibl-player-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$playerID}\">{$playerThumbnail}{$name}</a></td>
-    <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
-        <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$teamID}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
-            <img src=\"images/logo/new{$teamID}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-            <span class=\"ibl-team-cell__text\">{$teamName}</span>
-        </a>
-    </td>
-    <td class=\"ibl-stat-highlight\">{$daysLabel}</td>
-</tr>";
+        $playerCell = PlayerImageHelper::renderFlexiblePlayerCell($playerID, $player['name']);
+        $teamCell = TeamCellHelper::renderTeamCell($teamID, $player['teamName'], $player['teamColor1'], $player['teamColor2']);
+
+        return "<tr data-team-id=\"{$teamID}\">"
+            . "<td>{$position}</td>"
+            . $playerCell
+            . $teamCell
+            . "<td class=\"ibl-stat-highlight\">{$daysLabel}</td>"
+            . '</tr>';
     }
 
     /**

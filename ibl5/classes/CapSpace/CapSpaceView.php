@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CapSpace;
 
 use CapSpace\Contracts\CapSpaceViewInterface;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -107,23 +108,11 @@ class CapSpaceView implements CapSpaceViewInterface
      */
     private function renderTeamRow(array $teamData): string
     {
-        /** @var string $color1 */
-        $color1 = HtmlSanitizer::safeHtmlOutput($teamData['color1']);
-        /** @var string $color2 */
-        $color2 = HtmlSanitizer::safeHtmlOutput($teamData['color2']);
-        /** @var string $teamName */
-        $teamName = HtmlSanitizer::safeHtmlOutput($teamData['teamName']);
         $teamId = $teamData['teamId'];
+        $contractsUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '&amp;display=contracts';
 
         $html = '<tr data-team-id="' . $teamId . '">';
-
-        // Team name cell with logo - sticky column
-        $html .= '<td class="ibl-team-cell--colored sticky-col" style="background-color: #' . $color1 . ';">';
-        $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '&amp;display=contracts" ';
-        $html .= 'class="ibl-team-cell__name" style="color: #' . $color2 . ';">';
-        $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">';
-        $html .= '<span class="ibl-team-cell__text">' . $teamName . '</span></a>';
-        $html .= '</td>';
+        $html .= TeamCellHelper::renderTeamCell($teamId, $teamData['teamName'], $teamData['color1'], $teamData['color2'], 'sticky-col', $contractsUrl);
 
         // Available salary columns
         $years = ['year1', 'year2', 'year3', 'year4', 'year5', 'year6'];

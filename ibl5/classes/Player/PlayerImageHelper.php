@@ -83,10 +83,37 @@ class PlayerImageHelper implements PlayerImageHelperInterface
         $starterClass = in_array($playerID, $starterPids, true) ? ' is-starter' : '';
         $thumbnail = str_contains($displayName, '|') ? '' : self::renderThumbnail($playerID);
 
-        return '<td class="sticky-col ibl-player-cell' . $starterClass . '" style="white-space: nowrap;">'
+        return '<td class="sticky-col ibl-player-cell' . $starterClass . '">'
             . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'
             . $thumbnail
             . $displayName
+            . '</a></td>';
+    }
+
+    /**
+     * @see PlayerImageHelperInterface::renderFlexiblePlayerCell()
+     */
+    public static function renderFlexiblePlayerCell(
+        int $playerID,
+        string $rawName,
+        string $extraClasses = '',
+        array $starterPids = [],
+    ): string {
+        $resolved = self::resolvePlayerDisplay($playerID, $rawName);
+        /** @var string $safeName */
+        $safeName = \Utilities\HtmlSanitizer::safeHtmlOutput($resolved['name']);
+
+        $starterClass = in_array($playerID, $starterPids, true) ? ' is-starter' : '';
+
+        $classes = 'ibl-player-cell' . $starterClass;
+        if ($extraClasses !== '') {
+            $classes .= ' ' . $extraClasses;
+        }
+
+        return '<td class="' . $classes . '">'
+            . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'
+            . $resolved['thumbnail']
+            . $safeName
             . '</a></td>';
     }
 

@@ -37,27 +37,27 @@ $result = $stmt->get_result();
 $tableRows = '';
 while ($row = $result->fetch_assoc()) {
     $teamId = (int) $row['teamid'];
-    $teamName = Utilities\HtmlSanitizer::safeHtmlOutput($row['team_name']);
-    $teamCity = Utilities\HtmlSanitizer::safeHtmlOutput($row['team_city']);
-    $color1 = Utilities\HtmlSanitizer::safeHtmlOutput($row['color1']);
-    $color2 = Utilities\HtmlSanitizer::safeHtmlOutput($row['color2']);
+    $teamDisplay = trim(($row['team_city'] ?? '') . ' ' . ($row['team_name'] ?? ''));
+    $color1 = $row['color1'] ?? '333333';
+    $color2 = $row['color2'] ?? 'FFFFFF';
+    /** @var string $depth */
     $depth = Utilities\HtmlSanitizer::safeHtmlOutput($row['depth']);
+    /** @var string $simDepth */
     $simDepth = Utilities\HtmlSanitizer::safeHtmlOutput($row['sim_depth']);
+    /** @var string $asgVote */
     $asgVote = Utilities\HtmlSanitizer::safeHtmlOutput($row['asg_vote']);
+    /** @var string $eoyVote */
     $eoyVote = Utilities\HtmlSanitizer::safeHtmlOutput($row['eoy_vote']);
 
-    $tableRows .= "<tr data-team-id=\"{$teamId}\">
-        <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
-            <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$teamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
-                <img src=\"images/logo/new{$teamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-                <span class=\"ibl-team-cell__text\">{$teamCity} {$teamName}</span>
-            </a>
-        </td>
-        <td>{$simDepth}</td>
-        <td>{$depth}</td>
-        <td>{$asgVote}</td>
-        <td>{$eoyVote}</td>
-    </tr>";
+    $teamCell = UI\TeamCellHelper::renderTeamCell($teamId, $teamDisplay, $color1, $color2);
+
+    $tableRows .= "<tr data-team-id=\"{$teamId}\">"
+        . $teamCell
+        . "<td>{$simDepth}</td>"
+        . "<td>{$depth}</td>"
+        . "<td>{$asgVote}</td>"
+        . "<td>{$eoyVote}</td>"
+        . '</tr>';
 }
 
 $stmt->close();

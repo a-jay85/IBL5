@@ -7,6 +7,7 @@ namespace Trading;
 use Trading\Contracts\TradingViewInterface;
 use Player\PlayerImageHelper;
 use UI\TableStyles;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -206,18 +207,10 @@ class TradingView implements TradingViewInterface
         $teamName = HtmlSanitizer::safeHtmlOutput($team['name']);
         /** @var string $fullName */
         $fullName = HtmlSanitizer::safeHtmlOutput($team['fullName']);
-        /** @var string $color1 */
-        $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
-        /** @var string $color2 */
-        $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
+        $partnerUrl = 'modules.php?name=Trading&amp;op=offertrade&amp;partner=' . $teamName;
         ?>
         <tr>
-            <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
-                <a href="modules.php?name=Trading&amp;op=offertrade&amp;partner=<?= $teamName ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
-                    <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-                    <span class="ibl-team-cell__text"><?= $fullName ?></span>
-                </a>
-            </td>
+            <?= TeamCellHelper::renderTeamCell($teamId, $team['fullName'], $team['color1'], $team['color2'], '', $partnerUrl) ?>
         </tr>
 <?php endforeach; ?>
     </tbody>

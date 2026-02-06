@@ -7,6 +7,7 @@ namespace FreeAgency;
 use FreeAgency\Contracts\FreeAgencyViewInterface;
 use Player\Player;
 use Player\PlayerImageHelper;
+use UI\TeamCellHelper;
 
 /**
  * @see FreeAgencyViewInterface
@@ -123,14 +124,8 @@ class FreeAgencyView implements FreeAgencyViewInterface
                 <?php endif; ?>
             </td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <?php $resolved = PlayerImageHelper::resolvePlayerDisplay($player->playerID ?? 0, $playerName); ?>
-            <td class="ibl-player-cell" style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?? 0 ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
-            <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
-                <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
-                    <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-                    <span class="ibl-team-cell__text"><?= $teamNameStr ?></span>
-                </a>
-            </td>
+            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $playerName) ?>
+            <?= TeamCellHelper::renderTeamCell($teamId, $team->name, $team->color1, $team->color2) ?>
             <td class="sep-team"></td>
             <td><?= $player->age ?? 0 ?></td>
             <?= $this->renderPlayerRatings($player) ?>
@@ -188,14 +183,8 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <tr>
             <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Negotiate</a></td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <?php $resolved = PlayerImageHelper::resolvePlayerDisplay($player->playerID ?? 0, $player->name ?? ''); ?>
-            <td class="ibl-player-cell" style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?? 0 ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
-            <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
-                <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
-                    <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-                    <span class="ibl-team-cell__text"><?= $teamNameStr ?></span>
-                </a>
-            </td>
+            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
+            <?= TeamCellHelper::renderTeamCell($teamId, $team->name, $team->color1, $team->color2) ?>
             <td class="sep-team"></td>
             <td><?= $player->age ?? 0 ?></td>
             <?= $this->renderPlayerRatings($player) ?>
@@ -263,7 +252,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             </td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?php $resolved = PlayerImageHelper::resolvePlayerDisplay($player->playerID ?? 0, $player->name ?? ''); ?>
-            <td class="ibl-player-cell" style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?? 0 ?>">
+            <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?? 0 ?>">
                 <?= $resolved['thumbnail'] ?>
                 <?php if (($player->birdYears ?? 0) >= 3): ?>
                     *<em><?= htmlspecialchars($resolved['name']) ?></em>*
@@ -271,12 +260,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
                     <?= htmlspecialchars($resolved['name']) ?>
                 <?php endif; ?>
             </a></td>
-            <td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
-                <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
-                    <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-                    <span class="ibl-team-cell__text"><?= $teamNameStr ?></span>
-                </a>
-            </td>
+            <?= TeamCellHelper::renderTeamCell($teamId, $team->name, $team->color1, $team->color2) ?>
             <td class="sep-team"></td>
             <td><?= $player->age ?? 0 ?></td>
             <?= $this->renderPlayerRatings($player) ?>
@@ -319,8 +303,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <tr>
             <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Negotiate</a></td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <?php $resolved = PlayerImageHelper::resolvePlayerDisplay($player->playerID ?? 0, $player->name ?? ''); ?>
-            <td class="ibl-player-cell" style="white-space: nowrap;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?? 0 ?>"><?= $resolved['thumbnail'] ?><?= htmlspecialchars($resolved['name']) ?></a></td>
+            <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
             <?= $this->renderTeamCell($player) ?>
             <td class="sep-team"></td>
             <td><?= $player->age ?? 0 ?></td>
@@ -443,27 +426,18 @@ class FreeAgencyView implements FreeAgencyViewInterface
     {
         $teamId = $player->teamID ?? 0;
 
-        // Free agents without a team
         if ($teamId === 0) {
             return '<td>Free Agent</td>';
         }
 
-        // Get team colors from database
         $teamColors = \Player\Views\TeamColorHelper::getTeamColors($this->mysqli_db, $teamId);
-        $color1 = htmlspecialchars($teamColors['color1'] ?? 'D4AF37');
-        $color2 = htmlspecialchars($teamColors['color2'] ?? '1e3a5f');
-        $teamName = htmlspecialchars($player->teamName ?? '');
 
-        ob_start();
-        ?>
-<td class="ibl-team-cell--colored" style="background-color: #<?= $color1 ?>;">
-    <a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId ?>" class="ibl-team-cell__name" style="color: #<?= $color2 ?>;">
-        <img src="images/logo/new<?= $teamId ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
-        <span class="ibl-team-cell__text"><?= $teamName ?></span>
-    </a>
-</td>
-        <?php
-        return (string) ob_get_clean();
+        return TeamCellHelper::renderTeamCellOrFreeAgent(
+            $teamId,
+            $player->teamName ?? '',
+            $teamColors['color1'] ?? 'D4AF37',
+            $teamColors['color2'] ?? '1e3a5f',
+        );
     }
 
     /**

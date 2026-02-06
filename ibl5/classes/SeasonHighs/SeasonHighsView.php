@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace SeasonHighs;
 
-use SeasonHighs\Contracts\SeasonHighsViewInterface;
-use SeasonHighs\Contracts\SeasonHighsServiceInterface;
 use Player\PlayerImageHelper;
+use SeasonHighs\Contracts\SeasonHighsServiceInterface;
+use SeasonHighs\Contracts\SeasonHighsViewInterface;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -118,23 +119,14 @@ class SeasonHighsView implements SeasonHighsViewInterface
                 // Build team cell for player stats
                 if ($isPlayerStats) {
                     $tid = $row['tid'] ?? 0;
-                    /** @var string $teamName */
-                    $teamName = HtmlSanitizer::safeHtmlOutput($row['teamname'] ?? '');
-                    /** @var string $color1 */
-                    $color1 = HtmlSanitizer::safeHtmlOutput($row['color1'] ?? 'FFFFFF');
-                    /** @var string $color2 */
-                    $color2 = HtmlSanitizer::safeHtmlOutput($row['color2'] ?? '000000');
-
-                    if ($tid === 0) {
-                        $teamCell = '<td>FA</td>';
-                    } else {
-                        $teamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
-        <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$tid}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
-            <img src=\"images/logo/new{$tid}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-            <span class=\"ibl-team-cell__text\">{$teamName}</span>
-        </a>
-    </td>";
-                    }
+                    $teamCell = TeamCellHelper::renderTeamCellOrFreeAgent(
+                        $tid,
+                        $row['teamname'] ?? '',
+                        $row['color1'] ?? 'FFFFFF',
+                        $row['color2'] ?? '000000',
+                        '',
+                        'FA',
+                    );
                 }
             } elseif (isset($row['teamid'])) {
                 // Style team names with colored cell for team stats
@@ -151,22 +143,14 @@ class SeasonHighsView implements SeasonHighsViewInterface
             // Render row differently for team stats (styled team cell) vs player stats
             if ($isTeamStat) {
                 $teamId = (int) ($row['teamid'] ?? 0);
-                /** @var string $color1 */
-                $color1 = HtmlSanitizer::safeHtmlOutput($row['color1'] ?? 'FFFFFF');
-                /** @var string $color2 */
-                $color2 = HtmlSanitizer::safeHtmlOutput($row['color2'] ?? '000000');
+                $teamStatCell = TeamCellHelper::renderTeamCell($teamId, $row['name'], $row['color1'] ?? 'FFFFFF', $row['color2'] ?? '000000');
 
-                $output .= "<tr data-team-id=\"{$teamId}\">
-    <td class=\"rank-cell\">{$rank}</td>
-    <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
-        <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$teamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
-            <img src=\"images/logo/new{$teamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-            <span class=\"ibl-team-cell__text\">{$name}</span>
-        </a>
-    </td>
-    <td class=\"date-cell\">{$date}</td>
-    <td class=\"value-cell\">{$value}</td>
-</tr>";
+                $output .= "<tr data-team-id=\"{$teamId}\">"
+                    . "<td class=\"rank-cell\">{$rank}</td>"
+                    . $teamStatCell
+                    . "<td class=\"date-cell\">{$date}</td>"
+                    . "<td class=\"value-cell\">{$value}</td>"
+                    . '</tr>';
             } else {
                 $output .= "<tr data-team-id=\"{$tid}\">
     <td class=\"rank-cell\">{$rank}</td>

@@ -114,7 +114,7 @@ final class CareerLeaderboardsViewTest extends TestCase
         $this->assertStringContainsString('>1<', $html);
         
         // Check that player link is created (& properly encoded as &amp; in HTML)
-        $this->assertStringContainsString('href="modules.php?name=Player&amp;pa=showpage&amp;pid=123"', $html);
+        $this->assertStringContainsString('href="./modules.php?name=Player&amp;pa=showpage&amp;pid=123"', $html);
         $this->assertStringContainsString('>Test Player<', $html);
         
         // Check that stats are displayed

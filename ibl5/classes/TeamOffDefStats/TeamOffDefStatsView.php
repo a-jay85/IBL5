@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace TeamOffDefStats;
 
 use TeamOffDefStats\Contracts\TeamOffDefStatsViewInterface;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -386,13 +387,10 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
         $teamId = (int) $team['teamid'];
         /** @var string $name */
         $name = HtmlSanitizer::safeHtmlOutput($team['team_name']);
-        /** @var string $color1 */
-        $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
-        /** @var string $color2 */
-        $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
+        /** @var string $safeLabel */
+        $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
+        $nameHtml = $name . ' ' . $safeLabel;
 
-        return '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">
-            <a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';"><img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text">' . $name . ' ' . $label . '</span></a>
-        </td>';
+        return TeamCellHelper::renderTeamCell($teamId, $team['team_name'], $team['color1'], $team['color2'], '', '', $nameHtml);
     }
 }

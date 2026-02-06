@@ -122,11 +122,7 @@ class AwardHistoryView implements AwardHistoryViewInterface
         $pid = (int)($award['pid'] ?? 0);
 
         if ($pid > 0) {
-            /** @var array{thumbnail: string, name: string} $resolved */
-            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $award['name'] ?? '');
-            /** @var string $resolvedName */
-            $resolvedName = HtmlSanitizer::safeHtmlOutput($resolved['name']);
-            $playerCell = '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $resolved['thumbnail'] . $resolvedName . '</a></td>';
+            $playerCell = PlayerImageHelper::renderFlexiblePlayerCell($pid, $award['name'] ?? '');
         } else {
             /** @var string $escapedName */
             $escapedName = HtmlSanitizer::safeHtmlOutput($award['name'] ?? '');

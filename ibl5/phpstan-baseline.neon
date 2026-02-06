@@ -841,12 +841,6 @@ parameters:
 			path: classes/Player/PlayerStats.php
 
 		-
-			rawMessage: 'Parameter #1 (mixed) of echo cannot be converted to string.'
-			identifier: echo.nonString
-			count: 2
-			path: classes/PlayerDatabase/PlayerDatabaseView.php
-
-		-
 			rawMessage: Cannot access offset mixed on mixed.
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 2

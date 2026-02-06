@@ -68,6 +68,25 @@ interface PlayerImageHelperInterface
     public static function renderPlayerCell(int $playerID, string $displayName, array $starterPids = []): string;
 
     /**
+     * Render a flexible player name table cell with photo thumbnail
+     *
+     * Like renderPlayerCell() but without hardcoded sticky-col or inline white-space.
+     * Callers specify their own extra CSS classes (or none).
+     *
+     * @param int $playerID The player's ID
+     * @param string $rawName The raw player name (may contain '|' for no-photo indicator)
+     * @param string $extraClasses Additional CSS classes (e.g. 'sticky-col', 'sticky-col-2')
+     * @param array<int> $starterPids Array of starter player IDs for highlighting
+     * @return string Complete <td> HTML element
+     */
+    public static function renderFlexiblePlayerCell(
+        int $playerID,
+        string $rawName,
+        string $extraClasses = '',
+        array $starterPids = [],
+    ): string;
+
+    /**
      * Resolve a player's display name and thumbnail, handling pipe-delimited names.
      *
      * Names containing '|' indicate the player should not show a photo thumbnail.

@@ -6,6 +6,7 @@ namespace ContractList;
 
 use ContractList\Contracts\ContractListViewInterface;
 use Player\PlayerImageHelper;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -82,13 +83,9 @@ class ContractListView implements ContractListViewInterface
 
         foreach ($contracts as $contract) {
             $pid = $contract['pid'];
-            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $contract['name']);
-            $playerThumbnail = $resolved['thumbnail'];
-            /** @var string $name */
-            $name = HtmlSanitizer::safeHtmlOutput($resolved['name']);
+            $tid = $contract['tid'];
             /** @var string $pos */
             $pos = HtmlSanitizer::safeHtmlOutput($contract['pos']);
-            $tid = $contract['tid'];
             /** @var string $bird */
             $bird = HtmlSanitizer::safeHtmlOutput($contract['bird']);
             $con1 = $contract['con1'];
@@ -98,38 +95,21 @@ class ContractListView implements ContractListViewInterface
             $con5 = $contract['con5'];
             $con6 = $contract['con6'];
 
-            // Team cell styling
-            /** @var string $teamName */
-            $teamName = HtmlSanitizer::safeHtmlOutput($contract['teamname']);
-            /** @var string $color1 */
-            $color1 = HtmlSanitizer::safeHtmlOutput($contract['color1']);
-            /** @var string $color2 */
-            $color2 = HtmlSanitizer::safeHtmlOutput($contract['color2']);
+            $playerCell = PlayerImageHelper::renderFlexiblePlayerCell($pid, $contract['name'], 'sticky-col');
+            $teamCell = TeamCellHelper::renderTeamCellOrFreeAgent($tid, $contract['teamname'], $contract['color1'], $contract['color2']);
 
-            // Handle free agents (tid=0) gracefully
-            if ($tid === 0) {
-                $teamCell = '<td>Free Agent</td>';
-            } else {
-                $teamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
-        <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$tid}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
-            <img src=\"images/logo/new{$tid}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-            <span class=\"ibl-team-cell__text\">{$teamName}</span>
-        </a>
-    </td>";
-            }
-
-            $output .= "<tr data-team-id=\"{$tid}\">
-    <td class=\"sticky-col ibl-player-cell\" style=\"white-space: nowrap;\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a></td>
-    <td>{$pos}</td>
-    {$teamCell}
-    <td>{$bird}</td>
-    <td>{$con1}</td>
-    <td>{$con2}</td>
-    <td>{$con3}</td>
-    <td>{$con4}</td>
-    <td>{$con5}</td>
-    <td>{$con6}</td>
-</tr>";
+            $output .= "<tr data-team-id=\"{$tid}\">"
+                . $playerCell
+                . "<td>{$pos}</td>"
+                . $teamCell
+                . "<td>{$bird}</td>"
+                . "<td>{$con1}</td>"
+                . "<td>{$con2}</td>"
+                . "<td>{$con3}</td>"
+                . "<td>{$con4}</td>"
+                . "<td>{$con5}</td>"
+                . "<td>{$con6}</td>"
+                . '</tr>';
         }
 
         return $output;

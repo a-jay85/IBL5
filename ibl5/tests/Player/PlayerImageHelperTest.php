@@ -255,4 +255,60 @@ class PlayerImageHelperTest extends TestCase
 
         $this->assertStringNotContainsString('is-starter', $result);
     }
+
+    public function testRenderFlexiblePlayerCellBasic(): void
+    {
+        $result = PlayerImageHelper::renderFlexiblePlayerCell(123, 'John Smith');
+
+        $this->assertStringContainsString('class="ibl-player-cell"', $result);
+        $this->assertStringContainsString('pid=123', $result);
+        $this->assertStringContainsString('John Smith', $result);
+        $this->assertStringContainsString('<img', $result);
+        $this->assertStringNotContainsString('sticky-col', $result);
+        $this->assertStringNotContainsString('white-space', $result);
+    }
+
+    public function testRenderFlexiblePlayerCellWithExtraClasses(): void
+    {
+        $result = PlayerImageHelper::renderFlexiblePlayerCell(123, 'John Smith', 'sticky-col');
+
+        $this->assertStringContainsString('class="ibl-player-cell sticky-col"', $result);
+    }
+
+    public function testRenderFlexiblePlayerCellWithStickyCol2(): void
+    {
+        $result = PlayerImageHelper::renderFlexiblePlayerCell(123, 'John Smith', 'sticky-col-2');
+
+        $this->assertStringContainsString('class="ibl-player-cell sticky-col-2"', $result);
+    }
+
+    public function testRenderFlexiblePlayerCellWithStarterHighlight(): void
+    {
+        $result = PlayerImageHelper::renderFlexiblePlayerCell(123, 'John Smith', '', [123, 456]);
+
+        $this->assertStringContainsString('is-starter', $result);
+    }
+
+    public function testRenderFlexiblePlayerCellWithoutStarterHighlight(): void
+    {
+        $result = PlayerImageHelper::renderFlexiblePlayerCell(123, 'John Smith', '', [456, 789]);
+
+        $this->assertStringNotContainsString('is-starter', $result);
+    }
+
+    public function testRenderFlexiblePlayerCellSkipsThumbnailForPipeName(): void
+    {
+        $result = PlayerImageHelper::renderFlexiblePlayerCell(0, '|Cash');
+
+        $this->assertStringNotContainsString('<img', $result);
+        $this->assertStringContainsString('Cash', $result);
+    }
+
+    public function testRenderFlexiblePlayerCellEscapesName(): void
+    {
+        $result = PlayerImageHelper::renderFlexiblePlayerCell(123, '<script>alert(1)</script>');
+
+        $this->assertStringNotContainsString('<script>', $result);
+        $this->assertStringContainsString('&lt;script&gt;', $result);
+    }
 }

@@ -6,6 +6,7 @@ namespace Standings;
 
 use Standings\Contracts\StandingsRepositoryInterface;
 use Standings\Contracts\StandingsViewInterface;
+use UI\TeamCellHelper;
 
 /**
  * StandingsView - HTML rendering for team standings
@@ -155,10 +156,6 @@ class StandingsView implements StandingsViewInterface
     {
         $teamId = $team['tid'];
         $teamName = $this->formatTeamName($team);
-        /** @var string $color1 */
-        $color1 = \Utilities\HtmlSanitizer::safeHtmlOutput($team['color1']);
-        /** @var string $color2 */
-        $color2 = \Utilities\HtmlSanitizer::safeHtmlOutput($team['color2']);
         $streakData = $this->repository->getTeamStreakData($teamId);
 
         $lastWin = $streakData['last_win'] ?? 0;
@@ -193,7 +190,7 @@ class StandingsView implements StandingsViewInterface
         ob_start();
         ?>
         <tr data-team-id="<?= $teamId; ?>">
-            <td class="sticky-col ibl-team-cell--colored" style="background-color: #<?= $color1; ?>;"><a href="modules.php?name=Team&amp;op=team&amp;teamID=<?= $teamId; ?>" class="ibl-team-cell__name" style="color: #<?= $color2; ?>;"><img src="images/logo/new<?= $teamId; ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy"><span class="ibl-team-cell__text"><?= $teamName; ?></span></a></td>
+            <?= TeamCellHelper::renderTeamCell($teamId, $team['team_name'], $team['color1'], $team['color2'], 'sticky-col', '', $teamName) ?>
             <td><?= $leagueRecord; ?></td>
             <td><?= $pct; ?></td>
             <td><?= $pythagoreanPct; ?></td>

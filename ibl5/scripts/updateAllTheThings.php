@@ -94,6 +94,10 @@ try {
     $cachedService->invalidateCache();
     echo "<p>✓ Record Holders cache invalidated</p>";
 
+    // Pre-warm the cache so the first visitor doesn't trigger a cold rebuild
+    $records = $cachedService->getAllRecords();
+    echo "<p>✓ Record Holders cache rebuilt (" . count($records) . " sections)</p>";
+
     echo '<p><b>All the things have been updated!</b></p>';
 
 } catch (Exception $e) {

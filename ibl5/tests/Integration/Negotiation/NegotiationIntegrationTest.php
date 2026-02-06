@@ -79,8 +79,8 @@ class NegotiationIntegrationTest extends IntegrationTestCase
         // Assert - Should include cap space in form
         $this->assertStringContainsString('Test Player', $result);
         
-        // Verify cap space query was executed (queries for salary columns and retired players)
-        $this->assertQueryExecuted("retired = '0'");
+        // Verify cap space query was executed (queries vw_current_salary view)
+        $this->assertQueryExecuted("vw_current_salary");
     }
 
     // ========== VALIDATION FAILURE SCENARIOS ==========

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Team;
 
+use BasketballStats\StatsFormatter;
 use Team\Contracts\TeamComponentsViewInterface;
 use Team\Contracts\TeamRepositoryInterface;
 
@@ -70,14 +71,7 @@ class TeamComponentsView implements TeamComponentsViewInterface
                     $ibl_banner .= "</tr></td></table></tr>";
                 }
 
-                if ($champ_text === "") {
-                    $champ_text = (string) $banneryear;
-                } else {
-                    $champ_text .= ", $banneryear";
-                }
-                if ($bannername !== $teamName) {
-                    $champ_text .= " (as $bannername)";
-                }
+                $champ_text = $this->appendBannerYear($champ_text, $banneryear, $bannername, $teamName);
             } elseif ($bannertype === 2 || $bannertype === 3) {
                 if ($conference_titles % 5 === 0) {
                     $conf_banner .= "<tr><td align=\"center\"><table><tr>";
@@ -98,14 +92,7 @@ class TeamComponentsView implements TeamComponentsViewInterface
                     $conf_banner .= "</tr></table></td></tr>";
                 }
 
-                if ($conf_text === "") {
-                    $conf_text = (string) $banneryear;
-                } else {
-                    $conf_text .= ", $banneryear";
-                }
-                if ($bannername !== $teamName) {
-                    $conf_text .= " (as $bannername)";
-                }
+                $conf_text = $this->appendBannerYear($conf_text, $banneryear, $bannername, $teamName);
             } elseif ($bannertype >= 4 && $bannertype <= 7) {
                 if ($division_titles % 5 === 0) {
                     $div_banner .= "<tr><td align=\"center\"><table><tr>";
@@ -129,14 +116,7 @@ class TeamComponentsView implements TeamComponentsViewInterface
                     $div_banner .= "</tr></table></td></tr>";
                 }
 
-                if ($div_text === "") {
-                    $div_text = (string) $banneryear;
-                } else {
-                    $div_text .= ", $banneryear";
-                }
-                if ($bannername !== $teamName) {
-                    $div_text .= " (as $bannername)";
-                }
+                $div_text = $this->appendBannerYear($div_text, $banneryear, $bannername, $teamName);
             }
         }
 
@@ -335,27 +315,7 @@ class TeamComponentsView implements TeamComponentsViewInterface
     public function gmHistory(object $team): string
     {
         /** @var \Team $team */
-        $gmHistory = $this->repository->getGMHistory($team->ownerName, $team->name);
-
-        if ($gmHistory === []) {
-            return '';
-        }
-
-        $output = '<ul class="team-awards-list">';
-
-        foreach ($gmHistory as $record) {
-            /** @var string $year */
-            $year = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($record['year']));
-            $rawAward = preg_replace('/<br\s*\/?>/i', "\n", $record['Award']) ?? $record['Award'];
-            /** @var string $sanitizedAward */
-            $sanitizedAward = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($rawAward));
-            $award = nl2br($sanitizedAward);
-            $output .= "<li><span class=\"award-year\">$year</span> $award</li>";
-        }
-
-        $output .= '</ul>';
-
-        return $output;
+        return $this->renderAwardsList($this->repository->getGMHistory($team->ownerName, $team->name));
     }
 
     /**
@@ -365,54 +325,17 @@ class TeamComponentsView implements TeamComponentsViewInterface
     {
         /** @var \Team $team */
         $heatHistory = $this->repository->getHEATHistory($team->name);
-        $wintot = 0;
-        $lostot = 0;
 
-        // Find the best record by win percentage (most wins as tiebreaker)
-        $bestPct = -1.0;
-        $bestWins = -1;
-        $bestIndex = -1;
-        foreach ($heatHistory as $index => $record) {
-            $w = $record['wins'];
-            $l = $record['losses'];
-            $total = $w + $l;
-            if ($total > 0) {
-                $pct = $w / $total;
-                if ($pct > $bestPct) {
-                    $bestPct = $pct;
-                    $bestWins = $w;
-                    $bestIndex = $index;
-                } elseif ($pct === $bestPct && $w > $bestWins) {
-                    $bestWins = $w;
-                    $bestIndex = $index;
-                }
-            }
-        }
-
-        $output = '<ul class="team-history-list">';
-
-        foreach ($heatHistory as $index => $record) {
-            $yearwl = $record['year'];
-            /** @var string $namewl */
-            $namewl = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
-            $wins = $record['wins'];
-            $losses = $record['losses'];
-            $wintot += $wins;
-            $lostot += $losses;
-            $winpct = ($wins + $losses > 0) ? number_format($wins / ($wins + $losses), 3) : "0.000";
-            $teamID = $team->teamID;
-            $isBest = ($index === $bestIndex);
-            $boldOpen = $isBest ? '<strong>' : '';
-            $boldClose = $isBest ? '</strong>' : '';
-            $output .= "<li>{$boldOpen}<a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$yearwl\">$yearwl $namewl</a> <span class=\"record\">$wins-$losses ($winpct)</span>{$boldClose}</li>";
-        }
-
-        $output .= '</ul>';
-
-        $wlpct = ($wintot + $lostot > 0) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
-        $output .= "<div class=\"team-card__footer\">Totals: $wintot-$lostot ($wlpct)</div>";
-
-        return $output;
+        return $this->renderWinLossHistory(
+            $heatHistory,
+            $team->teamID,
+            static function (array $record): string {
+                $year = (int) $record['year'];
+                /** @var string $name */
+                $name = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
+                return $year . ' ' . $name;
+            },
+        );
     }
 
     /**
@@ -486,8 +409,8 @@ class TeamComponentsView implements TeamComponentsViewInterface
             }
             $totalSeriesW += $r['series_w'];
             $totalSeriesL += $r['series_l'];
-            $gamePct = ($r['wins'] + $r['losses'] > 0) ? number_format($r['wins'] / ($r['wins'] + $r['losses']), 3) : "0.000";
-            $seriesPct = ($r['series_w'] + $r['series_l'] > 0) ? number_format($r['series_w'] / ($r['series_w'] + $r['series_l']), 3) : "0.000";
+            $gamePct = StatsFormatter::formatPercentage($r['wins'], $r['wins'] + $r['losses']);
+            $seriesPct = StatsFormatter::formatPercentage($r['series_w'], $r['series_w'] + $r['series_l']);
             $roundName = $r['name'];
 
             $output .= "<div class=\"team-card__body\" style=\"padding-bottom: 0;\">"
@@ -499,10 +422,8 @@ class TeamComponentsView implements TeamComponentsViewInterface
                 . "<div class=\"team-card__footer\">Games: {$r['wins']}-{$r['losses']} ($gamePct) &middot; Series: {$r['series_w']}-{$r['series_l']} ($seriesPct)</div>";
         }
 
-        $pwlpct = ($totalplayoffwins + $totalplayofflosses > 0)
-            ? number_format($totalplayoffwins / ($totalplayoffwins + $totalplayofflosses), 3) : "0.000";
-        $swlpct = ($totalSeriesW + $totalSeriesL > 0)
-            ? number_format($totalSeriesW / ($totalSeriesW + $totalSeriesL), 3) : "0.000";
+        $pwlpct = StatsFormatter::formatPercentage($totalplayoffwins, $totalplayoffwins + $totalplayofflosses);
+        $swlpct = StatsFormatter::formatPercentage($totalSeriesW, $totalSeriesW + $totalSeriesL);
 
         $output .= "<div class=\"team-card__footer\" style=\"font-weight: 700;\">Post-Season: $totalplayoffwins-$totalplayofflosses ($pwlpct) &middot; Series: $totalSeriesW-$totalSeriesL ($swlpct)</div>";
 
@@ -516,6 +437,81 @@ class TeamComponentsView implements TeamComponentsViewInterface
     {
         /** @var \Team $team */
         $regularSeasonHistory = $this->repository->getRegularSeasonHistory($team->name);
+
+        return $this->renderWinLossHistory(
+            $regularSeasonHistory,
+            $team->teamID,
+            static function (array $record): string {
+                $yearwl = (string) $record['year'];
+                $prevYear = (int) $yearwl - 1;
+                /** @var string $name */
+                $name = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
+                return $prevYear . '-' . $yearwl . ' ' . $name;
+            },
+        );
+    }
+
+    /**
+     * @see TeamComponentsViewInterface::teamAccomplishments()
+     */
+    public function teamAccomplishments(object $team): string
+    {
+        /** @var \Team $team */
+        return $this->renderAwardsList($this->repository->getTeamAccomplishments($team->name));
+    }
+
+    /**
+     * Append a banner year to the accumulating text, noting the franchise name if different.
+     */
+    private function appendBannerYear(string $text, int|string $year, string $bannerName, string $currentName): string
+    {
+        if ($text === '') {
+            $text = (string) $year;
+        } else {
+            $text .= ", $year";
+        }
+        if ($bannerName !== $currentName) {
+            $text .= " (as $bannerName)";
+        }
+        return $text;
+    }
+
+    /**
+     * Render a list of awards/accomplishments from year+Award rows.
+     *
+     * @param list<array{year: string, Award: string}> $awards
+     */
+    private function renderAwardsList(array $awards): string
+    {
+        if ($awards === []) {
+            return '';
+        }
+
+        $output = '<ul class="team-awards-list">';
+
+        foreach ($awards as $record) {
+            /** @var string $year */
+            $year = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($record['year']));
+            $rawAward = preg_replace('/<br\s*\/?>/i', "\n", $record['Award']) ?? $record['Award'];
+            /** @var string $sanitizedAward */
+            $sanitizedAward = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($rawAward));
+            $award = nl2br($sanitizedAward);
+            $output .= "<li><span class=\"award-year\">$year</span> $award</li>";
+        }
+
+        $output .= '</ul>';
+
+        return $output;
+    }
+
+    /**
+     * Render a win/loss history list with best-record bolding and totals footer.
+     *
+     * @param list<array{year: string|int, namethatyear: string, wins: string|int, losses: string|int}> $history
+     * @param \Closure(array{year: string|int, namethatyear: string, wins: string|int, losses: string|int}): string $formatLabel
+     */
+    private function renderWinLossHistory(array $history, int $teamID, \Closure $formatLabel): string
+    {
         $wintot = 0;
         $lostot = 0;
 
@@ -523,7 +519,7 @@ class TeamComponentsView implements TeamComponentsViewInterface
         $bestPct = -1.0;
         $bestWins = -1;
         $bestIndex = -1;
-        foreach ($regularSeasonHistory as $index => $record) {
+        foreach ($history as $index => $record) {
             $w = (int) $record['wins'];
             $l = (int) $record['losses'];
             $total = $w + $l;
@@ -542,57 +538,24 @@ class TeamComponentsView implements TeamComponentsViewInterface
 
         $output = '<ul class="team-history-list">';
 
-        foreach ($regularSeasonHistory as $index => $record) {
+        foreach ($history as $index => $record) {
             $yearwl = $record['year'];
-            $yearwlInt = (int) $yearwl;
-            /** @var string $namewl */
-            $namewl = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
             $wins = (int) $record['wins'];
             $losses = (int) $record['losses'];
             $wintot += $wins;
             $lostot += $losses;
-            $winpct = ($wins + $losses > 0) ? number_format($wins / ($wins + $losses), 3) : "0.000";
-            $teamID = $team->teamID;
-            $prevYear = $yearwlInt - 1;
+            $winpct = StatsFormatter::formatPercentage($wins, $wins + $losses);
+            $label = $formatLabel($record);
             $isBest = ($index === $bestIndex);
             $boldOpen = $isBest ? '<strong>' : '';
             $boldClose = $isBest ? '</strong>' : '';
-            $output .= "<li>{$boldOpen}<a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$yearwl\">$prevYear-$yearwl $namewl</a> <span class=\"record\">$wins-$losses ($winpct)</span>{$boldClose}</li>";
+            $output .= "<li>{$boldOpen}<a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$yearwl\">$label</a> <span class=\"record\">$wins-$losses ($winpct)</span>{$boldClose}</li>";
         }
 
         $output .= '</ul>';
 
-        $wlpct = ($wintot + $lostot > 0) ? number_format($wintot / ($wintot + $lostot), 3) : "0.000";
+        $wlpct = StatsFormatter::formatPercentage($wintot, $wintot + $lostot);
         $output .= "<div class=\"team-card__footer\">Totals: $wintot-$lostot ($wlpct)</div>";
-
-        return $output;
-    }
-
-    /**
-     * @see TeamComponentsViewInterface::teamAccomplishments()
-     */
-    public function teamAccomplishments(object $team): string
-    {
-        /** @var \Team $team */
-        $teamAccomplishments = $this->repository->getTeamAccomplishments($team->name);
-
-        if ($teamAccomplishments === []) {
-            return '';
-        }
-
-        $output = '<ul class="team-awards-list">';
-
-        foreach ($teamAccomplishments as $record) {
-            /** @var string $year */
-            $year = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($record['year']));
-            $rawAward = preg_replace('/<br\s*\/?>/i', "\n", $record['Award']) ?? $record['Award'];
-            /** @var string $sanitizedAward */
-            $sanitizedAward = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($rawAward));
-            $award = nl2br($sanitizedAward);
-            $output .= "<li><span class=\"award-year\">$year</span> $award</li>";
-        }
-
-        $output .= '</ul>';
 
         return $output;
     }

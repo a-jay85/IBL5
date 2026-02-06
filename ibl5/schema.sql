@@ -135,7 +135,6 @@ CREATE TABLE `ibl_box_scores` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `uuid` char(36) NOT NULL,
   UNIQUE KEY `uuid` (`uuid`),
-  UNIQUE KEY `idx_uuid` (`uuid`),
   KEY `idx_date` (`Date`),
   KEY `idx_pid` (`pid`),
   KEY `idx_visitor_tid` (`visitorTID`),

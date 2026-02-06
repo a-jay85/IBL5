@@ -118,60 +118,6 @@ try {
     echo "<p>✓ Extension attempts reset</p>";
     flush();
 
-    // Show a loading spinner before the slow RecordHolders queries
-    echo <<<'HTML'
-<style>
-@keyframes spin { to { transform: rotate(360deg); } }
-.update-spinner {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    border: 3px solid #ccc;
-    border-top-color: #333;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    vertical-align: middle;
-    margin-right: 8px;
-}
-</style>
-<div id="record-spinner"><p><span class="update-spinner"></span>Rebuilding Record Holders cache…</p></div>
-HTML;
-    flush();
-
-    // Check for broken all-time records
-    $recordHoldersRepository = new \RecordHolders\RecordHoldersRepository($mysqli_db);
-    $recordDetector = new \RecordHolders\RecordBreakingDetector($recordHoldersRepository);
-    $latestGameDate = $season->getLastBoxScoreDate();
-    if ($latestGameDate !== '') {
-        $brokenRecords = $recordDetector->detectAndAnnounce($latestGameDate);
-        if ($brokenRecords !== []) {
-            echo "<p>✓ " . count($brokenRecords) . " record(s) broken!</p>";
-            foreach ($brokenRecords as $record) {
-                echo "<p>" . htmlspecialchars($record) . "</p>";
-            }
-        } else {
-            echo "<p>✓ No records broken</p>";
-        }
-    } else {
-        echo "<p>✓ No box score data to check</p>";
-    }
-    flush();
-
-    // Invalidate the RecordHolders page cache so next visit sees fresh data
-    $innerService = new \RecordHolders\RecordHoldersService($recordHoldersRepository);
-    $cachedService = new \RecordHolders\CachedRecordHoldersService($innerService, $mysqli_db);
-    $cachedService->invalidateCache();
-    echo "<p>✓ Record Holders cache invalidated</p>";
-    flush();
-
-    // Pre-warm the cache so the first visitor doesn't trigger a cold rebuild
-    $records = $cachedService->getAllRecords();
-
-    // Hide the spinner now that the rebuild is complete
-    echo '<script>document.getElementById("record-spinner").style.display="none";</script>';
-    echo "<p>✓ Record Holders cache rebuilt (" . count($records) . " sections)</p>";
-    flush();
-
     echo '<p><b>All the things have been updated!</b></p>';
     flush();
 

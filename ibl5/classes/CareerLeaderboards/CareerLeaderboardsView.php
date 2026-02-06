@@ -127,17 +127,13 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
     {
         $pid = $stats['pid'];
         $name = $stats['name'];
-        $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $name);
-        /** @var string $resolvedName */
-        $resolvedName = $resolved['name'];
-        /** @var string $resolvedThumbnail */
-        $resolvedThumbnail = $resolved['thumbnail'];
+        $playerCell = PlayerImageHelper::renderFlexiblePlayerCell($pid, $name, 'sticky-col-2');
 
         ob_start();
         ?>
 <tr>
     <td class="rank-cell sticky-col-1"><?= $rank ?></td>
-    <td class="sticky-col-2 ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $pid ?>"><?= $resolvedThumbnail ?><?= htmlspecialchars($resolvedName) ?></a></td>
+    <?= $playerCell ?>
     <td><?= htmlspecialchars((string) $stats['games']) ?></td>
     <td><?= htmlspecialchars($stats['minutes']) ?></td>
     <td><?= htmlspecialchars($stats['fgm']) ?></td>

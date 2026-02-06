@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DraftPickLocator;
 
 use DraftPickLocator\Contracts\DraftPickLocatorViewInterface;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -131,22 +132,9 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
     private function renderTeamRow(array $team, array $teamColorMap): string
     {
         $teamId = $team['teamId'];
-        /** @var string $color1 */
-        $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
-        /** @var string $color2 */
-        $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
-        /** @var string $teamName */
-        $teamName = HtmlSanitizer::safeHtmlOutput($team['teamName']);
 
         $html = '<tr data-team-id="' . $teamId . '">';
-
-        // Team name cell with team colors and logo - sticky column
-        $html .= '<td class="ibl-team-cell--colored sticky-col" style="background-color: #' . $color1 . ';">';
-        $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" ';
-        $html .= 'class="ibl-team-cell__name" style="color: #' . $color2 . ';">';
-        $html .= '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">';
-        $html .= '<span class="ibl-team-cell__text">' . $teamName . '</span></a>';
-        $html .= '</td>';
+        $html .= TeamCellHelper::renderTeamCell($teamId, $team['teamName'], $team['color1'], $team['color2'], 'sticky-col');
 
         // Pick cells - color traded picks with owning team's colors
         foreach ($team['picks'] as $pick) {

@@ -6,6 +6,7 @@ namespace ComparePlayers;
 
 use ComparePlayers\Contracts\ComparePlayersViewInterface;
 use Player\PlayerImageHelper;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -122,15 +123,10 @@ class ComparePlayersView implements ComparePlayersViewInterface
         $name = $player['name'];
         /** @var string $posSafe */
         $posSafe = HtmlSanitizer::safeHtmlOutput($player['pos']);
-        /** @var array{name: string, thumbnail: string} $resolved */
-        $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $name);
-        /** @var string $resolvedNameSafe */
-        $resolvedNameSafe = HtmlSanitizer::safeHtmlOutput($resolved['name']);
-
         $output = '<tr>';
         $output .= '<td>' . $posSafe . '</td>';
-        $output .= '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $resolved['thumbnail'] . $resolvedNameSafe . '</a></td>';
-        $output .= $this->renderTeamCell($player);
+        $output .= PlayerImageHelper::renderFlexiblePlayerCell($pid, $name);
+        $output .= TeamCellHelper::renderTeamCellOrFreeAgent($player['tid'], $player['teamname'] ?? '', $player['color1'] ?? 'FFFFFF', $player['color2'] ?? '000000');
         $output .= '<td>' . (int)$player['age'] . '</td>';
         $output .= '<td>' . (int)$player['r_fga'] . '</td>';
         $output .= '<td>' . (int)$player['r_fgp'] . '</td>';
@@ -208,15 +204,10 @@ class ComparePlayersView implements ComparePlayersViewInterface
 
         /** @var string $posSafe */
         $posSafe = HtmlSanitizer::safeHtmlOutput($player['pos']);
-        /** @var array{name: string, thumbnail: string} $resolved */
-        $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $name);
-        /** @var string $resolvedNameSafe */
-        $resolvedNameSafe = HtmlSanitizer::safeHtmlOutput($resolved['name']);
-
         $output = '<tr>';
         $output .= '<td>' . $posSafe . '</td>';
-        $output .= '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $resolved['thumbnail'] . $resolvedNameSafe . '</a></td>';
-        $output .= $this->renderTeamCell($player);
+        $output .= PlayerImageHelper::renderFlexiblePlayerCell($pid, $name);
+        $output .= TeamCellHelper::renderTeamCellOrFreeAgent($player['tid'], $player['teamname'] ?? '', $player['color1'] ?? 'FFFFFF', $player['color2'] ?? '000000');
         $output .= '<td>' . (int)$player['stats_gm'] . '</td>';
         $output .= '<td>' . (int)$player['stats_gs'] . '</td>';
         $output .= '<td>' . (int)$player['stats_min'] . '</td>';
@@ -285,15 +276,10 @@ class ComparePlayersView implements ComparePlayersViewInterface
 
         /** @var string $posSafe */
         $posSafe = HtmlSanitizer::safeHtmlOutput($player['pos']);
-        /** @var array{name: string, thumbnail: string} $resolved */
-        $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $name);
-        /** @var string $resolvedNameSafe */
-        $resolvedNameSafe = HtmlSanitizer::safeHtmlOutput($resolved['name']);
-
         $output = '<tr>';
         $output .= '<td>' . $posSafe . '</td>';
-        $output .= '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $resolved['thumbnail'] . $resolvedNameSafe . '</a></td>';
-        $output .= $this->renderTeamCell($player);
+        $output .= PlayerImageHelper::renderFlexiblePlayerCell($pid, $name);
+        $output .= TeamCellHelper::renderTeamCellOrFreeAgent($player['tid'], $player['teamname'] ?? '', $player['color1'] ?? 'FFFFFF', $player['color2'] ?? '000000');
         $output .= '<td>' . (int)$player['car_gm'] . '</td>';
         $output .= '<td>' . (int)$player['car_min'] . '</td>';
         $output .= '<td>' . (int)$player['car_fgm'] . '</td>';
@@ -316,29 +302,4 @@ class ComparePlayersView implements ComparePlayersViewInterface
         return $output;
     }
 
-    /**
-     * Render a team cell with team colors and logo.
-     *
-     * @param ComparePlayerRow $player
-     */
-    private function renderTeamCell(array $player): string
-    {
-        $tid = $player['tid'];
-        /** @var string $teamName */
-        $teamName = HtmlSanitizer::safeHtmlOutput($player['teamname'] ?? '');
-        /** @var string $color1 */
-        $color1 = HtmlSanitizer::safeHtmlOutput($player['color1'] ?? 'FFFFFF');
-        /** @var string $color2 */
-        $color2 = HtmlSanitizer::safeHtmlOutput($player['color2'] ?? '000000');
-
-        if ($tid === 0) {
-            return '<td>Free Agent</td>';
-        }
-
-        return '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">'
-            . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $tid . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';">'
-            . '<img src="images/logo/new' . $tid . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">'
-            . '<span class="ibl-team-cell__text">' . $teamName . '</span>'
-            . '</a></td>';
-    }
 }

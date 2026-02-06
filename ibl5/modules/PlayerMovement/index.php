@@ -16,6 +16,7 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
 use Player\PlayerImageHelper;
+use UI\TeamCellHelper;
 
 global $mysqli_db;
 $season = new Season($mysqli_db);
@@ -71,54 +72,30 @@ echo '<h2 class="ibl-title">Player Movement</h2>
 
 while ($row = $result->fetch_assoc()) {
     $pid = (int) $row['pid'];
-    $playerName = Utilities\HtmlSanitizer::safeHtmlOutput($row['name']);
-    $playerThumbnail = PlayerImageHelper::renderThumbnail($pid);
-
-    // New team data
-    $newTeamId = (int) $row['new_teamid'];
-    $newTeam = Utilities\HtmlSanitizer::safeHtmlOutput($row['new_team']);
-    $newCity = Utilities\HtmlSanitizer::safeHtmlOutput($row['new_city'] ?? '');
-    $newColor1 = $row['new_color1'] ?? '333333';
-    $newColor2 = $row['new_color2'] ?? 'FFFFFF';
 
     // Old team data
     $oldTeamId = (int) $row['old_teamid'];
-    $oldTeam = Utilities\HtmlSanitizer::safeHtmlOutput($row['old_team']);
-    $oldCity = Utilities\HtmlSanitizer::safeHtmlOutput($row['old_city'] ?? '');
+    $oldTeamDisplay = trim(($row['old_city'] ?? '') . ' ' . ($row['old_team'] ?? ''));
     $oldColor1 = $row['old_color1'] ?? '333333';
     $oldColor2 = $row['old_color2'] ?? 'FFFFFF';
 
-    // Build team cells - free agents get plain text instead of logo
-    if ($oldTeamId === 0) {
-        $oldTeamCell = '<td>Free Agent</td>';
-    } else {
-        $oldTeamDisplay = trim("{$oldCity} {$oldTeam}");
-        $oldTeamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$oldColor1};\">
-            <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$oldTeamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$oldColor2};\">
-                <img src=\"images/logo/new{$oldTeamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-                <span class=\"ibl-team-cell__text\">{$oldTeamDisplay}</span>
-            </a>
-        </td>";
-    }
+    // New team data
+    $newTeamId = (int) $row['new_teamid'];
+    $newTeamDisplay = trim(($row['new_city'] ?? '') . ' ' . ($row['new_team'] ?? ''));
+    $newColor1 = $row['new_color1'] ?? '333333';
+    $newColor2 = $row['new_color2'] ?? 'FFFFFF';
 
-    if ($newTeamId === 0) {
-        $newTeamCell = '<td>Free Agent</td>';
-    } else {
-        $newTeamDisplay = trim("{$newCity} {$newTeam}");
-        $newTeamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$newColor1};\">
-            <a href=\"modules.php?name=Team&amp;op=team&amp;teamID={$newTeamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$newColor2};\">
-                <img src=\"images/logo/new{$newTeamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-                <span class=\"ibl-team-cell__text\">{$newTeamDisplay}</span>
-            </a>
-        </td>";
-    }
+    // Build team cells - free agents get plain text instead of logo
+    $oldTeamCell = TeamCellHelper::renderTeamCellOrFreeAgent($oldTeamId, $oldTeamDisplay, $oldColor1, $oldColor2);
+    $newTeamCell = TeamCellHelper::renderTeamCellOrFreeAgent($newTeamId, $newTeamDisplay, $newColor1, $newColor2);
+    $playerCell = PlayerImageHelper::renderFlexiblePlayerCell($pid, $row['name']);
 
     $teamIds = implode(',', array_unique(array_filter([$oldTeamId, $newTeamId])));
-    echo "<tr data-team-ids=\"{$teamIds}\">
-        <td class=\"ibl-player-cell\"><a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$playerName}</a></td>
-        {$oldTeamCell}
-        {$newTeamCell}
-    </tr>";
+    echo "<tr data-team-ids=\"{$teamIds}\">"
+        . $playerCell
+        . $oldTeamCell
+        . $newTeamCell
+        . '</tr>';
 }
 
 $stmt->close();

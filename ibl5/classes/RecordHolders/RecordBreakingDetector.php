@@ -64,8 +64,15 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         $gameType = $this->getGameTypeFromDate($gameDate);
         $dateFilter = $this->getDateFilterForType($gameType);
 
-        foreach (self::PLAYER_STATS as $stat) {
-            $topRecords = $this->repository->getTopPlayerSingleGame($stat['expression'], $dateFilter);
+        // Build expression map and fetch all stats in one UNION ALL query (8 queries → 1)
+        $expressions = [];
+        foreach (self::PLAYER_STATS as $key => $stat) {
+            $expressions[$key] = $stat['expression'];
+        }
+        $allTopRecords = $this->repository->getTopPlayerSingleGameBatch($expressions, $dateFilter);
+
+        foreach (self::PLAYER_STATS as $key => $stat) {
+            $topRecords = $allTopRecords[$key] ?? [];
 
             if ($topRecords === []) {
                 continue;

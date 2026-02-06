@@ -151,7 +151,10 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
                 'playoffsUrl' => $this->getChallongeUrl('playoffs', $year),
             ],
             'allStarWeekend' => [
-                'gameMvp' => $this->extractAward($awards, 'All-Star Game MVP'),
+                'gameMvps' => array_merge(
+                    $this->extractAwardList($awards, 'All-Star Game MVP'),
+                    $this->extractAwardList($awards, 'All-Star Game Co-MVP'),
+                ),
                 'slamDunkWinner' => $this->extractAward($awards, 'Slam Dunk Competition - Winner'),
                 'threePointWinner' => $this->extractAward($awards, 'Three-Point Contest - Winner'),
                 'rookieSophomoreMvp' => $this->extractAward($awards, 'Rookie-Sophomore Challenge - MVP'),
@@ -506,9 +509,14 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
         }
 
         // All-Star Weekend winners
-        /** @var array{gameMvp: string, slamDunkWinner: string, threePointWinner: string, rookieSophomoreMvp: string, slamDunkParticipants: list<string>, threePointParticipants: list<string>, rookieSophomoreParticipants: list<string>} $asw */
+        /** @var array{gameMvps: list<string>, slamDunkWinner: string, threePointWinner: string, rookieSophomoreMvp: string, slamDunkParticipants: list<string>, threePointParticipants: list<string>, rookieSophomoreParticipants: list<string>} $asw */
         $asw = $data['allStarWeekend'];
-        foreach ([$asw['gameMvp'], $asw['slamDunkWinner'], $asw['threePointWinner'], $asw['rookieSophomoreMvp']] as $name) {
+        foreach ($asw['gameMvps'] as $name) {
+            if ($name !== '') {
+                $names[$name] = true;
+            }
+        }
+        foreach ([$asw['slamDunkWinner'], $asw['threePointWinner'], $asw['rookieSophomoreMvp']] as $name) {
             if ($name !== '') {
                 $names[$name] = true;
             }

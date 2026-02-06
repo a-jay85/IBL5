@@ -83,7 +83,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
         $label = $seasonData['label'];
         /** @var array{heatChampion: string, heatUrl: string, oneOnOneChampion: string, rookieOneOnOneChampion: string, oneOnOneUrl: string, iblFinalsWinner: string, iblFinalsLoser: string, iblFinalsLoserGames: int, playoffsUrl: string} $tournaments */
         $tournaments = $seasonData['tournaments'];
-        /** @var array{gameMvp: string, slamDunkWinner: string, threePointWinner: string, rookieSophomoreMvp: string, slamDunkParticipants: list<string>, threePointParticipants: list<string>, rookieSophomoreParticipants: list<string>} $allStarWeekend */
+        /** @var array{gameMvps: list<string>, slamDunkWinner: string, threePointWinner: string, rookieSophomoreMvp: string, slamDunkParticipants: list<string>, threePointParticipants: list<string>, rookieSophomoreParticipants: list<string>} $allStarWeekend */
         $allStarWeekend = $seasonData['allStarWeekend'];
         /** @var array{mvp: string, dpoy: string, roy: string, sixthMan: string, gmOfYear: array{name: string, team: string}, finalsMvp: string} $majorAwards */
         $majorAwards = $seasonData['majorAwards'];
@@ -255,17 +255,23 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
     }
 
     /**
-     * @param array{gameMvp: string, slamDunkWinner: string, threePointWinner: string, rookieSophomoreMvp: string, slamDunkParticipants: list<string>, threePointParticipants: list<string>, rookieSophomoreParticipants: list<string>} $asw
+     * @param array{gameMvps: list<string>, slamDunkWinner: string, threePointWinner: string, rookieSophomoreMvp: string, slamDunkParticipants: list<string>, threePointParticipants: list<string>, rookieSophomoreParticipants: list<string>} $asw
      * @param array<string, int> $playerIds
      */
     private function renderAllStarWeekend(array $asw, array $playerIds): string
     {
+        $mvpLabel = count($asw['gameMvps']) > 1 ? 'All-Star Game Co-MVPs' : 'All-Star Game MVP';
+        $mvpNames = array_map(
+            static fn(string $name): string => '<div>' . self::renderPlayerName($name, $playerIds) . '</div>',
+            $asw['gameMvps']
+        );
+
         $html = '<div class="season-archive-section"><h3>All-Star Weekend</h3>';
         $html .= '<table class="ibl-data-table"><thead><tr><th>Event</th><th>Winner</th></tr></thead><tbody>';
         $html .= '<tr><td>Three-Point Contest</td><td>' . self::renderPlayerName($asw['threePointWinner'], $playerIds) . '</td></tr>';
         $html .= '<tr><td>Slam Dunk Competition</td><td>' . self::renderPlayerName($asw['slamDunkWinner'], $playerIds) . '</td></tr>';
         $html .= '<tr><td>Rookie-Sophomore Challenge MVP</td><td>' . self::renderPlayerName($asw['rookieSophomoreMvp'], $playerIds) . '</td></tr>';
-        $html .= '<tr><td>All-Star Game MVP</td><td>' . self::renderPlayerName($asw['gameMvp'], $playerIds) . '</td></tr>';
+        $html .= '<tr><td>' . self::esc($mvpLabel) . '</td><td>' . implode('', $mvpNames) . '</td></tr>';
         $html .= '</tbody></table></div>';
 
         return $html;

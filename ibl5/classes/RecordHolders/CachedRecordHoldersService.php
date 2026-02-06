@@ -46,6 +46,21 @@ class CachedRecordHoldersService implements RecordHoldersServiceInterface
     }
 
     /**
+     * Fetch fresh records from the inner service and atomically replace the cache.
+     *
+     * Uses REPLACE INTO so the cache goes directly from old→new with no gap.
+     *
+     * @return AllRecordsData
+     */
+    public function rebuildCache(): array
+    {
+        $records = $this->inner->getAllRecords();
+        $this->writeCache($records);
+
+        return $records;
+    }
+
+    /**
      * Remove the cached record holders data.
      */
     public function invalidateCache(): void

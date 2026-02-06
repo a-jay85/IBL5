@@ -6,7 +6,7 @@ namespace UI\Tables;
 
 use Player\Player;
 use Player\PlayerImageHelper;
-use UI\Components\InjuryDaysLabel;
+use UI\Components\TooltipLabel;
 use UI\TeamCellHelper;
 
 /**
@@ -172,7 +172,13 @@ endif; ?>
             <td style="text-align: center;"><?= (int)$player->ratingClutch ?></td>
             <td style="text-align: center;"><?= (int)$player->ratingConsistency ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= InjuryDaysLabel::render((int)$row['injuryDays'], $row['injuryReturnDate']) ?></td>
+            <?php
+                $injDays = (int) $row['injuryDays'];
+                $injReturn = $row['injuryReturnDate'];
+            ?>
+            <td style="text-align: center;"><?= ($injDays > 0 && $injReturn !== '')
+                ? TooltipLabel::render((string) $injDays, 'Returns: ' . $injReturn)
+                : (string) $injDays ?></td>
         </tr>
 <?php endforeach; ?>
     </tbody>

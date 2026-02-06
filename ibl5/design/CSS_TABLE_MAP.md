@@ -96,7 +96,7 @@ These are used inside multiple table types.
 | `.totals-row` | Orange accent totals row | Team stat tables |
 | `.highlight` | Orange accent row | Various highlight rows |
 | `.drafted` | 50% opacity + strikethrough | Draft views |
-| `.injury-days-tooltip` | CSS tooltip for return dates | InjuriesView |
+| `.ibl-tooltip` | CSS tooltip on hover/focus | InjuriesView, Ratings, block-Chunk_Leaders |
 
 ## Row Variant Classes
 

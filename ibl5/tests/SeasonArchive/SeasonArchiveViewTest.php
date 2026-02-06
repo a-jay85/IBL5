@@ -197,29 +197,13 @@ class SeasonArchiveViewTest extends TestCase
         $this->assertStringContainsString('10-2', $result);
     }
 
-    public function testRenderSeasonDetailShowsChampionRostersAsTables(): void
+    public function testRenderSeasonDetailShowsMergedRostersSection(): void
     {
         $seasonData = $this->createMinimalSeasonData();
         $seasonData['championRosters'] = [
             'ibl' => ['Player A', 'Player B'],
             'heat' => ['Player C'],
         ];
-
-        $result = $this->view->renderSeasonDetail($seasonData);
-
-        $this->assertStringContainsString('Championship Rosters', $result);
-        $this->assertStringContainsString('IBL Champions', $result);
-        $this->assertStringContainsString('H.E.A.T. Champions', $result);
-        $this->assertStringContainsString('Player A', $result);
-        $this->assertStringContainsString('Player B', $result);
-        $this->assertStringContainsString('Player C', $result);
-        // Uses table format, not card format
-        $this->assertStringNotContainsString('season-archive-roster-card', $result);
-    }
-
-    public function testRenderSeasonDetailShowsAllStarRostersAsTables(): void
-    {
-        $seasonData = $this->createMinimalSeasonData();
         $seasonData['allStarRosters'] = [
             'east' => ['East Player 1', 'East Player 2'],
             'west' => ['West Player 1'],
@@ -227,13 +211,104 @@ class SeasonArchiveViewTest extends TestCase
 
         $result = $this->view->renderSeasonDetail($seasonData);
 
-        $this->assertStringContainsString('All-Star Rosters', $result);
-        $this->assertStringContainsString('Eastern Conference', $result);
-        $this->assertStringContainsString('Western Conference', $result);
+        // Single merged "Rosters" section replaces old separate sections
+        $this->assertStringContainsString('>Rosters</h3>', $result);
+        $this->assertStringNotContainsString('Championship Rosters', $result);
+        $this->assertStringNotContainsString('All-Star Rosters', $result);
+        // All three roster columns present
+        $this->assertStringContainsString('IBL Champions', $result);
+        $this->assertStringContainsString('Eastern Conf. All-Stars', $result);
+        $this->assertStringContainsString('Western Conf. All-Stars', $result);
+        $this->assertStringContainsString('H.E.A.T. Champions', $result);
+        // Player names present
+        $this->assertStringContainsString('Player A', $result);
+        $this->assertStringContainsString('Player B', $result);
+        $this->assertStringContainsString('Player C', $result);
         $this->assertStringContainsString('East Player 1', $result);
         $this->assertStringContainsString('West Player 1', $result);
-        // Uses table format, not card format
-        $this->assertStringNotContainsString('season-archive-roster-card', $result);
+        // Uses flexbox layout
+        $this->assertStringContainsString('season-archive-roster-flex', $result);
+        $this->assertStringContainsString('season-archive-roster-col', $result);
+    }
+
+    public function testRostersSectionShowsAllStarCoachCaptions(): void
+    {
+        $seasonData = $this->createMinimalSeasonData();
+        $seasonData['allStarRosters'] = [
+            'east' => ['East Player 1'],
+            'west' => ['West Player 1'],
+        ];
+        $seasonData['allStarCoaches'] = [
+            'east' => ['Ross Gates'],
+            'west' => ['Brandon Tomyoy'],
+        ];
+
+        $result = $this->view->renderSeasonDetail($seasonData);
+
+        $this->assertStringContainsString('Head Coach: Ross Gates', $result);
+        $this->assertStringContainsString('Head Coach: Brandon Tomyoy', $result);
+        $this->assertStringContainsString('season-archive-coach-caption', $result);
+    }
+
+    public function testRostersSectionShowsMultipleCoachesLabel(): void
+    {
+        $seasonData = $this->createMinimalSeasonData();
+        $seasonData['allStarRosters'] = [
+            'east' => ['East Player 1'],
+            'west' => ['West Player 1'],
+        ];
+        $seasonData['allStarCoaches'] = [
+            'east' => ['Coach A', 'Coach B'],
+            'west' => [],
+        ];
+
+        $result = $this->view->renderSeasonDetail($seasonData);
+
+        $this->assertStringContainsString('Head Coaches: Coach A, Coach B', $result);
+    }
+
+    public function testRostersSectionShowsIblChampionLogo(): void
+    {
+        $seasonData = $this->createMinimalSeasonData();
+        $seasonData['championRosters'] = [
+            'ibl' => ['Player A'],
+            'heat' => [],
+        ];
+        $seasonData['teamColors'] = [
+            'Clippers' => ['color1' => 'C8102E', 'color2' => 'FFFFFF', 'teamid' => 5],
+        ];
+
+        $result = $this->view->renderSeasonDetail($seasonData);
+
+        $this->assertStringContainsString('season-archive-champion-logo', $result);
+        $this->assertStringContainsString('new5.png', $result);
+        $this->assertStringContainsString('alt="Clippers"', $result);
+        // Logo appears after the "IBL Champions" heading (below the roster table)
+        $headingPos = strpos($result, 'IBL Champions</h4>');
+        $logoPos = strpos($result, 'class="season-archive-champion-logo"');
+        $this->assertNotFalse($headingPos);
+        $this->assertNotFalse($logoPos);
+        $this->assertGreaterThan($headingPos, $logoPos);
+    }
+
+    public function testRostersSectionShowsIblChampionCoachCaption(): void
+    {
+        $seasonData = $this->createMinimalSeasonData();
+        $seasonData['championRosters'] = [
+            'ibl' => ['Player A'],
+            'heat' => [],
+        ];
+        $seasonData['iblChampionCoach'] = 'Brandon Tomyoy';
+
+        $result = $this->view->renderSeasonDetail($seasonData);
+
+        $this->assertStringContainsString('Head Coach: Brandon Tomyoy', $result);
+        // Coach caption appears before "IBL Champions" heading
+        $captionPos = strpos($result, 'Head Coach: Brandon Tomyoy');
+        $headingPos = strpos($result, 'IBL Champions</h4>');
+        $this->assertNotFalse($captionPos);
+        $this->assertNotFalse($headingPos);
+        $this->assertLessThan($headingPos, $captionPos);
     }
 
     public function testRenderSeasonDetailShowsTeamAwards(): void
@@ -427,6 +502,8 @@ class SeasonArchiveViewTest extends TestCase
      *     teamAwards: array<string, string>,
      *     championRosters: array{ibl: list<string>, heat: list<string>},
      *     allStarRosters: array{east: list<string>, west: list<string>},
+     *     allStarCoaches: array{east: list<string>, west: list<string>},
+     *     iblChampionCoach: string,
      *     teamColors: array<string, array{color1: string, color2: string, teamid: int}>,
      *     playerIds: array<string, int>,
      *     teamIds: array<string, int>
@@ -480,6 +557,8 @@ class SeasonArchiveViewTest extends TestCase
             'teamAwards' => [],
             'championRosters' => ['ibl' => [], 'heat' => []],
             'allStarRosters' => ['east' => [], 'west' => []],
+            'allStarCoaches' => ['east' => [], 'west' => []],
+            'iblChampionCoach' => '',
             'teamColors' => [],
             'playerIds' => [],
             'teamIds' => [],

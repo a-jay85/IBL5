@@ -108,6 +108,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
         $heatYear = $year - 1;
         $heatStandingsRaw = $this->repository->getHeatWinLossByYear($heatYear);
         $teamColors = $this->repository->getTeamColors();
+        $teamConferences = $this->repository->getTeamConferences();
 
         // Build playoff bracket grouped by round
         $playoffBracket = $this->buildPlayoffBracket($playoffResults);
@@ -199,6 +200,8 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
                 'east' => $this->extractAwardList($awards, 'Eastern Conference All-Star'),
                 'west' => $this->extractAwardList($awards, 'Western Conference All-Star'),
             ],
+            'allStarCoaches' => $this->getAllStarCoaches($gmHistory, $year, $teamConferences),
+            'iblChampionCoach' => $this->getIblChampionCoach($gmHistory, $iblFinals['winner'], $year),
             'teamColors' => $teamColors,
             'playerIds' => [],
             'teamIds' => $teamIds,
@@ -303,6 +306,137 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
         }
 
         return ['name' => '', 'team' => ''];
+    }
+
+    /**
+     * Get All-Star Game head coaches for a given year, split by conference
+     *
+     * Parses "ASG Head Coach:" and "ASG Co-Head Coach:" lines from GM history
+     * Award field HTML. Determines conference by extracting team name from the
+     * `name` field (e.g., "Ross Gates (Bulls)") and looking it up in standings.
+     *
+     * @param list<GmHistoryRow> $gmHistory All GM history records
+     * @param int $year Season ending year
+     * @param array<string, string> $teamConferences Map of team_name => 'Eastern'|'Western'
+     * @return array{east: list<string>, west: list<string>}
+     */
+    private function getAllStarCoaches(array $gmHistory, int $year, array $teamConferences): array
+    {
+        $yearStr = (string) $year;
+        /** @var list<string> $east */
+        $east = [];
+        /** @var list<string> $west */
+        $west = [];
+
+        foreach ($gmHistory as $gm) {
+            $awardText = $gm['Award'];
+            $isCoach = false;
+
+            // Check "ASG Head Coach:" line
+            if (preg_match('/ASG Head Coach:\s*([0-9, ]+)/i', $awardText, $matches) === 1) {
+                $yearsInRecord = preg_split('/\s*,\s*/', trim($matches[1]));
+                if (is_array($yearsInRecord) && in_array($yearStr, $yearsInRecord, true)) {
+                    $isCoach = true;
+                }
+            }
+
+            // Check "ASG Co-Head Coach:" line
+            if (!$isCoach && preg_match('/ASG Co-Head Coach:\s*([0-9, ]+)/i', $awardText, $matches) === 1) {
+                $yearsInRecord = preg_split('/\s*,\s*/', trim($matches[1]));
+                if (is_array($yearsInRecord) && in_array($yearStr, $yearsInRecord, true)) {
+                    $isCoach = true;
+                }
+            }
+
+            if (!$isCoach) {
+                continue;
+            }
+
+            // Extract display name from <B>Name</B> in Award field
+            $displayName = '';
+            if (preg_match('/<B>([^<]+)<\/B>/i', $awardText, $nameMatch) === 1) {
+                $displayName = trim($nameMatch[1]);
+            }
+
+            // Extract team from name field: "Ross Gates (Bulls)" => "Bulls"
+            $teamName = '';
+            if (preg_match('/\(([^)]+)\)\s*$/', $gm['name'], $teamMatch) === 1) {
+                $teamName = trim($teamMatch[1]);
+            }
+
+            // Fall back to name field itself if no display name found
+            if ($displayName === '') {
+                $displayName = preg_replace('/\s*\(.*?\)\s*$/', '', $gm['name']) ?? $gm['name'];
+                $displayName = trim($displayName);
+            }
+
+            // Determine conference from team
+            $conference = $teamConferences[$teamName] ?? '';
+
+            if ($conference === 'Eastern') {
+                $east[] = $displayName;
+            } elseif ($conference === 'Western') {
+                $west[] = $displayName;
+            }
+        }
+
+        return ['east' => $east, 'west' => $west];
+    }
+
+    /**
+     * Get the head coach (GM) of the IBL champion team for a given year
+     *
+     * Parses the `year` field tenure range (e.g., "<B>1988-Present:</b>") and matches
+     * the team from the `name` field against the IBL Finals winner. Returns the display
+     * name from `<B>Name</B>` in the Award field.
+     *
+     * @param list<GmHistoryRow> $gmHistory All GM history records
+     * @param string $championTeam IBL Finals winner team name
+     * @param int $year Season ending year
+     * @return string Coach display name, or empty string if not found
+     */
+    private function getIblChampionCoach(array $gmHistory, string $championTeam, int $year): string
+    {
+        if ($championTeam === '') {
+            return '';
+        }
+
+        foreach ($gmHistory as $gm) {
+            // Extract team from name field: "Brandon Tomyoy (Clippers)" => "Clippers"
+            $teamName = '';
+            if (preg_match('/\(([^)]+)\)\s*$/', $gm['name'], $teamMatch) === 1) {
+                $teamName = trim($teamMatch[1]);
+            }
+
+            if ($teamName !== $championTeam) {
+                continue;
+            }
+
+            // Parse tenure range from year field: "<B>1988-Present:</b>" or "<B>1990-1997:</b>"
+            $yearField = strip_tags($gm['year']);
+            if (preg_match('/(\d{4})\s*-\s*(\w+)/', $yearField, $tenureMatch) !== 1) {
+                continue;
+            }
+
+            $startYear = (int) $tenureMatch[1];
+            $endPart = $tenureMatch[2];
+            $endYear = strtolower($endPart) === 'present' ? 9999 : (int) $endPart;
+
+            if ($year < $startYear || $year > $endYear) {
+                continue;
+            }
+
+            // Extract display name from <B>Name</B> in Award field
+            if (preg_match('/<B>([^<]+)<\/B>/i', $gm['Award'], $nameMatch) === 1) {
+                return trim($nameMatch[1]);
+            }
+
+            // Fall back to name field without team suffix
+            $displayName = preg_replace('/\s*\(.*?\)\s*$/', '', $gm['name']) ?? $gm['name'];
+            return trim($displayName);
+        }
+
+        return '';
     }
 
     /**

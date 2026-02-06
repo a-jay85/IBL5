@@ -128,8 +128,12 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
         $html .= $this->renderPlayoffBracket($playoffBracket, $teamColors, $year);
         $html .= $this->renderHeatStandings($heatStandings, $teamColors, $year);
         $html .= $this->renderTeamAwardsSection($teamAwards, $teamColors, $year);
-        $html .= $this->renderChampionRosters($championRosters, $playerIds);
-        $html .= $this->renderAllStarRosterTables($allStarRosters, $playerIds);
+        /** @var array{east: list<string>, west: list<string>} $allStarCoaches */
+        $allStarCoaches = $seasonData['allStarCoaches'];
+        $iblChampion = $tournaments['iblFinalsWinner'];
+        /** @var string $iblChampionCoach */
+        $iblChampionCoach = $seasonData['iblChampionCoach'];
+        $html .= $this->renderRosters($championRosters, $allStarRosters, $allStarCoaches, $playerIds, $teamColors, $year, $iblChampion, $iblChampionCoach);
 
         return $html;
     }
@@ -199,8 +203,12 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
             . '.season-archive-nav a:hover { text-decoration: underline; }'
             . '.season-archive-section { margin-bottom: var(--space-8, 2rem); }'
             . '.season-archive-section h3 { font-family: var(--font-display, \'Barlow Condensed\', sans-serif); font-size: 1.25rem; font-weight: 600; color: var(--navy-900, #0f172a); margin-bottom: var(--space-3, 0.75rem); }'
-            . '.season-archive-roster-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4, 1rem); }'
-            . '.season-archive-roster-grid h4 { font-family: var(--font-display, \'Barlow Condensed\', sans-serif); font-size: 1.1rem; font-weight: 600; color: var(--navy-800, #1e293b); margin-bottom: var(--space-2, 0.5rem); }'
+            . '.season-archive-roster-flex { display: flex; flex-wrap: wrap; gap: var(--space-4, 1rem); }'
+            . '.season-archive-roster-col { flex: 1 1 250px; min-width: 250px; }'
+            . '.season-archive-roster-col h4, .season-archive-section h4 { font-family: var(--font-display, \'Barlow Condensed\', sans-serif); font-size: 1.1rem; font-weight: 600; color: var(--navy-800, #1e293b); margin-bottom: var(--space-2, 0.5rem); }'
+            . '.season-archive-coach-caption { font-size: 0.85rem; color: var(--gray-600, #4b5563); margin-bottom: var(--space-1, 0.25rem); font-style: italic; }'
+            . '.season-archive-champion-logo { margin-top: var(--space-3, 0.75rem); text-align: center; }'
+            . '.season-archive-champion-logo img { display: inline-block; }'
             . '.bracket-link { color: var(--accent-500, #f97316); text-decoration: none; }'
             . '.bracket-link:hover { text-decoration: underline; }'
             . '.season-archive-bracket-hint { font-size: 0.85rem; color: var(--gray-500, #6b7280); margin-bottom: var(--space-2, 0.5rem); }'
@@ -424,73 +432,134 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
     }
 
     /**
-     * @param array{ibl: list<string>, heat: list<string>} $rosters
+     * Render merged Rosters section: IBL Champions, Eastern All-Stars, Western All-Stars
+     *
+     * Uses a 3-column flexbox layout with IBL champion logo and All-Star coach captions.
+     * H.E.A.T. Champions roster is appended separately if non-empty.
+     *
+     * @param array{ibl: list<string>, heat: list<string>} $championRosters
+     * @param array{east: list<string>, west: list<string>} $allStarRosters
+     * @param array{east: list<string>, west: list<string>} $allStarCoaches
      * @param array<string, int> $playerIds
+     * @param array<string, array{color1: string, color2: string, teamid: int}> $teamColors
      */
-    private function renderChampionRosters(array $rosters, array $playerIds): string
-    {
-        if ($rosters['ibl'] === [] && $rosters['heat'] === []) {
+    private function renderRosters(
+        array $championRosters,
+        array $allStarRosters,
+        array $allStarCoaches,
+        array $playerIds,
+        array $teamColors,
+        int $year,
+        string $iblChampion,
+        string $iblChampionCoach
+    ): string {
+        $hasIbl = $championRosters['ibl'] !== [];
+        $hasEast = $allStarRosters['east'] !== [];
+        $hasWest = $allStarRosters['west'] !== [];
+
+        if (!$hasIbl && !$hasEast && !$hasWest && $championRosters['heat'] === []) {
             return '';
         }
 
-        $html = '<div class="season-archive-section"><h3>Championship Rosters</h3>';
-        $html .= '<div class="season-archive-roster-grid">';
+        $html = '<div class="season-archive-section"><h3>Rosters</h3>';
+        $html .= '<div class="season-archive-roster-flex">';
 
-        if ($rosters['ibl'] !== []) {
-            $html .= '<div><h4>IBL Champions</h4>';
-            $html .= '<table class="ibl-data-table"><thead><tr><th>Player</th></tr></thead><tbody>';
-            foreach ($rosters['ibl'] as $player) {
-                $html .= '<tr><td>' . self::renderPlayerName($player, $playerIds) . '</td></tr>';
-            }
-            $html .= '</tbody></table></div>';
+        // IBL Champions column
+        if ($hasIbl) {
+            $html .= '<div class="season-archive-roster-col">';
+            $html .= $this->renderCoachCaption($iblChampionCoach !== '' ? [$iblChampionCoach] : []);
+            $html .= '<h4>IBL Champions</h4>';
+            $html .= $this->renderRosterTable($championRosters['ibl'], $playerIds);
+            $html .= $this->renderIblChampionLogoImg($iblChampion, $teamColors, $year);
+            $html .= '</div>';
         }
 
-        if ($rosters['heat'] !== []) {
-            $html .= '<div><h4>H.E.A.T. Champions</h4>';
-            $html .= '<table class="ibl-data-table"><thead><tr><th>Player</th></tr></thead><tbody>';
-            foreach ($rosters['heat'] as $player) {
-                $html .= '<tr><td>' . self::renderPlayerName($player, $playerIds) . '</td></tr>';
-            }
-            $html .= '</tbody></table></div>';
+        // Eastern Conference All-Stars column
+        if ($hasEast) {
+            $html .= '<div class="season-archive-roster-col">';
+            $html .= $this->renderCoachCaption($allStarCoaches['east']);
+            $html .= '<h4>Eastern Conf. All-Stars</h4>';
+            $html .= $this->renderRosterTable($allStarRosters['east'], $playerIds);
+            $html .= '</div>';
         }
 
-        $html .= '</div></div>';
+        // Western Conference All-Stars column
+        if ($hasWest) {
+            $html .= '<div class="season-archive-roster-col">';
+            $html .= $this->renderCoachCaption($allStarCoaches['west']);
+            $html .= '<h4>Western Conf. All-Stars</h4>';
+            $html .= $this->renderRosterTable($allStarRosters['west'], $playerIds);
+            $html .= '</div>';
+        }
+
+        $html .= '</div>';
+
+        // H.E.A.T. Champions as a separate roster below
+        if ($championRosters['heat'] !== []) {
+            $html .= '<div style="margin-top: var(--space-4, 1rem); max-width: 300px;">';
+            $html .= '<h4>H.E.A.T. Champions</h4>';
+            $html .= $this->renderRosterTable($championRosters['heat'], $playerIds);
+            $html .= '</div>';
+        }
+
+        $html .= '</div>';
 
         return $html;
     }
 
     /**
-     * @param array{east: list<string>, west: list<string>} $rosters
-     * @param array<string, int> $playerIds
+     * Render the IBL champion team logo below the roster, centered
+     *
+     * @param array<string, array{color1: string, color2: string, teamid: int}> $teamColors
      */
-    private function renderAllStarRosterTables(array $rosters, array $playerIds): string
+    private function renderIblChampionLogoImg(string $iblChampion, array $teamColors, int $year): string
     {
-        if ($rosters['east'] === [] && $rosters['west'] === []) {
+        if ($iblChampion === '') {
             return '';
         }
 
-        $html = '<div class="season-archive-section"><h3>All-Star Rosters</h3>';
-        $html .= '<div class="season-archive-roster-grid">';
-
-        if ($rosters['east'] !== []) {
-            $html .= '<div><h4>Eastern Conference</h4>';
-            $html .= '<table class="ibl-data-table"><thead><tr><th>Player</th></tr></thead><tbody>';
-            foreach ($rosters['east'] as $player) {
-                $html .= '<tr><td>' . self::renderPlayerName($player, $playerIds) . '</td></tr>';
-            }
-            $html .= '</tbody></table></div>';
+        $colors = $teamColors[$iblChampion] ?? null;
+        if ($colors === null) {
+            return '';
         }
 
-        if ($rosters['west'] !== []) {
-            $html .= '<div><h4>Western Conference</h4>';
-            $html .= '<table class="ibl-data-table"><thead><tr><th>Player</th></tr></thead><tbody>';
-            foreach ($rosters['west'] as $player) {
-                $html .= '<tr><td>' . self::renderPlayerName($player, $playerIds) . '</td></tr>';
-            }
-            $html .= '</tbody></table></div>';
+        $teamid = $colors['teamid'];
+        return '<div class="season-archive-champion-logo">'
+            . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamid . '&amp;yr=' . $year . '">'
+            . '<img src="images/logo/new' . $teamid . '.png" alt="' . self::esc($iblChampion) . '" width="64" height="64" loading="lazy">'
+            . '</a></div>';
+    }
+
+    /**
+     * Render coach caption above an All-Star roster
+     *
+     * @param list<string> $coaches Coach names
+     */
+    private function renderCoachCaption(array $coaches): string
+    {
+        if ($coaches === []) {
+            return '';
         }
 
-        $html .= '</div></div>';
+        $label = count($coaches) > 1 ? 'Head Coaches' : 'Head Coach';
+        $names = implode(', ', array_map([self::class, 'esc'], $coaches));
+
+        return '<p class="season-archive-coach-caption">' . $label . ': ' . $names . '</p>';
+    }
+
+    /**
+     * Render a single-column roster table
+     *
+     * @param list<string> $players
+     * @param array<string, int> $playerIds
+     */
+    private function renderRosterTable(array $players, array $playerIds): string
+    {
+        $html = '<table class="ibl-data-table"><thead><tr><th>Player</th></tr></thead><tbody>';
+        foreach ($players as $player) {
+            $html .= '<tr><td>' . self::renderPlayerName($player, $playerIds) . '</td></tr>';
+        }
+        $html .= '</tbody></table>';
 
         return $html;
     }

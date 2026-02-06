@@ -256,6 +256,33 @@ class PlayerImageHelperTest extends TestCase
         $this->assertStringNotContainsString('is-starter', $result);
     }
 
+    public function testRenderPlayerLinkBasic(): void
+    {
+        $result = PlayerImageHelper::renderPlayerLink(123, 'John Smith');
+
+        $this->assertStringContainsString('<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=123">', $result);
+        $this->assertStringContainsString('John Smith</a>', $result);
+        $this->assertStringContainsString('<img', $result);
+        $this->assertStringNotContainsString('<td', $result);
+        $this->assertStringNotContainsString('<span', $result);
+    }
+
+    public function testRenderPlayerLinkEscapesName(): void
+    {
+        $result = PlayerImageHelper::renderPlayerLink(123, '<script>alert(1)</script>');
+
+        $this->assertStringNotContainsString('<script>', $result);
+        $this->assertStringContainsString('&lt;script&gt;', $result);
+    }
+
+    public function testRenderPlayerLinkSkipsThumbnailForPipeName(): void
+    {
+        $result = PlayerImageHelper::renderPlayerLink(0, '|Cash');
+
+        $this->assertStringNotContainsString('<img', $result);
+        $this->assertStringContainsString('Cash</a>', $result);
+    }
+
     public function testRenderFlexiblePlayerCellBasic(): void
     {
         $result = PlayerImageHelper::renderFlexiblePlayerCell(123, 'John Smith');

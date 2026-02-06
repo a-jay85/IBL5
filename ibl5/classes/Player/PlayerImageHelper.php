@@ -91,6 +91,21 @@ class PlayerImageHelper implements PlayerImageHelperInterface
     }
 
     /**
+     * @see PlayerImageHelperInterface::renderPlayerLink()
+     */
+    public static function renderPlayerLink(int $playerID, string $rawName): string
+    {
+        $resolved = self::resolvePlayerDisplay($playerID, $rawName);
+        /** @var string $safeName */
+        $safeName = \Utilities\HtmlSanitizer::safeHtmlOutput($resolved['name']);
+
+        return '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'
+            . $resolved['thumbnail']
+            . $safeName
+            . '</a>';
+    }
+
+    /**
      * @see PlayerImageHelperInterface::renderFlexiblePlayerCell()
      */
     public static function renderFlexiblePlayerCell(
@@ -99,10 +114,6 @@ class PlayerImageHelper implements PlayerImageHelperInterface
         string $extraClasses = '',
         array $starterPids = [],
     ): string {
-        $resolved = self::resolvePlayerDisplay($playerID, $rawName);
-        /** @var string $safeName */
-        $safeName = \Utilities\HtmlSanitizer::safeHtmlOutput($resolved['name']);
-
         $starterClass = in_array($playerID, $starterPids, true) ? ' is-starter' : '';
 
         $classes = 'ibl-player-cell' . $starterClass;
@@ -111,10 +122,8 @@ class PlayerImageHelper implements PlayerImageHelperInterface
         }
 
         return '<td class="' . $classes . '">'
-            . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'
-            . $resolved['thumbnail']
-            . $safeName
-            . '</a></td>';
+            . self::renderPlayerLink($playerID, $rawName)
+            . '</td>';
     }
 
     /**

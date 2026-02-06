@@ -87,6 +87,19 @@ interface PlayerImageHelperInterface
     ): string;
 
     /**
+     * Render a player link with photo thumbnail (no wrapper element)
+     *
+     * Returns an `<a>` element containing a thumbnail image and the player's
+     * escaped name. This is the building block used by renderFlexiblePlayerCell()
+     * and can be wrapped in any container element (`<td>`, `<span>`, `<div>`).
+     *
+     * @param int $playerID The player's ID
+     * @param string $rawName The raw player name (may contain '|' for no-photo indicator)
+     * @return string HTML `<a>` element with thumbnail and name
+     */
+    public static function renderPlayerLink(int $playerID, string $rawName): string;
+
+    /**
      * Resolve a player's display name and thumbnail, handling pipe-delimited names.
      *
      * Names containing '|' indicate the player should not show a photo thumbnail.

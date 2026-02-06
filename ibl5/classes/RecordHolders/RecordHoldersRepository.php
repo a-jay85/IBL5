@@ -36,7 +36,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      * Games in Oct-Dec belong to a season ending the NEXT calendar year.
      * Games in Jan-Jun belong to a season ending the SAME calendar year.
      */
-    private const SEASON_YEAR_EXPRESSION = 'CASE WHEN MONTH(bs.Date) >= 10 THEN YEAR(bs.Date) + 1 ELSE YEAR(bs.Date) END';
+    private const SEASON_YEAR_EXPRESSION = 'bs.season_year';
 
     /** @var list<array{Date: string, visitorTeamID: int, homeTeamID: int, visitorScore: int, homeScore: int}>|null */
     private ?array $regularSeasonGamesCache = null;
@@ -149,12 +149,6 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getQuadrupleDoubles(): array
     {
-        $points = '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)';
-        $rebounds = '(bs.gameORB + bs.gameDRB)';
-        $assists = 'bs.gameAST';
-        $steals = 'bs.gameSTL';
-        $blocks = 'bs.gameBLK';
-
         $query = "SELECT
                 bs.pid,
                 p.name,
@@ -164,11 +158,11 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 COALESCE(sch.BoxID, 0) AS BoxID,
                 CASE WHEN h.teamid = bs.visitorTID THEN bs.homeTID ELSE bs.visitorTID END AS oppTid,
                 opp.team_name AS opp_team_name,
-                {$points} AS points,
-                {$rebounds} AS rebounds,
-                {$assists} AS assists,
-                {$steals} AS steals,
-                {$blocks} AS blocks
+                bs.calc_points AS points,
+                bs.calc_rebounds AS rebounds,
+                bs.gameAST AS assists,
+                bs.gameSTL AS steals,
+                bs.gameBLK AS blocks
             FROM ibl_box_scores bs
             JOIN ibl_plr p ON p.pid = bs.pid
             JOIN ibl_hist h ON h.pid = bs.pid AND h.year = ({$this->seasonYearExpression()})
@@ -178,11 +172,11 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 WHEN h.teamid = bs.visitorTID THEN bs.homeTID
                 ELSE bs.visitorTID END
             WHERE (
-                (CASE WHEN {$points} >= 10 THEN 1 ELSE 0 END)
-                + (CASE WHEN {$rebounds} >= 10 THEN 1 ELSE 0 END)
-                + (CASE WHEN {$assists} >= 10 THEN 1 ELSE 0 END)
-                + (CASE WHEN {$steals} >= 10 THEN 1 ELSE 0 END)
-                + (CASE WHEN {$blocks} >= 10 THEN 1 ELSE 0 END)
+                (CASE WHEN bs.calc_points >= 10 THEN 1 ELSE 0 END)
+                + (CASE WHEN bs.calc_rebounds >= 10 THEN 1 ELSE 0 END)
+                + (CASE WHEN bs.gameAST >= 10 THEN 1 ELSE 0 END)
+                + (CASE WHEN bs.gameSTL >= 10 THEN 1 ELSE 0 END)
+                + (CASE WHEN bs.gameBLK >= 10 THEN 1 ELSE 0 END)
             ) >= 4
             ORDER BY bs.Date ASC";
 
@@ -465,7 +459,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             return $this->regularSeasonGamesCache;
         }
 
-        $regularSeasonFilter = 'MONTH(Date) IN (11, 12, 1, 2, 3, 4, 5)';
+        $regularSeasonFilter = 'game_type = 1';
 
         /** @var list<array{Date: string, visitorTeamID: int, homeTeamID: int, visitorScore: int, homeScore: int}> $rows */
         $rows = $this->fetchAll(

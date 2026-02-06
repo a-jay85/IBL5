@@ -89,26 +89,28 @@ class CardBaseStylesTest extends TestCase
         $this->assertStringContainsString('2020', $html);
     }
 
-    public function testGetStylesContainsTeamLogoStyles(): void
+    public function testGetStylesReturnsEmptyString(): void
     {
         $colorScheme = TeamColorHelper::getDefaultColorScheme();
 
         $css = CardBaseStyles::getStyles($colorScheme);
 
-        $this->assertStringContainsString('.card-team-logo', $css);
-        $this->assertStringContainsString('object-fit: contain', $css);
-        $this->assertStringContainsString('opacity: 0.85', $css);
+        $this->assertSame('', $css);
     }
 
-    public function testGetStylesContainsLabelAndValueAlignment(): void
+    public function testGetCardCssPropertiesContainsCustomProperties(): void
     {
         $colorScheme = TeamColorHelper::getDefaultColorScheme();
 
-        $css = CardBaseStyles::getStyles($colorScheme);
+        $props = CardBaseStyles::getCardCssProperties($colorScheme);
 
-        $this->assertStringContainsString('.stats-grid .label', $css);
-        $this->assertStringContainsString('text-align: right', $css);
-        $this->assertStringContainsString('.stats-grid .value', $css);
-        $this->assertStringContainsString('text-align: left', $css);
+        $this->assertStringContainsString('--card-grad-start:', $props);
+        $this->assertStringContainsString('--card-grad-mid:', $props);
+        $this->assertStringContainsString('--card-grad-end:', $props);
+        $this->assertStringContainsString('--card-border:', $props);
+        $this->assertStringContainsString('--card-border-rgb:', $props);
+        $this->assertStringContainsString('--card-accent:', $props);
+        $this->assertStringContainsString('--card-text:', $props);
+        $this->assertStringContainsString('--card-text-muted:', $props);
     }
 }

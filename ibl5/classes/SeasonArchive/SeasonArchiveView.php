@@ -189,25 +189,12 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
         return '<td>' . self::esc($teamName) . '</td>';
     }
 
+    /**
+     * Styles are now centralized in design/components/season-archive.css.
+     */
     private function renderStyles(): string
     {
-        return '<style>'
-            . '.season-archive-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4, 1rem); flex-wrap: wrap; gap: var(--space-2, 0.5rem); }'
-            . '.season-archive-nav a { color: var(--accent-500, #f97316); text-decoration: none; font-weight: 600; font-family: var(--font-display, \'Barlow Condensed\', sans-serif); }'
-            . '.season-archive-nav a:hover { text-decoration: underline; }'
-            . '.season-archive-section { margin-bottom: var(--space-8, 2rem); }'
-            . '.season-archive-section h3 { font-family: var(--font-display, \'Barlow Condensed\', sans-serif); font-size: 1.25rem; font-weight: 600; color: var(--navy-900, #0f172a); margin-bottom: var(--space-3, 0.75rem); }'
-            . '.season-archive-roster-flex { display: flex; flex-wrap: wrap; gap: var(--space-4, 1rem); }'
-            . '.season-archive-roster-col { flex: 1 1 250px; min-width: 250px; }'
-            . '.season-archive-roster-col h4, .season-archive-section h4 { font-family: var(--font-display, \'Barlow Condensed\', sans-serif); font-size: 1.1rem; font-weight: 600; color: var(--navy-800, #1e293b); margin-bottom: var(--space-2, 0.5rem); }'
-            . '.season-archive-coach-caption { font-size: 0.85rem; color: var(--gray-600, #4b5563); margin-bottom: var(--space-1, 0.25rem); font-style: italic; }'
-            . '.season-archive-champion-logo { margin-top: var(--space-3, 0.75rem); text-align: center; }'
-            . '.season-archive-champion-logo img { display: inline-block; }'
-            . '.bracket-link { color: var(--accent-500, #f97316); text-decoration: none; }'
-            . '.bracket-link:hover { text-decoration: underline; }'
-            . '.season-archive-bracket-hint { font-size: 0.85rem; color: var(--gray-500, #6b7280); margin-bottom: var(--space-2, 0.5rem); }'
-            . '.bracket-round-start td { border-top: 2px solid var(--gray-300, #d1d5db); }'
-            . '</style>';
+        return '';
     }
 
     /**

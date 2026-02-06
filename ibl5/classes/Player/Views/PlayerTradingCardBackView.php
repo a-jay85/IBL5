@@ -23,103 +23,15 @@ class PlayerTradingCardBackView
     /**
      * Get scoped custom styles for trading card back with team colors
      *
+     * @deprecated CSS is now centralized in design/components/player-cards.css.
+     *             Custom properties are set inline on the container element in render().
+     *
      * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
-     * @return string HTML style tag with scoped CSS
+     * @return string Empty string — styles are in centralized CSS
      */
     public static function getStyles(?array $colorScheme = null): string
     {
-        if ($colorScheme === null) {
-            $colorScheme = TeamColorHelper::getDefaultColorScheme();
-        }
-
-        // Get shared base styles from CardBaseStyles
-        $baseStyles = CardBaseStyles::getStyles($colorScheme);
-
-        // Add back-card-specific styles only
-        $borderRgb = $colorScheme['border_rgb'];
-        $accent = $colorScheme['accent'];
-        $text = $colorScheme['text'];
-        $textMuted = $colorScheme['text_muted'];
-        
-        $backStyles = <<<HTML
-<style>
-/* Trading Card Back - Unique Styles (highs table, all-star pills) */
-.trading-card-back .highs-table {
-    width: 100%;
-    background: rgba(0,0,0,0.3);
-    border-radius: 8px;
-    padding: 8px;
-    margin-bottom: 12px;
-    border-collapse: collapse;
-    table-layout: fixed;
-}
-
-.trading-card-back .highs-table th,
-.trading-card-back .highs-table td {
-    padding: 4px 6px;
-    text-align: center;
-    font-size: 12px;
-    width: 18%;
-}
-
-.trading-card-back .highs-table .stat-label {
-    width: 28%;
-}
-
-.trading-card-back .highs-table .highs-header {
-    color: #{$accent};
-    font-weight: 600;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 1px solid rgba({$borderRgb}, 0.3);
-}
-
-.trading-card-back .highs-table .category-header {
-    color: #{$textMuted};
-    font-size: 9px;
-    font-weight: 600;
-    text-transform: uppercase;
-}
-
-.trading-card-back .highs-table .stat-label {
-    color: #{$accent};
-    font-weight: 600;
-    text-align: left;
-    font-size: 11px;
-}
-
-.trading-card-back .highs-table .stat-value {
-    color: #{$text};
-    font-weight: 700;
-    font-family: 'Monaco', 'Menlo', monospace;
-}
-
-.trading-card-back .highs-table .season-col {
-    background: rgba({$borderRgb}, 0.05);
-}
-
-.trading-card-back .highs-table .career-col {
-    background: rgba({$borderRgb}, 0.1);
-}
-
-.trading-card-back .allstar-pill .pill-label {
-    display: block;
-    font-size: 9px;
-    text-transform: uppercase;
-}
-
-@media (max-width: 480px) {
-    .trading-card-back .highs-table th,
-    .trading-card-back .highs-table td {
-        padding: 3px 4px;
-        font-size: 10px;
-    }
-}
-</style>
-HTML;
-
-        return $baseStyles . $backStyles;
+        return '';
     }
 
     /**
@@ -149,9 +61,11 @@ HTML;
         $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->teamID ?? 0);
         $playerData = CardBaseStyles::preparePlayerData($player, $playerID);
 
+        $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);
+
         ob_start();
         ?>
-<div class="trading-card-back">
+<div class="trading-card-back" style="<?= $cssProps ?>">
 <?= CardBaseStyles::renderCardTop($playerData) ?>
 
     <!-- PLAYER HIGHS SECTION -->

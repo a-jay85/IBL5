@@ -133,11 +133,6 @@ function themeheader()
 function themefooter()
 {
     global $bgcolor1;
-    // // if (defined('INDEX_FILE')) {
-    // echo "</td><td>&nbsp;&nbsp;</td><td valign=\"top\" bgcolor=$bgcolor1>";
-    // blocks("right");
-    // echo "</td>";
-    // // }
     echo "</div>"; // closes .site-content
     Nuke\Footer::renderPageGenerationTime();
 }

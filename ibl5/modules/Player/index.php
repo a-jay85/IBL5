@@ -5,12 +5,9 @@ use Player\PlayerStats;
 use Player\PlayerPageService;
 use Player\PlayerRepository;
 use Player\PlayerStatsRepository;
-use Player\Views\PlayerViewStyles;
 use Player\Views\PlayerButtonsView;
 use Player\Views\PlayerMenuView;
 use Player\Views\PlayerViewFactory;
-use Player\Views\PlayerTradingCardFrontView;
-use Player\Views\PlayerTradingCardBackView;
 use Player\Views\PlayerTradingCardFlipView;
 use Player\Views\PlayerStatsCardView;
 use Player\Views\PlayerStatsFlipCardView;
@@ -69,16 +66,9 @@ function showpage($playerID, $pageView)
     $teamColors = TeamColorHelper::getTeamColors($mysqli_db, $player->teamID);
     $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
     
-    // Include trading card styles with team colors (both front and back)
-    echo PlayerTradingCardFrontView::getStyles($colorScheme);
-    echo PlayerTradingCardBackView::getStyles($colorScheme);
+    // CSS is centralized in design/components/player-cards.css and player-views.css.
+    // Only JavaScript for flip interactions needs to be emitted here.
     echo PlayerTradingCardFlipView::getFlipStyles();
-    
-    // Include legacy player view styles for other components
-    echo PlayerViewStyles::getStyles();
-    
-    // Include stats card styles AFTER legacy styles to ensure they override
-    echo PlayerStatsCardView::getStyles($colorScheme);
     echo PlayerStatsFlipCardView::getFlipStyles($colorScheme);
 
     // Get All-Star Activity data using PlayerRepository

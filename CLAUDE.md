@@ -180,6 +180,9 @@ Every PHP file must have `declare(strict_types=1);` at the top. Additional requi
 ### Statistics Formatting
 Use `BasketballStats\StatsFormatter` for all stats - never `number_format()` directly.
 
+### CSS Centralization
+All CSS styles for modules and pages must be placed in `ibl5/design/components/`. Never write `<style>` blocks or CSS-generating methods in PHP class files. For dynamic team colors, use CSS custom properties set via inline `style` attributes on container elements, with the corresponding rules in centralized CSS files.
+
 ### HTML Modernization
 See `view-rendering.md` for the full deprecated-tag replacement table.
 

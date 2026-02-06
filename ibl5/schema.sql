@@ -219,6 +219,8 @@ CREATE TABLE `ibl_box_scores_teams` (
   KEY `idx_gt_tov` (`game_type`,`gameTOV`),
   KEY `idx_gt_ftm` (`game_type`,`gameFTM`),
   KEY `idx_gt_3gm` (`game_type`,`game3GM`),
+  KEY `idx_name` (`name`),
+  KEY `idx_gt_date_teams` (`game_type`,`Date`,`visitorTeamID`,`homeTeamID`),
   CONSTRAINT `fk_boxscoreteam_home` FOREIGN KEY (`homeTeamID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscoreteam_visitor` FOREIGN KEY (`visitorTeamID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -779,7 +781,9 @@ CREATE TABLE `ibl_playoff_results` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`id`),
   KEY `idx_year` (`year`),
-  KEY `idx_round` (`round`)
+  KEY `idx_round` (`round`),
+  KEY `idx_winner` (`winner`),
+  KEY `idx_loser` (`loser`)
 ) ENGINE=InnoDB AUTO_INCREMENT=281 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1114,13 +1118,13 @@ CREATE TABLE `ibl_schedule` (
   `uuid` char(36) NOT NULL,
   PRIMARY KEY (`SchedID`),
   UNIQUE KEY `uuid` (`uuid`),
-  UNIQUE KEY `idx_uuid` (`uuid`),
   KEY `BoxID` (`BoxID`),
   KEY `idx_year` (`Year`),
   KEY `idx_date` (`Date`),
   KEY `idx_visitor` (`Visitor`),
   KEY `idx_home` (`Home`),
   KEY `idx_year_date` (`Year`,`Date`),
+  KEY `idx_date_visitor_home` (`Date`,`Visitor`,`Home`),
   CONSTRAINT `chk_schedule_visitor_id` CHECK (`Visitor` >= 1 and `Visitor` <= 32),
   CONSTRAINT `chk_schedule_home_id` CHECK (`Home` >= 1 and `Home` <= 32),
   CONSTRAINT `chk_schedule_vscore` CHECK (`VScore` >= 0 and `VScore` <= 200),
@@ -1256,7 +1260,8 @@ CREATE TABLE `ibl_team_awards` (
   `name` varchar(35) NOT NULL,
   `Award` varchar(350) NOT NULL,
   `ID` int(11) NOT NULL,
-  PRIMARY KEY (`ID`)
+  PRIMARY KEY (`ID`),
+  KEY `idx_award` (`Award`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

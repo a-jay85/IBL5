@@ -258,31 +258,23 @@ class StandingsIntegrationTest extends TestCase
      */
     public function testGetTeamPythagoreanStatsReturnsCalculatedPoints(): void
     {
-        $offenseData = ['fgm' => 1000, 'ftm' => 500, 'tgm' => 300];
-        $defenseData = ['fgm' => 900, 'ftm' => 450, 'tgm' => 250];
+        // Single JOIN query returns combined offense+defense columns
+        $joinedData = [
+            'off_fgm' => 1000, 'off_ftm' => 500, 'off_tgm' => 300,
+            'def_fgm' => 900, 'def_ftm' => 450, 'def_tgm' => 250,
+        ];
 
-        // Create separate mock results for each query
-        $offenseResult = $this->createMock(\mysqli_result::class);
-        $offenseResult->method('fetch_assoc')->willReturn($offenseData);
+        $mockResult = $this->createMock(\mysqli_result::class);
+        $mockResult->method('fetch_assoc')->willReturn($joinedData);
 
-        $defenseResult = $this->createMock(\mysqli_result::class);
-        $defenseResult->method('fetch_assoc')->willReturn($defenseData);
-
-        // Create separate mock statements for each query
-        $offenseStmt = $this->createMock(\mysqli_stmt::class);
-        $offenseStmt->method('bind_param')->willReturn(true);
-        $offenseStmt->method('execute')->willReturn(true);
-        $offenseStmt->method('get_result')->willReturn($offenseResult);
-        $offenseStmt->method('close')->willReturn(true);
-
-        $defenseStmt = $this->createMock(\mysqli_stmt::class);
-        $defenseStmt->method('bind_param')->willReturn(true);
-        $defenseStmt->method('execute')->willReturn(true);
-        $defenseStmt->method('get_result')->willReturn($defenseResult);
-        $defenseStmt->method('close')->willReturn(true);
+        $mockStmt = $this->createMock(\mysqli_stmt::class);
+        $mockStmt->method('bind_param')->willReturn(true);
+        $mockStmt->method('execute')->willReturn(true);
+        $mockStmt->method('get_result')->willReturn($mockResult);
+        $mockStmt->method('close')->willReturn(true);
 
         $mockDb = $this->createMock(\mysqli::class);
-        $mockDb->method('prepare')->willReturnOnConsecutiveCalls($offenseStmt, $defenseStmt);
+        $mockDb->method('prepare')->willReturn($mockStmt);
 
         $repository = new StandingsRepository($mockDb);
         $result = $repository->getTeamPythagoreanStats(1);

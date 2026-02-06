@@ -38,27 +38,26 @@ class FranchiseHistoryRepositoryTest extends TestCase
     /**
      * Integration test to verify title calculation behavior
      *
-     * This test uses reflection to verify that the getNumberOfTitles method exists
-     * and that it's called during getAllFranchiseHistory execution. This prevents
-     * the regression where titles were directly read from ibl_team_history instead
-     * of being calculated from ibl_team_awards.
+     * This test uses reflection to verify that the getAllTitleCounts method exists.
+     * This prevents the regression where titles were directly read from
+     * ibl_team_history instead of being calculated from ibl_team_awards.
      */
     public function testGetAllFranchiseHistoryCalculatesTitlesFromAwardsTable(): void
     {
         $reflectionClass = new \ReflectionClass($this->repository);
-        
-        // Verify the private getNumberOfTitles method exists
+
+        // Verify the private getAllTitleCounts method exists (bulk title calculation)
         $this->assertTrue(
-            $reflectionClass->hasMethod('getNumberOfTitles'),
-            'Repository must have getNumberOfTitles method to calculate titles from ibl_team_awards'
+            $reflectionClass->hasMethod('getAllTitleCounts'),
+            'Repository must have getAllTitleCounts method to calculate titles from ibl_team_awards'
         );
 
-        $method = $reflectionClass->getMethod('getNumberOfTitles');
-        
+        $method = $reflectionClass->getMethod('getAllTitleCounts');
+
         // Verify it's a callable method
         $this->assertTrue(
             $method->isPrivate() || $method->isPublic(),
-            'getNumberOfTitles must be a callable method'
+            'getAllTitleCounts must be a callable method'
         );
     }
 
@@ -84,7 +83,7 @@ class FranchiseHistoryRepositoryTest extends TestCase
 
         // Verify that titles are calculated dynamically (not just read from ibl_team_history)
         $this->assertStringContainsString(
-            "Award LIKE ?",
+            "Award LIKE",
             $sourceCode,
             'Repository must use LIKE query to match award names'
         );
@@ -122,10 +121,10 @@ class FranchiseHistoryRepositoryTest extends TestCase
     {
         $reflectionClass = new \ReflectionClass($this->repository);
 
-        // Verify the private getPlayoffTotals method exists
+        // Verify the private getAllPlayoffTotals method exists (bulk playoff calculation)
         $this->assertTrue(
-            $reflectionClass->hasMethod('getPlayoffTotals'),
-            'Repository must have getPlayoffTotals method to calculate playoff records from ibl_playoff_results'
+            $reflectionClass->hasMethod('getAllPlayoffTotals'),
+            'Repository must have getAllPlayoffTotals method to calculate playoff records from ibl_playoff_results'
         );
 
         $fileName = $reflectionClass->getFileName();

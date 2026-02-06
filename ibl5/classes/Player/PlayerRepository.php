@@ -19,6 +19,10 @@ use Player\Contracts\PlayerRepositoryInterface;
  */
 class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryInterface
 {
+    /** @var array{allStar: int, threePoint: int, dunkContest: int, rookieSoph: int}|null */
+    private ?array $cachedAllStarWeekendCounts = null;
+    private ?string $cachedAllStarWeekendPlayerName = null;
+
     /**
      * Constructor - inherits from BaseMysqliRepository
      * 
@@ -341,12 +345,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     public function getAllStarGameCount(string $playerName): int
     {
-        $rows = $this->fetchAll(
-            "SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE '%Conference All-Star'",
-            "s",
-            $playerName
-        );
-        return count($rows);
+        return $this->getAllStarWeekendCounts($playerName)['allStar'];
     }
 
     /**
@@ -354,12 +353,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     public function getThreePointContestCount(string $playerName): int
     {
-        $rows = $this->fetchAll(
-            "SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE 'Three-Point Contest%'",
-            "s",
-            $playerName
-        );
-        return count($rows);
+        return $this->getAllStarWeekendCounts($playerName)['threePoint'];
     }
 
     /**
@@ -367,12 +361,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     public function getDunkContestCount(string $playerName): int
     {
-        $rows = $this->fetchAll(
-            "SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE 'Slam Dunk Competition%'",
-            "s",
-            $playerName
-        );
-        return count($rows);
+        return $this->getAllStarWeekendCounts($playerName)['dunkContest'];
     }
 
     /**
@@ -380,12 +369,42 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     public function getRookieSophChallengeCount(string $playerName): int
     {
-        $rows = $this->fetchAll(
-            "SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE 'Rookie-Sophomore Challenge'",
+        return $this->getAllStarWeekendCounts($playerName)['rookieSoph'];
+    }
+
+    /**
+     * Get all All-Star Weekend event counts in a single query
+     *
+     * @return array{allStar: int, threePoint: int, dunkContest: int, rookieSoph: int}
+     */
+    private function getAllStarWeekendCounts(string $playerName): array
+    {
+        if ($this->cachedAllStarWeekendCounts !== null && $this->cachedAllStarWeekendPlayerName === $playerName) {
+            return $this->cachedAllStarWeekendCounts;
+        }
+
+        /** @var array{allStar: int, threePoint: int, dunkContest: int, rookieSoph: int}|null $result */
+        $result = $this->fetchOne(
+            "SELECT
+                SUM(CASE WHEN Award LIKE '%Conference All-Star' THEN 1 ELSE 0 END) AS allStar,
+                SUM(CASE WHEN Award LIKE 'Three-Point Contest%' THEN 1 ELSE 0 END) AS threePoint,
+                SUM(CASE WHEN Award LIKE 'Slam Dunk Competition%' THEN 1 ELSE 0 END) AS dunkContest,
+                SUM(CASE WHEN Award LIKE 'Rookie-Sophomore Challenge' THEN 1 ELSE 0 END) AS rookieSoph
+            FROM ibl_awards
+            WHERE name = ?",
             "s",
             $playerName
         );
-        return count($rows);
+
+        $this->cachedAllStarWeekendPlayerName = $playerName;
+        $this->cachedAllStarWeekendCounts = [
+            'allStar' => (int) ($result['allStar'] ?? 0),
+            'threePoint' => (int) ($result['threePoint'] ?? 0),
+            'dunkContest' => (int) ($result['dunkContest'] ?? 0),
+            'rookieSoph' => (int) ($result['rookieSoph'] ?? 0),
+        ];
+
+        return $this->cachedAllStarWeekendCounts;
     }
 
     /**

@@ -33,18 +33,29 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
             ""
         );
 
+        $month = $this->determineMonth();
+
+        // Pre-load all team records to avoid N+1 queries in opponent record lookups
+        $this->statsCalculator->preloadTeamRecords();
+
+        // Fetch ALL played games once and partition by team
+        $allGames = $this->fetchAllPlayedGames($month);
+        $gamesByTeam = $this->partitionGamesByTeam($allGames);
+
         for ($i = 0; $i < count($teams); $i++) {
             /** @var array{TeamID: int, Team: string, streak_type: string, streak: int} $teamRow */
             $teamRow = $teams[$i];
             $tid = $teamRow['TeamID'];
             $teamName = $teamRow['Team'];
 
-            $month = $this->determineMonth();
-            $games = $this->buildGamesQuery($tid, $month);
+            $games = $gamesByTeam[$tid] ?? [];
 
             $stats = $this->calculateTeamStats($games, $tid);
             $log .= $this->updateTeamStats($tid, $teamName, $stats);
         }
+
+        // Update historical records once after all teams are processed (not per-team)
+        $this->updateHistoricalRecords();
 
         \UI::displayDebugOutput($log, 'Power Rankings Update Log');
 
@@ -62,9 +73,12 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
     }
 
     /**
+     * Fetch all played games for the season in a single query
+     *
      * @return list<array{Visitor: int, VScore: int, Home: int, HScore: int}>
      */
-    private function buildGamesQuery(int $tid, int $month): array {
+    private function fetchAllPlayedGames(int $month): array
+    {
         $startDate = $this->season->beginningYear . "-$month-01";
         $endDate = $this->season->endingYear . "-05-30";
 
@@ -72,16 +86,32 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         return $this->fetchAll(
             "SELECT Visitor, VScore, Home, HScore
             FROM ibl_schedule
-            WHERE (Visitor = ? OR Home = ?)
-            AND (VScore > 0 AND HScore > 0)
+            WHERE VScore > 0 AND HScore > 0
             AND Date BETWEEN ? AND ?
             ORDER BY Date ASC",
-            "iiss",
-            $tid,
-            $tid,
+            "ss",
             $startDate,
             $endDate
         );
+    }
+
+    /**
+     * Partition games by team ID (each game appears under both participating teams)
+     *
+     * @param list<array{Visitor: int, VScore: int, Home: int, HScore: int}> $allGames
+     * @return array<int, list<array{Visitor: int, VScore: int, Home: int, HScore: int}>>
+     */
+    private function partitionGamesByTeam(array $allGames): array
+    {
+        /** @var array<int, list<array{Visitor: int, VScore: int, Home: int, HScore: int}>> $byTeam */
+        $byTeam = [];
+
+        foreach ($allGames as $game) {
+            $byTeam[$game['Visitor']][] = $game;
+            $byTeam[$game['Home']][] = $game;
+        }
+
+        return $byTeam;
     }
 
     /**
@@ -151,8 +181,6 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
             $this->updateSeasonRecords($teamName);
         }
 
-        $this->updateHistoricalRecords();
-
         return $log;
     }
 
@@ -185,35 +213,26 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         }
     }
 
-    private function updateHistoricalRecords(): void {
-        // Update total wins
+    private function updateHistoricalRecords(): void
+    {
         $this->execute(
             "UPDATE ibl_team_history a
-            SET totwins = (
-                SELECT SUM(b.wins)
-                FROM ibl_team_win_loss AS b
-                WHERE a.team_name = b.currentname
-            )
-            WHERE a.team_name != 'Free Agents'",
-            ""
-        );
-
-        // Update total losses
-        $this->execute(
-            "UPDATE ibl_team_history a
-            SET totloss = (
-                SELECT SUM(b.losses)
-                FROM ibl_team_win_loss AS b
-                WHERE a.team_name = b.currentname
-            )
-            WHERE a.team_name != 'Free Agents'",
-            ""
-        );
-
-        // Update win percentage
-        $this->execute(
-            "UPDATE ibl_team_history a
-            SET winpct = a.totwins / (a.totwins + a.totloss)
+            SET
+                totwins = (
+                    SELECT SUM(b.wins)
+                    FROM ibl_team_win_loss AS b
+                    WHERE a.team_name = b.currentname
+                ),
+                totloss = (
+                    SELECT SUM(b.losses)
+                    FROM ibl_team_win_loss AS b
+                    WHERE a.team_name = b.currentname
+                ),
+                winpct = (
+                    SELECT SUM(b.wins) / (SUM(b.wins) + SUM(b.losses))
+                    FROM ibl_team_win_loss AS b
+                    WHERE a.team_name = b.currentname
+                )
             WHERE a.team_name != 'Free Agents'",
             ""
         );

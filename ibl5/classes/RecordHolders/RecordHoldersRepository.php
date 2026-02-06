@@ -38,6 +38,12 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     private const SEASON_YEAR_EXPRESSION = 'CASE WHEN MONTH(bs.Date) >= 10 THEN YEAR(bs.Date) + 1 ELSE YEAR(bs.Date) END';
 
+    /** @var list<array{Date: string, visitorTeamID: int, homeTeamID: int, visitorScore: int, homeScore: int}>|null */
+    private ?array $regularSeasonGamesCache = null;
+
+    /** @var array<int, string> Team ID → team name lookup cache */
+    private array $teamNameCache = [];
+
     /**
      * @see RecordHoldersRepositoryInterface::getTopPlayerSingleGame()
      *
@@ -450,18 +456,23 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
     }
 
     /**
-     * @see RecordHoldersRepositoryInterface::getLongestStreak()
+     * Fetch all regular season games from ibl_box_scores_teams, cached for reuse
      *
-     * Processes all games sequentially to find the longest winning or losing streak.
+     * Both getLongestStreak() and getBestWorstSeasonStart() need the same data.
      *
-     * @return list<StreakRecord>
+     * @return list<array{Date: string, visitorTeamID: int, homeTeamID: int, visitorScore: int, homeScore: int}>
      */
-    public function getLongestStreak(string $type): array
+    private function getRegularSeasonGames(): array
     {
-        // Get all regular season games ordered by date
+        if ($this->regularSeasonGamesCache !== null) {
+            return $this->regularSeasonGamesCache;
+        }
+
         $regularSeasonFilter = 'MONTH(Date) IN (11, 12, 1, 2, 3, 4, 5)';
 
-        $query = "SELECT
+        /** @var list<array{Date: string, visitorTeamID: int, homeTeamID: int, visitorScore: int, homeScore: int}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT
                 Date,
                 visitorTeamID,
                 homeTeamID,
@@ -470,9 +481,39 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             FROM ibl_box_scores_teams
             WHERE {$regularSeasonFilter}
             GROUP BY Date, visitorTeamID, homeTeamID
-            ORDER BY Date ASC";
+            ORDER BY Date ASC"
+        );
 
-        $rows = $this->fetchAll($query);
+        $this->regularSeasonGamesCache = $rows;
+        return $rows;
+    }
+
+    /**
+     * Resolve team name from team ID, using pre-loaded cache
+     */
+    private function resolveTeamName(int $teamId): string
+    {
+        if ($this->teamNameCache === []) {
+            /** @var list<array{teamid: int, team_name: string}> $rows */
+            $rows = $this->fetchAll("SELECT teamid, team_name FROM ibl_team_info", '');
+            foreach ($rows as $row) {
+                $this->teamNameCache[$row['teamid']] = $row['team_name'];
+            }
+        }
+
+        return $this->teamNameCache[$teamId] ?? '';
+    }
+
+    /**
+     * @see RecordHoldersRepositoryInterface::getLongestStreak()
+     *
+     * Processes all games sequentially to find the longest winning or losing streak.
+     *
+     * @return list<StreakRecord>
+     */
+    public function getLongestStreak(string $type): array
+    {
+        $rows = $this->getRegularSeasonGames();
 
         // Track streaks per team
         /** @var array<int, array{current: int, start: string, team: int}> $streaks */
@@ -530,16 +571,10 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         $records = [];
         foreach ($bestStreaks as $tid => $data) {
             if ($data['streak'] === $maxStreak && $maxStreak > 0) {
-                /** @var array{team_name: string}|null $teamInfo */
-                $teamInfo = $this->fetchOne(
-                    "SELECT team_name FROM ibl_team_info WHERE teamid = ?",
-                    'i',
-                    $tid
-                );
                 $startYear = $this->dateToSeasonEndingYear($data['start']);
                 $endYear = $this->dateToSeasonEndingYear($data['end']);
                 $records[] = [
-                    'team_name' => $teamInfo !== null ? $teamInfo['team_name'] : '',
+                    'team_name' => $this->resolveTeamName($tid),
                     'streak' => $data['streak'],
                     'start_date' => $data['start'],
                     'end_date' => $data['end'],
@@ -562,20 +597,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
      */
     public function getBestWorstSeasonStart(string $type): array
     {
-        $regularSeasonFilter = 'MONTH(Date) IN (11, 12, 1, 2, 3, 4, 5)';
-
-        $query = "SELECT
-                Date,
-                visitorTeamID,
-                homeTeamID,
-                (visitorQ1points + visitorQ2points + visitorQ3points + visitorQ4points + COALESCE(visitorOTpoints, 0)) AS visitorScore,
-                (homeQ1points + homeQ2points + homeQ3points + homeQ4points + COALESCE(homeOTpoints, 0)) AS homeScore
-            FROM ibl_box_scores_teams
-            WHERE {$regularSeasonFilter}
-            GROUP BY Date, visitorTeamID, homeTeamID
-            ORDER BY Date ASC";
-
-        $rows = $this->fetchAll($query);
+        $rows = $this->getRegularSeasonGames();
 
         // Track season starts per team per season
         /** @var array<string, array{wins: int, losses: int, streakBroken: bool}> $seasonStarts */
@@ -636,22 +658,16 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 [$tidStr, $yearStr] = explode('-', $key);
                 $tid = (int) $tidStr;
                 $year = (int) $yearStr;
-                /** @var array{team_name: string}|null $teamInfo */
-                $teamInfo = $this->fetchOne(
-                    "SELECT team_name FROM ibl_team_info WHERE teamid = ?",
-                    'i',
-                    $tid
-                );
                 if ($type === 'best') {
                     $records[] = [
-                        'team_name' => $teamInfo !== null ? $teamInfo['team_name'] : '',
+                        'team_name' => $this->resolveTeamName($tid),
                         'year' => $year,
                         'wins' => $data['wins'],
                         'losses' => 0,
                     ];
                 } else {
                     $records[] = [
-                        'team_name' => $teamInfo !== null ? $teamInfo['team_name'] : '',
+                        'team_name' => $this->resolveTeamName($tid),
                         'year' => $year,
                         'wins' => 0,
                         'losses' => $data['losses'],

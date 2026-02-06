@@ -631,7 +631,7 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin: var(--space-6) 0 var(--space-3) 0;
-    padding-bottom: var(--space-1);
+    padding-bottom: var(--space-0);
     border-bottom: 2px solid var(--accent-500);
     display: inline-block;
 }

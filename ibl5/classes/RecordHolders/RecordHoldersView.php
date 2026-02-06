@@ -62,62 +62,6 @@ class RecordHoldersView implements RecordHoldersViewInterface
     public function render(array $records): string
     {
         $output = '<h2 class="ibl-title">Record Holders</h2>';
-        $output .= '<style>
-.record-section { max-width: 900px; margin: 0 auto; }
-.record-section .ibl-card__body { padding: var(--space-2) 0; }
-
-.record-category { margin-bottom: var(--space-4); }
-.record-category:last-child { margin-bottom: 0; }
-.record-category__title {
-    font-family: var(--font-display);
-    font-size: 1.125rem; font-weight: 600;
-    color: var(--navy-800);
-    text-transform: uppercase; letter-spacing: 0.03em;
-    margin: var(--space-3) var(--space-3) var(--space-1);
-    padding-bottom: var(--space-0);
-    border-bottom: 2px solid var(--accent-500);
-    display: inline-block;
-}
-
-.record-table { table-layout: fixed; max-width: 100%; box-shadow: none; border: none; border-radius: 0; border-bottom: 1px solid var(--gray-200); }
-.record-table thead { background: var(--gray-100); }
-.record-table th { color: var(--gray-600); font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: var(--space-1) var(--space-2); }
-.record-table td { text-align: center; vertical-align: middle; padding: var(--space-2) var(--space-1); }
-.record-table td img { margin: 0 auto; }
-.record-table .player-cell { font-weight: 600; }
-.record-table .player-cell img { display: block; margin: 0 auto var(--space-1); }
-.record-table td.ibl-stat-highlight { font-size: 1.125rem; text-align: center; }
-
-.record-table--5col col.col-player { width: 25%; }
-.record-table--5col col.col-team { width: 15%; }
-.record-table--5col col.col-date { width: 30%; }
-.record-table--5col col.col-opponent { width: 15%; }
-.record-table--5col col.col-amount { width: 15%; }
-.record-table--4col-season col.col-player { width: 30%; }
-.record-table--4col-season col.col-team { width: 20%; }
-.record-table--4col-season col.col-season { width: 25%; }
-.record-table--4col-season col.col-amount { width: 25%; }
-.record-table--4col-team col.col-team { width: 20%; }
-.record-table--4col-team col.col-date { width: 35%; }
-.record-table--4col-team col.col-opponent { width: 20%; }
-.record-table--4col-team col.col-amount { width: 25%; }
-.record-table--3col-team-season col.col-team { width: 30%; }
-.record-table--3col-team-season col.col-season { width: 35%; }
-.record-table--3col-team-season col.col-amount { width: 35%; }
-.record-table--3col-franchise col.col-team { width: 25%; }
-.record-table--3col-franchise col.col-amount { width: 25%; }
-.record-table--3col-franchise col.col-years { width: 50%; }
-
-.record-section__subheading {
-    font-family: var(--font-display);
-    font-size: 1rem; font-weight: 600;
-    color: var(--gray-500);
-    text-transform: uppercase; letter-spacing: 0.05em;
-    margin: var(--space-4) var(--space-3) var(--space-2);
-    padding-bottom: var(--space-1);
-    border-bottom: 1px solid var(--gray-200);
-}
-</style>';
         $output .= '<div class="record-section">';
         $output .= $this->renderPlayerSingleGameRecords($records);
         $output .= $this->renderPlayerFullSeasonRecords($records['playerFullSeason']);

@@ -86,4 +86,11 @@ interface SeasonArchiveRepositoryInterface
      * @return array<string, int> Map of player name => pid (only found names included)
      */
     public function getPlayerIdsByNames(array $names): array;
+
+    /**
+     * Get team conference assignments from standings
+     *
+     * @return array<string, string> Map of team_name => 'Eastern'|'Western'
+     */
+    public function getTeamConferences(): array;
 }

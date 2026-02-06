@@ -27,6 +27,8 @@ namespace SeasonArchive\Contracts;
  *     teamAwards: array<string, string>,
  *     championRosters: array{ibl: list<string>, heat: list<string>},
  *     allStarRosters: array{east: list<string>, west: list<string>},
+ *     allStarCoaches: array{east: list<string>, west: list<string>},
+ *     iblChampionCoach: string,
  *     teamColors: array<string, array{color1: string, color2: string, teamid: int}>,
  *     playerIds: array<string, int>,
  *     teamIds: array<string, int>

@@ -33,10 +33,10 @@ Validate code quality, test coverage, and documentation before PR merge.
 
 ## 2. Database Operations
 
-### Dual Implementation Support
-- [ ] `method_exists($db, 'sql_escape_string')` check present
-- [ ] Legacy path uses `DatabaseService::escapeString()`
-- [ ] Modern path uses prepared statements
+### Prepared Statements
+- [ ] All repositories extend `BaseMysqliRepository`
+- [ ] All queries use prepared statements via `fetchOne()`, `fetchAll()`, `execute()`
+- [ ] No raw `$db->sql_query()` calls in refactored modules
 
 ### Security
 - [ ] No string interpolation with user input in SQL
@@ -57,7 +57,7 @@ Validate code quality, test coverage, and documentation before PR merge.
 
 ### Test Results
 ```bash
-cd ibl5 && vendor/bin/phpunit tests/ModuleName/
+cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary tests/ModuleName/
 ```
 - [ ] All tests pass
 - [ ] No warnings
@@ -107,7 +107,7 @@ cd ibl5 && vendor/bin/phpunit tests/ModuleName/
 ## Final Verification
 
 ```bash
-cd ibl5 && vendor/bin/phpunit  # Full suite - zero warnings/failures
+cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary
 ```
 
 PR ready for merge only when ALL checks pass.

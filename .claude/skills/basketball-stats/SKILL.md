@@ -58,6 +58,27 @@ Division with zero-division handling.
 $avg = StatsFormatter::safeDivide($total, $games); // Returns 0 if games=0
 ```
 
+### formatPercentageWithDecimals($made, $attempted, $decimals = 3)
+Shooting percentages with custom decimal places.
+```php
+echo StatsFormatter::formatPercentageWithDecimals($fgm, $fga, 1);  // "0.5"
+echo StatsFormatter::formatPercentageWithDecimals($fgm, $fga, 4);  // "0.5230"
+```
+
+### formatWithDecimals($value, $decimals)
+Format any value with custom decimal places.
+```php
+echo StatsFormatter::formatWithDecimals($rating, 1);  // "85.2"
+echo StatsFormatter::formatWithDecimals($rating, 3);  // "85.230"
+```
+
+### calculatePythagoreanWinPercentage($pointsScored, $pointsAllowed)
+Team win percentage using Daryl Morey's exponent (13.91).
+```php
+$winPct = StatsFormatter::calculatePythagoreanWinPercentage($ptsFor, $ptsAgainst);
+// Returns formatted percentage string
+```
+
 ## Usage Example
 
 ```php
@@ -74,13 +95,21 @@ echo "FG%: $fgPct | PPG: $ppg | RPG: $rpg";
 
 ## Input Validation
 
-Use `BasketballStats\StatsSanitizer` for input validation:
+Use `BasketballStats\StatsSanitizer` for input validation and sanitization:
 ```php
 use BasketballStats\StatsSanitizer;
 
-$playerId = StatsSanitizer::sanitizeInt($_GET['pid']);
-$rating = StatsSanitizer::sanitizeFloat($_POST['rating']);
-$name = StatsSanitizer::sanitizeString($_POST['name']);
+$playerId = StatsSanitizer::sanitizeInt($_GET['pid']);       // Returns 0 for null/empty
+$rating = StatsSanitizer::sanitizeFloat($_POST['rating']);   // Returns 0.0 for null/empty
+$name = StatsSanitizer::sanitizeString($_POST['name']);      // Returns '' for null
+
+// Sanitize entire database rows
+$row = StatsSanitizer::sanitizeRow($row, intFields: ['pid', 'tid'], floatFields: ['rating']);
+
+// Domain-specific sanitizers
+$pct = StatsSanitizer::sanitizePercentage($value);   // Clamps between 0 and 1
+$gp = StatsSanitizer::sanitizeGames($value);          // Ensures non-negative int
+$min = StatsSanitizer::sanitizeMinutes($value);        // Ensures non-negative float
 ```
 
 ## Examples

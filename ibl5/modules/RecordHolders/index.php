@@ -19,6 +19,7 @@ if (!defined('MODULE_FILE')) {
 
 use RecordHolders\RecordHoldersRepository;
 use RecordHolders\RecordHoldersService;
+use RecordHolders\CachedRecordHoldersService;
 use RecordHolders\RecordHoldersView;
 
 $module_name = basename(dirname(__FILE__));
@@ -29,7 +30,8 @@ $pagetitle = '- Record Holders';
 global $mysqli_db;
 
 $repository = new RecordHoldersRepository($mysqli_db);
-$service = new RecordHoldersService($repository);
+$innerService = new RecordHoldersService($repository);
+$service = new CachedRecordHoldersService($innerService, $mysqli_db);
 $view = new RecordHoldersView();
 
 $records = $service->getAllRecords();

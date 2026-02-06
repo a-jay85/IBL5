@@ -217,4 +217,31 @@ interface RecordHoldersRepositoryInterface
      * @return list<FranchiseTitleRecord>
      */
     public function getMostTitlesByType(string $titlePattern): array;
+
+    /**
+     * Get top player single-game records for multiple stats in one query (UNION ALL).
+     *
+     * @param array<string, string> $statExpressions Map of stat_type label => SQL expression
+     * @param string $dateFilter SQL WHERE clause for date filtering
+     * @return array<string, list<PlayerSingleGameRecord>> Keyed by stat_type label
+     */
+    public function getTopPlayerSingleGameBatch(array $statExpressions, string $dateFilter): array;
+
+    /**
+     * Get top team single-game records for multiple stats in one query (UNION ALL).
+     *
+     * @param array<string, array{expression: string, order: string}> $statExpressions Map of stat_type label => [expression, order]
+     * @param string $dateFilter SQL WHERE clause for date filtering
+     * @return array<string, list<TeamSingleGameRecord>> Keyed by stat_type label
+     */
+    public function getTopTeamSingleGameBatch(array $statExpressions, string $dateFilter): array;
+
+    /**
+     * Get top season averages for multiple stats in one query (UNION ALL).
+     *
+     * @param array<string, array{statColumn: string, gamesColumn: string}> $statColumns Map of stat_type label => column info
+     * @param int $minGames Minimum games required
+     * @return array<string, list<PlayerSeasonRecord>> Keyed by stat_type label
+     */
+    public function getTopSeasonAverageBatch(array $statColumns, int $minGames = 50): array;
 }

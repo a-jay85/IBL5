@@ -21,29 +21,16 @@ use Player\PlayerStats;
 class PlayerTradingCardFlipView
 {
     /**
-     * Get styles and scripts for flip functionality
-     * 
-     * @return string HTML with CSS and JavaScript
+     * Get scripts for flip functionality
+     *
+     * CSS is now centralized in design/components/player-cards.css.
+     * Only the JavaScript for flip interaction is returned.
+     *
+     * @return string HTML script tag with JavaScript
      */
     public static function getFlipStyles(): string
     {
-        $colorScheme = TeamColorHelper::getDefaultColorScheme();
-        
-        $flipCss = CardFlipStyles::getYAxisFlipCss('card-flip-container', 'card-flip-inner');
-        $iconCss = CardFlipStyles::getFlipIconCss($colorScheme, 'flip-icon', false);
-        $pulseCss = CardFlipStyles::getPulseAnimationCss($colorScheme, 'flip-icon', 'pulse-glow');
-        $script = CardFlipStyles::getFlipScript('.card-flip-container', '.flip-icon', false);
-        
-        return <<<HTML
-<style>
-{$flipCss}
-{$iconCss}
-{$pulseCss}
-</style>
-<script>
-{$script}
-</script>
-HTML;
+        return CardFlipStyles::getTradingCardFlipStyles();
     }
 
     /**

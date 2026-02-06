@@ -471,7 +471,7 @@ class SeasonArchiveViewTest extends TestCase
         $this->assertStringContainsString('Arvydas Sabonis', $result);
     }
 
-    public function testRenderIndexEmitsStylesWhenEnrichmentDataProvided(): void
+    public function testRenderIndexOmitsInlineStylesAfterCssCentralization(): void
     {
         $seasons = [
             ['year' => 1989, 'label' => 'Season I (1988-89)', 'iblChampion' => 'Clippers', 'heatChampion' => 'Rockets', 'mvp' => 'Arvydas Sabonis'],
@@ -482,7 +482,8 @@ class SeasonArchiveViewTest extends TestCase
 
         $result = $this->view->renderIndex($seasons, $teamColors);
 
-        $this->assertStringContainsString('<style>', $result);
+        // CSS is now centralized in design/components/season-archive.css
+        $this->assertStringNotContainsString('<style>', $result);
     }
 
     public function testRenderIndexWithoutEnrichmentDataOmitsStyles(): void

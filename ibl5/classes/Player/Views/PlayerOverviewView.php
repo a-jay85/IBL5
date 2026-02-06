@@ -111,9 +111,6 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
         <th>BLK</th>
         <th>PF</th>
     </tr>
-<style>
-    .gamelog {text-align: center;}
-</style>
         <?php
         foreach ($boxScores as $row) {
             /** @var array{Date: string, homeTID: int, visitorTID: int, gameMIN: int, game2GM: int, game2GA: int, game3GM: int, game3GA: int, gameFTM: int, gameFTA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int} $row */

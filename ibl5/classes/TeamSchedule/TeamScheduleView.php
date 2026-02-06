@@ -74,37 +74,13 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
     /**
      * Render CSS custom properties for team colors
+     *
+     * Sets --team-primary and --team-secondary on the container element.
+     * The corresponding style rules are in design/components/existing-components.css.
      */
     private function renderTeamColorStyles(string $color1, string $color2): string
     {
-        return '<style>
-            .schedule-container--team {
-                --team-primary: #' . $color1 . ';
-                --team-secondary: #' . $color2 . ';
-            }
-            .schedule-container--team .schedule-month__header {
-                background: var(--team-primary);
-                color: var(--team-secondary);
-            }
-            .schedule-container--team .schedule-month__header--playoffs {
-                background: var(--accent-500);
-                color: white;
-            }
-            .schedule-container--team .ibl-jump-menu__link:hover {
-                background: var(--team-primary);
-                color: var(--team-secondary);
-            }
-            .schedule-container--team .schedule-jump-btn {
-                background: var(--team-primary) !important;
-                color: var(--team-secondary) !important;
-                box-shadow: 0 2px 8px color-mix(in srgb, var(--team-primary) 40%, transparent);
-            }
-            .schedule-container--team .schedule-jump-btn:hover {
-                background: var(--team-primary) !important;
-                opacity: 0.9;
-                box-shadow: 0 4px 12px color-mix(in srgb, var(--team-primary) 50%, transparent);
-            }
-        </style>';
+        return '<style>.schedule-container--team{--team-primary:#' . $color1 . ';--team-secondary:#' . $color2 . ';}</style>';
     }
 
     /**

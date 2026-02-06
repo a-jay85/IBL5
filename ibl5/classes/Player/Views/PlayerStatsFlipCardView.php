@@ -29,17 +29,16 @@ class PlayerStatsFlipCardView
     ];
 
     /**
-     * Get styles and scripts for stats flip functionality
-     * 
-     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
-     * @return string HTML with CSS and JavaScript
+     * Get scripts for stats flip functionality
+     *
+     * CSS is now centralized in design/components/player-cards.css.
+     * Only the JavaScript for flip interaction is returned.
+     *
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme (no longer used for CSS)
+     * @return string HTML script tag with JavaScript
      */
     public static function getFlipStyles(?array $colorScheme = null): string
     {
-        if ($colorScheme === null) {
-            $colorScheme = TeamColorHelper::getDefaultColorScheme();
-        }
-        
         return CardFlipStyles::getStatsCardFlipStyles($colorScheme);
     }
 
@@ -71,16 +70,21 @@ class PlayerStatsFlipCardView
         $backLabel = $showAveragesFirst ? 'Totals' : 'Averages';
         $toggleTarget = $showAveragesFirst ? 'Totals' : 'Averages';
         
+        if ($colorScheme === null) {
+            $colorScheme = TeamColorHelper::getDefaultColorScheme();
+        }
+        $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);
+
         $flipIcon = CardFlipStyles::getFlipIcon();
         $escapedCategory = htmlspecialchars($statsCategory, ENT_QUOTES, 'UTF-8');
-        
+
         ob_start();
         ?>
 <div class="stats-flip-container" data-category="<?= $escapedCategory ?>">
     <div class="stats-flip-inner">
         <!-- Front (Averages by default) -->
         <div class="stats-front">
-            <div class="player-stats-card">
+            <div class="player-stats-card" style="<?= $cssProps ?>">
                 <span class="stats-view-label"><?= $frontLabel ?></span>
                 <button class="stats-flip-toggle pulse" title="Switch to <?= $toggleTarget ?>">
                     <?= $flipIcon ?>
@@ -89,10 +93,10 @@ class PlayerStatsFlipCardView
                 <?= $frontContent ?>
             </div>
         </div>
-        
+
         <!-- Back (Totals by default) -->
         <div class="stats-back">
-            <div class="player-stats-card">
+            <div class="player-stats-card" style="<?= $cssProps ?>">
                 <span class="stats-view-label"><?= $backLabel ?></span>
                 <button class="stats-flip-toggle" title="Switch to <?= $frontLabel ?>">
                     <?= $flipIcon ?>

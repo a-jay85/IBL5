@@ -19,8 +19,8 @@ namespace Team\Contracts;
  * @phpstan-type PowerRow array{TeamID: int, Team: string, Division: string, Conference: string, ranking: float, win: int, loss: int, gb: float, conf_win: int, conf_loss: int, div_win: int, div_loss: int, home_win: int, home_loss: int, road_win: int, road_loss: int, last_win: int, last_loss: int, streak_type: string, streak: int, created_at: string, updated_at: string}
  * @phpstan-type BannerRow array{year: int, currentname: string, bannername: string, bannertype: int}
  * @phpstan-type GMHistoryRow array{year: string, name: string, Award: string, prim: int}
- * @phpstan-type TeamAwardRow array{year: string, name: string, Award: string, ID: int}
- * @phpstan-type WinLossRow array{year: string, currentname: string, namethatyear: string, wins: string, losses: string, table_ID: int}
+ * @phpstan-type TeamAwardRow array{year: int, name: string, Award: string, ID: int}
+ * @phpstan-type WinLossRow array{year: int, currentname: string, namethatyear: string, wins: int, losses: int, table_ID: int}
  * @phpstan-type HEATWinLossRow array{year: int, currentname: string, namethatyear: string, wins: int, losses: int, table_ID: int}
  * @phpstan-type PlayoffResultRow array{year: int, round: int, winner: string, loser: string, loser_games: int, id: int}
  * @phpstan-type HistRow array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, r_2ga: int, r_2gp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_oo: int, r_do: int, r_po: int, r_to: int, r_od: int, r_dd: int, r_pd: int, r_td: int, salary: int, nuke_iblhist: int, created_at: string, updated_at: string}

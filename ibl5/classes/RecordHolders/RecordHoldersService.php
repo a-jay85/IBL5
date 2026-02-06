@@ -476,7 +476,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     /**
      * Format season win/loss records.
      *
-     * @param list<array{team_name: string, year: string, wins: int, losses: int}> $dbRecords
+     * @param list<array{team_name: string, year: int, wins: int, losses: int}> $dbRecords
      * @return list<FormattedTeamSeasonRecord>
      */
     private function formatSeasonWinLossRecords(array $dbRecords): array
@@ -484,7 +484,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         /** @var list<FormattedTeamSeasonRecord> $formatted */
         $formatted = [];
         foreach ($dbRecords as $record) {
-            $endingYear = (int) $record['year'];
+            $endingYear = $record['year'];
             $formatted[] = [
                 'teamAbbr' => $this->getTeamAbbreviationByName($record['team_name']),
                 'season' => $this->formatSeasonYearRange($endingYear),

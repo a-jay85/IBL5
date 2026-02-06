@@ -12,7 +12,7 @@ namespace SeasonArchive\Contracts;
  *
  * @phpstan-type AwardRow array{year: int, Award: string, name: string, table_ID: int}
  * @phpstan-type PlayoffRow array{year: int, round: int, winner: string, loser: string, loser_games: int, id: int}
- * @phpstan-type TeamAwardRow array{year: string, name: string, Award: string, ID: int}
+ * @phpstan-type TeamAwardRow array{year: int, name: string, Award: string, ID: int}
  * @phpstan-type GmHistoryRow array{year: string, name: string, Award: string, prim: int}
  * @phpstan-type HeatWinLossRow array{year: int, currentname: string, namethatyear: string, wins: int, losses: int, table_ID: int}
  * @phpstan-type TeamColorRow array{teamid: int, team_name: string, color1: string, color2: string}

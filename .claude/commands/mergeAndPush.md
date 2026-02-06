@@ -1,3 +1,8 @@
+---
+allowed-tools: Bash(bash:*)
+description: Merge master into production and push both branches
+---
+
 Run the merge-master-to-production-and-push script. Execute this command:
 
 ```bash

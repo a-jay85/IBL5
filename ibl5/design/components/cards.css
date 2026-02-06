@@ -322,6 +322,8 @@
     gap: var(--space-1) var(--space-3);
     font-size: 1rem;
     line-height: 1.4;
+    width: fit-content;
+    margin-inline: auto;
 }
 
 .team-info-list__label {
@@ -333,6 +335,7 @@
 
 .team-info-list__value {
     color: var(--gray-800);
+    text-align: left;
 }
 
 /* History list — year-linked records with win-loss records */
@@ -454,6 +457,7 @@
 .draft-picks-list__info {
     flex: 1;
     min-width: 0;
+    text-align: left;
 }
 
 .draft-picks-list__info a {
@@ -473,6 +477,7 @@
     font-style: italic;
     color: var(--gray-500);
     margin-top: 2px;
+    text-align: left;
 }
 
 /* Franchise History — three-column layout */

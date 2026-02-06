@@ -80,7 +80,7 @@ class SeasonArchiveRepositoryTest extends TestCase
         );
     }
 
-    public function testRepositoryQueriesGmHistoryTable(): void
+    public function testRepositoryQueriesGmAwardsTable(): void
     {
         $reflectionClass = new \ReflectionClass($this->repository);
         $fileName = $reflectionClass->getFileName();
@@ -89,9 +89,24 @@ class SeasonArchiveRepositoryTest extends TestCase
         $this->assertIsString($sourceCode);
 
         $this->assertStringContainsString(
-            'ibl_gm_history',
+            'ibl_gm_awards',
             $sourceCode,
-            'Repository must query ibl_gm_history table'
+            'Repository must query ibl_gm_awards table'
+        );
+    }
+
+    public function testRepositoryQueriesGmTenuresTable(): void
+    {
+        $reflectionClass = new \ReflectionClass($this->repository);
+        $fileName = $reflectionClass->getFileName();
+        $this->assertIsString($fileName);
+        $sourceCode = file_get_contents($fileName);
+        $this->assertIsString($sourceCode);
+
+        $this->assertStringContainsString(
+            'ibl_gm_tenures',
+            $sourceCode,
+            'Repository must query ibl_gm_tenures table'
         );
     }
 

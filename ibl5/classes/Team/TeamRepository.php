@@ -11,7 +11,8 @@ use Team\Contracts\TeamRepositoryInterface;
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  * @phpstan-import-type PowerRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type BannerRow from Contracts\TeamRepositoryInterface
- * @phpstan-import-type GMHistoryRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type GMTenureRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type GMAwardRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type TeamAwardRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type WinLossRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type HEATWinLossRow from Contracts\TeamRepositoryInterface
@@ -98,17 +99,30 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     }
 
     /**
-     * @see TeamRepositoryInterface::getGMHistory()
-     * @return list<GMHistoryRow>
+     * @see TeamRepositoryInterface::getGMTenures()
+     * @return list<GMTenureRow>
      */
-    public function getGMHistory(string $ownerName, string $teamName): array
+    public function getGMTenures(int $franchiseId): array
     {
-        $ownerAwardCode = $ownerName . " (" . $teamName . ")";
-        /** @var list<GMHistoryRow> */
+        /** @var list<GMTenureRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_gm_history WHERE name LIKE ? ORDER BY year ASC",
+            "SELECT * FROM ibl_gm_tenures WHERE franchise_id = ? ORDER BY start_season_year ASC",
+            "i",
+            $franchiseId
+        );
+    }
+
+    /**
+     * @see TeamRepositoryInterface::getGMAwards()
+     * @return list<GMAwardRow>
+     */
+    public function getGMAwards(string $gmUsername): array
+    {
+        /** @var list<GMAwardRow> */
+        return $this->fetchAll(
+            "SELECT * FROM ibl_gm_awards WHERE name = ? ORDER BY year ASC",
             "s",
-            $ownerAwardCode
+            $gmUsername
         );
     }
 

@@ -18,7 +18,8 @@ namespace Team\Contracts;
  *
  * @phpstan-type PowerRow array{TeamID: int, Team: string, Division: string, Conference: string, ranking: float, win: int, loss: int, gb: float, conf_win: int, conf_loss: int, div_win: int, div_loss: int, home_win: int, home_loss: int, road_win: int, road_loss: int, last_win: int, last_loss: int, streak_type: string, streak: int, created_at: string, updated_at: string}
  * @phpstan-type BannerRow array{year: int, currentname: string, bannername: string, bannertype: int}
- * @phpstan-type GMHistoryRow array{year: string, name: string, Award: string, prim: int}
+ * @phpstan-type GMTenureRow array{id: int, franchise_id: int, gm_username: string, start_season_year: int, end_season_year: int|null, is_mid_season_start: int, is_mid_season_end: int}
+ * @phpstan-type GMAwardRow array{year: int, Award: string, name: string, table_ID: int}
  * @phpstan-type TeamAwardRow array{year: int, name: string, Award: string, ID: int}
  * @phpstan-type WinLossRow array{year: int, currentname: string, namethatyear: string, wins: int, losses: int, table_ID: int}
  * @phpstan-type HEATWinLossRow array{year: int, currentname: string, namethatyear: string, wins: int, losses: int, table_ID: int}
@@ -68,15 +69,20 @@ interface TeamRepositoryInterface
     public function getChampionshipBanners(string $teamName): array;
 
     /**
-     * Get GM history for a team
+     * Get GM tenures for a franchise
      *
-     * Records match format: "Owner Name (Team Name)"
-     *
-     * @param string $ownerName Owner/GM name
-     * @param string $teamName Team name
-     * @return list<GMHistoryRow> Rows ordered by year ASC
+     * @param int $franchiseId Team ID (franchise_id in ibl_gm_tenures)
+     * @return list<GMTenureRow> Rows ordered by start_season_year ASC
      */
-    public function getGMHistory(string $ownerName, string $teamName): array;
+    public function getGMTenures(int $franchiseId): array;
+
+    /**
+     * Get GM awards for a specific GM
+     *
+     * @param string $gmUsername GM username
+     * @return list<GMAwardRow> Rows ordered by year ASC
+     */
+    public function getGMAwards(string $gmUsername): array;
 
     /**
      * Get team accomplishments and awards

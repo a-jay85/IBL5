@@ -16,7 +16,8 @@ use SeasonArchive\Contracts\SeasonArchiveRepositoryInterface;
  * @phpstan-import-type AwardRow from \SeasonArchive\Contracts\SeasonArchiveRepositoryInterface
  * @phpstan-import-type PlayoffRow from \SeasonArchive\Contracts\SeasonArchiveRepositoryInterface
  * @phpstan-import-type TeamAwardRow from \SeasonArchive\Contracts\SeasonArchiveRepositoryInterface
- * @phpstan-import-type GmHistoryRow from \SeasonArchive\Contracts\SeasonArchiveRepositoryInterface
+ * @phpstan-import-type GmAwardWithTeamRow from \SeasonArchive\Contracts\SeasonArchiveRepositoryInterface
+ * @phpstan-import-type GmTenureWithTeamRow from \SeasonArchive\Contracts\SeasonArchiveRepositoryInterface
  * @phpstan-import-type HeatWinLossRow from \SeasonArchive\Contracts\SeasonArchiveRepositoryInterface
  *
  * @see SeasonArchiveRepositoryInterface For the interface contract
@@ -82,13 +83,33 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     }
 
     /**
-     * @see SeasonArchiveRepositoryInterface::getAllGmHistory()
+     * @see SeasonArchiveRepositoryInterface::getAllGmAwardsWithTeams()
      */
-    public function getAllGmHistory(): array
+    public function getAllGmAwardsWithTeams(): array
     {
-        /** @var list<GmHistoryRow> */
+        /** @var list<GmAwardWithTeamRow> */
         return $this->fetchAll(
-            "SELECT year, name, Award, prim FROM ibl_gm_history"
+            "SELECT ga.year, ga.Award, ga.name AS gm_username, ti.team_name, ga.table_ID
+            FROM ibl_gm_awards ga
+            JOIN ibl_gm_tenures gt ON ga.name = gt.gm_username
+                AND ga.year >= gt.start_season_year
+                AND (gt.end_season_year IS NULL OR ga.year <= gt.end_season_year)
+            JOIN ibl_team_info ti ON gt.franchise_id = ti.teamid
+            ORDER BY ga.year ASC"
+        );
+    }
+
+    /**
+     * @see SeasonArchiveRepositoryInterface::getAllGmTenuresWithTeams()
+     */
+    public function getAllGmTenuresWithTeams(): array
+    {
+        /** @var list<GmTenureWithTeamRow> */
+        return $this->fetchAll(
+            "SELECT gt.gm_username, gt.start_season_year, gt.end_season_year, ti.team_name
+            FROM ibl_gm_tenures gt
+            JOIN ibl_team_info ti ON gt.franchise_id = ti.teamid
+            ORDER BY gt.start_season_year ASC"
         );
     }
 

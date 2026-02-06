@@ -13,7 +13,8 @@ namespace SeasonArchive\Contracts;
  * @phpstan-type AwardRow array{year: int, Award: string, name: string, table_ID: int}
  * @phpstan-type PlayoffRow array{year: int, round: int, winner: string, loser: string, loser_games: int, id: int}
  * @phpstan-type TeamAwardRow array{year: int, name: string, Award: string, ID: int}
- * @phpstan-type GmHistoryRow array{year: string, name: string, Award: string, prim: int}
+ * @phpstan-type GmAwardWithTeamRow array{year: int, Award: string, gm_username: string, team_name: string, table_ID: int}
+ * @phpstan-type GmTenureWithTeamRow array{gm_username: string, start_season_year: int, end_season_year: int|null, team_name: string}
  * @phpstan-type HeatWinLossRow array{year: int, currentname: string, namethatyear: string, wins: int, losses: int, table_ID: int}
  * @phpstan-type TeamColorRow array{teamid: int, team_name: string, color1: string, color2: string}
  *
@@ -56,11 +57,18 @@ interface SeasonArchiveRepositoryInterface
     public function getTeamAwardsByYear(int $year): array;
 
     /**
-     * Get all GM history records for parsing GM of the Year
+     * Get all GM awards with associated team names (via tenure JOIN)
      *
-     * @return list<GmHistoryRow> Array of GM history records
+     * @return list<GmAwardWithTeamRow> Array of GM award records with team names
      */
-    public function getAllGmHistory(): array;
+    public function getAllGmAwardsWithTeams(): array;
+
+    /**
+     * Get all GM tenures with associated team names
+     *
+     * @return list<GmTenureWithTeamRow> Array of GM tenure records with team names
+     */
+    public function getAllGmTenuresWithTeams(): array;
 
     /**
      * Get HEAT win/loss standings for a given HEAT year

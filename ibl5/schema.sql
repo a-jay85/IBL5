@@ -433,20 +433,8 @@ CREATE TABLE `ibl_gm_awards` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `ibl_gm_history`
+-- NOTE: ibl_gm_history has been replaced by ibl_gm_awards + ibl_gm_tenures above
 --
-
-DROP TABLE IF EXISTS `ibl_gm_history`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `ibl_gm_history` (
-  `year` varchar(35) NOT NULL,
-  `name` varchar(50) NOT NULL,
-  `Award` varchar(350) NOT NULL,
-  `prim` int(11) NOT NULL,
-  PRIMARY KEY (`prim`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `ibl_gm_tenures`

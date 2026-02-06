@@ -92,7 +92,8 @@ class SeasonArchiveServiceTest extends TestCase
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([
             ['year' => '<B>1989</B>', 'name' => 'Rockets', 'Award' => '<B>IBL HEAT Champions</b>', 'ID' => 11],
         ]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([]);
+        $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([
             ['year' => 1988, 'currentname' => 'Clippers', 'namethatyear' => 'Clippers', 'wins' => 10, 'losses' => 2, 'table_ID' => 13],
         ]);
@@ -129,7 +130,8 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([]);
+        $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
         $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
 
@@ -150,7 +152,8 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([]);
+        $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
         $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
@@ -160,21 +163,18 @@ class SeasonArchiveServiceTest extends TestCase
         $this->assertSame('Test Player', $result['tournaments']['oneOnOneChampion']);
     }
 
-    public function testGmOfYearParsedFromHtml(): void
+    public function testGmOfYearFromNormalizedData(): void
     {
         $this->mockRepository->method('getAwardsByYear')->willReturn([
             ['year' => 1990, 'Award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_ID' => 1],
         ]);
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([
-            [
-                'year' => '<B>1988-Present:</b>',
-                'name' => 'Ross Gates (Bulls)',
-                'Award' => '<B>Ross Gates</B><BR>GM of the Year: 1990, 1993<BR>ASG Head Coach: 1990, 1993, 1996',
-                'prim' => 1,
-            ],
+        $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([
+            ['year' => 1990, 'Award' => 'GM of the Year', 'gm_username' => 'Ross Gates', 'team_name' => 'Bulls', 'table_ID' => 8],
+            ['year' => 1993, 'Award' => 'GM of the Year', 'gm_username' => 'Ross Gates', 'team_name' => 'Bulls', 'table_ID' => 9],
         ]);
+        $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
         $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
@@ -191,14 +191,10 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([
-            [
-                'year' => '<B>1988-Present:</b>',
-                'name' => 'Ross Gates (Bulls)',
-                'Award' => '<B>Ross Gates</B><BR>GM of the Year: 1990, 1993<BR>ASG Head Coach: 1990, 1993',
-                'prim' => 1,
-            ],
+        $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([
+            ['year' => 1990, 'Award' => 'GM of the Year', 'gm_username' => 'Ross Gates', 'team_name' => 'Bulls', 'table_ID' => 8],
         ]);
+        $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
         $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
@@ -218,7 +214,8 @@ class SeasonArchiveServiceTest extends TestCase
             ['year' => '<B>1989</B>', 'name' => 'Clippers', 'Award' => '<B>Pacific Division Champions</b>', 'ID' => 5],
             ['year' => '<B>1989</B>', 'name' => 'Clippers', 'Award' => '<B>IBL Champions</b>', 'ID' => 8],
         ]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([]);
+        $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
         $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
@@ -238,7 +235,8 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([]);
+        $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
         $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
@@ -257,7 +255,8 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([]);
+        $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
         $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
@@ -276,7 +275,6 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([]);
 
         $seasons = $this->service->getAllSeasons();
 
@@ -294,7 +292,6 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([]);
 
         $seasons = $this->service->getAllSeasons();
 
@@ -314,7 +311,8 @@ class SeasonArchiveServiceTest extends TestCase
             ['year' => 1989, 'round' => 4, 'winner' => 'Clippers', 'loser' => 'Raptors', 'loser_games' => 3, 'id' => 15],
         ]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([]);
+        $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
         $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
@@ -343,7 +341,8 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([]);
+        $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
         $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
@@ -364,7 +363,8 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([]);
+        $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $this->mockRepository->method('getAllGmTenuresWithTeams')->willReturn([]);
         $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
         $this->mockRepository->method('getTeamColors')->willReturn([]);
 
@@ -385,31 +385,6 @@ class SeasonArchiveServiceTest extends TestCase
 
     public function testAllStarCoachesIncludedInSeasonDetail(): void
     {
-        $this->mockRepository->method('getAwardsByYear')->willReturn([
-            ['year' => 1990, 'Award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_ID' => 1],
-        ]);
-        $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([]);
-        $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
-        $this->mockRepository->method('getAllGmHistory')->willReturn([
-            [
-                'year' => '<B>1988-Present:</b>',
-                'name' => 'Ross Gates (Bulls)',
-                'Award' => '<B>Ross Gates</B><BR>GM of the Year: 1990, 1993<BR>ASG Head Coach: 1990, 1993, 1996',
-                'prim' => 1,
-            ],
-            [
-                'year' => '<B>1988-Present:</b>',
-                'name' => 'Brandon Tomyoy (Clippers)',
-                'Award' => '<B>Brandon Tomyoy</B><BR>ASG Head Coach: 1990, 2001',
-                'prim' => 2,
-            ],
-        ]);
-        $this->mockRepository->method('getHeatWinLossByYear')->willReturn([]);
-        $this->mockRepository->method('getTeamColors')->willReturn([]);
-        $this->mockRepository->method('getPlayerIdsByNames')->willReturn([]);
-
-        // Override the default empty getTeamConferences with actual data
-        // Since setUp already set willReturn([]), we need a new mock for this test
         $mockRepo = $this->createMock(SeasonArchiveRepositoryInterface::class);
         $mockRepo->method('getTeamConferences')->willReturn([
             'Bulls' => 'Eastern',
@@ -420,20 +395,11 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $mockRepo->method('getPlayoffResultsByYear')->willReturn([]);
         $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
-        $mockRepo->method('getAllGmHistory')->willReturn([
-            [
-                'year' => '<B>1988-Present:</b>',
-                'name' => 'Ross Gates (Bulls)',
-                'Award' => '<B>Ross Gates</B><BR>GM of the Year: 1990, 1993<BR>ASG Head Coach: 1990, 1993, 1996',
-                'prim' => 1,
-            ],
-            [
-                'year' => '<B>1988-Present:</b>',
-                'name' => 'Brandon Tomyoy (Clippers)',
-                'Award' => '<B>Brandon Tomyoy</B><BR>ASG Head Coach: 1990, 2001',
-                'prim' => 2,
-            ],
+        $mockRepo->method('getAllGmAwardsWithTeams')->willReturn([
+            ['year' => 1990, 'Award' => 'ASG Head Coach', 'gm_username' => 'Ross Gates', 'team_name' => 'Bulls', 'table_ID' => 1],
+            ['year' => 1990, 'Award' => 'ASG Head Coach', 'gm_username' => 'Brandon Tomyoy', 'team_name' => 'Clippers', 'table_ID' => 2],
         ]);
+        $mockRepo->method('getAllGmTenuresWithTeams')->willReturn([]);
         $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
         $mockRepo->method('getTeamColors')->willReturn([]);
         $mockRepo->method('getPlayerIdsByNames')->willReturn([]);
@@ -458,20 +424,11 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $mockRepo->method('getPlayoffResultsByYear')->willReturn([]);
         $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
-        $mockRepo->method('getAllGmHistory')->willReturn([
-            [
-                'year' => '<B>1988-Present:</b>',
-                'name' => 'RJ Lilley (Grizzlies)',
-                'Award' => '<B>RJ Lilley</B><BR>ASG Co-Head Coach: 2003<BR>ASG Head Coach: 1996',
-                'prim' => 1,
-            ],
-            [
-                'year' => '<B>1988-Present:</b>',
-                'name' => 'Spec-Bob (Sting)',
-                'Award' => '<B>Mel Baltazar</B><BR>ASG Head Coach: 2003',
-                'prim' => 2,
-            ],
+        $mockRepo->method('getAllGmAwardsWithTeams')->willReturn([
+            ['year' => 2003, 'Award' => 'ASG Co-Head Coach', 'gm_username' => 'RJ Lilley', 'team_name' => 'Grizzlies', 'table_ID' => 1],
+            ['year' => 2003, 'Award' => 'ASG Head Coach', 'gm_username' => 'Mel Baltazar', 'team_name' => 'Sting', 'table_ID' => 2],
         ]);
+        $mockRepo->method('getAllGmTenuresWithTeams')->willReturn([]);
         $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
         $mockRepo->method('getTeamColors')->willReturn([]);
         $mockRepo->method('getPlayerIdsByNames')->willReturn([]);
@@ -486,9 +443,6 @@ class SeasonArchiveServiceTest extends TestCase
 
     public function testAllStarCoachesEmptyWhenNoCoachesForYear(): void
     {
-        $result = $this->service->getSeasonDetail(1989);
-        // With default empty mocks, no coaches should be found
-        // But we need awards to not return null
         $mockRepo = $this->createMock(SeasonArchiveRepositoryInterface::class);
         $mockRepo->method('getTeamConferences')->willReturn([]);
         $mockRepo->method('getAwardsByYear')->willReturn([
@@ -496,7 +450,8 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $mockRepo->method('getPlayoffResultsByYear')->willReturn([]);
         $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
-        $mockRepo->method('getAllGmHistory')->willReturn([]);
+        $mockRepo->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $mockRepo->method('getAllGmTenuresWithTeams')->willReturn([]);
         $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
         $mockRepo->method('getTeamColors')->willReturn([]);
         $mockRepo->method('getPlayerIdsByNames')->willReturn([]);
@@ -519,19 +474,10 @@ class SeasonArchiveServiceTest extends TestCase
             ['year' => 1989, 'round' => 4, 'winner' => 'Clippers', 'loser' => 'Raptors', 'loser_games' => 3, 'id' => 15],
         ]);
         $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
-        $mockRepo->method('getAllGmHistory')->willReturn([
-            [
-                'year' => '<B>1988-Present:</b>',
-                'name' => 'Brandon Tomyoy (Clippers)',
-                'Award' => '<B>Brandon Tomyoy</B><BR>GM of the Year: 1989',
-                'prim' => 1,
-            ],
-            [
-                'year' => '<B>1988-Present:</b>',
-                'name' => 'Ross Gates (Bulls)',
-                'Award' => '<B>Ross Gates</B><BR>GM of the Year: 1990',
-                'prim' => 2,
-            ],
+        $mockRepo->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $mockRepo->method('getAllGmTenuresWithTeams')->willReturn([
+            ['gm_username' => 'Brandon Tomyoy', 'start_season_year' => 1988, 'end_season_year' => null, 'team_name' => 'Clippers'],
+            ['gm_username' => 'Ross Gates', 'start_season_year' => 1988, 'end_season_year' => null, 'team_name' => 'Bulls'],
         ]);
         $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
         $mockRepo->method('getTeamColors')->willReturn([]);
@@ -554,19 +500,10 @@ class SeasonArchiveServiceTest extends TestCase
             ['year' => 2000, 'round' => 4, 'winner' => 'Lakers', 'loser' => 'Raptors', 'loser_games' => 2, 'id' => 15],
         ]);
         $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
-        $mockRepo->method('getAllGmHistory')->willReturn([
-            [
-                'year' => '<B>1988-1999:</b>',
-                'name' => 'Andre Ivarsson (Lakers)',
-                'Award' => '<B>Tony (Tek)</B><BR>GM of the Year: 1991',
-                'prim' => 1,
-            ],
-            [
-                'year' => '<B>1999-Present:</B>',
-                'name' => 'Andre Ivarsson (Lakers)',
-                'Award' => '<B>Andre Ivarsson</B><BR>ASG Co-Head Coach: 2003',
-                'prim' => 2,
-            ],
+        $mockRepo->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $mockRepo->method('getAllGmTenuresWithTeams')->willReturn([
+            ['gm_username' => 'Tony (Tek)', 'start_season_year' => 1988, 'end_season_year' => 1999, 'team_name' => 'Lakers'],
+            ['gm_username' => 'Andre Ivarsson', 'start_season_year' => 1999, 'end_season_year' => null, 'team_name' => 'Lakers'],
         ]);
         $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
         $mockRepo->method('getTeamColors')->willReturn([]);
@@ -588,7 +525,8 @@ class SeasonArchiveServiceTest extends TestCase
         ]);
         $mockRepo->method('getPlayoffResultsByYear')->willReturn([]);
         $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
-        $mockRepo->method('getAllGmHistory')->willReturn([]);
+        $mockRepo->method('getAllGmAwardsWithTeams')->willReturn([]);
+        $mockRepo->method('getAllGmTenuresWithTeams')->willReturn([]);
         $mockRepo->method('getHeatWinLossByYear')->willReturn([]);
         $mockRepo->method('getTeamColors')->willReturn([]);
         $mockRepo->method('getPlayerIdsByNames')->willReturn([]);

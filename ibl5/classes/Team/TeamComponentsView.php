@@ -11,7 +11,8 @@ use Team\Contracts\TeamRepositoryInterface;
 /**
  * @phpstan-import-type PowerRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type BannerRow from Contracts\TeamRepositoryInterface
- * @phpstan-import-type GMHistoryRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type GMTenureRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type GMAwardRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type TeamAwardRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type WinLossRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type HEATWinLossRow from Contracts\TeamRepositoryInterface
@@ -315,7 +316,22 @@ class TeamComponentsView implements TeamComponentsViewInterface
     public function gmHistory(object $team): string
     {
         /** @var \Team $team */
-        return $this->renderAwardsList($this->repository->getGMHistory($team->ownerName, $team->name));
+        $tenures = $this->repository->getGMTenures($team->teamID);
+        $awards = $this->repository->getGMAwards($team->ownerName);
+
+        $tenureHtml = $this->renderGMTenureList($tenures);
+        $awardsHtml = $this->renderGMAwardsList($awards);
+
+        if ($tenureHtml === '' && $awardsHtml === '') {
+            return '';
+        }
+
+        $output = $tenureHtml;
+        if ($awardsHtml !== '') {
+            $output .= $awardsHtml;
+        }
+
+        return $output;
     }
 
     /**
@@ -476,9 +492,61 @@ class TeamComponentsView implements TeamComponentsViewInterface
     }
 
     /**
+     * Render GM tenure list as HTML
+     *
+     * @param list<GMTenureRow> $tenures
+     */
+    private function renderGMTenureList(array $tenures): string
+    {
+        if ($tenures === []) {
+            return '';
+        }
+
+        $output = '<ul class="team-awards-list">';
+
+        foreach ($tenures as $tenure) {
+            $start = $tenure['start_season_year'];
+            $end = $tenure['end_season_year'];
+            $endLabel = $end === null ? 'Present' : (string) $end;
+            /** @var string $username */
+            $username = \Utilities\HtmlSanitizer::safeHtmlOutput($tenure['gm_username']);
+            $output .= "<li><span class=\"award-year\">$start-$endLabel</span> $username</li>";
+        }
+
+        $output .= '</ul>';
+
+        return $output;
+    }
+
+    /**
+     * Render GM awards list as HTML
+     *
+     * @param list<GMAwardRow> $awards
+     */
+    private function renderGMAwardsList(array $awards): string
+    {
+        if ($awards === []) {
+            return '';
+        }
+
+        $output = '<ul class="team-awards-list">';
+
+        foreach ($awards as $award) {
+            $year = $award['year'];
+            /** @var string $awardName */
+            $awardName = \Utilities\HtmlSanitizer::safeHtmlOutput($award['Award']);
+            $output .= "<li><span class=\"award-year\">$year</span> $awardName</li>";
+        }
+
+        $output .= '</ul>';
+
+        return $output;
+    }
+
+    /**
      * Render a list of awards/accomplishments from year+Award rows.
      *
-     * @param list<array{year: int|string, Award: string}> $awards
+     * @param list<array{year: int, Award: string}> $awards
      */
     private function renderAwardsList(array $awards): string
     {
@@ -489,12 +557,10 @@ class TeamComponentsView implements TeamComponentsViewInterface
         $output = '<ul class="team-awards-list">';
 
         foreach ($awards as $record) {
-            $year = (int) $record['year'];
-            $rawAward = preg_replace('/<br\s*\/?>/i', "\n", $record['Award']) ?? $record['Award'];
+            $year = $record['year'];
             /** @var string $sanitizedAward */
-            $sanitizedAward = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($rawAward));
-            $award = nl2br($sanitizedAward);
-            $output .= "<li><span class=\"award-year\">$year</span> $award</li>";
+            $sanitizedAward = \Utilities\HtmlSanitizer::safeHtmlOutput($record['Award']);
+            $output .= "<li><span class=\"award-year\">$year</span> $sanitizedAward</li>";
         }
 
         $output .= '</ul>';

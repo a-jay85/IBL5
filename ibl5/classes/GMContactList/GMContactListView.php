@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace GMContactList;
 
 use GMContactList\Contracts\GMContactListViewInterface;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -97,12 +98,6 @@ class GMContactListView implements GMContactListViewInterface
     private function renderContactRow(array $contact): string
     {
         $teamId = (int) $contact['teamid'];
-        /** @var string $teamName */
-        $teamName = HtmlSanitizer::safeHtmlOutput($contact['team_name']);
-        /** @var string $color1 */
-        $color1 = HtmlSanitizer::safeHtmlOutput($contact['color1']);
-        /** @var string $color2 */
-        $color2 = HtmlSanitizer::safeHtmlOutput($contact['color2']);
         /** @var string $ownerName */
         $ownerName = HtmlSanitizer::safeHtmlOutput($contact['owner_name']);
         $discordID = $contact['discordID'];
@@ -113,17 +108,12 @@ class GMContactListView implements GMContactListViewInterface
             $gmCell = $ownerName;
         }
 
-        return "<tr data-team-id=\"{$teamId}\">
-    <td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
-        <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$teamId}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
-            <img src=\"images/logo/new{$teamId}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-            <span class=\"ibl-team-cell__text\">{$teamName}</span>
-        </a>
-    </td>
-    <td class=\"gm-cell\">
-        {$gmCell}
-    </td>
-</tr>";
+        $teamCell = TeamCellHelper::renderTeamCell($teamId, $contact['team_name'], $contact['color1'], $contact['color2']);
+
+        return "<tr data-team-id=\"{$teamId}\">"
+            . $teamCell
+            . "<td class=\"gm-cell\">{$gmCell}</td>"
+            . '</tr>';
     }
 
     /**

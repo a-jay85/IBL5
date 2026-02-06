@@ -7,6 +7,7 @@ namespace SeasonArchive;
 use Player\PlayerImageHelper;
 use SeasonArchive\Contracts\SeasonArchiveServiceInterface;
 use SeasonArchive\Contracts\SeasonArchiveViewInterface;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -164,7 +165,7 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
         $pid = $playerIds[$name] ?? null;
         if ($pid !== null) {
             $thumbnail = PlayerImageHelper::renderThumbnail($pid);
-            return '<span class="ibl-player-cell" style="white-space: nowrap;">'
+            return '<span class="ibl-player-cell">'
                 . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">'
                 . $thumbnail . self::esc($name) . '</a></span>';
         }
@@ -181,15 +182,9 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
     {
         $colors = $teamColors[$teamName] ?? null;
         if ($colors !== null) {
-            $color1 = self::esc($colors['color1']);
-            $color2 = self::esc($colors['color2']);
             $teamid = $colors['teamid'];
-            return '<td class="ibl-team-cell--colored" style="background-color: #' . $color1 . ';">'
-                . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamid . '&amp;yr=' . $year
-                . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';">'
-                . '<img src="images/logo/new' . $teamid . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">'
-                . '<span class="ibl-team-cell__text">' . self::esc($teamName) . '</span>'
-                . '</a></td>';
+            $yearUrl = TeamCellHelper::teamPageUrl($teamid, $year);
+            return TeamCellHelper::renderTeamCell($teamid, $teamName, $colors['color1'], $colors['color2'], '', $yearUrl);
         }
 
         return '<td>' . self::esc($teamName) . '</td>';

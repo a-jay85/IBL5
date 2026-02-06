@@ -7,6 +7,7 @@ namespace FreeAgencyPreview;
 use FreeAgencyPreview\Contracts\FreeAgencyPreviewServiceInterface;
 use FreeAgencyPreview\Contracts\FreeAgencyPreviewViewInterface;
 use Player\PlayerImageHelper;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -105,67 +106,46 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
 
         foreach ($freeAgents as $player) {
             $pid = $player['pid'];
-            $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $player['name']);
-            $playerThumbnail = $resolved['thumbnail'];
             $tid = $player['tid'];
-            /** @var string $name */
-            $name = HtmlSanitizer::safeHtmlOutput($resolved['name']);
             /** @var string $pos */
             $pos = HtmlSanitizer::safeHtmlOutput($player['pos']);
             $age = $player['age'];
 
-            // Team cell styling
-            /** @var string $teamName */
-            $teamName = HtmlSanitizer::safeHtmlOutput($player['teamname']);
-            /** @var string $color1 */
-            $color1 = HtmlSanitizer::safeHtmlOutput($player['color1']);
-            /** @var string $color2 */
-            $color2 = HtmlSanitizer::safeHtmlOutput($player['color2']);
+            $playerCell = PlayerImageHelper::renderFlexiblePlayerCell($pid, $player['name'], 'sticky-col');
+            $teamCell = TeamCellHelper::renderTeamCellOrFreeAgent($tid, $player['teamname'], $player['color1'], $player['color2']);
 
-            // Handle free agents (tid=0) gracefully
-            if ($tid === 0) {
-                $teamCell = '<td>Free Agent</td>';
-            } else {
-                $teamCell = "<td class=\"ibl-team-cell--colored\" style=\"background-color: #{$color1};\">
-        <a href=\"./modules.php?name=Team&amp;op=team&amp;teamID={$tid}\" class=\"ibl-team-cell__name\" style=\"color: #{$color2};\">
-            <img src=\"images/logo/new{$tid}.png\" alt=\"\" class=\"ibl-team-cell__logo\" width=\"24\" height=\"24\" loading=\"lazy\">
-            <span class=\"ibl-team-cell__text\">{$teamName}</span>
-        </a>
-    </td>";
-            }
-
-            $output .= "<tr data-team-id=\"{$tid}\">
-    <td class=\"sticky-col ibl-player-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a></td>
-    {$teamCell}
-    <td class=\"fa-preview-pos-col\">{$pos}</td>
-    <td>{$age}</td>
-    <td>{$player['r_fga']}</td>
-    <td>{$player['r_fgp']}</td>
-    <td>{$player['r_fta']}</td>
-    <td>{$player['r_ftp']}</td>
-    <td>{$player['r_tga']}</td>
-    <td>{$player['r_tgp']}</td>
-    <td>{$player['r_orb']}</td>
-    <td>{$player['r_drb']}</td>
-    <td>{$player['r_ast']}</td>
-    <td>{$player['r_stl']}</td>
-    <td>{$player['r_to']}</td>
-    <td>{$player['r_blk']}</td>
-    <td>{$player['r_foul']}</td>
-    <td>{$player['oo']}</td>
-    <td>{$player['do']}</td>
-    <td>{$player['po']}</td>
-    <td>{$player['to']}</td>
-    <td>{$player['od']}</td>
-    <td>{$player['dd']}</td>
-    <td>{$player['pd']}</td>
-    <td>{$player['td']}</td>
-    <td>{$player['loyalty']}</td>
-    <td>{$player['winner']}</td>
-    <td>{$player['playingTime']}</td>
-    <td>{$player['security']}</td>
-    <td>{$player['tradition']}</td>
-</tr>";
+            $output .= "<tr data-team-id=\"{$tid}\">"
+                . $playerCell
+                . $teamCell
+                . "<td class=\"fa-preview-pos-col\">{$pos}</td>"
+                . "<td>{$age}</td>"
+                . "<td>{$player['r_fga']}</td>"
+                . "<td>{$player['r_fgp']}</td>"
+                . "<td>{$player['r_fta']}</td>"
+                . "<td>{$player['r_ftp']}</td>"
+                . "<td>{$player['r_tga']}</td>"
+                . "<td>{$player['r_tgp']}</td>"
+                . "<td>{$player['r_orb']}</td>"
+                . "<td>{$player['r_drb']}</td>"
+                . "<td>{$player['r_ast']}</td>"
+                . "<td>{$player['r_stl']}</td>"
+                . "<td>{$player['r_to']}</td>"
+                . "<td>{$player['r_blk']}</td>"
+                . "<td>{$player['r_foul']}</td>"
+                . "<td>{$player['oo']}</td>"
+                . "<td>{$player['do']}</td>"
+                . "<td>{$player['po']}</td>"
+                . "<td>{$player['to']}</td>"
+                . "<td>{$player['od']}</td>"
+                . "<td>{$player['dd']}</td>"
+                . "<td>{$player['pd']}</td>"
+                . "<td>{$player['td']}</td>"
+                . "<td>{$player['loyalty']}</td>"
+                . "<td>{$player['winner']}</td>"
+                . "<td>{$player['playingTime']}</td>"
+                . "<td>{$player['security']}</td>"
+                . "<td>{$player['tradition']}</td>"
+                . '</tr>';
         }
 
         return $output;

@@ -50,7 +50,7 @@ class VotingResultsTableRenderer implements VotingResultsTableRendererInterface
             $pid = $row['pid'] ?? 0;
 
             if ($pid > 0) {
-                $nameCell = '<td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . PlayerImageHelper::renderThumbnail($pid) . $name . '</a></td>';
+                $nameCell = PlayerImageHelper::renderFlexiblePlayerCell($pid, $row['name']);
             } else {
                 $nameCell = '<td>' . $name . '</td>';
             }

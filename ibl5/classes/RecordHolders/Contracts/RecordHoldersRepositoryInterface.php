@@ -84,7 +84,7 @@ namespace RecordHolders\Contracts;
  *
  * @phpstan-type SeasonWinLossRecord array{
  *     team_name: string,
- *     year: string,
+ *     year: int,
  *     wins: int,
  *     losses: int
  * }

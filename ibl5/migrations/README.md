@@ -153,6 +153,63 @@ Implements:
 - Invalid data prevented at database level
 - API reliability improved with data validation
 
+### 009_schema_optimization_audit.sql (Phase 9) 🎯 PENDING
+
+**Priority:** Medium (Schema Quality & Performance)
+**Estimated Time:** 15-30 minutes
+**Risk Level:** Low-Medium
+
+**Prerequisites:**
+- Phases 1-8 must be completed
+- Database backup taken
+
+Implements the IBL5 Database Optimization Audit:
+
+**Part 1 - Remove Duplicate Indexes:**
+- Drop 7 redundant indexes across 6 tables
+- Convert `ibl_draft.draft_id` from UNIQUE KEY to proper PRIMARY KEY
+
+**Part 2 - Add Missing Primary Keys:**
+- Add PKs to 11 InnoDB tables (career stats, trade tables, banners, box_scores_teams)
+- Deduplicate career avgs data before PK addition
+
+**Part 3 - Remove Dead Columns:**
+- Drop `ibl_team_info.skype`, `.aim`, `.msn` (defunct services)
+- Drop `ibl_plr.temp` (unused scratch column)
+
+**Part 4 - Fix ibl_box_scores Missing PK:**
+- Add `id INT AUTO_INCREMENT PRIMARY KEY` (keep uuid as UNIQUE KEY)
+- Same for `ibl_box_scores_teams`
+
+**Part 5 - Create Optimization Views:**
+- `vw_current_salary` - Salary resolution (replaces CASE pattern in 5 repositories)
+- `vw_team_total_score` - Game totals from quarter scores
+- `vw_career_totals` - Regular season career totals from ibl_hist
+- `vw_series_records` - Head-to-head records (replaces 4-way UNION ALL)
+
+**Part 6 - Fix Column Types:**
+- `ibl_team_win_loss.year/wins/losses`: varchar → smallint unsigned
+- `ibl_draft_picks.year/round`: varchar → smallint/tinyint unsigned
+- `ibl_plr.htft/htin/wt`: varchar → tinyint/smallint unsigned
+- `ibl_team_awards.year`: Clean HTML `<B>` tags, convert varchar → smallint unsigned
+
+**Part 7 - Add Missing Foreign Keys:**
+- `ibl_plr.tid` → `ibl_team_info.teamid` (most critical)
+- `ibl_hist.teamid` → `ibl_team_info.teamid`
+- `ibl_schedule.Visitor/Home` → `ibl_team_info.teamid`
+- `ibl_plr_chunk.pid` → `ibl_plr.pid`
+- Drops conflicting CHECK constraints before FK addition
+
+**PHP Code Changes:**
+- `CommonMysqliRepository::getTeamTotalSalary()` → uses `vw_current_salary`
+- New methods: `getTeamNextYearSalary()`, `getPositionSalaryCommitmentNextYear()`, `getTeamCapSpaceNextSeason()`
+- `NegotiationRepository`: Salary methods use `vw_current_salary`, `getMarketMaximums()` cached in `cache` table
+- `FreeAgencyDemandRepository::getPositionSalaryCommitment()` → uses `vw_current_salary`
+- `RecordHoldersRepository`: Uses `vw_team_total_score`, removes CAST() workarounds
+- `SeriesRecordsRepository::getSeriesRecords()` → uses `vw_series_records`
+- `SeasonArchiveRepository::getTeamAwardsByYear()` → uses `= ?` instead of `LIKE ?`
+- PHPStan type annotations updated for new column types
+
 ### 007_enable_native_types.md (PHP Configuration) ✅ COMPLETED
 
 **Priority:** High (Runtime Type Safety)
@@ -742,6 +799,7 @@ For issues or questions:
 - **Phase 4:** Data Type Refinements (TINYINT, SMALLINT, ENUM, CHECK) - ✅ DONE (Nov 9, 2025)
 - **Phase 5.1:** Composite Indexes - ✅ DONE
 - **Phase 7:** Native PHP Type Casting - ✅ DONE (Jan 26, 2026)
+- **Phase 9:** Schema Optimization Audit - 🎯 PENDING (Feb 2026)
 
 ### 🎉 Phase 4 Implementation Complete!
 

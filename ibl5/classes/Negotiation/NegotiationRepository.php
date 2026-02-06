@@ -10,8 +10,6 @@ use Negotiation\Contracts\NegotiationRepositoryInterface;
 /**
  * @see NegotiationRepositoryInterface
  * @see BaseMysqliRepository
- *
- * @phpstan-type ContractRow array{cy: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int}
  */
 class NegotiationRepository extends BaseMysqliRepository implements NegotiationRepositoryInterface
 {
@@ -56,10 +54,10 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
      */
     public function getPositionSalaryCommitment(string $teamName, string $position, string $excludePlayerName): int
     {
-        /** @var list<ContractRow> $rows */
-        $rows = $this->fetchAll(
-            "SELECT cy, cy2, cy3, cy4, cy5, cy6
-             FROM ibl_plr
+        /** @var array{total_salary: int|null}|null $result */
+        $result = $this->fetchOne(
+            "SELECT SUM(next_year_salary) AS total_salary
+             FROM vw_current_salary
              WHERE teamname = ?
                AND pos = ?
                AND name != ?",
@@ -69,30 +67,7 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
             $excludePlayerName
         );
 
-        $totalCommitted = 0;
-
-        foreach ($rows as $row) {
-            // Look at salary committed next year (for extensions)
-            switch ($row['cy']) {
-                case 1:
-                    $totalCommitted += $row['cy2'];
-                    break;
-                case 2:
-                    $totalCommitted += $row['cy3'];
-                    break;
-                case 3:
-                    $totalCommitted += $row['cy4'];
-                    break;
-                case 4:
-                    $totalCommitted += $row['cy5'];
-                    break;
-                case 5:
-                    $totalCommitted += $row['cy6'];
-                    break;
-            }
-        }
-
-        return $totalCommitted;
+        return (int) ($result['total_salary'] ?? 0);
     }
 
     /**
@@ -100,40 +75,16 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
      */
     public function getTeamCapSpaceNextSeason(string $teamName): int
     {
-        /** @var list<ContractRow> $rows */
-        $rows = $this->fetchAll(
-            "SELECT cy, cy2, cy3, cy4, cy5, cy6
-             FROM ibl_plr
-             WHERE teamname = ?
-               AND retired = '0'",
+        /** @var array{total_salary: int|null}|null $result */
+        $result = $this->fetchOne(
+            "SELECT SUM(next_year_salary) AS total_salary
+             FROM vw_current_salary
+             WHERE teamname = ?",
             "s",
             $teamName
         );
 
-        $capSpace = \League::HARD_CAP_MAX;
-
-        foreach ($rows as $row) {
-            // Look at salary committed next year
-            switch ($row['cy']) {
-                case 1:
-                    $capSpace -= $row['cy2'];
-                    break;
-                case 2:
-                    $capSpace -= $row['cy3'];
-                    break;
-                case 3:
-                    $capSpace -= $row['cy4'];
-                    break;
-                case 4:
-                    $capSpace -= $row['cy5'];
-                    break;
-                case 5:
-                    $capSpace -= $row['cy6'];
-                    break;
-            }
-        }
-
-        return $capSpace;
+        return \League::HARD_CAP_MAX - (int) ($result['total_salary'] ?? 0);
     }
 
     /**
@@ -154,9 +105,30 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
     /**
      * @see NegotiationRepositoryInterface::getMarketMaximums()
      *
+     * Results are cached in the `cache` table for 24 hours since values only change after sim updates.
+     *
      * @return array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, td: int}
      */
     public function getMarketMaximums(): array
+    {
+        $cached = $this->readMarketMaximumsCache();
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $maximums = $this->computeMarketMaximums();
+        $this->writeMarketMaximumsCache($maximums);
+
+        return $maximums;
+    }
+
+    private const MARKET_MAX_CACHE_KEY = 'market_maximums';
+    private const MARKET_MAX_TTL = 86400; // 24 hours
+
+    /**
+     * @return array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, td: int}
+     */
+    private function computeMarketMaximums(): array
     {
         /** @var array{fga: int|null, fgp: int|null, fta: int|null, ftp: int|null, tga: int|null, tgp: int|null, orb: int|null, drb: int|null, ast: int|null, stl: int|null, r_to: int|null, blk: int|null, foul: int|null, oo: int|null, od: int|null, do: int|null, dd: int|null, po: int|null, pd: int|null, td: int|null}|null $result */
         $result = $this->fetchOne(
@@ -220,5 +192,54 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
             'pd' => $ensurePositive($result['pd']),
             'td' => $ensurePositive($result['td']),
         ];
+    }
+
+    /**
+     * @return array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, td: int}|null
+     */
+    private function readMarketMaximumsCache(): ?array
+    {
+        /** @var array{value: string, expiration: int}|null $row */
+        $row = $this->fetchOne(
+            "SELECT `value`, `expiration` FROM `cache` WHERE `key` = ?",
+            "s",
+            self::MARKET_MAX_CACHE_KEY
+        );
+
+        if ($row === null || !isset($row['expiration']) || !isset($row['value'])) {
+            return null;
+        }
+
+        if ($row['expiration'] < time()) {
+            return null;
+        }
+
+        /** @var mixed $decoded */
+        $decoded = json_decode($row['value'], true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        /** @var array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, td: int} $decoded */
+        return $decoded;
+    }
+
+    /**
+     * @param array{fga: int, fgp: int, fta: int, ftp: int, tga: int, tgp: int, orb: int, drb: int, ast: int, stl: int, to: int, blk: int, foul: int, oo: int, od: int, do: int, dd: int, po: int, pd: int, td: int} $maximums
+     */
+    private function writeMarketMaximumsCache(array $maximums): void
+    {
+        $encoded = json_encode($maximums);
+        if ($encoded === false) {
+            return;
+        }
+
+        $this->execute(
+            "REPLACE INTO `cache` (`key`, `value`, `expiration`) VALUES (?, ?, ?)",
+            "ssi",
+            self::MARKET_MAX_CACHE_KEY,
+            $encoded,
+            time() + self::MARKET_MAX_TTL
+        );
     }
 }

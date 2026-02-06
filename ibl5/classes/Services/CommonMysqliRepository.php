@@ -21,7 +21,7 @@ namespace Services;
  *
  * @phpstan-type UserRow array{user_id: int, username: string, user_email: string, user_ibl_team: string, name: string, date_started: string, discordID: ?int, user_password: string, user_level: int, user_active: ?int, ...}
  * @phpstan-type TeamInfoRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, owner_name: string, owner_email: string, discordID: ?int, formerly_known_as: ?string, Used_Extension_This_Chunk: int, Used_Extension_This_Season: ?int, HasMLE: int, HasLLE: int, ...}
- * @phpstan-type PlayerRow array{pid: int, name: string, nickname: ?string, age: ?int, tid: int, teamname: ?string, pos: string, sta: ?int, exp: ?int, bird: ?int, cy: ?int, cyt: ?int, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int, ordinal: ?int, active: ?int, injured: ?int, retired: ?int, droptime: ?int, stats_gs: ?int, stats_gm: ?int, stats_min: ?int, stats_fgm: ?int, stats_fga: ?int, stats_ftm: ?int, stats_fta: ?int, stats_3gm: ?int, stats_3ga: ?int, stats_orb: ?int, stats_drb: ?int, stats_ast: ?int, stats_stl: ?int, stats_to: ?int, stats_blk: ?int, stats_pf: ?int, sh_pts: ?int, sh_reb: ?int, sh_ast: ?int, sh_stl: ?int, sh_blk: ?int, s_dd: ?int, s_td: ?int, sp_pts: ?int, sp_reb: ?int, sp_ast: ?int, sp_stl: ?int, sp_blk: ?int, ch_pts: ?int, ch_reb: ?int, ch_ast: ?int, ch_stl: ?int, ch_blk: ?int, c_dd: ?int, c_td: ?int, cp_pts: ?int, cp_reb: ?int, cp_ast: ?int, cp_stl: ?int, cp_blk: ?int, car_gm: ?int, car_min: ?int, car_fgm: ?int, car_fga: ?int, car_ftm: ?int, car_fta: ?int, car_tgm: ?int, car_tga: ?int, car_orb: ?int, car_drb: ?int, car_reb: ?int, car_ast: ?int, car_stl: ?int, car_to: ?int, car_blk: ?int, car_pf: ?int, r_fga: ?int, r_fgp: ?int, r_fta: ?int, r_ftp: ?int, r_tga: ?int, r_tgp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_to: ?int, r_blk: ?int, r_foul: ?int, oo: ?int, od: ?int, do: ?int, dd: ?int, po: ?int, pd: ?int, to: ?int, td: ?int, Clutch: ?int, Consistency: ?int, talent: ?int, skill: ?int, intangibles: ?int, loyalty: ?int, playingTime: ?int, winner: ?int, tradition: ?int, security: ?int, draftround: ?int, draftedby: ?string, draftedbycurrentname: ?string, draftyear: ?int, draftpickno: ?int, htft: ?string, htin: ?string, wt: ?string, college: ?string, dc_PGDepth: ?int, dc_SGDepth: ?int, dc_SFDepth: ?int, dc_PFDepth: ?int, dc_CDepth: ?int, dc_active: ?int, dc_minutes: ?int, dc_of: ?int, dc_df: ?int, dc_oi: ?int, dc_di: ?int, dc_bh: ?int, ...}
+ * @phpstan-type PlayerRow array{pid: int, name: string, nickname: ?string, age: ?int, tid: int, teamname: ?string, pos: string, sta: ?int, exp: ?int, bird: ?int, cy: ?int, cyt: ?int, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int, ordinal: ?int, active: ?int, injured: ?int, retired: ?int, droptime: ?int, stats_gs: ?int, stats_gm: ?int, stats_min: ?int, stats_fgm: ?int, stats_fga: ?int, stats_ftm: ?int, stats_fta: ?int, stats_3gm: ?int, stats_3ga: ?int, stats_orb: ?int, stats_drb: ?int, stats_ast: ?int, stats_stl: ?int, stats_to: ?int, stats_blk: ?int, stats_pf: ?int, sh_pts: ?int, sh_reb: ?int, sh_ast: ?int, sh_stl: ?int, sh_blk: ?int, s_dd: ?int, s_td: ?int, sp_pts: ?int, sp_reb: ?int, sp_ast: ?int, sp_stl: ?int, sp_blk: ?int, ch_pts: ?int, ch_reb: ?int, ch_ast: ?int, ch_stl: ?int, ch_blk: ?int, c_dd: ?int, c_td: ?int, cp_pts: ?int, cp_reb: ?int, cp_ast: ?int, cp_stl: ?int, cp_blk: ?int, car_gm: ?int, car_min: ?int, car_fgm: ?int, car_fga: ?int, car_ftm: ?int, car_fta: ?int, car_tgm: ?int, car_tga: ?int, car_orb: ?int, car_drb: ?int, car_reb: ?int, car_ast: ?int, car_stl: ?int, car_to: ?int, car_blk: ?int, car_pf: ?int, r_fga: ?int, r_fgp: ?int, r_fta: ?int, r_ftp: ?int, r_tga: ?int, r_tgp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_to: ?int, r_blk: ?int, r_foul: ?int, oo: ?int, od: ?int, do: ?int, dd: ?int, po: ?int, pd: ?int, to: ?int, td: ?int, Clutch: ?int, Consistency: ?int, talent: ?int, skill: ?int, intangibles: ?int, loyalty: ?int, playingTime: ?int, winner: ?int, tradition: ?int, security: ?int, draftround: ?int, draftedby: ?string, draftedbycurrentname: ?string, draftyear: ?int, draftpickno: ?int, htft: ?int, htin: ?int, wt: ?int, college: ?string, dc_PGDepth: ?int, dc_SGDepth: ?int, dc_SFDepth: ?int, dc_PFDepth: ?int, dc_CDepth: ?int, dc_active: ?int, dc_minutes: ?int, dc_of: ?int, dc_df: ?int, dc_oi: ?int, dc_di: ?int, dc_bh: ?int, ...}
  */
 class CommonMysqliRepository extends \BaseMysqliRepository
 {
@@ -193,23 +193,70 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     {
         /** @var array{total_salary: int|null}|null $result */
         $result = $this->fetchOne(
-            "SELECT SUM(
-                CASE cy
-                    WHEN 1 THEN cy1
-                    WHEN 2 THEN cy2
-                    WHEN 3 THEN cy3
-                    WHEN 4 THEN cy4
-                    WHEN 5 THEN cy5
-                    WHEN 6 THEN cy6
-                    ELSE 0
-                END
-            ) AS total_salary
-            FROM ibl_plr
-            WHERE teamname = ? AND retired = 0",
+            "SELECT SUM(current_salary) AS total_salary
+            FROM vw_current_salary
+            WHERE teamname = ?",
             "s",
             $teamName
         );
 
         return (int) ($result['total_salary'] ?? 0);
+    }
+
+    /**
+     * Gets total salary commitment for next season for a team
+     *
+     * @param string $teamName Team name
+     * @return int Next year total salary in thousands
+     */
+    public function getTeamNextYearSalary(string $teamName): int
+    {
+        /** @var array{total_salary: int|null}|null $result */
+        $result = $this->fetchOne(
+            "SELECT SUM(next_year_salary) AS total_salary
+            FROM vw_current_salary
+            WHERE teamname = ?",
+            "s",
+            $teamName
+        );
+
+        return (int) ($result['total_salary'] ?? 0);
+    }
+
+    /**
+     * Gets salary commitment at a position for next season, excluding a specific player
+     *
+     * @param string $teamName Team name
+     * @param string $position Position (PG, SG, etc.)
+     * @param int $excludePlayerID Player ID to exclude
+     * @return int Next year salary commitment at position in thousands
+     */
+    public function getPositionSalaryCommitmentNextYear(string $teamName, string $position, int $excludePlayerID): int
+    {
+        /** @var array{total_salary: int|null}|null $result */
+        $result = $this->fetchOne(
+            "SELECT SUM(next_year_salary) AS total_salary
+            FROM vw_current_salary
+            WHERE teamname = ?
+              AND pos = ?
+              AND pid != ?",
+            "ssi",
+            $teamName,
+            $position,
+            $excludePlayerID
+        );
+
+        return (int) ($result['total_salary'] ?? 0);
+    }
+
+    /**
+     * Gets cap space for next season for a team
+     *
+     * @param string $teamName Team name
+     * @return int Cap space in thousands
+     */
+    public function getTeamCapSpaceNextSeason(string $teamName): int
+    {
+        return \League::HARD_CAP_MAX - $this->getTeamNextYearSalary($teamName);
     }
 }

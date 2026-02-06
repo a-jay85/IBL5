@@ -46,41 +46,10 @@ class SeriesRecordsRepository extends \BaseMysqliRepository implements SeriesRec
      */
     public function getSeriesRecords(): array
     {
-        // This complex query aggregates wins and losses for each team pairing
-        // from both home and visitor perspectives
-        $query = "SELECT self, opponent, SUM(wins) AS wins, SUM(losses) AS losses
-                  FROM (
-                      SELECT home AS self, visitor AS opponent, COUNT(*) AS wins, 0 AS losses
-                      FROM ibl_schedule
-                      WHERE HScore > VScore
-                      GROUP BY self, opponent
-
-                      UNION ALL
-
-                      SELECT visitor AS self, home AS opponent, COUNT(*) AS wins, 0 AS losses
-                      FROM ibl_schedule
-                      WHERE VScore > HScore
-                      GROUP BY self, opponent
-
-                      UNION ALL
-
-                      SELECT home AS self, visitor AS opponent, 0 AS wins, COUNT(*) AS losses
-                      FROM ibl_schedule
-                      WHERE HScore < VScore
-                      GROUP BY self, opponent
-
-                      UNION ALL
-
-                      SELECT visitor AS self, home AS opponent, 0 AS wins, COUNT(*) AS losses
-                      FROM ibl_schedule
-                      WHERE VScore < HScore
-                      GROUP BY self, opponent
-                  ) t
-                  GROUP BY self, opponent
-                  ORDER BY self, opponent";
-
         /** @var list<array{self: int, opponent: int, wins: int, losses: int}> */
-        return $this->fetchAll($query);
+        return $this->fetchAll(
+            "SELECT self, opponent, wins, losses FROM vw_series_records ORDER BY self, opponent"
+        );
     }
 
     /**

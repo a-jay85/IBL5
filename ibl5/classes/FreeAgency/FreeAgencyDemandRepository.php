@@ -18,7 +18,6 @@ use FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface;
  *
  * @phpstan-import-type TeamPerformanceRow from \FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface
  * @phpstan-import-type PlayerDemandsRow from \FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface
- * @phpstan-import-type ContractYearRow from \FreeAgency\Contracts\FreeAgencyDemandRepositoryInterface
  */
 class FreeAgencyDemandRepository extends BaseMysqliRepository implements FreeAgencyDemandRepositoryInterface
 {
@@ -71,48 +70,20 @@ class FreeAgencyDemandRepository extends BaseMysqliRepository implements FreeAge
      */
     public function getPositionSalaryCommitment(string $teamName, string $position, int $excludePlayerID): int
     {
-        /** @var list<ContractYearRow> $rows */
-        $rows = $this->fetchAll(
-            "SELECT cy, cy1, cy2, cy3, cy4, cy5, cy6 
-             FROM ibl_plr 
-             WHERE teamname = ? 
-               AND pos = ? 
+        /** @var array{total_salary: int|null}|null $result */
+        $result = $this->fetchOne(
+            "SELECT SUM(next_year_salary) AS total_salary
+             FROM vw_current_salary
+             WHERE teamname = ?
+               AND pos = ?
                AND pid != ?",
             "ssi",
             $teamName,
             $position,
             $excludePlayerID
         );
-        
-        $totalSalary = 0;
-        
-        foreach ($rows as $row) {
-            $currentYear = (int) $row['cy'];
-            
-            // Get salary for next year based on current contract year
-            switch ($currentYear) {
-                case 0:
-                    $totalSalary += (int) $row['cy1'];
-                    break;
-                case 1:
-                    $totalSalary += (int) $row['cy2'];
-                    break;
-                case 2:
-                    $totalSalary += (int) $row['cy3'];
-                    break;
-                case 3:
-                    $totalSalary += (int) $row['cy4'];
-                    break;
-                case 4:
-                    $totalSalary += (int) $row['cy5'];
-                    break;
-                case 5:
-                    $totalSalary += (int) $row['cy6'];
-                    break;
-            }
-        }
-        
-        return $totalSalary;
+
+        return (int) ($result['total_salary'] ?? 0);
     }
 
     /**

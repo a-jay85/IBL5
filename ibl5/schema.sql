@@ -192,6 +192,7 @@ CREATE TABLE `ibl_box_scores_teams` (
   KEY `idx_date` (`Date`),
   KEY `idx_visitor_team` (`visitorTeamID`),
   KEY `idx_home_team` (`homeTeamID`),
+  KEY `idx_date_visitor_home` (`Date`,`visitorTeamID`,`homeTeamID`),
   CONSTRAINT `fk_boxscoreteam_home` FOREIGN KEY (`homeTeamID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscoreteam_visitor` FOREIGN KEY (`visitorTeamID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -752,7 +753,9 @@ CREATE TABLE `ibl_playoff_results` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`id`),
   KEY `idx_year` (`year`),
-  KEY `idx_round` (`round`)
+  KEY `idx_round` (`round`),
+  KEY `idx_winner` (`winner`),
+  KEY `idx_loser` (`loser`)
 ) ENGINE=InnoDB AUTO_INCREMENT=281 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1094,6 +1097,7 @@ CREATE TABLE `ibl_schedule` (
   KEY `idx_visitor` (`Visitor`),
   KEY `idx_home` (`Home`),
   KEY `idx_year_date` (`Year`,`Date`),
+  KEY `idx_date_visitor_home` (`Date`,`Visitor`,`Home`),
   CONSTRAINT `chk_schedule_visitor_id` CHECK (`Visitor` >= 1 and `Visitor` <= 32),
   CONSTRAINT `chk_schedule_home_id` CHECK (`Home` >= 1 and `Home` <= 32),
   CONSTRAINT `chk_schedule_vscore` CHECK (`VScore` >= 0 and `VScore` <= 200),
@@ -1229,7 +1233,9 @@ CREATE TABLE `ibl_team_awards` (
   `name` varchar(35) NOT NULL,
   `Award` varchar(350) NOT NULL,
   `ID` int(11) NOT NULL,
-  PRIMARY KEY (`ID`)
+  PRIMARY KEY (`ID`),
+  KEY `idx_award` (`Award`(50)),
+  KEY `idx_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1380,7 +1386,8 @@ CREATE TABLE `ibl_team_win_loss` (
   `wins` varchar(75) NOT NULL DEFAULT '0',
   `losses` varchar(75) NOT NULL DEFAULT '0',
   `table_ID` int(11) NOT NULL AUTO_INCREMENT,
-  PRIMARY KEY (`table_ID`)
+  PRIMARY KEY (`table_ID`),
+  KEY `idx_currentname` (`currentname`)
 ) ENGINE=InnoDB AUTO_INCREMENT=859 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

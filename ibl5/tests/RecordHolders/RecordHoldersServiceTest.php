@@ -63,8 +63,10 @@ final class RecordHoldersServiceTest extends TestCase
             'value' => 80,
         ];
 
-        $this->mockRepository->method('getTopPlayerSingleGame')
-            ->willReturn([$playerRecord]);
+        // Batch method returns all stat categories at once
+        $batchResult = $this->buildBatchPlayerResult([$playerRecord]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($batchResult);
         $this->configureOtherMocksEmpty();
 
         $result = $this->service->getAllRecords();
@@ -99,8 +101,9 @@ final class RecordHoldersServiceTest extends TestCase
             'value' => 65,
         ];
 
-        $this->mockRepository->method('getTopPlayerSingleGame')
-            ->willReturn([$heatRecord]);
+        $batchResult = $this->buildBatchPlayerResult([$heatRecord]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($batchResult);
         $this->configureOtherMocksEmpty();
 
         $result = $this->service->getAllRecords();
@@ -116,8 +119,9 @@ final class RecordHoldersServiceTest extends TestCase
         $record2 = $this->createPlayerRecord(2, 'Player B', 34);
         $record3 = $this->createPlayerRecord(3, 'Player C', 33);
 
-        $this->mockRepository->method('getTopPlayerSingleGame')
-            ->willReturn([$record1, $record2, $record3]);
+        $batchResult = $this->buildBatchPlayerResult([$record1, $record2, $record3]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($batchResult);
         $this->configureOtherMocksEmpty();
 
         $result = $this->service->getAllRecords();
@@ -134,8 +138,9 @@ final class RecordHoldersServiceTest extends TestCase
     {
         $record = $this->createPlayerRecord(1, 'Player A', 80);
 
-        $this->mockRepository->method('getTopPlayerSingleGame')
-            ->willReturn([$record]);
+        $batchResult = $this->buildBatchPlayerResult([$record]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($batchResult);
         $this->configureOtherMocksEmpty();
 
         $result = $this->service->getAllRecords();
@@ -157,8 +162,9 @@ final class RecordHoldersServiceTest extends TestCase
             'value' => 34.2,
         ];
 
-        $this->mockRepository->method('getTopSeasonAverage')
-            ->willReturn([$seasonRecord]);
+        $batchResult = $this->buildBatchSeasonResult([$seasonRecord]);
+        $this->mockRepository->method('getTopSeasonAverageBatch')
+            ->willReturn($batchResult);
         $this->configureOtherMocksEmpty();
 
         $result = $this->service->getAllRecords();
@@ -237,8 +243,9 @@ final class RecordHoldersServiceTest extends TestCase
     {
         $record = $this->createPlayerRecord(927, 'Bob Pettit', 80, 1);
 
-        $this->mockRepository->method('getTopPlayerSingleGame')
-            ->willReturn([$record]);
+        $batchResult = $this->buildBatchPlayerResult([$record]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($batchResult);
         $this->configureOtherMocksEmpty();
 
         $result = $this->service->getAllRecords();
@@ -253,8 +260,9 @@ final class RecordHoldersServiceTest extends TestCase
         $record = $this->createPlayerRecord(927, 'Bob Pettit', 80);
         $record['BoxID'] = 1731;
 
-        $this->mockRepository->method('getTopPlayerSingleGame')
-            ->willReturn([$record]);
+        $batchResult = $this->buildBatchPlayerResult([$record]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($batchResult);
         $this->configureOtherMocksEmpty();
 
         $result = $this->service->getAllRecords();
@@ -268,8 +276,9 @@ final class RecordHoldersServiceTest extends TestCase
     {
         $record = $this->createPlayerRecord(927, 'Bob Pettit', 80);
 
-        $this->mockRepository->method('getTopPlayerSingleGame')
-            ->willReturn([$record]);
+        $batchResult = $this->buildBatchPlayerResult([$record]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($batchResult);
         $this->configureOtherMocksEmpty();
 
         $result = $this->service->getAllRecords();
@@ -326,15 +335,92 @@ final class RecordHoldersServiceTest extends TestCase
     }
 
     /**
+     * Build a batch player result where every stat category has the same records.
+     *
+     * @param list<array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int}> $records
+     * @return array<string, list<array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int}>>
+     */
+    private function buildBatchPlayerResult(array $records): array
+    {
+        $categories = [
+            'Most Points in a Single Game',
+            'Most Rebounds in a Single Game',
+            'Most Assists in a Single Game',
+            'Most Steals in a Single Game',
+            'Most Blocks in a Single Game',
+            'Most Turnovers in a Single Game',
+            'Most Field Goals in a Single Game',
+            'Most Free Throws in a Single Game',
+            'Most Three Pointers in a Single Game',
+        ];
+
+        $result = [];
+        foreach ($categories as $category) {
+            $result[$category] = $records;
+        }
+        return $result;
+    }
+
+    /**
+     * Build a batch season result where every stat category has the same records.
+     *
+     * @param list<array{pid: int, name: string, teamid: int, team: string, year: int, value: float}> $records
+     * @return array<string, list<array{pid: int, name: string, teamid: int, team: string, year: int, value: float}>>
+     */
+    private function buildBatchSeasonResult(array $records): array
+    {
+        $categories = [
+            'Highest Scoring Average in a Regular Season',
+            'Highest Rebounding Average in a Regular Season',
+            'Highest Assist Average in a Regular Season',
+            'Highest Steals Average in a Regular Season',
+            'Highest Blocks Average in a Regular Season',
+        ];
+
+        $result = [];
+        foreach ($categories as $category) {
+            $result[$category] = $records;
+        }
+        return $result;
+    }
+
+    /**
+     * Build a batch team result where every stat category has the same records.
+     *
+     * @param list<array{tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int}> $records
+     * @return array<string, list<array{tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int}>>
+     */
+    private function buildBatchTeamResult(array $records): array
+    {
+        $categories = [
+            'Most Points in a Single Game',
+            'Most Rebounds in a Single Game',
+            'Most Assists in a Single Game',
+            'Most Steals in a Single Game',
+            'Most Blocks in a Single Game',
+            'Most Field Goals in a Single Game',
+            'Most Free Throws in a Single Game',
+            'Most Three Pointers in a Single Game',
+            'Fewest Points in a Single Game',
+        ];
+
+        $result = [];
+        foreach ($categories as $category) {
+            $result[$category] = $records;
+        }
+        return $result;
+    }
+
+    /**
      * Configure all repository mocks to return empty arrays.
      */
     private function configureEmptyMocks(): void
     {
-        $this->mockRepository->method('getTopPlayerSingleGame')->willReturn([]);
-        $this->mockRepository->method('getTopSeasonAverage')->willReturn([]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($this->buildBatchPlayerResult([]));
+        $this->mockRepository->method('getTopSeasonAverageBatch')->willReturn($this->buildBatchSeasonResult([]));
+        $this->mockRepository->method('getTopTeamSingleGameBatch')->willReturn($this->buildBatchTeamResult([]));
         $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
         $this->mockRepository->method('getMostAllStarAppearances')->willReturn([]);
-        $this->mockRepository->method('getTopTeamSingleGame')->willReturn([]);
         $this->mockRepository->method('getTopTeamHalfScore')->willReturn([]);
         $this->mockRepository->method('getLargestMarginOfVictory')->willReturn([]);
         $this->mockRepository->method('getBestWorstSeasonRecord')->willReturn([]);
@@ -345,14 +431,14 @@ final class RecordHoldersServiceTest extends TestCase
     }
 
     /**
-     * Configure all mocks except getTopPlayerSingleGame to return empty.
+     * Configure all mocks except getTopPlayerSingleGameBatch to return empty.
      */
     private function configureOtherMocksEmpty(): void
     {
-        $this->mockRepository->method('getTopSeasonAverage')->willReturn([]);
+        $this->mockRepository->method('getTopSeasonAverageBatch')->willReturn($this->buildBatchSeasonResult([]));
+        $this->mockRepository->method('getTopTeamSingleGameBatch')->willReturn($this->buildBatchTeamResult([]));
         $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
         $this->mockRepository->method('getMostAllStarAppearances')->willReturn([]);
-        $this->mockRepository->method('getTopTeamSingleGame')->willReturn([]);
         $this->mockRepository->method('getTopTeamHalfScore')->willReturn([]);
         $this->mockRepository->method('getLargestMarginOfVictory')->willReturn([]);
         $this->mockRepository->method('getBestWorstSeasonRecord')->willReturn([]);

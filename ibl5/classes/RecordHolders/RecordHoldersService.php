@@ -153,7 +153,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     }
 
     /**
-     * Get player single-game records for a given game type.
+     * Get player single-game records for a given game type using batch query.
      *
      * @param string $gameType One of 'regularSeason', 'playoffs', 'heat'
      * @return array<string, list<FormattedPlayerRecord>>
@@ -161,10 +161,11 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     private function getPlayerSingleGameRecords(string $gameType): array
     {
         $dateFilter = self::DATE_FILTERS[$gameType] ?? self::DATE_FILTERS['regularSeason'];
-        $records = [];
 
-        foreach (self::PLAYER_STAT_EXPRESSIONS as $category => $expression) {
-            $dbRecords = $this->repository->getTopPlayerSingleGame($expression, $dateFilter);
+        $batchResults = $this->repository->getTopPlayerSingleGameBatch(self::PLAYER_STAT_EXPRESSIONS, $dateFilter);
+
+        $records = [];
+        foreach ($batchResults as $category => $dbRecords) {
             $formatted = $this->formatPlayerRecords($dbRecords, $gameType);
             /** @var list<FormattedPlayerRecord> $withTies */
             $withTies = $this->detectTies($formatted);
@@ -302,21 +303,16 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     }
 
     /**
-     * Get player full-season records.
+     * Get player full-season records using batch query.
      *
      * @return array<string, list<FormattedSeasonRecord>>
      */
     private function getPlayerFullSeasonRecords(): array
     {
+        $batchResults = $this->repository->getTopSeasonAverageBatch(self::SEASON_STAT_COLUMNS, 50);
+
         $records = [];
-
-        foreach (self::SEASON_STAT_COLUMNS as $category => $columns) {
-            $dbRecords = $this->repository->getTopSeasonAverage(
-                $columns['statColumn'],
-                $columns['gamesColumn'],
-                50
-            );
-
+        foreach ($batchResults as $category => $dbRecords) {
             /** @var list<FormattedSeasonRecord> $formatted */
             $formatted = [];
             foreach ($dbRecords as $record) {
@@ -341,7 +337,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
     }
 
     /**
-     * Get team single-game records.
+     * Get team single-game records using batch query where possible.
      *
      * @return array<string, list<FormattedTeamGameRecord>>
      */
@@ -350,9 +346,20 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         $records = [];
         $dateFilter = self::DATE_FILTERS['regularSeason'];
 
-        // Most/fewest points
+        // Build batch config for all team stats (8 DESC + 1 ASC = 9 queries → 1)
+        /** @var array<string, array{expression: string, order: string}> $batchConfig */
+        $batchConfig = [];
         foreach (self::TEAM_STAT_EXPRESSIONS as $category => $expression) {
-            $dbRecords = $this->repository->getTopTeamSingleGame($expression, $dateFilter);
+            $batchConfig[$category] = ['expression' => $expression, 'order' => 'DESC'];
+        }
+        $batchConfig['Fewest Points in a Single Game'] = [
+            'expression' => '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)',
+            'order' => 'ASC',
+        ];
+
+        $batchResults = $this->repository->getTopTeamSingleGameBatch($batchConfig, $dateFilter);
+
+        foreach ($batchResults as $category => $dbRecords) {
             $formatted = $this->formatTeamGameRecords($dbRecords);
             /** @var list<FormattedTeamGameRecord> $withTies */
             $withTies = $this->detectTies($formatted);
@@ -360,18 +367,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
             $records[$categoryLabel] = $withTies;
         }
 
-        // Fewest points
-        $fewest = $this->repository->getTopTeamSingleGame(
-            '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)',
-            $dateFilter,
-            'ASC'
-        );
-        $formattedFewest = $this->formatTeamGameRecords($fewest);
-        /** @var list<FormattedTeamGameRecord> $fewestWithTies */
-        $fewestWithTies = $this->detectTies($formattedFewest);
-        $records[$this->addTieLabel('Fewest Points in a Single Game', $fewestWithTies)] = $fewestWithTies;
-
-        // Half scores
+        // Half scores (these use a different query structure, keep as individual calls)
         $mostHalf = $this->formatTeamGameRecords($this->repository->getTopTeamHalfScore('first', 'DESC'));
         /** @var list<FormattedTeamGameRecord> $mostHalfTies */
         $mostHalfTies = $this->detectTies($mostHalf);

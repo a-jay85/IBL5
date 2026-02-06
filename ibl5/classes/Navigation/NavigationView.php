@@ -50,7 +50,13 @@ class NavigationView
      */
     public static function resolveTeamId(\mysqli $db, string $username): ?int
     {
-        $stmt = $db->prepare("SELECT user_ibl_team FROM nuke_users WHERE username = ?");
+        $stmt = $db->prepare(
+            "SELECT ti.teamid
+             FROM nuke_users nu
+             JOIN ibl_team_info ti ON ti.team_name = nu.user_ibl_team
+             WHERE nu.username = ?
+             LIMIT 1"
+        );
         if ($stmt === false) {
             return null;
         }
@@ -62,33 +68,13 @@ class NavigationView
             return null;
         }
         $row = $result->fetch_assoc();
-        if ($row === null || $row === false) {
-            $stmt->close();
-            return null;
-        }
-        $teamName = trim((string) $row['user_ibl_team']);
         $stmt->close();
 
-        if ($teamName === '' || $teamName === '0') {
+        if ($row === null || $row === false) {
             return null;
         }
 
-        $stmt2 = $db->prepare("SELECT teamid FROM ibl_team_info WHERE team_name = ?");
-        if ($stmt2 === false) {
-            return null;
-        }
-        $stmt2->bind_param('s', $teamName);
-        $stmt2->execute();
-        $result2 = $stmt2->get_result();
-        if ($result2 === false) {
-            $stmt2->close();
-            return null;
-        }
-        $row2 = $result2->fetch_assoc();
-        $teamId = ($row2 !== null && $row2 !== false) ? (int) $row2['teamid'] : null;
-        $stmt2->close();
-
-        return $teamId;
+        return (int) $row['teamid'];
     }
 
     /**

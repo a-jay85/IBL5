@@ -117,4 +117,81 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
             $teamName
         );
     }
+
+    /**
+     * Get both offense and defense statistics for a team in a single JOIN query
+     *
+     * @see TeamOffDefStatsRepositoryInterface::getTeamBothStats()
+     * @param string $teamName Team name
+     * @return array{offense: TeamOffenseStatsRow, defense: TeamDefenseStatsRow}|null Both stats or null
+     */
+    public function getTeamBothStats(string $teamName): ?array
+    {
+        /** @var array<string, int|string|null>|null $row */
+        $row = $this->fetchOne(
+            "SELECT
+                tos.teamID AS tos_teamID, tos.name AS tos_name,
+                tos.games AS tos_games, tos.fgm AS tos_fgm, tos.fga AS tos_fga,
+                tos.ftm AS tos_ftm, tos.fta AS tos_fta, tos.tgm AS tos_tgm, tos.tga AS tos_tga,
+                tos.orb AS tos_orb, tos.reb AS tos_reb, tos.ast AS tos_ast, tos.stl AS tos_stl,
+                tos.tvr AS tos_tvr, tos.blk AS tos_blk, tos.pf AS tos_pf,
+                tds.teamID AS tds_teamID, tds.name AS tds_name,
+                tds.games AS tds_games, tds.fgm AS tds_fgm, tds.fga AS tds_fga,
+                tds.ftm AS tds_ftm, tds.fta AS tds_fta, tds.tgm AS tds_tgm, tds.tga AS tds_tga,
+                tds.orb AS tds_orb, tds.reb AS tds_reb, tds.ast AS tds_ast, tds.stl AS tds_stl,
+                tds.tvr AS tds_tvr, tds.blk AS tds_blk, tds.pf AS tds_pf
+            FROM ibl_team_offense_stats tos
+            JOIN ibl_team_defense_stats tds ON tos.teamID = tds.teamID
+            WHERE tos.name = ?
+            LIMIT 1",
+            "s",
+            $teamName
+        );
+
+        if ($row === null) {
+            return null;
+        }
+
+        /** @var TeamOffenseStatsRow $offense */
+        $offense = [
+            'teamID' => (int) $row['tos_teamID'],
+            'name' => (string) $row['tos_name'],
+            'games' => (int) $row['tos_games'],
+            'fgm' => (int) $row['tos_fgm'],
+            'fga' => (int) $row['tos_fga'],
+            'ftm' => (int) $row['tos_ftm'],
+            'fta' => (int) $row['tos_fta'],
+            'tgm' => (int) $row['tos_tgm'],
+            'tga' => (int) $row['tos_tga'],
+            'orb' => (int) $row['tos_orb'],
+            'reb' => (int) $row['tos_reb'],
+            'ast' => (int) $row['tos_ast'],
+            'stl' => (int) $row['tos_stl'],
+            'tvr' => (int) $row['tos_tvr'],
+            'blk' => (int) $row['tos_blk'],
+            'pf' => (int) $row['tos_pf'],
+        ];
+
+        /** @var TeamDefenseStatsRow $defense */
+        $defense = [
+            'teamID' => (int) $row['tds_teamID'],
+            'name' => (string) $row['tds_name'],
+            'games' => (int) $row['tds_games'],
+            'fgm' => (int) $row['tds_fgm'],
+            'fga' => (int) $row['tds_fga'],
+            'ftm' => (int) $row['tds_ftm'],
+            'fta' => (int) $row['tds_fta'],
+            'tgm' => (int) $row['tds_tgm'],
+            'tga' => (int) $row['tds_tga'],
+            'orb' => (int) $row['tds_orb'],
+            'reb' => (int) $row['tds_reb'],
+            'ast' => (int) $row['tds_ast'],
+            'stl' => (int) $row['tds_stl'],
+            'tvr' => (int) $row['tds_tvr'],
+            'blk' => (int) $row['tds_blk'],
+            'pf' => (int) $row['tds_pf'],
+        ];
+
+        return ['offense' => $offense, 'defense' => $defense];
+    }
 }

@@ -17,10 +17,6 @@ use Scripts\MaintenanceRepository;
 
 $repository = new MaintenanceRepository($mysqli_db);
 
-$repository->updateDivisionTitles();
-$repository->updateConferenceTitles();
-$repository->updateIblTitles();
-$repository->updateHeatTitles();
-$repository->updatePlayoffAppearances();
+$repository->updateAllTitlesAndAppearances();
 
 echo "Franchise History update is complete!<br>";

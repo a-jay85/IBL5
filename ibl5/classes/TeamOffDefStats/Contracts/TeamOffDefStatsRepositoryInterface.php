@@ -45,4 +45,12 @@ interface TeamOffDefStatsRepositoryInterface
      * @return TeamDefenseStatsRow|null Team defense statistics
      */
     public function getTeamDefenseStats(string $teamName): ?array;
+
+    /**
+     * Get both offense and defense statistics for a team in a single query
+     *
+     * @param string $teamName Team name
+     * @return array{offense: TeamOffenseStatsRow, defense: TeamDefenseStatsRow}|null Both stats or null
+     */
+    public function getTeamBothStats(string $teamName): ?array;
 }

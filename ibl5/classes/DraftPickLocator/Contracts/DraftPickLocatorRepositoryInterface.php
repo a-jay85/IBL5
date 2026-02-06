@@ -30,4 +30,11 @@ interface DraftPickLocatorRepositoryInterface
      * @return list<array{ownerofpick: string, year: int, round: int}>
      */
     public function getDraftPicksForTeam(string $teamName): array;
+
+    /**
+     * Get all draft picks grouped by team pick name
+     *
+     * @return array<string, list<array{ownerofpick: string, year: int, round: int}>>
+     */
+    public function getAllDraftPicksGroupedByTeam(): array;
 }

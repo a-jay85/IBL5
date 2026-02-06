@@ -153,6 +153,46 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
     }
 
     /**
+     * @see MaintenanceRepositoryInterface::updateAllTitlesAndAppearances()
+     */
+    public function updateAllTitlesAndAppearances(): bool
+    {
+        $this->execute(
+            "UPDATE ibl_team_history SET
+                div_titles = (
+                    SELECT COUNT(*) FROM ibl_team_awards
+                    WHERE ibl_team_awards.Award LIKE '%Div.%'
+                    AND ibl_team_history.team_name = ibl_team_awards.name
+                ),
+                conf_titles = (
+                    SELECT COUNT(*) FROM ibl_team_awards
+                    WHERE ibl_team_awards.Award LIKE '%Conf.%'
+                    AND ibl_team_history.team_name = ibl_team_awards.name
+                ),
+                ibl_titles = (
+                    SELECT COUNT(*) FROM ibl_team_awards
+                    WHERE ibl_team_awards.Award LIKE '%World%'
+                    AND ibl_team_history.team_name = ibl_team_awards.name
+                ),
+                heat_titles = (
+                    SELECT COUNT(*) FROM ibl_team_awards
+                    WHERE ibl_team_awards.Award LIKE '%H.E.A.T.%'
+                    AND ibl_team_history.team_name = ibl_team_awards.name
+                ),
+                playoffs = (
+                    SELECT COUNT(*) FROM ibl_playoff_results
+                    WHERE (ibl_playoff_results.winner = ibl_team_history.team_name
+                           AND ibl_playoff_results.round = '1')
+                       OR (ibl_playoff_results.loser = ibl_team_history.team_name
+                           AND ibl_playoff_results.round = '1')
+                )",
+            ""
+        );
+
+        return true;
+    }
+
+    /**
      * @see MaintenanceRepositoryInterface::getSetting()
      */
     public function getSetting(string $name): ?string

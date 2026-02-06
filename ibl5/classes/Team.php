@@ -372,6 +372,25 @@ class Team extends BaseMysqliRepository
     }
 
     /**
+     * Get all players under contract (all positions)
+     *
+     * @return list<PlayerRow> Array of player rows
+     */
+    public function getAllPlayersUnderContractResult(): array
+    {
+        /** @var list<PlayerRow> */
+        return $this->fetchAll(
+            "SELECT *
+            FROM ibl_plr
+            WHERE teamname = ?
+              AND cy1 != 0
+              AND retired = 0",
+            "s",
+            $this->name
+        );
+    }
+
+    /**
      * Get players under contract by position
      *
      * @param string $position Position code (e.g., 'PG', 'SG', 'SF', 'PF', 'C')
@@ -549,7 +568,7 @@ class Team extends BaseMysqliRepository
         $array = [];
         foreach ($result as $plrRow) {
             $playerID = (int) $plrRow['pid'];
-            $array[$playerID] = Player::withPlayerID($this->db, $playerID);
+            $array[$playerID] = Player::withPlrRow($this->db, $plrRow);
         }
         return $array;
     }

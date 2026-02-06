@@ -40,6 +40,7 @@ class DraftPickLocatorServiceTest extends TestCase
     public function testGetAllTeamsWithPicksReturnsEmptyArrayWhenNoTeams(): void
     {
         $this->mockRepository->method('getAllTeams')->willReturn([]);
+        $this->mockRepository->method('getAllDraftPicksGroupedByTeam')->willReturn([]);
 
         $result = $this->service->getAllTeamsWithPicks();
 
@@ -52,12 +53,14 @@ class DraftPickLocatorServiceTest extends TestCase
         $teams = [
             ['teamid' => 1, 'team_city' => 'Boston', 'team_name' => 'Celtics', 'color1' => '00FF00', 'color2' => 'FFFFFF'],
         ];
-        $picks = [
-            ['year' => 2025, 'round' => 1, 'notes' => ''],
+        $allPicks = [
+            'Celtics' => [
+                ['ownerofpick' => 'Celtics', 'year' => 2025, 'round' => 1],
+            ],
         ];
 
         $this->mockRepository->method('getAllTeams')->willReturn($teams);
-        $this->mockRepository->method('getDraftPicksForTeam')->willReturn($picks);
+        $this->mockRepository->method('getAllDraftPicksGroupedByTeam')->willReturn($allPicks);
 
         $result = $this->service->getAllTeamsWithPicks();
 
@@ -74,7 +77,7 @@ class DraftPickLocatorServiceTest extends TestCase
         ];
 
         $this->mockRepository->method('getAllTeams')->willReturn($teams);
-        $this->mockRepository->method('getDraftPicksForTeam')->willReturn([]);
+        $this->mockRepository->method('getAllDraftPicksGroupedByTeam')->willReturn([]);
 
         $result = $this->service->getAllTeamsWithPicks();
 
@@ -89,7 +92,7 @@ class DraftPickLocatorServiceTest extends TestCase
         ];
 
         $this->mockRepository->method('getAllTeams')->willReturn($teams);
-        $this->mockRepository->method('getDraftPicksForTeam')->willReturn([]);
+        $this->mockRepository->method('getAllDraftPicksGroupedByTeam')->willReturn([]);
 
         $result = $this->service->getAllTeamsWithPicks();
 
@@ -105,10 +108,22 @@ class DraftPickLocatorServiceTest extends TestCase
             ['teamid' => 3, 'team_city' => 'C', 'team_name' => 'Team C', 'color1' => '000', 'color2' => 'FFF'],
         ];
 
-        $this->mockRepository->method('getAllTeams')->willReturn($teams);
-        $this->mockRepository->expects($this->exactly(3))
-            ->method('getDraftPicksForTeam');
+        $allPicks = [
+            'Team A' => [['ownerofpick' => 'Team A', 'year' => 2025, 'round' => 1]],
+            'Team B' => [['ownerofpick' => 'Team B', 'year' => 2025, 'round' => 1]],
+            'Team C' => [['ownerofpick' => 'Team C', 'year' => 2025, 'round' => 1]],
+        ];
 
-        $this->service->getAllTeamsWithPicks();
+        $this->mockRepository->method('getAllTeams')->willReturn($teams);
+        $this->mockRepository->expects($this->once())
+            ->method('getAllDraftPicksGroupedByTeam')
+            ->willReturn($allPicks);
+
+        $result = $this->service->getAllTeamsWithPicks();
+
+        $this->assertCount(3, $result);
+        $this->assertCount(1, $result[0]['picks']);
+        $this->assertCount(1, $result[1]['picks']);
+        $this->assertCount(1, $result[2]['picks']);
     }
 }

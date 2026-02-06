@@ -21,6 +21,9 @@ class TeamScheduleService implements TeamScheduleServiceInterface
     /** @phpstan-var \mysqli */
     private object $db;
 
+    /** @var array<int, \Team> */
+    private array $teamCache = [];
+
     /**
      * Constructor
      *
@@ -51,7 +54,11 @@ class TeamScheduleService implements TeamScheduleServiceInterface
         foreach ($teamSchedule as $gameRow) {
             /** @var array{Date: string, BoxID: int, Visitor: int, Home: int, VScore: int, HScore: int} $gameRow */
             $game = new \Game($gameRow);
-            $opposingTeam = \Team::initialize($this->db, $game->getOpposingTeamID($teamId));
+            $opposingTeamId = $game->getOpposingTeamID($teamId);
+            if (!isset($this->teamCache[$opposingTeamId])) {
+                $this->teamCache[$opposingTeamId] = \Team::initialize($this->db, $opposingTeamId);
+            }
+            $opposingTeam = $this->teamCache[$opposingTeamId];
 
             $dateFormat = $game->dateObject instanceof \DateTime ? $game->dateObject->format('F') : '';
 

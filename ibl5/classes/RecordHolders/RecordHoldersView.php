@@ -24,6 +24,36 @@ use Utilities\HtmlSanitizer;
  */
 class RecordHoldersView implements RecordHoldersViewInterface
 {
+    /** @var array<string, string> */
+    private const STAT_LABELS = [
+        'Most Points' => 'Pts',
+        'Most Rebounds' => 'Reb',
+        'Most Assists' => 'Ast',
+        'Most Steals' => 'Stl',
+        'Most Blocks' => 'Blk',
+        'Most Turnovers' => 'TO',
+        'Most 3-Pointers' => '3PM',
+        'Most Three-Pointers' => '3PM',
+        'Most Minutes' => 'Min',
+        'Highest Scoring Average' => 'PPG',
+        'Highest Rebounding Average' => 'RPG',
+        'Highest Assists Average' => 'APG',
+        'Highest Steals Average' => 'SPG',
+        'Highest Blocks Average' => 'BPG',
+        'Highest 3-Point' => '3P%',
+        'Highest Three-Point' => '3P%',
+        'Highest Field Goal' => 'FG%',
+        'Highest Free Throw' => 'FT%',
+        'Best Season Record' => 'Record',
+        'Worst Season Record' => 'Record',
+        'Most Wins' => 'Wins',
+        'Most Losses' => 'Losses',
+        'Most Playoff Appearances' => 'Apps',
+        'Most Championship' => 'Titles',
+        'Longest Winning Streak' => 'Wins',
+        'Longest Losing Streak' => 'Losses',
+    ];
+
     /**
      * @see RecordHoldersViewInterface::render()
      *
@@ -33,24 +63,62 @@ class RecordHoldersView implements RecordHoldersViewInterface
     {
         $output = '<h2 class="ibl-title">Record Holders</h2>';
         $output .= '<style>
-.record-holders-page td { text-align: center; vertical-align: middle; }
-.record-holders-page td img { margin: 0 auto; }
-.record-holders-page .ibl-data-table { max-width: 900px; margin-left: auto; margin-right: auto; table-layout: fixed; }
-.record-holders-page .cols-5 col.col-player { width: 25%; }
-.record-holders-page .cols-5 col.col-team { width: 15%; }
-.record-holders-page .cols-5 col.col-date { width: 30%; }
-.record-holders-page .cols-5 col.col-opponent { width: 15%; }
-.record-holders-page .cols-5 col.col-amount { width: 15%; }
-.record-holders-page .cols-4-season col.col-player { width: 30%; }
-.record-holders-page .cols-4-season col.col-team { width: 20%; }
-.record-holders-page .cols-4-season col.col-season { width: 25%; }
-.record-holders-page .cols-4-season col.col-amount { width: 25%; }
-.record-holders-page .cols-4-team col.col-team { width: 20%; }
-.record-holders-page .cols-4-team col.col-date { width: 35%; }
-.record-holders-page .cols-4-team col.col-opponent { width: 20%; }
-.record-holders-page .cols-4-team col.col-amount { width: 25%; }
+.record-section { max-width: 900px; margin: 0 auto; }
+.record-section .ibl-card__body { padding: var(--space-2) 0; }
+
+.record-category { margin-bottom: var(--space-4); }
+.record-category:last-child { margin-bottom: 0; }
+.record-category__title {
+    font-family: var(--font-display);
+    font-size: 1.125rem; font-weight: 600;
+    color: var(--navy-800);
+    text-transform: uppercase; letter-spacing: 0.03em;
+    margin: var(--space-3) var(--space-3) var(--space-1);
+    padding-bottom: var(--space-0);
+    border-bottom: 2px solid var(--accent-500);
+    display: inline-block;
+}
+
+.record-table { table-layout: fixed; max-width: 100%; box-shadow: none; border: none; border-radius: 0; border-bottom: 1px solid var(--gray-200); }
+.record-table thead { background: var(--gray-100); }
+.record-table th { color: var(--gray-600); font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: var(--space-1) var(--space-2); }
+.record-table td { text-align: center; vertical-align: middle; padding: var(--space-2) var(--space-1); }
+.record-table td img { margin: 0 auto; }
+.record-table .player-cell { font-weight: 600; }
+.record-table .player-cell img { display: block; margin: 0 auto var(--space-1); }
+.record-table td.ibl-stat-highlight { font-size: 1.125rem; text-align: center; }
+
+.record-table--5col col.col-player { width: 25%; }
+.record-table--5col col.col-team { width: 15%; }
+.record-table--5col col.col-date { width: 30%; }
+.record-table--5col col.col-opponent { width: 15%; }
+.record-table--5col col.col-amount { width: 15%; }
+.record-table--4col-season col.col-player { width: 30%; }
+.record-table--4col-season col.col-team { width: 20%; }
+.record-table--4col-season col.col-season { width: 25%; }
+.record-table--4col-season col.col-amount { width: 25%; }
+.record-table--4col-team col.col-team { width: 20%; }
+.record-table--4col-team col.col-date { width: 35%; }
+.record-table--4col-team col.col-opponent { width: 20%; }
+.record-table--4col-team col.col-amount { width: 25%; }
+.record-table--3col-team-season col.col-team { width: 30%; }
+.record-table--3col-team-season col.col-season { width: 35%; }
+.record-table--3col-team-season col.col-amount { width: 35%; }
+.record-table--3col-franchise col.col-team { width: 25%; }
+.record-table--3col-franchise col.col-amount { width: 25%; }
+.record-table--3col-franchise col.col-years { width: 50%; }
+
+.record-section__subheading {
+    font-family: var(--font-display);
+    font-size: 1rem; font-weight: 600;
+    color: var(--gray-500);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin: var(--space-4) var(--space-3) var(--space-2);
+    padding-bottom: var(--space-1);
+    border-bottom: 1px solid var(--gray-200);
+}
 </style>';
-        $output .= '<div class="record-holders-page">';
+        $output .= '<div class="record-section">';
         $output .= $this->renderPlayerSingleGameRecords($records);
         $output .= $this->renderPlayerFullSeasonRecords($records['playerFullSeason']);
         $output .= $this->renderPlayerPlayoffRecords($records);
@@ -72,36 +140,335 @@ class RecordHoldersView implements RecordHoldersViewInterface
      */
     private function renderPlayerSingleGameRecords(array $records): string
     {
-        $output = '<h2 class="ibl-table-title">All-Time IBL Records: Player, Regular Season (Single Game)</h2>';
-        $output .= '<table class="ibl-data-table cols-5">';
-        $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount"></colgroup>';
-        $output .= '<thead><tr><th colspan="5">Individual Single-Game Records</th></tr></thead>';
-        $output .= '<tbody>';
+        $output = '<div class="ibl-card">';
+        $output .= '<div class="ibl-card__header"><h2 class="ibl-card__title">Player, Regular Season (Single Game)</h2></div>';
+        $output .= '<div class="ibl-card__body">';
 
         foreach ($records['playerSingleGame']['regularSeason'] as $category => $categoryRecords) {
-            $output .= $this->renderCategoryHeader($category);
-            $output .= $this->renderPlayerColumnHeaders();
-            foreach ($categoryRecords as $record) {
-                $output .= $this->renderPlayerRecordRow($record);
-            }
+            $output .= $this->renderPlayerCategoryBlock($category, $categoryRecords);
         }
 
         // Quadruple Doubles
-        $output .= $this->renderCategoryHeader('Quadruple Doubles');
-        $output .= $this->renderPlayerColumnHeaders();
-        foreach ($records['quadrupleDoubles'] as $record) {
-            $output .= $this->renderPlayerRecordRow($record, true);
-        }
+        $output .= $this->renderPlayerCategoryBlock('Quadruple Doubles', $records['quadrupleDoubles'], true);
 
         // Most All-Star Appearances
-        $allStar = $records['allStarRecord'];
-        $output .= $this->renderCategoryHeader('Most All-Star Appearances');
-        $output .= '<tr class="text-center">';
-        $output .= '<td><strong style="font-weight: bold;">Player</strong></td>';
-        $output .= '<td><strong style="font-weight: bold;">Team</strong></td>';
-        $output .= '<td><strong style="font-weight: bold;">Amount</strong></td>';
-        $output .= '<td colspan="2"><strong style="font-weight: bold;">Years</strong></td>';
-        $output .= '</tr>';
+        $output .= $this->renderAllStarBlock($records['allStarRecord']);
+
+        $output .= '</div></div>';
+
+        return $output;
+    }
+
+    // ---------------------------------------------------------------
+    // Section 2: Regular Season (Full Season)
+    // ---------------------------------------------------------------
+
+    /**
+     * Render Section 2: Player Regular Season (Full Season) records.
+     *
+     * @param array<string, list<FormattedSeasonRecord>> $seasonRecords
+     */
+    private function renderPlayerFullSeasonRecords(array $seasonRecords): string
+    {
+        $output = '<div class="ibl-card">';
+        $output .= '<div class="ibl-card__header"><h2 class="ibl-card__title">Player, Regular Season (Full Season) [minimum 50 games]</h2></div>';
+        $output .= '<div class="ibl-card__body">';
+
+        foreach ($seasonRecords as $category => $categoryRecords) {
+            $output .= $this->renderSeasonCategoryBlock($category, $categoryRecords);
+        }
+
+        $output .= '</div></div>';
+
+        return $output;
+    }
+
+    // ---------------------------------------------------------------
+    // Section 3: Playoffs
+    // ---------------------------------------------------------------
+
+    /**
+     * Render Section 3: Player Playoff records.
+     *
+     * @param AllRecordsData $records
+     */
+    private function renderPlayerPlayoffRecords(array $records): string
+    {
+        $output = '<div class="ibl-card">';
+        $output .= '<div class="ibl-card__header"><h2 class="ibl-card__title">Player, Playoffs</h2></div>';
+        $output .= '<div class="ibl-card__body">';
+
+        foreach ($records['playerSingleGame']['playoffs'] as $category => $categoryRecords) {
+            $output .= $this->renderPlayerCategoryBlock($category, $categoryRecords);
+        }
+
+        $output .= '</div></div>';
+
+        return $output;
+    }
+
+    // ---------------------------------------------------------------
+    // Section 4: H.E.A.T.
+    // ---------------------------------------------------------------
+
+    /**
+     * Render Section 4: Player H.E.A.T. records.
+     *
+     * @param AllRecordsData $records
+     */
+    private function renderPlayerHeatRecords(array $records): string
+    {
+        $output = '<div class="ibl-card">';
+        $output .= '<div class="ibl-card__header"><h2 class="ibl-card__title">Player, H.E.A.T.</h2></div>';
+        $output .= '<div class="ibl-card__body">';
+
+        foreach ($records['playerSingleGame']['heat'] as $category => $categoryRecords) {
+            $output .= $this->renderPlayerCategoryBlock($category, $categoryRecords);
+        }
+
+        $output .= '</div></div>';
+
+        return $output;
+    }
+
+    // ---------------------------------------------------------------
+    // Section 5: Team Records
+    // ---------------------------------------------------------------
+
+    /**
+     * Render Section 5: Team records.
+     *
+     * @param AllRecordsData $records
+     */
+    private function renderTeamRecords(array $records): string
+    {
+        $output = '<div class="ibl-card">';
+        $output .= '<div class="ibl-card__header"><h2 class="ibl-card__title">Team Records</h2></div>';
+        $output .= '<div class="ibl-card__body">';
+
+        // Game records subsection
+        if ($records['teamGameRecords'] !== []) {
+            $output .= '<h4 class="record-section__subheading">Game Records</h4>';
+            foreach ($records['teamGameRecords'] as $category => $categoryRecords) {
+                $output .= $this->renderTeamGameCategoryBlock($category, $categoryRecords);
+            }
+        }
+
+        // Season records subsection
+        if ($records['teamSeasonRecords'] !== []) {
+            $output .= '<h4 class="record-section__subheading">Season Records</h4>';
+            foreach ($records['teamSeasonRecords'] as $category => $categoryRecords) {
+                $output .= $this->renderTeamSeasonCategoryBlock($category, $categoryRecords);
+            }
+        }
+
+        // Franchise records subsection
+        if ($records['teamFranchise'] !== []) {
+            $output .= '<h4 class="record-section__subheading">Franchise Records</h4>';
+            foreach ($records['teamFranchise'] as $category => $categoryRecords) {
+                $output .= $this->renderFranchiseCategoryBlock($category, $categoryRecords);
+            }
+        }
+
+        $output .= '</div></div>';
+
+        return $output;
+    }
+
+    // ---------------------------------------------------------------
+    // Per-category block renderers
+    // ---------------------------------------------------------------
+
+    /**
+     * Render a player single-game category block (heading + mini-table).
+     *
+     * @param list<FormattedPlayerRecord> $categoryRecords
+     */
+    private function renderPlayerCategoryBlock(string $category, array $categoryRecords, bool $multiLineAmount = false): string
+    {
+        $statLabel = $this->getStatColumnLabel($category);
+
+        $output = '<div class="record-category">';
+        $output .= $this->renderCategoryHeading($category);
+        $output .= '<table class="ibl-data-table record-table record-table--5col">';
+        $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount"></colgroup>';
+        /** @var string $safeStatLabel */
+        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
+        $output .= '<thead><tr><th>Player</th><th>Team</th><th>Date</th><th>Opponent</th><th>' . $safeStatLabel . '</th></tr></thead>';
+        $output .= '<tbody>';
+
+        foreach ($categoryRecords as $record) {
+            $output .= $this->renderPlayerRecordRow($record, $multiLineAmount);
+        }
+
+        $output .= '</tbody></table></div>';
+
+        return $output;
+    }
+
+    /**
+     * Render a full-season category block (heading + mini-table).
+     *
+     * @param list<FormattedSeasonRecord> $categoryRecords
+     */
+    private function renderSeasonCategoryBlock(string $category, array $categoryRecords): string
+    {
+        $statLabel = $this->getStatColumnLabel($category);
+
+        $output = '<div class="record-category">';
+        $output .= $this->renderCategoryHeading($category);
+        $output .= '<table class="ibl-data-table record-table record-table--4col-season">';
+        $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-season"><col class="col-amount"></colgroup>';
+        /** @var string $safeStatLabel */
+        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
+        $output .= '<thead><tr><th>Player</th><th>Team</th><th>Season</th><th>' . $safeStatLabel . '</th></tr></thead>';
+        $output .= '<tbody>';
+
+        foreach ($categoryRecords as $record) {
+            /** @var string $safeName */
+            $safeName = HtmlSanitizer::safeHtmlOutput($record['name']);
+            /** @var string $safeTeam */
+            $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
+            /** @var string $safeSeason */
+            $safeSeason = HtmlSanitizer::safeHtmlOutput($record['season']);
+            /** @var string $safeAmount */
+            $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
+            $pid = $record['pid'];
+            $teamTid = $record['teamTid'];
+            $teamYr = (int) $record['teamYr'];
+
+            $output .= '<tr>';
+            $output .= '<td class="player-cell"><img src="images/player/' . $pid . '.jpg" alt="' . $safeName . '" width="65" height="90" loading="lazy">';
+            $output .= '<a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $safeName . '</a></td>';
+            $output .= '<td><a href="../online/team.php?tid=' . $teamTid . '&amp;yr=' . $teamYr . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
+            $output .= '<td>' . $safeSeason . '</td>';
+            $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
+            $output .= '</tr>';
+        }
+
+        $output .= '</tbody></table></div>';
+
+        return $output;
+    }
+
+    /**
+     * Render a team game category block (heading + mini-table).
+     *
+     * @param list<FormattedTeamGameRecord> $categoryRecords
+     */
+    private function renderTeamGameCategoryBlock(string $category, array $categoryRecords): string
+    {
+        $statLabel = $this->getStatColumnLabel($category);
+
+        $output = '<div class="record-category">';
+        $output .= $this->renderCategoryHeading($category);
+        $output .= '<table class="ibl-data-table record-table record-table--4col-team">';
+        $output .= '<colgroup><col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount"></colgroup>';
+        /** @var string $safeStatLabel */
+        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
+        $output .= '<thead><tr><th>Team</th><th>Date</th><th>Opponent</th><th>' . $safeStatLabel . '</th></tr></thead>';
+        $output .= '<tbody>';
+
+        foreach ($categoryRecords as $record) {
+            $output .= $this->renderTeamGameRow($record);
+        }
+
+        $output .= '</tbody></table></div>';
+
+        return $output;
+    }
+
+    /**
+     * Render a team season category block (heading + mini-table).
+     *
+     * @param list<FormattedTeamSeasonRecord> $categoryRecords
+     */
+    private function renderTeamSeasonCategoryBlock(string $category, array $categoryRecords): string
+    {
+        $statLabel = $this->getStatColumnLabel($category);
+
+        $output = '<div class="record-category">';
+        $output .= $this->renderCategoryHeading($category);
+        $output .= '<table class="ibl-data-table record-table record-table--3col-team-season">';
+        $output .= '<colgroup><col class="col-team"><col class="col-season"><col class="col-amount"></colgroup>';
+        /** @var string $safeStatLabel */
+        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
+        $output .= '<thead><tr><th>Team</th><th>Season</th><th>' . $safeStatLabel . '</th></tr></thead>';
+        $output .= '<tbody>';
+
+        foreach ($categoryRecords as $record) {
+            /** @var string $safeTeam */
+            $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
+            /** @var string $safeSeason */
+            $safeSeason = HtmlSanitizer::safeHtmlOutput($record['season']);
+            /** @var string $safeAmount */
+            $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
+            $output .= '<tr>';
+            $output .= '<td><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></td>';
+            $output .= '<td>' . $safeSeason . '</td>';
+            $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
+            $output .= '</tr>';
+        }
+
+        $output .= '</tbody></table></div>';
+
+        return $output;
+    }
+
+    /**
+     * Render a franchise category block (heading + mini-table).
+     *
+     * @param list<FormattedFranchiseRecord> $categoryRecords
+     */
+    private function renderFranchiseCategoryBlock(string $category, array $categoryRecords): string
+    {
+        $statLabel = $this->getStatColumnLabel($category);
+
+        $output = '<div class="record-category">';
+        $output .= $this->renderCategoryHeading($category);
+        $output .= '<table class="ibl-data-table record-table record-table--3col-franchise">';
+        $output .= '<colgroup><col class="col-team"><col class="col-amount"><col class="col-years"></colgroup>';
+        /** @var string $safeStatLabel */
+        $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
+        $output .= '<thead><tr><th>Team</th><th>' . $safeStatLabel . '</th><th>Years</th></tr></thead>';
+        $output .= '<tbody>';
+
+        foreach ($categoryRecords as $record) {
+            /** @var string $safeTeam */
+            $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
+            /** @var string $safeAmount */
+            $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
+            /** @var string $safeYears */
+            $safeYears = HtmlSanitizer::safeHtmlOutput($record['years']);
+            $output .= '<tr>';
+            $output .= '<td><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></td>';
+            $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
+            $output .= '<td>' . $safeYears . '</td>';
+            $output .= '</tr>';
+        }
+
+        $output .= '</tbody></table></div>';
+
+        return $output;
+    }
+
+    // ---------------------------------------------------------------
+    // Special blocks
+    // ---------------------------------------------------------------
+
+    /**
+     * Render the All-Star Appearances block.
+     *
+     * @param array{name: string, pid: int|null, teams: string, teamTids: string, amount: int, years: string} $allStar
+     */
+    private function renderAllStarBlock(array $allStar): string
+    {
+        $output = '<div class="record-category">';
+        $output .= $this->renderCategoryHeading('Most All-Star Appearances');
+        $output .= '<table class="ibl-data-table record-table record-table--5col">';
+        $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-amount"><col class="col-date" span="2"></colgroup>';
+        $output .= '<thead><tr><th>Player</th><th>Team</th><th>Apps</th><th colspan="2">Years</th></tr></thead>';
+        $output .= '<tbody>';
 
         /** @var string $safeName */
         $safeName = HtmlSanitizer::safeHtmlOutput($allStar['name']);
@@ -126,217 +493,19 @@ class RecordHoldersView implements RecordHoldersViewInterface
         $safeYears = HtmlSanitizer::safeHtmlOutput($allStar['years']);
         $years = $allStar['years'] !== '' ? str_replace(', ', '<br>', $safeYears) : '';
 
-        $output .= '<tr class="text-center">';
-        $output .= '<td>';
+        $output .= '<tr>';
+        $output .= '<td class="player-cell">';
         if ($pid !== null) {
             $output .= '<img src="images/player/' . $pid . '.jpg" alt="' . $safeName . '" width="65" height="90" loading="lazy">';
-            $output .= '<strong style="font-weight: bold;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $safeName . '</a></strong>';
+            $output .= '<a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $safeName . '</a>';
         }
         $output .= '</td>';
-        $output .= '<td><strong style="font-weight: bold;">' . $teamLogos . '</strong></td>';
-        $output .= '<td><strong style="font-weight: bold;">' . $amount . '</strong></td>';
-        $output .= '<td colspan="2"><strong style="font-weight: bold;">' . $years . '</strong></td>';
+        $output .= '<td>' . $teamLogos . '</td>';
+        $output .= '<td class="ibl-stat-highlight">' . $amount . '</td>';
+        $output .= '<td colspan="2">' . $years . '</td>';
         $output .= '</tr>';
 
-        $output .= '</tbody></table>';
-
-        return $output;
-    }
-
-    // ---------------------------------------------------------------
-    // Section 2: Regular Season (Full Season)
-    // ---------------------------------------------------------------
-
-    /**
-     * Render Section 2: Player Regular Season (Full Season) records.
-     *
-     * @param array<string, list<FormattedSeasonRecord>> $seasonRecords
-     */
-    private function renderPlayerFullSeasonRecords(array $seasonRecords): string
-    {
-        $output = '<h2 class="ibl-table-title">All-Time IBL Records: Player, Regular Season (Full Season) [minimum 50 games]</h2>';
-        $output .= '<table class="ibl-data-table cols-4-season">';
-        $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-season"><col class="col-amount"></colgroup>';
-        $output .= '<thead><tr><th colspan="4">Season Average Records</th></tr></thead>';
-        $output .= '<tbody>';
-
-        foreach ($seasonRecords as $category => $categoryRecords) {
-            $output .= $this->renderCategoryHeader($category, 4);
-            $output .= '<tr class="text-center">';
-            $output .= '<td><strong style="font-weight: bold;">Player</strong></td>';
-            $output .= '<td><strong style="font-weight: bold;">Team</strong></td>';
-            $output .= '<td><strong style="font-weight: bold;">Season</strong></td>';
-            $output .= '<td><strong style="font-weight: bold;">Amount</strong></td>';
-            $output .= '</tr>';
-            foreach ($categoryRecords as $record) {
-                /** @var string $safeName */
-                $safeName = HtmlSanitizer::safeHtmlOutput($record['name']);
-                /** @var string $safeTeam */
-                $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
-                /** @var string $safeSeason */
-                $safeSeason = HtmlSanitizer::safeHtmlOutput($record['season']);
-                /** @var string $safeAmount */
-                $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
-                $pid = $record['pid'];
-                $teamTid = $record['teamTid'];
-                $teamYr = (int) $record['teamYr'];
-
-                $output .= '<tr class="text-center">';
-                $output .= '<td><img src="images/player/' . $pid . '.jpg" alt="' . $safeName . '" width="65" height="90" loading="lazy">';
-                $output .= '<strong style="font-weight: bold;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $safeName . '</a></strong></td>';
-                $output .= '<td><strong style="font-weight: bold;"><a href="../online/team.php?tid=' . $teamTid . '&amp;yr=' . $teamYr . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></strong></td>';
-                $output .= '<td><strong style="font-weight: bold;">' . $safeSeason . '</strong></td>';
-                $output .= '<td><strong style="font-weight: bold;">' . $safeAmount . '</strong></td>';
-                $output .= '</tr>';
-            }
-        }
-
-        $output .= '</tbody></table>';
-
-        return $output;
-    }
-
-    // ---------------------------------------------------------------
-    // Section 3: Playoffs
-    // ---------------------------------------------------------------
-
-    /**
-     * Render Section 3: Player Playoff records.
-     *
-     * @param AllRecordsData $records
-     */
-    private function renderPlayerPlayoffRecords(array $records): string
-    {
-        $output = '<h2 class="ibl-table-title">All-Time IBL Records: Player, Playoffs</h2>';
-        $output .= '<table class="ibl-data-table cols-5">';
-        $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount"></colgroup>';
-        $output .= '<thead><tr><th colspan="5">Playoff Records</th></tr></thead>';
-        $output .= '<tbody>';
-
-        foreach ($records['playerSingleGame']['playoffs'] as $category => $categoryRecords) {
-            $output .= $this->renderCategoryHeader($category);
-            $output .= $this->renderPlayerColumnHeaders();
-            foreach ($categoryRecords as $record) {
-                $output .= $this->renderPlayerRecordRow($record);
-            }
-        }
-
-        $output .= '</tbody></table>';
-
-        return $output;
-    }
-
-    // ---------------------------------------------------------------
-    // Section 4: H.E.A.T.
-    // ---------------------------------------------------------------
-
-    /**
-     * Render Section 4: Player H.E.A.T. records.
-     *
-     * @param AllRecordsData $records
-     */
-    private function renderPlayerHeatRecords(array $records): string
-    {
-        $output = '<h2 class="ibl-table-title">All-Time IBL Records: Player, H.E.A.T.</h2>';
-        $output .= '<table class="ibl-data-table cols-5">';
-        $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount"></colgroup>';
-        $output .= '<thead><tr><th colspan="5">H.E.A.T. Tournament Records</th></tr></thead>';
-        $output .= '<tbody>';
-
-        foreach ($records['playerSingleGame']['heat'] as $category => $categoryRecords) {
-            $output .= $this->renderCategoryHeader($category);
-            $output .= $this->renderPlayerColumnHeaders();
-            foreach ($categoryRecords as $record) {
-                $output .= $this->renderPlayerRecordRow($record);
-            }
-        }
-
-        $output .= '</tbody></table>';
-
-        return $output;
-    }
-
-    // ---------------------------------------------------------------
-    // Section 5: Team Records
-    // ---------------------------------------------------------------
-
-    /**
-     * Render Section 5: Team records.
-     *
-     * @param AllRecordsData $records
-     */
-    private function renderTeamRecords(array $records): string
-    {
-        $output = '<h2 class="ibl-table-title">All-Time IBL Records: Team</h2>';
-        $output .= '<table class="ibl-data-table cols-4-team">';
-        $output .= '<colgroup><col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount"></colgroup>';
-        $output .= '<thead><tr><th colspan="4">Team Records</th></tr></thead>';
-        $output .= '<tbody>';
-
-        // Game records (with box scores and opponents)
-        foreach ($records['teamGameRecords'] as $category => $categoryRecords) {
-            $output .= $this->renderCategoryHeader($category, 4);
-            $output .= '<tr class="text-center">';
-            $output .= '<td><strong style="font-weight: bold;">Team</strong></td>';
-            $output .= '<td><strong style="font-weight: bold;">Date</strong></td>';
-            $output .= '<td><strong style="font-weight: bold;">Opponent</strong></td>';
-            $output .= '<td><strong style="font-weight: bold;">Amount</strong></td>';
-            $output .= '</tr>';
-            foreach ($categoryRecords as $record) {
-                $output .= $this->renderTeamGameRow($record);
-            }
-        }
-
-        // Season records (team, season, record/amount)
-        foreach ($records['teamSeasonRecords'] as $category => $categoryRecords) {
-            $colLabel = ($category === 'Best Season Record' || $category === 'Worst Season Record') ? 'Record' : 'Amount';
-            $output .= $this->renderCategoryHeader($category, 4);
-            $output .= '<tr class="text-center">';
-            $output .= '<td><strong style="font-weight: bold;">Team</strong></td>';
-            $output .= '<td><strong style="font-weight: bold;">Season</strong></td>';
-            /** @var string $safeColLabel */
-            $safeColLabel = HtmlSanitizer::safeHtmlOutput($colLabel);
-            $output .= '<td colspan="2"><strong style="font-weight: bold;">' . $safeColLabel . '</strong></td>';
-            $output .= '</tr>';
-            foreach ($categoryRecords as $record) {
-                /** @var string $safeTeam */
-                $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
-                /** @var string $safeSeason */
-                $safeSeason = HtmlSanitizer::safeHtmlOutput($record['season']);
-                /** @var string $safeAmount */
-                $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
-                $output .= '<tr class="text-center">';
-                $output .= '<td><strong style="font-weight: bold;"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></strong></td>';
-                $output .= '<td><strong style="font-weight: bold;">' . $safeSeason . '</strong></td>';
-                $output .= '<td colspan="2"><strong style="font-weight: bold;">' . $safeAmount . '</strong></td>';
-                $output .= '</tr>';
-            }
-        }
-
-        // Franchise records (team, amount, years)
-        foreach ($records['teamFranchise'] as $category => $categoryRecords) {
-            $output .= $this->renderCategoryHeader($category, 4);
-            $output .= '<tr class="text-center">';
-            $output .= '<td><strong style="font-weight: bold;">Team</strong></td>';
-            $output .= '<td><strong style="font-weight: bold;">Amount</strong></td>';
-            $output .= '<td colspan="2"><strong style="font-weight: bold;">Years</strong></td>';
-            $output .= '</tr>';
-            foreach ($categoryRecords as $record) {
-                /** @var string $safeTeam */
-                $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
-                /** @var string $safeAmount */
-                $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
-                /** @var string $safeYears */
-                $safeYears = HtmlSanitizer::safeHtmlOutput($record['years']);
-                $output .= '<tr class="text-center">';
-                $output .= '<td><strong style="font-weight: bold;"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></strong></td>';
-                $output .= '<td><strong style="font-weight: bold;">' . $safeAmount . '</strong></td>';
-                $output .= '<td colspan="2"><strong style="font-weight: bold;">' . $safeYears . '</strong></td>';
-                $output .= '</tr>';
-            }
-        }
-
-        $output .= '</tbody></table>';
+        $output .= '</tbody></table></div>';
 
         return $output;
     }
@@ -346,27 +515,29 @@ class RecordHoldersView implements RecordHoldersViewInterface
     // ---------------------------------------------------------------
 
     /**
-     * Render a category sub-header row.
+     * Render a category heading with accent left border.
      */
-    private function renderCategoryHeader(string $category, int $colspan = 5): string
+    private function renderCategoryHeading(string $category): string
     {
         /** @var string $safeCategory */
         $safeCategory = HtmlSanitizer::safeHtmlOutput($category);
-        return '<tr class="text-center"><td colspan="' . $colspan . '"><strong style="font-weight: bold;"><em style="font-style: italic;">' . $safeCategory . '</em></strong></td></tr>';
+        return '<h3 class="record-category__title">' . $safeCategory . '</h3>';
     }
 
     /**
-     * Render standard player column headers (Player, Team, Date, Opponent, Amount).
+     * Get the stat-specific column label for a category name.
+     *
+     * Maps category names like "Most Points in a Single Game" to abbreviations like "Pts".
      */
-    private function renderPlayerColumnHeaders(): string
+    private function getStatColumnLabel(string $category): string
     {
-        return '<tr class="text-center">'
-            . '<td><strong style="font-weight: bold;">Player</strong></td>'
-            . '<td><strong style="font-weight: bold;">Team</strong></td>'
-            . '<td><strong style="font-weight: bold;">Date</strong></td>'
-            . '<td><strong style="font-weight: bold;">Opponent</strong></td>'
-            . '<td><strong style="font-weight: bold;">Amount</strong></td>'
-            . '</tr>';
+        foreach (self::STAT_LABELS as $prefix => $label) {
+            if (str_starts_with($category, $prefix)) {
+                return $label;
+            }
+        }
+
+        return 'Amount';
     }
 
     /**
@@ -393,8 +564,8 @@ class RecordHoldersView implements RecordHoldersViewInterface
         /** @var string $safeAmountRaw */
         $safeAmountRaw = HtmlSanitizer::safeHtmlOutput($record['amount']);
         $amount = $multiLineAmount
-            ? '<strong style="font-weight: bold;">' . str_replace("\n", '<br>', $safeAmountRaw) . '</strong>'
-            : '<strong style="font-weight: bold;">' . $safeAmountRaw . '</strong>';
+            ? str_replace("\n", '<br>', $safeAmountRaw)
+            : $safeAmountRaw;
 
         /** @var string $safeBoxScoreUrl */
         $safeBoxScoreUrl = HtmlSanitizer::safeHtmlOutput($record['boxScoreUrl']);
@@ -402,13 +573,13 @@ class RecordHoldersView implements RecordHoldersViewInterface
             ? '<a href="' . $safeBoxScoreUrl . '">' . $safeDate . '</a>'
             : $safeDate;
 
-        $output = '<tr class="text-center">';
-        $output .= '<td><img src="images/player/' . $pid . '.jpg" alt="' . $safeName . '" width="65" height="90" loading="lazy">';
-        $output .= '<strong style="font-weight: bold;"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $safeName . '</a></strong></td>';
-        $output .= '<td><strong style="font-weight: bold;"><a href="../online/team.php?tid=' . $teamTid . '&amp;yr=' . $teamYr . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></strong></td>';
-        $output .= '<td><strong style="font-weight: bold;">' . $dateCell . '</strong></td>';
-        $output .= '<td><strong style="font-weight: bold;"><a href="../online/team.php?tid=' . $oppTid . '&amp;yr=' . $oppYr . '"><img src="images/topics/' . $safeOppTeam . '.png" alt="' . strtoupper($safeOppTeam) . '"></a></strong></td>';
-        $output .= '<td>' . $amount . '</td>';
+        $output = '<tr>';
+        $output .= '<td class="player-cell"><img src="images/player/' . $pid . '.jpg" alt="' . $safeName . '" width="65" height="90" loading="lazy">';
+        $output .= '<a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $safeName . '</a></td>';
+        $output .= '<td><a href="../online/team.php?tid=' . $teamTid . '&amp;yr=' . $teamYr . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
+        $output .= '<td>' . $dateCell . '</td>';
+        $output .= '<td><a href="../online/team.php?tid=' . $oppTid . '&amp;yr=' . $oppYr . '"><img src="images/topics/' . $safeOppTeam . '.png" alt="' . strtoupper($safeOppTeam) . '"></a></td>';
+        $output .= '<td class="ibl-stat-highlight">' . $amount . '</td>';
         $output .= '</tr>';
 
         return $output;
@@ -436,11 +607,11 @@ class RecordHoldersView implements RecordHoldersViewInterface
             ? '<a href="' . $safeBoxScoreUrl . '">' . $safeDate . '</a>'
             : $safeDate;
 
-        $output = '<tr class="text-center">';
-        $output .= '<td><strong style="font-weight: bold;"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></strong></td>';
-        $output .= '<td><strong style="font-weight: bold;">' . $dateCell . '</strong></td>';
-        $output .= '<td><strong style="font-weight: bold;"><img src="images/topics/' . $safeOppTeam . '.png" alt="' . strtoupper($safeOppTeam) . '"></strong></td>';
-        $output .= '<td><strong style="font-weight: bold;">' . $safeAmount . '</strong></td>';
+        $output = '<tr>';
+        $output .= '<td><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></td>';
+        $output .= '<td>' . $dateCell . '</td>';
+        $output .= '<td><img src="images/topics/' . $safeOppTeam . '.png" alt="' . strtoupper($safeOppTeam) . '"></td>';
+        $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
         $output .= '</tr>';
 
         return $output;

@@ -301,14 +301,14 @@ final class RecordHoldersViewTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $html);
     }
 
-    public function testRenderIncludesStyleBlock(): void
+    public function testRenderUsesRecordSectionWrapper(): void
     {
         $records = $this->createMinimalRecords();
 
         $html = $this->view->render($records);
 
-        $this->assertStringContainsString('<style>', $html);
-        $this->assertStringContainsString('.record-section', $html);
+        $this->assertStringContainsString('record-section', $html);
+        $this->assertStringNotContainsString('<style>', $html);
     }
 
     public function testRenderUsesCardWrapperPerSection(): void

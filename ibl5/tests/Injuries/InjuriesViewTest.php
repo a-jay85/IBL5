@@ -248,7 +248,7 @@ class InjuriesViewTest extends TestCase
 
         $result = $this->view->render($injuredPlayers);
 
-        $this->assertStringContainsString('injury-days-tooltip', $result);
+        $this->assertStringContainsString('ibl-tooltip', $result);
         $this->assertStringContainsString('Returns: 2025-02-10', $result);
         $this->assertStringContainsString('tabindex="0"', $result);
     }

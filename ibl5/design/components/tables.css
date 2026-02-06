@@ -997,14 +997,14 @@ td.ibl-team-cell--colored {
 
 
 /* ==========================================================================
-   Injury Days Tooltip
+   Tooltip Component
 
-   Shows return date on hover (desktop) or tap/focus (mobile).
-   Positioned to the LEFT of the number to avoid table overflow clipping.
+   Shows tooltip text on hover (desktop) or tap/focus (mobile).
+   Positioned to the LEFT of the value to avoid table overflow clipping.
    Uses CSS-only approach for accessibility and mobile support.
    ========================================================================== */
 
-.injury-days-tooltip {
+.ibl-tooltip {
     position: relative;
     cursor: help;
     text-decoration: underline;
@@ -1014,11 +1014,11 @@ td.ibl-team-cell--colored {
 }
 
 /* Hide native title tooltip in favor of CSS tooltip */
-.injury-days-tooltip[title] {
+.ibl-tooltip[title] {
     position: relative;
 }
 
-.injury-days-tooltip::after {
+.ibl-tooltip::after {
     content: attr(title);
     position: absolute;
     top: 50%;
@@ -1041,7 +1041,7 @@ td.ibl-team-cell--colored {
 }
 
 /* Arrow pointing right */
-.injury-days-tooltip::before {
+.ibl-tooltip::before {
     content: '';
     position: absolute;
     top: 50%;
@@ -1057,21 +1057,21 @@ td.ibl-team-cell--colored {
 }
 
 /* Show on hover (desktop) */
-.injury-days-tooltip:hover::after,
-.injury-days-tooltip:hover::before {
+.ibl-tooltip:hover::after,
+.ibl-tooltip:hover::before {
     opacity: 1;
     visibility: visible;
 }
 
 /* Show on focus/tap (mobile) */
-.injury-days-tooltip:focus::after,
-.injury-days-tooltip:focus::before {
+.ibl-tooltip:focus::after,
+.ibl-tooltip:focus::before {
     opacity: 1;
     visibility: visible;
 }
 
 /* Remove default focus ring, add subtle highlight */
-.injury-days-tooltip:focus {
+.ibl-tooltip:focus {
     outline: none;
     background-color: var(--accent-100, #ffedd5);
     border-radius: var(--radius-sm, 0.25rem);

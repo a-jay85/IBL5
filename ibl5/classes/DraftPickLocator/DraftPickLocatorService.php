@@ -37,11 +37,11 @@ class DraftPickLocatorService
     public function getAllTeamsWithPicks(): array
     {
         $teams = $this->repository->getAllTeams();
+        $allPicks = $this->repository->getAllDraftPicksGroupedByTeam();
         $teamsWithPicks = [];
 
         foreach ($teams as $team) {
             $teamName = $team['team_name'];
-            $picks = $this->repository->getDraftPicksForTeam($teamName);
 
             $teamsWithPicks[] = [
                 'teamId' => $team['teamid'],
@@ -49,7 +49,7 @@ class DraftPickLocatorService
                 'teamName' => $teamName,
                 'color1' => $team['color1'],
                 'color2' => $team['color2'],
-                'picks' => $picks,
+                'picks' => $allPicks[$teamName] ?? [],
             ];
         }
 

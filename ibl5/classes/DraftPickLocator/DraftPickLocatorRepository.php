@@ -51,4 +51,32 @@ class DraftPickLocatorRepository extends \BaseMysqliRepository implements DraftP
             $teamName
         );
     }
+
+    /**
+     * @see DraftPickLocatorRepositoryInterface::getAllDraftPicksGroupedByTeam()
+     *
+     * @return array<string, list<array{ownerofpick: string, year: int, round: int}>>
+     */
+    public function getAllDraftPicksGroupedByTeam(): array
+    {
+        /** @var list<array{teampick: string, ownerofpick: string, year: int, round: int}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT teampick, ownerofpick, year, round
+             FROM ibl_draft_picks
+             ORDER BY teampick, year, round ASC"
+        );
+
+        /** @var array<string, list<array{ownerofpick: string, year: int, round: int}>> $grouped */
+        $grouped = [];
+        foreach ($rows as $row) {
+            $teamPick = $row['teampick'];
+            $grouped[$teamPick][] = [
+                'ownerofpick' => $row['ownerofpick'],
+                'year' => $row['year'],
+                'round' => $row['round'],
+            ];
+        }
+
+        return $grouped;
+    }
 }

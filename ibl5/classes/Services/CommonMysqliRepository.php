@@ -185,30 +185,31 @@ class CommonMysqliRepository extends \BaseMysqliRepository
 
     /**
      * Gets total salary for a team for the current year
-     * 
+     *
      * @param string $teamName Team name
      * @return int Total salary in thousands
      */
     public function getTeamTotalSalary(string $teamName): int
     {
-        $players = $this->fetchAll(
-            "SELECT * FROM ibl_plr WHERE teamname = ? AND retired = 0",
+        /** @var array{total_salary: int|null}|null $result */
+        $result = $this->fetchOne(
+            "SELECT SUM(
+                CASE cy
+                    WHEN 1 THEN cy1
+                    WHEN 2 THEN cy2
+                    WHEN 3 THEN cy3
+                    WHEN 4 THEN cy4
+                    WHEN 5 THEN cy5
+                    WHEN 6 THEN cy6
+                    ELSE 0
+                END
+            ) AS total_salary
+            FROM ibl_plr
+            WHERE teamname = ? AND retired = 0",
             "s",
             $teamName
         );
-        
-        $totalSalary = 0;
-        foreach ($players as $player) {
-            /** @var array{cy: int|null, cy1: int|null, cy2: int|null, cy3: int|null, cy4: int|null, cy5: int|null, cy6: int|null} $player */
-            $cy = $player['cy'] ?? 0;
-            $contractYearField = "cy$cy";
-            if (isset($player[$contractYearField])) {
-                /** @var int $salary */
-                $salary = $player[$contractYearField];
-                $totalSalary += $salary;
-            }
-        }
-        
-        return $totalSalary;
+
+        return (int) ($result['total_salary'] ?? 0);
     }
 }

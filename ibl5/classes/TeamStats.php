@@ -113,14 +113,10 @@ class TeamStats
 
     protected function loadByTeamName(string $teamName): void
     {
-        $offenseTotalsRow = $this->repository->getTeamOffenseStats($teamName);
-        if ($offenseTotalsRow !== null) {
-            $this->fillOffenseTotals($offenseTotalsRow);
-        }
-
-        $defenseTotalsRow = $this->repository->getTeamDefenseStats($teamName);
-        if ($defenseTotalsRow !== null) {
-            $this->fillDefenseTotals($defenseTotalsRow);
+        $bothStats = $this->repository->getTeamBothStats($teamName);
+        if ($bothStats !== null) {
+            $this->fillOffenseTotals($bothStats['offense']);
+            $this->fillDefenseTotals($bothStats['defense']);
         }
     }
 

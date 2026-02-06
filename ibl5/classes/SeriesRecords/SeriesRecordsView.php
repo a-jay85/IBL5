@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SeriesRecords;
 
 use SeriesRecords\Contracts\SeriesRecordsViewInterface;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -120,21 +121,11 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
     public function renderTeamNameCell(array $team, bool $isUserTeam): string
     {
         $teamId = $team['teamid'];
-        /** @var string $color1 */
-        $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
-        /** @var string $color2 */
-        $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
-        /** @var string $name */
-        $name = HtmlSanitizer::safeHtmlOutput($team['team_name']);
+        /** @var string $safeName */
+        $safeName = HtmlSanitizer::safeHtmlOutput($team['team_name']);
+        $nameHtml = $isUserTeam ? '<strong>' . $safeName . '</strong>' : $safeName;
 
-        $boldOpen = $isUserTeam ? '<strong>' : '';
-        $boldClose = $isUserTeam ? '</strong>' : '';
-
-        return '<td class="ibl-team-cell--colored sticky-col" style="background-color: #' . $color1 . ';">'
-            . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="ibl-team-cell__name" style="color: #' . $color2 . ';">'
-            . '<img src="images/logo/new' . $teamId . '.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">'
-            . '<span class="ibl-team-cell__text">' . $boldOpen . $name . $boldClose . '</span>'
-            . '</a></td>';
+        return TeamCellHelper::renderTeamCell($teamId, $team['team_name'], $team['color1'], $team['color2'], 'sticky-col', '', $nameHtml);
     }
 
     /**

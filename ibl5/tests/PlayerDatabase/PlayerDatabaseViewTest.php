@@ -167,7 +167,7 @@ final class PlayerDatabaseViewTest extends TestCase
 
         $html = $this->view->renderPlayerRow($player, 0);
 
-        $this->assertStringContainsString('href="modules.php?name=Player&amp;pa=showpage&amp;pid=123"', $html);
+        $this->assertStringContainsString('href="./modules.php?name=Player&amp;pa=showpage&amp;pid=123"', $html);
         $this->assertStringContainsString('>Test Player<', $html);
     }
 

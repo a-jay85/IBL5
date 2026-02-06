@@ -367,17 +367,12 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     bs.Date,
                     bs.visitorTeamID,
                     bs.homeTeamID,
-                    ABS(
-                        (bs.visitorQ1points + bs.visitorQ2points + bs.visitorQ3points + bs.visitorQ4points + COALESCE(bs.visitorOTpoints, 0))
-                        - (bs.homeQ1points + bs.homeQ2points + bs.homeQ3points + bs.homeQ4points + COALESCE(bs.homeOTpoints, 0))
-                    ) AS margin,
-                    CASE WHEN (bs.visitorQ1points + bs.visitorQ2points + bs.visitorQ3points + bs.visitorQ4points + COALESCE(bs.visitorOTpoints, 0))
-                        > (bs.homeQ1points + bs.homeQ2points + bs.homeQ3points + bs.homeQ4points + COALESCE(bs.homeOTpoints, 0))
+                    ABS(bs.visitorScore - bs.homeScore) AS margin,
+                    CASE WHEN bs.visitorScore > bs.homeScore
                         THEN bs.visitorTeamID ELSE bs.homeTeamID END AS winner_id,
-                    CASE WHEN (bs.visitorQ1points + bs.visitorQ2points + bs.visitorQ3points + bs.visitorQ4points + COALESCE(bs.visitorOTpoints, 0))
-                        > (bs.homeQ1points + bs.homeQ2points + bs.homeQ3points + bs.homeQ4points + COALESCE(bs.homeOTpoints, 0))
+                    CASE WHEN bs.visitorScore > bs.homeScore
                         THEN bs.homeTeamID ELSE bs.visitorTeamID END AS loser_id
-                FROM ibl_box_scores_teams bs
+                FROM vw_team_total_score bs
                 WHERE {$dateFilter}
                 GROUP BY bs.Date, bs.visitorTeamID, bs.homeTeamID
             ) sub
@@ -420,13 +415,13 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         $query = "SELECT
                 currentname AS team_name,
                 year,
-                CAST(wins AS UNSIGNED) AS wins,
-                CAST(losses AS UNSIGNED) AS losses
+                wins,
+                losses
             FROM ibl_team_win_loss
             WHERE currentname != 'Free Agents'
-                AND (CAST(wins AS UNSIGNED) + CAST(losses AS UNSIGNED)) > 0
-            ORDER BY (CAST(wins AS UNSIGNED) / (CAST(wins AS UNSIGNED) + CAST(losses AS UNSIGNED))) {$safeOrder},
-                CAST(wins AS UNSIGNED) {$safeOrder}
+                AND (wins + losses) > 0
+            ORDER BY (wins / (wins + losses)) {$safeOrder},
+                wins {$safeOrder}
             LIMIT 5";
 
         $rows = $this->fetchAll($query);
@@ -434,7 +429,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         /** @var list<SeasonWinLossRecord> $records */
         $records = [];
         foreach ($rows as $row) {
-            /** @var array{team_name: string, year: string, wins: int, losses: int} $row */
+            /** @var array{team_name: string, year: int, wins: int, losses: int} $row */
             $records[] = [
                 'team_name' => $row['team_name'],
                 'year' => $row['year'],
@@ -467,9 +462,9 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 Date,
                 visitorTeamID,
                 homeTeamID,
-                (visitorQ1points + visitorQ2points + visitorQ3points + visitorQ4points + COALESCE(visitorOTpoints, 0)) AS visitorScore,
-                (homeQ1points + homeQ2points + homeQ3points + homeQ4points + COALESCE(homeOTpoints, 0)) AS homeScore
-            FROM ibl_box_scores_teams
+                visitorScore,
+                homeScore
+            FROM vw_team_total_score
             WHERE {$regularSeasonFilter}
             GROUP BY Date, visitorTeamID, homeTeamID
             ORDER BY Date ASC"

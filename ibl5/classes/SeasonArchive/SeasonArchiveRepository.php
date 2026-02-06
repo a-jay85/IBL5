@@ -73,13 +73,11 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
      */
     public function getTeamAwardsByYear(int $year): array
     {
-        $yearPattern = '%' . $year . '%';
-
         /** @var list<TeamAwardRow> */
         return $this->fetchAll(
-            "SELECT year, name, Award, ID FROM ibl_team_awards WHERE year LIKE ?",
-            "s",
-            $yearPattern
+            "SELECT year, name, Award, ID FROM ibl_team_awards WHERE year = ?",
+            "i",
+            $year
         );
     }
 

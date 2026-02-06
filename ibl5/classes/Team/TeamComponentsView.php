@@ -330,10 +330,9 @@ class TeamComponentsView implements TeamComponentsViewInterface
             $heatHistory,
             $team->teamID,
             static function (array $record): string {
-                $year = (int) $record['year'];
                 /** @var string $name */
                 $name = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
-                return $year . ' ' . $name;
+                return $record['year'] . ' ' . $name;
             },
         );
     }
@@ -479,7 +478,7 @@ class TeamComponentsView implements TeamComponentsViewInterface
     /**
      * Render a list of awards/accomplishments from year+Award rows.
      *
-     * @param list<array{year: string, Award: string}> $awards
+     * @param list<array{year: int|string, Award: string}> $awards
      */
     private function renderAwardsList(array $awards): string
     {
@@ -490,8 +489,7 @@ class TeamComponentsView implements TeamComponentsViewInterface
         $output = '<ul class="team-awards-list">';
 
         foreach ($awards as $record) {
-            /** @var string $year */
-            $year = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($record['year']));
+            $year = (int) $record['year'];
             $rawAward = preg_replace('/<br\s*\/?>/i', "\n", $record['Award']) ?? $record['Award'];
             /** @var string $sanitizedAward */
             $sanitizedAward = \Utilities\HtmlSanitizer::safeHtmlOutput(strip_tags($rawAward));
@@ -507,8 +505,8 @@ class TeamComponentsView implements TeamComponentsViewInterface
     /**
      * Render a win/loss history list with best-record bolding and totals footer.
      *
-     * @param list<array{year: string|int, namethatyear: string, wins: string|int, losses: string|int}> $history
-     * @param \Closure(array{year: string|int, namethatyear: string, wins: string|int, losses: string|int}): string $formatLabel
+     * @param list<array{year: int, namethatyear: string, wins: int, losses: int}> $history
+     * @param \Closure(array{year: int, namethatyear: string, wins: int, losses: int}): string $formatLabel
      */
     private function renderWinLossHistory(array $history, int $teamID, \Closure $formatLabel): string
     {

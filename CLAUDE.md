@@ -137,6 +137,10 @@ ibl5/bin/db-query "DESCRIBE ibl_plr"
 
 **When to use `db-query`:** Use this script to explore the database schema, verify data after making changes, check record counts, and validate your work. This is the preferred method for Claude to query the local database since it's configured for auto-approval in the user's Claude Code settings.
 
+## Git Workflow
+
+**After committing:** Always suggest the `/mergeAndPush` slash command (not a bare `git push`). Present it as a clickable suggestion so the user can invoke it directly.
+
 ## Git Commit Conventions
 
 Commit body format — use `## Section` headers with bullet points:

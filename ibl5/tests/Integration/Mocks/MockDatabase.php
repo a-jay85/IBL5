@@ -74,13 +74,40 @@ class MockDatabase extends \mysqli
 
         // Special handling for pythagorean stats queries (offense/defense stats)
         // Always intercept these queries to avoid returning standings data
+        // The JOIN query uses aliases: off_fgm, off_ftm, off_tgm, def_fgm, def_ftm, def_tgm
         if (stripos($query, 'ibl_team_offense_stats') !== false ||
             stripos($query, 'ibl_team_defense_stats') !== false) {
             if (!empty($this->mockPythagoreanData)) {
-                return new MockDatabaseResult([$this->mockPythagoreanData]);
+                $data = $this->mockPythagoreanData;
+                // Translate base keys to aliased JOIN keys if needed
+                if (isset($data['fgm']) && !isset($data['off_fgm'])) {
+                    $data = [
+                        'off_fgm' => $data['fgm'], 'off_ftm' => $data['ftm'], 'off_tgm' => $data['tgm'],
+                        'def_fgm' => $data['fgm'], 'def_ftm' => $data['ftm'], 'def_tgm' => $data['tgm'],
+                    ];
+                }
+                return new MockDatabaseResult([$data]);
             }
             // Return empty result if no pythagorean data configured
             return new MockDatabaseResult([]);
+        }
+
+        // Special handling for market maximums query (bulk MAX from ibl_plr)
+        // Returns sensible defaults so tests don't produce undefined-key warnings
+        if (stripos($query, 'MAX(') !== false && stripos($query, 'ibl_plr') !== false) {
+            // If mock data has the correct aliased keys, use it directly
+            if (!empty($this->mockData) && isset($this->mockData[0]['fga'])) {
+                return new MockDatabaseResult($this->mockData);
+            }
+            // Return safe defaults (1 for each market maximum stat)
+            $defaults = [
+                'fga' => 1, 'fgp' => 1, 'fta' => 1, 'ftp' => 1,
+                'tga' => 1, 'tgp' => 1, 'orb' => 1, 'drb' => 1,
+                'ast' => 1, 'stl' => 1, 'r_to' => 1, 'blk' => 1,
+                'foul' => 1, 'oo' => 1, 'od' => 1, 'do' => 1,
+                'dd' => 1, 'po' => 1, 'pd' => 1, 'td' => 1,
+            ];
+            return new MockDatabaseResult([$defaults]);
         }
 
         // Special handling for voting queries (ASG and EOY tables)

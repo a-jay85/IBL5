@@ -10,9 +10,36 @@ use Utilities\StandingsGrouper;
 class StandingsUpdater extends \BaseMysqliRepository {
     private \Services\CommonMysqliRepository $commonRepository;
 
+    /** @var array<string, int> Team name to ID lookup map */
+    private array $teamNameToIdMap = [];
+
     public function __construct(object $db, \Services\CommonMysqliRepository $commonRepository) {
         parent::__construct($db);
         $this->commonRepository = $commonRepository;
+    }
+
+    /**
+     * Pre-fetch all team name→ID mappings to avoid per-team lookups
+     */
+    private function preloadTeamNameMap(): void
+    {
+        /** @var list<array{team_name: string, teamid: int}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT team_name, teamid FROM ibl_team_info",
+            ""
+        );
+
+        foreach ($rows as $row) {
+            $this->teamNameToIdMap[$row['team_name']] = $row['teamid'];
+        }
+    }
+
+    /**
+     * Look up team ID by name, using pre-loaded map with fallback
+     */
+    private function resolveTeamId(string $teamName): ?int
+    {
+        return $this->teamNameToIdMap[$teamName] ?? $this->commonRepository->getTidFromTeamname($teamName);
     }
 
     protected function extractWins(string $record): int {
@@ -36,6 +63,8 @@ class StandingsUpdater extends \BaseMysqliRepository {
         echo '<p>Updating the ibl_standings database table...<p>';
         $this->execute('TRUNCATE TABLE ibl_standings', '');
         echo 'TRUNCATE TABLE ibl_standings<p>';
+
+        $this->preloadTeamNameMap();
 
         $this->extractStandingsValues();
 
@@ -134,7 +163,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $nodeValue6 = $row->childNodes->item(6) !== null ? ($row->childNodes->item(6)->nodeValue ?? '') : '';
         $nodeValue7 = $row->childNodes->item(7) !== null ? ($row->childNodes->item(7)->nodeValue ?? '') : '';
 
-        $teamID = $this->commonRepository->getTidFromTeamname($nodeValue0);
+        $teamID = $this->resolveTeamId($nodeValue0);
         $leagueRecord = $nodeValue1;
         $pct = $nodeValue2;
         $confGB = $nodeValue3;
@@ -231,7 +260,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
         $nodeValue0 = $row->childNodes->item(0) !== null ? ($row->childNodes->item(0)->nodeValue ?? '') : '';
         $teamName = $nodeValue0;
-        $teamID = $this->commonRepository->getTidFromTeamname($teamName);
+        $teamID = $this->resolveTeamId($teamName);
 
         $nodeValue3 = $row->childNodes->item(3) !== null ? ($row->childNodes->item(3)->nodeValue ?? '') : '';
         $divGB = $nodeValue3;

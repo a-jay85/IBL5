@@ -117,37 +117,32 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      */
     public function getTeamPythagoreanStats(int $teamId): ?array
     {
-        // Get points scored from offense stats
-        /** @var array{fgm: int, ftm: int, tgm: int}|null $offenseStats */
-        $offenseStats = $this->fetchOne(
-            "SELECT fgm, ftm, tgm FROM ibl_team_offense_stats WHERE teamID = ?",
+        /** @var array{off_fgm: int, off_ftm: int, off_tgm: int, def_fgm: int, def_ftm: int, def_tgm: int}|null $stats */
+        $stats = $this->fetchOne(
+            "SELECT
+                tos.fgm AS off_fgm, tos.ftm AS off_ftm, tos.tgm AS off_tgm,
+                tds.fgm AS def_fgm, tds.ftm AS def_ftm, tds.tgm AS def_tgm
+            FROM ibl_team_offense_stats tos
+            JOIN ibl_team_defense_stats tds ON tos.teamID = tds.teamID
+            WHERE tos.teamID = ?",
             "i",
             $teamId
         );
 
-        // Get points allowed from defense stats
-        /** @var array{fgm: int, ftm: int, tgm: int}|null $defenseStats */
-        $defenseStats = $this->fetchOne(
-            "SELECT fgm, ftm, tgm FROM ibl_team_defense_stats WHERE teamID = ?",
-            "i",
-            $teamId
-        );
-
-        if ($offenseStats === null || $defenseStats === null) {
+        if ($stats === null) {
             return null;
         }
 
-        // Calculate points using BasketballStats\StatsFormatter
         $pointsScored = \BasketballStats\StatsFormatter::calculatePoints(
-            $offenseStats['fgm'],
-            $offenseStats['ftm'],
-            $offenseStats['tgm']
+            $stats['off_fgm'],
+            $stats['off_ftm'],
+            $stats['off_tgm']
         );
 
         $pointsAllowed = \BasketballStats\StatsFormatter::calculatePoints(
-            $defenseStats['fgm'],
-            $defenseStats['ftm'],
-            $defenseStats['tgm']
+            $stats['def_fgm'],
+            $stats['def_ftm'],
+            $stats['def_tgm']
         );
 
         return [

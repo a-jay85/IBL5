@@ -12,6 +12,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     private \Services\CommonMysqliRepository $commonRepository;
     private \Season $season;
 
+    /** @var array<string, int> Team name to ID lookup map */
+    private array $teamNameToIdMap = [];
+
     public function __construct(object $db, \Services\CommonMysqliRepository $commonRepository, \Season $season) {
         parent::__construct($db);
         $this->commonRepository = $commonRepository;
@@ -49,6 +52,30 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         return ScheduleParser::extractBoxID($boxHREF);
     }
 
+    /**
+     * Pre-fetch all team name→ID mappings to avoid per-game lookups
+     */
+    private function preloadTeamNameMap(): void
+    {
+        /** @var list<array{team_name: string, teamid: int}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT team_name, teamid FROM ibl_team_info",
+            ""
+        );
+
+        foreach ($rows as $row) {
+            $this->teamNameToIdMap[$row['team_name']] = $row['teamid'];
+        }
+    }
+
+    /**
+     * Look up team ID by name, using pre-loaded map with fallback
+     */
+    private function resolveTeamId(string $teamName): ?int
+    {
+        return $this->teamNameToIdMap[$teamName] ?? $this->commonRepository->getTidFromTeamname($teamName);
+    }
+
     public function update(): void {
         echo 'Updating the ibl_schedule database table...<p>';
 
@@ -56,6 +83,8 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $this->execute('TRUNCATE TABLE ibl_schedule', '');
         $log .= 'TRUNCATE TABLE ibl_schedule<p>';
+
+        $this->preloadTeamNameMap();
 
         $documentRootRaw = $_SERVER['DOCUMENT_ROOT'] ?? '';
         $documentRoot = is_string($documentRootRaw) ? $documentRootRaw : '';
@@ -121,8 +150,8 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                     }
                 }
 
-                $visitorTID = $this->commonRepository->getTidFromTeamname($visitorName);
-                $homeTID = $this->commonRepository->getTidFromTeamname($homeName);
+                $visitorTID = $this->resolveTeamId($visitorName);
+                $homeTID = $this->resolveTeamId($homeName);
 
                 if ($vScore !== 0 && $hScore !== 0 && $boxID === null) {
                     $errorMessage = "Script Error: box scores for games haven't been generated. Please delete and reupload the JSB HTML export with the box scores, then try again.";

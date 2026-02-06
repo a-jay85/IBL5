@@ -18,9 +18,40 @@ class TeamStatsCalculator
 {
     private object $db;
 
+    /** @var array<int, array{win: int, loss: int}>|null */
+    private ?array $teamRecordsCache = null;
+
     public function __construct(object $db)
     {
         $this->db = $db;
+    }
+
+    /**
+     * Pre-fetch all team records from ibl_power into a lookup array.
+     * Call once before processing multiple teams to avoid N+1 queries.
+     */
+    public function preloadTeamRecords(): void
+    {
+        if ($this->teamRecordsCache !== null) {
+            return;
+        }
+
+        $this->teamRecordsCache = [];
+
+        if (method_exists($this->db, 'fetchAll')) {
+            /** @var list<array{TeamID: int, win: int, loss: int}> $rows */
+            $rows = $this->db->fetchAll(
+                "SELECT TeamID, win, loss FROM ibl_power WHERE TeamID BETWEEN 1 AND 32",
+                ""
+            );
+
+            foreach ($rows as $row) {
+                $this->teamRecordsCache[$row['TeamID']] = [
+                    'win' => $row['win'],
+                    'loss' => $row['loss'],
+                ];
+            }
+        }
     }
 
     /**
@@ -137,13 +168,18 @@ class TeamStatsCalculator
     }
 
     /**
-     * Get opponent's record from database
+     * Get opponent's record, using pre-loaded cache when available
      *
      * @return array{win: int, loss: int}
      */
     private function getOpponentRecord(int $teamId): array
     {
-        // Use method_exists for duck-typing compatibility with MockDatabase and real db
+        // Use pre-loaded cache if available
+        if ($this->teamRecordsCache !== null) {
+            return $this->teamRecordsCache[$teamId] ?? ['win' => 0, 'loss' => 0];
+        }
+
+        // Fallback to per-query lookup for duck-typing compatibility with MockDatabase
         if (method_exists($this->db, 'fetchOne')) {
             /** @var array{win: int, loss: int}|null $result */
             $result = $this->db->fetchOne(

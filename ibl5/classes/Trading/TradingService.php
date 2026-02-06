@@ -45,11 +45,12 @@ class TradingService implements TradingServiceInterface
         $season = new \Season($mysqliDb);
 
         $userTeam = $this->commonRepository->getTeamnameFromUsername($username) ?? '';
-        $userTeamId = $this->commonRepository->getTidFromTeamname($userTeam) ?? 0;
-        $partnerTeamId = $this->commonRepository->getTidFromTeamname($partnerTeam) ?? 0;
 
         $userTeamData = $this->commonRepository->getTeamByName($userTeam);
         $partnerTeamData = $this->commonRepository->getTeamByName($partnerTeam);
+
+        $userTeamId = $userTeamData !== null ? $userTeamData['teamid'] : 0;
+        $partnerTeamId = $partnerTeamData !== null ? $partnerTeamData['teamid'] : 0;
 
         $userPlayers = $this->repository->getTeamPlayersForTrading($userTeamId);
         $userPicks = $this->repository->getTeamDraftPicksForTrading($userTeam);

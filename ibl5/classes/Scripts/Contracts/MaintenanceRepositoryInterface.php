@@ -74,6 +74,16 @@ interface MaintenanceRepositoryInterface
     public function updatePlayoffAppearances(): bool;
 
     /**
+     * Update all title counts and playoff appearances in a single query
+     *
+     * Combines division titles, conference titles, IBL titles, HEAT titles,
+     * and playoff appearances into one UPDATE statement.
+     *
+     * @return bool True on success
+     */
+    public function updateAllTitlesAndAppearances(): bool;
+
+    /**
      * Get a setting value by name
      *
      * @param string $name Setting name

@@ -11,6 +11,7 @@ use CapSpace\Contracts\CapSpaceRepositoryInterface;
  *
  * Processes team salary data and calculates available cap space.
  *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  * @phpstan-type AvailableSalary array{year1: int, year2: int, year3: int, year4: int, year5: int, year6: int}
  * @phpstan-type PositionSalaries array<string, int>
  * @phpstan-type CapSpaceTeamData array{team: \Team, teamId: int, teamName: string, teamCity: string, color1: string, color2: string, availableSalary: AvailableSalary, positionSalaries: PositionSalaries, freeAgencySlots: int, hasMLE: bool, hasLLE: bool}
@@ -76,11 +77,19 @@ class CapSpaceService
             'year6' => \League::HARD_CAP_MAX - $salaryCapSpent['year6'],
         ];
 
-        // Get salary by position
+        // Get salary by position — fetch all players under contract once, partition by position
+        $allPlayers = $team->getAllPlayersUnderContractResult();
+        /** @var array<string, list<PlayerRow>> $playersByPosition */
+        $playersByPosition = [];
+        foreach ($allPlayers as $playerRow) {
+            /** @var string $pos */
+            $pos = $playerRow['pos'] ?? '';
+            $playersByPosition[$pos][] = $playerRow;
+        }
         $positionSalaries = [];
         foreach (\JSB::PLAYER_POSITIONS as $position) {
-            $playersResult = $team->getPlayersUnderContractByPositionResult($position);
-            $positionSalaries[$position] = $team->getTotalNextSeasonSalariesFromPlrResult($playersResult);
+            $positionPlayers = $playersByPosition[$position] ?? [];
+            $positionSalaries[$position] = $team->getTotalNextSeasonSalariesFromPlrResult($positionPlayers);
         }
 
         // Calculate roster slots used

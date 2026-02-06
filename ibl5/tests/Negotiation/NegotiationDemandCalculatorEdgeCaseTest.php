@@ -450,8 +450,15 @@ class NegotiationDemandCalculatorEdgeCaseTest extends TestCase
 
     private function setupMarketMaximums(int $maxValue): void
     {
+        // Return all MAX column aliases used by the single bulk query in getMarketMaximums()
         $this->mockDb->setMockData([
-            ['max_value' => $maxValue]
+            [
+                'fga' => $maxValue, 'fgp' => $maxValue, 'fta' => $maxValue, 'ftp' => $maxValue,
+                'tga' => $maxValue, 'tgp' => $maxValue, 'orb' => $maxValue, 'drb' => $maxValue,
+                'ast' => $maxValue, 'stl' => $maxValue, 'r_to' => $maxValue, 'blk' => $maxValue,
+                'foul' => $maxValue, 'oo' => $maxValue, 'od' => $maxValue, 'do' => $maxValue,
+                'dd' => $maxValue, 'po' => $maxValue, 'pd' => $maxValue, 'td' => $maxValue,
+            ]
         ]);
     }
 

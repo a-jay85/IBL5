@@ -66,9 +66,18 @@ class Season extends BaseMysqliRepository
     {
         parent::__construct($db);
 
-        $this->phase = $this->getSeasonPhase();
+        // Bulk-fetch all needed settings in a single query
+        $settings = $this->getBulkSettings([
+            'Current Season Phase',
+            'Current Season Ending Year',
+            'Allow Trades',
+            'Allow Waiver Moves',
+            'Free Agency Notifications',
+        ]);
 
-        $this->endingYear = (int)$this->getSeasonEndingYear(); // Cast to integer since column type is VARCHAR
+        $this->phase = $settings['Current Season Phase'] ?? '';
+
+        $this->endingYear = (int)($settings['Current Season Ending Year'] ?? '0');
         $this->beginningYear = $this->endingYear - 1;
 
         $this->regularSeasonStartDate = new \DateTime("$this->beginningYear-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01");
@@ -83,10 +92,37 @@ class Season extends BaseMysqliRepository
 
         $this->projectedNextSimEndDate = $this->getProjectedNextSimEndDate($this->lastSimEndDate);
 
-        $this->allowTrades = $this->getAllowTradesStatus();
-        $this->allowWaivers = $this->getAllowWaiversStatus();
+        $this->allowTrades = $settings['Allow Trades'] ?? '';
+        $this->allowWaivers = $settings['Allow Waiver Moves'] ?? '';
 
-        $this->freeAgencyNotificationsState = $this->getFreeAgencyNotificationsState();
+        $this->freeAgencyNotificationsState = $settings['Free Agency Notifications'] ?? '';
+    }
+
+    /**
+     * Bulk-fetch multiple settings in a single query
+     *
+     * @param list<string> $names Setting names to fetch
+     * @return array<string, string> Map of setting name → value
+     */
+    private function getBulkSettings(array $names): array
+    {
+        $placeholders = implode(',', array_fill(0, count($names), '?'));
+        $types = str_repeat('s', count($names));
+
+        /** @var list<array{name: string, value: string}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT name, value FROM ibl_settings WHERE name IN ({$placeholders})",
+            $types,
+            ...$names
+        );
+
+        /** @var array<string, string> $map */
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row['name']] = $row['value'];
+        }
+
+        return $map;
     }
 
     /**

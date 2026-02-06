@@ -95,15 +95,18 @@ class StandingsRepositoryTest extends TestCase
 
     public function testGetTeamPythagoreanStatsReturnsArrayWhenFound(): void
     {
-        $offenseData = ['fgm' => 1000, 'ftm' => 500, 'tgm' => 300];
-        $defenseData = ['fgm' => 900, 'ftm' => 450, 'tgm' => 250];
+        // Single JOIN query returns combined offense+defense columns
+        $joinedData = [
+            'off_fgm' => 1000, 'off_ftm' => 500, 'off_tgm' => 300,
+            'def_fgm' => 900, 'def_ftm' => 450, 'def_tgm' => 250,
+        ];
 
         // Expected points: offense = 2*1000 + 500 + 300 = 2800
         // Expected points allowed: defense = 2*900 + 450 + 250 = 2500
 
         $mockResult = $this->createMock(\mysqli_result::class);
         $mockResult->method('fetch_assoc')
-            ->willReturnOnConsecutiveCalls($offenseData, $defenseData);
+            ->willReturn($joinedData);
 
         $mockStmt = $this->createMock(\mysqli_stmt::class);
         $mockStmt->method('bind_param')->willReturn(true);

@@ -164,10 +164,9 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
 
         $pid = $playerIds[$name] ?? null;
         if ($pid !== null) {
-            $thumbnail = PlayerImageHelper::renderThumbnail($pid);
             return '<span class="ibl-player-cell">'
-                . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">'
-                . $thumbnail . self::esc($name) . '</a></span>';
+                . PlayerImageHelper::renderPlayerLink($pid, $name)
+                . '</span>';
         }
 
         return self::esc($name);

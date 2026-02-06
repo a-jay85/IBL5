@@ -6,6 +6,7 @@ if (!defined('BLOCK_FILE')) {
 }
 
 use Player\PlayerImageHelper;
+use UI\Components\TooltipLabel;
 use Utilities\HtmlSanitizer;
 
 global $mysqli_db, $leagueContext;
@@ -159,7 +160,7 @@ $firstCategory = $categories[0] ?? 'Points';
 // Compact tabbed layout
 $content = '<div class="leaders-tabbed" id="' . $blockId . '">
     <div class="leaders-tabbed__header">
-        <h3 class="leaders-tabbed__title">' . HtmlSanitizer::safeHtmlOutput($season->phase) . ' Sim #' . $phaseSimNumber . ' Leaders</h3>
+        <h3 class="leaders-tabbed__title">' . HtmlSanitizer::safeHtmlOutput($season->phase) . ' ' . TooltipLabel::render('Sim #' . $phaseSimNumber, 'Overall Sim #' . $simNumber) . ' Leaders</h3>
     </div>
     <div class="leaders-tabbed__tabs" role="tablist">';
 

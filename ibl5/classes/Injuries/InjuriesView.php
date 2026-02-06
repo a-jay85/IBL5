@@ -6,7 +6,7 @@ namespace Injuries;
 
 use Injuries\Contracts\InjuriesViewInterface;
 use Player\PlayerImageHelper;
-use UI\Components\InjuryDaysLabel;
+use UI\Components\TooltipLabel;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
@@ -112,8 +112,9 @@ class InjuriesView implements InjuriesViewInterface
         $position = HtmlSanitizer::safeHtmlOutput($player['position']);
         $daysRemaining = $player['daysRemaining'];
         $returnDate = $player['returnDate'] ?? '';
-        $renderedLabel = InjuryDaysLabel::render($daysRemaining, $returnDate);
-        $daysLabel = $renderedLabel !== '' ? $renderedLabel : (string) $daysRemaining;
+        $daysLabel = ($daysRemaining > 0 && $returnDate !== '')
+            ? TooltipLabel::render((string) $daysRemaining, 'Returns: ' . $returnDate)
+            : (string) $daysRemaining;
 
         $playerCell = PlayerImageHelper::renderFlexiblePlayerCell($playerID, $player['name']);
         $teamCell = TeamCellHelper::renderTeamCell($teamID, $player['teamName'], $player['teamColor1'], $player['teamColor2']);

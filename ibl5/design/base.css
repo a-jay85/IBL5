@@ -24,14 +24,12 @@
    ========================================================================== */
 
 html {
-    overflow-x: hidden;
-    overscroll-behavior-x: none;
+    overflow-x: clip;
     /* Accessibility: Scale up base font size for better readability */
     font-size: 112.5%; /* 18px base instead of 16px */
 }
 
 body {
-    overscroll-behavior-x: none;
     width: 100%;
     max-width: 100%;
     position: relative;

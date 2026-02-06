@@ -25,7 +25,8 @@ ibl5/themes/IBL/style/style.css
 backups
 depthcharts
 /ibl5/ibl/IBL/
-/ibl5/shellScripts/
+ibl5/shellScripts/.env
+/ibl5/shellScripts/.DS_Store
 !/ibl5/ibl/IBL/Schedule.htm
 !/ibl5/ibl/IBL/Standings.htm
 !/ibl5/classes/

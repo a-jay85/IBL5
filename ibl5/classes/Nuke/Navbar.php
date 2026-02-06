@@ -26,7 +26,7 @@ class Navbar
         $thmcount = 0;
         $handle = opendir('themes');
         while ($file = readdir($handle)) {
-            if ((!mb_ereg("[.]", $file))) {
+            if ((!str_contains($file, '.'))) {
                 $thmcount++;
             }
         }

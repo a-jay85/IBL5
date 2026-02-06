@@ -88,6 +88,12 @@ try {
         echo "<p>✓ No box score data to check</p>";
     }
 
+    // Invalidate the RecordHolders page cache so next visit sees fresh data
+    $innerService = new \RecordHolders\RecordHoldersService($recordHoldersRepository);
+    $cachedService = new \RecordHolders\CachedRecordHoldersService($innerService, $mysqli_db);
+    $cachedService->invalidateCache();
+    echo "<p>✓ Record Holders cache invalidated</p>";
+
     echo '<p><b>All the things have been updated!</b></p>';
 
 } catch (Exception $e) {

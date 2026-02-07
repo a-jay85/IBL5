@@ -93,7 +93,10 @@ class TableViewSwitcher
         /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($tabLabel);
 
-        return '<a href="' . $href . '" class="ibl-tab' . $activeClass . '">' . $safeLabel . '</a>';
+        /** @var string $safeKey */
+        $safeKey = HtmlSanitizer::safeHtmlOutput($tabKey);
+
+        return '<a href="' . $href . '" class="ibl-tab' . $activeClass . '" data-display="' . $safeKey . '">' . $safeLabel . '</a>';
     }
 
     /**

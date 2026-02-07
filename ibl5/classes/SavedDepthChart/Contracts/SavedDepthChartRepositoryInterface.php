@@ -148,11 +148,13 @@ interface SavedDepthChartRepositoryInterface
     /**
      * Get live roster depth chart settings from ibl_plr
      *
-     * Returns all dc_* columns for active players on the team.
-     * This allows comparison with saved depth chart snapshots.
+     * Returns all dc_* columns plus name and ordinal for active players on the team.
+     * This allows comparison with saved depth chart snapshots and building snapshots from live data.
      *
      * @return list<array{
      *     pid: int,
+     *     name: string,
+     *     ordinal: int,
      *     dc_PGDepth: int,
      *     dc_SGDepth: int,
      *     dc_SFDepth: int,
@@ -168,4 +170,11 @@ interface SavedDepthChartRepositoryInterface
      * }>
      */
     public function getLiveRosterSettings(int $tid): array;
+
+    /**
+     * Get the active (is_active = 1) depth chart for a team
+     *
+     * @return SavedDepthChartRow|null
+     */
+    public function getActiveDepthChartForTeam(int $tid): ?array;
 }

@@ -176,7 +176,6 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
         $currentPhaseSim = $season->getPhaseSpecificSimNumber();
 
         $parts = [];
-        $parts[] = 'Current (Live)';
 
         // Find active DC for sim range, date range, and win-loss record
         $savedDcs = $this->repository->getSavedDepthChartsForTeam($tid);
@@ -186,6 +185,13 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
                 $activeDc = $dc;
                 break;
             }
+        }
+
+        // Use the active DC's name if it has one, otherwise default label
+        if ($activeDc !== null && $activeDc['name'] !== null && $activeDc['name'] !== '') {
+            $parts[] = $activeDc['name'] . ' (Live)';
+        } else {
+            $parts[] = 'Current (Live)';
         }
 
         // Sim range: active DC's start through current sim
@@ -476,6 +482,64 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
         }
 
         return $phase . ' Sims ' . $start . '-' . $end;
+    }
+
+    /**
+     * @see SavedDepthChartServiceInterface::nameOrCreateActive()
+     * @return array{success: bool, id: int, name: string}|array{success: bool, error: string}
+     */
+    public function nameOrCreateActive(int $tid, string $username, string $name, \Season $season): array
+    {
+        $activeDc = $this->repository->getActiveDepthChartForTeam($tid);
+
+        if ($activeDc !== null) {
+            $this->repository->updateName($activeDc['id'], $tid, $name);
+            return ['success' => true, 'id' => $activeDc['id'], 'name' => $name];
+        }
+
+        // No active DC — create one from live ibl_plr values
+        $livePlayers = $this->repository->getLiveRosterSettings($tid);
+        if ($livePlayers === []) {
+            return ['success' => false, 'error' => 'No players found on roster'];
+        }
+
+        $snapshots = [];
+        foreach ($livePlayers as $player) {
+            $snapshots[] = [
+                'pid' => $player['pid'],
+                'player_name' => $player['name'],
+                'ordinal' => $player['ordinal'],
+                'dc_PGDepth' => $player['dc_PGDepth'],
+                'dc_SGDepth' => $player['dc_SGDepth'],
+                'dc_SFDepth' => $player['dc_SFDepth'],
+                'dc_PFDepth' => $player['dc_PFDepth'],
+                'dc_CDepth' => $player['dc_CDepth'],
+                'dc_active' => $player['dc_active'],
+                'dc_minutes' => $player['dc_minutes'],
+                'dc_of' => $player['dc_of'],
+                'dc_df' => $player['dc_df'],
+                'dc_oi' => $player['dc_oi'],
+                'dc_di' => $player['dc_di'],
+                'dc_bh' => $player['dc_bh'],
+            ];
+        }
+
+        $simStartDate = $this->calculateNextSimStartDate($season->lastSimEndDate);
+        $simNumberStart = $season->lastSimNumber + 1;
+
+        $dcId = $this->repository->createSavedDepthChart(
+            $tid,
+            $username,
+            $name,
+            $season->phase,
+            $season->endingYear,
+            $simStartDate,
+            $simNumberStart
+        );
+
+        $this->repository->saveDepthChartPlayers($dcId, $snapshots);
+
+        return ['success' => true, 'id' => $dcId, 'name' => $name];
     }
 
     /**

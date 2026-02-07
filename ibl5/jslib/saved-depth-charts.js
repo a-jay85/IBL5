@@ -22,12 +22,17 @@
             return;
         }
 
+        // Show pencil on initial page load (Current (Live) is selected by default)
+        if (renameBtn) {
+            renameBtn.style.display = 'inline-block';
+        }
+
         // Show/hide rename button based on selection
         select.addEventListener('change', function () {
             var dcId = parseInt(select.value, 10);
 
             if (renameBtn) {
-                renameBtn.style.display = dcId > 0 ? 'inline-block' : 'none';
+                renameBtn.style.display = 'inline-block';
             }
 
             if (dcId === 0) {
@@ -43,7 +48,15 @@
         if (renameBtn) {
             renameBtn.addEventListener('click', function () {
                 var dcId = parseInt(select.value, 10);
-                if (dcId <= 0) return;
+
+                if (dcId === 0) {
+                    // Naming the current (live) depth chart
+                    var liveName = prompt('Enter a name for the current depth chart:');
+                    if (liveName === null || liveName.trim() === '') return;
+
+                    renameActiveDepthChart(liveName.trim());
+                    return;
+                }
 
                 var currentText = select.options[select.selectedIndex].text;
                 var newName = prompt('Enter a name for this depth chart:', currentText);
@@ -227,6 +240,32 @@
                 });
         }
 
+        function renameActiveDepthChart(newName) {
+            var url = config.apiBaseUrl + '&action=rename-active';
+
+            fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newName })
+            })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Failed to name active depth chart');
+                    return response.json();
+                })
+                .then(function (data) {
+                    if (data.success) {
+                        refreshDropdown(data.id);
+                    } else if (data.error) {
+                        alert(data.error);
+                    }
+                })
+                .catch(function (err) {
+                    console.error('Error naming active depth chart:', err);
+                    alert('Failed to name depth chart. Please try again.');
+                });
+        }
+
         function refreshDropdown(selectedId) {
             var url = config.apiBaseUrl + '&action=list';
 
@@ -259,6 +298,10 @@
                     // Re-select the previously selected item
                     if (selectedId) {
                         select.value = String(selectedId);
+                        // If option wasn't found (e.g., active DC hidden because it matches live), fall back to Current (Live)
+                        if (select.selectedIndex === -1) {
+                            select.value = '0';
+                        }
                     }
                 })
                 .catch(function (err) {

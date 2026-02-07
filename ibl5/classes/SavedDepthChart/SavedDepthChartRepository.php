@@ -225,13 +225,13 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
 
     /**
      * @see SavedDepthChartRepositoryInterface::getLiveRosterSettings()
-     * @return list<array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}>
+     * @return list<array{pid: int, name: string, ordinal: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}>
      */
     public function getLiveRosterSettings(int $tid): array
     {
-        /** @var list<array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> */
+        /** @var list<array{pid: int, name: string, ordinal: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> */
         return $this->fetchAll(
-            "SELECT pid, dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth,
+            "SELECT pid, name, ordinal, dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth,
                     dc_active, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh
              FROM ibl_plr
              WHERE tid = ? AND retired = '0' AND ordinal <= ?
@@ -239,6 +239,20 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
             "ii",
             $tid,
             \JSB::WAIVERS_ORDINAL
+        );
+    }
+
+    /**
+     * @see SavedDepthChartRepositoryInterface::getActiveDepthChartForTeam()
+     * @return SavedDepthChartRow|null
+     */
+    public function getActiveDepthChartForTeam(int $tid): ?array
+    {
+        /** @var SavedDepthChartRow|null */
+        return $this->fetchOne(
+            "SELECT * FROM ibl_saved_depth_charts WHERE tid = ? AND is_active = 1 LIMIT 1",
+            "i",
+            $tid
         );
     }
 }

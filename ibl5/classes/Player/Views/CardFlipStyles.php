@@ -89,7 +89,7 @@ class CardFlipStyles
 
     /**
      * Get the flip JavaScript for any flip container
-     * 
+     *
      * @param string $containerSelector CSS selector for flip containers
      * @param string $iconSelector CSS selector for flip icons
      * @param bool $toggleLabels Whether to toggle text labels (for stats cards)
@@ -99,16 +99,17 @@ class CardFlipStyles
     {
         $labelToggleCode = $toggleLabels ? <<<JS
 
-                // Update toggle label based on state
-                const isFlipped = container.classList.contains('flipped');
+                // Update toggle label and title based on state
                 flipIcons.forEach(function(t) {
                     const label = t.querySelector('.toggle-label');
                     if (label) {
                         const currentText = label.textContent;
                         if (currentText.includes('Totals')) {
                             label.textContent = 'Averages';
+                            t.title = 'Switch to Averages';
                         } else {
                             label.textContent = 'Totals';
+                            t.title = 'Switch to Totals';
                         }
                     }
                 });
@@ -118,10 +119,10 @@ JS
         return <<<JS
 document.addEventListener('DOMContentLoaded', function() {
     const flipContainers = document.querySelectorAll('{$containerSelector}');
-    
+
     flipContainers.forEach(function(container) {
         const flipIcons = container.querySelectorAll('{$iconSelector}');
-        
+
         flipIcons.forEach(function(flipIcon) {
             flipIcon.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -134,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
         });
-        
+
         // Add pulse for first 5 seconds to draw attention
         if (flipIcons.length > 0) {
             setTimeout(function() {
@@ -179,11 +180,55 @@ HTML;
     public static function getStatsCardFlipStyles(?array $colorScheme = null): string
     {
         $script = self::getFlipScript('.stats-flip-container', '.stats-flip-toggle', true);
+        $touchScroll = self::getTouchScrollScript('.stats-flip-container');
 
         return <<<HTML
 <script>
 {$script}
+{$touchScroll}
 </script>
 HTML;
+    }
+
+    /**
+     * Get touch-scroll polyfill for stats cards inside flip containers
+     *
+     * Mobile Safari blocks native touch-scrolling on overflow-x:auto elements
+     * that are descendants of a preserve-3d container. This polyfills horizontal
+     * touch-scrolling by manually tracking touch deltas and setting scrollLeft.
+     *
+     * @param string $containerSelector CSS selector for flip containers
+     * @return string JavaScript code
+     */
+    private static function getTouchScrollScript(string $containerSelector): string
+    {
+        return <<<JS
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('{$containerSelector} .player-stats-card').forEach(function(card) {
+        var startX, startY, initScrollLeft, scrollDir;
+        card.addEventListener('touchstart', function(e) {
+            if (card.scrollWidth <= card.clientWidth) return;
+            startX = e.touches[0].pageX;
+            startY = e.touches[0].pageY;
+            initScrollLeft = card.scrollLeft;
+            scrollDir = null;
+        }, {passive: true});
+        card.addEventListener('touchmove', function(e) {
+            if (startX === undefined) return;
+            var dx = startX - e.touches[0].pageX;
+            var dy = startY - e.touches[0].pageY;
+            if (scrollDir === null) scrollDir = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+            if (scrollDir === 'h') {
+                e.preventDefault();
+                card.scrollLeft = initScrollLeft + dx;
+            }
+        }, {passive: false});
+        card.addEventListener('touchend', function() {
+            startX = undefined;
+            scrollDir = null;
+        }, {passive: true});
+    });
+});
+JS;
     }
 }

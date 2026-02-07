@@ -219,7 +219,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             $parts[] = '(' . $record['wins'] . '-' . $record['losses'] . ')';
         }
 
-        return implode(' | ', $parts);
+        return implode(' ∙ ', $parts);
     }
 
     /**

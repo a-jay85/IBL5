@@ -27,7 +27,7 @@
     font-size: 0.8125rem;
     border: 1px solid #ccc;
     border-radius: 4px;
-    max-width: 320px;
+    max-width: 480px;
     cursor: pointer;
 }
 
@@ -46,11 +46,6 @@
 .saved-dc-rename-btn:hover {
     color: #111;
     border-color: #999;
-}
-
-.saved-dc-win-loss {
-    font-size: 0.8125rem;
-    color: #333;
 }
 
 .saved-dc-loading {

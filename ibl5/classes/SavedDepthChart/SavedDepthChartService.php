@@ -167,6 +167,38 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     }
 
     /**
+     * Build label for the "Current (Live)" dropdown entry
+     *
+     * Shows phase, phase-specific sim number, date range, and win-loss record.
+     */
+    public function buildCurrentLiveLabel(int $tid, \Season $season): string
+    {
+        $phaseSimNumber = $season->getPhaseSpecificSimNumber();
+
+        $parts = [];
+        $parts[] = 'Current (Live)';
+        $parts[] = $season->phase . ' Sim ' . $phaseSimNumber;
+
+        // Date range: last sim start through last sim end
+        $startDate = (new \DateTime($season->lastSimStartDate))->format('M j');
+        $endDate = (new \DateTime($season->lastSimEndDate))->format('M j');
+        $parts[] = $startDate . ' - ' . $endDate;
+
+        // Win-loss record for the current active DC's span (or full season)
+        // Find active DC for win-loss record date range
+        $savedDcs = $this->repository->getSavedDepthChartsForTeam($tid);
+        foreach ($savedDcs as $dc) {
+            if ($dc['is_active'] === 1) {
+                $record = $this->getWinLossRecord($tid, $dc['sim_start_date'], $season->lastSimEndDate);
+                $parts[] = '(' . $record['wins'] . '-' . $record['losses'] . ')';
+                break;
+            }
+        }
+
+        return implode(' | ', $parts);
+    }
+
+    /**
      * @see SavedDepthChartServiceInterface::getDropdownOptions()
      * @return list<array{id: int, label: string, isActive: bool}>
      */
@@ -174,30 +206,8 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     {
         $savedDcs = $this->repository->getSavedDepthChartsForTeam($tid);
 
-        // Find active DC
-        $activeDc = null;
-        foreach ($savedDcs as $dc) {
-            if ($dc['is_active'] === 1) {
-                $activeDc = $dc;
-                break;
-            }
-        }
-
-        // Hide active DC if it matches live ibl_plr settings exactly
-        $hideActiveDc = false;
-        if ($activeDc !== null) {
-            $dcPlayers = $this->repository->getPlayersForDepthChart($activeDc['id']);
-            $liveRosterPlayers = $this->repository->getLiveRosterSettings($tid);
-            $hideActiveDc = $this->isDepthChartMatchingLive($dcPlayers, $liveRosterPlayers);
-        }
-
         $options = [];
         foreach ($savedDcs as $dc) {
-            // Skip active DC if it matches live settings
-            if ($hideActiveDc && $activeDc !== null && $dc['id'] === $activeDc['id']) {
-                continue;
-            }
-
             $label = $this->buildDropdownLabel($dc, $season, $tid);
             $options[] = [
                 'id' => $dc['id'],
@@ -404,56 +414,4 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
         return implode(' | ', $parts);
     }
 
-    /**
-     * Check if saved depth chart settings match live ibl_plr settings exactly
-     *
-     * Returns true only if the same set of PIDs exist and all 12 dc_* columns
-     * match for every player. Detects roster changes from trades.
-     *
-     * @param list<SavedDepthChartPlayerRow> $dcPlayers Saved DC player settings
-     * @param list<array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $liveRosterPlayers Live ibl_plr settings
-     */
-    private function isDepthChartMatchingLive(array $dcPlayers, array $liveRosterPlayers): bool
-    {
-        // Build map of live settings by PID
-        /** @var array<int, array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $liveByPid */
-        $liveByPid = [];
-        foreach ($liveRosterPlayers as $player) {
-            $liveByPid[$player['pid']] = $player;
-        }
-
-        // Build map of saved settings by PID
-        /** @var array<int, SavedDepthChartPlayerRow> $savedByPid */
-        $savedByPid = [];
-        foreach ($dcPlayers as $player) {
-            $savedByPid[$player['pid']] = $player;
-        }
-
-        // PIDs must match exactly (detect trades)
-        $livePids = array_keys($liveByPid);
-        $savedPids = array_keys($savedByPid);
-        sort($livePids);
-        sort($savedPids);
-        if ($livePids !== $savedPids) {
-            return false;
-        }
-
-        // Compare all 12 dc_* columns for each player
-        $dcColumns = [
-            'dc_PGDepth', 'dc_SGDepth', 'dc_SFDepth', 'dc_PFDepth', 'dc_CDepth',
-            'dc_active', 'dc_minutes', 'dc_of', 'dc_df', 'dc_oi', 'dc_di', 'dc_bh',
-        ];
-
-        foreach ($savedByPid as $pid => $savedPlayer) {
-            $livePlayer = $liveByPid[$pid];
-
-            foreach ($dcColumns as $col) {
-                if ($savedPlayer[$col] !== $livePlayer[$col]) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
 }

@@ -16,7 +16,6 @@
         var select = document.getElementById('saved-dc-select');
         var renameBtn = document.getElementById('saved-dc-rename-btn');
         var loadingEl = document.getElementById('saved-dc-loading');
-        var winLossEl = document.getElementById('saved-dc-win-loss');
         var loadedDcInput = document.getElementById('loaded_dc_id');
 
         if (!select) {
@@ -158,18 +157,6 @@
         }
 
         function showStats(data) {
-            // Show win-loss record
-            if (winLossEl && data.winLoss) {
-                var wl = data.winLoss;
-                if (wl.label && wl.label !== '0-0') {
-                    winLossEl.innerHTML = '<strong>Record:</strong> ' + escapeHtml(wl.label);
-                    winLossEl.style.display = 'block';
-                } else {
-                    winLossEl.innerHTML = '';
-                    winLossEl.style.display = 'none';
-                }
-            }
-
             // Inject period averages into Sim Averages tab content area
             if (data.statsHtml) {
                 var statsContainer = document.getElementById('saved-dc-stats-panel');
@@ -248,7 +235,12 @@
                 .then(function (data) {
                     if (!select) return;
 
-                    // Preserve the "Current" option
+                    // Update "Current (Live)" option label if provided
+                    if (data.currentLiveLabel && select.options.length > 0) {
+                        select.options[0].textContent = data.currentLiveLabel;
+                    }
+
+                    // Preserve the "Current (Live)" option
                     while (select.options.length > 1) {
                         select.remove(1);
                     }

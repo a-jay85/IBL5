@@ -51,7 +51,8 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         // Render saved depth chart dropdown
         $savedDcService = new SavedDepthChartService($this->db);
         $dropdownOptions = $savedDcService->getDropdownOptions($teamID, $season);
-        $this->view->renderSavedDepthChartDropdown($dropdownOptions);
+        $currentLiveLabel = $savedDcService->buildCurrentLiveLabel($teamID, $season);
+        $this->view->renderSavedDepthChartDropdown($dropdownOptions, $currentLiveLabel);
 
         $playersResult = $this->repository->getPlayersOnTeam($teamName, $teamID);
 

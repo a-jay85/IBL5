@@ -766,13 +766,6 @@
 
 .stats-flip-container .stats-front {
     position: relative;
-    visibility: visible;
-    transition: visibility 0s 0.3s;
-}
-
-.stats-flip-container.flipped .stats-front {
-    visibility: hidden;
-    transition: visibility 0s 0.3s;
 }
 
 .stats-flip-container .stats-back {

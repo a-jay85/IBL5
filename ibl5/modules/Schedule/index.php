@@ -74,7 +74,7 @@ function renderLeagueSchedule(
     $teamRecordsResult = $mysqli_db->query($teamRecordsQuery);
     $teamRecords = [];
     while ($row = $teamRecordsResult->fetch_assoc()) {
-        $teamRecords[(int)$row['tid']] = $row['leagueRecord'];
+        $teamRecords[$row['tid']] = $row['leagueRecord'];
     }
     $teamRecordsResult->free();
 

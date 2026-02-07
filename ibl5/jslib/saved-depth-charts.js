@@ -67,6 +67,9 @@
                     if (loadingEl) loadingEl.style.display = 'none';
                     populateForm(data);
                     showStats(data);
+                    if (typeof window.IBL_recalculateDepthChartGlows === 'function') {
+                        window.IBL_recalculateDepthChartGlows();
+                    }
                 })
                 .catch(function (err) {
                     if (loadingEl) loadingEl.style.display = 'none';

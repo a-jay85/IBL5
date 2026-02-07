@@ -111,7 +111,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_plr WHERE teamname != ? AND retired = '0' ORDER BY ordinal ASC",
+            "SELECT * FROM ibl_plr WHERE teamname != ? AND retired = 0 ORDER BY ordinal ASC",
             "s",
             $teamName
         );

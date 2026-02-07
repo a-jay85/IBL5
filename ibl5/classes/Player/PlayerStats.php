@@ -27,7 +27,7 @@ class PlayerStats implements PlayerStatsInterface
 
     public string $name;
     public string $position;
-    public string $isRetired;
+    public int $isRetired;
 
     public int $seasonGamesStarted;
     public int $seasonGamesPlayed;
@@ -218,10 +218,10 @@ class PlayerStats implements PlayerStatsInterface
      */
     protected function fill(array $plrRow): void
     {
-        $this->playerID = (int) $plrRow['pid'];
+        $this->playerID = $plrRow['pid'];
         $this->name = (string) $plrRow['name'];
         $this->position = (string) $plrRow['pos'];
-        $this->isRetired = (string) ($plrRow['retired'] ?? '0');
+        $this->isRetired = $plrRow['retired'] ?? 0;
 
         $this->seasonGamesStarted = (int) ($plrRow['stats_gs'] ?? 0);
         $this->seasonGamesPlayed = (int) ($plrRow['stats_gm'] ?? 0);

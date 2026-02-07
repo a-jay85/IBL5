@@ -128,7 +128,7 @@ class League extends BaseMysqliRepository
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
-            WHERE retired = '0'
+            WHERE retired = 0
               AND draftyear + exp + cyt - cy = ?
             ORDER BY name ASC",
             "i",
@@ -147,7 +147,7 @@ class League extends BaseMysqliRepository
             "SELECT *
             FROM ibl_plr
             WHERE ordinal > ?
-              AND retired = '0'
+              AND retired = 0
               AND name NOT LIKE '%|%'
               AND name != '(no starter)'
             ORDER BY name ASC",

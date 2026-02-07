@@ -206,7 +206,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
             $draftYear = $pick['draftyear'];
             /** @var string $college */
             $college = HtmlSanitizer::safeHtmlOutput($pick['college']);
-            $isRetired = $pick['retired'] !== '0';
+            $isRetired = $pick['retired'] !== 0;
 
             $retiredBadge = $isRetired ? ' <span class="draft-retired-badge">(ret.)</span>' : '';
             $playerThumbnail = PlayerImageHelper::renderThumbnail($pid);

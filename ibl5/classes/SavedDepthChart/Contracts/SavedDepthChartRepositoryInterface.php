@@ -94,6 +94,11 @@ interface SavedDepthChartRepositoryInterface
     public function deactivateForTeam(int $tid, string $simEndDate, int $simNumberEnd): void;
 
     /**
+     * Deactivate all active depth charts for a team EXCEPT the given ID
+     */
+    public function deactivateOthersForTeam(int $tid, int $excludeId, string $simEndDate, int $simNumberEnd): void;
+
+    /**
      * Get all saved depth charts for a team, ordered by created_at DESC
      *
      * @return list<SavedDepthChartRow>

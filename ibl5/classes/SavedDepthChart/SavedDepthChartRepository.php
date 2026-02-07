@@ -110,6 +110,23 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     }
 
     /**
+     * @see SavedDepthChartRepositoryInterface::deactivateOthersForTeam()
+     */
+    public function deactivateOthersForTeam(int $tid, int $excludeId, string $simEndDate, int $simNumberEnd): void
+    {
+        $this->execute(
+            "UPDATE ibl_saved_depth_charts
+             SET is_active = 0, sim_end_date = ?, sim_number_end = ?
+             WHERE tid = ? AND is_active = 1 AND id != ?",
+            "siii",
+            $simEndDate,
+            $simNumberEnd,
+            $tid,
+            $excludeId
+        );
+    }
+
+    /**
      * @see SavedDepthChartRepositoryInterface::getSavedDepthChartsForTeam()
      * @return list<SavedDepthChartRow>
      */
@@ -250,7 +267,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     {
         /** @var SavedDepthChartRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_saved_depth_charts WHERE tid = ? AND is_active = 1 LIMIT 1",
+            "SELECT * FROM ibl_saved_depth_charts WHERE tid = ? AND is_active = 1 ORDER BY updated_at DESC LIMIT 1",
             "i",
             $tid
         );

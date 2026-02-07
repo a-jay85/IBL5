@@ -1451,6 +1451,7 @@ td.ibl-team-cell--colored {
 
 .depth-chart-table {
     max-width: none;
+    margin-bottom: 1rem;
 }
 
 .depth-chart-table td {

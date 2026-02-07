@@ -110,7 +110,24 @@
     }
 
     /**
-     * Capture all select values in the form as the "original" (live) baseline.
+     * Get the server-rendered default value for a <select> element.
+     * Reads option.defaultSelected (the HTML "selected" attribute), which is
+     * unaffected by browser form restoration on back-navigation.
+     */
+    function getServerRenderedValue(selectEl) {
+        for (var i = 0; i < selectEl.options.length; i++) {
+            if (selectEl.options[i].defaultSelected) {
+                return selectEl.options[i].value;
+            }
+        }
+        // No option had the SELECTED attribute — use the first option's value
+        return selectEl.options.length > 0 ? selectEl.options[0].value : '';
+    }
+
+    /**
+     * Capture the server-rendered (live DB) values as the baseline.
+     * Uses defaultSelected rather than the current value so that browser
+     * form restoration (back button) doesn't pollute the baseline.
      */
     function captureOriginalValues(form) {
         originalValues = {};
@@ -118,7 +135,7 @@
         for (var i = 0; i < selects.length; i++) {
             var sel = selects[i];
             if (sel.name) {
-                originalValues[sel.name] = sel.value;
+                originalValues[sel.name] = getServerRenderedValue(sel);
             }
         }
     }
@@ -157,5 +174,15 @@
                 updateGlow(this);
             });
         }
+    });
+
+    // Recalculate glows on every pageshow (fires after DOMContentLoaded).
+    // Covers two back-button scenarios:
+    //   1. bfcache (persisted=true): JS state preserved, DOMContentLoaded skipped
+    //   2. No bfcache (Chrome): JS re-executes, but the browser may restore form
+    //      values after DOMContentLoaded — pageshow fires after restoration.
+    // On initial load this is a harmless no-op (form matches server defaults).
+    window.addEventListener('pageshow', function () {
+        recalculateAll();
     });
 })();

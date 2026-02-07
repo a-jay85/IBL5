@@ -58,6 +58,13 @@ interface SavedDepthChartServiceInterface
     public function getWinLossRecord(int $tid, string $startDate, string $endDate): array;
 
     /**
+     * Build label for the "Current (Live)" dropdown entry
+     *
+     * Shows phase, phase-specific sim number, date range, and win-loss record.
+     */
+    public function buildCurrentLiveLabel(int $tid, \Season $season): string;
+
+    /**
      * Get formatted dropdown options for a team's saved depth charts
      *
      * @return list<array{id: int, label: string, isActive: bool}>

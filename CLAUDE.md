@@ -30,6 +30,8 @@ cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary -c php
 
 **PHPUnit output rule:** Always use `--no-progress --no-output --testdox-summary`. Only read output below `Summary of tests with errors, failures, or issues:` — this shows `OK (X tests, X assertions)` when passing, or only the failures/errors. Ignore everything above that line to save tokens.
 
+**Token-saving tip:** When merely checking if tests pass (not debugging failures), append `| tail -n 3` to commands to output only the final summary. Example: `cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary | tail -n 3`
+
 **Note:** PHPUnit 12.x has no `-v`/`--verbose`. Use `--display-all-issues` instead. See `phpunit-tests.md` for full testing rules and completion criteria.
 
 **Post-change test rule:** After making ANY code changes (source or test files), always run the **full** test suite (`vendor/bin/phpunit --no-progress --no-output --testdox-summary`), not just the tests for the module you changed. Changes in one module can break tests in other modules that depend on the same code.

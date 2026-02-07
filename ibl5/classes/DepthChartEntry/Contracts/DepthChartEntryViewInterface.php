@@ -206,6 +206,13 @@ interface DepthChartEntryViewInterface
     public function renderFormFooter(): void;
 
     /**
+     * Render the saved depth chart dropdown selector
+     *
+     * @param list<array{id: int, label: string, isActive: bool}> $options
+     */
+    public function renderSavedDepthChartDropdown(array $options): void;
+
+    /**
      * Render depth chart submission result page with success or error status
      * 
      * @param string $teamName Team name displayed at top of result

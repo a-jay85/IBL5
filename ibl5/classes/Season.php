@@ -99,6 +99,69 @@ class Season extends BaseMysqliRepository
     }
 
     /**
+     * Get the phase-specific simulation number for the current sim
+     *
+     * Calculates which sim number this is within the current phase.
+     * Example: Overall Sim #42 might be Regular Season Sim #15.
+     *
+     * @return int Phase-specific sim number (falls back to overall if 0)
+     */
+    public function getPhaseSpecificSimNumber(): int
+    {
+        return $this->calculatePhaseSimNumber($this->lastSimNumber, $this->phase, $this->endingYear);
+    }
+
+    /**
+     * Calculate phase-specific sim number for any sim/phase/season combination
+     *
+     * Counts sims within the phase's date range up to the given overall sim number.
+     * Uses `End Date` (not `Start Date`) because the first sim of a phase can have
+     * a Start Date in the prior phase's month.
+     *
+     * @param int $overallSimNumber The overall sim number to calculate for
+     * @param string $phase The season phase
+     * @param int $seasonYear The season ending year
+     * @return int Phase-specific sim number (falls back to overall if 0)
+     */
+    public function calculatePhaseSimNumber(int $overallSimNumber, string $phase, int $seasonYear): int
+    {
+        $beginningYear = $seasonYear - 1;
+
+        switch ($phase) {
+            case 'Preseason':
+                $phaseStartDate = sprintf('%d-%02d-01', self::IBL_PRESEASON_YEAR, self::IBL_REGULAR_SEASON_STARTING_MONTH);
+                $phaseEndDate = sprintf('%d-%02d-30', self::IBL_PRESEASON_YEAR + 1, self::IBL_REGULAR_SEASON_ENDING_MONTH);
+                break;
+            case 'HEAT':
+                $phaseStartDate = sprintf('%d-%02d-01', $beginningYear, self::IBL_HEAT_MONTH);
+                $phaseEndDate = sprintf('%d-%02d-30', $beginningYear, self::IBL_HEAT_MONTH);
+                break;
+            case 'Playoffs':
+                $phaseStartDate = sprintf('%d-%02d-01', $seasonYear, self::IBL_PLAYOFF_MONTH);
+                $phaseEndDate = sprintf('%d-%02d-30', $seasonYear, self::IBL_PLAYOFF_MONTH);
+                break;
+            default: // Regular Season (and fallback for other phases)
+                $phaseStartDate = sprintf('%d-%02d-01', $beginningYear, self::IBL_REGULAR_SEASON_STARTING_MONTH);
+                $phaseEndDate = sprintf('%d-%02d-30', $seasonYear, self::IBL_REGULAR_SEASON_ENDING_MONTH);
+                break;
+        }
+
+        /** @var array{cnt: int}|null $result */
+        $result = $this->fetchOne(
+            "SELECT COUNT(*) AS cnt FROM ibl_sim_dates WHERE `End Date` BETWEEN ? AND ? AND Sim <= ?",
+            "ssi",
+            $phaseStartDate,
+            $phaseEndDate,
+            $overallSimNumber
+        );
+
+        $phaseSimNumber = $result['cnt'] ?? 0;
+
+        // Fallback to overall sim number for non-game phases (Draft, Free Agency, etc.)
+        return $phaseSimNumber > 0 ? $phaseSimNumber : $overallSimNumber;
+    }
+
+    /**
      * Bulk-fetch multiple settings in a single query
      *
      * @param list<string> $names Setting names to fetch

@@ -381,26 +381,22 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             $parts[] = $dc['name'];
         }
 
-        $simStart = $dc['sim_number_start'];
-        $simEnd = $dc['sim_number_end'];
+        // Phase-specific sim number instead of overall sim number
+        $phaseSimNumber = $season->calculatePhaseSimNumber(
+            $dc['sim_number_start'],
+            $dc['phase'],
+            $dc['season_year']
+        );
+        $parts[] = $dc['phase'] . ' Sim ' . $phaseSimNumber;
 
-        if ($simEnd !== null && $simEnd > $simStart) {
-            $parts[] = 'Sims ' . $simStart . '-' . $simEnd;
-        } else {
-            $parts[] = 'Sim ' . $simStart;
-        }
-
-        if ($dc['is_active'] === 1) {
-            $parts[] = '(active)';
-        }
-
+        // Date range
         $startDate = (new \DateTime($dc['sim_start_date']))->format('M j');
         $endDateStr = $dc['sim_end_date'] !== null
             ? (new \DateTime($dc['sim_end_date']))->format('M j')
             : '?';
         $parts[] = $startDate . ' - ' . $endDateStr;
 
-        // Append win-loss record using sim_end_date or lastSimEndDate for active DCs
+        // Win-loss record using sim_end_date or lastSimEndDate for active DCs
         $recordEndDate = $dc['sim_end_date'] ?? $season->lastSimEndDate;
         $record = $this->getWinLossRecord($tid, $dc['sim_start_date'], $recordEndDate);
         $parts[] = '(' . $record['wins'] . '-' . $record['losses'] . ')';

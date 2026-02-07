@@ -208,4 +208,37 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
         );
         return $affected > 0;
     }
+
+    /**
+     * @see SavedDepthChartRepositoryInterface::getMostRecentDepthChart()
+     * @return SavedDepthChartRow|null
+     */
+    public function getMostRecentDepthChart(int $tid): ?array
+    {
+        /** @var SavedDepthChartRow|null */
+        return $this->fetchOne(
+            "SELECT * FROM ibl_saved_depth_charts WHERE tid = ? ORDER BY created_at DESC LIMIT 1",
+            "i",
+            $tid
+        );
+    }
+
+    /**
+     * @see SavedDepthChartRepositoryInterface::getLiveRosterSettings()
+     * @return list<array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}>
+     */
+    public function getLiveRosterSettings(int $tid): array
+    {
+        /** @var list<array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> */
+        return $this->fetchAll(
+            "SELECT pid, dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth,
+                    dc_active, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh
+             FROM ibl_plr
+             WHERE tid = ? AND retired = '0' AND ordinal <= ?
+             ORDER BY ordinal ASC",
+            "ii",
+            $tid,
+            \JSB::WAIVERS_ORDINAL
+        );
+    }
 }

@@ -137,4 +137,35 @@ interface SavedDepthChartRepositoryInterface
      * Re-activate a depth chart by ID (set is_active = 1)
      */
     public function reactivate(int $id, int $tid): bool;
+
+    /**
+     * Get the most recent saved depth chart for a team
+     *
+     * @return SavedDepthChartRow|null
+     */
+    public function getMostRecentDepthChart(int $tid): ?array;
+
+    /**
+     * Get live roster depth chart settings from ibl_plr
+     *
+     * Returns all dc_* columns for active players on the team.
+     * This allows comparison with saved depth chart snapshots.
+     *
+     * @return list<array{
+     *     pid: int,
+     *     dc_PGDepth: int,
+     *     dc_SGDepth: int,
+     *     dc_SFDepth: int,
+     *     dc_PFDepth: int,
+     *     dc_CDepth: int,
+     *     dc_active: int,
+     *     dc_minutes: int,
+     *     dc_of: int,
+     *     dc_df: int,
+     *     dc_oi: int,
+     *     dc_di: int,
+     *     dc_bh: int
+     * }>
+     */
+    public function getLiveRosterSettings(int $tid): array;
 }

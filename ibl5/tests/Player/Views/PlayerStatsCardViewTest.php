@@ -155,15 +155,14 @@ class PlayerStatsCardViewTest extends TestCase
         $this->assertStringContainsString('toggle-label', $result);
     }
 
-    public function testRenderIncludesViewLabels(): void
+    public function testRenderIncludesToggleLabelText(): void
     {
         $averagesHtml = '<table class="sortable player-table"><td class="player-table-header">Averages</td></table>';
         $totalsHtml = '<table class="sortable player-table"><td class="player-table-header">Totals</td></table>';
-        
+
         $result = PlayerStatsFlipCardView::render($averagesHtml, $totalsHtml, 'Playoffs');
-        
-        $this->assertStringContainsString('stats-view-label', $result);
-        $this->assertStringContainsString('Averages', $result);
+
+        $this->assertStringContainsString('toggle-label', $result);
         $this->assertStringContainsString('Totals', $result);
     }
 

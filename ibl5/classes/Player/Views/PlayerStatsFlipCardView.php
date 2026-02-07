@@ -66,10 +66,8 @@ class PlayerStatsFlipCardView
         // Determine which content goes on front and back
         $frontContent = $showAveragesFirst ? $styledAverages : $styledTotals;
         $backContent = $showAveragesFirst ? $styledTotals : $styledAverages;
-        $frontLabel = $showAveragesFirst ? 'Averages' : 'Totals';
-        $backLabel = $showAveragesFirst ? 'Totals' : 'Averages';
         $toggleTarget = $showAveragesFirst ? 'Totals' : 'Averages';
-        
+
         if ($colorScheme === null) {
             $colorScheme = TeamColorHelper::getDefaultColorScheme();
         }
@@ -80,28 +78,22 @@ class PlayerStatsFlipCardView
 
         ob_start();
         ?>
-<div class="stats-flip-container" data-category="<?= $escapedCategory ?>">
+<div class="stats-flip-container" style="<?= $cssProps ?>" data-category="<?= $escapedCategory ?>">
+    <button class="stats-flip-toggle pulse" title="Switch to <?= $toggleTarget ?>">
+        <?= $flipIcon ?>
+        <span class="toggle-label"><?= $toggleTarget ?></span>
+    </button>
     <div class="stats-flip-inner">
         <!-- Front (Averages by default) -->
         <div class="stats-front">
-            <div class="player-stats-card" style="<?= $cssProps ?>">
-                <span class="stats-view-label"><?= $frontLabel ?></span>
-                <button class="stats-flip-toggle pulse" title="Switch to <?= $toggleTarget ?>">
-                    <?= $flipIcon ?>
-                    <span class="toggle-label"><?= $toggleTarget ?></span>
-                </button>
+            <div class="player-stats-card">
                 <?= $frontContent ?>
             </div>
         </div>
 
         <!-- Back (Totals by default) -->
         <div class="stats-back">
-            <div class="player-stats-card" style="<?= $cssProps ?>">
-                <span class="stats-view-label"><?= $backLabel ?></span>
-                <button class="stats-flip-toggle" title="Switch to <?= $frontLabel ?>">
-                    <?= $flipIcon ?>
-                    <span class="toggle-label"><?= $frontLabel ?></span>
-                </button>
+            <div class="player-stats-card">
                 <?= $backContent ?>
             </div>
         </div>

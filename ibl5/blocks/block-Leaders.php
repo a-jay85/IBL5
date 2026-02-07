@@ -133,8 +133,8 @@ foreach ($categories as $index => $category) {
 
     // Leader (first player)
     $leader = $players[0];
-    $leaderPid = (int)$leader['pid'];
-    $leaderTid = (int)$leader['tid'];
+    $leaderPid = $leader['pid'];
+    $leaderTid = $leader['tid'];
     $leaderName = HtmlSanitizer::safeHtmlOutput($leader['name']);
     $leaderTeam = HtmlSanitizer::safeHtmlOutput($leader['teamname']);
     $leaderValue = HtmlSanitizer::safeHtmlOutput($leader['stat_value']);
@@ -161,8 +161,8 @@ foreach ($categories as $index => $category) {
     // Runners-up (positions 2-5)
     for ($i = 1; $i < count($players); $i++) {
         $player = $players[$i];
-        $pid = (int)$player['pid'];
-        $tid = (int)$player['tid'];
+        $pid = $player['pid'];
+        $tid = $player['tid'];
         $name = HtmlSanitizer::safeHtmlOutput($player['name']);
         $team = HtmlSanitizer::safeHtmlOutput($player['teamname']);
         $value = HtmlSanitizer::safeHtmlOutput($player['stat_value']);

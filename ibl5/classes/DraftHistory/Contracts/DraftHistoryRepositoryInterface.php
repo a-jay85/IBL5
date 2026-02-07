@@ -10,7 +10,7 @@ namespace DraftHistory\Contracts;
  * Provides methods to retrieve draft information from the database.
  *
  * @phpstan-type DraftPickByYearRow array{pid: int, name: string, pos: string, draftround: int, draftpickno: int, draftedby: string, college: string, teamid: int|null, team_city: string|null, color1: string|null, color2: string|null}
- * @phpstan-type DraftPickByTeamRow array{pid: int, name: string, pos: string, draftround: int, draftpickno: int, draftyear: int, college: string, retired: string}
+ * @phpstan-type DraftPickByTeamRow array{pid: int, name: string, pos: string, draftround: int, draftpickno: int, draftyear: int, college: string, retired: int}
  */
 interface DraftHistoryRepositoryInterface
 {

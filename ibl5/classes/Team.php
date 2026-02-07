@@ -282,7 +282,7 @@ class Team extends BaseMysqliRepository
             FROM ibl_plr
             WHERE teamname = ?
               AND tid = ?
-              AND retired = '0'
+              AND retired = 0
               AND ordinal <= '" . JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
             ORDER BY name ASC",
             "si",
@@ -312,14 +312,14 @@ class Team extends BaseMysqliRepository
                 (cy = 5 AND cy6 > 0)
             )";
         }
-        
+
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
             WHERE teamname = ?
               AND tid = ?
-              AND retired = '0'
+              AND retired = 0
               AND ordinal <= '" . JSB::WAIVERS_ORDINAL ."'" . $freeAgencyCondition . "
               AND injured = '0'
             ORDER BY name ASC",
@@ -464,12 +464,12 @@ class Team extends BaseMysqliRepository
         $resultContracts = $this->getRosterUnderContractOrderedByNameResult();
 
         foreach ($resultContracts as $contract) {
-            $yearUnderContract = (int) ($contract['cy'] ?? 0);
+            $yearUnderContract = $contract['cy'] ?? 0;
             if ($season->phase === "Free Agency") {
                 $yearUnderContract++;
             }
 
-            $cyt = (int) ($contract['cyt'] ?? 0);
+            $cyt = $contract['cyt'] ?? 0;
             $i = 1;
             while ($yearUnderContract <= $cyt) {
                 $fieldString = "cy" . $yearUnderContract;

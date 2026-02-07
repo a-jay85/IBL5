@@ -27,7 +27,7 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_plr WHERE teamname = ? AND tid = ? AND retired = '0' AND ordinal <= ? ORDER BY ordinal ASC",
+            "SELECT * FROM ibl_plr WHERE teamname = ? AND tid = ? AND retired = 0 AND ordinal <= ? ORDER BY ordinal ASC",
             "sii",
             $teamName,
             $teamID,

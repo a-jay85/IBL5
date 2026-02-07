@@ -220,7 +220,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     private function mapStatusFields(PlayerData $playerData, array $plrRow): void
     {
         $playerData->daysRemainingForInjury = $plrRow['injured'];
-        $playerData->isRetired = isset($plrRow['retired']) ? (string) $plrRow['retired'] : null;
+        $playerData->isRetired = $plrRow['retired'] ?? null;
         $playerData->timeDroppedOnWaivers = $plrRow['droptime'];
     }
 

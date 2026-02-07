@@ -54,7 +54,7 @@ class ContractListService implements ContractListServiceInterface
                 'name' => $player['name'],
                 'pos' => $player['pos'],
                 'teamname' => $player['teamname'],
-                'tid' => (int) ($player['tid'] ?? 0),
+                'tid' => $player['tid'] ?? 0,
                 'team_city' => $player['team_city'] ?? '',
                 'color1' => $player['color1'] ?? 'FFFFFF',
                 'color2' => $player['color2'] ?? '000000',

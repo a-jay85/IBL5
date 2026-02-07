@@ -364,7 +364,7 @@ function resetPlayerDatabase() {
      */
     public function renderPlayerRow(\Player\PlayerData $player, int $rowIndex): string
     {
-        $retired = $player->isRetired !== null ? (int) $player->isRetired : 0;
+        $retired = $player->isRetired ?? 0;
         $pid = (int) $player->playerID;
         $playerName = $player->name ?? '';
         $position = $player->position ?? '';

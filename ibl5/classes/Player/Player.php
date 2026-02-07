@@ -237,8 +237,8 @@ class Player implements PlayerInterface
     /** @var int|null Weight in pounds */
     public ?int $weightPounds = null;
 
-    /** @var string|null Is player retired ('0' or '1') */
-    public ?string $isRetired = null;
+    /** @var int|null Is player retired (0 or 1) */
+    public ?int $isRetired = null;
 
     /** @var int|null Unix timestamp when dropped on waivers */
     public ?int $timeDroppedOnWaivers = null;

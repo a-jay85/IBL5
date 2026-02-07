@@ -82,4 +82,14 @@ interface SavedDepthChartServiceInterface
      * @return PlayerSnapshotData
      */
     public function buildPlayerSnapshot(array $rosterPlayer, array $dcSettings, int $ordinal): array;
+
+    /**
+     * Name or create the active depth chart for a team
+     *
+     * If an active DC exists, renames it. If not, creates a new saved DC
+     * from live ibl_plr values with the given name.
+     *
+     * @return array{success: bool, id: int, name: string}|array{success: bool, error: string}
+     */
+    public function nameOrCreateActive(int $tid, string $username, string $name, \Season $season): array;
 }

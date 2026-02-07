@@ -92,7 +92,7 @@ function api($user)
     }
 
     $handler = new SavedDepthChart\SavedDepthChartApiHandler($mysqli_db);
-    $handler->handle($action, $tid, $params);
+    $handler->handle($action, $tid, $username, $params);
 }
 
 switch ($op) {

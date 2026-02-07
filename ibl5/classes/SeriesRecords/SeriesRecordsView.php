@@ -110,7 +110,7 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
     {
         /** @var string $safeTeamId */
         $safeTeamId = HtmlSanitizer::safeHtmlOutput((string)$teamId);
-        return '<th class="text-center"><img src="images/logo/new' . $safeTeamId . '.png" width="50" height="50" alt="Team ' . $safeTeamId . ' logo"></th>';
+        return '<th class="text-center"><img src="images/logo/new' . $safeTeamId . '.png" width="50" height="50" style="object-fit: contain;" alt="Team ' . $safeTeamId . ' logo"></th>';
     }
 
     /**

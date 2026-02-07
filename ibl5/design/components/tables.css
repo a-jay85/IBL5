@@ -763,7 +763,6 @@ tbody tr.user-team-row:nth-child(even):hover {
 .ibl-team-cell__logo {
     width: 24px;
     height: 24px;
-    aspect-ratio: 75 / 83;
     object-fit: contain;
     flex-shrink: 0;
 }
@@ -799,7 +798,6 @@ td.ibl-team-cell--colored {
 .ibl-team-cell--colored .ibl-team-cell__logo {
     width: 24px;
     height: 24px;
-    aspect-ratio: 75 / 83;
     object-fit: contain;
     flex-shrink: 0;
     filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.15));

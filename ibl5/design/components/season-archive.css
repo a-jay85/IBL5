@@ -78,6 +78,7 @@
 
 .season-archive-champion-logo img {
     display: inline-block;
+    object-fit: contain;
 }
 
 /* Bracket link */

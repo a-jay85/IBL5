@@ -160,7 +160,7 @@
 
 .trading-card .card-team-logo img,
 .trading-card-back .card-team-logo img {
-    max-width: 75px;
+    max-width: 83px;
     max-height: 83px;
     object-fit: contain;
     opacity: 0.85;
@@ -263,7 +263,7 @@
 
     .trading-card .card-team-logo img,
     .trading-card-back .card-team-logo img {
-        max-width: 50px;
+        max-width: 56px;
         max-height: 56px;
     }
 
@@ -525,15 +525,16 @@
     background: color-mix(in srgb, var(--card-border) 12%, transparent) !important;
 }
 
-/* Career/Total Row Styling */
+/* Career/Total Row Styling — non-color-mix properties are in a separate rule
+   so Tailwind's @supports(color-mix) wrapper doesn't interfere with them */
 .player-stats-card .career-row td,
 .player-stats-card tr.player-table-row-bold td,
 .player-stats-card .stats-table .career-row td,
 .player-stats-card .stats-table tr.player-table-row-bold td {
-    background: linear-gradient(90deg, color-mix(in srgb, var(--card-border) 20%, transparent) 0%, color-mix(in srgb, var(--card-border) 10%, transparent) 100%) !important;
     font-weight: 700 !important;
     color: var(--card-text) !important;
     border-top: 2px solid var(--card-border) !important;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--card-border) 20%, transparent) 0%, color-mix(in srgb, var(--card-border) 10%, transparent) 100%) !important;
 }
 
 /* Footer Row (e.g., Total Salary) */

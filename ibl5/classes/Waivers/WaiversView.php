@@ -41,11 +41,10 @@ class WaiversView implements WaiversViewInterface
                 <img src="images/logo/<?= $teamID ?>.jpg" alt="Team Logo" class="team-logo-banner">
                 <div class="ibl-card">
                     <div class="ibl-card__header">
-                        <h2 class="ibl-card__title">WAIVER WIRE - <?= $openRosterSpots ?> EMPTY ROSTER SPOTS / <?= $healthyOpenRosterSpots ?> HEALTHY ROSTER SPOTS</h2>
+                        <h2 class="ibl-card__title"><?= $openRosterSpots ?> OPEN SPOTS / <?= $healthyOpenRosterSpots ?> HEALTHY SPOTS</h2>
                     </div>
                     <div class="ibl-card__body">
                         <div class="ibl-form-group">
-                            <label class="ibl-label"><?= $teamNameEscaped ?></label>
                             <select name="Player_ID" class="ibl-select">
                                 <option value="">Select player...</option>
                                 <?php foreach ($players as $optionHtml): ?>

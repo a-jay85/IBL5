@@ -46,8 +46,8 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             if ($existingDc !== null) {
                 $this->repository->updateDepthChartPlayers($loadedDcId, $snapshots);
 
+                $this->repository->deactivateOthersForTeam($tid, $loadedDcId, $season->lastSimEndDate, $season->lastSimNumber);
                 if ($existingDc['is_active'] === 0) {
-                    $this->repository->deactivateForTeam($tid, $season->lastSimEndDate, $season->lastSimNumber);
                     $this->repository->reactivate($loadedDcId, $tid);
                 }
 
@@ -61,9 +61,9 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             // Unused DC exists — update it instead of creating a new one
             $this->repository->updateDepthChartPlayers($mostRecent['id'], $snapshots);
 
-            // Ensure it's active
+            // Ensure it's the only active DC
+            $this->repository->deactivateOthersForTeam($tid, $mostRecent['id'], $season->lastSimEndDate, $season->lastSimNumber);
             if ($mostRecent['is_active'] === 0) {
-                $this->repository->deactivateForTeam($tid, $season->lastSimEndDate, $season->lastSimNumber);
                 $this->repository->reactivate($mostRecent['id'], $tid);
             }
 
@@ -177,15 +177,8 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
 
         $parts = [];
 
-        // Find active DC for sim range, date range, and win-loss record
-        $savedDcs = $this->repository->getSavedDepthChartsForTeam($tid);
-        $activeDc = null;
-        foreach ($savedDcs as $dc) {
-            if ($dc['is_active'] === 1) {
-                $activeDc = $dc;
-                break;
-            }
-        }
+        // Find active DC (most recently updated) for sim range, date range, and win-loss record
+        $activeDc = $this->repository->getActiveDepthChartForTeam($tid);
 
         // Use the active DC's name if it has one, otherwise default label
         if ($activeDc !== null && $activeDc['name'] !== null && $activeDc['name'] !== '') {
@@ -230,14 +223,8 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     {
         $savedDcs = $this->repository->getSavedDepthChartsForTeam($tid);
 
-        // Find active DC
-        $activeDc = null;
-        foreach ($savedDcs as $dc) {
-            if ($dc['is_active'] === 1) {
-                $activeDc = $dc;
-                break;
-            }
-        }
+        // Find active DC (most recently updated if multiple)
+        $activeDc = $this->repository->getActiveDepthChartForTeam($tid);
 
         // Hide active DC if it matches live ibl_plr settings exactly
         $hideActiveDc = false;
@@ -494,6 +481,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
 
         if ($activeDc !== null) {
             $this->repository->updateName($activeDc['id'], $tid, $name);
+            $this->repository->deactivateOthersForTeam($tid, $activeDc['id'], $season->lastSimEndDate, $season->lastSimNumber);
             return ['success' => true, 'id' => $activeDc['id'], 'name' => $name];
         }
 

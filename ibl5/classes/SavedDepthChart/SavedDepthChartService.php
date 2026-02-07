@@ -55,7 +55,22 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             }
         }
 
-        // Fresh submission: deactivate previous, create new
+        // Check if most recent DC is unused (no sim has consumed it yet)
+        $mostRecent = $this->repository->getMostRecentDepthChart($tid);
+        if ($mostRecent !== null && $mostRecent['sim_end_date'] === null) {
+            // Unused DC exists — update it instead of creating a new one
+            $this->repository->updateDepthChartPlayers($mostRecent['id'], $snapshots);
+
+            // Ensure it's active
+            if ($mostRecent['is_active'] === 0) {
+                $this->repository->deactivateForTeam($tid, $season->lastSimEndDate, $season->lastSimNumber);
+                $this->repository->reactivate($mostRecent['id'], $tid);
+            }
+
+            return $mostRecent['id'];
+        }
+
+        // No unused DC — create new one
         $this->repository->deactivateForTeam($tid, $season->lastSimEndDate, $season->lastSimNumber);
 
         $simStartDate = $this->calculateNextSimStartDate($season->lastSimEndDate);
@@ -158,9 +173,31 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     public function getDropdownOptions(int $tid, \Season $season): array
     {
         $savedDcs = $this->repository->getSavedDepthChartsForTeam($tid);
-        $options = [];
 
+        // Find active DC
+        $activeDc = null;
         foreach ($savedDcs as $dc) {
+            if ($dc['is_active'] === 1) {
+                $activeDc = $dc;
+                break;
+            }
+        }
+
+        // Hide active DC if it matches live ibl_plr settings exactly
+        $hideActiveDc = false;
+        if ($activeDc !== null) {
+            $dcPlayers = $this->repository->getPlayersForDepthChart($activeDc['id']);
+            $liveRosterPlayers = $this->repository->getLiveRosterSettings($tid);
+            $hideActiveDc = $this->isDepthChartMatchingLive($dcPlayers, $liveRosterPlayers);
+        }
+
+        $options = [];
+        foreach ($savedDcs as $dc) {
+            // Skip active DC if it matches live settings
+            if ($hideActiveDc && $activeDc !== null && $dc['id'] === $activeDc['id']) {
+                continue;
+            }
+
             $label = $this->buildDropdownLabel($dc, $season);
             $options[] = [
                 'id' => $dc['id'],
@@ -364,5 +401,58 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
         $parts[] = $startDate . ' - ' . $endDate;
 
         return implode(' | ', $parts);
+    }
+
+    /**
+     * Check if saved depth chart settings match live ibl_plr settings exactly
+     *
+     * Returns true only if the same set of PIDs exist and all 12 dc_* columns
+     * match for every player. Detects roster changes from trades.
+     *
+     * @param list<SavedDepthChartPlayerRow> $dcPlayers Saved DC player settings
+     * @param list<array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $liveRosterPlayers Live ibl_plr settings
+     */
+    private function isDepthChartMatchingLive(array $dcPlayers, array $liveRosterPlayers): bool
+    {
+        // Build map of live settings by PID
+        /** @var array<int, array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $liveByPid */
+        $liveByPid = [];
+        foreach ($liveRosterPlayers as $player) {
+            $liveByPid[$player['pid']] = $player;
+        }
+
+        // Build map of saved settings by PID
+        /** @var array<int, SavedDepthChartPlayerRow> $savedByPid */
+        $savedByPid = [];
+        foreach ($dcPlayers as $player) {
+            $savedByPid[$player['pid']] = $player;
+        }
+
+        // PIDs must match exactly (detect trades)
+        $livePids = array_keys($liveByPid);
+        $savedPids = array_keys($savedByPid);
+        sort($livePids);
+        sort($savedPids);
+        if ($livePids !== $savedPids) {
+            return false;
+        }
+
+        // Compare all 12 dc_* columns for each player
+        $dcColumns = [
+            'dc_PGDepth', 'dc_SGDepth', 'dc_SFDepth', 'dc_PFDepth', 'dc_CDepth',
+            'dc_active', 'dc_minutes', 'dc_of', 'dc_df', 'dc_oi', 'dc_di', 'dc_bh',
+        ];
+
+        foreach ($savedByPid as $pid => $savedPlayer) {
+            $livePlayer = $liveByPid[$pid];
+
+            foreach ($dcColumns as $col) {
+                if ($savedPlayer[$col] !== $livePlayer[$col]) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 }

@@ -198,7 +198,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
                 continue;
             }
 
-            $label = $this->buildDropdownLabel($dc, $season);
+            $label = $this->buildDropdownLabel($dc, $season, $tid);
             $options[] = [
                 'id' => $dc['id'],
                 'label' => $label,
@@ -373,7 +373,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      *
      * @param SavedDepthChartRow $dc
      */
-    private function buildDropdownLabel(array $dc, \Season $season): string
+    private function buildDropdownLabel(array $dc, \Season $season, int $tid): string
     {
         $parts = [];
 
@@ -395,10 +395,15 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
         }
 
         $startDate = (new \DateTime($dc['sim_start_date']))->format('M j');
-        $endDate = $dc['sim_end_date'] !== null
+        $endDateStr = $dc['sim_end_date'] !== null
             ? (new \DateTime($dc['sim_end_date']))->format('M j')
             : '?';
-        $parts[] = $startDate . ' - ' . $endDate;
+        $parts[] = $startDate . ' - ' . $endDateStr;
+
+        // Append win-loss record using sim_end_date or lastSimEndDate for active DCs
+        $recordEndDate = $dc['sim_end_date'] ?? $season->lastSimEndDate;
+        $record = $this->getWinLossRecord($tid, $dc['sim_start_date'], $recordEndDate);
+        $parts[] = '(' . $record['wins'] . '-' . $record['losses'] . ')';
 
         return implode(' | ', $parts);
     }

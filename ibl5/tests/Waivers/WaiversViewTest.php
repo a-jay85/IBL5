@@ -112,8 +112,8 @@ class WaiversViewTest extends TestCase
         );
         $output = ob_get_clean();
 
-        $this->assertStringContainsString('3 EMPTY ROSTER SPOTS', $output);
-        $this->assertStringContainsString('2 HEALTHY ROSTER SPOTS', $output);
+        $this->assertStringContainsString('3 OPEN SPOTS', $output);
+        $this->assertStringContainsString('2 HEALTHY SPOTS', $output);
     }
 
     public function testRenderWaiverFormShowsErrorMessage(): void
@@ -204,7 +204,7 @@ class WaiversViewTest extends TestCase
         $this->assertStringContainsString('ibl-card__header', $output);
         $this->assertStringContainsString('ibl-card__body', $output);
         $this->assertStringContainsString('ibl-select', $output);
-        $this->assertStringContainsString('ibl-label', $output);
+        $this->assertStringContainsString('ibl-card__title', $output);
     }
 
     public function testRenderWaiverFormNoCustomWaiversClasses(): void

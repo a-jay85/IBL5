@@ -766,6 +766,13 @@
 
 .stats-flip-container .stats-front {
     position: relative;
+    visibility: visible;
+    transition: visibility 0s 0.3s;
+}
+
+.stats-flip-container.flipped .stats-front {
+    visibility: hidden;
+    transition: visibility 0s 0.3s;
 }
 
 .stats-flip-container .stats-back {
@@ -777,12 +784,14 @@
 
 /* Stats Flip Toggle Button */
 .stats-flip-toggle {
-    position: absolute;
-    top: 8px;
-    right: 8px;
     display: flex;
     align-items: center;
     gap: 6px;
+    width: fit-content;
+    margin-left: auto;
+    margin-bottom: 8px;
+    position: relative;
+    z-index: 5;
     background: color-mix(in srgb, var(--card-border) 95%, transparent);
     color: var(--card-grad-mid);
     font-size: 11px;
@@ -790,7 +799,6 @@
     padding: 6px 12px;
     border-radius: 6px;
     cursor: pointer;
-    z-index: 20;
     transition: all 0.3s ease;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     border: none;
@@ -815,29 +823,6 @@
     transform: rotate(180deg);
 }
 
-.stats-flip-toggle::after {
-    content: 'Click to toggle view';
-    position: absolute;
-    top: 100%;
-    right: 0;
-    margin-top: 8px;
-    padding: 4px 8px;
-    background: rgba(0, 0, 0, 0.9);
-    color: var(--card-accent);
-    font-size: 10px;
-    font-weight: 400;
-    text-transform: none;
-    white-space: nowrap;
-    border-radius: 4px;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s;
-}
-
-.stats-flip-toggle:hover::after {
-    opacity: 1;
-}
-
 @keyframes stats-pulse-glow {
     0%, 100% {
         box-shadow: 0 2px 8px rgba(0,0,0,0.3);
@@ -855,35 +840,10 @@
     .stats-flip-toggle {
         font-size: 10px;
         padding: 4px 8px;
-        top: 4px;
-        right: 4px;
     }
 
     .stats-flip-toggle svg {
         width: 12px;
         height: 12px;
-    }
-}
-
-/* Stats View Label */
-.stats-view-label {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    background: rgba(0, 0, 0, 0.6);
-    color: var(--card-accent);
-    font-size: 10px;
-    font-weight: 600;
-    padding: 4px 8px;
-    border-radius: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    z-index: 15;
-}
-
-@media (max-width: 768px) {
-    .stats-view-label {
-        font-size: 9px;
-        padding: 3px 6px;
     }
 }

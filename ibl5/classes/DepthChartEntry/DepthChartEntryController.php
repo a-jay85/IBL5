@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DepthChartEntry;
 
 use DepthChartEntry\Contracts\DepthChartEntryControllerInterface;
+use SavedDepthChart\SavedDepthChartService;
 use UI\Components\TableViewSwitcher;
 
 /**
@@ -47,7 +48,18 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         echo '<h2 class="ibl-title">Depth Chart Entry</h2>';
         $this->view->renderTeamLogo($teamID);
 
+        // Render saved depth chart dropdown
+        $savedDcService = new SavedDepthChartService($this->db);
+        $dropdownOptions = $savedDcService->getDropdownOptions($teamID, $season);
+        $this->view->renderSavedDepthChartDropdown($dropdownOptions);
+
         $playersResult = $this->repository->getPlayersOnTeam($teamName, $teamID);
+
+        // Collect current roster PIDs for JS config
+        $currentRosterPids = array_map(
+            static fn(array $p): int => $p['pid'],
+            $playersResult
+        );
 
         $slotNames = \JSB::PLAYER_POSITIONS;
 
@@ -66,6 +78,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
             'total_s' => 'Season Totals',
             'avg_s' => 'Season Averages',
             'per36mins' => 'Per 36 Minutes',
+            'chunk' => 'Sim Averages',
             'contracts' => 'Contracts',
         ];
 
@@ -73,6 +86,15 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $team->color1, $team->color2);
         $tableHtml = $this->renderTableForDisplay($display, $playersResult, $team, $season);
         echo $switcher->wrap($tableHtml);
+
+        // Output JS configuration for saved depth charts
+        $jsConfig = json_encode([
+            'teamId' => $teamID,
+            'apiBaseUrl' => 'modules.php?name=DepthChartEntry&op=api',
+            'currentRosterPids' => $currentRosterPids,
+        ], JSON_THROW_ON_ERROR);
+        echo '<script>window.IBL_DEPTH_CHART_CONFIG = ' . $jsConfig . ';</script>';
+        echo '<script src="jslib/saved-depth-charts.js" defer></script>';
 
         \Nuke\Footer::footer();
     }
@@ -91,6 +113,8 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
                 return \UI::seasonAverages($this->db, $result, $team, '');
             case 'per36mins':
                 return \UI::per36Minutes($this->db, $result, $team, '');
+            case 'chunk':
+                return \UI::periodAverages($this->db, $team, $season);
             case 'contracts':
                 $sharedFunctions = new \Shared($this->db);
                 return \UI::contracts($this->db, $result, $team, $sharedFunctions);

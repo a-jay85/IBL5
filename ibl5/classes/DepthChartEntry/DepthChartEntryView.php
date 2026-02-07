@@ -274,7 +274,11 @@ function resetDepthChart() {
         
         select.value = defaultValue;
     }
-    
+
+    if (typeof window.IBL_recalculateDepthChartGlows === 'function') {
+        window.IBL_recalculateDepthChartGlows();
+    }
+
     return false;
 }
 </script>

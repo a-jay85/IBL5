@@ -72,7 +72,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
                      dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth,
                      dc_active, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                "iisiiiiiiiiiiiiii",
+                "iisiiiiiiiiiiiii",
                 $depthChartId,
                 $snapshot['pid'],
                 $snapshot['player_name'],

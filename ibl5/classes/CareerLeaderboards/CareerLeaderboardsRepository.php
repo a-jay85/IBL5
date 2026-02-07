@@ -66,7 +66,7 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
         // Build WHERE clause
         $conditions = ["games > 0"];
         if ($activeOnly === 1) {
-            $conditions[] = "p.retired = '0'";
+            $conditions[] = "p.retired = 0";
         }
         $whereClause = implode(' AND ', $conditions);
 

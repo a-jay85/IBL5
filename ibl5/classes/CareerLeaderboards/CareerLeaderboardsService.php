@@ -25,7 +25,7 @@ class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
     {
         $pid = $row['pid'];
         $retired = $row['retired'];
-        $isRetired = ($retired !== '0' && $retired !== 0);
+        $isRetired = $retired !== 0;
         $name = $row['name'] . ($isRetired ? '*' : '');
 
         // Process based on table type

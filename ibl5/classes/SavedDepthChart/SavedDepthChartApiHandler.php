@@ -27,11 +27,12 @@ class SavedDepthChartApiHandler
     /**
      * Handle an API request
      *
-     * @param string $action The action to perform (list, load, rename)
+     * @param string $action The action to perform (list, load, rename, rename-active)
      * @param int $tid The team ID (already authorized)
+     * @param string $username The authenticated username
      * @param array<string, mixed> $params Request parameters
      */
-    public function handle(string $action, int $tid, array $params): void
+    public function handle(string $action, int $tid, string $username, array $params): void
     {
         header('Content-Type: application/json; charset=utf-8');
 
@@ -45,6 +46,9 @@ class SavedDepthChartApiHandler
                     break;
                 case 'rename':
                     $this->handleRename($tid, $params);
+                    break;
+                case 'rename-active':
+                    $this->handleRenameActive($tid, $username, $params);
                     break;
                 default:
                     $this->sendError('Unknown action', 400);
@@ -207,6 +211,30 @@ class SavedDepthChartApiHandler
         $success = $this->repository->updateName($dcId, $tid, $newName);
 
         echo json_encode(['success' => $success, 'name' => $newName], JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     */
+    private function handleRenameActive(int $tid, string $username, array $params): void
+    {
+        $rawNameValue = $params['name'] ?? '';
+        $rawName = is_string($rawNameValue) ? $rawNameValue : '';
+        $newName = trim(strip_tags($rawName));
+
+        if ($newName === '') {
+            $this->sendError('Name cannot be empty', 400);
+            return;
+        }
+
+        if (mb_strlen($newName) > 100) {
+            $newName = mb_substr($newName, 0, 100);
+        }
+
+        $season = new \Season($this->db);
+        $result = $this->service->nameOrCreateActive($tid, $username, $newName, $season);
+
+        echo json_encode($result, JSON_THROW_ON_ERROR);
     }
 
     private function sendError(string $message, int $httpCode): void

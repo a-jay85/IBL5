@@ -1,0 +1,61 @@
+/**
+ * Depth Chart Change Detection - Orange Glow + Background
+ *
+ * Highlights <select> elements whose values differ from the live database values.
+ * Five intensity levels scale with the magnitude of the change, using the
+ * design system's accent orange (--color-accent-500: #f97316).
+ *
+ * Each level combines three visual channels for maximum visibility:
+ *   1. Background color — warm tint escalating to saturated orange
+ *   2. Border color — shifts from neutral gray toward deep orange
+ *   3. Box-shadow glow — ambient halo for peripheral attention
+ *
+ * Accessibility: Level 1 uses a background lightness delta of ~4% from white,
+ * a visible border shift, and a subtle glow — all detectable by users with
+ * protanopia, deuteranopia, or tritanopia via luminance contrast alone.
+ */
+
+/* Base transition for smooth appearance across all properties */
+.depth-chart-form select {
+    transition: box-shadow 0.25s ease,
+                background-color 0.25s ease,
+                border-color 0.25s ease;
+}
+
+/* Level 1 – detectable hint (categorical change, small numeric diff)
+   Background: warm cream (#fff1e0) — ~4% darker than white for luminance-based detection
+   Border: soft orange-brown, visible shift from default gray-300 */
+.depth-chart-form select.dc-glow-1 {
+    background-color: #fff1e0;
+    border-color: #f0ad6e;
+    box-shadow: 0 0 4px 1px rgba(249, 115, 22, 0.3);
+}
+
+/* Level 2 – noticeable change */
+.depth-chart-form select.dc-glow-2 {
+    background-color: #ffe4c4;
+    border-color: #e8943e;
+    box-shadow: 0 0 6px 2px rgba(249, 115, 22, 0.4);
+}
+
+/* Level 3 – moderate change */
+.depth-chart-form select.dc-glow-3 {
+    background-color: #ffd6a5;
+    border-color: #e07d20;
+    box-shadow: 0 0 8px 3px rgba(249, 115, 22, 0.5);
+}
+
+/* Level 4 – significant change */
+.depth-chart-form select.dc-glow-4 {
+    background-color: #ffc580;
+    border-color: #d96c0c;
+    box-shadow: 0 0 10px 3px rgba(249, 115, 22, 0.65);
+}
+
+/* Level 5 – maximum change (e.g. position No → 1st)
+   Deep amber background with bold orange border and strong glow */
+.depth-chart-form select.dc-glow-5 {
+    background-color: #ffb35c;
+    border-color: #c05600;
+    box-shadow: 0 0 14px 4px rgba(249, 115, 22, 0.85);
+}

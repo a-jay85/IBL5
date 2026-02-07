@@ -75,7 +75,13 @@ class SavedDepthChartApiHandler
             ];
         }
 
-        echo json_encode(['depthCharts' => $depthCharts, 'options' => $options], JSON_THROW_ON_ERROR);
+        $currentLiveLabel = $this->service->buildCurrentLiveLabel($tid, $season);
+
+        echo json_encode([
+            'depthCharts' => $depthCharts,
+            'options' => $options,
+            'currentLiveLabel' => $currentLiveLabel,
+        ], JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -145,20 +151,9 @@ class SavedDepthChartApiHandler
             }
         }
 
-        // Win-loss record
-        $winLoss = ['wins' => 0, 'losses' => 0, 'label' => ''];
+        // Render period averages HTML
         $startDate = $dc['sim_start_date'];
         $endDate = $dc['sim_end_date'];
-        if ($endDate !== null && $endDate !== '') {
-            $wl = $this->service->getWinLossRecord($tid, $startDate, $endDate);
-            $winLoss = [
-                'wins' => $wl['wins'],
-                'losses' => $wl['losses'],
-                'label' => $wl['wins'] . '-' . $wl['losses'],
-            ];
-        }
-
-        // Render period averages HTML
         $statsHtml = '';
         if ($endDate !== null && $endDate !== '') {
             $team = \Team::initialize($this->db, $tid);
@@ -178,7 +173,6 @@ class SavedDepthChartApiHandler
             ],
             'players' => $players,
             'newPlayers' => $newPlayers,
-            'winLoss' => $winLoss,
             'statsHtml' => $statsHtml,
         ];
 

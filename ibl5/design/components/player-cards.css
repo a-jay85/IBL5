@@ -481,7 +481,6 @@
 /* Column headers */
 .player-stats-card table th,
 .player-stats-card .stats-table th {
-    background: color-mix(in srgb, var(--card-border) 15%, transparent) !important;
     color: var(--card-accent) !important;
     font-weight: 600 !important;
     font-size: 11px !important;
@@ -490,8 +489,9 @@
     padding: 8px 6px !important;
     text-align: center !important;
     border: none !important;
-    border-bottom: 1px solid color-mix(in srgb, var(--card-border) 30%, transparent) !important;
     white-space: nowrap;
+    background: color-mix(in srgb, var(--card-border) 15%, transparent) !important;
+    border-bottom: 1px solid color-mix(in srgb, var(--card-border) 30%, transparent) !important;
 }
 
 /* Table cells */
@@ -525,8 +525,7 @@
     background: color-mix(in srgb, var(--card-border) 12%, transparent) !important;
 }
 
-/* Career/Total Row Styling — non-color-mix properties are in a separate rule
-   so Tailwind's @supports(color-mix) wrapper doesn't interfere with them */
+/* Career/Total Row Styling */
 .player-stats-card .career-row td,
 .player-stats-card tr.player-table-row-bold td,
 .player-stats-card .stats-table .career-row td,
@@ -555,6 +554,14 @@
     color: var(--card-accent) !important;
     text-decoration: none !important;
     transition: color 0.2s ease;
+}
+
+/* Neutralize Mobile Safari auto-detected telephone links (e.g. "773-1531")
+   so they inherit their parent td's color instead of getting --card-accent */
+.player-stats-card a[href^="tel"] {
+    color: inherit !important;
+    text-decoration: inherit !important;
+    pointer-events: none;
 }
 
 .player-stats-card table a:hover,

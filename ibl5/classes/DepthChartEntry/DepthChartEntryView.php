@@ -298,13 +298,15 @@ JAVASCRIPT;
      *
      * @param list<array{id: int, label: string, isActive: bool}> $options
      */
-    public function renderSavedDepthChartDropdown(array $options): void
+    public function renderSavedDepthChartDropdown(array $options, string $currentLiveLabel): void
     {
         echo '<div class="saved-dc-dropdown-container">';
         echo '<label for="saved-dc-select" class="saved-dc-label">Load Saved Depth Chart:</label>';
         echo '<div class="saved-dc-select-wrapper">';
         echo '<select id="saved-dc-select" class="saved-dc-select">';
-        echo '<option value="0">Current (Live)</option>';
+        /** @var string $currentLiveLabelHtml */
+        $currentLiveLabelHtml = HtmlSanitizer::safeHtmlOutput($currentLiveLabel);
+        echo '<option value="0">' . $currentLiveLabelHtml . '</option>';
         foreach ($options as $option) {
             /** @var string $labelHtml */
             $labelHtml = HtmlSanitizer::safeHtmlOutput($option['label']);
@@ -313,7 +315,6 @@ JAVASCRIPT;
         echo '</select>';
         echo '<button type="button" id="saved-dc-rename-btn" class="saved-dc-rename-btn" title="Rename selected depth chart" style="display:none;">&#9998;</button>';
         echo '</div>';
-        echo '<div id="saved-dc-win-loss" class="saved-dc-win-loss"></div>';
         echo '<div id="saved-dc-loading" class="saved-dc-loading" style="display:none;">Loading...</div>';
         echo '</div>';
     }

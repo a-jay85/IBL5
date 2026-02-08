@@ -45,7 +45,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
      */
     private function renderPlayerHighs(string $seasonPhase, array $playerHighs): string
     {
-        $output = '<h2 class="ibl-table-title">Players\' ' . $seasonPhase . ' Highs</h1>';
+        $output = '<h2 class="ibl-table-title">Players\' ' . $seasonPhase . ' Highs</h2>';
         $output .= '<div class="ibl-grid ibl-grid--3col">';
 
         foreach ($playerHighs as $statName => $stats) {
@@ -65,7 +65,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
      */
     private function renderTeamHighs(string $seasonPhase, array $teamHighs): string
     {
-        $output = '<h2 class="ibl-table-title">Teams\' ' . $seasonPhase . ' Highs</h1>';
+        $output = '<h2 class="ibl-table-title">Teams\' ' . $seasonPhase . ' Highs</h2>';
         $output .= '<div class="ibl-grid ibl-grid--3col">';
 
         foreach ($teamHighs as $statName => $stats) {

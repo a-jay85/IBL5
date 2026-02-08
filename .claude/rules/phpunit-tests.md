@@ -12,6 +12,9 @@ vendor/bin/phpunit --filter testMethodName
 vendor/bin/phpunit -c phpunit.ci.xml        # Use specific config
 vendor/bin/phpunit --display-all-issues     # Show ALL issues (deprecations, warnings, etc.)
 
+# 💾 Token-saving: When just checking if tests pass (not debugging)
+vendor/bin/phpunit | tail -n 3              # Show only final summary lines
+
 # ❌ WRONG - These options don't exist in PHPUnit 12.x
 vendor/bin/phpunit -v
 vendor/bin/phpunit --verbose

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DepthChartEntry;
 
 use DepthChartEntry\Contracts\DepthChartEntryControllerInterface;
+use SavedDepthChart\SavedDepthChartService;
 use UI\Components\TableViewSwitcher;
 
 /**
@@ -47,7 +48,19 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         echo '<h2 class="ibl-title">Depth Chart Entry</h2>';
         $this->view->renderTeamLogo($teamID);
 
+        // Render saved depth chart dropdown
+        $savedDcService = new SavedDepthChartService($this->db);
+        $dropdownOptions = $savedDcService->getDropdownOptions($teamID, $season);
+        $currentLiveLabel = $savedDcService->buildCurrentLiveLabel($teamID, $season);
+        $this->view->renderSavedDepthChartDropdown($dropdownOptions, $currentLiveLabel);
+
         $playersResult = $this->repository->getPlayersOnTeam($teamName, $teamID);
+
+        // Collect current roster PIDs for JS config
+        $currentRosterPids = array_map(
+            static fn(array $p): int => $p['pid'],
+            $playersResult
+        );
 
         $slotNames = \JSB::PLAYER_POSITIONS;
 
@@ -61,22 +74,59 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
 
         $this->view->renderFormFooter();
 
+        echo '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
+        echo $this->getTableOutput($teamID, $display);
+        echo '</div></div>';
+
+        // Output JS configuration for saved depth charts
+        $jsConfig = json_encode([
+            'teamId' => $teamID,
+            'apiBaseUrl' => 'modules.php?name=DepthChartEntry&op=api',
+            'currentRosterPids' => $currentRosterPids,
+        ], JSON_THROW_ON_ERROR);
+        echo '<script>window.IBL_DEPTH_CHART_CONFIG = ' . $jsConfig . ';</script>';
+        echo '<script src="jslib/depth-chart-changes.js" defer></script>';
+        echo '<script src="jslib/saved-depth-charts.js" defer></script>';
+
+        // Output JS configuration for AJAX tab switching
+        $ajaxTabsConfig = json_encode([
+            'apiBaseUrl' => 'modules.php?name=DepthChartEntry&op=tab-api',
+            'params' => ['teamID' => $teamID],
+            'fallbackBaseUrl' => 'modules.php?name=DepthChartEntry',
+        ], JSON_THROW_ON_ERROR);
+        echo '<script>window.IBL_AJAX_TABS_CONFIG = ' . $ajaxTabsConfig . ';</script>';
+        echo '<script src="jslib/ajax-tabs.js" defer></script>';
+
+        \Nuke\Footer::footer();
+    }
+    
+    /**
+     * @see DepthChartEntryControllerInterface::getTableOutput()
+     */
+    public function getTableOutput(int $teamID, string $display): string
+    {
+        $season = new \Season($this->db);
+        $team = \Team::initialize($this->db, $teamID);
+
+        $teamName = $team->name;
+        $playersResult = $this->repository->getPlayersOnTeam($teamName, $teamID);
+
         $tabDefinitions = [
             'ratings' => 'Ratings',
             'total_s' => 'Season Totals',
             'avg_s' => 'Season Averages',
             'per36mins' => 'Per 36 Minutes',
+            'chunk' => 'Sim Averages',
             'contracts' => 'Contracts',
         ];
 
         $baseUrl = 'modules.php?name=DepthChartEntry';
         $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $team->color1, $team->color2);
         $tableHtml = $this->renderTableForDisplay($display, $playersResult, $team, $season);
-        echo $switcher->wrap($tableHtml);
 
-        \Nuke\Footer::footer();
+        return $switcher->wrap($tableHtml);
     }
-    
+
     /**
      * Render the appropriate table HTML based on display type
      *
@@ -91,6 +141,8 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
                 return \UI::seasonAverages($this->db, $result, $team, '');
             case 'per36mins':
                 return \UI::per36Minutes($this->db, $result, $team, '');
+            case 'chunk':
+                return \UI::periodAverages($this->db, $team, $season);
             case 'contracts':
                 $sharedFunctions = new \Shared($this->db);
                 return \UI::contracts($this->db, $result, $team, $sharedFunctions);

@@ -20,6 +20,11 @@ switch ($op) {
         $controller->displayTeamPage($teamID);
         break;
 
+    case "api":
+        $handler = new Team\TeamApiHandler($mysqli_db);
+        $handler->handle();
+        break;
+
     default:
         $controller->displayMenu();
         break;

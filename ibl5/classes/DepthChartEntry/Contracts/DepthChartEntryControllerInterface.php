@@ -42,4 +42,16 @@ interface DepthChartEntryControllerInterface
      * - Uses Season object to determine current phase
      */
     public function displayForm(string $username): void;
+
+    /**
+     * Get the stats table HTML for a given team and display mode
+     *
+     * Returns the TableViewSwitcher-wrapped table HTML (tabs + table) for use
+     * by both the full page render and the AJAX tab-switching API.
+     *
+     * @param int $teamID Team ID
+     * @param string $display Display mode (ratings, total_s, avg_s, per36mins, chunk, contracts)
+     * @return string HTML output
+     */
+    public function getTableOutput(int $teamID, string $display): string;
 }

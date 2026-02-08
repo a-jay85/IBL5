@@ -129,7 +129,8 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         /** @var string $slot4 */
         $slot4 = HtmlSanitizer::safeHtmlOutput($slotNames[4]);
         echo '<form name="DepthChartEntry" method="post" action="modules.php?name=DepthChartEntry&amp;op=submit" class="depth-chart-form">
-            <input type="hidden" name="Team_Name" value="' . $teamLogoEscaped . '">';
+            <input type="hidden" name="Team_Name" value="' . $teamLogoEscaped . '">
+            <input type="hidden" name="loaded_dc_id" id="loaded_dc_id" value="0">';
 
         echo '<div class="text-center"><table class="depth-chart-table ibl-data-table" data-no-responsive>
             <thead>
@@ -172,9 +173,10 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
             $player_staminacap = 40;
         }
 
-        echo "<tr>
+        echo "<tr data-pid=\"{$player_pid}\">
             <td>{$player_pos}</td>
             <td nowrap>
+                <input type=\"hidden\" name=\"pid{$depthCount}\" value=\"{$player_pid}\">
                 <input type=\"hidden\" name=\"Injury{$depthCount}\" value=\"{$player_inj}\">
                 <input type=\"hidden\" name=\"Name{$depthCount}\" value=\"{$player_name_html}\">
                 <a href=\"./modules.php?name=Player&pa=showpage&pid={$player_pid}\">{$player_name_html}</a>
@@ -272,7 +274,11 @@ function resetDepthChart() {
         
         select.value = defaultValue;
     }
-    
+
+    if (typeof window.IBL_recalculateDepthChartGlows === 'function') {
+        window.IBL_recalculateDepthChartGlows();
+    }
+
     return false;
 }
 </script>
@@ -289,6 +295,32 @@ JAVASCRIPT;
                 </tr>
             </tfoot>
         </table></div></form>';
+    }
+
+    /**
+     * Render the saved depth chart dropdown selector
+     *
+     * @param list<array{id: int, label: string, isActive: bool}> $options
+     */
+    public function renderSavedDepthChartDropdown(array $options, string $currentLiveLabel): void
+    {
+        echo '<div class="saved-dc-dropdown-container">';
+        echo '<label for="saved-dc-select" class="saved-dc-label">Load Saved Depth Chart:</label>';
+        echo '<div class="saved-dc-select-wrapper">';
+        echo '<select id="saved-dc-select" class="saved-dc-select">';
+        /** @var string $currentLiveLabelHtml */
+        $currentLiveLabelHtml = HtmlSanitizer::safeHtmlOutput($currentLiveLabel);
+        echo '<option value="0">' . $currentLiveLabelHtml . '</option>';
+        foreach ($options as $option) {
+            /** @var string $labelHtml */
+            $labelHtml = HtmlSanitizer::safeHtmlOutput($option['label']);
+            echo '<option value="' . $option['id'] . '">' . $labelHtml . '</option>';
+        }
+        echo '</select>';
+        echo '<button type="button" id="saved-dc-rename-btn" class="saved-dc-rename-btn" title="Rename selected depth chart" style="display:none;">&#9998;</button>';
+        echo '</div>';
+        echo '<div id="saved-dc-loading" class="saved-dc-loading" style="display:none;">Loading...</div>';
+        echo '</div>';
     }
 
     /**

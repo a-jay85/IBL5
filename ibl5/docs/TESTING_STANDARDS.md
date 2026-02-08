@@ -189,7 +189,7 @@ private InterfaceName $mockObject;
 ```
 
 **Examples in codebase:**
-- `tests/PlayerSearch/PlayerSearchServiceTest.php` (lines 21-24)
+- `tests/PlayerDatabase/PlayerDatabaseServiceTest.php` (lines 21-24)
 - `tests/Shared/SharedTest.php` (line 17)
 - `tests/Standings/StandingsViewTest.php` (line 21)
 
@@ -234,32 +234,46 @@ private InterfaceName $mockObject;
 
 ---
 
-## PHPUnit 12.4.3 Command Syntax
+## PHPUnit 12.x Command Syntax
 
-**The version of PHPUnit in this project has DIFFERENT command-line options than older versions.**
+**PHPUnit 12.x has different options than older versions. Key differences:**
 
-### ❌ WRONG - Invalid options:
+### ❌ WRONG - These do NOT exist in PHPUnit 12.x:
 ```bash
 vendor/bin/phpunit -v                      # Unknown option "-v"
 vendor/bin/phpunit --verbose               # Unknown option "--verbose"
-vendor/bin/phpunit -c phpunit.xml          # Unknown option "-c"
-vendor/bin/phpunit --configuration file    # Unknown option "--configuration"
-vendor/bin/phpunit --coverage-html dir     # Unknown option "--coverage-html"
 ```
 
 ### ✅ CORRECT - Valid options:
 ```bash
+# Basic execution
 vendor/bin/phpunit                         # Run all tests (default)
 vendor/bin/phpunit tests/Player/           # Run specific directory
 vendor/bin/phpunit tests/Player/PlayerTest.php  # Run specific file
 vendor/bin/phpunit --filter testMethodName # Run tests matching pattern
 vendor/bin/phpunit --testsuite suiteName   # Run specific test suite
+
+# Configuration
+vendor/bin/phpunit -c phpunit.ci.xml       # Use specific config file
+vendor/bin/phpunit --configuration file    # Same as -c
+
+# Display issue details (IMPORTANT - default only shows counts)
+vendor/bin/phpunit --display-all-issues    # Show ALL issues (recommended)
+vendor/bin/phpunit --display-deprecations  # Show deprecation details
+vendor/bin/phpunit --display-warnings      # Show warning details
+vendor/bin/phpunit --display-notices       # Show notice details
+vendor/bin/phpunit --display-phpunit-deprecations  # Show PHPUnit deprecation details
+
+# Other useful options
 vendor/bin/phpunit --quiet                 # Minimal output
 vendor/bin/phpunit --debug                 # Debug output
+vendor/bin/phpunit --coverage-html dir     # HTML coverage report
 vendor/bin/phpunit --help                  # Show all available options
 ```
 
-**Reference:** Check available options with `vendor/bin/phpunit --help` before using unknown flags.
+**Important:** PHPUnit 12.x does NOT have `-v`/`--verbose`. Use `--display-all-issues` to see issue details.
+
+**Reference:** Check available options with `vendor/bin/phpunit --help`.
 
 ---
 

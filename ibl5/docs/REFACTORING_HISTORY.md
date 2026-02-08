@@ -47,7 +47,7 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 - OneOnOneGameResultTest: 4 tests (DTO validation)
 - OneOnOnePlayerStatsTest: 4 tests (stats tracking)
 
-**Documentation:** `ibl5/classes/OneOnOne/README.md`
+**Documentation:** `ibl5/classes/OneOnOneGame/README.md`
 
 ---
 
@@ -56,14 +56,14 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 **Summary:** Refactored 8 display modules to interface-driven architecture in a single PR, completing all IBL5 module refactoring (100% complete).
 
 **Modules Refactored:**
-1. **Cap_Info** - Salary cap information and team cap scenarios
+1. **CapSpace** - Salary cap information and team cap scenarios
 2. **Draft_Pick_Locator** - Locate players by draft position and year
 3. **Franchise_History** - Historical franchise records and championships
 4. **Injuries** - Current injury list and timeline
 5. **League_Starters** - All-star starters for current season
 6. **Next_Sim** - Upcoming season simulation results
 7. **Power_Rankings** - League power rankings
-8. **Team_Schedule** - Team schedule and game results
+8. **Team_Schedule** - Team schedule and game results (Note: Legacy `modules/Team_Schedule/` removed January 2026; functionality consolidated into unified Schedule module at `modules/Schedule/`)
 
 **Key Improvements (All 8 Modules):**
 - Created Repository/Service/View pattern for each module with interfaces
@@ -75,7 +75,7 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 - Database query optimization where applicable
 
 **Classes Created (Summary):**
-- **CapInfoRepository, CapInfoService, CapInfoView** - Cap scenarios and free agency slots
+- **CapSpaceRepository, CapSpaceService, CapSpaceView** - Cap scenarios and free agency slots
 - **DraftPickLocatorRepository, DraftPickLocatorService, DraftPickLocatorView** - Draft history lookup
 - **FranchiseHistoryRepository, FranchiseHistoryView** - Team records with dynamic title calculation
 - **InjuriesService, InjuriesView** - Injury status display with timeline
@@ -85,7 +85,7 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 - **TeamScheduleService, TeamScheduleView** - Schedule with game results and team stats
 
 **Test Coverage:**
-- CapInfo: 16 tests (MLE/LLE flags, FA slots, salary calculations)
+- CapSpace: 16 tests (MLE/LLE flags, FA slots, salary calculations)
 - DraftPickLocator: 7 tests (draft year/position lookup)
 - FranchiseHistory: 12 tests (championship counts, title calculations from awards)
 - Injuries: 8 tests (injury filtering, timeline generation)
@@ -96,7 +96,7 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 - **UI Tables/Ratings:** 15+ tests (shared UI components)
 
 **Key Fixes:**
-- CapInfo: Fixed MLE/LLE flag conversion from string to integer comparison
+- CapSpace: Fixed MLE/LLE flag conversion from string to integer comparison
 - FranchiseHistory: Fixed title counts to calculate dynamically from ibl_team_awards instead of reading stale columns
 - NextSim: Fixed empty separator row rendering at beginning
 - All modules: Applied consistent HTML escaping and security patterns
@@ -122,9 +122,9 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 ---
 
-### 20. Player_Awards Module (January 2026)
+### 20. AwardHistory Module (January 2026)
 
-**Summary:** Refactored Player_Awards module with interface-driven architecture.
+**Summary:** Refactored AwardHistory module with interface-driven architecture.
 
 **Key Improvements:**
 - Created 4 classes + 4 interfaces
@@ -211,9 +211,9 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 ---
 
-### 15. Player_Search Module (November 28, 2025)
+### 15. PlayerDatabase Module (November 28, 2025)
 
-**Summary:** Refactored Player_Search module to fix **critical SQL injection vulnerability**. Achieved 84% code reduction (462 → 73 lines) while adding comprehensive security and 54 unit tests.
+**Summary:** Refactored PlayerDatabase module to fix **critical SQL injection vulnerability**. Achieved 84% code reduction (462 → 73 lines) while adding comprehensive security and 54 unit tests.
 
 **Security Issue Fixed:**
 ```php
@@ -236,13 +236,13 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 - Input validation with whitelist for positions and type checking
 
 **Classes Created:**
-1. **PlayerSearchValidator** - Input validation, sanitization, whitelist enforcement
-2. **PlayerSearchRepository** - Database queries with 100% prepared statements
-3. **PlayerSearchService** - Business logic, data transformation, orchestration
-4. **PlayerSearchView** - HTML rendering with output buffering pattern
+1. **PlayerDatabaseValidator** - Input validation, sanitization, whitelist enforcement
+2. **PlayerDatabaseRepository** - Database queries with 100% prepared statements
+3. **PlayerDatabaseService** - Business logic, data transformation, orchestration
+4. **PlayerDatabaseView** - HTML rendering with output buffering pattern
 
 **Files Refactored:**
-- `modules/Player_Search/index.php`: 462 → 73 lines (-84%)
+- `modules/PlayerDatabase/index.php`: 462 → 73 lines (-84%)
 
 **Security Hardening:**
 - All database operations via prepared statements
@@ -252,12 +252,12 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 - HTML escaping on all output with htmlspecialchars()
 
 **Test Coverage:**
-- PlayerSearchValidatorTest: 20 tests (validation, sanitization, security)
-- PlayerSearchRepositoryTest: 9 tests (query building, prepared statements)
-- PlayerSearchServiceTest: 7 tests (business logic, data transformation)
-- PlayerSearchViewTest: 18 tests (HTML rendering, XSS prevention)
+- PlayerDatabaseValidatorTest: 20 tests (validation, sanitization, security)
+- PlayerDatabaseRepositoryTest: 9 tests (query building, prepared statements)
+- PlayerDatabaseServiceTest: 7 tests (business logic, data transformation)
+- PlayerDatabaseViewTest: 18 tests (HTML rendering, XSS prevention)
 
-**Documentation:** `ibl5/classes/PlayerSearch/README.md`
+**Documentation:** `ibl5/classes/PlayerDatabase/README.md`
 
 ---
 
@@ -437,13 +437,13 @@ $stmt->bind_param('ss', $searchTerm, $searchTerm);
 
 ---
 
-### 4. DepthChart Module
+### 4. DepthChartEntry Module
 
 **Status:** ✅ Complete (6 classes, 2 tests)
 
 **Documentation:**
-- `ibl5/classes/DepthChart/README.md`
-- `ibl5/classes/DepthChart/SECURITY.md` - Security best practices
+- `ibl5/classes/DepthChartEntry/README.md`
+- `ibl5/classes/DepthChartEntry/SECURITY.md` - Security best practices
 
 ---
 
@@ -591,10 +591,10 @@ All IBL5 modules have been refactored to the interface-driven architecture patte
 
 ## Timeline
 
-- **November 2025:** Player, Season Leaders, Free Agency, Player_Search modules complete
+- **November 2025:** Player, Season Leaders, Free Agency, PlayerDatabase modules complete
 - **December 2025:** Compare_Players, Leaderboards, Standings modules complete
-- **January 5, 2026:** League_Stats, Player_Awards, Series_Records, One-on-One modules complete
-- **January 9, 2026:** 8 Display modules refactored (Cap_Info, Draft_Pick_Locator, Franchise_History, Injuries, League_Starters, Next_Sim, Power_Rankings, Team_Schedule) - **30/30 modules complete (100%)** ✅
+- **January 5, 2026:** League_Stats, AwardHistory, Series_Records, One-on-One modules complete
+- **January 9, 2026:** 8 Display modules refactored (CapSpace, Draft_Pick_Locator, Franchise_History, Injuries, League_Starters, Next_Sim, Power_Rankings, Team_Schedule) - **30/30 modules complete (100%)** ✅
 - **Target:** 80% test coverage by Q2 2026
 
 ---
@@ -609,7 +609,7 @@ All IBL5 modules have been refactored to the interface-driven architecture patte
 ### Component Documentation
 - [Statistics README](../classes/Statistics/README.md) - StatsFormatter usage
 - [Player README](../classes/Player/README.md) - Player module architecture
-- [DepthChart SECURITY](../classes/DepthChart/SECURITY.md) - Security patterns
+- [DepthChartEntry SECURITY](../classes/DepthChartEntry/SECURITY.md) - Security patterns
 - [ComparePlayers README](../classes/ComparePlayers/README.md) - Compare module architecture
 - [Standings README](../classes/Standings/README.md) - Standings module architecture
 

@@ -11,19 +11,28 @@ use Trading\Contracts\TradeProcessorInterface;
  *
  * Handles the complete trade execution process including player transfers,
  * draft pick transfers, cash transactions, news creation, and notifications.
- * 
+ *
  * @see TradeProcessorInterface
+ *
+ * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class TradeProcessor implements TradeProcessorInterface
 {
+    /** @phpstan-var \mysqli */
     protected object $db;
     protected TradingRepository $repository;
     protected \Services\CommonMysqliRepository $commonRepository;
     protected \Season $season;
     protected CashTransactionHandler $cashHandler;
     protected \Services\NewsService $newsService;
-    protected \Discord $discord;
+    protected ?\Discord $discord;
 
+    /**
+     * @phpstan-param \mysqli $db
+     */
     public function __construct(object $db, ?TradingRepository $repository = null)
     {
         $this->db = $db;
@@ -32,7 +41,15 @@ class TradeProcessor implements TradeProcessorInterface
         $this->season = new \Season($db);
         $this->cashHandler = new CashTransactionHandler($db, $this->repository);
         $this->newsService = new \Services\NewsService($db);
-        $this->discord = new \Discord($db);
+
+        // Initialize Discord with error handling
+        try {
+            $this->discord = new \Discord($db);
+        } catch (\Exception $e) {
+            // Discord unavailable - will skip notifications
+            error_log("Discord initialization failed in TradeProcessor: " . $e->getMessage());
+            $this->discord = null;
+        }
     }
 
     /**
@@ -42,7 +59,7 @@ class TradeProcessor implements TradeProcessorInterface
     {
         $tradeRows = $this->repository->getTradesByOfferId($offerId);
 
-        if (empty($tradeRows)) {
+        if ($tradeRows === []) {
             return [
                 'success' => false,
                 'error' => 'No trade data found for this offer ID'
@@ -61,7 +78,7 @@ class TradeProcessor implements TradeProcessorInterface
 
             $result = $this->processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId);
 
-            if ($result['success']) {
+            if ($result['success'] === true) {
                 $storytext .= $result['tradeLine'];
             }
         }
@@ -83,23 +100,23 @@ class TradeProcessor implements TradeProcessorInterface
 
     /**
      * Process a single trade item (player, pick, or cash)
-     * 
+     *
      * Routes the item to the appropriate handler based on type.
-     * 
-     * @param mixed $itemId Item ID (int for player/pick, composite string for cash)
-     * @param mixed $itemType Item type (1=player, 0=pick, 'cash'=cash)
+     *
+     * @param int $itemId Item ID (int for player/pick, composite int for cash)
+     * @param string $itemType Item type ('1'=player, '0'=pick, 'cash'=cash)
      * @param string $offeringTeamName Offering team
      * @param string $listeningTeamName Listening team
      * @param int $offerId Trade offer ID
-     * @return array Result with keys: success (bool), tradeLine (string)
+     * @return array{success: bool, tradeLine: string}
      */
-    protected function processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId)
+    protected function processTradeItem(int $itemId, string $itemType, string $offeringTeamName, string $listeningTeamName, int $offerId): array
     {
-        if ($itemType == 'cash') {
+        if ($itemType === 'cash') {
             return $this->processCashTransaction($itemId, $offeringTeamName, $listeningTeamName, $offerId);
-        } elseif ($itemType == 0) {
+        } elseif ($itemType === '0') {
             return $this->processDraftPick($itemId, $offeringTeamName, $listeningTeamName);
-        } elseif ($itemType == 1) {
+        } elseif ($itemType === '1') {
             return $this->processPlayer($itemId, $offeringTeamName, $listeningTeamName);
         }
 
@@ -108,74 +125,68 @@ class TradeProcessor implements TradeProcessorInterface
 
     /**
      * Process cash transaction
-     * 
+     *
      * Retrieves cash details from database and creates cash transaction records
      * via CashTransactionHandler.
-     * 
+     *
      * @param int $itemId Item ID for the transaction
      * @param string $offeringTeamName Offering team
      * @param string $listeningTeamName Listening team
      * @param int $offerId Trade offer ID
-     * @return array Result with keys: success (bool), tradeLine (string)
+     * @return array{success: bool, tradeLine: string}
      */
-    protected function processCashTransaction($itemId, $offeringTeamName, $listeningTeamName, $offerId)
+    protected function processCashTransaction(int $itemId, string $offeringTeamName, string $listeningTeamName, int $offerId): array
     {
-        $itemId = $this->cashHandler->generateUniquePid((int) $itemId);
-        
+        $uniquePid = $this->cashHandler->generateUniquePid($itemId);
+
         // Get cash details from repository
         $cashDetails = $this->repository->getCashTransactionByOffer($offerId, $offeringTeamName);
 
+        if ($cashDetails === null) {
+            return ['success' => false, 'tradeLine' => ''];
+        }
+
         $cashYear = [
-            1 => $cashDetails['cy1'],
-            2 => $cashDetails['cy2'],
-            3 => $cashDetails['cy3'],
-            4 => $cashDetails['cy4'],
-            5 => $cashDetails['cy5'],
-            6 => $cashDetails['cy6']
+            1 => $cashDetails['cy1'] ?? 0,
+            2 => $cashDetails['cy2'] ?? 0,
+            3 => $cashDetails['cy3'] ?? 0,
+            4 => $cashDetails['cy4'] ?? 0,
+            5 => $cashDetails['cy5'] ?? 0,
+            6 => $cashDetails['cy6'] ?? 0,
         ];
 
-        return $this->cashHandler->createCashTransaction($itemId, $offeringTeamName, $listeningTeamName, $cashYear);
+        return $this->cashHandler->createCashTransaction($uniquePid, $offeringTeamName, $listeningTeamName, $cashYear);
     }
 
     /**
      * Process draft pick transfer
-     * 
-     * Updates pick ownership and queues the query if during certain season phases.
-     * 
+     *
+     * Updates pick ownership and queues the operation if during certain season phases.
+     *
      * @param int $itemId Pick ID
      * @param string $offeringTeamName Offering team
      * @param string $listeningTeamName Listening team
-     * @return array Result with keys: success (bool), tradeLine (string)
+     * @return array{success: bool, tradeLine: string}
      */
-    protected function processDraftPick($itemId, $offeringTeamName, $listeningTeamName)
+    protected function processDraftPick(int $itemId, string $offeringTeamName, string $listeningTeamName): array
     {
-        $itemId = (int) $itemId;
-        
         // Get pick details from repository
         $pickData = $this->repository->getDraftPickById($itemId);
-        
-        if (!$pickData) {
+
+        if ($pickData === null) {
             return ['success' => false, 'tradeLine' => ''];
         }
-        
-        $tradeLine = "The $offeringTeamName send the " . 
-                    $pickData['year'] . " " . 
-                    $pickData['teampick'] . " Round " . 
+
+        $tradeLine = "The $offeringTeamName send the " .
+                    $pickData['year'] . " " .
+                    $pickData['teampick'] . " Round " .
                     $pickData['round'] . " draft pick to the $listeningTeamName.<br>";
 
         // Update pick ownership using repository
         $affectedRows = $this->repository->updateDraftPickOwnerById($itemId, $listeningTeamName);
-        
-        // Build query string for queue (if needed in certain phases)
-        // Note: Query is built for queue storage only - actual execution uses prepared statements in repository
-        if (method_exists($this->db, 'real_escape_string')) {
-            $escapedTeamName = $this->db->real_escape_string($listeningTeamName);
-        } else {
-            $escapedTeamName = \Services\DatabaseService::escapeString($this->db, $listeningTeamName);
-        }
-        $queryi = 'UPDATE ibl_draft_picks SET `ownerofpick` = "' . $escapedTeamName . '" WHERE `pickid` = ' . $itemId . ' LIMIT 1';
 
-        $this->queueTradeQuery($queryi, $tradeLine);
+        // Queue structured data for deferred execution during certain season phases
+        $this->queuePickTransfer($itemId, $listeningTeamName, $tradeLine);
 
         return [
             'success' => ($affectedRows > 0),
@@ -185,43 +196,34 @@ class TradeProcessor implements TradeProcessorInterface
 
     /**
      * Process player transfer
-     * 
-     * Updates player's team assignment and queues the query if during certain season phases.
-     * 
+     *
+     * Updates player's team assignment and queues the operation if during certain season phases.
+     *
      * @param int $itemId Player ID
      * @param string $offeringTeamName Offering team
      * @param string $listeningTeamName Listening team
-     * @return array Result with keys: success (bool), tradeLine (string)
+     * @return array{success: bool, tradeLine: string}
      */
-    protected function processPlayer($itemId, $offeringTeamName, $listeningTeamName)
+    protected function processPlayer(int $itemId, string $offeringTeamName, string $listeningTeamName): array
     {
-        $itemId = (int) $itemId;
-        $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName);
+        $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName) ?? 0;
 
         // Get full player data from repository
         $playerData = $this->repository->getPlayerById($itemId);
 
-        if (!$playerData) {
+        if ($playerData === null) {
             return ['success' => false, 'tradeLine' => ''];
         }
 
-        $tradeLine = "The $offeringTeamName send " . 
-                    $playerData['pos'] . " " . 
+        $tradeLine = "The $offeringTeamName send " .
+                    $playerData['pos'] . " " .
                     $playerData['name'] . " to the $listeningTeamName.<br>";
 
         // Update player team using repository
         $affectedRows = $this->repository->updatePlayerTeam($itemId, $listeningTeamName, $listeningTeamId);
-        
-        // Build query string for queue (if needed in certain phases)
-        // Note: Query is built for queue storage only - actual execution uses prepared statements in repository
-        if (method_exists($this->db, 'real_escape_string')) {
-            $escapedTeamName = $this->db->real_escape_string($listeningTeamName);
-        } else {
-            $escapedTeamName = \Services\DatabaseService::escapeString($this->db, $listeningTeamName);
-        }
-        $queryi = 'UPDATE ibl_plr SET `teamname` = "' . $escapedTeamName . '", `tid` = ' . $listeningTeamId . ' WHERE `pid` = ' . $itemId . ' LIMIT 1';
 
-        $this->queueTradeQuery($queryi, $tradeLine);
+        // Queue structured data for deferred execution during certain season phases
+        $this->queuePlayerTransfer($itemId, $listeningTeamName, $listeningTeamId, $tradeLine);
 
         return [
             'success' => ($affectedRows > 0),
@@ -230,23 +232,57 @@ class TradeProcessor implements TradeProcessorInterface
     }
 
     /**
-     * Queue trade query for later execution if in certain season phases
-     * 
-     * During Playoffs, Draft, or Free Agency phases, queries are queued
+     * Check if we should queue trades for later execution
+     *
+     * During Playoffs, Draft, or Free Agency phases, trades are queued
      * instead of executed immediately to prevent roster conflicts.
-     * 
-     * @param string $query SQL query to execute later
+     *
+     * @return bool True if in a phase that requires queueing
+     */
+    protected function shouldQueueTrades(): bool
+    {
+        return $this->season->phase === "Playoffs"
+            || $this->season->phase === "Draft"
+            || $this->season->phase === "Free Agency";
+    }
+
+    /**
+     * Queue player transfer for later execution if in certain season phases
+     *
+     * @param int $playerId Player ID
+     * @param string $teamName New team name
+     * @param int $teamId New team ID
      * @param string $tradeLine Trade description for tracking
      * @return void
      */
-    protected function queueTradeQuery($query, $tradeLine)
+    protected function queuePlayerTransfer(int $playerId, string $teamName, int $teamId, string $tradeLine): void
     {
-        if (
-            $this->season->phase == "Playoffs"
-            || $this->season->phase == "Draft"
-            || $this->season->phase == "Free Agency"
-        ) {
-            $this->repository->insertTradeQueue($query, $tradeLine);
+        if ($this->shouldQueueTrades()) {
+            $params = [
+                'player_id' => $playerId,
+                'team_name' => $teamName,
+                'team_id' => $teamId,
+            ];
+            $this->repository->insertTradeQueue('player_transfer', $params, $tradeLine);
+        }
+    }
+
+    /**
+     * Queue pick transfer for later execution if in certain season phases
+     *
+     * @param int $pickId Pick ID
+     * @param string $newOwner New owner team name
+     * @param string $tradeLine Trade description for tracking
+     * @return void
+     */
+    protected function queuePickTransfer(int $pickId, string $newOwner, string $tradeLine): void
+    {
+        if ($this->shouldQueueTrades()) {
+            $params = [
+                'pick_id' => $pickId,
+                'new_owner' => $newOwner,
+            ];
+            $this->repository->insertTradeQueue('pick_transfer', $params, $tradeLine);
         }
     }
 
@@ -260,7 +296,7 @@ class TradeProcessor implements TradeProcessorInterface
      * @param string $storytext Story text with full trade details
      * @return void
      */
-    protected function createNewsStory($storytitle, $storytext)
+    protected function createNewsStory(string $storytitle, string $storytext): void
     {
         // Category ID 2 is typically 'Trade News'
         // Topic ID 31 is typically 'IBL News' or general league news
@@ -271,9 +307,11 @@ class TradeProcessor implements TradeProcessorInterface
         $this->newsService->createNewsStory($categoryID, $topicID, $storytitle, $storytext);
         
         // Send email notification
-        if ($_SERVER['SERVER_NAME'] != "localhost") {
+        if ($_SERVER['SERVER_NAME'] !== "localhost") {
             $recipient = 'ibldepthcharts@gmail.com';
-            mail($recipient, $storytitle, $storytext, "From: trades@iblhoops.net");
+            // SECURITY: Sanitize email subject to prevent header injection
+            $safeSubject = \Utilities\EmailSanitizer::sanitizeSubject($storytitle);
+            mail($recipient, $safeSubject, $storytext, "From: trades@iblhoops.net");
         }
     }
 
@@ -287,19 +325,24 @@ class TradeProcessor implements TradeProcessorInterface
      * @param string $storytext Full story text with trade details
      * @return void
      */
-    protected function sendNotifications($offeringTeamName, $listeningTeamName, $storytext)
+    protected function sendNotifications(string $offeringTeamName, string $listeningTeamName, string $storytext): void
     {
-        $fromDiscordId = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
-        $toDiscordId = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
-        
-        // Build Discord mention text only if both IDs exist
-        if (!empty($fromDiscordId) && !empty($toDiscordId)) {
-            $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:\n" . $storytext;
-        } else {
-            $discordText = "$offeringTeamName and $listeningTeamName agreed to a trade:\n" . $storytext;
+        // Skip notifications if Discord is not available
+        if ($this->discord === null) {
+            return;
         }
 
         try {
+            $fromDiscordId = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
+            $toDiscordId = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
+
+            // Build Discord mention text only if both IDs exist
+            if ($fromDiscordId !== '' && $toDiscordId !== '') {
+                $discordText = "<@!$fromDiscordId> and <@!$toDiscordId> agreed to a trade:\n" . $storytext;
+            } else {
+                $discordText = "$offeringTeamName and $listeningTeamName agreed to a trade:\n" . $storytext;
+            }
+
             \Discord::postToChannel('#trades', $discordText);
             \Discord::postToChannel('#general-chat', $storytext);
         } catch (\Exception $e) {

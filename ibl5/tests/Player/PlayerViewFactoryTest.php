@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Player;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Player\Views\PlayerViewFactory;
 use Player\PlayerRepository;
@@ -25,9 +26,10 @@ use Player\Views\PlayerOneOnOneView;
 
 /**
  * PlayerViewFactoryTest - Tests for the PlayerViewFactory class
- * 
+ *
  * Verifies that the factory creates the correct view instances for each page type.
  */
+#[AllowMockObjectsWithoutExpectations]
 class PlayerViewFactoryTest extends TestCase
 {
     /** @var \mysqli&\PHPUnit\Framework\MockObject\MockObject */

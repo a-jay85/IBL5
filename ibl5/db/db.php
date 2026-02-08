@@ -94,7 +94,14 @@ switch ($dbtype) {
 
 if ($dbtype == 'MySQL') {
     $db = new MySQL($dbhost, $dbuname, $dbpass, $dbname, false);
-    $mysqli_db = new mysqli($dbhost, $dbuname, $dbpass, $dbname);
+
+    // Create mysqli connection with native type casting enabled
+    // This makes INT/FLOAT columns return PHP int/float instead of strings
+    // Required for PHP 8.x strict type declarations
+    $mysqli_db = new mysqli();
+    $mysqli_db->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, true);
+    $mysqli_db->real_connect($dbhost, $dbuname, $dbpass, $dbname);
+
     // Set character set to UTF-8 to support accent marks and special characters
     if ($mysqli_db) {
         $mysqli_db->set_charset('utf8mb4');

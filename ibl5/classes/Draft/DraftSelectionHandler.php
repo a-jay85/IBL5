@@ -11,23 +11,26 @@ use Draft\Contracts\DraftSelectionHandlerInterface;
  */
 class DraftSelectionHandler implements DraftSelectionHandlerInterface
 {
-    private $validator;
-    private $repository;
-    private $commonRepository;
-    private $processor;
-    private $view;
-    private $sharedFunctions;
-    private $season;
+    private DraftValidator $validator;
+    private DraftRepository $repository;
+    private \Services\CommonMysqliRepository $commonRepository;
+    private DraftProcessor $processor;
+    private DraftView $view;
+    private object $sharedFunctions;
+    /** @var \Season */
+    private object $season;
 
-    public function __construct(object $db, $sharedFunctions, $season)
+    public function __construct(object $db, object $sharedFunctions, object $season)
     {
         global $mysqli_db;
         $this->sharedFunctions = $sharedFunctions;
         $this->season = $season;
-        
+
         $this->validator = new DraftValidator();
         $this->repository = new DraftRepository($db);
-        $this->commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
+        /** @var object $mysqliDb */
+        $mysqliDb = $mysqli_db;
+        $this->commonRepository = new \Services\CommonMysqliRepository($mysqliDb);
         $this->processor = new DraftProcessor();
         $this->view = new DraftView();
     }
@@ -48,7 +51,7 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
         }
 
         // Process the draft selection
-        return $this->processDraftSelection($teamName, $playerName, $draftRound, $draftPick);
+        return $this->processDraftSelection($teamName, $playerName ?? '', $draftRound, $draftPick);
     }
 
     private function processDraftSelection(string $teamName, string $playerName, int $draftRound, int $draftPick): string
@@ -76,13 +79,15 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
         $teamOnTheClock = null;
         $discordIDOfTeamOnTheClock = null;
         if ($nextTeamDraftPick !== null) {
-            $teamOnTheClock = $this->sharedFunctions->getCurrentOwnerOfDraftPick(
+            /** @var \Shared $sharedFuncs */
+            $sharedFuncs = $this->sharedFunctions;
+            $teamOnTheClock = $sharedFuncs->getCurrentOwnerOfDraftPick(
                 $this->season->endingYear,
                 $draftRound,
                 $nextTeamDraftPick
             );
             if ($teamOnTheClock !== null) {
-                $discordIDOfTeamOnTheClock = $this->commonRepository->getTeamDiscordID($teamOnTheClock);
+                $discordIDOfTeamOnTheClock = $this->commonRepository->getTeamDiscordID((string) $teamOnTheClock);
             }
         }
         \Discord::postToChannel('#general-chat', $message);

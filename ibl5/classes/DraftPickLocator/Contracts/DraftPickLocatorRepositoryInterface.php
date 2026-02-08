@@ -9,6 +9,9 @@ namespace DraftPickLocator\Contracts;
  *
  * Defines methods for retrieving draft pick ownership data.
  *
+ * @phpstan-type TeamInfoRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string}
+ * @phpstan-type DraftPickRow array{ownerofpick: string, year: int, round: int}
+ *
  * @see \DraftPickLocator\DraftPickLocatorRepository For the concrete implementation
  */
 interface DraftPickLocatorRepositoryInterface
@@ -16,7 +19,7 @@ interface DraftPickLocatorRepositoryInterface
     /**
      * Get all teams with basic info
      *
-     * @return array Array of team data
+     * @return list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string}>
      */
     public function getAllTeams(): array;
 
@@ -24,7 +27,14 @@ interface DraftPickLocatorRepositoryInterface
      * Get draft picks for a specific team
      *
      * @param string $teamName Team name
-     * @return array Array of draft pick data
+     * @return list<array{ownerofpick: string, year: int, round: int}>
      */
     public function getDraftPicksForTeam(string $teamName): array;
+
+    /**
+     * Get all draft picks grouped by team pick name
+     *
+     * @return array<string, list<array{ownerofpick: string, year: int, round: int}>>
+     */
+    public function getAllDraftPicksGroupedByTeam(): array;
 }

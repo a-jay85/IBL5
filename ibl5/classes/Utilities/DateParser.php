@@ -29,7 +29,7 @@ class DateParser
         int $endingYear,
         string $league = 'IBL'
     ): ?array {
-        if (empty($rawDate)) {
+        if ($rawDate === '') {
             return null;
         }
 
@@ -52,7 +52,7 @@ class DateParser
             $beginningYear = \Season::IBL_PRESEASON_YEAR;
             $endingYear = \Season::IBL_PRESEASON_YEAR + 1;
         } elseif ($phase === "HEAT") {
-            if ($month == 11) {
+            if ($month === 11) {
                 $month = \Season::IBL_HEAT_MONTH;
             }
         }

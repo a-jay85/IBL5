@@ -39,8 +39,8 @@ class League extends BaseMysqliRepository
 
     /**
      * Format team IDs for SQL IN clause
-     * 
-     * @param array $conferenceTids Array of team IDs
+     *
+     * @param array<int, int> $conferenceTids Array of team IDs
      * @return string Formatted string for SQL IN clause
      */
     public function formatTidsForSqlQuery(array $conferenceTids): string
@@ -56,33 +56,38 @@ class League extends BaseMysqliRepository
      */
     public function getSimLengthInDays(): int
     {
+        /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
             "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
             "s",
             "Sim Length in Days"
         );
 
-        return (int)($result['value'] ?? 0);
+        if ($result === null) {
+            return 0;
+        }
+
+        return (int) $result['value'];
     }
 
     /**
      * Get All-Star voting candidates for a conference/position
-     * 
+     *
      * @param string $votingCategory Voting category (e.g., 'EC-CF', 'WC-CB')
-     * @return array All matching players
+     * @return array<int, array<string, mixed>> All matching players
      */
     public function getAllStarCandidatesResult(string $votingCategory): array
     {
         if (strpos($votingCategory, 'EC') !== false) {
-            $conferenceTids = $this::EASTERN_CONFERENCE_TEAMIDS;
-        } elseif (strpos($votingCategory, 'WC') !== false) {
-            $conferenceTids = $this::WESTERN_CONFERENCE_TEAMIDS;
+            $conferenceTids = self::EASTERN_CONFERENCE_TEAMIDS;
+        } else {
+            $conferenceTids = self::WESTERN_CONFERENCE_TEAMIDS;
         }
 
         if (strpos($votingCategory, 'CF') !== false) {
-            $positions = $this::ALL_STAR_FRONTCOURT_POSITIONS;
-        } elseif (strpos($votingCategory, 'CB') !== false) {
-            $positions = $this::ALL_STAR_BACKCOURT_POSITIONS;
+            $positions = self::ALL_STAR_FRONTCOURT_POSITIONS;
+        } else {
+            $positions = self::ALL_STAR_BACKCOURT_POSITIONS;
         }
 
         $query = "SELECT *
@@ -92,14 +97,14 @@ class League extends BaseMysqliRepository
           AND retired != 1
           AND stats_gm > '14'
         ORDER BY name";
-        
+
         return $this->fetchAll($query);
     }
 
     /**
      * Get all injured players
-     * 
-     * @return array All injured players
+     *
+     * @return array<int, array<string, mixed>> All injured players
      */
     public function getInjuredPlayersResult(): array
     {
@@ -114,16 +119,16 @@ class League extends BaseMysqliRepository
 
     /**
      * Get all free agents for the season
-     * 
+     *
      * @param Season $season Current season
-     * @return array All free agent players
+     * @return array<int, array<string, mixed>> All free agent players
      */
     public function getFreeAgentsResult(Season $season): array
     {
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
-            WHERE retired = '0'
+            WHERE retired = 0
               AND draftyear + exp + cyt - cy = ?
             ORDER BY name ASC",
             "i",
@@ -133,8 +138,8 @@ class League extends BaseMysqliRepository
 
     /**
      * Get all waived players
-     * 
-     * @return array All waived players
+     *
+     * @return array<int, array<string, mixed>> All waived players
      */
     public function getWaivedPlayersResult(): array
     {
@@ -142,8 +147,9 @@ class League extends BaseMysqliRepository
             "SELECT *
             FROM ibl_plr
             WHERE ordinal > ?
-              AND retired = '0'
+              AND retired = 0
               AND name NOT LIKE '%|%'
+              AND name != '(no starter)'
             ORDER BY name ASC",
             "i",
             JSB::WAIVERS_ORDINAL
@@ -152,8 +158,8 @@ class League extends BaseMysqliRepository
 
     /**
      * Get MVP award candidates
-     * 
-     * @return array All MVP candidates
+     *
+     * @return array<int, array<string, mixed>> All MVP candidates
      */
     public function getMVPCandidatesResult(): array
     {
@@ -169,8 +175,8 @@ class League extends BaseMysqliRepository
 
     /**
      * Get Sixth Person of the Year award candidates
-     * 
-     * @return array All Sixth Person candidates
+     *
+     * @return array<int, array<string, mixed>> All Sixth Person candidates
      */
     public function getSixthPersonOfTheYearCandidatesResult(): array
     {
@@ -187,8 +193,8 @@ class League extends BaseMysqliRepository
 
     /**
      * Get Rookie of the Year award candidates
-     * 
-     * @return array All Rookie of the Year candidates
+     *
+     * @return array<int, array<string, mixed>> All Rookie of the Year candidates
      */
     public function getRookieOfTheYearCandidatesResult(): array
     {
@@ -204,8 +210,8 @@ class League extends BaseMysqliRepository
 
     /**
      * Get GM of the Year award candidates
-     * 
-     * @return array All GM candidates
+     *
+     * @return array<int, array<string, mixed>> All GM candidates
      */
     public function getGMOfTheYearCandidatesResult(): array
     {
@@ -221,8 +227,8 @@ class League extends BaseMysqliRepository
 
     /**
      * Get all teams
-     * 
-     * @return array All teams except free agents
+     *
+     * @return array<int, array<string, mixed>> All teams except free agents
      */
     public function getAllTeamsResult(): array
     {

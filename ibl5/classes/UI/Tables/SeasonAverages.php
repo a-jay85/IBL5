@@ -1,12 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace UI\Tables;
 
 use Player\Player;
+use Player\PlayerImageHelper;
 use Player\PlayerStats;
+use UI\TeamCellHelper;
 
 /**
  * SeasonAverages - Displays season averages statistics table
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class SeasonAverages
 {
@@ -14,50 +20,61 @@ class SeasonAverages
      * Render the season averages table
      *
      * @param object $db Database connection
-     * @param iterable $result Player result set
-     * @param object $team Team object
+     * @param iterable<int, Player|array<string, mixed>> $result Player result set
+     * @param \Team $team Team object
      * @param string $yr Year filter (empty for current season)
+     * @param list<int> $starterPids Starter player IDs
+     * @param string $moduleName Module name
      * @return string HTML table
      */
-    public static function render($db, $result, $team, string $yr): string
+    public static function render(object $db, $result, \Team $team, string $yr, array $starterPids = [], string $moduleName = ""): string
     {
         $playerRows = [];
-        $i = 0;
         foreach ($result as $plrRow) {
-            if ($yr == "") {
-                $player = Player::withPlrRow($db, $plrRow);
-                $playerStats = PlayerStats::withPlrRow($db, $plrRow);
+            if ($yr === "") {
+                if ($plrRow instanceof Player) {
+                    $player = $plrRow;
+                    /** @var PlayerStats $playerStats */
+                    $playerStats = PlayerStats::withPlayerID($db, $player->playerID ?? 0);
+                } elseif (is_array($plrRow)) {
+                    /** @var PlayerRow $plrRow */
+                    $player = Player::withPlrRow($db, $plrRow);
+                    /** @var PlayerStats $playerStats */
+                    $playerStats = PlayerStats::withPlrRow($db, $plrRow);
+                } else {
+                    continue;
+                }
 
-                $firstCharacterOfPlayerName = substr($player->name, 0, 1);
-                if ($firstCharacterOfPlayerName == '|') {
+                $playerName = $player->name ?? '';
+                $firstCharacterOfPlayerName = substr($playerName, 0, 1);
+                if ($firstCharacterOfPlayerName === '|') {
                     continue;
                 }
             } else {
+                /** @var array<string, mixed> $plrRow */
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
+                /** @var PlayerStats $playerStats */
                 $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
             }
-
-            $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
 
             $playerRows[] = [
                 'player' => $player,
                 'playerStats' => $playerStats,
-                'bgcolor' => $bgcolor,
             ];
-
-            $i++;
         }
 
         $teamStats = \TeamStats::withTeamName($db, $team->name);
 
         ob_start();
-        echo \UI\TableStyles::render('season-avg', $team->color1, $team->color2);
         ?>
-<table style="margin: 0 auto;" class="sortable season-avg">
+<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
-        <tr style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
+        <tr>
+<?php if ($moduleName === "LeagueStarters"): ?>
+            <th>Team</th>
+<?php endif; ?>
             <th>Pos</th>
-            <th colspan="3">Player</th>
+            <th class="sticky-col">Player</th>
             <th>g</th>
             <th>gs</th>
             <th>min</th>
@@ -65,11 +82,11 @@ class SeasonAverages
             <th>fgm</th>
             <th>fga</th>
             <th>fgp</th>
-            <th class="sep-weak"></th>
+            <th class="sep-team"></th>
             <th>ftm</th>
             <th>fta</th>
             <th>ftp</th>
-            <th class="sep-weak"></th>
+            <th class="sep-team"></th>
             <th>3gm</th>
             <th>3ga</th>
             <th>3gp</th>
@@ -86,14 +103,19 @@ class SeasonAverages
     </thead>
     <tbody>
 <?php foreach ($playerRows as $row):
+    /** @var Player $player */
     $player = $row['player'];
+    /** @var PlayerStats $playerStats */
     $playerStats = $row['playerStats'];
 ?>
-        <tr style="background-color: #<?= $row['bgcolor'] ?>;">
-            <td><?= htmlspecialchars($player->position) ?></td>
-            <td colspan="3"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$player->playerID ?>"><?= $player->decoratedName ?></a></td>
-            <td style="text-align: center;"><?= (int)$playerStats->seasonGamesPlayed ?></td>
-            <td style="text-align: center;"><?= (int)$playerStats->seasonGamesStarted ?></td>
+        <tr>
+<?php if ($moduleName === "LeagueStarters"):
+    echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamID ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
+endif; ?>
+            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', $starterPids) ?>
+            <td style="text-align: center;"><?= $playerStats->seasonGamesPlayed ?></td>
+            <td style="text-align: center;"><?= $playerStats->seasonGamesStarted ?></td>
             <td style="text-align: center;"><?= $playerStats->seasonMinutesPerGame ?></td>
             <td class="sep-team"></td>
             <td style="text-align: center;"><?= $playerStats->seasonFieldGoalsMadePerGame ?></td>
@@ -120,65 +142,67 @@ class SeasonAverages
 <?php endforeach; ?>
     </tbody>
     <tfoot>
-<?php if ($yr == ""): ?>
+<?php if ($yr === ""):
+    $labelColspan = ($moduleName === "LeagueStarters") ? 3 : 2;
+?>
         <tr>
-            <td colspan="4"><b><?= htmlspecialchars($team->name) ?> Offense</b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseGamesPlayed ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonOffenseGamesPlayed ?></b></td>
+            <td colspan="<?= $labelColspan ?>"><?= htmlspecialchars($team->name) ?> Offense</td>
+            <td><?= $teamStats->seasonOffenseGamesPlayed ?></td>
+            <td><?= $teamStats->seasonOffenseGamesPlayed ?></td>
             <td></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseFieldGoalsMadePerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseFieldGoalsAttemptedPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseFieldGoalPercentage ?></b></td>
+            <td><?= $teamStats->seasonOffenseFieldGoalsMadePerGame ?></td>
+            <td><?= $teamStats->seasonOffenseFieldGoalsAttemptedPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseFieldGoalPercentage ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseFreeThrowsMadePerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseFreeThrowsAttemptedPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseFreeThrowPercentage ?></b></td>
+            <td><?= $teamStats->seasonOffenseFreeThrowsMadePerGame ?></td>
+            <td><?= $teamStats->seasonOffenseFreeThrowsAttemptedPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseFreeThrowPercentage ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseThreePointersMadePerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseThreePointersAttemptedPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseThreePointPercentage ?></b></td>
+            <td><?= $teamStats->seasonOffenseThreePointersMadePerGame ?></td>
+            <td><?= $teamStats->seasonOffenseThreePointersAttemptedPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseThreePointPercentage ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseOffensiveReboundsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseTotalReboundsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseAssistsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseStealsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseTurnoversPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffenseBlocksPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffensePersonalFoulsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonOffensePointsPerGame ?></b></td>
+            <td><?= $teamStats->seasonOffenseOffensiveReboundsPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseTotalReboundsPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseAssistsPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseStealsPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseTurnoversPerGame ?></td>
+            <td><?= $teamStats->seasonOffenseBlocksPerGame ?></td>
+            <td><?= $teamStats->seasonOffensePersonalFoulsPerGame ?></td>
+            <td><?= $teamStats->seasonOffensePointsPerGame ?></td>
         </tr>
         <tr>
-            <td colspan="4"><b><?= htmlspecialchars($team->name) ?> Defense</b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseGamesPlayed ?></b></td>
-            <td style="text-align: center;"><b><?= (int)$teamStats->seasonDefenseGamesPlayed ?></b></td>
+            <td colspan="<?= $labelColspan ?>"><?= htmlspecialchars($team->name) ?> Defense</td>
+            <td><?= $teamStats->seasonDefenseGamesPlayed ?></td>
+            <td><?= $teamStats->seasonDefenseGamesPlayed ?></td>
             <td></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseFieldGoalsMadePerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseFieldGoalsAttemptedPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseFieldGoalPercentage ?></b></td>
+            <td><?= $teamStats->seasonDefenseFieldGoalsMadePerGame ?></td>
+            <td><?= $teamStats->seasonDefenseFieldGoalsAttemptedPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseFieldGoalPercentage ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseFreeThrowsMadePerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseFreeThrowsAttemptedPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseFreeThrowPercentage ?></b></td>
+            <td><?= $teamStats->seasonDefenseFreeThrowsMadePerGame ?></td>
+            <td><?= $teamStats->seasonDefenseFreeThrowsAttemptedPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseFreeThrowPercentage ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseThreePointersMadePerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseThreePointersAttemptedPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseThreePointPercentage ?></b></td>
+            <td><?= $teamStats->seasonDefenseThreePointersMadePerGame ?></td>
+            <td><?= $teamStats->seasonDefenseThreePointersAttemptedPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseThreePointPercentage ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseOffensiveReboundsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseTotalReboundsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseAssistsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseStealsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseTurnoversPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefenseBlocksPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefensePersonalFoulsPerGame ?></b></td>
-            <td style="text-align: center;"><b><?= $teamStats->seasonDefensePointsPerGame ?></b></td>
+            <td><?= $teamStats->seasonDefenseOffensiveReboundsPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseTotalReboundsPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseAssistsPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseStealsPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseTurnoversPerGame ?></td>
+            <td><?= $teamStats->seasonDefenseBlocksPerGame ?></td>
+            <td><?= $teamStats->seasonDefensePersonalFoulsPerGame ?></td>
+            <td><?= $teamStats->seasonDefensePointsPerGame ?></td>
         </tr>
 <?php endif; ?>
     </tfoot>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

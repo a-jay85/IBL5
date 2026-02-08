@@ -32,18 +32,25 @@ class InjuriesService implements InjuriesServiceInterface
      */
     public function getInjuredPlayersWithTeams(): array
     {
+        $season = new \Season($this->db);
         $injuredPlayers = [];
 
-        foreach ($this->league->getInjuredPlayersResult() as $injuredPlayerRow) {
+        /** @var array<int, array<string, mixed>> $injuredRows */
+        $injuredRows = $this->league->getInjuredPlayersResult();
+
+        foreach ($injuredRows as $injuredPlayerRow) {
+            /** @phpstan-ignore argument.type (PlayerRow from SELECT * matches withPlrRow expectation) */
             $player = Player::withPlrRow($this->db, $injuredPlayerRow);
-            $team = Team::initialize($this->db, $player->teamID);
+            $playerID = $player->playerID ?? 0;
+            $team = Team::initialize($this->db, $playerID > 0 ? ($player->teamID ?? 0) : 0);
 
             $injuredPlayers[] = [
-                'playerID' => $player->playerID,
-                'name' => $player->name,
-                'position' => $player->position,
-                'daysRemaining' => $player->daysRemainingForInjury,
-                'teamID' => $player->teamID,
+                'playerID' => $playerID,
+                'name' => $player->name ?? '',
+                'position' => $player->position ?? '',
+                'daysRemaining' => $player->daysRemainingForInjury ?? 0,
+                'returnDate' => $player->getInjuryReturnDate($season->lastSimEndDate),
+                'teamID' => $player->teamID ?? 0,
                 'teamCity' => $team->city,
                 'teamName' => $team->name,
                 'teamColor1' => $team->color1,

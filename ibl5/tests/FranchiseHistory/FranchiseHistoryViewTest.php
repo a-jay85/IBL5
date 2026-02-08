@@ -50,12 +50,12 @@ class FranchiseHistoryViewTest extends TestCase
         $this->assertStringContainsString('Titles', $result);
     }
 
-    public function testRenderContainsWinLossHeaders(): void
+    public function testRenderContainsRecordHeaders(): void
     {
         $result = $this->view->render([]);
 
-        $this->assertStringContainsString('Win', $result);
-        $this->assertStringContainsString('Loss', $result);
+        $this->assertStringContainsString('All-Time<br>Record', $result);
+        $this->assertStringContainsString('Last Five<br>Seasons', $result);
     }
 
     public function testRenderEscapesHtmlEntities(): void
@@ -77,6 +77,12 @@ class FranchiseHistoryViewTest extends TestCase
                 'five_season_winpct' => 0.0,
                 'playoff_appearances' => 0,
                 'playoffs' => 0,
+                'playoff_total_wins' => 0,
+                'playoff_total_losses' => 0,
+                'playoff_winpct' => '.000',
+                'heat_total_wins' => 0,
+                'heat_total_losses' => 0,
+                'heat_winpct' => '0.000',
                 'heat_titles' => 0,
                 'division_titles' => 0,
                 'div_titles' => 0,
@@ -89,8 +95,8 @@ class FranchiseHistoryViewTest extends TestCase
         $result = $this->view->render($franchises);
 
         // Should escape HTML entities - verify the escaped versions appear
-        $this->assertStringContainsString('Test&lt;script&gt;', $result);
         $this->assertStringContainsString('Team&amp;Name', $result);
+        // City is no longer displayed, so only team name escaping matters
         // Should NOT contain the raw dangerous characters
         $this->assertStringNotContainsString('<script>', $result);
     }
@@ -111,6 +117,12 @@ class FranchiseHistoryViewTest extends TestCase
                 'five_season_losses' => 25,
                 'five_season_winpct' => 0.667,
                 'playoffs' => 10,
+                'playoff_total_wins' => 32,
+                'playoff_total_losses' => 20,
+                'playoff_winpct' => '0.615',
+                'heat_total_wins' => 80,
+                'heat_total_losses' => 40,
+                'heat_winpct' => '0.667',
                 'heat_titles' => 2,
                 'div_titles' => 3,
                 'conf_titles' => 4,
@@ -119,6 +131,11 @@ class FranchiseHistoryViewTest extends TestCase
         ];
 
         $result = $this->view->render($franchises);
+
+        // Verify merged record columns are rendered
+        $this->assertStringContainsString('100-50 (0.667)', $result, 'All-time record should be displayed');
+        $this->assertStringContainsString('50-25 (0.667)', $result, 'Last five seasons record should be displayed');
+        $this->assertStringContainsString('32-20 (0.615)', $result, 'Playoff record should be displayed');
 
         // Verify all title types are rendered
         $this->assertStringContainsString('>2<', $result, 'HEAT titles should be displayed');
@@ -143,6 +160,12 @@ class FranchiseHistoryViewTest extends TestCase
                 'five_season_losses' => 30,
                 'five_season_winpct' => 0.250,
                 'playoffs' => 0,
+                'playoff_total_wins' => 0,
+                'playoff_total_losses' => 0,
+                'playoff_winpct' => '.000',
+                'heat_total_wins' => 5,
+                'heat_total_losses' => 15,
+                'heat_winpct' => '0.250',
                 'heat_titles' => 0,
                 'div_titles' => 0,
                 'conf_titles' => 0,

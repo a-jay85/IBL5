@@ -175,7 +175,7 @@ Analyzed all modules based on:
 
 **Tertiary Priorities (Lower):**
 - Information Display modules (18 modules, 6-8 weeks total)
-  - Series_Records, Player_Awards, Cap_Info, etc.
+  - Series_Records, Player_Awards, CapSpace, etc.
 
 **Not Prioritized:**
 - Generic PHP-Nuke modules (40 modules, 81,000+ lines)

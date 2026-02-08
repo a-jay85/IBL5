@@ -38,23 +38,25 @@ class WaiversRepository extends BaseMysqliRepository implements WaiversRepositor
             $affectedRows = $this->execute($query, 'ii', $timestamp, $playerID);
             return $affectedRows > 0;
         } catch (\RuntimeException $e) {
-            error_log("Failed to drop player to waivers: " . $e->getMessage());
             return false;
         }
     }
     
     /**
      * @see WaiversRepositoryInterface::signPlayerFromWaivers()
+     *
+     * @param array{team_name: string, teamid: int} $team
+     * @param array{hasExistingContract: bool, salary: int} $contractData
      */
     public function signPlayerFromWaivers(int $playerID, array $team, array $contractData): bool
     {
-        $teamName = $team['team_name'] ?? '';
-        $teamID = (int) ($team['teamid'] ?? 0);
-        
+        $teamName = $team['team_name'];
+        $teamID = $team['teamid'];
+
         try {
             if (!$contractData['hasExistingContract']) {
                 // Need to set contract fields when no existing contract
-                $salary = (int) $contractData['salary'];
+                $salary = $contractData['salary'];
                 $query = "UPDATE ibl_plr 
                           SET `ordinal` = '800', `bird` = 0, `cy` = 0, `cyt` = 1, 
                               `cy1` = ?, `cy2` = 0, `cy3` = 0, `cy4` = 0, `cy5` = 0, 

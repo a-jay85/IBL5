@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\UI\Tables;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use UI\Tables\Ratings;
 use Player\Player;
@@ -16,6 +17,7 @@ use Player\Player;
  *
  * @covers \UI\Tables\Ratings
  */
+#[AllowMockObjectsWithoutExpectations]
 class RatingsTest extends TestCase
 {
     /**
@@ -94,7 +96,7 @@ class RatingsTest extends TestCase
             $this->createMockPlayer('Player 2', 2),
         ];
 
-        $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, 'Next_Sim');
+        $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, 'NextSim');
 
         // Find the opening <tbody> tag and get content after it
         $tableStart = strpos($html, '<tbody>');
@@ -104,20 +106,21 @@ class RatingsTest extends TestCase
         $afterTbody = substr($html, $tableStart);
 
         // The first element after <tbody> should be a <tr> with player data, NOT an empty separator
+        // Player rows don't have the "ratings-separator" class
         $firstRowMatch = preg_match(
-            '/<tbody>\\s*<tr[^>]*style="background-color:/',
+            '/<tbody>\\s*<tr(?![^>]*class="ratings-separator")/',
             $afterTbody
         );
 
         $this->assertEquals(
             1,
             $firstRowMatch,
-            'First row after <tbody> should be a player row (with bgcolor), not an empty separator'
+            'First row after <tbody> should be a player row, not an empty separator'
         );
 
-        // Verify no colspan="35" or colspan="36" at the start of tbody (those are separator rows)
+        // Verify no separator row at the start of tbody (those have class="ratings-separator")
         $emptyRowMatch = preg_match(
-            '/<tbody>\\s*<tr>\\s*<td colspan="(?:35|36)"/',
+            '/<tbody>\\s*<tr[^>]*class="ratings-separator"/',
             $afterTbody
         );
 
@@ -147,11 +150,11 @@ class RatingsTest extends TestCase
             $this->createMockPlayer('Player 4', 4),
         ];
 
-        $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, 'Next_Sim');
+        $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, 'NextSim');
 
-        // Count separator rows (empty colspan rows)
+        // Count separator rows (rows with class="ratings-separator")
         $separatorCount = preg_match_all(
-            '/<tr>\\s*<td colspan="35"/',
+            '/<tr[^>]*class="ratings-separator"/',
             $html
         );
 
@@ -183,9 +186,9 @@ class RatingsTest extends TestCase
 
         $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, '');
 
-        // Count separator rows
+        // Count separator rows (rows with class="ratings-separator")
         $separatorCount = preg_match_all(
-            '/<tr>\\s*<td colspan="35"/',
+            '/<tr[^>]*class="ratings-separator"/',
             $html
         );
 
@@ -208,7 +211,7 @@ class RatingsTest extends TestCase
 
         $team = $this->createMockTeam();
 
-        $html = Ratings::render($mockDb, [], $team, '', $mockSeason, 'Next_Sim');
+        $html = Ratings::render($mockDb, [], $team, '', $mockSeason, 'NextSim');
 
         $this->assertIsString($html);
         $this->assertStringContainsString('<tbody>', $html);
@@ -231,7 +234,7 @@ class RatingsTest extends TestCase
             $this->createMockPlayer('Test Player Two', 200),
         ];
 
-        $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, 'Next_Sim');
+        $html = Ratings::render($mockDb, $players, $team, '', $mockSeason, 'NextSim');
 
         // Verify first player name appears in the table
         $this->assertStringContainsString('Test Player One', $html);

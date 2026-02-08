@@ -20,7 +20,7 @@ interface DraftProcessorInterface
      *
      * @param int $draftPick The overall pick number (1-indexed across all rounds)
      * @param int $draftRound The round number
-     * @param string $seasonYear The year of the draft (e.g., '2026')
+     * @param int $seasonYear The year of the draft (e.g., 2026)
      * @param string $teamName The name of the team making the selection
      * @param string $playerName The name of the drafted player
      * @return string The formatted announcement message
@@ -51,8 +51,8 @@ interface DraftProcessorInterface
      * If draft is complete, appends a completion message instead.
      *
      * @param string $baseMessage The base draft announcement (from createDraftAnnouncement)
-     * @param string|null $discordID The Discord ID of the next team's owner, or null if draft is complete
-     * @param string|null $seasonYear The year of the draft (used only for completion message)
+     * @param int|null $discordID The Discord ID of the next team's owner, or null if draft is complete
+     * @param int|null $seasonYear The year of the draft (used only for completion message)
      * @return string The complete message with next team info or draft completion notice
      *
      * IMPORTANT BEHAVIORS:

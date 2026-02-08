@@ -1,8 +1,18 @@
 <?php
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+try {
+    require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+} catch (Exception $e) {
+    error_log("Failed to load mainfile.php: " . $e->getMessage());
+    die("Error loading system files. Please contact the administrator.");
+}
 
 global $mysqli_db;
+
+if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
+    error_log("Database connection not available");
+    die("Error: Database connection failed");
+}
 
 // Prepare trade data from POST
 $tradeData = [
@@ -34,32 +44,19 @@ for ($j = 0; $j < $tradeData['fieldsCounter']; $j++) {
     $tradeData['type'][$j] = $_POST['type' . $j] ?? 0;
 }
 
-// Create trade offer using new class
-$tradeOffer = new Trading\TradeOffer($mysqli_db);
-$result = $tradeOffer->createTradeOffer($tradeData);
-
-// Display trade cap details
-if (isset($result['capData'])) {
-    echo "Your Payroll this season, if this trade is accepted: {$result['capData']['userPostTradeCapTotal']}<br>";
-    echo "Their Payroll this season, if this trade is accepted: {$result['capData']['partnerPostTradeCapTotal']}<p>";
+// Create trade offer using existing class
+try {
+    $tradeOffer = new Trading\TradeOffer($mysqli_db);
+    $result = $tradeOffer->createTradeOffer($tradeData);
+} catch (Exception $e) {
+    error_log("Failed to create trade offer: " . $e->getMessage());
+    $result = ['success' => false, 'error' => $e->getMessage()];
 }
 
-// Display any errors and exit if trade creation failed
-if (!$result['success']) {
-    if (isset($result['error'])) {
-        echo $result['error'];
-    } elseif (isset($result['errors'])) {
-        foreach ($result['errors'] as $error) {
-            echo $error . "<br>";
-        }
-    }
-    echo "<p><a href='javascript:history.back()'>Please go back and adjust your trade proposal.</a>";
-    exit;
+if ($result['success']) {
+    header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=offer_sent');
+} else {
+    $error = $result['error'] ?? ($result['errors'] ? implode('; ', $result['errors']) : 'Unknown error');
+    header('Location: /ibl5/modules.php?name=Trading&op=offertrade&partner=' . rawurlencode($tradeData['listeningTeam']) . '&error=' . rawurlencode($error));
 }
-
-echo $result['tradeText'] ?? '';
-
-echo "<p>";
-echo "Trade Offer Sent!<br>
-    <a href='/ibl5/modules.php?name=Trading&op=reviewtrade'>Back to Trade Review</a>";
-?>
+exit;

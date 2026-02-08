@@ -76,9 +76,9 @@ if ($row['radminsuper'] == 1) {
         CloseTable();
         echo "<br>";
         OpenTable();
-        if (substr($ip2, 0, 2) == 00) {$ip2 = mb_ereg_replace("00", "", $ip2);}
-        if (substr($ip3, 0, 2) == 00) {$ip3 = mb_ereg_replace("00", "", $ip3);}
-        if (substr($ip4, 0, 2) == 00) {$ip4 = mb_ereg_replace("00", "", $ip4);}
+        if (substr($ip2, 0, 2) == 00) {$ip2 = str_replace("00", "", $ip2);}
+        if (substr($ip3, 0, 2) == 00) {$ip3 = str_replace("00", "", $ip3);}
+        if (substr($ip4, 0, 2) == 00) {$ip4 = str_replace("00", "", $ip4);}
         $ip = "$ip1.$ip2.$ip3.$ip4";
         if (empty($ip1) or empty($ip2) or empty($ip3) or empty($ip4)) {
             echo "<center><b>" . _ERROR . "</b> " . _IPOUTRANGE . "<br><br>" . _IPENTERED . " <b>" . $ip . "</b><br><br>" . _GOBACK . "</center>";
@@ -182,9 +182,9 @@ if ($row['radminsuper'] == 1) {
         CloseTable();
         echo "<br>";
         OpenTable();
-        if (substr($ip2, 0, 2) == 00) {$ip2 = mb_ereg_replace("00", "", $ip2);}
-        if (substr($ip3, 0, 2) == 00) {$ip3 = mb_ereg_replace("00", "", $ip3);}
-        if (substr($ip4, 0, 2) == 00) {$ip4 = mb_ereg_replace("00", "", $ip4);}
+        if (substr($ip2, 0, 2) == 00) {$ip2 = str_replace("00", "", $ip2);}
+        if (substr($ip3, 0, 2) == 00) {$ip3 = str_replace("00", "", $ip3);}
+        if (substr($ip4, 0, 2) == 00) {$ip4 = str_replace("00", "", $ip4);}
         $ip = "$ip1.$ip2.$ip3.$ip4";
         if ($ip1 == "" or $ip2 == "" or $ip3 == "" or $ip4 == "") {
             echo "<center><b>" . _ERROR . "</b> " . _IPOUTRANGE . "<br><br>" . _IPENTERED . " <b>$ip1.$ip2.$ip3.$ip4</b><br><br>" . _GOBACK . "</center>";

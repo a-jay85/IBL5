@@ -1,0 +1,54 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('This script must be run from the command line.');
+}
+
+set_time_limit(0);
+
+$_SERVER['DOCUMENT_ROOT'] = dirname(__DIR__, 2);
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/autoloader.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/config.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/db/db.php';
+
+/** @var \mysqli $mysqli_db */
+
+echo "Record Holders cache rebuild started\n";
+
+// --- Detect broken records for the latest game date ---
+
+$season = new Season($mysqli_db);
+$latestGameDate = $season->getLastBoxScoreDate();
+
+if ($latestGameDate !== '') {
+    echo "Latest game date: {$latestGameDate}\n";
+
+    $recordHoldersRepository = new \RecordHolders\RecordHoldersRepository($mysqli_db);
+    $detector = new \RecordHolders\RecordBreakingDetector($recordHoldersRepository);
+    $announcements = $detector->detectAndAnnounce($latestGameDate);
+
+    if ($announcements !== []) {
+        foreach ($announcements as $msg) {
+            echo "  RECORD BROKEN: {$msg}\n";
+        }
+    } else {
+        echo "  No records broken\n";
+    }
+} else {
+    echo "No box score data found, skipping record detection\n";
+}
+
+// --- Rebuild the cache atomically ---
+
+echo "Rebuilding cache...\n";
+
+$recordHoldersRepository ??= new \RecordHolders\RecordHoldersRepository($mysqli_db);
+$innerService = new \RecordHolders\RecordHoldersService($recordHoldersRepository);
+$cachedService = new \RecordHolders\CachedRecordHoldersService($innerService, $mysqli_db);
+$cachedService->rebuildCache();
+
+echo "Cache rebuilt successfully\n";

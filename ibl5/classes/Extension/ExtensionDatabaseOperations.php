@@ -8,61 +8,62 @@ use Extension\Contracts\ExtensionDatabaseOperationsInterface;
 
 /**
  * ExtensionDatabaseOperations - Database operations for contract extensions
- * 
+ *
  * Handles all database operations related to updating player contracts,
  * managing extension usage flags, and creating news stories.
- * 
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type ExtensionOffer from Contracts\ExtensionDatabaseOperationsInterface
+ * @phpstan-import-type ContractRow from Contracts\ExtensionDatabaseOperationsInterface
+ * @phpstan-import-type ProcessResult from Contracts\ExtensionDatabaseOperationsInterface
+ *
+ * @phpstan-type ContractDbRow array{cy: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int}
+ *
  * @see ExtensionDatabaseOperationsInterface
  */
 class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterface
 {
-    private object $db;
+    /** @var \mysqli */
+    private \mysqli $db;
     private \Services\NewsService $newsService;
 
     /**
      * Constructor
-     * 
-     * @param object $db mysqli connection or duck-typed mock for testing
+     *
+     * @param \mysqli $db mysqli connection
      */
     public function __construct(object $db)
     {
+        /** @var \mysqli $db */
         $this->db = $db;
         $this->newsService = new \Services\NewsService($db);
     }
 
     /**
+     * @param string $playerName
+     * @param ExtensionOffer $offer
+     * @param int $currentSalary
+     * @return bool
+     *
      * @see ExtensionDatabaseOperationsInterface::updatePlayerContract()
      */
     public function updatePlayerContract($playerName, $offer, $currentSalary)
     {
         $offerYears = $this->calculateOfferYears($offer);
         $totalYears = 1 + $offerYears;
-        $year4 = (isset($offer['year4']) && $offer['year4'] !== '' && $offer['year4'] !== null) ? $offer['year4'] : 0;
-        $year5 = (isset($offer['year5']) && $offer['year5'] !== '' && $offer['year5'] !== null) ? $offer['year5'] : 0;
-        
-        if ($this->db instanceof \mysqli) {
-            $stmt = $this->db->prepare(
-                "UPDATE ibl_plr SET cy = 1, cyt = ?, cy1 = ?, cy2 = ?, cy3 = ?, cy4 = ?, cy5 = ?, cy6 = ? WHERE name = ?"
-            );
-            $stmt->bind_param('iiiiiiis', $totalYears, $currentSalary, $offer['year1'], $offer['year2'], $offer['year3'], $year4, $year5, $playerName);
-            $result = $stmt->execute();
-            $stmt->close();
-            return $result;
-        } else {
-            // Mock database for tests
-            $query = "UPDATE ibl_plr SET 
-                cy = 1, 
-                cyt = $totalYears, 
-                cy1 = $currentSalary, 
-                cy2 = {$offer['year1']}, 
-                cy3 = {$offer['year2']}, 
-                cy4 = {$offer['year3']}, 
-                cy5 = $year4, 
-                cy6 = $year5 
-                WHERE name = ?";
-            $result = $this->db->sql_query($query);
-            return $result !== false;
+        $year4 = $offer['year4'];
+        $year5 = $offer['year5'];
+
+        $stmt = $this->db->prepare(
+            "UPDATE ibl_plr SET cy = 1, cyt = ?, cy1 = ?, cy2 = ?, cy3 = ?, cy4 = ?, cy5 = ?, cy6 = ? WHERE name = ?"
+        );
+        if ($stmt === false) {
+            return false;
         }
+        $stmt->bind_param('iiiiiiis', $totalYears, $currentSalary, $offer['year1'], $offer['year2'], $offer['year3'], $year4, $year5, $playerName);
+        $result = $stmt->execute();
+        $stmt->close();
+        return $result;
     }
 
     /**
@@ -70,18 +71,14 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
      */
     public function markExtensionUsedThisSim($teamName)
     {
-        if ($this->db instanceof \mysqli) {
-            $stmt = $this->db->prepare("UPDATE ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = ?");
-            $stmt->bind_param('s', $teamName);
-            $result = $stmt->execute();
-            $stmt->close();
-            return $result;
-        } else {
-            // Mock database for tests
-            $query = "UPDATE ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = ?";
-            $result = $this->db->sql_query($query);
-            return $result !== false;
+        $stmt = $this->db->prepare("UPDATE ibl_team_info SET Used_Extension_This_Chunk = 1 WHERE team_name = ?");
+        if ($stmt === false) {
+            return false;
         }
+        $stmt->bind_param('s', $teamName);
+        $result = $stmt->execute();
+        $stmt->close();
+        return $result;
     }
 
     /**
@@ -89,18 +86,14 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
      */
     public function markExtensionUsedThisSeason($teamName)
     {
-        if ($this->db instanceof \mysqli) {
-            $stmt = $this->db->prepare("UPDATE ibl_team_info SET Used_Extension_This_Season = 1 WHERE team_name = ?");
-            $stmt->bind_param('s', $teamName);
-            $result = $stmt->execute();
-            $stmt->close();
-            return $result;
-        } else {
-            // Mock database for tests
-            $query = "UPDATE ibl_team_info SET Used_Extension_This_Season = 1 WHERE team_name = ?";
-            $result = $this->db->sql_query($query);
-            return $result !== false;
+        $stmt = $this->db->prepare("UPDATE ibl_team_info SET Used_Extension_This_Season = 1 WHERE team_name = ?");
+        if ($stmt === false) {
+            return false;
         }
+        $stmt->bind_param('s', $teamName);
+        $result = $stmt->execute();
+        $stmt->close();
+        return $result;
     }
 
     /**
@@ -112,23 +105,22 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
         if ($topicID === null) {
             return false;
         }
-        
+
         $categoryID = $this->newsService->getCategoryIDByTitle('Contract Extensions');
         if ($categoryID === null) {
             return false;
         }
-        
+
         $this->newsService->incrementCategoryCounter('Contract Extensions');
-        
-        $playerNameEscaped = \Services\DatabaseService::escapeString($this->db, $playerName);
-        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
-        $title = "$playerNameEscaped extends their contract with the $teamNameEscaped";
-        $hometext = "$playerNameEscaped today accepted a contract extension offer from the $teamNameEscaped worth $offerInMillions million dollars over $offerYears years";
-        if ($offerDetails) {
+
+        // NewsService uses prepared statements - no escaping needed here
+        $title = "{$playerName} extends their contract with the {$teamName}";
+        $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth {$offerInMillions} million dollars over {$offerYears} years";
+        if ($offerDetails !== '') {
             $hometext .= ":<br>" . $offerDetails;
         }
         $hometext .= ".";
-        
+
         return $this->newsService->createNewsStory($categoryID, $topicID, $title, $hometext);
     }
 
@@ -141,109 +133,132 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
         if ($topicID === null) {
             return false;
         }
-        
+
         $categoryID = $this->newsService->getCategoryIDByTitle('Contract Extensions');
         if ($categoryID === null) {
             return false;
         }
-        
+
         $this->newsService->incrementCategoryCounter('Contract Extensions');
-        
-        $playerNameEscaped = \Services\DatabaseService::escapeString($this->db, $playerName);
-        $teamNameEscaped = \Services\DatabaseService::escapeString($this->db, $teamName);
-        $title = "$playerNameEscaped turns down an extension offer from the $teamNameEscaped";
-        $hometext = "$playerNameEscaped today rejected a contract extension offer from the $teamNameEscaped worth $offerInMillions million dollars over $offerYears years.";
-        
+
+        // NewsService uses prepared statements - no escaping needed here
+        $title = "{$playerName} turns down an extension offer from the {$teamName}";
+        $hometext = "{$playerName} today rejected a contract extension offer from the {$teamName} worth {$offerInMillions} million dollars over {$offerYears} years.";
+
         return $this->newsService->createNewsStory($categoryID, $topicID, $title, $hometext);
     }
 
     /**
+     * @param string $playerName
+     * @return PlayerRow|null
+     *
      * @see ExtensionDatabaseOperationsInterface::getPlayerPreferences()
      */
     public function getPlayerPreferences($playerName)
     {
-        if ($this->db instanceof \mysqli) {
-            $stmt = $this->db->prepare("SELECT * FROM ibl_plr WHERE name = ?");
-            $stmt->bind_param('s', $playerName);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            
-            if ($result->num_rows == 0) {
-                $stmt->close();
-                return null;
-            }
-            
-            $row = $result->fetch_assoc();
-            $stmt->close();
-            return $row;
-        } else {
-            // Mock database for tests
-            $query = "SELECT * FROM ibl_plr WHERE name = ?";
-            $result = $this->db->sql_query($query);
-            
-            if (!$result || $this->db->sql_numrows($result) == 0) {
-                return null;
-            }
-            
-            return $this->db->sql_fetchrow($result);
+        $stmt = $this->db->prepare("SELECT * FROM ibl_plr WHERE name = ?");
+        if ($stmt === false) {
+            return null;
         }
+        $stmt->bind_param('s', $playerName);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if ($result === false || $result->num_rows === 0) {
+            $stmt->close();
+            return null;
+        }
+
+        /** @var PlayerRow|null $row */
+        $row = $result->fetch_assoc();
+        $stmt->close();
+        return $row;
     }
 
+    /**
+     * @param string $playerName
+     * @return ContractRow|null
+     *
+     * @see ExtensionDatabaseOperationsInterface::getPlayerCurrentContract()
+     */
     public function getPlayerCurrentContract($playerName)
     {
-        if ($this->db instanceof \mysqli) {
-            $stmt = $this->db->prepare("SELECT cy, cy1, cy2, cy3, cy4, cy5, cy6 FROM ibl_plr WHERE name = ?");
-            $stmt->bind_param('s', $playerName);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            
-            if ($result->num_rows == 0) {
-                $stmt->close();
-                return null;
-            }
-            
-            $contract = $result->fetch_assoc();
-            $stmt->close();
-            
-            if ($contract && isset($contract['cy'])) {
-                $cy = $contract['cy'];
-                $contract['currentSalary'] = isset($contract['cy' . $cy]) ? $contract['cy' . $cy] : 0;
-            } else {
-                $contract['currentSalary'] = 0;
-            }
-            return $contract;
-        } else {
-            // Mock database for tests
-            $query = "SELECT cy, cy1, cy2, cy3, cy4, cy5, cy6 FROM ibl_plr WHERE name = ?";
-            $result = $this->db->sql_query($query);
-            
-            if (!$result || $this->db->sql_numrows($result) == 0) {
-                return null;
-            }
-            
-            $contract = $this->db->sql_fetchrow($result);
-            if ($contract && isset($contract['cy'])) {
-                $cy = $contract['cy'];
-                $contract['currentSalary'] = isset($contract['cy' . $cy]) ? $contract['cy' . $cy] : 0;
-            } else {
-                $contract['currentSalary'] = 0;
-            }
-            return $contract;
+        $stmt = $this->db->prepare("SELECT cy, cy1, cy2, cy3, cy4, cy5, cy6 FROM ibl_plr WHERE name = ?");
+        if ($stmt === false) {
+            return null;
         }
+        $stmt->bind_param('s', $playerName);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if ($result === false || $result->num_rows === 0) {
+            $stmt->close();
+            return null;
+        }
+
+        /** @var ContractDbRow|null $dbRow */
+        $dbRow = $result->fetch_assoc();
+        $stmt->close();
+
+        if ($dbRow === null) {
+            return null;
+        }
+
+        $cy = $dbRow['cy'];
+        $cyField = 'cy' . $cy;
+        $currentSalary = 0;
+        if ($cy >= 1 && $cy <= 6) {
+            /** @var array{cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int} $salaryFields */
+            $salaryFields = [
+                'cy1' => $dbRow['cy1'],
+                'cy2' => $dbRow['cy2'],
+                'cy3' => $dbRow['cy3'],
+                'cy4' => $dbRow['cy4'],
+                'cy5' => $dbRow['cy5'],
+                'cy6' => $dbRow['cy6'],
+            ];
+            if (isset($salaryFields[$cyField])) {
+                $currentSalary = $salaryFields[$cyField];
+            }
+        }
+
+        return [
+            'cy' => $dbRow['cy'],
+            'cy1' => $dbRow['cy1'],
+            'cy2' => $dbRow['cy2'],
+            'cy3' => $dbRow['cy3'],
+            'cy4' => $dbRow['cy4'],
+            'cy5' => $dbRow['cy5'],
+            'cy6' => $dbRow['cy6'],
+            'currentSalary' => $currentSalary,
+        ];
     }
 
-    private function calculateOfferYears($offer)
+    /**
+     * @param ExtensionOffer $offer
+     * @return int<3, 5>
+     */
+    private function calculateOfferYears($offer): int
     {
         $years = 5;
-        if ($offer['year5'] == 0) {
+        if ($offer['year5'] === 0) {
             $years = 4;
         }
-        if ($offer['year4'] == 0) {
+        if ($offer['year4'] === 0) {
             $years = 3;
         }
         return $years;
     }
-    
+
+    /**
+     * @param string $playerName
+     * @param string $teamName
+     * @param ExtensionOffer $offer
+     * @param int $currentSalary
+     * @return ProcessResult
+     *
+     * @see ExtensionDatabaseOperationsInterface::processAcceptedExtension()
+     */
     public function processAcceptedExtension($playerName, $teamName, $offer, $currentSalary)
     {
         $this->updatePlayerContract($playerName, $offer, $currentSalary);
@@ -255,7 +270,15 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
         $this->createAcceptedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears, $offerDetails);
         return ['success' => true];
     }
-    
+
+    /**
+     * @param string $playerName
+     * @param string $teamName
+     * @param ExtensionOffer $offer
+     * @return ProcessResult
+     *
+     * @see ExtensionDatabaseOperationsInterface::processRejectedExtension()
+     */
     public function processRejectedExtension($playerName, $teamName, $offer)
     {
         $offerYears = $this->calculateOfferYears($offer);

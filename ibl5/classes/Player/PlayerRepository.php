@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Player;
 
 use BaseMysqliRepository;
@@ -7,14 +9,20 @@ use Player\Contracts\PlayerRepositoryInterface;
 
 /**
  * PlayerRepository - Database operations for player data
- * 
+ *
  * Extends BaseMysqliRepository for standardized prepared statement handling.
- * 
+ *
  * @see PlayerRepositoryInterface For method contracts
  * @see BaseMysqliRepository For base class documentation and error codes
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryInterface
 {
+    /** @var array{allStar: int, threePoint: int, dunkContest: int, rookieSoph: int}|null */
+    private ?array $cachedAllStarWeekendCounts = null;
+    private ?string $cachedAllStarWeekendPlayerName = null;
+
     /**
      * Constructor - inherits from BaseMysqliRepository
      * 
@@ -36,21 +44,24 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      */
     public function loadByID(int $playerID): PlayerData
     {
+        /** @var PlayerRow|null $plrRow */
         $plrRow = $this->fetchOne(
             "SELECT * FROM ibl_plr WHERE pid = ? LIMIT 1",
             "i",
             $playerID
         );
-        
+
         if ($plrRow === null) {
             throw new \RuntimeException("Player with ID $playerID not found");
         }
-        
+
         return $this->fillFromCurrentRow($plrRow);
     }
 
     /**
      * Fill a PlayerData object from a current player row
+     *
+     * @param PlayerRow $plrRow Database row from ibl_plr
      */
     public function fillFromCurrentRow(array $plrRow): PlayerData
     {
@@ -82,6 +93,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
 
     /**
      * Map basic player fields
+     *
+     * @param PlayerRow $plrRow Database row from ibl_plr
      */
     private function mapBasicFields(PlayerData $playerData, array $plrRow): void
     {
@@ -91,12 +104,20 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
         $playerData->nickname = $this->getOptionalStrippedValue($plrRow, 'nickname');
         $playerData->age = $plrRow['age'];
         $playerData->teamID = $plrRow['tid'];
-        $playerData->teamName = stripslashes($plrRow['teamname']);
-        $playerData->position = $plrRow['pos'];
+        $playerData->teamName = isset($plrRow['teamname']) ? stripslashes($plrRow['teamname']) : null;
+        /** @var string|null $color1 */
+        $color1 = $plrRow['color1'] ?? null;
+        $playerData->teamColor1 = $color1;
+        /** @var string|null $color2 */
+        $color2 = $plrRow['color2'] ?? null;
+        $playerData->teamColor2 = $color2;
+        $playerData->position = $plrRow['pos'] ?? '';
     }
 
     /**
      * Map rating fields from current player row
+     *
+     * @param PlayerRow $plrRow Database row from ibl_plr
      */
     private function mapRatingsFromCurrentRow(PlayerData $playerData, array $plrRow): void
     {
@@ -130,6 +151,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
 
     /**
      * Map free agency preference fields
+     *
+     * @param PlayerRow $plrRow Database row from ibl_plr
      */
     private function mapFreeAgencyFields(PlayerData $playerData, array $plrRow): void
     {
@@ -142,23 +165,27 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
 
     /**
      * Map contract fields
+     *
+     * @param PlayerRow $plrRow Database row from ibl_plr
      */
     private function mapContractFields(PlayerData $playerData, array $plrRow): void
     {
-        $playerData->yearsOfExperience = (int) $plrRow['exp'];
-        $playerData->birdYears = (int) $plrRow['bird'];
-        $playerData->contractCurrentYear = (int) $plrRow['cy'];
-        $playerData->contractTotalYears = (int) $plrRow['cyt'];
-        $playerData->contractYear1Salary = (int) $plrRow['cy1'];
-        $playerData->contractYear2Salary = (int) $plrRow['cy2'];
-        $playerData->contractYear3Salary = (int) $plrRow['cy3'];
-        $playerData->contractYear4Salary = (int) $plrRow['cy4'];
-        $playerData->contractYear5Salary = (int) $plrRow['cy5'];
-        $playerData->contractYear6Salary = (int) $plrRow['cy6'];
+        $playerData->yearsOfExperience = $plrRow['exp'];
+        $playerData->birdYears = $plrRow['bird'];
+        $playerData->contractCurrentYear = $plrRow['cy'];
+        $playerData->contractTotalYears = $plrRow['cyt'];
+        $playerData->contractYear1Salary = $plrRow['cy1'];
+        $playerData->contractYear2Salary = $plrRow['cy2'];
+        $playerData->contractYear3Salary = $plrRow['cy3'];
+        $playerData->contractYear4Salary = $plrRow['cy4'];
+        $playerData->contractYear5Salary = $plrRow['cy5'];
+        $playerData->contractYear6Salary = $plrRow['cy6'];
     }
 
     /**
      * Map draft fields
+     *
+     * @param PlayerRow $plrRow Database row from ibl_plr
      */
     private function mapDraftFields(PlayerData $playerData, array $plrRow): void
     {
@@ -172,52 +199,68 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
 
     /**
      * Map physical attribute fields
+     *
+     * @param PlayerRow $plrRow Database row from ibl_plr
      */
     private function mapPhysicalFields(PlayerData $playerData, array $plrRow): void
     {
-        $playerData->heightFeet = $plrRow['htft'];
-        $playerData->heightInches = $plrRow['htin'];
-        $playerData->weightPounds = $plrRow['wt'];
+        $htft = $plrRow['htft'] ?? null;
+        $playerData->heightFeet = $htft !== null ? (int) $htft : null;
+        $htin = $plrRow['htin'] ?? null;
+        $playerData->heightInches = $htin !== null ? (int) $htin : null;
+        $wt = $plrRow['wt'] ?? null;
+        $playerData->weightPounds = $wt !== null ? (int) $wt : null;
     }
 
     /**
      * Map status fields
+     *
+     * @param PlayerRow $plrRow Database row from ibl_plr
      */
     private function mapStatusFields(PlayerData $playerData, array $plrRow): void
     {
         $playerData->daysRemainingForInjury = $plrRow['injured'];
-        $playerData->isRetired = $plrRow['retired'];
+        $playerData->isRetired = $plrRow['retired'] ?? null;
         $playerData->timeDroppedOnWaivers = $plrRow['droptime'];
     }
 
     /**
      * Helper method to get optional string value with stripslashes, or null if not set/empty
+     *
+     * @param array<string, mixed> $row
      */
     private function getOptionalStrippedValue(array $row, string $key): ?string
     {
         $value = $row[$key] ?? null;
-        return ($value !== null && $value !== '') ? stripslashes($value) : null;
+        if (!is_string($value) || $value === '') {
+            return null;
+        }
+        return stripslashes($value);
     }
 
     /**
      * Fill a PlayerData object from a historical player row
+     *
+     * @param array{pid: ?int, year: ?int, name: ?string, team: ?string, teamid: ?int, salary: ?int, r_2ga: ?int, r_2gp: ?int, r_fta: ?int, r_ftp: ?int, r_3ga: ?int, r_3gp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_blk: ?int, r_tvr: ?int, r_oo: ?int, r_od: ?int, r_do: ?int, r_dd: ?int, r_po: ?int, r_pd: ?int, r_to: ?int, r_td: ?int, ...} $plrRow
      */
     public function fillFromHistoricalRow(array $plrRow): PlayerData
     {
         $playerData = new PlayerData();
 
         // Basic historical player information
-        $playerData->playerID = $plrRow['pid'];
-        $playerData->historicalYear = $plrRow['year'];
-        $playerData->name = stripslashes($plrRow['name']);
-        $playerData->teamName = stripslashes($plrRow['team']);
-        $playerData->teamID = $plrRow['teamid'];
-        
+        $playerData->playerID = $plrRow['pid'] ?? null;
+        $playerData->historicalYear = $plrRow['year'] ?? null;
+        $name = $plrRow['name'] ?? null;
+        $playerData->name = $name !== null ? stripslashes($name) : null;
+        $team = $plrRow['team'] ?? null;
+        $playerData->teamName = $team !== null ? stripslashes($team) : null;
+        $playerData->teamID = $plrRow['teamid'] ?? null;
+
         // Ratings from historical row (note different column names)
         $this->mapRatingsFromHistoricalRow($playerData, $plrRow);
-        
+
         // Salary
-        $playerData->salaryJSB = $plrRow['salary'];
+        $playerData->salaryJSB = $plrRow['salary'] ?? null;
 
         // Initialize contract fields for historical data (values are snapshots, not current)
         $playerData->contractCurrentYear = 0;
@@ -234,29 +277,31 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
 
     /**
      * Map rating fields from historical player row (different column names than current)
+     *
+     * @param array{r_2ga: ?int, r_2gp: ?int, r_fta: ?int, r_ftp: ?int, r_3ga: ?int, r_3gp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_blk: ?int, r_tvr: ?int, r_oo: ?int, r_od: ?int, r_do: ?int, r_dd: ?int, r_po: ?int, r_pd: ?int, r_to: ?int, r_td: ?int, ...} $plrRow
      */
     private function mapRatingsFromHistoricalRow(PlayerData $playerData, array $plrRow): void
     {
-        $playerData->ratingFieldGoalAttempts = $plrRow['r_2ga'];
-        $playerData->ratingFieldGoalPercentage = $plrRow['r_2gp'];
-        $playerData->ratingFreeThrowAttempts = $plrRow['r_fta'];
-        $playerData->ratingFreeThrowPercentage = $plrRow['r_ftp'];
-        $playerData->ratingThreePointAttempts = $plrRow['r_3ga'];
-        $playerData->ratingThreePointPercentage = $plrRow['r_3gp'];
-        $playerData->ratingOffensiveRebounds = $plrRow['r_orb'];
-        $playerData->ratingDefensiveRebounds = $plrRow['r_drb'];
-        $playerData->ratingAssists = $plrRow['r_ast'];
-        $playerData->ratingSteals = $plrRow['r_stl'];
-        $playerData->ratingBlocks = $plrRow['r_blk'];
-        $playerData->ratingTurnovers = $plrRow['r_tvr'];
-        $playerData->ratingOutsideOffense = $plrRow['r_oo'];
-        $playerData->ratingOutsideDefense = $plrRow['r_od'];
-        $playerData->ratingDriveOffense = $plrRow['r_do'];
-        $playerData->ratingDriveDefense = $plrRow['r_dd'];
-        $playerData->ratingPostOffense = $plrRow['r_po'];
-        $playerData->ratingPostDefense = $plrRow['r_pd'];
-        $playerData->ratingTransitionOffense = $plrRow['r_to'];
-        $playerData->ratingTransitionDefense = $plrRow['r_td'];
+        $playerData->ratingFieldGoalAttempts = $plrRow['r_2ga'] ?? null;
+        $playerData->ratingFieldGoalPercentage = $plrRow['r_2gp'] ?? null;
+        $playerData->ratingFreeThrowAttempts = $plrRow['r_fta'] ?? null;
+        $playerData->ratingFreeThrowPercentage = $plrRow['r_ftp'] ?? null;
+        $playerData->ratingThreePointAttempts = $plrRow['r_3ga'] ?? null;
+        $playerData->ratingThreePointPercentage = $plrRow['r_3gp'] ?? null;
+        $playerData->ratingOffensiveRebounds = $plrRow['r_orb'] ?? null;
+        $playerData->ratingDefensiveRebounds = $plrRow['r_drb'] ?? null;
+        $playerData->ratingAssists = $plrRow['r_ast'] ?? null;
+        $playerData->ratingSteals = $plrRow['r_stl'] ?? null;
+        $playerData->ratingBlocks = $plrRow['r_blk'] ?? null;
+        $playerData->ratingTurnovers = $plrRow['r_tvr'] ?? null;
+        $playerData->ratingOutsideOffense = $plrRow['r_oo'] ?? null;
+        $playerData->ratingOutsideDefense = $plrRow['r_od'] ?? null;
+        $playerData->ratingDriveOffense = $plrRow['r_do'] ?? null;
+        $playerData->ratingDriveDefense = $plrRow['r_dd'] ?? null;
+        $playerData->ratingPostOffense = $plrRow['r_po'] ?? null;
+        $playerData->ratingPostDefense = $plrRow['r_pd'] ?? null;
+        $playerData->ratingTransitionOffense = $plrRow['r_to'] ?? null;
+        $playerData->ratingTransitionDefense = $plrRow['r_td'] ?? null;
     }
 
     /**
@@ -271,16 +316,17 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
             "s",
             $playerName
         );
-        
+
         // Return demand array or empty array with all keys set to 0
-        if ($row) {
+        if ($row !== null) {
+            /** @var array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int, ...} $row */
             return [
-                'dem1' => (int) ($row['dem1'] ?? 0),
-                'dem2' => (int) ($row['dem2'] ?? 0),
-                'dem3' => (int) ($row['dem3'] ?? 0),
-                'dem4' => (int) ($row['dem4'] ?? 0),
-                'dem5' => (int) ($row['dem5'] ?? 0),
-                'dem6' => (int) ($row['dem6'] ?? 0),
+                'dem1' => $row['dem1'] ?? 0,
+                'dem2' => $row['dem2'] ?? 0,
+                'dem3' => $row['dem3'] ?? 0,
+                'dem4' => $row['dem4'] ?? 0,
+                'dem5' => $row['dem5'] ?? 0,
+                'dem6' => $row['dem6'] ?? 0,
             ];
         }
         
@@ -295,76 +341,79 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * Get All-Star Game appearances count for a player
-     * 
-     * @param string $playerName Player name to search for
-     * @return int Number of All-Star Game appearances
+     * @see PlayerRepositoryInterface::getAllStarGameCount()
      */
     public function getAllStarGameCount(string $playerName): int
     {
-        $rows = $this->fetchAll(
-            "SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE '%Conference All-Star'",
-            "s",
-            $playerName
-        );
-        return count($rows);
+        return $this->getAllStarWeekendCounts($playerName)['allStar'];
     }
 
     /**
-     * Get Three-Point Contest appearances count for a player
-     * 
-     * @param string $playerName Player name to search for
-     * @return int Number of Three-Point Contest appearances
+     * @see PlayerRepositoryInterface::getThreePointContestCount()
      */
     public function getThreePointContestCount(string $playerName): int
     {
-        $rows = $this->fetchAll(
-            "SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE 'Three-Point Contest%'",
-            "s",
-            $playerName
-        );
-        return count($rows);
+        return $this->getAllStarWeekendCounts($playerName)['threePoint'];
     }
 
     /**
-     * Get Slam Dunk Competition appearances count for a player
-     * 
-     * @param string $playerName Player name to search for
-     * @return int Number of Slam Dunk Competition appearances
+     * @see PlayerRepositoryInterface::getDunkContestCount()
      */
     public function getDunkContestCount(string $playerName): int
     {
-        $rows = $this->fetchAll(
-            "SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE 'Slam Dunk Competition%'",
-            "s",
-            $playerName
-        );
-        return count($rows);
+        return $this->getAllStarWeekendCounts($playerName)['dunkContest'];
     }
 
     /**
-     * Get Rookie-Sophomore Challenge appearances count for a player
-     * 
-     * @param string $playerName Player name to search for
-     * @return int Number of Rookie-Sophomore Challenge appearances
+     * @see PlayerRepositoryInterface::getRookieSophChallengeCount()
      */
     public function getRookieSophChallengeCount(string $playerName): int
     {
-        $rows = $this->fetchAll(
-            "SELECT * FROM ibl_awards WHERE name = ? AND Award LIKE 'Rookie-Sophomore Challenge'",
+        return $this->getAllStarWeekendCounts($playerName)['rookieSoph'];
+    }
+
+    /**
+     * Get all All-Star Weekend event counts in a single query
+     *
+     * @return array{allStar: int, threePoint: int, dunkContest: int, rookieSoph: int}
+     */
+    private function getAllStarWeekendCounts(string $playerName): array
+    {
+        if ($this->cachedAllStarWeekendCounts !== null && $this->cachedAllStarWeekendPlayerName === $playerName) {
+            return $this->cachedAllStarWeekendCounts;
+        }
+
+        /** @var array{allStar: int, threePoint: int, dunkContest: int, rookieSoph: int}|null $result */
+        $result = $this->fetchOne(
+            "SELECT
+                SUM(CASE WHEN Award LIKE '%Conference All-Star' THEN 1 ELSE 0 END) AS allStar,
+                SUM(CASE WHEN Award LIKE 'Three-Point Contest%' THEN 1 ELSE 0 END) AS threePoint,
+                SUM(CASE WHEN Award LIKE 'Slam Dunk Competition%' THEN 1 ELSE 0 END) AS dunkContest,
+                SUM(CASE WHEN Award LIKE 'Rookie-Sophomore Challenge' THEN 1 ELSE 0 END) AS rookieSoph
+            FROM ibl_awards
+            WHERE name = ?",
             "s",
             $playerName
         );
-        return count($rows);
+
+        $this->cachedAllStarWeekendPlayerName = $playerName;
+        $this->cachedAllStarWeekendCounts = [
+            'allStar' => (int) ($result['allStar'] ?? 0),
+            'threePoint' => (int) ($result['threePoint'] ?? 0),
+            'dunkContest' => (int) ($result['dunkContest'] ?? 0),
+            'rookieSoph' => (int) ($result['rookieSoph'] ?? 0),
+        ];
+
+        return $this->cachedAllStarWeekendCounts;
     }
 
     /**
      * Get all sim dates ordered by sim number
-     * 
+     *
      * Returns all simulation date ranges from ibl_sim_dates table.
      * Note: 'Start Date' and 'End Date' columns are DATE type in schema.
-     * 
-     * @return array Array of sim date records with keys: Sim (int), 'Start Date' (string YYYY-MM-DD), 'End Date' (string YYYY-MM-DD)
+     *
+     * @return array<int, array<string, mixed>> Array of sim date records
      */
     public function getAllSimDates(): array
     {
@@ -375,12 +424,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * Get box scores for a player between specific dates
-     * 
-     * @param int $playerID Player ID
-     * @param string $startDate Start date (YYYY-MM-DD)
-     * @param string $endDate End date (YYYY-MM-DD)
-     * @return array Array of box score records
+     * @see PlayerRepositoryInterface::getBoxScoresBetweenDates()
+     * @return array<int, array<string, mixed>>
      */
     public function getBoxScoresBetweenDates(int $playerID, string $startDate, string $endDate): array
     {
@@ -394,10 +439,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * Get historical stats for a player ordered by year
-     * 
-     * @param int $playerID Player ID
-     * @return array Array of historical stat records
+     * @see PlayerRepositoryInterface::getHistoricalStats()
+     * @return array<int, array<string, mixed>>
      */
     public function getHistoricalStats(int $playerID): array
     {
@@ -409,10 +452,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * Get playoff stats for a player ordered by year
-     * 
-     * @param string $playerName Player name
-     * @return array Array of playoff stat records
+     * @see PlayerRepositoryInterface::getPlayoffStats()
+     * @return array<int, array<string, mixed>>
      */
     public function getPlayoffStats(string $playerName): array
     {
@@ -424,10 +465,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * Get heat stats for a player ordered by year
-     * 
-     * @param string $playerName Player name
-     * @return array Array of heat stat records
+     * @see PlayerRepositoryInterface::getHeatStats()
+     * @return array<int, array<string, mixed>>
      */
     public function getHeatStats(string $playerName): array
     {
@@ -439,10 +478,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * Get Olympics stats for a player ordered by year
-     * 
-     * @param string $playerName Player name
-     * @return array Array of Olympics stat records
+     * @see PlayerRepositoryInterface::getOlympicsStats()
+     * @return array<int, array<string, mixed>>
      */
     public function getOlympicsStats(string $playerName): array
     {
@@ -454,10 +491,8 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * Get all awards for a player ordered by year
-     * 
-     * @param string $playerName Player name
-     * @return array Array of award records
+     * @see PlayerRepositoryInterface::getAwards()
+     * @return array<int, array<string, mixed>>
      */
     public function getAwards(string $playerName): array
     {
@@ -469,14 +504,12 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * Get player statistics by player ID
-     *
      * @see PlayerRepositoryInterface::getPlayerStats()
-     * @param int $playerID Player ID
-     * @return array|null Player statistics
+     * @return PlayerRow|null
      */
     public function getPlayerStats(int $playerID): ?array
     {
+        /** @var PlayerRow|null */
         return $this->fetchOne(
             "SELECT * FROM ibl_plr WHERE pid = ? LIMIT 1",
             "i",

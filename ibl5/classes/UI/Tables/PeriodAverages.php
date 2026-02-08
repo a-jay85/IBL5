@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace UI\Tables;
 
-use Services\DatabaseService;
+use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -13,15 +15,16 @@ class PeriodAverages
     /**
      * Render the period averages table
      *
-     * @param \mysqli $db Modern mysqli database connection (required)
-     * @param object $team Team object
-     * @param object $season Season object
+     * @param \mysqli $db Database connection
+     * @param \Team $team Team object
+     * @param \Season $season Season object
      * @param string|null|\DateTime $startDate Start date for the period (defaults to last sim)
      * @param string|null|\DateTime $endDate End date for the period (defaults to last sim)
+     * @param list<int> $starterPids Starter player IDs
      * @return string HTML table
      * @throws \Exception If database connection is invalid
      */
-    public static function render(\mysqli $db, $team, $season, $startDate = null, $endDate = null): string
+    public static function render(\mysqli $db, $team, $season, $startDate = null, $endDate = null, array $starterPids = []): string
     {
         if ($startDate === null && $endDate === null) {
             // default to last simulated period
@@ -89,60 +92,62 @@ class PeriodAverages
         $resultPlayerSimBoxScores = $stmt->get_result();
         $stmt->close();
 
+        if ($resultPlayerSimBoxScores === false) {
+            throw new \Exception('Failed to get result set');
+        }
+
+        /** @var list<array{name: string, pos: string, pid: int, games: int, min: string, fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, reb: string, ast: string, stl: string, tov: string, blk: string, pf: string, pts: string}> $playerRows */
         $playerRows = [];
-        $i = 0;
 
-        while ($row = $resultPlayerSimBoxScores->fetch_assoc()) {
-            $bgcolor = (($i % 2) == 0) ? "FFFFFF" : "EEEEEE";
-
+        while (true) {
+            $dbRow = $resultPlayerSimBoxScores->fetch_assoc();
+            if (!is_array($dbRow)) {
+                break;
+            }
             $playerRows[] = [
-                'name' => HtmlSanitizer::safeHtmlOutput($row['name']),
-                'pos' => $row['pos'],
-                'pid' => $row['pid'],
-                'games' => $row['games'],
-                'min' => $row['gameMINavg'],
-                'fgm' => $row['gameFGMavg'],
-                'fga' => $row['gameFGAavg'],
-                'fgp' => $row['gameFGPavg'] ?? '0.000',
-                'ftm' => $row['gameFTMavg'],
-                'fta' => $row['gameFTAavg'],
-                'ftp' => $row['gameFTPavg'] ?? '0.000',
-                'tgm' => $row['game3GMavg'],
-                'tga' => $row['game3GAavg'],
-                'tgp' => $row['game3GPavg'] ?? '0.000',
-                'orb' => $row['gameORBavg'],
-                'reb' => $row['gameREBavg'],
-                'ast' => $row['gameASTavg'],
-                'stl' => $row['gameSTLavg'],
-                'tov' => $row['gameTOVavg'],
-                'blk' => $row['gameBLKavg'],
-                'pf' => $row['gamePFavg'],
-                'pts' => $row['gamePTSavg'],
-                'bgcolor' => $bgcolor,
+                'name' => htmlspecialchars((string) ($dbRow['name'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                'pos' => (string) $dbRow['pos'],
+                'pid' => (int) $dbRow['pid'],
+                'games' => $dbRow['games'],
+                'min' => $dbRow['gameMINavg'],
+                'fgm' => $dbRow['gameFGMavg'],
+                'fga' => $dbRow['gameFGAavg'],
+                'fgp' => $dbRow['gameFGPavg'] ?? '0.000',
+                'ftm' => $dbRow['gameFTMavg'],
+                'fta' => $dbRow['gameFTAavg'],
+                'ftp' => $dbRow['gameFTPavg'] ?? '0.000',
+                'tgm' => $dbRow['game3GMavg'],
+                'tga' => $dbRow['game3GAavg'],
+                'tgp' => $dbRow['game3GPavg'] ?? '0.000',
+                'orb' => $dbRow['gameORBavg'],
+                'reb' => $dbRow['gameREBavg'],
+                'ast' => $dbRow['gameASTavg'],
+                'stl' => $dbRow['gameSTLavg'],
+                'tov' => $dbRow['gameTOVavg'],
+                'blk' => $dbRow['gameBLKavg'],
+                'pf' => $dbRow['gamePFavg'],
+                'pts' => $dbRow['gamePTSavg'],
             ];
-
-            $i++;
         }
 
         ob_start();
-        echo \UI\TableStyles::render('sim-avg', $team->color1, $team->color2);
         ?>
-<table style="margin: 0 auto;" class="sortable sim-avg">
+<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
-        <tr style="background-color: #<?= htmlspecialchars($team->color1) ?>;">
+        <tr>
             <th>Pos</th>
-            <th colspan="3">Player</th>
+            <th class="sticky-col">Player</th>
             <th>g</th>
             <th>min</th>
             <th class="sep-team"></th>
             <th>fgm</th>
             <th>fga</th>
             <th>fgp</th>
-            <th class="sep-weak"></th>
+            <th class="sep-team"></th>
             <th>ftm</th>
             <th>fta</th>
             <th>ftp</th>
-            <th class="sep-weak"></th>
+            <th class="sep-team"></th>
             <th>3gm</th>
             <th>3ga</th>
             <th>3gp</th>
@@ -159,9 +164,9 @@ class PeriodAverages
     </thead>
     <tbody>
 <?php foreach ($playerRows as $row): ?>
-        <tr style="background-color: #<?= $row['bgcolor'] ?>;">
+        <tr>
             <td><?= htmlspecialchars($row['pos']) ?></td>
-            <td colspan="3"><a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=<?= (int)$row['pid'] ?>"><?= $row['name'] ?></a></td>
+            <?= PlayerImageHelper::renderPlayerCell($row['pid'], $row['name'], $starterPids) ?>
             <td style="text-align: center;"><?= (int)$row['games'] ?></td>
             <td style="text-align: center;"><?= $row['min'] ?></td>
             <td class="sep-team"></td>
@@ -190,6 +195,6 @@ class PeriodAverages
     </tbody>
 </table>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 }

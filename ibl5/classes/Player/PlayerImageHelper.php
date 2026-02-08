@@ -65,7 +65,80 @@ class PlayerImageHelper implements PlayerImageHelperInterface
      * - Numeric (convertible to int)
      * - Greater than zero when converted to int
      */
-    public static function isValidPlayerID($playerID): bool
+    /**
+     * @see PlayerImageHelperInterface::renderThumbnail()
+     */
+    public static function renderThumbnail($playerID, string $basePath = './images/player/'): string
+    {
+        $url = self::getImageUrl($playerID, $basePath);
+
+        return '<img src="' . $url . '" alt="" class="ibl-player-photo" width="24" height="24" loading="lazy">';
+    }
+
+    /**
+     * @see PlayerImageHelperInterface::renderPlayerCell()
+     */
+    public static function renderPlayerCell(int $playerID, string $displayName, array $starterPids = []): string
+    {
+        $starterClass = in_array($playerID, $starterPids, true) ? ' is-starter' : '';
+        $thumbnail = str_contains($displayName, '|') ? '' : self::renderThumbnail($playerID);
+
+        return '<td class="sticky-col ibl-player-cell' . $starterClass . '">'
+            . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'
+            . $thumbnail
+            . $displayName
+            . '</a></td>';
+    }
+
+    /**
+     * @see PlayerImageHelperInterface::renderPlayerLink()
+     */
+    public static function renderPlayerLink(int $playerID, string $rawName): string
+    {
+        $resolved = self::resolvePlayerDisplay($playerID, $rawName);
+        /** @var string $safeName */
+        $safeName = \Utilities\HtmlSanitizer::safeHtmlOutput($resolved['name']);
+
+        return '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'
+            . $resolved['thumbnail']
+            . $safeName
+            . '</a>';
+    }
+
+    /**
+     * @see PlayerImageHelperInterface::renderFlexiblePlayerCell()
+     */
+    public static function renderFlexiblePlayerCell(
+        int $playerID,
+        string $rawName,
+        string $extraClasses = '',
+        array $starterPids = [],
+    ): string {
+        $starterClass = in_array($playerID, $starterPids, true) ? ' is-starter' : '';
+
+        $classes = 'ibl-player-cell' . $starterClass;
+        if ($extraClasses !== '') {
+            $classes .= ' ' . $extraClasses;
+        }
+
+        return '<td class="' . $classes . '">'
+            . self::renderPlayerLink($playerID, $rawName)
+            . '</td>';
+    }
+
+    /**
+     * @see PlayerImageHelperInterface::resolvePlayerDisplay()
+     */
+    public static function resolvePlayerDisplay(int $playerID, string $rawName): array
+    {
+        $hasPipe = str_contains($rawName, '|');
+        $cleanName = $hasPipe ? str_replace('|', '', strip_tags($rawName)) : $rawName;
+        $thumbnail = $hasPipe ? '' : self::renderThumbnail($playerID);
+
+        return ['thumbnail' => $thumbnail, 'name' => $cleanName];
+    }
+
+    public static function isValidPlayerID(int|float|string|null $playerID): bool
     {
         // Null or empty string
         if ($playerID === null || $playerID === '') {

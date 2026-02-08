@@ -1,6 +1,6 @@
 <?php
 
-if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
+if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -18,6 +18,11 @@ $controller = new Team\TeamController($mysqli_db);
 switch ($op) {
     case "team":
         $controller->displayTeamPage($teamID);
+        break;
+
+    case "api":
+        $handler = new Team\TeamApiHandler($mysqli_db);
+        $handler->handle();
         break;
 
     default:

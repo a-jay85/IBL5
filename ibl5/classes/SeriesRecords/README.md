@@ -108,7 +108,6 @@ $controller->main($user);
 - `Services\CommonMysqliRepository` - Team ID lookup from team name
 - `Utilities\HtmlSanitizer` - XSS protection for output
 - `Nuke\Header`, `Nuke\Footer` - Page frame rendering
-- `UI::displaytopmenu()` - Navigation menu
 
 ## Related Modules
 

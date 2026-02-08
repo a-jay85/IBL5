@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace Tests\Player;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Player\PlayerStatsRepository;
 
 /**
  * PlayerStatsRepositoryTest - Tests for the PlayerStatsRepository class
- * 
+ *
  * Verifies database queries for player statistics retrieval.
  */
+#[AllowMockObjectsWithoutExpectations]
 class PlayerStatsRepositoryTest extends TestCase
 {
     /** @var \mysqli&\PHPUnit\Framework\MockObject\MockObject */

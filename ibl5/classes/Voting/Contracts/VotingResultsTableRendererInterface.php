@@ -1,11 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Voting\Contracts;
 
 /**
  * VotingResultsTableRendererInterface - Voting results HTML rendering
  *
  * Renders voting results tables using legacy module styling.
+ *
+ * @phpstan-import-type VoteTable from VotingResultsServiceInterface
  */
 interface VotingResultsTableRendererInterface
 {
@@ -15,9 +19,7 @@ interface VotingResultsTableRendererInterface
      * Takes an array of table data and renders each as an HTML table
      * with title and styled rows.
      *
-     * @param array $tables Array of tables, each containing:
-     *                      - 'title' (string): Table heading
-     *                      - 'rows' (array): Array of ['name' => string, 'votes' => int]
+     * @param list<VoteTable> $tables Array of tables
      * @return string HTML output for all tables
      *
      * **HTML Structure:**

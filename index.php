@@ -96,4 +96,3 @@ if (stripos_clone($name,"..") || (isset($file) && stripos_clone($file,"..")) || 
 
 ?>
 <link rel="shortcut icon" href="/favicon.ico">
-<script src="http://www.iblhoops.net/jslib/sorttable.js"></script>

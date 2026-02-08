@@ -9,6 +9,9 @@ namespace DraftPickLocator\Contracts;
  *
  * Defines methods for generating HTML output for draft pick matrix.
  *
+ * @phpstan-import-type DraftPickRow from DraftPickLocatorRepositoryInterface
+ * @phpstan-type TeamWithPicks array{teamId: int, teamCity: string, teamName: string, color1: string, color2: string, picks: list<array{ownerofpick: string, year: int, round: int}>}
+ *
  * @see \DraftPickLocator\DraftPickLocatorView For the concrete implementation
  */
 interface DraftPickLocatorViewInterface
@@ -16,7 +19,7 @@ interface DraftPickLocatorViewInterface
     /**
      * Render the complete draft pick matrix
      *
-     * @param array $teamsWithPicks Teams with their draft pick data
+     * @param list<array{teamId: int, teamCity: string, teamName: string, color1: string, color2: string, picks: list<array{ownerofpick: string, year: int, round: int}>}> $teamsWithPicks Teams with their draft pick data
      * @param int $currentEndingYear Current season ending year
      * @return string HTML output
      */

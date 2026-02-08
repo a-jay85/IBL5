@@ -1,0 +1,14 @@
+{
+  "name": "ibl5-design",
+  "version": "1.0.0",
+  "description": "IBL5 Design System with Tailwind CSS 4",
+  "type": "module",
+  "scripts": {
+    "css:watch": "bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --watch",
+    "css:build": "bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/cli": "^4.0.0"
+  }
+}

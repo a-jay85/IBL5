@@ -6,37 +6,38 @@ namespace Extension\Contracts;
 
 /**
  * ExtensionDatabaseOperationsInterface - Contract for extension database operations
- * 
+ *
  * Defines the data access layer for contract extension transactions. Handles all
  * database operations related to updating player contracts, managing extension
  * usage flags, and creating news stories for extension results.
- * 
+ *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ *
+ * @phpstan-type ExtensionOffer array{year1: int, year2: int, year3: int, year4: int, year5: int}
+ * @phpstan-type ContractRow array{cy: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, currentSalary: int}
+ * @phpstan-type ProcessResult array{success: bool}
+ *
  * @package Extension\Contracts
  */
 interface ExtensionDatabaseOperationsInterface
 {
     /**
      * Updates a player's contract with the new extension terms
-     * 
+     *
      * Modifies the player's contract record to reflect the newly signed extension.
      * The current salary becomes year 1, and offer years become years 2-6.
-     * 
+     *
      * @param string $playerName Player name for lookup
-     * @param array $offer Offer array with keys:
-     *   - 'year1': int - First extension year salary
-     *   - 'year2': int - Second extension year salary
-     *   - 'year3': int - Third extension year salary
-     *   - 'year4': int - Fourth extension year salary (0 if 3-year deal)
-     *   - 'year5': int - Fifth extension year salary (0 if 4-year deal or less)
+     * @param ExtensionOffer $offer Offer array with yearly salary amounts in thousands
      * @param int $currentSalary Player's current year salary (becomes cy1)
      * @return bool True if update succeeded, false on database error
-     * 
+     *
      * **Database Changes:**
      * - Sets cy = 1 (current year of contract)
      * - Sets cyt = total years (current + extension years)
      * - Sets cy1 = currentSalary
      * - Sets cy2-cy6 = offer year1-year5
-     * 
+     *
      * **Behaviors:**
      * - Escapes player name for SQL safety
      * - Treats empty/null year4, year5 as 0
@@ -108,13 +109,13 @@ interface ExtensionDatabaseOperationsInterface
 
     /**
      * Retrieves player preferences and info
-     * 
+     *
      * Gets the full player record including free agency preferences used
      * in extension evaluation calculations.
-     * 
+     *
      * @param string $playerName Player name for lookup
-     * @return array|null Player info array or null if not found
-     * 
+     * @return PlayerRow|null Player info array or null if not found
+     *
      * **Return Fields (relevant for extensions):**
      * - Free agency preference fields (winner, tradition, loyalty, playing_time)
      * - Contract fields (cy, cy1-cy6, cyt)
@@ -124,16 +125,13 @@ interface ExtensionDatabaseOperationsInterface
 
     /**
      * Retrieves player's current contract information
-     * 
+     *
      * Gets contract details needed for extension processing, including
      * the current year salary calculation.
-     * 
+     *
      * @param string $playerName Player name for lookup
-     * @return array|null Contract info with keys:
-     *   - 'cy': int - Current contract year
-     *   - 'cy1'-'cy6': int - Salary for each year
-     *   - 'currentSalary': int - Calculated current year salary
-     * 
+     * @return ContractRow|null Contract info or null if player not found
+     *
      * **Behaviors:**
      * - Calculates currentSalary based on cy field
      * - Returns null if player not found
@@ -142,27 +140,27 @@ interface ExtensionDatabaseOperationsInterface
 
     /**
      * Process a complete accepted extension workflow
-     * 
+     *
      * Convenience method that executes all steps for an accepted extension:
      * updates contract, marks extension used, and creates news story.
-     * 
+     *
      * @param string $playerName Player name
      * @param string $teamName Team name
-     * @param array $offer Offer array with year1-year5
+     * @param ExtensionOffer $offer Offer array with year1-year5
      * @param int $currentSalary Current salary
-     * @return array ['success' => bool]
+     * @return ProcessResult
      */
     public function processAcceptedExtension($playerName, $teamName, $offer, $currentSalary);
 
     /**
      * Process a complete rejected extension workflow
-     * 
+     *
      * Convenience method that creates the rejection news story.
-     * 
+     *
      * @param string $playerName Player name
      * @param string $teamName Team name
-     * @param array $offer Offer array with year1-year5
-     * @return array ['success' => bool]
+     * @param ExtensionOffer $offer Offer array with year1-year5
+     * @return ProcessResult
      */
     public function processRejectedExtension($playerName, $teamName, $offer);
 }

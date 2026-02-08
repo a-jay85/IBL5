@@ -11,6 +11,8 @@ use Player\Player;
  *
  * Validates eligibility and business rules for contract negotiations.
  * Reuses PlayerContractValidator for contract-specific checks.
+ *
+ * @phpstan-type ValidationResult array{valid: bool, error?: string|null}
  */
 interface NegotiationValidatorInterface
 {
@@ -21,9 +23,7 @@ interface NegotiationValidatorInterface
      *
      * @param Player $player The player to check
      * @param string $userTeamName The user's team name for ownership validation
-     * @return array Validation result with keys:
-     *               - 'valid' (bool): True if player can negotiate
-     *               - 'error' (string|null): Error message if validation failed
+     * @return ValidationResult Validation result
      *
      * **Validations Performed:**
      * 1. Player ownership - Player must be on user's team
@@ -42,12 +42,10 @@ interface NegotiationValidatorInterface
      *
      * Contract extensions are not allowed during the free agency period.
      *
-     * @return array Validation result with keys:
-     *               - 'valid' (bool): True if free agency is NOT active
-     *               - 'error' (string|null): Error message if free agency is active
+     * @return ValidationResult Validation result
      *
      * **Behaviors:**
-     * - Queries nuke_modules table for 'Free_Agency' module status
+     * - Queries nuke_modules table for 'FreeAgency' module status
      * - Returns invalid if module.active = 1
      * - Returns valid if module not found or active = 0
      */

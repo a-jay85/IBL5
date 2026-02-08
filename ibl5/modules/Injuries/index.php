@@ -39,11 +39,7 @@ $injuredPlayers = $service->getInjuredPlayersWithTeams();
 
 // Render page
 Nuke\Header::header();
-OpenTable();
-
-UI::displaytopmenu($mysqli_db, $teamID);
 
 echo $view->render($injuredPlayers);
 
-CloseTable();
 Nuke\Footer::footer();

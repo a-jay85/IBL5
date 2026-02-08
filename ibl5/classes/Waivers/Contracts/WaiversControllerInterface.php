@@ -22,7 +22,7 @@ interface WaiversControllerInterface
      * waiver operation. Should check if waivers are currently open before proceeding.
      * 
      * @param mixed $user Current user object (from PhpNuke authentication)
-     * @param string $action Action to perform ('add' or 'drop')
+     * @param string $action Action to perform ('add' or 'waive')
      * @return void Renders appropriate view based on user state and action
      * 
      * **Behaviors:**
@@ -34,19 +34,20 @@ interface WaiversControllerInterface
 
     /**
      * Executes waiver wire operations (add or drop)
-     * 
-     * Main workflow method that processes waiver submissions and displays the form.
-     * Handles both initial form display and form submission processing.
-     * 
+     *
+     * Uses PRG (Post-Redirect-Get) pattern: POST submissions are processed
+     * and redirected with result/error query parameters. GET requests display
+     * the form with optional result banners.
+     *
      * @param string $username Username of the logged-in user
-     * @param string $action Action to perform ('add' or 'drop')
-     * @return void Renders waiver form with appropriate data or error messages
-     * 
+     * @param string $action Action to perform ('add' or 'waive')
+     * @return void On POST: redirects with result/error params. On GET: renders waiver form.
+     *
      * **Behaviors:**
      * - Looks up user's team information
-     * - Processes POST data if a submission was made
-     * - Displays the waiver form with current roster/waiver pool data
-     * - Shows success or error messages from previous submission
+     * - On POST: processes submission, redirects to GET with result/error query param
+     * - On GET: displays the waiver form with current roster/waiver pool data
+     * - Shows success or error banners from redirected result/error params
      */
     public function executeWaiverOperation(string $username, string $action): void;
 }

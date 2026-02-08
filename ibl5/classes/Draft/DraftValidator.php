@@ -11,7 +11,8 @@ use Draft\Contracts\DraftValidatorInterface;
  */
 class DraftValidator implements DraftValidatorInterface
 {
-    private $errors = [];
+    /** @var array<int, string> */
+    private array $errors = [];
 
     /**
      * @see DraftValidatorInterface::validateDraftSelection()
@@ -24,7 +25,6 @@ class DraftValidator implements DraftValidatorInterface
             return false;
         }
         if ($currentDraftSelection !== null && $currentDraftSelection !== '') {
-            var_dump($currentDraftSelection);
             $this->errors[] = "It looks like you've already drafted a player with this draft pick.";
             return false;
         }

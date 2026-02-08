@@ -7,6 +7,9 @@ namespace Voting;
 use Voting\Contracts\VotingResultsServiceInterface;
 
 /**
+ * @phpstan-import-type VoteRow from VotingResultsServiceInterface
+ * @phpstan-import-type VoteTable from VotingResultsServiceInterface
+ *
  * @see VotingResultsServiceInterface
  */
 class VotingResultsService implements VotingResultsServiceInterface
@@ -15,6 +18,7 @@ class VotingResultsService implements VotingResultsServiceInterface
     private const EOY_TABLE = 'ibl_votes_EOY';
     public const BLANK_BALLOT_LABEL = '(No Selection Recorded)';
 
+    /** @var array<string, list<string>> */
     private const ALL_STAR_CATEGORIES = [
         'Eastern Conference Frontcourt' => ['East_F1', 'East_F2', 'East_F3', 'East_F4'],
         'Eastern Conference Backcourt' => ['East_B1', 'East_B2', 'East_B3', 'East_B4'],
@@ -22,6 +26,7 @@ class VotingResultsService implements VotingResultsServiceInterface
         'Western Conference Backcourt' => ['West_B1', 'West_B2', 'West_B3', 'West_B4'],
     ];
 
+    /** @var array<string, array<string, int>> */
     private const END_OF_YEAR_CATEGORIES = [
         'Most Valuable Player' => ['MVP_1' => 3, 'MVP_2' => 2, 'MVP_3' => 1],
         'Sixth Man of the Year' => ['Six_1' => 3, 'Six_2' => 2, 'Six_3' => 1],
@@ -29,15 +34,17 @@ class VotingResultsService implements VotingResultsServiceInterface
         'GM of the Year' => ['GM_1' => 3, 'GM_2' => 2, 'GM_3' => 1],
     ];
 
-    private $db;
+    private \mysqli $db;
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
     }
 
     /**
      * @see VotingResultsServiceInterface::getAllStarResults()
+     *
+     * @return list<VoteTable>
      */
     public function getAllStarResults(): array
     {
@@ -53,6 +60,8 @@ class VotingResultsService implements VotingResultsServiceInterface
 
     /**
      * @see VotingResultsServiceInterface::getEndOfYearResults()
+     *
+     * @return list<VoteTable>
      */
     public function getEndOfYearResults(): array
     {
@@ -67,6 +76,10 @@ class VotingResultsService implements VotingResultsServiceInterface
         return $results;
     }
 
+    /**
+     * @param list<string> $ballotColumns
+     * @return list<VoteRow>
+     */
     private function fetchAllStarTotals(array $ballotColumns): array
     {
         $query = $this->buildAllStarQuery($ballotColumns);
@@ -74,6 +87,10 @@ class VotingResultsService implements VotingResultsServiceInterface
         return $this->executeVoteQuery($query);
     }
 
+    /**
+     * @param array<string, int> $ballotColumnsWithWeights
+     * @return list<VoteRow>
+     */
     private function fetchEndOfYearTotals(array $ballotColumnsWithWeights): array
     {
         $query = $this->buildEndOfYearQuery($ballotColumnsWithWeights);
@@ -81,6 +98,9 @@ class VotingResultsService implements VotingResultsServiceInterface
         return $this->executeVoteQuery($query);
     }
 
+    /**
+     * @param list<string> $ballotColumns
+     */
     private function buildAllStarQuery(array $ballotColumns): string
     {
         $selectStatements = [];
@@ -95,6 +115,9 @@ class VotingResultsService implements VotingResultsServiceInterface
         return $query;
     }
 
+    /**
+     * @param array<string, int> $ballotColumnsWithWeights
+     */
     private function buildEndOfYearQuery(array $ballotColumnsWithWeights): string
     {
         $selectStatements = [];
@@ -109,34 +132,12 @@ class VotingResultsService implements VotingResultsServiceInterface
         return $query;
     }
 
+    /**
+     * @return list<VoteRow>
+     */
     private function executeVoteQuery(string $query): array
     {
-        // Support both legacy and modern database connections
-        if (method_exists($this->db, 'sql_query')) {
-            // LEGACY: mysql class with sql_* methods
-            $result = $this->db->sql_query($query);
-            if ($result === false) {
-                return [];
-            }
-
-            $rows = [];
-            while ($record = $result->fetch_assoc()) {
-                $name = trim((string) ($record['name'] ?? ''));
-                if ($name === '') {
-                    $name = self::BLANK_BALLOT_LABEL;
-                }
-
-                $votes = (int) ($record['votes'] ?? 0);
-                $rows[] = [
-                    'name' => $name,
-                    'votes' => $votes,
-                ];
-            }
-
-            return $rows;
-        }
-
-        // MODERN: mysqli with prepared statements (no parameters needed for these queries)
+        // Use mysqli with prepared statements (no parameters needed for these queries)
         $stmt = $this->db->prepare($query);
         if ($stmt === false) {
             error_log("VotingResultsService: Failed to prepare query: " . $this->db->error);
@@ -156,8 +157,13 @@ class VotingResultsService implements VotingResultsServiceInterface
             return [];
         }
 
+        /** @var list<VoteRow> $rows */
         $rows = [];
-        while ($record = $result->fetch_assoc()) {
+        while (true) {
+            $record = $result->fetch_assoc();
+            if (!is_array($record)) {
+                break;
+            }
             $name = trim((string) ($record['name'] ?? ''));
             if ($name === '') {
                 $name = self::BLANK_BALLOT_LABEL;
@@ -167,10 +173,87 @@ class VotingResultsService implements VotingResultsServiceInterface
             $rows[] = [
                 'name' => $name,
                 'votes' => $votes,
+                'pid' => 0,
             ];
         }
 
         $stmt->close();
+
+        return $this->resolvePlayerIds($rows);
+    }
+
+    /**
+     * Batch-resolve player IDs from names via ibl_plr table.
+     *
+     * @param list<VoteRow> $rows Rows with 'name' and 'votes' keys
+     * @return list<VoteRow> Same rows with 'pid' resolved
+     */
+    private function resolvePlayerIds(array $rows): array
+    {
+        // Vote names are stored as "Player Name, Team" -- extract player name for lookup
+        /** @var array<string, string> $voteToPlayer */
+        $voteToPlayer = [];
+        /** @var array<string, true> $playerNames */
+        $playerNames = [];
+        foreach ($rows as $row) {
+            if ($row['name'] !== self::BLANK_BALLOT_LABEL) {
+                $playerName = self::extractPlayerName($row['name']);
+                $voteToPlayer[$row['name']] = $playerName;
+                $playerNames[$playerName] = true;
+            }
+        }
+
+        if ($playerNames === []) {
+            return $rows;
+        }
+
+        $uniqueNames = array_keys($playerNames);
+        $placeholders = implode(',', array_fill(0, count($uniqueNames), '?'));
+        $stmt = $this->db->prepare("SELECT pid, name FROM ibl_plr WHERE name IN ({$placeholders})");
+        if ($stmt === false) {
+            return $rows;
+        }
+
+        $stmt->execute($uniqueNames);
+        $result = $stmt->get_result();
+
+        if ($result === false) {
+            $stmt->close();
+            return $rows;
+        }
+
+        /** @var array<string, int> $pidMap */
+        $pidMap = [];
+        while (true) {
+            $record = $result->fetch_assoc();
+            if (!is_array($record)) {
+                break;
+            }
+            $pidMap[(string) $record['name']] = (int) $record['pid'];
+        }
+        $stmt->close();
+
+        foreach ($rows as &$row) {
+            $playerName = $voteToPlayer[$row['name']] ?? '';
+            $row['pid'] = $pidMap[$playerName] ?? 0;
+        }
+
         return $rows;
+    }
+
+    /**
+     * Extract the player name from a vote entry like "LeBron James, Sting".
+     *
+     * Strips the trailing ", TeamName" portion. If there is no comma, returns
+     * the full string (handles GM names and other non-player entries).
+     */
+    private static function extractPlayerName(string $voteName): string
+    {
+        $lastComma = strrpos($voteName, ',');
+        if ($lastComma === false) {
+            return trim($voteName);
+        }
+
+        return trim(substr($voteName, 0, $lastComma));
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\NextSim;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use NextSim\NextSimView;
 use NextSim\Contracts\NextSimViewInterface;
@@ -15,6 +16,7 @@ use NextSim\Contracts\NextSimViewInterface;
  *
  * @covers \NextSim\NextSimView
  */
+#[AllowMockObjectsWithoutExpectations]
 class NextSimViewTest extends TestCase
 {
     public function testImplementsNextSimViewInterface(): void
@@ -22,7 +24,7 @@ class NextSimViewTest extends TestCase
         $mockDb = $this->createMock(\mysqli::class);
         $mockSeason = $this->createMock(\Season::class);
 
-        $view = new NextSimView($mockDb, $mockSeason, 'Next_Sim');
+        $view = new NextSimView($mockDb, $mockSeason, 'NextSim');
 
         $this->assertInstanceOf(NextSimViewInterface::class, $view);
     }
@@ -32,7 +34,7 @@ class NextSimViewTest extends TestCase
         $mockDb = $this->createMock(\mysqli::class);
         $mockSeason = $this->createMock(\Season::class);
 
-        $view = new NextSimView($mockDb, $mockSeason, 'Next_Sim');
+        $view = new NextSimView($mockDb, $mockSeason, 'NextSim');
         $result = $view->render([], 7);
 
         $this->assertIsString($result);
@@ -43,7 +45,7 @@ class NextSimViewTest extends TestCase
         $mockDb = $this->createMock(\mysqli::class);
         $mockSeason = $this->createMock(\Season::class);
 
-        $view = new NextSimView($mockDb, $mockSeason, 'Next_Sim');
+        $view = new NextSimView($mockDb, $mockSeason, 'NextSim');
         $result = $view->render([], 7);
 
         $this->assertStringContainsString('Next Sim', $result);
@@ -54,7 +56,7 @@ class NextSimViewTest extends TestCase
         $mockDb = $this->createMock(\mysqli::class);
         $mockSeason = $this->createMock(\Season::class);
 
-        $view = new NextSimView($mockDb, $mockSeason, 'Next_Sim');
+        $view = new NextSimView($mockDb, $mockSeason, 'NextSim');
         $result = $view->render([], 7);
 
         $this->assertStringContainsString('No games projected next sim', $result);

@@ -1,0 +1,537 @@
+/**
+ * IBL5 Card Components
+ *
+ * Shared card/block styles used across:
+ * - SeasonHighsView
+ * - DraftView
+ * - Sidebar blocks
+ * - News articles
+ * - Stat cards
+ */
+
+/* ==========================================================================
+   Base Card
+   ========================================================================== */
+
+.ibl-card {
+    font-family: var(--font-sans);
+    background: white;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+    margin-bottom: var(--space-4);
+    transition: box-shadow var(--transition-base);
+}
+
+.ibl-card:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+/* Card Header — shared by .ibl-card, .ibl-sidebar-block, and former .ibl-table-header */
+.ibl-card__header,
+.ibl-sidebar-block__header {
+    background: var(--gradient-navy-header);
+    padding: var(--space-3) var(--space-4);
+    color: white;
+}
+
+.ibl-card__header--accent {
+    background: var(--gradient-accent);
+}
+
+/* Card Title — shared base across card components */
+.ibl-card__title,
+.ibl-sidebar-block__title,
+.ibl-centerbox__title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.ibl-card__title {
+    font-weight: 700;
+}
+
+.ibl-card__subtitle {
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: var(--space-1);
+}
+
+/* Card Body */
+.ibl-card__body {
+    padding: var(--space-4);
+}
+
+.ibl-card__body--compact {
+    padding: var(--space-2) var(--space-3);
+}
+
+/* Card Footer */
+.ibl-card__footer {
+    padding: var(--space-3) var(--space-4);
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-100);
+}
+
+/* ==========================================================================
+   Stat Card (Leaders Block)
+   ========================================================================== */
+
+.ibl-stat-card {
+    background: white;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.ibl-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.ibl-stat-card__header {
+    background: var(--gradient-navy-header);
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ibl-stat-card__category {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ibl-stat-card__badge {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-400);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Leader display */
+.ibl-stat-card__leader {
+    padding: var(--space-4);
+    background: linear-gradient(180deg, var(--gray-50) 0%, white 100%);
+    border-bottom: 1px solid var(--gray-100);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.ibl-stat-card__leader-value {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--accent-500);
+    line-height: 1;
+}
+
+/* ==========================================================================
+   Sidebar Block
+   ========================================================================== */
+
+.ibl-sidebar-block {
+    font-family: var(--font-sans);
+    background: white;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+    margin-bottom: var(--space-4);
+}
+
+/* .ibl-sidebar-block__header and __title now share rules with .ibl-card equivalents above */
+
+.ibl-sidebar-block__body {
+    padding: var(--space-4);
+    font-size: 1.125rem;
+    color: var(--gray-700);
+}
+
+/* ==========================================================================
+   Center Block (Legacy OpenTable replacement)
+   ========================================================================== */
+
+.ibl-centerbox {
+    font-family: var(--font-sans);
+    background: white;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+    margin-bottom: var(--space-6);
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* .ibl-centerbox__title now shares rule with .ibl-card__title above */
+.ibl-centerbox__header {
+    background: var(--gradient-navy-header);
+    padding: var(--space-4) var(--space-6);
+    text-align: center;
+}
+
+.ibl-centerbox__content {
+    padding: var(--space-6);
+    max-width: 100%;
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   Empty State
+   ========================================================================== */
+
+.ibl-empty-state {
+    text-align: center;
+    padding: var(--space-12) var(--space-6);
+    color: var(--gray-500);
+}
+
+.ibl-empty-state__icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto var(--space-4);
+    color: var(--gray-300);
+}
+
+.ibl-empty-state__text {
+    font-size: 1.125rem;
+}
+
+/* ==========================================================================
+   Badge/Status Indicators
+   ========================================================================== */
+
+.ibl-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-full);
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ibl-badge--success {
+    background: #f0fdf4;
+    color: #16a34a;
+}
+
+.ibl-badge--warning {
+    background: #fffbeb;
+    color: #d97706;
+}
+
+.ibl-badge--danger {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.ibl-badge--info {
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+/* ==========================================================================
+   Alert Banners
+   ========================================================================== */
+
+.ibl-alert {
+    font-family: var(--font-sans);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-4);
+    font-size: 1.125rem;
+    line-height: 1.5;
+}
+
+.ibl-alert--success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.ibl-alert--error   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.ibl-alert--info    { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.ibl-alert--warning { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+
+/* ==========================================================================
+   Team Card — team-colored variant of ibl-card
+   Used for Team module sidebar sections and inline components.
+   Requires --team-color-primary and --team-color-secondary custom properties.
+   ========================================================================== */
+
+.team-card {
+    font-family: var(--font-sans);
+    background: white;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--gray-100);
+    margin-bottom: var(--space-4);
+}
+
+.team-card__header {
+    background: var(--team-color-primary);
+    padding: var(--space-2) var(--space-4);
+    text-align: center;
+}
+
+@supports (color: color-mix(in lab, red, red)) {
+    .team-card__header {
+        background: linear-gradient(135deg, var(--team-color-primary), color-mix(in srgb, var(--team-color-primary) 85%, black));
+    }
+}
+
+.team-card__title {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--team-color-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0;
+}
+
+.team-card__body {
+    padding: var(--space-3) var(--space-4);
+    font-size: 1rem;
+    color: var(--gray-700);
+}
+
+.team-card__body--flush {
+    padding: 0;
+}
+
+/* Team info list — key/value pairs inside team-card */
+.team-info-list {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-1) var(--space-3);
+    font-size: 1rem;
+    line-height: 1.4;
+    width: fit-content;
+    margin-inline: auto;
+}
+
+.team-info-list__label {
+    font-weight: 600;
+    color: var(--gray-600);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.team-info-list__value {
+    color: var(--gray-800);
+    text-align: left;
+}
+
+/* History list — year-linked records with win-loss records */
+.team-history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.9375rem;
+    line-height: 1.3;
+}
+
+.team-history-list li {
+    padding: var(--space-1) 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.team-history-list li:last-child {
+    border-bottom: none;
+}
+
+.team-history-list a {
+    color: var(--gray-800);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color var(--transition-fast);
+}
+
+.team-history-list a:hover {
+    color: var(--team-color-primary, var(--accent-500));
+}
+
+.team-history-list .record {
+    color: var(--gray-500);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Totals footer inside team-card */
+.team-card__footer {
+    padding: var(--space-2) var(--space-4);
+    background: var(--gray-50);
+    border-top: 1px solid var(--gray-100);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+/* Awards list — compact year + award pairs */
+.team-awards-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.9375rem;
+}
+
+.team-awards-list li {
+    padding: var(--space-1) 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.team-awards-list li:last-child {
+    border-bottom: none;
+}
+
+.team-awards-list .award-year {
+    font-weight: 700;
+    color: var(--gray-800);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Team cards row — flexbox for Draft Picks, Current Season, Awards */
+.team-cards-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+    margin-bottom: 1rem;
+}
+
+.team-cards-row > .team-card {
+    flex: 0 1 360px;
+    margin-bottom: 0;
+}
+
+.team-card:has(.franchise-history-columns) {
+    max-width: 1400px;
+    margin-inline: auto;
+}
+
+/* Draft picks list */
+.draft-picks-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.draft-picks-list__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    border-bottom: 1px solid var(--gray-100);
+    transition: background-color var(--transition-fast);
+}
+
+.draft-picks-list__item:last-child {
+    border-bottom: none;
+}
+
+.draft-picks-list__item:hover {
+    background-color: var(--gray-50);
+}
+
+.draft-picks-list__logo {
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+}
+
+.draft-picks-list__info {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+}
+
+.draft-picks-list__info a {
+    color: var(--gray-800);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9375rem;
+    transition: color var(--transition-fast);
+}
+
+.draft-picks-list__info a:hover {
+    color: var(--team-color-primary, var(--accent-500));
+}
+
+.draft-picks-list__notes {
+    font-size: 0.8125rem;
+    font-style: italic;
+    color: var(--gray-500);
+    margin-top: 2px;
+    text-align: left;
+}
+
+/* Franchise History — three-column layout */
+.franchise-history-columns {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.franchise-history-column {
+    flex: 1 1 200px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--gray-100);
+}
+
+.franchise-history-column:last-child {
+    border-right: none;
+}
+
+.franchise-history-column__title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-500);
+    padding: var(--space-2) var(--space-3);
+    margin: 0;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.franchise-history-column .team-history-list {
+    padding: 0 var(--space-3);
+    flex: 1;
+}
+
+.franchise-history-column .team-card__body {
+    padding: var(--space-2) var(--space-3);
+}
+
+.franchise-history-column .team-card__footer {
+    font-size: 0.8125rem;
+    padding: var(--space-2) var(--space-3);
+    margin-top: auto;
+}
+
+/* Playoff series result line */
+.playoff-result {
+    font-size: 0.9375rem;
+    line-height: 1.3;
+}
+
+.playoff-result--win {
+    font-weight: 600;
+}
+

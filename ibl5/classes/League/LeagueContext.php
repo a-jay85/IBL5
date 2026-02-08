@@ -30,18 +30,21 @@ class LeagueContext
     public function getCurrentLeague(): string
     {
         // Check URL override first
-        if (isset($_GET['league']) && $this->isValidLeague($_GET['league'])) {
-            return $_GET['league'];
+        $getLeague = $_GET['league'] ?? null;
+        if (is_string($getLeague) && $this->isValidLeague($getLeague)) {
+            return $getLeague;
         }
 
         // Check session
-        if (isset($_SESSION['current_league']) && $this->isValidLeague($_SESSION['current_league'])) {
-            return $_SESSION['current_league'];
+        $sessionLeague = $_SESSION['current_league'] ?? null;
+        if (is_string($sessionLeague) && $this->isValidLeague($sessionLeague)) {
+            return $sessionLeague;
         }
 
         // Check cookie
-        if (isset($_COOKIE[self::COOKIE_NAME]) && $this->isValidLeague($_COOKIE[self::COOKIE_NAME])) {
-            return $_COOKIE[self::COOKIE_NAME];
+        $cookieLeague = $_COOKIE[self::COOKIE_NAME] ?? null;
+        if (is_string($cookieLeague) && $this->isValidLeague($cookieLeague)) {
+            return $cookieLeague;
         }
 
         // Default to IBL
@@ -67,9 +70,18 @@ class LeagueContext
         $_SESSION['current_league'] = $league;
 
         // Set cookie with 30-day expiry (skip in CLI/test mode to avoid header errors)
+        // SECURITY: Use secure cookie options
         if (php_sapi_name() !== 'cli' && !headers_sent()) {
             $expiry = time() + (30 * 24 * 60 * 60);
-            setcookie(self::COOKIE_NAME, $league, $expiry, '/');
+            $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+            setcookie(self::COOKIE_NAME, $league, [
+                'expires' => $expiry,
+                'path' => '/',
+                'secure' => $isHttps,
+                'httponly' => true,
+                'samesite' => 'Lax',  // Lax for league switching via links
+            ]);
         }
     }
 
@@ -94,14 +106,14 @@ class LeagueContext
         if ($currentLeague === self::LEAGUE_OLYMPICS) {
             $iblOnlyModules = [
                 'Draft',
-                'Draft_Pick_Locator',
-                'Free_Agency',
+                'DraftPickLocator',
+                'FreeAgency',
                 'Waivers',
                 'Trading',
                 'Voting',
-                'Voting_Results',
-                'Cap_Info',
-                'Franchise_History'
+                'VotingResults',
+                'CapSpace',
+                'FranchiseHistory'
             ];
 
             return !in_array($moduleName, $iblOnlyModules, true);
@@ -112,8 +124,8 @@ class LeagueContext
 
     /**
      * Get configuration for the current league
-     * 
-     * @return array Associative array with title, short_name, primary_color, logo_path
+     *
+     * @return array<string, string> Associative array with title, short_name, primary_color, logo_path
      */
     public function getConfig(): array
     {

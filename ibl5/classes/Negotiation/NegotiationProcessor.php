@@ -4,25 +4,26 @@ declare(strict_types=1);
 
 namespace Negotiation;
 
+use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
 use Negotiation\Contracts\NegotiationProcessorInterface;
 use Negotiation\Contracts\NegotiationRepositoryInterface;
 use Player\Player;
 
 /**
  * @see NegotiationProcessorInterface
+ *
+ * @phpstan-import-type TeamFactors from NegotiationDemandCalculatorInterface
  */
 class NegotiationProcessor implements NegotiationProcessorInterface
 {
     private object $db;
-    private object $mysqli_db;
     private NegotiationRepositoryInterface $repository;
     private NegotiationValidator $validator;
     private NegotiationDemandCalculator $demandCalculator;
-    
-    public function __construct($db, object $mysqli_db)
+
+    public function __construct(object $db, object $mysqli_db)
     {
         $this->db = $db;
-        $this->mysqli_db = $mysqli_db;
         $this->repository = new NegotiationRepository($mysqli_db);
         $this->validator = new NegotiationValidator($mysqli_db);
         $this->demandCalculator = new NegotiationDemandCalculator($mysqli_db);
@@ -48,17 +49,17 @@ class NegotiationProcessor implements NegotiationProcessorInterface
         // Validate free agency is not active
         $freeAgencyValidation = $this->validator->validateFreeAgencyNotActive();
         if (!$freeAgencyValidation['valid']) {
-            return $output . NegotiationViewHelper::renderError($freeAgencyValidation['error']);
+            return $output . NegotiationViewHelper::renderError((string) ($freeAgencyValidation['error'] ?? ''));
         }
-        
+
         // Validate negotiation eligibility
         $eligibilityValidation = $this->validator->validateNegotiationEligibility($player, $userTeamName);
         if (!$eligibilityValidation['valid']) {
-            return $output . NegotiationViewHelper::renderError($eligibilityValidation['error']);
+            return $output . NegotiationViewHelper::renderError((string) ($eligibilityValidation['error'] ?? ''));
         }
-        
+
         // Get team factors for demand calculation
-        $teamFactors = $this->getTeamFactors($userTeamName, $player->position, $player->name);
+        $teamFactors = $this->getTeamFactors($userTeamName, $player->position ?? '', $player->name ?? '');
         
         // Calculate contract demands
         $demands = $this->demandCalculator->calculateDemands($player, $teamFactors);
@@ -82,11 +83,11 @@ class NegotiationProcessor implements NegotiationProcessorInterface
     
     /**
      * Get team factors for demand calculation
-     * 
+     *
      * @param string $teamName Team name
      * @param string $playerPosition Player position
      * @param string $playerName Player name (to exclude from position calculation)
-     * @return array Team factors
+     * @return TeamFactors Team factors
      */
     private function getTeamFactors(string $teamName, string $playerPosition, string $playerName): array
     {

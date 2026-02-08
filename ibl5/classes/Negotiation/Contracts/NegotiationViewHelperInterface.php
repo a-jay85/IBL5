@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Negotiation\Contracts;
 
+use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
 use Player\Player;
 
 /**
@@ -11,6 +12,8 @@ use Player\Player;
  *
  * Handles HTML rendering for the negotiation page, separating
  * presentation logic from business logic. All methods are static.
+ *
+ * @phpstan-import-type DemandResult from NegotiationDemandCalculatorInterface
  */
 interface NegotiationViewHelperInterface
 {
@@ -21,7 +24,7 @@ interface NegotiationViewHelperInterface
      * input fields, and informational notes about contract rules.
      *
      * @param Player $player The player object
-     * @param array $demands Calculated demands with keys year1-year6, years, total
+     * @param DemandResult $demands Calculated demands with keys year1-year6, years, total
      * @param int $capSpace Available cap space for year 1
      * @param int $maxYearOneSalary Maximum first year salary based on experience
      * @return string HTML form output

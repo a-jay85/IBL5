@@ -11,10 +11,13 @@ use Waivers\Contracts\WaiversValidatorInterface;
  */
 class WaiversValidator implements WaiversValidatorInterface
 {
+    /** @var array<int, string> */
     private array $errors = [];
     
     /**
      * @see WaiversValidatorInterface::getErrors()
+     *
+     * @return array<int, string>
      */
     public function getErrors(): array
     {

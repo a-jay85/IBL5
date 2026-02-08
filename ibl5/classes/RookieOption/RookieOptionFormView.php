@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace RookieOption;
 
-use Services\DatabaseService;
+use Player\Player;
 use Utilities\HtmlSanitizer;
+use Player\PlayerImageHelper;
 use RookieOption\Contracts\RookieOptionFormViewInterface;
 
 /**
@@ -14,38 +15,98 @@ use RookieOption\Contracts\RookieOptionFormViewInterface;
 class RookieOptionFormView implements RookieOptionFormViewInterface
 {
     /**
-     * @see RookieOptionFormViewInterface::renderError()
-     */
-    public function renderError(string $errorMessage): void
-    {
-        $errorMessageEscaped = nl2br(HtmlSanitizer::safeHtmlOutput($errorMessage));
-        
-        echo "{$errorMessageEscaped}<p>
-            <a href=\"javascript:history.back()\">Go Back</a>";
-    }
-    
-    /**
      * @see RookieOptionFormViewInterface::renderForm()
      */
-    public function renderForm($player, string $teamName, int $rookieOptionValue): void
+    public function renderForm(Player $player, string $teamName, int $rookieOptionValue, ?string $error = null, ?string $result = null, ?string $from = null): string
     {
-        $playerID = (int) $player->playerID;
-        $playerPosition = HtmlSanitizer::safeHtmlOutput($player->position);
-        $playerName = HtmlSanitizer::safeHtmlOutput($player->name);
+        $playerID = $player->playerID ?? 0;
+        /** @var string $playerPosition */
+        $playerPosition = HtmlSanitizer::safeHtmlOutput($player->position ?? '');
+        /** @var string $playerName */
+        $playerName = HtmlSanitizer::safeHtmlOutput($player->name ?? '');
+        /** @var string $teamNameEscaped */
         $teamNameEscaped = HtmlSanitizer::safeHtmlOutput($teamName);
-        $rookieOptionValueEscaped = HtmlSanitizer::safeHtmlOutput((string) $rookieOptionValue);
-        $playerImageUrl = \Player\PlayerImageHelper::getImageUrl($playerID);
-        
-        echo "<img align=left src=\"{$playerImageUrl}\"><p>
-        You may exercise the rookie option on <b>{$playerPosition} {$playerName}</b>.<p>
-        Their contract value the season after this one will be <b>{$rookieOptionValueEscaped}</b>.<p>
-        WARNING: By exercising this option, <b>you can't use an in-season contract extension on them next season</b>.<p>
-        <b>They will become a free agent</b>.<p>
-        <form name=\"RookieExtend\" method=\"post\" action=\"/ibl5/modules/Player/rookieoption.php\">
-            <input type=\"hidden\" name=\"teamname\" value=\"{$teamNameEscaped}\">
-            <input type=\"hidden\" name=\"playerID\" value=\"{$playerID}\">
-            <input type=\"hidden\" name=\"rookieOptionValue\" value=\"{$rookieOptionValueEscaped}\">
-            <input type=\"submit\" value=\"Exercise Rookie Option\">
-        </form>";
+        $playerImageUrl = PlayerImageHelper::getImageUrl($playerID);
+        if ($from !== null) {
+            /** @var string $fromEscaped */
+            $fromEscaped = HtmlSanitizer::safeHtmlOutput($from);
+        } else {
+            $fromEscaped = '';
+        }
+
+        ob_start();
+
+        // Error banner from PRG redirect
+        if ($error !== null) {
+            /** @var string $safeError */
+            $safeError = HtmlSanitizer::safeHtmlOutput($error);
+            ?>
+<div class="ibl-alert ibl-alert--error"><?= $safeError ?></div>
+            <?php
+        }
+
+        // Result banner from PRG redirect
+        echo $this->renderResultBanner($result);
+
+        // Card: Player Info + Rookie Option Form
+        ?>
+<div class="ibl-card">
+    <div class="ibl-card__header">
+        <h2 class="ibl-card__title"><?= $playerPosition ?> <?= $playerName ?> - Rookie Option</h2>
+    </div>
+    <div class="ibl-card__body">
+        <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
+            <img src="<?= htmlspecialchars($playerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= $playerName ?>" style="max-width: 120px; border-radius: 0.375rem;">
+            <div>
+                <div style="margin-bottom: 0.5rem;">
+                    <span class="ibl-label">Rookie Option Value:</span>
+                    <strong style="font-weight: bold;"><?= $rookieOptionValue ?></strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="ibl-alert ibl-alert--warning">
+    <strong style="font-weight: bold;">Warning:</strong> By exercising this option, you cannot use an in-season contract extension on this player next season. They will become a free agent after the option year.
+</div>
+
+<div class="ibl-card">
+    <div class="ibl-card__header">
+        <h2 class="ibl-card__title">Exercise Option</h2>
+    </div>
+    <div class="ibl-card__body">
+        <form name="RookieExtend" method="post" action="modules.php?name=Player&amp;pa=processrookieoption">
+            <input type="hidden" name="teamname" value="<?= $teamNameEscaped ?>">
+            <input type="hidden" name="playerID" value="<?= $playerID ?>">
+            <input type="hidden" name="rookieOptionValue" value="<?= $rookieOptionValue ?>">
+            <input type="hidden" name="from" value="<?= $fromEscaped ?>">
+            <button type="submit" class="ibl-btn ibl-btn--primary">Exercise Rookie Option</button>
+        </form>
+    </div>
+</div>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    private function renderResultBanner(?string $result): string
+    {
+        if ($result === null) {
+            return '';
+        }
+
+        $banners = [
+            'rookie_option_success' => ['class' => 'ibl-alert--success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
+            'email_failed' => ['class' => 'ibl-alert--warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
+        ];
+
+        if (!isset($banners[$result])) {
+            return '';
+        }
+
+        $banner = $banners[$result];
+        /** @var string $safeMessage */
+        $safeMessage = HtmlSanitizer::safeHtmlOutput($banner['message']);
+        return '<div class="ibl-alert ' . $banner['class'] . '">' . $safeMessage . '</div>';
     }
 }

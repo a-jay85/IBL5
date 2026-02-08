@@ -16,9 +16,10 @@ interface LeagueStartersViewInterface
     /**
      * Render the complete league starters display
      *
-     * @param array $startersByPosition Starters organized by position
+     * @param array<string, array<int, \Player\Player>> $startersByPosition Starters organized by position
      * @param \Team $userTeam User's team for comparison
+     * @param string $display Active display tab key
      * @return string HTML output
      */
-    public function render(array $startersByPosition, \Team $userTeam): string;
+    public function render(array $startersByPosition, \Team $userTeam, string $display = 'ratings'): string;
 }

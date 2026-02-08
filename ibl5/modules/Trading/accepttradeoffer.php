@@ -1,32 +1,36 @@
 <?php
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+try {
+    require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+} catch (Exception $e) {
+    error_log("Failed to load mainfile.php: " . $e->getMessage());
+    die("Error loading system files. Please contact the administrator.");
+}
 
 global $mysqli_db;
 
-$offerId = $_POST['offer'];
-
-if ($offerId != NULL) {
-    $tradeProcessor = new Trading\TradeProcessor($mysqli_db);
-    $result = $tradeProcessor->processTrade((int)$offerId);
-    
-    if ($result['success']) {
-        // Trade processed successfully
-        echo "Trade accepted!<p>";
-    } else {
-        echo "Error processing trade: " . ($result['error'] ?? 'Unknown error');
-        exit;
-    }
-} else {
-    echo "Nothing to see here!";
-    exit;
+if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
+    error_log("Database connection not available");
+    die("Error: Database connection failed");
 }
 
-?>
+$offerId = $_POST['offer'] ?? null;
 
-<HTML><HEAD><TITLE>Trade Offer Processing</TITLE>
-<meta http-equiv="refresh" content="3;url=/ibl5/modules.php?name=Trading&op=reviewtrade">
-</HEAD><BODY>
-<a href="/ibl5/modules.php?name=Trading&op=reviewtrade">Click here to go back to the Trade Review page,</a><br>
-or wait 3 seconds to be redirected automatically!
-</BODY></HTML>
+if ($offerId !== null) {
+    try {
+        $tradeProcessor = new Trading\TradeProcessor($mysqli_db);
+        $result = $tradeProcessor->processTrade((int) $offerId);
+
+        if ($result['success']) {
+            header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_accepted');
+        } else {
+            header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($result['error'] ?? 'Unknown error'));
+        }
+    } catch (Exception $e) {
+        error_log("Failed to process trade: " . $e->getMessage());
+        header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=accept_error&error=' . rawurlencode($e->getMessage()));
+    }
+} else {
+    header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade');
+}
+exit;

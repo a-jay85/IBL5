@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Services;
 
 /**
@@ -13,9 +15,9 @@ class CommonValidator
     /**
      * Validates that a player belongs to the specified team
      *
-     * @param object $player Player object with teamName, position, and name properties
+     * @param object&\Player\Player $player Player object with teamName, position, and name properties
      * @param string $userTeamName The team name to validate against
-     * @return array Validation result with 'valid' boolean and optional 'error' message
+     * @return array{valid: bool, error?: string} Validation result with 'valid' boolean and optional 'error' message
      *
      * @example
      * $result = CommonValidator::validatePlayerOwnership($player, 'Seattle Supersonics');
@@ -23,12 +25,15 @@ class CommonValidator
      *     echo $result['error'];
      * }
      */
-    public static function validatePlayerOwnership($player, string $userTeamName): array
+    public static function validatePlayerOwnership(object $player, string $userTeamName): array
     {
+        /** @var \Player\Player $player */
         if ($player->teamName !== $userTeamName) {
             // Include player details in error message for better user feedback
-            $playerDescription = isset($player->position) && isset($player->name)
-                ? "{$player->position} {$player->name}"
+            $position = $player->position ?? '';
+            $name = $player->name ?? '';
+            $playerDescription = ($position !== '' && $name !== '')
+                ? "{$position} {$name}"
                 : "This player";
 
             return [

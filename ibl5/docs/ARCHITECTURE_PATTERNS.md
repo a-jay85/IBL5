@@ -7,7 +7,7 @@
 
 ## Interface-Driven Architecture Pattern
 
-**Established Pattern (Implemented in PlayerSearch, FreeAgency, Player modules)**
+**Established Pattern (Implemented in PlayerDatabase, FreeAgency, Player modules)**
 
 The codebase uses **interface contracts** as the single source of truth for class responsibilities. This pattern maximizes LLM readability and maintainability.
 
@@ -50,15 +50,15 @@ Module/
 ```php
 <?php
 
-namespace PlayerSearch\Contracts;
+namespace PlayerDatabase\Contracts;
 
 /**
- * PlayerSearchValidatorInterface - Validates player search input
+ * PlayerDatabaseValidatorInterface - Validates player search input
  * 
  * Enforces whitelist validation and input sanitization for player search operations.
  * All methods return true/false to indicate validation success/failure.
  */
-interface PlayerSearchValidatorInterface
+interface PlayerDatabaseValidatorInterface
 {
     /**
      * Validate and sanitize player name search input
@@ -108,20 +108,20 @@ interface PlayerSearchValidatorInterface
 ```php
 <?php
 
-namespace PlayerSearch;
+namespace PlayerDatabase;
 
-use PlayerSearch\Contracts\PlayerSearchValidatorInterface;
+use PlayerDatabase\Contracts\PlayerDatabaseValidatorInterface;
 
 /**
- * @see PlayerSearchValidatorInterface
+ * @see PlayerDatabaseValidatorInterface
  */
-class PlayerSearchValidator implements PlayerSearchValidatorInterface
+class PlayerDatabaseValidator implements PlayerDatabaseValidatorInterface
 {
     private const VALID_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
     private const MAX_NAME_LENGTH = 64;
 
     /**
-     * @see PlayerSearchValidatorInterface::validatePlayerName()
+     * @see PlayerDatabaseValidatorInterface::validatePlayerName()
      */
     public function validatePlayerName(string $playerName): string
     {
@@ -133,7 +133,7 @@ class PlayerSearchValidator implements PlayerSearchValidatorInterface
     }
 
     /**
-     * @see PlayerSearchValidatorInterface::validatePosition()
+     * @see PlayerDatabaseValidatorInterface::validatePosition()
      */
     public function validatePosition(string $position): bool
     {
@@ -286,7 +286,7 @@ As the codebase migrates toward Laravel/modern PHP, all database interactions sh
 ## Current Implementation Status
 
 **Modules with Complete Interface Architecture:**
-- ✅ **PlayerSearch** (4 interfaces, 4 implementations, 54 tests)
+- ✅ **PlayerDatabase** (4 interfaces, 4 implementations, 54 tests)
 - ✅ **FreeAgency** (7 interfaces, 6 implementations, 11 tests)
 - ✅ **Player** (9 interfaces, 8 implementations, 84 tests)
 

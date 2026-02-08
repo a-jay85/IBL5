@@ -22,7 +22,7 @@ Internet-based fantasy basketball site powered by Jump Shot Basketball simulatio
 
 **Code Quality:**
 - 15 IBL modules refactored (65% complete)
-- **Interface-driven architecture** implemented in PlayerSearch, FreeAgency, Player (proven pattern)
+- **Interface-driven architecture** implemented in PlayerDatabase, FreeAgency, Player (proven pattern)
 - 219 tests passing (596 assertions) 
 - ~48% test coverage (target: 80%)
 - Next priority: Compare_Players Module (403 lines)
@@ -39,7 +39,7 @@ Internet-based fantasy basketball site powered by Jump Shot Basketball simulatio
 **📖 [Complete Documentation Index](ibl5/docs/README.md)** - Navigate all documentation
 
 ### Architecture & Best Practices
-- **[Interface-Driven Architecture Pattern](.github/copilot-instructions.md#%EF%B8%8F-critical-interface-driven-architecture-pattern)** - Interfaces as contracts in PlayerSearch, FreeAgency, Player modules
+- **[Interface-Driven Architecture Pattern](.github/copilot-instructions.md#%EF%B8%8F-critical-interface-driven-architecture-pattern)** - Interfaces as contracts in PlayerDatabase, FreeAgency, Player modules
 - [Copilot Coding Agent Instructions](.github/copilot-instructions.md) - Complete development standards
 
 ### Core Guides (Root)
@@ -55,7 +55,7 @@ Internet-based fantasy basketball site powered by Jump Shot Basketball simulatio
 - [STATISTICS_FORMATTING_GUIDE.md](ibl5/docs/STATISTICS_FORMATTING_GUIDE.md) - StatsFormatter usage
 
 ### Component Documentation (With Code & Interfaces)
-- [PlayerSearch/](ibl5/classes/PlayerSearch/) - 4 interfaces, 4 classes, 54 tests, SQL injection fixed ✅
+- [PlayerDatabase/](ibl5/classes/PlayerDatabase/) - 4 interfaces, 4 classes, 54 tests, SQL injection fixed ✅
 - [FreeAgency/](ibl5/classes/FreeAgency/) - 7 interfaces, 6 classes, 11 tests ✅
 - [Player/](ibl5/classes/Player/) - 9 interfaces, 8 classes, 84 tests ✅
 - [Statistics/](ibl5/classes/Statistics/) - StatsFormatter and StatsSanitizer

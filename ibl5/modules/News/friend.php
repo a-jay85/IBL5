@@ -18,7 +18,7 @@ if (!strpos($_SERVER['PHP_SELF'], 'admin.php')) {
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
-if (stripos_clone($_SERVER['QUERY_STRING'], '%25')) {
+if (str_contains($_SERVER['QUERY_STRING'], '%25')) {
     header("Location: index.php");
 }
 

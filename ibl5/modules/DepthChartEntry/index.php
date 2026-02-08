@@ -47,6 +47,14 @@ function submit()
     Nuke\Footer::footer();
 }
 
+function tabApi()
+{
+    global $mysqli_db;
+
+    $handler = new DepthChartEntry\DepthChartEntryApiHandler($mysqli_db);
+    $handler->handle();
+}
+
 function api($user)
 {
     global $mysqli_db, $cookie;
@@ -98,6 +106,9 @@ function api($user)
 switch ($op) {
     case "submit":
         submit();
+        break;
+    case "tab-api":
+        tabApi();
         break;
     case "api":
         api($user);

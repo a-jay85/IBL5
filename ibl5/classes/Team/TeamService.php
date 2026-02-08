@@ -43,6 +43,49 @@ class TeamService implements TeamServiceInterface
 
         $team = \Team::initialize($this->db, $teamID);
 
+        $insertyear = ($yr !== null && $yr !== '') ? "&yr=$yr" : "";
+
+        $tableOutput = $this->getTableOutput($teamID, $yr, $display);
+
+        $isActualTeam = ($teamID !== 0);
+
+        $teamModules = new TeamComponentsView($this->repository);
+        $draftPicksTable = $isActualTeam ? $teamModules->draftPicks($team) : "";
+
+        $currentSeasonCard = "";
+        $awardsCard = "";
+        $franchiseHistoryCard = "";
+        $rafters = "";
+        if ($isActualTeam) {
+            $sidebarData = $this->renderTeamInfoRight($team);
+            $currentSeasonCard = $sidebarData['currentSeasonCard'];
+            $awardsCard = $sidebarData['awardsCard'];
+            $franchiseHistoryCard = $sidebarData['franchiseHistoryCard'];
+            $rafters = $sidebarData['rafters'];
+        }
+
+        return [
+            'teamID' => $teamID,
+            'team' => $team,
+            'imagesPath' => $imagesPath,
+            'yr' => $yr,
+            'display' => $display,
+            'insertyear' => $insertyear,
+            'isActualTeam' => $isActualTeam,
+            'tableOutput' => $tableOutput,
+            'draftPicksTable' => $draftPicksTable,
+            'currentSeasonCard' => $currentSeasonCard,
+            'awardsCard' => $awardsCard,
+            'franchiseHistoryCard' => $franchiseHistoryCard,
+            'rafters' => $rafters,
+        ];
+    }
+
+    /**
+     * @see TeamServiceInterface::getTableOutput()
+     */
+    public function getTableOutput(int $teamID, ?string $yr, string $display): string
+    {
         $sharedFunctions = new \Shared($this->db);
         $season = new \Season($this->db);
 
@@ -87,6 +130,8 @@ class TeamService implements TeamServiceInterface
         $teamColor1 = $teamData['color1'] ?? '000000';
         $teamColor2 = $teamData['color2'] ?? 'FFFFFF';
 
+        $team = \Team::initialize($this->db, $teamID);
+
         /** @var list<int> $starterPids */
         $starterPids = [];
         if ($teamID > 0 && ($yr === null || $yr === '')) {
@@ -100,40 +145,8 @@ class TeamService implements TeamServiceInterface
 
         $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $teamColor1, $teamColor2);
         $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $sharedFunctions, $starterPids);
-        $tableOutput = $switcher->wrap($tableHtml);
 
-        $isActualTeam = ($teamID !== 0);
-
-        $teamModules = new TeamComponentsView($this->repository);
-        $draftPicksTable = $isActualTeam ? $teamModules->draftPicks($team) : "";
-
-        $currentSeasonCard = "";
-        $awardsCard = "";
-        $franchiseHistoryCard = "";
-        $rafters = "";
-        if ($isActualTeam) {
-            $sidebarData = $this->renderTeamInfoRight($team);
-            $currentSeasonCard = $sidebarData['currentSeasonCard'];
-            $awardsCard = $sidebarData['awardsCard'];
-            $franchiseHistoryCard = $sidebarData['franchiseHistoryCard'];
-            $rafters = $sidebarData['rafters'];
-        }
-
-        return [
-            'teamID' => $teamID,
-            'team' => $team,
-            'imagesPath' => $imagesPath,
-            'yr' => $yr,
-            'display' => $display,
-            'insertyear' => $insertyear,
-            'isActualTeam' => $isActualTeam,
-            'tableOutput' => $tableOutput,
-            'draftPicksTable' => $draftPicksTable,
-            'currentSeasonCard' => $currentSeasonCard,
-            'awardsCard' => $awardsCard,
-            'franchiseHistoryCard' => $franchiseHistoryCard,
-            'rafters' => $rafters,
-        ];
+        return $switcher->wrap($tableHtml);
     }
 
     /**

@@ -70,10 +70,10 @@ class TableViewSwitcherTest extends TestCase
         $result = $switcher->renderTabs();
 
         // "Season Totals" tab should have active class
-        $this->assertStringContainsString('class="ibl-tab ibl-tab--active">Season Totals</a>', $result);
+        $this->assertStringContainsString('class="ibl-tab ibl-tab--active" data-display="total_s">Season Totals</a>', $result);
         // Other tabs should not have active class
-        $this->assertStringContainsString('class="ibl-tab">Ratings</a>', $result);
-        $this->assertStringContainsString('class="ibl-tab">Season Averages</a>', $result);
+        $this->assertStringContainsString('class="ibl-tab" data-display="ratings">Ratings</a>', $result);
+        $this->assertStringContainsString('class="ibl-tab" data-display="avg_s">Season Averages</a>', $result);
     }
 
     public function testTabHrefsIncludeBaseUrlAndDisplayParam(): void

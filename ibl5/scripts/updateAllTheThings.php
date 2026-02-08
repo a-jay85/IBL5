@@ -118,6 +118,15 @@ try {
     echo "<p>✓ Extension attempts reset</p>";
     flush();
 
+    // Extend active saved depth charts
+    echo "<p>Updating saved depth charts...</p>";
+    flush();
+    $savedDcUpdater = new Updater\SavedDepthChartUpdater($mysqli_db);
+    $freshSeason = new Season($mysqli_db);
+    $savedDcCount = $savedDcUpdater->update($freshSeason->lastSimEndDate, $freshSeason->lastSimNumber);
+    echo "<p>✓ Saved depth charts updated ($savedDcCount active DCs extended)</p>";
+    flush();
+
     echo '<p><b>All the things have been updated!</b></p>';
     flush();
 

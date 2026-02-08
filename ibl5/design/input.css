@@ -56,6 +56,8 @@
 @import './components/player-views.css';
 @import './components/player-cards.css';
 @import './components/season-archive.css';
+@import './components/saved-depth-charts.css';
+@import './components/depth-chart-changes.css';
 
 /* Site-wide layout wrapper (replaces legacy themeheader table) */
 .site-content {

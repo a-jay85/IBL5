@@ -146,7 +146,7 @@ class DepthChartEntryValidatorTest extends TestCase
         $this->validator->validate($depthChartData, 'Regular Season');
         $errorHtml = $this->validator->getErrorMessagesHtml();
         
-        $this->assertStringContainsString('<font color=red>', $errorHtml);
+        $this->assertStringContainsString('color: red', $errorHtml);
         $this->assertStringContainsString('at least 12 active players', $errorHtml);
     }
     

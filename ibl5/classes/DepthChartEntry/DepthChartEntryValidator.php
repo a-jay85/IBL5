@@ -113,7 +113,11 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
     {
         $html = '';
         foreach ($this->errors as $error) {
-            $html .= "<font color=red><b>{$error['message']}</b></font><p>{$error['detail']}</center><p>";
+            /** @var string $message */
+            $message = \Utilities\HtmlSanitizer::safeHtmlOutput($error['message']);
+            /** @var string $detail */
+            $detail = \Utilities\HtmlSanitizer::safeHtmlOutput($error['detail']);
+            $html .= '<div style="text-align: center;"><span style="color: red;"><strong style="font-weight: bold;">' . $message . '</strong></span><p>' . $detail . '</p></div>';
         }
         return $html;
     }

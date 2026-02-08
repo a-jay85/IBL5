@@ -1,39 +1,47 @@
 <?php
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+try {
+    require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+} catch (Exception $e) {
+    error_log("Failed to load mainfile.php: " . $e->getMessage());
+    die("Error loading system files. Please contact the administrator.");
+}
 
 global $mysqli_db;
 
-$offer_id = $_POST['offer'];
-$teamRejecting = $_POST['teamRejecting'];
-$teamReceiving = $_POST['teamReceiving'];
+if (!isset($_POST['offer']) || empty($_POST['offer'])) {
+    error_log("Missing offer ID in POST data");
+    die("Error: Missing trade offer ID");
+}
 
-$stmtClearInfo = $mysqli_db->prepare("DELETE FROM ibl_trade_info WHERE tradeOfferID = ?");
-$stmtClearInfo->bind_param("i", $offer_id);
-$resultClearInfo = $stmtClearInfo->execute();
-$stmtClearInfo->close();
+if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
+    error_log("Database connection not available");
+    die("Error: Database connection failed");
+}
 
-$stmtClearCash = $mysqli_db->prepare("DELETE FROM ibl_trade_cash WHERE tradeOfferID = ?");
-$stmtClearCash->bind_param("i", $offer_id);
-$resultClearCash = $stmtClearCash->execute();
-$stmtClearCash->close();
+$offerId = (int) $_POST['offer'];
+$teamRejecting = $_POST['teamRejecting'] ?? '';
+$teamReceiving = $_POST['teamReceiving'] ?? '';
 
-$discord = new Discord($mysqli_db);
-$rejectingUserDiscordID = $discord->getDiscordIDFromTeamname($teamRejecting);
-$receivingUserDiscordID = $discord->getDiscordIDFromTeamname($teamReceiving);
-$discordDMmessage = 'Sorry, trade proposal declined by <@!' . $rejectingUserDiscordID . '>.
+// Delete trade offer using repository
+$repository = new Trading\TradingRepository($mysqli_db);
+$repository->deleteTradeOffer($offerId);
+
+// Attempt Discord notification (gracefully fail if not available)
+try {
+    $discord = new Discord($mysqli_db);
+    $rejectingUserDiscordID = $discord->getDiscordIDFromTeamname($teamRejecting);
+    $receivingUserDiscordID = $discord->getDiscordIDFromTeamname($teamReceiving);
+    $discordDMmessage = 'Sorry, trade proposal declined by <@!' . $rejectingUserDiscordID . '>.
 Go here to make another offer: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
-$arrayContent = array(
+    $arrayContent = [
         'message' => $discordDMmessage,
-        'receivingUserDiscordID' => $receivingUserDiscordID,);
+        'receivingUserDiscordID' => $receivingUserDiscordID,
+    ];
+} catch (Exception $e) {
+    // Silently fail if Discord notification fails
+    // The trade rejection itself has already succeeded
+}
 
-echo "<p>";
-// $response = Discord::sendCurlPOST('http://localhost:50000/discordDM', $arrayContent);
-
-?>
-
-<HTML><HEAD><TITLE>Trade Offer Processing</TITLE>
-<meta http-equiv="refresh" content="0;url='/ibl5/modules.php?name=Trading&op=reviewtrade'">
-</HEAD><BODY>
-Trade Offer Rejected. Redirecting you to trade review page...
-</BODY></HTML>
+header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_rejected');
+exit;

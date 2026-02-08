@@ -45,15 +45,15 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
      */
     public function calculateContractTotalYears(array $cashYear): int
     {
-        if (($cashYear[6] ?? 0) != 0) {
+        if (($cashYear[6] ?? 0) !== 0) {
             return 6;
-        } elseif (($cashYear[5] ?? 0) != 0) {
+        } elseif (($cashYear[5] ?? 0) !== 0) {
             return 5;
-        } elseif (($cashYear[4] ?? 0) != 0) {
+        } elseif (($cashYear[4] ?? 0) !== 0) {
             return 4;
-        } elseif (($cashYear[3] ?? 0) != 0) {
+        } elseif (($cashYear[3] ?? 0) !== 0) {
             return 3;
-        } elseif (($cashYear[2] ?? 0) != 0) {
+        } elseif (($cashYear[2] ?? 0) !== 0) {
             return 2;
         } else {
             return 1;
@@ -65,8 +65,8 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
      */
     public function createCashTransaction(int $itemId, string $offeringTeamName, string $listeningTeamName, array $cashYear): array
     {
-        $offeringTeamId = $this->commonRepository->getTidFromTeamname($offeringTeamName);
-        $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName);
+        $offeringTeamId = $this->commonRepository->getTidFromTeamname($offeringTeamName) ?? 0;
+        $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName) ?? 0;
         
         // Use null coalescing to default missing years to 0
         $cy1 = (int) ($cashYear[1] ?? 0);
@@ -168,7 +168,7 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
     public function hasCashInTrade(array $cashAmounts): bool
     {
         foreach ($cashAmounts as $amount) {
-            if (!empty($amount) && (int)$amount !== 0) {
+            if ((int)$amount !== 0) {
                 return true;
             }
         }

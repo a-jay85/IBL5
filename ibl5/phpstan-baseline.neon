@@ -1,0 +1,1483 @@
+parameters:
+	ignoreErrors:
+		-
+			rawMessage: Cannot cast mixed to string.
+			identifier: cast.string
+			count: 1
+			path: classes/AwardHistory/AwardHistoryView.php
+
+		-
+			rawMessage: 'Property DepthChartEntry\DepthChartEntryView::$processor is never read, only written.'
+			identifier: property.onlyWritten
+			count: 1
+			path: classes/DepthChartEntry/DepthChartEntryView.php
+
+		-
+			rawMessage: 'Property Draft\DraftSelectionHandler::$season (Season) does not accept object.'
+			identifier: assign.propertyType
+			count: 1
+			path: classes/Draft/DraftSelectionHandler.php
+
+		-
+			rawMessage: 'Method FreeAgency\FreeAgencyCapCalculator::calculateRosterSpots() should return array<int, int> but returns array<int>.'
+			identifier: return.type
+			count: 1
+			path: classes/FreeAgency/FreeAgencyCapCalculator.php
+
+		-
+			rawMessage: Casting to int something that's already int.
+			identifier: cast.useless
+			count: 1
+			path: classes/FreeAgency/FreeAgencyFormComponents.php
+
+		-
+			rawMessage: Cannot access offset mixed on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 5
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Cannot access offset mysqli_result on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Cannot call method data_seek() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Cannot call method fetch_array() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Constant END_TRANSACTION not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Implicit array creation is not allowed - variable $result does not exist.
+			identifier: variable.implicitArray
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::__construct() has parameter $database with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::__construct() has parameter $persistency with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::__construct() has parameter $sqlpassword with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::__construct() has parameter $sqlserver with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::__construct() has parameter $sqluser with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::__construct() with return type void returns false but should not return anything.'
+			identifier: return.void
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::__construct() with return type void returns mixed but should not return anything.'
+			identifier: return.void
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_affectedrows() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_close() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_error() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_error() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_fetch_assoc() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_fetch_assoc() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_fetchrow() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_fetchrow() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_fetchrowset() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_fetchrowset() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_fieldname() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_fieldname() has parameter $offset with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_fieldname() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_fieldtype() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_fieldtype() has parameter $offset with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_fieldtype() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_freeresult() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_freeresult() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_nextid() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_numfields() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_numfields() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_numrows() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_numrows() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_query() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_query() has parameter $query with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_query() has parameter $transaction with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_result() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_result() has parameter $field with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_result() has parameter $res with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_result() has parameter $row with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_rowseek() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_rowseek() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Method MySQL::sql_rowseek() has parameter $rownum with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a while condition, array|false|null given.'
+			identifier: while.condNotBoolean
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $hostname of function mysqli_connect expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $mysql of function mysqli_affected_rows expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $mysql of function mysqli_close expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $mysql of function mysqli_errno expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $mysql of function mysqli_error expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $mysql of function mysqli_insert_id expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $mysql of function mysqli_query expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $mysql of function mysqli_select_db expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $mysql of function mysqli_set_charset expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $result of function mysqli_data_seek expects mysqli_result, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $result of function mysqli_fetch_field_direct expects mysqli_result, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $result of function mysqli_free_result expects mysqli_result, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $result of function mysqli_num_fields expects mysqli_result, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #1 $result of function mysqli_num_rows expects mysqli_result, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #2 $database of function mysqli_select_db expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #2 $index of function mysqli_fetch_field_direct expects int, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #2 $offset of function mysqli_data_seek expects int, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #2 $query of function mysqli_query expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #2 $username of function mysqli_connect expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: 'Parameter #3 $password of function mysqli_connect expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Property MySQL::$db_connect_id has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Property MySQL::$dbname has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Property MySQL::$num_queries has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Property MySQL::$password has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Property MySQL::$persistency has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Property MySQL::$query_result has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Property MySQL::$row has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Property MySQL::$rowset has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Property MySQL::$server has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Property MySQL::$user has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/MySQL.php
+
+		-
+			rawMessage: Binary operation "+" between string and string results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: Binary operation "-" between mixed and mixed results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: Binary operation "." between mixed and ' ' results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: Binary operation "." between non-falsy-string and mixed results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: Constant _PAGEGENERATION not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: Constant _SECONDS not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: Function blocks not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: Function include_secure not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: Function is_admin not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: Function themefooter not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: 'Method Nuke\Footer::foot() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: 'Method Nuke\Footer::footer() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: 'Parameter #1 $path of function basename expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: 'Part $name (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 2
+			path: classes/Nuke/Footer.php
+
+		-
+			rawMessage: Binary operation "." between mixed and '/ibl5' results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: Binary operation "." between mixed and '/ibl5/mainfile.php' results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: Function blocks not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: Function get_theme not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: Function include_secure not found.
+			identifier: function.notFound
+			count: 3
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: Function message_box not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: Function online not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: Function themeheader not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: 'Method Nuke\Header::head() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: 'Method Nuke\Header::header() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function strpos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: 'Parameter #1 $path of function dirname expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: 'Part $ThemeSel (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 4
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: 'Part $pagetitle (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: 'Part $sitename (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: classes/Nuke/Header.php
+
+		-
+			rawMessage: Binary operation "." between '<br><center>[ <a…' and mixed results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: Binary operation "." between 'SELECT overwrite…' and mixed results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: Binary operation "." between non-falsy-string and mixed results in an error.
+			identifier: binaryOp.invalid
+			count: 15
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: Cannot access offset 'overwrite_theme' on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Cannot call method sql_fetchrow() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Cannot call method sql_query() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: Constant _CHANGEHOME not found.
+			identifier: constant.notFound
+			count: 3
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: Constant _CHANGEYOURINFO not found.
+			identifier: constant.notFound
+			count: 3
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: Constant _CONFIGCOMMENTS not found.
+			identifier: constant.notFound
+			count: 3
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: Constant _LOGOUTEXIT not found.
+			identifier: constant.notFound
+			count: 3
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: Constant _RETURNACCOUNT not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: Constant _SELECTTHETHEME not found.
+			identifier: constant.notFound
+			count: 3
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: Function get_lang not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: Function get_theme not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Method Nuke\Navbar::menuimg() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Method Nuke\Navbar::menuimg() has parameter $gfile with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Method Nuke\Navbar::nav() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Method Nuke\Navbar::nav() has parameter $main_up with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a while condition, string|false given.'
+			identifier: while.condNotBoolean
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Parameter #1 $dir_handle of function closedir expects resource|null, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Parameter #1 $dir_handle of function readdir expects resource|null, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Parameter #1 $value of function intval expects array|bool|float|int|resource|string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Part $ThemeSel (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 2
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Part $gfile (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 3
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Part $menuimg (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 5
+			path: classes/Nuke/Navbar.php
+
+		-
+			rawMessage: 'Method Player\Player::getLongBuyoutArray() should return array<int, int> but returns array<int>.'
+			identifier: return.type
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: 'Method Player\Player::getShortBuyoutArray() should return array<int, int> but returns array<int>.'
+			identifier: return.type
+			count: 1
+			path: classes/Player/Player.php
+
+		-
+			rawMessage: 'Parameter #1 $plrRow (array{pid: int|null, year: int|null, name: string|null, team: string|null, teamid: int|null, salary: int|null, r_2ga: int|null, r_2gp: int|null, ...}) of method Player\PlayerRepository::fillFromHistoricalRow() should be contravariant with parameter $histRow (array<string, mixed>) of method Player\Contracts\PlayerRepositoryInterface::fillFromHistoricalRow()'
+			identifier: method.childParameterType
+			count: 1
+			path: classes/Player/PlayerRepository.php
+
+		-
+			rawMessage: 'Parameter #1 $plrRow of method Player\PlayerStats::fill() expects array{pid: int, name: string, nickname: string|null, age: int|null, tid: int, teamname: string|null, pos: string, sta: int|null, ...}, array<string, mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Player/PlayerStats.php
+
+		-
+			rawMessage: Cannot access offset mixed on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 2
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Cannot call method changes() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Cannot call method close() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Cannot call method columnName() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Cannot call method fetchArray() on mixed.'
+			identifier: method.nonObject
+			count: 6
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Cannot call method lastErrorCode() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Cannot call method lastErrorMsg() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Cannot call method lastInsertRowID() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Cannot call method numColumns() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Cannot call method query() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Cannot call method reset() on mixed.'
+			identifier: method.nonObject
+			count: 3
+			path: classes/SQLite.php
+
+		-
+			rawMessage: Implicit array creation is not allowed - variable $result does not exist.
+			identifier: variable.implicitArray
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::__construct() has parameter $database_file with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::__construct() with return type void returns SQLite3 but should not return anything.'
+			identifier: return.void
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_affectedrows() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_close() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_error() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_error() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fetch_assoc() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fetch_assoc() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fetchfield() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fetchfield() has parameter $field with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fetchfield() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fetchfield() has parameter $rownum with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fetchrow() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fetchrow() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fetchrowset() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fetchrowset() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fieldname() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fieldname() has parameter $offset with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fieldname() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fieldtype() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fieldtype() has parameter $offset with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_fieldtype() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_freeresult() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_freeresult() has parameter $result with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_nextid() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_numfields() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_numfields() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_numrows() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_numrows() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_query() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_query() has parameter $query with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_query() has parameter $transaction with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_result() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_result() has parameter $field with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_result() has parameter $result with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_result() has parameter $row with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_rowseek() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_rowseek() has parameter $query_id with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Method SQLite::sql_rowseek() has parameter $rownum with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a negated boolean, array|false given.'
+			identifier: booleanNot.exprNotBoolean
+			count: 2
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a ternary operator condition, SQLite3 given.'
+			identifier: ternary.condNotBoolean
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: 'Parameter #1 $filename of class SQLite3 constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: Possibly invalid array key type mixed.
+			identifier: offsetAccess.invalidOffset
+			count: 2
+			path: classes/SQLite.php
+
+		-
+			rawMessage: Property SQLite::$db_connect_id has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: Property SQLite::$num_queries has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: Property SQLite::$query_result has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: Property SQLite::$row has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: Property SQLite::$rowset has no type specified.
+			identifier: missingType.property
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: Ternary operator condition is always true.
+			identifier: ternary.alwaysTrue
+			count: 1
+			path: classes/SQLite.php
+
+		-
+			rawMessage: Constant _ALL not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _ALLAUTHORS not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _ALLTOPICS not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _ARTICLES not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _ATTACHART not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _CONTRIBUTEDBY not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _DELETE not found.
+			identifier: constant.notFound
+			count: 2
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _EDIT not found.
+			identifier: constant.notFound
+			count: 2
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _MONTH not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _MONTHS not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _NEXTMATCHES not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _NOCOMMENTS not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _NOMATCHES not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _NONAME not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _ON not found.
+			identifier: constant.notFound
+			count: 2
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _POSTEDBY not found.
+			identifier: constant.notFound
+			count: 2
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _PREVMATCHES not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _SCOMMENTS not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _SEARCHIN not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _SEARCHON not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _SEARCHRESULTS not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _SEARCHUSERS not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _SREPLIES not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _SREPLY not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _SSTORIES not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _SUSERS not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _TOPIC not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _UCOMMENT not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _UCOMMENTS not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _WEEK not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _WEEKS not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Function formatTimestamp not found.
+			identifier: function.notFound
+			count: 2
+			path: classes/Search/SearchView.php
+
+		-
+			rawMessage: Constant _LOGININCOR not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/SeriesRecords/SeriesRecordsController.php
+
+		-
+			rawMessage: Constant _USERREGLOGIN not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/SeriesRecords/SeriesRecordsController.php
+
+		-
+			rawMessage: Function cookiedecode not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/SeriesRecords/SeriesRecordsController.php
+
+		-
+			rawMessage: Function is_user not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/SeriesRecords/SeriesRecordsController.php
+
+		-
+			rawMessage: Function loginbox not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/SeriesRecords/SeriesRecordsController.php
+
+		-
+			rawMessage: 'Property SeriesRecords\SeriesRecordsController::$db (mysqli) does not accept object.'
+			identifier: assign.propertyType
+			count: 1
+			path: classes/SeriesRecords/SeriesRecordsController.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 9
+			path: classes/Services/PlayerDataConverter.php
+
+		-
+			rawMessage: 'Method TeamOffDefStats\TeamOffDefStatsService::calculateDifferentials() should return list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: array{fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, ...}}> but returns list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, differentials: non-empty-array<''ast''|''blk''|''fga''|''fgm''|''fgp''|''fta''|''ftm''|''ftp''|''orb''|''pf''|''pts''|''reb''|''stl''|''tga''|''tgm''|''tgp''|''tvr'', string>}>.'
+			identifier: return.type
+			count: 1
+			path: classes/TeamOffDefStats/TeamOffDefStatsService.php
+
+		-
+			rawMessage: 'Parameter #2 $timestamp of function date expects int|null, int|false given.'
+			identifier: argument.type
+			count: 1
+			path: classes/TeamSchedule/TeamScheduleView.php
+
+		-
+			rawMessage: Cannot cast mixed to string.
+			identifier: cast.string
+			count: 1
+			path: classes/Utilities/HtmlSanitizer.php
+
+		-
+			rawMessage: Constant _LOGININCOR not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Waivers/WaiversController.php
+
+		-
+			rawMessage: Constant _USERREGLOGIN not found.
+			identifier: constant.notFound
+			count: 2
+			path: classes/Waivers/WaiversController.php
+
+		-
+			rawMessage: Function is_user not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/Waivers/WaiversController.php
+
+		-
+			rawMessage: Function loginbox not found.
+			identifier: function.notFound
+			count: 1
+			path: classes/Waivers/WaiversView.php

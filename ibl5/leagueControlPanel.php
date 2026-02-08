@@ -12,11 +12,11 @@ $querySuccessful = false;
 if (isset($_POST['query'])) {
     switch ($_POST['query']) {
         case 'Activate Player and Season Leaders modules after Trivia':
-            $queryString = "UPDATE nuke_modules SET active = 1 WHERE title = 'Player' OR title = 'Season_Leaders';";
+            $queryString = "UPDATE nuke_modules SET active = 1 WHERE title = 'Player' OR title = 'SeasonLeaderboards';";
             $successText = "Player and Season Leaders modules have been activated.";
             break;
         case 'Deactivate Player and Season Leaders modules for Trivia':
-            $queryString = "UPDATE nuke_modules SET active = 0 WHERE title = 'Player' OR title = 'Season_Leaders';";
+            $queryString = "UPDATE nuke_modules SET active = 0 WHERE title = 'Player' OR title = 'SeasonLeaderboards';";
             $successText = "Player and Season Leaders modules have been deactivated.";
             break;
         case 'Insert new `ibl_heat_win_loss` database entries':
@@ -252,7 +252,7 @@ if ($currentLeague === 'ibl') {
     <INPUT type='submit' name='query' value='Set Season Phase'><p>";
 }
 
-echo "<A HREF=\"/ibl5/pages/seasonHighs.php\">Season Highs</A><p>";
+echo "<A HREF=\"/ibl5/modules.php?name=SeasonHighs\">Season Highs</A><p>";
 
 switch ($season->phase) {
     case 'Preseason':

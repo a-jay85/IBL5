@@ -1,4 +1,5 @@
 <?php
+
 if (!strpos($_SERVER['PHP_SELF'], 'admin.php')) {
     #show right panel:
     define('INDEX_FILE', true);
@@ -15,66 +16,134 @@ if (!strpos($_SERVER['PHP_SELF'], 'admin.php')) {
 /* the Free Software Foundation; either version 2 of the License.       */
 /************************************************************************/
 
+/**
+ * Article display page - refactored for security
+ *
+ * SECURITY NOTES:
+ * - All database queries use prepared statements
+ * - All user input is validated and cast to appropriate types
+ * - Comment system removed (deprecated, see Task #4)
+ */
+
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
+
+global $db, $mysqli_db, $prefix, $user_prefix, $user, $multilingual, $currentlang, $anonymous, $articlecomm, $cookieusrtime;
+
 $optionbox = "";
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-if (isset($sid)) {$sid = intval($sid);} else { $sid = "";}
+// Validate and sanitize $sid parameter
+$sid = isset($sid) && is_numeric($sid) ? (int) $sid : 0;
+$REQUEST_URI = $_SERVER['REQUEST_URI'] ?? '';
+
 if (stristr($REQUEST_URI, "mainfile")) {
     Header("Location: modules.php?name=$module_name&file=article&sid=$sid");
-} elseif (empty($sid) && !isset($tid)) {
+    exit;
+} elseif ($sid === 0 && !isset($tid)) {
     Header("Location: index.php");
+    exit;
 }
 
-if ($save and is_user($user)) {
+// Handle user preference save (uses prepared statement)
+$save = isset($save) ? (bool) $save : false;
+if ($save && is_user($user)) {
     cookiedecode($user);
     getusrinfo($user);
-    if (!isset($mode)) {$mode = $userinfo['umode'];}
-    if (!isset($order)) {$order = $userinfo['uorder'];}
-    if (!isset($thold)) {$thold = $userinfo['thold'];}
-    $db->sql_query("UPDATE " . $user_prefix . "_users SET umode='$mode', uorder='$order', thold='$thold' where uid='$cookie[0]'");
+
+    // Cast all user input to safe types
+    $mode = isset($mode) && is_string($mode) ? substr($mode, 0, 20) : ($userinfo['umode'] ?? 'flat');
+    $order = isset($order) && is_numeric($order) ? (int) $order : ($userinfo['uorder'] ?? 0);
+    $thold = isset($thold) && is_numeric($thold) ? (int) $thold : ($userinfo['thold'] ?? 0);
+    $userId = isset($cookie[0]) && is_numeric($cookie[0]) ? (int) $cookie[0] : 0;
+
+    // Whitelist valid mode values
+    $validModes = ['flat', 'nested', 'nocomments', 'thread'];
+    if (!in_array($mode, $validModes, true)) {
+        $mode = 'flat';
+    }
+
+    // Use prepared statement for user preference update
+    if ($userId > 0) {
+        $stmt = $mysqli_db->prepare(
+            "UPDATE " . $user_prefix . "_users SET umode = ?, uorder = ?, thold = ? WHERE uid = ?"
+        );
+        if ($stmt !== false) {
+            $stmt->bind_param('siii', $mode, $order, $thold, $userId);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
+
     getusrinfo($user);
     $info = base64_encode("$userinfo[user_id]:$userinfo[username]:$userinfo[user_password]:$userinfo[storynum]:$userinfo[umode]:$userinfo[uorder]:$userinfo[thold]:$userinfo[noscore]");
-    setcookie("user", "$info", time() + $cookieusrtime);
+    // SECURITY: Set user cookie with secure options
+    $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+    setcookie("user", "$info", [
+        'expires' => time() + $cookieusrtime,
+        'path' => '/',
+        'secure' => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
 }
 
-if ($op == "Reply") {
-    $display = "";
-    if (isset($mode)) {$display .= "&mode=" . $mode;}
-    if (isset($order)) {$display .= "&order=" . $order;}
-    if (isset($thold)) {$display .= "&thold=" . $thold;}
-    Header("Location: modules.php?name=$module_name&file=comments&op=Reply&pid=0&sid=" . $sid . $display);
-}
+// Comment system removed - was deprecated and insecure
+// The "Reply" operation and comments.php include have been removed
 
-$result = $db->sql_query("select catid, aid, time, title, hometext, bodytext, topic, informant, notes, acomm, haspoll, pollID, score, ratings FROM " . $prefix . "_stories where sid='$sid'");
-if ($numrows = $db->sql_numrows($result) != 1) {
+// Fetch article using prepared statement
+$stmt = $mysqli_db->prepare(
+    "SELECT catid, aid, time, title, hometext, bodytext, topic, informant, notes, acomm, haspoll, pollID, score, ratings
+     FROM " . $prefix . "_stories
+     WHERE sid = ?"
+);
+if ($stmt === false) {
     Header("Location: index.php");
-    die();
+    exit;
 }
-$row = $db->sql_fetchrow($result);
-$catid = intval($row['catid']);
-$aaid = filter($row['aid'], "nohtml");
-$time = $row['time'];
-$title = filter($row['title'], "nohtml");
-$hometext = filter($row['hometext']);
-$bodytext = filter($row['bodytext']);
-$topic = intval($row['topic']);
-$informant = filter($row['informant'], "nohtml");
-$notes = filter($row['notes']);
-$acomm = intval($row['acomm']);
-$haspoll = intval($row['haspoll']);
-$pollID = intval($row['pollID']);
-$score = intval($row['score']);
-$ratings = intval($row['ratings']);
+
+$stmt->bind_param('i', $sid);
+$stmt->execute();
+$result = $stmt->get_result();
+
+if ($result->num_rows !== 1) {
+    $stmt->close();
+    Header("Location: index.php");
+    exit;
+}
+
+$row = $result->fetch_assoc();
+$stmt->close();
+
+$catid = (int) ($row['catid'] ?? 0);
+$aaid = filter($row['aid'] ?? '', "nohtml");
+$time = $row['time'] ?? '';
+$title = filter($row['title'] ?? '', "nohtml");
+$hometext = filter($row['hometext'] ?? '');
+$bodytext = filter($row['bodytext'] ?? '');
+$topic = (int) ($row['topic'] ?? 0);
+$informant = filter($row['informant'] ?? '', "nohtml");
+$notes = filter($row['notes'] ?? '');
+$acomm = (int) ($row['acomm'] ?? 0);
+$haspoll = (int) ($row['haspoll'] ?? 0);
+$pollID = (int) ($row['pollID'] ?? 0);
+$score = (int) ($row['score'] ?? 0);
+$ratings = (int) ($row['ratings'] ?? 0);
 
 if (empty($aaid)) {
     Header("Location: modules.php?name=$module_name");
+    exit;
 }
 
-$db->sql_query("UPDATE " . $prefix . "_stories SET counter=counter+1 where sid='$sid'");
+// Update view counter using prepared statement
+$stmtCounter = $mysqli_db->prepare("UPDATE " . $prefix . "_stories SET counter = counter + 1 WHERE sid = ?");
+if ($stmtCounter !== false) {
+    $stmtCounter->bind_param('i', $sid);
+    $stmtCounter->execute();
+    $stmtCounter->close();
+}
 
 $artpage = 1;
 $pagetitle = "- $title";
@@ -104,15 +173,24 @@ if (empty($informant)) {
 
 getTopics($sid);
 
-if ($catid != 0) {
-    $row2 = $db->sql_fetchrow($db->sql_query("select title from " . $prefix . "_stories_cat where catid='$catid'"));
-    $title1 = filter($row2['title'], "nohtml");
-    $title = "<a href=\"modules.php?name=$module_name&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
+// Fetch category using prepared statement if catid is set
+if ($catid !== 0) {
+    $stmtCat = $mysqli_db->prepare("SELECT title FROM " . $prefix . "_stories_cat WHERE catid = ?");
+    if ($stmtCat !== false) {
+        $stmtCat->bind_param('i', $catid);
+        $stmtCat->execute();
+        $catResult = $stmtCat->get_result();
+        $row2 = $catResult->fetch_assoc();
+        $stmtCat->close();
+
+        if ($row2 !== null) {
+            $title1 = filter($row2['title'] ?? '', "nohtml");
+            $title = "<a href=\"modules.php?name=$module_name&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
+        }
+    }
 }
 
-//echo "<table width=\"100%\" border=\"0\"><tr><td valign=\"top\" width=\"100%\">\n";
 themearticle($aaid, $informant, $datetime, $title, $bodytext, $topic, $topicname, $topicimage, $topictext);
-//echo "</td><td>&nbsp;</td><td valign=\"top\">\n";
 
 if ($multilingual == 1) {
     $querylang = "AND (blanguage='$currentlang' OR blanguage='')";
@@ -120,13 +198,11 @@ if ($multilingual == 1) {
     $querylang = "";
 }
 
-/* old modules */
-
-//echo "</td></tr></table>\n";
 cookiedecode($user);
 include "modules/$module_name/associates.php";
 
-if (((empty($mode) or ($mode != "nocomments")) or ($acomm == 0)) or ($articlecomm == 1)) {
-    include "modules/News/comments.php";
-}
+// Comment system removed - deprecated functionality
+// The old comments.php was a security vulnerability (SQL injection)
+// Comments can be re-implemented with proper security if needed
+
 Nuke\Footer::footer();

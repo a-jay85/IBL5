@@ -14,6 +14,43 @@ namespace Draft\Contracts;
  * - Player creation from draft selections
  *
  * All methods use prepared statements internally – SQL injection is prevented.
+ *
+ * @phpstan-type DraftClassPlayerRow = array{
+ *     id: int,
+ *     name: string,
+ *     pos: string,
+ *     age: int,
+ *     team: string,
+ *     fga: int,
+ *     fgp: int,
+ *     fta: int,
+ *     ftp: int,
+ *     tga: int,
+ *     tgp: int,
+ *     orb: int,
+ *     drb: int,
+ *     ast: int,
+ *     stl: int,
+ *     tvr: int,
+ *     blk: int,
+ *     oo: int,
+ *     do: int,
+ *     po: int,
+ *     to: int,
+ *     od: int,
+ *     dd: int,
+ *     pd: int,
+ *     td: int,
+ *     talent: int,
+ *     skill: int,
+ *     intangibles: int,
+ *     ranking: float|null,
+ *     invite: string|null,
+ *     drafted: int|null,
+ *     sta: int|null
+ * }
+ *
+ * @phpstan-type DraftPickRow = array{team: string, round: int, pick: int}
  */
 interface DraftRepositoryInterface
 {
@@ -176,7 +213,7 @@ interface DraftRepositoryInterface
      * Retrieves the complete list of available draft prospects from ibl_draft_class.
      * Used for rendering player tables and searching available players.
      *
-     * @return array<int, array<string, mixed>> Array of player records, each row is array<string, mixed>
+     * @return list<DraftClassPlayerRow> Array of player records
      *
      * IMPORTANT BEHAVIORS:
      *  - Returns all players from ibl_draft_class table
@@ -201,7 +238,7 @@ interface DraftRepositoryInterface
      * Combines team, round, and pick information for the next selection.
      * Used to determine whose turn it is and what round/pick number.
      *
-     * @return array{team: string, round: int, pick: int}|null Array with team/round/pick info, or null if draft complete
+     * @return DraftPickRow|null Array with team/round/pick info, or null if draft complete
      *
      * IMPORTANT BEHAVIORS:
      *  - Finds first unpicked position (player field is empty)

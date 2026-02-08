@@ -1,24 +1,29 @@
 <?php
 
+declare(strict_types=1);
+
 class Game
 {
-    public $date;
-    public $dateObject;
-    public $boxScoreID;
+    public string $date;
+    public \DateTime|false $dateObject;
+    public int $boxScoreID;
 
-    public $visitorTeamID;
-    public $homeTeamID;
+    public int $visitorTeamID;
+    public int $homeTeamID;
 
-    public $visitorScore;
-    public $homeScore;
+    public int $visitorScore;
+    public int $homeScore;
 
-    public $isUnplayed;
-    public $winningTeamID;
+    public bool $isUnplayed;
+    public int $winningTeamID;
 
-    public $opposingTeamID;
-    public $userTeamLocationPrefix;
+    public int $opposingTeamID;
+    public string $userTeamLocationPrefix;
 
-    public function __construct($scheduleRow)
+    /**
+     * @param array{Date: string, BoxID: int, Visitor: int, Home: int, VScore: int, HScore: int} $scheduleRow
+     */
+    public function __construct(array $scheduleRow)
     {
         $this->date = $scheduleRow['Date'];
         $this->dateObject = date_create($this->date);
@@ -30,19 +35,19 @@ class Game
         $this->visitorScore = $scheduleRow['VScore'];
         $this->homeScore = $scheduleRow['HScore'];
 
-        $this->isUnplayed = ($this->visitorScore == $this->homeScore);
+        $this->isUnplayed = ($this->visitorScore === $this->homeScore);
         $this->winningTeamID = $this->visitorScore > $this->homeScore ? $this->visitorTeamID : $this->homeTeamID;
     }
 
-    public function getOpposingTeamID($userTeamID)
+    public function getOpposingTeamID(int $userTeamID): int
     {
-        $this->opposingTeamID = $this->visitorTeamID == $userTeamID ? $this->homeTeamID : $this->visitorTeamID;
+        $this->opposingTeamID = $this->visitorTeamID === $userTeamID ? $this->homeTeamID : $this->visitorTeamID;
         return $this->opposingTeamID;
     }
 
-    public function getUserTeamLocationPrefix($userTeamID)
+    public function getUserTeamLocationPrefix(int $userTeamID): string
     {
-        $this->userTeamLocationPrefix = $this->visitorTeamID == $userTeamID ? "@" : "vs";
+        $this->userTeamLocationPrefix = $this->visitorTeamID === $userTeamID ? "@" : "vs";
         return $this->userTeamLocationPrefix;
     }
 }

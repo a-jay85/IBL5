@@ -46,7 +46,7 @@ class InjuriesViewTest extends TestCase
     {
         $result = $this->view->render([]);
 
-        $this->assertStringContainsString('INJURED PLAYERS', $result);
+        $this->assertStringContainsString('Injured Players', $result);
     }
 
     public function testRenderContainsTableHeaders(): void
@@ -56,7 +56,7 @@ class InjuriesViewTest extends TestCase
         $this->assertStringContainsString('Pos', $result);
         $this->assertStringContainsString('Player', $result);
         $this->assertStringContainsString('Team', $result);
-        $this->assertStringContainsString('Days Injured', $result);
+        $this->assertStringContainsString('>Days<', $result);
     }
 
     public function testRenderWithInjuredPlayersData(): void
@@ -67,6 +67,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'John Smith',
                 'position' => 'PG',
                 'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
                 'teamID' => 1,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
@@ -80,7 +81,6 @@ class InjuriesViewTest extends TestCase
         $this->assertStringContainsString('John Smith', $result);
         $this->assertStringContainsString('PG', $result);
         $this->assertStringContainsString('5', $result);
-        $this->assertStringContainsString('Boston', $result);
         $this->assertStringContainsString('Celtics', $result);
     }
 
@@ -92,6 +92,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'Player One',
                 'position' => 'PG',
                 'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
                 'teamID' => 1,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
@@ -103,6 +104,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'Player Two',
                 'position' => 'C',
                 'daysRemaining' => 10,
+                'returnDate' => '2025-02-15',
                 'teamID' => 2,
                 'teamCity' => 'Los Angeles',
                 'teamName' => 'Lakers',
@@ -119,7 +121,7 @@ class InjuriesViewTest extends TestCase
         $this->assertStringContainsString('Lakers', $result);
     }
 
-    public function testRenderAlternatesRowColors(): void
+    public function testRenderUsesDataTableClassForRowAlternation(): void
     {
         $injuredPlayers = [
             [
@@ -127,6 +129,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'Player One',
                 'position' => 'PG',
                 'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
                 'teamID' => 1,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
@@ -138,6 +141,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'Player Two',
                 'position' => 'C',
                 'daysRemaining' => 10,
+                'returnDate' => '2025-02-15',
                 'teamID' => 2,
                 'teamCity' => 'Los Angeles',
                 'teamName' => 'Lakers',
@@ -148,9 +152,8 @@ class InjuriesViewTest extends TestCase
 
         $result = $this->view->render($injuredPlayers);
 
-        // Should contain alternating row classes
-        $this->assertStringContainsString('injuries-row-even', $result);
-        $this->assertStringContainsString('injuries-row-odd', $result);
+        // Row alternation handled by design system CSS via ibl-data-table class
+        $this->assertStringContainsString('ibl-data-table', $result);
     }
 
     public function testRenderEscapesHtmlEntities(): void
@@ -161,6 +164,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'Player<script>alert("xss")</script>',
                 'position' => 'PG',
                 'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
                 'teamID' => 1,
                 'teamCity' => 'Test<script>',
                 'teamName' => 'Team&Name',
@@ -173,8 +177,10 @@ class InjuriesViewTest extends TestCase
 
         // The raw <script> tag should not appear - should be escaped
         $this->assertStringNotContainsString('<script>alert', $result);
-        // Escaped version should appear
+        // Escaped player name should appear (city is no longer displayed)
         $this->assertStringContainsString('&lt;script&gt;', $result);
+        // Team name should be escaped
+        $this->assertStringContainsString('Team&amp;Name', $result);
     }
 
     public function testRenderIncludesPlayerLinks(): void
@@ -185,6 +191,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'John Smith',
                 'position' => 'PG',
                 'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
                 'teamID' => 1,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
@@ -207,6 +214,7 @@ class InjuriesViewTest extends TestCase
                 'name' => 'John Smith',
                 'position' => 'PG',
                 'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
                 'teamID' => 42,
                 'teamCity' => 'Boston',
                 'teamName' => 'Celtics',
@@ -219,5 +227,29 @@ class InjuriesViewTest extends TestCase
 
         $this->assertStringContainsString('teamID=42', $result);
         $this->assertStringContainsString('modules.php?name=Team', $result);
+    }
+
+    public function testRenderShowsReturnDateTooltip(): void
+    {
+        $injuredPlayers = [
+            [
+                'playerID' => 1,
+                'name' => 'John Smith',
+                'position' => 'PG',
+                'daysRemaining' => 5,
+                'returnDate' => '2025-02-10',
+                'teamID' => 1,
+                'teamCity' => 'Boston',
+                'teamName' => 'Celtics',
+                'teamColor1' => '007A33',
+                'teamColor2' => 'FFFFFF',
+            ],
+        ];
+
+        $result = $this->view->render($injuredPlayers);
+
+        $this->assertStringContainsString('ibl-tooltip', $result);
+        $this->assertStringContainsString('Returns: 2025-02-10', $result);
+        $this->assertStringContainsString('tabindex="0"', $result);
     }
 }

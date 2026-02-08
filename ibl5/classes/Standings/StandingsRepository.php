@@ -12,6 +12,10 @@ use Standings\Contracts\StandingsRepositoryInterface;
  * Retrieves standings data from ibl_standings and ibl_power tables.
  * Supports both conference and division groupings.
  *
+ * @phpstan-import-type StandingsRow from StandingsRepositoryInterface
+ * @phpstan-import-type StreakRow from StandingsRepositoryInterface
+ * @phpstan-import-type PythagoreanStats from StandingsRepositoryInterface
+ *
  * @see StandingsRepositoryInterface For the interface contract
  * @see \BaseMysqliRepository For base class documentation
  */
@@ -56,42 +60,51 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
 
     /**
      * @see StandingsRepositoryInterface::getStandingsByRegion()
+     *
+     * @return list<StandingsRow>
      */
     public function getStandingsByRegion(string $region): array
     {
         $columns = $this->getGroupingColumns($region);
 
         $query = "SELECT
-            tid,
-            team_name,
-            leagueRecord,
-            pct,
-            {$columns['gbColumn']} AS gamesBack,
-            confRecord,
-            divRecord,
-            homeRecord,
-            awayRecord,
-            gamesUnplayed,
-            {$columns['magicNumberColumn']} AS magicNumber,
-            clinchedConference,
-            clinchedDivision,
-            clinchedPlayoffs,
-            (homeWins + homeLosses) AS homeGames,
-            (awayWins + awayLosses) AS awayGames
-            FROM ibl_standings
-            WHERE {$columns['grouping']} = ?
-            ORDER BY {$columns['gbColumn']} ASC";
+            s.tid,
+            s.team_name,
+            s.leagueRecord,
+            s.pct,
+            s.{$columns['gbColumn']} AS gamesBack,
+            s.confRecord,
+            s.divRecord,
+            s.homeRecord,
+            s.awayRecord,
+            s.gamesUnplayed,
+            s.{$columns['magicNumberColumn']} AS magicNumber,
+            s.clinchedConference,
+            s.clinchedDivision,
+            s.clinchedPlayoffs,
+            (s.homeWins + s.homeLosses) AS homeGames,
+            (s.awayWins + s.awayLosses) AS awayGames,
+            t.color1,
+            t.color2
+            FROM ibl_standings s
+            JOIN ibl_team_info t ON s.tid = t.teamid
+            WHERE s.{$columns['grouping']} = ?
+            ORDER BY s.{$columns['gbColumn']} ASC";
 
+        /** @var list<StandingsRow> */
         return $this->fetchAll($query, "s", $region);
     }
 
     /**
     * @see StandingsRepositoryInterface::getTeamStreakData()
+     *
+     * @return StreakRow|null
      */
     public function getTeamStreakData(int $teamId): ?array
     {
+        /** @var StreakRow|null */
         return $this->fetchOne(
-            "SELECT last_win, last_loss, streak_type, streak FROM ibl_power WHERE TeamID = ?",
+            "SELECT last_win, last_loss, streak_type, streak, ranking FROM ibl_power WHERE TeamID = ?",
             "i",
             $teamId
         );
@@ -99,38 +112,37 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
 
     /**
      * @see StandingsRepositoryInterface::getTeamPythagoreanStats()
+     *
+     * @return PythagoreanStats|null
      */
     public function getTeamPythagoreanStats(int $teamId): ?array
     {
-        // Get points scored from offense stats
-        $offenseStats = $this->fetchOne(
-            "SELECT fgm, ftm, tgm FROM ibl_team_offense_stats WHERE teamID = ?",
+        /** @var array{off_fgm: int, off_ftm: int, off_tgm: int, def_fgm: int, def_ftm: int, def_tgm: int}|null $stats */
+        $stats = $this->fetchOne(
+            "SELECT
+                tos.fgm AS off_fgm, tos.ftm AS off_ftm, tos.tgm AS off_tgm,
+                tds.fgm AS def_fgm, tds.ftm AS def_ftm, tds.tgm AS def_tgm
+            FROM ibl_team_offense_stats tos
+            JOIN ibl_team_defense_stats tds ON tos.teamID = tds.teamID
+            WHERE tos.teamID = ?",
             "i",
             $teamId
         );
 
-        // Get points allowed from defense stats
-        $defenseStats = $this->fetchOne(
-            "SELECT fgm, ftm, tgm FROM ibl_team_defense_stats WHERE teamID = ?",
-            "i",
-            $teamId
-        );
-
-        if ($offenseStats === null || $defenseStats === null) {
+        if ($stats === null) {
             return null;
         }
 
-        // Calculate points using BasketballStats\StatsFormatter
         $pointsScored = \BasketballStats\StatsFormatter::calculatePoints(
-            $offenseStats['fgm'],
-            $offenseStats['ftm'],
-            $offenseStats['tgm']
+            $stats['off_fgm'],
+            $stats['off_ftm'],
+            $stats['off_tgm']
         );
 
         $pointsAllowed = \BasketballStats\StatsFormatter::calculatePoints(
-            $defenseStats['fgm'],
-            $defenseStats['ftm'],
-            $defenseStats['tgm']
+            $stats['def_fgm'],
+            $stats['def_ftm'],
+            $stats['def_tgm']
         );
 
         return [

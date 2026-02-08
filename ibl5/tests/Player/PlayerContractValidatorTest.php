@@ -325,7 +325,7 @@ class PlayerContractValidatorTest extends TestCase
 
     private function createMockSeason($endingYear)
     {
-        $season = $this->createMock(\Season::class);
+        $season = $this->createStub(\Season::class);
         $season->endingYear = $endingYear;
         return $season;
     }

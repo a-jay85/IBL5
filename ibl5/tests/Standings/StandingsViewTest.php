@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Standings;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Standings\StandingsRepository;
 use Standings\StandingsView;
@@ -15,6 +16,7 @@ use Standings\Contracts\StandingsViewInterface;
  *
  * @covers \Standings\StandingsView
  */
+#[AllowMockObjectsWithoutExpectations]
 class StandingsViewTest extends TestCase
 {
     private StandingsViewInterface $view;
@@ -37,17 +39,6 @@ class StandingsViewTest extends TestCase
         $result = $this->view->render();
 
         $this->assertIsString($result);
-    }
-
-    public function testRenderIncludesSorttableScript(): void
-    {
-        $this->mockRepository->method('getStandingsByRegion')->willReturn([]);
-        $this->mockRepository->method('getTeamStreakData')->willReturn(null);
-        $this->mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
-
-        $result = $this->view->render();
-
-        $this->assertStringContainsString('<script src="sorttable.js"></script>', $result);
     }
 
     public function testRenderIncludesAllConferences(): void
@@ -84,12 +75,12 @@ class StandingsViewTest extends TestCase
 
         $result = $this->view->renderRegion('Eastern');
 
-        $this->assertStringContainsString('<table class="sortable standings-table">', $result);
+        $this->assertStringContainsString('<table class="sortable ibl-data-table">', $result);
         $this->assertStringContainsString('Team', $result);
         $this->assertStringContainsString('W-L', $result);
-        $this->assertStringContainsString('Pct', $result);
+        $this->assertStringContainsString('Win%', $result);
         $this->assertStringContainsString('GB', $result);
-        $this->assertStringContainsString('Magic#', $result);
+        $this->assertStringContainsString('Magic', $result);
     }
 
     public function testRenderRegionDisplaysTeamData(): void
@@ -112,6 +103,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -150,6 +143,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -187,6 +182,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -223,6 +220,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 1,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -235,7 +234,7 @@ class StandingsViewTest extends TestCase
 
         $result = $this->view->renderRegion('Eastern');
 
-        $this->assertStringContainsString('<b>Z</b>-Celtics', $result);
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">Z</span>-Celtics', $result);
     }
 
     public function testRenderRegionDisplaysClinchedDivisionIndicator(): void
@@ -258,6 +257,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 1,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -270,7 +271,7 @@ class StandingsViewTest extends TestCase
 
         $result = $this->view->renderRegion('Eastern');
 
-        $this->assertStringContainsString('<b>Y</b>-Celtics', $result);
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">Y</span>-Celtics', $result);
     }
 
     public function testRenderRegionDisplaysClinchedPlayoffsIndicator(): void
@@ -293,6 +294,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 1,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -305,7 +308,7 @@ class StandingsViewTest extends TestCase
 
         $result = $this->view->renderRegion('Eastern');
 
-        $this->assertStringContainsString('<b>X</b>-Celtics', $result);
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">X</span>-Celtics', $result);
     }
 
     public function testRenderRegionHandlesMissingStreakData(): void
@@ -328,6 +331,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 
@@ -364,6 +369,8 @@ class StandingsViewTest extends TestCase
                 'clinchedConference' => 0,
                 'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
             ],
         ];
 

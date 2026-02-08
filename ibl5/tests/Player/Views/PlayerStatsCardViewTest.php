@@ -20,14 +20,11 @@ class PlayerStatsCardViewTest extends TestCase
     // PlayerStatsCardView Tests
     // =========================================================================
 
-    public function testGetStylesReturnsValidCss(): void
+    public function testGetStylesReturnsEmptyString(): void
     {
         $styles = PlayerStatsCardView::getStyles();
-        
-        $this->assertStringContainsString('<style>', $styles);
-        $this->assertStringContainsString('.player-stats-card', $styles);
-        $this->assertStringContainsString('.stats-table', $styles);
-        $this->assertStringContainsString('</style>', $styles);
+
+        $this->assertSame('', $styles);
     }
 
     public function testWrapAddsCardWrapper(): void
@@ -123,15 +120,12 @@ class PlayerStatsCardViewTest extends TestCase
         $this->assertCount(4, $supportedTypes);
     }
 
-    public function testGetFlipStylesReturnsValidCssAndJs(): void
+    public function testGetFlipStylesReturnsJsOnly(): void
     {
         $styles = PlayerStatsFlipCardView::getFlipStyles();
-        
-        $this->assertStringContainsString('<style>', $styles);
-        $this->assertStringContainsString('.stats-flip-container', $styles);
-        $this->assertStringContainsString('.stats-flip-toggle', $styles);
-        $this->assertStringContainsString('</style>', $styles);
-        
+
+        // CSS is now centralized — only JS flip interaction code should be emitted
+        $this->assertStringNotContainsString('<style>', $styles);
         $this->assertStringContainsString('<script>', $styles);
         $this->assertStringContainsString('DOMContentLoaded', $styles);
         $this->assertStringContainsString('</script>', $styles);
@@ -161,15 +155,14 @@ class PlayerStatsCardViewTest extends TestCase
         $this->assertStringContainsString('toggle-label', $result);
     }
 
-    public function testRenderIncludesViewLabels(): void
+    public function testRenderIncludesToggleLabelText(): void
     {
         $averagesHtml = '<table class="sortable player-table"><td class="player-table-header">Averages</td></table>';
         $totalsHtml = '<table class="sortable player-table"><td class="player-table-header">Totals</td></table>';
-        
+
         $result = PlayerStatsFlipCardView::render($averagesHtml, $totalsHtml, 'Playoffs');
-        
-        $this->assertStringContainsString('stats-view-label', $result);
-        $this->assertStringContainsString('Averages', $result);
+
+        $this->assertStringContainsString('toggle-label', $result);
         $this->assertStringContainsString('Totals', $result);
     }
 

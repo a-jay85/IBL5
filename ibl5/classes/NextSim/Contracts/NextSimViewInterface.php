@@ -9,6 +9,8 @@ namespace NextSim\Contracts;
  *
  * Defines methods for generating HTML output for next sim games.
  *
+ * @phpstan-import-type NextSimGameData from \NextSim\Contracts\NextSimServiceInterface
+ *
  * @see \NextSim\NextSimView For the concrete implementation
  */
 interface NextSimViewInterface
@@ -16,7 +18,7 @@ interface NextSimViewInterface
     /**
      * Render the complete next sim display
      *
-     * @param array $games Processed game data
+     * @param array<int, NextSimGameData> $games Processed game data
      * @param int $simLengthInDays Simulation length in days
      * @return string HTML output
      */

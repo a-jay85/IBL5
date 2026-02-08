@@ -10,127 +10,129 @@ use Player\Contracts\PlayerStatsRepositoryInterface;
 
 /**
  * PlayerStats - Player statistics data object
- * 
+ *
  * Provides access to current season stats, career stats, season/career highs,
  * and per-game averages. Uses PlayerStatsRepository for all database operations.
- * 
+ *
  * @see PlayerStatsInterface
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class PlayerStats implements PlayerStatsInterface
 {
     protected PlayerStatsRepositoryInterface $repository;
 
-    public $playerID;
-    public $plr;
+    public int|string $playerID;
+    /** @var array<string, mixed>|null */
+    public ?array $plr = null;
 
-    public $name;
-    public $position;
-    public $isRetired;
-    
-    public $seasonGamesStarted;
-    public $seasonGamesPlayed;
-    public $seasonMinutes;
-    public $seasonFieldGoalsMade;
-    public $seasonFieldGoalsAttempted;
-    public $seasonFreeThrowsMade;
-    public $seasonFreeThrowsAttempted;
-    public $seasonThreePointersMade;
-    public $seasonThreePointersAttempted;
-    public $seasonOffensiveRebounds;
-    public $seasonDefensiveRebounds;
-    public $seasonTotalRebounds;
-    public $seasonAssists;
-    public $seasonSteals;
-    public $seasonTurnovers;
-    public $seasonBlocks;
-    public $seasonPersonalFouls;
-    public $seasonPoints;
+    public string $name;
+    public string $position;
+    public int $isRetired;
 
-    public $seasonMinutesPerGame;
-    public $seasonFieldGoalsMadePerGame;
-    public $seasonFieldGoalsAttemptedPerGame;
-    public $seasonFreeThrowsMadePerGame;
-    public $seasonFreeThrowsAttemptedPerGame;
-    public $seasonThreePointersMadePerGame;
-    public $seasonThreePointersAttemptedPerGame;
-    public $seasonOffensiveReboundsPerGame;
-    public $seasonDefensiveReboundsPerGame;
-    public $seasonTotalReboundsPerGame;
-    public $seasonAssistsPerGame;
-    public $seasonStealsPerGame;
-    public $seasonTurnoversPerGame;
-    public $seasonBlocksPerGame;
-    public $seasonPersonalFoulsPerGame;
-    public $seasonPointsPerGame;
-    
-    public $seasonFieldGoalPercentage;
-    public $seasonFreeThrowPercentage;
-    public $seasonThreePointPercentage;
+    public int $seasonGamesStarted;
+    public int $seasonGamesPlayed;
+    public int $seasonMinutes;
+    public int $seasonFieldGoalsMade;
+    public int $seasonFieldGoalsAttempted;
+    public int $seasonFreeThrowsMade;
+    public int $seasonFreeThrowsAttempted;
+    public int $seasonThreePointersMade;
+    public int $seasonThreePointersAttempted;
+    public int $seasonOffensiveRebounds;
+    public int $seasonDefensiveRebounds;
+    public int $seasonTotalRebounds;
+    public int $seasonAssists;
+    public int $seasonSteals;
+    public int $seasonTurnovers;
+    public int $seasonBlocks;
+    public int $seasonPersonalFouls;
+    public int $seasonPoints;
 
-    public $seasonHighPoints;
-    public $seasonHighRebounds;
-    public $seasonHighAssists;
-    public $seasonHighSteals;
-    public $seasonHighBlocks;
-    public $seasonDoubleDoubles;
-    public $seasonTripleDoubles;
+    public string $seasonMinutesPerGame;
+    public string $seasonFieldGoalsMadePerGame;
+    public string $seasonFieldGoalsAttemptedPerGame;
+    public string $seasonFreeThrowsMadePerGame;
+    public string $seasonFreeThrowsAttemptedPerGame;
+    public string $seasonThreePointersMadePerGame;
+    public string $seasonThreePointersAttemptedPerGame;
+    public string $seasonOffensiveReboundsPerGame;
+    public string $seasonDefensiveReboundsPerGame;
+    public string $seasonTotalReboundsPerGame;
+    public string $seasonAssistsPerGame;
+    public string $seasonStealsPerGame;
+    public string $seasonTurnoversPerGame;
+    public string $seasonBlocksPerGame;
+    public string $seasonPersonalFoulsPerGame;
+    public string $seasonPointsPerGame;
 
-    public $seasonPlayoffHighPoints;
-    public $seasonPlayoffHighRebounds;
-    public $seasonPlayoffHighAssists;
-    public $seasonPlayoffHighSteals;
-    public $seasonPlayoffHighBlocks;
-    public $seasonPlayoffDoubleDoubles;
-    public $seasonPlayoffTripleDoubles;
+    public string $seasonFieldGoalPercentage;
+    public string $seasonFreeThrowPercentage;
+    public string $seasonThreePointPercentage;
 
-    public $careerSeasonHighPoints;
-    public $careerSeasonHighRebounds;
-    public $careerSeasonHighAssists;
-    public $careerSeasonHighSteals;
-    public $careerSeasonHighBlocks;
-    public $careerDoubleDoubles;
-    public $careerTripleDoubles;
+    public int $seasonHighPoints;
+    public int $seasonHighRebounds;
+    public int $seasonHighAssists;
+    public int $seasonHighSteals;
+    public int $seasonHighBlocks;
+    public int $seasonDoubleDoubles;
+    public int $seasonTripleDoubles;
 
-    public $careerPlayoffHighPoints;
-    public $careerPlayoffHighRebounds;
-    public $careerPlayoffHighAssists;
-    public $careerPlayoffHighSteals;
-    public $careerPlayoffHighBlocks;
-    public $careerPlayoffDoubleDoubles;
-    public $careerPlayoffTripleDoubles;
+    public int $seasonPlayoffHighPoints;
+    public int $seasonPlayoffHighRebounds;
+    public int $seasonPlayoffHighAssists;
+    public int $seasonPlayoffHighSteals;
+    public int $seasonPlayoffHighBlocks;
+    public int $seasonPlayoffDoubleDoubles;
+    public int $seasonPlayoffTripleDoubles;
 
-    public $careerGamesPlayed;
-    public $careerMinutesPlayed;
-    public $careerFieldGoalsMade;
-    public $careerFieldGoalsAttempted;
-    public $careerFreeThrowsMade;
-    public $careerFreeThrowsAttempted;
-    public $careerThreePointersMade;
-    public $careerThreePointersAttempted;
-    public $careerOffensiveRebounds;
-    public $careerDefensiveRebounds;
-    public $careerTotalRebounds;
-    public $careerAssists;
-    public $careerSteals;
-    public $careerTurnovers;
-    public $careerBlocks;
-    public $careerPersonalFouls;
-    public $careerPoints;
+    public int $careerSeasonHighPoints;
+    public int $careerSeasonHighRebounds;
+    public int $careerSeasonHighAssists;
+    public int $careerSeasonHighSteals;
+    public int $careerSeasonHighBlocks;
+    public int $careerDoubleDoubles;
+    public int $careerTripleDoubles;
 
-    public $gameMinutesPlayed;
-    public $gameFieldGoalsMade;
-    public $gameFieldGoalsAttempted;
-    public $gameFreeThrowsMade;
-    public $gameFreeThrowsAttempted;
-    public $gameThreePointersMade;
-    public $gameThreePointersAttempted;
-    public $gameOffensiveRebounds;
-    public $gameDefensiveRebounds;
-    public $gameAssists;
-    public $gameSteals;
-    public $gameTurnovers;
-    public $gameBlocks;
-    public $gamePersonalFouls;
+    public int $careerPlayoffHighPoints;
+    public int $careerPlayoffHighRebounds;
+    public int $careerPlayoffHighAssists;
+    public int $careerPlayoffHighSteals;
+    public int $careerPlayoffHighBlocks;
+    public int $careerPlayoffDoubleDoubles;
+    public int $careerPlayoffTripleDoubles;
+
+    public int $careerGamesPlayed;
+    public int $careerMinutesPlayed;
+    public int $careerFieldGoalsMade;
+    public int $careerFieldGoalsAttempted;
+    public int $careerFreeThrowsMade;
+    public int $careerFreeThrowsAttempted;
+    public int $careerThreePointersMade;
+    public int $careerThreePointersAttempted;
+    public int $careerOffensiveRebounds;
+    public int $careerDefensiveRebounds;
+    public int $careerTotalRebounds;
+    public int $careerAssists;
+    public int $careerSteals;
+    public int $careerTurnovers;
+    public int $careerBlocks;
+    public int $careerPersonalFouls;
+    public int $careerPoints;
+
+    public string $gameMinutesPlayed;
+    public string $gameFieldGoalsMade;
+    public string $gameFieldGoalsAttempted;
+    public string $gameFreeThrowsMade;
+    public string $gameFreeThrowsAttempted;
+    public string $gameThreePointersMade;
+    public string $gameThreePointersAttempted;
+    public string $gameOffensiveRebounds;
+    public string $gameDefensiveRebounds;
+    public string $gameAssists;
+    public string $gameSteals;
+    public string $gameTurnovers;
+    public string $gameBlocks;
+    public string $gamePersonalFouls;
 
     /**
      * Constructor - accepts repository for database operations
@@ -160,7 +162,7 @@ class PlayerStats implements PlayerStatsInterface
     {
         $repository = new PlayerStatsRepository($db);
         $instance = new self($repository);
-        $instance->loadByID($player->playerID);
+        $instance->loadByID($player->playerID ?? 0);
         return $instance;
     }
 
@@ -202,39 +204,42 @@ class PlayerStats implements PlayerStatsInterface
      */
     protected function loadByID(int $playerID): void
     {
+        /** @var PlayerRow|null $plrRow */
         $plrRow = $this->repository->getPlayerStats($playerID);
-        if ($plrRow) {
+        if ($plrRow !== null) {
             $this->fill($plrRow);
         }
     }
 
     /**
      * Fill stats from a current player database row
+     *
+     * @param PlayerRow $plrRow
      */
     protected function fill(array $plrRow): void
     {
         $this->playerID = $plrRow['pid'];
-        $this->name = $plrRow['name'];
-        $this->position = $plrRow['pos'];
-        $this->isRetired = $plrRow['retired'];
+        $this->name = (string) $plrRow['name'];
+        $this->position = (string) $plrRow['pos'];
+        $this->isRetired = $plrRow['retired'] ?? 0;
 
-        $this->seasonGamesStarted = $plrRow['stats_gs'];
-        $this->seasonGamesPlayed = $plrRow['stats_gm'];
-        $this->seasonMinutes = $plrRow['stats_min'];
-        $this->seasonFieldGoalsMade = $plrRow['stats_fgm'];
-        $this->seasonFieldGoalsAttempted = $plrRow['stats_fga'];
-        $this->seasonFreeThrowsMade = $plrRow['stats_ftm'];
-        $this->seasonFreeThrowsAttempted = $plrRow['stats_fta'];
-        $this->seasonThreePointersMade = $plrRow['stats_3gm'];
-        $this->seasonThreePointersAttempted = $plrRow['stats_3ga'];
-        $this->seasonOffensiveRebounds = $plrRow['stats_orb'];
-        $this->seasonDefensiveRebounds = $plrRow['stats_drb'];
+        $this->seasonGamesStarted = (int) ($plrRow['stats_gs'] ?? 0);
+        $this->seasonGamesPlayed = (int) ($plrRow['stats_gm'] ?? 0);
+        $this->seasonMinutes = (int) ($plrRow['stats_min'] ?? 0);
+        $this->seasonFieldGoalsMade = (int) ($plrRow['stats_fgm'] ?? 0);
+        $this->seasonFieldGoalsAttempted = (int) ($plrRow['stats_fga'] ?? 0);
+        $this->seasonFreeThrowsMade = (int) ($plrRow['stats_ftm'] ?? 0);
+        $this->seasonFreeThrowsAttempted = (int) ($plrRow['stats_fta'] ?? 0);
+        $this->seasonThreePointersMade = (int) ($plrRow['stats_3gm'] ?? 0);
+        $this->seasonThreePointersAttempted = (int) ($plrRow['stats_3ga'] ?? 0);
+        $this->seasonOffensiveRebounds = (int) ($plrRow['stats_orb'] ?? 0);
+        $this->seasonDefensiveRebounds = (int) ($plrRow['stats_drb'] ?? 0);
         $this->seasonTotalRebounds = $this->seasonOffensiveRebounds + $this->seasonDefensiveRebounds;
-        $this->seasonAssists = $plrRow['stats_ast'];
-        $this->seasonSteals = $plrRow['stats_stl'];
-        $this->seasonTurnovers = $plrRow['stats_to'];
-        $this->seasonBlocks = $plrRow['stats_blk'];
-        $this->seasonPersonalFouls = $plrRow['stats_pf'];
+        $this->seasonAssists = (int) ($plrRow['stats_ast'] ?? 0);
+        $this->seasonSteals = (int) ($plrRow['stats_stl'] ?? 0);
+        $this->seasonTurnovers = (int) ($plrRow['stats_to'] ?? 0);
+        $this->seasonBlocks = (int) ($plrRow['stats_blk'] ?? 0);
+        $this->seasonPersonalFouls = (int) ($plrRow['stats_pf'] ?? 0);
         $this->seasonPoints = StatsFormatter::calculatePoints($this->seasonFieldGoalsMade, $this->seasonFreeThrowsMade, $this->seasonThreePointersMade);
 
         $this->seasonMinutesPerGame = StatsFormatter::formatPerGameAverage($this->seasonMinutes, $this->seasonGamesPlayed);
@@ -257,75 +262,82 @@ class PlayerStats implements PlayerStatsInterface
         $this->seasonFieldGoalPercentage = StatsFormatter::formatPercentage($this->seasonFieldGoalsMade, $this->seasonFieldGoalsAttempted);
         $this->seasonFreeThrowPercentage = StatsFormatter::formatPercentage($this->seasonFreeThrowsMade, $this->seasonFreeThrowsAttempted);
         $this->seasonThreePointPercentage = StatsFormatter::formatPercentage($this->seasonThreePointersMade, $this->seasonThreePointersAttempted);
-        
-        $this->seasonHighPoints = $plrRow['sh_pts'];
-        $this->seasonHighRebounds = $plrRow['sh_reb'];
-        $this->seasonHighAssists = $plrRow['sh_ast'];
-        $this->seasonHighSteals = $plrRow['sh_stl'];
-        $this->seasonHighBlocks = $plrRow['sh_blk'];
-        $this->seasonDoubleDoubles = $plrRow['s_dd'];
-        $this->seasonTripleDoubles = $plrRow['s_td'];
 
-        $this->seasonPlayoffHighPoints = $plrRow['sp_pts'];
-        $this->seasonPlayoffHighRebounds = $plrRow['sp_reb'];
-        $this->seasonPlayoffHighAssists = $plrRow['sp_ast'];
-        $this->seasonPlayoffHighSteals = $plrRow['sp_stl'];
-        $this->seasonPlayoffHighBlocks = $plrRow['sp_blk'];
+        $this->seasonHighPoints = (int) ($plrRow['sh_pts'] ?? 0);
+        $this->seasonHighRebounds = (int) ($plrRow['sh_reb'] ?? 0);
+        $this->seasonHighAssists = (int) ($plrRow['sh_ast'] ?? 0);
+        $this->seasonHighSteals = (int) ($plrRow['sh_stl'] ?? 0);
+        $this->seasonHighBlocks = (int) ($plrRow['sh_blk'] ?? 0);
+        $this->seasonDoubleDoubles = (int) ($plrRow['s_dd'] ?? 0);
+        $this->seasonTripleDoubles = (int) ($plrRow['s_td'] ?? 0);
 
-        $this->careerSeasonHighPoints = $plrRow['ch_pts'];
-        $this->careerSeasonHighRebounds = $plrRow['ch_reb'];
-        $this->careerSeasonHighAssists = $plrRow['ch_ast'];
-        $this->careerSeasonHighSteals = $plrRow['ch_stl'];
-        $this->careerSeasonHighBlocks = $plrRow['ch_blk'];
-        $this->careerDoubleDoubles = $plrRow['c_dd'];
-        $this->careerTripleDoubles = $plrRow['c_td'];
+        $this->seasonPlayoffHighPoints = (int) ($plrRow['sp_pts'] ?? 0);
+        $this->seasonPlayoffHighRebounds = (int) ($plrRow['sp_reb'] ?? 0);
+        $this->seasonPlayoffHighAssists = (int) ($plrRow['sp_ast'] ?? 0);
+        $this->seasonPlayoffHighSteals = (int) ($plrRow['sp_stl'] ?? 0);
+        $this->seasonPlayoffHighBlocks = (int) ($plrRow['sp_blk'] ?? 0);
+        $this->seasonPlayoffDoubleDoubles = 0;
+        $this->seasonPlayoffTripleDoubles = 0;
 
-        $this->careerPlayoffHighPoints = $plrRow['cp_pts'];
-        $this->careerPlayoffHighRebounds = $plrRow['cp_reb'];
-        $this->careerPlayoffHighAssists = $plrRow['cp_ast'];
-        $this->careerPlayoffHighSteals = $plrRow['cp_stl'];
-        $this->careerPlayoffHighBlocks = $plrRow['cp_blk'];
+        $this->careerSeasonHighPoints = (int) ($plrRow['ch_pts'] ?? 0);
+        $this->careerSeasonHighRebounds = (int) ($plrRow['ch_reb'] ?? 0);
+        $this->careerSeasonHighAssists = (int) ($plrRow['ch_ast'] ?? 0);
+        $this->careerSeasonHighSteals = (int) ($plrRow['ch_stl'] ?? 0);
+        $this->careerSeasonHighBlocks = (int) ($plrRow['ch_blk'] ?? 0);
+        $this->careerDoubleDoubles = (int) ($plrRow['c_dd'] ?? 0);
+        $this->careerTripleDoubles = (int) ($plrRow['c_td'] ?? 0);
 
-        $this->careerGamesPlayed = $plrRow['car_gm'];
-        $this->careerMinutesPlayed = $plrRow['car_min'];
-        $this->careerFieldGoalsMade = $plrRow['car_fgm'];
-        $this->careerFieldGoalsAttempted = $plrRow['car_fga'];
-        $this->careerFreeThrowsMade = $plrRow['car_ftm'];
-        $this->careerFreeThrowsAttempted = $plrRow['car_fta'];
-        $this->careerThreePointersMade = $plrRow['car_tgm'];
-        $this->careerThreePointersAttempted = $plrRow['car_tga'];
-        $this->careerOffensiveRebounds = $plrRow['car_orb'];
-        $this->careerDefensiveRebounds = $plrRow['car_drb'];
-        $this->careerTotalRebounds = $plrRow['car_reb'];
-        $this->careerAssists = $plrRow['car_ast'];
-        $this->careerSteals = $plrRow['car_stl'];
-        $this->careerTurnovers = $plrRow['car_to'];
-        $this->careerBlocks = $plrRow['car_blk'];
-        $this->careerPersonalFouls = $plrRow['car_pf'];
+        $this->careerPlayoffHighPoints = (int) ($plrRow['cp_pts'] ?? 0);
+        $this->careerPlayoffHighRebounds = (int) ($plrRow['cp_reb'] ?? 0);
+        $this->careerPlayoffHighAssists = (int) ($plrRow['cp_ast'] ?? 0);
+        $this->careerPlayoffHighSteals = (int) ($plrRow['cp_stl'] ?? 0);
+        $this->careerPlayoffHighBlocks = (int) ($plrRow['cp_blk'] ?? 0);
+        $this->careerPlayoffDoubleDoubles = 0;
+        $this->careerPlayoffTripleDoubles = 0;
+
+        $this->careerGamesPlayed = (int) ($plrRow['car_gm'] ?? 0);
+        $this->careerMinutesPlayed = (int) ($plrRow['car_min'] ?? 0);
+        $this->careerFieldGoalsMade = (int) ($plrRow['car_fgm'] ?? 0);
+        $this->careerFieldGoalsAttempted = (int) ($plrRow['car_fga'] ?? 0);
+        $this->careerFreeThrowsMade = (int) ($plrRow['car_ftm'] ?? 0);
+        $this->careerFreeThrowsAttempted = (int) ($plrRow['car_fta'] ?? 0);
+        $this->careerThreePointersMade = (int) ($plrRow['car_tgm'] ?? 0);
+        $this->careerThreePointersAttempted = (int) ($plrRow['car_tga'] ?? 0);
+        $this->careerOffensiveRebounds = (int) ($plrRow['car_orb'] ?? 0);
+        $this->careerDefensiveRebounds = (int) ($plrRow['car_drb'] ?? 0);
+        $this->careerTotalRebounds = (int) ($plrRow['car_reb'] ?? 0);
+        $this->careerAssists = (int) ($plrRow['car_ast'] ?? 0);
+        $this->careerSteals = (int) ($plrRow['car_stl'] ?? 0);
+        $this->careerTurnovers = (int) ($plrRow['car_to'] ?? 0);
+        $this->careerBlocks = (int) ($plrRow['car_blk'] ?? 0);
+        $this->careerPersonalFouls = (int) ($plrRow['car_pf'] ?? 0);
         $this->careerPoints = StatsFormatter::calculatePoints($this->careerFieldGoalsMade, $this->careerFreeThrowsMade, $this->careerThreePointersMade);
     }
 
     /**
      * Fill stats from a historical player database row
+     *
+     * @param array<string, mixed> $plrRow
      */
     protected function fillHistorical(array $plrRow): void
     {
-        $this->seasonGamesPlayed = $plrRow['gm'];
-        $this->seasonMinutes = $plrRow['min'];
-        $this->seasonFieldGoalsMade = $plrRow['fgm'];
-        $this->seasonFieldGoalsAttempted = $plrRow['fga'];
-        $this->seasonFreeThrowsMade = $plrRow['ftm'];
-        $this->seasonFreeThrowsAttempted = $plrRow['fta'];
-        $this->seasonThreePointersMade = $plrRow['3gm'];
-        $this->seasonThreePointersAttempted = $plrRow['3ga'];
-        $this->seasonOffensiveRebounds = $plrRow['orb'];
-        $this->seasonTotalRebounds = $plrRow['reb'];
+        /** @var array{gm: ?int, min: ?int, fgm: ?int, fga: ?int, ftm: ?int, fta: ?int, '3gm': ?int, '3ga': ?int, orb: ?int, reb: ?int, ast: ?int, stl: ?int, blk: ?int, tvr: ?int, pf: ?int, ...} $plrRow */
+        $this->seasonGamesPlayed = $plrRow['gm'] ?? 0;
+        $this->seasonMinutes = $plrRow['min'] ?? 0;
+        $this->seasonFieldGoalsMade = $plrRow['fgm'] ?? 0;
+        $this->seasonFieldGoalsAttempted = $plrRow['fga'] ?? 0;
+        $this->seasonFreeThrowsMade = $plrRow['ftm'] ?? 0;
+        $this->seasonFreeThrowsAttempted = $plrRow['fta'] ?? 0;
+        $this->seasonThreePointersMade = $plrRow['3gm'] ?? 0;
+        $this->seasonThreePointersAttempted = $plrRow['3ga'] ?? 0;
+        $this->seasonOffensiveRebounds = $plrRow['orb'] ?? 0;
+        $this->seasonTotalRebounds = $plrRow['reb'] ?? 0;
         $this->seasonDefensiveRebounds = $this->seasonTotalRebounds - $this->seasonOffensiveRebounds;
-        $this->seasonAssists = $plrRow['ast'];
-        $this->seasonSteals = $plrRow['stl'];
-        $this->seasonBlocks = $plrRow['blk'];
-        $this->seasonTurnovers = $plrRow['tvr'];
-        $this->seasonPersonalFouls = $plrRow['pf'];
+        $this->seasonAssists = $plrRow['ast'] ?? 0;
+        $this->seasonSteals = $plrRow['stl'] ?? 0;
+        $this->seasonBlocks = $plrRow['blk'] ?? 0;
+        $this->seasonTurnovers = $plrRow['tvr'] ?? 0;
+        $this->seasonPersonalFouls = $plrRow['pf'] ?? 0;
         $this->seasonPoints = StatsFormatter::calculatePoints($this->seasonFieldGoalsMade, $this->seasonFreeThrowsMade, $this->seasonThreePointersMade);
 
         $this->seasonMinutesPerGame = StatsFormatter::formatPerGameAverage($this->seasonMinutes, $this->seasonGamesPlayed);

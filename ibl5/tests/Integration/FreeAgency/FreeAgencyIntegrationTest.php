@@ -71,8 +71,9 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->processOfferSubmission($postData);
 
         // Assert
-        $this->assertStringContainsString('Your offer is legal', $result);
-        $this->assertStringContainsString('Free_Agency', $result);
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
+        $this->assertSame('offer_success', $result['type']);
 
         // Verify offer was saved to database
         $this->assertQueryExecuted('INSERT INTO ibl_fa_offers');
@@ -98,7 +99,9 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->processOfferSubmission($postData);
 
         // Assert
-        $this->assertStringContainsString('Your offer is legal', $result);
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
+        $this->assertSame('offer_success', $result['type']);
 
         // Verify MLE flag was set
         $this->assertQueryExecuted('INSERT INTO ibl_fa_offers');
@@ -123,7 +126,9 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->processOfferSubmission($postData);
 
         // Assert
-        $this->assertStringContainsString('Your offer is legal', $result);
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
+        $this->assertSame('offer_success', $result['type']);
 
         // Verify LLE flag was set
         $this->assertQueryExecuted('INSERT INTO ibl_fa_offers');
@@ -148,7 +153,9 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->processOfferSubmission($postData);
 
         // Assert
-        $this->assertStringContainsString('Your offer is legal', $result);
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
+        $this->assertSame('offer_success', $result['type']);
         $this->assertQueryExecuted('INSERT INTO ibl_fa_offers');
     }
 
@@ -179,8 +186,10 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->processOfferSubmission($postData);
 
         // Assert
-        $this->assertStringContainsString('previously signed', $result);
-        $this->assertStringContainsString('ff0000', $result); // Error color
+        $this->assertIsArray($result);
+        $this->assertFalse($result['success']);
+        $this->assertSame('already_signed', $result['type']);
+        $this->assertStringContainsString('previously signed', $result['message']);
 
         // Verify no offer was saved
         $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
@@ -211,7 +220,9 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->processOfferSubmission($postData);
 
         // Assert
-        $this->assertStringContainsString('ff0000', $result); // Error color
+        $this->assertIsArray($result);
+        $this->assertFalse($result['success']);
+        $this->assertSame('validation_error', $result['type']);
 
         // Verify no offer was saved
         $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
@@ -232,8 +243,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $result = $this->processor->deleteOffers('Miami Cyclones', 1);
 
         // Assert
-        $this->assertStringContainsString('deleted', $result);
-        $this->assertStringContainsString('Free_Agency', $result);
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
 
         // Verify DELETE query was executed
         $this->assertQueryExecuted('DELETE FROM ibl_fa_offers');
@@ -249,8 +260,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Salary_Total' => 5000,
                 'Salary_Cap' => 8250,
                 'Tax_Line' => 10000,
-                'HasMLE' => 0,
-                'HasLLE' => 0,
+                'HasMLE' => '0',
+                'HasLLE' => '0',
                 // Player is not signed
                 'tid' => 0,
                 'teamname' => 'Free Agent',
@@ -268,8 +279,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Salary_Total' => 9000,
                 'Salary_Cap' => 8250,
                 'Tax_Line' => 10000,
-                'HasMLE' => 1,
-                'HasLLE' => 0,
+                'HasMLE' => '1',
+                'HasLLE' => '0',
                 // Over cap but can use MLE
                 'tid' => 0,
                 'teamname' => 'Free Agent',
@@ -286,8 +297,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Salary_Total' => 9000,
                 'Salary_Cap' => 8250,
                 'Tax_Line' => 10000,
-                'HasMLE' => 0,
-                'HasLLE' => 1,
+                'HasMLE' => '0',
+                'HasLLE' => '1',
                 'tid' => 0,
                 'teamname' => 'Free Agent',
                 'freeAgencyNotificationsState' => 'Off',
@@ -303,8 +314,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Salary_Total' => 12000,
                 'Salary_Cap' => 8250,
                 'Tax_Line' => 10000,
-                'HasMLE' => 0,
-                'HasLLE' => 0,
+                'HasMLE' => '0',
+                'HasLLE' => '0',
                 'tid' => 0,
                 'teamname' => 'Free Agent',
                 'freeAgencyNotificationsState' => 'Off',
@@ -324,7 +335,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'freeAgencyNotificationsState' => 'Off',
                 // Critical: These fields indicate player was signed this FA period
                 'cy' => 0,  // Current year = 0 (not yet started)
-                'cy1' => '500',  // But has year 1 contract != "0" (signed!)
+                'cy1' => 500,  // But has year 1 contract != 0 (signed!)
             ])
         ]);
     }
@@ -337,8 +348,8 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Salary_Total' => 8000,
                 'Salary_Cap' => 8250,
                 'Tax_Line' => 10000,
-                'HasMLE' => 0,
-                'HasLLE' => 0,
+                'HasMLE' => '0',
+                'HasLLE' => '0',
                 'tid' => 0,
                 'teamname' => 'Free Agent',
                 'freeAgencyNotificationsState' => 'Off',
@@ -379,7 +390,7 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
             'pos' => 'SG',
             // Free agent contract status (not signed)
             'cy' => 0,  // Current year = 0 (not in contract)
-            'cy1' => '0',  // Year 1 salary = '0' (unsigned)
+            'cy1' => 0,  // Year 1 salary = 0 (unsigned)
         ]), TestDataFactory::createTeam([
             'teamid' => 1,
             'team_name' => 'Miami Cyclones',

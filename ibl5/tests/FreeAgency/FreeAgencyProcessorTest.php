@@ -96,15 +96,15 @@ class FreeAgencyProcessorTest extends TestCase
         $this->assertNotEmpty($faOfferQueries, 'Expected query targeting ibl_fa_offers table');
     }
 
-    public function testDeleteOffersReturnsHtmlResponse(): void
+    public function testDeleteOffersReturnsResultArray(): void
     {
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
 
         $result = $this->processor->deleteOffers('Test Team', 1);
 
-        $this->assertIsString($result);
-        // The result should contain HTML markup
-        $this->assertMatchesRegularExpression('/<.*>/', $result);
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('success', $result);
+        $this->assertTrue($result['success']);
     }
 
     // ============================================

@@ -175,33 +175,48 @@ class StatisticsRepository extends \BaseMysqliRepository
     {
         $topicsActive = function_exists('is_active') ? is_active("Topics") : false;
         $linksActive = function_exists('is_active') ? is_active("Web_Links") : false;
-        
-        return [
-            'users' => count(
-                $this->fetchAll("SELECT user_id FROM {$this->userPrefix}_users")
-            ),
-            'authors' => count(
-                $this->fetchAll("SELECT * FROM {$this->prefix}_authors")
-            ),
-            'stories' => count(
-                $this->fetchAll("SELECT sid FROM {$this->prefix}_stories")
-            ),
-            'comments' => count(
-                $this->fetchAll("SELECT tid FROM {$this->prefix}_comments")
-            ),
-            'submissions' => count(
-                $this->fetchAll("SELECT * FROM {$this->prefix}_queue")
-            ),
-            'topics' => $topicsActive ? count(
-                $this->fetchAll("SELECT * FROM {$this->prefix}_topics")
-            ) : 0,
-            'links' => $linksActive ? count(
-                $this->fetchAll("SELECT * FROM {$this->prefix}_links_links")
-            ) : 0,
-            'linkCategories' => $linksActive ? count(
-                $this->fetchAll("SELECT * FROM {$this->prefix}_links_categories")
-            ) : 0
+
+        /** @var array{users: int, authors: int, stories: int, comments: int, submissions: int}|null $row */
+        $row = $this->fetchOne(
+            "SELECT
+                (SELECT COUNT(*) FROM {$this->userPrefix}_users) AS users,
+                (SELECT COUNT(*) FROM {$this->prefix}_authors) AS authors,
+                (SELECT COUNT(*) FROM {$this->prefix}_stories) AS stories,
+                (SELECT COUNT(*) FROM {$this->prefix}_comments) AS comments,
+                (SELECT COUNT(*) FROM {$this->prefix}_queue) AS submissions"
+        );
+
+        $counts = [
+            'users' => intval($row['users'] ?? 0),
+            'authors' => intval($row['authors'] ?? 0),
+            'stories' => intval($row['stories'] ?? 0),
+            'comments' => intval($row['comments'] ?? 0),
+            'submissions' => intval($row['submissions'] ?? 0),
+            'topics' => 0,
+            'links' => 0,
+            'linkCategories' => 0,
         ];
+
+        if ($topicsActive) {
+            /** @var array{cnt: int}|null $topicRow */
+            $topicRow = $this->fetchOne(
+                "SELECT COUNT(*) AS cnt FROM {$this->prefix}_topics"
+            );
+            $counts['topics'] = intval($topicRow['cnt'] ?? 0);
+        }
+
+        if ($linksActive) {
+            /** @var array{links: int, linkCategories: int}|null $linkRow */
+            $linkRow = $this->fetchOne(
+                "SELECT
+                    (SELECT COUNT(*) FROM {$this->prefix}_links_links) AS links,
+                    (SELECT COUNT(*) FROM {$this->prefix}_links_categories) AS linkCategories"
+            );
+            $counts['links'] = intval($linkRow['links'] ?? 0);
+            $counts['linkCategories'] = intval($linkRow['linkCategories'] ?? 0);
+        }
+
+        return $counts;
     }
 
     /**
@@ -356,23 +371,24 @@ class StatisticsRepository extends \BaseMysqliRepository
     public function getHourlyStats(int $year, int $month, int $date): array
     {
         $stats = array_fill(0, 24, 0);
-        
-        for ($hour = 0; $hour <= 23; $hour++) {
-            $row = $this->fetchOne(
-                "SELECT hour, hits FROM {$this->prefix}_stats_hour 
-                 WHERE year = ? AND month = ? AND date = ? AND hour = ?",
-                "iiii",
-                $year,
-                $month,
-                $date,
-                $hour
-            );
-            
-            if ($row) {
+
+        $rows = $this->fetchAll(
+            "SELECT hour, hits FROM {$this->prefix}_stats_hour
+             WHERE year = ? AND month = ? AND date = ?
+             ORDER BY hour ASC",
+            "iii",
+            $year,
+            $month,
+            $date
+        );
+
+        foreach ($rows as $row) {
+            $hour = intval($row['hour']);
+            if ($hour >= 0 && $hour <= 23) {
                 $stats[$hour] = intval($row['hits']);
             }
         }
-        
+
         return $stats;
     }
 

@@ -18,7 +18,6 @@ use Shared\Contracts\SharedRepositoryInterface;
  * - Module status queries
  * - Contract extension management
  *
- * @implements SharedRepositoryInterface
  */
 class SharedRepository extends \BaseMysqliRepository implements SharedRepositoryInterface
 {
@@ -33,6 +32,7 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
      */
     public function getNumberOfTitles(string $teamName, string $titleName): int
     {
+        /** @var array{count: int}|null $result */
         $result = $this->fetchOne(
             "SELECT COUNT(name) as count FROM ibl_team_awards WHERE name = ? AND Award LIKE ?",
             "ss",
@@ -40,7 +40,7 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
             "%{$titleName}%"
         );
 
-        return $result ? (int) ($result['count'] ?? 0) : 0;
+        return $result !== null ? $result['count'] : 0;
     }
 
     /**
@@ -56,6 +56,7 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
      */
     public function getCurrentOwnerOfDraftPick(int $draftYear, int $draftRound, string $teamNameOfDraftPickOrigin): ?string
     {
+        /** @var array{ownerofpick: string}|null $result */
         $result = $this->fetchOne(
             "SELECT ownerofpick FROM ibl_draft_picks WHERE year = ? AND round = ? AND teampick = ? LIMIT 1",
             "iis",
@@ -64,7 +65,7 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
             $teamNameOfDraftPickOrigin
         );
 
-        return $result ? ($result['ownerofpick'] ?? null) : null;
+        return $result !== null ? $result['ownerofpick'] : null;
     }
 
     /**
@@ -77,12 +78,13 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
      */
     public function isFreeAgencyModuleActive(): ?int
     {
+        /** @var array{active: int}|null $result */
         $result = $this->fetchOne(
-            "SELECT active FROM nuke_modules WHERE title = 'Free_Agency' LIMIT 1",
+            "SELECT active FROM nuke_modules WHERE title = 'FreeAgency' LIMIT 1",
             "",
         );
 
-        return $result ? (int) ($result['active'] ?? null) : null;
+        return $result !== null ? $result['active'] : null;
     }
 
     /**

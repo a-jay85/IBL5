@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Bun
+bun.lockb
+
+# Build artifacts (optional - can be committed for deployment)
+# themes/IBL/style/style.css
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PHP
+vendor/
+composer.lock
+
+# Logs
+*.log

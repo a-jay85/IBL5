@@ -1,97 +1,89 @@
 <?php
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+declare(strict_types=1);
 
-$query1 = "SELECT * FROM ibl_plr";
-$result1 = $db->sql_query($query1);
-$num1 = $db->sql_numrows($result1);
+/**
+ * Season Leaderboard Update Script
+ *
+ * Calculates season career averages from the player table (car_* columns).
+ */
 
-$counter = 0;
-$i = 0;
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/autoloader.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/config.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/db/db.php';
+
+use Scripts\LeaderboardRepository;
+
+$repository = new LeaderboardRepository($mysqli_db);
 
 echo "<HTML><HEAD><TITLE>SEASON LEADERBOARD UPDATE</TITLE></HEAD><BODY>";
 
-while ($i < $num1) {
-    $playername = $db->sql_result($result1, $i, "name");
-    $playerid = $db->sql_result($result1, $i, "pid");
+// Get all players
+$players = $repository->getAllPlayers();
+$counter = 0;
 
-    $query2 = "SELECT * FROM ibl_plr WHERE name LIKE '$playername'";
-    $result2 = $db->sql_query($query2);
-    @$num2 = $db->sql_numrows($result2);
+foreach ($players as $player) {
+    $playerName = $player['name'];
+    $playerId = (int) $player['pid'];
 
-    $j = 0;
-    $tot_games = 0;
-    $tot_minutes = 0;
-    $tot_fgm = 0;
-    $tot_fga = 0;
-    $tot_ftm = 0;
-    $tot_fta = 0;
-    $tot_tgm = 0;
-    $tot_tga = 0;
-    $tot_orb = 0;
-    $tot_reb = 0;
-    $tot_ast = 0;
-    $tot_stl = 0;
-    $tot_tvr = 0;
-    $tot_blk = 0;
-    $tot_pf = 0;
-    $tot_pts = 0;
+    // Get career stats from ibl_plr table
+    $careerStats = $repository->getPlayerCareerStats($playerName);
 
-    while ($j < $num2) {
-
-        $games = $db->sql_result($result2, $j, "car_gm");
-        $minutes = $db->sql_result($result2, $j, "car_min");
-        $fgm = $db->sql_result($result2, $j, "car_fgm");
-        $fga = $db->sql_result($result2, $j, "car_fga");
-        $ftm = $db->sql_result($result2, $j, "car_ftm");
-        $fta = $db->sql_result($result2, $j, "car_fta");
-        $tgm = $db->sql_result($result2, $j, "car_tgm");
-        $tga = $db->sql_result($result2, $j, "car_tga");
-        $orb = $db->sql_result($result2, $j, "car_orb");
-        $reb = $db->sql_result($result2, $j, "car_reb");
-        $ast = $db->sql_result($result2, $j, "car_ast");
-        $stl = $db->sql_result($result2, $j, "car_stl");
-        $tvr = $db->sql_result($result2, $j, "car_to");
-        $blk = $db->sql_result($result2, $j, "car_blk");
-        $pf = $db->sql_result($result2, $j, "car_pf");
-        $pts = $db->sql_result($result2, $j, "car_pts");
-
-        $tot_games = $tot_games + $games;
-        $tot_minutes = $tot_games ? $tot_minutes + $minutes / $tot_games : "0.00";
-        $tot_fgm = $tot_games ? $tot_fgm + $fgm / $tot_games : "0.00";
-        $tot_fga = $tot_games ? $tot_fga + $fga / $tot_games : "0.00";
-        $tot_fgpct = $fga ? $fgm / $fga : "0.000";
-        $tot_ftm = $tot_games ? $tot_ftm + $ftm / $tot_games : "0.00";
-        $tot_fta = $tot_games ? $tot_fta + $fta / $tot_games : "0.00";
-        $tot_ftpct = $fta ? $ftm / $fta : "0.000";
-        $tot_tgm = $tot_games ? $tot_tgm + $tgm / $tot_games : "0.00";
-        $tot_tga = $tot_games ? $tot_tga + $tga / $tot_games : "0.00";
-        $tot_tpct = $tga ? $tgm / $tga : "0.000";
-        $tot_orb = $tot_games ? $tot_orb + $orb / $tot_games : "0.00";
-        $tot_reb = $tot_games ? $tot_reb + $reb / $tot_games : "0.00";
-        $tot_ast = $tot_games ? $tot_ast + $ast / $tot_games : "0.00";
-        $tot_stl = $tot_games ? $tot_stl + $stl / $tot_games : "0.00";
-        $tot_tvr = $tot_games ? $tot_tvr + $tvr / $tot_games : "0.00";
-        $tot_blk = $tot_games ? $tot_blk + $blk / $tot_games : "0.00";
-        $tot_pf = $tot_games ? $tot_pf + $pf / $tot_games : "0.00";
-        $tot_pts = $tot_games ? $tot_pts + $pts / $tot_games : "0.00";
-
-        $j++;
+    if ($careerStats === null) {
+        continue;
     }
 
-    echo "Updating $playername's records... $tot_games total games.<br>";
+    $totGames = (int) $careerStats['car_gm'];
+    $totMinutes = (int) $careerStats['car_min'];
+    $totFgm = (int) $careerStats['car_fgm'];
+    $totFga = (int) $careerStats['car_fga'];
+    $totFtm = (int) $careerStats['car_ftm'];
+    $totFta = (int) $careerStats['car_fta'];
+    $totTgm = (int) $careerStats['car_tgm'];
+    $totTga = (int) $careerStats['car_tga'];
+    $totOrb = (int) $careerStats['car_orb'];
+    $totReb = (int) $careerStats['car_reb'];
+    $totAst = (int) $careerStats['car_ast'];
+    $totStl = (int) $careerStats['car_stl'];
+    $totTvr = (int) $careerStats['car_to'];
+    $totBlk = (int) $careerStats['car_blk'];
+    $totPf = (int) $careerStats['car_pf'];
+    $totPts = (int) $careerStats['car_pts'];
 
-    $query3 = "DELETE FROM ibl_season_career_avgs WHERE `name` = '$playername'";
-    $result3 = $db->sql_query($query3);
+    echo "Updating " . htmlspecialchars($playerName) . "'s records... $totGames total games.<br>";
 
-    if ($tot_games > 0) {
+    // Delete old averages
+    $repository->deletePlayerCareerAvgs($playerName, 'ibl_season_career_avgs');
 
-        $query4 = "INSERT INTO ibl_season_career_avgs (`pid` , `name` , `games` , `minutes` , `fgm` , `fga` , `fgpct` ,  `ftm` , `fta` , `ftpct` ,  `tgm` , `tga` , `tpct` ,  `orb` , `reb` , `ast` , `stl` , `tvr` , `blk` , `pf` , `pts` ) VALUES ( '$playerid' ,  '$playername' ,  '$tot_games' , '$tot_minutes' , '$tot_fgm' , '$tot_fga' , '$tot_fgpct' , '$tot_ftm' , '$tot_fta' , '$tot_ftpct' , '$tot_tgm' , '$tot_tga' , '$tot_tpct' , '$tot_orb' , '$tot_reb' , '$tot_ast' , '$tot_stl' , '$tot_tvr' , '$tot_blk' , '$tot_pf' , '$tot_pts' ) ";
-        $result4 = $db->sql_query($query4);
-        $counter = $counter + 1;
+    if ($totGames > 0) {
+        // Calculate averages
+        $avgData = [
+            'pid' => $playerId,
+            'name' => $playerName,
+            'games' => $totGames,
+            'minutes' => round($totMinutes / $totGames, 2),
+            'fgm' => round($totFgm / $totGames, 2),
+            'fga' => round($totFga / $totGames, 2),
+            'fgpct' => $totFga > 0 ? round($totFgm / $totFga, 3) : 0.000,
+            'ftm' => round($totFtm / $totGames, 2),
+            'fta' => round($totFta / $totGames, 2),
+            'ftpct' => $totFta > 0 ? round($totFtm / $totFta, 3) : 0.000,
+            'tgm' => round($totTgm / $totGames, 2),
+            'tga' => round($totTga / $totGames, 2),
+            'tpct' => $totTga > 0 ? round($totTgm / $totTga, 3) : 0.000,
+            'orb' => round($totOrb / $totGames, 2),
+            'reb' => round($totReb / $totGames, 2),
+            'ast' => round($totAst / $totGames, 2),
+            'stl' => round($totStl / $totGames, 2),
+            'tvr' => round($totTvr / $totGames, 2),
+            'blk' => round($totBlk / $totGames, 2),
+            'pf' => round($totPf / $totGames, 2),
+            'pts' => round($totPts / $totGames, 2),
+        ];
+
+        $repository->insertPlayerCareerAvgs('ibl_season_career_avgs', $avgData);
+        $counter++;
     }
-
-    $i++;
 }
 
 echo "Updated $counter records</BODY></HTML>";

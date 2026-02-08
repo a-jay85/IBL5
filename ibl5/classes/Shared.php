@@ -19,19 +19,19 @@ use Shared\SharedRepository;
  */
 class Shared
 {
-    protected $db;
+    protected ?object $db;
     protected SharedRepositoryInterface $sharedRepository;
 
     /**
      * Creates a new Shared instance
      *
-     * @param mixed $db Active mysqli connection
+     * @param object|null $db Active mysqli connection
      * @param SharedRepositoryInterface|null $sharedRepository Optional repository injection (for testing)
      */
-    public function __construct($db, ?SharedRepositoryInterface $sharedRepository = null)
+    public function __construct(?object $db, ?SharedRepositoryInterface $sharedRepository = null)
     {
         $this->db = $db;
-        $this->sharedRepository = $sharedRepository ?? new SharedRepository($db);
+        $this->sharedRepository = $sharedRepository ?? new SharedRepository($db ?? new \stdClass());
     }
 
     /**

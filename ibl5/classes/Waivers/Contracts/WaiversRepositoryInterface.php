@@ -45,10 +45,10 @@ interface WaiversRepositoryInterface
      * with existing contracts and free agents who need veteran minimum contracts.
      * 
      * @param int $playerID Player ID to sign (must be positive integer)
-     * @param array $team Team data array with keys:
+     * @param array{team_name: string, teamid: int} $team Team data array with keys:
      *   - 'team_name': string - Full team name
      *   - 'teamid': int - Team ID for foreign key relationship
-     * @param array $contractData Contract information with keys:
+     * @param array{hasExistingContract: bool, salary: int} $contractData Contract information with keys:
      *   - 'hasExistingContract': bool - Whether player has existing contract
      *   - 'salary': int - Salary amount (used only if no existing contract)
      * @return bool True if update succeeded, false on database error

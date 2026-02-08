@@ -7,8 +7,19 @@ namespace Team;
 use Team\Contracts\TeamRepositoryInterface;
 
 /**
+ * @phpstan-import-type TeamInfoRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type PowerRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type BannerRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type GMTenureRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type GMAwardRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type TeamAwardRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type WinLossRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type HEATWinLossRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type PlayoffResultRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type HistRow from Contracts\TeamRepositoryInterface
+ *
  * @see TeamRepositoryInterface
- * @extends \BaseMysqliRepository
  */
 class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInterface
 {
@@ -19,9 +30,11 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
 
     /**
      * @see TeamRepositoryInterface::getTeam()
+     * @return TeamInfoRow|null
      */
     public function getTeam(int $teamID): ?array
     {
+        /** @var TeamInfoRow|null */
         return $this->fetchOne(
             "SELECT * FROM ibl_team_info WHERE teamid = ?",
             "i",
@@ -31,9 +44,11 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
 
     /**
      * @see TeamRepositoryInterface::getTeamPowerData()
+     * @return PowerRow|null
      */
     public function getTeamPowerData(string $teamName): ?array
     {
+        /** @var PowerRow|null */
         return $this->fetchOne(
             "SELECT * FROM ibl_power WHERE Team = ?",
             "s",
@@ -43,9 +58,11 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
 
     /**
      * @see TeamRepositoryInterface::getDivisionStandings()
+     * @return list<PowerRow>
      */
     public function getDivisionStandings(string $division): array
     {
+        /** @var list<PowerRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_power WHERE Division = ? ORDER BY gb DESC",
             "s",
@@ -55,9 +72,11 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
 
     /**
      * @see TeamRepositoryInterface::getConferenceStandings()
+     * @return list<PowerRow>
      */
     public function getConferenceStandings(string $conference): array
     {
+        /** @var list<PowerRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_power WHERE Conference = ? ORDER BY gb DESC",
             "s",
@@ -67,9 +86,11 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
 
     /**
      * @see TeamRepositoryInterface::getChampionshipBanners()
+     * @return list<BannerRow>
      */
     public function getChampionshipBanners(string $teamName): array
     {
+        /** @var list<BannerRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_banners WHERE currentname = ? ORDER BY year ASC",
             "s",
@@ -78,23 +99,40 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     }
 
     /**
-     * @see TeamRepositoryInterface::getGMHistory()
+     * @see TeamRepositoryInterface::getGMTenures()
+     * @return list<GMTenureRow>
      */
-    public function getGMHistory(string $ownerName, string $teamName): array
+    public function getGMTenures(int $franchiseId): array
     {
-        $ownerAwardCode = $ownerName . " (" . $teamName . ")";
+        /** @var list<GMTenureRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_gm_history WHERE name LIKE ? ORDER BY year ASC",
+            "SELECT * FROM ibl_gm_tenures WHERE franchise_id = ? ORDER BY start_season_year ASC",
+            "i",
+            $franchiseId
+        );
+    }
+
+    /**
+     * @see TeamRepositoryInterface::getGMAwards()
+     * @return list<GMAwardRow>
+     */
+    public function getGMAwards(string $gmUsername): array
+    {
+        /** @var list<GMAwardRow> */
+        return $this->fetchAll(
+            "SELECT * FROM ibl_gm_awards WHERE name = ? ORDER BY year ASC",
             "s",
-            $ownerAwardCode
+            $gmUsername
         );
     }
 
     /**
      * @see TeamRepositoryInterface::getTeamAccomplishments()
+     * @return list<TeamAwardRow>
      */
     public function getTeamAccomplishments(string $teamName): array
     {
+        /** @var list<TeamAwardRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_team_awards WHERE name LIKE ? ORDER BY year DESC",
             "s",
@@ -104,9 +142,11 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
 
     /**
      * @see TeamRepositoryInterface::getRegularSeasonHistory()
+     * @return list<WinLossRow>
      */
     public function getRegularSeasonHistory(string $teamName): array
     {
+        /** @var list<WinLossRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_team_win_loss WHERE currentname = ? ORDER BY year DESC",
             "s",
@@ -116,9 +156,11 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
 
     /**
      * @see TeamRepositoryInterface::getHEATHistory()
+     * @return list<HEATWinLossRow>
      */
     public function getHEATHistory(string $teamName): array
     {
+        /** @var list<HEATWinLossRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_heat_win_loss WHERE currentname = ? ORDER BY year DESC",
             "s",
@@ -128,23 +170,27 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
 
     /**
      * @see TeamRepositoryInterface::getPlayoffResults()
+     * @return list<PlayoffResultRow>
      */
     public function getPlayoffResults(): array
     {
+        /** @var list<PlayoffResultRow> */
         return $this->fetchAll("SELECT * FROM ibl_playoff_results ORDER BY year DESC");
     }
 
     /**
      * @see TeamRepositoryInterface::getFreeAgencyRoster()
+     * @return list<PlayerRow>
      */
     public function getFreeAgencyRoster(int $teamID): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT * 
-            FROM ibl_plr 
-            WHERE tid = ? 
-              AND retired = 0 
-              AND cyt != cy 
+            "SELECT *
+            FROM ibl_plr
+            WHERE tid = ?
+              AND retired = 0
+              AND cyt != cy
             ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC",
             "i",
             $teamID
@@ -153,14 +199,16 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
 
     /**
      * @see TeamRepositoryInterface::getRosterUnderContract()
+     * @return list<PlayerRow>
      */
     public function getRosterUnderContract(int $teamID): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT * 
-            FROM ibl_plr 
-            WHERE tid = ? 
-              AND retired = 0 
+            "SELECT *
+            FROM ibl_plr
+            WHERE tid = ?
+              AND retired = 0
             ORDER BY CASE WHEN ordinal > 960 THEN 1 ELSE 0 END, name ASC",
             "i",
             $teamID
@@ -169,25 +217,29 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
 
     /**
      * @see TeamRepositoryInterface::getFreeAgents()
+     * @return list<PlayerRow>
      */
     public function getFreeAgents(bool $includeFreeAgencyActive = false): array
     {
         if ($includeFreeAgencyActive) {
+            /** @var list<PlayerRow> */
             return $this->fetchAll(
                 "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 AND cyt != cy ORDER BY ordinal ASC"
             );
-        } else {
-            return $this->fetchAll(
-                "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC"
-            );
         }
+        /** @var list<PlayerRow> */
+        return $this->fetchAll(
+            "SELECT * FROM ibl_plr WHERE ordinal > '959' AND retired = 0 ORDER BY ordinal ASC"
+        );
     }
 
     /**
      * @see TeamRepositoryInterface::getEntireLeagueRoster()
+     * @return list<PlayerRow>
      */
     public function getEntireLeagueRoster(): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_plr WHERE retired = 0 AND name NOT LIKE '%Buyouts' ORDER BY ordinal ASC"
         );
@@ -195,9 +247,11 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
 
     /**
      * @see TeamRepositoryInterface::getHistoricalRoster()
+     * @return list<HistRow>
      */
     public function getHistoricalRoster(int $teamID, string $year): array
     {
+        /** @var list<HistRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_hist WHERE teamid = ? AND year = ? ORDER BY name ASC",
             "is",

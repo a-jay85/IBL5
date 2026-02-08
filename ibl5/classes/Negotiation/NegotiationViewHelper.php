@@ -4,18 +4,25 @@ declare(strict_types=1);
 
 namespace Negotiation;
 
+use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
 use Negotiation\Contracts\NegotiationViewHelperInterface;
 use Player\Player;
-use Services\DatabaseService;
 use Utilities\HtmlSanitizer;
 
 /**
  * @see NegotiationViewHelperInterface
+ *
+ * @phpstan-import-type DemandResult from NegotiationDemandCalculatorInterface
  */
 class NegotiationViewHelper implements NegotiationViewHelperInterface
 {
     /**
      * @see NegotiationViewHelperInterface::renderNegotiationForm()
+     *
+     * @param Player $player The player object
+     * @param DemandResult $demands Calculated demands
+     * @param int $capSpace Available cap space for year 1
+     * @param int $maxYearOneSalary Maximum first year salary based on experience
      */
     public static function renderNegotiationForm(
         Player $player,
@@ -23,9 +30,11 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
         int $capSpace,
         int $maxYearOneSalary
     ): string {
-        $playerName = HtmlSanitizer::safeHtmlOutput($player->name);
-        $playerID = (int)$player->playerID;
-        $teamName = HtmlSanitizer::safeHtmlOutput($player->teamName);
+        /** @var string $playerName */
+        $playerName = HtmlSanitizer::safeHtmlOutput($player->name ?? '');
+        $playerID = $player->playerID ?? 0;
+        /** @var string $teamName */
+        $teamName = HtmlSanitizer::safeHtmlOutput($player->teamName ?? '');
         
         // Build demand display
         $demandDisplay = self::buildDemandDisplay($demands);
@@ -84,42 +93,42 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
     <input type="submit" value="Offer Extension!">
 </form>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
-    
+
     /**
      * Build demand display string
-     * 
-     * @param array $demands Demand amounts
+     *
+     * @param DemandResult $demands Demand amounts
      * @return string HTML formatted demand display
      */
     private static function buildDemandDisplay(array $demands): string
     {
-        $display = "<td>" . (string)$demands['year1'] . "</td>";
-        
-        if ($demands['year2'] != 0) {
-            $display .= "<td>" . $demands['year2'] . "</td>";
+        $display = '<td>' . (int) $demands['year1'] . '</td>';
+
+        if ((int) $demands['year2'] !== 0) {
+            $display .= '<td>' . (int) $demands['year2'] . '</td>';
         }
-        if ($demands['year3'] != 0) {
-            $display .= "<td>" . $demands['year3'] . "</td>";
+        if ((int) $demands['year3'] !== 0) {
+            $display .= '<td>' . (int) $demands['year3'] . '</td>';
         }
-        if ($demands['year4'] != 0) {
-            $display .= "<td>" . $demands['year4'] . "</td>";
+        if ((int) $demands['year4'] !== 0) {
+            $display .= '<td>' . (int) $demands['year4'] . '</td>';
         }
-        if ($demands['year5'] != 0) {
-            $display .= "<td>" . $demands['year5'] . "</td>";
+        if ((int) $demands['year5'] !== 0) {
+            $display .= '<td>' . (int) $demands['year5'] . '</td>';
         }
-        if ($demands['year6'] != 0) {
-            $display .= "<td>" . $demands['year6'] . "</td>";
+        if ($demands['year6'] !== 0) {
+            $display .= '<td>' . $demands['year6'] . '</td>';
         }
-        
+
         return $display;
     }
     
     /**
      * Render editable offer fields with demand defaults
-     * 
-     * @param array $demands Demand amounts
+     *
+     * @param DemandResult $demands Demand amounts
      * @return string HTML for input fields
      */
     private static function renderEditableOfferFields(array $demands): string
@@ -132,23 +141,23 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
 <td><input type="number" style="width: 4em" name="offerYear4" size="4" value="<?= $demands['year4'] ?>"></td>
 <td><input type="number" style="width: 4em" name="offerYear5" size="4" value="<?= $demands['year5'] ?>"></td>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
     
     /**
      * Render max salary fields
-     * 
-     * @param int $maxYearOne Maximum first year salary
+     *
+     * @param int $maxYear1 Maximum first year salary
      * @param int $maxRaise Maximum raise per year
-     * @param array $demands Demand amounts (to determine which years to show)
+     * @param DemandResult $demands Demand amounts (to determine which years to show)
      * @return string HTML for input fields
      */
     private static function renderMaxSalaryFields(int $maxYear1, int $maxRaise, array $demands): string
     {
-        $maxYear2 = ($demands['year2'] != 0) ? $maxYear1 + $maxRaise : 0;
-        $maxYear3 = ($demands['year3'] != 0) ? $maxYear2 + $maxRaise : 0;
-        $maxYear4 = ($demands['year4'] != 0) ? $maxYear3 + $maxRaise : 0;
-        $maxYear5 = ($demands['year5'] != 0) ? $maxYear4 + $maxRaise : 0;
+        $maxYear2 = ($demands['year2'] !== 0) ? $maxYear1 + $maxRaise : 0;
+        $maxYear3 = ($demands['year3'] !== 0) ? $maxYear2 + $maxRaise : 0;
+        $maxYear4 = ($demands['year4'] !== 0) ? $maxYear3 + $maxRaise : 0;
+        $maxYear5 = ($demands['year5'] !== 0) ? $maxYear4 + $maxRaise : 0;
         
         ob_start();
         ?>
@@ -158,15 +167,17 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
 <td><input type="text" name="offerYear4" size="4" value="<?= $maxYear4 ?>"></td>
 <td><input type="text" name="offerYear5" size="4" value="<?= $maxYear5 ?>"></td>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
-    
+
     /**
      * @see NegotiationViewHelperInterface::renderError()
      */
     public static function renderError(string $error): string
     {
-        return "<p>" . HtmlSanitizer::safeHtmlOutput($error) . "</p>";
+        /** @var string $escaped */
+        $escaped = HtmlSanitizer::safeHtmlOutput($error);
+        return '<p>' . $escaped . '</p>';
     }
 
     /**
@@ -174,9 +185,11 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
      */
     public static function renderHeader(Player $player): string
     {
-        $playerPos = HtmlSanitizer::safeHtmlOutput($player->position);
-        $playerName = HtmlSanitizer::safeHtmlOutput($player->name);
-        
-        return "<b>$playerPos $playerName</b> - Contract Demands:<br>";
+        /** @var string $playerPos */
+        $playerPos = HtmlSanitizer::safeHtmlOutput($player->position ?? '');
+        /** @var string $playerName */
+        $playerName = HtmlSanitizer::safeHtmlOutput($player->name ?? '');
+
+        return "<b>{$playerPos} {$playerName}</b> - Contract Demands:<br>";
     }
 }

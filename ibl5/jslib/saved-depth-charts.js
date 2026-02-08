@@ -69,7 +69,7 @@
         function loadDepthChart(dcId) {
             if (loadingEl) loadingEl.style.display = 'block';
 
-            var url = config.apiBaseUrl + '&action=load&id=' + dcId;
+            var url = config.apiBaseUrl + '&action=load&id=' + encodeURIComponent(String(dcId));
 
             fetch(url, { credentials: 'same-origin' })
                 .then(function (response) {
@@ -309,10 +309,5 @@
                 });
         }
 
-        function escapeHtml(text) {
-            var div = document.createElement('div');
-            div.appendChild(document.createTextNode(text));
-            return div.innerHTML;
-        }
     });
 })();

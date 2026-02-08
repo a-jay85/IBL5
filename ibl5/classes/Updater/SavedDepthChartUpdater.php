@@ -16,7 +16,7 @@ class SavedDepthChartUpdater
 {
     private SavedDepthChartRepository $repository;
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         $this->repository = new SavedDepthChartRepository($db);
     }

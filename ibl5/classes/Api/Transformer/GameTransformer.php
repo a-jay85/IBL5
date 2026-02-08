@@ -9,7 +9,7 @@ class GameTransformer
     /**
      * Transform a game row from vw_schedule_upcoming for list/detail endpoints.
      *
-     * @param array{game_uuid: string, season_year: int, game_date: string, game_status: string, visitor_uuid: string, visitor_city: string, visitor_name: string, visitor_full_name: string, visitor_score: int|null, home_uuid: string, home_city: string, home_name: string, home_full_name: string, home_score: int|null} $row
+     * @param array{game_uuid: string, season_year: int, game_date: string, game_status: string, visitor_uuid: string, visitor_city: string, visitor_name: string, visitor_full_name: string, visitor_score: int, home_uuid: string, home_city: string, home_name: string, home_full_name: string, home_score: int} $row
      * @return array<string, mixed>
      */
     public function transform(array $row): array

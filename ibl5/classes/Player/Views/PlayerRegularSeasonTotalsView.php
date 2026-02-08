@@ -72,26 +72,26 @@ class PlayerRegularSeasonTotalsView implements PlayerRegularSeasonTotalsViewInte
     </tr>
         <?php
         foreach ($historicalStats as $row) {
-            $year = (int)$row['year'];
+            $year = $row['year'];
             /** @var string $team */
             $team = HtmlSanitizer::safeHtmlOutput($row['team']);
-            $teamId = (int)$row['teamid'];
-            $gm = (int)$row['games'];
-            $min = (int)$row['minutes'];
-            $fgm = (int)$row['fgm'];
-            $fga = (int)$row['fga'];
-            $ftm = (int)$row['ftm'];
-            $fta = (int)$row['fta'];
-            $tgm = (int)$row['tgm'];
-            $tga = (int)$row['tga'];
-            $orb = (int)$row['orb'];
-            $reb = (int)$row['reb'];
-            $ast = (int)$row['ast'];
-            $stl = (int)$row['stl'];
-            $tvr = (int)$row['tvr'];
-            $blk = (int)$row['blk'];
-            $pf = (int)$row['pf'];
-            $pts = (int)$row['pts'];
+            $teamId = $row['teamid'];
+            $gm = $row['games'];
+            $min = $row['minutes'];
+            $fgm = $row['fgm'];
+            $fga = $row['fga'];
+            $ftm = $row['ftm'];
+            $fta = $row['fta'];
+            $tgm = $row['tgm'];
+            $tga = $row['tga'];
+            $orb = $row['orb'];
+            $reb = $row['reb'];
+            $ast = $row['ast'];
+            $stl = $row['stl'];
+            $tvr = $row['tvr'];
+            $blk = $row['blk'];
+            $pf = $row['pf'];
+            $pts = $row['pts'];
             
             // Calculate points if pts is 0 (e.g., 2006 season)
             // Formula: 2*fgm + ftm + tgm (fgm includes all field goals, tgm adds the extra point for 3-pointers)

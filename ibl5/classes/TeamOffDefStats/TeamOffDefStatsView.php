@@ -225,7 +225,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
      */
     private function renderTotalsRow(array $team, array $stats, string $label): string
     {
-        $teamId = (int) $team['teamid'];
+        $teamId = $team['teamid'];
         $teamCell = $this->renderTeamCell($team, $label);
 
         return "<tr data-team-id=\"{$teamId}\">
@@ -258,7 +258,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
      */
     private function renderAveragesRow(array $team, array $stats, string $label): string
     {
-        $teamId = (int) $team['teamid'];
+        $teamId = $team['teamid'];
         $teamCell = $this->renderTeamCell($team, $label);
 
         return "<tr data-team-id=\"{$teamId}\">
@@ -291,7 +291,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
      */
     private function renderDifferentialsRow(array $team): string
     {
-        $teamId = (int) $team['teamid'];
+        $teamId = $team['teamid'];
         $teamCell = $this->renderTeamCell($team, 'Diff');
         $diffs = $team['differentials'];
 
@@ -384,7 +384,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
      */
     private function renderTeamCell(array $team, string $label): string
     {
-        $teamId = (int) $team['teamid'];
+        $teamId = $team['teamid'];
         /** @var string $name */
         $name = HtmlSanitizer::safeHtmlOutput($team['team_name']);
         /** @var string $safeLabel */

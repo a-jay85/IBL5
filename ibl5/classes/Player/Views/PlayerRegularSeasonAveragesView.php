@@ -73,30 +73,30 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
     </tr>
         <?php
         foreach ($historicalStats as $row) {
-            $year = (int)$row['year'];
+            $year = $row['year'];
             /** @var string $team */
             $team = HtmlSanitizer::safeHtmlOutput($row['team']);
-            $teamId = (int)$row['teamid'];
-            $gm = (int)$row['games'];
+            $teamId = $row['teamid'];
+            $gm = $row['games'];
             
             if ($gm > 0) {
                 // Calculate points if pts is 0 (e.g., 2006 season)
                 // Formula: 2*fgm + ftm + tgm
-                $ptsTotal = (int)$row['pts'];
+                $ptsTotal = $row['pts'];
                 if ($ptsTotal === 0) {
-                    $ptsTotal = (2 * (int)$row['fgm']) + (int)$row['ftm'] + (int)$row['tgm'];
+                    $ptsTotal = (2 * $row['fgm']) + $row['ftm'] + $row['tgm'];
                 }
                 
                 $min = StatsFormatter::formatPerGameAverage((float)$row['minutes'], $gm);
                 $fgm = StatsFormatter::formatPerGameAverage((float)$row['fgm'], $gm);
                 $fga = StatsFormatter::formatPerGameAverage((float)$row['fga'], $gm);
-                $fgp = StatsFormatter::formatPercentageWithDecimals((int)$row['fgm'], (int)$row['fga']);
+                $fgp = StatsFormatter::formatPercentageWithDecimals($row['fgm'], $row['fga']);
                 $ftm = StatsFormatter::formatPerGameAverage((float)$row['ftm'], $gm);
                 $fta = StatsFormatter::formatPerGameAverage((float)$row['fta'], $gm);
-                $ftp = StatsFormatter::formatPercentageWithDecimals((int)$row['ftm'], (int)$row['fta']);
+                $ftp = StatsFormatter::formatPercentageWithDecimals($row['ftm'], $row['fta']);
                 $tgm = StatsFormatter::formatPerGameAverage((float)$row['tgm'], $gm);
                 $tga = StatsFormatter::formatPerGameAverage((float)$row['tga'], $gm);
-                $tgp = StatsFormatter::formatPercentageWithDecimals((int)$row['tgm'], (int)$row['tga']);
+                $tgp = StatsFormatter::formatPercentageWithDecimals($row['tgm'], $row['tga']);
                 $orb = StatsFormatter::formatPerGameAverage((float)$row['orb'], $gm);
                 $reb = StatsFormatter::formatPerGameAverage((float)$row['reb'], $gm);
                 $ast = StatsFormatter::formatPerGameAverage((float)$row['ast'], $gm);
@@ -144,7 +144,7 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
             ?>
     <tr class="player-table-row-bold">
         <td colspan=2>Career</td>
-        <td><?= (int)$careerAverages['games'] ?></td>
+        <td><?= $careerAverages['games'] ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['minutes'], 1) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['fgm'], 1) ?></td>
         <td><?= StatsFormatter::formatWithDecimals((float)$careerAverages['fga'], 1) ?></td>

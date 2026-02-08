@@ -97,7 +97,7 @@ class GMContactListView implements GMContactListViewInterface
      */
     private function renderContactRow(array $contact): string
     {
-        $teamId = (int) $contact['teamid'];
+        $teamId = $contact['teamid'];
         /** @var string $ownerName */
         $ownerName = HtmlSanitizer::safeHtmlOutput($contact['owner_name']);
         $discordID = $contact['discordID'];

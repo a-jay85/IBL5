@@ -634,7 +634,7 @@ class NavigationView
             foreach ($this->teamsData as $conf => $divisions) {
                 foreach ($divisions as $div => $teams) {
                     foreach ($teams as $team) {
-                        if ((int)$team['teamid'] === $this->teamId) {
+                        if ($team['teamid'] === $this->teamId) {
                             $userConference = $conf;
                             $userDivision = $div;
                             break 3;

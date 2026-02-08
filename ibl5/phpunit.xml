@@ -142,5 +142,8 @@
         <testsuite name="RecordHolders Module Tests">
             <directory>tests/RecordHolders</directory>
         </testsuite>
+        <testsuite name="API Module Tests">
+            <directory>tests/Api</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

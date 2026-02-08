@@ -70,11 +70,6 @@ if ($match === null) {
 /** @var class-string<\Api\Contracts\ControllerInterface> $controllerClass */
 $controllerClass = $match['controller'];
 
-if (!class_exists($controllerClass)) {
-    $responder->error(501, 'not_implemented', 'This endpoint is not yet implemented.');
-    exit;
-}
-
 /** @var \Api\Contracts\ControllerInterface $controller */
 $controller = new $controllerClass($mysqli_db);
 $controller->handle($match['params'], $_GET, $responder);

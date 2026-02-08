@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Api\Controller;
 
+use Api\Cache\ETagHandler;
 use Api\Contracts\ControllerInterface;
+use Api\Repository\ApiPlayerStatsRepository;
 use Api\Response\JsonResponder;
+use Api\Transformer\PlayerStatsTransformer;
 
 class PlayerStatsController implements ControllerInterface
 {
-    /** @phpstan-ignore property.onlyWritten */
     private \mysqli $db;
 
     public function __construct(\mysqli $db)
@@ -22,6 +24,26 @@ class PlayerStatsController implements ControllerInterface
      */
     public function handle(array $params, array $query, JsonResponder $responder): void
     {
-        $responder->error(501, 'not_implemented', 'This endpoint is not yet implemented.');
+        $uuid = $params['uuid'] ?? '';
+        $repo = new ApiPlayerStatsRepository($this->db);
+        $transformer = new PlayerStatsTransformer();
+        $etag = new ETagHandler();
+
+        $row = $repo->getCareerStats($uuid);
+        if ($row === null) {
+            $responder->error(404, 'not_found', 'Player not found.');
+            return;
+        }
+
+        $updatedAt = is_string($row['updated_at'] ?? null) ? $row['updated_at'] : '';
+        $tag = $etag->generate($updatedAt);
+        if ($etag->matches($tag)) {
+            $responder->notModified();
+            return;
+        }
+
+        /** @phpstan-ignore argument.type (DB view guarantees array shape) */
+        $data = $transformer->transformCareer($row);
+        $responder->success($data, [], 200, $etag->getHeaders($tag));
     }
 }

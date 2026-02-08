@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\FranchiseHistory;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use FranchiseHistory\FranchiseHistoryRepository;
 use FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface;
@@ -16,6 +17,7 @@ use FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface;
  *
  * @covers \FranchiseHistory\FranchiseHistoryRepository
  */
+#[AllowMockObjectsWithoutExpectations]
 class FranchiseHistoryRepositoryTest extends TestCase
 {
     private FranchiseHistoryRepository $repository;
@@ -36,27 +38,26 @@ class FranchiseHistoryRepositoryTest extends TestCase
     /**
      * Integration test to verify title calculation behavior
      *
-     * This test uses reflection to verify that the getNumberOfTitles method exists
-     * and that it's called during getAllFranchiseHistory execution. This prevents
-     * the regression where titles were directly read from ibl_team_history instead
-     * of being calculated from ibl_team_awards.
+     * This test uses reflection to verify that the getAllTitleCounts method exists.
+     * This prevents the regression where titles were directly read from
+     * ibl_team_history instead of being calculated from ibl_team_awards.
      */
     public function testGetAllFranchiseHistoryCalculatesTitlesFromAwardsTable(): void
     {
         $reflectionClass = new \ReflectionClass($this->repository);
-        
-        // Verify the private getNumberOfTitles method exists
+
+        // Verify the private getAllTitleCounts method exists (bulk title calculation)
         $this->assertTrue(
-            $reflectionClass->hasMethod('getNumberOfTitles'),
-            'Repository must have getNumberOfTitles method to calculate titles from ibl_team_awards'
+            $reflectionClass->hasMethod('getAllTitleCounts'),
+            'Repository must have getAllTitleCounts method to calculate titles from ibl_team_awards'
         );
 
-        $method = $reflectionClass->getMethod('getNumberOfTitles');
-        
+        $method = $reflectionClass->getMethod('getAllTitleCounts');
+
         // Verify it's a callable method
         $this->assertTrue(
             $method->isPrivate() || $method->isPublic(),
-            'getNumberOfTitles must be a callable method'
+            'getAllTitleCounts must be a callable method'
         );
     }
 
@@ -82,7 +83,7 @@ class FranchiseHistoryRepositoryTest extends TestCase
 
         // Verify that titles are calculated dynamically (not just read from ibl_team_history)
         $this->assertStringContainsString(
-            "Award LIKE ?",
+            "Award LIKE",
             $sourceCode,
             'Repository must use LIKE query to match award names'
         );
@@ -107,6 +108,40 @@ class FranchiseHistoryRepositoryTest extends TestCase
             'IBL Champions',
             $sourceCode,
             'Repository must search for IBL Champions titles'
+        );
+    }
+
+    /**
+     * Verify that getPlayoffTotals method exists and queries ibl_playoff_results
+     *
+     * This test documents the expected behavior: playoff game records must be
+     * derived from series results in ibl_playoff_results using CASE expressions.
+     */
+    public function testRepositoryQueriesPlayoffResultsForPlayoffTotals(): void
+    {
+        $reflectionClass = new \ReflectionClass($this->repository);
+
+        // Verify the private getAllPlayoffTotals method exists (bulk playoff calculation)
+        $this->assertTrue(
+            $reflectionClass->hasMethod('getAllPlayoffTotals'),
+            'Repository must have getAllPlayoffTotals method to calculate playoff records from ibl_playoff_results'
+        );
+
+        $fileName = $reflectionClass->getFileName();
+        $sourceCode = file_get_contents($fileName);
+
+        // Verify that the repository queries ibl_playoff_results table
+        $this->assertStringContainsString(
+            'ibl_playoff_results',
+            $sourceCode,
+            'Repository must query ibl_playoff_results table to calculate playoff records'
+        );
+
+        // Verify that playoff fields are assigned in the foreach loop
+        $this->assertMatchesRegularExpression(
+            '/\$team\[[\'"]playoff_total_wins[\'"]\]\s*=/',
+            $sourceCode,
+            'Repository must assign calculated playoff wins to team array'
         );
     }
 

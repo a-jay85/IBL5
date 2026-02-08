@@ -21,100 +21,16 @@ class PlayerTradingCardFrontView
 {
     /**
      * Get scoped custom styles for trading card with team colors
-     * 
-     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
-     * @return string HTML style tag with scoped CSS
+     *
+     * @deprecated CSS is now centralized in design/components/player-cards.css.
+     *             Custom properties are set inline on the container element in render().
+     *
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
+     * @return string Empty string — styles are in centralized CSS
      */
     public static function getStyles(?array $colorScheme = null): string
     {
-        if ($colorScheme === null) {
-            $colorScheme = TeamColorHelper::getDefaultColorScheme();
-        }
-        
-        // Get shared base styles from CardBaseStyles
-        $baseStyles = CardBaseStyles::getStyles($colorScheme);
-        
-        // Add front-card-specific styles only
-        $borderRgb = $colorScheme['border_rgb'];
-        $accent = $colorScheme['accent'];
-        $text = $colorScheme['text'];
-        $textMuted = $colorScheme['text_muted'];
-        
-        $frontStyles = <<<HTML
-<style>
-/* Trading Card Front - Unique Styles (ratings, contract bar) */
-.trading-card .rating-row {
-    display: grid;
-    gap: 4px;
-    background: rgba(0,0,0,0.3);
-    border-radius: 8px;
-    padding: 8px;
-    margin-bottom: 6px;
-}
-
-.trading-card .rating-row.shooting { grid-template-columns: repeat(6, 1fr); }
-.trading-card .rating-row.rebounding { grid-template-columns: repeat(7, 1fr); }
-.trading-card .rating-row.offense-defense { grid-template-columns: repeat(9, 1fr); }
-
-.trading-card .rating-cell {
-    text-align: center;
-    padding: 4px 2px;
-}
-
-.trading-card .rating-label {
-    font-size: 9px;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: #{$accent};
-    letter-spacing: 0.5px;
-}
-
-.trading-card .rating-value {
-    font-size: 14px;
-    font-weight: 700;
-    color: #{$text};
-    font-family: 'Monaco', 'Menlo', monospace;
-}
-
-.trading-card .contract-bar {
-    background: linear-gradient(90deg, rgba({$borderRgb}, 0.2) 0%, rgba({$borderRgb}, 0.05) 100%);
-    border-left: 3px solid #{$colorScheme['border']};
-    padding: 8px 12px;
-    border-radius: 0 8px 8px 0;
-    margin-top: 8px;
-}
-
-.trading-card .contract-bar .contract-flex {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 12px;
-}
-
-.trading-card .contract-bar .contract-label {
-    color: #{$textMuted};
-}
-
-.trading-card .contract-bar .contract-value {
-    color: #{$text};
-    font-weight: bold;
-    margin-left: 4px;
-}
-
-.trading-card .contract-bar .contract-amount {
-    color: #{$accent};
-    font-weight: bold;
-    margin-left: 4px;
-}
-
-@media (max-width: 480px) {
-    .trading-card .rating-label { font-size: 8px; }
-    .trading-card .rating-value { font-size: 12px; }
-}
-</style>
-HTML;
-
-        return $baseStyles . $frontStyles;
+        return '';
     }
 
     /**
@@ -129,17 +45,20 @@ HTML;
     public static function render(Player $player, int $playerID, string $contractDisplay, ?\mysqli $db = null): string
     {
         // Get color scheme and prepare player data
-        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, (int)$player->teamID);
+        $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $player->teamID ?? 0);
         $playerData = CardBaseStyles::preparePlayerData($player, $playerID);
         
         // Additional front-card specific data
-        $expYears = HtmlSanitizer::safeHtmlOutput((string)$player->yearsOfExperience);
-        $birdYears = HtmlSanitizer::safeHtmlOutput((string)$player->birdYears);
+        $expYears = (string) ($player->yearsOfExperience ?? 0);
+        $birdYears = (string) ($player->birdYears ?? 0);
+        /** @var string $contractSafe */
         $contractSafe = HtmlSanitizer::safeHtmlOutput($contractDisplay);
+
+        $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);
 
         ob_start();
         ?>
-<div class="trading-card">
+<div class="trading-card" style="<?= $cssProps ?>">
 <?= CardBaseStyles::renderCardTop($playerData) ?>
 
     <!-- RATINGS SECTION -->
@@ -217,15 +136,15 @@ HTML;
     </div>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * Render a single rating cell
      */
-    private static function renderRatingCell(string $label, $value): string
+    private static function renderRatingCell(string $label, ?int $value): string
     {
-        $safeValue = HtmlSanitizer::safeHtmlOutput((string)$value);
+        $safeValue = (string) ($value ?? 0);
         return <<<HTML
 <div class="rating-cell">
     <div class="rating-label">{$label}</div>
@@ -237,9 +156,9 @@ HTML;
     /**
      * Render a stat pill
      */
-    private static function renderPill(string $label, $value, bool $isPreference = false): string
+    private static function renderPill(string $label, ?int $value, bool $isPreference = false): string
     {
-        $safeValue = HtmlSanitizer::safeHtmlOutput((string)$value);
+        $safeValue = (string) ($value ?? 0);
         $class = $isPreference ? 'stat-pill preference' : 'stat-pill intangible';
         return <<<HTML
 <div class="{$class}">

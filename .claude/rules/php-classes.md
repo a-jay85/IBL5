@@ -4,35 +4,36 @@ paths: ibl5/classes/**/*.php
 
 # PHP Class Development Rules
 
-## Interface-Driven Architecture
-Structure modules in `ibl5/classes/ModuleName/`:
-```
-Module/
-├── Contracts/
-│   ├── ModuleRepositoryInterface.php
-│   └── ModuleServiceInterface.php
-├── ModuleRepository.php    # implements ModuleRepositoryInterface
-├── ModuleService.php       # implements ModuleServiceInterface
-└── ModuleView.php          # HTML rendering
-```
-
 ## Interface Standards
 - Method signatures with full PHPDoc
 - `@see InterfaceName::methodName()` instead of duplicating docblocks
 - Class constants for domain values
 
-## Database Dual-Implementation
-Support both database types:
+## Database Access Pattern
+All classes in `/ibl5/classes/` use mysqli with prepared statements via BaseMysqliRepository:
 ```php
-if (method_exists($this->db, 'sql_escape_string')) {
-    // LEGACY: sql_* methods with DatabaseService::escapeString()
-    $escaped = \Services\DatabaseService::escapeString($this->db, $input);
-} else {
-    // MODERN: prepared statements (preferred)
-    $stmt = $this->db->prepare("SELECT * FROM table WHERE col = ?");
-    $stmt->bind_param('s', $input);
+// Repository pattern (preferred for database operations)
+class MyRepository extends BaseMysqliRepository
+{
+    public function getById(int $id): ?array
+    {
+        return $this->fetchOne("SELECT * FROM table WHERE id = ?", "i", $id);
+    }
+
+    public function getAll(): array
+    {
+        return $this->fetchAll("SELECT * FROM table", "");
+    }
+
+    public function update(int $id, string $name): bool
+    {
+        return $this->execute("UPDATE table SET name = ? WHERE id = ?", "si", $name, $id) !== false;
+    }
 }
 ```
+
+**Note:** PHP-Nuke modules in `/ibl5/modules/` may still use legacy `$db` patterns.
+The `MySQL` class is deprecated and only exists for PHP-Nuke backward compatibility.
 
 ## View Rendering Pattern
 Use output buffering:

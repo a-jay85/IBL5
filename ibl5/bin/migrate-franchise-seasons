@@ -1,0 +1,655 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('This script must be run from the command line.');
+}
+
+set_time_limit(0);
+
+$_SERVER['DOCUMENT_ROOT'] = dirname(__DIR__, 2);
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/autoloader.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/config.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/db/db.php';
+
+/** @var \mysqli $mysqli_db */
+
+echo "=== Franchise Seasons & GM Tenures Migration ===\n\n";
+
+// ─────────────────────────────────────────────────────────────
+// Step 0: Create tables if they don't exist
+// ─────────────────────────────────────────────────────────────
+
+echo "Step 0: Creating tables...\n";
+
+$mysqli_db->query("
+    CREATE TABLE IF NOT EXISTS `ibl_franchise_seasons` (
+        `id` int NOT NULL AUTO_INCREMENT,
+        `franchise_id` int NOT NULL,
+        `season_year` smallint unsigned NOT NULL,
+        `season_ending_year` smallint unsigned NOT NULL,
+        `team_city` varchar(24) COLLATE utf8mb4_unicode_ci NOT NULL,
+        `team_name` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `uq_franchise_season` (`franchise_id`,`season_year`),
+        KEY `idx_team_name` (`team_name`),
+        KEY `idx_season_year` (`season_year`),
+        KEY `idx_ending_year` (`season_ending_year`),
+        CONSTRAINT `fk_fs_franchise` FOREIGN KEY (`franchise_id`) REFERENCES `ibl_team_info` (`teamid`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
+
+if ($mysqli_db->errno !== 0) {
+    echo "  ERROR creating ibl_franchise_seasons: {$mysqli_db->error}\n";
+    exit(1);
+}
+echo "  ibl_franchise_seasons: OK\n";
+
+$mysqli_db->query("
+    CREATE TABLE IF NOT EXISTS `ibl_gm_tenures` (
+        `id` int NOT NULL AUTO_INCREMENT,
+        `franchise_id` int NOT NULL,
+        `gm_username` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+        `start_season_year` smallint unsigned NOT NULL,
+        `end_season_year` smallint unsigned DEFAULT NULL,
+        `is_mid_season_start` tinyint(1) NOT NULL DEFAULT 0,
+        `is_mid_season_end` tinyint(1) NOT NULL DEFAULT 0,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `uq_tenure` (`franchise_id`,`gm_username`,`start_season_year`),
+        KEY `idx_gm` (`gm_username`),
+        KEY `idx_franchise` (`franchise_id`),
+        CONSTRAINT `fk_gt_franchise` FOREIGN KEY (`franchise_id`) REFERENCES `ibl_team_info` (`teamid`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
+
+if ($mysqli_db->errno !== 0) {
+    echo "  ERROR creating ibl_gm_tenures: {$mysqli_db->error}\n";
+    exit(1);
+}
+echo "  ibl_gm_tenures: OK\n\n";
+
+// ─────────────────────────────────────────────────────────────
+// Step 1: Fix data issues in ibl_team_win_loss
+// ─────────────────────────────────────────────────────────────
+
+echo "Step 1: Fixing data issues in ibl_team_win_loss...\n";
+
+// Delete duplicate Aces 2007 row (keep the lower table_ID)
+$result = $mysqli_db->query(
+    "SELECT table_ID FROM ibl_team_win_loss
+     WHERE currentname = 'Aces' AND year = 2007
+     ORDER BY table_ID"
+);
+
+if ($result !== false) {
+    $acesDupes = [];
+    while ($row = $result->fetch_assoc()) {
+        $acesDupes[] = (int)$row['table_ID'];
+    }
+    $result->free();
+
+    if (count($acesDupes) > 1) {
+        // Keep the first, delete the rest
+        $deleteIds = array_slice($acesDupes, 1);
+        foreach ($deleteIds as $deleteId) {
+            $stmt = $mysqli_db->prepare(
+                "DELETE FROM ibl_team_win_loss WHERE table_ID = ?"
+            );
+            $stmt->bind_param('i', $deleteId);
+            $stmt->execute();
+            echo "  Deleted duplicate Aces 2007 row (table_ID={$deleteId})\n";
+            $stmt->close();
+        }
+    } else {
+        echo "  No duplicate Aces 2007 rows found (already clean)\n";
+    }
+}
+
+// Delete erroneous Hornets 2007 row (0-0 record)
+$stmt = $mysqli_db->prepare(
+    "DELETE FROM ibl_team_win_loss WHERE currentname = 'Hornets' AND year = 2007 AND wins = 0 AND losses = 0"
+);
+$stmt->execute();
+$deletedHornets = $stmt->affected_rows;
+$stmt->close();
+
+if ($deletedHornets > 0) {
+    echo "  Deleted erroneous Hornets 2007 row (0-0 record)\n";
+} else {
+    echo "  No erroneous Hornets 2007 row found (already clean)\n";
+}
+
+echo "\n";
+
+// ─────────────────────────────────────────────────────────────
+// Step 2: Populate ibl_franchise_seasons
+// ─────────────────────────────────────────────────────────────
+
+echo "Step 2: Populating ibl_franchise_seasons...\n";
+
+// Clear existing data for idempotent re-runs
+$mysqli_db->query("DELETE FROM ibl_franchise_seasons");
+echo "  Cleared existing ibl_franchise_seasons data\n";
+
+// Build team name → franchise_id lookup from ibl_team_info
+$teamLookup = [];
+$result = $mysqli_db->query("SELECT teamid, team_name, team_city FROM ibl_team_info WHERE teamid > 0");
+if ($result !== false) {
+    while ($row = $result->fetch_assoc()) {
+        $teamLookup[(string)$row['team_name']] = [
+            'teamid' => (int)$row['teamid'],
+            'team_city' => (string)$row['team_city'],
+        ];
+    }
+    $result->free();
+}
+
+// City transition rules: franchise currentname => array of [start_season_year, end_season_year, city]
+// season_year = ending_year - 1
+$cityRules = [
+    'Aces' => [
+        ['start' => 1988, 'end' => 1999, 'city' => 'Oklahoma City'],
+        ['start' => 2000, 'end' => 9999, 'city' => 'Las Vegas'],
+    ],
+    'Braves' => [
+        ['start' => 1988, 'end' => 2001, 'city' => 'Seattle'],
+        ['start' => 2002, 'end' => 9999, 'city' => 'Buffalo'],
+    ],
+    'Nets' => [
+        ['start' => 1988, 'end' => 1997, 'city' => 'Brooklyn'],
+        ['start' => 1998, 'end' => 9999, 'city' => 'New Jersey'],
+    ],
+    'Rockets' => [
+        ['start' => 1988, 'end' => 2000, 'city' => 'San Antonio'],
+        ['start' => 2001, 'end' => 9999, 'city' => 'Houston'],
+    ],
+];
+
+/**
+ * Determine the city for a franchise in a given season year.
+ *
+ * @param string $currentname The franchise's current name (from ibl_team_win_loss.currentname)
+ * @param int $seasonYear The season starting year
+ * @param array<string, array{teamid: int, team_city: string}> $teamLookup
+ * @param array<string, list<array{start: int, end: int, city: string}>> $cityRules
+ */
+function getCityForSeason(
+    string $currentname,
+    int $seasonYear,
+    array $teamLookup,
+    array $cityRules
+): string {
+    if (isset($cityRules[$currentname])) {
+        foreach ($cityRules[$currentname] as $rule) {
+            if ($seasonYear >= $rule['start'] && $seasonYear <= $rule['end']) {
+                return $rule['city'];
+            }
+        }
+    }
+
+    // Default: use current city from ibl_team_info
+    return $teamLookup[$currentname]['team_city'] ?? 'Unknown';
+}
+
+// Fetch all valid win/loss records
+$result = $mysqli_db->query(
+    "SELECT year, currentname, namethatyear
+     FROM ibl_team_win_loss
+     ORDER BY currentname, year"
+);
+
+$insertStmt = $mysqli_db->prepare(
+    "INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year, team_city, team_name)
+     VALUES (?, ?, ?, ?, ?)"
+);
+
+$franchiseSeasonsInserted = 0;
+$franchiseSeasonsErrors = [];
+
+if ($result !== false) {
+    while ($row = $result->fetch_assoc()) {
+        $endingYear = (int)$row['year'];
+        $currentname = (string)$row['currentname'];
+        $namethatyear = (string)$row['namethatyear'];
+        $seasonYear = $endingYear - 1;
+
+        if (!isset($teamLookup[$currentname])) {
+            $franchiseSeasonsErrors[] = "Unknown team: {$currentname} (year={$endingYear})";
+            continue;
+        }
+
+        $franchiseId = $teamLookup[$currentname]['teamid'];
+        $city = getCityForSeason($currentname, $seasonYear, $teamLookup, $cityRules);
+
+        $insertStmt->bind_param('iiiss', $franchiseId, $seasonYear, $endingYear, $city, $namethatyear);
+        $insertStmt->execute();
+
+        if ($insertStmt->errno !== 0) {
+            $franchiseSeasonsErrors[] = "Insert failed for {$currentname} season_year={$seasonYear}: {$insertStmt->error}";
+        } else {
+            $franchiseSeasonsInserted++;
+        }
+    }
+    $result->free();
+}
+
+$insertStmt->close();
+
+echo "  Inserted: {$franchiseSeasonsInserted} rows\n";
+if ($franchiseSeasonsErrors !== []) {
+    echo "  Errors:\n";
+    foreach ($franchiseSeasonsErrors as $error) {
+        echo "    - {$error}\n";
+    }
+}
+echo "\n";
+
+// ─────────────────────────────────────────────────────────────
+// Step 3: Populate ibl_gm_tenures
+// ─────────────────────────────────────────────────────────────
+
+echo "Step 3: Populating ibl_gm_tenures...\n";
+
+// Clear existing data for idempotent re-runs
+$mysqli_db->query("DELETE FROM ibl_gm_tenures");
+echo "  Cleared existing ibl_gm_tenures data\n";
+
+// Build team name (from parentheses) → franchise_id lookup
+// ibl_gm_history.name format: "Username (TeamName)"
+$result = $mysqli_db->query(
+    "SELECT prim, year, name, Award FROM ibl_gm_history ORDER BY prim"
+);
+
+$tenureStmt = $mysqli_db->prepare(
+    "INSERT INTO ibl_gm_tenures (franchise_id, gm_username, start_season_year, end_season_year)
+     VALUES (?, ?, ?, ?)"
+);
+
+$gmTenuresInserted = 0;
+$gmTenuresErrors = [];
+$gmTenuresParsed = [];
+
+if ($result !== false) {
+    while ($row = $result->fetch_assoc()) {
+        $prim = (int)$row['prim'];
+        $yearHtml = (string)$row['year'];
+        $nameField = (string)$row['name'];
+        $awardHtml = (string)$row['Award'];
+
+        // Extract team name from parentheses in name field
+        // Format: "Username (TeamName)"
+        if (preg_match('/\(([^)]+)\)/', $nameField, $teamMatch) !== 1) {
+            $gmTenuresErrors[] = "prim={$prim}: Could not extract team from name='{$nameField}'";
+            continue;
+        }
+        $teamName = $teamMatch[1];
+
+        if (!isset($teamLookup[$teamName])) {
+            $gmTenuresErrors[] = "prim={$prim}: Unknown team '{$teamName}' from name='{$nameField}'";
+            continue;
+        }
+        $franchiseId = $teamLookup[$teamName]['teamid'];
+
+        // Extract GM username from Award bold text
+        // Format: "<B>GM Name</B>..." or "<b>GM Name</b>..."
+        $awardStripped = strip_tags($awardHtml, '');
+        if (preg_match('/<[Bb]>([^<]+)<\/[Bb]>/i', $awardHtml, $gmMatch) !== 1) {
+            $gmTenuresErrors[] = "prim={$prim}: Could not extract GM from Award for {$teamName}";
+            continue;
+        }
+        $gmUsername = trim($gmMatch[1]);
+
+        // Extract year range from year field
+        // Formats: "<B>1988-Present:</b>", "<B>1988-2005:</b>", "<B>1988:</b>", "<B>2004-2005</b>"
+        $yearStripped = strip_tags($yearHtml);
+        $yearStripped = trim($yearStripped, ": \t\n\r\0\x0B");
+
+        $startYear = null;
+        $endYear = null;
+
+        if (preg_match('/^(\d{4})-Present$/i', $yearStripped, $yearMatch) === 1) {
+            $startYear = (int)$yearMatch[1];
+            $endYear = null; // NULL = present
+        } elseif (preg_match('/^(\d{4})-(\d{4})$/', $yearStripped, $yearMatch) === 1) {
+            $startYear = (int)$yearMatch[1];
+            $endYear = (int)$yearMatch[2];
+        } elseif (preg_match('/^(\d{4})$/', $yearStripped, $yearMatch) === 1) {
+            $startYear = (int)$yearMatch[1];
+            $endYear = (int)$yearMatch[1]; // Single year
+        } else {
+            $gmTenuresErrors[] = "prim={$prim}: Could not parse year '{$yearStripped}' for {$teamName}";
+            continue;
+        }
+
+        $tenureStmt->bind_param('isii', $franchiseId, $gmUsername, $startYear, $endYear);
+        $tenureStmt->execute();
+
+        if ($tenureStmt->errno !== 0) {
+            $gmTenuresErrors[] = "prim={$prim}: Insert failed for {$gmUsername} at {$teamName}: {$tenureStmt->error}";
+        } else {
+            $gmTenuresInserted++;
+            $gmTenuresParsed[] = [
+                'prim' => $prim,
+                'franchise_id' => $franchiseId,
+                'team' => $teamName,
+                'gm' => $gmUsername,
+                'start' => $startYear,
+                'end' => $endYear,
+            ];
+        }
+    }
+    $result->free();
+}
+
+$tenureStmt->close();
+
+echo "  Inserted: {$gmTenuresInserted} rows\n";
+if ($gmTenuresErrors !== []) {
+    echo "  Parse/insert errors:\n";
+    foreach ($gmTenuresErrors as $error) {
+        echo "    - {$error}\n";
+    }
+}
+echo "\n";
+
+// ─────────────────────────────────────────────────────────────
+// Step 3b: Correct known ibl_gm_history data issues
+// ─────────────────────────────────────────────────────────────
+
+echo "Step 3b: Applying GM tenure corrections...\n";
+
+$kingsId = $teamLookup['Kings']['teamid'];
+$celticsId = $teamLookup['Celtics']['teamid'];
+
+// prim=29 lists Myke under "DaWizard (Celtics)" but Myke was actually the Kings' first GM.
+// Delete the erroneous Celtics tenure and insert the correct Kings tenure.
+$stmt = $mysqli_db->prepare(
+    "DELETE FROM ibl_gm_tenures WHERE franchise_id = ? AND gm_username = 'Myke'"
+);
+$stmt->bind_param('i', $celticsId);
+$stmt->execute();
+$deletedCelticsMyke = $stmt->affected_rows;
+$stmt->close();
+
+if ($deletedCelticsMyke > 0) {
+    echo "  Removed erroneous Myke tenure from Celtics (ibl_gm_history prim=29 mislabeled)\n";
+    // Also remove from parsed array so mid-season detection doesn't use it
+    $gmTenuresParsed = array_values(array_filter(
+        $gmTenuresParsed,
+        static fn(array $t): bool => !($t['franchise_id'] === $celticsId && $t['gm'] === 'Myke')
+    ));
+}
+
+// Insert correct Myke tenure: Kings GM from 1992-1993 through 1996-1997 season
+$stmt = $mysqli_db->prepare(
+    "INSERT IGNORE INTO ibl_gm_tenures (franchise_id, gm_username, start_season_year, end_season_year)
+     VALUES (?, 'Myke', 1992, 1996)"
+);
+$stmt->bind_param('i', $kingsId);
+$stmt->execute();
+if ($stmt->affected_rows > 0) {
+    echo "  Added Myke as Kings GM (1992-1996)\n";
+    $gmTenuresParsed[] = [
+        'prim' => 0,
+        'franchise_id' => $kingsId,
+        'team' => 'Kings',
+        'gm' => 'Myke',
+        'start' => 1992,
+        'end' => 1996,
+    ];
+}
+$stmt->close();
+
+// Fix Ross Tirona's Kings start year: he took over in 1997-1998 season (season_year=1997),
+// but ibl_gm_history prim=39 says "1998-2005" which is off by one.
+$stmt = $mysqli_db->prepare(
+    "UPDATE ibl_gm_tenures SET start_season_year = 1997
+     WHERE franchise_id = ? AND gm_username = 'Ross Tirona' AND start_season_year = 1998"
+);
+$stmt->bind_param('i', $kingsId);
+$stmt->execute();
+if ($stmt->affected_rows > 0) {
+    echo "  Fixed Ross Tirona Kings start year: 1998 → 1997\n";
+    foreach ($gmTenuresParsed as &$tenure) {
+        if ($tenure['franchise_id'] === $kingsId && $tenure['gm'] === 'Ross Tirona' && $tenure['start'] === 1998) {
+            $tenure['start'] = 1997;
+        }
+    }
+    unset($tenure);
+}
+$stmt->close();
+
+$trailblazersId = $teamLookup['Trailblazers']['teamid'];
+$pistonsId = $teamLookup['Pistons']['teamid'];
+
+// prim=15 lists River Foster as Trailblazers GM for 1988, but Peter Kim has always been GM.
+// Remove the erroneous River Foster tenure and clear Peter Kim's mid-season flag.
+$stmt = $mysqli_db->prepare(
+    "DELETE FROM ibl_gm_tenures WHERE franchise_id = ? AND gm_username = 'River Foster'"
+);
+$stmt->bind_param('i', $trailblazersId);
+$stmt->execute();
+if ($stmt->affected_rows > 0) {
+    echo "  Removed erroneous River Foster tenure from Trailblazers\n";
+    $gmTenuresParsed = array_values(array_filter(
+        $gmTenuresParsed,
+        static fn(array $t): bool => !($t['franchise_id'] === $trailblazersId && $t['gm'] === 'River Foster')
+    ));
+}
+$stmt->close();
+
+$stmt = $mysqli_db->prepare(
+    "UPDATE ibl_gm_tenures SET is_mid_season_start = 0
+     WHERE franchise_id = ? AND gm_username = 'Peter Kim'"
+);
+$stmt->bind_param('i', $trailblazersId);
+$stmt->execute();
+if ($stmt->affected_rows > 0) {
+    echo "  Cleared mid-season flag on Peter Kim (Trailblazers)\n";
+}
+$stmt->close();
+
+// Johnny McKeever started the 2003-2004 Pistons season (season_year=2003),
+// but ibl_gm_history prim=47 says "2004-Present".
+$stmt = $mysqli_db->prepare(
+    "UPDATE ibl_gm_tenures SET start_season_year = 2003
+     WHERE franchise_id = ? AND gm_username = 'Johnny McKeever' AND start_season_year = 2004"
+);
+$stmt->bind_param('i', $pistonsId);
+$stmt->execute();
+if ($stmt->affected_rows > 0) {
+    echo "  Fixed Johnny McKeever Pistons start year: 2004 → 2003\n";
+    foreach ($gmTenuresParsed as &$tenure) {
+        if ($tenure['franchise_id'] === $pistonsId && $tenure['gm'] === 'Johnny McKeever' && $tenure['start'] === 2004) {
+            $tenure['start'] = 2003;
+        }
+    }
+    unset($tenure);
+}
+$stmt->close();
+
+echo "\n";
+
+// ─────────────────────────────────────────────────────────────
+// Step 4: Detect mid-season transitions
+// ─────────────────────────────────────────────────────────────
+
+echo "Step 4: Detecting mid-season transitions...\n";
+
+// For each franchise, find years where two GMs overlap
+$midSeasonTransitions = [];
+
+// Group tenures by franchise_id
+$tenuresByFranchise = [];
+foreach ($gmTenuresParsed as $tenure) {
+    $tenuresByFranchise[$tenure['franchise_id']][] = $tenure;
+}
+
+foreach ($tenuresByFranchise as $franchiseId => $tenures) {
+    // Sort by start year
+    usort($tenures, static function (array $a, array $b): int {
+        return $a['start'] <=> $b['start'];
+    });
+
+    for ($i = 0; $i < count($tenures); $i++) {
+        for ($j = $i + 1; $j < count($tenures); $j++) {
+            $a = $tenures[$i];
+            $b = $tenures[$j];
+
+            $aEnd = $a['end'] ?? 9999;
+            $bEnd = $b['end'] ?? 9999;
+
+            // Check if they overlap at the transition point
+            // GM B starts in the same year GM A ends
+            if ($b['start'] === $aEnd) {
+                $midSeasonTransitions[] = [
+                    'team' => $a['team'],
+                    'year' => $aEnd,
+                    'outgoing_gm' => $a['gm'],
+                    'incoming_gm' => $b['gm'],
+                ];
+
+                // Flag the outgoing GM's end as mid-season
+                $updateStmt = $mysqli_db->prepare(
+                    "UPDATE ibl_gm_tenures SET is_mid_season_end = 1
+                     WHERE franchise_id = ? AND gm_username = ? AND start_season_year = ?"
+                );
+                $updateStmt->bind_param('isi', $a['franchise_id'], $a['gm'], $a['start']);
+                $updateStmt->execute();
+                $updateStmt->close();
+
+                // Flag the incoming GM's start as mid-season
+                $updateStmt = $mysqli_db->prepare(
+                    "UPDATE ibl_gm_tenures SET is_mid_season_start = 1
+                     WHERE franchise_id = ? AND gm_username = ? AND start_season_year = ?"
+                );
+                $updateStmt->bind_param('isi', $b['franchise_id'], $b['gm'], $b['start']);
+                $updateStmt->execute();
+                $updateStmt->close();
+            }
+        }
+    }
+}
+
+if ($midSeasonTransitions !== []) {
+    echo "  Detected mid-season transitions:\n";
+    foreach ($midSeasonTransitions as $transition) {
+        echo "    - {$transition['team']} {$transition['year']}: {$transition['outgoing_gm']} → {$transition['incoming_gm']}\n";
+    }
+} else {
+    echo "  No mid-season transitions detected\n";
+}
+echo "\n";
+
+// ─────────────────────────────────────────────────────────────
+// Step 5: Validation report
+// ─────────────────────────────────────────────────────────────
+
+echo "=== Validation Report ===\n\n";
+
+// Count rows
+$fsCount = $mysqli_db->query("SELECT COUNT(*) AS cnt FROM ibl_franchise_seasons");
+$gtCount = $mysqli_db->query("SELECT COUNT(*) AS cnt FROM ibl_gm_tenures");
+
+if ($fsCount !== false) {
+    $row = $fsCount->fetch_assoc();
+    echo "ibl_franchise_seasons: {$row['cnt']} rows\n";
+    $fsCount->free();
+}
+if ($gtCount !== false) {
+    $row = $gtCount->fetch_assoc();
+    echo "ibl_gm_tenures: {$row['cnt']} rows\n";
+    $gtCount->free();
+}
+echo "\n";
+
+// Check for seasons with no GM assigned
+echo "Seasons with no GM coverage:\n";
+$noGmResult = $mysqli_db->query("
+    SELECT fs.franchise_id, fs.season_year, fs.team_city, fs.team_name
+    FROM ibl_franchise_seasons fs
+    LEFT JOIN ibl_gm_tenures gt
+        ON gt.franchise_id = fs.franchise_id
+        AND fs.season_year >= gt.start_season_year
+        AND fs.season_year <= COALESCE(gt.end_season_year, 9999)
+    WHERE gt.id IS NULL
+    ORDER BY fs.franchise_id, fs.season_year
+");
+
+$noGmCount = 0;
+if ($noGmResult !== false) {
+    while ($row = $noGmResult->fetch_assoc()) {
+        echo "  - {$row['team_city']} {$row['team_name']} ({$row['season_year']})\n";
+        $noGmCount++;
+    }
+    $noGmResult->free();
+}
+if ($noGmCount === 0) {
+    echo "  None - all seasons have GM coverage\n";
+}
+echo "\n";
+
+// Spot-check: Aces franchise history
+echo "Spot-check: Aces franchise history\n";
+$acesResult = $mysqli_db->query("
+    SELECT fs.season_year, fs.season_ending_year, fs.team_city, fs.team_name
+    FROM ibl_franchise_seasons fs
+    JOIN ibl_team_info ti ON ti.teamid = fs.franchise_id
+    WHERE ti.team_name = 'Aces'
+    ORDER BY fs.season_year
+");
+if ($acesResult !== false) {
+    while ($row = $acesResult->fetch_assoc()) {
+        echo "  {$row['season_year']}-{$row['season_ending_year']}: {$row['team_city']} {$row['team_name']}\n";
+    }
+    $acesResult->free();
+}
+echo "\n";
+
+// Spot-check: Nets franchise history
+echo "Spot-check: Nets franchise history\n";
+$netsResult = $mysqli_db->query("
+    SELECT fs.season_year, fs.season_ending_year, fs.team_city, fs.team_name
+    FROM ibl_franchise_seasons fs
+    JOIN ibl_team_info ti ON ti.teamid = fs.franchise_id
+    WHERE ti.team_name = 'Nets'
+    ORDER BY fs.season_year
+");
+if ($netsResult !== false) {
+    while ($row = $netsResult->fetch_assoc()) {
+        echo "  {$row['season_year']}-{$row['season_ending_year']}: {$row['team_city']} {$row['team_name']}\n";
+    }
+    $netsResult->free();
+}
+echo "\n";
+
+// Spot-check: Bucks GM history
+echo "Spot-check: Bucks GM tenures\n";
+$bucksResult = $mysqli_db->query("
+    SELECT gt.gm_username, gt.start_season_year, gt.end_season_year,
+           gt.is_mid_season_start, gt.is_mid_season_end
+    FROM ibl_gm_tenures gt
+    JOIN ibl_team_info ti ON ti.teamid = gt.franchise_id
+    WHERE ti.team_name = 'Bucks'
+    ORDER BY gt.start_season_year
+");
+if ($bucksResult !== false) {
+    while ($row = $bucksResult->fetch_assoc()) {
+        $end = $row['end_season_year'] ?? 'Present';
+        $flags = '';
+        if ((int)$row['is_mid_season_start'] === 1) {
+            $flags .= ' [mid-season start]';
+        }
+        if ((int)$row['is_mid_season_end'] === 1) {
+            $flags .= ' [mid-season end]';
+        }
+        echo "  {$row['gm_username']}: {$row['start_season_year']}-{$end}{$flags}\n";
+    }
+    $bucksResult->free();
+}
+echo "\n";
+
+echo "=== Migration complete ===\n";

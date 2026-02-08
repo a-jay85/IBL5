@@ -1,21 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Team;
+
 use PHPUnit\Framework\TestCase;
 use Team\TeamRepository;
 
 /**
  * Tests for TeamRepository
- * 
+ *
  * Validates database query methods for team-related data
  */
 class TeamRepositoryTest extends TestCase
 {
-    private $db;
-    private $repository;
+    private \MockDatabase $db;
+    private TeamRepository $repository;
 
     protected function setUp(): void
     {
-        $this->db = new MockDatabase();
+        $this->db = new \MockDatabase();
         $this->repository = new TeamRepository($this->db);
     }
 

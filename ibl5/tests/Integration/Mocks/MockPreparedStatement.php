@@ -16,13 +16,16 @@ class MockPreparedStatement
     public string $error = '';
     public int $errno = 0;
 
-    /**  
-     * @param MockDatabase|null $mockDb Mock database instance to use.  
-     *                                  If null (or omitted), a new MockDatabase  
-     *                                  instance will be created for this statement,  
-     *                                  rather than using any shared instance.  
-     * @param string $query             The SQL query string for this mock statement.  
-     */  
+    /** @var MockDatabaseResult|bool|null Stored result from execute() for get_result() */
+    private MockDatabaseResult|bool|null $lastResult = null;
+
+    /**
+     * @param MockDatabase|null $mockDb Mock database instance to use.
+     *                                  If null (or omitted), a new MockDatabase
+     *                                  instance will be created for this statement,
+     *                                  rather than using any shared instance.
+     * @param string $query             The SQL query string for this mock statement.
+     */
     public function __construct(?MockDatabase $mockDb, string $query = '')
     {
         $this->mockDb = $mockDb ?? new MockDatabase();
@@ -45,39 +48,37 @@ class MockPreparedStatement
 
     /**
      * Execute the prepared statement
+     * Stores the result for later retrieval via get_result()
      */
     public function execute(?array $params = null): bool
     {
         $query = $this->replacePlaceholders($this->query);
-        
-        // Execute the query using the mock database
+
+        // Execute the query using the mock database and store result
         $result = $this->mockDb->sql_query($query);
-        
+        $this->lastResult = $result;
+
         // Set affected_rows if query was UPDATE/INSERT/DELETE
-        if (stripos($query, 'UPDATE') === 0 || 
-            stripos($query, 'INSERT') === 0 || 
+        if (stripos($query, 'UPDATE') === 0 ||
+            stripos($query, 'INSERT') === 0 ||
             stripos($query, 'DELETE') === 0) {
             $this->affected_rows = $this->mockDb->sql_affectedrows();
         }
-        
+
         return $result !== false;
     }
 
     /**
      * Get the result of the prepared statement
-     * TEMPORARY: Returns object|false during migration to support MockMysqliResult
+     * Returns the stored result from the last execute() call
      */
     public function get_result(): object|false
     {
-        $query = $this->replacePlaceholders($this->query);
-        
-        // Execute the query using the mock database (this tracks the query)
-        $mockResult = $this->mockDb->sql_query($query);
-        
-        if ($mockResult instanceof MockDatabaseResult) {
-            return new MockMysqliResult($mockResult);
+        // Return stored result from execute() instead of calling sql_query() again
+        if ($this->lastResult instanceof MockDatabaseResult) {
+            return new MockMysqliResult($this->lastResult);
         }
-        
+
         return false;
     }
     

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace FranchiseHistory;
 
+use FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface;
 use FranchiseHistory\Contracts\FranchiseHistoryViewInterface;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -12,46 +14,29 @@ use Utilities\HtmlSanitizer;
  *
  * Generates sortable HTML table displaying franchise history data.
  *
+ * @phpstan-import-type FranchiseRow from FranchiseHistoryRepositoryInterface
+ *
  * @see FranchiseHistoryViewInterface For the interface contract
  */
 class FranchiseHistoryView implements FranchiseHistoryViewInterface
 {
     /**
      * @see FranchiseHistoryViewInterface::render()
+     *
+     * @param array<int, FranchiseRow> $franchiseData
      */
     public function render(array $franchiseData): string
     {
-        $html = $this->getStyleBlock();
+        $html = '';
+        $html .= '<h2 class="ibl-title">Franchise History</h2>';
+        $html .= '<div class="sticky-scroll-wrapper">';
+        $html .= '<div class="sticky-scroll-container">';
         $html .= $this->renderTableHeader();
         $html .= $this->renderTableRows($franchiseData);
-        $html .= '</table>';
+        $html .= '</tbody></table>';
+        $html .= '</div></div>';
 
         return $html;
-    }
-
-    /**
-     * Generate CSS styles for the franchise history table
-     *
-     * @return string CSS style block
-     */
-    private function getStyleBlock(): string
-    {
-        return '<style>
-            .franchise-table {
-                border: 1px solid #000;
-                border-collapse: collapse;
-            }
-            .franchise-table th, .franchise-table td {
-                border: 1px solid #000;
-                padding: 4px;
-            }
-            .franchise-table th {
-                background-color: #ddd;
-            }
-            .last-five-cell {
-                background-color: #ddd;
-            }
-        </style>';
     }
 
     /**
@@ -61,27 +46,28 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
      */
     private function renderTableHeader(): string
     {
-        return '<table class="sortable franchise-table">
+        return '<table class="sortable ibl-data-table sticky-table">
+            <thead>
             <tr>
-                <th>Team</th>
-                <th>All-Time<br>Wins</th>
-                <th>All-Time<br>Losses</th>
-                <th>All-Time<br>Pct.</th>
-                <th class="last-five-cell">Last Five<br>Seasons<br>Wins</th>
-                <th class="last-five-cell">Last Five<br>Seasons<br>Losses</th>
-                <th class="last-five-cell">Last Five<br>Seasons<br>Pct.</th>
-                <th>Playoffs</th>
+                <th class="ibl-team-cell--colored sticky-col sticky-corner">Team</th>
+                <th>All-Time<br>Record</th>
+                <th>Last Five<br>Seasons</th>
+                <th>All-Time<br>Playoffs Record</th>
+                <th>All-Time<br>HEAT Record</th>
+                <th>Playoff<br>Berths</th>
                 <th>H.E.A.T.<br>Titles</th>
                 <th>Div.<br>Titles</th>
                 <th>Conf.<br>Titles</th>
                 <th>IBL<br>Titles</th>
-            </tr>';
+            </tr>
+            </thead>
+            <tbody>';
     }
 
     /**
      * Render all team rows
      *
-     * @param array $franchiseData Array of franchise data
+     * @param array<int, FranchiseRow> $franchiseData Array of franchise data
      * @return string HTML for all team rows
      */
     private function renderTableRows(array $franchiseData): string
@@ -98,41 +84,48 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
     /**
      * Render a single team row
      *
-     * @param array $team Team franchise data
+     * @param FranchiseRow $team Team franchise data
      * @return string HTML for team row
      */
     private function renderTeamRow(array $team): string
     {
         $teamId = (int)$team['teamid'];
-        $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
-        $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
-        $teamCity = HtmlSanitizer::safeHtmlOutput($team['team_city']);
-        $teamName = HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
-        $html = '<tr>';
+        $html = '<tr data-team-id="' . $teamId . '">';
+        $html .= TeamCellHelper::renderTeamCell($teamId, $team['team_name'], $team['color1'], $team['color2'], 'sticky-col');
 
-        // Team name cell
-        $html .= '<td style="background-color: #' . $color1 . ';">';
-        $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" ';
-        $html .= 'style="color: #' . $color2 . ';">' . $teamCity . ' ' . $teamName . '</a>';
-        $html .= '</td>';
+        // All-time record
+        $allTimeWins = (int)$team['totwins'];
+        $allTimeLosses = (int)$team['totloss'];
+        /** @var string $allTimeWinpct */
+        $allTimeWinpct = HtmlSanitizer::safeHtmlOutput($team['winpct']);
+        $html .= '<td style="white-space: nowrap;" sorttable_customkey="' . $allTimeWinpct . '">' . $allTimeWins . '-' . $allTimeLosses . ' (' . $allTimeWinpct . ')</td>';
 
-        // All-time stats
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['totwins']) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['totloss']) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['winpct']) . '</td>';
+        // Last five seasons record
+        $fiveSeasonWins = (int)$team['five_season_wins'];
+        $fiveSeasonLosses = (int)$team['five_season_losses'];
+        /** @var string $fiveSeasonWinpct */
+        $fiveSeasonWinpct = HtmlSanitizer::safeHtmlOutput($team['five_season_winpct'] ?? '');
+        $html .= '<td style="white-space: nowrap;" sorttable_customkey="' . $fiveSeasonWinpct . '">' . $fiveSeasonWins . '-' . $fiveSeasonLosses . ' (' . $fiveSeasonWinpct . ')</td>';
 
-        // Last five seasons stats
-        $html .= '<td class="last-five-cell">' . HtmlSanitizer::safeHtmlOutput($team['five_season_wins']) . '</td>';
-        $html .= '<td class="last-five-cell">' . HtmlSanitizer::safeHtmlOutput($team['five_season_losses']) . '</td>';
-        $html .= '<td class="last-five-cell">' . HtmlSanitizer::safeHtmlOutput($team['five_season_winpct']) . '</td>';
+        // Record columns
+        $playoffWins = (int)$team['playoff_total_wins'];
+        $playoffLosses = (int)$team['playoff_total_losses'];
+        /** @var string $playoffWinpct */
+        $playoffWinpct = HtmlSanitizer::safeHtmlOutput($team['playoff_winpct']);
+        $html .= '<td style="white-space: nowrap;" sorttable_customkey="' . $playoffWinpct . '">' . $playoffWins . '-' . $playoffLosses . ' (' . $playoffWinpct . ')</td>';
+        $heatWins = (int)$team['heat_total_wins'];
+        $heatLosses = (int)$team['heat_total_losses'];
+        /** @var string $heatWinpct */
+        $heatWinpct = HtmlSanitizer::safeHtmlOutput($team['heat_winpct']);
+        $html .= '<td style="white-space: nowrap;" sorttable_customkey="' . $heatWinpct . '">' . $heatWins . '-' . $heatLosses . ' (' . $heatWinpct . ')</td>';
 
-        // Titles and playoffs
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['playoffs']) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['heat_titles']) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['div_titles']) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['conf_titles']) . '</td>';
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($team['ibl_titles']) . '</td>';
+        // Titles and playoff berths
+        $html .= '<td>' . (int)$team['playoffs'] . '</td>';
+        $html .= '<td>' . $team['heat_titles'] . '</td>';
+        $html .= '<td>' . $team['div_titles'] . '</td>';
+        $html .= '<td>' . $team['conf_titles'] . '</td>';
+        $html .= '<td>' . $team['ibl_titles'] . '</td>';
 
         $html .= '</tr>';
 

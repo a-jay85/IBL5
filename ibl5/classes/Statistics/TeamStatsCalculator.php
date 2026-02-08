@@ -6,13 +6,20 @@ namespace Statistics;
 
 /**
  * TeamStatsCalculator - Calculate team statistics from game data
- * 
+ *
  * Computes wins, losses, home/away splits, streaks, and ranking scores
  * from game result data for power rankings updates.
+ *
+ * @phpstan-type GameRow array{Visitor: int, VScore: int, Home: int, HScore: int}
+ * @phpstan-type NormalizedGame array{awayTeam: int, awayScore: int, homeTeam: int, homeScore: int}
+ * @phpstan-type TeamStats array{wins: int, losses: int, homeWins: int, homeLosses: int, awayWins: int, awayLosses: int, winPoints: int, lossPoints: int, winsInLast10Games: int, lossesInLast10Games: int, streak: int, streakType: string}
  */
 class TeamStatsCalculator
 {
     private object $db;
+
+    /** @var array<int, array{win: int, loss: int}>|null */
+    private ?array $teamRecordsCache = null;
 
     public function __construct(object $db)
     {
@@ -20,24 +27,39 @@ class TeamStatsCalculator
     }
 
     /**
+     * Pre-fetch all team records from ibl_power into a lookup array.
+     * Call once before processing multiple teams to avoid N+1 queries.
+     */
+    public function preloadTeamRecords(): void
+    {
+        if ($this->teamRecordsCache !== null) {
+            return;
+        }
+
+        $this->teamRecordsCache = [];
+
+        if (method_exists($this->db, 'fetchAll')) {
+            /** @var list<array{TeamID: int, win: int, loss: int}> $rows */
+            $rows = $this->db->fetchAll(
+                "SELECT TeamID, win, loss FROM ibl_power WHERE TeamID BETWEEN 1 AND 32",
+                ""
+            );
+
+            foreach ($rows as $row) {
+                $this->teamRecordsCache[$row['TeamID']] = [
+                    'win' => $row['win'],
+                    'loss' => $row['loss'],
+                ];
+            }
+        }
+    }
+
+    /**
      * Calculate team statistics from an array of games
-     * 
-     * @param array $games Array of game data with Visitor, VScore, Home, HScore
+     *
+     * @param list<GameRow> $games Array of game data with Visitor, VScore, Home, HScore
      * @param int $tid Team ID to calculate stats for
-     * @return array{
-     *     wins: int,
-     *     losses: int,
-     *     homeWins: int,
-     *     homeLosses: int,
-     *     awayWins: int,
-     *     awayLosses: int,
-     *     winPoints: int,
-     *     lossPoints: int,
-     *     winsInLast10Games: int,
-     *     lossesInLast10Games: int,
-     *     streak: int,
-     *     streakType: string
-     * }
+     * @return TeamStats
      */
     public function calculate(array $games, int $tid): array
     {
@@ -57,6 +79,8 @@ class TeamStatsCalculator
 
     /**
      * Initialize empty stats array
+     *
+     * @return TeamStats
      */
     private function initializeStats(): array
     {
@@ -78,6 +102,9 @@ class TeamStatsCalculator
 
     /**
      * Normalize game data to standard format
+     *
+     * @param GameRow $gameData
+     * @return NormalizedGame
      */
     private function normalizeGameData(array $gameData): array
     {
@@ -91,10 +118,13 @@ class TeamStatsCalculator
 
     /**
      * Update stats based on a single game result
+     *
+     * @param TeamStats $stats
+     * @param NormalizedGame $game
      */
     private function updateGameStats(array &$stats, array $game, int $currentGame, int $totalGames, int $tid): void
     {
-        if ($tid == $game['awayTeam']) {
+        if ($tid === $game['awayTeam']) {
             $opponentTeam = $game['homeTeam'];
             $isWin = $game['awayScore'] > $game['homeScore'];
             $isHome = false;
@@ -138,12 +168,20 @@ class TeamStatsCalculator
     }
 
     /**
-     * Get opponent's record from database
+     * Get opponent's record, using pre-loaded cache when available
+     *
+     * @return array{win: int, loss: int}
      */
     private function getOpponentRecord(int $teamId): array
     {
-        // Use method_exists for duck-typing compatibility with MockDatabase and real db
+        // Use pre-loaded cache if available
+        if ($this->teamRecordsCache !== null) {
+            return $this->teamRecordsCache[$teamId] ?? ['win' => 0, 'loss' => 0];
+        }
+
+        // Fallback to per-query lookup for duck-typing compatibility with MockDatabase
         if (method_exists($this->db, 'fetchOne')) {
+            /** @var array{win: int, loss: int}|null $result */
             $result = $this->db->fetchOne(
                 "SELECT win, loss FROM ibl_power WHERE TeamID = ?",
                 "i",

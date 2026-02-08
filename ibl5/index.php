@@ -31,11 +31,11 @@ if ($httpref == 1) {
     if (isset($_SERVER['HTTP_REFERER'])) {
         $referer = $_SERVER['HTTP_REFERER'];
         $referer = check_html($referer, "nohtml");
-        if (mb_eregi("nuke_", $referer) && mb_eregi("into", $referer) && mb_eregi("from", $referer)) {
+        if (stripos($referer, "nuke_") !== false && stripos($referer, "into") !== false && stripos($referer, "from") !== false) {
             $referer = "";
         }
     }
-    if (!empty($referer) && !stripos_clone($referer, "unknown") && !stripos_clone($referer, "bookmark") && !stripos_clone($referer, $_SERVER['HTTP_HOST'])) {
+    if (!empty($referer) && !str_contains($referer, "unknown") && !str_contains($referer, "bookmark") && !str_contains($referer, $_SERVER['HTTP_HOST'])) {
         $result = $db->sql_query("INSERT INTO " . $prefix . "_referer VALUES (NULL, '" . $referer . "')");
     }
     $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_referer"));
@@ -49,7 +49,7 @@ $name = trim($name);
 if (isset($file)) {$file = trim($file);}
 $mod_file = trim($mod_file);
 $mop = trim($mop);
-if (stripos_clone($name, "..") || (isset($file) && stripos_clone($file, "..")) || stripos_clone($mod_file, "..") || stripos_clone($mop, "..")) {
+if (str_contains($name, "..") || (isset($file) && str_contains($file, "..")) || str_contains($mod_file, "..") || str_contains($mop, "..")) {
     die("You are so cool...");
 } else {
     $ThemeSel = get_theme();

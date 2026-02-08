@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyDemandCalculatorInterface;
@@ -57,23 +59,23 @@ class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
     ): float {
         // Get team performance data
         $teamPerformance = $this->repository->getTeamPerformance($teamName);
-        
+
         // Calculate position salary
         $positionSalary = $this->calculatePositionSalary($teamName, $player);
-        
+
         // Calculate modifiers
         $modifier = $this->calculateModifier(
             $teamPerformance['wins'],
             $teamPerformance['losses'],
             $teamPerformance['tradWins'],
             $teamPerformance['tradLosses'],
-            $player->freeAgencyPlayForWinner,
-            $player->freeAgencyTradition,
-            $player->freeAgencyLoyalty,
-            $player->freeAgencySecurity,
-            $player->freeAgencyPlayingTime,
+            $player->freeAgencyPlayForWinner ?? 0,
+            $player->freeAgencyTradition ?? 0,
+            $player->freeAgencyLoyalty ?? 0,
+            $player->freeAgencySecurity ?? 0,
+            $player->freeAgencyPlayingTime ?? 0,
             $teamName,
-            $player->teamName,
+            $player->teamName ?? '',
             $yearsInOffer,
             $positionSalary
         );
@@ -112,8 +114,8 @@ class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
     ): int {
         $totalSalary = $this->repository->getPositionSalaryCommitment(
             $teamName,
-            $player->position,
-            $player->playerID
+            $player->position ?? '',
+            $player->playerID ?? 0
         );
         
         // Cap at maximum
@@ -162,7 +164,7 @@ class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
         $factorTradition = self::TRADITION_FACTOR * $traditionDifferential * ($playerTradition - 1);
         
         // Loyalty factor (bonus for staying, penalty for leaving)
-        if ($teamName == $playerTeamName) {
+        if ($teamName === $playerTeamName) {
             $factorLoyalty = self::LOYALTY_BONUS_PERCENTAGE * ($playerLoyalty - 1);
         } else {
             $factorLoyalty = -self::LOYALTY_BONUS_PERCENTAGE * ($playerLoyalty - 1);

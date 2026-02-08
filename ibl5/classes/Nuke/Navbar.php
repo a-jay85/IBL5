@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Nuke;
 
 class Navbar
@@ -10,7 +12,7 @@ class Navbar
         if (file_exists("themes/$ThemeSel/images/menu/$gfile")) {
             $menuimg = "themes/$ThemeSel/images/menu/$gfile";
         } else {
-            $menuimg = "modules/Your_Account/images/$gfile";
+            $menuimg = "modules/YourAccount/images/$gfile";
         }
         return ($menuimg);
     }
@@ -18,13 +20,13 @@ class Navbar
     public static function nav($main_up = 0)
     {
         global $articlecomm, $db, $prefix;
-        get_lang("Your_Account");
+        get_lang("YourAccount");
         $row = $db->sql_fetchrow($db->sql_query("SELECT overwrite_theme from " . $prefix . "_config"));
         $overwrite_theme = intval($row['overwrite_theme']);
         $thmcount = 0;
         $handle = opendir('themes');
         while ($file = readdir($handle)) {
-            if ((!mb_ereg("[.]", $file))) {
+            if ((!str_contains($file, '.'))) {
                 $thmcount++;
             }
         }
@@ -33,43 +35,43 @@ class Navbar
     
         $menuimg = Navbar::menuimg("info.gif");
         echo "<font class=\"content\">"
-            . "<center><a href=\"modules.php?name=Your_Account&amp;op=edituser\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _CHANGEYOURINFO . "\" title=\"" . _CHANGEYOURINFO . "\"></a><br>"
-            . "<a href=\"modules.php?name=Your_Account&amp;op=edituser\">" . _CHANGEYOURINFO . "</a>"
+            . "<center><a href=\"modules.php?name=YourAccount&amp;op=edituser\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _CHANGEYOURINFO . "\" title=\"" . _CHANGEYOURINFO . "\"></a><br>"
+            . "<a href=\"modules.php?name=YourAccount&amp;op=edituser\">" . _CHANGEYOURINFO . "</a>"
             . "</center></font></td>";
     
         $menuimg = Navbar::menuimg("home.gif");
         echo "<td width=\"10%\"><font class=\"content\">"
-            . "<center><a href=\"modules.php?name=Your_Account&amp;op=edithome\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _CHANGEHOME . "\" title=\"" . _CHANGEHOME . "\"></a><br>"
-            . "<a href=\"modules.php?name=Your_Account&amp;op=edithome\">" . _CHANGEHOME . "</a>"
+            . "<center><a href=\"modules.php?name=YourAccount&amp;op=edithome\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _CHANGEHOME . "\" title=\"" . _CHANGEHOME . "\"></a><br>"
+            . "<a href=\"modules.php?name=YourAccount&amp;op=edithome\">" . _CHANGEHOME . "</a>"
             . "</center></form></font></td>";
     
-        if ($articlecomm == 1) {
+        if ($articlecomm === 1) {
             $menuimg = Navbar::menuimg("comments.gif");
             echo "<td width=\"10%\"><font class=\"content\">"
-                . "<center><a href=\"modules.php?name=Your_Account&amp;op=editcomm\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _CONFIGCOMMENTS . "\" title=\"" . _CONFIGCOMMENTS . "\"></a><br>"
-                . "<a href=\"modules.php?name=Your_Account&amp;op=editcomm\">" . _CONFIGCOMMENTS . "</a>"
+                . "<center><a href=\"modules.php?name=YourAccount&amp;op=editcomm\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _CONFIGCOMMENTS . "\" title=\"" . _CONFIGCOMMENTS . "\"></a><br>"
+                . "<a href=\"modules.php?name=YourAccount&amp;op=editcomm\">" . _CONFIGCOMMENTS . "</a>"
                 . "</center></form></font></td>";
         }
         
 
     
-        if ($thmcount > 1 and $overwrite_theme == 1) {
+        if ($thmcount > 1 and $overwrite_theme === 1) {
             $menuimg = Navbar::menuimg("themes.gif");
             echo "<td width=\"10%\"><font class=\"content\">"
-                . "<center><a href=\"modules.php?name=Your_Account&amp;op=chgtheme\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _SELECTTHETHEME . "\" title=\"" . _SELECTTHETHEME . "\"></a><br>"
-                . "<a href=\"modules.php?name=Your_Account&amp;op=chgtheme\">" . _SELECTTHETHEME . "</a>"
+                . "<center><a href=\"modules.php?name=YourAccount&amp;op=chgtheme\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _SELECTTHETHEME . "\" title=\"" . _SELECTTHETHEME . "\"></a><br>"
+                . "<a href=\"modules.php?name=YourAccount&amp;op=chgtheme\">" . _SELECTTHETHEME . "</a>"
                 . "</center></form></font></td>";
         }
     
         $menuimg = Navbar::menuimg("exit.gif");
         echo "<td width=\"10%\"><font class=\"content\">"
-            . "<center><a href=\"modules.php?name=Your_Account&amp;op=logout\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _LOGOUTEXIT . "\" title=\"" . _LOGOUTEXIT . "\"></a><br>"
-            . "<a href=\"modules.php?name=Your_Account&amp;op=logout\">" . _LOGOUTEXIT . "</a>"
+            . "<center><a href=\"modules.php?name=YourAccount&amp;op=logout\"><img src=\"$menuimg\" border=\"0\" alt=\"" . _LOGOUTEXIT . "\" title=\"" . _LOGOUTEXIT . "\"></a><br>"
+            . "<a href=\"modules.php?name=YourAccount&amp;op=logout\">" . _LOGOUTEXIT . "</a>"
             . "</center></form></font>";
     
         echo "</td></tr></table>";
-        if ($main_up != 1) {
-            echo "<br><center>[ <a href=\"modules.php?name=Your_Account\">" . _RETURNACCOUNT . "</a> ]</center>\n";
+        if ($main_up !== 1) {
+            echo "<br><center>[ <a href=\"modules.php?name=YourAccount\">" . _RETURNACCOUNT . "</a> ]</center>\n";
         }
     }
 }

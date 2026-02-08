@@ -6,12 +6,17 @@ namespace Standings;
 
 use Standings\Contracts\StandingsRepositoryInterface;
 use Standings\Contracts\StandingsViewInterface;
+use UI\TeamCellHelper;
 
 /**
  * StandingsView - HTML rendering for team standings
  *
  * Generates sortable HTML tables for conference and division standings.
  * Handles clinched indicators (X/Y/Z) and team streak display.
+ *
+ * @phpstan-import-type StandingsRow from StandingsRepositoryInterface
+ * @phpstan-import-type StreakRow from StandingsRepositoryInterface
+ * @phpstan-import-type PythagoreanStats from StandingsRepositoryInterface
  *
  * @see StandingsViewInterface For the interface contract
  * @see StandingsRepository For data access
@@ -35,13 +40,11 @@ class StandingsView implements StandingsViewInterface
      */
     public function render(): string
     {
-        $html = '<script src="sorttable.js"></script>';
-        $html .= $this->getStyleBlock();
+        $html = '';
 
         // Conference standings
         $html .= $this->renderRegion('Eastern');
         $html .= $this->renderRegion('Western');
-        $html .= '<p>';
 
         // Division standings
         $html .= $this->renderRegion('Atlantic');
@@ -50,48 +53,6 @@ class StandingsView implements StandingsViewInterface
         $html .= $this->renderRegion('Pacific');
 
         return $html;
-    }
-
-    /**
-     * Generate consolidated CSS styles for standings tables
-     *
-     * @return string CSS style block
-     */
-    private function getStyleBlock(): string
-    {
-        return '<style>
-            .standings-title {
-                color: #fd004d;
-                font-weight: bold;
-            }
-            
-            .standings-table {
-                border-collapse: separate;
-                border-spacing: 2px;
-            }
-            
-            .standings-header-row {
-                background-color: #006cb3;
-            }
-            
-            .standings-header-cell {
-                text-align: center;
-                color: #ffffff;
-                font-weight: bold;
-            }
-            
-            .standings-cell {
-                text-align: center;
-            }
-            
-            .standings-team-cell {
-                text-align: left;
-            }
-            
-            .standings-divider {
-                text-align: center;
-            }
-        </style>';
     }
 
     /**
@@ -104,7 +65,7 @@ class StandingsView implements StandingsViewInterface
 
         $html = $this->renderHeader($region, $groupingType);
         $html .= $this->renderRows($standings);
-        $html .= '</table><p>';
+        $html .= '</tbody></table></div></div>'; // Close table, scroll container, and wrapper
 
         return $html;
     }
@@ -133,38 +94,45 @@ class StandingsView implements StandingsViewInterface
      */
     private function renderHeader(string $region, string $groupingType): string
     {
+        /** @var string $safeRegion */
         $safeRegion = \Utilities\HtmlSanitizer::safeHtmlOutput($region);
         $title = $safeRegion . ' ' . $groupingType;
 
         ob_start();
         ?>
-        <div class="standings-title"><?= $title; ?></div>
-        <table class="sortable standings-table">
-            <tr class="standings-header-row">
-                <td class="standings-header-cell">Team</td>
-                <td class="standings-header-cell">W-L</td>
-                <td class="standings-header-cell">Pct</td>
-                <td class="standings-header-cell">Pyth<br>W-L%</td>
-                <td class="standings-header-cell">GB</td>
-                <td class="standings-header-cell">Magic#</td>
-                <td class="standings-header-cell">Left</td>
-                <td class="standings-header-cell">Conf.</td>
-                <td class="standings-header-cell">Div.</td>
-                <td class="standings-header-cell">Home</td>
-                <td class="standings-header-cell">Away</td>
-                <td class="standings-header-cell">Home<br>Played</td>
-                <td class="standings-header-cell">Away<br>Played</td>
-                <td class="standings-header-cell">Last 10</td>
-                <td class="standings-header-cell">Streak</td>
-            </tr>
+        <h2 class="ibl-title"><?= $title; ?></h2>
+        <div class="table-scroll-wrapper">
+        <div class="table-scroll-container">
+        <table class="sortable ibl-data-table">
+            <thead>
+                <tr>
+                    <th class="sticky-col">Team</th>
+                    <th>W-L</th>
+                    <th>Win%</th>
+                    <th>Pyth<br>W-L%</th>
+                    <th>GB</th>
+                    <th>Magic<br>#</th>
+                    <th>Games<br>Left</th>
+                    <th>Conf.</th>
+                    <th>Div.</th>
+                    <th>Home</th>
+                    <th>Away</th>
+                    <th>Home<br>Played</th>
+                    <th>Away<br>Played</th>
+                    <th>Last 10<br>W-L</th>
+                    <th>Streak</th>
+                    <th>Power<br>Rank</th>
+                </tr>
+            </thead>
+            <tbody>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * Render all team rows for a standings table
      *
-     * @param array $standings Array of team standings data
+     * @param list<StandingsRow> $standings Array of team standings data
      * @return string HTML for all team rows
      */
     private function renderRows(array $standings): string
@@ -181,19 +149,21 @@ class StandingsView implements StandingsViewInterface
     /**
      * Render a single team row
      *
-     * @param array $team Team standings data
+     * @param StandingsRow $team Team standings data
      * @return string HTML for team row
      */
     private function renderTeamRow(array $team): string
     {
-        $teamId = (int) $team['tid'];
+        $teamId = $team['tid'];
         $teamName = $this->formatTeamName($team);
         $streakData = $this->repository->getTeamStreakData($teamId);
 
         $lastWin = $streakData['last_win'] ?? 0;
         $lastLoss = $streakData['last_loss'] ?? 0;
+        /** @var string $streakType */
         $streakType = \Utilities\HtmlSanitizer::safeHtmlOutput($streakData['streak_type'] ?? '');
         $streak = $streakData['streak'] ?? 0;
+        $rating = $streakData['ranking'] ?? 0;
 
         // Get Pythagorean win percentage
         $pythagoreanStats = $this->repository->getTeamPythagoreanStats($teamId);
@@ -205,49 +175,63 @@ class StandingsView implements StandingsViewInterface
             );
         }
 
+        $leagueRecord = $team['leagueRecord'];
+        $pct = $team['pct'];
+        $gamesBack = $team['gamesBack'];
+        $magicNumber = $team['magicNumber'];
+        $gamesUnplayed = $team['gamesUnplayed'];
+        $confRecord = $team['confRecord'];
+        $divRecord = $team['divRecord'];
+        $homeRecord = $team['homeRecord'];
+        $awayRecord = $team['awayRecord'];
+        $homeGames = $team['homeGames'];
+        $awayGames = $team['awayGames'];
+
         ob_start();
         ?>
-        <tr>
-            <td class="standings-team-cell"><a href="modules.php?name=Team&op=team&teamID=<?= $teamId; ?>"><?= $teamName; ?></a></td>
-            <td class="standings-cell"><?= $team['leagueRecord']; ?></td>
-            <td class="standings-cell"><?= $team['pct']; ?></td>
-            <td class="standings-cell"><?= $pythagoreanPct; ?></td>
-            <td class="standings-cell"><?= $team['gamesBack']; ?></td>
-            <td class="standings-cell"><?= $team['magicNumber']; ?></td>
-            <td class="standings-cell"><?= $team['gamesUnplayed']; ?></td>
-            <td class="standings-cell"><?= $team['confRecord']; ?></td>
-            <td class="standings-cell"><?= $team['divRecord']; ?></td>
-            <td class="standings-cell"><?= $team['homeRecord']; ?></td>
-            <td class="standings-cell"><?= $team['awayRecord']; ?></td>
-            <td class="standings-cell"><?= $team['homeGames']; ?></td>
-            <td class="standings-cell"><?= $team['awayGames']; ?></td>
-            <td class="standings-cell"><?= $lastWin; ?>-<?= $lastLoss; ?></td>
-            <td class="standings-cell"><?= $streakType; ?> <?= $streak; ?></td>
+        <tr data-team-id="<?= $teamId; ?>">
+            <?= TeamCellHelper::renderTeamCell($teamId, $team['team_name'], $team['color1'], $team['color2'], 'sticky-col', '', $teamName) ?>
+            <td><?= $leagueRecord; ?></td>
+            <td><?= $pct; ?></td>
+            <td><?= $pythagoreanPct; ?></td>
+            <td><?= $gamesBack; ?></td>
+            <td><?= $magicNumber; ?></td>
+            <td><?= $gamesUnplayed; ?></td>
+            <td><?= $confRecord; ?></td>
+            <td><?= $divRecord; ?></td>
+            <td><?= $homeRecord; ?></td>
+            <td><?= $awayRecord; ?></td>
+            <td><?= $homeGames; ?></td>
+            <td><?= $awayGames; ?></td>
+            <td><?= $lastWin; ?>-<?= $lastLoss; ?></td>
+            <td><?= $streakType; ?> <?= $streak; ?></td>
+            <td><span class="ibl-stat-highlight"><?= $rating; ?></span></td>
         </tr>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**
      * Format team name with clinched indicator
      *
-     * @param array $team Team standings data
+     * @param StandingsRow $team Team standings data
      * @return string Formatted team name with clinched prefix if applicable
      */
     private function formatTeamName(array $team): string
     {
+        /** @var string $teamName */
         $teamName = \Utilities\HtmlSanitizer::safeHtmlOutput($team['team_name']);
 
-        if ($team['clinchedConference'] == 1) {
-            return '<b>Z</b>-' . $teamName;
+        if ($team['clinchedConference'] === 1) {
+            return '<span class="ibl-clinched-indicator">Z</span>-' . $teamName;
         }
 
-        if ($team['clinchedDivision'] == 1) {
-            return '<b>Y</b>-' . $teamName;
+        if ($team['clinchedDivision'] === 1) {
+            return '<span class="ibl-clinched-indicator">Y</span>-' . $teamName;
         }
 
-        if ($team['clinchedPlayoffs'] == 1) {
-            return '<b>X</b>-' . $teamName;
+        if ($team['clinchedPlayoffs'] === 1) {
+            return '<span class="ibl-clinched-indicator">X</span>-' . $teamName;
         }
 
         return $teamName;

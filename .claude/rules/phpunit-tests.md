@@ -9,11 +9,21 @@ paths: ibl5/tests/**/*.php
 # ✅ CORRECT commands
 vendor/bin/phpunit tests/Module/
 vendor/bin/phpunit --filter testMethodName
+vendor/bin/phpunit -c phpunit.ci.xml        # Use specific config
+vendor/bin/phpunit --display-all-issues     # Show ALL issues (deprecations, warnings, etc.)
 
-# ❌ WRONG - These options don't exist
+# 💾 Token-saving: When just checking if tests pass (not debugging)
+vendor/bin/phpunit | tail -n 3              # Show only final summary lines
+
+# ❌ WRONG - These options don't exist in PHPUnit 12.x
 vendor/bin/phpunit -v
-vendor/bin/phpunit -c phpunit.xml
+vendor/bin/phpunit --verbose
 ```
+
+## Display Issue Details
+PHPUnit 12.x only shows summary counts by default. To see full details:
+- `--display-all-issues` - **Recommended:** shows everything
+- `--display-deprecations`, `--display-warnings`, `--display-notices` - specific types
 
 ## Test File Structure
 ```php
@@ -87,6 +97,25 @@ Register in `ibl5/phpunit.xml`:
 ```
 
 ## Completion Criteria
-- Zero warnings, zero failures
+
+**IMPORTANT:** Before considering ANY PHPUnit task complete:
+
+1. **Run the full test suite**: `vendor/bin/phpunit`
+2. **Verify clean output**: The final line must show `OK (X tests, Y assertions)` with NO warnings, failures, or errors
+3. **Check for warnings**: If output shows `OK, but there were issues!`, run `--display-all-issues` and FIX the warnings
+4. **Don't silence warnings**: Resolve root causes instead of suppressing warnings (unless truly necessary)
+
+Requirements:
+- Zero warnings, zero failures, zero errors
 - No skipped tests
 - All public methods tested
+
+## Post-Task Documentation Update
+
+After completing any PHPUnit task (adding tests, fixing tests, etc.):
+
+1. Run `vendor/bin/phpunit` and note the final test count
+2. Update these files with new test count and coverage percentage:
+   - `DEVELOPMENT_GUIDE.md` - Status line and relevant sections
+   - `ibl5/docs/STRATEGIC_PRIORITIES.md` - Progress section (if significantly changed)
+3. If adding integration tests, document them in the "Recent Updates" section of `DEVELOPMENT_GUIDE.md`

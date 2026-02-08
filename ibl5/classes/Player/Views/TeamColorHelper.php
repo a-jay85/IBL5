@@ -33,20 +33,27 @@ class TeamColorHelper
     public static function getTeamColors(\mysqli $db, int $teamID): array
     {
         $stmt = $db->prepare('SELECT color1, color2 FROM ibl_team_info WHERE teamid = ?');
+        if ($stmt === false) {
+            return ['color1' => 'D4AF37', 'color2' => '1e3a5f'];
+        }
         $stmt->bind_param('i', $teamID);
         $stmt->execute();
         $result = $stmt->get_result();
+        if ($result === false) {
+            $stmt->close();
+            return ['color1' => 'D4AF37', 'color2' => '1e3a5f'];
+        }
         $row = $result->fetch_assoc();
         $stmt->close();
-        
-        if (!$row) {
+
+        if ($row === null || $row === false) {
             // Default to gold if team not found
             return ['color1' => 'D4AF37', 'color2' => '1e3a5f'];
         }
-        
+
         return [
-            'color1' => $row['color1'] ?: 'D4AF37',
-            'color2' => $row['color2'] ?: '1e3a5f'
+            'color1' => $row['color1'] !== null && $row['color1'] !== '' ? (string) $row['color1'] : 'D4AF37',
+            'color2' => $row['color2'] !== null && $row['color2'] !== '' ? (string) $row['color2'] : '1e3a5f'
         ];
     }
 
@@ -65,9 +72,9 @@ class TeamColorHelper
         }
         
         return [
-            'r' => hexdec(substr($hex, 0, 2)),
-            'g' => hexdec(substr($hex, 2, 2)),
-            'b' => hexdec(substr($hex, 4, 2))
+            'r' => (int) hexdec(substr($hex, 0, 2)),
+            'g' => (int) hexdec(substr($hex, 2, 2)),
+            'b' => (int) hexdec(substr($hex, 4, 2))
         ];
     }
 
@@ -287,8 +294,8 @@ class TeamColorHelper
 
     /**
      * Get default color scheme (fallback)
-     * 
-     * @return array Color scheme array
+     *
+     * @return array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string} Color scheme array
      */
     public static function getDefaultColorScheme(): array
     {

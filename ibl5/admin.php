@@ -26,12 +26,12 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 //Uncomment the following lines after setting the site url in the Administration
 //global $nukeurl;
-//if (!stripos_clone($_SERVER['HTTP_HOST'], $nukeurl)) {
+//if (!str_contains($_SERVER['HTTP_HOST'], $nukeurl)) {
 //  die("Access denied");
 //}
 
 $checkurl = $_SERVER['REQUEST_URI'];
-if ((stripos_clone($checkurl, 'AddAuthor')) or (stripos_clone($checkurl, 'VXBkYXRlQXV0aG9y')) or (stripos_clone($checkurl, 'QWRkQXV0aG9y')) or (stripos_clone($checkurl, 'UpdateAuthor')) or (stripos_clone($checkurl, "?admin")) or (stripos_clone($checkurl, "&admin"))) {
+if ((str_contains($checkurl, 'AddAuthor')) or (str_contains($checkurl, 'VXBkYXRlQXV0aG9y')) or (str_contains($checkurl, 'QWRkQXV0aG9y')) or (str_contains($checkurl, 'UpdateAuthor')) or (str_contains($checkurl, "?admin")) or (str_contains($checkurl, "&admin"))) {
     die("Illegal Operation");
 }
 
@@ -49,7 +49,7 @@ function create_first($name, $url, $email, $pwd, $user_new)
         $db->sql_query("INSERT INTO " . $prefix . "_authors VALUES ('" . addslashes($name) . "', '$the_adm', '" . addslashes($url) . "', '" . addslashes($email) . "', '$pwd', '0', '1', '')");
         if ($user_new == 1) {
             $user_regdate = date("M d, Y");
-            $user_avatar = "gallery/blank.gif";
+            $user_avatar = "";
             $commentlimit = 4096;
             if ($url == "http://") {$url = "";}
             $db->sql_query("INSERT INTO " . $user_prefix . "_users (user_id, username, user_email, user_website, user_avatar, user_regdate, user_password, theme, commentmax, user_level, user_lang, user_dateformat) VALUES (NULL,'" . addslashes($name) . "','" . addslashes($email) . "','" . addslashes($url) . "','$user_avatar','$user_regdate','$pwd','$Default_Theme','$commentlimit', '2', 'english','D M d, Y g:i a')");
@@ -87,7 +87,7 @@ if ($the_first == 0) {
     die();
 }
 
-if (isset($aid) && (mb_ereg("[^a-zA-Z0-9_-]", trim($aid)))) {
+if (isset($aid) && (preg_match('/[^a-zA-Z0-9_-]/', trim($aid)))) {
     die("Begone");
 }
 if (isset($aid)) {$aid = substr($aid, 0, 25);}
@@ -107,7 +107,16 @@ if ((isset($aid)) && (isset($pwd)) && (isset($op)) && ($op == "login")) {
         $admlanguage = addslashes($admlanguage);
         if ($rpwd == $pwd) {
             $admin = base64_encode("$aid:$pwd:$admlanguage");
-            setcookie("admin", $admin, time() + 2592000);
+            // SECURITY: Use secure cookie options
+            $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+            setcookie("admin", $admin, [
+                'expires' => time() + 2592000,
+                'path' => '/',
+                'secure' => $isHttps,
+                'httponly' => true,
+                'samesite' => 'Strict',
+            ]);
             unset($op);
         }
     }
@@ -256,7 +265,7 @@ function GraphicAdmin()
     $handle = opendir('modules');
     $modlist = "";
     while ($file = readdir($handle)) {
-        if ((!mb_ereg("[.]", $file))) {
+        if ((!str_contains($file, '.'))) {
             $modlist .= "$file ";
         }
     }
@@ -466,7 +475,14 @@ if ($admintest) {
             break;
 
         case "logout":
-            setcookie("admin", false);
+            // SECURITY: Clear cookie with proper options
+            setcookie("admin", "", [
+                'expires' => 1,
+                'path' => '/',
+                'secure' => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+                'httponly' => true,
+                'samesite' => 'Strict',
+            ]);
             $admin = "";
             Nuke\Header::header();
             OpenTable();

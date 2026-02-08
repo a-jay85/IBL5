@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace SeriesRecords;
 
 use SeriesRecords\Contracts\SeriesRecordsViewInterface;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
  * SeriesRecordsView - View rendering for series records
- * 
+ *
  * Handles all HTML generation for the series records grid table display.
  * Uses HtmlSanitizer for XSS protection on all output.
- * 
+ *
+ * @phpstan-import-type SeriesTeamRow from Contracts\SeriesRecordsRepositoryInterface
+ *
  * @see SeriesRecordsViewInterface
  */
 class SeriesRecordsView implements SeriesRecordsViewInterface
@@ -26,6 +29,9 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
 
     /**
      * @see SeriesRecordsViewInterface::renderSeriesRecordsTable()
+     *
+     * @param list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string}> $teams
+     * @param array<int, array<int, array{wins: int, losses: int}>> $seriesMatrix
      */
     public function renderSeriesRecordsTable(
         array $teams,
@@ -33,16 +39,20 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         int $userTeamId,
         int $numTeams
     ): string {
-        $output = '<table border="1" class="sortable">';
+        $output = '<h2 class="ibl-title">Series Records</h2>';
+        $output .= '<div class="sticky-scroll-wrapper">';
+        $output .= '<div class="sticky-scroll-container">';
+        $output .= '<table class="sortable ibl-data-table sticky-table">';
 
         // Header row with team logos
-        $output .= '<tr>';
-        $output .= '<th>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr;&rarr;<br>vs.<br>&uarr;</th>';
+        $output .= '<thead><tr>';
+        $output .= '<th class="sticky-col sticky-corner">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&rarr;&rarr;<br>vs.<br>&uarr;</th>';
 
         for ($i = 1; $i <= $numTeams; $i++) {
             $output .= $this->renderHeaderCell($i);
         }
-        $output .= '</tr>';
+        $output .= '</tr></thead>';
+        $output .= '<tbody>';
 
         // Data rows - one per team
         $teamIndex = 0;
@@ -51,13 +61,13 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
             $team = $teams[$teamIndex] ?? null;
 
             // Skip if team data doesn't match expected team ID
-            if ($team && (int) $team['teamid'] !== $rowTeamId) {
+            if ($team !== null && $team['teamid'] !== $rowTeamId) {
                 // Team ID mismatch - might be skipped team, output empty row
                 $output .= $this->renderEmptyRow($rowTeamId, $numTeams, $userTeamId);
                 continue;
             }
 
-            if (!$team) {
+            if ($team === null) {
                 $output .= $this->renderEmptyRow($rowTeamId, $numTeams, $userTeamId);
                 continue;
             }
@@ -74,8 +84,8 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
                     $output .= $this->renderDiagonalCell($isUserTeamRow);
                 } else {
                     $record = $this->service->getRecordFromMatrix($seriesMatrix, $rowTeamId, $colTeamId);
-                    $wins = $record['wins'];
-                    $losses = $record['losses'];
+                    $wins = (int) $record['wins'];
+                    $losses = (int) $record['losses'];
                     $bgColor = $this->service->getRecordBackgroundColor($wins, $losses);
                     $isBold = ($isUserTeamRow || $userTeamId === $colTeamId);
 
@@ -87,7 +97,8 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
             $teamIndex++;
         }
 
-        $output .= '</table>';
+        $output .= '</tbody></table>';
+        $output .= '</div></div>';
 
         return $output;
     }
@@ -97,29 +108,24 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
      */
     public function renderHeaderCell(int $teamId): string
     {
-        $safeTeamId = HtmlSanitizer::safeHtmlOutput($teamId);
-        return '<th align="center"><img src="images/logo/new' . $safeTeamId . '.png" width="50" height="50" alt="Team ' . $safeTeamId . ' logo"></th>';
+        /** @var string $safeTeamId */
+        $safeTeamId = HtmlSanitizer::safeHtmlOutput((string)$teamId);
+        return '<th class="text-center"><img src="images/logo/new' . $safeTeamId . '.png" width="50" height="50" style="object-fit: contain;" alt="Team ' . $safeTeamId . ' logo"></th>';
     }
 
     /**
      * @see SeriesRecordsViewInterface::renderTeamNameCell()
+     *
+     * @param array{teamid: int, team_city: string, team_name: string, color1: string, color2: string} $team
      */
     public function renderTeamNameCell(array $team, bool $isUserTeam): string
     {
-        $teamId = HtmlSanitizer::safeHtmlOutput($team['teamid']);
-        $color1 = HtmlSanitizer::safeHtmlOutput($team['color1']);
-        $color2 = HtmlSanitizer::safeHtmlOutput($team['color2']);
-        $city = HtmlSanitizer::safeHtmlOutput($team['team_city']);
-        $name = HtmlSanitizer::safeHtmlOutput($team['team_name']);
+        $teamId = $team['teamid'];
+        /** @var string $safeName */
+        $safeName = HtmlSanitizer::safeHtmlOutput($team['team_name']);
+        $nameHtml = $isUserTeam ? '<strong>' . $safeName . '</strong>' : $safeName;
 
-        $boldOpen = $isUserTeam ? '<strong>' : '';
-        $boldClose = $isUserTeam ? '</strong>' : '';
-
-        return '<td bgcolor="' . $color1 . '">'
-            . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '">'
-            . '<span style="color: ' . $color2 . ';">'
-            . $boldOpen . $city . ' ' . $name . $boldClose
-            . '</span></a></td>';
+        return TeamCellHelper::renderTeamCell($teamId, $team['team_name'], $team['color1'], $team['color2'], 'sticky-col', '', $nameHtml);
     }
 
     /**
@@ -127,14 +133,17 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
      */
     public function renderRecordCell(int $wins, int $losses, string $backgroundColor, bool $isBold): string
     {
-        $safeWins = HtmlSanitizer::safeHtmlOutput($wins);
-        $safeLosses = HtmlSanitizer::safeHtmlOutput($losses);
+        /** @var string $safeWins */
+        $safeWins = HtmlSanitizer::safeHtmlOutput((string)$wins);
+        /** @var string $safeLosses */
+        $safeLosses = HtmlSanitizer::safeHtmlOutput((string)$losses);
+        /** @var string $safeBgColor */
         $safeBgColor = HtmlSanitizer::safeHtmlOutput($backgroundColor);
 
         $boldOpen = $isBold ? '<strong>' : '';
         $boldClose = $isBold ? '</strong>' : '';
 
-        return '<td align="center" bgcolor="' . $safeBgColor . '">'
+        return '<td class="text-center" style="background-color: ' . $safeBgColor . ';">'
             . $boldOpen . $safeWins . ' - ' . $safeLosses . $boldClose
             . '</td>';
     }
@@ -147,12 +156,12 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         $boldOpen = $isUserTeam ? '<strong>' : '';
         $boldClose = $isUserTeam ? '</strong>' : '';
 
-        return '<td align="center">' . $boldOpen . 'x' . $boldClose . '</td>';
+        return '<td class="text-center">' . $boldOpen . 'x' . $boldClose . '</td>';
     }
 
     /**
      * Render an empty row for missing team data
-     * 
+     *
      * @param int $teamId The team ID for this row
      * @param int $numTeams Total number of teams
      * @param int $userTeamId The user's team ID for highlighting
@@ -165,13 +174,13 @@ class SeriesRecordsView implements SeriesRecordsViewInterface
         $boldClose = $isUserTeamRow ? '</strong>' : '';
 
         $output = '<tr>';
-        $output .= '<td>' . $boldOpen . 'Team ' . $teamId . $boldClose . '</td>';
+        $output .= '<td class="sticky-col">' . $boldOpen . 'Team ' . $teamId . $boldClose . '</td>';
 
         for ($i = 1; $i <= $numTeams; $i++) {
             if ($teamId === $i) {
-                $output .= '<td align="center">' . $boldOpen . 'x' . $boldClose . '</td>';
+                $output .= '<td class="text-center">' . $boldOpen . 'x' . $boldClose . '</td>';
             } else {
-                $output .= '<td align="center">0 - 0</td>';
+                $output .= '<td class="text-center">0 - 0</td>';
             }
         }
 

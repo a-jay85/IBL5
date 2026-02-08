@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Player\Contracts;
 
 /**
@@ -37,4 +39,76 @@ interface PlayerImageHelperInterface
      * @see https://www.w3schools.com/CSS/css_rwd_images.asp - Responsive images best practices
      */
     public static function getImageUrl($playerID, string $basePath = './images/player/'): string;
+
+    /**
+     * Render a player thumbnail <img> tag with lazy loading
+     *
+     * Returns a complete <img> element with class="ibl-player-photo", 24x24 dimensions,
+     * and loading="lazy". Uses getImageUrl() internally for safe URL generation.
+     *
+     * @param int|string|null $playerID The player's ID
+     * @param string $basePath Optional base path prefix (default: './images/player/')
+     * @return string Complete <img> HTML tag
+     */
+    public static function renderThumbnail($playerID, string $basePath = './images/player/'): string;
+
+    /**
+     * Render a complete player name table cell with photo thumbnail
+     *
+     * Returns a <td> element with sticky-col positioning, player photo thumbnail,
+     * linked player name, and optional starter highlighting. Used across all table
+     * types (Ratings, Season Totals, Season Averages, Per 36 Minutes, Sim Averages,
+     * Contracts) for consistent player name cell rendering.
+     *
+     * @param int $playerID The player's ID
+     * @param string $displayName The player's display name (already decorated/sanitized)
+     * @param array<int> $starterPids Array of starter player IDs for highlighting
+     * @return string Complete <td> HTML element
+     */
+    public static function renderPlayerCell(int $playerID, string $displayName, array $starterPids = []): string;
+
+    /**
+     * Render a flexible player name table cell with photo thumbnail
+     *
+     * Like renderPlayerCell() but without hardcoded sticky-col or inline white-space.
+     * Callers specify their own extra CSS classes (or none).
+     *
+     * @param int $playerID The player's ID
+     * @param string $rawName The raw player name (may contain '|' for no-photo indicator)
+     * @param string $extraClasses Additional CSS classes (e.g. 'sticky-col', 'sticky-col-2')
+     * @param array<int> $starterPids Array of starter player IDs for highlighting
+     * @return string Complete <td> HTML element
+     */
+    public static function renderFlexiblePlayerCell(
+        int $playerID,
+        string $rawName,
+        string $extraClasses = '',
+        array $starterPids = [],
+    ): string;
+
+    /**
+     * Render a player link with photo thumbnail (no wrapper element)
+     *
+     * Returns an `<a>` element containing a thumbnail image and the player's
+     * escaped name. This is the building block used by renderFlexiblePlayerCell()
+     * and can be wrapped in any container element (`<td>`, `<span>`, `<div>`).
+     *
+     * @param int $playerID The player's ID
+     * @param string $rawName The raw player name (may contain '|' for no-photo indicator)
+     * @return string HTML `<a>` element with thumbnail and name
+     */
+    public static function renderPlayerLink(int $playerID, string $rawName): string;
+
+    /**
+     * Resolve a player's display name and thumbnail, handling pipe-delimited names.
+     *
+     * Names containing '|' indicate the player should not show a photo thumbnail.
+     * The pipe character and any HTML tags are stripped from the returned display name.
+     * For normal names, a thumbnail is generated via renderThumbnail().
+     *
+     * @param int $playerID The player's ID
+     * @param string $rawName The raw player name (may contain '|' and HTML tags)
+     * @return array{thumbnail: string, name: string} Thumbnail HTML (or '') and cleaned name
+     */
+    public static function resolvePlayerDisplay(int $playerID, string $rawName): array;
 }

@@ -9,6 +9,8 @@ namespace Draft\Contracts;
  *
  * Handles all HTML output for draft-related pages including error messages,
  * draft interface, and player tables.
+ *
+ * @phpstan-import-type DraftClassPlayerRow from DraftRepositoryInterface
  */
 interface DraftViewInterface
 {
@@ -49,7 +51,7 @@ interface DraftViewInterface
      * Creates the main draft selection page with a sortable player table,
      * draft form, and submit button (only shown if user owns current pick).
      *
-     * @param array<int, array<string, mixed>> $players Array of player records from ibl_draft_class
+     * @param list<DraftClassPlayerRow> $players Array of player records from ibl_draft_class
      * @param string $teamLogo The current user's team name
      * @param string $pickOwner The team that owns the current pick
      * @param int $draftRound The current draft round
@@ -97,7 +99,7 @@ interface DraftViewInterface
      * Creates a sortable HTML table with all draft class players, their stats, and
      * radio buttons for selection. Drafted players are shown as strikethrough and disabled.
      *
-     * @param array<int, array<string, mixed>> $players Array of player records from ibl_draft_class
+     * @param list<DraftClassPlayerRow> $players Array of player records from ibl_draft_class
      * @param string $teamLogo The current user's team name
      * @param string $pickOwner The team that owns the current pick
      * @return string HTML formatted player table
@@ -181,7 +183,7 @@ interface DraftViewInterface
      * Determines whether the draft has any players remaining for selection.
      * Used to show/hide the Draft button in the interface.
      *
-     * @param array<int, array<string, mixed>> $players Array of player records
+     * @param list<DraftClassPlayerRow> $players Array of player records
      * @return bool True if at least one player is undrafted (drafted=0), false if all drafted
      *
      * IMPORTANT BEHAVIORS:

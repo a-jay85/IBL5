@@ -46,8 +46,8 @@ IBL5/
 │   │   └── STATISTICS_FORMATTING_GUIDE.md → ../classes/Statistics/README.md
 │   │
 │   ├── classes/                       # Component-specific docs
-│   │   ├── DepthChart/
-│   │   │   ├── README.md              # DepthChart architecture
+│   │   ├── DepthChartEntry/
+│   │   │   ├── README.md              # DepthChartEntry architecture
 │   │   │   └── SECURITY.md            # Security patterns
 │   │   ├── Draft/README.md            # Draft module
 │   │   ├── Negotiation/README.md      # Negotiation module

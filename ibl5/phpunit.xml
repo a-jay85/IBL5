@@ -21,8 +21,8 @@
         <testsuite name="UpdateAllTheThings Tests">
             <directory>tests/UpdateAllTheThings</directory>
         </testsuite>
-        <testsuite name="DepthChart Module Tests">
-            <directory>tests/DepthChart</directory>
+        <testsuite name="DepthChartEntry Module Tests">
+            <directory>tests/DepthChartEntry</directory>
         </testsuite>
         <testsuite name="Waivers Module Tests">
             <directory>tests/Waivers</directory>
@@ -45,11 +45,11 @@
         <testsuite name="Negotiation Module Tests">
             <directory>tests/Negotiation</directory>
         </testsuite>
-        <testsuite name="Leaderboards Module Tests">
-            <directory>tests/Leaderboards</directory>
+        <testsuite name="CareerLeaderboards Module Tests">
+            <directory>tests/CareerLeaderboards</directory>
         </testsuite>
-        <testsuite name="Season Leaders Module Tests">
-            <directory>tests/SeasonLeaders</directory>
+        <testsuite name="SeasonLeaderboards Module Tests">
+            <directory>tests/SeasonLeaderboards</directory>
         </testsuite>
         <testsuite name="Utilities Tests">
             <directory>tests/Utilities</directory>
@@ -58,7 +58,7 @@
             <directory>tests/VotingResults</directory>
         </testsuite>
         <testsuite name="Player Search Module Tests">
-            <directory>tests/PlayerSearch</directory>
+            <directory>tests/PlayerDatabase</directory>
         </testsuite>
         <testsuite name="FreeAgency Module Tests">
             <directory>tests/FreeAgency</directory>
@@ -71,6 +71,9 @@
         </testsuite>
         <testsuite name="League Module Tests">
             <directory>tests/League</directory>
+        </testsuite>
+        <testsuite name="Boxscore Module Tests">
+            <directory>tests/Boxscore</directory>
         </testsuite>
         <testsuite name="Root Tests">
             <file>tests/ContractRulesTest.php</file>
@@ -85,8 +88,8 @@
         <testsuite name="SeriesRecords Module Tests">
             <directory>tests/SeriesRecords</directory>
         </testsuite>
-        <testsuite name="OneOnOne Module Tests">
-            <directory>tests/OneOnOne</directory>
+        <testsuite name="OneOnOneGame Module Tests">
+            <directory>tests/OneOnOneGame</directory>
         </testsuite>
         <testsuite name="DraftPickLocator Module Tests">
             <directory>tests/DraftPickLocator</directory>
@@ -103,11 +106,14 @@
         <testsuite name="Injuries Module Tests">
             <directory>tests/Injuries</directory>
         </testsuite>
-        <testsuite name="CapInfo Module Tests">
-            <directory>tests/CapInfo</directory>
+        <testsuite name="CapSpace Module Tests">
+            <directory>tests/CapSpace</directory>
         </testsuite>
-        <testsuite name="PlayerAwards Module Tests">
-            <directory>tests/PlayerAwards</directory>
+        <testsuite name="AwardHistory Module Tests">
+            <directory>tests/AwardHistory</directory>
+        </testsuite>
+        <testsuite name="TeamOffDefStats Module Tests">
+            <directory>tests/TeamOffDefStats</directory>
         </testsuite>
         <testsuite name="Standings Module Tests">
             <directory>tests/Standings</directory>
@@ -115,17 +121,26 @@
         <testsuite name="FranchiseHistory Module Tests">
             <directory>tests/FranchiseHistory</directory>
         </testsuite>
-        <testsuite name="PowerRankings Module Tests">
-            <directory>tests/PowerRankings</directory>
-        </testsuite>
         <testsuite name="Shared Module Tests">
             <directory>tests/Shared</directory>
         </testsuite>
         <testsuite name="Statistics Module Tests">
             <directory>tests/Statistics</directory>
         </testsuite>
+        <testsuite name="Scripts Module Tests">
+            <directory>tests/Scripts</directory>
+        </testsuite>
         <testsuite name="Integration Tests">
             <directory>tests/Integration</directory>
+        </testsuite>
+        <testsuite name="GMContactList Module Tests">
+            <directory>tests/GMContactList</directory>
+        </testsuite>
+        <testsuite name="SeasonArchive Module Tests">
+            <directory>tests/SeasonArchive</directory>
+        </testsuite>
+        <testsuite name="RecordHolders Module Tests">
+            <directory>tests/RecordHolders</directory>
         </testsuite>
     </testsuites>
 </phpunit>

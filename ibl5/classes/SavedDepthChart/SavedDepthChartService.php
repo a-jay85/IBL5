@@ -196,14 +196,21 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             );
             $parts[] = $this->formatSimRange($season->phase, $phaseSimStart, $currentPhaseSim);
 
-            // Date range: active DC start through current sim end
-            $startDate = (new \DateTime($activeDc['sim_start_date']))->format('M j');
+            // Date range: active DC start through current sim end (or projected if no sim has consumed this DC yet)
+            $rawStartDate = $activeDc['sim_start_date'];
+            $rawEndDate = $season->lastSimEndDate;
+            if ($rawStartDate > $rawEndDate) {
+                $rawEndDate = $season->projectedNextSimEndDate->format('Y-m-d');
+            }
+
+            $startDate = (new \DateTime($rawStartDate))->format('M j');
+            $endDate = (new \DateTime($rawEndDate))->format('M j');
         } else {
             $parts[] = $season->phase . ' Sim ' . $currentPhaseSim;
             $startDate = (new \DateTime($season->lastSimStartDate))->format('M j');
+            $endDate = (new \DateTime($season->lastSimEndDate))->format('M j');
         }
 
-        $endDate = (new \DateTime($season->lastSimEndDate))->format('M j');
         $parts[] = $startDate . ' - ' . $endDate;
 
         // Win-loss record for the active DC's span

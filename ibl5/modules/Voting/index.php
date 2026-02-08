@@ -2,6 +2,7 @@
 <?php
 
 use Player\Player;
+use Player\PlayerImageHelper;
 use Player\PlayerStats;
 
 /************************************************************************/
@@ -20,7 +21,7 @@ use Player\PlayerStats;
 /*                                                                      */
 /************************************************************************/
 
-if (!mb_eregi("modules.php", $_SERVER['PHP_SELF'])) {
+if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
     die("You can't access this file directly...");
 }
 
@@ -48,8 +49,6 @@ function userinfo($username)
 
 // === CODE TO INSERT IBL DEPTH CHART ===
 
-    OpenTable();
-
     function getCandidates($votingCategory, $voterTeamName)
     {
         global $db, $mysqli_db;
@@ -74,15 +73,15 @@ function userinfo($username)
 			function ShowAndHide$votingCategory() {
 				var x = document.getElementById('$votingCategory');
 				if (x.style.display == 'none') {
-					x.style.display = 'block';
+					x.style.display = '';
 				} else {
 					x.style.display = 'none';
 				}
 			}
 		</SCRIPT>";
 
-        $output = "<table id=\"$votingCategory\" style=\"display:none\" class=\"sortable\">
-			<tbody>
+        $output = "<table id=\"$votingCategory\" style=\"display:none\" class=\"sortable ibl-data-table voting-form-table\">
+			<thead>
 				<tr>";
 
         if ($season->phase == "Regular Season") {
@@ -95,34 +94,38 @@ function userinfo($username)
 
         if ($votingCategory != "GM") {
             $output .= "<th>Name</th>
-						<th>gm</th>
-						<th>gs</th>
-						<th>min</th>
-						<th>fgm</th>
-						<th>fga</th>
-						<th>fgp</th>
-						<th>ftm</th>
-						<th>fta</th>
-						<th>ftp</th>
-						<th>3gm</th>
-						<th>3ga</th>
-						<th>3gp</th>
-						<th>orb</th>
-						<th>drb</th>
-						<th>reb</th>
-						<th>ast</th>
-						<th>stl</th>
-						<th>to</th>
-						<th>blk</th>
-						<th>pf</th>
-						<th>pts</th>
+						<th>GM</th>
+						<th>GS</th>
+						<th>MIN</th>
+						<th>FGM</th>
+						<th>FGA</th>
+						<th>FG%</th>
+						<th>FTM</th>
+						<th>FTA</th>
+						<th>FT%</th>
+						<th>3PM</th>
+						<th>3PA</th>
+						<th>3P%</th>
+						<th>ORB</th>
+						<th>DRB</th>
+						<th>REB</th>
+						<th>AST</th>
+						<th>STL</th>
+						<th>TO</th>
+						<th>BLK</th>
+						<th>PF</th>
+						<th>PTS</th>
 						<th>2x2</th>
-						<th>3x3</th>
-					</tr>";
+						<th>3x2</th>
+					</tr>
+				</thead>
+				<tbody>";
         } else {
             $output .= "<th>Name</th>
 						<th>Team</th>
-					</tr>";
+					</tr>
+				</thead>
+				<tbody>";
         }
 
         $i = 0;
@@ -136,22 +139,20 @@ function userinfo($username)
                 $teamname = $row['team_city'] . " " . $row['team_name'];
             }
 
-            (($i % 2) == 0) ? $bgcolor = "FFFFFF" : $bgcolor = "EEEEEE";
-
-            $output .= "<tr bgcolor=$bgcolor>";
+            $output .= "<tr>";
 
             if (!str_contains($teamname, $voterTeamName)) {
                 if ($season->phase == "Regular Season") {
-                    $output .= "<td><center><input type=\"checkbox\" name=\"" . $votingCategory . "[]\" value=\"$player->name, $player->teamName\"></center></td>";
+                    $output .= "<td><input type=\"checkbox\" name=\"" . $votingCategory . "[]\" value=\"$player->name, $player->teamName\"></td>";
                 } else {
                     if ($votingCategory == "GM") {
-                        $output .= "<td><center><input type=\"radio\" name=\"" . $votingCategory . "[1]\" value=\"$name, $teamname\"></center></td>
-                                    <td><center><input type=\"radio\" name=\"" . $votingCategory . "[2]\" value=\"$name, $teamname\"></center></td>
-                                    <td><center><input type=\"radio\" name=\"" . $votingCategory . "[3]\" value=\"$name, $teamname\"></center></td>";
+                        $output .= "<td><input type=\"radio\" name=\"" . $votingCategory . "[1]\" value=\"$name, $teamname\"></td>
+                                    <td><input type=\"radio\" name=\"" . $votingCategory . "[2]\" value=\"$name, $teamname\"></td>
+                                    <td><input type=\"radio\" name=\"" . $votingCategory . "[3]\" value=\"$name, $teamname\"></td>";
                     } else {
-                        $output .= "<td><center><input type=\"radio\" name=\"" . $votingCategory . "[1]\" value=\"$player->name, $player->teamName\"></center></td>
-                                    <td><center><input type=\"radio\" name=\"" . $votingCategory . "[2]\" value=\"$player->name, $player->teamName\"></center></td>
-                                    <td><center><input type=\"radio\" name=\"" . $votingCategory . "[3]\" value=\"$player->name, $player->teamName\"></center></td>";
+                        $output .= "<td><input type=\"radio\" name=\"" . $votingCategory . "[1]\" value=\"$player->name, $player->teamName\"></td>
+                                    <td><input type=\"radio\" name=\"" . $votingCategory . "[2]\" value=\"$player->name, $player->teamName\"></td>
+                                    <td><input type=\"radio\" name=\"" . $votingCategory . "[3]\" value=\"$player->name, $player->teamName\"></td>";
                     }
                 }
             } else {
@@ -165,7 +166,8 @@ function userinfo($username)
             }
 
             if ($votingCategory != "GM") {
-                $output .= "<td>$player->name, $player->teamName</td>
+                $playerThumbnail = PlayerImageHelper::renderThumbnail($player->playerID);
+                $output .= "<td class=\"ibl-player-cell\">$playerThumbnail$player->name, $player->teamName</td>
 							<td>$playerStats->seasonGamesPlayed</td>
 							<td>$playerStats->seasonGamesStarted</td>
 							<td>$playerStats->seasonMinutesPerGame</td>
@@ -192,14 +194,15 @@ function userinfo($username)
 						</tr>";
             } else {
                 $output .= "<td>$name</td>
-							<td>$teamname</td>";
+							<td>$teamname</td>
+						</tr>";
             }
 
             $i++;
         }
 
         $output .= "</tbody>
-			</table><br><br>";
+			</table>";
 
         return $output;
     }
@@ -210,10 +213,10 @@ function userinfo($username)
 
     $formAction = ($season->phase == "Regular Season") ? "modules/Voting/ASGVote.php" : "modules/Voting/EOYVote.php";
     echo "<form name=\"$formName\" method=\"post\" action=\"$formAction\">
-		<center>
-			<img src=\"images/logo/$tid.jpg\"><br><br>";
+		<div class=\"voting-form-container\">
+			<img src=\"images/logo/$tid.jpg\" alt=\"Team Logo\" class=\"team-logo-banner\">";
 
-    echo "<input type=\"submit\" value=\"Submit Votes!\">";
+    echo "<button type=\"submit\" class=\"ibl-btn ibl-btn--primary ibl-btn--lg\">Submit Votes!</button>";
 
     $easternConferenceFrontcourt = $easternConferenceBackcourt = "";
     $westernConferenceFrontcourt = $westernConferenceBackcourt = "";
@@ -226,27 +229,27 @@ function userinfo($username)
         $westernConferenceFrontcourt .= getCandidates('WCF', $voterTeamName);
         $westernConferenceBackcourt .= getCandidates('WCB', $voterTeamName);
 
-        echo "<div onclick=\"ShowAndHideECF()\">
-				<h2>Select FOUR Eastern Conference Frontcourt Players:</h2>
-				<i>Tap/click here to reveal/hide nominees</i>
+        echo "<div class=\"voting-category\" onclick=\"ShowAndHideECF()\">
+				<h2 class=\"ibl-title voting-category-title\">Eastern Conference Frontcourt</h2>
+				<p class=\"voting-category-instruction\">Select FOUR players. Tap/click to reveal/hide nominees.</p>
 			</div>
 			$easternConferenceFrontcourt
 
-			<div onclick=\"ShowAndHideECB()\">
-				<h2>Select FOUR Eastern Conference Backcourt Players:</h2>
-				<i>Tap/click here to reveal/hide nominees</i>
+			<div class=\"voting-category\" onclick=\"ShowAndHideECB()\">
+				<h2 class=\"ibl-title voting-category-title\">Eastern Conference Backcourt</h2>
+				<p class=\"voting-category-instruction\">Select FOUR players. Tap/click to reveal/hide nominees.</p>
 			</div>
 			$easternConferenceBackcourt
 
-			<div onclick=\"ShowAndHideWCF()\">
-				<h2>Select FOUR Western Conference Frontcourt Players:</h2>
-				<i>Tap/click here to reveal/hide nominees</i>
+			<div class=\"voting-category\" onclick=\"ShowAndHideWCF()\">
+				<h2 class=\"ibl-title voting-category-title\">Western Conference Frontcourt</h2>
+				<p class=\"voting-category-instruction\">Select FOUR players. Tap/click to reveal/hide nominees.</p>
 			</div>
 			$westernConferenceFrontcourt
 
-			<div onclick=\"ShowAndHideWCB()\">
-				<h2>Select FOUR Western Conference Backcourt Players:</h2>
-				<i>Tap/click here to reveal/hide nominees</i>
+			<div class=\"voting-category\" onclick=\"ShowAndHideWCB()\">
+				<h2 class=\"ibl-title voting-category-title\">Western Conference Backcourt</h2>
+				<p class=\"voting-category-instruction\">Select FOUR players. Tap/click to reveal/hide nominees.</p>
 			</div>
 			$westernConferenceBackcourt";
     } else {
@@ -255,38 +258,36 @@ function userinfo($username)
         $rookiesOfTheYear .= getCandidates('ROY', $voterTeamName);
         $generalManagers .= getCandidates('GM', $voterTeamName);
 
-        echo "<div onclick=\"ShowAndHideMVP()\">
-				<h2>Select your top THREE choices for Most Valuable Player:</h2>
-				<i>Tap/click here to reveal/hide nominees</i>
+        echo "<div class=\"voting-category\" onclick=\"ShowAndHideMVP()\">
+				<h2 class=\"ibl-title voting-category-title\">Most Valuable Player</h2>
+				<p class=\"voting-category-instruction\">Select your top THREE choices. Tap/click to reveal/hide nominees.</p>
 			</div>
 			$mostValuablePlayers
 
-			<div onclick=\"ShowAndHideSix()\">
-				<h2>Select your top THREE choices for Sixth-Person of the Year:</h2>
-				<i>Tap/click here to reveal/hide nominees</i>
+			<div class=\"voting-category\" onclick=\"ShowAndHideSix()\">
+				<h2 class=\"ibl-title voting-category-title\">Sixth-Person of the Year</h2>
+				<p class=\"voting-category-instruction\">Select your top THREE choices. Tap/click to reveal/hide nominees.</p>
 			</div>
 			$sixthPersons
 
-			<div onclick=\"ShowAndHideROY()\">
-				<h2>Select your top THREE choices for Rookie of the Year:</h2>
-				<i>Tap/click here to reveal/hide nominees</i>
+			<div class=\"voting-category\" onclick=\"ShowAndHideROY()\">
+				<h2 class=\"ibl-title voting-category-title\">Rookie of the Year</h2>
+				<p class=\"voting-category-instruction\">Select your top THREE choices. Tap/click to reveal/hide nominees.</p>
 			</div>
 			$rookiesOfTheYear
 
-			<div onclick=\"ShowAndHideGM()\">
-				<h2>Select your top THREE choices for General Manager of the Year:</h2>
-				<i>Tap/click here to reveal/hide nominees</i>
+			<div class=\"voting-category\" onclick=\"ShowAndHideGM()\">
+				<h2 class=\"ibl-title voting-category-title\">General Manager of the Year</h2>
+				<p class=\"voting-category-instruction\">Select your top THREE choices. Tap/click to reveal/hide nominees.</p>
 			</div>
 			$generalManagers";
     }
 
     echo "<input type=\"hidden\" name=\"teamname\" value=\"$voterTeamName\">
 
-		<input type=\"submit\" value=\"Submit Votes!\">
-	</center>
+		<button type=\"submit\" class=\"ibl-btn ibl-btn--primary ibl-btn--lg\">Submit Votes!</button>
+	</div>
 	</form>";
-
-    CloseTable();
 
     Nuke\Footer::footer();
 }
@@ -297,14 +298,10 @@ function main($user)
     if (!is_user($user)) {
         Nuke\Header::header();
         if ($stop) {
-            OpenTable();
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
-            CloseTable();
             echo "<br>\n";
         } else {
-            OpenTable();
             echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
-            CloseTable();
             echo "<br>\n";
         }
         if (!is_user($user)) {

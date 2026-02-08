@@ -17,30 +17,33 @@ interface WaiversViewInterface
 {
     /**
      * Renders the waiver wire form
-     * 
+     *
      * Generates the complete waiver wire HTML form including team logo,
      * player selection dropdown, roster status, and submit button.
-     * 
+     * Uses PRG pattern: result/error parameters come from GET query params
+     * after a redirect.
+     *
      * @param string $teamName Team name for display and form submission
      * @param int $teamID Team ID for logo display
-     * @param string $action Action type ('add' or 'drop')
-     * @param array $players Array of pre-built HTML option strings for dropdown
+     * @param string $action Action type ('add' or 'waive')
+     * @param array<int, string> $players Array of pre-built HTML option strings for dropdown
      *   Each element should be output from buildPlayerOption()
      * @param int $openRosterSpots Number of open roster spots (0-15)
      * @param int $healthyOpenRosterSpots Number of healthy open roster spots (0-15)
-     * @param string $errorMessage Optional error/success message to display (default: '')
+     * @param ?string $result PRG result key (e.g. 'player_added', 'player_dropped')
+     * @param ?string $error PRG error message to display
      * @return void Outputs HTML directly
-     * 
+     *
      * **HTML Structure:**
-     * - Error message (if provided) in red
+     * - Result/error banner (if applicable) via ibl-alert
      * - Team logo image
-     * - Roster status header
-     * - Player selection dropdown
+     * - Roster status header in ibl-card
+     * - Player selection dropdown with ibl-select
      * - Hidden form fields (team name, action, roster counts)
      * - Submit button with double-click prevention
-     * 
+     *
      * **Security:**
-     * - All output is HTML-escaped using htmlspecialchars()
+     * - All output is HTML-escaped using HtmlSanitizer::safeHtmlOutput()
      * - Uses output buffering pattern for clean HTML
      */
     public function renderWaiverForm(
@@ -50,7 +53,8 @@ interface WaiversViewInterface
         array $players,
         int $openRosterSpots,
         int $healthyOpenRosterSpots,
-        string $errorMessage = ''
+        ?string $result = null,
+        ?string $error = null
     ): void;
 
     /**

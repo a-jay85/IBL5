@@ -12,14 +12,12 @@ use Player\Views\PlayerViewFactory;
  */
 class PlayerPageService implements PlayerPageServiceInterface
 {
-    private $db;
     private PlayerRepository $repository;
     private PlayerStatsRepository $statsRepository;
     private PlayerViewFactory $viewFactory;
 
-    public function __construct($db)
+    public function __construct(object $db)
     {
-        $this->db = $db;
         $this->repository = new PlayerRepository($db);
         $this->statsRepository = new PlayerStatsRepository($db);
         $this->viewFactory = new PlayerViewFactory($this->repository, $this->statsRepository);
@@ -54,12 +52,14 @@ class PlayerPageService implements PlayerPageServiceInterface
             return false;
         }
 
-        return $userTeam->name != "Free Agents"
-            && $userTeam->hasUsedExtensionThisSeason == 0
+        /** @var \Team $userTeam */
+        /** @var \Season $season */
+        return $userTeam->name !== "Free Agents"
+            && $userTeam->hasUsedExtensionThisSeason === 0
             && $player->canRenegotiateContract()
-            && $player->teamName == $userTeam->name
-            && $season->phase != 'Draft'
-            && $season->phase != 'Free Agency';
+            && $player->teamName === $userTeam->name
+            && $season->phase !== 'Draft'
+            && $season->phase !== 'Free Agency';
     }
 
     /**
@@ -75,8 +75,10 @@ class PlayerPageService implements PlayerPageServiceInterface
      */
     public function canShowRookieOptionButton(Player $player, object $userTeam, object $season): bool
     {
-        return $userTeam->name != "Free Agents"
+        /** @var \Team $userTeam */
+        /** @var \Season $season */
+        return $userTeam->name !== "Free Agents"
             && $player->canRookieOption($season->phase)
-            && $player->teamName == $userTeam->name;
+            && $player->teamName === $userTeam->name;
     }
 }

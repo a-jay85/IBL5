@@ -4,63 +4,76 @@ declare(strict_types=1);
 
 namespace Voting;
 
+use Player\PlayerImageHelper;
 use Voting\Contracts\VotingResultsTableRendererInterface;
+use Voting\Contracts\VotingResultsServiceInterface;
 
 /**
+ * @phpstan-import-type VoteRow from VotingResultsServiceInterface
+ * @phpstan-import-type VoteTable from VotingResultsServiceInterface
+ *
  * @see VotingResultsTableRendererInterface
  */
 class VotingResultsTableRenderer implements VotingResultsTableRendererInterface
 {
     private const METRIC_LABEL = 'Votes';
-    private const TABLE_STYLE = 'width: min(100%, 420px); border-collapse: collapse; margin: 0 auto 1.5rem;';
-    private const HEADER_CELL_STYLE = 'border-bottom: 2px solid #ccc; text-align: left; padding: 0.4rem 0.75rem; font-weight: 600;';
-    private const ROW_CELL_STYLE = 'border-bottom: 1px solid #eee; padding: 0.35rem 0.75rem;';
-    private const ROW_CELL_ALT_STYLE = 'border-bottom: 1px solid #eee; padding: 0.35rem 0.75rem; background-color: #f8f9fb;';
 
     /**
      * @see VotingResultsTableRendererInterface::renderTables()
+     *
+     * @param list<VoteTable> $tables
      */
     public function renderTables(array $tables): string
     {
         $output = '';
         foreach ($tables as $table) {
-            $title = $table['title'] ?? '';
-            $rows = $table['rows'] ?? [];
+            $title = $table['title'];
+            $rows = $table['rows'];
             $output .= $this->renderTable($title, $rows);
         }
 
         return $output;
     }
 
+    /**
+     * @param list<VoteRow> $rows
+     */
     private function renderTable(string $title, array $rows): string
     {
         $escapedTitle = htmlspecialchars($title, \ENT_QUOTES, 'UTF-8');
 
+        /** @var list<string> $rowsHtml */
         $rowsHtml = [];
-        foreach ($rows as $index => $row) {
-            $name = htmlspecialchars((string) ($row['name'] ?? ''), \ENT_QUOTES, 'UTF-8');
-            $votes = (int) ($row['votes'] ?? 0);
-            $cellStyle = ($index % 2 === 0) ? self::ROW_CELL_STYLE : self::ROW_CELL_ALT_STYLE;
+        foreach ($rows as $row) {
+            $name = htmlspecialchars($row['name'], \ENT_QUOTES, 'UTF-8');
+            $votes = $row['votes'];
+            $pid = $row['pid'] ?? 0;
+
+            if ($pid > 0) {
+                $nameCell = PlayerImageHelper::renderFlexiblePlayerCell($pid, $row['name']);
+            } else {
+                $nameCell = '<td>' . $name . '</td>';
+            }
+
             $rowsHtml[] = sprintf(
-                '    <tr><td style="%s">%s</td><td style="%s">%d</td></tr>',
-                $cellStyle,
-                $name,
-                $cellStyle,
+                '        <tr>%s<td>%d</td></tr>',
+                $nameCell,
                 $votes
             );
         }
 
-        $tableRowsHtml = $rowsHtml ? "\n" . implode("\n", $rowsHtml) . "\n" : "\n";
-        
-        $html =
-            '<h2 style="text-align: center;">' . $escapedTitle . '</h2>' .
-            '<table class="sortable" style="' . self::TABLE_STYLE . '">' .
-            '<tr>' .
-            '<th style="' . self::HEADER_CELL_STYLE . '">Player</th>' .
-            '<th style="' . self::HEADER_CELL_STYLE . '">' . self::METRIC_LABEL . '</th>' .
-            '</tr>' .
-            $tableRowsHtml .
-            '</table>';
+        $tableRowsHtml = $rowsHtml !== [] ? "\n" . implode("\n", $rowsHtml) . "\n    " : "\n    ";
+
+        $html = '<h2 class="ibl-title">' . $escapedTitle . '</h2>
+<table class="sortable ibl-data-table voting-results-table">
+    <thead>
+        <tr>
+            <th>Player</th>
+            <th>' . self::METRIC_LABEL . '</th>
+        </tr>
+    </thead>
+    <tbody>' . $tableRowsHtml . '</tbody>
+</table>';
 
         return $html;
     }

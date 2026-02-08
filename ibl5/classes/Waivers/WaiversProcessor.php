@@ -50,13 +50,13 @@ class WaiversProcessor implements WaiversProcessorInterface
         
         if ($season->phase === 'Free Agency') {
             $currentSeasonSalary = $this->contractCalculator->getNextSeasonSalary($playerData);
-            $experience = $playerData->yearsOfExperience + 1;
+            $experience = ($playerData->yearsOfExperience ?? 0) + 1;
         } else {
             $currentSeasonSalary = $this->contractCalculator->getCurrentSeasonSalary($playerData);
-            $experience = $playerData->yearsOfExperience;
+            $experience = $playerData->yearsOfExperience ?? 0;
         }
-        
-        if ($currentSeasonSalary == 0) {
+
+        if ($currentSeasonSalary === 0) {
             return (string) $this->calculateVeteranMinimumSalary($experience);
         }
         
@@ -86,6 +86,9 @@ class WaiversProcessor implements WaiversProcessorInterface
     
     /**
      * @see WaiversProcessorInterface::determineContractData()
+     *
+     * @param array{cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, exp: int} $playerData
+     * @return array{hasExistingContract: bool, salary: int}
      */
     public function determineContractData(array $playerData, Season $season): array
     {
@@ -94,10 +97,10 @@ class WaiversProcessor implements WaiversProcessorInterface
         // Determine current season salary and experience based on phase
         if ($season->phase === 'Free Agency') {
             $currentSeasonSalary = $this->contractCalculator->getNextSeasonSalary($playerDataObj);
-            $experience = $playerDataObj->yearsOfExperience + 1;
+            $experience = ($playerDataObj->yearsOfExperience ?? 0) + 1;
         } else {
             $currentSeasonSalary = $this->contractCalculator->getCurrentSeasonSalary($playerDataObj);
-            $experience = $playerDataObj->yearsOfExperience;
+            $experience = $playerDataObj->yearsOfExperience ?? 0;
         }
     
         $hasExistingContract = $currentSeasonSalary > 0;

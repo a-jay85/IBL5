@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Voting\Contracts;
 
 /**
@@ -7,6 +9,9 @@ namespace Voting\Contracts;
  *
  * Retrieves aggregated voting results for All-Star and end-of-year
  * awards from the database.
+ *
+ * @phpstan-type VoteRow array{name: string, votes: int, pid: int}
+ * @phpstan-type VoteTable array{title: string, rows: list<VoteRow>}
  */
 interface VotingResultsServiceInterface
 {
@@ -15,9 +20,7 @@ interface VotingResultsServiceInterface
      *
      * Retrieves and aggregates All-Star ballot data from ibl_votes_ASG table.
      *
-     * @return array Array of category results, each element containing:
-     *               - 'title' (string): Category name (e.g., "Eastern Conference Frontcourt")
-     *               - 'rows' (array): Array of ['name' => string, 'votes' => int] sorted by votes DESC
+     * @return list<VoteTable> Array of category results
      *
      * **Categories Returned:**
      * 1. Eastern Conference Frontcourt (columns: East_F1-F4)
@@ -39,9 +42,7 @@ interface VotingResultsServiceInterface
      * Retrieves and aggregates end-of-year ballot data from ibl_votes_EOY table
      * with weighted scoring (1st place = 3pts, 2nd = 2pts, 3rd = 1pt).
      *
-     * @return array Array of category results, each element containing:
-     *               - 'title' (string): Award name (e.g., "Most Valuable Player")
-     *               - 'rows' (array): Array of ['name' => string, 'votes' => int] sorted by votes DESC
+     * @return list<VoteTable> Array of category results
      *
      * **Categories Returned:**
      * 1. Most Valuable Player (columns: MVP_1, MVP_2, MVP_3)

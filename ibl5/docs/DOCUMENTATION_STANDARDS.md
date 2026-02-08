@@ -29,7 +29,7 @@
 - Examples:
   - `ibl5/classes/Player/README.md` - Player module architecture
   - `ibl5/classes/Statistics/README.md` - StatsFormatter usage
-  - `ibl5/classes/DepthChart/SECURITY.md` - Security patterns
+  - `ibl5/classes/DepthChartEntry/SECURITY.md` - Security patterns
   - `ibl5/tests/Trading/README.md` - Trading test documentation
 - **When to create**: When refactoring a module or creating a new class
 - **Keep updated**: Update when module architecture changes

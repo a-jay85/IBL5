@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Nuke;
 
 class Header
@@ -35,6 +37,9 @@ class Header
         echo "<title>$sitename $pagetitle</title>\n";
         echo '<meta name="google-site-verification" content="3y3xJYDHSYUitn7cbfFfI6C2BiK_q66dtRfykpzHW5w" />';
         echo "<script src=\"{$relativePath}jslib/sorttable.js\"></script>";
+        echo "<script src=\"{$relativePath}jslib/responsive-tables.js\"></script>";
+        echo "<script src=\"{$relativePath}jslib/name-abbreviation.js\"></script>";
+        echo "<script src=\"{$relativePath}jslib/user-team-highlighter.js\"></script>";
 
         include "includes/meta.php";
         include "includes/javascript.php";
@@ -43,7 +48,9 @@ class Header
             echo "<link REL=\"shortcut icon\" HREF=\"{$relativePath}themes/$ThemeSel/images/favicon.ico\" TYPE=\"image/x-icon\">\n";
         }
         echo "<link rel=\"alternate\" type=\"application/rss+xml\" title=\"RSS\" href=\"{$relativePath}backend.php\">\n";
-        echo "<LINK REL=\"StyleSheet\" HREF=\"{$relativePath}themes/$ThemeSel/style/style.css\" TYPE=\"text/css\">\n\n\n";
+        $cssPath = "themes/$ThemeSel/style/style.css";
+        $cssVersion = file_exists($cssPath) ? filemtime($cssPath) : '';
+        echo "<LINK REL=\"StyleSheet\" HREF=\"{$relativePath}{$cssPath}?v={$cssVersion}\" TYPE=\"text/css\">\n\n\n";
         if (file_exists("includes/custom_files/custom_head.php")) {
             include_secure("includes/custom_files/custom_head.php");
         }

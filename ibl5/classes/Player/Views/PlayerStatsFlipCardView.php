@@ -29,17 +29,16 @@ class PlayerStatsFlipCardView
     ];
 
     /**
-     * Get styles and scripts for stats flip functionality
-     * 
-     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
-     * @return string HTML with CSS and JavaScript
+     * Get scripts for stats flip functionality
+     *
+     * CSS is now centralized in design/components/player-cards.css.
+     * Only the JavaScript for flip interaction is returned.
+     *
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme (no longer used for CSS)
+     * @return string HTML script tag with JavaScript
      */
     public static function getFlipStyles(?array $colorScheme = null): string
     {
-        if ($colorScheme === null) {
-            $colorScheme = TeamColorHelper::getDefaultColorScheme();
-        }
-        
         return CardFlipStyles::getStatsCardFlipStyles($colorScheme);
     }
 
@@ -50,7 +49,7 @@ class PlayerStatsFlipCardView
      * @param string $totalsHtml HTML content for the totals view
      * @param string $statsCategory Category name (e.g., "Regular Season", "Playoffs")
      * @param bool $showAveragesFirst Whether to show averages first (default: true)
-     * @param array|null $colorScheme Optional color scheme from TeamColorHelper
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Optional color scheme from TeamColorHelper
      * @return string Complete HTML for flippable stats card
      */
     public static function render(
@@ -67,44 +66,41 @@ class PlayerStatsFlipCardView
         // Determine which content goes on front and back
         $frontContent = $showAveragesFirst ? $styledAverages : $styledTotals;
         $backContent = $showAveragesFirst ? $styledTotals : $styledAverages;
-        $frontLabel = $showAveragesFirst ? 'Averages' : 'Totals';
-        $backLabel = $showAveragesFirst ? 'Totals' : 'Averages';
         $toggleTarget = $showAveragesFirst ? 'Totals' : 'Averages';
-        
+
+        if ($colorScheme === null) {
+            $colorScheme = TeamColorHelper::getDefaultColorScheme();
+        }
+        $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);
+
         $flipIcon = CardFlipStyles::getFlipIcon();
         $escapedCategory = htmlspecialchars($statsCategory, ENT_QUOTES, 'UTF-8');
-        
+
         ob_start();
         ?>
-<div class="stats-flip-container" data-category="<?= $escapedCategory ?>">
+<div class="stats-flip-container" style="<?= $cssProps ?>" data-category="<?= $escapedCategory ?>">
+    <button class="stats-flip-toggle pulse" title="Switch to <?= $toggleTarget ?>">
+        <?= $flipIcon ?>
+        <span class="toggle-label"><?= $toggleTarget ?></span>
+    </button>
     <div class="stats-flip-inner">
         <!-- Front (Averages by default) -->
         <div class="stats-front">
             <div class="player-stats-card">
-                <span class="stats-view-label"><?= $frontLabel ?></span>
-                <button class="stats-flip-toggle pulse" title="Switch to <?= $toggleTarget ?>">
-                    <?= $flipIcon ?>
-                    <span class="toggle-label"><?= $toggleTarget ?></span>
-                </button>
                 <?= $frontContent ?>
             </div>
         </div>
-        
+
         <!-- Back (Totals by default) -->
         <div class="stats-back">
             <div class="player-stats-card">
-                <span class="stats-view-label"><?= $backLabel ?></span>
-                <button class="stats-flip-toggle" title="Switch to <?= $frontLabel ?>">
-                    <?= $flipIcon ?>
-                    <span class="toggle-label"><?= $frontLabel ?></span>
-                </button>
                 <?= $backContent ?>
             </div>
         </div>
     </div>
 </div>
         <?php
-        return ob_get_clean();
+        return (string) ob_get_clean();
     }
 
     /**

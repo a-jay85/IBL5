@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Player;
 
 use Player\Contracts\PlayerInjuryCalculatorInterface;
@@ -18,8 +20,15 @@ class PlayerInjuryCalculator implements PlayerInjuryCalculatorInterface
             return "";
         } else {
             $properLastSimEndDate = date_create($rawLastSimEndDate);
-            $injuryDateString = $playerData->daysRemainingForInjury + 1 . ' days';
-            $injuryReturnDate = date_add($properLastSimEndDate, date_interval_create_from_date_string($injuryDateString));
+            if ($properLastSimEndDate === false) {
+                return "";
+            }
+            $injuryDateString = ($playerData->daysRemainingForInjury + 1) . ' days';
+            $interval = date_interval_create_from_date_string($injuryDateString);
+            if ($interval === false) {
+                return "";
+            }
+            $injuryReturnDate = date_add($properLastSimEndDate, $interval);
             return $injuryReturnDate->format('Y-m-d');
         }
     }

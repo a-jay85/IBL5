@@ -13,6 +13,8 @@ class WaiversView implements WaiversViewInterface
 {
     /**
      * @see WaiversViewInterface::renderWaiverForm()
+     *
+     * @param array<int, string> $players
      */
     public function renderWaiverForm(
         string $teamName,
@@ -21,58 +23,77 @@ class WaiversView implements WaiversViewInterface
         array $players,
         int $openRosterSpots,
         int $healthyOpenRosterSpots,
-        string $errorMessage = ''
+        ?string $result = null,
+        ?string $error = null
     ): void {
-        $teamNameEscaped = htmlspecialchars($teamName, ENT_QUOTES, 'UTF-8');
-        $actionEscaped = htmlspecialchars($action, ENT_QUOTES, 'UTF-8');
+        /** @var string $teamNameEscaped */
+        $teamNameEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($teamName);
+        /** @var string $actionEscaped */
+        $actionEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($action);
 
         ob_start();
         ?>
-        <?php if ($errorMessage): ?>
-            <center>
-            <font color="red"><b><?= htmlspecialchars($errorMessage, ENT_QUOTES, 'UTF-8') ?></b></font>
-            </center>
-        <?php endif; ?>
-        <form name="Waiver_Move" method="post" action="">
+        <h2 class="ibl-title">Waivers</h2>
+        <?= $this->renderResultBanner($result, $error) ?>
+        <form name="Waiver_Move" method="post" action="" style="max-width: 600px; margin: 0 auto;">
             <input type="hidden" name="Team_Name" value="<?= $teamNameEscaped ?>">
-            <center>
-            <img src="images/logo/<?= $teamID ?>.jpg"><br>
-            <table border="1" cellspacing="0" cellpadding="0">
-                <tr>
-                <th colspan="3">
-                    <center>
-                    WAIVER WIRE - YOUR TEAM CURRENTLY HAS <?= $openRosterSpots ?> EMPTY ROSTER SPOTS and <?= $healthyOpenRosterSpots ?> HEALTHY ROSTER SPOTS
-                    </center>
-                </th>
-                </tr>
-                <tr>
-                <td valign="top">
-                    <center>
-                    <b><u><?= $teamNameEscaped ?></u></b>
-                    <select name="Player_ID">
-                        <option value="">Select player...</option>
-                        <?php foreach ($players as $optionHtml): ?>
-                        <?= $optionHtml ?>
-                        <?php endforeach; ?>
-                    </select>
-                    </center>
-                </td>
-                </tr>
-                <input type="hidden" name="Action" value="<?= $actionEscaped ?>">
-                <input type="hidden" name="rosterslots" value="<?= $openRosterSpots ?>">
-                <input type="hidden" name="healthyrosterslots" value="<?= $healthyOpenRosterSpots ?>">
-                <tr>
-                <td colspan="3">
-                    <center>
-                    <input type="submit" value="Click to <?= $actionEscaped ?> player(s) to/from Waiver Pool" onclick="this.disabled=true;this.value='Submitting...'; this.form.submit();">
-                    </center>
-                </td>
-                </tr>
-            </table>
-            </center>
+            <div class="text-center">
+                <img src="images/logo/<?= $teamID ?>.jpg" alt="Team Logo" class="team-logo-banner">
+                <div class="ibl-card">
+                    <div class="ibl-card__header">
+                        <h2 class="ibl-card__title"><?= $openRosterSpots ?> OPEN SPOTS / <?= $healthyOpenRosterSpots ?> HEALTHY SPOTS</h2>
+                    </div>
+                    <div class="ibl-card__body">
+                        <div class="ibl-form-group">
+                            <select name="Player_ID" class="ibl-select">
+                                <option value="">Select player...</option>
+                                <?php foreach ($players as $optionHtml): ?>
+                                <?= $optionHtml ?>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <input type="hidden" name="Action" value="<?= $actionEscaped ?>">
+                        <input type="hidden" name="rosterslots" value="<?= $openRosterSpots ?>">
+                        <input type="hidden" name="healthyrosterslots" value="<?= $healthyOpenRosterSpots ?>">
+                        <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block" onclick="this.disabled=true;this.textContent='Submitting...'; this.form.submit();">
+                            Click to <?= $actionEscaped ?> player(s) to/from Waiver Pool
+                        </button>
+                    </div>
+                </div>
+            </div>
         </form>
         <?php
-        echo ob_get_clean();
+        $output = ob_get_clean();
+        if ($output !== false) {
+            echo $output;
+        }
+    }
+
+    private function renderResultBanner(?string $result, ?string $error): string
+    {
+        if ($error !== null) {
+            /** @var string $errorEscaped */
+            $errorEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($error);
+            return '<div class="ibl-alert ibl-alert--error">' . $errorEscaped . '</div>';
+        }
+
+        if ($result === null) {
+            return '';
+        }
+
+        $banners = [
+            'player_added'   => ['class' => 'ibl-alert--success', 'message' => 'Player successfully signed from waivers.'],
+            'player_dropped' => ['class' => 'ibl-alert--success', 'message' => 'Player successfully dropped to waivers.'],
+        ];
+
+        if (!isset($banners[$result])) {
+            return '';
+        }
+
+        $banner = $banners[$result];
+        /** @var string $messageEscaped */
+        $messageEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($banner['message']);
+        return '<div class="ibl-alert ' . $banner['class'] . '">' . $messageEscaped . '</div>';
     }
     
     /**
@@ -84,16 +105,19 @@ class WaiversView implements WaiversViewInterface
         string $contract,
         string $waitTime = ''
     ): string {
-        $playerNameEscaped = htmlspecialchars($playerName, ENT_QUOTES, 'UTF-8');
-        $contractEscaped = htmlspecialchars($contract, ENT_QUOTES, 'UTF-8');
-        $waitTimeEscaped = htmlspecialchars($waitTime, ENT_QUOTES, 'UTF-8');
-        
-        $displayText = "$playerNameEscaped $contractEscaped";
-        if ($waitTime) {
-            $displayText .= " $waitTimeEscaped";
+        /** @var string $playerNameEscaped */
+        $playerNameEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($playerName);
+        /** @var string $contractEscaped */
+        $contractEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($contract);
+        /** @var string $waitTimeEscaped */
+        $waitTimeEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($waitTime);
+
+        $displayText = "{$playerNameEscaped} {$contractEscaped}";
+        if ($waitTime !== '') {
+            $displayText .= " {$waitTimeEscaped}";
         }
-        
-        return "<option value=\"$playerID\">$displayText</option>";
+
+        return "<option value=\"{$playerID}\">{$displayText}</option>";
     }
     
     /**
@@ -102,11 +126,10 @@ class WaiversView implements WaiversViewInterface
     public function renderNotLoggedIn(string $message): void
     {
         \Nuke\Header::header();
-        OpenTable();
-        \UI::displaytopmenu($GLOBALS['db'], 0);
-        echo "<center><font class=\"title\"><b>" . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . "</b></font></center>";
+        /** @var string $messageEscaped */
+        $messageEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($message);
+        echo '<div class="text-center"><strong class="ibl-title">' . $messageEscaped . '</strong></div>';
         loginbox();
-        CloseTable();
         \Nuke\Footer::footer();
     }
     
@@ -116,10 +139,7 @@ class WaiversView implements WaiversViewInterface
     public function renderWaiversClosed(): void
     {
         \Nuke\Header::header();
-        OpenTable();
-        \UI::displaytopmenu($GLOBALS['db'], 0);
         echo "Sorry, but players may not be added from or dropped to waivers at the present time.";
-        CloseTable();
         \Nuke\Footer::footer();
     }
 }

@@ -16,7 +16,7 @@ interface LeagueStartersServiceInterface
     /**
      * Get all starters by position across the league
      *
-     * @return array Starters organized by position
+     * @return array<string, array<int, \Player\Player>> Starters organized by position
      */
     public function getAllStartersByPosition(): array;
 }

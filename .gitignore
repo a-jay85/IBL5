@@ -16,15 +16,17 @@ config.php
 configOlympics.php
 config.inc.php
 database_dump_*.sql
-discordWebhooks (not CURL).php
-Discord.php
 localDbUpdate.sh
 ibl5/classes/DatabaseConnection.php
+ibl5/config/discord.config.php
+ibl5/bin/db-query
+ibl5/themes/IBL/style/style.css
 
 backups
 depthcharts
 /ibl5/ibl/IBL/
-/ibl5/shellScripts/
+ibl5/shellScripts/.env
+/ibl5/shellScripts/.DS_Store
 !/ibl5/ibl/IBL/Schedule.htm
 !/ibl5/ibl/IBL/Standings.htm
 !/ibl5/classes/

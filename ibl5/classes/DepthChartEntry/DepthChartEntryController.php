@@ -74,6 +74,43 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
 
         $this->view->renderFormFooter();
 
+        echo '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
+        echo $this->getTableOutput($teamID, $display);
+        echo '</div></div>';
+
+        // Output JS configuration for saved depth charts
+        $jsConfig = json_encode([
+            'teamId' => $teamID,
+            'apiBaseUrl' => 'modules.php?name=DepthChartEntry&op=api',
+            'currentRosterPids' => $currentRosterPids,
+        ], JSON_THROW_ON_ERROR);
+        echo '<script>window.IBL_DEPTH_CHART_CONFIG = ' . $jsConfig . ';</script>';
+        echo '<script src="jslib/depth-chart-changes.js" defer></script>';
+        echo '<script src="jslib/saved-depth-charts.js" defer></script>';
+
+        // Output JS configuration for AJAX tab switching
+        $ajaxTabsConfig = json_encode([
+            'apiBaseUrl' => 'modules.php?name=DepthChartEntry&op=tab-api',
+            'params' => ['teamID' => $teamID],
+            'fallbackBaseUrl' => 'modules.php?name=DepthChartEntry',
+        ], JSON_THROW_ON_ERROR);
+        echo '<script>window.IBL_AJAX_TABS_CONFIG = ' . $ajaxTabsConfig . ';</script>';
+        echo '<script src="jslib/ajax-tabs.js" defer></script>';
+
+        \Nuke\Footer::footer();
+    }
+    
+    /**
+     * @see DepthChartEntryControllerInterface::getTableOutput()
+     */
+    public function getTableOutput(int $teamID, string $display): string
+    {
+        $season = new \Season($this->db);
+        $team = \Team::initialize($this->db, $teamID);
+
+        $teamName = $team->name;
+        $playersResult = $this->repository->getPlayersOnTeam($teamName, $teamID);
+
         $tabDefinitions = [
             'ratings' => 'Ratings',
             'total_s' => 'Season Totals',
@@ -86,21 +123,10 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $baseUrl = 'modules.php?name=DepthChartEntry';
         $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $team->color1, $team->color2);
         $tableHtml = $this->renderTableForDisplay($display, $playersResult, $team, $season);
-        echo $switcher->wrap($tableHtml);
 
-        // Output JS configuration for saved depth charts
-        $jsConfig = json_encode([
-            'teamId' => $teamID,
-            'apiBaseUrl' => 'modules.php?name=DepthChartEntry&op=api',
-            'currentRosterPids' => $currentRosterPids,
-        ], JSON_THROW_ON_ERROR);
-        echo '<script>window.IBL_DEPTH_CHART_CONFIG = ' . $jsConfig . ';</script>';
-        echo '<script src="jslib/depth-chart-changes.js" defer></script>';
-        echo '<script src="jslib/saved-depth-charts.js" defer></script>';
-
-        \Nuke\Footer::footer();
+        return $switcher->wrap($tableHtml);
     }
-    
+
     /**
      * Render the appropriate table HTML based on display type
      *

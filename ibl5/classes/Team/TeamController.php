@@ -70,13 +70,17 @@ class TeamController implements TeamControllerInterface
         echo $this->view->render($pageData);
 
         // Output JS configuration for AJAX tab switching
+        $params = ['teamID' => $teamID];
+        if ($yr !== null) {
+            $params['yr'] = $yr;
+        }
         $jsConfig = json_encode([
-            'teamId' => $teamID,
             'apiBaseUrl' => 'modules.php?name=Team&op=api',
-            'yr' => $yr,
+            'params' => $params,
+            'fallbackBaseUrl' => 'modules.php?name=Team&op=team&teamID=' . $teamID,
         ], JSON_THROW_ON_ERROR);
-        echo '<script>window.IBL_TEAM_CONFIG = ' . $jsConfig . ';</script>';
-        echo '<script src="jslib/team-tabs.js" defer></script>';
+        echo '<script>window.IBL_AJAX_TABS_CONFIG = ' . $jsConfig . ';</script>';
+        echo '<script src="jslib/ajax-tabs.js" defer></script>';
 
         \Nuke\Footer::footer();
     }

@@ -1,18 +1,22 @@
 /**
- * Team Page AJAX Tab Switching
+ * Reusable AJAX Tab Switching
  *
  * Intercepts tab clicks to fetch table HTML via API and swap content in place.
  * Progressive enhancement: falls back to full page reload without JS.
  *
- * Reads config from window.IBL_TEAM_CONFIG:
- *   { teamId, apiBaseUrl, yr }
+ * Reads config from window.IBL_AJAX_TABS_CONFIG:
+ *   {
+ *     apiBaseUrl:       'modules.php?name=Team&op=api',
+ *     params:           { teamID: 5, yr: '2024' },
+ *     fallbackBaseUrl:  'modules.php?name=Team&op=team&teamID=5',
+ *   }
  */
 (function () {
     'use strict';
 
     document.addEventListener('DOMContentLoaded', function () {
-        var config = window.IBL_TEAM_CONFIG;
-        if (!config || config.teamId === undefined || !config.apiBaseUrl) {
+        var config = window.IBL_AJAX_TABS_CONFIG;
+        if (!config || !config.apiBaseUrl || !config.params) {
             return;
         }
 
@@ -22,6 +26,16 @@
         }
 
         var isLoading = false;
+
+        function buildQueryString(params) {
+            var parts = [];
+            for (var key in params) {
+                if (Object.prototype.hasOwnProperty.call(params, key) && params[key] !== null && params[key] !== undefined) {
+                    parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(params[key]));
+                }
+            }
+            return parts.join('&');
+        }
 
         // Event delegation on the container for tab clicks
         container.addEventListener('click', function (e) {
@@ -84,10 +98,7 @@
         function fetchTab(display) {
             isLoading = true;
 
-            var url = config.apiBaseUrl + '&teamID=' + config.teamId + '&display=' + encodeURIComponent(display);
-            if (config.yr) {
-                url += '&yr=' + encodeURIComponent(config.yr);
-            }
+            var url = config.apiBaseUrl + '&display=' + encodeURIComponent(display) + '&' + buildQueryString(config.params);
 
             fetch(url)
                 .then(function (response) {
@@ -104,13 +115,9 @@
                 })
                 .catch(function (err) {
                     isLoading = false;
-                    console.error('Error fetching team tab:', err);
+                    console.error('Error fetching tab:', err);
                     // On error, fall back to full page navigation
-                    var fallbackUrl = 'modules.php?name=Team&op=team&teamID=' + config.teamId + '&display=' + encodeURIComponent(display);
-                    if (config.yr) {
-                        fallbackUrl += '&yr=' + encodeURIComponent(config.yr);
-                    }
-                    window.location.href = fallbackUrl;
+                    window.location.href = config.fallbackBaseUrl + '&display=' + encodeURIComponent(display);
                 });
         }
     });

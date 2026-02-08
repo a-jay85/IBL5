@@ -188,6 +188,13 @@ All CSS styles for modules and pages must be placed in `ibl5/design/components/`
 ### HTML Modernization
 See `view-rendering.md` for the full deprecated-tag replacement table.
 
+### PR Documentation Checklist
+After completing a module refactoring or significant feature, update these files:
+- `STRATEGIC_PRIORITIES.md` — mark module complete
+- `REFACTORING_HISTORY.md` — add entry for the work done
+- `ibl5/classes/ModuleName/README.md` — create module README
+- `DEVELOPMENT_GUIDE.md` — update module counts and status
+
 ### Production Validation
 After refactoring, compare output against iblhoops.net. Results must match exactly.
 
@@ -207,7 +214,6 @@ Context-aware rules auto-load when relevant:
 - `basketball-stats/` - StatsFormatter usage
 - `contract-rules/` - CBA salary cap rules
 - `database-repository/` - BaseMysqliRepository patterns
-- `code-review/` - PR validation checklist
 - `documentation-updates/` - Doc update workflow
 
 ## Key References

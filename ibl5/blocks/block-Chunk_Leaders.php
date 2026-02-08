@@ -19,43 +19,7 @@ $lastSimStartDate = $season->lastSimStartDate;
 $lastSimEndDate = $season->lastSimEndDate;
 $simNumber = $season->lastSimNumber;
 
-// Determine phase date range using Season constants
-$beginningYear = $season->beginningYear;
-$endingYear = $season->endingYear;
-
-switch ($season->phase) {
-    case 'Preseason':
-        $phaseStartDate = sprintf('%d-%02d-01', Season::IBL_PRESEASON_YEAR, Season::IBL_REGULAR_SEASON_STARTING_MONTH);
-        $phaseEndDate = sprintf('%d-%02d-30', Season::IBL_PRESEASON_YEAR + 1, Season::IBL_REGULAR_SEASON_ENDING_MONTH);
-        break;
-    case 'HEAT':
-        $phaseStartDate = sprintf('%d-%02d-01', $beginningYear, Season::IBL_HEAT_MONTH);
-        $phaseEndDate = sprintf('%d-%02d-30', $beginningYear, Season::IBL_HEAT_MONTH);
-        break;
-    case 'Playoffs':
-        $phaseStartDate = sprintf('%d-%02d-01', $endingYear, Season::IBL_PLAYOFF_MONTH);
-        $phaseEndDate = sprintf('%d-%02d-30', $endingYear, Season::IBL_PLAYOFF_MONTH);
-        break;
-    default: // Regular Season
-        $phaseStartDate = sprintf('%d-%02d-01', $beginningYear, Season::IBL_REGULAR_SEASON_STARTING_MONTH);
-        $phaseEndDate = sprintf('%d-%02d-30', $endingYear, Season::IBL_REGULAR_SEASON_ENDING_MONTH);
-        break;
-}
-
-// Count sims within phase date range up to current sim (use End Date because
-// the first sim of a phase can have a Start Date in the prior phase's month)
-$stmtPhaseCount = $mysqli_db->prepare(
-    "SELECT COUNT(*) AS cnt FROM ibl_sim_dates WHERE `End Date` BETWEEN ? AND ? AND Sim <= ?"
-);
-$stmtPhaseCount->bind_param('ssi', $phaseStartDate, $phaseEndDate, $simNumber);
-$stmtPhaseCount->execute();
-$phaseSimNumber = (int)$stmtPhaseCount->get_result()->fetch_assoc()['cnt'];
-$stmtPhaseCount->close();
-
-// Fallback for non-game phases (Draft, Free Agency)
-if ($phaseSimNumber === 0) {
-    $phaseSimNumber = $simNumber;
-}
+$phaseSimNumber = $season->getPhaseSpecificSimNumber();
 
 $querySimStatLeaders = "SELECT *
 FROM (

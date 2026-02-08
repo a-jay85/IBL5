@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace DepthChartEntry;
 
 use DepthChartEntry\Contracts\DepthChartEntrySubmissionHandlerInterface;
+use SavedDepthChart\SavedDepthChartService;
 
 /**
  * @phpstan-import-type ProcessedPlayerData from Contracts\DepthChartEntryProcessorInterface
@@ -19,6 +20,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
     private DepthChartEntryProcessor $processor;
     private DepthChartEntryValidator $validator;
     private DepthChartEntryView $view;
+    private SavedDepthChartService $savedDcService;
 
     public function __construct(\mysqli $db)
     {
@@ -27,6 +29,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
         $this->processor = new DepthChartEntryProcessor();
         $this->validator = new DepthChartEntryValidator();
         $this->view = new DepthChartEntryView($this->processor);
+        $this->savedDcService = new SavedDepthChartService($db);
     }
 
     /**
@@ -61,6 +64,9 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
 
         $this->saveDepthChartFile($teamName, $processedData['playerData']);
 
+        // Save depth chart snapshot
+        $this->saveDepthChartSnapshot($teamName, $postData, $season);
+
         $this->view->renderSubmissionResult($teamName, $processedData['playerData'], true);
     }
 
@@ -79,6 +85,88 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
         }
 
         $this->repository->updateTeamHistory($teamName);
+    }
+
+    /**
+     * Save depth chart snapshot for historical tracking
+     *
+     * @param array<string, mixed> $postData
+     */
+    private function saveDepthChartSnapshot(string $teamName, array $postData, \Season $season): void
+    {
+        try {
+            $commonRepo = new \Services\CommonMysqliRepository($this->db);
+            $tid = $commonRepo->getTidFromTeamname($teamName) ?? 0;
+            if ($tid === 0) {
+                return;
+            }
+
+            // Resolve username from team name
+            /** @var string $rawTeamName */
+            $rawTeamName = $postData['Team_Name'] ?? '';
+            // Look up which user owns this team - we need to find from nuke_users
+            $username = $this->resolveUsernameForTeam($teamName);
+            if ($username === '') {
+                return;
+            }
+
+            // Get roster players for snapshot (fresh from DB since they were just updated)
+            $rosterPlayers = $this->repository->getPlayersOnTeam($teamName, $tid);
+
+            $loadedDcId = 0;
+            $rawLoadedDcId = $postData['loaded_dc_id'] ?? '0';
+            if (is_string($rawLoadedDcId) && is_numeric($rawLoadedDcId)) {
+                $loadedDcId = (int) $rawLoadedDcId;
+            } elseif (is_int($rawLoadedDcId)) {
+                $loadedDcId = $rawLoadedDcId;
+            }
+
+            $dcName = null;
+            $rawDcName = $postData['dc_name'] ?? null;
+            if (is_string($rawDcName) && trim($rawDcName) !== '') {
+                $dcName = trim(strip_tags($rawDcName));
+            }
+
+            $this->savedDcService->saveOnSubmit(
+                $tid,
+                $username,
+                $dcName,
+                $rosterPlayers,
+                $postData,
+                $loadedDcId,
+                $season
+            );
+        } catch (\RuntimeException $e) {
+            // Don't fail the main submission if snapshot save fails
+            error_log('SavedDepthChart snapshot error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Resolve username that owns the given team name
+     */
+    private function resolveUsernameForTeam(string $teamName): string
+    {
+        $query = "SELECT username FROM nuke_users WHERE user_ibl_team = ? LIMIT 1";
+        $stmt = $this->db->prepare($query);
+        if ($stmt === false) {
+            return '';
+        }
+        $stmt->bind_param('s', $teamName);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result === false) {
+            $stmt->close();
+            return '';
+        }
+        $row = $result->fetch_assoc();
+        $stmt->close();
+
+        if (!is_array($row) || !isset($row['username'])) {
+            return '';
+        }
+
+        return (string) $row['username'];
     }
 
     /**

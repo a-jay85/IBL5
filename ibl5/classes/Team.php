@@ -148,10 +148,10 @@ class Team extends BaseMysqliRepository
         $discordID = $teamRow['discordID'] ?? null;
         $this->discordID = $discordID;
 
-        $this->hasUsedExtensionThisSim = (int) $teamRow['Used_Extension_This_Chunk'];
-        $this->hasUsedExtensionThisSeason = (int) ($teamRow['Used_Extension_This_Season'] ?? 0);
-        $this->hasMLE = (int) $teamRow['HasMLE'];
-        $this->hasLLE = (int) $teamRow['HasLLE'];
+        $this->hasUsedExtensionThisSim = $teamRow['Used_Extension_This_Chunk'];
+        $this->hasUsedExtensionThisSeason = $teamRow['Used_Extension_This_Season'] ?? 0;
+        $this->hasMLE = $teamRow['HasMLE'];
+        $this->hasLLE = $teamRow['HasLLE'];
 
         /** @var string|null $leagueRecord */
         $leagueRecord = $teamRow['leagueRecord'] ?? null;

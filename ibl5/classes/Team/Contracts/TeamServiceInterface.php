@@ -57,4 +57,17 @@ interface TeamServiceInterface
      * @return StartersData Starters keyed by position
      */
     public function extractStartersData(array $roster): array;
+
+    /**
+     * Render the table output (tabs + table HTML) for a given display mode
+     *
+     * Used by the API handler to return just the table portion of the team page
+     * without the full page layout (banner, sidebar, etc.).
+     *
+     * @param int $teamID Team ID (>0 = specific team, 0 = free agents, -1 = entire league)
+     * @param ?string $yr Historical year parameter (null if current season)
+     * @param string $display Active display tab (e.g., 'ratings', 'contracts')
+     * @return string Complete table HTML with tab navigation
+     */
+    public function getTableOutput(int $teamID, ?string $yr, string $display): string;
 }

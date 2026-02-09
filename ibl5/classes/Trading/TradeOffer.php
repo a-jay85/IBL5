@@ -444,12 +444,7 @@ class TradeOffer implements TradeOfferInterface
 ' . $cleanTradeText . '
 Go here to accept or decline: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
 
-            $arrayContent = [
-                'message' => $discordDMmessage,
-                'receivingUserDiscordID' => $receivingUserDiscordID,
-            ];
-
-            // $response = \Discord::sendCurlPOST('http://localhost:50000/discordDM', $arrayContent);
+            \Discord::sendDM($receivingUserDiscordID, $discordDMmessage);
         } catch (\Exception $e) {
             // Log error but don't fail the trade offer
             error_log("Discord notification failed in sendTradeNotification: " . $e->getMessage());

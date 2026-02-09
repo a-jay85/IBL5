@@ -1,13 +1,16 @@
 import type { PlayerDetail } from '../api/types.js';
-import { createBaseEmbed, getTeamColor, formatStat, formatPercentage } from './common.js';
+import { createBaseEmbed, getTeamColor, formatStat, formatPercentage, playerUrl, teamUrl } from './common.js';
 
 export function playerDetailEmbed(player: PlayerDetail) {
-    const teamName = player.team ? player.team.full_name : 'Free Agent';
+    const teamName = player.team
+        ? `[${player.team.full_name}](${teamUrl(player.team.team_id)})`
+        : 'Free Agent';
     const color = player.team ? getTeamColor(player.team.city) : 0x888888;
 
     const embed = createBaseEmbed()
         .setColor(color)
         .setTitle(player.name)
+        .setURL(playerUrl(player.pid))
         .setDescription(`${player.position} | ${teamName}`)
         .addFields(
             {

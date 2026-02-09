@@ -4,7 +4,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { Injury } from '../api/types.js';
-import { createBaseEmbed, errorEmbed } from '../embeds/common.js';
+import { createBaseEmbed, errorEmbed, playerUrl, teamUrl } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 export const injuries: Command = {
@@ -29,7 +29,7 @@ export const injuries: Command = {
             }
 
             const lines = response.data.map(inj => {
-                return `**${inj.player.name}** (${inj.player.position}) — ${inj.team.name} | ${inj.injury.days_remaining} day${inj.injury.days_remaining === 1 ? '' : 's'}`;
+                return `**[${inj.player.name}](${playerUrl(inj.player.pid)})** (${inj.player.position}) — [${inj.team.name}](${teamUrl(inj.team.team_id)}) | ${inj.injury.days_remaining} day${inj.injury.days_remaining === 1 ? '' : 's'}`;
             });
 
             const content = lines.join('\n');

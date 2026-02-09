@@ -1,11 +1,12 @@
 import type { Player, TeamDetail } from '../api/types.js';
-import { createBaseEmbed, getTeamColor, pad, formatStat } from './common.js';
+import { createBaseEmbed, getTeamColor, pad, teamUrl, discordProfileUrl } from './common.js';
 
 export function rosterEmbed(team: TeamDetail, players: Player[]) {
     const embed = createBaseEmbed()
         .setColor(getTeamColor(team.city))
         .setTitle(`${team.full_name} Roster`)
-        .setDescription(`Owner: ${team.owner} | Arena: ${team.arena}`);
+        .setURL(teamUrl(team.team_id))
+        .setDescription(`Owner: ${team.owner_discord_id !== null ? `[${team.owner}](${discordProfileUrl(team.owner_discord_id)})` : team.owner} | Arena: ${team.arena}`);
 
     if (players.length === 0) {
         embed.addFields({ name: 'Roster', value: 'No players on roster.' });

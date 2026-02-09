@@ -1,16 +1,15 @@
 import type { Leader } from '../api/types.js';
-import { createBaseEmbed } from './common.js';
+import { createBaseEmbed, playerUrl, teamYearUrl } from './common.js';
 
 const CATEGORY_LABELS: Record<string, string> = {
-    ppg: 'Points Per Game',
-    rpg: 'Rebounds Per Game',
-    apg: 'Assists Per Game',
-    spg: 'Steals Per Game',
-    bpg: 'Blocks Per Game',
+    ppg: 'Points',
+    rpg: 'Rebounds',
+    apg: 'Assists',
+    spg: 'Steals',
+    bpg: 'Blocks',
     fgp: 'Field Goal %',
     ftp: 'Free Throw %',
     tgp: '3-Point %',
-    qa: 'QA Rating',
 };
 
 function getStatValue(leader: Leader, category: string): number | string {
@@ -34,7 +33,7 @@ export function leadersEmbed(leaders: Leader[], category: string) {
 
     const embed = createBaseEmbed()
         .setColor(0x1E90FF)
-        .setTitle(`League Leaders - ${label}`);
+        .setTitle(`Top 10 Season Averages - ${label}`);
 
     if (leaders.length === 0) {
         embed.setDescription('No leaders data available.');
@@ -45,7 +44,8 @@ export function leadersEmbed(leaders: Leader[], category: string) {
         const value = getStatValue(l, category);
         const num = typeof value === 'string' ? parseFloat(value) : value;
         const stat = isPercentage ? `${(num * 100).toFixed(1)}%` : num.toFixed(1);
-        return `${i + 1}. **${l.player.name}** (${l.team.name}) — **${stat}**`;
+        const yr = String(l.season).slice(-2);
+        return `${i + 1}. **[${l.player.name}](${playerUrl(l.player.pid)})** ([\'${yr} ${l.team.name}](${teamYearUrl(l.team.team_id, l.season)})) — **${stat}**`;
     });
 
     embed.setDescription(lines.join('\n'));

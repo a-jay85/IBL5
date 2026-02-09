@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { Player, PlayerDetail } from '../api/types.js';
-import { createBaseEmbed, formatStat, formatPercentage, errorEmbed, isUuid } from '../embeds/common.js';
+import { createBaseEmbed, formatStat, formatPercentage, errorEmbed, isUuid, playerUrl, teamUrl } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 async function playerAutocomplete(interaction: AutocompleteInteraction) {
@@ -76,7 +76,7 @@ export const compare: Command = {
 
             function playerStats(p: typeof p1) {
                 return [
-                    `Team: ${p.team?.full_name ?? 'FA'}`,
+                    `Team: ${p.team ? `[${p.team.full_name}](${teamUrl(p.team.team_id)})` : 'FA'}`,
                     `Pos: ${p.position} | Age: ${p.age}`,
                     `GP: ${p.stats.games_played}`,
                     `PPG: **${formatStat(p.stats.points_per_game)}**`,
@@ -92,7 +92,8 @@ export const compare: Command = {
 
             const embed = createBaseEmbed()
                 .setColor(0x1E90FF)
-                .setTitle(`${p1.name} vs ${p2.name}`)
+                .setTitle(`Compare Players`)
+                .setDescription(`[${p1.name}](${playerUrl(p1.pid)}) vs [${p2.name}](${playerUrl(p2.pid)})`)
                 .addFields(
                     { name: p1.name, value: playerStats(p1), inline: true },
                     { name: p2.name, value: playerStats(p2), inline: true },

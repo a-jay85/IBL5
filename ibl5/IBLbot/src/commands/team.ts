@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { Team, TeamDetail } from '../api/types.js';
-import { createBaseEmbed, getTeamColor, formatRecord, errorEmbed, isUuid } from '../embeds/common.js';
+import { createBaseEmbed, getTeamColor, formatRecord, errorEmbed, isUuid, teamUrl, discordProfileUrl } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 let teamCache: Team[] = [];
@@ -72,12 +72,13 @@ export const team: Command = {
             const embed = createBaseEmbed()
                 .setColor(getTeamColor(t.city))
                 .setTitle(t.full_name)
+                .setURL(teamUrl(t.team_id))
                 .setDescription(`${t.conference ?? '-'} Conference | ${t.division ?? '-'} Division`)
                 .addFields(
                     {
                         name: 'Info',
                         value: [
-                            `Owner: ${t.owner}`,
+                            `Owner: ${t.owner_discord_id !== null ? `[${t.owner}](${discordProfileUrl(t.owner_discord_id)})` : t.owner}`,
                             `Arena: ${t.arena}`,
                         ].join('\n'),
                         inline: true,

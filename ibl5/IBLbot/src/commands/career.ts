@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { Player, PlayerCareerStats } from '../api/types.js';
-import { createBaseEmbed, getTeamColor, formatStat, formatPercentage, errorEmbed, isUuid } from '../embeds/common.js';
+import { createBaseEmbed, getTeamColor, formatStat, formatPercentage, errorEmbed, isUuid, playerUrl, draftHistoryUrl } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 export const career: Command = {
@@ -60,6 +60,7 @@ export const career: Command = {
             const embed = createBaseEmbed()
                 .setColor(0x1E90FF)
                 .setTitle(`${stats.name} - Career Stats`)
+                .setURL(playerUrl(stats.pid))
                 .addFields(
                     {
                         name: 'Career Totals',
@@ -97,7 +98,9 @@ export const career: Command = {
             if (stats.draft.year !== null) {
                 embed.addFields({
                     name: 'Draft Info',
-                    value: `${stats.draft.year} Round ${stats.draft.round}, Pick ${stats.draft.pick} (${stats.draft.team ?? 'N/A'})`,
+                    value: stats.draft.team_id !== null
+                        ? `[${stats.draft.year} Round ${stats.draft.round}, Pick ${stats.draft.pick} (${stats.draft.team})](${draftHistoryUrl(stats.draft.team_id)})`
+                        : `${stats.draft.year} Round ${stats.draft.round}, Pick ${stats.draft.pick} (${stats.draft.team ?? 'N/A'})`,
                     inline: false,
                 });
             }

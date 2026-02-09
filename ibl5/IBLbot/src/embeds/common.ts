@@ -1,4 +1,7 @@
 import { EmbedBuilder } from 'discord.js';
+import { config } from '../config.js';
+
+const siteBase = config.api.baseUrl.replace(/\/api\/v1$/, '');
 
 // IBL team colors for embed accents
 const TEAM_COLORS: Record<string, number> = {
@@ -66,6 +69,41 @@ export function errorEmbed(message: string): EmbedBuilder {
         .setColor(0xFF0000)
         .setTitle('Error')
         .setDescription(message);
+}
+
+/**
+ * Build a URL to a player's page on the site.
+ */
+export function playerUrl(pid: number): string {
+    return `${siteBase}/modules.php?name=Player&pa=showpage&pid=${pid}`;
+}
+
+/**
+ * Build a URL to a team's page on the site.
+ */
+export function teamUrl(teamId: number): string {
+    return `${siteBase}/modules.php?name=Team&op=team&teamID=${teamId}`;
+}
+
+/**
+ * Build a URL to a team's draft history page.
+ */
+export function draftHistoryUrl(teamId: number): string {
+    return `${siteBase}/modules.php?name=DraftHistory&teamID=${teamId}`;
+}
+
+/**
+ * Build a URL to a team's historical page for a specific season.
+ */
+export function teamYearUrl(teamId: number, year: number): string {
+    return `${siteBase}/modules.php?name=Team&op=team&teamID=${teamId}&yr=${year}`;
+}
+
+/**
+ * Build a URL to a Discord user's profile.
+ */
+export function discordProfileUrl(discordId: number): string {
+    return `https://discord.com/users/${discordId}`;
 }
 
 /**

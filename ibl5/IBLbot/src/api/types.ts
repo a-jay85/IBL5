@@ -31,11 +31,13 @@ export interface TeamRef {
     city: string;
     name: string;
     full_name: string;
+    team_id: number;
 }
 
 // Player (list)
 export interface Player {
     uuid: string;
+    pid: number;
     name: string;
     position: string;
     age: number;
@@ -88,7 +90,9 @@ export interface Team {
     city: string;
     name: string;
     full_name: string;
+    team_id: number;
     owner: string;
+    owner_discord_id: number | null;
     arena: string;
     conference: string | null;
     division: string | null;
@@ -162,12 +166,14 @@ export interface SeasonInfo {
 export interface Leader {
     player: {
         uuid: string;
+        pid: number;
         name: string;
     };
     team: {
         uuid: string | null;
         city: string;
         name: string;
+        team_id: number;
     };
     season: number;
     stats: {
@@ -189,6 +195,7 @@ export interface Leader {
 export interface Injury {
     player: {
         uuid: string;
+        pid: number;
         name: string;
         position: string;
     };
@@ -196,6 +203,7 @@ export interface Injury {
         uuid: string | null;
         city: string;
         name: string;
+        team_id: number;
     };
     injury: {
         days_remaining: number;
@@ -205,6 +213,7 @@ export interface Injury {
 // Player career stats
 export interface PlayerCareerStats {
     uuid: string;
+    pid: number;
     name: string;
     career_totals: {
         games: number;
@@ -231,17 +240,20 @@ export interface PlayerCareerStats {
         round: number | null;
         pick: number | null;
         team: string | null;
+        team_id: number | null;
     };
 }
 
 // Player season stats (history)
 export interface PlayerSeasonStats {
     year: number;
+    pid: number;
     player_name: string;
     team: {
         uuid: string | null;
         city: string;
         name: string;
+        team_id: number;
     };
     games: number;
     minutes: number;

@@ -26,7 +26,6 @@ export const leaders: Command = {
                     { name: 'FG%', value: 'fgp' },
                     { name: 'FT%', value: 'ftp' },
                     { name: '3PT%', value: 'tgp' },
-                    { name: 'QA Rating', value: 'qa' },
                 ),
         )
         .addIntegerOption(option =>

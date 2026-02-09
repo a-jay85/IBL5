@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { Player, PlayerSeasonStats } from '../api/types.js';
-import { createBaseEmbed, errorEmbed, formatStat, formatPercentage, isUuid } from '../embeds/common.js';
+import { createBaseEmbed, errorEmbed, formatStat, formatPercentage, isUuid, playerUrl, teamYearUrl } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 export const history: Command = {
@@ -66,14 +66,15 @@ export const history: Command = {
 
             const embed = createBaseEmbed()
                 .setColor(0x1E90FF)
-                .setTitle(`${playerName} - Season History`);
+                .setTitle(`${playerName} - Season History`)
+                .setURL(playerUrl(seasons[0].pid));
 
             const lines = seasons.map(s => {
                 const ppg = formatStat(s.per_game.points);
                 const rpg = formatStat(s.per_game.rebounds);
                 const apg = formatStat(s.per_game.assists);
                 const fg = formatPercentage(s.percentages.fg);
-                return `**${s.year}** ${s.team.name} | ${s.games} GP\nPPG: **${ppg}** | RPG: ${rpg} | APG: ${apg} | FG: ${fg}`;
+                return `[**${s.year}** ${s.team.name}](${teamYearUrl(s.team.team_id, s.year)}) | ${s.games} GP\nPPG: **${ppg}** | RPG: ${rpg} | APG: ${apg} | FG: ${fg}`;
             });
 
             const content = lines.join('\n');

@@ -5,7 +5,7 @@ import { startExpressServer } from './server/express.js';
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds],
-});
+}); 
 
 // Bot ready
 client.once(Events.ClientReady, c => {

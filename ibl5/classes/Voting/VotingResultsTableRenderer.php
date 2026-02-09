@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Voting;
 
 use Player\PlayerImageHelper;
+use Utilities\HtmlSanitizer;
 use Voting\Contracts\VotingResultsTableRendererInterface;
 use Voting\Contracts\VotingResultsServiceInterface;
 
@@ -40,12 +41,14 @@ class VotingResultsTableRenderer implements VotingResultsTableRendererInterface
      */
     private function renderTable(string $title, array $rows): string
     {
-        $escapedTitle = htmlspecialchars($title, \ENT_QUOTES, 'UTF-8');
+        /** @var string $escapedTitle */
+        $escapedTitle = HtmlSanitizer::safeHtmlOutput($title);
 
         /** @var list<string> $rowsHtml */
         $rowsHtml = [];
         foreach ($rows as $row) {
-            $name = htmlspecialchars($row['name'], \ENT_QUOTES, 'UTF-8');
+            /** @var string $name */
+            $name = HtmlSanitizer::safeHtmlOutput($row['name']);
             $votes = $row['votes'];
             $pid = $row['pid'] ?? 0;
 

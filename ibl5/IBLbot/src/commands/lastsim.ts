@@ -3,36 +3,33 @@ import {
     type ChatInputCommandInteraction,
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
-import type { Game } from '../api/types.js';
-import { scoresEmbed } from '../embeds/schedule-embed.js';
+import type { Game, SeasonInfo } from '../api/types.js';
+import { lastsimEmbed } from '../embeds/schedule-embed.js';
 import { errorEmbed } from '../embeds/common.js';
 import type { Command } from './index.js';
 
-export const scores: Command = {
+export const lastsim: Command = {
     data: new SlashCommandBuilder()
-        .setName('scores')
-        .setDescription('View recent game scores')
-        .addIntegerOption(option =>
-            option
-                .setName('count')
-                .setDescription('Number of games to show (default: 10)')
-                .setMinValue(1)
-                .setMaxValue(25),
-        ),
+        .setName('lastsim')
+        .setDescription('View all scores from the last simulation'),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply();
 
-        const count = interaction.options.getInteger('count') ?? 10;
-
         try {
+            const seasonResponse = await apiGet<SeasonInfo>('season');
+            const season = seasonResponse.data;
+
             const response = await apiGet<Game[]>('games', {
                 status: 'completed',
-                per_page: count,
+                date_start: season.last_sim.start_date,
+                date_end: season.last_sim.end_date,
+                per_page: 100,
                 sort: 'game_date',
-                order: 'desc',
+                order: 'asc',
             });
-            await interaction.editReply({ embeds: [scoresEmbed(response.data)] });
+
+            await interaction.editReply({ embeds: [lastsimEmbed(response.data, season)] });
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
             await interaction.editReply({ embeds: [errorEmbed(message)] });

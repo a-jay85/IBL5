@@ -1,28 +1,30 @@
-import type { Game } from '../api/types.js';
+import type { Game, SeasonInfo } from '../api/types.js';
+import { config } from '../config.js';
 import { createBaseEmbed, getTeamColor } from './common.js';
 
-export function scoresEmbed(games: Game[]) {
+export function lastsimEmbed(games: Game[], season: SeasonInfo) {
+    const siteBase = config.api.baseUrl.replace(/\/api\/v1$/, '');
+
     const embed = createBaseEmbed()
         .setColor(0x1E90FF)
-        .setTitle('Recent Scores');
+        .setTitle(`Last Sim Scores — Sim #${season.last_sim.number}`);
 
     if (games.length === 0) {
-        embed.setDescription('No recent games found.');
+        embed.setDescription('No games found for the last sim.');
         return embed;
     }
 
     const lines = games.map(g => {
-        const visitor = `${g.visitor.city}`;
-        const home = `${g.home.city}`;
+        const boxUrl = `${siteBase}/ibl/IBL/box${g.box_score_id}.htm`;
+        const shortDate = g.date.slice(5); // "MM-DD" from "YYYY-MM-DD"
+
         if (g.status === 'played' || g.status === 'completed') {
             const winner = g.visitor.score > g.home.score ? 'visitor' : 'home';
-            const vScore = g.visitor.score;
-            const hScore = g.home.score;
             const vBold = winner === 'visitor' ? '**' : '';
             const hBold = winner === 'home' ? '**' : '';
-            return `${g.date} | ${vBold}${visitor} ${vScore}${vBold} @ ${hBold}${home} ${hScore}${hBold}`;
+            return `[${shortDate}](${boxUrl}) | ${vBold}${g.visitor.name} ${g.visitor.score}${vBold} @ ${hBold}${g.home.name} ${g.home.score}${hBold}`;
         }
-        return `${g.date} | ${visitor} @ ${home} (${g.status})`;
+        return `${shortDate} | ${g.visitor.name} @ ${g.home.name} (${g.status})`;
     });
 
     embed.setDescription(lines.join('\n'));

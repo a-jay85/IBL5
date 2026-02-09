@@ -9,11 +9,10 @@ import {
 import { player } from './player.js';
 import { standings } from './standings.js';
 import { schedule } from './schedule.js';
-import { scores } from './scores.js';
+import { lastsim } from './lastsim.js';
 import { leaders } from './leaders.js';
 import { roster } from './roster.js';
 import { career } from './career.js';
-import { boxscore } from './boxscore.js';
 import { injuries } from './injuries.js';
 import { compare } from './compare.js';
 import { team } from './team.js';
@@ -29,11 +28,10 @@ const commandList: Command[] = [
     player,
     standings,
     schedule,
-    scores,
+    lastsim,
     leaders,
     roster,
     career,
-    boxscore,
     injuries,
     compare,
     team,

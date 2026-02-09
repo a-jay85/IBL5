@@ -27,6 +27,7 @@ class Router implements RouterInterface
         'games'                   => Controller\GameListController::class,
         'stats/leaders'           => Controller\LeadersController::class,
         'injuries'                => Controller\InjuriesController::class,
+        'season'                  => Controller\SeasonController::class,
     ];
 
     /**

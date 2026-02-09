@@ -11,7 +11,7 @@ class ApiGameRepository extends \BaseMysqliRepository
     /**
      * Get paginated list of games from the schedule view.
      *
-     * @param array<string, string> $filters Optional filters (season, status, team, date)
+     * @param array<string, string> $filters Optional filters (season, status, team, date, date_start, date_end)
      * @return array<int, array<string, mixed>>
      */
     public function getGames(Paginator $paginator, array $filters = []): array
@@ -136,6 +136,18 @@ class ApiGameRepository extends \BaseMysqliRepository
             $where[] = 'game_date = ?';
             $types .= 's';
             $params[] = $filters['date'];
+        }
+
+        if (isset($filters['date_start']) && $filters['date_start'] !== '') {
+            $where[] = 'game_date >= ?';
+            $types .= 's';
+            $params[] = $filters['date_start'];
+        }
+
+        if (isset($filters['date_end']) && $filters['date_end'] !== '') {
+            $where[] = 'game_date <= ?';
+            $types .= 's';
+            $params[] = $filters['date_end'];
         }
     }
 }

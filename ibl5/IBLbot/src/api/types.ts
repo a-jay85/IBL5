@@ -142,8 +142,19 @@ export interface Game {
     season: number;
     date: string;
     status: string;
-    visitor: TeamRef & { score: number };
-    home: TeamRef & { score: number };
+    box_score_id: number;
+    visitor: TeamRef & { score: number; team_id: number };
+    home: TeamRef & { score: number; team_id: number };
+}
+
+// Season info
+export interface SeasonInfo {
+    phase: string;
+    last_sim: {
+        number: number;
+        start_date: string;
+        end_date: string;
+    };
 }
 
 // Leader
@@ -187,79 +198,6 @@ export interface Injury {
     };
     injury: {
         days_remaining: number;
-    };
-}
-
-// Boxscore
-export interface BoxscorePlayerLine {
-    uuid: string | null;
-    name: string;
-    position: string;
-    minutes: number;
-    two_pt_made: number;
-    two_pt_attempted: number;
-    ft_made: number;
-    ft_attempted: number;
-    three_pt_made: number;
-    three_pt_attempted: number;
-    fg_made: number;
-    fg_attempted: number;
-    offensive_rebounds: number;
-    defensive_rebounds: number;
-    rebounds: number;
-    assists: number;
-    steals: number;
-    turnovers: number;
-    blocks: number;
-    personal_fouls: number;
-    points: number;
-}
-
-export interface BoxscoreTeamStats {
-    name: string;
-    quarter_scoring: {
-        q1: { visitor: number; home: number };
-        q2: { visitor: number; home: number };
-        q3: { visitor: number; home: number };
-        q4: { visitor: number; home: number };
-        ot: { visitor: number; home: number };
-    };
-    totals: {
-        fg_made: number;
-        fg_attempted: number;
-        two_pt_made: number;
-        two_pt_attempted: number;
-        ft_made: number;
-        ft_attempted: number;
-        three_pt_made: number;
-        three_pt_attempted: number;
-        offensive_rebounds: number;
-        defensive_rebounds: number;
-        rebounds: number;
-        assists: number;
-        steals: number;
-        turnovers: number;
-        blocks: number;
-        personal_fouls: number;
-        points: number;
-    };
-    attendance: number;
-    capacity: number;
-    records: {
-        visitor: string;
-        home: string;
-    };
-}
-
-export interface Boxscore {
-    game: Game;
-    visitor: {
-        team_stats: BoxscoreTeamStats;
-        players: BoxscorePlayerLine[];
-    };
-    home: {
-        team_stats: BoxscoreTeamStats;
-        players: BoxscorePlayerLine[];
     };
 }
 

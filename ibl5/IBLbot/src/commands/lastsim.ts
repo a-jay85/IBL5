@@ -6,7 +6,7 @@ import { apiGet } from '../api/client.js';
 import type { Game, SeasonInfo } from '../api/types.js';
 import { lastsimLeagueEmbed, lastsimTeamEmbed } from '../embeds/schedule-embed.js';
 import { handleCommandError, requireUuid } from '../embeds/common.js';
-import { teamAutocomplete, getTeams } from '../autocomplete.js';
+import { teamAutocomplete, resolveTeam } from '../autocomplete.js';
 import type { Command } from './index.js';
 
 export const lastsim: Command = {
@@ -34,10 +34,7 @@ export const lastsim: Command = {
             if (uuid) {
                 if (!await requireUuid(interaction, uuid, 'team')) return;
 
-                const teams = await getTeams();
-                const team = teams.find(t => t.uuid === uuid);
-                const teamName = team?.full_name ?? uuid;
-                const teamId = team?.team_id ?? 0;
+                const { name: teamName, id: teamId } = await resolveTeam(uuid);
 
                 const response = await apiGet<Game[]>('games', {
                     team: uuid,

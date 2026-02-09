@@ -17,6 +17,12 @@ export async function getTeams(): Promise<Team[]> {
     return teamCache;
 }
 
+export async function resolveTeam(uuid: string): Promise<{ name: string; id: number }> {
+    const teams = await getTeams();
+    const team = teams.find(t => t.uuid === uuid);
+    return { name: team?.full_name ?? uuid, id: team?.team_id ?? 0 };
+}
+
 export async function playerAutocomplete(interaction: AutocompleteInteraction) {
     const focused = interaction.options.getFocused();
     if (focused.length < 2) {

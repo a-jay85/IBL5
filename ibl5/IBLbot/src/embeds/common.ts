@@ -54,6 +54,12 @@ export function formatStat(value: number | string | null, suffix = ''): string {
     return `${value}${suffix}`;
 }
 
+export function formatWinPct(value: number | string | null, fallback = '-'): string {
+    if (value === null) return fallback;
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    return num.toFixed(3);
+}
+
 export function formatPercentage(value: number | string | null): string {
     if (value === null) return '-';
     const num = typeof value === 'string' ? parseFloat(value) : value;

@@ -1,6 +1,6 @@
 import { type EmbedBuilder } from 'discord.js';
 import type { StandingsEntry } from '../api/types.js';
-import { createBaseEmbed, IBL_BLUE, pad } from './common.js';
+import { addMonospaceField, createBaseEmbed, formatWinPct, IBL_BLUE, pad } from './common.js';
 
 const HEADER = `${pad('Team', 13)} ${pad('W-L', 5)} ${pad('Pct', 5, 'right')} ${pad('GB', 4, 'right')}`;
 
@@ -8,9 +8,7 @@ function formatLine(t: StandingsEntry, gbKey: 'conference' | 'division'): string
     const name = t.team.name.length > 16
         ? t.team.name.substring(0, 16)
         : t.team.name;
-    const pct = t.win_percentage !== null
-        ? (typeof t.win_percentage === 'string' ? parseFloat(t.win_percentage) : t.win_percentage).toFixed(3)
-        : '  -  ';
+    const pct = formatWinPct(t.win_percentage, '  -  ');
     const gb = t.games_back[gbKey] ?? '-';
     const clinch = t.clinched.conference ? ' z' : t.clinched.division ? ' y' : t.clinched.playoffs ? ' x' : '';
     return `${pad(name + clinch, 13)} ${pad(t.record.league, 5)} ${pad(pct, 5, 'right')} ${pad(gb, 4, 'right')}`;
@@ -18,11 +16,7 @@ function formatLine(t: StandingsEntry, gbKey: 'conference' | 'division'): string
 
 function addGroup(embed: EmbedBuilder, name: string, teams: StandingsEntry[], gbKey: 'conference' | 'division'): void {
     const lines = teams.map(t => formatLine(t, gbKey));
-    embed.addFields({
-        name,
-        value: '```\n' + HEADER + '\n' + lines.join('\n') + '\n```',
-        inline: false,
-    });
+    addMonospaceField(embed, name, HEADER, lines);
 }
 
 const DIVISIONS = ['Atlantic', 'Central', 'Midwest', 'Pacific'];

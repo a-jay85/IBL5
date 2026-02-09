@@ -15,9 +15,11 @@ class InjuriesControllerTest extends IntegrationTestCase
         $this->mockDb->setMockData([
             [
                 'player_uuid' => 'player-uuid-1',
+                'pid' => 4825,
                 'name' => 'Kevin Martin',
                 'pos' => 'SG',
                 'injured' => 5,
+                'teamid' => 26,
                 'team_uuid' => 'team-uuid-1',
                 'team_city' => 'Sacramento',
                 'team_name' => 'Kings',

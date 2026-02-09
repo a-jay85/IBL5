@@ -51,8 +51,8 @@ class GameTransformerTest extends TestCase
         $result = $this->transformer->transform($row);
 
         $this->assertSame('game-uuid-123', $result['uuid']);
+        $this->assertSame(545, $result['box_score_id']);
         $this->assertArrayNotHasKey('schedule_id', $result);
-        $this->assertArrayNotHasKey('box_score_id', $result);
         $this->assertArrayNotHasKey('visitor_team_id', $result);
         $this->assertArrayNotHasKey('home_team_id', $result);
     }

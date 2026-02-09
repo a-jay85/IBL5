@@ -32,7 +32,16 @@ SELECT
   t.owner_name,
   CONCAT(t.team_city, ' ', t.team_name) AS full_team_name,
   -- Current Contract
-  p.cy AS current_salary,
+  p.cy AS contract_year,
+  CASE p.cy
+    WHEN 1 THEN p.cy1
+    WHEN 2 THEN p.cy2
+    WHEN 3 THEN p.cy3
+    WHEN 4 THEN p.cy4
+    WHEN 5 THEN p.cy5
+    WHEN 6 THEN p.cy6
+    ELSE 0
+  END AS current_salary,
   p.cy1 AS year1_salary,
   p.cy2 AS year2_salary,
   -- Current Season Stats

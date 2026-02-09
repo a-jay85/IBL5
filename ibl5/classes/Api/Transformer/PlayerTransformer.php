@@ -9,19 +9,20 @@ class PlayerTransformer
     /**
      * Transform a player row from vw_player_current for list endpoints.
      *
-     * @param array{player_uuid: string, name: string, position: string, age: int, htft: int, htin: int, experience: int, team_uuid: string|null, team_city: string|null, team_name: string|null, full_team_name: string|null, current_salary: int, year1_salary: int, year2_salary: int, games_played: int, points_per_game: float|null, fg_percentage: float|null, ft_percentage: float|null, three_pt_percentage: float|null} $row
+     * @param array{player_uuid: string, pid: int, name: string, position: string, age: int, htft: int, htin: int, experience: int, teamid: int|null, team_uuid: string|null, team_city: string|null, team_name: string|null, full_team_name: string|null, current_salary: int, year1_salary: int, year2_salary: int, games_played: int, points_per_game: float|null, fg_percentage: float|null, ft_percentage: float|null, three_pt_percentage: float|null} $row
      * @return array<string, mixed>
      */
     public function transform(array $row): array
     {
         return [
             'uuid' => $row['player_uuid'],
+            'pid' => $row['pid'],
             'name' => $row['name'],
             'position' => $row['position'],
             'age' => $row['age'],
             'height' => $this->formatHeight($row['htft'], $row['htin']),
             'experience' => $row['experience'],
-            'team' => $this->transformTeam($row['team_uuid'], $row['team_city'] ?? '', $row['team_name'] ?? '', $row['full_team_name'] ?? ''),
+            'team' => $this->transformTeam($row['teamid'], $row['team_uuid'], $row['team_city'] ?? '', $row['team_name'] ?? '', $row['full_team_name'] ?? ''),
             'contract' => [
                 'current_salary' => $row['current_salary'],
                 'year1' => $row['year1_salary'],
@@ -40,7 +41,7 @@ class PlayerTransformer
     /**
      * Transform a player row for detail endpoints (includes full stats).
      *
-     * @param array{player_uuid: string, name: string, position: string, age: int, htft: int, htin: int, experience: int, bird_rights: int, team_uuid: string|null, team_city: string|null, team_name: string|null, full_team_name: string|null, current_salary: int, year1_salary: int, year2_salary: int, games_played: int, minutes_played: int, field_goals_made: int, field_goals_attempted: int, free_throws_made: int, free_throws_attempted: int, three_pointers_made: int, three_pointers_attempted: int, offensive_rebounds: int, defensive_rebounds: int, assists: int, steals: int, turnovers: int, blocks: int, personal_fouls: int, points_per_game: float|null, fg_percentage: float|null, ft_percentage: float|null, three_pt_percentage: float|null} $row
+     * @param array{player_uuid: string, pid: int, name: string, position: string, age: int, htft: int, htin: int, experience: int, bird_rights: int, teamid: int|null, team_uuid: string|null, team_city: string|null, team_name: string|null, full_team_name: string|null, current_salary: int, year1_salary: int, year2_salary: int, games_played: int, minutes_played: int, field_goals_made: int, field_goals_attempted: int, free_throws_made: int, free_throws_attempted: int, three_pointers_made: int, three_pointers_attempted: int, offensive_rebounds: int, defensive_rebounds: int, assists: int, steals: int, turnovers: int, blocks: int, personal_fouls: int, points_per_game: float|null, fg_percentage: float|null, ft_percentage: float|null, three_pt_percentage: float|null} $row
      * @return array<string, mixed>
      */
     public function transformDetail(array $row): array
@@ -88,11 +89,11 @@ class PlayerTransformer
     /**
      * Transform team sub-object.
      *
-     * @return array{uuid: string, city: string, name: string, full_name: string}|null
+     * @return array{uuid: string, city: string, name: string, full_name: string, team_id: int}|null
      */
-    private function transformTeam(?string $teamUuid, string $teamCity, string $teamName, string $fullTeamName): ?array
+    private function transformTeam(?int $teamId, ?string $teamUuid, string $teamCity, string $teamName, string $fullTeamName): ?array
     {
-        if ($teamUuid === null) {
+        if ($teamUuid === null || $teamId === null) {
             return null;
         }
 
@@ -101,6 +102,7 @@ class PlayerTransformer
             'city' => $teamCity,
             'name' => $teamName,
             'full_name' => $fullTeamName,
+            'team_id' => $teamId,
         ];
     }
 }

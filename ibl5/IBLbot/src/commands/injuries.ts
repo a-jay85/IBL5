@@ -1,0 +1,42 @@
+import {
+    SlashCommandBuilder,
+    type ChatInputCommandInteraction,
+} from 'discord.js';
+import { apiGet } from '../api/client.js';
+import type { Injury } from '../api/types.js';
+import { createBaseEmbed, errorEmbed, playerUrl, teamUrl, setDescriptionOrSplit, handleCommandError } from '../embeds/common.js';
+import type { Command } from './index.js';
+
+export const injuries: Command = {
+    data: new SlashCommandBuilder()
+        .setName('injuries')
+        .setDescription('View all injured players'),
+
+    async execute(interaction: ChatInputCommandInteraction) {
+        await interaction.deferReply();
+
+        try {
+            const response = await apiGet<Injury[]>('injuries');
+
+            const embed = createBaseEmbed()
+                .setColor(0xFF6B6B)
+                .setTitle('Injury Report');
+
+            if (response.data.length === 0) {
+                embed.setDescription('No injured players.');
+                await interaction.editReply({ embeds: [embed] });
+                return;
+            }
+
+            const lines = response.data.map(inj => {
+                return `**[${inj.player.name}](${playerUrl(inj.player.pid)})** (${inj.player.position}) — [${inj.team.name}](${teamUrl(inj.team.team_id)}) | ${inj.injury.days_remaining} day${inj.injury.days_remaining === 1 ? '' : 's'}`;
+            });
+
+            setDescriptionOrSplit(embed, lines, 'Injured Players');
+
+            await interaction.editReply({ embeds: [embed] });
+        } catch (error) {
+            await handleCommandError(interaction, error);
+        }
+    },
+};

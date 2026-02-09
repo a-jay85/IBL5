@@ -22,10 +22,12 @@ class TeamTransformerTest extends TestCase
     private function makeTeamRow(): array
     {
         return [
+            'teamid' => 10,
             'uuid' => 'team-uuid-123',
             'team_city' => 'Chicago',
             'team_name' => 'Bulls',
             'owner_name' => 'TestOwner',
+            'discordID' => 123456789,
             'arena' => 'United Center',
             'conference' => 'East',
             'division' => 'Central',
@@ -47,12 +49,13 @@ class TeamTransformerTest extends TestCase
         $this->assertSame('Central', $result['division']);
     }
 
-    public function testTransformExcludesInternalIds(): void
+    public function testTransformIncludesInternalIds(): void
     {
         $row = $this->makeTeamRow();
         $result = $this->transformer->transform($row);
 
-        $this->assertArrayNotHasKey('teamid', $result);
+        $this->assertSame(10, $result['team_id']);
+        $this->assertSame(123456789, $result['owner_discord_id']);
     }
 
     public function testTransformDetailIncludesRecords(): void

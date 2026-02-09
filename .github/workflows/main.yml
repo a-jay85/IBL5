@@ -74,8 +74,9 @@ jobs:
 
             echo "Starting new bot process..."
             mkdir -p logs
-            nohup node dist/index.js > logs/bot.log 2>&1 &
+            setsid node dist/index.js > logs/bot.log 2>&1 < /dev/null &
             echo $! > bot.pid
+            sleep 1
 
             echo "IBLbot deployed successfully (PID: $(cat bot.pid))"
           '

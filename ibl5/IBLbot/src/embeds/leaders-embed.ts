@@ -13,7 +13,7 @@ const CATEGORY_LABELS: Record<string, string> = {
     qa: 'QA Rating',
 };
 
-function getStatValue(leader: Leader, category: string): number {
+function getStatValue(leader: Leader, category: string): number | string {
     const s = leader.stats;
     switch (category) {
         case 'ppg': return s.points_per_game;
@@ -46,7 +46,8 @@ export function leadersEmbed(leaders: Leader[], category: string) {
         const name = pad(l.player.name, 20);
         const team = pad(l.team.name, 14);
         const value = getStatValue(l, category);
-        const stat = isPercentage ? `${value.toFixed(1)}%` : value.toFixed(1);
+        const num = typeof value === 'string' ? parseFloat(value) : value;
+        const stat = isPercentage ? `${(num * 100).toFixed(1)}%` : num.toFixed(1);
         return `${rank}${name} ${team} ${stat}`;
     });
 

@@ -91,7 +91,7 @@ export const team: Command = {
                     {
                         name: 'Standings',
                         value: [
-                            `Win%: ${t.standings.win_percentage !== null ? t.standings.win_percentage.toFixed(3) : '-'}`,
+                            `Win%: ${t.standings.win_percentage !== null ? (typeof t.standings.win_percentage === 'string' ? parseFloat(t.standings.win_percentage) : t.standings.win_percentage).toFixed(3) : '-'}`,
                             `Conf GB: ${t.standings.conference_games_back ?? '-'}`,
                             `Div GB: ${t.standings.division_games_back ?? '-'}`,
                             `Games Left: ${t.standings.games_remaining ?? '-'}`,

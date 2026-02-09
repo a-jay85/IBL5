@@ -26,7 +26,9 @@ export function standingsEmbed(entries: StandingsEntry[], conference?: string) {
             const name = t.team.city.length > 16
                 ? t.team.city.substring(0, 16)
                 : t.team.city;
-            const pct = t.win_percentage !== null ? t.win_percentage.toFixed(3) : '  -  ';
+            const pct = t.win_percentage !== null
+                ? (typeof t.win_percentage === 'string' ? parseFloat(t.win_percentage) : t.win_percentage).toFixed(3)
+                : '  -  ';
             const gb = t.games_back.conference ?? '-';
             const clinch = t.clinched.conference ? ' z' : t.clinched.division ? ' y' : t.clinched.playoffs ? ' x' : '';
             return `${pad(name + clinch, 18)} ${pad(t.record.league, 7)} ${pad(pct, 5, 'right')} ${pad(gb, 5, 'right')}`;

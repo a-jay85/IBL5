@@ -12,14 +12,13 @@ export function rosterEmbed(team: TeamDetail, players: Player[]) {
         return embed;
     }
 
-    const header = `${pad('Name', 20)} ${pad('Pos', 3)} ${pad('Age', 3, 'right')} ${pad('PPG', 5, 'right')} ${pad('Sal', 5, 'right')}`;
+    const header = `${pad('Name', 17)} ${pad('Pos', 3)} ${pad('Age', 3, 'right')} ${pad('Sal', 4, 'right')}`;
     const lines = players.map(p => {
-        const name = pad(p.name, 20);
+        const name = pad(p.name, 17);
         const pos = pad(p.position, 3);
         const age = pad(String(p.age), 3, 'right');
-        const ppg = pad(formatStat(p.stats.points_per_game), 5, 'right');
-        const sal = pad(String(p.contract.current_salary), 5, 'right');
-        return `${name} ${pos} ${age} ${ppg} ${sal}`;
+        const sal = pad(String(p.contract.current_salary), 4, 'right');
+        return `${name} ${pos} ${age} ${sal}`;
     });
 
     const table = '```\n' + header + '\n' + lines.join('\n') + '\n```';

@@ -21,7 +21,7 @@ export function standingsEmbed(entries: StandingsEntry[], conference?: string) {
         .setTitle(title);
 
     for (const [conf, teams] of conferences) {
-        const header = `${pad('Team', 18)} ${pad('W-L', 7)} ${pad('Pct', 5, 'right')} ${pad('GB', 5, 'right')}`;
+        const header = `${pad('Team', 13)} ${pad('W-L', 5)} ${pad('Pct', 5, 'right')} ${pad('GB', 4, 'right')}`;
         const lines = teams.map(t => {
             const name = t.team.name.length > 16
                 ? t.team.name.substring(0, 16)
@@ -31,7 +31,7 @@ export function standingsEmbed(entries: StandingsEntry[], conference?: string) {
                 : '  -  ';
             const gb = t.games_back.conference ?? '-';
             const clinch = t.clinched.conference ? ' z' : t.clinched.division ? ' y' : t.clinched.playoffs ? ' x' : '';
-            return `${pad(name + clinch, 18)} ${pad(t.record.league, 7)} ${pad(pct, 5, 'right')} ${pad(gb, 5, 'right')}`;
+            return `${pad(name + clinch, 13)} ${pad(t.record.league, 5)} ${pad(pct, 5, 'right')} ${pad(gb, 4, 'right')}`;
         });
 
         embed.addFields({

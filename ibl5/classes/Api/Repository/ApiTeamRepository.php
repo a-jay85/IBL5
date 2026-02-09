@@ -18,10 +18,12 @@ class ApiTeamRepository extends \BaseMysqliRepository
         $orderBy = $paginator->getOrderByClause();
 
         return $this->fetchAll(
-            "SELECT t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,
-                    s.conference, s.division
+            "SELECT t.teamid, t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,
+                    s.conference, s.division,
+                    nu.discordID
              FROM ibl_team_info t
              LEFT JOIN ibl_standings s ON t.teamid = s.tid
+             LEFT JOIN nuke_users nu ON nu.user_ibl_team = t.team_name
              ORDER BY {$orderBy}
              LIMIT ? OFFSET ?",
             'ii',
@@ -49,8 +51,9 @@ class ApiTeamRepository extends \BaseMysqliRepository
     public function getTeamByUuid(string $uuid): ?array
     {
         return $this->fetchOne(
-            "SELECT t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,
+            "SELECT t.teamid, t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,
                     s.conference, s.division,
+                    nu.discordID,
                     s.leagueRecord AS league_record,
                     s.pct AS win_percentage,
                     s.confRecord AS conference_record,
@@ -64,6 +67,7 @@ class ApiTeamRepository extends \BaseMysqliRepository
                     s.gamesUnplayed AS games_remaining
              FROM ibl_team_info t
              LEFT JOIN ibl_standings s ON t.teamid = s.tid
+             LEFT JOIN nuke_users nu ON nu.user_ibl_team = t.team_name
              WHERE t.uuid = ?",
             's',
             $uuid

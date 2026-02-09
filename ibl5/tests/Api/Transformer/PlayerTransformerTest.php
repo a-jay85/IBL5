@@ -23,6 +23,7 @@ class PlayerTransformerTest extends TestCase
     {
         return [
             'player_uuid' => 'abc-123-def',
+            'pid' => 123,
             'name' => 'LeBron James',
             'position' => 'SF',
             'age' => 39,
@@ -30,6 +31,7 @@ class PlayerTransformerTest extends TestCase
             'htin' => 9,
             'experience' => 20,
             'bird_rights' => 3,
+            'teamid' => 5,
             'team_uuid' => 'team-uuid-456',
             'team_city' => 'Los Angeles',
             'team_name' => 'Lakers',
@@ -66,7 +68,7 @@ class PlayerTransformerTest extends TestCase
         $result = $this->transformer->transform($row);
 
         $this->assertSame('abc-123-def', $result['uuid']);
-        $this->assertArrayNotHasKey('pid', $result);
+        $this->assertSame(123, $result['pid']);
         $this->assertArrayNotHasKey('tid', $result);
         $this->assertArrayNotHasKey('teamid', $result);
     }
@@ -93,6 +95,7 @@ class PlayerTransformerTest extends TestCase
         $this->assertSame('Los Angeles', $result['team']['city']);
         $this->assertSame('Lakers', $result['team']['name']);
         $this->assertSame('Los Angeles Lakers', $result['team']['full_name']);
+        $this->assertSame(5, $result['team']['team_id']);
     }
 
     public function testTransformTeamIsNullWhenNoTeamUuid(): void

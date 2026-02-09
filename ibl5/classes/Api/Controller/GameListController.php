@@ -48,6 +48,12 @@ class GameListController implements ControllerInterface
         if (isset($query['date']) && $query['date'] !== '') {
             $filters['date'] = $query['date'];
         }
+        if (isset($query['date_start']) && $query['date_start'] !== '') {
+            $filters['date_start'] = $query['date_start'];
+        }
+        if (isset($query['date_end']) && $query['date_end'] !== '') {
+            $filters['date_end'] = $query['date_end'];
+        }
 
         $total = $repo->countGames($filters);
         $rows = $repo->getGames($paginator, $filters);

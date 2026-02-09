@@ -63,7 +63,7 @@ jobs:
             npm run build
 
             echo "Registering slash commands..."
-            node dist/deploy-commands.js
+            npm run deploy-commands
 
             echo "Stopping old bot process..."
             if [ -f bot.pid ] && kill -0 "$(cat bot.pid)" 2>/dev/null; then

@@ -130,3 +130,41 @@ export function pad(str: string, width: number, align: 'left' | 'right' = 'left'
     }
     return truncated.padEnd(width);
 }
+
+/**
+ * Set embed description if content fits, otherwise split into two fields.
+ * Discord description limit is 4096 chars; this splits at the midpoint of lines.
+ */
+export function setDescriptionOrSplit(embed: EmbedBuilder, lines: string[], fieldName: string): void {
+    const content = lines.join('\n');
+
+    if (content.length <= 4096) {
+        embed.setDescription(content);
+    } else {
+        const mid = Math.ceil(lines.length / 2);
+        embed.addFields(
+            { name: fieldName, value: lines.slice(0, mid).join('\n') },
+            { name: '\u200B', value: lines.slice(mid).join('\n') },
+        );
+    }
+}
+
+/**
+ * Add a monospace code-block field, splitting into two fields if it exceeds
+ * Discord's 1024-char field limit.
+ */
+export function addMonospaceField(embed: EmbedBuilder, fieldName: string, header: string, lines: string[]): void {
+    const table = '```\n' + header + '\n' + lines.join('\n') + '\n```';
+
+    if (table.length <= 1024) {
+        embed.addFields({ name: fieldName, value: table });
+    } else {
+        const mid = Math.ceil(lines.length / 2);
+        const part1 = '```\n' + header + '\n' + lines.slice(0, mid).join('\n') + '\n```';
+        const part2 = '```\n' + lines.slice(mid).join('\n') + '\n```';
+        embed.addFields(
+            { name: fieldName, value: part1 },
+            { name: '\u200B', value: part2 },
+        );
+    }
+}

@@ -4,7 +4,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { PlayerSeasonStats } from '../api/types.js';
-import { createBaseEmbed, IBL_BLUE, errorEmbed, formatStat, formatPercentage, isUuid, playerUrl, teamYearUrl } from '../embeds/common.js';
+import { createBaseEmbed, IBL_BLUE, errorEmbed, formatStat, formatPercentage, isUuid, playerUrl, teamYearUrl, setDescriptionOrSplit } from '../embeds/common.js';
 import { playerAutocomplete } from '../autocomplete.js';
 import type { Command } from './index.js';
 
@@ -56,17 +56,7 @@ export const history: Command = {
                 return `[**${s.year}** ${s.team.name}](${teamYearUrl(s.team.team_id, s.year)}) | ${s.games} GP\nPPG: **${ppg}** | RPG: ${rpg} | APG: ${apg} | FG: ${fg}`;
             });
 
-            const content = lines.join('\n');
-
-            if (content.length <= 4096) {
-                embed.setDescription(content);
-            } else {
-                const mid = Math.ceil(lines.length / 2);
-                embed.addFields(
-                    { name: 'Seasons', value: lines.slice(0, mid).join('\n') },
-                    { name: '\u200B', value: lines.slice(mid).join('\n') },
-                );
-            }
+            setDescriptionOrSplit(embed, lines, 'Seasons');
 
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {

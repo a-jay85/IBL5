@@ -1,5 +1,5 @@
 import type { Player, TeamDetail } from '../api/types.js';
-import { createBaseEmbed, getTeamColor, pad, teamUrl, discordProfileUrl } from './common.js';
+import { createBaseEmbed, getTeamColor, pad, teamUrl, discordProfileUrl, addMonospaceField } from './common.js';
 
 export function rosterEmbed(team: TeamDetail, players: Player[]) {
     const embed = createBaseEmbed()
@@ -22,21 +22,7 @@ export function rosterEmbed(team: TeamDetail, players: Player[]) {
         return `${name} ${pos} ${age} ${sal}`;
     });
 
-    const table = '```\n' + header + '\n' + lines.join('\n') + '\n```';
-
-    // Discord has a 1024 char limit per field value
-    if (table.length <= 1024) {
-        embed.addFields({ name: 'Players', value: table });
-    } else {
-        // Split into two fields if needed
-        const mid = Math.ceil(lines.length / 2);
-        const part1 = '```\n' + header + '\n' + lines.slice(0, mid).join('\n') + '\n```';
-        const part2 = '```\n' + lines.slice(mid).join('\n') + '\n```';
-        embed.addFields(
-            { name: 'Players', value: part1 },
-            { name: '\u200B', value: part2 },
-        );
-    }
+    addMonospaceField(embed, 'Players', header, lines);
 
     return embed;
 }

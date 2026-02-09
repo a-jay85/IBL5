@@ -4,7 +4,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { Injury } from '../api/types.js';
-import { createBaseEmbed, pad, errorEmbed } from '../embeds/common.js';
+import { createBaseEmbed, errorEmbed } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 export const injuries: Command = {
@@ -28,21 +28,19 @@ export const injuries: Command = {
                 return;
             }
 
-            const header = `${pad('Player', 20)} ${pad('Pos', 3)} ${pad('Team', 14)} ${pad('Days', 4, 'right')}`;
             const lines = response.data.map(inj => {
-                return `${pad(inj.player.name, 20)} ${pad(inj.player.position, 3)} ${pad(inj.team.name, 14)} ${pad(String(inj.injury.days_remaining), 4, 'right')}`;
+                return `**${inj.player.name}** (${inj.player.position}) — ${inj.team.name} | ${inj.injury.days_remaining} day${inj.injury.days_remaining === 1 ? '' : 's'}`;
             });
 
-            const table = '```\n' + header + '\n' + lines.join('\n') + '\n```';
+            const content = lines.join('\n');
 
-            if (table.length <= 4096) {
-                embed.setDescription(table);
+            if (content.length <= 4096) {
+                embed.setDescription(content);
             } else {
-                // Split into multiple fields
                 const mid = Math.ceil(lines.length / 2);
                 embed.addFields(
-                    { name: 'Injured Players', value: '```\n' + header + '\n' + lines.slice(0, mid).join('\n') + '\n```' },
-                    { name: '\u200B', value: '```\n' + lines.slice(mid).join('\n') + '\n```' },
+                    { name: 'Injured Players', value: lines.slice(0, mid).join('\n') },
+                    { name: '\u200B', value: lines.slice(mid).join('\n') },
                 );
             }
 

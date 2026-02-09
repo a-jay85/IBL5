@@ -1,5 +1,5 @@
 import type { Boxscore } from '../api/types.js';
-import { createBaseEmbed, pad } from './common.js';
+import { createBaseEmbed } from './common.js';
 import { EmbedBuilder } from 'discord.js';
 
 export function boxscoreEmbeds(box: Boxscore): EmbedBuilder[] {
@@ -14,34 +14,44 @@ export function boxscoreEmbeds(box: Boxscore): EmbedBuilder[] {
         .setTitle(`${game.visitor.full_name} @ ${game.home.full_name}`)
         .setDescription(`**${game.visitor.score} - ${game.home.score}** | ${game.date}`);
 
-    // Quarter scoring table
-    const qHeader = `${pad('', 12)} ${pad('Q1', 4, 'right')} ${pad('Q2', 4, 'right')} ${pad('Q3', 4, 'right')} ${pad('Q4', 4, 'right')} ${pad('OT', 4, 'right')} ${pad('TOT', 4, 'right')}`;
-    const qVisitor = `${pad(game.visitor.city, 12)} ${pad(String(qs.q1.visitor), 4, 'right')} ${pad(String(qs.q2.visitor), 4, 'right')} ${pad(String(qs.q3.visitor), 4, 'right')} ${pad(String(qs.q4.visitor), 4, 'right')} ${pad(String(qs.ot.visitor), 4, 'right')} ${pad(String(game.visitor.score), 4, 'right')}`;
-    const qHome = `${pad(game.home.city, 12)} ${pad(String(qs.q1.home), 4, 'right')} ${pad(String(qs.q2.home), 4, 'right')} ${pad(String(qs.q3.home), 4, 'right')} ${pad(String(qs.q4.home), 4, 'right')} ${pad(String(qs.ot.home), 4, 'right')} ${pad(String(game.home.score), 4, 'right')}`;
+    // Quarter scoring — compact variable-width format
+    const vLine = `**${game.visitor.city}:** ${qs.q1.visitor} | ${qs.q2.visitor} | ${qs.q3.visitor} | ${qs.q4.visitor}${qs.ot.visitor > 0 ? ` | OT: ${qs.ot.visitor}` : ''} — **${game.visitor.score}**`;
+    const hLine = `**${game.home.city}:** ${qs.q1.home} | ${qs.q2.home} | ${qs.q3.home} | ${qs.q4.home}${qs.ot.home > 0 ? ` | OT: ${qs.ot.home}` : ''} — **${game.home.score}**`;
 
     mainEmbed.addFields({
         name: 'Score by Quarter',
-        value: '```\n' + qHeader + '\n' + qVisitor + '\n' + qHome + '\n```',
+        value: vLine + '\n' + hLine,
     });
 
     // Team totals comparison
     const vt = vStats.totals;
     const ht = hStats.totals;
-    const teamStats = [
-        `FG:  ${vt.fg_made}/${vt.fg_attempted} vs ${ht.fg_made}/${ht.fg_attempted}`,
-        `3PT: ${vt.three_pt_made}/${vt.three_pt_attempted} vs ${ht.three_pt_made}/${ht.three_pt_attempted}`,
-        `FT:  ${vt.ft_made}/${vt.ft_attempted} vs ${ht.ft_made}/${ht.ft_attempted}`,
-        `REB: ${vt.rebounds} vs ${ht.rebounds}`,
-        `AST: ${vt.assists} vs ${ht.assists}`,
-        `STL: ${vt.steals} vs ${ht.steals}`,
-        `BLK: ${vt.blocks} vs ${ht.blocks}`,
-        `TO:  ${vt.turnovers} vs ${ht.turnovers}`,
-    ].join('\n');
-
-    mainEmbed.addFields({
-        name: `Team Stats (${game.visitor.city} vs ${game.home.city})`,
-        value: '```\n' + teamStats + '\n```',
-    });
+    mainEmbed.addFields(
+        {
+            name: game.visitor.city,
+            value: [
+                `FG: ${vt.fg_made}/${vt.fg_attempted}`,
+                `3PT: ${vt.three_pt_made}/${vt.three_pt_attempted}`,
+                `FT: ${vt.ft_made}/${vt.ft_attempted}`,
+                `REB: ${vt.rebounds} | AST: ${vt.assists}`,
+                `STL: ${vt.steals} | BLK: ${vt.blocks}`,
+                `TO: ${vt.turnovers}`,
+            ].join('\n'),
+            inline: true,
+        },
+        {
+            name: game.home.city,
+            value: [
+                `FG: ${ht.fg_made}/${ht.fg_attempted}`,
+                `3PT: ${ht.three_pt_made}/${ht.three_pt_attempted}`,
+                `FT: ${ht.ft_made}/${ht.ft_attempted}`,
+                `REB: ${ht.rebounds} | AST: ${ht.assists}`,
+                `STL: ${ht.steals} | BLK: ${ht.blocks}`,
+                `TO: ${ht.turnovers}`,
+            ].join('\n'),
+            inline: true,
+        },
+    );
 
     const embeds: EmbedBuilder[] = [mainEmbed];
 
@@ -53,19 +63,18 @@ export function boxscoreEmbeds(box: Boxscore): EmbedBuilder[] {
             .setColor(0x1E90FF)
             .setTitle(`${teamGame.full_name} Box Score`);
 
-        const header = `${pad('Player', 16)} ${pad('MIN', 3, 'right')} ${pad('PTS', 3, 'right')} ${pad('REB', 3, 'right')} ${pad('AST', 3, 'right')} ${pad('STL', 2, 'right')} ${pad('BLK', 2, 'right')} ${pad('FG', 7, 'right')}`;
         const lines = teamData.players.map(p => {
-            return `${pad(p.name, 16)} ${pad(String(p.minutes), 3, 'right')} ${pad(String(p.points), 3, 'right')} ${pad(String(p.rebounds), 3, 'right')} ${pad(String(p.assists), 3, 'right')} ${pad(String(p.steals), 2, 'right')} ${pad(String(p.blocks), 2, 'right')} ${pad(`${p.fg_made}-${p.fg_attempted}`, 7, 'right')}`;
+            return `**${p.name}** ${p.minutes} MIN\n${p.points} PTS | ${p.rebounds} REB | ${p.assists} AST | ${p.steals} STL | ${p.blocks} BLK | ${p.fg_made}-${p.fg_attempted} FG`;
         });
 
-        const table = '```\n' + header + '\n' + lines.join('\n') + '\n```';
-        if (table.length <= 1024) {
-            playerEmbed.addFields({ name: 'Players', value: table });
+        const content = lines.join('\n');
+        if (content.length <= 4096) {
+            playerEmbed.setDescription(content);
         } else {
             const mid = Math.ceil(lines.length / 2);
             playerEmbed.addFields(
-                { name: 'Players', value: '```\n' + header + '\n' + lines.slice(0, mid).join('\n') + '\n```' },
-                { name: '\u200B', value: '```\n' + lines.slice(mid).join('\n') + '\n```' },
+                { name: 'Players', value: lines.slice(0, mid).join('\n') },
+                { name: '\u200B', value: lines.slice(mid).join('\n') },
             );
         }
 

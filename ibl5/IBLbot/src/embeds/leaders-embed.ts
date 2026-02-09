@@ -1,5 +1,5 @@
 import type { Leader } from '../api/types.js';
-import { createBaseEmbed, pad } from './common.js';
+import { createBaseEmbed } from './common.js';
 
 const CATEGORY_LABELS: Record<string, string> = {
     ppg: 'Points Per Game',
@@ -42,15 +42,12 @@ export function leadersEmbed(leaders: Leader[], category: string) {
     }
 
     const lines = leaders.map((l, i) => {
-        const rank = `${i + 1}.`.padEnd(4);
-        const name = pad(l.player.name, 20);
-        const team = pad(l.team.name, 14);
         const value = getStatValue(l, category);
         const num = typeof value === 'string' ? parseFloat(value) : value;
         const stat = isPercentage ? `${(num * 100).toFixed(1)}%` : num.toFixed(1);
-        return `${rank}${name} ${team} ${stat}`;
+        return `${i + 1}. **${l.player.name}** (${l.team.name}) — **${stat}**`;
     });
 
-    embed.setDescription('```\n' + lines.join('\n') + '\n```');
+    embed.setDescription(lines.join('\n'));
     return embed;
 }

@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { Player, PlayerSeasonStats } from '../api/types.js';
-import { createBaseEmbed, pad, errorEmbed } from '../embeds/common.js';
+import { createBaseEmbed, errorEmbed, formatStat, formatPercentage } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 export const history: Command = {
@@ -64,24 +64,23 @@ export const history: Command = {
                 .setColor(0x1E90FF)
                 .setTitle(`Season History`);
 
-            const header = `${pad('Year', 5)} ${pad('Team', 14)} ${pad('GP', 3, 'right')} ${pad('PPG', 5, 'right')} ${pad('RPG', 5, 'right')} ${pad('APG', 5, 'right')} ${pad('FG%', 5, 'right')}`;
             const lines = seasons.map(s => {
-                const ppg = typeof s.per_game.points === 'string' ? parseFloat(s.per_game.points) : s.per_game.points;
-                const rpg = typeof s.per_game.rebounds === 'string' ? parseFloat(s.per_game.rebounds) : s.per_game.rebounds;
-                const apg = typeof s.per_game.assists === 'string' ? parseFloat(s.per_game.assists) : s.per_game.assists;
-                const fg = typeof s.percentages.fg === 'string' ? parseFloat(s.percentages.fg) * 100 : s.percentages.fg;
-                return `${pad(String(s.year), 5)} ${pad(s.team.name, 14)} ${pad(String(s.games), 3, 'right')} ${pad(ppg.toFixed(1), 5, 'right')} ${pad(rpg.toFixed(1), 5, 'right')} ${pad(apg.toFixed(1), 5, 'right')} ${pad(fg.toFixed(1), 5, 'right')}`;
+                const ppg = formatStat(s.per_game.points);
+                const rpg = formatStat(s.per_game.rebounds);
+                const apg = formatStat(s.per_game.assists);
+                const fg = formatPercentage(s.percentages.fg);
+                return `**${s.year}** ${s.team.name} | ${s.games} GP\nPPG: **${ppg}** | RPG: ${rpg} | APG: ${apg} | FG: ${fg}`;
             });
 
-            const table = '```\n' + header + '\n' + lines.join('\n') + '\n```';
+            const content = lines.join('\n');
 
-            if (table.length <= 4096) {
-                embed.setDescription(table);
+            if (content.length <= 4096) {
+                embed.setDescription(content);
             } else {
                 const mid = Math.ceil(lines.length / 2);
                 embed.addFields(
-                    { name: 'Seasons', value: '```\n' + header + '\n' + lines.slice(0, mid).join('\n') + '\n```' },
-                    { name: '\u200B', value: '```\n' + lines.slice(mid).join('\n') + '\n```' },
+                    { name: 'Seasons', value: lines.slice(0, mid).join('\n') },
+                    { name: '\u200B', value: lines.slice(mid).join('\n') },
                 );
             }
 

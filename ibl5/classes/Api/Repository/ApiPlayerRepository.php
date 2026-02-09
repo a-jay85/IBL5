@@ -9,7 +9,7 @@ use Api\Pagination\Paginator;
 class ApiPlayerRepository extends \BaseMysqliRepository
 {
     /**
-     * Get paginated list of active players from the API view.
+     * Get paginated list of players from the API view.
      *
      * @param array<string, string> $filters Optional filters (position, team UUID, search)
      * @return array<int, array<string, mixed>>

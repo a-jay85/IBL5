@@ -11,7 +11,7 @@ class ApiPlayerRepository extends \BaseMysqliRepository
     /**
      * Get paginated list of active players from the API view.
      *
-     * @param array<string, string> $filters Optional filters (position, team UUID)
+     * @param array<string, string> $filters Optional filters (position, team UUID, search)
      * @return array<int, array<string, mixed>>
      */
     public function getPlayers(Paginator $paginator, array $filters = []): array
@@ -30,6 +30,12 @@ class ApiPlayerRepository extends \BaseMysqliRepository
             $where[] = 'team_uuid = ?';
             $types .= 's';
             $params[] = $filters['team'];
+        }
+
+        if (isset($filters['search']) && $filters['search'] !== '') {
+            $where[] = 'name LIKE ?';
+            $types .= 's';
+            $params[] = '%' . $filters['search'] . '%';
         }
 
         $whereClause = $where !== [] ? 'WHERE ' . implode(' AND ', $where) : '';
@@ -64,6 +70,12 @@ class ApiPlayerRepository extends \BaseMysqliRepository
             $where[] = 'team_uuid = ?';
             $types .= 's';
             $params[] = $filters['team'];
+        }
+
+        if (isset($filters['search']) && $filters['search'] !== '') {
+            $where[] = 'name LIKE ?';
+            $types .= 's';
+            $params[] = '%' . $filters['search'] . '%';
         }
 
         $whereClause = $where !== [] ? 'WHERE ' . implode(' AND ', $where) : '';

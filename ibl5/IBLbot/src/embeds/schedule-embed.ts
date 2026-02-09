@@ -1,5 +1,5 @@
 import type { Game, SeasonInfo } from '../api/types.js';
-import { createBaseEmbed, siteBase, IBL_BLUE, getTeamColor, boxScoreUrl, scheduleUrl } from './common.js';
+import { createBaseEmbed, siteBase, IBL_BLUE, getTeamColor, boxScoreUrl, scheduleUrl, teamUrl } from './common.js';
 
 const DESCRIPTION_LIMIT = 4096;
 
@@ -48,7 +48,9 @@ function formatLeagueLine(g: Game): string {
         return `${boxLink} | ${vBold}${shortName(g.visitor.name)} ${g.visitor.score}${vBold} @ ${hBold}${shortName(g.home.name)} ${g.home.score}${hBold}`;
     }
 
-    return `${shortDate} | ${shortName(g.visitor.name)} @ ${shortName(g.home.name)}`;
+    const visitor = `[${shortName(g.visitor.name)}](${teamUrl(g.visitor.team_id)})`;
+    const home = `[${shortName(g.home.name)}](${teamUrl(g.home.team_id)})`;
+    return `${shortDate} | ${visitor} @ ${home}`;
 }
 
 /**
@@ -70,7 +72,8 @@ function formatTeamLine(g: Game, teamFullName: string): string {
         return `${boxLink} | ${prefix} ${shortName(opponent.name)} — **${result}** ${teamScore}-${oppScore}`;
     }
 
-    return `${shortDate} | ${prefix} ${shortName(opponent.name)}`;
+    const oppLink = `[${shortName(opponent.name)}](${teamUrl(opponent.team_id)})`;
+    return `${shortDate} | ${prefix} ${oppLink}`;
 }
 
 // --- Last Sim embeds ---

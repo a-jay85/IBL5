@@ -1,5 +1,5 @@
 import type { Game, SeasonInfo } from '../api/types.js';
-import { createBaseEmbed, IBL_BLUE, getTeamColor, boxScoreUrl } from './common.js';
+import { createBaseEmbed, IBL_BLUE, getTeamColor, boxScoreUrl, teamUrl, scheduleUrl } from './common.js';
 
 export function lastsimEmbed(games: Game[], season: SeasonInfo) {
     const embed = createBaseEmbed()
@@ -28,28 +28,25 @@ export function lastsimEmbed(games: Game[], season: SeasonInfo) {
     return embed;
 }
 
-export function scheduleEmbed(games: Game[], teamName: string) {
+export function nextsimEmbed(games: Game[], teamName: string, teamId: number) {
     const embed = createBaseEmbed()
         .setColor(getTeamColor(teamName))
-        .setTitle(`${teamName} Schedule`);
+        .setTitle(`${teamName} — Next Sim Schedule`)
+        .setURL(scheduleUrl(teamId));
 
     if (games.length === 0) {
-        embed.setDescription('No games found.');
+        embed.setDescription('No games projected for the next sim.');
         return embed;
     }
 
     const lines = games.map(g => {
-        const isHome = g.home.city === teamName || g.home.name === teamName || g.home.full_name === teamName;
+        const isHome = g.home.full_name === teamName;
         const opponent = isHome ? g.visitor : g.home;
         const prefix = isHome ? 'vs' : '@';
+        const shortDate = g.date.slice(5); // "MM-DD" from "YYYY-MM-DD"
+        const oppLink = `[${opponent.name}](${teamUrl(opponent.team_id)})`;
 
-        if (g.status === 'played' || g.status === 'completed') {
-            const teamScore = isHome ? g.home.score : g.visitor.score;
-            const oppScore = isHome ? g.visitor.score : g.home.score;
-            const result = teamScore > oppScore ? 'W' : 'L';
-            return `${g.date} | ${prefix} ${opponent.city} — **${result}** ${teamScore}-${oppScore}`;
-        }
-        return `${g.date} | ${prefix} ${opponent.city}`;
+        return `${shortDate} | ${prefix} ${oppLink}`;
     });
 
     embed.setDescription(lines.join('\n'));

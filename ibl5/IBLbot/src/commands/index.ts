@@ -8,7 +8,7 @@ import {
 
 import { player } from './player.js';
 import { standings } from './standings.js';
-import { schedule } from './schedule.js';
+import { nextsim } from './nextsim.js';
 import { lastsim } from './lastsim.js';
 import { leaders } from './leaders.js';
 import { roster } from './roster.js';
@@ -27,7 +27,7 @@ export interface Command {
 const commandList: Command[] = [
     player,
     standings,
-    schedule,
+    nextsim,
     lastsim,
     leaders,
     roster,

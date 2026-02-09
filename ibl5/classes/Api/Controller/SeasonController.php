@@ -27,6 +27,8 @@ class SeasonController implements ControllerInterface
 
         $phaseSimNumber = $season->getPhaseSpecificSimNumber();
 
+        $projectedNextSimEndDate = $season->projectedNextSimEndDate->format('Y-m-d');
+
         $data = [
             'phase' => $season->phase,
             'last_sim' => [
@@ -35,9 +37,10 @@ class SeasonController implements ControllerInterface
                 'start_date' => $season->lastSimStartDate,
                 'end_date' => $season->lastSimEndDate,
             ],
+            'projected_next_sim_end_date' => $projectedNextSimEndDate,
         ];
 
-        $cacheKey = $season->phase . $season->lastSimNumber . $phaseSimNumber . $season->lastSimStartDate . $season->lastSimEndDate;
+        $cacheKey = $season->phase . $season->lastSimNumber . $phaseSimNumber . $season->lastSimStartDate . $season->lastSimEndDate . $projectedNextSimEndDate;
         $tag = $etag->generate($cacheKey);
         if ($etag->matches($tag)) {
             $responder->notModified();

@@ -160,6 +160,7 @@ export interface SeasonInfo {
         start_date: string;
         end_date: string;
     };
+    projected_next_sim_end_date: string;
 }
 
 // Leader

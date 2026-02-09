@@ -86,6 +86,13 @@ export function teamUrl(teamId: number): string {
 }
 
 /**
+ * Build a URL to a team's schedule page.
+ */
+export function scheduleUrl(teamId: number): string {
+    return `${siteBase}/modules.php?name=Schedule&teamID=${teamId}`;
+}
+
+/**
  * Build a URL to a team's draft history page.
  */
 export function draftHistoryUrl(teamId: number): string {

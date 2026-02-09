@@ -23,9 +23,9 @@ export function standingsEmbed(entries: StandingsEntry[], conference?: string) {
     for (const [conf, teams] of conferences) {
         const header = `${pad('Team', 18)} ${pad('W-L', 7)} ${pad('Pct', 5, 'right')} ${pad('GB', 5, 'right')}`;
         const lines = teams.map(t => {
-            const name = t.team.city.length > 16
-                ? t.team.city.substring(0, 16)
-                : t.team.city;
+            const name = t.team.name.length > 16
+                ? t.team.name.substring(0, 16)
+                : t.team.name;
             const pct = t.win_percentage !== null
                 ? (typeof t.win_percentage === 'string' ? parseFloat(t.win_percentage) : t.win_percentage).toFixed(3)
                 : '  -  ';

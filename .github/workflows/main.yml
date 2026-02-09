@@ -54,10 +54,11 @@ jobs:
         if: steps.iblbot-changes.outputs.changed == 'true'
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            set -e
             cd www/ibl5/IBLbot
 
             echo "Installing dependencies..."
-            npm install
+            npm install --include=dev
 
             echo "Building TypeScript..."
             npm run build

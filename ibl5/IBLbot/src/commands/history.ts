@@ -4,7 +4,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { PlayerSeasonStats } from '../api/types.js';
-import { createBaseEmbed, errorEmbed, formatStat, formatPercentage, isUuid, playerUrl, teamYearUrl } from '../embeds/common.js';
+import { createBaseEmbed, IBL_BLUE, errorEmbed, formatStat, formatPercentage, isUuid, playerUrl, teamYearUrl } from '../embeds/common.js';
 import { playerAutocomplete } from '../autocomplete.js';
 import type { Command } from './index.js';
 
@@ -44,7 +44,7 @@ export const history: Command = {
             const playerName = seasons[0].player_name;
 
             const embed = createBaseEmbed()
-                .setColor(0x1E90FF)
+                .setColor(IBL_BLUE)
                 .setTitle(`${playerName} - Season History`)
                 .setURL(playerUrl(seasons[0].pid));
 

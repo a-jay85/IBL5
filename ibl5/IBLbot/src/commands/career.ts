@@ -4,7 +4,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { PlayerCareerStats } from '../api/types.js';
-import { createBaseEmbed, getTeamColor, formatStat, formatPercentage, errorEmbed, isUuid, playerUrl, draftHistoryUrl } from '../embeds/common.js';
+import { createBaseEmbed, IBL_BLUE, getTeamColor, formatStat, formatPercentage, errorEmbed, isUuid, playerUrl, draftHistoryUrl } from '../embeds/common.js';
 import { playerAutocomplete } from '../autocomplete.js';
 import type { Command } from './index.js';
 
@@ -37,7 +37,7 @@ export const career: Command = {
             const stats = response.data;
 
             const embed = createBaseEmbed()
-                .setColor(0x1E90FF)
+                .setColor(IBL_BLUE)
                 .setTitle(`${stats.name} - Career Stats`)
                 .setURL(playerUrl(stats.pid))
                 .addFields(

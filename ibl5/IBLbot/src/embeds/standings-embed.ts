@@ -1,5 +1,5 @@
 import type { StandingsEntry } from '../api/types.js';
-import { createBaseEmbed, pad } from './common.js';
+import { createBaseEmbed, IBL_BLUE, pad } from './common.js';
 
 export function standingsEmbed(entries: StandingsEntry[], conference?: string) {
     const title = conference
@@ -17,7 +17,7 @@ export function standingsEmbed(entries: StandingsEntry[], conference?: string) {
     }
 
     const embed = createBaseEmbed()
-        .setColor(0x1E90FF)
+        .setColor(IBL_BLUE)
         .setTitle(title);
 
     for (const [conf, teams] of conferences) {

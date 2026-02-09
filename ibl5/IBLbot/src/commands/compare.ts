@@ -4,7 +4,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { PlayerDetail } from '../api/types.js';
-import { createBaseEmbed, formatStat, formatPercentage, errorEmbed, isUuid, playerUrl, teamUrl } from '../embeds/common.js';
+import { createBaseEmbed, IBL_BLUE, formatStat, formatPercentage, errorEmbed, isUuid, playerUrl, teamUrl } from '../embeds/common.js';
 import { playerAutocomplete } from '../autocomplete.js';
 import type { Command } from './index.js';
 
@@ -66,7 +66,7 @@ export const compare: Command = {
             }
 
             const embed = createBaseEmbed()
-                .setColor(0x1E90FF)
+                .setColor(IBL_BLUE)
                 .setTitle(`Compare Players`)
                 .setDescription(`[${p1.name}](${playerUrl(p1.pid)}) vs [${p2.name}](${playerUrl(p2.pid)})`)
                 .addFields(

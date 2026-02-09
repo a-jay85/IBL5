@@ -1,7 +1,7 @@
 import { EmbedBuilder } from 'discord.js';
 import { config } from '../config.js';
 
-const siteBase = config.api.baseUrl.replace(/\/api\/v1$/, '');
+export const siteBase = config.api.baseUrl.replace(/\/api\/v1$/, '');
 
 // IBL team colors for embed accents
 const TEAM_COLORS: Record<string, number> = {
@@ -37,7 +37,7 @@ const TEAM_COLORS: Record<string, number> = {
     'Washington': 0x002B5C,
 };
 
-const IBL_BLUE = 0x1E90FF;
+export const IBL_BLUE = 0x1E90FF;
 
 export function getTeamColor(cityOrName: string): number {
     return TEAM_COLORS[cityOrName] ?? IBL_BLUE;
@@ -97,6 +97,13 @@ export function draftHistoryUrl(teamId: number): string {
  */
 export function teamYearUrl(teamId: number, year: number): string {
     return `${siteBase}/modules.php?name=Team&op=team&teamID=${teamId}&yr=${year}`;
+}
+
+/**
+ * Build a URL to a box score page.
+ */
+export function boxScoreUrl(boxScoreId: number): string {
+    return `${siteBase}/ibl/IBL/box${boxScoreId}.htm`;
 }
 
 /**

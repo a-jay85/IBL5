@@ -1,5 +1,5 @@
 import type { Leader } from '../api/types.js';
-import { createBaseEmbed, playerUrl, teamYearUrl } from './common.js';
+import { createBaseEmbed, IBL_BLUE, playerUrl, teamYearUrl } from './common.js';
 
 const CATEGORY_LABELS: Record<string, string> = {
     ppg: 'Points',
@@ -32,7 +32,7 @@ export function leadersEmbed(leaders: Leader[], category: string) {
     const isPercentage = ['fgp', 'ftp', 'tgp'].includes(category);
 
     const embed = createBaseEmbed()
-        .setColor(0x1E90FF)
+        .setColor(IBL_BLUE)
         .setTitle(`Top 10 Season Averages - ${label}`);
 
     if (leaders.length === 0) {

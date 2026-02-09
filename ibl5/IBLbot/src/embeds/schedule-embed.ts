@@ -1,12 +1,9 @@
 import type { Game, SeasonInfo } from '../api/types.js';
-import { config } from '../config.js';
-import { createBaseEmbed, getTeamColor } from './common.js';
+import { createBaseEmbed, IBL_BLUE, getTeamColor, boxScoreUrl } from './common.js';
 
 export function lastsimEmbed(games: Game[], season: SeasonInfo) {
-    const siteBase = config.api.baseUrl.replace(/\/api\/v1$/, '');
-
     const embed = createBaseEmbed()
-        .setColor(0x1E90FF)
+        .setColor(IBL_BLUE)
         .setTitle(`Last Sim Scores — ${season.phase} Sim #${season.last_sim.phase_sim_number}`);
 
     if (games.length === 0) {
@@ -15,7 +12,7 @@ export function lastsimEmbed(games: Game[], season: SeasonInfo) {
     }
 
     const lines = games.map(g => {
-        const boxUrl = `${siteBase}/ibl/IBL/box${g.box_score_id}.htm`;
+        const boxUrl = boxScoreUrl(g.box_score_id);
         const shortDate = g.date.slice(5); // "MM-DD" from "YYYY-MM-DD"
 
         if (g.status === 'played' || g.status === 'completed') {

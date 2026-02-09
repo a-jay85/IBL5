@@ -14,25 +14,31 @@ export const standings: Command = {
         .setDescription('View league standings')
         .addStringOption(option =>
             option
-                .setName('conference')
-                .setDescription('Filter by conference')
+                .setName('view')
+                .setDescription('How to display standings')
+                .setRequired(true)
                 .addChoices(
-                    { name: 'Eastern', value: 'Eastern' },
-                    { name: 'Western', value: 'Western' },
+                    { name: 'League by Conference', value: 'League' },
+                    { name: 'Eastern Conference', value: 'Eastern' },
+                    { name: 'Western Conference', value: 'Western' },
+                    { name: 'League by Division', value: 'All Divisions' },
+                    { name: 'Atlantic Division', value: 'Atlantic' },
+                    { name: 'Central Division', value: 'Central' },
+                    { name: 'Midwest Division', value: 'Midwest' },
+                    { name: 'Pacific Division', value: 'Pacific' },
                 ),
         ),
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply();
 
-        const conference = interaction.options.getString('conference');
+        const view = interaction.options.getString('view', true);
 
         try {
-            const endpoint = conference
-                ? `standings/${conference}`
-                : 'standings';
+            const isConference = view === 'Eastern' || view === 'Western';
+            const endpoint = isConference ? `standings/${view}` : 'standings';
             const response = await apiGet<StandingsEntry[]>(endpoint);
-            await interaction.editReply({ embeds: [standingsEmbed(response.data, conference ?? undefined)] });
+            await interaction.editReply({ embeds: [standingsEmbed(response.data, view)] });
         } catch (error) {
             await handleCommandError(interaction, error);
         }

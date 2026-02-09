@@ -1,44 +1,75 @@
+import { type EmbedBuilder } from 'discord.js';
 import type { StandingsEntry } from '../api/types.js';
 import { createBaseEmbed, IBL_BLUE, pad } from './common.js';
 
-export function standingsEmbed(entries: StandingsEntry[], conference?: string) {
-    const title = conference
-        ? `${conference} Conference Standings`
-        : 'IBL Standings';
+const HEADER = `${pad('Team', 13)} ${pad('W-L', 5)} ${pad('Pct', 5, 'right')} ${pad('GB', 4, 'right')}`;
 
-    // Group by conference
-    const conferences = new Map<string, StandingsEntry[]>();
-    for (const entry of entries) {
-        const conf = entry.conference;
-        if (!conferences.has(conf)) {
-            conferences.set(conf, []);
-        }
-        conferences.get(conf)!.push(entry);
-    }
+function formatLine(t: StandingsEntry, gbKey: 'conference' | 'division'): string {
+    const name = t.team.name.length > 16
+        ? t.team.name.substring(0, 16)
+        : t.team.name;
+    const pct = t.win_percentage !== null
+        ? (typeof t.win_percentage === 'string' ? parseFloat(t.win_percentage) : t.win_percentage).toFixed(3)
+        : '  -  ';
+    const gb = t.games_back[gbKey] ?? '-';
+    const clinch = t.clinched.conference ? ' z' : t.clinched.division ? ' y' : t.clinched.playoffs ? ' x' : '';
+    return `${pad(name + clinch, 13)} ${pad(t.record.league, 5)} ${pad(pct, 5, 'right')} ${pad(gb, 4, 'right')}`;
+}
+
+function addGroup(embed: EmbedBuilder, name: string, teams: StandingsEntry[], gbKey: 'conference' | 'division'): void {
+    const lines = teams.map(t => formatLine(t, gbKey));
+    embed.addFields({
+        name,
+        value: '```\n' + HEADER + '\n' + lines.join('\n') + '\n```',
+        inline: false,
+    });
+}
+
+const DIVISIONS = ['Atlantic', 'Central', 'Midwest', 'Pacific'];
+
+export function standingsEmbed(entries: StandingsEntry[], view: string) {
+    const isAllDivisions = view === 'All Divisions';
+    const isSingleDivision = DIVISIONS.includes(view);
+
+    const title = isAllDivisions
+        ? 'IBL Division Standings'
+        : isSingleDivision
+            ? `${view} Division Standings`
+            : view === 'Eastern' || view === 'Western'
+                ? `${view} Conference Standings`
+                : 'IBL Standings';
 
     const embed = createBaseEmbed()
         .setColor(IBL_BLUE)
         .setTitle(title);
 
-    for (const [conf, teams] of conferences) {
-        const header = `${pad('Team', 13)} ${pad('W-L', 5)} ${pad('Pct', 5, 'right')} ${pad('GB', 4, 'right')}`;
-        const lines = teams.map(t => {
-            const name = t.team.name.length > 16
-                ? t.team.name.substring(0, 16)
-                : t.team.name;
-            const pct = t.win_percentage !== null
-                ? (typeof t.win_percentage === 'string' ? parseFloat(t.win_percentage) : t.win_percentage).toFixed(3)
-                : '  -  ';
-            const gb = t.games_back.conference ?? '-';
-            const clinch = t.clinched.conference ? ' z' : t.clinched.division ? ' y' : t.clinched.playoffs ? ' x' : '';
-            return `${pad(name + clinch, 13)} ${pad(t.record.league, 5)} ${pad(pct, 5, 'right')} ${pad(gb, 4, 'right')}`;
-        });
+    if (isSingleDivision) {
+        const divTeams = entries.filter(e => e.division === view);
+        addGroup(embed, view, divTeams, 'division');
+    } else if (isAllDivisions) {
+        const divisions = new Map<string, StandingsEntry[]>();
+        for (const entry of entries) {
+            if (!divisions.has(entry.division)) {
+                divisions.set(entry.division, []);
+            }
+            divisions.get(entry.division)!.push(entry);
+        }
 
-        embed.addFields({
-            name: conf,
-            value: '```\n' + header + '\n' + lines.join('\n') + '\n```',
-            inline: false,
-        });
+        for (const [div, teams] of divisions) {
+            addGroup(embed, div, teams, 'division');
+        }
+    } else {
+        const conferences = new Map<string, StandingsEntry[]>();
+        for (const entry of entries) {
+            if (!conferences.has(entry.conference)) {
+                conferences.set(entry.conference, []);
+            }
+            conferences.get(entry.conference)!.push(entry);
+        }
+
+        for (const [conf, teams] of conferences) {
+            addGroup(embed, conf, teams, 'conference');
+        }
     }
 
     return embed;

@@ -25,16 +25,19 @@ class SeasonController implements ControllerInterface
         $season = new \Season($this->db);
         $etag = new ETagHandler();
 
+        $phaseSimNumber = $season->getPhaseSpecificSimNumber();
+
         $data = [
             'phase' => $season->phase,
             'last_sim' => [
                 'number' => $season->lastSimNumber,
+                'phase_sim_number' => $phaseSimNumber,
                 'start_date' => $season->lastSimStartDate,
                 'end_date' => $season->lastSimEndDate,
             ],
         ];
 
-        $cacheKey = $season->phase . $season->lastSimNumber . $season->lastSimStartDate . $season->lastSimEndDate;
+        $cacheKey = $season->phase . $season->lastSimNumber . $phaseSimNumber . $season->lastSimStartDate . $season->lastSimEndDate;
         $tag = $etag->generate($cacheKey);
         if ($etag->matches($tag)) {
             $responder->notModified();

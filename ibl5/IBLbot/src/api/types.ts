@@ -152,6 +152,7 @@ export interface SeasonInfo {
     phase: string;
     last_sim: {
         number: number;
+        phase_sim_number: number;
         start_date: string;
         end_date: string;
     };

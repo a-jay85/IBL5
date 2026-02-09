@@ -7,7 +7,7 @@ export function lastsimEmbed(games: Game[], season: SeasonInfo) {
 
     const embed = createBaseEmbed()
         .setColor(0x1E90FF)
-        .setTitle(`Last Sim Scores — Sim #${season.last_sim.number}`);
+        .setTitle(`Last Sim Scores — ${season.phase} Sim ${season.last_sim.phase_sim_number}`);
 
     if (games.length === 0) {
         embed.setDescription('No games found for the last sim.');

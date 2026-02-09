@@ -15,7 +15,8 @@
     /** Long team names mapped to shorter display forms */
     const TEAM_ABBREVIATIONS = {
         'Timberwolves': 'T-Wolves',
-        'Trailblazers': 'Blazers'
+        'Trailblazers': 'Blazers',
+        'Mavericks': 'Mavs'
     };
 
     /**

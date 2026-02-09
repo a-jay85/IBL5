@@ -66,7 +66,11 @@ export const history: Command = {
 
             const header = `${pad('Year', 5)} ${pad('Team', 14)} ${pad('GP', 3, 'right')} ${pad('PPG', 5, 'right')} ${pad('RPG', 5, 'right')} ${pad('APG', 5, 'right')} ${pad('FG%', 5, 'right')}`;
             const lines = seasons.map(s => {
-                return `${pad(String(s.year), 5)} ${pad(s.team.name, 14)} ${pad(String(s.games), 3, 'right')} ${pad(s.per_game.points.toFixed(1), 5, 'right')} ${pad(s.per_game.rebounds.toFixed(1), 5, 'right')} ${pad(s.per_game.assists.toFixed(1), 5, 'right')} ${pad(s.percentages.fg.toFixed(1), 5, 'right')}`;
+                const ppg = typeof s.per_game.points === 'string' ? parseFloat(s.per_game.points) : s.per_game.points;
+                const rpg = typeof s.per_game.rebounds === 'string' ? parseFloat(s.per_game.rebounds) : s.per_game.rebounds;
+                const apg = typeof s.per_game.assists === 'string' ? parseFloat(s.per_game.assists) : s.per_game.assists;
+                const fg = typeof s.percentages.fg === 'string' ? parseFloat(s.percentages.fg) * 100 : s.percentages.fg;
+                return `${pad(String(s.year), 5)} ${pad(s.team.name, 14)} ${pad(String(s.games), 3, 'right')} ${pad(ppg.toFixed(1), 5, 'right')} ${pad(rpg.toFixed(1), 5, 'right')} ${pad(apg.toFixed(1), 5, 'right')} ${pad(fg.toFixed(1), 5, 'right')}`;
             });
 
             const table = '```\n' + header + '\n' + lines.join('\n') + '\n```';

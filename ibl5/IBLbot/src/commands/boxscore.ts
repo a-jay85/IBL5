@@ -15,26 +15,65 @@ export const boxscore: Command = {
         .setDescription('View a game\'s box score')
         .addStringOption(option =>
             option
+                .setName('date')
+                .setDescription('Game date (YYYY-MM-DD format)')
+                .setRequired(true)
+                .setAutocomplete(true),
+        )
+        .addStringOption(option =>
+            option
                 .setName('game')
-                .setDescription('Select a recent game')
+                .setDescription('Select a game from the chosen date')
                 .setRequired(true)
                 .setAutocomplete(true),
         ),
 
     async autocomplete(interaction: AutocompleteInteraction) {
+        const focusedOption = interaction.options.getFocused(true);
+
         try {
-            const response = await apiGet<Game[]>('games', {
-                status: 'completed',
-                per_page: 25,
-                sort: 'game_date',
-                order: 'desc',
-            });
-            await interaction.respond(
-                response.data.map(g => ({
-                    name: `${g.date} | ${g.visitor.city} ${g.visitor.score} @ ${g.home.city} ${g.home.score}`,
-                    value: g.uuid,
-                })),
-            );
+            if (focusedOption.name === 'date') {
+                // Return recent game dates
+                const response = await apiGet<Game[]>('games', {
+                    status: 'completed',
+                    per_page: 25,
+                    sort: 'game_date',
+                    order: 'desc',
+                });
+
+                // Get unique dates
+                const uniqueDates = [...new Set(response.data.map(g => g.date))];
+
+                await interaction.respond(
+                    uniqueDates.map(date => ({
+                        name: date,
+                        value: date,
+                    })),
+                );
+            } else if (focusedOption.name === 'game') {
+                // Return games for the selected date
+                const selectedDate = interaction.options.getString('date');
+
+                if (!selectedDate) {
+                    await interaction.respond([]);
+                    return;
+                }
+
+                const response = await apiGet<Game[]>('games', {
+                    status: 'completed',
+                    date: selectedDate,
+                    per_page: 25,
+                    sort: 'game_date',
+                    order: 'desc',
+                });
+
+                await interaction.respond(
+                    response.data.map(g => ({
+                        name: `${g.visitor.city} ${g.visitor.score} @ ${g.home.city} ${g.home.score}`,
+                        value: g.uuid,
+                    })),
+                );
+            }
         } catch {
             await interaction.respond([]);
         }

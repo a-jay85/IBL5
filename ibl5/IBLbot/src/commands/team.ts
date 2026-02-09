@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { Team, TeamDetail } from '../api/types.js';
-import { createBaseEmbed, getTeamColor, formatRecord, errorEmbed } from '../embeds/common.js';
+import { createBaseEmbed, getTeamColor, formatRecord, errorEmbed, isUuid } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 let teamCache: Team[] = [];
@@ -58,10 +58,15 @@ export const team: Command = {
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply();
 
-        const teamUuid = interaction.options.getString('name', true);
+        const uuid = interaction.options.getString('name', true);
 
         try {
-            const response = await apiGet<TeamDetail>(`teams/${teamUuid}`);
+            if (!isUuid(uuid)) {
+                await interaction.editReply({ embeds: [errorEmbed('Please use autocomplete to select a team.')] });
+                return;
+            }
+
+            const response = await apiGet<TeamDetail>(`teams/${uuid}`, undefined, { resourceType: 'team' });
             const t = response.data;
 
             const embed = createBaseEmbed()

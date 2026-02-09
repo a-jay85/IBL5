@@ -6,7 +6,7 @@ import {
 import { apiGet } from '../api/client.js';
 import type { Game, Boxscore } from '../api/types.js';
 import { boxscoreEmbeds } from '../embeds/boxscore-embed.js';
-import { errorEmbed } from '../embeds/common.js';
+import { errorEmbed, isUuid } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 export const boxscore: Command = {
@@ -43,10 +43,15 @@ export const boxscore: Command = {
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply();
 
-        const gameUuid = interaction.options.getString('game', true);
+        const uuid = interaction.options.getString('game', true);
 
         try {
-            const response = await apiGet<Boxscore>(`games/${gameUuid}/boxscore`);
+            if (!isUuid(uuid)) {
+                await interaction.editReply({ embeds: [errorEmbed('Please use autocomplete to select a game.')] });
+                return;
+            }
+
+            const response = await apiGet<Boxscore>(`games/${uuid}/boxscore`, undefined, { resourceType: 'game' });
             const embeds = boxscoreEmbeds(response.data);
             await interaction.editReply({ embeds });
         } catch (error) {

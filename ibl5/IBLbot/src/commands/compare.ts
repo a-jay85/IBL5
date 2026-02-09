@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { Player, PlayerDetail } from '../api/types.js';
-import { createBaseEmbed, formatStat, formatPercentage, errorEmbed } from '../embeds/common.js';
+import { createBaseEmbed, formatStat, formatPercentage, errorEmbed, isUuid } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 async function playerAutocomplete(interaction: AutocompleteInteraction) {
@@ -61,9 +61,14 @@ export const compare: Command = {
         const uuid2 = interaction.options.getString('player2', true);
 
         try {
+            if (!isUuid(uuid1) || !isUuid(uuid2)) {
+                await interaction.editReply({ embeds: [errorEmbed('Please use autocomplete to select both players.')] });
+                return;
+            }
+
             const [res1, res2] = await Promise.all([
-                apiGet<PlayerDetail>(`players/${uuid1}`),
-                apiGet<PlayerDetail>(`players/${uuid2}`),
+                apiGet<PlayerDetail>(`players/${uuid1}`, undefined, { resourceType: 'player' }),
+                apiGet<PlayerDetail>(`players/${uuid2}`, undefined, { resourceType: 'player' }),
             ]);
 
             const p1 = res1.data;

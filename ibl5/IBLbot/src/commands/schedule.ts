@@ -6,7 +6,7 @@ import {
 import { apiGet } from '../api/client.js';
 import type { Game, Team } from '../api/types.js';
 import { scheduleEmbed } from '../embeds/schedule-embed.js';
-import { errorEmbed } from '../embeds/common.js';
+import { errorEmbed, isUuid } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 // Cache teams list for autocomplete (refreshed every 10 min)
@@ -67,21 +67,26 @@ export const schedule: Command = {
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply();
 
-        const teamUuid = interaction.options.getString('team', true);
+        const uuid = interaction.options.getString('team', true);
         const count = interaction.options.getInteger('count') ?? 10;
 
         try {
+            if (!isUuid(uuid)) {
+                await interaction.editReply({ embeds: [errorEmbed('Please use autocomplete to select a team.')] });
+                return;
+            }
+
             // Look up team name for display
             const teams = await getTeams();
-            const team = teams.find(t => t.uuid === teamUuid);
-            const teamName = team?.full_name ?? teamUuid;
+            const team = teams.find(t => t.uuid === uuid);
+            const teamName = team?.full_name ?? uuid;
 
             const response = await apiGet<Game[]>('games', {
-                team: teamUuid,
+                team: uuid,
                 per_page: count,
                 sort: 'game_date',
                 order: 'desc',
-            });
+            }, { resourceType: 'team' });
 
             await interaction.editReply({
                 embeds: [scheduleEmbed(response.data, teamName)],

@@ -69,6 +69,13 @@ export function errorEmbed(message: string): EmbedBuilder {
 }
 
 /**
+ * Check if a value looks like a UUID (came from autocomplete).
+ */
+export function isUuid(value: string): boolean {
+    return value.includes('-') && value.length > 20;
+}
+
+/**
  * Pad a string to a fixed width for monospace table formatting
  */
 export function pad(str: string, width: number, align: 'left' | 'right' = 'left'): string {

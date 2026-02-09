@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { Player, PlayerCareerStats } from '../api/types.js';
-import { createBaseEmbed, getTeamColor, formatStat, formatPercentage, errorEmbed } from '../embeds/common.js';
+import { createBaseEmbed, getTeamColor, formatStat, formatPercentage, errorEmbed, isUuid } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 export const career: Command = {
@@ -49,7 +49,12 @@ export const career: Command = {
         const uuid = interaction.options.getString('name', true);
 
         try {
-            const response = await apiGet<PlayerCareerStats>(`players/${uuid}/stats`);
+            if (!isUuid(uuid)) {
+                await interaction.editReply({ embeds: [errorEmbed('Please use autocomplete to select a player.')] });
+                return;
+            }
+
+            const response = await apiGet<PlayerCareerStats>(`players/${uuid}/stats`, undefined, { resourceType: 'player' });
             const stats = response.data;
 
             const embed = createBaseEmbed()

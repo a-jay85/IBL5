@@ -17,6 +17,7 @@ const etagCache = new Map<string, { etag: string; data: unknown }>();
 export async function apiGet<T>(
     endpoint: string,
     params?: Record<string, string | number | undefined>,
+    options?: { resourceType?: 'player' | 'team' | 'game' },
 ): Promise<ApiResponse<T>> {
     const url = new URL(`${config.api.baseUrl}/${endpoint}`);
 
@@ -45,6 +46,22 @@ export async function apiGet<T>(
     // 304 Not Modified - return cached data
     if (response.status === 304 && cached) {
         return cached.data as ApiResponse<T>;
+    }
+
+    // Handle non-JSON responses (e.g., HTML error pages)
+    const contentType = response.headers.get('content-type');
+    if (!contentType?.includes('application/json')) {
+        let message: string;
+        if (response.status === 404 || response.status === 403) {
+            const resourceType = options?.resourceType ?? 'resource';
+            const autocompleteHint = resourceType !== 'resource'
+                ? ` Please use autocomplete to select a valid ${resourceType}.`
+                : '';
+            message = `${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)} not found.${autocompleteHint}`;
+        } else {
+            message = `API returned non-JSON response (status ${response.status})`;
+        }
+        throw new ApiError(response.status, 'invalid_response', message);
     }
 
     const body = await response.json() as ApiResponse<T> | ApiErrorResponse;

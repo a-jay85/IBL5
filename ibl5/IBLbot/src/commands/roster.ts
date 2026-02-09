@@ -4,11 +4,10 @@ import {
     type AutocompleteInteraction,
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
-import type { Player, TeamDetail } from '../api/types.js';
+import type { Player, Team, TeamDetail } from '../api/types.js';
 import { rosterEmbed } from '../embeds/roster-embed.js';
-import { errorEmbed } from '../embeds/common.js';
+import { errorEmbed, isUuid } from '../embeds/common.js';
 import type { Command } from './index.js';
-import type { Team } from '../api/types.js';
 
 // Shared team cache
 let teamCache: Team[] = [];
@@ -61,12 +60,17 @@ export const roster: Command = {
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply();
 
-        const teamUuid = interaction.options.getString('team', true);
+        const uuid = interaction.options.getString('team', true);
 
         try {
+            if (!isUuid(uuid)) {
+                await interaction.editReply({ embeds: [errorEmbed('Please use autocomplete to select a team.')] });
+                return;
+            }
+
             const [teamResponse, rosterResponse] = await Promise.all([
-                apiGet<TeamDetail>(`teams/${teamUuid}`),
-                apiGet<Player[]>(`teams/${teamUuid}/roster`),
+                apiGet<TeamDetail>(`teams/${uuid}`, undefined, { resourceType: 'team' }),
+                apiGet<Player[]>(`teams/${uuid}/roster`, undefined, { resourceType: 'team' }),
             ]);
 
             await interaction.editReply({

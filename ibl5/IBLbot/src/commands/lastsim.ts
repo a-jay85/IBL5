@@ -5,7 +5,7 @@ import {
 import { apiGet } from '../api/client.js';
 import type { Game, SeasonInfo } from '../api/types.js';
 import { lastsimEmbed } from '../embeds/schedule-embed.js';
-import { errorEmbed } from '../embeds/common.js';
+import { handleCommandError } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 export const lastsim: Command = {
@@ -31,8 +31,7 @@ export const lastsim: Command = {
 
             await interaction.editReply({ embeds: [lastsimEmbed(response.data, season)] });
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            await interaction.editReply({ embeds: [errorEmbed(message)] });
+            await handleCommandError(interaction, error);
         }
     },
 };

@@ -1,4 +1,4 @@
-import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder, type ChatInputCommandInteraction } from 'discord.js';
 import { config } from '../config.js';
 
 export const siteBase = config.api.baseUrl.replace(/\/api\/v1$/, '');
@@ -167,4 +167,24 @@ export function addMonospaceField(embed: EmbedBuilder, fieldName: string, header
             { name: '\u200B', value: part2 },
         );
     }
+}
+
+/**
+ * Standard error handler for command catch blocks.
+ */
+export async function handleCommandError(interaction: ChatInputCommandInteraction, error: unknown): Promise<void> {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    await interaction.editReply({ embeds: [errorEmbed(message)] });
+}
+
+/**
+ * Validate that a value is a UUID (from autocomplete). Replies with an error
+ * and returns false if invalid.
+ */
+export async function requireUuid(interaction: ChatInputCommandInteraction, value: string, entityType: string): Promise<boolean> {
+    if (isUuid(value)) {
+        return true;
+    }
+    await interaction.editReply({ embeds: [errorEmbed(`Please use autocomplete to select a ${entityType}.`)] });
+    return false;
 }

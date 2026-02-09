@@ -4,7 +4,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { PlayerDetail } from '../api/types.js';
-import { createBaseEmbed, IBL_BLUE, formatStat, formatPercentage, errorEmbed, isUuid, playerUrl, teamUrl } from '../embeds/common.js';
+import { createBaseEmbed, IBL_BLUE, formatStat, formatPercentage, playerUrl, teamUrl, handleCommandError, requireUuid } from '../embeds/common.js';
 import { playerAutocomplete } from '../autocomplete.js';
 import type { Command } from './index.js';
 
@@ -36,10 +36,8 @@ export const compare: Command = {
         const uuid2 = interaction.options.getString('player2', true);
 
         try {
-            if (!isUuid(uuid1) || !isUuid(uuid2)) {
-                await interaction.editReply({ embeds: [errorEmbed('Please use autocomplete to select both players.')] });
-                return;
-            }
+            if (!await requireUuid(interaction, uuid1, 'player')) return;
+            if (!await requireUuid(interaction, uuid2, 'player')) return;
 
             const [res1, res2] = await Promise.all([
                 apiGet<PlayerDetail>(`players/${uuid1}`, undefined, { resourceType: 'player' }),
@@ -76,8 +74,7 @@ export const compare: Command = {
 
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            await interaction.editReply({ embeds: [errorEmbed(message)] });
+            await handleCommandError(interaction, error);
         }
     },
 };

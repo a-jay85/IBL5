@@ -4,7 +4,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { PlayerCareerStats } from '../api/types.js';
-import { createBaseEmbed, IBL_BLUE, getTeamColor, formatStat, formatPercentage, errorEmbed, isUuid, playerUrl, draftHistoryUrl } from '../embeds/common.js';
+import { createBaseEmbed, IBL_BLUE, getTeamColor, formatStat, formatPercentage, errorEmbed, playerUrl, draftHistoryUrl, handleCommandError, requireUuid } from '../embeds/common.js';
 import { playerAutocomplete } from '../autocomplete.js';
 import type { Command } from './index.js';
 
@@ -28,10 +28,7 @@ export const career: Command = {
         const uuid = interaction.options.getString('name', true);
 
         try {
-            if (!isUuid(uuid)) {
-                await interaction.editReply({ embeds: [errorEmbed('Please use autocomplete to select a player.')] });
-                return;
-            }
+            if (!await requireUuid(interaction, uuid, 'player')) return;
 
             const response = await apiGet<PlayerCareerStats>(`players/${uuid}/stats`, undefined, { resourceType: 'player' });
             const stats = response.data;
@@ -94,8 +91,7 @@ export const career: Command = {
 
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            await interaction.editReply({ embeds: [errorEmbed(message)] });
+            await handleCommandError(interaction, error);
         }
     },
 };

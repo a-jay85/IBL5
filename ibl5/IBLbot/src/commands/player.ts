@@ -5,7 +5,7 @@ import {
 import { apiGet } from '../api/client.js';
 import type { PlayerDetail } from '../api/types.js';
 import { playerDetailEmbed } from '../embeds/player-embed.js';
-import { errorEmbed, isUuid } from '../embeds/common.js';
+import { handleCommandError, requireUuid } from '../embeds/common.js';
 import { playerAutocomplete } from '../autocomplete.js';
 import type { Command } from './index.js';
 
@@ -29,16 +29,12 @@ export const player: Command = {
         const uuid = interaction.options.getString('name', true);
 
         try {
-            if (!isUuid(uuid)) {
-                await interaction.editReply({ embeds: [errorEmbed('Please use autocomplete to select a player.')] });
-                return;
-            }
+            if (!await requireUuid(interaction, uuid, 'player')) return;
 
             const response = await apiGet<PlayerDetail>(`players/${uuid}`, undefined, { resourceType: 'player' });
             await interaction.editReply({ embeds: [playerDetailEmbed(response.data)] });
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            await interaction.editReply({ embeds: [errorEmbed(message)] });
+            await handleCommandError(interaction, error);
         }
     },
 };

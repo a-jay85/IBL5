@@ -5,7 +5,7 @@ import {
 import { apiGet } from '../api/client.js';
 import type { Game } from '../api/types.js';
 import { scheduleEmbed } from '../embeds/schedule-embed.js';
-import { errorEmbed, isUuid } from '../embeds/common.js';
+import { handleCommandError, requireUuid } from '../embeds/common.js';
 import { teamAutocomplete, getTeams } from '../autocomplete.js';
 import type { Command } from './index.js';
 
@@ -37,10 +37,7 @@ export const schedule: Command = {
         const count = interaction.options.getInteger('count') ?? 10;
 
         try {
-            if (!isUuid(uuid)) {
-                await interaction.editReply({ embeds: [errorEmbed('Please use autocomplete to select a team.')] });
-                return;
-            }
+            if (!await requireUuid(interaction, uuid, 'team')) return;
 
             // Look up team name for display
             const teams = await getTeams();
@@ -58,8 +55,7 @@ export const schedule: Command = {
                 embeds: [scheduleEmbed(response.data, teamName)],
             });
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            await interaction.editReply({ embeds: [errorEmbed(message)] });
+            await handleCommandError(interaction, error);
         }
     },
 };

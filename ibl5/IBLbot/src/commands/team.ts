@@ -4,7 +4,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { TeamDetail } from '../api/types.js';
-import { createBaseEmbed, getTeamColor, formatRecord, errorEmbed, isUuid, teamUrl, discordProfileUrl } from '../embeds/common.js';
+import { createBaseEmbed, getTeamColor, formatRecord, teamUrl, discordProfileUrl, handleCommandError, requireUuid } from '../embeds/common.js';
 import { teamAutocomplete } from '../autocomplete.js';
 import type { Command } from './index.js';
 
@@ -28,10 +28,7 @@ export const team: Command = {
         const uuid = interaction.options.getString('name', true);
 
         try {
-            if (!isUuid(uuid)) {
-                await interaction.editReply({ embeds: [errorEmbed('Please use autocomplete to select a team.')] });
-                return;
-            }
+            if (!await requireUuid(interaction, uuid, 'team')) return;
 
             const response = await apiGet<TeamDetail>(`teams/${uuid}`, undefined, { resourceType: 'team' });
             const t = response.data;
@@ -75,8 +72,7 @@ export const team: Command = {
 
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            await interaction.editReply({ embeds: [errorEmbed(message)] });
+            await handleCommandError(interaction, error);
         }
     },
 };

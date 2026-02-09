@@ -5,7 +5,7 @@ import {
 import { apiGet } from '../api/client.js';
 import type { StandingsEntry } from '../api/types.js';
 import { standingsEmbed } from '../embeds/standings-embed.js';
-import { errorEmbed } from '../embeds/common.js';
+import { handleCommandError } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 export const standings: Command = {
@@ -34,8 +34,7 @@ export const standings: Command = {
             const response = await apiGet<StandingsEntry[]>(endpoint);
             await interaction.editReply({ embeds: [standingsEmbed(response.data, conference ?? undefined)] });
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            await interaction.editReply({ embeds: [errorEmbed(message)] });
+            await handleCommandError(interaction, error);
         }
     },
 };

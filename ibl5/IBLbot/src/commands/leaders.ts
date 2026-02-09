@@ -5,7 +5,7 @@ import {
 import { apiGet } from '../api/client.js';
 import type { Leader } from '../api/types.js';
 import { leadersEmbed } from '../embeds/leaders-embed.js';
-import { errorEmbed } from '../embeds/common.js';
+import { handleCommandError } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 export const leaders: Command = {
@@ -49,8 +49,7 @@ export const leaders: Command = {
             });
             await interaction.editReply({ embeds: [leadersEmbed(response.data, category)] });
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            await interaction.editReply({ embeds: [errorEmbed(message)] });
+            await handleCommandError(interaction, error);
         }
     },
 };

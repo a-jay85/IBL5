@@ -4,7 +4,7 @@ import {
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
 import type { Injury } from '../api/types.js';
-import { createBaseEmbed, errorEmbed, playerUrl, teamUrl, setDescriptionOrSplit } from '../embeds/common.js';
+import { createBaseEmbed, errorEmbed, playerUrl, teamUrl, setDescriptionOrSplit, handleCommandError } from '../embeds/common.js';
 import type { Command } from './index.js';
 
 export const injuries: Command = {
@@ -36,8 +36,7 @@ export const injuries: Command = {
 
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            await interaction.editReply({ embeds: [errorEmbed(message)] });
+            await handleCommandError(interaction, error);
         }
     },
 };

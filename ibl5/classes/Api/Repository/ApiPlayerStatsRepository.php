@@ -14,7 +14,10 @@ class ApiPlayerStatsRepository extends \BaseMysqliRepository
     public function getCareerStats(string $playerUuid): ?array
     {
         return $this->fetchOne(
-            'SELECT * FROM vw_player_career_stats WHERE player_uuid = ?',
+            'SELECT v.*, dt.teamid AS draft_team_id
+             FROM vw_player_career_stats v
+             LEFT JOIN ibl_team_info dt ON v.drafted_by_team = dt.team_name
+             WHERE v.player_uuid = ?',
             's',
             $playerUuid
         );

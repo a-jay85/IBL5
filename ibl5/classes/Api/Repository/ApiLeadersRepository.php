@@ -23,7 +23,7 @@ class ApiLeadersRepository extends \BaseMysqliRepository
         'fgp' => '(`fgm`/`fga`)',
         'ftp' => '(`ftm`/`fta`)',
         'tgp' => '(`tgm`/`tga`)',
-        'qa' => '(((2*fgm+ftm+tgm)+reb+(2*ast)+(2*stl)+(2*blk)-((fga-fgm)+(fta-ftm)+tvr+pf))/games)',
+        'qa' => '((CAST(2*fgm+ftm+tgm+reb+2*ast+2*stl+2*blk AS SIGNED) - CAST((fga-fgm)+(fta-ftm)+tvr+pf AS SIGNED))/games)',
     ];
 
     private const VALID_CATEGORIES = ['ppg', 'rpg', 'apg', 'spg', 'bpg', 'fgp', 'ftp', 'tgp', 'qa'];

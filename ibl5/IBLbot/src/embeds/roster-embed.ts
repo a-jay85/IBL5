@@ -18,7 +18,7 @@ export function rosterEmbed(team: TeamDetail, players: Player[]) {
         const pos = pad(p.position, 3);
         const age = pad(String(p.age), 3, 'right');
         const ppg = pad(formatStat(p.stats.points_per_game), 5, 'right');
-        const sal = pad(`$${p.contract.current_salary}K`, 5, 'right');
+        const sal = pad(String(p.contract.current_salary), 5, 'right');
         return `${name} ${pos} ${age} ${ppg} ${sal}`;
     });
 

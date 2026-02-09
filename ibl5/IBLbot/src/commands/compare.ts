@@ -87,7 +87,7 @@ export const compare: Command = {
                 ['STL', String(p1.stats.steals), String(p2.stats.steals)],
                 ['BLK', String(p1.stats.blocks), String(p2.stats.blocks)],
                 ['TO', String(p1.stats.turnovers), String(p2.stats.turnovers)],
-                ['Salary', `$${p1.contract.current_salary}K`, `$${p2.contract.current_salary}K`],
+                ['Salary', `${p1.contract.current_salary}`, `${p2.contract.current_salary}`],
             ];
 
             const header = `${pad('', 6)} ${pad(p1.name, 18)} ${pad(p2.name, 18)}`;

@@ -22,9 +22,9 @@ export function playerDetailEmbed(player: PlayerDetail) {
             {
                 name: 'Contract',
                 value: [
-                    `Salary: $${player.contract.current_salary}K`,
-                    `Yr 1: $${player.contract.year1}K`,
-                    `Yr 2: $${player.contract.year2}K`,
+                    `Salary: ${player.contract.current_salary}`,
+                    `Yr 1: ${player.contract.year1}`,
+                    `Yr 2: ${player.contract.year2}`,
                     `Bird Rights: ${player.bird_rights} yr${player.bird_rights !== 1 ? 's' : ''}`,
                 ].join('\n'),
                 inline: true,

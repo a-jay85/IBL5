@@ -46,14 +46,15 @@ export function createBaseEmbed(): EmbedBuilder {
         .setTimestamp();
 }
 
-export function formatStat(value: number | null, suffix = ''): string {
+export function formatStat(value: number | string | null, suffix = ''): string {
     if (value === null) return '-';
     return `${value}${suffix}`;
 }
 
-export function formatPercentage(value: number | null): string {
+export function formatPercentage(value: number | string | null): string {
     if (value === null) return '-';
-    return `${value.toFixed(1)}%`;
+    const num = typeof value === 'string' ? parseFloat(value) : value;
+    return `${(num * 100).toFixed(1)}%`;
 }
 
 export function formatRecord(record: string | null): string {

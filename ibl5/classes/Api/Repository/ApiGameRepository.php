@@ -11,7 +11,7 @@ class ApiGameRepository extends \BaseMysqliRepository
     /**
      * Get paginated list of games from the schedule view.
      *
-     * @param array<string, string> $filters Optional filters (season, status, team, date)
+     * @param array<string, string> $filters Optional filters (season, status, team, date, date_start, date_end)
      * @return array<int, array<string, mixed>>
      */
     public function getGames(Paginator $paginator, array $filters = []): array
@@ -92,7 +92,7 @@ class ApiGameRepository extends \BaseMysqliRepository
     public function getBoxscorePlayers(int $visitorTid, int $homeTid, string $date): array
     {
         return $this->fetchAll(
-            'SELECT b.*, p.uuid AS player_uuid
+            'SELECT b.*, p.uuid AS player_uuid, p.tid AS player_tid
              FROM ibl_box_scores b
              LEFT JOIN ibl_plr p ON b.pid = p.pid
              WHERE b.Date = ? AND b.visitorTID = ? AND b.homeTID = ?
@@ -136,6 +136,18 @@ class ApiGameRepository extends \BaseMysqliRepository
             $where[] = 'game_date = ?';
             $types .= 's';
             $params[] = $filters['date'];
+        }
+
+        if (isset($filters['date_start']) && $filters['date_start'] !== '') {
+            $where[] = 'game_date >= ?';
+            $types .= 's';
+            $params[] = $filters['date_start'];
+        }
+
+        if (isset($filters['date_end']) && $filters['date_end'] !== '') {
+            $where[] = 'game_date <= ?';
+            $types .= 's';
+            $params[] = $filters['date_end'];
         }
     }
 }

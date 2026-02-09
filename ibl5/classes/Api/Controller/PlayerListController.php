@@ -39,6 +39,9 @@ class PlayerListController implements ControllerInterface
         if (isset($query['team']) && $query['team'] !== '') {
             $filters['team'] = $query['team'];
         }
+        if (isset($query['search']) && $query['search'] !== '') {
+            $filters['search'] = $query['search'];
+        }
 
         $total = $repo->countPlayers($filters);
         $rows = $repo->getPlayers($paginator, $filters);

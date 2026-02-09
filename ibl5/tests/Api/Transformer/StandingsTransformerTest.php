@@ -22,6 +22,7 @@ class StandingsTransformerTest extends TestCase
     private function makeStandingsRow(): array
     {
         return [
+            'teamid' => 5,
             'team_uuid' => 'team-uuid-456',
             'team_city' => 'Miami',
             'team_name' => 'Heat',
@@ -54,12 +55,12 @@ class StandingsTransformerTest extends TestCase
         $this->assertSame('Miami Heat', $result['team']['full_name']);
     }
 
-    public function testTransformExcludesInternalIds(): void
+    public function testTransformIncludesTeamIdInNestedObject(): void
     {
         $row = $this->makeStandingsRow();
-        $row['teamid'] = 5;
         $result = $this->transformer->transform($row);
 
+        $this->assertSame(5, $result['team']['team_id']);
         $this->assertArrayNotHasKey('teamid', $result);
         $this->assertArrayNotHasKey('team_uuid', $result);
     }

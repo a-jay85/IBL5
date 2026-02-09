@@ -9,7 +9,7 @@ class StandingsTransformer
     /**
      * Transform a standings row from vw_team_standings.
      *
-     * @param array{team_uuid: string, team_city: string, team_name: string, full_team_name: string, conference: string, division: string, league_record: string, conference_record: string, division_record: string, home_record: string, away_record: string, win_percentage: float|null, conference_games_back: string|null, division_games_back: string|null, games_remaining: int, clinched_conference: int, clinched_division: int, clinched_playoffs: int} $row
+     * @param array{teamid: int, team_uuid: string, team_city: string, team_name: string, full_team_name: string, conference: string, division: string, league_record: string, conference_record: string, division_record: string, home_record: string, away_record: string, win_percentage: float|null, conference_games_back: string|null, division_games_back: string|null, games_remaining: int, clinched_conference: int, clinched_division: int, clinched_playoffs: int} $row
      * @return array<string, mixed>
      */
     public function transform(array $row): array
@@ -20,6 +20,7 @@ class StandingsTransformer
                 'city' => $row['team_city'],
                 'name' => $row['team_name'],
                 'full_name' => $row['full_team_name'],
+                'team_id' => $row['teamid'],
             ],
             'conference' => $row['conference'],
             'division' => $row['division'],

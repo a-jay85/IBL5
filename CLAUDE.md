@@ -132,9 +132,10 @@ $count = DatabaseConnection::fetchValue("SELECT COUNT(*) FROM ibl_plr");
 **Claude Code Database Queries (Auto-Approved):**
 ```bash
 # Use this wrapper script for database queries - it auto-approves without user confirmation
-ibl5/bin/db-query "SELECT * FROM ibl_plr LIMIT 5"
-ibl5/bin/db-query "SELECT COUNT(*) FROM ibl_team_info"
-ibl5/bin/db-query "DESCRIBE ibl_plr"
+# IMPORTANT: CWD is usually ibl5/ (from "cd ibl5 && ..." commands), so use ./bin/db-query
+./bin/db-query "SELECT * FROM ibl_plr LIMIT 5"
+./bin/db-query "SELECT COUNT(*) FROM ibl_team_info"
+./bin/db-query "DESCRIBE ibl_plr"
 ```
 
 **When to use `db-query`:** Use this script to explore the database schema, verify data after making changes, check record counts, and validate your work. This is the preferred method for Claude to query the local database since it's configured for auto-approval in the user's Claude Code settings.

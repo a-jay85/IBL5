@@ -55,6 +55,7 @@ class PlayerStatsTransformerTest extends TestCase
     {
         return [
             'player_uuid' => 'player-uuid-123',
+            'name' => 'LeBron James',
             'year' => 2007,
             'team' => 'Celtics',
             'team_uuid' => 'team-uuid-456',
@@ -156,6 +157,7 @@ class PlayerStatsTransformerTest extends TestCase
         $result = $this->transformer->transformSeason($row);
 
         $this->assertSame(2007, $result['year']);
+        $this->assertSame('LeBron James', $result['player_name']);
         $this->assertSame(82, $result['games']);
         $this->assertSame(2238, $result['minutes']);
         $this->assertSame(500, $result['salary']);

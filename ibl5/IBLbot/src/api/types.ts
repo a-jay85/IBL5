@@ -298,6 +298,7 @@ export interface PlayerCareerStats {
 // Player season stats (history)
 export interface PlayerSeasonStats {
     year: number;
+    player_name: string;
     team: {
         uuid: string | null;
         city: string;

@@ -67,6 +67,7 @@ class PlayerStatsTransformer
 
         return [
             'year' => $row['year'],
+            'player_name' => $row['name'],
             'team' => [
                 'uuid' => $row['team_uuid'],
                 'city' => $row['team_city'] ?? '',

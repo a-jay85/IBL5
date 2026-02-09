@@ -57,12 +57,11 @@ export const history: Command = {
                 return;
             }
 
-            // Get player name from the first season's context or UUID
-            const playerName = seasons[0].team.name !== '' ? `Season History` : 'Season History';
+            const playerName = seasons[0].player_name;
 
             const embed = createBaseEmbed()
                 .setColor(0x1E90FF)
-                .setTitle(`Season History`);
+                .setTitle(`${playerName} - Season History`);
 
             const lines = seasons.map(s => {
                 const ppg = formatStat(s.per_game.points);

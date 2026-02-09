@@ -27,7 +27,7 @@ export const scores: Command = {
 
         try {
             const response = await apiGet<Game[]>('games', {
-                status: 'played',
+                status: 'completed',
                 per_page: count,
                 sort: 'game_date',
                 order: 'desc',

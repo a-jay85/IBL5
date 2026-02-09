@@ -24,7 +24,7 @@ export const boxscore: Command = {
     async autocomplete(interaction: AutocompleteInteraction) {
         try {
             const response = await apiGet<Game[]>('games', {
-                status: 'played',
+                status: 'completed',
                 per_page: 25,
                 sort: 'game_date',
                 order: 'desc',

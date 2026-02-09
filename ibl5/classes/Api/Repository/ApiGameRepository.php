@@ -92,7 +92,7 @@ class ApiGameRepository extends \BaseMysqliRepository
     public function getBoxscorePlayers(int $visitorTid, int $homeTid, string $date): array
     {
         return $this->fetchAll(
-            'SELECT b.*, p.uuid AS player_uuid
+            'SELECT b.*, p.uuid AS player_uuid, p.tid AS player_tid
              FROM ibl_box_scores b
              LEFT JOIN ibl_plr p ON b.pid = p.pid
              WHERE b.Date = ? AND b.visitorTID = ? AND b.homeTID = ?

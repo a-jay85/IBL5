@@ -1,11 +1,11 @@
 import {
     SlashCommandBuilder,
     type ChatInputCommandInteraction,
-    type AutocompleteInteraction,
 } from 'discord.js';
 import { apiGet } from '../api/client.js';
-import type { Player, PlayerSeasonStats } from '../api/types.js';
+import type { PlayerSeasonStats } from '../api/types.js';
 import { createBaseEmbed, errorEmbed, formatStat, formatPercentage, isUuid, playerUrl, teamYearUrl } from '../embeds/common.js';
+import { playerAutocomplete } from '../autocomplete.js';
 import type { Command } from './index.js';
 
 export const history: Command = {
@@ -20,28 +20,7 @@ export const history: Command = {
                 .setAutocomplete(true),
         ),
 
-    async autocomplete(interaction: AutocompleteInteraction) {
-        const focused = interaction.options.getFocused();
-        if (focused.length < 2) {
-            await interaction.respond([]);
-            return;
-        }
-
-        try {
-            const response = await apiGet<Player[]>('players', {
-                search: focused,
-                per_page: 10,
-            });
-            await interaction.respond(
-                response.data.map(p => ({
-                    name: `${p.name} (${p.position} - ${p.team?.full_name ?? 'FA'})`,
-                    value: p.uuid,
-                })),
-            );
-        } catch {
-            await interaction.respond([]);
-        }
-    },
+    autocomplete: playerAutocomplete,
 
     async execute(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply();

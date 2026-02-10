@@ -45,6 +45,20 @@ class TradeDeclineController implements ControllerInterface
         // The approval team is the team that needs to accept/decline
         $approvalTeam = $tradeRows[0]['approval'] ?? '';
 
+        // Determine the offering team from trade rows
+        $offeringTeam = '';
+        foreach ($tradeRows as $row) {
+            $from = $row['from'] ?? '';
+            if ($from !== '' && $from !== $approvalTeam) {
+                $offeringTeam = $from;
+                break;
+            }
+        }
+        // For self-trades (or localhost where approval='test'), fall back to first row's 'from'
+        if ($offeringTeam === '') {
+            $offeringTeam = $tradeRows[0]['from'] ?? '';
+        }
+
         // On localhost, TradingRepository sets approval to 'test' — skip Discord ID verification
         // and decline notification (no real GM to notify)
         if ($approvalTeam !== 'test') {
@@ -57,24 +71,11 @@ class TradeDeclineController implements ControllerInterface
                 return;
             }
 
-            // Determine the offering team (the team that proposed the trade)
-            $offeringTeam = '';
-            foreach ($tradeRows as $row) {
-                $from = $row['from'] ?? '';
-                if ($from !== '' && $from !== $approvalTeam) {
-                    $offeringTeam = $from;
-                    break;
-                }
-            }
-
             // Send decline notification to the offering team's GM
             if ($offeringTeam !== '') {
                 try {
                     $offeringGmDiscordId = $discord->getDiscordIDFromTeamname($offeringTeam);
-
-                    $declineMessage = 'Sorry, trade proposal declined by <@!' . $gmDiscordId . '>.'
-                        . "\n" . 'Go here to make another offer: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
-
+                    $declineMessage = \Trading\TradingService::buildDeclineMessage($gmDiscordId, $approvalTeam);
                     \Discord::sendDM($offeringGmDiscordId, $declineMessage);
                 } catch (\Exception $e) {
                     // Log but don't fail the decline
@@ -86,6 +87,50 @@ class TradeDeclineController implements ControllerInterface
         // Delete the trade offer
         $repository->deleteTradeOffer($offerId);
 
-        $responder->success(['declined' => true]);
+        // Look up offering team's GM Discord ID from ibl_team_info
+        $offeringTeamDiscordId = '';
+        if ($offeringTeam !== '') {
+            $offeringTeamDiscordId = $this->getTeamDiscordId($offeringTeam);
+        }
+
+        $responder->success([
+            'declined' => true,
+            'offering_team' => $offeringTeam,
+            'offering_gm_discord_id' => $offeringTeamDiscordId,
+        ]);
+    }
+
+    /**
+     * Get a team's GM Discord ID from ibl_team_info.
+     */
+    private function getTeamDiscordId(string $teamName): string
+    {
+        $stmt = $this->db->prepare(
+            "SELECT discordID FROM ibl_team_info WHERE team_name = ? LIMIT 1"
+        );
+        if ($stmt === false) {
+            return '';
+        }
+
+        $stmt->bind_param('s', $teamName);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            return '';
+        }
+
+        $result = $stmt->get_result();
+        if ($result === false) {
+            $stmt->close();
+            return '';
+        }
+
+        $row = $result->fetch_assoc();
+        $stmt->close();
+
+        if ($row === null || !isset($row['discordID'])) {
+            return '';
+        }
+
+        return (string) $row['discordID'];
     }
 }

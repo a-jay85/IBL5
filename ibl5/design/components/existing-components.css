@@ -750,11 +750,18 @@
     margin-bottom: var(--space-3);
 }
 
+.schedule-header__center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
 .schedule-highlight-note {
     font-size: 0.875rem;
     font-style: italic;
     color: var(--gray-500);
-    margin: 0.25rem 0 0 0;
+    margin: 0;
 }
 
 a.schedule-jump-btn {

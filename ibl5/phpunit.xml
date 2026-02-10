@@ -145,5 +145,32 @@
         <testsuite name="API Module Tests">
             <directory>tests/Api</directory>
         </testsuite>
+        <testsuite name="TransactionHistory Module Tests">
+            <directory>tests/TransactionHistory</directory>
+        </testsuite>
+        <testsuite name="AllStarAppearances Module Tests">
+            <directory>tests/AllStarAppearances</directory>
+        </testsuite>
+        <testsuite name="ContractList Module Tests">
+            <directory>tests/ContractList</directory>
+        </testsuite>
+        <testsuite name="DraftHistory Module Tests">
+            <directory>tests/DraftHistory</directory>
+        </testsuite>
+        <testsuite name="FreeAgencyPreview Module Tests">
+            <directory>tests/FreeAgencyPreview</directory>
+        </testsuite>
+        <testsuite name="SavedDepthChart Module Tests">
+            <directory>tests/SavedDepthChart</directory>
+        </testsuite>
+        <testsuite name="Search Module Tests">
+            <directory>tests/Search</directory>
+        </testsuite>
+        <testsuite name="SeasonHighs Module Tests">
+            <directory>tests/SeasonHighs</directory>
+        </testsuite>
+        <testsuite name="Topics Module Tests">
+            <directory>tests/Topics</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

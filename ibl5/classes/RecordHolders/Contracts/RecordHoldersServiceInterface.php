@@ -45,12 +45,15 @@ namespace RecordHolders\Contracts;
  *
  * @phpstan-type FormattedTeamSeasonRecord array{
  *     teamAbbr: string,
+ *     teamTid: int,
+ *     teamYr: string,
  *     season: string,
  *     amount: string
  * }
  *
  * @phpstan-type FormattedFranchiseRecord array{
  *     teamAbbr: string,
+ *     teamTid: int,
  *     amount: string,
  *     years: string
  * }

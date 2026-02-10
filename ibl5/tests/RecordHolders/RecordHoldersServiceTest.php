@@ -321,6 +321,54 @@ final class RecordHoldersServiceTest extends TestCase
         $this->assertArrayHasKey('Longest Losing Streak', $seasonRecords);
     }
 
+    public function testTeamSeasonRecordsIncludeTeamTidAndTeamYr(): void
+    {
+        $seasonRecord = [
+            'team_name' => 'Bulls',
+            'year' => 1993,
+            'wins' => 71,
+            'losses' => 11,
+        ];
+
+        $this->mockRepository->method('getBestWorstSeasonRecord')
+            ->willReturn([$seasonRecord]);
+        $this->mockRepository->method('getBestWorstSeasonStart')->willReturn([]);
+        $this->mockRepository->method('getLongestStreak')->willReturn([]);
+        $this->configureNonSeasonMocksEmpty();
+
+        $result = $this->service->getAllRecords();
+
+        $bestRecord = $result['teamSeasonRecords']['Best Season Record'];
+        $this->assertCount(1, $bestRecord);
+        $this->assertSame(7, $bestRecord[0]['teamTid']);
+        $this->assertSame('1993', $bestRecord[0]['teamYr']);
+        $this->assertSame('chi', $bestRecord[0]['teamAbbr']);
+        $this->assertSame('1992-93', $bestRecord[0]['season']);
+    }
+
+    public function testFranchiseRecordsIncludeTeamTid(): void
+    {
+        $franchiseRecord = [
+            'team_name' => 'Nets',
+            'count' => 7,
+            'years' => '1989, 1990, 1991',
+        ];
+
+        $this->mockRepository->method('getMostPlayoffAppearances')
+            ->willReturn([$franchiseRecord]);
+        $this->mockRepository->method('getMostTitlesByType')->willReturn([]);
+        $this->configureNonFranchiseMocksEmpty();
+
+        $result = $this->service->getAllRecords();
+
+        $playoffKey = array_key_first($result['teamFranchise']);
+        $this->assertNotNull($playoffKey);
+        $playoffRecords = $result['teamFranchise'][$playoffKey];
+        $this->assertCount(1, $playoffRecords);
+        $this->assertSame(4, $playoffRecords[0]['teamTid']);
+        $this->assertSame('bkn', $playoffRecords[0]['teamAbbr']);
+    }
+
     public function testTeamFranchiseRecordsContainsExpectedCategories(): void
     {
         $this->configureEmptyMocks();
@@ -467,5 +515,38 @@ final class RecordHoldersServiceTest extends TestCase
         $this->mockRepository->method('getBestWorstSeasonStart')->willReturn([]);
         $this->mockRepository->method('getMostPlayoffAppearances')->willReturn([]);
         $this->mockRepository->method('getMostTitlesByType')->willReturn([]);
+    }
+
+    /**
+     * Configure all mocks except team season record mocks to return empty.
+     */
+    private function configureNonSeasonMocksEmpty(): void
+    {
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($this->buildBatchPlayerResult([]));
+        $this->mockRepository->method('getTopSeasonAverageBatch')->willReturn($this->buildBatchSeasonResult([]));
+        $this->mockRepository->method('getTopTeamSingleGameBatch')->willReturn($this->buildBatchTeamResult([]));
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
+        $this->mockRepository->method('getMostAllStarAppearances')->willReturn([]);
+        $this->mockRepository->method('getTopTeamHalfScore')->willReturn([]);
+        $this->mockRepository->method('getLargestMarginOfVictory')->willReturn([]);
+        $this->mockRepository->method('getMostPlayoffAppearances')->willReturn([]);
+        $this->mockRepository->method('getMostTitlesByType')->willReturn([]);
+    }
+
+    /**
+     * Configure all mocks except franchise record mocks to return empty.
+     */
+    private function configureNonFranchiseMocksEmpty(): void
+    {
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($this->buildBatchPlayerResult([]));
+        $this->mockRepository->method('getTopSeasonAverageBatch')->willReturn($this->buildBatchSeasonResult([]));
+        $this->mockRepository->method('getTopTeamSingleGameBatch')->willReturn($this->buildBatchTeamResult([]));
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
+        $this->mockRepository->method('getMostAllStarAppearances')->willReturn([]);
+        $this->mockRepository->method('getTopTeamHalfScore')->willReturn([]);
+        $this->mockRepository->method('getLargestMarginOfVictory')->willReturn([]);
+        $this->mockRepository->method('getBestWorstSeasonRecord')->willReturn([]);
+        $this->mockRepository->method('getLongestStreak')->willReturn([]);
+        $this->mockRepository->method('getBestWorstSeasonStart')->willReturn([]);
     }
 }

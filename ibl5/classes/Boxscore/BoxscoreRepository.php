@@ -93,4 +93,54 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
 
         return true;
     }
+
+    /**
+     * @see BoxscoreRepositoryInterface::findTeamBoxscore()
+     */
+    public function findTeamBoxscore(string $date, int $visitorTeamID, int $homeTeamID, int $gameOfThatDay): ?array
+    {
+        return $this->fetchOne(
+            "SELECT visitorQ1points, visitorQ2points, visitorQ3points, visitorQ4points, visitorOTpoints,
+                    homeQ1points, homeQ2points, homeQ3points, homeQ4points, homeOTpoints
+             FROM ibl_box_scores_teams
+             WHERE Date = ? AND visitorTeamID = ? AND homeTeamID = ? AND gameOfThatDay = ?
+             LIMIT 1",
+            "siii",
+            $date,
+            $visitorTeamID,
+            $homeTeamID,
+            $gameOfThatDay
+        );
+    }
+
+    /**
+     * @see BoxscoreRepositoryInterface::deleteTeamBoxscoresByGame()
+     */
+    public function deleteTeamBoxscoresByGame(string $date, int $visitorTeamID, int $homeTeamID, int $gameOfThatDay): int
+    {
+        return $this->execute(
+            "DELETE FROM ibl_box_scores_teams
+             WHERE Date = ? AND visitorTeamID = ? AND homeTeamID = ? AND gameOfThatDay = ?",
+            "siii",
+            $date,
+            $visitorTeamID,
+            $homeTeamID,
+            $gameOfThatDay
+        );
+    }
+
+    /**
+     * @see BoxscoreRepositoryInterface::deletePlayerBoxscoresByGame()
+     */
+    public function deletePlayerBoxscoresByGame(string $date, int $visitorTID, int $homeTID): int
+    {
+        return $this->execute(
+            "DELETE FROM ibl_box_scores
+             WHERE Date = ? AND visitorTID = ? AND homeTID = ?",
+            "sii",
+            $date,
+            $visitorTID,
+            $homeTID
+        );
+    }
 }

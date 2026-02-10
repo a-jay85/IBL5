@@ -17,6 +17,7 @@ use Team\Contracts\TeamRepositoryInterface;
  * @phpstan-import-type WinLossRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type HEATWinLossRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type PlayoffResultRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type FranchiseSeasonRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type TeamInfoRow from \Services\CommonMysqliRepository
  *
  * @see TeamComponentsViewInterface
@@ -196,16 +197,19 @@ class TeamComponentsView implements TeamComponentsViewInterface
 
         /** @var string $teamName */
         $teamName = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
-        /** @var string $fka */
-        $fka = \Utilities\HtmlSanitizer::safeHtmlOutput($team->formerlyKnownAs ?? '');
         /** @var string $arena */
         $arena = \Utilities\HtmlSanitizer::safeHtmlOutput($team->arena);
+
+        $franchiseSeasons = $this->repository->getFranchiseSeasons($team->teamID);
+        $fkaRaw = $this->buildFormerlyKnownAs($franchiseSeasons, $team->city, $team->name);
+        /** @var string $fka */
+        $fka = $fkaRaw !== null ? \Utilities\HtmlSanitizer::safeHtmlOutput($fkaRaw) : '';
 
         $output = '<div class="team-info-list">'
             . '<span class="team-info-list__label">Team</span>'
             . "<span class=\"team-info-list__value\">$teamName</span>";
 
-        if ($team->formerlyKnownAs !== null && $team->formerlyKnownAs !== '') {
+        if ($fka !== '') {
             $output .= '<span class="team-info-list__label">f.k.a.</span>'
                 . "<span class=\"team-info-list__value\">$fka</span>";
         }
@@ -252,6 +256,58 @@ class TeamComponentsView implements TeamComponentsViewInterface
             3 => 'rd',
             default => 'th',
         };
+    }
+
+    /**
+     * Build a "formerly known as" string from franchise season history.
+     *
+     * Groups consecutive seasons with the same city+name into eras,
+     * excludes the current identity, and formats past eras as
+     * "City Name (startYear-endYear)" joined by ", ".
+     *
+     * @param list<FranchiseSeasonRow> $franchiseSeasons
+     * @return string|null Formatted string or null if no past eras
+     */
+    private function buildFormerlyKnownAs(array $franchiseSeasons, string $currentCity, string $currentName): ?string
+    {
+        if ($franchiseSeasons === []) {
+            return null;
+        }
+
+        /** @var list<array{city: string, name: string, startYear: int, endYear: int}> $eras */
+        $eras = [];
+
+        foreach ($franchiseSeasons as $season) {
+            $city = $season['team_city'];
+            $name = $season['team_name'];
+            $lastIndex = count($eras) - 1;
+
+            if ($lastIndex >= 0 && $eras[$lastIndex]['city'] === $city && $eras[$lastIndex]['name'] === $name) {
+                $eras[$lastIndex] = [
+                    'city' => $eras[$lastIndex]['city'],
+                    'name' => $eras[$lastIndex]['name'],
+                    'startYear' => $eras[$lastIndex]['startYear'],
+                    'endYear' => $season['season_ending_year'],
+                ];
+            } else {
+                $eras[] = [
+                    'city' => $city,
+                    'name' => $name,
+                    'startYear' => $season['season_year'],
+                    'endYear' => $season['season_ending_year'],
+                ];
+            }
+        }
+
+        $parts = [];
+        foreach ($eras as $era) {
+            if ($era['city'] === $currentCity && $era['name'] === $currentName) {
+                continue;
+            }
+            $parts[] = $era['city'] . ' ' . $era['name'] . ' (' . $era['startYear'] . '-' . $era['endYear'] . ')';
+        }
+
+        return $parts !== [] ? implode(', ', $parts) : null;
     }
 
     /**

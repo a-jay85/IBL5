@@ -12,6 +12,19 @@ $hasUploadedFiles = isset($_FILES['scoFiles']['name']) && is_array($_FILES['scoF
 
 // When reached via fetch with uploaded files, skip rendering the upload form
 if (!$hasUploadedFiles) {
+    $stylesheetPath = '/ibl5/themes/IBL/style/style.css';
+    /** @var int|false $stylesheetMtime */
+    $stylesheetMtime = filemtime($_SERVER['DOCUMENT_ROOT'] . $stylesheetPath);
+    $cacheBuster = $stylesheetMtime !== false ? '?v=' . $stylesheetMtime : '';
+
+    echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">'
+        . '<title>.sco File Parser</title>'
+        . '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        . '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+        . '<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=block" rel="stylesheet">'
+        . '<link rel="stylesheet" href="' . $stylesheetPath . $cacheBuster . '">'
+        . '</head><body>';
+
     echo $view->renderUploadForm();
 
     // On first load (no upload), parse the default .sco file with current season settings
@@ -21,6 +34,8 @@ if (!$hasUploadedFiles) {
         $result = $processor->processScoFile($defaultScoPath, 0, '');
         echo $view->renderParseLog($result);
     }
+
+    echo '</body></html>';
 }
 
 if ($hasUploadedFiles) {

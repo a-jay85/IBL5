@@ -24,14 +24,23 @@ class BoxscoreView
     {
         ob_start();
         ?>
-<h1>JSB .sco File Parser</h1>
-<h2>Uploader</h2>
-<p>Select a folder containing subfolders with <code>.sco</code> files. Season and phase are auto-detected from folder names
-(e.g. <code>0506 Preseason</code>, <code>9900 HEAT</code>, <code>0506 Sim 1</code>).</p>
-<label for="folderPicker" class="ibl-btn ibl-btn--secondary" style="display: inline-flex; cursor: pointer;">Choose Folder</label>
-<input type="file" id="folderPicker" webkitdirectory style="display: none;" />
-<div id="file-preview"></div>
-<div id="results"></div>
+<div class="sco-parser">
+    <div class="ibl-card">
+        <div class="ibl-card__header">
+            <h1 class="ibl-card__title">.sco File Parser</h1>
+            <div class="ibl-card__subtitle">Jump Shot Basketball Score Importer</div>
+        </div>
+        <div class="ibl-card__body" style="text-align: center;">
+            <p class="sco-parser__description">Select a folder containing subfolders with <code>.sco</code> files.<br>
+                Season and phase are auto-detected from folder names<br>
+                (e.g. <code>0506 Preseason</code>, <code>9900 HEAT</code>, <code>0506 Sim 1</code>).</p>
+            <label for="folderPicker" class="ibl-btn ibl-btn--secondary" style="cursor: pointer;">Choose Folder</label>
+            <input type="file" id="folderPicker" webkitdirectory style="display: none;" />
+        </div>
+    </div>
+    <div id="file-preview"></div>
+    <div id="results"></div>
+</div>
 <script>
 (function () {
     var folderInput = document.getElementById('folderPicker');
@@ -109,7 +118,7 @@ class BoxscoreView
                 formData.append('seasonPhases[]', phases[k]);
             }
 
-            previewDiv.innerHTML = '<p>Processing\u2026</p>';
+            previewDiv.innerHTML = '<div class="sco-processing"><span class="sco-processing__spinner"></span> Processing\u2026</div>';
 
             fetch('/ibl5/scripts/scoParser.php', {
                 method: 'POST',
@@ -122,7 +131,7 @@ class BoxscoreView
             })
             .catch(function (err) {
                 previewDiv.innerHTML = '';
-                resultsDiv.innerHTML = '<p style="color: #dc2626;">Upload failed: ' + escapeHtml(String(err)) + '</p>';
+                resultsDiv.innerHTML = '<div class="ibl-alert ibl-alert--error"><strong>Upload Failed:</strong> ' + escapeHtml(String(err)) + '</div>';
             });
         }
 
@@ -213,7 +222,7 @@ class BoxscoreView
      */
     public function renderUploadError(int $errorCode): string
     {
-        return '<p>' . $errorCode . '</p>';
+        return '<div class="ibl-alert ibl-alert--error"><strong>Upload Error:</strong> File upload failed (error code ' . $errorCode . ').</div>';
     }
 
     /**
@@ -224,17 +233,42 @@ class BoxscoreView
      */
     public function renderParseLog(array $result): string
     {
+        /** @var int $gamesInserted */
+        $gamesInserted = (int) $result['gamesInserted'];
+        /** @var int $gamesUpdated */
+        $gamesUpdated = (int) $result['gamesUpdated'];
+        /** @var int $gamesSkipped */
+        $gamesSkipped = (int) $result['gamesSkipped'];
+        /** @var int $linesProcessed */
+        $linesProcessed = (int) $result['linesProcessed'];
+
         ob_start();
         ?>
-<h2>Parse Log</h2>
-        <?php foreach ($result['messages'] as $message): ?>
-        <?php /** @var string $safeMessage */ $safeMessage = HtmlSanitizer::safeHtmlOutput($message); ?>
-<p><?= $safeMessage ?></p>
-        <?php endforeach; ?>
+<div class="ibl-card sco-parse-result">
+    <div class="ibl-card__header">
+        <h2 class="ibl-card__title">Parse Results</h2>
+    </div>
+    <div class="ibl-card__body">
+        <div class="sco-summary">
+            <span class="ibl-badge ibl-badge--success"><?= $gamesInserted ?> Inserted</span>
+            <span class="ibl-badge ibl-badge--info"><?= $gamesUpdated ?> Updated</span>
+            <span class="ibl-badge ibl-badge--warning"><?= $gamesSkipped ?> Skipped</span>
+            <span class="sco-summary__lines"><?= $linesProcessed ?> lines processed</span>
+        </div>
+        <?php if ($result['messages'] !== []): ?>
+        <div class="sco-log">
+            <?php foreach ($result['messages'] as $message): ?>
+            <?php /** @var string $safeMessage */ $safeMessage = HtmlSanitizer::safeHtmlOutput($message); ?>
+            <p class="sco-log__message"><?= $safeMessage ?></p>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
         <?php if (isset($result['error']) && $result['error'] !== ''): ?>
         <?php /** @var string $safeError */ $safeError = HtmlSanitizer::safeHtmlOutput($result['error']); ?>
-<p><strong>Error:</strong> <?= $safeError ?></p>
+        <div class="ibl-alert ibl-alert--error"><strong>Error:</strong> <?= $safeError ?></div>
         <?php endif; ?>
+    </div>
+</div>
         <?php
         return (string) ob_get_clean();
     }

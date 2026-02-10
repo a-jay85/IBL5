@@ -1,9 +1,42 @@
 /**
- * SCO Parser - Folder Picker & File Preview
+ * SCO Parser - Upload, Preview & Parse Results
  *
  * Styles for the .sco file upload form with folder-based
- * season detection and per-file disambiguation UI.
+ * season detection, per-file disambiguation UI, and parse result log.
  */
+
+/* ==========================================================================
+   Page Layout
+   ========================================================================== */
+
+.sco-parser {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4, 1rem);
+}
+
+/* ==========================================================================
+   Description & Inline Code
+   ========================================================================== */
+
+.sco-parser__description {
+    font-size: 1.125rem;
+    color: var(--gray-600, #4b5563);
+    line-height: 1.6;
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.sco-parser__description code {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.875rem;
+    background: var(--gray-100, #f3f4f6);
+    color: var(--accent-600, #ea580c);
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm, 0.25rem);
+    border: 1px solid var(--gray-200, #e5e7eb);
+}
 
 /* ==========================================================================
    File Preview Table
@@ -95,4 +128,101 @@
     color: var(--gray-500, #6b7280);
     font-style: italic;
     padding: 1rem 0;
+}
+
+/* ==========================================================================
+   Parse Result Card (self-contained for use inside or outside .sco-parser)
+   ========================================================================== */
+
+.sco-parse-result {
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* ==========================================================================
+   Summary Stats
+   ========================================================================== */
+
+.sco-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2, 0.5rem);
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.sco-summary__lines {
+    font-size: 1rem;
+    color: var(--gray-500, #6b7280);
+    padding: var(--space-1, 0.25rem) 0;
+}
+
+/* ==========================================================================
+   Parse Log (Terminal Style)
+   ========================================================================== */
+
+.sco-log {
+    background: var(--navy-900, #0f172a);
+    border-radius: var(--radius-md, 0.375rem);
+    padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.sco-log__message {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.8125rem;
+    color: #94a3b8;
+    line-height: 1.7;
+    margin: 0;
+    padding: var(--space-1, 0.25rem) 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sco-log__message:last-child {
+    border-bottom: none;
+}
+
+.sco-log + .ibl-alert {
+    margin-top: var(--space-4, 1rem);
+}
+
+/* ==========================================================================
+   Processing State
+   ========================================================================== */
+
+.sco-processing {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2, 0.5rem);
+    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--gray-600, #4b5563);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: var(--space-4, 1rem) 0;
+}
+
+.sco-processing__spinner {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--gray-300, #d1d5db);
+    border-top-color: var(--accent-500, #f97316);
+    border-radius: 50%;
+    animation: sco-spin 0.6s linear infinite;
+}
+
+@keyframes sco-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Submit Button Spacing
+   ========================================================================== */
+
+#sco-submit-btn {
+    margin-top: var(--space-4, 1rem);
 }

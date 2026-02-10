@@ -44,4 +44,36 @@ interface BoxscoreRepositoryInterface
      * @return bool True if both deletions succeeded, false otherwise
      */
     public function deleteRegularSeasonAndPlayoffsBoxScores(int $seasonStartingYear): bool;
+
+    /**
+     * Find a team boxscore by game identifiers
+     *
+     * @param string $date Game date in Y-m-d format
+     * @param int $visitorTeamID Visitor team ID
+     * @param int $homeTeamID Home team ID
+     * @param int $gameOfThatDay Game number for that day (1 = first game, 2 = doubleheader)
+     * @return array<string, mixed>|null Row with quarter point columns, or null if not found
+     */
+    public function findTeamBoxscore(string $date, int $visitorTeamID, int $homeTeamID, int $gameOfThatDay): ?array;
+
+    /**
+     * Delete team boxscore records for a specific game
+     *
+     * @param string $date Game date in Y-m-d format
+     * @param int $visitorTeamID Visitor team ID
+     * @param int $homeTeamID Home team ID
+     * @param int $gameOfThatDay Game number for that day
+     * @return int Number of affected rows
+     */
+    public function deleteTeamBoxscoresByGame(string $date, int $visitorTeamID, int $homeTeamID, int $gameOfThatDay): int;
+
+    /**
+     * Delete player boxscore records for a specific game
+     *
+     * @param string $date Game date in Y-m-d format
+     * @param int $visitorTID Visitor team ID
+     * @param int $homeTID Home team ID
+     * @return int Number of affected rows
+     */
+    public function deletePlayerBoxscoresByGame(string $date, int $visitorTID, int $homeTID): int;
 }

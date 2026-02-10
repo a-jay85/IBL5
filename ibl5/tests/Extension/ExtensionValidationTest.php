@@ -194,7 +194,6 @@ class ExtensionValidationTest extends TestCase
             'leagueRecord' => '0-0',
             'capRoom' => 0,
             'capacity' => 20000,
-            'formerly_known_as' => '',
             'owner_name' => 'Test Owner',
             'owner_email' => 'test@example.com',
             'color1' => '#000000',

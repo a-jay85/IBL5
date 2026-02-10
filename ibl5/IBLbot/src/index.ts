@@ -5,7 +5,7 @@ import { startExpressServer } from './server/express.js';
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds],
-});
+}); 
 
 // Bot ready
 client.once(Events.ClientReady, c => {
@@ -26,11 +26,15 @@ client.on(Events.InteractionCreate, async interaction => {
             await command.execute(interaction);
         } catch (error) {
             console.error(`Error executing /${interaction.commandName}:`, error);
-            const reply = { content: 'An error occurred while executing this command.', ephemeral: true };
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp(reply);
-            } else {
-                await interaction.reply(reply);
+            try {
+                const reply = { content: 'An error occurred while executing this command.', ephemeral: true };
+                if (interaction.replied || interaction.deferred) {
+                    await interaction.followUp(reply);
+                } else {
+                    await interaction.reply(reply);
+                }
+            } catch {
+                // Interaction expired — nothing we can do
             }
         }
     } else if (interaction.isAutocomplete()) {

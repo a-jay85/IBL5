@@ -25,7 +25,7 @@ class LeadersController implements ControllerInterface
     /**
      * @see ControllerInterface::handle()
      */
-    public function handle(array $params, array $query, JsonResponder $responder): void
+    public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         // Leaders use category-based sort, not column sort from Paginator
         // We still use Paginator for page/per_page only

@@ -25,7 +25,7 @@ class TeamRosterController implements ControllerInterface
     /**
      * @see ControllerInterface::handle()
      */
-    public function handle(array $params, array $query, JsonResponder $responder): void
+    public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         $teamUuid = $params['uuid'] ?? '';
         $paginator = new Paginator($query, 'name', self::ALLOWED_SORT_COLUMNS);

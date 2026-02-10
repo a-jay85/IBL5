@@ -2,6 +2,7 @@ import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { config } from './config.js';
 import { commands } from './commands/index.js';
 import { startExpressServer } from './server/express.js';
+import { handleTradeButton } from './interactions/trade-buttons.js';
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds],
@@ -35,6 +36,14 @@ client.on(Events.InteractionCreate, async interaction => {
                 }
             } catch {
                 // Interaction expired — nothing we can do
+            }
+        }
+    } else if (interaction.isButton()) {
+        if (interaction.customId.startsWith('trade_')) {
+            try {
+                await handleTradeButton(interaction);
+            } catch (error) {
+                console.error(`Trade button error for ${interaction.customId}:`, error);
             }
         }
     } else if (interaction.isAutocomplete()) {

@@ -25,7 +25,7 @@ class PlayerListController implements ControllerInterface
     /**
      * @see ControllerInterface::handle()
      */
-    public function handle(array $params, array $query, JsonResponder $responder): void
+    public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         $paginator = new Paginator($query, 'name', self::ALLOWED_SORT_COLUMNS);
         $repo = new ApiPlayerRepository($this->db);

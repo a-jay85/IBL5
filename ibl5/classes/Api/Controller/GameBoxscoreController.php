@@ -23,7 +23,7 @@ class GameBoxscoreController implements ControllerInterface
     /**
      * @see ControllerInterface::handle()
      */
-    public function handle(array $params, array $query, JsonResponder $responder): void
+    public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         $uuid = $params['uuid'] ?? '';
         $repo = new ApiGameRepository($this->db);

@@ -25,7 +25,7 @@ class GameListController implements ControllerInterface
     /**
      * @see ControllerInterface::handle()
      */
-    public function handle(array $params, array $query, JsonResponder $responder): void
+    public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         if (!isset($query['order'])) {
             $query['order'] = 'desc';

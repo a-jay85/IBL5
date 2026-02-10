@@ -1196,15 +1196,22 @@ td.ibl-team-cell--colored {
    - Trade offer review cards
    ========================================================================== */
 
-/* Trading layout table - simple layout container, not a data table */
+/* Trading layout — flex container replacing former layout table */
 .trading-layout {
-    border-collapse: separate;
-    border-spacing: var(--space-2);
+    text-align: center;
+    max-width: 960px;
     margin: 0 auto;
 }
 
-.trading-layout > tbody > tr > td {
-    vertical-align: top;
+.trading-layout__rosters {
+    display: flex;
+    gap: var(--space-2);
+    justify-content: center;
+}
+
+.trading-layout__card {
+    flex: 1 1 0;
+    min-width: 0;
 }
 
 /* Team selection table with logos */
@@ -1216,8 +1223,8 @@ td.ibl-team-cell--colored {
 
 /* Roster tables for player/pick selection */
 .trading-roster {
-    min-width: 280px;
-    max-width: 450px;
+    width: 100%;
+    table-layout: fixed;
 }
 
 .trading-roster td {
@@ -1236,6 +1243,19 @@ td.ibl-team-cell--colored {
 /* Player names: no-wrap, abbreviate via JS; draft pick cells: allow wrapping */
 .trading-roster .ibl-player-cell a[href*="pid="] {
     white-space: nowrap;
+}
+
+/* Override flex with grid on pick/player cells so the 1fr track gives the
+   text column a definite width, enabling overflow-wrap to actually wrap. */
+.trading-roster .ibl-player-cell {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+}
+
+.trading-roster .draft-picks-list__notes {
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 /* Cap totals table */

@@ -63,60 +63,68 @@ class TradingView implements TradingViewInterface
         ?>
 <form name="Trade_Offer" method="post" action="/ibl5/modules/Trading/maketradeoffer.php">
     <input type="hidden" name="offeringTeam" value="<?= $userTeam ?>">
-    <div style="text-align: center;">
+    <div class="trading-layout">
         <h2 class="ibl-title">Trading</h2>
-        <table class="trading-layout">
-            <tr>
-                <td style="vertical-align: top;">
-                    <table class="ibl-data-table trading-roster team-table" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>;">
-                        <thead>
-                            <tr>
-                                <th colspan="4"><img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="team-logo-banner" style="margin-bottom: 0;"></th>
-                            </tr>
-                            <tr>
-                                <th>Select</th>
-                                <th>Pos</th>
-                                <th>Name</th>
-                                <th>Salary</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?= $userPlayerRows['html'] ?>
-                            <?= $userPickRows['html'] ?>
-                        </tbody>
-                    </table>
-                </td>
-                <td style="vertical-align: top;">
-                    <input type="hidden" name="switchCounter" value="<?= (int) $switchCounter ?>">
-                    <input type="hidden" name="listeningTeam" value="<?= $partnerTeam ?>">
-                    <table class="ibl-data-table trading-roster team-table" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>;">
-                        <thead>
-                            <tr>
-                                <th colspan="4"><img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="team-logo-banner" style="margin-bottom: 0;"></th>
-                            </tr>
-                            <tr>
-                                <th>Select</th>
-                                <th>Pos</th>
-                                <th>Name</th>
-                                <th>Salary</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?= $partnerPlayerRows['html'] ?>
-                            <?= $partnerPickRows['html'] ?>
-                        </tbody>
-                    </table>
-                </td>
-            </tr>
+        <div class="trading-layout__rosters">
+            <div class="trading-layout__card">
+                <table class="ibl-data-table trading-roster team-table" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>;">
+                    <colgroup>
+                        <col style="width: 50px;">
+                        <col style="width: 40px;">
+                        <col>
+                        <col style="width: 70px;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th colspan="4"><img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="team-logo-banner" style="margin-bottom: 0;"></th>
+                        </tr>
+                        <tr>
+                            <th>Select</th>
+                            <th>Pos</th>
+                            <th>Name</th>
+                            <th>Salary</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?= $userPlayerRows['html'] ?>
+                        <?= $userPickRows['html'] ?>
+                    </tbody>
+                </table>
+            </div>
+            <div class="trading-layout__card">
+                <input type="hidden" name="switchCounter" value="<?= (int) $switchCounter ?>">
+                <input type="hidden" name="listeningTeam" value="<?= $partnerTeam ?>">
+                <table class="ibl-data-table trading-roster team-table" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>;">
+                    <colgroup>
+                        <col style="width: 50px;">
+                        <col style="width: 40px;">
+                        <col>
+                        <col style="width: 70px;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th colspan="4"><img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="team-logo-banner" style="margin-bottom: 0;"></th>
+                        </tr>
+                        <tr>
+                            <th>Select</th>
+                            <th>Pos</th>
+                            <th>Name</th>
+                            <th>Salary</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?= $partnerPlayerRows['html'] ?>
+                        <?= $partnerPickRows['html'] ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 <?= $this->renderCapTotals($pageData, $seasonEndingYear, $userTeam, $partnerTeam) ?>
 <?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam) ?>
-            <tr>
-                <td colspan="2" style="text-align: center; padding: 1rem;">
-                    <input type="hidden" name="fieldsCounter" value="<?= (int) $k ?>">
-                    <button type="submit" class="ibl-btn ibl-btn--primary">Make Trade Offer</button>
-                </td>
-            </tr>
-        </table>
+        <div style="text-align: center; padding: 1rem;">
+            <input type="hidden" name="fieldsCounter" value="<?= (int) $k ?>">
+            <button type="submit" class="ibl-btn ibl-btn--primary">Make Trade Offer</button>
+        </div>
     </div>
 </form>
         <?php
@@ -389,7 +397,7 @@ class TradingView implements TradingViewInterface
 
         ob_start();
         ?>
-<tr><td colspan="2"><table class="ibl-data-table trading-cap-totals" data-no-responsive style="width: 100%; margin-top: 1rem;">
+<table class="ibl-data-table trading-cap-totals" data-no-responsive style="width: 100%; margin-top: 1rem;">
     <thead><tr><th colspan="2">Cap Totals</th></tr></thead>
     <tbody>
 <?php for ($z = 0; $z < $seasonsToDisplay; $z++):
@@ -403,7 +411,7 @@ class TradingView implements TradingViewInterface
     </tr>
 <?php endfor; ?>
     </tbody>
-</table></td></tr>
+</table>
         <?php
         return (string) ob_get_clean();
     }
@@ -415,7 +423,7 @@ class TradingView implements TradingViewInterface
     {
         ob_start();
         ?>
-<tr><td colspan="2"><table class="ibl-data-table trading-cash-exchange" data-no-responsive style="width: 100%; margin-top: 1rem;">
+<table class="ibl-data-table trading-cash-exchange" data-no-responsive style="width: 100%; margin-top: 1rem;">
     <thead><tr><th colspan="2">Cash Exchange</th></tr></thead>
     <tbody>
 <?php for ($i = $cashStartYear; $i <= $cashEndYear; $i++):
@@ -437,7 +445,7 @@ class TradingView implements TradingViewInterface
     </tr>
 <?php endfor; ?>
     </tbody>
-</table></td></tr>
+</table>
         <?php
         return (string) ob_get_clean();
     }

@@ -10,9 +10,10 @@ class Router implements RouterInterface
 {
     private const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
     private const CONFERENCE_PATTERN = 'East(?:ern)?|West(?:ern)?';
+    private const OFFER_ID_PATTERN = '\d+';
 
-    /** @var array<string, string> Route patterns to controller class names. Order matters: specific first. */
-    private const ROUTES = [
+    /** @var array<string, string> GET route patterns to controller class names. Order matters: specific first. */
+    private const GET_ROUTES = [
         'players/{uuid}/stats'    => Controller\PlayerStatsController::class,
         'players/{uuid}/history'  => Controller\PlayerHistoryController::class,
         'players/{uuid}'          => Controller\PlayerDetailController::class,
@@ -30,18 +31,26 @@ class Router implements RouterInterface
         'season'                  => Controller\SeasonController::class,
     ];
 
+    /** @var array<string, string> POST route patterns to controller class names. */
+    private const POST_ROUTES = [
+        'trades/{offerId}/accept'  => Controller\TradeAcceptController::class,
+        'trades/{offerId}/decline' => Controller\TradeDeclineController::class,
+    ];
+
     /**
      * @see RouterInterface::match()
      */
     public function match(string $path, string $method): ?array
     {
-        if ($method !== 'GET') {
-            return null;
-        }
+        $routes = match ($method) {
+            'GET' => self::GET_ROUTES,
+            'POST' => self::POST_ROUTES,
+            default => [],
+        };
 
         $path = trim($path, '/');
 
-        foreach (self::ROUTES as $pattern => $controllerClass) {
+        foreach ($routes as $pattern => $controllerClass) {
             $params = $this->matchPattern($pattern, $path);
             if ($params !== null) {
                 return [
@@ -86,8 +95,8 @@ class Router implements RouterInterface
 
         // Replace escaped placeholders with capturing groups
         $regex = str_replace(
-            [preg_quote('{uuid}', '#'), preg_quote('{conference}', '#')],
-            ['(?P<uuid>' . self::UUID_PATTERN . ')', '(?P<conference>' . self::CONFERENCE_PATTERN . ')'],
+            [preg_quote('{uuid}', '#'), preg_quote('{conference}', '#'), preg_quote('{offerId}', '#')],
+            ['(?P<uuid>' . self::UUID_PATTERN . ')', '(?P<conference>' . self::CONFERENCE_PATTERN . ')', '(?P<offerId>' . self::OFFER_ID_PATTERN . ')'],
             $regex
         );
 

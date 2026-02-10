@@ -22,7 +22,7 @@ class StandingsController implements ControllerInterface
     /**
      * @see ControllerInterface::handle()
      */
-    public function handle(array $params, array $query, JsonResponder $responder): void
+    public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         $conference = $this->normalizeConference($params['conference'] ?? null);
         $repo = new ApiStandingsRepository($this->db);

@@ -216,6 +216,81 @@ class Discord
     }
 
     /**
+     * Send a trade proposal DM with interactive buttons via the IBLbot Express server
+     *
+     * Posts to the IBLbot /discordTradeDM endpoint which sends a rich embed
+     * with Accept/Decline buttons to the specified Discord user.
+     *
+     * @param string $recipientDiscordId Discord user ID of the receiving GM
+     * @param int $tradeOfferId Trade offer ID for button interaction tracking
+     * @param string $offeringTeamName Name of the team proposing the trade
+     * @param string $tradeText Human-readable trade description
+     * @return string|null Response body or null if skipped
+     */
+    public static function sendTradeDM(string $recipientDiscordId, int $tradeOfferId, string $offeringTeamName, string $tradeText): ?string
+    {
+        // Defensive check: only send if Discord class exists (allows graceful degradation)
+        if (!class_exists('Discord', false)) {
+            return null;
+        }
+
+        // Skip actual HTTP calls during PHPUnit testing
+        if (defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL)) {
+            return null;
+        }
+
+        // Skip if recipient has no Discord ID
+        if ($recipientDiscordId === '') {
+            return null;
+        }
+
+        self::loadConfig();
+
+        if (self::$iblbotUrl === '') {
+            return null;
+        }
+
+        $payload = json_encode([
+            'content' => [
+                'receivingUserDiscordID' => $recipientDiscordId,
+                'type' => 'trade_proposal',
+                'tradeOfferId' => $tradeOfferId,
+                'offeringTeamName' => $offeringTeamName,
+                'tradeText' => $tradeText,
+            ],
+        ]);
+        if ($payload === false) {
+            throw new \Exception('Failed to encode JSON payload for Discord trade DM');
+        }
+
+        $url = self::$iblbotUrl . '/discordTradeDM';
+
+        $curl = curl_init();
+
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $url,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HEADER => false,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+        ]);
+
+        $response = curl_exec($curl);
+        $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+
+        $error = curl_error($curl);
+        if ($error !== '') {
+            throw new \Exception('cURL error sending trade DM: ' . $error);
+        }
+
+        if ($httpCode < 200 || $httpCode >= 300) {
+            throw new \Exception('Trade DM failed with HTTP ' . $httpCode . ': ' . (is_string($response) ? $response : ''));
+        }
+
+        return is_string($response) ? $response : null;
+    }
+
+    /**
      * Post a message to a Discord channel via webhook
      *
      * @param string $channelName Channel name (with or without # prefix)

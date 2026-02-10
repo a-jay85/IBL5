@@ -123,7 +123,7 @@ class TradeOffer implements TradeOfferInterface
         $result = $this->insertTradeOfferData($tradeOfferId, $tradeData);
         
         if ($result['success']) {
-            $this->sendTradeNotification($tradeData, $result['tradeText']);
+            $this->sendTradeNotification($tradeData, $result['tradeText'], $tradeOfferId);
         }
 
         return $result;
@@ -423,12 +423,14 @@ class TradeOffer implements TradeOfferInterface
     /**
      * Send trade notification to receiving team
      *
-     * Sends Discord DM to the listening team with trade proposal details.
+     * Sends Discord DM to the listening team with trade proposal details,
+     * including interactive Accept/Decline buttons when a trade offer ID is provided.
      *
      * @param TradeFormData $tradeData Trade data with offeringTeam and listeningTeam keys
      * @param string $tradeText Trade description text
+     * @param int $tradeOfferId Trade offer ID for button interaction tracking
      */
-    protected function sendTradeNotification(array $tradeData, string $tradeText): void
+    protected function sendTradeNotification(array $tradeData, string $tradeText, int $tradeOfferId): void
     {
         // Skip notification if Discord is not available
         if ($this->discord === null) {
@@ -439,16 +441,11 @@ class TradeOffer implements TradeOfferInterface
             $offeringTeamName = $tradeData['offeringTeam'];
             $listeningTeamName = $tradeData['listeningTeam'];
 
-            $offeringUserDiscordID = $this->discord->getDiscordIDFromTeamname($offeringTeamName);
             $receivingUserDiscordID = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
 
             $cleanTradeText = str_replace(['<br>', '&nbsp;', '<i>', '</i>'], ["\n", " ", "_", "_"], $tradeText);
 
-            $discordDMmessage = 'New trade proposal from <@!' . $offeringUserDiscordID . '>!
-' . $cleanTradeText . '
-Go here to accept or decline: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
-
-            \Discord::sendDM($receivingUserDiscordID, $discordDMmessage);
+            \Discord::sendTradeDM($receivingUserDiscordID, $tradeOfferId, $offeringTeamName, $cleanTradeText);
         } catch (\Exception $e) {
             // Log error but don't fail the trade offer
             error_log("Discord notification failed in sendTradeNotification: " . $e->getMessage());

@@ -24,6 +24,7 @@ use Trading\Contracts\TradingRepositoryInterface;
  * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradingDraftPickRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type CashTransactionData from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type CashPlayerData from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type TradeAutocounterRow from \Trading\Contracts\TradingRepositoryInterface
@@ -586,11 +587,13 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function getTeamDraftPicksForTrading(string $teamName): array
     {
-        /** @var list<DraftPickRow> */
+        /** @var list<TradingDraftPickRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_draft_picks
-             WHERE ownerofpick = ?
-             ORDER BY year, round ASC",
+            "SELECT dp.*, t.teamid AS teampick_id
+             FROM ibl_draft_picks dp
+             JOIN ibl_team_info t ON t.team_name = dp.teampick
+             WHERE dp.ownerofpick = ?
+             ORDER BY dp.year, dp.round ASC",
             "s",
             $teamName
         );

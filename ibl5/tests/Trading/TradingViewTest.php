@@ -71,7 +71,7 @@ class TradingViewTest extends TestCase
     {
         $pageData = $this->createTradeOfferPageData();
         $pageData['userPicks'] = [
-            ['pickid' => 10, 'year' => '2025', 'teampick' => 'Lakers', 'round' => '1', 'notes' => null, 'ownerofpick' => 'Lakers', 'created_at' => '', 'updated_at' => ''],
+            ['pickid' => 10, 'year' => '2025', 'teampick' => 'Lakers', 'teampick_id' => 5, 'round' => '1', 'notes' => null, 'ownerofpick' => 'Lakers', 'created_at' => '', 'updated_at' => ''],
         ];
 
         $html = $this->view->renderTradeOfferForm($pageData);

@@ -23,8 +23,16 @@ $offerId = (int) $_POST['offer'];
 $teamRejecting = $_POST['teamRejecting'] ?? '';
 $teamReceiving = $_POST['teamReceiving'] ?? '';
 
-// Delete trade offer using repository
+// Check if trade still exists (may have been accepted/declined via Discord)
 $repository = new Trading\TradingRepository($mysqli_db);
+$tradeRows = $repository->getTradesByOfferId($offerId);
+
+if ($tradeRows === []) {
+    header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
+    exit;
+}
+
+// Delete trade offer
 $repository->deleteTradeOffer($offerId);
 
 // Attempt Discord notification (gracefully fail if not available)

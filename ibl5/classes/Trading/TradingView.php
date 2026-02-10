@@ -251,6 +251,7 @@ class TradingView implements TradingViewInterface
             'trade_accepted' => ['class' => 'ibl-alert--success', 'message' => 'Trade accepted!'],
             'trade_rejected' => ['class' => 'ibl-alert--info', 'message' => 'Trade offer rejected.'],
             'accept_error' => ['class' => 'ibl-alert--error', 'message' => 'Error processing trade.'],
+            'already_processed' => ['class' => 'ibl-alert--warning', 'message' => 'This trade has already been accepted, declined, or withdrawn.'],
         ];
 
         if (!isset($banners[$result])) {

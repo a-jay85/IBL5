@@ -13,6 +13,7 @@ use Trading\Contracts\TradingRepositoryInterface;
  * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradingDraftPickRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type TeamWithCityRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
@@ -36,7 +37,7 @@ class TradingService implements TradingServiceInterface
     /**
      * @see TradingServiceInterface::getTradeOfferPageData()
      *
-     * @return array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<DraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<DraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string}
+     * @return array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<TradingDraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<TradingDraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string}
      */
     public function getTradeOfferPageData(string $username, string $partnerTeam): array
     {

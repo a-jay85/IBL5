@@ -14,7 +14,7 @@ use Utilities\HtmlSanitizer;
  * @see TradingViewInterface
  *
  * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradingRepositoryInterface
- * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradingDraftPickRow from \Trading\Contracts\TradingRepositoryInterface
  */
 class TradingView implements TradingViewInterface
 {
@@ -25,7 +25,7 @@ class TradingView implements TradingViewInterface
      */
     public function renderTradeOfferForm(array $pageData): string
     {
-        /** @var array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<DraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<DraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string, result?: string, error?: string} $pageData */
+        /** @var array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<TradingDraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<TradingDraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string, result?: string, error?: string} $pageData */
 
         /** @var string $userTeam */
         $userTeam = HtmlSanitizer::safeHtmlOutput($pageData['userTeam']);
@@ -330,7 +330,7 @@ class TradingView implements TradingViewInterface
     /**
      * Build HTML rows for draft picks in the trade form
      *
-     * @param list<DraftPickRow> $picks Draft pick rows from repository
+     * @param list<TradingDraftPickRow> $picks Draft pick rows from repository
      * @param int $startK Starting form field counter
      * @return array{html: string, nextK: int}
      */
@@ -344,6 +344,7 @@ class TradingView implements TradingViewInterface
             $pickYear = $row['year'];
             /** @var string $pickTeam */
             $pickTeam = HtmlSanitizer::safeHtmlOutput($row['teampick']);
+            $pickTeamId = $row['teampick_id'];
             $pickRound = $row['round'];
             $pickNotes = $row['notes'];
             ?>
@@ -357,7 +358,7 @@ class TradingView implements TradingViewInterface
     <td class="ibl-player-cell">
         <img src="images/logo/<?= $pickTeam ?>.png" alt="" class="ibl-team-cell__logo" width="24" height="24" loading="lazy">
         <div>
-            <?= $pickYear ?> R<?= $pickRound ?> <span class="ibl-team-cell__text"><?= $pickTeam ?></span>
+            <?= $pickYear ?> R<?= $pickRound ?> <a href="./modules.php?name=Team&amp;op=team&amp;teamID=<?= $pickTeamId ?>"><span class="ibl-team-cell__text"><?= $pickTeam ?></span></a>
 <?php if ($pickNotes !== null && $pickNotes !== ''):
     /** @var string $pickNotesEscaped */
     $pickNotesEscaped = HtmlSanitizer::safeHtmlOutput($pickNotes);

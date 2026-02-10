@@ -88,7 +88,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
      */
     private function renderTeamBanner(int $teamId, string $teamName): string
     {
-        return '<div style="text-align: center;">'
+        return '<div class="schedule-team-banner">'
             . '<img class="schedule-team-banner__logo" src="./images/logo/' . $teamId . '.jpg" alt="' . $teamName . '" width="415" height="50">'
             . '</div>';
     }
@@ -100,7 +100,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
     {
         $html = '<div class="schedule-header">';
         $html .= '<div class="schedule-header__left">';
-        $html .= '<h1 class="schedule-title">Schedule</h1>';
+        $html .= '<h1 class="ibl-title">Schedule</h1>';
         $html .= '<p class="schedule-highlight-note">Next sim: ' . $simLengthInDays . ' days</p>';
         $html .= '</div>';
 

@@ -165,7 +165,7 @@ function renderLeagueSchedule(
     // Header with month nav and jump button
     echo '<div class="schedule-header">';
     echo '<div class="schedule-header__left">';
-    echo '<h1 class="schedule-title">Schedule</h1>';
+    echo '<h1 class="ibl-title">Schedule</h1>';
     echo '<p class="schedule-highlight-note">Next sim length: ' . \Utilities\HtmlSanitizer::safeHtmlOutput($simLengthDays) . ' days</p>';
     echo '</div>';
     if ($firstUnplayedId) {

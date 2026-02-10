@@ -196,6 +196,7 @@ class TeamScheduleViewTest extends TestCase
         $game->visitorScore = 105;
         $game->homeScore = 98;
         $game->boxScoreID = 12345;
+        $game->gameOfThatDay = 3;
         $game->visitorTeamID = 1;  // User's team is visitor
         $game->homeTeamID = 2;     // Opponent is home team
 

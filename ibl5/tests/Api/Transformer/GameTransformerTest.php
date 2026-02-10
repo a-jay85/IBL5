@@ -27,6 +27,7 @@ class GameTransformerTest extends TestCase
             'season_year' => 2007,
             'game_date' => '2007-01-15',
             'box_score_id' => 545,
+            'game_of_that_day' => 3,
             'game_status' => 'completed',
             'visitor_uuid' => 'visitor-uuid-456',
             'visitor_team_id' => 1,

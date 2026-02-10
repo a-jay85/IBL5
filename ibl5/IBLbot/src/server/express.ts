@@ -1,6 +1,7 @@
 import express from 'express';
 import type { Client } from 'discord.js';
 import { config } from '../config.js';
+import { handleTradeDM } from './trade-dm.js';
 
 export function startExpressServer(client: Client): void {
     const app = express();
@@ -24,6 +25,8 @@ export function startExpressServer(client: Client): void {
                 res.status(500).send('Failed to send DM');
             });
     });
+
+    app.post('/discordTradeDM', handleTradeDM(client));
 
     app.listen(config.express.port, () => {
         console.log(`Express server listening on port ${config.express.port}`);

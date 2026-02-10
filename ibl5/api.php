@@ -14,7 +14,7 @@ declare(strict_types=1);
 // Handle CORS preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: GET, OPTIONS');
+    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
     header('Access-Control-Allow-Headers: X-API-Key, Content-Type');
     header('Access-Control-Max-Age: 86400');
     http_response_code(204);
@@ -33,10 +33,23 @@ $router = new Api\Router();
 $route = $_GET['route'] ?? '';
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
-// Only GET is supported
-if ($method !== 'GET') {
-    $responder->error(405, 'method_not_allowed', 'Only GET requests are supported.');
+// Only GET and POST are supported
+if ($method !== 'GET' && $method !== 'POST') {
+    $responder->error(405, 'method_not_allowed', 'Only GET and POST requests are supported.');
     exit;
+}
+
+// Parse JSON body for POST requests
+$body = null;
+if ($method === 'POST') {
+    $rawBody = file_get_contents('php://input');
+    if ($rawBody !== false && $rawBody !== '') {
+        $body = json_decode($rawBody, true);
+        if (!is_array($body)) {
+            $responder->error(400, 'bad_request', 'Request body must be valid JSON.');
+            exit;
+        }
+    }
 }
 
 // Authenticate
@@ -72,4 +85,4 @@ $controllerClass = $match['controller'];
 
 /** @var \Api\Contracts\ControllerInterface $controller */
 $controller = new $controllerClass($mysqli_db);
-$controller->handle($match['params'], $_GET, $responder);
+$controller->handle($match['params'], $_GET, $responder, $body);

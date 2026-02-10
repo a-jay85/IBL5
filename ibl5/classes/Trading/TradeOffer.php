@@ -410,8 +410,12 @@ class TradeOffer implements TradeOfferInterface
             $approvalTeamName
         );
 
-        $cashText = implode(' ', array_filter($cashAmounts, static fn (int $amount): bool => $amount !== 0));
-        $tradeText = "The $offeringTeamName send $cashText in cash to the $listeningTeamName.<br>";
+        $tradeText = CashTransactionHandler::formatCashTradeText(
+            $cashAmounts,
+            $offeringTeamName,
+            $listeningTeamName,
+            $this->season->endingYear
+        );
 
         return ['tradeText' => $tradeText];
     }

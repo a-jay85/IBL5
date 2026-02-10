@@ -9,6 +9,9 @@ class Discord
     /** @var array<string, string> Discord webhook URLs loaded from config */
     private static array $webhooks = [];
 
+    /** @var string IBLbot Express server URL for DM endpoint */
+    private static string $iblbotUrl = '';
+
     /** @var bool Whether config has been loaded */
     private static bool $configLoaded = false;
 
@@ -39,11 +42,11 @@ class Discord
         $examplePath = __DIR__ . '/../config/discord.config.example.php';
 
         if (file_exists($configPath)) {
-            /** @var array{webhooks?: array<string, string>} $config */
+            /** @var array{webhooks?: array<string, string>, iblbot_url?: string} $config */
             $config = require $configPath;
         } elseif (file_exists($examplePath)) {
             // Fallback to example config (e.g., in development without secrets set up)
-            /** @var array{webhooks?: array<string, string>} $config */
+            /** @var array{webhooks?: array<string, string>, iblbot_url?: string} $config */
             $config = require $examplePath;
         } else {
             throw new \RuntimeException(
@@ -57,6 +60,7 @@ class Discord
         }
 
         self::$webhooks = $config['webhooks'];
+        self::$iblbotUrl = $config['iblbot_url'] ?? '';
         self::$configLoaded = true;
     }
 
@@ -137,6 +141,77 @@ class Discord
         }
 
         // Note: curl_close() is deprecated in PHP 8.0+ - handle is automatically closed
+        return is_string($response) ? $response : null;
+    }
+
+    /**
+     * Send a Discord DM via the IBLbot Express server
+     *
+     * Posts to the IBLbot /discordDM endpoint which sends a direct message
+     * to the specified Discord user.
+     *
+     * @param string $recipientDiscordId Discord user ID of the recipient
+     * @param string $message Message content to send
+     * @return string|null Response body or null if skipped
+     */
+    public static function sendDM(string $recipientDiscordId, string $message): ?string
+    {
+        // Defensive check: only send if Discord class exists (allows graceful degradation)
+        if (!class_exists('Discord', false)) {
+            return null;
+        }
+
+        // Skip actual HTTP calls during PHPUnit testing
+        if (defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL)) {
+            return null;
+        }
+
+        // Skip if recipient has no Discord ID
+        if ($recipientDiscordId === '') {
+            return null;
+        }
+
+        self::loadConfig();
+
+        if (self::$iblbotUrl === '') {
+            return null;
+        }
+
+        $payload = json_encode([
+            'content' => [
+                'receivingUserDiscordID' => $recipientDiscordId,
+                'message' => $message,
+            ],
+        ]);
+        if ($payload === false) {
+            throw new \Exception('Failed to encode JSON payload for Discord DM');
+        }
+
+        $url = self::$iblbotUrl . '/discordDM';
+
+        $curl = curl_init();
+
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $url,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HEADER => false,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+        ]);
+
+        $response = curl_exec($curl);
+        $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+
+        $error = curl_error($curl);
+        if ($error !== '') {
+            throw new \Exception('cURL error sending Discord DM: ' . $error);
+        }
+
+        // IBLbot Express endpoint returns HTTP 200 on success
+        if ($httpCode < 200 || $httpCode >= 300) {
+            throw new \Exception('Discord DM failed with HTTP ' . $httpCode . ': ' . (is_string($response) ? $response : ''));
+        }
+
         return is_string($response) ? $response : null;
     }
 

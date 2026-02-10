@@ -410,8 +410,12 @@ class TradeOffer implements TradeOfferInterface
             $approvalTeamName
         );
 
-        $cashText = implode(' ', array_filter($cashAmounts, static fn (int $amount): bool => $amount !== 0));
-        $tradeText = "The $offeringTeamName send $cashText in cash to the $listeningTeamName.<br>";
+        $tradeText = CashTransactionHandler::formatCashTradeText(
+            $cashAmounts,
+            $offeringTeamName,
+            $listeningTeamName,
+            $this->season->endingYear
+        );
 
         return ['tradeText' => $tradeText];
     }
@@ -444,12 +448,7 @@ class TradeOffer implements TradeOfferInterface
 ' . $cleanTradeText . '
 Go here to accept or decline: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
 
-            $arrayContent = [
-                'message' => $discordDMmessage,
-                'receivingUserDiscordID' => $receivingUserDiscordID,
-            ];
-
-            // $response = \Discord::sendCurlPOST('http://localhost:50000/discordDM', $arrayContent);
+            \Discord::sendDM($receivingUserDiscordID, $discordDMmessage);
         } catch (\Exception $e) {
             // Log error but don't fail the trade offer
             error_log("Discord notification failed in sendTradeNotification: " . $e->getMessage());

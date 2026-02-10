@@ -144,6 +144,30 @@ class Boxscore
     }
 
     /**
+     * Check whether the parsed game scores match an existing database row
+     *
+     * Compares the sum of visitor and home quarter scores from $this (strings from .sco file)
+     * against the same sums from $dbRow (ints from DB with native types enabled).
+     *
+     * @param array{visitorQ1points: int, visitorQ2points: int, visitorQ3points: int, visitorQ4points: int, visitorOTpoints: int, homeQ1points: int, homeQ2points: int, homeQ3points: int, homeQ4points: int, homeOTpoints: int} $dbRow
+     * @return bool True if both visitor and home totals match
+     */
+    public function scoresMatchDatabase(array $dbRow): bool
+    {
+        $parsedVisitorTotal = (int) $this->visitorQ1points + (int) $this->visitorQ2points
+            + (int) $this->visitorQ3points + (int) $this->visitorQ4points + (int) $this->visitorOTpoints;
+        $parsedHomeTotal = (int) $this->homeQ1points + (int) $this->homeQ2points
+            + (int) $this->homeQ3points + (int) $this->homeQ4points + (int) $this->homeOTpoints;
+
+        $dbVisitorTotal = $dbRow['visitorQ1points'] + $dbRow['visitorQ2points']
+            + $dbRow['visitorQ3points'] + $dbRow['visitorQ4points'] + $dbRow['visitorOTpoints'];
+        $dbHomeTotal = $dbRow['homeQ1points'] + $dbRow['homeQ2points']
+            + $dbRow['homeQ3points'] + $dbRow['homeQ4points'] + $dbRow['homeOTpoints'];
+
+        return $parsedVisitorTotal === $dbVisitorTotal && $parsedHomeTotal === $dbHomeTotal;
+    }
+
+    /**
      * Delete preseason boxscores for both players and teams
      *
      * @param object $db Active mysqli connection

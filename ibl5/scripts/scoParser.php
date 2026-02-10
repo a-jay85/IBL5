@@ -22,30 +22,10 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
     $scoFile = fopen("$scoFilePath", "rb");
     fseek($scoFile, 1000000);
 
-    if ($operatingSeasonPhase == "Preseason") {
-        if (Boxscore::deletePreseasonBoxScores($mysqli_db, $operatingSeasonStartingYear)) {
-            echo "Deleted any existing Preseason box scores." . "<p>";
-        } else {
-            echo "<b><font color=#F00>Failed to delete existing Preseason box scores!</font></b>";
-        }
-    } elseif ($operatingSeasonPhase == "HEAT") {
-        if (Boxscore::deletePreseasonBoxScores($mysqli_db, $operatingSeasonStartingYear)) {
-            echo "Deleted any existing Preseason box scores." . "<p>";
-        } else {
-            echo "<b><font color=#F00>Failed to delete existing Preseason box scores!</font></b>";
-        }
-        if (Boxscore::deleteHEATBoxScores($mysqli_db, $operatingSeasonStartingYear)) {
-            echo "Deleted any existing HEAT box scores." . "<p>";
-        } else {
-            echo "<b><font color=#F00>Failed to delete existing HEAT box scores!</font></b>";
-        }
-    } else {
-        if (Boxscore::deleteRegularSeasonAndPlayoffsBoxScores($mysqli_db, $operatingSeasonStartingYear)) {
-            echo "Deleted any existing regular season and playoffs box scores." . "<p>";
-        } else {
-            echo "<b><font color=#F00>Failed to delete existing regular season and playoffs box scores!</font></b>";
-        }
-    }
+    $boxscoreRepository = new \Boxscore\BoxscoreRepository($mysqli_db);
+    $gamesInserted = 0;
+    $gamesUpdated = 0;
+    $gamesSkipped = 0;
 
     echo "<i>[scoParser works silently now]</i><br>";
 
@@ -140,6 +120,38 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
         $homeQ4points = $boxscoreGameInfo->homeQ4points;
         $homeOTpoints = $boxscoreGameInfo->homeOTpoints;
 
+        // Upsert logic: check if this game already exists in the database
+        $existingGame = $boxscoreRepository->findTeamBoxscore(
+            $boxscoreGameInfo->gameDate,
+            $boxscoreGameInfo->visitorTeamID,
+            $boxscoreGameInfo->homeTeamID,
+            $boxscoreGameInfo->gameOfThatDay
+        );
+
+        $shouldInsert = false;
+        if ($existingGame === null) {
+            $shouldInsert = true;
+            $gamesInserted++;
+        } elseif ($boxscoreGameInfo->scoresMatchDatabase($existingGame)) {
+            $gamesSkipped++;
+            continue;
+        } else {
+            // Scores differ — delete old records, then re-insert
+            $boxscoreRepository->deleteTeamBoxscoresByGame(
+                $boxscoreGameInfo->gameDate,
+                $boxscoreGameInfo->visitorTeamID,
+                $boxscoreGameInfo->homeTeamID,
+                $boxscoreGameInfo->gameOfThatDay
+            );
+            $boxscoreRepository->deletePlayerBoxscoresByGame(
+                $boxscoreGameInfo->gameDate,
+                $boxscoreGameInfo->visitorTeamID,
+                $boxscoreGameInfo->homeTeamID
+            );
+            $shouldInsert = true;
+            $gamesUpdated++;
+        }
+
         for ($i = 0; $i < 30; $i++) {
             $x = $i * 53; // 53 = amount of characters to skip to get to the next player's/team's data line
             $playerInfoLine = substr($line, 58 + $x, 53);
@@ -163,10 +175,10 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
             $gameBlocks = $playerStats->gameBlocks;
             $gamePersonalFouls = $playerStats->gamePersonalFouls;
 
-            if ($playerStats->name != null || $playerStats->name != '') {
+            if ($shouldInsert && ($playerStats->name != null || $playerStats->name != '')) {
                 // Generate UUID for player boxscore record (team scores don't use UUID)
                 $playerUuid = UuidGenerator::generateUuid();
-                
+
                 if ($playerID == 0) {
                     if ($teamStatement->execute()) {
                         $numberOfLinesProcessed++;
@@ -181,6 +193,7 @@ function scoParser($uploadedFilePath, $operatingSeasonEndingYear, $operatingSeas
     }
 
     echo "<p>Number of .sco lines processed: $numberOfLinesProcessed";
+    echo "<br>Games inserted: $gamesInserted | Games updated: $gamesUpdated | Games skipped: $gamesSkipped";
 
     if ($operatingSeasonPhase != "Preseason") {
         $newSimEndDate = $season->getLastBoxScoreDate();

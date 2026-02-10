@@ -340,6 +340,23 @@ class TradeValidatorTest extends TestCase
      * @group validation
      * @group roster-limits
      */
+    public function testAllowsOneForOneSwapAtRosterLimit(): void
+    {
+        // Team has 15 actual players (buyout/cash placeholder records excluded by repository).
+        // A 1-for-1 swap: 15 - 1 + 1 = 15, which is within the limit.
+        // Before the fix, buyout records inflated the count to 16, making this fail.
+        $this->mockDb->setMockData([['cnt' => 15]]);
+
+        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 1, 1);
+
+        $this->assertTrue($result['valid'], '1-for-1 swap at roster limit should be valid');
+        $this->assertSame([], $result['errors']);
+    }
+
+    /**
+     * @group validation
+     * @group roster-limits
+     */
     public function testAllowsEqualPlayerSwapAtRosterLimit(): void
     {
         // Both teams have 15 players, user sends 2, partner sends 2

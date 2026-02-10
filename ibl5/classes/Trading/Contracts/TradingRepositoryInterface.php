@@ -285,6 +285,7 @@ interface TradingRepositoryInterface
      * Get team players eligible for trading display
      *
      * Returns active (non-retired) players for a team, ordered by ordinal.
+     * Excludes buyout/cash placeholder records whose names start with '|'.
      * Includes position, name, contract year data needed by trade form.
      *
      * @param int $teamId Team ID
@@ -323,7 +324,10 @@ interface TradingRepositoryInterface
     public function deleteTradeOffer(int $offerId): void;
 
     /**
-     * Count active roster players for a team (excludes retired and cash placeholders)
+     * Count active roster players for a team
+     *
+     * Excludes retired players, cash placeholders (ordinal >= 100000),
+     * and buyout/cash records whose names start with '|'.
      *
      * @param string $teamName Team name
      * @return int Number of active players on the team's roster

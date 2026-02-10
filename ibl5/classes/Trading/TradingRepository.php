@@ -543,7 +543,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     {
         /** @var array{cnt: int}|null $result */
         $result = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM ibl_plr WHERE teamname = ? AND retired = 0 AND ordinal < 100000",
+            "SELECT COUNT(*) AS cnt FROM ibl_plr WHERE teamname = ? AND retired = 0 AND ordinal < 100000 AND name NOT LIKE '|%'",
             "s",
             $teamName
         );
@@ -575,7 +575,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
         return $this->fetchAll(
             "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
              FROM ibl_plr
-             WHERE tid = ? AND retired = 0
+             WHERE tid = ? AND retired = 0 AND name NOT LIKE '|%'
              ORDER BY ordinal ASC",
             "i",
             $teamId

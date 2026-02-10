@@ -15,7 +15,7 @@ use Player\Player;
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  * @phpstan-import-type TeamInfoRow from \Services\CommonMysqliRepository
  *
- * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discordID: ?int, formerly_known_as: ?string, Used_Extension_This_Chunk: int, Used_Extension_This_Season: ?int, HasMLE: int, HasLLE: int, leagueRecord: ?string, ...}
+ * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discordID: ?int, Used_Extension_This_Chunk: int, Used_Extension_This_Season: ?int, HasMLE: int, HasLLE: int, leagueRecord: ?string, ...}
  * @phpstan-type DraftPickRow array{pickid: int, ownerofpick: string, teampick: string, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
  * @phpstan-type FreeAgencyOfferRow array{team: string, name: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, ...}
  */
@@ -29,7 +29,6 @@ class Team extends BaseMysqliRepository
     public string $color2;
     public string $arena;
     public int $capacity;
-    public ?string $formerlyKnownAs;
 
     public string $ownerName;
     public string $ownerEmail;
@@ -141,7 +140,6 @@ class Team extends BaseMysqliRepository
         $this->color2 = $teamRow['color2'];
         $this->arena = $teamRow['arena'];
         $this->capacity = $teamRow['capacity'];
-        $this->formerlyKnownAs = $teamRow['formerly_known_as'] ?? null;
 
         $this->ownerName = $teamRow['owner_name'];
         $this->ownerEmail = $teamRow['owner_email'];

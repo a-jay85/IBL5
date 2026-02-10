@@ -487,6 +487,8 @@ class RecordHoldersService implements RecordHoldersServiceInterface
             $endingYear = $record['year'];
             $formatted[] = [
                 'teamAbbr' => $this->getTeamAbbreviationByName($record['team_name']),
+                'teamTid' => $this->getTeamIdByName($record['team_name']),
+                'teamYr' => (string) $endingYear,
                 'season' => $this->formatSeasonYearRange($endingYear),
                 'amount' => $record['wins'] . '-' . $record['losses'],
             ];
@@ -510,6 +512,8 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         foreach ($dbRecords as $record) {
             $formatted[] = [
                 'teamAbbr' => $this->getTeamAbbreviationByName($record['team_name']),
+                'teamTid' => $this->getTeamIdByName($record['team_name']),
+                'teamYr' => (string) $record['year'],
                 'season' => $this->formatSeasonYearRange($record['year']),
                 'amount' => $record['wins'] . '-' . $record['losses'],
             ];
@@ -536,6 +540,8 @@ class RecordHoldersService implements RecordHoldersServiceInterface
             }
             $formatted[] = [
                 'teamAbbr' => $this->getTeamAbbreviationByName($record['team_name']),
+                'teamTid' => $this->getTeamIdByName($record['team_name']),
+                'teamYr' => (string) $record['start_year'],
                 'season' => $season,
                 'amount' => (string) $record['streak'],
             ];
@@ -595,6 +601,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         foreach ($dbRecords as $record) {
             $formatted[] = [
                 'teamAbbr' => $this->getTeamAbbreviationByName($record['team_name']),
+                'teamTid' => $this->getTeamIdByName($record['team_name']),
                 'amount' => (string) $record['count'],
                 'years' => strip_tags($record['years']),
             ];
@@ -630,6 +637,17 @@ class RecordHoldersService implements RecordHoldersServiceInterface
 
         $teamId = $this->nameToIdCache[$teamName] ?? 0;
         return $this->getTeamAbbreviation($teamId);
+    }
+
+    /**
+     * Get team ID from team name, using the same cache as getTeamAbbreviationByName().
+     */
+    private function getTeamIdByName(string $teamName): int
+    {
+        // Ensure cache is populated
+        $this->getTeamAbbreviationByName($teamName);
+
+        return $this->nameToIdCache[$teamName] ?? 0;
     }
 
     /**

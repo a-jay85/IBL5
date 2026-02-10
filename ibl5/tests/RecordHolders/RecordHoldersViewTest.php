@@ -213,6 +213,29 @@ final class RecordHoldersViewTest extends TestCase
         $this->assertStringContainsString('34.2', $html);
     }
 
+    public function testRenderPlayerFullSeasonLinksSeasonToTeamPage(): void
+    {
+        $records = $this->createMinimalRecords();
+        $records['playerFullSeason'] = [
+            'Highest Scoring Average in a Regular Season' => [
+                [
+                    'pid' => 304,
+                    'name' => 'Mitch Richmond',
+                    'teamAbbr' => 'mia',
+                    'teamTid' => 2,
+                    'teamYr' => '1994',
+                    'season' => '1993-94',
+                    'amount' => '34.2',
+                ],
+            ],
+        ];
+
+        $html = $this->view->render($records);
+
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=2&amp;yr=1994', $html);
+        $this->assertStringContainsString('>1993-94</a>', $html);
+    }
+
     public function testRenderTeamGameRecordIncludesTeamLogo(): void
     {
         $records = $this->createMinimalRecords();
@@ -243,6 +266,8 @@ final class RecordHoldersViewTest extends TestCase
             'Best Season Record' => [
                 [
                     'teamAbbr' => 'chi',
+                    'teamTid' => 7,
+                    'teamYr' => '1993',
                     'season' => '1992-93',
                     'amount' => '71-11',
                 ],
@@ -255,6 +280,27 @@ final class RecordHoldersViewTest extends TestCase
         $this->assertStringContainsString('1992-93', $html);
     }
 
+    public function testRenderTeamSeasonRecordLinksSeasonToTeamPage(): void
+    {
+        $records = $this->createMinimalRecords();
+        $records['teamSeasonRecords'] = [
+            'Best Season Record' => [
+                [
+                    'teamAbbr' => 'chi',
+                    'teamTid' => 7,
+                    'teamYr' => '1993',
+                    'season' => '1992-93',
+                    'amount' => '71-11',
+                ],
+            ],
+        ];
+
+        $html = $this->view->render($records);
+
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=7&amp;yr=1993', $html);
+        $this->assertStringContainsString('>1992-93</a>', $html);
+    }
+
     public function testRenderFranchiseRecord(): void
     {
         $records = $this->createMinimalRecords();
@@ -262,6 +308,7 @@ final class RecordHoldersViewTest extends TestCase
             'Most Playoff Appearances' => [
                 [
                     'teamAbbr' => 'bkn',
+                    'teamTid' => 4,
                     'amount' => '7',
                     'years' => '1989, 1990, 1991',
                 ],
@@ -272,6 +319,27 @@ final class RecordHoldersViewTest extends TestCase
 
         $this->assertStringContainsString('Most Playoff Appearances', $html);
         $this->assertStringContainsString('images/topics/bkn.png', $html);
+    }
+
+    public function testRenderFranchiseRecordLinksYearsToTeamPage(): void
+    {
+        $records = $this->createMinimalRecords();
+        $records['teamFranchise'] = [
+            'Most Playoff Appearances' => [
+                [
+                    'teamAbbr' => 'bkn',
+                    'teamTid' => 4,
+                    'amount' => '3',
+                    'years' => '1989, 1990, 1991',
+                ],
+            ],
+        ];
+
+        $html = $this->view->render($records);
+
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=4&amp;yr=1989', $html);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=4&amp;yr=1990', $html);
+        $this->assertStringContainsString('modules.php?name=Team&amp;op=team&amp;teamID=4&amp;yr=1991', $html);
     }
 
     public function testRenderSanitizesOutput(): void
@@ -463,6 +531,8 @@ final class RecordHoldersViewTest extends TestCase
             'Best Season Record' => [
                 [
                     'teamAbbr' => 'chi',
+                    'teamTid' => 7,
+                    'teamYr' => '1993',
                     'season' => '1992-93',
                     'amount' => '71-11',
                 ],
@@ -472,6 +542,7 @@ final class RecordHoldersViewTest extends TestCase
             'Most Playoff Appearances' => [
                 [
                     'teamAbbr' => 'bkn',
+                    'teamTid' => 4,
                     'amount' => '7',
                     'years' => '1989, 1990, 1991',
                 ],

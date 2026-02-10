@@ -6,6 +6,7 @@ namespace RecordHolders;
 
 use RecordHolders\Contracts\RecordHoldersViewInterface;
 use RecordHolders\Contracts\RecordHoldersServiceInterface;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -281,11 +282,13 @@ class RecordHoldersView implements RecordHoldersViewInterface
             $teamTid = $record['teamTid'];
             $teamYr = (int) $record['teamYr'];
 
+            $seasonLink = '<a href="' . TeamCellHelper::teamPageUrl($teamTid, $teamYr) . '">' . $safeSeason . '</a>';
+
             $output .= '<tr>';
             $output .= '<td class="player-cell"><img src="images/player/' . $pid . '.jpg" alt="' . $safeName . '" width="65" height="90" loading="lazy">';
             $output .= '<a href="modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid . '">' . $safeName . '</a></td>';
             $output .= '<td><a href="../online/team.php?tid=' . $teamTid . '&amp;yr=' . $teamYr . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
-            $output .= '<td>' . $safeSeason . '</td>';
+            $output .= '<td>' . $seasonLink . '</td>';
             $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
             $output .= '</tr>';
         }
@@ -347,9 +350,14 @@ class RecordHoldersView implements RecordHoldersViewInterface
             $safeSeason = HtmlSanitizer::safeHtmlOutput($record['season']);
             /** @var string $safeAmount */
             $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
+            $teamTid = $record['teamTid'];
+            $teamYr = (int) $record['teamYr'];
+
+            $seasonLink = '<a href="' . TeamCellHelper::teamPageUrl($teamTid, $teamYr) . '">' . $safeSeason . '</a>';
+
             $output .= '<tr>';
             $output .= '<td><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></td>';
-            $output .= '<td>' . $safeSeason . '</td>';
+            $output .= '<td>' . $seasonLink . '</td>';
             $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
             $output .= '</tr>';
         }
@@ -382,12 +390,15 @@ class RecordHoldersView implements RecordHoldersViewInterface
             $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
             /** @var string $safeAmount */
             $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
-            /** @var string $safeYears */
-            $safeYears = HtmlSanitizer::safeHtmlOutput($record['years']);
+            $teamTid = $record['teamTid'];
+
+            // Link each year to the team's history page for that season
+            $yearsLinked = $this->renderFranchiseYearLinks($record['years'], $teamTid);
+
             $output .= '<tr>';
             $output .= '<td><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></td>';
             $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
-            $output .= '<td>' . $safeYears . '</td>';
+            $output .= '<td>' . $yearsLinked . '</td>';
             $output .= '</tr>';
         }
 
@@ -457,6 +468,32 @@ class RecordHoldersView implements RecordHoldersViewInterface
     // ---------------------------------------------------------------
     // Shared rendering helpers
     // ---------------------------------------------------------------
+
+    /**
+     * Render franchise years as individual links to team history pages.
+     *
+     * Splits "1996, 1998, 2001" into linked years separated by ", ".
+     */
+    private function renderFranchiseYearLinks(string $years, int $teamTid): string
+    {
+        if ($years === '') {
+            return '';
+        }
+
+        $yearList = explode(', ', $years);
+        $linked = [];
+        foreach ($yearList as $year) {
+            /** @var string $safeYear */
+            $safeYear = HtmlSanitizer::safeHtmlOutput(trim($year));
+            $yearInt = (int) trim($year);
+            if ($yearInt > 0) {
+                $linked[] = '<a href="' . TeamCellHelper::teamPageUrl($teamTid, $yearInt) . '">' . $safeYear . '</a>';
+            } else {
+                $linked[] = $safeYear;
+            }
+        }
+        return implode(', ', $linked);
+    }
 
     /**
      * Render a category heading with accent left border.

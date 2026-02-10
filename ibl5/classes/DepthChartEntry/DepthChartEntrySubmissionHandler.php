@@ -28,7 +28,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
         $this->repository = new DepthChartEntryRepository($db);
         $this->processor = new DepthChartEntryProcessor();
         $this->validator = new DepthChartEntryValidator();
-        $this->view = new DepthChartEntryView($this->processor);
+        $this->view = new DepthChartEntryView();
         $this->savedDcService = new SavedDepthChartService($db);
     }
 

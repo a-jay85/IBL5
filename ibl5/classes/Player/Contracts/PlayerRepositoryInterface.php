@@ -51,7 +51,7 @@ interface PlayerRepositoryInterface
      * into a PlayerData object representing a player in a previous season.
      * Similar to fillFromCurrentRow but handles historical data structure.
      * 
-     * @param array<string, mixed> $histRow Database row from ibl_hist
+     * @param array{pid: ?int, year: ?int, name: ?string, team: ?string, teamid: ?int, salary: ?int, r_2ga: ?int, r_2gp: ?int, r_fta: ?int, r_ftp: ?int, r_3ga: ?int, r_3gp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_blk: ?int, r_tvr: ?int, r_oo: ?int, r_od: ?int, r_do: ?int, r_dd: ?int, r_po: ?int, r_pd: ?int, r_to: ?int, r_td: ?int, ...} $histRow Database row from ibl_hist
      * @return PlayerData Fully populated PlayerData object with historical data
      */
     public function fillFromHistoricalRow(array $histRow): PlayerData;

@@ -17,16 +17,14 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
 {
     private \mysqli $db;
     private DepthChartEntryRepository $repository;
-    private DepthChartEntryProcessor $processor;
     private DepthChartEntryView $view;
     private \Services\CommonMysqliRepository $commonRepository;
-    
+
     public function __construct(\mysqli $db)
     {
         $this->db = $db;
         $this->repository = new DepthChartEntryRepository($db);
-        $this->processor = new DepthChartEntryProcessor();
-        $this->view = new DepthChartEntryView($this->processor);
+        $this->view = new DepthChartEntryView();
         $this->commonRepository = new \Services\CommonMysqliRepository($db);
     }
     

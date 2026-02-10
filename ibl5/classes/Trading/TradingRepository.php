@@ -583,6 +583,22 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
+     * @see TradingRepositoryInterface::getTeamCashRecordsForSalary()
+     */
+    public function getTeamCashRecordsForSalary(int $teamId): array
+    {
+        /** @var list<TradingPlayerRow> */
+        return $this->fetchAll(
+            "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
+             FROM ibl_plr
+             WHERE tid = ? AND retired = 0 AND name LIKE '|%'
+             ORDER BY ordinal ASC",
+            "i",
+            $teamId
+        );
+    }
+
+    /**
      * @see TradingRepositoryInterface::getTeamDraftPicksForTrading()
      */
     public function getTeamDraftPicksForTrading(string $teamName): array

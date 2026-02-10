@@ -55,11 +55,13 @@ class TradingService implements TradingServiceInterface
 
         $userPlayers = $this->repository->getTeamPlayersForTrading($userTeamId);
         $userPicks = $this->repository->getTeamDraftPicksForTrading($userTeam);
-        $userFutureSalary = $this->calculateFutureSalaries($userPlayers, $season);
+        $userCashRecords = $this->repository->getTeamCashRecordsForSalary($userTeamId);
+        $userFutureSalary = $this->calculateFutureSalaries([...$userPlayers, ...$userCashRecords], $season);
 
         $partnerPlayers = $this->repository->getTeamPlayersForTrading($partnerTeamId);
         $partnerPicks = $this->repository->getTeamDraftPicksForTrading($partnerTeam);
-        $partnerFutureSalary = $this->calculateFutureSalaries($partnerPlayers, $season);
+        $partnerCashRecords = $this->repository->getTeamCashRecordsForSalary($partnerTeamId);
+        $partnerFutureSalary = $this->calculateFutureSalaries([...$partnerPlayers, ...$partnerCashRecords], $season);
 
         // Calculate cash exchange year range
         $currentSeasonEndingYear = $season->endingYear;

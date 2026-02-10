@@ -62,7 +62,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
         $html = $this->renderTeamColorStyles($color1, $color2);
         $html .= '<div class="schedule-container schedule-container--team">';
-        $html .= $this->renderTeamBanner($teamId, $teamName, $color1);
+        $html .= $this->renderTeamBanner($teamId, $teamName);
         $html .= $this->renderHeader($simLengthInDays, $firstUpcomingId);
         $html .= $this->renderMonthNav($gamesByMonth, $isPlayoffPhase, $playoffMonthKey);
         $html .= $this->renderGamesByMonth($gamesByMonth, $games, $teamId, $team->name, $isPlayoffPhase, $playoffMonthKey);
@@ -86,11 +86,11 @@ class TeamScheduleView implements TeamScheduleViewInterface
     /**
      * Render responsive team banner with logo
      */
-    private function renderTeamBanner(int $teamId, string $teamName, string $color1): string
+    private function renderTeamBanner(int $teamId, string $teamName): string
     {
-        return '<div class="schedule-team-banner" style="background: linear-gradient(135deg, #' . $color1 . ', #' . $color1 . 'cc);">
-            <img class="schedule-team-banner__logo" src="./images/logo/' . $teamId . '.jpg" alt="' . $teamName . '" width="415" height="50">
-        </div>';
+        return '<div style="text-align: center;">'
+            . '<img class="schedule-team-banner__logo" src="./images/logo/' . $teamId . '.jpg" alt="' . $teamName . '" width="415" height="50">'
+            . '</div>';
     }
 
     /**

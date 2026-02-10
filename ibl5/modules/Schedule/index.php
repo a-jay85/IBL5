@@ -164,16 +164,16 @@ function renderLeagueSchedule(
 
     // Header with month nav and jump button
     echo '<div class="schedule-header">';
-    echo '<div class="schedule-header__left">';
     echo '<h1 class="ibl-title">Schedule</h1>';
-    echo '<p class="schedule-highlight-note">Next sim length: ' . \Utilities\HtmlSanitizer::safeHtmlOutput($simLengthDays) . ' days</p>';
-    echo '</div>';
+    echo '<div class="schedule-header__center">';
     if ($firstUnplayedId) {
         echo '<a href="#' . $firstUnplayedId . '" class="schedule-jump-btn" onclick="scrollToNextGames(event)">';
         echo '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
         echo 'Next Games';
         echo '</a>';
     }
+    echo '<p class="schedule-highlight-note">Next sim length: ' . \Utilities\HtmlSanitizer::safeHtmlOutput($simLengthDays) . ' days</p>';
+    echo '</div>';
     echo '</div>';
 
     // Month navigation

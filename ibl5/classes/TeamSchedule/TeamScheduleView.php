@@ -99,10 +99,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
     private function renderHeader(int $simLengthInDays, ?string $firstUpcomingId): string
     {
         $html = '<div class="schedule-header">';
-        $html .= '<div class="schedule-header__left">';
         $html .= '<h1 class="ibl-title">Schedule</h1>';
-        $html .= '<p class="schedule-highlight-note">Next sim: ' . $simLengthInDays . ' days</p>';
-        $html .= '</div>';
+        $html .= '<div class="schedule-header__center">';
 
         if ($firstUpcomingId !== null && $firstUpcomingId !== '') {
             $html .= '<a href="#' . $firstUpcomingId . '" class="schedule-jump-btn" onclick="scrollToNextGames(event)">';
@@ -111,6 +109,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
             $html .= '</a>';
         }
 
+        $html .= '<p class="schedule-highlight-note">Next sim: ' . $simLengthInDays . ' days</p>';
+        $html .= '</div>';
         $html .= '</div>';
         return $html;
     }

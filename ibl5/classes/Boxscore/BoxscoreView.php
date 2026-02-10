@@ -28,7 +28,7 @@ class BoxscoreView
 <h2>Uploader</h2>
 <form enctype="multipart/form-data" action="/ibl5/scripts/scoParser.php" method="POST">
     <input type="hidden" name="MAX_FILE_SIZE" value="14000000" />
-    <label for="scoFile">Upload Old Season's .sco: </label><input name="scoFile" type="file" /><p>
+    <label for="scoFiles">Upload Old Season's .sco: </label><input name="scoFiles[]" type="file" multiple /><p>
     <label for="seasonPhase">Season Phase for Uploaded .sco: </label><select name="seasonPhase">
         <option value="Preseason">Preseason</option>
         <option value="HEAT">HEAT</option>
@@ -37,7 +37,7 @@ class BoxscoreView
     <label for="seasonEndingYear">Season <strong><span style="text-decoration: underline;">Ending</span></strong> Year for Uploaded .sco: </label><input type="text" name="seasonEndingYear" maxlength="4" minlength="4" size="4" /><br>
     <em>e.g. HEAT before the 1990-1991 season</em> = <code>1991</code><br>
     <em>e.g. 1984-1985 Preseason or Regular Season</em> = <code>1985</code><p>
-    <input type="submit" value="Parse Uploaded .sco File" />
+    <input type="submit" value="Parse Uploaded .sco Files" />
 </form>
 <hr>
 <br>

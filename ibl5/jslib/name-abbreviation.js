@@ -88,7 +88,7 @@
     }
 
     function processTeamNames() {
-        const spans = document.querySelectorAll('.stat-table .ibl-team-cell__text, .draft-pick-table .ibl-team-cell__text, .trading-roster .ibl-team-cell__text');
+        const spans = document.querySelectorAll('.stat-table .ibl-team-cell__text, .draft-pick-table .ibl-team-cell__text');
 
         spans.forEach(span => {
             // Store original name on first encounter

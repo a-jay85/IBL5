@@ -8,6 +8,8 @@ interface TradeApiResponse {
         accepted?: boolean;
         declined?: boolean;
         story?: string;
+        offering_team?: string;
+        offering_gm_discord_id?: string;
     };
 }
 
@@ -50,6 +52,13 @@ export async function handleTradeButton(interaction: ButtonInteraction): Promise
 
             if (isAccept && body.data?.story) {
                 embed.setDescription(body.data.story.replace(/<br>/g, '\n'));
+            } else if (!isAccept && body.data?.offering_team) {
+                const team = body.data.offering_team;
+                const counterOfferUrl = `http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=offertrade&partner=${encodeURIComponent(team)}`;
+                const gmMention = body.data.offering_gm_discord_id
+                    ? ` <@!${body.data.offering_gm_discord_id}>`
+                    : '';
+                embed.setDescription(`[Click/tap here to counter-offer](${counterOfferUrl})${gmMention}`);
             }
 
             await interaction.editReply({ embeds: [embed], components: [] });

@@ -32,9 +32,8 @@ try {
     $discord = new Discord($mysqli_db);
     $rejectingUserDiscordID = $discord->getDiscordIDFromTeamname($teamRejecting);
     $receivingUserDiscordID = $discord->getDiscordIDFromTeamname($teamReceiving);
-    $discordDMmessage = 'Sorry, trade proposal declined by <@!' . $rejectingUserDiscordID . '>.
-Go here to make another offer: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
-    \Discord::sendDM($receivingUserDiscordID, $discordDMmessage);
+    $declineMessage = Trading\TradingService::buildDeclineMessage($rejectingUserDiscordID, $teamRejecting);
+    \Discord::sendDM($receivingUserDiscordID, $declineMessage);
 } catch (Exception $e) {
     // Silently fail if Discord notification fails
     // The trade rejection itself has already succeeded

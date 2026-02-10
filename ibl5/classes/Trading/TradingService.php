@@ -325,6 +325,21 @@ class TradingService implements TradingServiceInterface
     }
 
     /**
+     * Build the Discord DM message sent to the proposing GM when a trade is declined.
+     *
+     * @param string $decliningGmDiscordId Discord user ID of the GM who declined
+     * @param string $decliningTeamName Team name of the GM who declined (used in counter-offer link)
+     */
+    public static function buildDeclineMessage(string $decliningGmDiscordId, string $decliningTeamName): string
+    {
+        $counterOfferUrl = 'http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=offertrade&partner='
+            . rawurlencode($decliningTeamName);
+
+        return 'Sorry, trade proposal declined by <@!' . $decliningGmDiscordId . '>.'
+            . "\n" . '[Click/tap to counter-offer](' . $counterOfferUrl . ')';
+    }
+
+    /**
      * Check if the season is in an offseason phase where contract years advance
      */
     private function isOffseasonPhase(string $phase): bool

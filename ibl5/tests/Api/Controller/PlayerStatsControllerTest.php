@@ -49,6 +49,7 @@ class PlayerStatsControllerTest extends IntegrationTestCase
                 'draft_round' => 1,
                 'draft_pick' => 5,
                 'drafted_by_team' => 'Heat',
+                'draft_team_id' => 14,
                 'created_at' => '2025-01-01 00:00:00',
                 'updated_at' => '2026-01-15 12:00:00',
             ],

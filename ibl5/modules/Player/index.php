@@ -32,10 +32,24 @@ $pagetitle = "- Player Archives";
 function showpage($playerID, $pageView)
 {
     global $db, $mysqli_db, $cookie;
+
+    // Resolve UUID to numeric PID if a UUID string was passed instead of an integer
+    if (!is_numeric($playerID) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string) $playerID)) {
+        $resolvedPid = DatabaseConnection::fetchValue(
+            "SELECT pid FROM ibl_plr WHERE uuid = ?",
+            [(string) $playerID],
+            'pid'
+        );
+        if ($resolvedPid !== null) {
+            $playerID = (int) $resolvedPid;
+        }
+    }
+    $playerID = (int) $playerID;
+
     $sharedFunctions = new Shared($mysqli_db);
     $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
     $season = new Season($mysqli_db);
-    
+
     // Player uses mysqli_db for PlayerRepository (refactored to use prepared statements)
     // Other classes still use legacy $db for backward compatibility
     $player = Player::withPlayerID($mysqli_db, $playerID);

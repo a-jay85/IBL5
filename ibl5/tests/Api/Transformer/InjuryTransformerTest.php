@@ -23,9 +23,11 @@ class InjuryTransformerTest extends TestCase
     {
         return [
             'player_uuid' => 'player-uuid-123',
+            'pid' => 4825,
             'name' => 'Kevin Martin',
             'pos' => 'SG',
             'injured' => 5,
+            'teamid' => 26,
             'team_uuid' => 'team-uuid-456',
             'team_city' => 'Sacramento',
             'team_name' => 'Kings',
@@ -60,15 +62,13 @@ class InjuryTransformerTest extends TestCase
         $this->assertSame(5, $result['injury']['days_remaining']);
     }
 
-    public function testTransformExcludesInternalIds(): void
+    public function testTransformIncludesInternalIdsInNestedObjects(): void
     {
         $row = $this->makeInjuryRow();
-        $row['pid'] = 4825;
-        $row['tid'] = 26;
         $result = $this->transformer->transform($row);
 
-        $this->assertArrayNotHasKey('pid', $result);
-        $this->assertArrayNotHasKey('tid', $result);
+        $this->assertSame(4825, $result['player']['pid']);
+        $this->assertSame(26, $result['team']['team_id']);
     }
 
     public function testTransformHandlesNullTeam(): void

@@ -23,7 +23,9 @@ class LeaderTransformerTest extends TestCase
     {
         return [
             'player_uuid' => 'player-uuid-123',
+            'pid' => 201,
             'name' => 'Sleepy Floyd',
+            'teamid' => 1,
             'team_uuid' => 'team-uuid-456',
             'team_city' => 'Boston',
             'team_name' => 'Celtics',
@@ -102,15 +104,13 @@ class LeaderTransformerTest extends TestCase
         $this->assertSame('0.326', $result['stats']['three_pt_percentage']);
     }
 
-    public function testTransformExcludesInternalIds(): void
+    public function testTransformIncludesInternalIdsInNestedObjects(): void
     {
         $row = $this->makeLeaderRow();
-        $row['pid'] = 201;
-        $row['teamid'] = 1;
         $result = $this->transformer->transform($row);
 
-        $this->assertArrayNotHasKey('pid', $result);
-        $this->assertArrayNotHasKey('teamid', $result);
+        $this->assertSame(201, $result['player']['pid']);
+        $this->assertSame(1, $result['team']['team_id']);
     }
 
     public function testTransformHandlesNullTeam(): void

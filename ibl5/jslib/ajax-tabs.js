@@ -111,6 +111,12 @@
                     isLoading = false;
                     if (data.html) {
                         container.innerHTML = data.html;
+
+                        // Re-initialize sorting on the new table
+                        var tables = container.querySelectorAll('table.sortable');
+                        for (var i = 0; i < tables.length; i++) {
+                            sorttable.makeSortable(tables[i]);
+                        }
                     }
                 })
                 .catch(function (err) {

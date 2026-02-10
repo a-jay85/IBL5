@@ -43,6 +43,7 @@ class PlayerStatsTransformerTest extends TestCase
             'draft_round' => 1,
             'draft_pick' => 1,
             'drafted_by_team' => 'Cavaliers',
+            'draft_team_id' => 5,
             'created_at' => '2025-01-01 00:00:00',
             'updated_at' => '2026-01-15 12:00:00',
         ];
@@ -55,6 +56,8 @@ class PlayerStatsTransformerTest extends TestCase
     {
         return [
             'player_uuid' => 'player-uuid-123',
+            'pid' => 201,
+            'name' => 'LeBron James',
             'year' => 2007,
             'team' => 'Celtics',
             'team_uuid' => 'team-uuid-456',
@@ -89,7 +92,7 @@ class PlayerStatsTransformerTest extends TestCase
         $result = $this->transformer->transformCareer($row);
 
         $this->assertSame('player-uuid-123', $result['uuid']);
-        $this->assertArrayNotHasKey('pid', $result);
+        $this->assertSame(201, $result['pid']);
     }
 
     public function testTransformCareerIncludesTotals(): void
@@ -135,6 +138,7 @@ class PlayerStatsTransformerTest extends TestCase
         $this->assertSame(1, $result['draft']['round']);
         $this->assertSame(1, $result['draft']['pick']);
         $this->assertSame('Cavaliers', $result['draft']['team']);
+        $this->assertSame(5, $result['draft']['team_id']);
     }
 
     public function testTransformCareerHandlesNullDraft(): void
@@ -156,6 +160,7 @@ class PlayerStatsTransformerTest extends TestCase
         $result = $this->transformer->transformSeason($row);
 
         $this->assertSame(2007, $result['year']);
+        $this->assertSame('LeBron James', $result['player_name']);
         $this->assertSame(82, $result['games']);
         $this->assertSame(2238, $result['minutes']);
         $this->assertSame(500, $result['salary']);
@@ -216,12 +221,12 @@ class PlayerStatsTransformerTest extends TestCase
         $this->assertSame('0.0', $result['per_game']['rebounds']);
     }
 
-    public function testTransformSeasonExcludesInternalIds(): void
+    public function testTransformSeasonIncludesInternalIds(): void
     {
         $row = $this->makeSeasonRow();
         $result = $this->transformer->transformSeason($row);
 
-        $this->assertArrayNotHasKey('pid', $result);
-        $this->assertArrayNotHasKey('teamid', $result);
+        $this->assertSame(201, $result['pid']);
+        $this->assertSame(1, $result['team']['team_id']);
     }
 }

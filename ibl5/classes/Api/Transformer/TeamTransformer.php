@@ -9,7 +9,7 @@ class TeamTransformer
     /**
      * Transform a team row for list endpoints.
      *
-     * @param array{uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null} $row
+     * @param array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, discordID: int|null} $row
      * @return array<string, mixed>
      */
     public function transform(array $row): array
@@ -19,7 +19,9 @@ class TeamTransformer
             'city' => $row['team_city'],
             'name' => $row['team_name'],
             'full_name' => $row['team_city'] . ' ' . $row['team_name'],
+            'team_id' => $row['teamid'],
             'owner' => $row['owner_name'],
+            'owner_discord_id' => $row['discordID'],
             'arena' => $row['arena'],
             'conference' => $row['conference'],
             'division' => $row['division'],
@@ -29,7 +31,7 @@ class TeamTransformer
     /**
      * Transform a team row for detail endpoint (includes standings/power data).
      *
-     * @param array{uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, league_record: string|null, conference_record: string|null, division_record: string|null, home_wins: int|null, home_losses: int|null, away_wins: int|null, away_losses: int|null, win_percentage: float|null, conference_games_back: string|null, division_games_back: string|null, games_remaining: int|null} $row
+     * @param array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, discordID: int|null, league_record: string|null, conference_record: string|null, division_record: string|null, home_wins: int|null, home_losses: int|null, away_wins: int|null, away_losses: int|null, win_percentage: float|null, conference_games_back: string|null, division_games_back: string|null, games_remaining: int|null} $row
      * @return array<string, mixed>
      */
     public function transformDetail(array $row): array

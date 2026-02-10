@@ -76,7 +76,7 @@ class GameBoxscoreController implements ControllerInterface
         }
 
         foreach ($playerRows as $playerRow) {
-            $playerTid = is_int($playerRow['visitorTID'] ?? null) ? $playerRow['visitorTID'] : 0;
+            $playerTid = is_int($playerRow['player_tid'] ?? null) ? $playerRow['player_tid'] : 0;
             /** @phpstan-ignore argument.type (DB row guarantees array shape) */
             $transformedPlayer = $boxscoreTransformer->transformPlayerLine($playerRow);
             if ($playerTid === $visitorTeamId) {

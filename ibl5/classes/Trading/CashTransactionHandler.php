@@ -61,9 +61,27 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
     }
 
     /**
+     * @see CashTransactionHandlerInterface::formatCashTradeText()
+     */
+    public static function formatCashTradeText(array $cashYear, string $from, string $to, int $seasonEndingYear): string
+    {
+        $lines = '';
+        for ($y = 1; $y <= 6; $y++) {
+            $amount = $cashYear[$y] ?? 0;
+            if ($amount === 0) {
+                continue;
+            }
+            $startYear = $seasonEndingYear - 2 + $y;
+            $endYear = $seasonEndingYear - 1 + $y;
+            $lines .= "The {$from} send {$amount} in cash to the {$to} for {$startYear}-{$endYear}.<br>";
+        }
+        return $lines;
+    }
+
+    /**
      * @see CashTransactionHandlerInterface::createCashTransaction()
      */
-    public function createCashTransaction(int $itemId, string $offeringTeamName, string $listeningTeamName, array $cashYear): array
+    public function createCashTransaction(int $itemId, string $offeringTeamName, string $listeningTeamName, array $cashYear, int $seasonEndingYear): array
     {
         $offeringTeamId = $this->commonRepository->getTidFromTeamname($offeringTeamName) ?? 0;
         $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName) ?? 0;
@@ -122,11 +140,7 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
         ]);
 
         $success = ($affectedRowsPositive > 0) && ($affectedRowsNegative > 0);
-        $tradeLine = "";
-
-        if ($success) {
-            $tradeLine = "The $offeringTeamName send $cy1 $cy2 $cy3 $cy4 $cy5 $cy6 in cash to the $listeningTeamName.<br>";
-        }
+        $tradeLine = self::formatCashTradeText($cashYear, $offeringTeamName, $listeningTeamName, $seasonEndingYear);
 
         return [
             'success' => $success,

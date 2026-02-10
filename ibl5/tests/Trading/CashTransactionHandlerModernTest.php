@@ -95,16 +95,19 @@ class CashTransactionHandlerModernTest extends TestCase
         $fromTeamName = 'Los Angeles Lakers';
         $toTeamName = 'Boston Celtics';
         $cashYear = [1 => 100, 2 => 200, 3 => 0, 4 => 0, 5 => 0, 6 => 0];
+        $seasonEndingYear = 2007;
 
         // Act
-        $result = $this->cashHandler->createCashTransaction($itemId, $fromTeamName, $toTeamName, $cashYear);
+        $result = $this->cashHandler->createCashTransaction($itemId, $fromTeamName, $toTeamName, $cashYear, $seasonEndingYear);
 
         // Assert
         $this->assertTrue($result['success'], 'Cash transaction should succeed');
         $this->assertStringContainsString($fromTeamName, $result['tradeLine']);
         $this->assertStringContainsString($toTeamName, $result['tradeLine']);
-        $this->assertStringContainsString('100 200', $result['tradeLine']);
-        $this->assertStringContainsString('cash', $result['tradeLine']);
+        $this->assertStringContainsString('100 in cash', $result['tradeLine']);
+        $this->assertStringContainsString('2006-2007', $result['tradeLine']);
+        $this->assertStringContainsString('200 in cash', $result['tradeLine']);
+        $this->assertStringContainsString('2007-2008', $result['tradeLine']);
     }
 
     /**
@@ -240,17 +243,20 @@ class CashTransactionHandlerModernTest extends TestCase
         $fromTeamName = 'San Antonio Spurs';
         $toTeamName = 'Portland Trail Blazers';
         $cashYear = [1 => 250, 2 => 275, 3 => 300, 4 => 0, 5 => 0, 6 => 0];
+        $seasonEndingYear = 2007;
 
         // Act - Test the complete workflow
         $contractYears = $this->cashHandler->calculateContractTotalYears($cashYear);
         $hasCash = $this->cashHandler->hasCashInTrade($cashYear);
-        $transactionResult = $this->cashHandler->createCashTransaction($itemId, $fromTeamName, $toTeamName, $cashYear);
+        $transactionResult = $this->cashHandler->createCashTransaction($itemId, $fromTeamName, $toTeamName, $cashYear, $seasonEndingYear);
 
         // Assert - Verify the complete workflow
         $this->assertEquals(3, $contractYears, 'Should calculate 3 contract years');
         $this->assertTrue($hasCash, 'Should detect cash in trade');
         $this->assertTrue($transactionResult['success'], 'Transaction should succeed');
-        $this->assertStringContainsString('250 275 300', $transactionResult['tradeLine']);
+        $this->assertStringContainsString('250 in cash', $transactionResult['tradeLine']);
+        $this->assertStringContainsString('275 in cash', $transactionResult['tradeLine']);
+        $this->assertStringContainsString('300 in cash', $transactionResult['tradeLine']);
         $this->assertStringContainsString($fromTeamName, $transactionResult['tradeLine']);
         $this->assertStringContainsString($toTeamName, $transactionResult['tradeLine']);
     }

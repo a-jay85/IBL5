@@ -82,4 +82,33 @@ class Season
     {
         return $this->projectedNextSimEndDate;
     }
+
+    /**
+     * Get last box score date (mock implementation)
+     */
+    public function getLastBoxScoreDate(): string
+    {
+        return $this->lastSimEndDate;
+    }
+
+    /**
+     * Get first box score date (mock implementation)
+     */
+    public function getFirstBoxScoreDate(): string
+    {
+        return $this->lastSimStartDate;
+    }
+
+    /**
+     * Set last sim dates array (mock implementation)
+     *
+     * @return int Number of affected rows (always 1 for mock)
+     */
+    public function setLastSimDatesArray(string $newSimNumber, string $newSimStartDate, string $newSimEndDate): int
+    {
+        $this->lastSimNumber = (int) $newSimNumber;
+        $this->lastSimStartDate = $newSimStartDate;
+        $this->lastSimEndDate = $newSimEndDate;
+        return 1;
+    }
 }

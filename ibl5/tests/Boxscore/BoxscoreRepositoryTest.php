@@ -96,4 +96,85 @@ class BoxscoreRepositoryTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->repository->deletePreseasonBoxScores();
     }
+
+    public function testInsertTeamBoxscoreExecutesInsertQuery(): void
+    {
+        $this->mockDb->setReturnTrue(true);
+
+        $result = $this->repository->insertTeamBoxscore(
+            '2025-01-15',
+            'TestTeam',
+            1,
+            1,
+            2,
+            15000,
+            18000,
+            10,
+            5,
+            8,
+            7,
+            25,
+            30,
+            20,
+            28,
+            0,
+            22,
+            27,
+            24,
+            30,
+            0,
+            40,
+            85,
+            20,
+            25,
+            10,
+            30,
+            12,
+            30,
+            25,
+            8,
+            15,
+            5,
+            20,
+        );
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString('INSERT INTO ibl_box_scores_teams', $queries[0]);
+        $this->assertSame(1, $result);
+    }
+
+    public function testInsertPlayerBoxscoreExecutesInsertQuery(): void
+    {
+        $this->mockDb->setReturnTrue(true);
+
+        $result = $this->repository->insertPlayerBoxscore(
+            '2025-01-15',
+            'test-uuid-1234',
+            'John Smith',
+            'PG',
+            101,
+            1,
+            2,
+            32,
+            8,
+            15,
+            4,
+            5,
+            3,
+            7,
+            2,
+            6,
+            7,
+            2,
+            3,
+            1,
+            3,
+        );
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString('INSERT INTO ibl_box_scores', $queries[0]);
+        $this->assertSame(1, $result);
+    }
 }

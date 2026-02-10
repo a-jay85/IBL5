@@ -56,8 +56,7 @@ class HtmlSanitizer
             return htmlspecialchars($json, $flags, 'UTF-8');
         }
 
-        // Fallback for any other type: cast to string and HTML-escape
-        $stringValue = (string) $value;
-        return htmlspecialchars($stringValue, $flags, 'UTF-8');
+        // Remaining types (resource, callable, etc.) cannot be meaningfully rendered
+        return '';
     }
 }

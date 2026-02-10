@@ -88,21 +88,21 @@ interface PlayerContractCalculatorInterface
      * Example: Remaining salary $600,000 returns [100000, 100000, 100000, 100000, 100000, 100000]
      * 
      * @param PlayerData $playerData The player to calculate for
-     * @return array<int> Buyout amounts for each of 6 years
+     * @return array<int, int> Buyout amounts for each of 6 years
      */
     public function getLongBuyoutArray(PlayerData $playerData): array;
 
     /**
      * Calculate short buyout terms (2 years)
-     * 
+     *
      * Spreads the total remaining contract salary evenly over 2 years.
      * Used when a team buys out a player for immediate cap relief.
      * Returns an array of 2 equal salary amounts.
-     * 
+     *
      * Example: Remaining salary $600,000 returns [300000, 300000]
-     * 
+     *
      * @param PlayerData $playerData The player to calculate for
-     * @return array<int> Buyout amounts for each of 2 years
+     * @return array<int, int> Buyout amounts for each of 2 years
      */
     public function getShortBuyoutArray(PlayerData $playerData): array;
 }

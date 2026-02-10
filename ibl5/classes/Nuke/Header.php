@@ -6,20 +6,26 @@ namespace Nuke;
 
 class Header
 {
-    public static function head()
+    public static function head(): void
     {
-        global $sitename, $pagetitle;
+        /** @var string $sitename */
+        global $sitename;
+        /** @var string $pagetitle */
+        global $pagetitle;
         $ThemeSel = get_theme();
-        
+
         // Calculate the correct base path for resources
-        $scriptPath = $_SERVER['SCRIPT_NAME'];
-        $documentRoot = $_SERVER['DOCUMENT_ROOT'];
-        $currentFile = $_SERVER['SCRIPT_FILENAME'];
-        
+        $scriptNameRaw = $_SERVER['SCRIPT_NAME'] ?? '';
+        $scriptPath = is_string($scriptNameRaw) ? $scriptNameRaw : '';
+        $docRootRaw = $_SERVER['DOCUMENT_ROOT'] ?? '';
+        $documentRoot = is_string($docRootRaw) ? $docRootRaw : '';
+        $currentFileRaw = $_SERVER['SCRIPT_FILENAME'] ?? '';
+        $currentFile = is_string($currentFileRaw) ? $currentFileRaw : '';
+
         // Calculate how many directory levels deep we are from the application root
         $iblRoot = $documentRoot . '/ibl5';
         $relativePath = '';
-        
+
         // If we're in a subdirectory of ibl5, calculate the relative path back to root
         if (strpos($currentFile, $iblRoot) === 0) {
             $relativeFromIblRoot = substr(dirname($currentFile), strlen($iblRoot));
@@ -29,7 +35,7 @@ class Header
                 $relativePath = str_repeat('../', $levels);
             }
         }
-        
+
         include_secure("themes/$ThemeSel/theme.php");
         echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">';
         echo '<html xmlns="http://www.w3.org/1999/xhtml">';
@@ -61,10 +67,12 @@ class Header
         themeheader();
     }
 
-    public static function header()
+    public static function header(): void
     {
         define('NUKE_HEADER', true);
-        require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+        $docRootForMainfile = $_SERVER['DOCUMENT_ROOT'] ?? '';
+        $docRootStr = is_string($docRootForMainfile) ? $docRootForMainfile : '';
+        require_once $docRootStr . '/ibl5/mainfile.php';
 
         online();
         Header::head();

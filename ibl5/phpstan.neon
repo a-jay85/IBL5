@@ -8,5 +8,7 @@ parameters:
         - classes
     excludePaths:
         - classes/SiteStatistics
+    bootstrapFiles:
+        - phpstan-stubs/nuke-globals.stub.php
     phpVersion: 80300
     treatPhpDocTypesAsCertain: false

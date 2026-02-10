@@ -52,21 +52,23 @@ if (!defined("SQL_LAYER")) {
      */
     class MySQL
     {
-        public $db_connect_id;
-        public $query_result;
-        public $row = array();
-        public $rowset = array();
-        public $num_queries = 0;
-        public $persistency;
-        public $user;
-        public $password;
-        public $server;
-        public $dbname;
+        public \mysqli|false $db_connect_id = false;
+        public \mysqli_result|bool|null $query_result = null;
+        /** @var array<int|string, array<int|string, mixed>> */
+        public array $row = [];
+        /** @var array<int|string, array<int|string, mixed>> */
+        public array $rowset = [];
+        public int $num_queries = 0;
+        public bool $persistency = true;
+        public string $user = '';
+        public string $password = '';
+        public string $server = '';
+        public string $dbname = '';
 
         //
         // Constructor
         //
-        public function __construct($sqlserver, $sqluser, $sqlpassword, $database, $persistency = true)
+        public function __construct(string $sqlserver, string $sqluser, string $sqlpassword, string $database, bool $persistency = true)
         {
             $this->persistency = $persistency;
             $this->user = $sqluser;
@@ -77,30 +79,29 @@ if (!defined("SQL_LAYER")) {
             if (!$this->persistency) {
                 $this->db_connect_id = @mysqli_connect($this->server, $this->user, $this->password);
             }
-            if ($this->db_connect_id) {
+            if ($this->db_connect_id instanceof \mysqli) {
                 if ($database !== "") {
                     $this->dbname = $database;
                     $dbselect = @mysqli_select_db($this->db_connect_id, $this->dbname);
                     if (!$dbselect) {
                         @mysqli_close($this->db_connect_id);
-                        $this->db_connect_id = $dbselect;
+                        $this->db_connect_id = false;
                     }
                 }
-                // Set character set to UTF-8 to support accent marks and special characters
-                @mysqli_set_charset($this->db_connect_id, 'utf8mb4');
-                return $this->db_connect_id;
-            } else {
-                return false;
+                if ($this->db_connect_id instanceof \mysqli) {
+                    // Set character set to UTF-8 to support accent marks and special characters
+                    @mysqli_set_charset($this->db_connect_id, 'utf8mb4');
+                }
             }
         }
 
         //
         // Other base methods
         //
-        public function sql_close()
+        public function sql_close(): bool
         {
-            if ($this->db_connect_id) {
-                if ($this->query_result) {
+            if ($this->db_connect_id instanceof \mysqli) {
+                if ($this->query_result instanceof \mysqli_result) {
                     @mysqli_free_result($this->query_result);
                 }
                 $result = @mysqli_close($this->db_connect_id);
@@ -113,54 +114,55 @@ if (!defined("SQL_LAYER")) {
         //
         // Base query method
         //
-        public function sql_query($query = "", $transaction = false)
+        /** @param int|bool $transaction */
+        public function sql_query(string $query = "", int|bool $transaction = false): \mysqli_result|bool
         {
             // Remove any pre-existing queries
             unset($this->query_result);
-            if ($query !== "") {
+            if ($query !== "" && $this->db_connect_id instanceof \mysqli) {
                 $this->query_result = @mysqli_query($this->db_connect_id, $query);
             }
-            if ($this->query_result) {
-                unset($this->row);
-                unset($this->rowset);
+            if ($this->query_result instanceof \mysqli_result) {
+                $this->row = [];
+                $this->rowset = [];
                 return $this->query_result;
             } else {
-                return ($transaction === END_TRANSACTION) ? true : false;
+                return $transaction === END_TRANSACTION;
             }
         }
 
         //
         // Other query methods
         //
-        public function sql_numrows($query_id = 0)
+        /** @param \mysqli_result|int $query_id */
+        public function sql_numrows(\mysqli_result|int $query_id = 0): int|false
         {
-            if (!$query_id) {
+            if ($query_id === 0) {
                 $query_id = $this->query_result;
             }
-            if ($query_id) {
-                $result = @mysqli_num_rows($query_id);
-                return $result;
+            if ($query_id instanceof \mysqli_result) {
+                return (int) @mysqli_num_rows($query_id);
             } else {
                 return false;
             }
         }
 
-        public function sql_affectedrows()
+        public function sql_affectedrows(): int|false
         {
-            if ($this->db_connect_id) {
-                $result = @mysqli_affected_rows($this->db_connect_id);
-                return $result;
+            if ($this->db_connect_id instanceof \mysqli) {
+                return (int) @mysqli_affected_rows($this->db_connect_id);
             } else {
                 return false;
             }
         }
 
-        public function sql_numfields($query_id = 0)
+        /** @param \mysqli_result|int $query_id */
+        public function sql_numfields(\mysqli_result|int $query_id = 0): int|false
         {
-            if (!$query_id) {
+            if ($query_id === 0) {
                 $query_id = $this->query_result;
             }
-            if ($query_id) {
+            if ($query_id instanceof \mysqli_result) {
                 $result = @mysqli_num_fields($query_id);
                 return $result;
             } else {
@@ -168,12 +170,13 @@ if (!defined("SQL_LAYER")) {
             }
         }
 
-        public function sql_fieldname($offset, $query_id = 0)
+        /** @param \mysqli_result|int $query_id */
+        public function sql_fieldname(int $offset, \mysqli_result|int $query_id = 0): \stdClass|false
         {
-            if (!$query_id) {
+            if ($query_id === 0) {
                 $query_id = $this->query_result;
             }
-            if ($query_id) {
+            if ($query_id instanceof \mysqli_result) {
                 $result = @mysqli_fetch_field_direct($query_id, $offset);
                 return $result;
             } else {
@@ -181,12 +184,13 @@ if (!defined("SQL_LAYER")) {
             }
         }
 
-        public function sql_fieldtype($offset, $query_id = 0)
+        /** @param \mysqli_result|int $query_id */
+        public function sql_fieldtype(int $offset, \mysqli_result|int $query_id = 0): \stdClass|false
         {
-            if (!$query_id) {
+            if ($query_id === 0) {
                 $query_id = $this->query_result;
             }
-            if ($query_id) {
+            if ($query_id instanceof \mysqli_result) {
                 $result = @mysqli_fetch_field_direct($query_id, $offset);
                 return $result;
             } else {
@@ -194,20 +198,20 @@ if (!defined("SQL_LAYER")) {
             }
         }
 
-        public function sql_fetchrow($query_id = 0)
+        /**
+         * @param \mysqli_result|array<mixed>|int|bool $query_id
+         * @return array<mixed>|false|null
+         */
+        public function sql_fetchrow(\mysqli_result|array|int|bool $query_id = 0): array|false|null
         {
-            if (!$query_id) {
+            if ($query_id === 0) {
                 $query_id = $this->query_result;
             }
-            if ($query_id) {
+            if ($query_id !== null && $query_id !== false) {
                 // If $query_id is already an array (from refactored methods), return it directly
                 if (is_array($query_id)) {
                     return $query_id;
                 }
-                // Original PHP-Nuke implementation method is commented out.
-                // It has been simplified for PHP 7+ since mysqli_fetch_array always returns objects and not resources.
-                // $this->row[$query_id] = @mysqli_fetch_array($query_id);
-                // return $this->row[$query_id];
                 if ($query_id instanceof \mysqli_result) {
                     return mysqli_fetch_array($query_id);
                 }
@@ -217,22 +221,27 @@ if (!defined("SQL_LAYER")) {
             }
         }
 
-        public function sql_fetchrowset($query_id = 0)
+        /**
+         * @param \mysqli_result|array<mixed>|int|bool $query_id
+         * @return array<int, array<mixed>>|false
+         */
+        public function sql_fetchrowset(\mysqli_result|array|int|bool $query_id = 0): array|false
         {
-            if (!$query_id) {
+            if ($query_id === 0) {
                 $query_id = $this->query_result;
             }
-            if ($query_id) {
+            if ($query_id !== null && $query_id !== false) {
                 // If $query_id is already an array (from refactored methods), wrap it in result array
                 if (is_array($query_id)) {
                     return [$query_id];
                 }
-                unset($this->rowset[$query_id]);
-                unset($this->row[$query_id]);
                 if ($query_id instanceof \mysqli_result) {
+                    /** @var list<array<mixed>> $result */
                     $result = [];
-                    while ($this->rowset[$query_id] = @mysqli_fetch_array($query_id)) {
-                        $result[] = $this->rowset[$query_id];
+                    while (($row = @mysqli_fetch_array($query_id)) !== null) {
+                        if (is_array($row)) {
+                            $result[] = $row;
+                        }
                     }
                     return $result;
                 }
@@ -242,12 +251,16 @@ if (!defined("SQL_LAYER")) {
             }
         }
 
-        public function sql_fetch_assoc($query_id = 0)
+        /**
+         * @param \mysqli_result|array<string, mixed>|int|bool $query_id
+         * @return array<string, mixed>|false|null
+         */
+        public function sql_fetch_assoc(\mysqli_result|array|int|bool $query_id = 0): array|false|null
         {
-            if (!$query_id) {
+            if ($query_id === 0) {
                 $query_id = $this->query_result;
             }
-            if ($query_id) {
+            if ($query_id !== null && $query_id !== false) {
                 // If $query_id is already an array (from refactored methods), return it directly
                 if (is_array($query_id)) {
                     return $query_id;
@@ -262,19 +275,23 @@ if (!defined("SQL_LAYER")) {
         }
 
         // copy/pasted this function from the top comment of https://www.php.net/manual/en/class.mysqli-result.php
-        public function sql_result($res, $row, $field = 0)
+        public function sql_result(\mysqli_result $res, int $row, int|string $field = 0): mixed
         {
             $res->data_seek($row);
             $datarow = $res->fetch_array();
+            if (!is_array($datarow)) {
+                return false;
+            }
             return $datarow[$field];
         }
 
-        public function sql_rowseek($rownum, $query_id = 0)
+        /** @param \mysqli_result|int $query_id */
+        public function sql_rowseek(int $rownum, \mysqli_result|int $query_id = 0): bool
         {
-            if (!$query_id) {
+            if ($query_id === 0) {
                 $query_id = $this->query_result;
             }
-            if ($query_id) {
+            if ($query_id instanceof \mysqli_result) {
                 $result = @mysqli_data_seek($query_id, $rownum);
                 return $result;
             } else {
@@ -282,9 +299,9 @@ if (!defined("SQL_LAYER")) {
             }
         }
 
-        public function sql_nextid()
+        public function sql_nextid(): int|string|false
         {
-            if ($this->db_connect_id) {
+            if ($this->db_connect_id instanceof \mysqli) {
                 $result = @mysqli_insert_id($this->db_connect_id);
                 return $result;
             } else {
@@ -292,27 +309,27 @@ if (!defined("SQL_LAYER")) {
             }
         }
 
-        public function sql_freeresult($query_id = 0)
+        /** @param \mysqli_result|int $query_id */
+        public function sql_freeresult(\mysqli_result|int $query_id = 0): bool
         {
-            if (!$query_id) {
+            if ($query_id === 0) {
                 $query_id = $this->query_result;
             }
-            if ($query_id) {
-                unset($this->row[$query_id]);
-                unset($this->rowset[$query_id]);
-
+            if ($query_id instanceof \mysqli_result) {
                 @mysqli_free_result($query_id);
-
                 return true;
             } else {
                 return false;
             }
         }
 
-        public function sql_error($query_id = 0)
+        /** @return array{message: string, code: int} */
+        public function sql_error(int $query_id = 0): array
         {
-            $result["message"] = @mysqli_error($this->db_connect_id);
-            $result["code"] = @mysqli_errno($this->db_connect_id);
+            $result = [
+                'message' => $this->db_connect_id instanceof \mysqli ? @mysqli_error($this->db_connect_id) : '',
+                'code' => $this->db_connect_id instanceof \mysqli ? @mysqli_errno($this->db_connect_id) : 0,
+            ];
 
             return $result;
         }

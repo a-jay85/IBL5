@@ -328,7 +328,8 @@ class TeamScheduleView implements TeamScheduleViewInterface
         foreach ($games as $row) {
             $game = $row['game'];
             $date = $game->date;
-            $monthKey = date('Y-m', strtotime($date));
+            $dateTimestampForMonth = strtotime($date);
+            $monthKey = $dateTimestampForMonth !== false ? date('Y-m', $dateTimestampForMonth) : '1970-01';
             $monthLabel = $row['currentMonth'];
 
             if (!isset($byMonth[$monthKey])) {

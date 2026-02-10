@@ -153,7 +153,10 @@ class TradeOffer implements TradeOfferInterface
      * Calculate salary cap data for both teams
      *
      * Computes current cap totals and amounts being sent/received for both teams,
-     * including cash considerations based on current season phase.
+     * including existing cash transaction records and new cash considerations.
+     *
+     * For self-trades (same team on both sides), sent/received amounts are zeroed
+     * because all players remain on the same roster.
      *
      * @param TradeFormData $tradeData Trade data from form submission
      * @return array{userCurrentSeasonCapTotal: int, partnerCurrentSeasonCapTotal: int, userCapSentToPartner: int, partnerCapSentToUser: int}
@@ -165,7 +168,7 @@ class TradeOffer implements TradeOfferInterface
         $userCapSentToPartner = 0;
         $partnerCapSentToUser = 0;
 
-        // Calculate user team salary data
+        // Calculate user team salary data from form
         $switchCounter = $tradeData['switchCounter'];
         for ($j = 0; $j < $switchCounter; $j++) {
             $isChecked = $tradeData['check'][$j] ?? null;
@@ -177,7 +180,7 @@ class TradeOffer implements TradeOfferInterface
             }
         }
 
-        // Calculate partner team salary data
+        // Calculate partner team salary data from form
         $fieldsCounter = $tradeData['fieldsCounter'];
         for ($j = $switchCounter; $j < $fieldsCounter; $j++) {
             $isChecked = $tradeData['check'][$j] ?? null;
@@ -189,9 +192,18 @@ class TradeOffer implements TradeOfferInterface
             }
         }
 
-        // Add cash considerations
+        // Include existing cash transaction records (e.g. "Cash from Heat")
+        // which are stored as player records with names starting with '|'
+        // but excluded from the form's hidden contract fields
+        $userTeamId = $this->commonRepository->getTidFromTeamname($tradeData['offeringTeam']) ?? 0;
+        $partnerTeamId = $this->commonRepository->getTidFromTeamname($tradeData['listeningTeam']) ?? 0;
+
+        $userCurrentSeasonCapTotal += $this->sumCashRecordSalaries($userTeamId);
+        $partnerCurrentSeasonCapTotal += $this->sumCashRecordSalaries($partnerTeamId);
+
+        // Add new cash considerations from this trade offer
         $cashConsiderations = $this->validator->getCurrentSeasonCashConsiderations(
-            $tradeData['userSendsCash'], 
+            $tradeData['userSendsCash'],
             $tradeData['partnerSendsCash']
         );
 
@@ -200,12 +212,55 @@ class TradeOffer implements TradeOfferInterface
         $partnerCurrentSeasonCapTotal += $cashConsiderations['cashSentToMe'];
         $partnerCurrentSeasonCapTotal -= $cashConsiderations['cashSentToThem'];
 
+        // Self-trade: both sides are the same team, so no players actually move.
+        // Zero out sent/received to avoid double-counting.
+        if ($tradeData['offeringTeam'] === $tradeData['listeningTeam']) {
+            $userCapSentToPartner = 0;
+            $partnerCapSentToUser = 0;
+        }
+
         return [
             'userCurrentSeasonCapTotal' => $userCurrentSeasonCapTotal,
             'partnerCurrentSeasonCapTotal' => $partnerCurrentSeasonCapTotal,
             'userCapSentToPartner' => $userCapSentToPartner,
             'partnerCapSentToUser' => $partnerCapSentToUser
         ];
+    }
+
+    /**
+     * Sum current-season salary from cash transaction records for a team
+     *
+     * Cash records (names starting with '|') are excluded from form hidden fields
+     * but still affect the team's salary cap. This computes their current-year
+     * impact using the same contract-year logic as the form.
+     *
+     * @param int $teamId Team ID
+     * @return int Sum of cash record salaries for the current season (may be negative)
+     */
+    private function sumCashRecordSalaries(int $teamId): int
+    {
+        $cashRecords = $this->repository->getTeamCashRecordsForSalary($teamId);
+        $isOffseason = $this->season->phase === 'Playoffs'
+            || $this->season->phase === 'Draft'
+            || $this->season->phase === 'Free Agency';
+
+        $total = 0;
+        foreach ($cashRecords as $record) {
+            $cy = $record['cy'] ?? 0;
+            $cy = is_int($cy) ? $cy : 0;
+            if ($isOffseason) {
+                $cy++;
+            }
+            if ($cy === 0) {
+                $cy = 1;
+            }
+            if ($cy < 7) {
+                $cyValue = $record["cy{$cy}"] ?? 0;
+                $total += is_int($cyValue) ? $cyValue : 0;
+            }
+        }
+
+        return $total;
     }
 
     /**

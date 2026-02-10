@@ -17,9 +17,20 @@ if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
 $offerId = $_POST['offer'] ?? null;
 
 if ($offerId !== null) {
+    $offerId = (int) $offerId;
+
+    // Check if trade still exists (may have been accepted/declined via Discord)
+    $repository = new Trading\TradingRepository($mysqli_db);
+    $tradeRows = $repository->getTradesByOfferId($offerId);
+
+    if ($tradeRows === []) {
+        header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
+        exit;
+    }
+
     try {
         $tradeProcessor = new Trading\TradeProcessor($mysqli_db);
-        $result = $tradeProcessor->processTrade((int) $offerId);
+        $result = $tradeProcessor->processTrade($offerId);
 
         if ($result['success']) {
             header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_accepted');

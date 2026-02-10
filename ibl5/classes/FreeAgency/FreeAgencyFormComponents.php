@@ -165,13 +165,13 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         // Offer years
         for ($i = 0; $i < count($offers); $i++) {
             $yearNum = $i + 1;
-            echo "<input type=\"hidden\" name=\"offeryear{$yearNum}\" value=\"" . (int) $offers[$i] . "\">\n";
+            echo "<input type=\"hidden\" name=\"offeryear{$yearNum}\" value=\"" . $offers[$i] . "\">\n";
         }
 
         // Essential form data - uses player properties
         echo "<input type=\"hidden\" name=\"teamname\" value=\"" . htmlspecialchars($this->teamName) . "\">\n";
         echo "<input type=\"hidden\" name=\"playerID\" value=\"" . (int) $this->player->playerID . "\">\n";
-        echo "<input type=\"hidden\" name=\"offerType\" value=\"" . (int) $offerType . "\">\n";
+        echo "<input type=\"hidden\" name=\"offerType\" value=\"" . $offerType . "\">\n";
 
         return (string) ob_get_clean();
     }

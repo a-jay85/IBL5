@@ -77,7 +77,9 @@ class AwardHistoryView implements AwardHistoryViewInterface
             $id = 'sort-' . $value;
             $output .= '<label class="player-awards-sort__option" for="' . $id . '">';
             $output .= '<input type="radio" name="aw_sortby" value="' . $value . '" id="' . $id . '"' . $checked . '>';
-            $output .= ' <span>' . (string) HtmlSanitizer::safeHtmlOutput($label) . '</span>';
+            /** @var string $safeLabel */
+            $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
+            $output .= ' <span>' . $safeLabel . '</span>';
             $output .= '</label>';
         }
         $output .= '</div>';

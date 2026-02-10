@@ -173,6 +173,7 @@ class PlayerStats implements PlayerStatsInterface
     {
         $repository = new PlayerStatsRepository($db);
         $instance = new self($repository);
+        /** @var PlayerRow $plrRow */
         $instance->fill($plrRow);
         return $instance;
     }

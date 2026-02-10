@@ -8,24 +8,29 @@ class Footer
 {
     public static function renderPageGenerationTime(): void
     {
+        /** @var float $start_time */
         global $start_time;
         $mtime = microtime();
-        $mtime = explode(" ", $mtime);
-        $mtime = $mtime[1] + $mtime[0];
-        $end_time = $mtime;
-        $total_time = ($end_time - $start_time);
-        $total_time = _PAGEGENERATION . " " . substr((string) $total_time, 0, 4) . " " . _SECONDS;
+        $mtimeParts = explode(" ", $mtime);
+        $end_time = (float) $mtimeParts[1] + (float) $mtimeParts[0];
+        $total_time = $end_time - $start_time;
+        $total_time_str = _PAGEGENERATION . " " . substr((string) $total_time, 0, 4) . " " . _SECONDS;
 
-        echo "<!-- " . $total_time . " -->\n";
+        echo "<!-- " . $total_time_str . " -->\n";
     }
 
-    public static function foot()
+    public static function foot(): never
     {
-        global $name, $admin;
+        /** @var string $name */
+        global $name;
+        /** @var string $admin */
+        global $admin;
         if (defined('HOME_FILE')) {
             blocks("Down");
         }
-        if (basename($_SERVER['PHP_SELF']) !== "index.php" and defined('MODULE_FILE') and (file_exists("modules/$name/admin/panel.php") && is_admin($admin))) {
+        $phpSelfRaw = $_SERVER['PHP_SELF'] ?? '';
+        $phpSelf = is_string($phpSelfRaw) ? $phpSelfRaw : '';
+        if (basename($phpSelf) !== "index.php" and defined('MODULE_FILE') and (file_exists("modules/$name/admin/panel.php") && is_admin($admin))) {
             echo "<br>";
             include "modules/$name/admin/panel.php";
         }
@@ -38,7 +43,7 @@ class Footer
         die();
     }
 
-    public static function footer()
+    public static function footer(): never
     {
         define('NUKE_FOOTER', true);
         Footer::foot();

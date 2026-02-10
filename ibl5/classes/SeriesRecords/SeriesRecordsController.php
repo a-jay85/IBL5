@@ -23,7 +23,7 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
     private SeriesRecordsView $view;
     private CommonMysqliRepository $commonRepository;
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
         $this->repository = new SeriesRecordsRepository($db);

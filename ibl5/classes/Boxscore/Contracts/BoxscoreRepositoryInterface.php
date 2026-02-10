@@ -163,6 +163,14 @@ interface BoxscoreRepositoryInterface
      * @param int $playerID Player ID
      * @param int $visitorTeamID Visitor team ID
      * @param int $homeTeamID Home team ID
+     * @param int $gameOfThatDay Game number for that date (1st, 2nd game)
+     * @param int $attendance Attendance at the game
+     * @param int $capacity Arena capacity
+     * @param int $visitorWins Visitor team wins before this game
+     * @param int $visitorLosses Visitor team losses before this game
+     * @param int $homeWins Home team wins before this game
+     * @param int $homeLosses Home team losses before this game
+     * @param int $teamID Player's team ID (visitor or home)
      * @param int $minutesPlayed Minutes played
      * @param int $fieldGoalsMade FGM
      * @param int $fieldGoalsAttempted FGA
@@ -187,6 +195,14 @@ interface BoxscoreRepositoryInterface
         int $playerID,
         int $visitorTeamID,
         int $homeTeamID,
+        int $gameOfThatDay,
+        int $attendance,
+        int $capacity,
+        int $visitorWins,
+        int $visitorLosses,
+        int $homeWins,
+        int $homeLosses,
+        int $teamID,
         int $minutesPlayed,
         int $fieldGoalsMade,
         int $fieldGoalsAttempted,

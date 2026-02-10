@@ -77,10 +77,7 @@ class TradeProcessor implements TradeProcessorInterface
             $listeningTeamName = $tradeRow['to'];
 
             $result = $this->processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId);
-
-            if ($result['success'] === true) {
-                $storytext .= $result['tradeLine'];
-            }
+            $storytext .= $result['tradeLine'];
         }
 
         // Create news story and notifications
@@ -155,7 +152,7 @@ class TradeProcessor implements TradeProcessorInterface
             6 => $cashDetails['cy6'] ?? 0,
         ];
 
-        return $this->cashHandler->createCashTransaction($uniquePid, $offeringTeamName, $listeningTeamName, $cashYear);
+        return $this->cashHandler->createCashTransaction($uniquePid, $offeringTeamName, $listeningTeamName, $cashYear, $this->season->endingYear);
     }
 
     /**
@@ -344,7 +341,11 @@ class TradeProcessor implements TradeProcessorInterface
             }
 
             \Discord::postToChannel('#trades', $discordText);
-            \Discord::postToChannel('#general-chat', $storytext);
+
+            $serverName = $_SERVER['SERVER_NAME'] ?? 'localhost';
+            if ($serverName !== 'localhost' && $serverName !== '127.0.0.1') {
+                \Discord::postToChannel('#general-chat', $storytext);
+            }
         } catch (\Exception $e) {
             // Log the error but don't fail the trade
             error_log('Discord notification failed: ' . $e->getMessage());

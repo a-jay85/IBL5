@@ -34,10 +34,7 @@ try {
     $receivingUserDiscordID = $discord->getDiscordIDFromTeamname($teamReceiving);
     $discordDMmessage = 'Sorry, trade proposal declined by <@!' . $rejectingUserDiscordID . '>.
 Go here to make another offer: http://www.iblhoops.net/ibl5/modules.php?name=Trading&op=reviewtrade';
-    $arrayContent = [
-        'message' => $discordDMmessage,
-        'receivingUserDiscordID' => $receivingUserDiscordID,
-    ];
+    \Discord::sendDM($receivingUserDiscordID, $discordDMmessage);
 } catch (Exception $e) {
     // Silently fail if Discord notification fails
     // The trade rejection itself has already succeeded

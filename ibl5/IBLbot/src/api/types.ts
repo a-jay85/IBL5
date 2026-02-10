@@ -147,6 +147,7 @@ export interface Game {
     date: string;
     status: string;
     box_score_id: number;
+    game_of_that_day: number;
     visitor: TeamRef & { score: number; team_id: number };
     home: TeamRef & { score: number; team_id: number };
 }

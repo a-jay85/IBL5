@@ -58,6 +58,7 @@ final class RecordHoldersServiceTest extends TestCase
             'team_name' => 'Timberwolves',
             'date' => '1996-01-16',
             'BoxID' => 0,
+            'gameOfThatDay' => 0,
             'oppTid' => 20,
             'opp_team_name' => 'Grizzlies',
             'value' => 80,
@@ -96,6 +97,7 @@ final class RecordHoldersServiceTest extends TestCase
             'team_name' => 'Magic',
             'date' => '1994-10-12',
             'BoxID' => 0,
+            'gameOfThatDay' => 0,
             'oppTid' => 11,
             'opp_team_name' => 'Pacers',
             'value' => 65,
@@ -183,6 +185,7 @@ final class RecordHoldersServiceTest extends TestCase
             'team_name' => 'Heat',
             'date' => '1992-12-12',
             'BoxID' => 0,
+            'gameOfThatDay' => 0,
             'oppTid' => 25,
             'opp_team_name' => 'Pistons',
             'points' => 12,
@@ -255,7 +258,24 @@ final class RecordHoldersServiceTest extends TestCase
         $this->assertSame('bos', $firstCategory[0]['teamAbbr']);
     }
 
-    public function testBoxScoreUrlGeneratedWhenBoxIdAvailable(): void
+    public function testBoxScoreUrlGeneratedWhenGameOfThatDayAvailable(): void
+    {
+        $record = $this->createPlayerRecord(927, 'Bob Pettit', 80);
+        $record['gameOfThatDay'] = 3;
+
+        $batchResult = $this->buildBatchPlayerResult([$record]);
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($batchResult);
+        $this->configureOtherMocksEmpty();
+
+        $result = $this->service->getAllRecords();
+
+        $regSeason = $result['playerSingleGame']['regularSeason'];
+        $firstCategory = array_values($regSeason)[0];
+        $this->assertStringContainsString('1996-01-16-game-3/boxscore', $firstCategory[0]['boxScoreUrl']);
+    }
+
+    public function testBoxScoreUrlFallsBackToLegacyWhenNoGameOfThatDay(): void
     {
         $record = $this->createPlayerRecord(927, 'Bob Pettit', 80);
         $record['BoxID'] = 1731;
@@ -269,10 +289,10 @@ final class RecordHoldersServiceTest extends TestCase
 
         $regSeason = $result['playerSingleGame']['regularSeason'];
         $firstCategory = array_values($regSeason)[0];
-        $this->assertSame('modules.php?name=Scores&pa=boxscore&boxid=1731', $firstCategory[0]['boxScoreUrl']);
+        $this->assertSame('./ibl/IBL/box1731.htm', $firstCategory[0]['boxScoreUrl']);
     }
 
-    public function testBoxScoreUrlEmptyWhenNoBoxId(): void
+    public function testBoxScoreUrlEmptyWhenNeitherAvailable(): void
     {
         $record = $this->createPlayerRecord(927, 'Bob Pettit', 80);
 
@@ -317,7 +337,7 @@ final class RecordHoldersServiceTest extends TestCase
     /**
      * Helper to create a player record with customizable values.
      *
-     * @return array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int}
+     * @return array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}
      */
     private function createPlayerRecord(int $pid, string $name, int $value, int $tid = 14): array
     {
@@ -328,6 +348,7 @@ final class RecordHoldersServiceTest extends TestCase
             'team_name' => 'Test Team',
             'date' => '1996-01-16',
             'BoxID' => 0,
+            'gameOfThatDay' => 0,
             'oppTid' => 20,
             'opp_team_name' => 'Grizzlies',
             'value' => $value,
@@ -337,8 +358,8 @@ final class RecordHoldersServiceTest extends TestCase
     /**
      * Build a batch player result where every stat category has the same records.
      *
-     * @param list<array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int}> $records
-     * @return array<string, list<array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int}>>
+     * @param list<array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
+     * @return array<string, list<array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}>>
      */
     private function buildBatchPlayerResult(array $records): array
     {
@@ -387,8 +408,8 @@ final class RecordHoldersServiceTest extends TestCase
     /**
      * Build a batch team result where every stat category has the same records.
      *
-     * @param list<array{tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int}> $records
-     * @return array<string, list<array{tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int}>>
+     * @param list<array{tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}> $records
+     * @return array<string, list<array{tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int}>>
      */
     private function buildBatchTeamResult(array $records): array
     {

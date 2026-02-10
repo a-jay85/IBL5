@@ -20,6 +20,7 @@ class GameListControllerTest extends IntegrationTestCase
                 'game_date' => '2007-01-15',
                 'box_score_id' => 545,
                 'game_status' => 'completed',
+                'game_of_that_day' => 3,
                 'visitor_uuid' => 'visitor-uuid-1',
                 'visitor_team_id' => 1,
                 'visitor_city' => 'Boston',

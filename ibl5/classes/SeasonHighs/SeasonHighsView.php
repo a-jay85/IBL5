@@ -133,11 +133,17 @@ class SeasonHighsView implements SeasonHighsViewInterface
                 $isTeamStat = true;
             }
 
-            // Link dates to box score when boxId is available
-            if (isset($row['boxId'])) {
-                $boxId = (int) $row['boxId'];
+            // Link dates to box score when gameOfThatDay is available
+            $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl(
+                $row['date'],
+                $row['gameOfThatDay'] ?? 0,
+                $row['boxId'] ?? 0
+            );
+            if ($boxScoreUrl !== '') {
+                /** @var string $safeUrl */
+                $safeUrl = HtmlSanitizer::safeHtmlOutput($boxScoreUrl);
                 /** @var string $date */
-                $date = "<a href=\"./ibl/IBL/box{$boxId}.htm\">{$date}</a>";
+                $date = "<a href=\"{$safeUrl}\">{$date}</a>";
             }
 
             // Render row differently for team stats (styled team cell) vs player stats

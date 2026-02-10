@@ -21,7 +21,15 @@ class TeamSchedule extends Schedule implements TeamScheduleInterface
     {
         /** @var \mysqli $db */
         $stmt = $db->prepare(
-            "SELECT * FROM `ibl_schedule` WHERE Visitor = ? OR Home = ? ORDER BY Date ASC"
+            "SELECT s.*, bst.gameOfThatDay
+            FROM ibl_schedule s
+            LEFT JOIN (
+                SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                FROM ibl_box_scores_teams
+                GROUP BY Date, visitorTeamID, homeTeamID
+            ) bst ON bst.Date = s.Date AND bst.visitorTeamID = s.Visitor AND bst.homeTeamID = s.Home
+            WHERE s.Visitor = ? OR s.Home = ?
+            ORDER BY s.Date ASC"
         );
         if ($stmt === false) {
             throw new \Exception('Prepare failed: ' . $db->error);

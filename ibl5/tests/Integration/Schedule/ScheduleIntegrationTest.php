@@ -149,7 +149,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         TeamSchedule::getSchedule($GLOBALS['mysqli_db'], $teamId);
 
         // Assert
-        $this->assertQueryExecuted('ORDER BY Date ASC');
+        $this->assertQueryExecuted('ORDER BY s.Date ASC');
     }
 
     /**
@@ -899,6 +899,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
             'Home' => $homeId,
             'HScore' => $homeScore,
             'BoxID' => $boxId,
+            'gameOfThatDay' => 0,
         ];
     }
 
@@ -959,6 +960,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $game->visitorScore = $visitorScore;
         $game->homeScore = $homeScore;
         $game->boxScoreID = 12345;
+        $game->gameOfThatDay = 0;
         $game->visitorTeamID = 5;
         $game->homeTeamID = 10;
 

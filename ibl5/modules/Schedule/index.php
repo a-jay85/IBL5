@@ -63,10 +63,16 @@ function renderLeagueSchedule(
     $projectedNextSimEndDate = $season->projectedNextSimEndDate;
     $simLengthDays = $league->getSimLengthInDays();
 
-    // Get all games using MySQLi
-    $query = "SELECT SchedID, Date, Visitor, VScore, Home, HScore, BoxID
-              FROM ibl_schedule
-              ORDER BY Date ASC, SchedID ASC";
+    // Get all games using MySQLi, with gameOfThatDay from box score teams table
+    $query = "SELECT s.SchedID, s.Date, s.Visitor, s.VScore, s.Home, s.HScore, s.BoxID,
+              bst.gameOfThatDay
+              FROM ibl_schedule s
+              LEFT JOIN (
+                  SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                  FROM ibl_box_scores_teams
+                  GROUP BY Date, visitorTeamID, homeTeamID
+              ) bst ON bst.Date = s.Date AND bst.visitorTeamID = s.Visitor AND bst.homeTeamID = s.Home
+              ORDER BY s.Date ASC, s.SchedID ASC";
     $result = $mysqli_db->query($query);
 
     // Get team records using MySQLi
@@ -90,6 +96,7 @@ function renderLeagueSchedule(
         $home = (int)$row['Home'];
         $homeScore = (int)$row['HScore'];
         $boxid = (int)$row['BoxID'];
+        $gameOfThatDay = (int)($row['gameOfThatDay'] ?? 0);
 
         $monthKey = date('Y-m', strtotime($date));
         $monthLabel = date('F', strtotime($date));
@@ -128,6 +135,8 @@ function renderLeagueSchedule(
             'homeTeam' => $commonRepository->getTeamnameFromTeamID((int) $home),
             'homeRecord' => $teamRecords[$home] ?? '',
             'boxid' => $boxid,
+            'gameOfThatDay' => $gameOfThatDay,
+            'boxScoreUrl' => \Utilities\BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxid),
             'isUnplayed' => $isUnplayed,
             'isUpcoming' => $isUpcoming,
             'visitorWon' => ($visitorScore > $homeScore),
@@ -217,7 +226,7 @@ function renderLeagueSchedule(
                 }
 
                 $gameId = 'game-' . $game['boxid'];
-                $boxScoreUrl = 'ibl/IBL/box' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['boxid']) . '.htm';
+                $boxScoreUrl = \Utilities\HtmlSanitizer::safeHtmlOutput($game['boxScoreUrl']);
                 $visitorTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitor']);
                 $homeTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['home']);
 
@@ -230,11 +239,17 @@ function renderLeagueSchedule(
                 echo '</a>';
                 echo '<a href="' . $visitorTeamUrl . '" class="schedule-game__logo-link"><img class="schedule-game__logo" src="images/logo/new' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitor']) . '.png" alt="" width="25" height="25" loading="lazy"></a>';
 
-                // Scores + @ (links to box score)
-                echo '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorScore'])) . '</a>';
-                echo '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
+                // Scores + @ (links to box score when available)
                 $hClass = $game['homeWon'] ? ' schedule-game__team--win' : '';
-                echo '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeScore'])) . '</a>';
+                if ($boxScoreUrl !== '') {
+                    echo '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorScore'])) . '</a>';
+                    echo '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
+                    echo '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeScore'])) . '</a>';
+                } else {
+                    echo '<span class="schedule-game__score-link' . $vClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorScore'])) . '</span>';
+                    echo '<span class="schedule-game__vs">@</span>';
+                    echo '<span class="schedule-game__score-link' . $hClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeScore'])) . '</span>';
+                }
 
                 // Home logo + team (links to team page)
                 echo '<a href="' . $homeTeamUrl . '" class="schedule-game__logo-link"><img class="schedule-game__logo" src="images/logo/new' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['home']) . '.png" alt="" width="25" height="25" loading="lazy"></a>';

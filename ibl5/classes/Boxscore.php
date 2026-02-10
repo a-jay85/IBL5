@@ -41,6 +41,14 @@ class Boxscore
         pid,
         visitorTID,
         homeTID,
+        gameOfThatDay,
+        attendance,
+        capacity,
+        visitorWins,
+        visitorLosses,
+        homeWins,
+        homeLosses,
+        teamID,
         gameMIN,
         game2GM,
         game2GA,
@@ -56,7 +64,7 @@ class Boxscore
         gameBLK,
         gamePF
     )
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"; 
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"; 
 
     const TEAMSTATEMENT_PREPARE = "INSERT INTO ibl_box_scores_teams (
         Date,

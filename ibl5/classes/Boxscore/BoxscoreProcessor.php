@@ -137,6 +137,9 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                         $gameLinesProcessed++;
                     } else {
                         $playerUuid = UuidGenerator::generateUuid();
+                        // Determine player's team ID based on position in 30-player array
+                        // Players 0-14 are visitors, players 15-29 are home team
+                        $playerTeamID = $i < 15 ? $boxscoreGameInfo->visitorTeamID : $boxscoreGameInfo->homeTeamID;
                         $this->repository->insertPlayerBoxscore(
                             $boxscoreGameInfo->gameDate,
                             $playerUuid,
@@ -145,6 +148,14 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                             (int) $playerStats->playerID,
                             $boxscoreGameInfo->visitorTeamID,
                             $boxscoreGameInfo->homeTeamID,
+                            $boxscoreGameInfo->gameOfThatDay,
+                            (int) $boxscoreGameInfo->attendance,
+                            (int) $boxscoreGameInfo->capacity,
+                            (int) $boxscoreGameInfo->visitorWins,
+                            (int) $boxscoreGameInfo->visitorLosses,
+                            (int) $boxscoreGameInfo->homeWins,
+                            (int) $boxscoreGameInfo->homeLosses,
+                            $playerTeamID,
                             (int) $playerStats->gameMinutesPlayed,
                             (int) $playerStats->gameFieldGoalsMade,
                             (int) $playerStats->gameFieldGoalsAttempted,

@@ -465,24 +465,24 @@ class TradingView implements TradingViewInterface
         ob_start();
         ?>
 <div class="trade-offer-card" style="margin-bottom: 1rem; padding: 1rem; border: 1px solid var(--gray-200); border-radius: var(--radius-md); background: white;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+    <div style="margin-bottom: 0.5rem;">
         <strong>Trade Offer #<?= $offerId ?></strong>
-        <div style="display: flex; gap: 0.5rem;">
+    </div>
+    <div style="display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 0.5rem;">
 <?php if ($offer['hasHammer']): ?>
-            <form name="tradeaccept" method="post" action="/ibl5/modules/Trading/accepttradeoffer.php" style="margin: 0;">
-                <input type="hidden" name="offer" value="<?= $offerId ?>">
-                <button type="submit" class="ibl-btn ibl-btn--success" onclick="this.disabled=true;this.textContent='Submitting...'; this.form.submit();">Accept</button>
-            </form>
+        <form name="tradeaccept" method="post" action="/ibl5/modules/Trading/accepttradeoffer.php" style="margin: 0;">
+            <input type="hidden" name="offer" value="<?= $offerId ?>">
+            <button type="submit" class="ibl-btn ibl-btn--success" onclick="this.disabled=true;this.textContent='Submitting...'; this.form.submit();">Accept</button>
+        </form>
 <?php else: ?>
-            <span style="color: var(--gray-500); font-style: italic;">Awaiting Approval</span>
+        <span style="color: var(--gray-500); font-style: italic;">Awaiting Approval</span>
 <?php endif; ?>
-            <form name="tradereject" method="post" action="/ibl5/modules/Trading/rejecttradeoffer.php" style="margin: 0;">
-                <input type="hidden" name="offer" value="<?= $offerId ?>">
-                <input type="hidden" name="teamRejecting" value="<?= $userTeam ?>">
-                <input type="hidden" name="teamReceiving" value="<?= $oppositeTeam ?>">
-                <button type="submit" class="ibl-btn ibl-btn--danger">Reject</button>
-            </form>
-        </div>
+        <form name="tradereject" method="post" action="/ibl5/modules/Trading/rejecttradeoffer.php" style="margin: 0;">
+            <input type="hidden" name="offer" value="<?= $offerId ?>">
+            <input type="hidden" name="teamRejecting" value="<?= $userTeam ?>">
+            <input type="hidden" name="teamReceiving" value="<?= $oppositeTeam ?>">
+            <button type="submit" class="ibl-btn ibl-btn--danger">Reject</button>
+        </form>
     </div>
     <div class="trade-offer-items">
 <?php foreach ($offer['items'] as $item): ?>

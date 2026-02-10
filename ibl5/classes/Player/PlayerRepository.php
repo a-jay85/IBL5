@@ -424,21 +424,6 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     }
 
     /**
-     * @see PlayerRepositoryInterface::getBoxScoresBetweenDates()
-     * @return array<int, array<string, mixed>>
-     */
-    public function getBoxScoresBetweenDates(int $playerID, string $startDate, string $endDate): array
-    {
-        return $this->fetchAll(
-            "SELECT * FROM ibl_box_scores WHERE pid = ? AND Date BETWEEN ? AND ? ORDER BY Date ASC",
-            "iss",
-            $playerID,
-            $startDate,
-            $endDate
-        );
-    }
-
-    /**
      * @see PlayerRepositoryInterface::getHistoricalStats()
      * @return array<int, array<string, mixed>>
      */

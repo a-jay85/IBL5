@@ -41,7 +41,8 @@ function formatLeagueLine(g: Game): string {
     const shortDate = g.date.slice(5); // "MM-DD" from "YYYY-MM-DD"
 
     if (g.status === 'played' || g.status === 'completed') {
-        const boxLink = `[${shortDate}](${boxScoreUrl(g.box_score_id)})`;
+        const url = boxScoreUrl(g.date, g.game_of_that_day);
+        const boxLink = url ? `[${shortDate}](${url})` : shortDate;
         const winner = g.visitor.score > g.home.score ? 'visitor' : 'home';
         const vBold = winner === 'visitor' ? '**' : '';
         const hBold = winner === 'home' ? '**' : '';
@@ -65,7 +66,8 @@ function formatTeamLine(g: Game, teamFullName: string): string {
     const prefix = isHome ? 'vs' : '@';
 
     if (g.status === 'played' || g.status === 'completed') {
-        const boxLink = `[${shortDate}](${boxScoreUrl(g.box_score_id)})`;
+        const url = boxScoreUrl(g.date, g.game_of_that_day);
+        const boxLink = url ? `[${shortDate}](${url})` : shortDate;
         const teamScore = isHome ? g.home.score : g.visitor.score;
         const oppScore = isHome ? g.visitor.score : g.home.score;
         const result = teamScore > oppScore ? 'W' : 'L';

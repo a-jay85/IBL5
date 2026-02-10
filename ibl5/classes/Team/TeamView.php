@@ -46,18 +46,19 @@ class TeamView implements TeamViewInterface
         /** @var string $teamNameSafe */
         $teamNameSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
         $yearHeading = ($yr !== null && $yr !== '')
-            ? "<h1 class=\"ibl-title\" style=\"margin: 0.5rem 0;\">$yrSafe $teamNameSafe</h1>"
+            ? "<h1 class=\"ibl-title\">$yrSafe $teamNameSafe</h1>"
             : "";
 
         $bannerHtml = $isActualTeam
-            ? $this->renderTeamBanner($teamID, $team, $imagesPath, $yearHeading)
-            : "<div style=\"text-align: center; margin-bottom: 1rem;\"><img src=\"./{$imagesPath}logo/{$teamID}.jpg\" style=\"display: block; margin: 0 auto;\">{$yearHeading}</div>";
+            ? $this->renderTeamBanner($teamID, $team, $imagesPath)
+            : "<div style=\"text-align: center; margin-bottom: 1rem;\"><img src=\"./{$imagesPath}logo/{$teamID}.jpg\" style=\"display: block; margin: 0 auto;\"></div>";
 
         ob_start();
         ?>
 <div class="team-page-layout">
     <div class="team-page-main">
         <div class="team-stats-block">
+            <?= $yearHeading ?>
             <?= $bannerHtml ?>
             <div class="table-scroll-wrapper">
                 <div class="table-scroll-container">
@@ -80,7 +81,7 @@ class TeamView implements TeamViewInterface
      *
      * @param \Team $team Team object with color1, color2 properties
      */
-    private function renderTeamBanner(int $teamID, object $team, string $imagesPath, string $yearHeading): string
+    private function renderTeamBanner(int $teamID, object $team, string $imagesPath): string
     {
         /** @var \Team $team */
         $color1 = \UI\TableStyles::sanitizeColor($team->color1);
@@ -92,7 +93,6 @@ class TeamView implements TeamViewInterface
     <a href="modules.php?name=Schedule&amp;teamID=<?= $teamID ?>" class="team-action-link">Schedule</a>
     <div style="text-align: center;">
         <img src="./<?= $imagesPath ?>logo/<?= $teamID ?>.jpg" style="display: block; margin: 0 18px;">
-        <?= $yearHeading ?>
     </div>
     <a href="modules.php?name=DraftHistory&amp;teamID=<?= $teamID ?>" class="team-action-link">Draft History</a>
 </div>

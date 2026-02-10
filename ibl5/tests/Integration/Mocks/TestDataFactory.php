@@ -58,7 +58,6 @@ class TestDataFactory
             'draftyear' => 2020,
             'draftround' => 1,
             'draftpickno' => 15,
-            'formerly_known_as' => null,
             // Rating fields (required by PlayerRepository)
             // ibl_plr table uses these field names
             'oo' => 50,

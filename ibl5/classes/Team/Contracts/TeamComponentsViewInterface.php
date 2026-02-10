@@ -23,7 +23,7 @@ interface TeamComponentsViewInterface
     /**
      * Render current season summary (record, standings, arena, etc.)
      *
-     * @param object $team Team object with name, formerlyKnownAs, arena, capacity
+     * @param object $team Team object with name, city, arena, capacity, teamID
      * @return string HTML info list
      */
     public function currentSeason(object $team): string;

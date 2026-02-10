@@ -766,7 +766,6 @@ class ExtensionIntegrationTest extends IntegrationTestCase
             'color2' => 'White',
             'arena' => 'Test Arena',
             'capacity' => 20000,
-            'formerly_known_as' => '',
             'owner_name' => 'Test Owner',
             'owner_email' => 'owner@test.com',
             'discordID' => '123456',

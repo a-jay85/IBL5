@@ -18,6 +18,7 @@ use Team\Contracts\TeamRepositoryInterface;
  * @phpstan-import-type HEATWinLossRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type PlayoffResultRow from Contracts\TeamRepositoryInterface
  * @phpstan-import-type HistRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type FranchiseSeasonRow from Contracts\TeamRepositoryInterface
  *
  * @see TeamRepositoryInterface
  */
@@ -257,6 +258,20 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
             "is",
             $teamID,
             $year
+        );
+    }
+
+    /**
+     * @see TeamRepositoryInterface::getFranchiseSeasons()
+     * @return list<FranchiseSeasonRow>
+     */
+    public function getFranchiseSeasons(int $franchiseId): array
+    {
+        /** @var list<FranchiseSeasonRow> */
+        return $this->fetchAll(
+            "SELECT * FROM ibl_franchise_seasons WHERE franchise_id = ? ORDER BY season_year ASC",
+            "i",
+            $franchiseId
         );
     }
 }

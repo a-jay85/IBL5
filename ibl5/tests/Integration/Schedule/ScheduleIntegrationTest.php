@@ -68,7 +68,6 @@ class ScheduleIntegrationTest extends IntegrationTestCase
                 'color2' => '000000',
                 'arena' => 'Test Arena',
                 'capacity' => 20000,
-                'formerly_known_as' => null,
                 'owner_name' => 'Test Owner',
                 'owner_email' => 'test@example.com',
                 'discordID' => '123456789',

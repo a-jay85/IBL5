@@ -25,6 +25,7 @@ namespace Team\Contracts;
  * @phpstan-type HEATWinLossRow array{year: int, currentname: string, namethatyear: string, wins: int, losses: int, table_ID: int}
  * @phpstan-type PlayoffResultRow array{year: int, round: int, winner: string, loser: string, loser_games: int, id: int}
  * @phpstan-type HistRow array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, r_2ga: int, r_2gp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_oo: int, r_do: int, r_po: int, r_to: int, r_od: int, r_dd: int, r_pd: int, r_td: int, salary: int, nuke_iblhist: int, created_at: string, updated_at: string}
+ * @phpstan-type FranchiseSeasonRow array{id: int, franchise_id: int, season_year: int, season_ending_year: int, team_city: string, team_name: string}
  */
 interface TeamRepositoryInterface
 {
@@ -154,4 +155,12 @@ interface TeamRepositoryInterface
      * @return list<HistRow> Player rows ordered by name ASC
      */
     public function getHistoricalRoster(int $teamID, string $year): array;
+
+    /**
+     * Get all franchise seasons for a franchise
+     *
+     * @param int $franchiseId Franchise ID (teamid from ibl_team_info)
+     * @return list<FranchiseSeasonRow> Rows ordered by season_year ASC
+     */
+    public function getFranchiseSeasons(int $franchiseId): array;
 }

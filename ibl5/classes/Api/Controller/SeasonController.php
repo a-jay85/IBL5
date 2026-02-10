@@ -20,7 +20,7 @@ class SeasonController implements ControllerInterface
     /**
      * @see ControllerInterface::handle()
      */
-    public function handle(array $params, array $query, JsonResponder $responder): void
+    public function handle(array $params, array $query, JsonResponder $responder, ?array $body = null): void
     {
         $season = new \Season($this->db);
         $etag = new ETagHandler();

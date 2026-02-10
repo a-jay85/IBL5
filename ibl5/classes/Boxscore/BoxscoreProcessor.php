@@ -81,11 +81,9 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             if ($upsertAction === 'skip') {
                 $gamesSkipped++;
                 continue;
-            } elseif ($upsertAction === 'update') {
-                $gamesUpdated++;
-            } else {
-                $gamesInserted++;
             }
+
+            $gameLinesProcessed = 0;
 
             for ($i = 0; $i < 30; $i++) {
                 $x = $i * 53;
@@ -136,7 +134,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                             (int) $playerStats->gameBlocks,
                             (int) $playerStats->gamePersonalFouls,
                         );
-                        $linesProcessed++;
+                        $gameLinesProcessed++;
                     } else {
                         $playerUuid = UuidGenerator::generateUuid();
                         $this->repository->insertPlayerBoxscore(
@@ -162,9 +160,19 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                             (int) $playerStats->gameBlocks,
                             (int) $playerStats->gamePersonalFouls,
                         );
-                        $linesProcessed++;
+                        $gameLinesProcessed++;
                     }
                 }
+            }
+
+            // Only count the game if data was actually written to the DB
+            if ($gameLinesProcessed > 0) {
+                if ($upsertAction === 'update') {
+                    $gamesUpdated++;
+                } else {
+                    $gamesInserted++;
+                }
+                $linesProcessed += $gameLinesProcessed;
             }
         }
 

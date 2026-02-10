@@ -16,6 +16,7 @@ namespace RecordHolders\Contracts;
  *     team_name: string,
  *     date: string,
  *     BoxID: int,
+ *     gameOfThatDay: int,
  *     oppTid: int,
  *     opp_team_name: string,
  *     value: int
@@ -37,6 +38,7 @@ namespace RecordHolders\Contracts;
  *     team_name: string,
  *     date: string,
  *     BoxID: int,
+ *     gameOfThatDay: int,
  *     oppTid: int,
  *     opp_team_name: string,
  *     points: int,
@@ -57,6 +59,7 @@ namespace RecordHolders\Contracts;
  *     team_name: string,
  *     date: string,
  *     BoxID: int,
+ *     gameOfThatDay: int,
  *     oppTid: int,
  *     opp_team_name: string,
  *     value: int
@@ -67,6 +70,7 @@ namespace RecordHolders\Contracts;
  *     team_name: string,
  *     date: string,
  *     BoxID: int,
+ *     gameOfThatDay: int,
  *     oppTid: int,
  *     opp_team_name: string,
  *     value: int
@@ -79,6 +83,7 @@ namespace RecordHolders\Contracts;
  *     loser_name: string,
  *     date: string,
  *     BoxID: int,
+ *     gameOfThatDay: int,
  *     margin: int
  * }
  *

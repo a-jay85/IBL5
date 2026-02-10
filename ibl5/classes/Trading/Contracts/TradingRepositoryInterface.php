@@ -335,6 +335,17 @@ interface TradingRepositoryInterface
     public function getTeamPlayerCount(string $teamName): int;
 
     /**
+     * Get cash placeholder records for a team's salary calculation
+     *
+     * Returns cash transaction records (names starting with '|') that affect
+     * a team's salary cap totals but should not appear in the trading roster.
+     *
+     * @param int $teamId Team ID
+     * @return list<TradingPlayerRow> Cash placeholder rows with contract year data
+     */
+    public function getTeamCashRecordsForSalary(int $teamId): array;
+
+    /**
      * Get all teams with city, name, colors and ID for trading UI
      *
      * @return list<TeamWithCityRow> Team rows ordered by city

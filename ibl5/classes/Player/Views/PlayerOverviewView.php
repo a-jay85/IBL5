@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Player\Views;
 
 use Player\Player;
-use Player\PlayerRepository;
+use Player\PlayerStatsRepository;
 use Player\PlayerStats;
 use Player\Contracts\PlayerOverviewViewInterface;
 use Services\CommonMysqliRepository;
@@ -14,22 +14,22 @@ use Utilities\HtmlSanitizer;
 
 /**
  * PlayerOverviewView - Renders the player overview page
- * 
+ *
  * Displays player ratings, free agency preferences, and current season game log.
  * Uses repositories for all database access - no inline queries.
- * 
+ *
  * @see PlayerOverviewViewInterface
  */
 class PlayerOverviewView implements PlayerOverviewViewInterface
 {
-    private PlayerRepository $playerRepository;
+    private PlayerStatsRepository $statsRepository;
     private CommonMysqliRepository $commonRepository;
 
     public function __construct(
-        PlayerRepository $playerRepository,
+        PlayerStatsRepository $statsRepository,
         CommonMysqliRepository $commonRepository
     ) {
-        $this->playerRepository = $playerRepository;
+        $this->statsRepository = $statsRepository;
         $this->commonRepository = $commonRepository;
     }
 
@@ -80,7 +80,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
      */
     private function renderGameLog(int $playerID, string $startDate, string $endDate): string
     {
-        $boxScores = $this->playerRepository->getBoxScoresBetweenDates($playerID, $startDate, $endDate);
+        $boxScores = $this->statsRepository->getBoxScoresBetweenDates($playerID, $startDate, $endDate);
 
         ob_start();
         ?>

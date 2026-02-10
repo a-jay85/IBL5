@@ -136,16 +136,6 @@ interface PlayerRepositoryInterface
     public function getHistoricalStats(int $playerID): array;
 
     /**
-     * Get box scores for a player between specific dates
-     * 
-     * @param int $playerID Player ID
-     * @param string $startDate Start date (YYYY-MM-DD)
-     * @param string $endDate End date (YYYY-MM-DD)
-     * @return array<array<string, mixed>> Array of box score records ordered by Date ASC
-     */
-    public function getBoxScoresBetweenDates(int $playerID, string $startDate, string $endDate): array;
-
-    /**
      * Get playoff stats for a player ordered by year
      * 
      * @param string $playerName Player name (exact match)

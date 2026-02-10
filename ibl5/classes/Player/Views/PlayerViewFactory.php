@@ -72,7 +72,7 @@ class PlayerViewFactory
             throw new \RuntimeException('CommonMysqliRepository is required for PlayerOverviewView');
         }
         
-        return new PlayerOverviewView($this->repository, $commonRepo);
+        return new PlayerOverviewView($this->statsRepository, $commonRepo);
     }
 
     /**

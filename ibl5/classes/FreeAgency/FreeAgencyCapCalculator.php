@@ -122,7 +122,7 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
      * Decrements a spot for each year where there is non-zero salary.
      * Works with both player future salaries array and contract offer arrays.
      * 
-     * @param array<int> $rosterSpots Roster spots array (indexed 0-5), passed by reference
+     * @param array<int, int> $rosterSpots Roster spots array (indexed 0-5), passed by reference
      * @param array<int|string, int|string|mixed> $salaries Salary values (array indices 0-5 or keys offer1-6)
      * @return void
      */

@@ -193,6 +193,7 @@ class TeamOffDefStatsService implements TeamOffDefStatsServiceInterface
                 $team['raw_defense']['tga']
             );
 
+            /** @var DifferentialStats $teamDiffs */
             $differentials[] = [
                 'teamid' => $team['teamid'],
                 'team_city' => $team['team_city'],

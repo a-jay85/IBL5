@@ -20,6 +20,7 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
     /** @var \Season */
     private object $season;
 
+    /** @param \Season $season */
     public function __construct(object $db, object $sharedFunctions, object $season)
     {
         global $mysqli_db;

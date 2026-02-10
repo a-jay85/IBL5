@@ -15,10 +15,6 @@ use Utilities\HtmlSanitizer;
  */
 class DepthChartEntryView implements DepthChartEntryViewInterface
 {
-    public function __construct(private readonly DepthChartEntryProcessor $processor)
-    {
-    }
-
     /**
      * @see DepthChartEntryViewInterface::renderTeamLogo()
      */

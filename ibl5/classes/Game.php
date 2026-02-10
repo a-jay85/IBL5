@@ -7,6 +7,7 @@ class Game
     public string $date;
     public \DateTime|false $dateObject;
     public int $boxScoreID;
+    public int $gameOfThatDay;
 
     public int $visitorTeamID;
     public int $homeTeamID;
@@ -21,13 +22,14 @@ class Game
     public string $userTeamLocationPrefix;
 
     /**
-     * @param array{Date: string, BoxID: int, Visitor: int, Home: int, VScore: int, HScore: int} $scheduleRow
+     * @param array{Date: string, BoxID: int, Visitor: int, Home: int, VScore: int, HScore: int, gameOfThatDay?: int|null} $scheduleRow
      */
     public function __construct(array $scheduleRow)
     {
         $this->date = $scheduleRow['Date'];
         $this->dateObject = date_create($this->date);
         $this->boxScoreID = $scheduleRow['BoxID'];
+        $this->gameOfThatDay = (int) ($scheduleRow['gameOfThatDay'] ?? 0);
 
         $this->visitorTeamID = $scheduleRow['Visitor'];
         $this->homeTeamID = $scheduleRow['Home'];

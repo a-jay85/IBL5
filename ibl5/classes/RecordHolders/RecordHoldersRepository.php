@@ -58,6 +58,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 h.team AS team_name,
                 bs.Date AS `date`,
                 COALESCE(sch.BoxID, 0) AS BoxID,
+                COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,
                 CASE WHEN h.teamid = bs.visitorTID THEN bs.homeTID ELSE bs.visitorTID END AS oppTid,
                 opp.team_name AS opp_team_name,
                 {$statExpression} AS value
@@ -66,6 +67,11 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             JOIN ibl_hist h ON h.pid = bs.pid AND h.year = ({$this->seasonYearExpression()})
             LEFT JOIN ibl_schedule sch ON sch.Date = bs.Date
                 AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
+            LEFT JOIN (
+                SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                FROM ibl_box_scores_teams
+                GROUP BY Date, visitorTeamID, homeTeamID
+            ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
             LEFT JOIN ibl_team_info opp ON opp.teamid = CASE
                 WHEN h.teamid = bs.visitorTID THEN bs.homeTID
                 ELSE bs.visitorTID END
@@ -78,7 +84,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         /** @var list<PlayerSingleGameRecord> $records */
         $records = [];
         foreach ($rows as $row) {
-            /** @var array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int} $row */
+            /** @var array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} $row */
             $records[] = [
                 'pid' => $row['pid'],
                 'name' => $row['name'],
@@ -86,6 +92,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 'team_name' => $row['team_name'],
                 'date' => $row['date'],
                 'BoxID' => $row['BoxID'],
+                'gameOfThatDay' => $row['gameOfThatDay'],
                 'oppTid' => $row['oppTid'],
                 'opp_team_name' => $row['opp_team_name'],
                 'value' => $row['value'],
@@ -156,6 +163,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 h.team AS team_name,
                 bs.Date AS `date`,
                 COALESCE(sch.BoxID, 0) AS BoxID,
+                COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,
                 CASE WHEN h.teamid = bs.visitorTID THEN bs.homeTID ELSE bs.visitorTID END AS oppTid,
                 opp.team_name AS opp_team_name,
                 bs.calc_points AS points,
@@ -168,6 +176,11 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             JOIN ibl_hist h ON h.pid = bs.pid AND h.year = ({$this->seasonYearExpression()})
             LEFT JOIN ibl_schedule sch ON sch.Date = bs.Date
                 AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
+            LEFT JOIN (
+                SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                FROM ibl_box_scores_teams
+                GROUP BY Date, visitorTeamID, homeTeamID
+            ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
             LEFT JOIN ibl_team_info opp ON opp.teamid = CASE
                 WHEN h.teamid = bs.visitorTID THEN bs.homeTID
                 ELSE bs.visitorTID END
@@ -185,7 +198,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         /** @var list<QuadrupleDoubleRecord> $records */
         $records = [];
         foreach ($rows as $row) {
-            /** @var array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, points: int, rebounds: int, assists: int, steals: int, blocks: int} $row */
+            /** @var array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, points: int, rebounds: int, assists: int, steals: int, blocks: int} $row */
             $records[] = [
                 'pid' => $row['pid'],
                 'name' => $row['name'],
@@ -193,6 +206,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 'team_name' => $row['team_name'],
                 'date' => $row['date'],
                 'BoxID' => $row['BoxID'],
+                'gameOfThatDay' => $row['gameOfThatDay'],
                 'oppTid' => $row['oppTid'],
                 'opp_team_name' => $row['opp_team_name'],
                 'points' => $row['points'],
@@ -251,6 +265,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 t.team_name,
                 bs.Date AS `date`,
                 COALESCE(sch.BoxID, 0) AS BoxID,
+                COALESCE(bs.gameOfThatDay, 0) AS gameOfThatDay,
                 CASE WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID ELSE bs.visitorTeamID END AS oppTid,
                 opp.team_name AS opp_team_name,
                 {$statExpression} AS value
@@ -270,12 +285,13 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         /** @var list<TeamSingleGameRecord> $records */
         $records = [];
         foreach ($rows as $row) {
-            /** @var array{tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int} $row */
+            /** @var array{tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} $row */
             $records[] = [
                 'tid' => $row['tid'],
                 'team_name' => $row['team_name'],
                 'date' => $row['date'],
                 'BoxID' => $row['BoxID'],
+                'gameOfThatDay' => $row['gameOfThatDay'],
                 'oppTid' => $row['oppTid'],
                 'opp_team_name' => $row['opp_team_name'],
                 'value' => $row['value'],
@@ -311,6 +327,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 t.team_name,
                 bs.Date AS `date`,
                 COALESCE(sch.BoxID, 0) AS BoxID,
+                COALESCE(bs.gameOfThatDay, 0) AS gameOfThatDay,
                 CASE WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID ELSE bs.visitorTeamID END AS oppTid,
                 opp.team_name AS opp_team_name,
                 {$expression} AS value
@@ -329,12 +346,13 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         /** @var list<TeamHalfRecord> $records */
         $records = [];
         foreach ($rows as $row) {
-            /** @var array{tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int} $row */
+            /** @var array{tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} $row */
             $records[] = [
                 'tid' => $row['tid'],
                 'team_name' => $row['team_name'],
                 'date' => $row['date'],
                 'BoxID' => $row['BoxID'],
+                'gameOfThatDay' => $row['gameOfThatDay'],
                 'oppTid' => $row['oppTid'],
                 'opp_team_name' => $row['opp_team_name'],
                 'value' => $row['value'],
@@ -361,6 +379,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 loser_t.team_name AS loser_name,
                 sub.Date AS `date`,
                 COALESCE(sch.BoxID, 0) AS BoxID,
+                COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,
                 sub.margin
             FROM (
                 SELECT
@@ -380,6 +399,11 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             JOIN ibl_team_info loser_t ON loser_t.teamid = sub.loser_id
             LEFT JOIN ibl_schedule sch ON sch.Date = sub.Date
                 AND sch.Visitor = sub.visitorTeamID AND sch.Home = sub.homeTeamID
+            LEFT JOIN (
+                SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                FROM ibl_box_scores_teams
+                GROUP BY Date, visitorTeamID, homeTeamID
+            ) bst ON bst.Date = sub.Date AND bst.visitorTeamID = sub.visitorTeamID AND bst.homeTeamID = sub.homeTeamID
             ORDER BY sub.margin DESC, sub.Date ASC
             LIMIT 5";
 
@@ -388,7 +412,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         /** @var list<MarginRecord> $records */
         $records = [];
         foreach ($rows as $row) {
-            /** @var array{winner_tid: int, winner_name: string, loser_tid: int, loser_name: string, date: string, BoxID: int, margin: int} $row */
+            /** @var array{winner_tid: int, winner_name: string, loser_tid: int, loser_name: string, date: string, BoxID: int, gameOfThatDay: int, margin: int} $row */
             $records[] = [
                 'winner_tid' => $row['winner_tid'],
                 'winner_name' => $row['winner_name'],
@@ -396,6 +420,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 'loser_name' => $row['loser_name'],
                 'date' => $row['date'],
                 'BoxID' => $row['BoxID'],
+                'gameOfThatDay' => $row['gameOfThatDay'],
                 'margin' => $row['margin'],
             ];
         }
@@ -733,6 +758,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     h.team AS team_name,
                     bs.Date AS `date`,
                     COALESCE(sch.BoxID, 0) AS BoxID,
+                    COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,
                     CASE WHEN h.teamid = bs.visitorTID THEN bs.homeTID ELSE bs.visitorTID END AS oppTid,
                     opp.team_name AS opp_team_name,
                     {$expression} AS value
@@ -741,6 +767,11 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 JOIN ibl_hist h ON h.pid = bs.pid AND h.year = ({$this->seasonYearExpression()})
                 LEFT JOIN ibl_schedule sch ON sch.Date = bs.Date
                     AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
+                LEFT JOIN (
+                    SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                    FROM ibl_box_scores_teams
+                    GROUP BY Date, visitorTeamID, homeTeamID
+                ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
                 LEFT JOIN ibl_team_info opp ON opp.teamid = CASE
                     WHEN h.teamid = bs.visitorTID THEN bs.homeTID
                     ELSE bs.visitorTID END
@@ -759,7 +790,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         }
 
         foreach ($rows as $row) {
-            /** @var array{stat_type: string, pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int} $row */
+            /** @var array{stat_type: string, pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} $row */
             $label = $row['stat_type'];
             $results[$label][] = [
                 'pid' => $row['pid'],
@@ -768,6 +799,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 'team_name' => $row['team_name'],
                 'date' => $row['date'],
                 'BoxID' => $row['BoxID'],
+                'gameOfThatDay' => $row['gameOfThatDay'],
                 'oppTid' => $row['oppTid'],
                 'opp_team_name' => $row['opp_team_name'],
                 'value' => $row['value'],
@@ -799,6 +831,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     t.team_name,
                     bs.Date AS `date`,
                     COALESCE(sch.BoxID, 0) AS BoxID,
+                    COALESCE(bs.gameOfThatDay, 0) AS gameOfThatDay,
                     CASE WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID ELSE bs.visitorTeamID END AS oppTid,
                     opp.team_name AS opp_team_name,
                     {$config['expression']} AS value
@@ -824,13 +857,14 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         }
 
         foreach ($rows as $row) {
-            /** @var array{stat_type: string, tid: int, team_name: string, date: string, BoxID: int, oppTid: int, opp_team_name: string, value: int} $row */
+            /** @var array{stat_type: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} $row */
             $label = $row['stat_type'];
             $results[$label][] = [
                 'tid' => $row['tid'],
                 'team_name' => $row['team_name'],
                 'date' => $row['date'],
                 'BoxID' => $row['BoxID'],
+                'gameOfThatDay' => $row['gameOfThatDay'],
                 'oppTid' => $row['oppTid'],
                 'opp_team_name' => $row['opp_team_name'],
                 'value' => $row['value'],

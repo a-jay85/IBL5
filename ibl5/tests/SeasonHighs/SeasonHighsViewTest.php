@@ -98,13 +98,13 @@ class SeasonHighsViewTest extends TestCase
     public function testRenderLinksDateToBoxScore(): void
     {
         $data = [
-            'playerHighs' => ['POINTS' => [self::createHighEntry(['boxId' => 99])]],
+            'playerHighs' => ['POINTS' => [self::createHighEntry(['gameOfThatDay' => 3])]],
             'teamHighs' => [],
         ];
 
         $html = $this->view->render('Regular Season', $data);
 
-        $this->assertStringContainsString('box99.htm', $html);
+        $this->assertStringContainsString('2024-12-15-game-3/boxscore', $html);
     }
 
     public function testRenderHandlesEmptyData(): void

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Player\Views;
 
 use Player\Player;
-use Player\PlayerRepository;
+use Player\PlayerStatsRepository;
 use Player\PlayerStats;
 use Player\Contracts\PlayerOverviewViewInterface;
 use Services\CommonMysqliRepository;
@@ -14,22 +14,22 @@ use Utilities\HtmlSanitizer;
 
 /**
  * PlayerOverviewView - Renders the player overview page
- * 
+ *
  * Displays player ratings, free agency preferences, and current season game log.
  * Uses repositories for all database access - no inline queries.
- * 
+ *
  * @see PlayerOverviewViewInterface
  */
 class PlayerOverviewView implements PlayerOverviewViewInterface
 {
-    private PlayerRepository $playerRepository;
+    private PlayerStatsRepository $statsRepository;
     private CommonMysqliRepository $commonRepository;
 
     public function __construct(
-        PlayerRepository $playerRepository,
+        PlayerStatsRepository $statsRepository,
         CommonMysqliRepository $commonRepository
     ) {
-        $this->playerRepository = $playerRepository;
+        $this->statsRepository = $statsRepository;
         $this->commonRepository = $commonRepository;
     }
 
@@ -80,7 +80,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
      */
     private function renderGameLog(int $playerID, string $startDate, string $endDate): string
     {
-        $boxScores = $this->playerRepository->getBoxScoresBetweenDates($playerID, $startDate, $endDate);
+        $boxScores = $this->statsRepository->getBoxScoresBetweenDates($playerID, $startDate, $endDate);
 
         ob_start();
         ?>
@@ -114,7 +114,7 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
     </tr>
         <?php
         foreach ($boxScores as $row) {
-            /** @var array{Date: string, homeTID: int, visitorTID: int, gameMIN: int, game2GM: int, game2GA: int, game3GM: int, game3GA: int, gameFTM: int, gameFTA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int} $row */
+            /** @var array{Date: string, homeTID: int, visitorTID: int, gameOfThatDay: int, BoxID: int, gameMIN: int, game2GM: int, game2GA: int, game3GM: int, game3GA: int, gameFTM: int, gameFTA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int} $row */
             $fgm = $row['game2GM'] + $row['game3GM'];
             $fga = $row['game2GA'] + $row['game3GA'];
             $pts = (2 * $row['game2GM']) + (3 * $row['game3GM']) + $row['gameFTM'];
@@ -128,13 +128,16 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
             $homeTeam = $this->commonRepository->getTeamnameFromTeamID($row['visitorTID']);
             /** @var string $safeDate */
             $safeDate = HtmlSanitizer::safeHtmlOutput($row['Date']);
+            $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($row['Date'], (int) ($row['gameOfThatDay'] ?? 0), (int) ($row['BoxID'] ?? 0));
+            /** @var string $safeBoxScoreUrl */
+            $safeBoxScoreUrl = HtmlSanitizer::safeHtmlOutput($boxScoreUrl);
             /** @var string $safeAwayTeam */
             $safeAwayTeam = HtmlSanitizer::safeHtmlOutput($awayTeam);
             /** @var string $safeHomeTeam */
             $safeHomeTeam = HtmlSanitizer::safeHtmlOutput($homeTeam);
             ?>
     <tr>
-        <td class="gamelog"><?= $safeDate ?></td>
+        <td class="gamelog"><?php if ($boxScoreUrl !== ''): ?><a href="<?= $safeBoxScoreUrl ?>"><?= $safeDate ?></a><?php else: ?><?= $safeDate ?><?php endif; ?></td>
         <td class="gamelog"><?= $safeAwayTeam ?></td>
         <td class="gamelog"><?= $safeHomeTeam ?></td>
         <td class="gamelog"><?= $row['gameMIN'] ?></td>

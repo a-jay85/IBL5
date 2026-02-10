@@ -204,7 +204,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $gameId = 'team-game-' . $game->boxScoreID;
         $visitorTeamId = $game->visitorTeamID;
         $homeTeamId = $game->homeTeamID;
-        $boxScoreUrl = './ibl/IBL/box' . $game->boxScoreID . '.htm';
+        $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($game->date, $game->gameOfThatDay, $game->boxScoreID);
 
         // Determine which team is visitor/home
         $isUserHome = ($homeTeamId === $userTeamId);
@@ -258,13 +258,17 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
         // Scores + @ (same as League Schedule)
         if ($row['isUnplayed']) {
-            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link">–</a>';
-            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
-            $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link">–</a>';
-        } else {
+            $html .= '<span class="schedule-game__score-link">–</span>';
+            $html .= '<span class="schedule-game__vs">@</span>';
+            $html .= '<span class="schedule-game__score-link">–</span>';
+        } elseif ($boxScoreUrl !== '') {
             $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vWinClass . '">' . $game->visitorScore . '</a>';
             $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
             $html .= '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hWinClass . '">' . $game->homeScore . '</a>';
+        } else {
+            $html .= '<span class="schedule-game__score-link' . $vWinClass . '">' . $game->visitorScore . '</span>';
+            $html .= '<span class="schedule-game__vs">@</span>';
+            $html .= '<span class="schedule-game__score-link' . $hWinClass . '">' . $game->homeScore . '</span>';
         }
 
         // Home logo + team (same as League Schedule)

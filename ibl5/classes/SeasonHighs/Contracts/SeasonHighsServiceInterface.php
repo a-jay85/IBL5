@@ -20,7 +20,8 @@ namespace SeasonHighs\Contracts;
  *     color1?: string,
  *     color2?: string,
  *     teamid?: int,
- *     boxId?: int
+ *     boxId?: int,
+ *     gameOfThatDay?: int
  * }
  *
  * @phpstan-type SeasonHighsData array{

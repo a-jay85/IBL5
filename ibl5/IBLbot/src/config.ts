@@ -20,6 +20,7 @@ export const config = {
         baseUrl: requireEnv('API_BASE_URL'),
         key: requireEnv('API_KEY'),
     },
+    ibl6BaseUrl: process.env['IBL6_BASE_URL'] ?? 'https://ibl6.iblhoops.net',
     express: {
         port: parseInt(process.env['EXPRESS_PORT'] ?? '50000', 10),
     },

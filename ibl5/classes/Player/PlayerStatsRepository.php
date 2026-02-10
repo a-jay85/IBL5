@@ -58,7 +58,18 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     public function getBoxScoresBetweenDates(int $playerID, string $startDate, string $endDate): array
     {
         return $this->fetchAll(
-            "SELECT * FROM ibl_box_scores WHERE pid = ? AND Date BETWEEN ? AND ? ORDER BY Date ASC",
+            "SELECT bs.*,
+                    COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,
+                    COALESCE(sch.BoxID, 0) AS BoxID
+             FROM ibl_box_scores bs
+             LEFT JOIN (
+                 SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
+                 FROM ibl_box_scores_teams
+                 GROUP BY Date, visitorTeamID, homeTeamID
+             ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
+             LEFT JOIN ibl_schedule sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
+             WHERE bs.pid = ? AND bs.Date BETWEEN ? AND ?
+             ORDER BY bs.Date ASC",
             "iss",
             $playerID,
             $startDate,

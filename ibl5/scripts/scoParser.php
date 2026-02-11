@@ -97,9 +97,5 @@ if ($isAllStarSubmission) {
 
         $result = $processor->processScoFile($tmpName, $seasonEndingYear, $seasonPhase);
         echo $view->renderParseLog($result);
-
-        // Process All-Star Weekend games from the uploaded file
-        $allStarResult = $processor->processAllStarGames($tmpName, $seasonEndingYear);
-        echo $view->renderAllStarLog($allStarResult);
     }
 }

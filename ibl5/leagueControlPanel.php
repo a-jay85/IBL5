@@ -30,9 +30,9 @@ if (isset($_POST['query'])) {
 
             if ($resultCheck->num_rows == 0) {
                 // Fetch all team names
-                $stmtTeams = $mysqli_db->prepare("SELECT team_name FROM ibl_team_info WHERE teamid != ? ORDER BY teamid ASC");
-                $freeAgentsTeamId = League::FREE_AGENTS_TEAMID;
-                $stmtTeams->bind_param("i", $freeAgentsTeamId);
+                $stmtTeams = $mysqli_db->prepare("SELECT team_name FROM ibl_team_info WHERE teamid BETWEEN 1 AND ? ORDER BY teamid ASC");
+                $maxRealTeamId = League::MAX_REAL_TEAMID;
+                $stmtTeams->bind_param("i", $maxRealTeamId);
                 $stmtTeams->execute();
                 $resultTeams = $stmtTeams->get_result();
                 $stmtTeams->close();

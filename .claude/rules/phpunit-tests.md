@@ -98,12 +98,14 @@ Register in `ibl5/phpunit.xml`:
 
 ## Completion Criteria
 
-**IMPORTANT:** Before considering ANY PHPUnit task complete:
+**IMPORTANT:** Before considering ANY task involving PHP code complete:
 
-1. **Run the full test suite**: `vendor/bin/phpunit`
+1. **Run the FULL test suite**: `vendor/bin/phpunit` — never use `--testsuite` or `--filter` as the final verification. Changes in one module frequently break tests in other modules (shared mocks, interfaces, base classes).
 2. **Verify clean output**: The final line must show `OK (X tests, Y assertions)` with NO warnings, failures, or errors
 3. **Check for warnings**: If output shows `OK, but there were issues!`, run `--display-all-issues` and FIX the warnings
 4. **Don't silence warnings**: Resolve root causes instead of suppressing warnings (unless truly necessary)
+
+**When to use targeted suites:** Only use `--testsuite` or `--filter` when actively debugging a specific failing test to get faster feedback. Once the targeted test passes, immediately re-run the full suite.
 
 Requirements:
 - Zero warnings, zero failures, zero errors

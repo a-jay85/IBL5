@@ -41,7 +41,9 @@ cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary -c php
 cd ibl5 && composer run analyse
 ```
 
-**Note:** PHPStan and PHPUnit run automatically via PostToolUse hooks after every Edit — no need to run them manually between edits. If your changes introduce new errors above the baseline, fix them before proceeding. The only exception: errors clearly caused by another Claude instance's simultaneous changes to files you did not touch — those may be ignored.
+**Note:** PHPStan and the **full** PHPUnit test suite run automatically via PostToolUse hooks after every Edit/Write — no need to run them manually between edits. If your changes introduce new errors above the baseline, fix them before proceeding. The only exception: errors clearly caused by another Claude instance's simultaneous changes to files you did not touch — those may be ignored.
+
+**Full test suite rule:** Always run the **full** PHPUnit test suite (no `--testsuite` or `--filter` flags) after making PHP changes and before considering any task complete. Changes in one module frequently break tests in other modules (e.g., updating a shared mock, interface, or base class). Only use `--testsuite` or `--filter` when actively debugging a specific failing test — then re-run the full suite once it passes.
 
 **Write PHPStan-clean code proactively.** Don't rely on the analyser to catch mistakes. The project runs level `max` with `phpstan-strict-rules` and `bleedingEdge`, which means:
 
@@ -170,7 +172,7 @@ Other Claude instances may be working in this directory simultaneously.
 1. **Before editing a file:** Run `git status`. If the file has unstaged changes you didn't make, alert the user before proceeding.
 2. **Scope discipline:** Only modify files directly related to your task. If you need to change a shared file, confirm with the user first.
 3. **Before staging:** Run `git diff --name-only` and only stage files you personally modified. Never use `git add .` or `git add -A`.
-4. **Testing:** If other instances may have partial work in progress, prefer running your module's test suite over the full suite.
+4. **Testing:** Always run the full test suite, even if other instances may have partial work in progress. If another instance's in-progress changes cause failures in files you did not touch, note them but do not suppress them.
 
 ## PHP / Database Gotchas
 

@@ -147,7 +147,7 @@ class PlayerStats implements PlayerStatsInterface
     /**
      * @see PlayerStatsInterface::withPlayerID()
      */
-    public static function withPlayerID(object $db, int $playerID): PlayerStatsInterface
+    public static function withPlayerID(object $db, int $playerID): self
     {
         $repository = new PlayerStatsRepository($db);
         $instance = new self($repository);

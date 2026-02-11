@@ -406,6 +406,7 @@ class TeamComponentsView implements TeamComponentsViewInterface
                 $name = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
                 return $record['year'] . ' ' . $name;
             },
+            1,
         );
     }
 
@@ -629,8 +630,9 @@ class TeamComponentsView implements TeamComponentsViewInterface
      *
      * @param list<array{year: int, namethatyear: string, wins: int, losses: int}> $history
      * @param \Closure(array{year: int, namethatyear: string, wins: int, losses: int}): string $formatLabel
+     * @param int $urlYearOffset Offset added to year for the roster link URL (e.g., +1 for HEAT since ibl_hist uses ending year)
      */
-    private function renderWinLossHistory(array $history, int $teamID, \Closure $formatLabel): string
+    private function renderWinLossHistory(array $history, int $teamID, \Closure $formatLabel, int $urlYearOffset = 0): string
     {
         $wintot = 0;
         $lostot = 0;
@@ -666,10 +668,11 @@ class TeamComponentsView implements TeamComponentsViewInterface
             $lostot += $losses;
             $winpct = StatsFormatter::formatPercentage($wins, $wins + $losses);
             $label = $formatLabel($record);
+            $urlYear = $yearwl + $urlYearOffset;
             $isBest = ($index === $bestIndex);
             $boldOpen = $isBest ? '<strong>' : '';
             $boldClose = $isBest ? '</strong>' : '';
-            $output .= "<li>{$boldOpen}<a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$yearwl\">$label</a> <span class=\"record\">$wins-$losses ($winpct)</span>{$boldClose}</li>";
+            $output .= "<li>{$boldOpen}<a href=\"./modules.php?name=Team&amp;op=team&amp;teamID=$teamID&amp;yr=$urlYear\">$label</a> <span class=\"record\">$wins-$losses ($winpct)</span>{$boldClose}</li>";
         }
 
         $output .= '</ul>';

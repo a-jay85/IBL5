@@ -136,7 +136,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             <tr>
                 <td class="date-cell"><?= $dateSafe ?></td>
                 <td><span class="txn-badge txn-badge--<?= $catId ?>"><?= $catNameSafe ?></span></td>
-                <td><?= $titleSafe ?></td>
+                <td><a href="modules.php?name=News&file=article&sid=<?= (int) $row['sid'] ?>"><?= $titleSafe ?></a></td>
             </tr>
         <?php endforeach; ?>
     </tbody>

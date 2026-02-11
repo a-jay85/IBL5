@@ -273,6 +273,19 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
+     * @see TradingRepositoryInterface::getTradesByOfferIdForUpdate()
+     */
+    public function getTradesByOfferIdForUpdate(int $offerId): array
+    {
+        /** @var list<TradeInfoRow> */
+        return $this->fetchAll(
+            "SELECT * FROM ibl_trade_info WHERE tradeofferid = ? FOR UPDATE",
+            "i",
+            $offerId
+        );
+    }
+
+    /**
      * @see TradingRepositoryInterface::getCashTransactionByOffer()
      */
     public function getCashTransactionByOffer(int $offerId, string $sendingTeam): ?array

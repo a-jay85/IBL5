@@ -25,6 +25,7 @@ class League extends BaseMysqliRepository
     const HARD_CAP_MAX = 7000;
 
     const FREE_AGENTS_TEAMID = 0;
+    const MAX_REAL_TEAMID = 28;
 
     /**
      * Constructor - inherits from BaseMysqliRepository
@@ -218,10 +219,10 @@ class League extends BaseMysqliRepository
         return $this->fetchAll(
             "SELECT owner_name, team_city, team_name
             FROM ibl_team_info
-            WHERE teamid != ?
+            WHERE teamid BETWEEN 1 AND ?
             ORDER BY owner_name",
             "i",
-            League::FREE_AGENTS_TEAMID
+            League::MAX_REAL_TEAMID
         );
     }
 
@@ -235,10 +236,10 @@ class League extends BaseMysqliRepository
         return $this->fetchAll(
             "SELECT *
             FROM ibl_team_info
-            WHERE teamid != ?
+            WHERE teamid BETWEEN 1 AND ?
             ORDER BY teamid ASC",
             "i",
-            League::FREE_AGENTS_TEAMID
+            League::MAX_REAL_TEAMID
         );
     }
 }

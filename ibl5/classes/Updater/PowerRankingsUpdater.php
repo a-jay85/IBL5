@@ -28,7 +28,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         $teams = $this->fetchAll(
             "SELECT TeamID, Team, streak_type, streak
             FROM ibl_power
-            WHERE TeamID BETWEEN 1 AND 32
+            WHERE TeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             ORDER BY TeamID ASC",
             ""
         );

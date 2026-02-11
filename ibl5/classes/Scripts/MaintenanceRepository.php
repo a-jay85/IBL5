@@ -24,9 +24,9 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
     {
         /** @var array<int, array{team_name: string}> */
         return $this->fetchAll(
-            "SELECT team_name FROM ibl_team_info WHERE teamid != ?",
+            "SELECT team_name FROM ibl_team_info WHERE teamid BETWEEN 1 AND ?",
             "i",
-            \League::FREE_AGENTS_TEAMID
+            \League::MAX_REAL_TEAMID
         );
     }
 

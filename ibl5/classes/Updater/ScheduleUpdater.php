@@ -59,8 +59,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     {
         /** @var list<array{team_name: string, teamid: int}> $rows */
         $rows = $this->fetchAll(
-            "SELECT team_name, teamid FROM ibl_team_info",
-            ""
+            "SELECT team_name, teamid FROM ibl_team_info WHERE teamid BETWEEN 1 AND ?",
+            "i",
+            \League::MAX_REAL_TEAMID
         );
 
         foreach ($rows as $row) {

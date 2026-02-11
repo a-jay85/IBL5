@@ -165,6 +165,34 @@ interface BoxscoreRepositoryInterface
     public function findAllStarTeamNames(string $date): ?array;
 
     /**
+     * Find All-Star Game team records that still have default placeholder names
+     *
+     * Returns rows from ibl_box_scores_teams where name is 'Team Away' or 'Team Home'
+     * and the game is an All-Star Game (visitorTeamID=50, homeTeamID=51).
+     *
+     * @return list<array{id: int, Date: string, name: string, visitorTeamID: int, homeTeamID: int}>
+     */
+    public function findAllStarGamesWithDefaultNames(): array;
+
+    /**
+     * Get player names for an All-Star team on a given date
+     *
+     * @param string $date Game date in Y-m-d format
+     * @param int $teamID Team ID (50 = visitor, 51 = home)
+     * @return list<string> Player names in insertion order
+     */
+    public function getPlayersForAllStarTeam(string $date, int $teamID): array;
+
+    /**
+     * Rename an All-Star team by updating the name on a team boxscore record
+     *
+     * @param int $recordId Primary key of the ibl_box_scores_teams row
+     * @param string $newName New team name (max 16 chars)
+     * @return int Number of affected rows
+     */
+    public function renameAllStarTeam(int $recordId, string $newName): int;
+
+    /**
      * Insert a player boxscore row
      *
      * @param string $date Game date in Y-m-d format

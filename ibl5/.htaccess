@@ -1,4 +1,10 @@
 RewriteEngine On
 
+# Upload limits for .sco file parsing (some files exceed 300MB)
+php_value upload_max_filesize 512M
+php_value post_max_size 512M
+php_value max_execution_time 300
+php_value memory_limit 512M
+
 # API v1 routing - rewrite /api/v1/* to api.php
 RewriteRule ^api/v1/(.*)$ api.php?route=$1 [QSA,L]

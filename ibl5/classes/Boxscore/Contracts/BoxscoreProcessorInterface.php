@@ -34,4 +34,32 @@ interface BoxscoreProcessorInterface
      *         - 'error': string - Error message if success is false
      */
     public function processScoFile(string $filePath, int $seasonEndingYear, string $seasonPhase): array;
+
+    /**
+     * Process All-Star Weekend games from the first 4000 bytes of a .sco file
+     *
+     * Block 0 (bytes 0–1999): Rising Stars Game (Rookies vs Sophomores)
+     * Block 1 (bytes 2000–3999): All-Star Game (custom team names)
+     *
+     * @param string $filePath Path to the .sco file
+     * @param int $seasonEndingYear Season ending year
+     * @param string|null $allStarAwayName Away team name for All-Star Game (null = first request, prompt needed)
+     * @param string|null $allStarHomeName Home team name for All-Star Game (null = first request, prompt needed)
+     * @return array{
+     *     success: bool,
+     *     messages: list<string>,
+     *     allStarPending?: bool,
+     *     awayLeadingScorer?: string,
+     *     homeLeadingScorer?: string,
+     *     allStarRawData?: string,
+     *     seasonEndingYear?: int,
+     *     skipped?: string
+     * }
+     */
+    public function processAllStarGames(
+        string $filePath,
+        int $seasonEndingYear,
+        ?string $allStarAwayName = null,
+        ?string $allStarHomeName = null,
+    ): array;
 }

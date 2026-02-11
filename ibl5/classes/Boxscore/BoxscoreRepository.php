@@ -145,6 +145,31 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     }
 
     /**
+     * @see BoxscoreRepositoryInterface::findAllStarTeamNames()
+     */
+    public function findAllStarTeamNames(string $date): ?array
+    {
+        /** @var list<array{name: string}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT name FROM ibl_box_scores_teams
+             WHERE Date = ? AND visitorTeamID = 50 AND homeTeamID = 51
+             ORDER BY id ASC
+             LIMIT 2",
+            "s",
+            $date
+        );
+
+        if (count($rows) < 2) {
+            return null;
+        }
+
+        return [
+            'awayName' => $rows[0]['name'],
+            'homeName' => $rows[1]['name'],
+        ];
+    }
+
+    /**
      * @see BoxscoreRepositoryInterface::insertTeamBoxscore()
      */
     public function insertTeamBoxscore(

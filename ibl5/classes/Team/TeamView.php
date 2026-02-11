@@ -31,6 +31,8 @@ class TeamView implements TeamViewInterface
         $awardsCard = $pageData['awardsCard'];
         $franchiseHistoryCard = $pageData['franchiseHistoryCard'];
         $rafters = $pageData['rafters'];
+        $userTeamName = $pageData['userTeamName'];
+        $isOwnTeam = $pageData['isOwnTeam'];
 
         $draftPicksHtml = $isActualTeam ? $this->renderDraftPicksSection($team, $draftPicksTable) : "";
         $cardsRowHtml = "";
@@ -50,7 +52,7 @@ class TeamView implements TeamViewInterface
             : "";
 
         $bannerHtml = $isActualTeam
-            ? $this->renderTeamBanner($teamID, $team, $imagesPath)
+            ? $this->renderTeamBanner($teamID, $team, $imagesPath, $userTeamName, $isOwnTeam)
             : "<div style=\"text-align: center; margin-bottom: 1rem;\"><img src=\"./{$imagesPath}logo/{$teamID}.jpg\" style=\"display: block; margin: 0 auto;\"></div>";
 
         ob_start();
@@ -79,22 +81,41 @@ class TeamView implements TeamViewInterface
     /**
      * Render the team banner row with logo centered and action links flanking it
      *
-     * @param \Team $team Team object with color1, color2 properties
+     * @param \Team $team Team object with color1, color2, name, discordID properties
      */
-    private function renderTeamBanner(int $teamID, object $team, string $imagesPath): string
+    private function renderTeamBanner(int $teamID, object $team, string $imagesPath, string $userTeamName, bool $isOwnTeam): string
     {
         /** @var \Team $team */
         $color1 = \UI\TableStyles::sanitizeColor($team->color1);
         $color2 = \UI\TableStyles::sanitizeColor($team->color2);
 
+        $tradeButton = '';
+        $discordButton = '';
+        if ($userTeamName !== '') {
+            if ($isOwnTeam) {
+                $tradeButton = '<a href="modules.php?name=Trading&amp;op=reviewtrade" class="team-action-link">Trade</a>';
+                $discordButton = '<a href="https://discord.com/channels/' . \Discord::IBL_GUILD_ID . '" class="team-action-link" target="_blank" rel="noopener noreferrer">Discord</a>';
+            } else {
+                $partnerParam = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
+                $tradeButton = '<a href="modules.php?name=Trading&amp;op=offertrade&amp;partner=' . urlencode($team->name) . '" class="team-action-link">Trade</a>';
+                if ($team->discordID !== null) {
+                    /** @var string $discordIDSafe */
+                    $discordIDSafe = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $team->discordID);
+                    $discordButton = '<a href="https://discord.com/users/' . $discordIDSafe . '" class="team-action-link" target="_blank" rel="noopener noreferrer">Discord</a>';
+                }
+            }
+        }
+
         ob_start();
         ?>
 <div class="team-banner-row" style="--team-tab-bg-color: #<?= $color1 ?>; --team-tab-active-color: #<?= $color2 ?>;">
+    <?= $tradeButton ?>
     <a href="modules.php?name=Schedule&amp;teamID=<?= $teamID ?>" class="team-action-link">Schedule</a>
-    <div style="text-align: center;">
+    <div class="team-banner-logo" style="text-align: center;">
         <img src="./<?= $imagesPath ?>logo/<?= $teamID ?>.jpg" style="display: block; margin: 0 18px;">
     </div>
     <a href="modules.php?name=DraftHistory&amp;teamID=<?= $teamID ?>" class="team-action-link">Draft History</a>
+    <?= $discordButton ?>
 </div>
         <?php
         return (string) ob_get_clean();

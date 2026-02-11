@@ -32,7 +32,7 @@ class TeamService implements TeamServiceInterface
      * @see TeamServiceInterface::getTeamPageData()
      * @return TeamPageData
      */
-    public function getTeamPageData(int $teamID, ?string $yr, string $display): array
+    public function getTeamPageData(int $teamID, ?string $yr, string $display, string $userTeamName = ''): array
     {
         global $leagueContext;
         /** @var \League\LeagueContext $leagueContext */
@@ -78,6 +78,8 @@ class TeamService implements TeamServiceInterface
             'awardsCard' => $awardsCard,
             'franchiseHistoryCard' => $franchiseHistoryCard,
             'rafters' => $rafters,
+            'userTeamName' => $userTeamName,
+            'isOwnTeam' => ($userTeamName !== '' && $userTeamName === $team->name),
         ];
     }
 

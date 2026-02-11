@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 class Discord
 {
+    /** @var string IBL Discord server (guild) snowflake ID */
+    public const IBL_GUILD_ID = '399119059771195392';
+
     private \mysqli $db;
 
     /** @var array<string, string> Discord webhook URLs loaded from config */

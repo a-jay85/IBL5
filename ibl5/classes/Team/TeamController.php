@@ -66,7 +66,19 @@ class TeamController implements TeamControllerInterface
 
         \Nuke\Header::header();
 
-        $pageData = $this->service->getTeamPageData($teamID, $yr, $display);
+        $userTeamName = '';
+        global $user;
+        if (is_user($user)) {
+            $userInfo = getusrinfo($user);
+            if (is_array($userInfo)) {
+                $rawTeam = $userInfo['user_ibl_team'] ?? '';
+                if (is_string($rawTeam) && $rawTeam !== '') {
+                    $userTeamName = $rawTeam;
+                }
+            }
+        }
+
+        $pageData = $this->service->getTeamPageData($teamID, $yr, $display, $userTeamName);
         echo $this->view->render($pageData);
 
         // Output JS configuration for AJAX tab switching

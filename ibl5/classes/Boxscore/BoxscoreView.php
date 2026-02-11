@@ -70,6 +70,8 @@ class BoxscoreView
             phase = 'HEAT';
         } else if (lower.indexOf('playoff') !== -1) {
             phase = 'Regular Season/Playoffs';
+        } else if (lower.indexOf('finals') !== -1) {
+            phase = 'Regular Season/Playoffs';
         } else if (/\bsim\b/i.test(name)) {
             phase = 'Regular Season/Playoffs';
         }

@@ -57,42 +57,53 @@ class TradeProcessor implements TradeProcessorInterface
      */
     public function processTrade(int $offerId): array
     {
-        $tradeRows = $this->repository->getTradesByOfferId($offerId);
+        $this->db->begin_transaction();
 
-        if ($tradeRows === []) {
+        try {
+            // Acquire exclusive row-level lock to prevent double-processing
+            $tradeRows = $this->repository->getTradesByOfferIdForUpdate($offerId);
+
+            if ($tradeRows === []) {
+                $this->db->rollback();
+                return [
+                    'success' => false,
+                    'error' => 'No trade data found for this offer ID'
+                ];
+            }
+
+            $storytext = "";
+            $offeringTeamName = '';
+            $listeningTeamName = '';
+
+            foreach ($tradeRows as $tradeRow) {
+                $itemId = $tradeRow['itemid'];
+                $itemType = $tradeRow['itemtype'];
+                $offeringTeamName = $tradeRow['from'];
+                $listeningTeamName = $tradeRow['to'];
+
+                $result = $this->processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId);
+                $storytext .= $result['tradeLine'];
+            }
+
+            // Create news story and notifications
+            $storytitle = "$offeringTeamName and $listeningTeamName make a trade.";
+
+            $this->createNewsStory($storytitle, $storytext);
+            $this->sendNotifications($offeringTeamName, $listeningTeamName, $storytext);
+            $this->repository->deleteTradeInfoByOfferId($offerId);
+            $this->repository->deleteTradeCashByOfferId($offerId);
+
+            $this->db->commit();
+
             return [
-                'success' => false,
-                'error' => 'No trade data found for this offer ID'
+                'success' => true,
+                'storytext' => $storytext,
+                'storytitle' => $storytitle
             ];
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
         }
-
-        $storytext = "";
-        $offeringTeamName = '';
-        $listeningTeamName = '';
-
-        foreach ($tradeRows as $tradeRow) {
-            $itemId = $tradeRow['itemid'];
-            $itemType = $tradeRow['itemtype'];
-            $offeringTeamName = $tradeRow['from'];
-            $listeningTeamName = $tradeRow['to'];
-
-            $result = $this->processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId);
-            $storytext .= $result['tradeLine'];
-        }
-
-        // Create news story and notifications
-        $storytitle = "$offeringTeamName and $listeningTeamName make a trade.";
-        
-        $this->createNewsStory($storytitle, $storytext);
-        $this->sendNotifications($offeringTeamName, $listeningTeamName, $storytext);
-        $this->repository->deleteTradeInfoByOfferId($offerId);
-        $this->repository->deleteTradeCashByOfferId($offerId);
-
-        return [
-            'success' => true,
-            'storytext' => $storytext,
-            'storytitle' => $storytitle
-        ];
     }
 
     /**

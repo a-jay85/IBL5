@@ -77,6 +77,21 @@ class TradeProcessorTest extends TestCase
                 };
             }
 
+            public function begin_transaction(int $flags = 0, ?string $name = null): bool
+            {
+                return true;
+            }
+
+            public function commit(int $flags = 0, ?string $name = null): bool
+            {
+                return true;
+            }
+
+            public function rollback(int $flags = 0, ?string $name = null): bool
+            {
+                return true;
+            }
+
             #[\ReturnTypeWillChange]
             public function query(string $query, int $result_mode = MYSQLI_STORE_RESULT)
             {

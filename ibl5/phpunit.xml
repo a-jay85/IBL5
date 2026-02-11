@@ -57,6 +57,9 @@
         <testsuite name="Voting Results Module Tests">
             <directory>tests/VotingResults</directory>
         </testsuite>
+        <testsuite name="Voting Module Tests">
+            <directory>tests/Voting</directory>
+        </testsuite>
         <testsuite name="Player Search Module Tests">
             <directory>tests/PlayerDatabase</directory>
         </testsuite>
@@ -96,6 +99,15 @@
         </testsuite>
         <testsuite name="TeamSchedule Module Tests">
             <directory>tests/TeamSchedule</directory>
+        </testsuite>
+        <testsuite name="LeagueSchedule Module Tests">
+            <directory>tests/LeagueSchedule</directory>
+        </testsuite>
+        <testsuite name="ActivityTracker Module Tests">
+            <directory>tests/ActivityTracker</directory>
+        </testsuite>
+        <testsuite name="PlayerMovement Module Tests">
+            <directory>tests/PlayerMovement</directory>
         </testsuite>
         <testsuite name="NextSim Module Tests">
             <directory>tests/NextSim</directory>

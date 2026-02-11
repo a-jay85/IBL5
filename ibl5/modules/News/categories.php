@@ -41,7 +41,7 @@ function theindex($catid)
     }
     $catid = intval($catid);
     $db->sql_query("update " . $prefix . "_stories_cat set counter=counter+1 where catid='$catid'");
-    $result = $db->sql_query("SELECT sid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm, score, ratings FROM " . $prefix . "_stories where catid='$catid' $querylang ORDER BY sid DESC limit $storynum");
+    $result = $db->sql_query("SELECT sid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm FROM " . $prefix . "_stories where catid='$catid' $querylang ORDER BY sid DESC limit $storynum");
     while ($row = $db->sql_fetchrow($result)) {
         $s_sid = intval($row['sid']);
         $aid = filter($row['aid'], "nohtml");
@@ -55,8 +55,6 @@ function theindex($catid)
         $informant = filter($row['informant'], "nohtml");
         $notes = filter($row['notes']);
         $acomm = intval($row['acomm']);
-        $score = intval($row['score']);
-        $ratings = intval($row['ratings']);
         getTopics($s_sid);
         formatTimestamp($time);
         $subject = filter($subject, "nohtml");
@@ -79,12 +77,6 @@ function theindex($catid)
         if ($articlecomm == 1 and $acomm == 0) {
             if ($c_count == 0) {$morelink .= "$story_link" . _COMMENTSQ . "</a>";} elseif ($c_count == 1) {$morelink .= "$story_link$c_count " . _COMMENT . "</a>";} elseif ($c_count > 1) {$morelink .= "$story_link$c_count " . _COMMENTS . "</a>";}
         }
-        if ($score != 0) {
-            $rated = substr($score / $ratings, 0, 4);
-        } else {
-            $rated = 0;
-        }
-        $morelink .= " | " . _SCORE . " $rated";
         $morelink .= " ";
         $morelink = str_replace(" |  | ", " | ", $morelink);
         $sid = intval($s_sid);

@@ -583,11 +583,6 @@
     color: var(--accent-600);
 }
 
-.news-article__score {
-    font-size: 1rem;
-    color: var(--gray-500);
-}
-
 /* Transaction-specific styling */
 .news-article--transaction .news-article__header {
     border-bottom: 2px solid var(--accent-500);

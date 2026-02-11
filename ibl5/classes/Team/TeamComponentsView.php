@@ -449,9 +449,9 @@ class TeamComponentsView implements TeamComponentsViewInterface
             }
 
             /** @var string $winnerSafe */
-            $winnerSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($winner);
+            $winnerSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($playoff['winner_name_that_year']);
             /** @var string $loserSafe */
-            $loserSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($loser);
+            $loserSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($playoff['loser_name_that_year']);
 
             if ($isWin) {
                 $totalplayoffwins += 4;

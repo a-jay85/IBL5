@@ -43,40 +43,39 @@ class PeriodAverages
         $teamID = (int)$team->teamID;
 
         // Use prepared statement for date filtering
-        $query = "SELECT name,
-            pos,
-            pid,
-            COUNT(DISTINCT `Date`) as games,
-            ROUND(SUM(gameMIN)/COUNT(DISTINCT `Date`), 1) as gameMINavg,
-            ROUND(SUM(game2GM + game3GM)/COUNT(DISTINCT `Date`), 2) as gameFGMavg,
-            ROUND(SUM(game2GA + game3GA)/COUNT(DISTINCT `Date`), 2) as gameFGAavg,
-            ROUND((SUM(game2GM) + SUM(game3GM)) / (SUM(game2GA) + SUM(game3GA)), 3) as gameFGPavg,
-            ROUND(SUM(gameFTM)/COUNT(DISTINCT `Date`), 2) as gameFTMavg,
-            ROUND(SUM(gameFTA)/COUNT(DISTINCT `Date`), 2) as gameFTAavg,
-            ROUND((SUM(gameFTM)) / (SUM(gameFTA)), 3) as gameFTPavg,
-            ROUND(SUM(game3GM)/COUNT(DISTINCT `Date`), 2) as game3GMavg,
-            ROUND(SUM(game3GA)/COUNT(DISTINCT `Date`), 2) as game3GAavg,
-            ROUND((SUM(game3GM)) / (SUM(game3GA)), 3) as game3GPavg,
-            ROUND(SUM(gameORB)/COUNT(DISTINCT `Date`), 1) as gameORBavg,
-            ROUND((SUM(gameORB) + SUM(gameDRB))/COUNT(DISTINCT `Date`), 1) as gameREBavg,
-            ROUND(SUM(gameAST)/COUNT(DISTINCT `Date`), 1) as gameASTavg,
-            ROUND(SUM(gameSTL)/COUNT(DISTINCT `Date`), 1) as gameSTLavg,
-            ROUND(SUM(gameTOV)/COUNT(DISTINCT `Date`), 1) as gameTOVavg,
-            ROUND(SUM(gameBLK)/COUNT(DISTINCT `Date`), 1) as gameBLKavg,
-            ROUND(SUM(gamePF)/COUNT(DISTINCT `Date`) , 1) as gamePFavg,
-            ROUND(((2 * SUM(game2GM)) + SUM(gameFTM) + (3 * SUM(game3GM)))/COUNT(DISTINCT `Date`) , 1) as gamePTSavg
-        FROM   ibl_box_scores
-        WHERE  date BETWEEN ? AND ?
-            AND ( hometid = ?
-                OR visitortid = ? )
-            AND gameMIN > 0
-            AND pid IN (SELECT pid
-                        FROM   ibl_plr
-                        WHERE  tid = ?
-                            AND retired = 0
-                            AND `name` NOT LIKE '%|%')
-        GROUP  BY name, pos, pid
-        ORDER  BY name ASC";
+        $query = "SELECT p.name,
+            bs.pos,
+            bs.pid,
+            COUNT(DISTINCT bs.`Date`) as games,
+            ROUND(SUM(bs.gameMIN)/COUNT(DISTINCT bs.`Date`), 1) as gameMINavg,
+            ROUND(SUM(bs.game2GM + bs.game3GM)/COUNT(DISTINCT bs.`Date`), 2) as gameFGMavg,
+            ROUND(SUM(bs.game2GA + bs.game3GA)/COUNT(DISTINCT bs.`Date`), 2) as gameFGAavg,
+            ROUND((SUM(bs.game2GM) + SUM(bs.game3GM)) / (SUM(bs.game2GA) + SUM(bs.game3GA)), 3) as gameFGPavg,
+            ROUND(SUM(bs.gameFTM)/COUNT(DISTINCT bs.`Date`), 2) as gameFTMavg,
+            ROUND(SUM(bs.gameFTA)/COUNT(DISTINCT bs.`Date`), 2) as gameFTAavg,
+            ROUND((SUM(bs.gameFTM)) / (SUM(bs.gameFTA)), 3) as gameFTPavg,
+            ROUND(SUM(bs.game3GM)/COUNT(DISTINCT bs.`Date`), 2) as game3GMavg,
+            ROUND(SUM(bs.game3GA)/COUNT(DISTINCT bs.`Date`), 2) as game3GAavg,
+            ROUND((SUM(bs.game3GM)) / (SUM(bs.game3GA)), 3) as game3GPavg,
+            ROUND(SUM(bs.gameORB)/COUNT(DISTINCT bs.`Date`), 1) as gameORBavg,
+            ROUND((SUM(bs.gameORB) + SUM(bs.gameDRB))/COUNT(DISTINCT bs.`Date`), 1) as gameREBavg,
+            ROUND(SUM(bs.gameAST)/COUNT(DISTINCT bs.`Date`), 1) as gameASTavg,
+            ROUND(SUM(bs.gameSTL)/COUNT(DISTINCT bs.`Date`), 1) as gameSTLavg,
+            ROUND(SUM(bs.gameTOV)/COUNT(DISTINCT bs.`Date`), 1) as gameTOVavg,
+            ROUND(SUM(bs.gameBLK)/COUNT(DISTINCT bs.`Date`), 1) as gameBLKavg,
+            ROUND(SUM(bs.gamePF)/COUNT(DISTINCT bs.`Date`) , 1) as gamePFavg,
+            ROUND(((2 * SUM(bs.game2GM)) + SUM(bs.gameFTM) + (3 * SUM(bs.game3GM)))/COUNT(DISTINCT bs.`Date`) , 1) as gamePTSavg
+        FROM   ibl_box_scores bs
+        JOIN   ibl_plr p ON bs.pid = p.pid
+        WHERE  bs.date BETWEEN ? AND ?
+            AND ( bs.hometid = ?
+                OR bs.visitortid = ? )
+            AND bs.gameMIN > 0
+            AND p.tid = ?
+            AND p.retired = 0
+            AND p.name NOT LIKE '%|%'
+        GROUP  BY p.name, bs.pos, bs.pid
+        ORDER  BY p.name ASC";
         
         // Use mysqli prepared statement directly
         $stmt = $db->prepare($query);

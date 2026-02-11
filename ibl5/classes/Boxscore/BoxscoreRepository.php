@@ -194,9 +194,11 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     {
         /** @var list<array{name: string}> $rows */
         $rows = $this->fetchAll(
-            "SELECT name FROM ibl_box_scores
-             WHERE Date = ? AND visitorTID = 50 AND homeTID = 51 AND teamID = ?
-             ORDER BY id ASC",
+            "SELECT COALESCE(p.name, bs.name) AS name
+             FROM ibl_box_scores bs
+             LEFT JOIN ibl_plr p ON bs.pid = p.pid
+             WHERE bs.Date = ? AND bs.visitorTID = 50 AND bs.homeTID = 51 AND bs.teamID = ?
+             ORDER BY bs.id ASC",
             "si",
             $date,
             $teamID

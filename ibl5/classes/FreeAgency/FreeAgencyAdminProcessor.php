@@ -273,8 +273,8 @@ class FreeAgencyAdminProcessor extends BaseMysqliRepository implements FreeAgenc
             $currentTime = date('Y-m-d H:i:s');
             $affected = $this->execute(
                 "INSERT INTO nuke_stories
-                 (catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, ihome, alanguage, acomm, haspoll, pollID, score, ratings, rating_ip, associated)
-                 VALUES (8, 'chibul', ?, ?, ?, ?, 0, 0, 29, 'chibul', '', 0, 'english', 0, 0, 0, 0, 0, '0', '29-')",
+                 (catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, ihome, alanguage, acomm, haspoll, pollID, associated)
+                 VALUES (8, 'chibul', ?, ?, ?, ?, 0, 0, 29, 'chibul', '', 0, 'english', 0, 0, 0, '29-')",
                 "ssss",
                 $newsTitle,
                 $currentTime,

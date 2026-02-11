@@ -95,7 +95,7 @@ if ($save && is_user($user)) {
 
 // Fetch article using prepared statement
 $stmt = $mysqli_db->prepare(
-    "SELECT catid, aid, time, title, hometext, bodytext, topic, informant, notes, acomm, haspoll, pollID, score, ratings
+    "SELECT catid, aid, time, title, hometext, bodytext, topic, informant, notes, acomm, haspoll, pollID
      FROM " . $prefix . "_stories
      WHERE sid = ?"
 );
@@ -129,8 +129,6 @@ $notes = filter($row['notes'] ?? '');
 $acomm = (int) ($row['acomm'] ?? 0);
 $haspoll = (int) ($row['haspoll'] ?? 0);
 $pollID = (int) ($row['pollID'] ?? 0);
-$score = (int) ($row['score'] ?? 0);
-$ratings = (int) ($row['ratings'] ?? 0);
 
 if (empty($aaid)) {
     Header("Location: modules.php?name=$module_name");

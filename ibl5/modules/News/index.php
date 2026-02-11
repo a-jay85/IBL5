@@ -62,7 +62,7 @@ function theindex($new_topic = "0")
         CloseTable();
         echo "<br>";
     }
-    $result = $db->sql_query("SELECT sid, catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm, score, ratings FROM " . $prefix . "_stories $qdb $querylang ORDER BY sid DESC limit $storynum");
+    $result = $db->sql_query("SELECT sid, catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm FROM " . $prefix . "_stories $qdb $querylang ORDER BY sid DESC limit $storynum");
     while ($row = $db->sql_fetchrow($result)) {
         $s_sid = intval($row['sid']);
         $catid = intval($row['catid']);
@@ -77,8 +77,6 @@ function theindex($new_topic = "0")
         $informant = filter($row['informant'], "nohtml");
         $notes = filter($row['notes']);
         $acomm = intval($row['acomm']);
-        $score = intval($row['score']);
-        $ratings = intval($row['ratings']);
         if ($catid > 0) {
             $row2 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));
             $cattitle = stripslashes(check_html($row2['title'], "nohtml"));
@@ -117,152 +115,9 @@ function theindex($new_topic = "0")
             $title1 = filter($row3['title'], "nohtml");
             $title = "<a class='readmore' href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
         }
-        if ($score != 0) {
-            $rated = substr($score / $ratings, 0, 4);
-        } else {
-            $rated = 0;
-        }
-        $morelink_parts[] = "<span class=\"news-article__score\">" . _SCORE . " $rated</span>";
         $morelink = implode(' | ', $morelink_parts);
         themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
     }
-    Nuke\Footer::footer();
-}
-
-function rate_article($sid, $score, $gfx_check, $random_num = "0")
-{
-    global $prefix, $db, $ratecookie, $sitename, $r_options, $sitekey, $gfx_chk, $module_name;
-    $sid = intval($sid);
-    $score = intval($score);
-    if (isset($random_num)) {
-        $datekey = date("F j");
-        $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $random_num . $datekey));
-        $code = substr($rcode, 2, 3);
-        if (extension_loaded("gd") and $code != $gfx_check and $gfx_chk != 0) {
-            mt_srand((double) microtime() * 1000000);
-            $maxran = 1000000;
-            $random_num = mt_rand(0, $maxran);
-            Nuke\Header::header();
-            title("$sitename: " . _ARTICLERATING . "");
-            OpenTable();
-            $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories WHERE sid='$sid'"));
-            $row['title'] = filter($row['title'], "nohtml");
-            echo "<center><a href=\"modules.php?name=$module_name&file=article&sid=$sid$r_options\"><b>" . $row['title'] . "</b></a><br>" . _ARTICLERATING . ": <img src=\"images/articles/stars-$score.gif\" border=\"0\" alt=\"$score/5\" title=\"$score/5\"> ($score/5)<br><br>";
-            echo "" . _TOFINISHRATINGERROR . "<br><br>";
-            echo "<form action=\"modules.php?name=$module_name\" method=\"post\">";
-            echo "" . _SECURITYCODE . ":<br><img src='?gfx=gfx_little&random_num=$random_num' border='1' alt='" . _SECURITYCODE . "' title='" . _SECURITYCODE . "'><br><br>\n";
-            echo "" . _TYPESECCODE . ":<br><input type=\"text\" NAME=\"gfx_check\" SIZE=\"3\" MAXLENGTH=\"3\"><br>\n";
-            echo "<input type=\"hidden\" name=\"random_num\" value=\"$random_num\"><br>\n";
-            echo "<input type=\"hidden\" name=\"score\" value=\"$score\"><br>\n";
-            echo "<input type=\"hidden\" name=\"sid\" value=\"$sid\">\n";
-            echo "<input type=\"hidden\" name=\"op\" value=\"rate_article\">";
-            echo "<input type=\"submit\" value=\"" . _CASTMYVOTE . "\"></font></center></form>";
-            CloseTable();
-            Nuke\Footer::footer();
-            die();
-        } else {
-            $score = intval($score);
-            $sid = intval($sid);
-            if ($score) {
-                if ($score > 5) {$score = 5;}
-                if ($score < 1) {$score = 1;}
-                if ($score != 1 and $score != 2 and $score != 3 and $score != 4 and $score != 5) {
-                    Header("Location: index.php");
-                    die();
-                }
-                $ip = filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP) ?: '';
-                $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_stories WHERE sid='$sid' AND rating_ip='$ip'"));
-                if ($num != 0) {
-                    Header("Location: modules.php?name=News&op=rate_complete&sid=$sid&rated=1");
-                    die();
-                }
-                if (isset($ratecookie)) {
-                    $rcookie = base64_decode($ratecookie);
-                    $rcookie = addslashes($rcookie);
-                    $r_cookie = explode(":", $rcookie);
-                }
-                for ($i = 0; $i < sizeof($r_cookie); $i++) {
-                    if ($r_cookie[$i] == $sid) {
-                        $a = 1;
-                    }
-                }
-                if ($a == 1) {
-                    Header("Location: modules.php?name=News&op=rate_complete&sid=$sid&rated=1");
-                    die();
-                } else {
-                    $ip = filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP) ?: '';
-                    $result = $db->sql_query("update " . $prefix . "_stories set score=score+$score, ratings=ratings+1, rating_ip='$ip' where sid='$sid'");
-                    $info = base64_encode("$rcookie$sid:");
-                    setcookie("ratecookie", "$info", time() + 86400);
-                    update_points(7);
-                    Header("Location: modules.php?name=News&op=rate_complete&sid=$sid&score=$score");
-                }
-            } else {
-                Nuke\Header::header();
-                title("$sitename: " . _ARTICLERATING . "");
-                OpenTable();
-                echo "<center>" . _DIDNTRATE . "<br><br>"
-                    . "" . _GOBACK . "</center>";
-                CloseTable();
-                Nuke\Footer::footer();
-            }
-        }
-    } else {
-        mt_srand((double) microtime() * 1000000);
-        $maxran = 1000000;
-        $random_num = mt_rand(0, $maxran);
-        if (extension_loaded("gd") and $gfx_chk != 0) {
-            Nuke\Header::header();
-            title("$sitename: " . _ARTICLERATING . "");
-            OpenTable();
-            $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories WHERE sid='$sid'"));
-            echo "<center><a href=\"modules.php?name=$module_name&file=article&sid=$sid$r_options\"><b>" . $row['title'] . "</b></a><br>" . _ARTICLERATING . ": <img src=\"images/articles/stars-$score.gif\" border=\"0\" alt=\"$score/5\" title=\"$score/5\"> ($score/5)<br><br>";
-            echo "" . _TOFINISHRATING . "<br><br>";
-            echo "<form action=\"modules.php?name=$module_name\" method=\"post\">";
-            echo "" . _SECURITYCODE . ":<br><img src='?gfx=gfx_little&random_num=$random_num' border='1' alt='" . _SECURITYCODE . "' title='" . _SECURITYCODE . "'><br><br>\n";
-            echo "" . _TYPESECCODE . ":<br><input type=\"text\" NAME=\"gfx_check\" SIZE=\"3\" MAXLENGTH=\"3\"><br>\n";
-            echo "<input type=\"hidden\" name=\"random_num\" value=\"$random_num\"><br>\n";
-            echo "<input type=\"hidden\" name=\"score\" value=\"$score\"><br>\n";
-            echo "<input type=\"hidden\" name=\"sid\" value=\"$sid\">\n";
-            echo "<input type=\"hidden\" name=\"op\" value=\"rate_article\">";
-            echo "<input type=\"submit\" value=\"" . _CASTMYVOTE . "\"></font></center></form>";
-            CloseTable();
-            Nuke\Footer::footer();
-        } else {
-            $random_num = "$random_num";
-            $gfx_check = "$code";
-            Header("Location: modules.php?name=$module_name&op=rate_article&sid=$sid&score=$score&random_num=$random_num");
-        }
-    }
-}
-
-function rate_complete($sid, $score, $rated = 0)
-{
-    global $sitename, $user, $cookie, $module_name, $userinfo;
-    $sid = intval($sid);
-    $score = intval($score);
-    $rated = intval($rated);
-    $r_options = "";
-    if (is_user($user)) {
-        getusrinfo($user);
-        if (isset($userinfo['umode'])) {$r_options .= "&amp;mode=" . $userinfo['umode'];}
-        if (isset($userinfo['uorder'])) {$r_options .= "&amp;order=" . $userinfo['uorder'];}
-        if (isset($userinfo['thold'])) {$r_options .= "&amp;thold=" . $userinfo['thold'];}
-    }
-    Nuke\Header::header();
-    title("$sitename: " . _ARTICLERATING . "");
-    OpenTable();
-    if ($rated == 0) {
-        $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories WHERE sid='$sid'"));
-        $row['title'] = filter($row['title'], "nohtml");
-        echo "<center><a href=\"modules.php?name=$module_name&file=article&sid=$sid$r_options\"><b>" . $row['title'] . "</b></a><br>" . _YOURATEDARTICLE . ": <img src=\"images/articles/stars-$score.gif\" border=\"0\" alt=\"$score/5\" title=\"$score/5\"> ($score/5)<br><br>";
-        echo "<center>" . _THANKSVOTEARTICLE . "<br><br>"
-            . "[ <a href=\"modules.php?name=$module_name&amp;file=article&amp;sid=$sid$r_options\">" . _BACKTOARTICLEPAGE . "</a> ]</center>";
-    } elseif ($rated == 1) {
-        echo "<center>" . _ALREADYVOTEDARTICLE . "<br><br>"
-            . "[ <a href=\"modules.php?name=$module_name&amp;file=article&amp;sid=$sid$r_options\">" . _BACKTOARTICLEPAGE . "</a> ]</center>";
-    }
-    CloseTable();
     Nuke\Footer::footer();
 }
 
@@ -273,14 +128,6 @@ switch ($op) {
 
     default:
         theindex($new_topic);
-        break;
-
-    case "rate_article":
-        rate_article($sid, $score, $gfx_check, $random_num);
-        break;
-
-    case "rate_complete":
-        rate_complete($sid, $score, $rated);
         break;
 
 }

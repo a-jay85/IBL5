@@ -25,7 +25,7 @@ class GMContactListRepository extends \BaseMysqliRepository implements GMContact
                          ti.owner_name, nu.discordID
             FROM ibl_team_info ti
             LEFT JOIN nuke_users nu ON nu.user_ibl_team = ti.team_name
-            WHERE ti.teamid > 0
+            WHERE ti.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             ORDER BY ti.team_city ASC";
 
         /** @var array<int, array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, owner_name: string, discordID: int|null}> */

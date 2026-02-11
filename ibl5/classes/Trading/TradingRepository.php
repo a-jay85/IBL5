@@ -65,7 +65,9 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     {
         /** @var list<TeamNameRow> */
         return $this->fetchAll(
-            "SELECT team_name FROM ibl_team_info ORDER BY team_name"
+            "SELECT team_name FROM ibl_team_info WHERE teamid BETWEEN 1 AND ? ORDER BY team_name",
+            "i",
+            \League::MAX_REAL_TEAMID
         );
     }
 
@@ -562,7 +564,9 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     {
         /** @var list<TeamWithCityRow> */
         return $this->fetchAll(
-            "SELECT teamid, team_name, team_city, color1, color2 FROM ibl_team_info ORDER BY team_city ASC"
+            "SELECT teamid, team_name, team_city, color1, color2 FROM ibl_team_info WHERE teamid BETWEEN 1 AND ? ORDER BY team_city ASC",
+            "i",
+            \League::MAX_REAL_TEAMID
         );
     }
 

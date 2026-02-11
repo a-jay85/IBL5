@@ -27,10 +27,10 @@ class DraftPickLocatorRepository extends \BaseMysqliRepository implements DraftP
         return $this->fetchAll(
             "SELECT teamid, team_city, team_name, color1, color2
              FROM ibl_team_info
-             WHERE teamid != ?
+             WHERE teamid BETWEEN 1 AND ?
              ORDER BY teamid ASC",
             "i",
-            \League::FREE_AGENTS_TEAMID
+            \League::MAX_REAL_TEAMID
         );
     }
 

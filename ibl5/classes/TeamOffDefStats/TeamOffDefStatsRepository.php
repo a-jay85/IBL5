@@ -76,7 +76,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
             FROM ibl_team_info ti
             LEFT JOIN ibl_team_offense_stats tos ON ti.teamid = tos.teamID
             LEFT JOIN ibl_team_defense_stats tds ON ti.teamid = tds.teamID
-            WHERE ti.teamid != " . \League::FREE_AGENTS_TEAMID . "
+            WHERE ti.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             ORDER BY ti.team_city
         ";
 

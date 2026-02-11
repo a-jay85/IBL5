@@ -84,7 +84,7 @@ $season = new Season($mysqli_db);
 $tidOffenseStats = $tidDefenseStats = 0;
 
 // Fetch all team IDs and names using modern mysqli
-$queryTeamIDsNames = "SELECT teamid, team_name FROM ibl_team_info ORDER BY teamid ASC";
+$queryTeamIDsNames = "SELECT teamid, team_name FROM ibl_team_info WHERE teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . " ORDER BY teamid ASC";
 $resultTeamIDsNames = $mysqli_db->query($queryTeamIDsNames);
 $allTeamData = [];
 if ($resultTeamIDsNames) {

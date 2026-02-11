@@ -49,7 +49,7 @@ class MaintenanceRepositoryTest extends TestCase
         $this->repository->getAllTeams();
 
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertStringContainsString('teamid !=', $queries[0]);
+        $this->assertStringContainsString('teamid BETWEEN 1 AND', $queries[0]);
     }
 
     public function testGetTeamRecentCompleteSeasonsReturnsSeasons(): void

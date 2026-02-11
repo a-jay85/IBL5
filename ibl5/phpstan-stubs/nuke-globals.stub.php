@@ -86,6 +86,11 @@ function themeheader(): void {}
 /** @return void */
 function themefooter(): void {}
 
+/**
+ * @return array<string, mixed>|null
+ */
+function getusrinfo(mixed $user): ?array { return null; }
+
 /** @return bool */
 function is_admin(mixed $admin): bool { return false; }
 

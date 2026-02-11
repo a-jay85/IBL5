@@ -1430,6 +1430,16 @@ CREATE TABLE `ibl_team_info` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- All-Star Weekend placeholder teams (satisfy FK constraints for boxscore inserts)
+--
+
+INSERT INTO `ibl_team_info` (`teamid`, `team_city`, `team_name`, `uuid`) VALUES
+(40, 'IBL', 'Rookies', UUID()),
+(41, 'IBL', 'Sophomores', UUID()),
+(50, 'IBL', 'All-Star Away', UUID()),
+(51, 'IBL', 'All-Star Home', UUID());
+
+--
 -- Table structure for table `ibl_team_offense_stats`
 --
 

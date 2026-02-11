@@ -41,7 +41,7 @@ class TeamStatsCalculator
         if (method_exists($this->db, 'fetchAll')) {
             /** @var list<array{TeamID: int, win: int, loss: int}> $rows */
             $rows = $this->db->fetchAll(
-                "SELECT TeamID, win, loss FROM ibl_power WHERE TeamID BETWEEN 1 AND 32",
+                "SELECT TeamID, win, loss FROM ibl_power WHERE TeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID,
                 ""
             );
 

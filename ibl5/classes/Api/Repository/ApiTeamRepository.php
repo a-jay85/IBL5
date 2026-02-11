@@ -24,9 +24,11 @@ class ApiTeamRepository extends \BaseMysqliRepository
              FROM ibl_team_info t
              LEFT JOIN ibl_standings s ON t.teamid = s.tid
              LEFT JOIN nuke_users nu ON nu.user_ibl_team = t.team_name
+             WHERE t.teamid BETWEEN 1 AND ?
              ORDER BY {$orderBy}
              LIMIT ? OFFSET ?",
-            'ii',
+            'iii',
+            \League::MAX_REAL_TEAMID,
             $paginator->getLimit(),
             $paginator->getOffset()
         );
@@ -38,7 +40,11 @@ class ApiTeamRepository extends \BaseMysqliRepository
     public function countTeams(): int
     {
         /** @var array{total: int}|null $row */
-        $row = $this->fetchOne('SELECT COUNT(*) AS total FROM ibl_team_info');
+        $row = $this->fetchOne(
+            'SELECT COUNT(*) AS total FROM ibl_team_info WHERE teamid BETWEEN 1 AND ?',
+            'i',
+            \League::MAX_REAL_TEAMID
+        );
 
         return $row !== null ? $row['total'] : 0;
     }

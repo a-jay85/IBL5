@@ -133,6 +133,8 @@ function theindex($new_topic = "0")
 function rate_article($sid, $score, $gfx_check, $random_num = "0")
 {
     global $prefix, $db, $ratecookie, $sitename, $r_options, $sitekey, $gfx_chk, $module_name;
+    $sid = intval($sid);
+    $score = intval($score);
     if (isset($random_num)) {
         $datekey = date("F j");
         $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $random_num . $datekey));
@@ -169,7 +171,7 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
                     Header("Location: index.php");
                     die();
                 }
-                $ip = $_SERVER['REMOTE_ADDR'];
+                $ip = filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP) ?: '';
                 $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_stories WHERE sid='$sid' AND rating_ip='$ip'"));
                 if ($num != 0) {
                     Header("Location: modules.php?name=News&op=rate_complete&sid=$sid&rated=1");
@@ -189,7 +191,7 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
                     Header("Location: modules.php?name=News&op=rate_complete&sid=$sid&rated=1");
                     die();
                 } else {
-                    $ip = $_SERVER['REMOTE_ADDR'];
+                    $ip = filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP) ?: '';
                     $result = $db->sql_query("update " . $prefix . "_stories set score=score+$score, ratings=ratings+1, rating_ip='$ip' where sid='$sid'");
                     $info = base64_encode("$rcookie$sid:");
                     setcookie("ratecookie", "$info", time() + 86400);
@@ -238,6 +240,9 @@ function rate_article($sid, $score, $gfx_check, $random_num = "0")
 function rate_complete($sid, $score, $rated = 0)
 {
     global $sitename, $user, $cookie, $module_name, $userinfo;
+    $sid = intval($sid);
+    $score = intval($score);
+    $rated = intval($rated);
     $r_options = "";
     if (is_user($user)) {
         getusrinfo($user);

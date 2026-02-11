@@ -163,8 +163,14 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
 
     $articleClass = $isTransaction ? 'news-article news-article--transaction' : 'news-article';
 
+    $topicIconHtml = '';
+    if (!empty($t_image) && file_exists($t_image)) {
+        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__topic-icon-link"><img src="' . \Utilities\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
+    }
+
     echo '<article class="' . $articleClass . '">
         <header class="news-article__header">
+            ' . $topicIconHtml . '
             <h2 class="news-article__title">' . $safeTitle . '</h2>
             <div class="news-article__meta">
                 <span class="news-article__meta-item">
@@ -183,12 +189,6 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
             </div>
         </header>
         <div class="news-article__body">';
-
-    if (!empty($t_image) && file_exists($t_image)) {
-        echo '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '">
-            <img src="' . \Utilities\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy">
-        </a>';
-    }
 
     FormatStoryModern($thetext, $notes, $aid, $informant);
 
@@ -214,7 +214,9 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
     }
 
     // Sanitize output
-    $safeTitle = \Utilities\HtmlSanitizer::safeHtmlOutput($title);
+    // Note: $title may contain trusted HTML links from News module (already filtered there)
+    // We strip the deprecated <font> tags but preserve the links
+    $safeTitle = str_replace(['<font class="storycat">', '</font>'], ['<span class="ibl-badge">', '</span>'], $title);
     $safeDatetime = \Utilities\HtmlSanitizer::safeHtmlOutput($datetime);
     $safeTopictext = \Utilities\HtmlSanitizer::safeHtmlOutput($topictext);
     $safeAid = \Utilities\HtmlSanitizer::safeHtmlOutput($aid);
@@ -226,15 +228,21 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
             $safeInformant = \Utilities\HtmlSanitizer::safeHtmlOutput($informant);
             $contributorHtml = '<span class="news-article__meta-item">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                ' . _CONTRIBUTEDBY . ' <a href="modules.php?name=YourAccount&amp;op=userinfo&amp;username=' . $safeInformant . '" style="color: var(--accent-500);">' . $safeInformant . '</a>
+                ' . _CONTRIBUTEDBY . ' <a href="modules.php?name=YourAccount&amp;op=userinfo&amp;username=' . $safeInformant . '">' . $safeInformant . '</a>
             </span>';
         } else {
             $contributorHtml = '<span class="news-article__meta-item">' . _CONTRIBUTEDBY . ' ' . $anonymous . '</span>';
         }
     }
 
+    $topicIconHtml = '';
+    if (!empty($t_image) && file_exists($t_image)) {
+        $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__topic-icon-link"><img src="' . \Utilities\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
+    }
+
     echo '<article class="news-article" style="max-width: 900px;">
         <header class="news-article__header">
+            ' . $topicIconHtml . '
             <h1 class="news-article__title" style="font-size: 1.5rem;">' . $safeTitle . '</h1>
             <div class="news-article__meta">
                 <span class="news-article__meta-item">
@@ -249,12 +257,6 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
             </div>
         </header>
         <div class="news-article__body">';
-
-    if (!empty($t_image) && file_exists($t_image)) {
-        echo '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '">
-            <img src="' . \Utilities\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy">
-        </a>';
-    }
 
     echo $thetext;
 

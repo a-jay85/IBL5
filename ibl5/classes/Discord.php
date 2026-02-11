@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 class Discord
 {
-    /** @var string IBL Discord server (guild) snowflake ID */
-    public const IBL_GUILD_ID = '399119059771195392';
+    /** @var string Production IBL Discord server (guild) snowflake ID */
+    public const IBL_GUILD_ID = '666986450889474053';
+
+    /** @var string Testing/development Discord server snowflake ID */
+    public const IBL_GUILD_ID_TESTING = '399119059771195392';
 
     private \mysqli $db;
 
@@ -17,6 +20,20 @@ class Discord
 
     /** @var bool Whether config has been loaded */
     private static bool $configLoaded = false;
+
+    /**
+     * Get the guild ID for the current environment
+     *
+     * Uses the testing server on localhost, production server otherwise.
+     */
+    public static function getGuildID(): string
+    {
+        $serverName = $_SERVER['SERVER_NAME'] ?? 'localhost';
+        if ($serverName === 'localhost' || $serverName === '127.0.0.1') {
+            return self::IBL_GUILD_ID_TESTING;
+        }
+        return self::IBL_GUILD_ID;
+    }
 
     /**
      * @param \mysqli $db Database connection

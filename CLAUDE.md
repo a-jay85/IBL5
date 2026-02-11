@@ -34,8 +34,6 @@ cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary -c php
 
 **Note:** PHPUnit 12.x has no `-v`/`--verbose`. Use `--display-all-issues` instead. See `phpunit-tests.md` for full testing rules and completion criteria.
 
-**Post-change test rule:** After making ANY code changes (source or test files), always run the **full** test suite (`vendor/bin/phpunit --no-progress --no-output --testdox-summary`), not just the tests for the module you changed. Changes in one module can break tests in other modules that depend on the same code.
-
 ### Static Analysis (PHPStan)
 
 ```bash
@@ -43,7 +41,7 @@ cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary -c php
 cd ibl5 && composer run analyse
 ```
 
-**PHPStan gate rule:** Run `composer run analyse` **before** creating or running unit tests. If your changes introduce new errors above the baseline, fix them before proceeding. The only exception: errors clearly caused by another Claude instance's simultaneous changes to files you did not touch — those may be ignored.
+**Note:** PHPStan and PHPUnit run automatically via PostToolUse hooks after every Edit — no need to run them manually between edits. If your changes introduce new errors above the baseline, fix them before proceeding. The only exception: errors clearly caused by another Claude instance's simultaneous changes to files you did not touch — those may be ignored.
 
 **Write PHPStan-clean code proactively.** Don't rely on the analyser to catch mistakes. The project runs level `max` with `phpstan-strict-rules` and `bleedingEdge`, which means:
 

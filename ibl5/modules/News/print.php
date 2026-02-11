@@ -33,8 +33,8 @@ function PrintPage($sid)
     $row = $db->sql_fetchrow($db->sql_query("SELECT title, time, hometext, bodytext, topic, notes FROM " . $prefix . "_stories WHERE sid='$sid'"));
     $title = filter($row['title'], nohtml);
     $time = $row['time'];
-    $hometext = filter($row['hometext']);
-    $bodytext = filter($row['bodytext']);
+    $hometext = nl2br(filter($row['hometext']));
+    $bodytext = nl2br(filter($row['bodytext']));
     $topic = intval($row['topic']);
     $notes = filter($row['notes']);
     $row2 = $db->sql_fetchrow($db->sql_query("SELECT topictext FROM " . $prefix . "_topics WHERE topicid='$topic'"));

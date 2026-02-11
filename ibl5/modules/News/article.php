@@ -156,7 +156,7 @@ $hometext = filter($hometext);
 $bodytext = filter($bodytext);
 $notes = filter($notes);
 if (!empty($notes)) {
-    $notes = "<br><br><b>" . _NOTE . "</b> <i>$notes</i>";
+    $notes = "\n\n<b>" . _NOTE . "</b> <i>$notes</i>";
 } else {
     $notes = "";
 }
@@ -164,7 +164,7 @@ if (!empty($notes)) {
 if (empty($bodytext)) {
     $bodytext = "$hometext$notes";
 } else {
-    $bodytext = "$hometext<br><br>$bodytext$notes";
+    $bodytext = "$hometext\n\n$bodytext$notes";
 }
 
 if (empty($informant)) {
@@ -190,7 +190,7 @@ if ($catid !== 0) {
     }
 }
 
-themearticle($aaid, $informant, $datetime, $title, $bodytext, $topic, $topicname, $topicimage, $topictext);
+themearticle($aaid, $informant, $time, $title, $bodytext, $topic, $topicname, $topicimage, $topictext);
 
 if ($multilingual == 1) {
     $querylang = "AND (blanguage='$currentlang' OR blanguage='')";

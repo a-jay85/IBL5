@@ -10,12 +10,17 @@ declare(strict_types=1);
  *
  * @see TeamSchedule\TeamScheduleService For team-specific business logic
  * @see TeamSchedule\TeamScheduleView For team-specific HTML rendering
+ * @see LeagueSchedule\LeagueScheduleService For league-wide business logic
+ * @see LeagueSchedule\LeagueScheduleView For league-wide HTML rendering
  */
 
 if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
+use LeagueSchedule\LeagueScheduleRepository;
+use LeagueSchedule\LeagueScheduleService;
+use LeagueSchedule\LeagueScheduleView;
 use TeamSchedule\TeamScheduleService;
 use TeamSchedule\TeamScheduleView;
 
@@ -45,253 +50,11 @@ if ($isValidTeam) {
     echo $view->render($team, $games, $league->getSimLengthInDays(), $season->phase);
 } else {
     // League-wide schedule
-    renderLeagueSchedule($mysqli_db, $commonRepository, $season, $league);
+    $repository = new LeagueScheduleRepository($mysqli_db);
+    $service = new LeagueScheduleService($repository);
+    $view = new LeagueScheduleView();
+    $pageData = $service->getSchedulePageData($season, $league, $commonRepository);
+    echo $view->render($pageData);
 }
 
 Nuke\Footer::footer();
-
-/**
- * Render the league-wide schedule using MySQLi
- */
-function renderLeagueSchedule(
-    mysqli $mysqli_db,
-    Services\CommonMysqliRepository $commonRepository,
-    Season $season,
-    League $league
-): void {
-    // Use Season's projectedNextSimEndDate which handles All-Star break correctly
-    $projectedNextSimEndDate = $season->projectedNextSimEndDate;
-    $simLengthDays = $league->getSimLengthInDays();
-
-    // Get all games using MySQLi, with gameOfThatDay from box score teams table
-    $query = "SELECT s.SchedID, s.Date, s.Visitor, s.VScore, s.Home, s.HScore, s.BoxID,
-              bst.gameOfThatDay
-              FROM ibl_schedule s
-              LEFT JOIN (
-                  SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
-                  FROM ibl_box_scores_teams
-                  GROUP BY Date, visitorTeamID, homeTeamID
-              ) bst ON bst.Date = s.Date AND bst.visitorTeamID = s.Visitor AND bst.homeTeamID = s.Home
-              ORDER BY s.Date ASC, s.SchedID ASC";
-    $result = $mysqli_db->query($query);
-
-    // Get team records using MySQLi
-    $teamRecordsQuery = "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC";
-    $teamRecordsResult = $mysqli_db->query($teamRecordsQuery);
-    $teamRecords = [];
-    while ($row = $teamRecordsResult->fetch_assoc()) {
-        $teamRecords[$row['tid']] = $row['leagueRecord'];
-    }
-    $teamRecordsResult->free();
-
-    // Organize games by month and date
-    $gamesByMonth = [];
-    $months = [];
-    $firstUnplayedId = null;
-
-    while ($row = $result->fetch_assoc()) {
-        $date = $row['Date'];
-        $visitor = (int)$row['Visitor'];
-        $visitorScore = (int)$row['VScore'];
-        $home = (int)$row['Home'];
-        $homeScore = (int)$row['HScore'];
-        $boxid = (int)$row['BoxID'];
-        $gameOfThatDay = (int)($row['gameOfThatDay'] ?? 0);
-
-        $monthKey = date('Y-m', strtotime($date));
-        $monthLabel = date('F', strtotime($date));
-
-        if (!isset($gamesByMonth[$monthKey])) {
-            $gamesByMonth[$monthKey] = [];
-            $months[$monthKey] = $monthLabel;
-        }
-
-        if (!isset($gamesByMonth[$monthKey][$date])) {
-            $gamesByMonth[$monthKey][$date] = [];
-        }
-
-        $gameDate = date_create($date);
-        $isUpcoming = \Utilities\ScheduleHighlighter::shouldHighlight(
-            $visitorScore,
-            $homeScore,
-            $gameDate,
-            $projectedNextSimEndDate
-        );
-        $isUnplayed = \Utilities\ScheduleHighlighter::isGameUnplayed($visitorScore, $homeScore);
-
-        // Track first upcoming game (next sim)
-        if ($isUpcoming && $firstUnplayedId === null) {
-            $firstUnplayedId = 'game-' . $boxid;
-        }
-
-        $gamesByMonth[$monthKey][$date][] = [
-            'date' => $date,
-            'visitor' => $visitor,
-            'visitorScore' => $visitorScore,
-            'visitorTeam' => $commonRepository->getTeamnameFromTeamID((int) $visitor),
-            'visitorRecord' => $teamRecords[$visitor] ?? '',
-            'home' => $home,
-            'homeScore' => $homeScore,
-            'homeTeam' => $commonRepository->getTeamnameFromTeamID((int) $home),
-            'homeRecord' => $teamRecords[$home] ?? '',
-            'boxid' => $boxid,
-            'gameOfThatDay' => $gameOfThatDay,
-            'boxScoreUrl' => \Utilities\BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxid),
-            'isUnplayed' => $isUnplayed,
-            'isUpcoming' => $isUpcoming,
-            'visitorWon' => ($visitorScore > $homeScore),
-            'homeWon' => ($homeScore > $visitorScore),
-        ];
-    }
-    $result->free();
-
-    // In playoff phases, relabel June as "Playoffs" and move to front
-    $isPlayoffPhase = in_array($season->phase, ['Playoffs', 'Draft', 'Free Agency'], true);
-    $playoffMonthKey = null;
-    if ($isPlayoffPhase) {
-        foreach (array_keys($gamesByMonth) as $key) {
-            if ((int)date('n', strtotime($key . '-01')) === Season::IBL_PLAYOFF_MONTH) {
-                $playoffMonthKey = $key;
-                break;
-            }
-        }
-        if ($playoffMonthKey !== null) {
-            $months[$playoffMonthKey] = 'Playoffs';
-
-            $reorderedMonths = [$playoffMonthKey => 'Playoffs'];
-            unset($months[$playoffMonthKey]);
-            $months = $reorderedMonths + $months;
-
-            $reorderedGames = [$playoffMonthKey => $gamesByMonth[$playoffMonthKey]];
-            unset($gamesByMonth[$playoffMonthKey]);
-            $gamesByMonth = $reorderedGames + $gamesByMonth;
-        }
-    }
-
-    // Output schedule container
-    echo '<div class="schedule-container">';
-
-    // Header with month nav and jump button
-    echo '<div class="schedule-header">';
-    echo '<h1 class="ibl-title">Schedule</h1>';
-    echo '<div class="schedule-header__center">';
-    if ($firstUnplayedId) {
-        echo '<a href="#' . $firstUnplayedId . '" class="schedule-jump-btn" onclick="scrollToNextGames(event)">';
-        echo '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
-        echo 'Next Games';
-        echo '</a>';
-    }
-    echo '<p class="schedule-highlight-note">Next sim length: ' . \Utilities\HtmlSanitizer::safeHtmlOutput($simLengthDays) . ' days</p>';
-    echo '</div>';
-    echo '</div>';
-
-    // Month navigation
-    echo '<nav class="ibl-jump-menu schedule-months">';
-    foreach ($months as $key => $label) {
-        if ($isPlayoffPhase && $key === $playoffMonthKey) {
-            continue;
-        }
-        $abbrev = date('M', strtotime($key . '-01')); // 3-letter abbreviation
-        echo '<a href="#month-' . $key . '" class="ibl-jump-menu__link schedule-months__link" onclick="scrollToMonth(event, \'' . $key . '\')">';
-        echo '<span class="schedule-months__full">' . $label . '</span>';
-        echo '<span class="schedule-months__abbr">' . $abbrev . '</span>';
-        echo '</a>';
-    }
-    echo '</nav>';
-
-    // Output games by month
-    foreach ($gamesByMonth as $monthKey => $dates) {
-        $monthLabel = $months[$monthKey];
-
-        echo '<div class="schedule-month" id="month-' . $monthKey . '">';
-        $headerClass = 'schedule-month__header';
-        if ($isPlayoffPhase && $monthKey === $playoffMonthKey) {
-            $headerClass .= ' schedule-month__header--playoffs';
-        }
-        echo '<div class="' . $headerClass . '">' . $monthLabel . '</div>';
-
-        foreach ($dates as $date => $games) {
-            $dayNum = date('j', strtotime($date));
-
-            echo '<div class="schedule-day">';
-            echo '<div class="schedule-day__header">';
-            echo '<span class="schedule-day__num">' . $dayNum . '</span>';
-            echo '</div>';
-
-            echo '<div class="schedule-day__games">';
-            foreach ($games as $game) {
-                $gameClass = 'schedule-game';
-                if ($game['isUpcoming']) {
-                    $gameClass .= ' schedule-game--upcoming';
-                }
-
-                $gameId = 'game-' . $game['boxid'];
-                $boxScoreUrl = \Utilities\HtmlSanitizer::safeHtmlOutput($game['boxScoreUrl']);
-                $visitorTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitor']);
-                $homeTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['home']);
-
-                echo '<div class="' . $gameClass . '" id="' . $gameId . '" data-home-team-id="' . (int)$game['home'] . '" data-visitor-team-id="' . (int)$game['visitor'] . '">';
-
-                // Visitor team + logo (links to team page)
-                $vClass = $game['visitorWon'] ? ' schedule-game__team--win' : '';
-                echo '<a href="' . $visitorTeamUrl . '" class="schedule-game__team-link">';
-                echo '<span class="schedule-game__team' . $vClass . '"><span class="schedule-game__team-text">' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorTeam']) . '</span> <span class="schedule-game__record">(' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorRecord']) . ')</span></span>';
-                echo '</a>';
-                echo '<a href="' . $visitorTeamUrl . '" class="schedule-game__logo-link"><img class="schedule-game__logo" src="images/logo/new' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitor']) . '.png" alt="" width="25" height="25" loading="lazy"></a>';
-
-                // Scores + @ (links to box score when available)
-                $hClass = $game['homeWon'] ? ' schedule-game__team--win' : '';
-                if ($boxScoreUrl !== '') {
-                    echo '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $vClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorScore'])) . '</a>';
-                    echo '<a href="' . $boxScoreUrl . '" class="schedule-game__vs">@</a>';
-                    echo '<a href="' . $boxScoreUrl . '" class="schedule-game__score-link' . $hClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeScore'])) . '</a>';
-                } else {
-                    echo '<span class="schedule-game__score-link' . $vClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['visitorScore'])) . '</span>';
-                    echo '<span class="schedule-game__vs">@</span>';
-                    echo '<span class="schedule-game__score-link' . $hClass . '">' . ($game['isUnplayed'] ? '–' : \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeScore'])) . '</span>';
-                }
-
-                // Home logo + team (links to team page)
-                echo '<a href="' . $homeTeamUrl . '" class="schedule-game__logo-link"><img class="schedule-game__logo" src="images/logo/new' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['home']) . '.png" alt="" width="25" height="25" loading="lazy"></a>';
-                echo '<a href="' . $homeTeamUrl . '" class="schedule-game__team-link">';
-                echo '<span class="schedule-game__team' . $hClass . '"><span class="schedule-game__team-text">' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeTeam']) . '</span> <span class="schedule-game__record">(' . \Utilities\HtmlSanitizer::safeHtmlOutput($game['homeRecord']) . ')</span></span>';
-                echo '</a>';
-
-                echo '</div>';
-            }
-            echo '</div>'; // day__games
-            echo '</div>'; // day
-        }
-
-        echo '</div>'; // month
-    }
-
-    echo '</div>'; // schedule-container
-
-    // Scroll scripts
-    echo '<script>
-var headerOffset = 70; // Offset for sticky header
-
-function scrollToMonth(e, monthKey) {
-    e.preventDefault();
-    var el = document.getElementById("month-" + monthKey);
-    if (el) {
-        var rect = el.getBoundingClientRect();
-        var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        var targetY = scrollTop + rect.top - headerOffset;
-        window.scrollTo({ top: targetY, behavior: "smooth" });
-    }
-}
-
-function scrollToNextGames(e) {
-    e.preventDefault();
-    var el = document.getElementById("' . ($firstUnplayedId ?? '') . '");
-    if (el) {
-        var rect = el.getBoundingClientRect();
-        var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        var targetY = scrollTop + rect.top - (window.innerHeight / 2) + (rect.height / 2);
-        window.scrollTo({ top: targetY, behavior: "smooth" });
-    }
-}
-</script>';
-}

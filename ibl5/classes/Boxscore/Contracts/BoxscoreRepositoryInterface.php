@@ -154,6 +154,17 @@ interface BoxscoreRepositoryInterface
     ): int;
 
     /**
+     * Find All-Star Game team names from existing boxscore records
+     *
+     * Queries ibl_box_scores_teams for the All-Star Game (visitorTeamID=50, homeTeamID=51)
+     * on the given date. Returns the team names from the two team-total rows.
+     *
+     * @param string $date Game date in Y-m-d format
+     * @return array{awayName: string, homeName: string}|null Team names or null if not found
+     */
+    public function findAllStarTeamNames(string $date): ?array;
+
+    /**
      * Insert a player boxscore row
      *
      * @param string $date Game date in Y-m-d format

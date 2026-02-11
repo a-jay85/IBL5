@@ -1311,7 +1311,7 @@ function automated_news()
                         $aid2 = filter($aid2, "nohtml", 1);
                         $informant2 = filter($informant2, "nohtml", 1);
                         $db->sql_query("DELETE FROM " . $prefix . "_autonews WHERE anid='$anid'");
-                        $db->sql_query("INSERT INTO " . $prefix . "_stories VALUES (NULL, '$catid2', '$aid2', '$title', '$time2', '$hometext', '$bodytext', '0', '0', '$topic2', '$informant2', '$notes', '$ihome2', '$alanguage2', '$acomm2', '0', '0', '0', '0', '0', '$associated2')");
+                        $db->sql_query("INSERT INTO " . $prefix . "_stories (catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, ihome, alanguage, acomm, haspoll, pollID, associated) VALUES ('$catid2', '$aid2', '$title', '$time2', '$hometext', '$bodytext', '0', '0', '$topic2', '$informant2', '$notes', '$ihome2', '$alanguage2', '$acomm2', '0', '0', '$associated2')");
                     }
                 }
                 $db->sql_freeresult($result2);
@@ -1482,22 +1482,5 @@ if (isset($gfx)) {
             die();
             break;
 
-        case "gfx_little":
-            $datekey = date("F j");
-            $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $random_num . $datekey));
-            $code = substr($rcode, 2, 3);
-            $ThemeSel = get_theme();
-            if (file_exists("themes/" . $ThemeSel . "/images/code_bg_little.jpg")) {
-                $image = ImageCreateFromJPEG("themes/" . $ThemeSel . "/images/code_bg_little.jpg");
-            } else {
-                $image = ImageCreateFromJPEG("images/code_bg_little.jpg");
-            }
-            $text_color = ImageColorAllocate($image, 80, 80, 80);
-            Header("Content-type: image/jpeg");
-            ImageString($image, 5, 12, 2, $code, $text_color);
-            ImageJPEG($image, null, 75);
-            ImageDestroy($image);
-            die();
-            break;
     }
 }

@@ -6,7 +6,7 @@ namespace NextSim;
 
 use NextSim\Contracts\NextSimServiceInterface;
 use Player\Player;
-use Schedule\TeamSchedule;
+use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 
 /**
  * NextSimService - Business logic for next simulation games
@@ -22,15 +22,19 @@ class NextSimService implements NextSimServiceInterface
     /** @phpstan-var \mysqli */
     private object $db;
 
+    private TeamScheduleRepositoryInterface $teamScheduleRepository;
+
     /**
      * Constructor
      *
      * @param object $db Database connection
+     * @param TeamScheduleRepositoryInterface $teamScheduleRepository Team schedule repository
      * @phpstan-param \mysqli $db
      */
-    public function __construct(object $db)
+    public function __construct(object $db, TeamScheduleRepositoryInterface $teamScheduleRepository)
     {
         $this->db = $db;
+        $this->teamScheduleRepository = $teamScheduleRepository;
     }
 
     /**
@@ -40,8 +44,7 @@ class NextSimService implements NextSimServiceInterface
      */
     public function getNextSimGames(int $teamId, \Season $season): array
     {
-        $projectedGames = TeamSchedule::getProjectedGamesNextSimResult(
-            $this->db,
+        $projectedGames = $this->teamScheduleRepository->getProjectedGamesNextSimResult(
             $teamId,
             $season->lastSimEndDate
         );

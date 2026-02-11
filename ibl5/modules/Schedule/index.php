@@ -21,6 +21,7 @@ if (!defined('MODULE_FILE')) {
 use LeagueSchedule\LeagueScheduleRepository;
 use LeagueSchedule\LeagueScheduleService;
 use LeagueSchedule\LeagueScheduleView;
+use TeamSchedule\TeamScheduleRepository;
 use TeamSchedule\TeamScheduleService;
 use TeamSchedule\TeamScheduleView;
 
@@ -44,7 +45,8 @@ Nuke\Header::header();
 
 if ($isValidTeam) {
     // Team-specific schedule with colors, logo, and win/loss tracking
-    $service = new TeamScheduleService($mysqli_db);
+    $teamScheduleRepository = new TeamScheduleRepository($mysqli_db);
+    $service = new TeamScheduleService($mysqli_db, $teamScheduleRepository);
     $view = new TeamScheduleView();
     $games = $service->getProcessedSchedule($teamID, $season);
     echo $view->render($team, $games, $league->getSimLengthInDays(), $season->phase);

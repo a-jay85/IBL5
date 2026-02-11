@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace TeamSchedule;
 
+use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 use TeamSchedule\Contracts\TeamScheduleServiceInterface;
-use Schedule\TeamSchedule as ScheduleTeamSchedule;
 
 /**
  * TeamScheduleService - Business logic for team schedule display
@@ -21,6 +21,8 @@ class TeamScheduleService implements TeamScheduleServiceInterface
     /** @phpstan-var \mysqli */
     private object $db;
 
+    private TeamScheduleRepositoryInterface $repository;
+
     /** @var array<int, \Team> */
     private array $teamCache = [];
 
@@ -28,11 +30,13 @@ class TeamScheduleService implements TeamScheduleServiceInterface
      * Constructor
      *
      * @param object $db Database connection
+     * @param TeamScheduleRepositoryInterface $repository Team schedule repository
      * @phpstan-param \mysqli $db
      */
-    public function __construct(object $db)
+    public function __construct(object $db, TeamScheduleRepositoryInterface $repository)
     {
         $this->db = $db;
+        $this->repository = $repository;
     }
 
     /**
@@ -42,7 +46,7 @@ class TeamScheduleService implements TeamScheduleServiceInterface
      */
     public function getProcessedSchedule(int $teamId, \Season $season): array
     {
-        $teamSchedule = ScheduleTeamSchedule::getSchedule($this->db, $teamId);
+        $teamSchedule = $this->repository->getSchedule($teamId);
 
         /** @var list<ScheduleGameRow> $rows */
         $rows = [];

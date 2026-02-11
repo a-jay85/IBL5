@@ -152,6 +152,21 @@ class Boxscore
     }
 
     /**
+     * Override game metadata after parsing (used for All-Star Weekend games)
+     */
+    public function overrideGameContext(
+        string $gameDate,
+        int $visitorTeamID,
+        int $homeTeamID,
+        int $gameOfThatDay,
+    ): void {
+        $this->gameDate = $gameDate;
+        $this->visitorTeamID = $visitorTeamID;
+        $this->homeTeamID = $homeTeamID;
+        $this->gameOfThatDay = $gameOfThatDay;
+    }
+
+    /**
      * Check whether the parsed game scores match an existing database row
      *
      * Compares the sum of visitor and home quarter scores from $this (strings from .sco file)

@@ -128,6 +128,7 @@ class BoxscoreView
             .then(function (html) {
                 previewDiv.innerHTML = '';
                 resultsDiv.innerHTML = html;
+                handleAllStarPrompt(resultsDiv);
             })
             .catch(function (err) {
                 previewDiv.innerHTML = '';
@@ -209,6 +210,36 @@ class BoxscoreView
         return div.innerHTML;
     }
 })();
+
+function handleAllStarPrompt(container) {
+    var allStarDiv = container.querySelector('[data-all-star-pending]');
+    if (!allStarDiv) return;
+
+    var awayScorer = allStarDiv.getAttribute('data-away-scorer');
+    var homeScorer = allStarDiv.getAttribute('data-home-scorer');
+
+    var awayName = window.prompt(
+        'All-Star Game: What is the name of the AWAY team whose leading scorer was ' + awayScorer + '?'
+    );
+    if (!awayName) return;
+
+    var homeName = window.prompt(
+        'All-Star Game: What is the name of the HOME team whose leading scorer was ' + homeScorer + '?'
+    );
+    if (!homeName) return;
+
+    var fd = new FormData();
+    fd.append('allStarAwayName', awayName);
+    fd.append('allStarHomeName', homeName);
+    fd.append('allStarRawData', allStarDiv.getAttribute('data-raw'));
+    fd.append('seasonEndingYear', allStarDiv.getAttribute('data-year'));
+
+    fetch('/ibl5/scripts/scoParser.php', { method: 'POST', body: fd })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+            allStarDiv.outerHTML = html;
+        });
+}
 </script>
         <?php
         return (string) ob_get_clean();
@@ -272,4 +303,57 @@ class BoxscoreView
         <?php
         return (string) ob_get_clean();
     }
+
+    /**
+     * Render All-Star game processing results
+     *
+     * When an All-Star prompt is pending, renders a hidden div with data attributes
+     * for client-side prompting. Otherwise renders log messages.
+     *
+     * @param array{success: bool, messages: list<string>, allStarPending?: bool, awayLeadingScorer?: string, homeLeadingScorer?: string, allStarRawData?: string, seasonEndingYear?: int, skipped?: string} $result
+     * @return string HTML output
+     */
+    public function renderAllStarLog(array $result): string
+    {
+        ob_start();
+
+        if (isset($result['allStarPending']) && $result['allStarPending'] === true) {
+            /** @var string $awayScorer */
+            $awayScorer = HtmlSanitizer::safeHtmlOutput($result['awayLeadingScorer'] ?? '');
+            /** @var string $homeScorer */
+            $homeScorer = HtmlSanitizer::safeHtmlOutput($result['homeLeadingScorer'] ?? '');
+            /** @var string $rawData */
+            $rawData = HtmlSanitizer::safeHtmlOutput($result['allStarRawData'] ?? '');
+            $year = (int) ($result['seasonEndingYear'] ?? 0);
+            ?>
+<div data-all-star-pending="1"
+     data-away-scorer="<?= $awayScorer ?>"
+     data-home-scorer="<?= $homeScorer ?>"
+     data-raw="<?= $rawData ?>"
+     data-year="<?= $year ?>"
+     style="display: none;"></div>
+            <?php
+        }
+
+        if ($result['messages'] !== []) {
+            ?>
+<div class="ibl-card sco-parse-result">
+    <div class="ibl-card__header">
+        <h2 class="ibl-card__title">All-Star Weekend</h2>
+    </div>
+    <div class="ibl-card__body">
+        <div class="sco-log">
+            <?php foreach ($result['messages'] as $message): ?>
+            <?php /** @var string $safeMessage */ $safeMessage = HtmlSanitizer::safeHtmlOutput($message); ?>
+            <p class="sco-log__message"><?= $safeMessage ?></p>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
+            <?php
+        }
+
+        return (string) ob_get_clean();
+    }
+
 }

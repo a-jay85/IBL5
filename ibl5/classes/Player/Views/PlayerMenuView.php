@@ -100,7 +100,7 @@ class PlayerMenuView
      *
      * @param int $playerID The player's ID
      * @param int|null $currentPageType Current page type to mark as selected
-     * @param array{primary: string, primaryDark: string, secondary: string, secondaryDark: string, text: string, textOnSecondary: string}|null $colorScheme Team color scheme
+     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Team color scheme from TeamColorHelper
      * @return string HTML for player menu
      */
     public static function render(int $playerID, ?int $currentPageType = null, ?array $colorScheme = null): string
@@ -122,7 +122,7 @@ class PlayerMenuView
 
         // Team color CSS custom properties for accent coloring
         $primaryColor = $colorScheme['primary'] ?? '#f97316';
-        $primaryDark = $colorScheme['primaryDark'] ?? '#ea580c';
+        $primaryDark = '#' . TeamColorHelper::darken($colorScheme['primary'] ?? 'f97316', 15);
 
         ob_start();
         ?>

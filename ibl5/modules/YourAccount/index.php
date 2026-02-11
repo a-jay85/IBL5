@@ -56,19 +56,19 @@ function userCheck($username, $user_email)
         $stop = "<center>" . _NICKNOSPACES . "</center>";
     }
 
-    if ($db->sql_numrows($db->sql_query("SELECT username FROM " . $user_prefix . "_users WHERE username='$username'")) > 0) {
+    if (\DatabaseConnection::fetchValue("SELECT COUNT(*) FROM nuke_users WHERE username = ?", [$username]) > 0) {
         $stop = "<center>" . _NICKTAKEN . "</center><br>";
     }
 
-    if ($db->sql_numrows($db->sql_query("SELECT username FROM " . $user_prefix . "_users_temp WHERE username='$username'")) > 0) {
+    if (\DatabaseConnection::fetchValue("SELECT COUNT(*) FROM nuke_users_temp WHERE username = ?", [$username]) > 0) {
         $stop = "<center>" . _NICKTAKEN . "</center><br>";
     }
 
-    if ($db->sql_numrows($db->sql_query("SELECT user_email FROM " . $user_prefix . "_users WHERE user_email='$user_email'")) > 0) {
+    if (\DatabaseConnection::fetchValue("SELECT COUNT(*) FROM nuke_users WHERE user_email = ?", [$user_email]) > 0) {
         $stop = "<center>" . _EMAILREGISTERED . "</center><br>";
     }
 
-    if ($db->sql_numrows($db->sql_query("SELECT user_email FROM " . $user_prefix . "_users_temp WHERE user_email='$user_email'")) > 0) {
+    if (\DatabaseConnection::fetchValue("SELECT COUNT(*) FROM nuke_users_temp WHERE user_email = ?", [$user_email]) > 0) {
         $stop = "<center>" . _EMAILREGISTERED . "</center><br>";
     }
 
@@ -173,7 +173,7 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
         $username = rtrim($username, "\\");
         $username = str_replace("'", "\'", $username);
         $user_email = filter($user_email, "nohtml", 1);
-        $result = $db->sql_query("INSERT INTO " . $user_prefix . "_users_temp (user_id, username, user_email, user_password, user_regdate, check_num, time) VALUES (NULL, '$username', '$user_email', '$new_password', '$user_regdate', '$check_num', '$time')");
+        $result = \DatabaseConnection::query("INSERT INTO nuke_users_temp (user_id, username, user_email, user_password, user_regdate, check_num, time) VALUES (NULL, ?, ?, ?, ?, ?, ?)", [$username, $user_email, $new_password, $user_regdate, $check_num, $time]);
         if (!$result) {
             echo "" . _ERROR . "<br>";
         } else {
@@ -203,19 +203,17 @@ function activate($username, $check_num)
     $username = rtrim($username, "\\");
     $username = str_replace("'", "\'", $username);
     $past = time() - 86400;
-    $db->sql_query("DELETE FROM " . $user_prefix . "_users_temp WHERE time < $past");
-    $sql = "SELECT * FROM " . $user_prefix . "_users_temp WHERE username='$username' AND check_num='$check_num'";
-    $result = $db->sql_query($sql);
-    if ($db->sql_numrows($result) == 1) {
-        $row = $db->sql_fetchrow($result);
+    \DatabaseConnection::query("DELETE FROM nuke_users_temp WHERE time < ?", [$past]);
+    $row = \DatabaseConnection::fetchRow("SELECT * FROM nuke_users_temp WHERE username = ? AND check_num = ?", [$username, $check_num]);
+    if ($row !== null) {
         $user_password = htmlspecialchars(stripslashes($row['user_password']));
         if ($check_num == $row['check_num']) {
-            $db->sql_query("INSERT INTO " . $user_prefix . "_users (user_id, username, user_email, user_password, user_avatar, user_avatar_type, user_regdate, user_lang) VALUES (NULL, '" . $row['username'] . "', '" . $row['user_email'] . "', '$user_password', '', '3', '" . $row['user_regdate'] . "', '$language')");
-            $db->sql_query("DELETE FROM " . $user_prefix . "_users_temp WHERE username='$username' AND check_num='$check_num'");
+            \DatabaseConnection::query("INSERT INTO nuke_users (user_id, username, user_email, user_password, user_avatar, user_avatar_type, user_regdate, user_lang) VALUES (NULL, ?, ?, ?, '', '3', ?, ?)", [$row['username'], $row['user_email'], $user_password, $row['user_regdate'], $language]);
+            \DatabaseConnection::query("DELETE FROM nuke_users_temp WHERE username = ? AND check_num = ?", [$username, $check_num]);
             Nuke\Header::header();
             title("" . _ACTIVATIONYES . "");
             OpenTable();
-            echo "<center><b>" . $row['username'] . ":</b> " . _ACTMSG . "</center>";
+            echo "<center><b>" . htmlspecialchars($row['username']) . ":</b> " . _ACTMSG . "</center>";
             CloseTable();
             Nuke\Footer::footer();
             die();
@@ -245,15 +243,11 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     global $articlecomm, $user, $cookie, $sitename, $prefix, $user_prefix, $db, $admin, $broadcast_msg, $my_headlines, $module_name, $subscription_url, $admin_file;
     $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
     $username = rtrim($username, "\\");
-    $username = str_replace("'", "\'", $username);
-    $sql2 = "SELECT * FROM " . $user_prefix . "_users WHERE username='$username'";
-    $result2 = $db->sql_query($sql2);
-    $num = $db->sql_numrows($result2);
-    if ($num != 1) {
+    $userinfo = \DatabaseConnection::fetchRow("SELECT * FROM nuke_users WHERE username = ?", [$username]);
+    if ($userinfo === null) {
         Header("Location: modules.php?name=$module_name");
         die();
     }
-    $userinfo = $db->sql_fetchrow($result2);
     if (!$bypass) {
         cookiedecode($user);
     }
@@ -286,50 +280,48 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
     // Avatar display - simplified without forum config
     $userinfo['user_avatar'] = "images/pix.gif";
     
-    if (($num == 1) && ($userinfo['user_website'] || $userinfo['femail'] || $userinfo['bio'] || $userinfo['user_avatar'] || $userinfo['user_icq'] || $userinfo['user_aim'] || $userinfo['user_yim'] || $userinfo['user_msnm'] || $userinfo['user_location'] || $userinfo['user_occ'] || $userinfo['user_interests'] || $userinfo['user_sig'])) {
+    if ($userinfo['user_website'] || $userinfo['femail'] || $userinfo['bio'] || $userinfo['user_avatar'] || $userinfo['user_icq'] || $userinfo['user_aim'] || $userinfo['user_yim'] || $userinfo['user_msnm'] || $userinfo['user_location'] || $userinfo['user_occ'] || $userinfo['user_interests'] || $userinfo['user_sig']) {
         echo "<center><font class=\"content\">";
-        echo "<img src=\"" . $userinfo['user_avatar'] . "\"><br><br>\n";
-        if ($userinfo['user_website'] != "http://" and !empty($userinfo['user_website'])) {echo "" . _MYHOMEPAGE . " <a href=\"" . $userinfo['user_website'] . "\" target=\"new\">" . $userinfo['user_website'] . "</a><br>\n";}
-        if ($userinfo['femail']) {echo "" . _MYEMAIL . " <a href=\"mailto:" . $userinfo['femail'] . "\">" . $userinfo['femail'] . "</a><br>\n";}
+        echo "<img src=\"" . htmlspecialchars($userinfo['user_avatar']) . "\"><br><br>\n";
+        if ($userinfo['user_website'] != "http://" and !empty($userinfo['user_website'])) {echo "" . _MYHOMEPAGE . " <a href=\"" . htmlspecialchars($userinfo['user_website']) . "\" target=\"new\">" . htmlspecialchars($userinfo['user_website']) . "</a><br>\n";}
+        if ($userinfo['femail']) {echo "" . _MYEMAIL . " <a href=\"mailto:" . htmlspecialchars($userinfo['femail']) . "\">" . htmlspecialchars($userinfo['femail']) . "</a><br>\n";}
         if ($userinfo['user_icq'] && preg_match('/^[0-9]+$/', $userinfo['user_icq'])) {
-            echo "" . _ICQ . ": " . $userinfo['user_icq'] . "<br>\n";
+            echo "" . _ICQ . ": " . htmlspecialchars($userinfo['user_icq']) . "<br>\n";
         }
 
         if ($userinfo['user_aim']) {
-            echo "" . _AIM . ": " . $userinfo['user_aim'] . "<br>\n";
+            echo "" . _AIM . ": " . htmlspecialchars($userinfo['user_aim']) . "<br>\n";
         }
 
         if ($userinfo['user_yim']) {
-            echo "" . _YIM . ": " . $userinfo['user_yim'] . "<br>\n";
+            echo "" . _YIM . ": " . htmlspecialchars($userinfo['user_yim']) . "<br>\n";
         }
 
         if ($userinfo['user_msnm']) {
-            echo "" . _MSNM . ": " . $userinfo['user_msnm'] . "<br>\n";
+            echo "" . _MSNM . ": " . htmlspecialchars($userinfo['user_msnm']) . "<br>\n";
         }
 
         if ($userinfo['user_from']) {
-            echo "" . _LOCATION . ": " . $userinfo['user_from'] . "<br>\n";
+            echo "" . _LOCATION . ": " . htmlspecialchars($userinfo['user_from']) . "<br>\n";
         }
 
         if ($userinfo['user_occ']) {
-            echo "" . _OCCUPATION . ": " . $userinfo['user_occ'] . "<br>\n";
+            echo "" . _OCCUPATION . ": " . htmlspecialchars($userinfo['user_occ']) . "<br>\n";
         }
 
         if ($userinfo['user_interests']) {
-            echo "" . _INTERESTS . ": " . $userinfo['user_interests'] . "<br>\n";
+            echo "" . _INTERESTS . ": " . htmlspecialchars($userinfo['user_interests']) . "<br>\n";
         }
 
-        $userinfo['user_sig'] = nl2br($userinfo['user_sig']);
+        $userinfo['user_sig'] = nl2br(htmlspecialchars($userinfo['user_sig']));
         if ($userinfo['user_sig']) {
             echo "<br><b>" . _SIGNATURE . ":</b><br>" . $userinfo['user_sig'] . "<br>\n";
         }
 
-        if ($userinfo['bio']) {echo "<br><b>" . _EXTRAINFO . ":</b><br>" . $userinfo['bio'] . "<br>\n";}
-        $sql2 = "SELECT uname FROM " . $prefix . "_session WHERE uname='$username'";
-        $result2 = $db->sql_query($sql2);
-        $row2 = $db->sql_fetchrow($result2);
+        if ($userinfo['bio']) {echo "<br><b>" . _EXTRAINFO . ":</b><br>" . htmlspecialchars($userinfo['bio']) . "<br>\n";}
+        $row2 = \DatabaseConnection::fetchRow("SELECT uname FROM nuke_session WHERE uname = ?", [$username]);
         $username_pm = $username;
-        $username_online = $row2['uname'];
+        $username_online = $row2['uname'] ?? '';
         if (empty($username_online)) {
             $online = _OFFLINE;
         } else {
@@ -1189,9 +1181,7 @@ function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $us
     $check = $cookie[1];
     $check = filter($check, "nohtml", 1);
     $check2 = $cookie[2];
-    $sql = "SELECT user_id, user_password FROM " . $user_prefix . "_users WHERE username='$check'";
-    $result = $db->sql_query($sql);
-    $row = $db->sql_fetchrow($result);
+    $row = \DatabaseConnection::fetchRow("SELECT user_id, user_password FROM nuke_users WHERE username = ?", [$check]);
     $vuid = intval($row['user_id']);
     $ccpass = filter($row['user_password'], "nohtml", 1);
     $ccpass = htmlspecialchars(stripslashes($ccpass));
@@ -1235,18 +1225,16 @@ function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $us
                 $user_allowhtml = intval($user_allowhtml);
                 $user_allowsmile = intval($user_allowsmile);
                 $user_id = intval($user_id);
-                $db->sql_query("UPDATE " . $user_prefix . "_users SET name='$realname', user_email='$user_email', femail='$femail', user_website='$user_website', user_password='$user_password', bio='$bio', user_icq='$user_icq', user_occ='$user_occ', user_from='$user_from', user_interests='$user_interests', user_sig='$user_sig', user_aim='$user_aim', user_yim='$user_yim', user_msnm='$user_msnm', newsletter='$newsletter', user_viewemail='$user_viewemail', user_allow_viewonline='$user_allow_viewonline', user_notify='$user_notify', user_attachsig='$user_attachsig', user_allowbbcode='$user_allowbbcode', user_allowhtml='$user_allowhtml', user_allowsmile='$user_allowsmile', user_timezone='$user_timezone', user_dateformat='$user_dateformat' WHERE user_id='$user_id'");
-                $sql = "SELECT user_id, username, user_password, storynum, umode, uorder, thold, noscore, ublockon, theme FROM " . $user_prefix . "_users WHERE username='$username' AND user_password='$user_password'";
-                $result = $db->sql_query($sql);
-                if ($db->sql_numrows($result) == 1) {
-                    $userinfo = $db->sql_fetchrow($result);
+                \DatabaseConnection::query("UPDATE nuke_users SET name=?, user_email=?, femail=?, user_website=?, user_password=?, bio=?, user_icq=?, user_occ=?, user_from=?, user_interests=?, user_sig=?, user_aim=?, user_yim=?, user_msnm=?, newsletter=?, user_viewemail=?, user_allow_viewonline=?, user_notify=?, user_attachsig=?, user_allowbbcode=?, user_allowhtml=?, user_allowsmile=?, user_timezone=?, user_dateformat=? WHERE user_id=?", [$realname, $user_email, $femail, $user_website, $user_password, $bio, $user_icq, $user_occ, $user_from, $user_interests, $user_sig, $user_aim, $user_yim, $user_msnm, $newsletter, $user_viewemail, $user_allow_viewonline, $user_notify, $user_attachsig, $user_allowbbcode, $user_allowhtml, $user_allowsmile, $user_timezone, $user_dateformat, $user_id]);
+                $userinfo = \DatabaseConnection::fetchRow("SELECT user_id, username, user_password, storynum, umode, uorder, thold, noscore, ublockon, theme, commentmax FROM nuke_users WHERE username = ? AND user_password = ?", [$username, $user_password]);
+                if ($userinfo !== null) {
                     docookie($userinfo['user_id'], $userinfo['username'], $userinfo['user_password'], $userinfo['storynum'], $userinfo['umode'], $userinfo['uorder'], $userinfo['thold'], $userinfo['noscore'], $userinfo['ublockon'], $userinfo['theme'], $userinfo['commentmax']);
                 } else {
                     echo "<center>" . _SOMETHINGWRONG . "</center><br>";
                 }
                 $db->sql_query("UNLOCK TABLES");
             } else {
-                $db->sql_query("UPDATE " . $user_prefix . "_users SET name='$realname', user_email='$user_email', femail='$femail', user_website='$user_website', bio='$bio', user_icq='$user_icq', user_occ='$user_occ', user_from='$user_from', user_interests='$user_interests', user_sig='$user_sig', user_aim='$user_aim', user_yim='$user_yim', user_msnm='$user_msnm', newsletter='$newsletter', user_viewemail='$user_viewemail', user_allow_viewonline='$user_allow_viewonline', user_notify='$user_notify', user_attachsig='$user_attachsig', user_allowbbcode='$user_allowbbcode', user_allowhtml='$user_allowhtml', user_allowsmile='$user_allowsmile', user_timezone='$user_timezone', user_dateformat='$user_dateformat' WHERE user_id='$user_id'");
+                \DatabaseConnection::query("UPDATE nuke_users SET name=?, user_email=?, femail=?, user_website=?, bio=?, user_icq=?, user_occ=?, user_from=?, user_interests=?, user_sig=?, user_aim=?, user_yim=?, user_msnm=?, newsletter=?, user_viewemail=?, user_allow_viewonline=?, user_notify=?, user_attachsig=?, user_allowbbcode=?, user_allowhtml=?, user_allowsmile=?, user_timezone=?, user_dateformat=? WHERE user_id=?", [$realname, $user_email, $femail, $user_website, $bio, $user_icq, $user_occ, $user_from, $user_interests, $user_sig, $user_aim, $user_yim, $user_msnm, $newsletter, $user_viewemail, $user_allow_viewonline, $user_notify, $user_attachsig, $user_allowbbcode, $user_allowhtml, $user_allowsmile, $user_timezone, $user_dateformat, $user_id]);
             }
             Header("Location: modules.php?name=$module_name");
         }
@@ -1384,9 +1372,7 @@ function savehome($user_id, $username, $storynum, $ublockon, $ublock, $broadcast
     $check = $cookie[1];
     $check = filter($check, "nohtml", 1);
     $check2 = $cookie[2];
-    $sql = "SELECT user_id, user_password FROM " . $user_prefix . "_users WHERE username='$check'";
-    $result = $db->sql_query($sql);
-    $row = $db->sql_fetchrow($result);
+    $row = \DatabaseConnection::fetchRow("SELECT user_id, user_password FROM nuke_users WHERE username = ?", [$check]);
     $vuid = intval($row['user_id']);
     $ccpass = filter($row['user_password'], "nohtml", 1);
     if (($user_id == $vuid) and ($check2 == $ccpass)) {
@@ -1419,9 +1405,7 @@ function savetheme($user_id, $theme)
     $check = filter($check, "nohtml", 1);
     $check2 = $cookie[2];
     $theme_error = "";
-    $sql = "SELECT user_id, user_password FROM " . $user_prefix . "_users WHERE username='$check'";
-    $result = $db->sql_query($sql);
-    $row = $db->sql_fetchrow($result);
+    $row = \DatabaseConnection::fetchRow("SELECT user_id, user_password FROM nuke_users WHERE username = ?", [$check]);
     $vuid = intval($row['user_id']);
     $ccpass = filter($row['user_password'], "nohtml", 1);
     if (($user_id == $vuid) and ($check2 == $ccpass)) {
@@ -1505,9 +1489,7 @@ function savecomm($user_id, $username, $umode, $uorder, $thold, $noscore, $comme
     cookiedecode($user);
     $check = $cookie[1];
     $check2 = $cookie[2];
-    $sql = "SELECT user_id, user_password FROM " . $user_prefix . "_users WHERE username='$check'";
-    $result = $db->sql_query($sql);
-    $row = $db->sql_fetchrow($result);
+    $row = \DatabaseConnection::fetchRow("SELECT user_id, user_password FROM nuke_users WHERE username = ?", [$check]);
     $vuid = intval($row['user_id']);
     $ccpass = filter($row['user_password'], "nohtml", 1);
     if (($user_id == $vuid) and ($check2 == $ccpass)) {

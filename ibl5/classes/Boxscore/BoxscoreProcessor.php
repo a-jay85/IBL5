@@ -23,6 +23,9 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
     private const RISING_STARS_VISITOR_TID = 40;
     private const RISING_STARS_HOME_TID = 41;
 
+    public const DEFAULT_AWAY_NAME = 'Team Away';
+    public const DEFAULT_HOME_NAME = 'Team Home';
+
     /** @phpstan-var \mysqli */
     protected object $db;
     protected BoxscoreRepository $repository;
@@ -125,8 +128,6 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
     public function processAllStarGames(
         string $filePath,
         int $seasonEndingYear,
-        ?string $allStarAwayName = null,
-        ?string $allStarHomeName = null,
     ): array {
         /** @var list<string> $messages */
         $messages = [];
@@ -155,28 +156,6 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
 
         fseek($scoFile, 0);
 
-        // Second request (team names provided): file is a single All-Star game line
-        if ($allStarAwayName !== null && $allStarHomeName !== null) {
-            $allStarLine = fgets($scoFile, 2001);
-            fclose($scoFile);
-
-            if ($allStarLine !== false && trim(substr($allStarLine, 0, 58)) !== '') {
-                $this->processAllStarGame(
-                    $allStarLine,
-                    $operatingSeasonEndingYear,
-                    $allStarAwayName,
-                    $allStarHomeName,
-                    $messages,
-                );
-            }
-
-            return [
-                'success' => true,
-                'messages' => $messages,
-            ];
-        }
-
-        // First request: read both blocks from the full .sco file
         // Block 0: Rising Stars Game (bytes 0–1999)
         $risingStarsLine = fgets($scoFile, 2001);
         // Block 1: All-Star Game (bytes 2000–3999)
@@ -189,20 +168,9 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             $this->processRisingStarsGame($risingStarsLine, $operatingSeasonEndingYear, $messages);
         }
 
-        // Process All-Star Game
+        // Process All-Star Game (inserted with default placeholder names)
         if ($allStarLine !== false && trim(substr($allStarLine, 0, 58)) !== '') {
-            $allStarResult = $this->processAllStarGame(
-                $allStarLine,
-                $operatingSeasonEndingYear,
-                null,
-                null,
-                $messages,
-            );
-
-            if ($allStarResult !== null) {
-                // Pending prompt needed — return with prompt data
-                return $allStarResult;
-            }
+            $this->processAllStarGame($allStarLine, $operatingSeasonEndingYear, $messages);
         }
 
         return [
@@ -371,20 +339,19 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
     /**
      * Process the All-Star Game (Block 1)
      *
+     * Outcome A: scores match existing record — skip.
+     * Outcome B: scores differ — re-insert preserving existing custom names.
+     * Outcome C: new game — insert with default placeholder names.
+     *
      * @param string $line 2000-byte game line
      * @param int $seasonEndingYear Season ending year
-     * @param string|null $awayName Custom away team name (null = prompt needed)
-     * @param string|null $homeName Custom home team name (null = prompt needed)
      * @param list<string> $messages Log messages (modified by reference)
-     * @return array{success: bool, messages: list<string>, allStarPending: bool, awayLeadingScorer: string, homeLeadingScorer: string, allStarRawData: string, seasonEndingYear: int}|null Prompt data if names needed, null if processed
      */
     private function processAllStarGame(
         string $line,
         int $seasonEndingYear,
-        ?string $awayName,
-        ?string $homeName,
         array &$messages,
-    ): ?array {
+    ): void {
         $gameDate = $seasonEndingYear . '-02-03';
 
         $gameInfoLine = substr($line, 0, 58);
@@ -411,12 +378,12 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             if ($existingGame !== null) {
                 /** @var array{visitorQ1points: int, visitorQ2points: int, visitorQ3points: int, visitorQ4points: int, visitorOTpoints: int, homeQ1points: int, homeQ2points: int, homeQ3points: int, homeQ4points: int, homeOTpoints: int} $existingGame */
                 if ($boxscoreGameInfo->scoresMatchDatabase($existingGame)) {
-                    // Outcome (a): scores match — skip
+                    // Outcome A: scores match — skip
                     $messages[] = 'All-Star Game: already exists with matching scores, skipped.';
-                    return null;
+                    return;
                 }
 
-                // Outcome (b): scores differ — read existing names before deleting
+                // Outcome B: scores differ — read existing names before deleting
                 $savedAwayName = $existingNames['awayName'];
                 $savedHomeName = $existingNames['homeName'];
 
@@ -428,80 +395,27 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                     $messages[] = "All-Star Game: updated with existing team names ({$linesProcessed} lines).";
                 }
 
-                return null;
+                return;
             }
         }
 
-        // Outcome (c): game not in DB — check if names were provided
-        if ($awayName !== null && $homeName !== null) {
-            // Second request: names provided, insert
-            $upsertAction = $this->processGameUpsert($boxscoreGameInfo);
-            if ($upsertAction === 'skip') {
-                $messages[] = 'All-Star Game: already exists, skipped.';
-                return null;
-            }
-
-            $linesProcessed = $this->processGameLine($line, $boxscoreGameInfo, $awayName, $homeName);
-            if ($linesProcessed > 0) {
-                $action = $upsertAction === 'update' ? 'updated' : 'inserted';
-                $messages[] = "All-Star Game: {$action} as {$awayName} vs {$homeName} ({$linesProcessed} lines).";
-            }
-
-            return null;
+        // Outcome C: game not in DB — insert with default placeholder names
+        $upsertAction = $this->processGameUpsert($boxscoreGameInfo);
+        if ($upsertAction === 'skip') {
+            $messages[] = 'All-Star Game: already exists, skipped.';
+            return;
         }
 
-        // First request: calculate leading scorers and return prompt data
-        $awayLeadingScorer = $this->findLeadingScorer($line, 0, 14);
-        $homeLeadingScorer = $this->findLeadingScorer($line, 15, 29);
-
-        return [
-            'success' => true,
-            'messages' => $messages,
-            'allStarPending' => true,
-            'awayLeadingScorer' => $awayLeadingScorer,
-            'homeLeadingScorer' => $homeLeadingScorer,
-            'allStarRawData' => base64_encode($line),
-            'seasonEndingYear' => $seasonEndingYear,
-        ];
-    }
-
-    /**
-     * Find the leading scorer among players in a range of the 30-player array
-     *
-     * @param string $line 2000-byte game line
-     * @param int $startIndex First player index (inclusive)
-     * @param int $endIndex Last player index (inclusive)
-     * @return string Leading scorer name
-     */
-    private function findLeadingScorer(string $line, int $startIndex, int $endIndex): string
-    {
-        $maxPoints = -1;
-        $leadingScorerName = 'Unknown';
-
-        for ($i = $startIndex; $i <= $endIndex; $i++) {
-            $x = $i * 53;
-            $playerInfoLine = substr($line, 58 + $x, 53);
-
-            $playerID = trim(substr($playerInfoLine, 18, 6));
-            if ($playerID === '' || (int) $playerID === 0) {
-                continue;
-            }
-
-            $fgm = (int) substr($playerInfoLine, 26, 2);
-            $ftm = (int) substr($playerInfoLine, 31, 2);
-            $tpm = (int) substr($playerInfoLine, 35, 2);
-            // FGM includes 3-pointers as 2-point FGs; TGM adds the extra point
-            $points = ($fgm * 2) + $ftm + $tpm;
-
-            if ($points > $maxPoints) {
-                $maxPoints = $points;
-                $name = trim(substr($playerInfoLine, 0, 16));
-                $converted = mb_convert_encoding($name, 'UTF-8', 'ISO-8859-1');
-                $leadingScorerName = $converted !== false ? $converted : $name;
-            }
+        $linesProcessed = $this->processGameLine(
+            $line,
+            $boxscoreGameInfo,
+            self::DEFAULT_AWAY_NAME,
+            self::DEFAULT_HOME_NAME,
+        );
+        if ($linesProcessed > 0) {
+            $action = $upsertAction === 'update' ? 'updated' : 'inserted';
+            $messages[] = "All-Star Game: {$action} ({$linesProcessed} lines).";
         }
-
-        return $leadingScorerName;
     }
 
     /**

@@ -163,6 +163,7 @@ class StandingsView implements StandingsViewInterface
         /** @var string $streakType */
         $streakType = \Utilities\HtmlSanitizer::safeHtmlOutput($streakData['streak_type'] ?? '');
         $streak = $streakData['streak'] ?? 0;
+        $streakSortKey = ($streakData['streak_type'] ?? '') === 'W' ? $streak : -$streak;
         $rating = $streakData['ranking'] ?? 0;
 
         // Get Pythagorean win percentage
@@ -204,7 +205,7 @@ class StandingsView implements StandingsViewInterface
             <td><?= $homeGames; ?></td>
             <td><?= $awayGames; ?></td>
             <td><?= $lastWin; ?>-<?= $lastLoss; ?></td>
-            <td><?= $streakType; ?> <?= $streak; ?></td>
+            <td sorttable_customkey="<?= $streakSortKey; ?>"><?= $streakType; ?> <?= $streak; ?></td>
             <td><span class="ibl-stat-highlight"><?= $rating; ?></span></td>
         </tr>
         <?php

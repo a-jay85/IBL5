@@ -177,6 +177,8 @@ interface BoxscoreRepositoryInterface
     /**
      * Get player names for an All-Star team on a given date
      *
+     * Uses full names from ibl_plr (falls back to ibl_box_scores.name for team total rows).
+     *
      * @param string $date Game date in Y-m-d format
      * @param int $teamID Team ID (50 = visitor, 51 = home)
      * @return list<string> Player names in insertion order

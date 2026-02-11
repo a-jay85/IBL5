@@ -78,7 +78,13 @@ class TeamController implements TeamControllerInterface
             }
         }
 
-        $pageData = $this->service->getTeamPageData($teamID, $yr, $display, $userTeamName);
+        try {
+            $pageData = $this->service->getTeamPageData($teamID, $yr, $display, $userTeamName);
+        } catch (\RuntimeException $e) {
+            echo '<div class="ibl-alert ibl-alert--error">Team not found.</div>';
+            \Nuke\Footer::footer();
+        }
+
         echo $this->view->render($pageData);
 
         // Output JS configuration for AJAX tab switching

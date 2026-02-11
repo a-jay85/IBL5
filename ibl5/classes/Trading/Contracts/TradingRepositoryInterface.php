@@ -164,6 +164,20 @@ interface TradingRepositoryInterface
     public function getTradesByOfferId(int $offerId): array;
 
     /**
+     * Get trade items by offer ID with exclusive row-level lock
+     *
+     * Identical to getTradesByOfferId() but appends FOR UPDATE to acquire
+     * an exclusive lock within the current transaction. Used by TradeProcessor
+     * to prevent double-processing of trades via TOCTOU race conditions.
+     *
+     * Must be called within an active transaction (BEGIN ... COMMIT/ROLLBACK).
+     *
+     * @param int $offerId Trade offer ID
+     * @return list<TradeInfoRow> Trade items with itemid, itemtype, from, to fields
+     */
+    public function getTradesByOfferIdForUpdate(int $offerId): array;
+
+    /**
      * Get cash transaction by offer ID and sending team
      *
      * @param int $offerId Trade offer ID

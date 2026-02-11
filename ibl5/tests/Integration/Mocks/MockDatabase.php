@@ -269,6 +269,24 @@ class MockDatabase extends \mysqli
     }
 
     /**
+     * Mock transaction support - no-op stubs to prevent "object is already closed" errors
+     */
+    public function begin_transaction(int $flags = 0, ?string $name = null): bool
+    {
+        return true;
+    }
+
+    public function commit(int $flags = 0, ?string $name = null): bool
+    {
+        return true;
+    }
+
+    public function rollback(int $flags = 0, ?string $name = null): bool
+    {
+        return true;
+    }
+
+    /**
      * Mock prepared statement support
      * Returns a MockPreparedStatement that supports bind_param and execute
      */

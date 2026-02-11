@@ -6,6 +6,7 @@ namespace Tests\NextSim;
 
 use PHPUnit\Framework\TestCase;
 use NextSim\NextSimService;
+use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 
 /**
  * NextSimServiceTest - Tests for NextSimService
@@ -15,10 +16,14 @@ class NextSimServiceTest extends TestCase
     private \MockDatabase $mockDb;
     private object $mockMysqliDb;
 
+    /** @var TeamScheduleRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
+    private TeamScheduleRepositoryInterface $stubRepository;
+
     protected function setUp(): void
     {
         $this->mockDb = new \MockDatabase();
         $this->setupMockMysqliDb();
+        $this->stubRepository = $this->createStub(TeamScheduleRepositoryInterface::class);
     }
 
     protected function tearDown(): void
@@ -29,7 +34,7 @@ class NextSimServiceTest extends TestCase
     private function setupMockMysqliDb(): void
     {
         $mockDb = $this->mockDb;
-        
+
         $this->mockMysqliDb = new class($mockDb) extends \mysqli {
             private \MockDatabase $mockDb;
             public int $connect_errno = 0;
@@ -57,7 +62,7 @@ class NextSimServiceTest extends TestCase
                 return addslashes($string);
             }
         };
-        
+
         $GLOBALS['mysqli_db'] = $this->mockMysqliDb;
     }
 
@@ -67,15 +72,15 @@ class NextSimServiceTest extends TestCase
 
     public function testServiceCanBeInstantiated(): void
     {
-        $service = new NextSimService($this->mockMysqliDb);
-        
+        $service = new NextSimService($this->mockMysqliDb, $this->stubRepository);
+
         $this->assertInstanceOf(NextSimService::class, $service);
     }
 
     public function testServiceImplementsCorrectInterface(): void
     {
-        $service = new NextSimService($this->mockMysqliDb);
-        
+        $service = new NextSimService($this->mockMysqliDb, $this->stubRepository);
+
         $this->assertInstanceOf(
             \NextSim\Contracts\NextSimServiceInterface::class,
             $service
@@ -88,9 +93,9 @@ class NextSimServiceTest extends TestCase
 
     public function testMultipleServicesCanBeInstantiated(): void
     {
-        $service1 = new NextSimService($this->mockMysqliDb);
-        $service2 = new NextSimService($this->mockMysqliDb);
-        
+        $service1 = new NextSimService($this->mockMysqliDb, $this->stubRepository);
+        $service2 = new NextSimService($this->mockMysqliDb, $this->stubRepository);
+
         $this->assertNotSame($service1, $service2);
     }
 }

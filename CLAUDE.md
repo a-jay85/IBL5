@@ -57,6 +57,8 @@ cd ibl5 && composer run analyse
 
 ## Architecture
 
+New features should follow the Repository-Service-View pattern. See `ibl5/scripts/scoParser.php` as the canonical refactored example.
+
 ### Interface-Driven Modules
 All 30 modules follow Repository/Service/View pattern with interfaces in `Contracts/` subdirectories:
 ```
@@ -142,11 +144,13 @@ $count = DatabaseConnection::fetchValue("SELECT COUNT(*) FROM ibl_plr");
 
 **When to use `db-query`:** Use this script to explore the database schema, verify data after making changes, check record counts, and validate your work. This is the preferred method for Claude to query the local database since it's configured for auto-approval in the user's Claude Code settings.
 
-## Git Workflow
+## Git & Commits
 
 **After committing:** Always suggest `/mergeAndPush` (not a bare `git push`). Only suggest it as a clickable inline prompt — do NOT mention it in your text messages.
 
-## Git Commit Conventions
+When committing, only include files relevant to the current task. Always review `git diff --staged` before committing. Never commit unrelated files.
+
+### Commit Conventions
 
 Commit body format — use `## Section` headers with bullet points:
 ```
@@ -166,6 +170,17 @@ Other Claude instances may be working in this directory simultaneously.
 2. **Scope discipline:** Only modify files directly related to your task. If you need to change a shared file, confirm with the user first.
 3. **Before staging:** Run `git diff --name-only` and only stage files you personally modified. Never use `git add .` or `git add -A`.
 4. **Testing:** If other instances may have partial work in progress, prefer running your module's test suite over the full suite.
+
+## PHP / Database Gotchas
+
+- PHP class constants cannot be interpolated in double-quoted strings; use concatenation instead.
+- The `active` field on players means "on a depth chart", NOT "active/retired status".
+- `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` affects `COALESCE` — nullable LEFT JOIN columns may still produce `null` despite COALESCE.
+- Database views may filter results unexpectedly; check view definitions before assuming query bugs.
+
+## Frontend / CSS
+
+When debugging CSS layout issues, immediately check for inherited properties like `white-space: nowrap` that may override your fixes. Use browser DevTools-style reasoning: inspect computed styles, not just the element's own rules.
 
 ## Mandatory Rules
 

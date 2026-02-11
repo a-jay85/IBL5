@@ -28,6 +28,11 @@ class TeamViewTest extends TestCase
         $team->name = 'Celtics';
         $team->color1 = 'FF0000';
         $team->color2 = '0000FF';
+        $team->discordID = null;
+
+        if (isset($overrides['team'])) {
+            $team = $overrides['team'];
+        }
 
         return array_merge([
             'teamID' => 1,
@@ -43,6 +48,8 @@ class TeamViewTest extends TestCase
             'awardsCard' => '<div class="team-card">awards</div>',
             'franchiseHistoryCard' => '<div class="team-card">franchise history</div>',
             'rafters' => '<div>banners</div>',
+            'userTeamName' => '',
+            'isOwnTeam' => false,
         ], $overrides);
     }
 
@@ -97,6 +104,7 @@ class TeamViewTest extends TestCase
         $team->name = 'Free Agents';
         $team->color1 = '000000';
         $team->color2 = 'FFFFFF';
+        $team->discordID = null;
 
         $output = $this->view->render($this->createPageData([
             'teamID' => 0,
@@ -123,6 +131,7 @@ class TeamViewTest extends TestCase
         $team->name = 'Free Agents';
         $team->color1 = '000000';
         $team->color2 = 'FFFFFF';
+        $team->discordID = null;
 
         $output = $this->view->render($this->createPageData([
             'teamID' => 0,
@@ -155,5 +164,98 @@ class TeamViewTest extends TestCase
 
         $this->assertStringContainsString('team-page-rafters', $output);
         $this->assertStringContainsString('<div>banners</div>', $output);
+    }
+
+    // ============================================
+    // TRADE & DISCORD BUTTON TESTS
+    // ============================================
+
+    public function testBannerHidesButtonsWhenNotLoggedIn(): void
+    {
+        $output = $this->view->render($this->createPageData([
+            'userTeamName' => '',
+            'isOwnTeam' => false,
+        ]));
+
+        $this->assertStringNotContainsString('name=Trading', $output);
+        $this->assertStringNotContainsString('discord.com', $output);
+    }
+
+    public function testBannerTradeLinksToReviewtradeOnOwnTeam(): void
+    {
+        $output = $this->view->render($this->createPageData([
+            'userTeamName' => 'Celtics',
+            'isOwnTeam' => true,
+        ]));
+
+        $this->assertStringContainsString('op=reviewtrade', $output);
+        $this->assertStringNotContainsString('op=offertrade', $output);
+    }
+
+    public function testBannerTradeLinksToOffertradeOnOtherTeam(): void
+    {
+        $output = $this->view->render($this->createPageData([
+            'userTeamName' => 'Lakers',
+            'isOwnTeam' => false,
+        ]));
+
+        $this->assertStringContainsString('op=offertrade', $output);
+        $this->assertStringContainsString('partner=Celtics', $output);
+        $this->assertStringNotContainsString('op=reviewtrade', $output);
+    }
+
+    public function testBannerDiscordLinksToGuildOnOwnTeam(): void
+    {
+        $output = $this->view->render($this->createPageData([
+            'userTeamName' => 'Celtics',
+            'isOwnTeam' => true,
+        ]));
+
+        $this->assertStringContainsString('discord.com/channels/' . \Discord::IBL_GUILD_ID, $output);
+    }
+
+    public function testBannerDiscordLinksToUserProfileOnOtherTeam(): void
+    {
+        $team = new \stdClass();
+        $team->name = 'Celtics';
+        $team->color1 = 'FF0000';
+        $team->color2 = '0000FF';
+        $team->discordID = '123456789012345678';
+
+        $output = $this->view->render($this->createPageData([
+            'team' => $team,
+            'userTeamName' => 'Lakers',
+            'isOwnTeam' => false,
+        ]));
+
+        $this->assertStringContainsString('discord.com/users/123456789012345678', $output);
+    }
+
+    public function testBannerDiscordHiddenOnOtherTeamWhenNoDiscordID(): void
+    {
+        $output = $this->view->render($this->createPageData([
+            'userTeamName' => 'Lakers',
+            'isOwnTeam' => false,
+        ]));
+
+        $this->assertStringNotContainsString('discord.com/users', $output);
+    }
+
+    public function testBannerDiscordLinksOpenInNewTab(): void
+    {
+        $output = $this->view->render($this->createPageData([
+            'userTeamName' => 'Celtics',
+            'isOwnTeam' => true,
+        ]));
+
+        $this->assertStringContainsString('target="_blank"', $output);
+        $this->assertStringContainsString('rel="noopener noreferrer"', $output);
+    }
+
+    public function testBannerHasLogoCssClass(): void
+    {
+        $output = $this->view->render($this->createPageData());
+
+        $this->assertStringContainsString('team-banner-logo', $output);
     }
 }

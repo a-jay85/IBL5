@@ -26,7 +26,9 @@ namespace Team\Contracts;
  *     currentSeasonCard: string,
  *     awardsCard: string,
  *     franchiseHistoryCard: string,
- *     rafters: string
+ *     rafters: string,
+ *     userTeamName: string,
+ *     isOwnTeam: bool
  * }
  * @phpstan-type StartersData array<string, array{name: string|null, pid: int|null}>
  * @phpstan-type SidebarData array{currentSeasonCard: string, awardsCard: string, franchiseHistoryCard: string, rafters: string}
@@ -45,7 +47,7 @@ interface TeamServiceInterface
      * @param string $display Active display tab (e.g., 'ratings', 'contracts')
      * @return TeamPageData
      */
-    public function getTeamPageData(int $teamID, ?string $yr, string $display): array;
+    public function getTeamPageData(int $teamID, ?string $yr, string $display, string $userTeamName = ''): array;
 
     /**
      * Extract starting lineup data from roster array

@@ -219,14 +219,15 @@ function handleAllStarPrompt(container) {
 
     var awayScorer = allStarDiv.getAttribute('data-away-scorer');
     var homeScorer = allStarDiv.getAttribute('data-home-scorer');
+    var year = allStarDiv.getAttribute('data-year');
 
     var awayName = window.prompt(
-        'All-Star Game: What is the name of the AWAY team whose leading scorer was ' + awayScorer + '?'
+        year + ' All-Star Game: What is the name of the AWAY team whose leading scorer was ' + awayScorer + '?'
     );
     if (!awayName) return;
 
     var homeName = window.prompt(
-        'All-Star Game: What is the name of the HOME team whose leading scorer was ' + homeScorer + '?'
+        year + ' All-Star Game: What is the name of the HOME team whose leading scorer was ' + homeScorer + '?'
     );
     if (!homeName) return;
 

@@ -116,7 +116,6 @@ function theindex($new_topic = "0")
             $row3 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));
             $title1 = filter($row3['title'], "nohtml");
             $title = "<a class='readmore' href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
-            $morelink_parts[] = "<a class=\"news-article__link\" href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\">$title1</a>";
         }
         if ($score != 0) {
             $rated = substr($score / $ratings, 0, 4);
@@ -124,7 +123,7 @@ function theindex($new_topic = "0")
             $rated = 0;
         }
         $morelink_parts[] = "<span class=\"news-article__score\">" . _SCORE . " $rated</span>";
-        $morelink = implode('', $morelink_parts);
+        $morelink = implode(' | ', $morelink_parts);
         themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
     }
     Nuke\Footer::footer();

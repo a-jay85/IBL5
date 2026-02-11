@@ -63,7 +63,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		const players = (await prisma.$queryRaw`
             SELECT 
                 bp.Date,
-                bp.name,
+                COALESCE(plr.name, bp.name) as name,
                 bp.pos,
                 bp.pid,
                 plr.tid as playerTeamId,

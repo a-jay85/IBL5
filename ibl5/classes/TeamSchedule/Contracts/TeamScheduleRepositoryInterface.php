@@ -1,0 +1,38 @@
+<?php
+
+declare(strict_types=1);
+
+namespace TeamSchedule\Contracts;
+
+/**
+ * TeamScheduleRepositoryInterface - Contract for team schedule data retrieval
+ *
+ * Provides methods for retrieving team schedule information from the database.
+ *
+ * @see \TeamSchedule\TeamScheduleRepository For the concrete implementation
+ */
+interface TeamScheduleRepositoryInterface
+{
+    /**
+     * Get full season schedule for a team
+     *
+     * Retrieves all games (home and away) for a team ordered by date,
+     * joined with box score data to include gameOfThatDay.
+     *
+     * @param int $teamID Team ID to get schedule for
+     * @return array<int, array<string, mixed>> Schedule rows ordered by date ascending
+     */
+    public function getSchedule(int $teamID): array;
+
+    /**
+     * Get projected games for next simulation result
+     *
+     * Retrieves games scheduled within the next sim period
+     * starting from the day after the last sim end date.
+     *
+     * @param int $teamID Team ID to get schedule for
+     * @param string $lastSimEndDate Date string (YYYY-MM-DD) of last sim end
+     * @return array<int, array<string, mixed>> Upcoming game rows ordered by date ascending
+     */
+    public function getProjectedGamesNextSimResult(int $teamID, string $lastSimEndDate): array;
+}

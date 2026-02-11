@@ -19,6 +19,7 @@ if (!defined('MODULE_FILE')) {
 
 use NextSim\NextSimService;
 use NextSim\NextSimView;
+use TeamSchedule\TeamScheduleRepository;
 
 global $db, $cookie, $mysqli_db;
 
@@ -35,7 +36,8 @@ $userTeam = Team::initialize($mysqli_db, $userTeamName);
 $league = new League($mysqli_db);
 
 // Initialize services
-$service = new NextSimService($mysqli_db);
+$teamScheduleRepository = new TeamScheduleRepository($mysqli_db);
+$service = new NextSimService($mysqli_db, $teamScheduleRepository);
 $view = new NextSimView($mysqli_db, $season, $module_name);
 
 // Get next sim games

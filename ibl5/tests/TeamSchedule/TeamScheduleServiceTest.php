@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\TeamSchedule;
 
 use PHPUnit\Framework\TestCase;
+use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 use TeamSchedule\TeamScheduleService;
 
 /**
@@ -15,10 +16,14 @@ class TeamScheduleServiceTest extends TestCase
     private \MockDatabase $mockDb;
     private object $mockMysqliDb;
 
+    /** @var TeamScheduleRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
+    private TeamScheduleRepositoryInterface $stubRepository;
+
     protected function setUp(): void
     {
         $this->mockDb = new \MockDatabase();
         $this->setupMockMysqliDb();
+        $this->stubRepository = $this->createStub(TeamScheduleRepositoryInterface::class);
     }
 
     protected function tearDown(): void
@@ -29,7 +34,7 @@ class TeamScheduleServiceTest extends TestCase
     private function setupMockMysqliDb(): void
     {
         $mockDb = $this->mockDb;
-        
+
         $this->mockMysqliDb = new class($mockDb) extends \mysqli {
             private \MockDatabase $mockDb;
             public int $connect_errno = 0;
@@ -57,7 +62,7 @@ class TeamScheduleServiceTest extends TestCase
                 return addslashes($string);
             }
         };
-        
+
         $GLOBALS['mysqli_db'] = $this->mockMysqliDb;
     }
 
@@ -67,15 +72,15 @@ class TeamScheduleServiceTest extends TestCase
 
     public function testServiceCanBeInstantiated(): void
     {
-        $service = new TeamScheduleService($this->mockMysqliDb);
-        
+        $service = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+
         $this->assertInstanceOf(TeamScheduleService::class, $service);
     }
 
     public function testServiceImplementsCorrectInterface(): void
     {
-        $service = new TeamScheduleService($this->mockMysqliDb);
-        
+        $service = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+
         $this->assertInstanceOf(
             \TeamSchedule\Contracts\TeamScheduleServiceInterface::class,
             $service
@@ -88,9 +93,9 @@ class TeamScheduleServiceTest extends TestCase
 
     public function testMultipleServicesCanBeInstantiated(): void
     {
-        $service1 = new TeamScheduleService($this->mockMysqliDb);
-        $service2 = new TeamScheduleService($this->mockMysqliDb);
-        
+        $service1 = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+        $service2 = new TeamScheduleService($this->mockMysqliDb, $this->stubRepository);
+
         $this->assertNotSame($service1, $service2);
     }
 }

@@ -170,6 +170,60 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     }
 
     /**
+     * @see BoxscoreRepositoryInterface::findAllStarGamesWithDefaultNames()
+     */
+    public function findAllStarGamesWithDefaultNames(): array
+    {
+        /** @var list<array{id: int, Date: string, name: string, visitorTeamID: int, homeTeamID: int}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT id, Date, name, visitorTeamID, homeTeamID
+             FROM ibl_box_scores_teams
+             WHERE name IN ('Team Away', 'Team Home')
+               AND visitorTeamID = 50 AND homeTeamID = 51
+             ORDER BY Date ASC, id ASC",
+            ""
+        );
+
+        return $rows;
+    }
+
+    /**
+     * @see BoxscoreRepositoryInterface::getPlayersForAllStarTeam()
+     */
+    public function getPlayersForAllStarTeam(string $date, int $teamID): array
+    {
+        /** @var list<array{name: string}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT name FROM ibl_box_scores
+             WHERE Date = ? AND visitorTID = 50 AND homeTID = 51 AND teamID = ?
+             ORDER BY id ASC",
+            "si",
+            $date,
+            $teamID
+        );
+
+        $names = [];
+        foreach ($rows as $row) {
+            $names[] = $row['name'];
+        }
+
+        return $names;
+    }
+
+    /**
+     * @see BoxscoreRepositoryInterface::renameAllStarTeam()
+     */
+    public function renameAllStarTeam(int $recordId, string $newName): int
+    {
+        return $this->execute(
+            "UPDATE ibl_box_scores_teams SET name = ? WHERE id = ?",
+            "si",
+            $newName,
+            $recordId
+        );
+    }
+
+    /**
      * @see BoxscoreRepositoryInterface::insertTeamBoxscore()
      */
     public function insertTeamBoxscore(

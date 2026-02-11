@@ -3,8 +3,14 @@ name: Tests and Analysis
 on:
   push:
     branches: [ master, develop ]
+    paths:
+      - '**.php'
+      - 'ibl5/migrations/**.sql'
   pull_request:
     branches: [ master, develop ]
+    paths:
+      - '**.php'
+      - 'ibl5/migrations/**.sql'
 
 jobs:
   test:
@@ -13,51 +19,18 @@ jobs:
     strategy:
       matrix:
         php-version: ['8.3']
-    
-    services:
-      mariadb:
-        image: mariadb:10.6
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: ibl5_test
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -u root -proot"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-        ports:
-          - 3306:3306
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
         php-version: ${{ matrix.php-version }}
-        extensions: mbstring, intl, pdo, pdo_mysql
-        coverage: xdebug
-    
-    - name: Wait for MariaDB
-      run: |
-        echo "Waiting for MariaDB to be ready..."
-        until mysqladmin ping -h 127.0.0.1 -u root -proot --silent; do
-          echo "MariaDB is unavailable - sleeping"
-          sleep 2
-        done
-        echo "✓ MariaDB is ready"
-    
-    - name: Initialize test database
-      run: |
-        echo "Creating test database schema..."
-        mysql -h 127.0.0.1 -u root -proot ibl5_test < ibl5/schema.sql
-        echo "✓ Test database initialized"
-        echo ""
-        echo "Verifying database tables..."
-        TABLE_COUNT=$(mysql -h 127.0.0.1 -u root -proot -s -N -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'ibl5_test';")
-        echo "✓ Created $TABLE_COUNT tables"
-    
+        extensions: mbstring, intl
+        coverage: none
+
     - name: Cache vendor directory
       uses: actions/cache@v4
       with:
@@ -65,82 +38,17 @@ jobs:
         key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
         restore-keys: |
           ${{ runner.os }}-vendor-
-    
+
     - name: Create config.php
       working-directory: ibl5
-      env:
-        DB_HOST: ${{ secrets.DB_HOST }}
-        DB_USER: ${{ secrets.DB_USER }}
-        DB_PASS: ${{ secrets.DB_PASS }}
-        DB_NAME: ${{ secrets.DB_NAME }}
-        PREFIX: ${{ secrets.PREFIX }}
-        USER_PREFIX: ${{ secrets.USER_PREFIX }}
-        DB_TYPE: ${{ secrets.DB_TYPE }}
-      run: |
-        echo "Generating config.php from template with repository secrets..."
-        
-        # Read the template file
-        cp config.php.example config.php
-        
-        # Replace the placeholders with actual secret values
-        # Using sed with different delimiters to handle special characters in passwords
-        sed -i "s|\$dbhost = \"localhost\";|\$dbhost = \"${DB_HOST:-localhost}\";|g" config.php
-        sed -i "s|\$dbuname = \"iblhoops_\";|\$dbuname = \"${DB_USER:-iblhoops_}\";|g" config.php
-        sed -i "s|\$dbpass = \"password\";|\$dbpass = \"${DB_PASS:-password}\";|g" config.php
-        sed -i "s|\$dbname = \"iblhoops_\";|\$dbname = \"${DB_NAME:-iblhoops_}\";|g" config.php
-        sed -i "s|\$prefix = \"nuke\";|\$prefix = \"${PREFIX:-nuke}\";|g" config.php
-        sed -i "s|\$user_prefix = \"nuke\";|\$user_prefix = \"${USER_PREFIX:-nuke}\";|g" config.php
-        sed -i "s|\$dbtype = \"MySQL\";|\$dbtype = \"${DB_TYPE:-MySQL}\";|g" config.php
-        
-        echo "✓ config.php created with repository secrets"
-        echo ""
-        echo "Verifying config.php was created..."
-        if [ -f "config.php" ]; then
-          echo "✓ config.php exists"
-          echo ""
-          echo "Config file structure (secrets masked):"
-          grep -E '^\$db|^\$prefix|^\$user_prefix' config.php | sed 's/=.*/= "[MASKED]";/g'
-        else
-          echo "✗ config.php was not created!"
-          exit 1
-        fi
-    
+      run: cp config.php.example config.php
+
     - name: Install dependencies
       working-directory: ibl5
-      run: |
-        echo "Current directory: $(pwd)"
-        echo "Checking composer.json..."
-        cat composer.json | head -20
-        echo ""
-        echo "Running: composer install --no-progress --no-interaction"
-        echo "Note: Composer will check GitHub Actions cache first, then Composer cache, then download if needed"
-        composer install --no-progress --no-interaction || {
-          echo "Composer install failed, trying again with verbose output..."
-          composer install || exit 1
-        }
-        echo ""
-        echo "Verifying installation..."
-        if [ -f "vendor/bin/phpunit" ]; then
-          echo "✓ PHPUnit found"
-          vendor/bin/phpunit --version
-        else
-          echo "✗ PHPUnit not found in vendor/bin/"
-          echo "vendor/bin contents:"
-          ls -la vendor/bin/ 2>/dev/null | head -20 || echo "vendor/bin not found"
-          echo ""
-          echo "vendor/ top-level contents:"
-          ls -la vendor/ 2>/dev/null | head -30 || echo "vendor/ not found"
-          exit 1
-        fi
-    
+      run: composer install --no-progress --no-interaction
+
     - name: Run PHPUnit tests
       working-directory: ibl5
-      env:
-        DB_HOST: 127.0.0.1
-        DB_USER: root
-        DB_PASS: root
-        DB_NAME: ibl5_test
-        DB_PORT: 3306
       run: |
         vendor/bin/phpunit \
           --configuration phpunit.ci.xml \

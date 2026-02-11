@@ -7,7 +7,7 @@ namespace Tests\Integration\Schedule;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use Tests\Integration\IntegrationTestCase;
 use Tests\Integration\Mocks\TestDataFactory;
-use Schedule\TeamSchedule;
+use TeamSchedule\TeamScheduleRepository;
 use TeamSchedule\TeamScheduleService;
 use TeamSchedule\TeamScheduleView;
 
@@ -22,20 +22,22 @@ use TeamSchedule\TeamScheduleView;
  * - Month grouping and highlighting
  * - View rendering with team colors and game results
  *
- * @covers \Schedule\TeamSchedule
+ * @covers \TeamSchedule\TeamScheduleRepository
  * @covers \TeamSchedule\TeamScheduleService
  * @covers \TeamSchedule\TeamScheduleView
  */
 #[AllowMockObjectsWithoutExpectations]
 class ScheduleIntegrationTest extends IntegrationTestCase
 {
+    private TeamScheduleRepository $repository;
     private TeamScheduleService $service;
     private TeamScheduleView $view;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new TeamScheduleService($GLOBALS['mysqli_db']);
+        $this->repository = new TeamScheduleRepository($GLOBALS['mysqli_db']);
+        $this->service = new TeamScheduleService($GLOBALS['mysqli_db'], $this->repository);
         $this->view = new TeamScheduleView();
 
         // Set up mock team data for all teams used in tests
@@ -84,6 +86,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
 
     protected function tearDown(): void
     {
+        unset($this->repository);
         unset($this->service);
         unset($this->view);
         parent::tearDown();
@@ -103,7 +106,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([]);
 
         // Act
-        TeamSchedule::getSchedule($GLOBALS['mysqli_db'], $teamId);
+        $this->repository->getSchedule($teamId);
 
         // Assert
         $this->assertQueryExecuted('ibl_schedule');
@@ -116,7 +119,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
      * @group schedule
      * @group repository
      */
-    public function testGetScheduleReturnsIterableResult(): void
+    public function testGetScheduleReturnsArray(): void
     {
         // Arrange
         $teamId = 5;
@@ -127,10 +130,11 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData($scheduleData);
 
         // Act
-        $result = TeamSchedule::getSchedule($GLOBALS['mysqli_db'], $teamId);
+        $result = $this->repository->getSchedule($teamId);
 
-        // Assert - Result should be iterable
-        $this->assertIsIterable($result);
+        // Assert - Result should be an array
+        $this->assertIsArray($result);
+        $this->assertCount(2, $result);
     }
 
     /**
@@ -145,7 +149,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([]);
 
         // Act
-        TeamSchedule::getSchedule($GLOBALS['mysqli_db'], $teamId);
+        $this->repository->getSchedule($teamId);
 
         // Assert
         $this->assertQueryExecuted('ORDER BY s.Date ASC');
@@ -163,14 +167,10 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([]);
 
         // Act
-        $result = TeamSchedule::getSchedule($GLOBALS['mysqli_db'], $teamId);
+        $result = $this->repository->getSchedule($teamId);
 
         // Assert
-        $count = 0;
-        foreach ($result as $row) {
-            $count++;
-        }
-        $this->assertEquals(0, $count);
+        $this->assertSame([], $result);
     }
 
     /**
@@ -189,7 +189,7 @@ class ScheduleIntegrationTest extends IntegrationTestCase
 
         // Act - This will throw because League requires more data, but we can verify the query structure
         try {
-            TeamSchedule::getProjectedGamesNextSimResult($GLOBALS['mysqli_db'], $teamId, $lastSimEndDate);
+            $this->repository->getProjectedGamesNextSimResult($teamId, $lastSimEndDate);
         } catch (\Exception $e) {
             // Expected - League initialization may fail in test environment
         }

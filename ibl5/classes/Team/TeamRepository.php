@@ -176,7 +176,17 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     public function getPlayoffResults(): array
     {
         /** @var list<PlayoffResultRow> */
-        return $this->fetchAll("SELECT * FROM ibl_playoff_results ORDER BY year DESC");
+        return $this->fetchAll(
+            "SELECT pr.year, pr.round, pr.winner, pr.loser, pr.loser_games, pr.id,
+                    COALESCE(wfs.team_name, pr.winner) AS winner_name_that_year,
+                    COALESCE(lfs.team_name, pr.loser) AS loser_name_that_year
+             FROM ibl_playoff_results pr
+             LEFT JOIN ibl_team_info wti ON wti.team_name = TRIM(pr.winner)
+             LEFT JOIN ibl_franchise_seasons wfs ON wfs.franchise_id = wti.teamid AND wfs.season_ending_year = pr.year
+             LEFT JOIN ibl_team_info lti ON lti.team_name = TRIM(pr.loser)
+             LEFT JOIN ibl_franchise_seasons lfs ON lfs.franchise_id = lti.teamid AND lfs.season_ending_year = pr.year
+             ORDER BY pr.year DESC"
+        );
     }
 
     /**

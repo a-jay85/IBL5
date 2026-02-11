@@ -211,7 +211,7 @@ class TeamViewTest extends TestCase
             'isOwnTeam' => true,
         ]));
 
-        $this->assertStringContainsString('discord.com/channels/' . \Discord::IBL_GUILD_ID, $output);
+        $this->assertStringContainsString('discord.com/channels/' . \Discord::getGuildID(), $output);
     }
 
     public function testBannerDiscordLinksToUserProfileOnOtherTeam(): void

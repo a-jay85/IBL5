@@ -22,7 +22,6 @@ namespace Trading\Contracts;
  * @phpstan-type TradingDraftPickRow array{pickid: int, ownerofpick: string, teampick: string, teampick_id: int, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
  * @phpstan-type CashTransactionData array{teamname: string, year1: int, year2: int, year3: int, year4: int, year5: int, year6: int, row: int}
  * @phpstan-type CashPlayerData array{ordinal: int, pid: int, name: string, tid: int, teamname: string, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, retired: int}
- * @phpstan-type TradeAutocounterRow array{counter: int}
  */
 interface TradingRepositoryInterface
 {
@@ -296,6 +295,28 @@ interface TradingRepositoryInterface
     public function getLastInsertId(): int;
 
     /**
+     * Generate the next trade offer ID using AUTO_INCREMENT
+     *
+     * Inserts a row into ibl_trade_offers and returns the generated ID.
+     * This is atomic and race-condition-free.
+     *
+     * @return int New trade offer ID
+     * @throws \RuntimeException If ID generation fails
+     */
+    public function generateNextTradeOfferId(): int;
+
+    /**
+     * Delete a trade offer parent row by ID
+     *
+     * Removes the parent record from ibl_trade_offers.
+     * Called by deleteTradeOffer() after child rows are removed.
+     *
+     * @param int $offerId Trade offer ID
+     * @return int Number of rows affected
+     */
+    public function deleteTradeOfferById(int $offerId): int;
+
+    /**
      * Get team players eligible for trading display
      *
      * Returns active (non-retired) players for a team, ordered by ordinal.
@@ -329,7 +350,7 @@ interface TradingRepositoryInterface
     /**
      * Delete a complete trade offer (info rows + cash rows)
      *
-     * Removes all trade_info and trade_cash records for a given offer ID.
+     * Removes all trade_info, trade_cash, and trade_offers records for a given offer ID.
      * Used when rejecting a trade offer.
      *
      * @param int $offerId Trade offer ID

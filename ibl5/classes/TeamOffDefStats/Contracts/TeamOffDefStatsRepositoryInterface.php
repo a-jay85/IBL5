@@ -26,31 +26,35 @@ interface TeamOffDefStatsRepositoryInterface
      * ibl_team_defense_stats to fetch all data in one query instead of
      * 30 individual queries.
      *
+     * @param int $seasonYear Season ending year (e.g. 2025 for the 2024-25 season)
      * @return list<AllTeamStatsRow> Array of team statistics rows ordered by team city
      */
-    public function getAllTeamStats(): array;
+    public function getAllTeamStats(int $seasonYear): array;
 
     /**
      * Get team offense statistics by team name
      *
      * @param string $teamName Team name
+     * @param int $seasonYear Season ending year
      * @return TeamOffenseStatsRow|null Team offense statistics
      */
-    public function getTeamOffenseStats(string $teamName): ?array;
+    public function getTeamOffenseStats(string $teamName, int $seasonYear): ?array;
 
     /**
      * Get team defense statistics by team name
      *
      * @param string $teamName Team name
+     * @param int $seasonYear Season ending year
      * @return TeamDefenseStatsRow|null Team defense statistics
      */
-    public function getTeamDefenseStats(string $teamName): ?array;
+    public function getTeamDefenseStats(string $teamName, int $seasonYear): ?array;
 
     /**
      * Get both offense and defense statistics for a team in a single query
      *
      * @param string $teamName Team name
+     * @param int $seasonYear Season ending year
      * @return array{offense: TeamOffenseStatsRow, defense: TeamDefenseStatsRow}|null Both stats or null
      */
-    public function getTeamBothStats(string $teamName): ?array;
+    public function getTeamBothStats(string $teamName, int $seasonYear): ?array;
 }

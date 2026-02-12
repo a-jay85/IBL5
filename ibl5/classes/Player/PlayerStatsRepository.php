@@ -91,9 +91,11 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
 
     /**
      * @see PlayerStatsRepositoryInterface::getPlayoffStats()
+     * @return list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}>
      */
     public function getPlayoffStats(string $playerName): array
     {
+        /** @var list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> */
         return $this->fetchAll(
             "SELECT * FROM ibl_playoff_stats WHERE name = ? ORDER BY year ASC",
             "s",
@@ -131,9 +133,11 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
 
     /**
      * @see PlayerStatsRepositoryInterface::getHeatStats()
+     * @return list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}>
      */
     public function getHeatStats(string $playerName): array
     {
+        /** @var list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> */
         return $this->fetchAll(
             "SELECT * FROM ibl_heat_stats WHERE name = ? ORDER BY year ASC",
             "s",

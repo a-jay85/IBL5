@@ -27,7 +27,7 @@ class StandingsViewTest extends TestCase
     protected function setUp(): void
     {
         $this->mockRepository = $this->createMock(StandingsRepositoryInterface::class);
-        $this->view = new StandingsView($this->mockRepository);
+        $this->view = new StandingsView($this->mockRepository, 2025);
     }
 
     public function testRenderReturnsString(): void

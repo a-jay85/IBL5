@@ -34,7 +34,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
     {
         parent::setUp();
         $this->repository = new StandingsRepository($GLOBALS['mysqli_db']);
-        $this->view = new StandingsView($this->repository);
+        $this->view = new StandingsView($this->repository, 2025);
     }
 
     protected function tearDown(): void
@@ -245,7 +245,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockPythagoreanData(['fgm' => 1000, 'ftm' => 500, 'tgm' => 300]);
 
         // Act
-        $this->repository->getTeamPythagoreanStats(5);
+        $this->repository->getTeamPythagoreanStats(5, 2025);
 
         // Assert
         $this->assertQueryExecuted('ibl_team_offense_stats');
@@ -265,7 +265,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockPythagoreanData(['fgm' => 1000, 'ftm' => 500, 'tgm' => 300]);
 
         // Act
-        $result = $this->repository->getTeamPythagoreanStats(5);
+        $result = $this->repository->getTeamPythagoreanStats(5, 2025);
 
         // Assert
         $this->assertIsArray($result);
@@ -285,7 +285,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([]);
 
         // Act
-        $result = $this->repository->getTeamPythagoreanStats(999);
+        $result = $this->repository->getTeamPythagoreanStats(999, 2025);
 
         // Assert
         $this->assertNull($result);

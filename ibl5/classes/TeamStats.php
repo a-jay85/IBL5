@@ -103,17 +103,17 @@ class TeamStats
         $this->repository = $repository;
     }
 
-    public static function withTeamName(object $db, string $teamName): self
+    public static function withTeamName(object $db, string $teamName, int $seasonYear): self
     {
         $repository = new TeamOffDefStatsRepository($db);
         $instance = new self($repository);
-        $instance->loadByTeamName($teamName);
+        $instance->loadByTeamName($teamName, $seasonYear);
         return $instance;
     }
 
-    protected function loadByTeamName(string $teamName): void
+    protected function loadByTeamName(string $teamName, int $seasonYear): void
     {
-        $bothStats = $this->repository->getTeamBothStats($teamName);
+        $bothStats = $this->repository->getTeamBothStats($teamName, $seasonYear);
         if ($bothStats !== null) {
             $this->fillOffenseTotals($bothStats['offense']);
             $this->fillDefenseTotals($bothStats['defense']);

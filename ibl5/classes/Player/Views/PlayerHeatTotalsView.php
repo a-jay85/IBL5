@@ -72,7 +72,7 @@ class PlayerHeatTotalsView implements PlayerHeatTotalsViewInterface
     </tr>
         <?php
         foreach ($heatStats as $row) {
-            /** @var array{team: string, year: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $row */
+            /** @var array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $row */
             $year = $row['year'];
             /** @var string $team */
             $team = HtmlSanitizer::safeHtmlOutput($row['team']);
@@ -91,8 +91,7 @@ class PlayerHeatTotalsView implements PlayerHeatTotalsViewInterface
             $tvr = $row['tvr'];
             $blk = $row['blk'];
             $pf = $row['pf'];
-            // Calculate points: 2*fgm + ftm + tgm
-            $pts = $fgm + $fgm + $ftm + $tgm;
+            $pts = $row['pts'];
 
             // Accumulate career totals
             $carTotals['gm'] += $gm;

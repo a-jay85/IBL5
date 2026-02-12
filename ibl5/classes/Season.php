@@ -56,6 +56,12 @@ class Season extends BaseMysqliRepository
     const IBL_REGULAR_SEASON_ENDING_MONTH = 05;
     const IBL_PLAYOFF_MONTH = 06;
 
+    const IBL_ALL_STAR_BREAK_START_DAY = 1;   // Feb 1 - first day with no regular season games
+    const IBL_RISING_STARS_GAME_DAY = 2;      // Feb 2 - Rising Stars game
+    const IBL_ALL_STAR_GAME_DAY = 3;          // Feb 3 - All-Star Game
+    const IBL_ALL_STAR_BREAK_END_DAY = 4;     // Feb 4 - last day with no regular season games
+    const IBL_POST_ALL_STAR_FIRST_DAY = 5;    // Feb 5 - first valid sim day after break
+
     /**
      * Constructor - initializes season data from database
      * 
@@ -81,7 +87,7 @@ class Season extends BaseMysqliRepository
         $this->beginningYear = $this->endingYear - 1;
 
         $this->regularSeasonStartDate = new \DateTime("$this->beginningYear-" . Season::IBL_REGULAR_SEASON_STARTING_MONTH . "-01");
-        $this->postAllStarStartDate = new \DateTime("$this->endingYear-" . Season::IBL_ALL_STAR_MONTH . "-04");
+        $this->postAllStarStartDate = new \DateTime(sprintf('%d-%02d-%02d', $this->endingYear, self::IBL_ALL_STAR_MONTH, self::IBL_POST_ALL_STAR_FIRST_DAY));
         $this->playoffsStartDate = new \DateTime("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-01");
         $this->playoffsEndDate = new \DateTime("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-30");
 
@@ -305,17 +311,22 @@ class Season extends BaseMysqliRepository
 
         $lastSimEndDateObj = new \DateTime($lastSimEndDate);
         $interval = new \DateInterval('P' . $simLengthInDays . 'D');
-        $projectedNextSimEndDate = date_add($lastSimEndDateObj, $interval);
+        $projectedNextSimEndDate = date_add(clone $lastSimEndDateObj, $interval);
 
-        // override $projectedNextSimEndDate to account for the All-Star Break
-        $allStarBreakStart = new \DateTime("$this->endingYear-01-31");
-        $allStarBreakEnd = new \DateTime("$this->endingYear-02-05");
-        if (
-            $projectedNextSimEndDate > $allStarBreakStart
-            && $projectedNextSimEndDate <= $allStarBreakEnd
-        ) {
-            $postAllStarStart = new \DateTime("$this->endingYear-" . self::IBL_ALL_STAR_MONTH . "-04");
-            $projectedNextSimEndDate = date_add($postAllStarStart, new \DateInterval('P' . $simLengthInDays . 'D'));
+        // Adjust projected end date to skip over the All-Star Break (Feb 1-4)
+        $breakFirstDay = new \DateTime(sprintf(
+            '%d-%02d-%02d',
+            $this->endingYear,
+            self::IBL_ALL_STAR_MONTH,
+            self::IBL_ALL_STAR_BREAK_START_DAY
+        ));
+        $breakLengthDays = self::IBL_ALL_STAR_BREAK_END_DAY - self::IBL_ALL_STAR_BREAK_START_DAY + 1;
+
+        if ($lastSimEndDateObj < $breakFirstDay && $projectedNextSimEndDate >= $breakFirstDay) {
+            $projectedNextSimEndDate = date_add(
+                $projectedNextSimEndDate,
+                new \DateInterval('P' . $breakLengthDays . 'D')
+            );
         }
 
         return $projectedNextSimEndDate;

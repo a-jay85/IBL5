@@ -183,28 +183,14 @@ class ScheduleIntegrationTest extends IntegrationTestCase
         // Arrange
         $teamId = 5;
         $lastSimEndDate = '2025-01-14';
-        $this->mockDb->setMockData([
-            ['value' => '7'] // Mock League data (matches ibl_settings.value column)
-        ]);
+        $projectedNextSimEndDate = '2025-01-21';
+        $this->mockDb->setMockData([]);
 
-        // Act - This will throw because League requires more data, but we can verify the query structure
-        try {
-            $this->repository->getProjectedGamesNextSimResult($teamId, $lastSimEndDate);
-        } catch (\Exception $e) {
-            // Expected - League initialization may fail in test environment
-        }
+        // Act
+        $this->repository->getProjectedGamesNextSimResult($teamId, $lastSimEndDate, $projectedNextSimEndDate);
 
-        // Assert - Verify query was attempted with ADDDATE
-        $queries = $this->getExecutedQueries();
-        $foundScheduleQuery = false;
-        foreach ($queries as $query) {
-            if (stripos($query, 'ibl_schedule') !== false && stripos($query, 'ADDDATE') !== false) {
-                $foundScheduleQuery = true;
-                break;
-            }
-        }
-        // Even if League init fails, we should have tried the schedule query or league query
-        $this->assertTrue(count($queries) > 0);
+        // Assert - Verify query was executed against ibl_schedule
+        $this->assertQueryExecuted('ibl_schedule');
     }
 
     // ========== SERVICE WIN/LOSS TRACKING TESTS ==========

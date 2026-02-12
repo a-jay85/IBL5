@@ -50,7 +50,7 @@ class SeasonArchiveRepositoryTest extends TestCase
         );
     }
 
-    public function testRepositoryQueriesPlayoffResultsTable(): void
+    public function testRepositoryQueriesPlayoffSeriesResultsView(): void
     {
         $reflectionClass = new \ReflectionClass($this->repository);
         $fileName = $reflectionClass->getFileName();
@@ -59,9 +59,9 @@ class SeasonArchiveRepositoryTest extends TestCase
         $this->assertIsString($sourceCode);
 
         $this->assertStringContainsString(
-            'ibl_playoff_results',
+            'vw_playoff_series_results',
             $sourceCode,
-            'Repository must query ibl_playoff_results table'
+            'Repository must query vw_playoff_series_results view'
         );
     }
 
@@ -140,7 +140,7 @@ class SeasonArchiveRepositoryTest extends TestCase
         );
     }
 
-    public function testPlayoffResultsExcludeAnomalousYear(): void
+    public function testPlayoffResultsUseViewNotLegacyTable(): void
     {
         $reflectionClass = new \ReflectionClass($this->repository);
         $fileName = $reflectionClass->getFileName();
@@ -148,11 +148,11 @@ class SeasonArchiveRepositoryTest extends TestCase
         $sourceCode = file_get_contents($fileName);
         $this->assertIsString($sourceCode);
 
-        // Verify the query excludes year=1 anomalous rows
-        $this->assertStringContainsString(
-            'year > 1',
+        // Verify the query uses the view (which has no anomalous year=1 data)
+        $this->assertStringNotContainsString(
+            'ibl_playoff_results',
             $sourceCode,
-            'Repository must exclude anomalous year=1 rows from playoff results'
+            'Repository must not query legacy ibl_playoff_results table directly'
         );
     }
 

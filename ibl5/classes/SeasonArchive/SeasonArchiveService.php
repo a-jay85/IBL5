@@ -490,7 +490,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     /**
      * Get IBL champion from playoff results (round 4 winner)
      *
-     * @param list<array{year: int, round: int, winner: string, loser: string, loser_games: int, id: int}> $playoffResults
+     * @param list<array{year: int, round: int, winner: string, loser: string, winner_games: int, loser_games: int}> $playoffResults
      * @return string IBL champion team name, or empty string
      */
     private function getIblChampionFromPlayoffs(array $playoffResults): string
@@ -525,7 +525,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     /**
      * Build playoff bracket grouped by round
      *
-     * @param list<array{year: int, round: int, winner: string, loser: string, loser_games: int, id: int}> $playoffResults
+     * @param list<array{year: int, round: int, winner: string, loser: string, winner_games: int, loser_games: int}> $playoffResults
      * @return array<int, list<PlayoffSeries>> Map of round => series list
      */
     private function buildPlayoffBracket(array $playoffResults): array
@@ -552,7 +552,7 @@ class SeasonArchiveService implements SeasonArchiveServiceInterface
     /**
      * Get IBL Finals data (round 4)
      *
-     * @param list<array{year: int, round: int, winner: string, loser: string, loser_games: int, id: int}> $playoffResults
+     * @param list<array{year: int, round: int, winner: string, loser: string, winner_games: int, loser_games: int}> $playoffResults
      * @return array{winner: string, loser: string, loserGames: int}
      */
     private function getIblFinals(array $playoffResults): array

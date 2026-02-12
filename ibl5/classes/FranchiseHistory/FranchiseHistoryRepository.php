@@ -78,9 +78,9 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
     /**
      * Get aggregated playoff game wins and losses for all teams in bulk
      *
-     * Derives game-level records from series results in ibl_playoff_results:
-     * - When team is the winner: +4 wins, +loser_games losses
-     * - When team is the loser: +loser_games wins, +4 losses
+     * Derives game-level records from series results in vw_playoff_series_results:
+     * - When team is the winner: +winner_games wins, +loser_games losses
+     * - When team is the loser: +loser_games wins, +winner_games losses
      *
      * @return array<string, array{wins: int, losses: int, winpct: string}> Map of team name → playoff totals
      */
@@ -89,12 +89,12 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
         $rows = $this->fetchAll(
             "SELECT
                 team_name,
-                SUM(CASE WHEN team_name = winner THEN 4 ELSE loser_games END) AS total_wins,
-                SUM(CASE WHEN team_name = winner THEN loser_games ELSE 4 END) AS total_losses
+                SUM(CASE WHEN team_name = winner THEN winner_games ELSE loser_games END) AS total_wins,
+                SUM(CASE WHEN team_name = winner THEN loser_games ELSE winner_games END) AS total_losses
             FROM (
-                SELECT winner AS team_name, winner, loser_games FROM ibl_playoff_results
+                SELECT winner AS team_name, winner, winner_games, loser_games FROM vw_playoff_series_results
                 UNION ALL
-                SELECT loser AS team_name, winner, loser_games FROM ibl_playoff_results
+                SELECT loser AS team_name, winner, winner_games, loser_games FROM vw_playoff_series_results
             ) AS combined
             GROUP BY team_name"
         );

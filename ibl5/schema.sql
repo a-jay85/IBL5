@@ -2,7 +2,7 @@
 --
 -- Host: iblhoops.net    Database: iblhoops_ibl5
 -- ------------------------------------------------------
--- Server version	5.5.5-10.11.15-MariaDB
+-- Server version	5.5.5-10.11.16-MariaDB
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -66,6 +66,47 @@ CREATE TABLE `failed_jobs` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `ibl_api_keys`
+--
+
+DROP TABLE IF EXISTS `ibl_api_keys`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `ibl_api_keys` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `key_hash` char(64) NOT NULL COMMENT 'SHA-256 hash of the API key',
+  `key_prefix` char(8) NOT NULL COMMENT 'First 8 chars of key for log identification',
+  `owner_name` varchar(64) NOT NULL COMMENT 'Human-readable owner (e.g. Discord Bot - MJ)',
+  `permission_level` enum('public','team_owner','commissioner') NOT NULL DEFAULT 'public',
+  `rate_limit_tier` enum('standard','elevated','unlimited') NOT NULL DEFAULT 'standard',
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `last_used_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `key_hash` (`key_hash`),
+  KEY `idx_key_hash` (`key_hash`),
+  KEY `idx_is_active` (`is_active`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `ibl_api_rate_limits`
+--
+
+DROP TABLE IF EXISTS `ibl_api_rate_limits`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `ibl_api_rate_limits` (
+  `api_key_hash` char(64) NOT NULL,
+  `window_start` timestamp NOT NULL COMMENT 'Start of the 1-minute window',
+  `request_count` int(10) unsigned NOT NULL DEFAULT 1,
+  PRIMARY KEY (`api_key_hash`,`window_start`),
+  KEY `idx_window_start` (`window_start`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `ibl_awards`
 --
 
@@ -115,14 +156,6 @@ CREATE TABLE `ibl_box_scores` (
   `pid` int(11) DEFAULT NULL,
   `visitorTID` int(11) DEFAULT NULL,
   `homeTID` int(11) DEFAULT NULL,
-  `gameOfThatDay` tinyint(3) unsigned DEFAULT NULL COMMENT 'Game number for that date (1st, 2nd game)',
-  `attendance` int(11) DEFAULT NULL COMMENT 'Attendance at the game',
-  `capacity` int(11) DEFAULT NULL COMMENT 'Arena capacity',
-  `visitorWins` smallint(5) unsigned DEFAULT NULL COMMENT 'Visitor team wins before this game',
-  `visitorLosses` smallint(5) unsigned DEFAULT NULL COMMENT 'Visitor team losses before this game',
-  `homeWins` smallint(5) unsigned DEFAULT NULL COMMENT 'Home team wins before this game',
-  `homeLosses` smallint(5) unsigned DEFAULT NULL COMMENT 'Home team losses before this game',
-  `teamID` int(11) DEFAULT NULL COMMENT 'Player''s team ID (visitor or home)',
   `gameMIN` tinyint(3) unsigned DEFAULT NULL COMMENT 'Minutes played',
   `game2GM` tinyint(3) unsigned DEFAULT NULL COMMENT 'Field goals made',
   `game2GA` tinyint(3) unsigned DEFAULT NULL COMMENT 'Field goals attempted',
@@ -145,6 +178,14 @@ CREATE TABLE `ibl_box_scores` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `uuid` char(36) NOT NULL,
+  `gameOfThatDay` tinyint(3) unsigned DEFAULT NULL COMMENT 'Game number for that date (1st, 2nd game)',
+  `attendance` int(11) DEFAULT NULL COMMENT 'Attendance at the game',
+  `capacity` int(11) DEFAULT NULL COMMENT 'Arena capacity',
+  `visitorWins` smallint(5) unsigned DEFAULT NULL COMMENT 'Visitor team wins before this game',
+  `visitorLosses` smallint(5) unsigned DEFAULT NULL COMMENT 'Visitor team losses before this game',
+  `homeWins` smallint(5) unsigned DEFAULT NULL COMMENT 'Home team wins before this game',
+  `homeLosses` smallint(5) unsigned DEFAULT NULL COMMENT 'Home team losses before this game',
+  `teamID` int(11) DEFAULT NULL COMMENT 'Player''s team ID (visitor or home)',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uuid` (`uuid`),
   KEY `idx_date` (`Date`),
@@ -167,7 +208,7 @@ CREATE TABLE `ibl_box_scores` (
   CONSTRAINT `fk_boxscore_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscore_visitor` FOREIGN KEY (`visitorTID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `chk_box_minutes` CHECK (`gameMIN` is null or `gameMIN` >= 0 and `gameMIN` <= 70)
-) ENGINE=InnoDB AUTO_INCREMENT=669732 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=575561 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -237,7 +278,7 @@ CREATE TABLE `ibl_box_scores_teams` (
   KEY `idx_gt_date_teams` (`game_type`,`Date`,`visitorTeamID`,`homeTeamID`),
   CONSTRAINT `fk_boxscoreteam_home` FOREIGN KEY (`homeTeamID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscoreteam_visitor` FOREIGN KEY (`visitorTeamID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=14536 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=49014 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -442,8 +483,20 @@ CREATE TABLE `ibl_gm_awards` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- NOTE: ibl_gm_history has been replaced by ibl_gm_awards + ibl_gm_tenures above
+-- Table structure for table `ibl_gm_history`
 --
+
+DROP TABLE IF EXISTS `ibl_gm_history`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `ibl_gm_history` (
+  `year` varchar(35) NOT NULL,
+  `name` varchar(50) NOT NULL,
+  `Award` varchar(350) NOT NULL,
+  `prim` int(11) NOT NULL,
+  PRIMARY KEY (`prim`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `ibl_gm_tenures`
@@ -647,7 +700,7 @@ CREATE TABLE `ibl_hist` (
   KEY `idx_pid_year_team` (`pid`,`year`,`team`),
   CONSTRAINT `fk_hist_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_hist_team` FOREIGN KEY (`teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=12647 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=13961 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1162,6 +1215,66 @@ CREATE TABLE `ibl_power` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `ibl_saved_depth_chart_players`
+--
+
+DROP TABLE IF EXISTS `ibl_saved_depth_chart_players`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `ibl_saved_depth_chart_players` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `depth_chart_id` int(10) unsigned NOT NULL,
+  `pid` int(11) NOT NULL,
+  `player_name` varchar(64) NOT NULL COMMENT 'Snapshot for historical display',
+  `ordinal` int(11) NOT NULL DEFAULT 0,
+  `dc_PGDepth` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `dc_SGDepth` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `dc_SFDepth` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `dc_PFDepth` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `dc_CDepth` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `dc_active` tinyint(3) unsigned NOT NULL DEFAULT 1,
+  `dc_minutes` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `dc_of` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `dc_df` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `dc_oi` tinyint(4) NOT NULL DEFAULT 0,
+  `dc_di` tinyint(4) NOT NULL DEFAULT 0,
+  `dc_bh` tinyint(4) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `idx_depth_chart_id` (`depth_chart_id`),
+  KEY `idx_pid` (`pid`),
+  CONSTRAINT `fk_saved_dc_header` FOREIGN KEY (`depth_chart_id`) REFERENCES `ibl_saved_depth_charts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=77 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `ibl_saved_depth_charts`
+--
+
+DROP TABLE IF EXISTS `ibl_saved_depth_charts`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `ibl_saved_depth_charts` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `tid` int(11) NOT NULL,
+  `username` varchar(25) NOT NULL,
+  `name` varchar(100) DEFAULT NULL COMMENT 'User-assigned label',
+  `phase` varchar(30) NOT NULL COMMENT 'Season phase at save time',
+  `season_year` smallint(5) unsigned NOT NULL COMMENT 'Season ending year',
+  `sim_start_date` date NOT NULL COMMENT 'Next sim start date when saved',
+  `sim_end_date` date DEFAULT NULL COMMENT 'Extended as sims run',
+  `sim_number_start` int(10) unsigned NOT NULL,
+  `sim_number_end` int(10) unsigned DEFAULT NULL,
+  `is_active` tinyint(3) unsigned NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_tid_active` (`tid`,`is_active`),
+  KEY `idx_tid_created` (`tid`,`created_at` DESC),
+  KEY `idx_active` (`is_active`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `ibl_schedule`
 --
 
@@ -1245,6 +1358,39 @@ CREATE TABLE `ibl_settings` (
   PRIMARY KEY (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = '' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`iblhoops_chibul`@`71.145.211.164`*/ /*!50003 TRIGGER trg_season_rollover
+AFTER UPDATE ON ibl_settings
+FOR EACH ROW
+BEGIN
+  DECLARE v_new_ending_year    SMALLINT UNSIGNED;
+  DECLARE v_new_beginning_year SMALLINT UNSIGNED;
+
+  IF NEW.name = 'Current Season Ending Year' AND OLD.value <> NEW.value THEN
+
+    SET v_new_ending_year    = CAST(NEW.value AS UNSIGNED);
+    SET v_new_beginning_year = v_new_ending_year - 1;
+
+    INSERT IGNORE INTO ibl_franchise_seasons
+      (franchise_id, season_year, season_ending_year, team_city, team_name)
+    SELECT teamid, v_new_beginning_year, v_new_ending_year, team_city, team_name
+      FROM ibl_team_info;
+
+  END IF;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
 -- Table structure for table `ibl_sim_dates`
@@ -1258,7 +1404,7 @@ CREATE TABLE `ibl_sim_dates` (
   `Start Date` date DEFAULT NULL,
   `End Date` date DEFAULT NULL,
   PRIMARY KEY (`Sim`)
-) ENGINE=InnoDB AUTO_INCREMENT=682 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=683 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1407,7 +1553,6 @@ CREATE TABLE `ibl_team_info` (
   `owner_name` varchar(32) NOT NULL DEFAULT '',
   `owner_email` varchar(48) NOT NULL DEFAULT '',
   `discordID` bigint(20) unsigned DEFAULT NULL,
-  `formerly_known_as` varchar(255) DEFAULT NULL,
   `Contract_Wins` int(11) NOT NULL DEFAULT 0,
   `Contract_Losses` int(11) NOT NULL DEFAULT 0,
   `Contract_AvgW` int(11) NOT NULL DEFAULT 0,
@@ -1428,16 +1573,46 @@ CREATE TABLE `ibl_team_info` (
   KEY `idx_discordID` (`discordID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = '' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`iblhoops_chibul`@`71.145.211.164`*/ /*!50003 TRIGGER trg_team_identity_sync
+AFTER UPDATE ON ibl_team_info
+FOR EACH ROW
+BEGIN
+  DECLARE v_ending_year    SMALLINT UNSIGNED;
+  DECLARE v_beginning_year SMALLINT UNSIGNED;
 
---
--- All-Star Weekend placeholder teams (satisfy FK constraints for boxscore inserts)
---
+  IF OLD.team_city <> NEW.team_city OR OLD.team_name <> NEW.team_name THEN
 
-INSERT INTO `ibl_team_info` (`teamid`, `team_city`, `team_name`, `uuid`) VALUES
-(40, 'IBL', 'Rookies', UUID()),
-(41, 'IBL', 'Sophomores', UUID()),
-(50, 'IBL', 'All-Star Away', UUID()),
-(51, 'IBL', 'All-Star Home', UUID());
+    SELECT CAST(value AS UNSIGNED) INTO v_ending_year
+      FROM ibl_settings
+     WHERE name = 'Current Season Ending Year'
+     LIMIT 1;
+
+    SET v_beginning_year = v_ending_year - 1;
+
+    INSERT INTO ibl_franchise_seasons
+      (franchise_id, season_year, season_ending_year, team_city, team_name)
+    VALUES
+      (NEW.teamid, v_beginning_year, v_ending_year, NEW.team_city, NEW.team_name)
+    ON DUPLICATE KEY UPDATE
+      team_city = NEW.team_city,
+      team_name = NEW.team_name;
+
+  END IF;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
 -- Table structure for table `ibl_team_offense_stats`
@@ -1497,7 +1672,7 @@ DROP TABLE IF EXISTS `ibl_trade_autocounter`;
 CREATE TABLE `ibl_trade_autocounter` (
   `counter` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`counter`)
-) ENGINE=InnoDB AUTO_INCREMENT=11998 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=12018 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1519,7 +1694,7 @@ CREATE TABLE `ibl_trade_cash` (
   `cy5` int(11) DEFAULT NULL,
   `cy6` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1543,7 +1718,7 @@ CREATE TABLE `ibl_trade_info` (
   KEY `idx_tradeofferid` (`tradeofferid`),
   KEY `idx_from` (`from`),
   KEY `idx_to` (`to`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2472,7 +2647,7 @@ CREATE TABLE `nuke_referer` (
   `rid` int(11) NOT NULL AUTO_INCREMENT,
   `url` varchar(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`rid`)
-) ENGINE=MyISAM AUTO_INCREMENT=40416 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=40428 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2592,6 +2767,9 @@ CREATE TABLE `nuke_stories` (
   `acomm` int(11) NOT NULL DEFAULT 0,
   `haspoll` int(11) NOT NULL DEFAULT 0,
   `pollID` int(11) NOT NULL DEFAULT 0,
+  `score` int(11) NOT NULL DEFAULT 0,
+  `ratings` int(11) NOT NULL DEFAULT 0,
+  `rating_ip` varchar(15) DEFAULT '0',
   `associated` mediumtext DEFAULT NULL,
   PRIMARY KEY (`sid`),
   KEY `catid` (`catid`),
@@ -2727,6 +2905,82 @@ CREATE TABLE `nuke_users` (
   KEY `user_email` (`user_email`(250))
 ) ENGINE=MyISAM AUTO_INCREMENT=773 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = '' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`iblhoops_chibul`@`71.145.211.164`*/ /*!50003 TRIGGER trg_gm_tenure_track
+AFTER UPDATE ON nuke_users
+FOR EACH ROW
+BEGIN
+  DECLARE v_ending_year   SMALLINT UNSIGNED;
+  DECLARE v_beginning_year SMALLINT UNSIGNED;
+  DECLARE v_phase         VARCHAR(128);
+  DECLARE v_is_mid_season TINYINT(1);
+  DECLARE v_old_franchise INT;
+  DECLARE v_new_franchise INT;
+
+  IF OLD.user_ibl_team <> NEW.user_ibl_team THEN
+
+    -- Read current season context
+    SELECT CAST(value AS UNSIGNED) INTO v_ending_year
+      FROM ibl_settings
+     WHERE name = 'Current Season Ending Year'
+     LIMIT 1;
+
+    SET v_beginning_year = v_ending_year - 1;
+
+    SELECT value INTO v_phase
+      FROM ibl_settings
+     WHERE name = 'Current Season Phase'
+     LIMIT 1;
+
+    SET v_is_mid_season = (v_phase IN ('Regular Season', 'Playoffs', 'HEAT'));
+
+    -- Close the old tenure (if the user was on a real team)
+    IF OLD.user_ibl_team <> '' THEN
+      SELECT teamid INTO v_old_franchise
+        FROM ibl_team_info
+       WHERE team_name = OLD.user_ibl_team
+       LIMIT 1;
+
+      IF v_old_franchise IS NOT NULL THEN
+        UPDATE ibl_gm_tenures
+           SET end_season_year   = v_beginning_year,
+               is_mid_season_end = v_is_mid_season
+         WHERE franchise_id   = v_old_franchise
+           AND gm_username    = OLD.username
+           AND end_season_year IS NULL;
+      END IF;
+    END IF;
+
+    -- Open a new tenure (if the user is assigned to a real team)
+    IF NEW.user_ibl_team <> '' THEN
+      SELECT teamid INTO v_new_franchise
+        FROM ibl_team_info
+       WHERE team_name = NEW.user_ibl_team
+       LIMIT 1;
+
+      IF v_new_franchise IS NOT NULL THEN
+        INSERT INTO ibl_gm_tenures
+          (franchise_id, gm_username, start_season_year, is_mid_season_start)
+        VALUES
+          (v_new_franchise, NEW.username, v_beginning_year, v_is_mid_season);
+      END IF;
+    END IF;
+
+  END IF;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
 -- Table structure for table `nuke_users_temp`
@@ -2744,7 +2998,7 @@ CREATE TABLE `nuke_users_temp` (
   `check_num` varchar(50) NOT NULL DEFAULT '',
   `time` varchar(14) NOT NULL DEFAULT '',
   PRIMARY KEY (`user_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=11592 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=11594 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2963,6 +3217,162 @@ SET character_set_client = utf8;
 SET character_set_client = @saved_cs_client;
 
 --
+-- Temporary table structure for view `vw_free_agency_offers`
+--
+
+DROP TABLE IF EXISTS `vw_free_agency_offers`;
+/*!50001 DROP VIEW IF EXISTS `vw_free_agency_offers`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `vw_free_agency_offers` AS SELECT 
+ 1 AS `offer_id`,
+ 1 AS `player_uuid`,
+ 1 AS `pid`,
+ 1 AS `player_name`,
+ 1 AS `position`,
+ 1 AS `age`,
+ 1 AS `team_uuid`,
+ 1 AS `teamid`,
+ 1 AS `team_city`,
+ 1 AS `team_name`,
+ 1 AS `full_team_name`,
+ 1 AS `year1_amount`,
+ 1 AS `year2_amount`,
+ 1 AS `year3_amount`,
+ 1 AS `year4_amount`,
+ 1 AS `year5_amount`,
+ 1 AS `year6_amount`,
+ 1 AS `total_contract_value`,
+ 1 AS `modifier`,
+ 1 AS `random`,
+ 1 AS `perceived_value`,
+ 1 AS `is_mle`,
+ 1 AS `is_lle`,
+ 1 AS `created_at`,
+ 1 AS `updated_at`*/;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Temporary table structure for view `vw_player_career_stats`
+--
+
+DROP TABLE IF EXISTS `vw_player_career_stats`;
+/*!50001 DROP VIEW IF EXISTS `vw_player_career_stats`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `vw_player_career_stats` AS SELECT 
+ 1 AS `player_uuid`,
+ 1 AS `pid`,
+ 1 AS `name`,
+ 1 AS `career_games`,
+ 1 AS `career_minutes`,
+ 1 AS `career_points`,
+ 1 AS `career_rebounds`,
+ 1 AS `career_assists`,
+ 1 AS `career_steals`,
+ 1 AS `career_blocks`,
+ 1 AS `ppg_career`,
+ 1 AS `rpg_career`,
+ 1 AS `apg_career`,
+ 1 AS `fg_pct_career`,
+ 1 AS `ft_pct_career`,
+ 1 AS `three_pt_pct_career`,
+ 1 AS `playoff_minutes`,
+ 1 AS `draft_year`,
+ 1 AS `draft_round`,
+ 1 AS `draft_pick`,
+ 1 AS `drafted_by_team`,
+ 1 AS `created_at`,
+ 1 AS `updated_at`*/;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Temporary table structure for view `vw_player_current`
+--
+
+DROP TABLE IF EXISTS `vw_player_current`;
+/*!50001 DROP VIEW IF EXISTS `vw_player_current`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `vw_player_current` AS SELECT 
+ 1 AS `player_uuid`,
+ 1 AS `pid`,
+ 1 AS `name`,
+ 1 AS `nickname`,
+ 1 AS `age`,
+ 1 AS `position`,
+ 1 AS `htft`,
+ 1 AS `htin`,
+ 1 AS `active`,
+ 1 AS `retired`,
+ 1 AS `experience`,
+ 1 AS `bird_rights`,
+ 1 AS `team_uuid`,
+ 1 AS `teamid`,
+ 1 AS `team_city`,
+ 1 AS `team_name`,
+ 1 AS `owner_name`,
+ 1 AS `full_team_name`,
+ 1 AS `contract_year`,
+ 1 AS `current_salary`,
+ 1 AS `year1_salary`,
+ 1 AS `year2_salary`,
+ 1 AS `games_played`,
+ 1 AS `minutes_played`,
+ 1 AS `field_goals_made`,
+ 1 AS `field_goals_attempted`,
+ 1 AS `free_throws_made`,
+ 1 AS `free_throws_attempted`,
+ 1 AS `three_pointers_made`,
+ 1 AS `three_pointers_attempted`,
+ 1 AS `offensive_rebounds`,
+ 1 AS `defensive_rebounds`,
+ 1 AS `assists`,
+ 1 AS `steals`,
+ 1 AS `turnovers`,
+ 1 AS `blocks`,
+ 1 AS `personal_fouls`,
+ 1 AS `fg_percentage`,
+ 1 AS `ft_percentage`,
+ 1 AS `three_pt_percentage`,
+ 1 AS `points_per_game`,
+ 1 AS `created_at`,
+ 1 AS `updated_at`*/;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Temporary table structure for view `vw_schedule_upcoming`
+--
+
+DROP TABLE IF EXISTS `vw_schedule_upcoming`;
+/*!50001 DROP VIEW IF EXISTS `vw_schedule_upcoming`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `vw_schedule_upcoming` AS SELECT 
+ 1 AS `game_uuid`,
+ 1 AS `schedule_id`,
+ 1 AS `season_year`,
+ 1 AS `game_date`,
+ 1 AS `box_score_id`,
+ 1 AS `game_of_that_day`,
+ 1 AS `visitor_uuid`,
+ 1 AS `visitor_team_id`,
+ 1 AS `visitor_city`,
+ 1 AS `visitor_name`,
+ 1 AS `visitor_full_name`,
+ 1 AS `visitor_score`,
+ 1 AS `home_uuid`,
+ 1 AS `home_team_id`,
+ 1 AS `home_city`,
+ 1 AS `home_name`,
+ 1 AS `home_full_name`,
+ 1 AS `home_score`,
+ 1 AS `game_status`,
+ 1 AS `created_at`,
+ 1 AS `updated_at`*/;
+SET character_set_client = @saved_cs_client;
+
+--
 -- Temporary table structure for view `vw_series_records`
 --
 
@@ -2975,6 +3385,49 @@ SET character_set_client = utf8;
  1 AS `opponent`,
  1 AS `wins`,
  1 AS `losses`*/;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Temporary table structure for view `vw_team_standings`
+--
+
+DROP TABLE IF EXISTS `vw_team_standings`;
+/*!50001 DROP VIEW IF EXISTS `vw_team_standings`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `vw_team_standings` AS SELECT 
+ 1 AS `team_uuid`,
+ 1 AS `teamid`,
+ 1 AS `team_city`,
+ 1 AS `team_name`,
+ 1 AS `full_team_name`,
+ 1 AS `owner_name`,
+ 1 AS `league_record`,
+ 1 AS `win_percentage`,
+ 1 AS `conference`,
+ 1 AS `conference_record`,
+ 1 AS `conference_games_back`,
+ 1 AS `division`,
+ 1 AS `division_record`,
+ 1 AS `division_games_back`,
+ 1 AS `home_wins`,
+ 1 AS `home_losses`,
+ 1 AS `away_wins`,
+ 1 AS `away_losses`,
+ 1 AS `home_record`,
+ 1 AS `away_record`,
+ 1 AS `games_remaining`,
+ 1 AS `conference_wins`,
+ 1 AS `conference_losses`,
+ 1 AS `division_wins`,
+ 1 AS `division_losses`,
+ 1 AS `clinched_conference`,
+ 1 AS `clinched_division`,
+ 1 AS `clinched_playoffs`,
+ 1 AS `conference_magic_number`,
+ 1 AS `division_magic_number`,
+ 1 AS `created_at`,
+ 1 AS `updated_at`*/;
 SET character_set_client = @saved_cs_client;
 
 --
@@ -3035,6 +3488,78 @@ SET character_set_client = @saved_cs_client;
 /*!50001 SET collation_connection      = @saved_col_connection */;
 
 --
+-- Final view structure for view `vw_free_agency_offers`
+--
+
+/*!50001 DROP VIEW IF EXISTS `vw_free_agency_offers`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY INVOKER */
+/*!50001 VIEW `vw_free_agency_offers` AS select `fa`.`primary_key` AS `offer_id`,`p`.`uuid` AS `player_uuid`,`p`.`pid` AS `pid`,`p`.`name` AS `player_name`,`p`.`pos` AS `position`,`p`.`age` AS `age`,`t`.`uuid` AS `team_uuid`,`t`.`teamid` AS `teamid`,`t`.`team_city` AS `team_city`,`t`.`team_name` AS `team_name`,concat(`t`.`team_city`,' ',`t`.`team_name`) AS `full_team_name`,`fa`.`offer1` AS `year1_amount`,`fa`.`offer2` AS `year2_amount`,`fa`.`offer3` AS `year3_amount`,`fa`.`offer4` AS `year4_amount`,`fa`.`offer5` AS `year5_amount`,`fa`.`offer6` AS `year6_amount`,`fa`.`offer1` + `fa`.`offer2` + `fa`.`offer3` + `fa`.`offer4` + `fa`.`offer5` + `fa`.`offer6` AS `total_contract_value`,`fa`.`modifier` AS `modifier`,`fa`.`random` AS `random`,`fa`.`perceivedvalue` AS `perceived_value`,`fa`.`MLE` AS `is_mle`,`fa`.`LLE` AS `is_lle`,`fa`.`created_at` AS `created_at`,`fa`.`updated_at` AS `updated_at` from ((`ibl_fa_offers` `fa` join `ibl_plr` `p` on(`fa`.`name` = `p`.`name`)) join `ibl_team_info` `t` on(`fa`.`team` = `t`.`team_name`)) */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `vw_player_career_stats`
+--
+
+/*!50001 DROP VIEW IF EXISTS `vw_player_career_stats`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY INVOKER */
+/*!50001 VIEW `vw_player_career_stats` AS select `p`.`uuid` AS `player_uuid`,`p`.`pid` AS `pid`,`p`.`name` AS `name`,`p`.`car_gm` AS `career_games`,`p`.`car_min` AS `career_minutes`,round(`p`.`car_fgm` * 2 + `p`.`car_tgm` + `p`.`car_ftm`,0) AS `career_points`,`p`.`car_orb` + `p`.`car_drb` AS `career_rebounds`,`p`.`car_ast` AS `career_assists`,`p`.`car_stl` AS `career_steals`,`p`.`car_blk` AS `career_blocks`,round((`p`.`car_fgm` * 2 + `p`.`car_tgm` + `p`.`car_ftm`) / nullif(`p`.`car_gm`,0),1) AS `ppg_career`,round((`p`.`car_orb` + `p`.`car_drb`) / nullif(`p`.`car_gm`,0),1) AS `rpg_career`,round(`p`.`car_ast` / nullif(`p`.`car_gm`,0),1) AS `apg_career`,round(`p`.`car_fgm` / nullif(`p`.`car_fga`,0),3) AS `fg_pct_career`,round(`p`.`car_ftm` / nullif(`p`.`car_fta`,0),3) AS `ft_pct_career`,round(`p`.`car_tgm` / nullif(`p`.`car_tga`,0),3) AS `three_pt_pct_career`,`p`.`car_playoff_min` AS `playoff_minutes`,`p`.`draftyear` AS `draft_year`,`p`.`draftround` AS `draft_round`,`p`.`draftpickno` AS `draft_pick`,`p`.`draftedby` AS `drafted_by_team`,`p`.`created_at` AS `created_at`,`p`.`updated_at` AS `updated_at` from `ibl_plr` `p` */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `vw_player_current`
+--
+
+/*!50001 DROP VIEW IF EXISTS `vw_player_current`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY INVOKER */
+/*!50001 VIEW `vw_player_current` AS select `p`.`uuid` AS `player_uuid`,`p`.`pid` AS `pid`,`p`.`name` AS `name`,`p`.`nickname` AS `nickname`,`p`.`age` AS `age`,`p`.`pos` AS `position`,`p`.`htft` AS `htft`,`p`.`htin` AS `htin`,`p`.`active` AS `active`,`p`.`retired` AS `retired`,`p`.`exp` AS `experience`,`p`.`bird` AS `bird_rights`,`t`.`uuid` AS `team_uuid`,`t`.`teamid` AS `teamid`,`t`.`team_city` AS `team_city`,`t`.`team_name` AS `team_name`,`t`.`owner_name` AS `owner_name`,concat(`t`.`team_city`,' ',`t`.`team_name`) AS `full_team_name`,`p`.`cy` AS `contract_year`,case `p`.`cy` when 1 then `p`.`cy1` when 2 then `p`.`cy2` when 3 then `p`.`cy3` when 4 then `p`.`cy4` when 5 then `p`.`cy5` when 6 then `p`.`cy6` else 0 end AS `current_salary`,`p`.`cy1` AS `year1_salary`,`p`.`cy2` AS `year2_salary`,`p`.`stats_gm` AS `games_played`,`p`.`stats_min` AS `minutes_played`,`p`.`stats_fgm` AS `field_goals_made`,`p`.`stats_fga` AS `field_goals_attempted`,`p`.`stats_ftm` AS `free_throws_made`,`p`.`stats_fta` AS `free_throws_attempted`,`p`.`stats_3gm` AS `three_pointers_made`,`p`.`stats_3ga` AS `three_pointers_attempted`,`p`.`stats_orb` AS `offensive_rebounds`,`p`.`stats_drb` AS `defensive_rebounds`,`p`.`stats_ast` AS `assists`,`p`.`stats_stl` AS `steals`,`p`.`stats_to` AS `turnovers`,`p`.`stats_blk` AS `blocks`,`p`.`stats_pf` AS `personal_fouls`,round(`p`.`stats_fgm` / nullif(`p`.`stats_fga`,0),3) AS `fg_percentage`,round(`p`.`stats_ftm` / nullif(`p`.`stats_fta`,0),3) AS `ft_percentage`,round(`p`.`stats_3gm` / nullif(`p`.`stats_3ga`,0),3) AS `three_pt_percentage`,round((`p`.`stats_fgm` * 2 + `p`.`stats_3gm` + `p`.`stats_ftm`) / nullif(`p`.`stats_gm`,0),1) AS `points_per_game`,`p`.`created_at` AS `created_at`,`p`.`updated_at` AS `updated_at` from (`ibl_plr` `p` left join `ibl_team_info` `t` on(`p`.`tid` = `t`.`teamid`)) */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `vw_schedule_upcoming`
+--
+
+/*!50001 DROP VIEW IF EXISTS `vw_schedule_upcoming`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY INVOKER */
+/*!50001 VIEW `vw_schedule_upcoming` AS select `sch`.`uuid` AS `game_uuid`,`sch`.`SchedID` AS `schedule_id`,`sch`.`Year` AS `season_year`,`sch`.`Date` AS `game_date`,`sch`.`BoxID` AS `box_score_id`,coalesce(`bst`.`gameOfThatDay`,0) AS `game_of_that_day`,`tv`.`uuid` AS `visitor_uuid`,`tv`.`teamid` AS `visitor_team_id`,`tv`.`team_city` AS `visitor_city`,`tv`.`team_name` AS `visitor_name`,concat(`tv`.`team_city`,' ',`tv`.`team_name`) AS `visitor_full_name`,`sch`.`VScore` AS `visitor_score`,`th`.`uuid` AS `home_uuid`,`th`.`teamid` AS `home_team_id`,`th`.`team_city` AS `home_city`,`th`.`team_name` AS `home_name`,concat(`th`.`team_city`,' ',`th`.`team_name`) AS `home_full_name`,`sch`.`HScore` AS `home_score`,case when `sch`.`VScore` = 0 and `sch`.`HScore` = 0 then 'scheduled' else 'completed' end AS `game_status`,`sch`.`created_at` AS `created_at`,`sch`.`updated_at` AS `updated_at` from (((`ibl_schedule` `sch` join `ibl_team_info` `tv` on(`sch`.`Visitor` = `tv`.`teamid`)) join `ibl_team_info` `th` on(`sch`.`Home` = `th`.`teamid`)) left join (select `ibl_box_scores_teams`.`Date` AS `Date`,`ibl_box_scores_teams`.`visitorTeamID` AS `visitorTeamID`,`ibl_box_scores_teams`.`homeTeamID` AS `homeTeamID`,min(`ibl_box_scores_teams`.`gameOfThatDay`) AS `gameOfThatDay` from `ibl_box_scores_teams` group by `ibl_box_scores_teams`.`Date`,`ibl_box_scores_teams`.`visitorTeamID`,`ibl_box_scores_teams`.`homeTeamID`) `bst` on(`bst`.`Date` = `sch`.`Date` and `bst`.`visitorTeamID` = `sch`.`Visitor` and `bst`.`homeTeamID` = `sch`.`Home`)) */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
 -- Final view structure for view `vw_series_records`
 --
 
@@ -3048,6 +3573,24 @@ SET character_set_client = @saved_cs_client;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
 /*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY DEFINER */
 /*!50001 VIEW `vw_series_records` AS select `t`.`self` AS `self`,`t`.`opponent` AS `opponent`,sum(`t`.`wins`) AS `wins`,sum(`t`.`losses`) AS `losses` from (select `ibl_schedule`.`Home` AS `self`,`ibl_schedule`.`Visitor` AS `opponent`,count(0) AS `wins`,0 AS `losses` from `ibl_schedule` where `ibl_schedule`.`HScore` > `ibl_schedule`.`VScore` group by `ibl_schedule`.`Home`,`ibl_schedule`.`Visitor` union all select `ibl_schedule`.`Visitor` AS `self`,`ibl_schedule`.`Home` AS `opponent`,count(0) AS `wins`,0 AS `losses` from `ibl_schedule` where `ibl_schedule`.`VScore` > `ibl_schedule`.`HScore` group by `ibl_schedule`.`Visitor`,`ibl_schedule`.`Home` union all select `ibl_schedule`.`Home` AS `self`,`ibl_schedule`.`Visitor` AS `opponent`,0 AS `wins`,count(0) AS `losses` from `ibl_schedule` where `ibl_schedule`.`HScore` < `ibl_schedule`.`VScore` group by `ibl_schedule`.`Home`,`ibl_schedule`.`Visitor` union all select `ibl_schedule`.`Visitor` AS `self`,`ibl_schedule`.`Home` AS `opponent`,0 AS `wins`,count(0) AS `losses` from `ibl_schedule` where `ibl_schedule`.`VScore` < `ibl_schedule`.`HScore` group by `ibl_schedule`.`Visitor`,`ibl_schedule`.`Home`) `t` group by `t`.`self`,`t`.`opponent` */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `vw_team_standings`
+--
+
+/*!50001 DROP VIEW IF EXISTS `vw_team_standings`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY INVOKER */
+/*!50001 VIEW `vw_team_standings` AS select `t`.`uuid` AS `team_uuid`,`t`.`teamid` AS `teamid`,`t`.`team_city` AS `team_city`,`t`.`team_name` AS `team_name`,concat(`t`.`team_city`,' ',`t`.`team_name`) AS `full_team_name`,`t`.`owner_name` AS `owner_name`,`s`.`leagueRecord` AS `league_record`,`s`.`pct` AS `win_percentage`,`s`.`conference` AS `conference`,`s`.`confRecord` AS `conference_record`,`s`.`confGB` AS `conference_games_back`,`s`.`division` AS `division`,`s`.`divRecord` AS `division_record`,`s`.`divGB` AS `division_games_back`,`s`.`homeWins` AS `home_wins`,`s`.`homeLosses` AS `home_losses`,`s`.`awayWins` AS `away_wins`,`s`.`awayLosses` AS `away_losses`,concat(`s`.`homeWins`,'-',`s`.`homeLosses`) AS `home_record`,concat(`s`.`awayWins`,'-',`s`.`awayLosses`) AS `away_record`,`s`.`gamesUnplayed` AS `games_remaining`,`s`.`confWins` AS `conference_wins`,`s`.`confLosses` AS `conference_losses`,`s`.`divWins` AS `division_wins`,`s`.`divLosses` AS `division_losses`,`s`.`clinchedConference` AS `clinched_conference`,`s`.`clinchedDivision` AS `clinched_division`,`s`.`clinchedPlayoffs` AS `clinched_playoffs`,`s`.`confMagicNumber` AS `conference_magic_number`,`s`.`divMagicNumber` AS `division_magic_number`,`s`.`created_at` AS `created_at`,`s`.`updated_at` AS `updated_at` from (`ibl_team_info` `t` join `ibl_standings` `s` on(`t`.`teamid` = `s`.`tid`)) */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
@@ -3079,4 +3622,4 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-02-06 12:23:00
+-- Dump completed on 2026-02-11 19:39:51

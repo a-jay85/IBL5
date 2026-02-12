@@ -59,22 +59,21 @@ export const load: PageServerLoad = async ({ params }) => {
 			home: `${gameData.home_city} ${gameData.home_name} (ID: ${gameData.homeTeamId})`
 		});
 
-		// Get players with correct team ID references
+		// Get players using the recorded teamID (not the player's current team)
 		const players = (await prisma.$queryRaw`
-            SELECT 
+            SELECT
                 bp.Date,
                 COALESCE(plr.name, bp.name) as name,
                 bp.pos,
                 bp.pid,
-                plr.tid as playerTeamId,
-                -- Check if player's team matches away team
-                CASE 
-                    WHEN plr.tid = ${gameData.awayTeamId} THEN 1
+                bp.teamID as playerTeamId,
+                CASE
+                    WHEN bp.teamID = ${gameData.awayTeamId} THEN 1
                     ELSE 0
                 END as isAwayPlayer,
                 bp.gameMIN as min,
-                bp.gameFGM as fgm,
-                bp.gameFGA as fga,
+                bp.calc_fg_made as fgm,
+                (bp.game2GA + bp.game3GA) as fga,
                 bp.gameFTM as ftm,
                 bp.gameFTA as fta,
                 bp.game3GM as tpm,
@@ -86,13 +85,14 @@ export const load: PageServerLoad = async ({ params }) => {
                 bp.gameTOV as tov,
                 bp.gameBLK as blk,
                 bp.gamePF as pf,
-                (bp.gameORB + bp.gameDRB) as reb,
-                (bp.gameFGM * 2 + bp.game3GM + bp.gameFTM) as pts
+                bp.calc_rebounds as reb,
+                bp.calc_points as pts
             FROM ibl_box_scores bp
             LEFT JOIN ibl_plr plr ON bp.pid = plr.pid
             WHERE DATE(bp.Date) = DATE(${gameDate})
-            AND plr.tid IN (${gameData.awayTeamId}, ${gameData.homeTeamId})
-            ORDER BY plr.tid DESC, bp.gameMIN DESC
+            AND bp.gameOfThatDay = ${gameNumber}
+            AND bp.teamID IN (${gameData.awayTeamId}, ${gameData.homeTeamId})
+            ORDER BY bp.teamID = ${gameData.awayTeamId} DESC, bp.gameMIN DESC
         `) as any[];
 
 		console.log(`✅ Found ${players.length} total players for this game`);
@@ -107,10 +107,8 @@ export const load: PageServerLoad = async ({ params }) => {
 		if (players.length > 0) {
 			console.log(
 				'🔍 First 3 players:',
-				players.slice(0, 3).map((p) => ({
+				players.slice(0, 3).map((p: any) => ({
 					name: p.name,
-					visitorTID: p.visitorTID,
-					homeTID: p.homeTID,
 					playerTeamId: p.playerTeamId,
 					isAwayPlayer: p.isAwayPlayer
 				}))

@@ -87,7 +87,7 @@ class SeasonArchiveServiceTest extends TestCase
             ['year' => 1989, 'Award' => 'Blocks Leader (1st)', 'name' => 'Test Blocker', 'table_ID' => 85],
         ]);
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([
-            ['year' => 1989, 'round' => 4, 'winner' => 'Clippers', 'loser' => 'Raptors', 'loser_games' => 3, 'id' => 15],
+            ['year' => 1989, 'round' => 4, 'winner' => 'Clippers', 'loser' => 'Raptors', 'winner_games' => 4, 'loser_games' => 3],
         ]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([
             ['year' => '<B>1989</B>', 'name' => 'Rockets', 'Award' => '<B>IBL HEAT Champions</b>', 'ID' => 11],
@@ -305,10 +305,10 @@ class SeasonArchiveServiceTest extends TestCase
             ['year' => 1989, 'Award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_ID' => 1],
         ]);
         $this->mockRepository->method('getPlayoffResultsByYear')->willReturn([
-            ['year' => 1989, 'round' => 1, 'winner' => 'Raptors', 'loser' => 'Pelicans', 'loser_games' => 0, 'id' => 1],
-            ['year' => 1989, 'round' => 1, 'winner' => 'Heat', 'loser' => 'Sting', 'loser_games' => 0, 'id' => 3],
-            ['year' => 1989, 'round' => 2, 'winner' => 'Raptors', 'loser' => 'Nets', 'loser_games' => 3, 'id' => 9],
-            ['year' => 1989, 'round' => 4, 'winner' => 'Clippers', 'loser' => 'Raptors', 'loser_games' => 3, 'id' => 15],
+            ['year' => 1989, 'round' => 1, 'winner' => 'Raptors', 'loser' => 'Pelicans', 'winner_games' => 3, 'loser_games' => 0],
+            ['year' => 1989, 'round' => 1, 'winner' => 'Heat', 'loser' => 'Sting', 'winner_games' => 3, 'loser_games' => 0],
+            ['year' => 1989, 'round' => 2, 'winner' => 'Raptors', 'loser' => 'Nets', 'winner_games' => 4, 'loser_games' => 3],
+            ['year' => 1989, 'round' => 4, 'winner' => 'Clippers', 'loser' => 'Raptors', 'winner_games' => 4, 'loser_games' => 3],
         ]);
         $this->mockRepository->method('getTeamAwardsByYear')->willReturn([]);
         $this->mockRepository->method('getAllGmAwardsWithTeams')->willReturn([]);
@@ -471,7 +471,7 @@ class SeasonArchiveServiceTest extends TestCase
             ['year' => 1989, 'Award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_ID' => 1],
         ]);
         $mockRepo->method('getPlayoffResultsByYear')->willReturn([
-            ['year' => 1989, 'round' => 4, 'winner' => 'Clippers', 'loser' => 'Raptors', 'loser_games' => 3, 'id' => 15],
+            ['year' => 1989, 'round' => 4, 'winner' => 'Clippers', 'loser' => 'Raptors', 'winner_games' => 4, 'loser_games' => 3],
         ]);
         $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
         $mockRepo->method('getAllGmAwardsWithTeams')->willReturn([]);
@@ -497,7 +497,7 @@ class SeasonArchiveServiceTest extends TestCase
             ['year' => 2000, 'Award' => 'Most Valuable Player (1st)', 'name' => 'Test MVP', 'table_ID' => 1],
         ]);
         $mockRepo->method('getPlayoffResultsByYear')->willReturn([
-            ['year' => 2000, 'round' => 4, 'winner' => 'Lakers', 'loser' => 'Raptors', 'loser_games' => 2, 'id' => 15],
+            ['year' => 2000, 'round' => 4, 'winner' => 'Lakers', 'loser' => 'Raptors', 'winner_games' => 4, 'loser_games' => 2],
         ]);
         $mockRepo->method('getTeamAwardsByYear')->willReturn([]);
         $mockRepo->method('getAllGmAwardsWithTeams')->willReturn([]);

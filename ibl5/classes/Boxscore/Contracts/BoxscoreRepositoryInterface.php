@@ -154,6 +154,16 @@ interface BoxscoreRepositoryInterface
     ): int;
 
     /**
+     * Check if any player boxscore records for a game have NULL teamID
+     *
+     * @param string $date Game date in Y-m-d format
+     * @param int $visitorTID Visitor team ID
+     * @param int $homeTID Home team ID
+     * @return bool True if at least one player record has NULL teamID
+     */
+    public function hasNullTeamIdPlayerBoxscores(string $date, int $visitorTID, int $homeTID): bool;
+
+    /**
      * Find All-Star Game team names from existing boxscore records
      *
      * Queries ibl_box_scores_teams for the All-Star Game (visitorTeamID=50, homeTeamID=51)

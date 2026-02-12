@@ -44,7 +44,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
     /**
      * @see BoxscoreProcessorInterface::processScoFile()
      */
-    public function processScoFile(string $filePath, int $seasonEndingYear, string $seasonPhase): array
+    public function processScoFile(string $filePath, int $seasonEndingYear, string $seasonPhase, bool $skipSimDates = false): array
     {
         /** @var list<string> $messages */
         $messages = [];
@@ -109,8 +109,10 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $messages[] = "Number of .sco lines processed: {$linesProcessed}";
         $messages[] = "Games inserted: {$gamesInserted} | Games updated: {$gamesUpdated} | Games skipped: {$gamesSkipped}";
 
-        $simDateMessages = $this->updateSimDates($operatingSeasonPhase);
-        $messages = array_merge($messages, $simDateMessages);
+        if (!$skipSimDates) {
+            $simDateMessages = $this->updateSimDates($operatingSeasonPhase);
+            $messages = array_merge($messages, $simDateMessages);
+        }
 
         return [
             'success' => true,
@@ -437,11 +439,22 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         }
 
         /** @var array{visitorQ1points: int, visitorQ2points: int, visitorQ3points: int, visitorQ4points: int, visitorOTpoints: int, homeQ1points: int, homeQ2points: int, homeQ3points: int, homeQ4points: int, homeOTpoints: int} $existingGame */
-        if ($boxscoreGameInfo->scoresMatchDatabase($existingGame)) {
-            return 'skip';
+        $scoresMatch = $boxscoreGameInfo->scoresMatchDatabase($existingGame);
+
+        if ($scoresMatch) {
+            // Scores match — but re-import if player records have NULL teamID
+            $hasNullTeamId = $this->repository->hasNullTeamIdPlayerBoxscores(
+                $boxscoreGameInfo->gameDate,
+                $boxscoreGameInfo->visitorTeamID,
+                $boxscoreGameInfo->homeTeamID
+            );
+
+            if (!$hasNullTeamId) {
+                return 'skip';
+            }
         }
 
-        // Scores differ — delete old records, then re-insert
+        // Scores differ or player records need teamID fix — delete old records, then re-insert
         $this->repository->deleteTeamBoxscoresByGame(
             $boxscoreGameInfo->gameDate,
             $boxscoreGameInfo->visitorTeamID,

@@ -81,8 +81,6 @@ $sharedFunctions = new Shared($mysqli_db);
 $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 $season = new Season($mysqli_db);
 
-$tidOffenseStats = $tidDefenseStats = 0;
-
 // Fetch all team IDs and names using modern mysqli
 $queryTeamIDsNames = "SELECT teamid, team_name FROM ibl_team_info WHERE teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . " ORDER BY teamid ASC";
 $resultTeamIDsNames = $mysqli_db->query($queryTeamIDsNames);
@@ -813,52 +811,11 @@ while (!feof($plrFile)) {
                 die('Invalid query: ' . $mysqli_db->error);
             }
         }
-    } elseif ($ordinal >= 1441 && $ordinal <= 1504) {
-        if ($ordinal >= 1441 && $ordinal <= 1472) {
-            if ($ordinal == 1441) {
-                echo "ibl_plr and ibl_hist updated!<br><br>";
-                echo "Updating ibl_team_offense_stats...<br>";
-            }
-            $tidOffenseStats++;
-            $sideOfTheBall = 'offense';
-            $teamName = $commonRepository->getTeamnameFromTeamID((int) $tidOffenseStats);
-        } elseif ($ordinal >= 1473 && $ordinal <= 1504) {
-            if ($ordinal == 1473) {
-                echo "ibl_team_offense_stats updated!<br><br>";
-                echo "Updating ibl_team_defense_stats...<br>";
-            }
-            $tidDefenseStats++;
-            $sideOfTheBall = 'defense';
-            $teamName = $commonRepository->getTeamnameFromTeamID((int) $tidDefenseStats);
-        }
-
-        $teamUpdateQuery = 'UPDATE `ibl_team_' . $sideOfTheBall . '_stats`
-            SET
-            `teamID` = ' . ${'tid' . ucfirst($sideOfTheBall) . 'Stats'} . ',
-            `games` = ' . $seasonGamesPlayed . ',
-            `fgm` = ' . ($season2GM + $season3GM) . ',
-            `fga` = ' . ($season2GA + $season3GA) . ',
-            `ftm` = ' . $seasonFTM . ',
-            `fta` = ' . $seasonFTA . ',
-            `tgm` = ' . $season3GM . ',
-            `tga` = ' . $season3GA . ',
-            `orb` = ' . $seasonORB . ',
-            `reb` = ' . ($seasonORB + $seasonDRB) . ',
-            `ast` = ' . $seasonAST . ',
-            `stl` = ' . $seasonSTL . ',
-            `tvr` = ' . $seasonTVR . ',
-            `blk` = ' . $seasonBLK . ',
-            `pf` = ' . $seasonPF . '
-            WHERE
-            `name` = \'' . $teamName . '\';';
-        if (!$mysqli_db->query($teamUpdateQuery)) {
-            die('Invalid query: ' . $mysqli_db->error);
-        }
     }
 }
 fclose($plrFile);
 
-echo "ibl_team_defense_stats updated!<br><br>";
+echo "ibl_plr and ibl_hist updated!<br><br>";
 
 echo "Assigning team names to players...<br>";
 

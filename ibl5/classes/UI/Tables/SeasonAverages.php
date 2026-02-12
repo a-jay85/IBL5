@@ -63,7 +63,9 @@ class SeasonAverages
             ];
         }
 
-        $teamStats = \TeamStats::withTeamName($db, $team->name);
+        /** @var \mysqli $db */
+        $season = new \Season($db);
+        $teamStats = \TeamStats::withTeamName($db, $team->name, $season->endingYear);
 
         ob_start();
         ?>

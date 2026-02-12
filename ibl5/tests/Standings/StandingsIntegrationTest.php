@@ -277,7 +277,7 @@ class StandingsIntegrationTest extends TestCase
         $mockDb->method('prepare')->willReturn($mockStmt);
 
         $repository = new StandingsRepository($mockDb);
-        $result = $repository->getTeamPythagoreanStats(1);
+        $result = $repository->getTeamPythagoreanStats(1, 2025);
 
         // Expected: 2*fgm + ftm + tgm
         // Offense: 2*1000 + 500 + 300 = 2800
@@ -294,7 +294,7 @@ class StandingsIntegrationTest extends TestCase
         $mockDb = $this->createMockDatabaseWithPreparedStatement(null);
         $repository = new StandingsRepository($mockDb);
 
-        $result = $repository->getTeamPythagoreanStats(999);
+        $result = $repository->getTeamPythagoreanStats(999, 2025);
 
         $this->assertNull($result);
     }
@@ -334,7 +334,7 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getTeamStreakData')->willReturn(null);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
 
         // Should show Z, not Y or X
@@ -374,7 +374,7 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getTeamStreakData')->willReturn(null);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
 
         // Should show Y, not X
@@ -413,7 +413,7 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getTeamStreakData')->willReturn(null);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
 
         // Should not have any indicator prefix
@@ -445,7 +445,7 @@ class StandingsIntegrationTest extends TestCase
         ]);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
 
         $this->assertStringContainsString('W 6', $result);
@@ -469,7 +469,7 @@ class StandingsIntegrationTest extends TestCase
         ]);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
 
         $this->assertStringContainsString('L 5', $result);
@@ -493,7 +493,7 @@ class StandingsIntegrationTest extends TestCase
         ]);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
 
         // Check for last 10 format
@@ -518,7 +518,7 @@ class StandingsIntegrationTest extends TestCase
         ]);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
 
         // Rating should be in the ibl-stat-highlight class span
@@ -540,7 +540,7 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getTeamStreakData')->willReturn(null);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->render();
 
         $expectedHeaders = [
@@ -564,7 +564,7 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getTeamStreakData')->willReturn(null);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->render();
 
         $this->assertStringContainsString('table-scroll-wrapper', $result);
@@ -581,7 +581,7 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getTeamStreakData')->willReturn(null);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->render();
 
         $this->assertStringNotContainsString('<script>', $result);
@@ -597,7 +597,7 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getTeamStreakData')->willReturn(null);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->render();
 
         $this->assertStringContainsString('ibl-data-table', $result);
@@ -617,7 +617,7 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getTeamStreakData')->willReturn(null);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
 
         $this->assertStringContainsString('<img src="images/logo/', $result);
@@ -639,7 +639,7 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getTeamStreakData')->willReturn(null);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
 
         // Region should appear escaped if it contained special chars
@@ -664,7 +664,7 @@ class StandingsIntegrationTest extends TestCase
         ]);
         $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
 
-        $view = new StandingsView($mockRepository);
+        $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
 
         $this->assertStringNotContainsString('<script>alert(1)</script>', $result);

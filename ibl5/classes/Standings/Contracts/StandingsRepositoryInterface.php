@@ -38,7 +38,8 @@ interface StandingsRepositoryInterface
      * Get team offensive and defensive stats for Pythagorean calculation
      *
      * @param int $teamId Team ID
+     * @param int $seasonYear Season ending year (e.g. 2025 for the 2024-25 season)
      * @return PythagoreanStats|null Array with 'pointsScored' and 'pointsAllowed' or null if not found
      */
-    public function getTeamPythagoreanStats(int $teamId): ?array;
+    public function getTeamPythagoreanStats(int $teamId, int $seasonYear): ?array;
 }

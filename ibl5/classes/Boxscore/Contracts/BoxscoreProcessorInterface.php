@@ -23,6 +23,7 @@ interface BoxscoreProcessorInterface
      * @param string $filePath Path to the .sco file
      * @param int $seasonEndingYear Season ending year (0 to use current season)
      * @param string $seasonPhase Season phase (empty to use current phase)
+     * @param bool $skipSimDates When true, skip updating ibl_sim_dates (use for historical imports)
      * @return array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string}
      *         Result:
      *         - 'success': bool - Whether processing completed without errors
@@ -33,7 +34,7 @@ interface BoxscoreProcessorInterface
      *         - 'messages': list<string> - Log messages from processing
      *         - 'error': string - Error message if success is false
      */
-    public function processScoFile(string $filePath, int $seasonEndingYear, string $seasonPhase): array;
+    public function processScoFile(string $filePath, int $seasonEndingYear, string $seasonPhase, bool $skipSimDates = false): array;
 
     /**
      * Process All-Star Weekend games from the first 4000 bytes of a .sco file

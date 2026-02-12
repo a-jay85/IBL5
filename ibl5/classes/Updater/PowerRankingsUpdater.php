@@ -175,42 +175,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
             last 10 = {$stats['winsInLast10Games']}-{$stats['lossesInLast10Games']},
             ranking score = {$ranking}<br>";
 
-        if ($this->season->phase === "HEAT" && $stats['wins'] !== 0 && $stats['losses'] !== 0) {
-            $this->updateHeatRecords($teamName);
-        } elseif ($this->season->phase === "Regular Season") {
-            $this->updateSeasonRecords($teamName);
-        }
-
         return $log;
-    }
-
-    private function updateSeasonRecords(string $teamName): void {
-        $this->execute(
-            "UPDATE ibl_team_win_loss a, ibl_power b
-            SET a.wins = b.win,
-                a.losses = b.loss
-            WHERE a.currentname = b.Team
-            AND a.year = ?",
-            "i",
-            $this->season->endingYear
-        );
-    }
-
-    private function updateHeatRecords(string $teamName): void {
-        try {
-            $this->execute(
-                "UPDATE ibl_heat_win_loss a, ibl_power b
-                SET a.wins = b.win,
-                    a.losses = b.loss
-                WHERE a.currentname = b.Team
-                AND a.year = ?",
-                "i",
-                $this->season->beginningYear
-            );
-            echo "Updated HEAT records for {$this->season->beginningYear}<p>";
-        } catch (\Exception $e) {
-            echo "<b>`ibl_heat_win_loss` update FAILED for {$teamName}! Have you <A HREF=\"leagueControlPanel.php\">inserted new database rows</A> for the new HEAT season?</b><p>";
-        }
     }
 
     private function updateHistoricalRecords(): void

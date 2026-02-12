@@ -120,7 +120,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     {
         /** @var list<HeatWinLossRow> */
         return $this->fetchAll(
-            "SELECT year, currentname, namethatyear, wins, losses, table_ID FROM ibl_heat_win_loss WHERE year = ? ORDER BY wins DESC, losses ASC",
+            "SELECT year, currentname, namethatyear, wins, losses FROM ibl_heat_win_loss WHERE year = ? ORDER BY wins DESC, losses ASC",
             "i",
             $heatYear
         );

@@ -29,6 +29,12 @@ class Season
     const IBL_ALL_STAR_MONTH = 2;
     const IBL_REGULAR_SEASON_ENDING_MONTH = 5;
     const IBL_PLAYOFF_MONTH = 6;
+
+    const IBL_ALL_STAR_BREAK_START_DAY = 1;
+    const IBL_RISING_STARS_GAME_DAY = 2;
+    const IBL_ALL_STAR_GAME_DAY = 3;
+    const IBL_ALL_STAR_BREAK_END_DAY = 4;
+    const IBL_POST_ALL_STAR_FIRST_DAY = 5;
     
     protected object $db;
     
@@ -45,7 +51,7 @@ class Season
         $this->endingYear = 2024;
         $this->beginningYear = 2023;
         $this->regularSeasonStartDate = date_create("2023-11-01");
-        $this->postAllStarStartDate = date_create("2024-02-04");
+        $this->postAllStarStartDate = date_create("2024-02-05");
         $this->playoffsStartDate = date_create("2024-06-01");
         $this->playoffsEndDate = date_create("2024-06-30");
         $this->projectedNextSimEndDate = date_create("2024-01-10");

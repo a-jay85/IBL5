@@ -41,24 +41,18 @@ class TeamScheduleRepository extends \BaseMysqliRepository implements TeamSchedu
      *
      * @return array<int, array<string, mixed>>
      */
-    public function getProjectedGamesNextSimResult(int $teamID, string $lastSimEndDate): array
+    public function getProjectedGamesNextSimResult(int $teamID, string $lastSimEndDate, string $projectedNextSimEndDate): array
     {
-        /** @var \mysqli $db */
-        $db = $this->db;
-        $league = new \League($db);
-        $simLengthInDays = $league->getSimLengthInDays();
-
         return $this->fetchAll(
             "SELECT * FROM `ibl_schedule`
              WHERE (Visitor = ? OR Home = ?)
-               AND Date BETWEEN ADDDATE(?, 1) AND ADDDATE(?, ?)
+               AND Date BETWEEN ADDDATE(?, 1) AND ?
              ORDER BY Date ASC",
-            'iissi',
+            'iiss',
             $teamID,
             $teamID,
             $lastSimEndDate,
-            $lastSimEndDate,
-            $simLengthInDays
+            $projectedNextSimEndDate
         );
     }
 }

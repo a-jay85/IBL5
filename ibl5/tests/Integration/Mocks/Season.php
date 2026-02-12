@@ -21,7 +21,10 @@ class Season
     public string $allowTrades = 'Yes';
     public string $allowWaivers = 'Yes';
     public string $freeAgencyNotificationsState = 'Off';
-    
+
+    public ?string $lastRegularSeasonGameDate = null;
+    public int $simLengthInDays = 7;
+
     const IBL_PRESEASON_YEAR = 9998;
     const IBL_OLYMPICS_MONTH = 8;
     const IBL_HEAT_MONTH = 10;
@@ -84,9 +87,45 @@ class Season
         ];
     }
     
-    private function getProjectedNextSimEndDate(object $db, string $lastSimEndDate): string
+    public function getProjectedNextSimEndDate(string $lastSimEndDate): \DateTimeInterface
     {
-        return $this->projectedNextSimEndDate;
+        $lastSimEndDateObj = new \DateTime($lastSimEndDate);
+        $interval = new \DateInterval('P' . $this->simLengthInDays . 'D');
+        $projectedNextSimEndDate = date_add(clone $lastSimEndDateObj, $interval);
+
+        // Adjust projected end date to skip over the All-Star Break (Feb 1-4)
+        $breakFirstDay = new \DateTime(sprintf(
+            '%d-%02d-%02d',
+            $this->endingYear,
+            self::IBL_ALL_STAR_MONTH,
+            self::IBL_ALL_STAR_BREAK_START_DAY
+        ));
+        $breakLengthDays = self::IBL_ALL_STAR_BREAK_END_DAY - self::IBL_ALL_STAR_BREAK_START_DAY + 1;
+
+        if ($lastSimEndDateObj < $breakFirstDay && $projectedNextSimEndDate >= $breakFirstDay) {
+            $projectedNextSimEndDate = date_add(
+                $projectedNextSimEndDate,
+                new \DateInterval('P' . $breakLengthDays . 'D')
+            );
+        }
+
+        // Adjust projected end date to skip the RS-to-Playoffs gap
+        if ($this->lastRegularSeasonGameDate !== null && $this->playoffsStartDate !== null) {
+            $lastRSGameDate = new \DateTime($this->lastRegularSeasonGameDate);
+            $gapStartDate = date_add(clone $lastRSGameDate, new \DateInterval('P1D'));
+
+            if ($gapStartDate < $this->playoffsStartDate) {
+                if ($lastSimEndDateObj < $gapStartDate && $projectedNextSimEndDate >= $gapStartDate) {
+                    $gapDays = (int) $gapStartDate->diff($this->playoffsStartDate)->days;
+                    $projectedNextSimEndDate = date_add(
+                        $projectedNextSimEndDate,
+                        new \DateInterval('P' . $gapDays . 'D')
+                    );
+                }
+            }
+        }
+
+        return $projectedNextSimEndDate;
     }
 
     /**

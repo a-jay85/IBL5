@@ -23,7 +23,7 @@ namespace Team\Contracts;
  * @phpstan-type TeamAwardRow array{year: int, name: string, Award: string, ID: int}
  * @phpstan-type WinLossRow array{year: int, currentname: string, namethatyear: string, wins: int, losses: int, table_ID: int}
  * @phpstan-type HEATWinLossRow array{year: int, currentname: string, namethatyear: string, wins: int, losses: int, table_ID: int}
- * @phpstan-type PlayoffResultRow array{year: int, round: int, winner: string, loser: string, loser_games: int, id: int, winner_name_that_year: string, loser_name_that_year: string}
+ * @phpstan-type PlayoffResultRow array{year: int, round: int, winner: string, loser: string, winner_games: int, loser_games: int, winner_name_that_year: string, loser_name_that_year: string}
  * @phpstan-type HistRow array{pid: int, name: string, year: int, team: string, teamid: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, r_2ga: int, r_2gp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_oo: int, r_do: int, r_po: int, r_to: int, r_od: int, r_dd: int, r_pd: int, r_td: int, salary: int, nuke_iblhist: int, created_at: string, updated_at: string}
  * @phpstan-type FranchiseSeasonRow array{id: int, franchise_id: int, season_year: int, season_ending_year: int, team_city: string, team_name: string}
  */

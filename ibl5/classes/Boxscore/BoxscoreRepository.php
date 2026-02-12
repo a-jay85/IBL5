@@ -145,6 +145,25 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     }
 
     /**
+     * @see BoxscoreRepositoryInterface::hasNullTeamIdPlayerBoxscores()
+     */
+    public function hasNullTeamIdPlayerBoxscores(string $date, int $visitorTID, int $homeTID): bool
+    {
+        /** @var array{cnt: int}|null $row */
+        $row = $this->fetchOne(
+            "SELECT COUNT(*) AS cnt FROM ibl_box_scores
+             WHERE Date = ? AND visitorTID = ? AND homeTID = ? AND pid <> 0 AND teamID IS NULL
+             LIMIT 1",
+            "sii",
+            $date,
+            $visitorTID,
+            $homeTID
+        );
+
+        return $row !== null && $row['cnt'] > 0;
+    }
+
+    /**
      * @see BoxscoreRepositoryInterface::findAllStarTeamNames()
      */
     public function findAllStarTeamNames(string $date): ?array

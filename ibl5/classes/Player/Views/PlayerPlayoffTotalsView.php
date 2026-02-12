@@ -91,8 +91,7 @@ class PlayerPlayoffTotalsView implements PlayerPlayoffTotalsViewInterface
             $tvr = $row['tvr'];
             $blk = $row['blk'];
             $pf = $row['pf'];
-            // Calculate points: 2*fgm + ftm + tgm
-            $pts = $fgm + $fgm + $ftm + $tgm;
+            $pts = $row['pts'];
 
             // Accumulate career totals
             $carTotals['gm'] += $gm;

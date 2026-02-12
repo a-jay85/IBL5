@@ -75,6 +75,9 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
                                     return ['year' => $this->data['year']];
                                 }
                                 if (str_contains($this->query, 'ibl_schedule')) {
+                                    return ['max_date' => null];
+                                }
+                                if (str_contains($this->query, 'ibl_sim_dates')) {
                                     return [
                                         'Sim' => 10,
                                         'Start Date' => '2025-01-01',
@@ -238,5 +241,92 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
         $season = new \Season($this->mockDb);
 
         $this->assertTrue(property_exists($season, 'allowWaivers'));
+    }
+
+    // ============================================
+    // RS-TO-PLAYOFFS GAP SKIP TESTS
+    // ============================================
+
+    /**
+     * Create a Season mock configured for gap-skip testing
+     *
+     * Uses the mock Season (via class_alias) with properties set directly
+     * instead of database queries.
+     *
+     * @param int $simLengthInDays Sim length in days
+     * @param string|null $lastRSGameDate Last regular season game date (YYYY-MM-DD), or null
+     * @return \Season Configured mock Season
+     */
+    private function createGapSkipSeason(
+        int $simLengthInDays,
+        ?string $lastRSGameDate,
+    ): \Season {
+        $season = new \Season($this->mockDb);
+        $season->endingYear = 2025;
+        $season->playoffsStartDate = new \DateTime('2025-06-01');
+        $season->simLengthInDays = $simLengthInDays;
+        $season->lastRegularSeasonGameDate = $lastRSGameDate;
+        return $season;
+    }
+
+    public function testGapSkipWhenSimCrossesGap(): void
+    {
+        $season = $this->createGapSkipSeason(7, '2025-05-15');
+
+        $result = $season->getProjectedNextSimEndDate('2025-05-10');
+
+        // May 10 + 7 = May 17, crosses gap (May 16 to June 1 = 16 days), May 17 + 16 = June 2
+        $this->assertSame('2025-06-02', $result->format('Y-m-d'));
+    }
+
+    public function testGapSkipWhenLastRsSimDone(): void
+    {
+        $season = $this->createGapSkipSeason(7, '2025-05-15');
+
+        $result = $season->getProjectedNextSimEndDate('2025-05-15');
+
+        // May 15 + 7 = May 22, crosses gap (May 16 to June 1 = 16 days), May 22 + 16 = June 7
+        $this->assertSame('2025-06-07', $result->format('Y-m-d'));
+    }
+
+    public function testNoGapSkipWhenSimEndsBeforeGap(): void
+    {
+        $season = $this->createGapSkipSeason(3, '2025-05-15');
+
+        $result = $season->getProjectedNextSimEndDate('2025-05-08');
+
+        // May 8 + 3 = May 11, does not reach gap (May 16), no adjustment
+        $this->assertSame('2025-05-11', $result->format('Y-m-d'));
+    }
+
+    public function testNoGapSkipWhenAlreadyInPlayoffs(): void
+    {
+        $season = $this->createGapSkipSeason(7, '2025-05-15');
+
+        $result = $season->getProjectedNextSimEndDate('2025-06-01');
+
+        // June 1 + 7 = June 8, lastSimEnd (June 1) is NOT < gapStart (May 16), no adjustment
+        $this->assertSame('2025-06-08', $result->format('Y-m-d'));
+    }
+
+    public function testNoGapSkipWhenNoScheduleData(): void
+    {
+        $season = $this->createGapSkipSeason(7, null);
+
+        $result = $season->getProjectedNextSimEndDate('2025-05-10');
+
+        // No lastRSGameDate, no adjustment: May 10 + 7 = May 17
+        $this->assertSame('2025-05-17', $result->format('Y-m-d'));
+    }
+
+    public function testNoGapSkipWhenRsEndsMay31(): void
+    {
+        $season = $this->createGapSkipSeason(7, '2025-05-31');
+
+        $result = $season->getProjectedNextSimEndDate('2025-05-28');
+
+        // gapStart = June 1, playoffsStart = June 1, gapStart < playoffsStart is false, no adjustment
+        // May 28 + 7 = June 4
+        $this->assertSame('2025-06-04', $result->format('Y-m-d'));
     }
 }

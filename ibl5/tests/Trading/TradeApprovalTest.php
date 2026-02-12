@@ -12,7 +12,7 @@ class TradeApprovalTest extends TestCase
         
         // Set up mock data for team ID lookups, player data, and roster counts
         $this->db->setMockData([
-            ['counter' => 1000, 'cnt' => 10],
+            ['id' => 1001, 'cnt' => 10],
             ['name' => 'Test Player', 'pos' => 'PG', 'cnt' => 10]
         ]);
         
@@ -287,8 +287,8 @@ class QueryAwareMockDatabase extends MockDatabase
         }
         
         // Return appropriate mock data based on query type
-        if (stripos($query, 'ibl_trade_autocounter') !== false) {
-            return new MockDatabaseResult([['counter' => 1000]]);
+        if (stripos($query, 'LAST_INSERT_ID') !== false) {
+            return new MockDatabaseResult([['id' => 1001]]);
         }
         
         if (stripos($query, 'ibl_plr') !== false) {

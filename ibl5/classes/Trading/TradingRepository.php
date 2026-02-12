@@ -27,7 +27,6 @@ use Trading\Contracts\TradingRepositoryInterface;
  * @phpstan-import-type TradingDraftPickRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type CashTransactionData from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type CashPlayerData from \Trading\Contracts\TradingRepositoryInterface
- * @phpstan-import-type TradeAutocounterRow from \Trading\Contracts\TradingRepositoryInterface
  */
 class TradingRepository extends BaseMysqliRepository implements TradingRepositoryInterface
 {
@@ -460,31 +459,23 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * Get the current trade autocounter value
+     * Generate the next trade offer ID using AUTO_INCREMENT
      *
-     * @return TradeAutocounterRow|null Row with 'counter' column, or null if no rows
+     * Inserts a row into ibl_trade_offers and returns the generated ID.
+     * This is atomic and race-condition-free unlike the previous read-then-increment pattern.
+     *
+     * @return int New trade offer ID
+     * @throws \RuntimeException If ID generation fails
      */
-    public function getTradeAutocounter(): ?array
+    public function generateNextTradeOfferId(): int
     {
-        /** @var TradeAutocounterRow|null */
-        return $this->fetchOne(
-            "SELECT counter FROM ibl_trade_autocounter ORDER BY counter DESC LIMIT 1"
-        );
-    }
-
-    /**
-     * Insert a new trade autocounter value
-     * 
-     * @param int $counter Counter value to insert
-     * @return int Number of affected rows
-     */
-    public function insertTradeAutocounter(int $counter): int
-    {
-        return $this->execute(
-            "INSERT INTO ibl_trade_autocounter (counter) VALUES (?)",
-            "i",
-            $counter
-        );
+        $this->execute("INSERT INTO ibl_trade_offers () VALUES ()");
+        /** @var array{id: int}|null $row */
+        $row = $this->fetchOne("SELECT LAST_INSERT_ID() AS id");
+        if ($row === null || $row['id'] === 0) {
+            throw new \RuntimeException('Failed to generate trade offer ID');
+        }
+        return $row['id'];
     }
 
     /**
@@ -650,5 +641,18 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     {
         $this->deleteTradeInfoByOfferId($offerId);
         $this->deleteTradeCashByOfferId($offerId);
+        $this->deleteTradeOfferById($offerId);
+    }
+
+    /**
+     * @see TradingRepositoryInterface::deleteTradeOfferById()
+     */
+    public function deleteTradeOfferById(int $offerId): int
+    {
+        return $this->execute(
+            "DELETE FROM ibl_trade_offers WHERE id = ?",
+            "i",
+            $offerId
+        );
     }
 }

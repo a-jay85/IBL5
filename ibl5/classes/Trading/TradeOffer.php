@@ -16,7 +16,6 @@ use Trading\Contracts\TradeOfferInterface;
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
- * @phpstan-import-type TradeAutocounterRow from \Trading\Contracts\TradingRepositoryInterface
  *
  * @phpstan-type TradeFormData array{offeringTeam: string, listeningTeam: string, switchCounter: int, fieldsCounter: int, check: array<int, string|null>, index: array<int, string>, type: array<int, string>, contract: array<int, string>, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>}
  */
@@ -131,22 +130,14 @@ class TradeOffer implements TradeOfferInterface
 
     /**
      * Generate a new unique trade offer ID
-     * 
-     * Queries the autocounter table and increments to get the next available ID.
-     * 
+     *
+     * Delegates to repository which uses AUTO_INCREMENT for atomic ID generation.
+     *
      * @return int New trade offer ID
      */
     protected function generateTradeOfferId(): int
     {
-        // Get current counter using repository
-        $currentCounterRow = $this->repository->getTradeAutocounter();
-        $currentCounter = $currentCounterRow !== null ? $currentCounterRow['counter'] : 0;
-        $tradeOfferId = $currentCounter + 1;
-
-        // Insert new counter using prepared statement
-        $this->repository->insertTradeAutocounter($tradeOfferId);
-
-        return $tradeOfferId;
+        return $this->repository->generateNextTradeOfferId();
     }
 
     /**

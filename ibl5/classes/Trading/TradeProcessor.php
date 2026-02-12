@@ -90,8 +90,7 @@ class TradeProcessor implements TradeProcessorInterface
 
             $this->createNewsStory($storytitle, $storytext);
             $this->sendNotifications($offeringTeamName, $listeningTeamName, $storytext);
-            $this->repository->deleteTradeInfoByOfferId($offerId);
-            $this->repository->deleteTradeCashByOfferId($offerId);
+            $this->repository->deleteTradeOffer($offerId);
 
             $this->db->commit();
 

@@ -19,41 +19,6 @@ if (isset($_POST['query'])) {
             $queryString = "UPDATE nuke_modules SET active = 0 WHERE title = 'Player' OR title = 'SeasonLeaderboards';";
             $successText = "Player and Season Leaders modules have been deactivated.";
             break;
-        case 'Insert new `ibl_heat_win_loss` database entries':
-            $currentSeasonHEATYear = $season->beginningYear;
-            // Check if entries already exist for this season
-            $stmtCheck = $mysqli_db->prepare("SELECT currentname FROM ibl_heat_win_loss WHERE year = ?");
-            $stmtCheck->bind_param("i", $currentSeasonHEATYear);
-            $stmtCheck->execute();
-            $resultCheck = $stmtCheck->get_result();
-            $stmtCheck->close();
-
-            if ($resultCheck->num_rows == 0) {
-                // Fetch all team names
-                $stmtTeams = $mysqli_db->prepare("SELECT team_name FROM ibl_team_info WHERE teamid BETWEEN 1 AND ? ORDER BY teamid ASC");
-                $maxRealTeamId = League::MAX_REAL_TEAMID;
-                $stmtTeams->bind_param("i", $maxRealTeamId);
-                $stmtTeams->execute();
-                $resultTeams = $stmtTeams->get_result();
-                $stmtTeams->close();
-
-                $values = '';
-                $i = 0;
-                while ($row = $resultTeams->fetch_assoc()) {
-                    $teamName = $row['team_name'];
-                    $values .= "($currentSeasonHEATYear, '$teamName', '$teamName', 0, 0)";
-                    if ($resultTeams->num_rows > $i + 1) {
-                        $values .= ", ";
-                    }
-                    $i++;
-                }
-
-                $queryString = "INSERT INTO ibl_heat_win_loss (`year`, `currentname`, `namethatyear`, `wins`, `losses`) VALUES $values;";
-                $successText = "New `ibl_heat_win_loss` database entries were inserted for each team for the $currentSeasonHEATYear season.";
-            } else {
-                $failureText = "`ibl_heat_win_loss` database entries already exist for the $currentSeasonHEATYear season! New entries were NOT inserted.";
-            }
-            break;
         case 'Reset All Contract Extensions':
             $queryString = "UPDATE ibl_team_info SET Used_Extension_This_Season = 0;";
             $successText = "All teams' contract extensions have been reset.";
@@ -275,8 +240,7 @@ switch ($season->phase) {
             <A HREF=\"/ibl5/scripts/updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>
             <A HREF=\"/ibl5/scripts/heatupdateboth.php\">Update HEAT Leaderboards</A><p>
-            <A HREF=\"/ibl5/scripts/history_update.php\">IBL History Update</A><p>
-            <INPUT type='submit' name='query' value='Insert new `ibl_heat_win_loss` database entries'><p>";
+            <A HREF=\"/ibl5/scripts/history_update.php\">IBL History Update</A><p>";
         break;
     case 'Regular Season':
         echo "<A HREF=\"/ibl5/scripts/plrParser.php\">Run plrParser.php</A>

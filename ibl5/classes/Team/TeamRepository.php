@@ -149,7 +149,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<WinLossRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_team_win_loss WHERE currentname = ? ORDER BY year DESC",
+            "SELECT year, currentname, namethatyear, wins, losses FROM ibl_team_win_loss WHERE currentname = ? ORDER BY year DESC",
             "s",
             $teamName
         );
@@ -163,7 +163,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<HEATWinLossRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_heat_win_loss WHERE currentname = ? ORDER BY year DESC",
+            "SELECT year, currentname, namethatyear, wins, losses FROM ibl_heat_win_loss WHERE currentname = ? ORDER BY year DESC",
             "s",
             $teamName
         );

@@ -48,6 +48,8 @@ class Season extends BaseMysqliRepository
 
     public string $freeAgencyNotificationsState;
 
+    private ?string $lastRegularSeasonGameDate = null;
+
     const IBL_PRESEASON_YEAR = 9998;
     const IBL_OLYMPICS_MONTH = 8;
     const IBL_HEAT_MONTH = 10;
@@ -90,6 +92,8 @@ class Season extends BaseMysqliRepository
         $this->postAllStarStartDate = new \DateTime(sprintf('%d-%02d-%02d', $this->endingYear, self::IBL_ALL_STAR_MONTH, self::IBL_POST_ALL_STAR_FIRST_DAY));
         $this->playoffsStartDate = new \DateTime("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-01");
         $this->playoffsEndDate = new \DateTime("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-30");
+
+        $this->lastRegularSeasonGameDate = $this->getLastRegularSeasonGameDate();
 
         $arrayLastSimDates = $this->getLastSimDatesArray();
         $this->lastSimNumber = $arrayLastSimDates["Sim"];
@@ -299,8 +303,30 @@ class Season extends BaseMysqliRepository
     }
 
     /**
+     * Get the last regular season game date from the schedule
+     *
+     * Fetches MAX(Date) from ibl_schedule before the playoffs start date.
+     * Used to detect the RS-to-Playoffs gap for sim date projections.
+     *
+     * @return string|null Last RS game date (YYYY-MM-DD), or null if no schedule data
+     */
+    private function getLastRegularSeasonGameDate(): ?string
+    {
+        $playoffsStart = sprintf('%d-%02d-01', $this->endingYear, self::IBL_PLAYOFF_MONTH);
+
+        /** @var array{max_date: string|null}|null $result */
+        $result = $this->fetchOne(
+            "SELECT MAX(Date) AS max_date FROM ibl_schedule WHERE Date < ?",
+            "s",
+            $playoffsStart
+        );
+
+        return ($result !== null && $result['max_date'] !== null) ? $result['max_date'] : null;
+    }
+
+    /**
      * Get projected next sim end date
-     * 
+     *
      * @param string $lastSimEndDate Last sim end date (YYYY-MM-DD format from DATE column)
      * @return \DateTimeInterface Projected next sim end date
      */
@@ -327,6 +353,22 @@ class Season extends BaseMysqliRepository
                 $projectedNextSimEndDate,
                 new \DateInterval('P' . $breakLengthDays . 'D')
             );
+        }
+
+        // Adjust projected end date to skip the RS-to-Playoffs gap
+        if ($this->lastRegularSeasonGameDate !== null) {
+            $lastRSGameDate = new \DateTime($this->lastRegularSeasonGameDate);
+            $gapStartDate = date_add(clone $lastRSGameDate, new \DateInterval('P1D'));
+
+            if ($gapStartDate < $this->playoffsStartDate) {
+                if ($lastSimEndDateObj < $gapStartDate && $projectedNextSimEndDate >= $gapStartDate) {
+                    $gapDays = (int) $gapStartDate->diff($this->playoffsStartDate)->days;
+                    $projectedNextSimEndDate = date_add(
+                        $projectedNextSimEndDate,
+                        new \DateInterval('P' . $gapDays . 'D')
+                    );
+                }
+            }
         }
 
         return $projectedNextSimEndDate;

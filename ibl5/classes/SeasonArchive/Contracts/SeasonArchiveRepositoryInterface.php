@@ -11,7 +11,7 @@ namespace SeasonArchive\Contracts;
  * including awards, playoff results, team awards, HEAT standings, and GM history.
  *
  * @phpstan-type AwardRow array{year: int, Award: string, name: string, table_ID: int}
- * @phpstan-type PlayoffRow array{year: int, round: int, winner: string, loser: string, loser_games: int, id: int}
+ * @phpstan-type PlayoffRow array{year: int, round: int, winner: string, loser: string, winner_games: int, loser_games: int}
  * @phpstan-type TeamAwardRow array{year: int, name: string, Award: string, ID: int}
  * @phpstan-type GmAwardWithTeamRow array{year: int, Award: string, gm_username: string, team_name: string, table_ID: int}
  * @phpstan-type GmTenureWithTeamRow array{gm_username: string, start_season_year: int, end_season_year: int|null, team_name: string}
@@ -38,7 +38,7 @@ interface SeasonArchiveRepositoryInterface
     public function getAwardsByYear(int $year): array;
 
     /**
-     * Get playoff results for a given year, excluding anomalous year=1 rows
+     * Get playoff results for a given year, derived from box score data
      *
      * @param int $year Season ending year
      * @return list<PlayoffRow> Array of playoff results ordered by round

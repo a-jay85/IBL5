@@ -112,29 +112,29 @@ class FranchiseHistoryRepositoryTest extends TestCase
     }
 
     /**
-     * Verify that getPlayoffTotals method exists and queries ibl_playoff_results
+     * Verify that getPlayoffTotals method exists and queries vw_playoff_series_results
      *
      * This test documents the expected behavior: playoff game records must be
-     * derived from series results in ibl_playoff_results using CASE expressions.
+     * derived from series results in vw_playoff_series_results using CASE expressions.
      */
-    public function testRepositoryQueriesPlayoffResultsForPlayoffTotals(): void
+    public function testRepositoryQueriesPlayoffSeriesResultsViewForPlayoffTotals(): void
     {
         $reflectionClass = new \ReflectionClass($this->repository);
 
         // Verify the private getAllPlayoffTotals method exists (bulk playoff calculation)
         $this->assertTrue(
             $reflectionClass->hasMethod('getAllPlayoffTotals'),
-            'Repository must have getAllPlayoffTotals method to calculate playoff records from ibl_playoff_results'
+            'Repository must have getAllPlayoffTotals method to calculate playoff records from vw_playoff_series_results'
         );
 
         $fileName = $reflectionClass->getFileName();
         $sourceCode = file_get_contents($fileName);
 
-        // Verify that the repository queries ibl_playoff_results table
+        // Verify that the repository queries vw_playoff_series_results view
         $this->assertStringContainsString(
-            'ibl_playoff_results',
+            'vw_playoff_series_results',
             $sourceCode,
-            'Repository must query ibl_playoff_results table to calculate playoff records'
+            'Repository must query vw_playoff_series_results view to calculate playoff records'
         );
 
         // Verify that playoff fields are assigned in the foreach loop

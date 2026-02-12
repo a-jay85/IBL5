@@ -140,11 +140,11 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
     {
         $this->execute(
             "UPDATE ibl_team_history SET playoffs = (
-                SELECT COUNT(*) FROM ibl_playoff_results
-                WHERE (ibl_playoff_results.winner = ibl_team_history.team_name
-                       AND ibl_playoff_results.round = '1')
-                   OR (ibl_playoff_results.loser = ibl_team_history.team_name
-                       AND ibl_playoff_results.round = '1')
+                SELECT COUNT(*) FROM vw_playoff_series_results
+                WHERE (vw_playoff_series_results.winner = ibl_team_history.team_name
+                       AND vw_playoff_series_results.round = 1)
+                   OR (vw_playoff_series_results.loser = ibl_team_history.team_name
+                       AND vw_playoff_series_results.round = 1)
             )",
             ""
         );
@@ -180,11 +180,11 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
                     AND ibl_team_history.team_name = ibl_team_awards.name
                 ),
                 playoffs = (
-                    SELECT COUNT(*) FROM ibl_playoff_results
-                    WHERE (ibl_playoff_results.winner = ibl_team_history.team_name
-                           AND ibl_playoff_results.round = '1')
-                       OR (ibl_playoff_results.loser = ibl_team_history.team_name
-                           AND ibl_playoff_results.round = '1')
+                    SELECT COUNT(*) FROM vw_playoff_series_results
+                    WHERE (vw_playoff_series_results.winner = ibl_team_history.team_name
+                           AND vw_playoff_series_results.round = 1)
+                       OR (vw_playoff_series_results.loser = ibl_team_history.team_name
+                           AND vw_playoff_series_results.round = 1)
                 )",
             ""
         );

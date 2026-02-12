@@ -32,7 +32,8 @@ interface TeamScheduleRepositoryInterface
      *
      * @param int $teamID Team ID to get schedule for
      * @param string $lastSimEndDate Date string (YYYY-MM-DD) of last sim end
+     * @param string $projectedNextSimEndDate Date string (YYYY-MM-DD) of projected next sim end (break-aware)
      * @return array<int, array<string, mixed>> Upcoming game rows ordered by date ascending
      */
-    public function getProjectedGamesNextSimResult(int $teamID, string $lastSimEndDate): array;
+    public function getProjectedGamesNextSimResult(int $teamID, string $lastSimEndDate, string $projectedNextSimEndDate): array;
 }

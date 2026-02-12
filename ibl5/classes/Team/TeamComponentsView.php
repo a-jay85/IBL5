@@ -454,20 +454,22 @@ class TeamComponentsView implements TeamComponentsViewInterface
             /** @var string $loserSafe */
             $loserSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($playoff['loser_name_that_year']);
 
+            $winnerGames = $playoff['winner_games'];
+
             if ($isWin) {
-                $totalplayoffwins += 4;
+                $totalplayoffwins += $winnerGames;
                 $totalplayofflosses += $loserGames;
-                $rounds[$round]['wins'] += 4;
+                $rounds[$round]['wins'] += $winnerGames;
                 $rounds[$round]['losses'] += $loserGames;
                 $rounds[$round]['series_w']++;
-                $rounds[$round]['results'][] = "<li class=\"playoff-result playoff-result--win\">$year &mdash; $winnerSafe 4, $loserSafe $loserGames</li>";
+                $rounds[$round]['results'][] = "<li class=\"playoff-result playoff-result--win\">$year &mdash; $winnerSafe $winnerGames, $loserSafe $loserGames</li>";
             } else {
-                $totalplayofflosses += 4;
+                $totalplayofflosses += $winnerGames;
                 $totalplayoffwins += $loserGames;
-                $rounds[$round]['losses'] += 4;
+                $rounds[$round]['losses'] += $winnerGames;
                 $rounds[$round]['wins'] += $loserGames;
                 $rounds[$round]['series_l']++;
-                $rounds[$round]['results'][] = "<li class=\"playoff-result\">$year &mdash; $winnerSafe 4, $loserSafe $loserGames</li>";
+                $rounds[$round]['results'][] = "<li class=\"playoff-result\">$year &mdash; $winnerSafe $winnerGames, $loserSafe $loserGames</li>";
             }
         }
 

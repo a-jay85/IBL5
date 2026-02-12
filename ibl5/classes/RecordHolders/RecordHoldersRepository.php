@@ -701,8 +701,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 t.team_name,
                 COUNT(DISTINCT pr.year) AS count,
                 GROUP_CONCAT(DISTINCT pr.year ORDER BY pr.year ASC SEPARATOR ', ') AS years
-            FROM ibl_playoff_results pr
-            JOIN ibl_team_info t ON t.team_name = pr.winner OR t.team_name = pr.loser
+            FROM vw_playoff_series_results pr
+            JOIN ibl_team_info t ON t.teamid = pr.winner_tid OR t.teamid = pr.loser_tid
             WHERE t.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             GROUP BY t.team_name
             ORDER BY count DESC, t.team_name ASC

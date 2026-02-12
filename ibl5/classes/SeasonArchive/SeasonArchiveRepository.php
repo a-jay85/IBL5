@@ -63,7 +63,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     {
         /** @var list<PlayoffRow> */
         return $this->fetchAll(
-            "SELECT year, round, winner, loser, loser_games, id FROM ibl_playoff_results WHERE year = ? AND year > 1 ORDER BY round ASC, id ASC",
+            "SELECT year, round, winner, loser, winner_games, loser_games FROM vw_playoff_series_results WHERE year = ? ORDER BY round ASC, winner ASC",
             "i",
             $year
         );

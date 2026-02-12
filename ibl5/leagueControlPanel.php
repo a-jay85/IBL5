@@ -239,7 +239,6 @@ switch ($season->phase) {
                 <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p>
             <A HREF=\"/ibl5/scripts/updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>
-            <A HREF=\"/ibl5/scripts/heatupdateboth.php\">Update HEAT Leaderboards</A><p>
             <A HREF=\"/ibl5/scripts/history_update.php\">IBL History Update</A><p>";
         break;
     case 'Regular Season':
@@ -276,10 +275,7 @@ switch ($season->phase) {
             <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>";
         break;
     case 'Draft':
-        echo "<A HREF=\"/ibl5/scripts/playoffupdate.php\">Playoff Leaderboard Update #1</A><p>
-            <A HREF=\"/ibl5/scripts/playofflbupdate.php\">Playoff Leaderboard Update #2</A><p>
-            <A HREF=\"/ibl5/scripts/seasonlbupdate.php\">Season Leaderboard Update</A><p>
-            <A HREF=\"/ibl5/scripts/history_update.php\">IBL History Update</A><p>
+        echo "<A HREF=\"/ibl5/scripts/history_update.php\">IBL History Update</A><p>
             <select name=\"Waivers\">
                 <option value = \"Yes\"" . ($season->allowWaivers == "Yes" ? " SELECTED" : "") . ">Yes</option>
                 <option value = \"No\"" . ($season->allowWaivers == "No" ? " SELECTED" : "") . ">No</option>

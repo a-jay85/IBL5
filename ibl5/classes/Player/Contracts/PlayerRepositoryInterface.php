@@ -137,17 +137,17 @@ interface PlayerRepositoryInterface
 
     /**
      * Get playoff stats for a player ordered by year
-     * 
+     *
      * @param string $playerName Player name (exact match)
-     * @return array<array<string, mixed>> Array of playoff stat records ordered by year ASC
+     * @return list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> Array of playoff stat records ordered by year ASC
      */
     public function getPlayoffStats(string $playerName): array;
 
     /**
      * Get HEAT stats for a player ordered by year
-     * 
+     *
      * @param string $playerName Player name (exact match)
-     * @return array<array<string, mixed>> Array of HEAT stat records ordered by year ASC
+     * @return list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> Array of HEAT stat records ordered by year ASC
      */
     public function getHeatStats(string $playerName): array;
 

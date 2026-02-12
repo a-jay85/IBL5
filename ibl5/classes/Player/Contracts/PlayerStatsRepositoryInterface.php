@@ -67,11 +67,13 @@ interface PlayerStatsRepositoryInterface
 
     /**
      * Get playoff stats for a player ordered by year
-     * 
-     * Queries ibl_playoff_stats table for all playoff season records.
-     * 
+     *
+     * Queries ibl_playoff_stats view for all playoff season records.
+     * Each row includes: year, pos, pid, name, team, games, minutes, fgm, fga,
+     * ftm, fta, tgm, tga, orb, reb, ast, stl, tvr, blk, pf, pts.
+     *
      * @param string $playerName Player name (exact match)
-     * @return array<array<string, mixed>> Array of playoff stat records ordered by year ASC
+     * @return list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> Array of playoff stat records ordered by year ASC
      */
     public function getPlayoffStats(string $playerName): array;
 
@@ -97,11 +99,13 @@ interface PlayerStatsRepositoryInterface
 
     /**
      * Get HEAT stats for a player ordered by year
-     * 
-     * Queries ibl_heat_stats table for all HEAT tournament season records.
-     * 
+     *
+     * Queries ibl_heat_stats view for all HEAT tournament season records.
+     * Each row includes: year, pos, pid, name, team, games, minutes, fgm, fga,
+     * ftm, fta, tgm, tga, orb, reb, ast, stl, tvr, blk, pf, pts.
+     *
      * @param string $playerName Player name (exact match)
-     * @return array<array<string, mixed>> Array of HEAT stat records ordered by year ASC
+     * @return list<array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int}> Array of HEAT stat records ordered by year ASC
      */
     public function getHeatStats(string $playerName): array;
 

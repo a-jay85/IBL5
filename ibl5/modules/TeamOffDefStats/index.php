@@ -30,9 +30,10 @@ $pagetitle = "- $module_name";
 $repository = new TeamOffDefStats\TeamOffDefStatsRepository($mysqli_db);
 $service = new TeamOffDefStats\TeamOffDefStatsService();
 $view = new TeamOffDefStats\TeamOffDefStatsView();
+$season = new Season($mysqli_db);
 
 // Fetch and process data
-$rawStats = $repository->getAllTeamStats();
+$rawStats = $repository->getAllTeamStats($season->endingYear);
 $processedStats = $service->processTeamStats($rawStats);
 $leagueTotals = $service->calculateLeagueTotals($processedStats);
 $differentials = $service->calculateDifferentials($processedStats);

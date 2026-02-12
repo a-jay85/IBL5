@@ -72,7 +72,7 @@ class PlayerPlayoffTotalsView implements PlayerPlayoffTotalsViewInterface
     </tr>
         <?php
         foreach ($playoffStats as $row) {
-            /** @var array{team: string, year: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $row */
+            /** @var array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $row */
             $year = $row['year'];
             /** @var string $team */
             $team = HtmlSanitizer::safeHtmlOutput($row['team']);

@@ -115,7 +115,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      *
      * @return PythagoreanStats|null
      */
-    public function getTeamPythagoreanStats(int $teamId): ?array
+    public function getTeamPythagoreanStats(int $teamId, int $seasonYear): ?array
     {
         /** @var array{off_fgm: int, off_ftm: int, off_tgm: int, def_fgm: int, def_ftm: int, def_tgm: int}|null $stats */
         $stats = $this->fetchOne(
@@ -123,10 +123,11 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
                 tos.fgm AS off_fgm, tos.ftm AS off_ftm, tos.tgm AS off_tgm,
                 tds.fgm AS def_fgm, tds.ftm AS def_ftm, tds.tgm AS def_tgm
             FROM ibl_team_offense_stats tos
-            JOIN ibl_team_defense_stats tds ON tos.teamID = tds.teamID
-            WHERE tos.teamID = ?",
-            "i",
-            $teamId
+            JOIN ibl_team_defense_stats tds ON tos.teamID = tds.teamID AND tos.season_year = tds.season_year
+            WHERE tos.teamID = ? AND tos.season_year = ?",
+            "ii",
+            $teamId,
+            $seasonYear
         );
 
         if ($stats === null) {

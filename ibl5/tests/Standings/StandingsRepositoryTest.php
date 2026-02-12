@@ -88,7 +88,7 @@ class StandingsRepositoryTest extends TestCase
         $mockDb = $this->createMockDatabaseWithPreparedStatement(null);
         $repository = new StandingsRepository($mockDb);
 
-        $result = $repository->getTeamPythagoreanStats(999);
+        $result = $repository->getTeamPythagoreanStats(999, 2025);
 
         $this->assertNull($result);
     }
@@ -118,7 +118,7 @@ class StandingsRepositoryTest extends TestCase
         $mockDb->method('prepare')->willReturn($mockStmt);
 
         $repository = new StandingsRepository($mockDb);
-        $result = $repository->getTeamPythagoreanStats(1);
+        $result = $repository->getTeamPythagoreanStats(1, 2025);
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('pointsScored', $result);

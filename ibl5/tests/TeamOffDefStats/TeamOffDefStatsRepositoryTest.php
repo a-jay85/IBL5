@@ -35,7 +35,7 @@ class TeamOffDefStatsRepositoryTest extends TestCase
         $mockDb = $this->createMockDatabase([]);
         $repository = new TeamOffDefStatsRepository($mockDb);
 
-        $result = $repository->getAllTeamStats();
+        $result = $repository->getAllTeamStats(2025);
 
         $this->assertIsArray($result);
     }
@@ -53,7 +53,7 @@ class TeamOffDefStatsRepositoryTest extends TestCase
         $mockDb = $this->createMockDatabase($testData);
         $repository = new TeamOffDefStatsRepository($mockDb);
 
-        $result = $repository->getAllTeamStats();
+        $result = $repository->getAllTeamStats(2025);
 
         $this->assertCount(2, $result);
 
@@ -79,7 +79,7 @@ class TeamOffDefStatsRepositoryTest extends TestCase
         $mockDb = $this->createMockDatabase([]);
         $repository = new TeamOffDefStatsRepository($mockDb);
 
-        $result = $repository->getAllTeamStats();
+        $result = $repository->getAllTeamStats(2025);
 
         $this->assertIsArray($result);
         $this->assertEmpty($result);
@@ -133,7 +133,7 @@ class TeamOffDefStatsRepositoryTest extends TestCase
         $mockDb = $this->createMockDatabase($testData);
         $repository = new TeamOffDefStatsRepository($mockDb);
 
-        $result = $repository->getAllTeamStats();
+        $result = $repository->getAllTeamStats(2025);
 
         $this->assertCount(1, $result);
         $this->assertNull($result[0]['offense_games']);
@@ -192,6 +192,11 @@ class TeamOffDefStatsRepositoryTest extends TestCase
                     public function __construct(array $data)
                     {
                         $this->data = $data;
+                    }
+
+                    public function bind_param(string $types, mixed &...$vars): bool
+                    {
+                        return true;
                     }
 
                     public function execute(): bool

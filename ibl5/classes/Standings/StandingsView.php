@@ -24,15 +24,18 @@ use UI\TeamCellHelper;
 class StandingsView implements StandingsViewInterface
 {
     private StandingsRepositoryInterface $repository;
+    private int $seasonYear;
 
     /**
      * Constructor
      *
      * @param StandingsRepositoryInterface $repository Standings data repository
+     * @param int $seasonYear Season ending year (e.g. 2025 for the 2024-25 season)
      */
-    public function __construct(StandingsRepositoryInterface $repository)
+    public function __construct(StandingsRepositoryInterface $repository, int $seasonYear)
     {
         $this->repository = $repository;
+        $this->seasonYear = $seasonYear;
     }
 
     /**
@@ -167,7 +170,7 @@ class StandingsView implements StandingsViewInterface
         $rating = $streakData['ranking'] ?? 0;
 
         // Get Pythagorean win percentage
-        $pythagoreanStats = $this->repository->getTeamPythagoreanStats($teamId);
+        $pythagoreanStats = $this->repository->getTeamPythagoreanStats($teamId, $this->seasonYear);
         $pythagoreanPct = '0.000';
         if ($pythagoreanStats !== null) {
             $pythagoreanPct = \BasketballStats\StatsFormatter::calculatePythagoreanWinPercentage(

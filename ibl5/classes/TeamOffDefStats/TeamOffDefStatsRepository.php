@@ -36,10 +36,10 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
      * @see TeamOffDefStatsRepositoryInterface::getAllTeamStats()
      * @return list<AllTeamStatsRow> Array of team statistics rows ordered by team name
      */
-    public function getAllTeamStats(): array
+    public function getAllTeamStats(int $seasonYear): array
     {
         $query = "
-            SELECT 
+            SELECT
                 ti.teamid,
                 ti.team_city,
                 ti.team_name,
@@ -74,14 +74,14 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
                 tds.blk AS defense_blk,
                 tds.pf AS defense_pf
             FROM ibl_team_info ti
-            LEFT JOIN ibl_team_offense_stats tos ON ti.teamid = tos.teamID
-            LEFT JOIN ibl_team_defense_stats tds ON ti.teamid = tds.teamID
+            LEFT JOIN ibl_team_offense_stats tos ON ti.teamid = tos.teamID AND tos.season_year = ?
+            LEFT JOIN ibl_team_defense_stats tds ON ti.teamid = tds.teamID AND tds.season_year = ?
             WHERE ti.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             ORDER BY ti.team_city
         ";
 
         /** @var list<AllTeamStatsRow> */
-        return $this->fetchAll($query);
+        return $this->fetchAll($query, "ii", $seasonYear, $seasonYear);
     }
 
     /**
@@ -89,15 +89,17 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
      *
      * @see TeamOffDefStatsRepositoryInterface::getTeamOffenseStats()
      * @param string $teamName Team name
+     * @param int $seasonYear Season ending year
      * @return TeamOffenseStatsRow|null Team offense statistics
      */
-    public function getTeamOffenseStats(string $teamName): ?array
+    public function getTeamOffenseStats(string $teamName, int $seasonYear): ?array
     {
         /** @var TeamOffenseStatsRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_team_offense_stats WHERE name = ? LIMIT 1",
-            "s",
-            $teamName
+            "SELECT * FROM ibl_team_offense_stats WHERE name = ? AND season_year = ? LIMIT 1",
+            "si",
+            $teamName,
+            $seasonYear
         );
     }
 
@@ -106,15 +108,17 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
      *
      * @see TeamOffDefStatsRepositoryInterface::getTeamDefenseStats()
      * @param string $teamName Team name
+     * @param int $seasonYear Season ending year
      * @return TeamDefenseStatsRow|null Team defense statistics
      */
-    public function getTeamDefenseStats(string $teamName): ?array
+    public function getTeamDefenseStats(string $teamName, int $seasonYear): ?array
     {
         /** @var TeamDefenseStatsRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_team_defense_stats WHERE name = ? LIMIT 1",
-            "s",
-            $teamName
+            "SELECT * FROM ibl_team_defense_stats WHERE name = ? AND season_year = ? LIMIT 1",
+            "si",
+            $teamName,
+            $seasonYear
         );
     }
 
@@ -123,9 +127,10 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
      *
      * @see TeamOffDefStatsRepositoryInterface::getTeamBothStats()
      * @param string $teamName Team name
+     * @param int $seasonYear Season ending year
      * @return array{offense: TeamOffenseStatsRow, defense: TeamDefenseStatsRow}|null Both stats or null
      */
-    public function getTeamBothStats(string $teamName): ?array
+    public function getTeamBothStats(string $teamName, int $seasonYear): ?array
     {
         /** @var array<string, int|string|null>|null $row */
         $row = $this->fetchOne(
@@ -141,11 +146,12 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
                 tds.orb AS tds_orb, tds.reb AS tds_reb, tds.ast AS tds_ast, tds.stl AS tds_stl,
                 tds.tvr AS tds_tvr, tds.blk AS tds_blk, tds.pf AS tds_pf
             FROM ibl_team_offense_stats tos
-            JOIN ibl_team_defense_stats tds ON tos.teamID = tds.teamID
-            WHERE tos.name = ?
+            JOIN ibl_team_defense_stats tds ON tos.teamID = tds.teamID AND tos.season_year = tds.season_year
+            WHERE tos.name = ? AND tos.season_year = ?
             LIMIT 1",
-            "s",
-            $teamName
+            "si",
+            $teamName,
+            $seasonYear
         );
 
         if ($row === null) {

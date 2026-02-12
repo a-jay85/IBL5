@@ -124,7 +124,7 @@ final class RecordHoldersRepositoryTest extends IntegrationTestCase
 
         $this->repository->getMostPlayoffAppearances();
 
-        $this->assertQueryExecuted('ibl_playoff_results');
+        $this->assertQueryExecuted('vw_playoff_series_results');
     }
 
     public function testGetMostTitlesByTypeQueriesTeamAwards(): void

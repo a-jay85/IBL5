@@ -257,7 +257,7 @@ SELECT
   CAST(SUM(bs.calc_points) AS SIGNED) AS pts
 FROM ibl_box_scores bs
 JOIN ibl_plr p ON bs.pid = p.pid
-JOIN ibl_franchise_seasons fs ON bs.teamID = fs.franchise_id AND bs.season_year = fs.season_year
+JOIN ibl_franchise_seasons fs ON bs.teamID = fs.franchise_id AND bs.season_year = fs.season_ending_year
 WHERE bs.game_type = 2
 GROUP BY bs.pid, p.name, bs.season_year, fs.team_name;
 
@@ -291,7 +291,7 @@ SELECT
   CAST(SUM(bs.calc_points) AS SIGNED) AS pts
 FROM ibl_box_scores bs
 JOIN ibl_plr p ON bs.pid = p.pid
-JOIN ibl_franchise_seasons fs ON bs.teamID = fs.franchise_id AND bs.season_year = fs.season_year
+JOIN ibl_franchise_seasons fs ON bs.teamID = fs.franchise_id AND bs.season_year = fs.season_ending_year
 WHERE bs.game_type = 3
 GROUP BY bs.pid, p.name, bs.season_year, fs.team_name;
 
@@ -324,7 +324,7 @@ SELECT
   CAST(SUM(bst.gamePF) AS SIGNED) AS pf
 FROM ibl_box_scores_teams bst
 JOIN ibl_franchise_seasons fs
-  ON fs.team_name = bst.name AND fs.season_year = bst.season_year
+  ON fs.team_name = bst.name AND fs.season_ending_year = bst.season_year
 WHERE bst.game_type = 1
 GROUP BY fs.franchise_id, fs.team_name, bst.season_year;
 
@@ -363,6 +363,6 @@ JOIN ibl_box_scores_teams opp
   AND my.gameOfThatDay = opp.gameOfThatDay
   AND my.name <> opp.name
 JOIN ibl_franchise_seasons fs
-  ON fs.team_name = my.name AND fs.season_year = my.season_year
+  ON fs.team_name = my.name AND fs.season_ending_year = my.season_year
 WHERE my.game_type = 1
 GROUP BY fs.franchise_id, fs.team_name, my.season_year;

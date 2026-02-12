@@ -329,5 +329,6 @@ class TradeIntegrationTest extends IntegrationTestCase
         $this->assertTrue($result['success']);
         $this->assertQueryExecuted('DELETE FROM ibl_trade_info');
         $this->assertQueryExecuted('DELETE FROM ibl_trade_cash');
+        $this->assertQueryExecuted('DELETE FROM ibl_trade_offers');
     }
 }

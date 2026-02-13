@@ -80,3 +80,43 @@ jobs:
 
             echo "IBLbot deployed successfully (PID: $(cat bot.pid))"
           '
+
+      - name: Check for IBL6 changes
+        id: ibl6-changes
+        run: |
+          if git diff --name-only ${{ github.event.before }}..${{ github.sha }} | grep -qE '^(IBL6/|\.github/workflows/main\.yml)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy and restart IBL6
+        if: steps.ibl6-changes.outputs.changed == 'true'
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            set -e
+            cd www/IBL6
+
+            echo "Installing dependencies..."
+            npm ci
+
+            echo "Generating Prisma client..."
+            npx prisma generate
+
+            echo "Building SvelteKit..."
+            npm run build
+
+            echo "Stopping old IBL6 process..."
+            if [ -f ibl6.pid ] && kill -0 "$(cat ibl6.pid)" 2>/dev/null; then
+              kill "$(cat ibl6.pid)"
+              sleep 2
+            fi
+
+            echo "Starting IBL6..."
+            mkdir -p logs
+            setsid node build/index.js > logs/ibl6.log 2>&1 < /dev/null &
+            echo $! > ibl6.pid
+            sleep 1
+
+            echo "IBL6 deployed successfully (PID: $(cat ibl6.pid))"
+          '

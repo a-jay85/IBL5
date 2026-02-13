@@ -98,8 +98,8 @@ jobs:
       - name: Deploy IBL6 build to server
         if: steps.ibl6-changes.outputs.changed == 'true'
         run: |
-          rsync -az --delete -e "ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy" \
-            IBL6/build/ ${{ secrets.USERNAME }}@${{ secrets.HOST }}:www/IBL6/build/
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'rm -rf www/IBL6/build'
+          scp -r -P ${{ secrets.PORT }} -i ~/.ssh/id_deploy IBL6/build ${{ secrets.USERNAME }}@${{ secrets.HOST }}:www/IBL6/
 
       - name: Install deps and restart IBL6
         if: steps.ibl6-changes.outputs.changed == 'true'

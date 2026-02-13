@@ -249,4 +249,24 @@ interface RecordHoldersRepositoryInterface
      * @return array<string, list<PlayerSeasonRecord>> Keyed by stat_type label
      */
     public function getTopSeasonAverageBatch(array $statColumns, int $minGames = 50): array;
+
+    /**
+     * Get the last game date for which record announcements were processed.
+     */
+    public function getLastAnnouncedDate(): ?string;
+
+    /**
+     * Mark a game date as the last processed for record announcements.
+     */
+    public function markAnnouncementsProcessed(string $gameDate): void;
+
+    /**
+     * Get distinct game dates that need record-checking, based on ibl_sim_dates.
+     *
+     * Uses the latest sim's date range. If a lastAnnouncedDate is provided,
+     * only returns dates after it (handles partial announcements).
+     *
+     * @return list<string> Dates in ascending order (YYYY-MM-DD)
+     */
+    public function getUnannouncedGameDates(?string $lastAnnouncedDate): array;
 }

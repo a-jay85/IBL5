@@ -5,24 +5,40 @@ declare(strict_types=1);
 namespace Updater;
 
 use Utilities\UuidGenerator;
-use Utilities\ScheduleParser;
+use Utilities\SchFileParser;
 use Utilities\DateParser;
 
 class ScheduleUpdater extends \BaseMysqliRepository {
-    private \Services\CommonMysqliRepository $commonRepository;
     private \Season $season;
 
-    /** @var array<string, int> Team name to ID lookup map */
-    private array $teamNameToIdMap = [];
+    /** @var array<int, string> Team ID to name lookup (for logging) */
+    private array $teamIdToNameMap = [];
 
-    public function __construct(object $db, \Services\CommonMysqliRepository $commonRepository, \Season $season) {
+    private const UNPLAYED_BOX_ID = 100000;
+
+    /** @var array<int, string> Calendar month number to name for date string construction */
+    private const MONTH_NAMES = [
+        1 => 'January',
+        2 => 'February',
+        3 => 'March',
+        4 => 'April',
+        5 => 'May',
+        6 => 'June',
+        7 => 'July',
+        8 => 'August',
+        9 => 'September',
+        10 => 'October',
+        11 => 'November',
+        12 => 'December',
+    ];
+
+    public function __construct(object $db, \Season $season) {
         parent::__construct($db);
-        $this->commonRepository = $commonRepository;
         $this->season = $season;
     }
 
     /**
-     * @return array{date: string, year: int, month: int}|null
+     * @return array{date: string, year: int, month: int, day: int}|null
      */
     protected function extractDate(string $rawDate): ?array {
         global $leagueContext;
@@ -48,12 +64,8 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         );
     }
 
-    protected function extractBoxID(string $boxHREF): string {
-        return ScheduleParser::extractBoxID($boxHREF);
-    }
-
     /**
-     * Pre-fetch all team name→ID mappings to avoid per-game lookups
+     * Pre-fetch team ID→name mappings for logging
      */
     private function preloadTeamNameMap(): void
     {
@@ -65,16 +77,28 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         );
 
         foreach ($rows as $row) {
-            $this->teamNameToIdMap[$row['team_name']] = $row['teamid'];
+            $this->teamIdToNameMap[$row['teamid']] = $row['team_name'];
         }
     }
 
     /**
-     * Look up team ID by name, using pre-loaded map with fallback
+     * Build a date string from month and day for DateParser consumption.
+     *
+     * Example: buildDateString(11, 2) → "November 2, 2000"
      */
-    private function resolveTeamId(string $teamName): ?int
+    private function buildDateString(int $month, int $day): string
     {
-        return $this->teamNameToIdMap[$teamName] ?? $this->commonRepository->getTidFromTeamname($teamName);
+        $monthName = self::MONTH_NAMES[$month];
+
+        return "{$monthName} {$day}, 2000";
+    }
+
+    /**
+     * Get team name by ID for logging purposes.
+     */
+    private function getTeamNameById(int $teamId): string
+    {
+        return $this->teamIdToNameMap[$teamId] ?? "Team #{$teamId}";
     }
 
     public function update(): void {
@@ -89,113 +113,92 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $documentRootRaw = $_SERVER['DOCUMENT_ROOT'] ?? '';
         $documentRoot = is_string($documentRootRaw) ? $documentRootRaw : '';
-        $scheduleFilePath = $documentRoot . '/ibl5/ibl/IBL/Schedule.htm';
-        $schedule = new \DOMDocument();
-        $schedule->loadHTMLFile($scheduleFilePath);
-        $schedule->preserveWhiteSpace = false;
-        $rows = $schedule->getElementsByTagName('tr');
+        $schFilePath = $documentRoot . '/ibl5/IBL5.sch';
 
+        $games = SchFileParser::parseFile($schFilePath);
+
+        $currentDateSlot = -1;
         $date = null;
         $year = null;
+        /** @var int|null $month */
+        $month = null;
 
-        foreach ($rows as $row) {
-            $thirdCellNode = $row->childNodes->item(2);
-            $secondCellNode = $row->childNodes->item(1);
-            $firstCellNode = $row->childNodes->item(0);
-            $checkThirdCell = $thirdCellNode !== null ? $thirdCellNode->nodeValue : null;
-            $checkSecondCell = $secondCellNode !== null ? $secondCellNode->nodeValue : null;
-            $checkFirstCell = $firstCellNode !== null ? $firstCellNode->nodeValue : null;
+        foreach ($games as $game) {
+            // Compute date when we move to a new date slot
+            if ($game['date_slot'] !== $currentDateSlot) {
+                $currentDateSlot = $game['date_slot'];
+                $monthDay = SchFileParser::dateSlotToMonthDay($game['date_slot']);
 
-            if ($checkSecondCell === null) {
-                $fullDate = $this->extractDate($row->textContent);
-                $date = $fullDate['date'] ?? null;
-                $year = $fullDate['year'] ?? null;
+                if ($monthDay !== null) {
+                    $dateString = $this->buildDateString($monthDay['month'], $monthDay['day']);
+                    $fullDate = $this->extractDate($dateString);
+                    $date = $fullDate['date'] ?? null;
+                    $year = $fullDate['year'] ?? null;
+                    $month = $fullDate['month'] ?? null;
+                } else {
+                    $date = null;
+                    $year = null;
+                    $month = null;
+                }
             }
 
-            if ($this->season->phase === "HEAT" && isset($fullDate['month']) && $fullDate['month'] !== \Season::IBL_HEAT_MONTH) {
+            if ($date === null || $year === null) {
                 continue;
             }
 
-            if ($checkThirdCell !== null && $checkThirdCell !== "" && $checkFirstCell !== "visitor") {
-                $boxID = null;
-                $firstCell = $row->childNodes->item(1);
+            // HEAT phase: only include games from the HEAT month
+            if ($this->season->phase === "HEAT" && $month !== \Season::IBL_HEAT_MONTH) {
+                continue;
+            }
 
-                if ($firstCell instanceof \DOMElement) {
-                    $links = $firstCell->getElementsByTagName('a');
-                    if ($links->length > 0) {
-                        $linkItem = $links->item(0);
-                        if ($linkItem !== null) {
-                            $boxLink = $linkItem->getAttribute('href');
-                            $boxID = (int) $this->extractBoxID($boxLink);
-                        }
-                    }
-                }
+            // Compute BoxID: real for played games, placeholder for unplayed
+            if ($game['played']) {
+                $boxID = SchFileParser::computeBoxId($game['date_slot'], $game['game_index']);
+            } else {
+                $boxID = self::UNPLAYED_BOX_ID;
+            }
 
-                $visitorCellNode = $row->childNodes->item(0);
-                $vScoreCellNode = $row->childNodes->item(1);
-                $homeCellNode = $row->childNodes->item(2);
-                $hScoreCellNode = $row->childNodes->item(3);
-                $visitorName = rtrim($visitorCellNode !== null ? $visitorCellNode->textContent : '');
-                $vScore = $vScoreCellNode !== null ? $vScoreCellNode->textContent : '';
-                $homeName = rtrim($homeCellNode !== null ? $homeCellNode->textContent : '');
-                $hScore = $hScoreCellNode !== null ? $hScoreCellNode->textContent : '';
+            $visitorTID = $game['visitor'];
+            $homeTID = $game['home'];
+            $vScore = $game['visitor_score'];
+            $hScore = $game['home_score'];
 
-                $scoreNode = $row->childNodes->item(1);
-                if ($scoreNode === null || $scoreNode->nodeValue === null || $scoreNode->nodeValue === "") {
-                    $vScore = 0;
-                    $hScore = 0;
-                    if ($boxID !== null && $boxID > 99999) {
-                        $boxID = $boxID + 1;
-                    } else {
-                        $boxID = 100000;
-                    }
-                }
+            $uuid = UuidGenerator::generateUuid();
 
-                $visitorTID = $this->resolveTeamId($visitorName);
-                $homeTID = $this->resolveTeamId($homeName);
+            $visitorName = $this->getTeamNameById($visitorTID);
+            $homeName = $this->getTeamNameById($homeTID);
 
-                if ($vScore !== 0 && $hScore !== 0 && $boxID === null) {
-                    $errorMessage = "Script Error: box scores for games haven't been generated. Please delete and reupload the JSB HTML export with the box scores, then try again.";
-                    error_log("[ScheduleUpdater] Box scores missing for game between {$visitorName} and {$homeName}");
-                    echo "<b><font color=red>{$errorMessage}</font></b>";
-                    throw new \RuntimeException($errorMessage, 1003);
-                }
-
-                if ($visitorTID !== null && $homeTID !== null) {
-                    $uuid = UuidGenerator::generateUuid();
-                    
-                    try {
-                        $this->execute(
-                            "INSERT INTO ibl_schedule (
-                                Year,
-                                BoxID,
-                                Date,
-                                Visitor,
-                                Vscore,
-                                Home,
-                                Hscore,
-                                uuid
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                            "iisiiiis",
-                            $year,
-                            $boxID,
-                            $date,
-                            $visitorTID,
-                            $vScore,
-                            $homeTID,
-                            $hScore,
-                            $uuid
-                        );
-                        $log .= "Inserted game: {$visitorName} @ {$homeName} on {$date}<br>";
-                    } catch (\Exception $e) {
-                        $errorMessage = "Failed to insert schedule data for game between {$visitorName} and {$homeName}: " . $e->getMessage();
-                        error_log("[ScheduleUpdater] Database insert error: {$errorMessage}");
-                        echo "<b><font color=red>Script Error: Failed to insert schedule data for game between {$visitorName} and {$homeName}.</font></b>";
-                        throw new \RuntimeException($errorMessage, 1002);
-                    }
-                }
+            try {
+                $this->execute(
+                    "INSERT INTO ibl_schedule (
+                        Year,
+                        BoxID,
+                        Date,
+                        Visitor,
+                        Vscore,
+                        Home,
+                        Hscore,
+                        uuid
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    "iisiiiis",
+                    $year,
+                    $boxID,
+                    $date,
+                    $visitorTID,
+                    $vScore,
+                    $homeTID,
+                    $hScore,
+                    $uuid
+                );
+                $log .= "Inserted game: {$visitorName} @ {$homeName} on {$date}<br>";
+            } catch (\Exception $e) {
+                $errorMessage = "Failed to insert schedule data for game between {$visitorName} and {$homeName}: " . $e->getMessage();
+                error_log("[ScheduleUpdater] Database insert error: {$errorMessage}");
+                echo "<b><font color=red>Script Error: Failed to insert schedule data for game between {$visitorName} and {$homeName}.</font></b>";
+                throw new \RuntimeException($errorMessage, 1002);
             }
         }
+
         \UI::displayDebugOutput($log, 'ibl_schedule SQL Queries');
 
         echo 'The ibl_schedule database table has been updated.<p>';

@@ -123,7 +123,7 @@ if ($stmt->execute()) {
 
     $stmt->close();
 
-    $stmtUpdateTime = $mysqli_db->prepare("UPDATE ibl_team_history SET asg_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = ?");
+    $stmtUpdateTime = $mysqli_db->prepare("UPDATE ibl_team_info SET asg_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = ?");
     $stmtUpdateTime->bind_param('s', $Team_Name);
     $stmtUpdateTime->execute();
     $stmtUpdateTime->close();

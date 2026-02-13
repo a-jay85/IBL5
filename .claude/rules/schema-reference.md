@@ -9,7 +9,7 @@ paths: ibl5/schema.sql
 | Category | Tables |
 |----------|--------|
 | Players | `ibl_plr` (main), `ibl_hist` (history), `ibl_plr_chunk` (stats) |
-| Teams | `ibl_team_info`, `ibl_team_history`, `ibl_standings` |
+| Teams | `ibl_team_info`, `ibl_standings` |
 | Games | `ibl_schedule`, `ibl_box_scores`, `ibl_box_scores_teams` |
 | Contracts | `ibl_fa_offers`, `ibl_trade_*` tables |
 | Draft | `ibl_draft`, `ibl_draft_picks` |
@@ -36,7 +36,7 @@ $query = "SELECT * FROM vw_player_current WHERE uuid = ?";
 ## API-Ready Features
 - **Timestamps:** 19 tables have `created_at`, `updated_at`
 - **UUIDs:** 5 critical tables for secure public IDs
-- **Views:** `vw_player_current`, `vw_team_standings`, `vw_game_schedule`, `vw_player_stats_summary`, `vw_trade_history`
+- **Views:** `vw_player_current`, `vw_team_standings`, `vw_game_schedule`, `vw_player_stats_summary`, `vw_trade_history`, `vw_team_awards`, `vw_franchise_summary`
 
 ## Foreign Key Relationships (24)
 - `ibl_hist.pid` → `ibl_plr.pid`
@@ -44,7 +44,7 @@ $query = "SELECT * FROM vw_player_current WHERE uuid = ?";
 - `ibl_box_scores.gameid` → `ibl_schedule.Date`
 
 ## Engine Status
-- **InnoDB (52):** All critical IBL tables - ACID transactions
+- **InnoDB (51):** All critical IBL tables - ACID transactions
 - **MyISAM (84):** Legacy PhpNuke CMS tables
 
 ## Best Practices

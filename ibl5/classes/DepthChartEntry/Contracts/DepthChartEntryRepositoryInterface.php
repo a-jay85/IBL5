@@ -58,22 +58,22 @@ interface DepthChartEntryRepositoryInterface
     public function updatePlayerDepthChart(string $playerName, array $depthChartValues): bool;
 
     /**
-     * Update team history timestamps for depth chart submissions
-     * 
+     * Update team timestamps for depth chart submissions
+     *
      * Records when a team last submitted their depth chart by updating
-     * both regular season and simulation-mode timestamps in team history.
-     * 
-     * @param string $teamName Team name (used to identify team in history table)
-     * @return bool True if both updates succeeded, false if either update failed
-     * 
+     * both regular season and simulation-mode timestamps in ibl_team_info.
+     *
+     * @param string $teamName Team name (used to identify team)
+     * @return bool True if update succeeded, false if update failed
+     *
      * **Updated Fields:**
-     * - ibl_team_history.depth: Updated to NOW() (current timestamp)
-     * - ibl_team_history.sim_depth: Updated to NOW() (current timestamp)
-     * 
+     * - ibl_team_info.depth: Updated to NOW() (current timestamp)
+     * - ibl_team_info.sim_depth: Updated to NOW() (current timestamp)
+     *
      * **Important Behaviors:**
      * - Team name is sanitized via DatabaseService::escapeString() for security
      * - Updates the current NOW() timestamp (MySQL server time)
-     * - Returns false if any update fails (transactional check)
+     * - Returns false if update fails (transactional check)
      * - Both fields are updated for consistency (regular season + simulation)
      */
     public function updateTeamHistory(string $teamName): bool;

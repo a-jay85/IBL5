@@ -39,7 +39,7 @@ if (isset($_POST['query'])) {
             $stmtSettings->execute();
             $stmtSettings->close();
             
-            $stmtTeamHistory = $mysqli_db->prepare("UPDATE ibl_team_history SET asg_vote = 'No Vote'");
+            $stmtTeamHistory = $mysqli_db->prepare("UPDATE ibl_team_info SET asg_vote = 'No Vote'");
             $stmtTeamHistory->execute();
             $stmtTeamHistory->close();
             
@@ -58,7 +58,7 @@ if (isset($_POST['query'])) {
             $stmtSettings2->execute();
             $stmtSettings2->close();
             
-            $stmtTeamHistory2 = $mysqli_db->prepare("UPDATE ibl_team_history SET eoy_vote = 'No Vote'");
+            $stmtTeamHistory2 = $mysqli_db->prepare("UPDATE ibl_team_info SET eoy_vote = 'No Vote'");
             $stmtTeamHistory2->execute();
             $stmtTeamHistory2->close();
             
@@ -239,7 +239,7 @@ switch ($season->phase) {
                 <br><b>(but make sure you've uploaded the updated PLR file before you run this!)</b><p>
             <A HREF=\"/ibl5/scripts/updateAllTheThings.php\">Update All The Things</A><p>
             <A HREF=\"/ibl5/scripts/scoParser.php\">Run scoParser.php</A><p>
-            <A HREF=\"/ibl5/scripts/history_update.php\">IBL History Update</A><p>";
+";
         break;
     case 'Regular Season':
         echo "<A HREF=\"/ibl5/scripts/plrParser.php\">Run plrParser.php</A>
@@ -275,8 +275,7 @@ switch ($season->phase) {
             <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>";
         break;
     case 'Draft':
-        echo "<A HREF=\"/ibl5/scripts/history_update.php\">IBL History Update</A><p>
-            <select name=\"Waivers\">
+        echo "<select name=\"Waivers\">
                 <option value = \"Yes\"" . ($season->allowWaivers == "Yes" ? " SELECTED" : "") . ">Yes</option>
                 <option value = \"No\"" . ($season->allowWaivers == "No" ? " SELECTED" : "") . ">No</option>
             </select>

@@ -7,8 +7,7 @@ namespace Scripts\Contracts;
 /**
  * MaintenanceRepositoryInterface - Database operations for maintenance scripts
  *
- * Provides methods for updating tradition factors, franchise history,
- * and reading settings.
+ * Provides methods for updating tradition factors and reading settings.
  */
 interface MaintenanceRepositoryInterface
 {
@@ -37,51 +36,6 @@ interface MaintenanceRepositoryInterface
      * @return bool True on success
      */
     public function updateTeamTradition(string $teamName, int $avgWins, int $avgLosses): bool;
-
-    /**
-     * Update division titles count for all teams
-     *
-     * @return bool True on success
-     */
-    public function updateDivisionTitles(): bool;
-
-    /**
-     * Update conference titles count for all teams
-     *
-     * @return bool True on success
-     */
-    public function updateConferenceTitles(): bool;
-
-    /**
-     * Update IBL (World) titles count for all teams
-     *
-     * @return bool True on success
-     */
-    public function updateIblTitles(): bool;
-
-    /**
-     * Update H.E.A.T. titles count for all teams
-     *
-     * @return bool True on success
-     */
-    public function updateHeatTitles(): bool;
-
-    /**
-     * Update playoff appearances count for all teams
-     *
-     * @return bool True on success
-     */
-    public function updatePlayoffAppearances(): bool;
-
-    /**
-     * Update all title counts and playoff appearances in a single query
-     *
-     * Combines division titles, conference titles, IBL titles, HEAT titles,
-     * and playoff appearances into one UPDATE statement.
-     *
-     * @return bool True on success
-     */
-    public function updateAllTitlesAndAppearances(): bool;
 
     /**
      * Get a setting value by name

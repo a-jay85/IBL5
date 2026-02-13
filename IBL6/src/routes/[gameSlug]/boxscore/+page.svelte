@@ -4,6 +4,7 @@
     import PlayerCard from '$lib/components/PlayerCard.svelte';
     import SlideButtonSelector from '$lib/components/SlideButtonSelector.svelte';
     import StatsHorizontal from '$lib/components/StatsHorizontal.svelte';
+    import { formatDate } from '$lib/utils/utils';
 
     const headers = [
         'Pos', 'Name', 'min', 'fgm', 'fga', 'ftm', 'fta', 
@@ -146,7 +147,7 @@
             <!-- VS and Game Info -->
             <div class="text-center">
                 <div class="text-sm opacity-75 mb-1">
-                    {new Date(game.date).toLocaleDateString()}
+                    {formatDate(game.date)}
                 </div>
                 <div class="text-2xl font-bold">VS</div>
                 <div class="text-sm opacity-75 mt-1">

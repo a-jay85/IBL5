@@ -28,17 +28,19 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
         $fiveSeasonsAgoEndingYear = $currentEndingYear - 4;
 
         $query = "SELECT
-            ibl_team_history.*,
+            ti.teamid, ti.team_name, ti.color1, ti.color2,
+            fs.totwins, fs.totloss, fs.winpct, fs.playoffs,
             SUM(ibl_team_win_loss.wins) as five_season_wins,
             SUM(ibl_team_win_loss.losses) as five_season_losses,
             (SUM(ibl_team_win_loss.wins) + SUM(ibl_team_win_loss.losses)) as totalgames,
             ROUND((SUM(ibl_team_win_loss.wins) / (SUM(ibl_team_win_loss.wins) + SUM(ibl_team_win_loss.losses))), 3) as five_season_winpct
-            FROM ibl_team_history
-            INNER JOIN ibl_team_win_loss ON ibl_team_win_loss.currentname = ibl_team_history.team_name
-            WHERE teamid != ?
+            FROM ibl_team_info ti
+            JOIN vw_franchise_summary fs ON fs.teamid = ti.teamid
+            INNER JOIN ibl_team_win_loss ON ibl_team_win_loss.currentname = ti.team_name
+            WHERE ti.teamid != ?
             AND year BETWEEN ? AND ?
             GROUP BY currentname
-            ORDER BY teamid ASC";
+            ORDER BY ti.teamid ASC";
 
         /** @var array<int, array{team_name: string, teamid: int|string, color1: string, color2: string, totwins: int|string, totloss: int|string, winpct: string, five_season_wins: int|string, five_season_losses: int|string, five_season_winpct: string|null, totalgames: int|string, playoffs: int|string}> $teams */
         $teams = $this->fetchAll(
@@ -158,7 +160,7 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
                 SUM(CASE WHEN Award LIKE '%Division%' THEN 1 ELSE 0 END) AS div_titles,
                 SUM(CASE WHEN Award LIKE '%Conference%' THEN 1 ELSE 0 END) AS conf_titles,
                 SUM(CASE WHEN Award LIKE '%IBL Champions%' THEN 1 ELSE 0 END) AS ibl_titles
-            FROM ibl_team_awards
+            FROM vw_team_awards
             GROUP BY name"
         );
 

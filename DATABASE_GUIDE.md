@@ -1,7 +1,7 @@
 # IBL5 Database Guide
 
-**Last Updated:** January 5, 2026  
-**Schema Version:** v1.4 - Production Ready
+**Last Updated:** February 12, 2026
+**Schema Version:** v1.5 - Production Ready
 
 ## Quick Reference
 
@@ -9,14 +9,14 @@
 **Always reference `ibl5/schema.sql` for table/column names and relationships.** Never assume database structures exist without verification. This prevents hallucination of non-existent tables.
 
 ### Current Status
-- **Total Tables:** 136 (52 InnoDB, 84 MyISAM legacy)
+- **Total Tables:** 136 (51 InnoDB, 84 MyISAM legacy, 23 views)
 - **Foreign Keys:** 24 constraints implemented
 - **Indexes:** 56+ performance indexes + 4 composite
 - **API Ready:** ✅ Complete (Timestamps, UUIDs, Views)
 
 ### Key Tables
 - **Players:** `ibl_plr` (main), `ibl_hist` (history), `ibl_plr_chunk` (stats)
-- **Teams:** `ibl_team_info`, `ibl_team_history`, `ibl_standings`
+- **Teams:** `ibl_team_info`, `ibl_standings`
 - **Games:** `ibl_schedule`, `ibl_box_scores`, `ibl_box_scores_teams`
 - **Contracts:** `ibl_fa_offers`, `ibl_trade_*` tables
 - **Draft:** `ibl_draft`, `ibl_draft_picks`
@@ -28,18 +28,23 @@
 ## Database Architecture
 
 ### Engine Status
-- **InnoDB Tables (52):** All critical IBL tables - ACID transactions, row-level locking
+- **InnoDB Tables (51):** All critical IBL tables - ACID transactions, row-level locking
 - **MyISAM Tables (84):** Legacy PhpNuke CMS tables - evaluate before converting
+- **Views (23):** Computed views replacing denormalized tables (stats, win/loss, awards, franchise history)
 
 ### API-Ready Features ✅
 1. **Timestamps:** 19 tables have `created_at`, `updated_at` for caching/ETags
 2. **UUIDs:** 5 critical tables (players, teams, games, etc.) for secure public IDs
-3. **Views:** 5 database views for optimized API queries
+3. **Views:** 23 database views replacing denormalized tables and optimizing API queries
    - `vw_player_current` - Current season player data
    - `vw_team_standings` - Real-time standings
-   - `vw_game_schedule` - Schedule with team info
-   - `vw_player_stats_summary` - Aggregated stats
-   - `vw_trade_history` - Trade records
+   - `vw_team_awards` - All team awards (Div/Conf/Lottery from `ibl_team_awards`, IBL Champions from `vw_playoff_series_results`, HEAT Champions from `ibl_box_scores_teams`)
+   - `vw_franchise_summary` - All-time wins/losses/winpct/playoffs/titles per team
+   - `vw_playoff_series_results` - Playoff series outcomes derived from box scores
+   - `vw_current_salary` - Salary resolution (replaces CASE pattern)
+   - `vw_career_totals` - Regular season career totals
+   - `vw_series_records` - Head-to-head records
+   - Plus 15 additional views for stats, win/loss, and schedule data
 
 ### Foreign Key Relationships (24)
 Core data integrity constraints implemented:
@@ -100,7 +105,7 @@ When writing new queries, avoid MySQL-specific features:
 - **Player Data:** plr, plr_chunk, hist (80+ columns total)
 - **Statistics:** *_stats, *_career_avgs, *_career_totals (multiple seasons)
 - **Games:** schedule, box_scores, box_scores_teams
-- **Team Management:** team_info, team_history, standings
+- **Team Management:** team_info, standings (team_history dropped Feb 2026, replaced by `vw_franchise_summary` and `vw_team_awards` views)
 - **Operations:** draft, fa_offers, trade_* tables
 - **Awards/Voting:** awards, votes_ASG, votes_EOY
 
@@ -139,6 +144,10 @@ $query = "SELECT * FROM vw_player_current WHERE uuid = ?";
 - **Phase 1 (Nov 1, 2025):** InnoDB conversion, critical indexes ✅
 - **Phase 2 (Nov 2, 2025):** Foreign key constraints ✅
 - **Phase 3 (Nov 4, 2025):** API preparation (timestamps, UUIDs, views) ✅
+- **Migration 026 (Feb 2026):** Created `vw_playoff_series_results` view ✅
+- **Migration 027 (Feb 2026):** Replaced win/loss tables with computed views ✅
+- **Migration 028 (Feb 2026):** Replaced 9 stats tables with computed views ✅
+- **Migration 030 (Feb 2026):** Dropped `ibl_team_history`, created `vw_team_awards` and `vw_franchise_summary` views ✅
 
 ## Additional Resources
 - Schema Reference: `/ibl5/schema.sql`

@@ -34,7 +34,7 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
     {
         /** @var array{count: int}|null $result */
         $result = $this->fetchOne(
-            "SELECT COUNT(name) as count FROM ibl_team_awards WHERE name = ? AND Award LIKE ?",
+            "SELECT COUNT(name) as count FROM vw_team_awards WHERE name = ? AND Award LIKE ?",
             "ss",
             $teamName,
             "%{$titleName}%"

@@ -107,7 +107,7 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
         // We don't check affected_rows because MySQL returns 0 when NOW() equals the existing timestamp
         try {
             $this->execute(
-                "UPDATE ibl_team_history SET depth = NOW(), sim_depth = NOW() WHERE team_name = ?",
+                "UPDATE ibl_team_info SET depth = NOW(), sim_depth = NOW() WHERE team_name = ?",
                 "s",
                 $teamName
             );

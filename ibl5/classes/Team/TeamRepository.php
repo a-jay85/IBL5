@@ -135,7 +135,7 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<TeamAwardRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_team_awards WHERE name LIKE ? ORDER BY year DESC",
+            "SELECT * FROM vw_team_awards WHERE name LIKE ? ORDER BY year DESC",
             "s",
             $teamName
         );

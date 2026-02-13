@@ -948,7 +948,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 name AS team_name,
                 COUNT(*) AS count,
                 GROUP_CONCAT(year ORDER BY year ASC SEPARATOR ', ') AS years
-            FROM ibl_team_awards
+            FROM vw_team_awards
             WHERE Award LIKE ?
             GROUP BY name
             ORDER BY count DESC, name ASC

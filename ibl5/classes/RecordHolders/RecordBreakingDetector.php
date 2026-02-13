@@ -148,23 +148,26 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         /** @var list<string> $announcements */
         $announcements = [];
         $topValue = $topRecords[0]['value'];
+        $previous = $this->findPreviousPlayerRecord($topRecords, $targetDates);
+
+        if ($previous === null || $topValue < $previous['value']) {
+            return [];
+        }
+
+        $isTied = $topValue === $previous['value'];
 
         foreach ($topRecords as $record) {
             if (isset($targetDates[$record['date']]) && $record['value'] === $topValue) {
-                $previous = $this->findPreviousPlayerRecord($topRecords, $targetDates);
-                if ($previous !== null && $record['value'] >= $previous['value']) {
-                    $isTied = $record['value'] === $previous['value'];
-                    $announcements[] = $this->formatPlayerRecordMessage(
-                        $record['name'],
-                        $record['team_name'],
-                        $record['value'],
-                        $statUnit,
-                        $previous['name'],
-                        $previous['value'],
-                        $gameTypeLabel,
-                        $isTied
-                    );
-                }
+                $announcements[] = $this->formatPlayerRecordMessage(
+                    $record['name'],
+                    $record['team_name'],
+                    $record['value'],
+                    $statUnit,
+                    $previous['name'],
+                    $previous['value'],
+                    $gameTypeLabel,
+                    $isTied
+                );
             }
         }
 
@@ -187,29 +190,34 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         /** @var list<string> $announcements */
         $announcements = [];
         $topValue = $topRecords[0]['value'];
+        $previous = $this->findPreviousTeamRecord($topRecords, $targetDates);
+
+        if ($previous === null) {
+            return [];
+        }
+
+        $isNewRecord = $isAscending
+            ? $topValue <= $previous['value']
+            : $topValue >= $previous['value'];
+
+        if (!$isNewRecord) {
+            return [];
+        }
+
+        $isTied = $topValue === $previous['value'];
 
         foreach ($topRecords as $record) {
             if (isset($targetDates[$record['date']]) && $record['value'] === $topValue) {
-                $previous = $this->findPreviousTeamRecord($topRecords, $targetDates);
-                if ($previous !== null) {
-                    $isNewRecord = $isAscending
-                        ? $record['value'] <= $previous['value']
-                        : $record['value'] >= $previous['value'];
-
-                    if ($isNewRecord) {
-                        $isTied = $record['value'] === $previous['value'];
-                        $announcements[] = $this->formatTeamRecordMessage(
-                            $record['team_name'],
-                            $record['value'],
-                            $statUnit,
-                            $previous['team_name'],
-                            $previous['value'],
-                            $gameTypeLabel,
-                            $isTied,
-                            $isAscending
-                        );
-                    }
-                }
+                $announcements[] = $this->formatTeamRecordMessage(
+                    $record['team_name'],
+                    $record['value'],
+                    $statUnit,
+                    $previous['team_name'],
+                    $previous['value'],
+                    $gameTypeLabel,
+                    $isTied,
+                    $isAscending
+                );
             }
         }
 

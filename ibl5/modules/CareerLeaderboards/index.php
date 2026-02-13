@@ -14,7 +14,9 @@ $pagetitle = "- Player Archives";
 global $mysqli_db;
 
 // Initialize classes
-$repository = new \CareerLeaderboards\CareerLeaderboardsRepository($mysqli_db);
+$dbCache = new \Cache\DatabaseCache($mysqli_db);
+$innerRepository = new \CareerLeaderboards\CareerLeaderboardsRepository($mysqli_db);
+$repository = new \CareerLeaderboards\CachedCareerLeaderboardsRepository($innerRepository, $dbCache);
 $service = new CareerLeaderboards\CareerLeaderboardsService();
 $view = new \CareerLeaderboards\CareerLeaderboardsView($service);
 

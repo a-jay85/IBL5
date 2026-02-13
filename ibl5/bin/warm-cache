@@ -1,0 +1,47 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('This script must be run from the command line.');
+}
+
+set_time_limit(0);
+
+$_SERVER['DOCUMENT_ROOT'] = dirname(__DIR__, 2);
+$_SERVER['SERVER_NAME'] = 'localhost'; // Set for CLI context
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/autoloader.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/config.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/db/db.php';
+
+/** @var \mysqli $mysqli_db */
+
+echo "Cache warming started at " . date('Y-m-d H:i:s') . "\n";
+
+// --- Career Leaderboards ---
+
+echo "\nWarming Career Leaderboards cache...\n";
+
+$dbCache = new \Cache\DatabaseCache($mysqli_db);
+$innerRepository = new \CareerLeaderboards\CareerLeaderboardsRepository($mysqli_db);
+$cachedRepository = new \CareerLeaderboards\CachedCareerLeaderboardsRepository($innerRepository, $dbCache);
+$cachedRepository->rebuildCache();
+
+echo "Career Leaderboards cache warmed (8 table keys)\n";
+
+// --- Record Holders ---
+
+echo "\nWarming Record Holders cache...\n";
+
+$recordHoldersRepository = new \RecordHolders\RecordHoldersRepository($mysqli_db);
+$innerService = new \RecordHolders\RecordHoldersService($recordHoldersRepository);
+$cachedService = new \RecordHolders\CachedRecordHoldersService($innerService, $mysqli_db);
+$cachedService->rebuildCache();
+
+echo "Record Holders cache warmed\n";
+
+// --- Done ---
+
+echo "\nAll caches warmed successfully at " . date('Y-m-d H:i:s') . "\n";

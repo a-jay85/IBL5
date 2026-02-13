@@ -72,6 +72,13 @@ class MockDatabase extends \mysqli
             return new MockDatabaseResult($this->mockTeamData);
         }
 
+        // Special handling for bulk ibl_power queries (getAllStreakData)
+        // Only intercept queries WITHOUT a WHERE clause to avoid breaking
+        // single-team queries (getTeamStreakData, getTeamPowerData) that set up their own mock data
+        if (stripos($query, 'ibl_power') !== false && stripos($query, 'WHERE') === false) {
+            return new MockDatabaseResult([]);
+        }
+
         // Special handling for pythagorean stats queries (offense/defense stats)
         // Always intercept these queries to avoid returning standings data
         // The JOIN query uses aliases: off_fgm, off_ftm, off_tgm, def_fgm, def_ftm, def_tgm
@@ -82,6 +89,7 @@ class MockDatabase extends \mysqli
                 // Translate base keys to aliased JOIN keys if needed
                 if (isset($data['fgm']) && !isset($data['off_fgm'])) {
                     $data = [
+                        'teamID' => 1,
                         'off_fgm' => $data['fgm'], 'off_ftm' => $data['ftm'], 'off_tgm' => $data['tgm'],
                         'def_fgm' => $data['fgm'], 'def_ftm' => $data['ftm'], 'def_tgm' => $data['tgm'],
                     ];

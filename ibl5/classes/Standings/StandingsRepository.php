@@ -134,6 +134,74 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             return null;
         }
 
+        return $this->calculatePythagoreanStats($stats);
+    }
+
+    /**
+     * @see StandingsRepositoryInterface::getAllStreakData()
+     *
+     * @return array<int, StreakRow>
+     */
+    public function getAllStreakData(): array
+    {
+        /** @var list<array{TeamID: int, last_win: int, last_loss: int, streak_type: string, streak: int, ranking: int}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT TeamID, last_win, last_loss, streak_type, streak, ranking FROM ibl_power",
+            ""
+        );
+
+        /** @var array<int, StreakRow> $result */
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row['TeamID']] = [
+                'last_win' => $row['last_win'],
+                'last_loss' => $row['last_loss'],
+                'streak_type' => $row['streak_type'],
+                'streak' => $row['streak'],
+                'ranking' => $row['ranking'],
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @see StandingsRepositoryInterface::getAllPythagoreanStats()
+     *
+     * @return array<int, PythagoreanStats>
+     */
+    public function getAllPythagoreanStats(int $seasonYear): array
+    {
+        /** @var list<array{teamID: int, off_fgm: int, off_ftm: int, off_tgm: int, def_fgm: int, def_ftm: int, def_tgm: int}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT
+                tos.teamID,
+                tos.fgm AS off_fgm, tos.ftm AS off_ftm, tos.tgm AS off_tgm,
+                tds.fgm AS def_fgm, tds.ftm AS def_ftm, tds.tgm AS def_tgm
+            FROM ibl_team_offense_stats tos
+            JOIN ibl_team_defense_stats tds ON tos.teamID = tds.teamID AND tos.season_year = tds.season_year
+            WHERE tos.season_year = ?",
+            "i",
+            $seasonYear
+        );
+
+        /** @var array<int, PythagoreanStats> $result */
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row['teamID']] = $this->calculatePythagoreanStats($row);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Calculate Pythagorean stats from raw shooting data
+     *
+     * @param array{off_fgm: int, off_ftm: int, off_tgm: int, def_fgm: int, def_ftm: int, def_tgm: int} $stats
+     * @return PythagoreanStats
+     */
+    private function calculatePythagoreanStats(array $stats): array
+    {
         $pointsScored = \BasketballStats\StatsFormatter::calculatePoints(
             $stats['off_fgm'],
             $stats['off_ftm'],

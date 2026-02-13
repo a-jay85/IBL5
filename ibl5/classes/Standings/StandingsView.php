@@ -26,6 +26,12 @@ class StandingsView implements StandingsViewInterface
     private StandingsRepositoryInterface $repository;
     private int $seasonYear;
 
+    /** @var array<int, StreakRow>|null Pre-loaded streak data keyed by team ID */
+    private ?array $allStreakData = null;
+
+    /** @var array<int, PythagoreanStats>|null Pre-loaded Pythagorean stats keyed by team ID */
+    private ?array $allPythagoreanStats = null;
+
     /**
      * Constructor
      *
@@ -43,6 +49,10 @@ class StandingsView implements StandingsViewInterface
      */
     public function render(): string
     {
+        // Pre-load all streak and Pythagorean data in 2 queries instead of per-team
+        $this->allStreakData = $this->repository->getAllStreakData();
+        $this->allPythagoreanStats = $this->repository->getAllPythagoreanStats($this->seasonYear);
+
         $html = '';
 
         // Conference standings
@@ -55,6 +65,10 @@ class StandingsView implements StandingsViewInterface
         $html .= $this->renderRegion('Midwest');
         $html .= $this->renderRegion('Pacific');
 
+        // Clear pre-loaded data
+        $this->allStreakData = null;
+        $this->allPythagoreanStats = null;
+
         return $html;
     }
 
@@ -63,6 +77,14 @@ class StandingsView implements StandingsViewInterface
      */
     public function renderRegion(string $region): string
     {
+        // If called standalone (not via render()), load data on demand
+        if ($this->allStreakData === null) {
+            $this->allStreakData = $this->repository->getAllStreakData();
+        }
+        if ($this->allPythagoreanStats === null) {
+            $this->allPythagoreanStats = $this->repository->getAllPythagoreanStats($this->seasonYear);
+        }
+
         $groupingType = $this->getGroupingType($region);
         $standings = $this->repository->getStandingsByRegion($region);
 
@@ -159,7 +181,7 @@ class StandingsView implements StandingsViewInterface
     {
         $teamId = $team['tid'];
         $teamName = $this->formatTeamName($team);
-        $streakData = $this->repository->getTeamStreakData($teamId);
+        $streakData = $this->allStreakData[$teamId] ?? null;
 
         $lastWin = $streakData['last_win'] ?? 0;
         $lastLoss = $streakData['last_loss'] ?? 0;
@@ -169,8 +191,8 @@ class StandingsView implements StandingsViewInterface
         $streakSortKey = ($streakData['streak_type'] ?? '') === 'W' ? $streak : -$streak;
         $rating = $streakData['ranking'] ?? 0;
 
-        // Get Pythagorean win percentage
-        $pythagoreanStats = $this->repository->getTeamPythagoreanStats($teamId, $this->seasonYear);
+        // Get Pythagorean win percentage from pre-loaded data
+        $pythagoreanStats = $this->allPythagoreanStats[$teamId] ?? null;
         $pythagoreanPct = '0.000';
         if ($pythagoreanStats !== null) {
             $pythagoreanPct = \BasketballStats\StatsFormatter::calculatePythagoreanWinPercentage(

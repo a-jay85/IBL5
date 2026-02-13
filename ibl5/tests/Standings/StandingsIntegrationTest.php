@@ -331,8 +331,8 @@ class StandingsIntegrationTest extends TestCase
                 'color2' => 'FFFFFF',
             ],
         ]);
-        $mockRepository->method('getTeamStreakData')->willReturn(null);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllStreakData')->willReturn([]);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
@@ -371,8 +371,8 @@ class StandingsIntegrationTest extends TestCase
                 'color2' => 'FFFFFF',
             ],
         ]);
-        $mockRepository->method('getTeamStreakData')->willReturn(null);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllStreakData')->willReturn([]);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
@@ -410,8 +410,8 @@ class StandingsIntegrationTest extends TestCase
                 'color2' => 'FFFFFF',
             ],
         ]);
-        $mockRepository->method('getTeamStreakData')->willReturn(null);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllStreakData')->willReturn([]);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
@@ -436,14 +436,10 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getStandingsByRegion')->willReturn([
             $this->createMockTeamData(),
         ]);
-        $mockRepository->method('getTeamStreakData')->willReturn([
-            'last_win' => 8,
-            'last_loss' => 2,
-            'streak_type' => 'W',
-            'streak' => 6,
-            'ranking' => 3,
+        $mockRepository->method('getAllStreakData')->willReturn([
+            1 => ['last_win' => 8, 'last_loss' => 2, 'streak_type' => 'W', 'streak' => 6, 'ranking' => 3],
         ]);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
@@ -460,14 +456,10 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getStandingsByRegion')->willReturn([
             $this->createMockTeamData(),
         ]);
-        $mockRepository->method('getTeamStreakData')->willReturn([
-            'last_win' => 2,
-            'last_loss' => 8,
-            'streak_type' => 'L',
-            'streak' => 5,
-            'ranking' => 25,
+        $mockRepository->method('getAllStreakData')->willReturn([
+            1 => ['last_win' => 2, 'last_loss' => 8, 'streak_type' => 'L', 'streak' => 5, 'ranking' => 25],
         ]);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
@@ -484,14 +476,10 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getStandingsByRegion')->willReturn([
             $this->createMockTeamData(),
         ]);
-        $mockRepository->method('getTeamStreakData')->willReturn([
-            'last_win' => 7,
-            'last_loss' => 3,
-            'streak_type' => 'W',
-            'streak' => 2,
-            'ranking' => 5,
+        $mockRepository->method('getAllStreakData')->willReturn([
+            1 => ['last_win' => 7, 'last_loss' => 3, 'streak_type' => 'W', 'streak' => 2, 'ranking' => 5],
         ]);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
@@ -509,14 +497,10 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getStandingsByRegion')->willReturn([
             $this->createMockTeamData(),
         ]);
-        $mockRepository->method('getTeamStreakData')->willReturn([
-            'last_win' => 6,
-            'last_loss' => 4,
-            'streak_type' => 'W',
-            'streak' => 1,
-            'ranking' => 7,
+        $mockRepository->method('getAllStreakData')->willReturn([
+            1 => ['last_win' => 6, 'last_loss' => 4, 'streak_type' => 'W', 'streak' => 1, 'ranking' => 7],
         ]);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
@@ -537,8 +521,8 @@ class StandingsIntegrationTest extends TestCase
     {
         $mockRepository = $this->createMock(StandingsRepositoryInterface::class);
         $mockRepository->method('getStandingsByRegion')->willReturn([]);
-        $mockRepository->method('getTeamStreakData')->willReturn(null);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllStreakData')->willReturn([]);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->render();
@@ -561,8 +545,8 @@ class StandingsIntegrationTest extends TestCase
     {
         $mockRepository = $this->createMock(StandingsRepositoryInterface::class);
         $mockRepository->method('getStandingsByRegion')->willReturn([]);
-        $mockRepository->method('getTeamStreakData')->willReturn(null);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllStreakData')->willReturn([]);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->render();
@@ -578,8 +562,8 @@ class StandingsIntegrationTest extends TestCase
     {
         $mockRepository = $this->createMock(StandingsRepositoryInterface::class);
         $mockRepository->method('getStandingsByRegion')->willReturn([]);
-        $mockRepository->method('getTeamStreakData')->willReturn(null);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllStreakData')->willReturn([]);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->render();
@@ -594,8 +578,8 @@ class StandingsIntegrationTest extends TestCase
     {
         $mockRepository = $this->createMock(StandingsRepositoryInterface::class);
         $mockRepository->method('getStandingsByRegion')->willReturn([]);
-        $mockRepository->method('getTeamStreakData')->willReturn(null);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllStreakData')->willReturn([]);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->render();
@@ -614,8 +598,8 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getStandingsByRegion')->willReturn([
             $this->createMockTeamData(),
         ]);
-        $mockRepository->method('getTeamStreakData')->willReturn(null);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllStreakData')->willReturn([]);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
@@ -636,8 +620,8 @@ class StandingsIntegrationTest extends TestCase
         // This would normally not happen, but testing defense in depth
         $mockRepository = $this->createMock(StandingsRepositoryInterface::class);
         $mockRepository->method('getStandingsByRegion')->willReturn([]);
-        $mockRepository->method('getTeamStreakData')->willReturn(null);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllStreakData')->willReturn([]);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');
@@ -655,14 +639,10 @@ class StandingsIntegrationTest extends TestCase
         $mockRepository->method('getStandingsByRegion')->willReturn([
             $this->createMockTeamData(),
         ]);
-        $mockRepository->method('getTeamStreakData')->willReturn([
-            'last_win' => 5,
-            'last_loss' => 5,
-            'streak_type' => '<script>alert(1)</script>',
-            'streak' => 1,
-            'ranking' => 15,
+        $mockRepository->method('getAllStreakData')->willReturn([
+            1 => ['last_win' => 5, 'last_loss' => 5, 'streak_type' => '<script>alert(1)</script>', 'streak' => 1, 'ranking' => 15],
         ]);
-        $mockRepository->method('getTeamPythagoreanStats')->willReturn(null);
+        $mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
         $view = new StandingsView($mockRepository, 2025);
         $result = $view->renderRegion('Eastern');

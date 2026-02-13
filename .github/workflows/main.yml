@@ -122,7 +122,7 @@ jobs:
 
             echo "Starting IBL6..."
             mkdir -p logs
-            setsid node build/index.js > logs/ibl6.log 2>&1 < /dev/null &
+            setsid env PORT=3001 node build/index.js > logs/ibl6.log 2>&1 < /dev/null &
             echo $! > ibl6.pid
             sleep 1
 

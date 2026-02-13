@@ -49,7 +49,7 @@ export function createGameUrl(date: string | Date, gameOfThatDay: number): strin
 export function formatDate(date: string | Date): string {
 	try {
 		const gameDate = typeof date === 'string' ? new Date(date) : date;
-		return gameDate.toLocaleDateString();
+		return gameDate.toLocaleDateString('en-US', { timeZone: 'UTC' });
 	} catch {
 		return 'Invalid Date';
 	}

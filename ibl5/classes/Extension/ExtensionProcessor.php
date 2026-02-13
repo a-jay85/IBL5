@@ -255,7 +255,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         $playerID = $extensionData['playerID'] ?? null;
         if ($playerID !== null) {
             try {
-                return Player::withPlayerID($this->db, $playerID);
+                return Player::withPlayerID($this->db, (int) $playerID);
             } catch (\Exception $e) {
                 return null;
             }

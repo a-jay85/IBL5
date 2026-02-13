@@ -183,6 +183,83 @@ final class RecordBreakingDetectorTest extends TestCase
         $this->assertStringContainsString('HEAT', $result[0]);
     }
 
+    public function testDetectsTiedRecord(): void
+    {
+        $tiedRecord = [
+            'pid' => 100,
+            'name' => 'New Star',
+            'tid' => 2,
+            'team_name' => 'Heat',
+            'date' => '2007-01-15',
+            'BoxID' => 0,
+            'oppTid' => 3,
+            'opp_team_name' => 'Knicks',
+            'value' => 80,
+        ];
+
+        $previousRecord = [
+            'pid' => 927,
+            'name' => 'Bob Pettit',
+            'tid' => 14,
+            'team_name' => 'Timberwolves',
+            'date' => '1996-01-16',
+            'BoxID' => 0,
+            'oppTid' => 20,
+            'opp_team_name' => 'Grizzlies',
+            'value' => 80,
+        ];
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($this->buildBatchResult([$tiedRecord, $previousRecord]));
+
+        $result = $this->detector->detectAndAnnounce('2007-01-15');
+
+        $this->assertNotEmpty($result);
+        $this->assertStringContainsString('IBL RECORD TIED', $result[0]);
+        $this->assertStringContainsString('New Star', $result[0]);
+        $this->assertStringContainsString('80', $result[0]);
+        $this->assertStringContainsString('tying', $result[0]);
+        $this->assertStringContainsString('Bob Pettit', $result[0]);
+    }
+
+    public function testBrokenRecordDoesNotSayTied(): void
+    {
+        $newRecord = [
+            'pid' => 100,
+            'name' => 'New Star',
+            'tid' => 2,
+            'team_name' => 'Heat',
+            'date' => '2007-01-15',
+            'BoxID' => 0,
+            'oppTid' => 3,
+            'opp_team_name' => 'Knicks',
+            'value' => 85,
+        ];
+
+        $previousRecord = [
+            'pid' => 927,
+            'name' => 'Bob Pettit',
+            'tid' => 14,
+            'team_name' => 'Timberwolves',
+            'date' => '1996-01-16',
+            'BoxID' => 0,
+            'oppTid' => 20,
+            'opp_team_name' => 'Grizzlies',
+            'value' => 80,
+        ];
+
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')
+            ->willReturn($this->buildBatchResult([$newRecord, $previousRecord]));
+
+        $result = $this->detector->detectAndAnnounce('2007-01-15');
+
+        $this->assertNotEmpty($result);
+        $this->assertStringContainsString('NEW IBL RECORD', $result[0]);
+        $this->assertStringContainsString('breaking', $result[0]);
+        $this->assertStringNotContainsString('tying', $result[0]);
+        $this->assertStringNotContainsString('TIED', $result[0]);
+    }
+
     public function testMessageFormatIncludesTeamName(): void
     {
         $newRecord = [

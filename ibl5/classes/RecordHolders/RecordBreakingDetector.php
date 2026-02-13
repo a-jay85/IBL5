@@ -82,9 +82,10 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
             $topValue = $topRecords[0]['value'];
             foreach ($topRecords as $record) {
                 if ($record['date'] === $gameDate && $record['value'] === $topValue) {
-                    // Check if this beats the previous record
+                    // Check if this beats or ties the previous record
                     $previousRecord = $this->findPreviousRecord($topRecords, $gameDate);
-                    if ($previousRecord !== null && $record['value'] > $previousRecord['value']) {
+                    if ($previousRecord !== null && $record['value'] >= $previousRecord['value']) {
+                        $isTied = $record['value'] === $previousRecord['value'];
                         $message = $this->formatRecordMessage(
                             $record['name'],
                             $record['team_name'],
@@ -92,7 +93,8 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
                             $stat['unit'],
                             $previousRecord['name'],
                             $previousRecord['value'],
-                            self::GAME_TYPE_LABELS[$gameType] ?? 'regular season'
+                            self::GAME_TYPE_LABELS[$gameType] ?? 'regular season',
+                            $isTied
                         );
                         $brokenRecords[] = $message;
                         $this->sendDiscordNotification($message);
@@ -121,7 +123,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     }
 
     /**
-     * Format a record-breaking announcement message.
+     * Format a record-breaking or record-tying announcement message.
      */
     private function formatRecordMessage(
         string $playerName,
@@ -130,8 +132,16 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         string $statUnit,
         string $previousHolder,
         int $previousValue,
-        string $gameTypeLabel
+        string $gameTypeLabel,
+        bool $isTied
     ): string {
+        if ($isTied) {
+            return "**IBL RECORD TIED!**\n"
+                . $playerName . ' (' . $teamName . ') just recorded **' . $newValue . ' ' . $statUnit
+                . '** in a ' . $gameTypeLabel . ' game, tying '
+                . $previousHolder . "'s all-time record!";
+        }
+
         return "**NEW IBL RECORD!**\n"
             . $playerName . ' (' . $teamName . ') just recorded **' . $newValue . ' ' . $statUnit
             . '** in a ' . $gameTypeLabel . ' game, breaking '

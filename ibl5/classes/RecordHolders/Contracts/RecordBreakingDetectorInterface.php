@@ -12,10 +12,10 @@ namespace RecordHolders\Contracts;
 interface RecordBreakingDetectorInterface
 {
     /**
-     * Detect and announce any broken records from the given game date.
+     * Detect and announce any broken or tied records from the given game date.
      *
-     * @param string $gameDate The date to check for broken records (YYYY-MM-DD)
-     * @return list<string> List of broken record announcement messages
+     * @param string $gameDate The date to check for broken/tied records (YYYY-MM-DD)
+     * @return list<string> List of record announcement messages (broken and tied)
      */
     public function detectAndAnnounce(string $gameDate): array;
 }

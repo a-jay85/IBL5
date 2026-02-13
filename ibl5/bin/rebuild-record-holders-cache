@@ -20,34 +20,36 @@ include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/db/db.php';
 
 echo "Record Holders cache rebuild started\n";
 
-// --- Detect broken records for the latest game date ---
+// --- Detect broken/tied records for new game dates ---
 
-$season = new Season($mysqli_db);
-$latestGameDate = $season->getLastBoxScoreDate();
+$recordHoldersRepository = new \RecordHolders\RecordHoldersRepository($mysqli_db);
+$lastAnnouncedDate = $recordHoldersRepository->getLastAnnouncedDate();
+$newDates = $recordHoldersRepository->getUnannouncedGameDates($lastAnnouncedDate);
 
-if ($latestGameDate !== '') {
-    echo "Latest game date: {$latestGameDate}\n";
+if ($newDates !== []) {
+    $latestDate = $newDates[count($newDates) - 1];
+    echo 'Checking ' . count($newDates) . ' game date(s) for records (' . $newDates[0] . ' to ' . $latestDate . ")\n";
 
-    $recordHoldersRepository = new \RecordHolders\RecordHoldersRepository($mysqli_db);
     $detector = new \RecordHolders\RecordBreakingDetector($recordHoldersRepository);
-    $announcements = $detector->detectAndAnnounce($latestGameDate);
+    $announcements = $detector->detectAndAnnounce($newDates);
 
     if ($announcements !== []) {
         foreach ($announcements as $msg) {
-            echo "  RECORD BROKEN: {$msg}\n";
+            echo "  RECORD: {$msg}\n";
         }
     } else {
-        echo "  No records broken\n";
+        echo "  No records broken or tied\n";
     }
+
+    $recordHoldersRepository->markAnnouncementsProcessed($latestDate);
 } else {
-    echo "No box score data found, skipping record detection\n";
+    echo "No new game dates to check\n";
 }
 
 // --- Rebuild the cache atomically ---
 
 echo "Rebuilding cache...\n";
 
-$recordHoldersRepository ??= new \RecordHolders\RecordHoldersRepository($mysqli_db);
 $innerService = new \RecordHolders\RecordHoldersService($recordHoldersRepository);
 $cachedService = new \RecordHolders\CachedRecordHoldersService($innerService, $mysqli_db);
 $cachedService->rebuildCache();

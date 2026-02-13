@@ -1,7 +1,7 @@
 <script lang='ts'>
     import '../app.css';
     import type { PageData } from './$types';
-    import { createGameUrl } from '$lib/utils/utils';
+    import { createGameUrl, formatDate } from '$lib/utils/utils';
     import logo from '$lib/assets/logo.jpg';
 	import { onMount } from 'svelte';
 
@@ -50,7 +50,7 @@
                         <!-- Game details -->
                         <div class="text-xs sm:text-sm opacity-75 mt-2">
                             <div class="flex flex-col sm:flex-row sm:justify-center sm:gap-4 items-center">
-                                <span>{new Date(game.date).toLocaleDateString()}</span>
+                                <span>{formatDate(game.date)}</span>
                                 <span class="hidden sm:inline text-xs">•</span>
                                 <span>Game {game.gameOfThatDay}</span>
                             </div>

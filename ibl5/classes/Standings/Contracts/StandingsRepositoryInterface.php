@@ -42,4 +42,19 @@ interface StandingsRepositoryInterface
      * @return PythagoreanStats|null Array with 'pointsScored' and 'pointsAllowed' or null if not found
      */
     public function getTeamPythagoreanStats(int $teamId, int $seasonYear): ?array;
+
+    /**
+     * Get streak, last 10 games, and power ranking data for all teams
+     *
+     * @return array<int, StreakRow> Map of team ID to streak data
+     */
+    public function getAllStreakData(): array;
+
+    /**
+     * Get offensive and defensive stats for all teams in a season for Pythagorean calculation
+     *
+     * @param int $seasonYear Season ending year (e.g. 2025 for the 2024-25 season)
+     * @return array<int, PythagoreanStats> Map of team ID to Pythagorean stats
+     */
+    public function getAllPythagoreanStats(int $seasonYear): array;
 }

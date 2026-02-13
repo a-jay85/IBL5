@@ -142,7 +142,7 @@ if (strpos($MVP1, $Team_Name) !== false) {
     $stmt->execute();
     $stmt->close();
 
-    $stmtUpdateTime = $mysqli_db->prepare("UPDATE ibl_team_history SET eoy_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = ?");
+    $stmtUpdateTime = $mysqli_db->prepare("UPDATE ibl_team_info SET eoy_vote = NOW() + INTERVAL 2 HOUR WHERE team_name = ?");
     $stmtUpdateTime->bind_param('s', $Team_Name);
     $stmtUpdateTime->execute();
     $stmtUpdateTime->close();

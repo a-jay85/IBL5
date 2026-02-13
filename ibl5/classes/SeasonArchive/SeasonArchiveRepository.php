@@ -76,7 +76,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     {
         /** @var list<TeamAwardRow> */
         return $this->fetchAll(
-            "SELECT year, name, Award, ID FROM ibl_team_awards WHERE year = ?",
+            "SELECT year, name, Award, ID FROM vw_team_awards WHERE year = ?",
             "i",
             $year
         );

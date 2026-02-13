@@ -86,7 +86,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
 
         // Assert - Correct queries executed
         $this->assertEquals(12, $this->countQueriesMatching('UPDATE ibl_plr'));
-        $this->assertQueryExecuted('UPDATE ibl_team_history');
+        $this->assertQueryExecuted('UPDATE ibl_team_info');
         $this->assertQueryExecuted('depth = NOW()');
     }
 
@@ -311,7 +311,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         // We should NOT update database when validation fails
         // (This tests the workflow - the handler should check validation before saving)
         $this->assertQueryNotExecuted('UPDATE ibl_plr');
-        $this->assertQueryNotExecuted('UPDATE ibl_team_history');
+        $this->assertQueryNotExecuted('UPDATE ibl_team_info');
     }
 
     // ========== PLAYOFFS VS REGULAR SEASON RULES ==========

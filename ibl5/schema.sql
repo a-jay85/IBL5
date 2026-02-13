@@ -1507,35 +1507,6 @@ CREATE TABLE `ibl_team_defense_stats` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `ibl_team_history`
---
-
-DROP TABLE IF EXISTS `ibl_team_history`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `ibl_team_history` (
-  `teamid` int(11) NOT NULL DEFAULT 0,
-  `team_city` varchar(24) NOT NULL DEFAULT '',
-  `team_name` varchar(16) NOT NULL DEFAULT '',
-  `color1` varchar(6) NOT NULL DEFAULT '',
-  `color2` varchar(6) NOT NULL DEFAULT '',
-  `depth` varchar(100) NOT NULL,
-  `sim_depth` varchar(100) NOT NULL,
-  `asg_vote` varchar(100) NOT NULL,
-  `eoy_vote` varchar(100) NOT NULL,
-  `totwins` int(11) NOT NULL,
-  `totloss` int(11) NOT NULL,
-  `winpct` float(4,3) NOT NULL,
-  `playoffs` int(11) NOT NULL,
-  `div_titles` int(11) NOT NULL,
-  `conf_titles` int(11) NOT NULL,
-  `ibl_titles` int(11) NOT NULL,
-  `heat_titles` int(11) NOT NULL,
-  PRIMARY KEY (`teamid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `ibl_team_info`
 --
 
@@ -1563,6 +1534,10 @@ CREATE TABLE `ibl_team_info` (
   `HasMLE` int(11) NOT NULL DEFAULT 0,
   `HasLLE` int(11) NOT NULL DEFAULT 0,
   `chart` char(2) NOT NULL DEFAULT '',
+  `depth` varchar(100) NOT NULL DEFAULT '',
+  `sim_depth` varchar(100) NOT NULL DEFAULT 'No Depth Chart',
+  `asg_vote` varchar(100) NOT NULL DEFAULT 'No Vote',
+  `eoy_vote` varchar(100) NOT NULL DEFAULT 'No Vote',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `uuid` char(36) NOT NULL,
@@ -3159,6 +3134,41 @@ CREATE TABLE `users` (
   UNIQUE KEY `users_email_unique` (`email`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Temporary table structure for view `vw_franchise_summary`
+--
+
+DROP TABLE IF EXISTS `vw_franchise_summary`;
+/*!50001 DROP VIEW IF EXISTS `vw_franchise_summary`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `vw_franchise_summary` AS SELECT
+ 1 AS `teamid`,
+ 1 AS `totwins`,
+ 1 AS `totloss`,
+ 1 AS `winpct`,
+ 1 AS `playoffs`,
+ 1 AS `div_titles`,
+ 1 AS `conf_titles`,
+ 1 AS `ibl_titles`,
+ 1 AS `heat_titles`*/;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Temporary table structure for view `vw_team_awards`
+--
+
+DROP TABLE IF EXISTS `vw_team_awards`;
+/*!50001 DROP VIEW IF EXISTS `vw_team_awards`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `vw_team_awards` AS SELECT
+ 1 AS `year`,
+ 1 AS `name`,
+ 1 AS `Award`,
+ 1 AS `ID`*/;
+SET character_set_client = @saved_cs_client;
 
 --
 -- Temporary table structure for view `vw_career_totals`

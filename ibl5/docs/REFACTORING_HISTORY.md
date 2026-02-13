@@ -10,6 +10,28 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 ## Completed Refactorings
 
+### Database: Drop ibl_team_history Table (February 2026)
+
+**Summary:** Dropped the denormalized `ibl_team_history` cache table and replaced it with computed database views (`vw_team_awards`, `vw_franchise_summary`). Continues the pattern from migrations 026-028 of replacing denormalized/cached tables with views computed from canonical data sources.
+
+**Migration:** `030_drop_team_history.sql`
+
+**Key Changes:**
+- Dropped `ibl_team_history` table (denormalized cache of team records, awards, and operational fields)
+- Moved operational columns (`depth`, `sim_depth`, `asg_vote`, `eoy_vote`) to `ibl_team_info`
+- Created `vw_team_awards` view (unions all team awards from canonical sources: `ibl_team_awards` for Div/Conf/Lottery, `vw_playoff_series_results` for IBL Champions, `ibl_box_scores_teams` for HEAT Champions)
+- Created `vw_franchise_summary` view (computes all-time wins/losses/winpct/playoffs/title counts per team)
+- Deleted IBL Champions and HEAT Champions rows from `ibl_team_awards` (now derived from game data)
+- Removed 6 sync methods from `MaintenanceRepository` + interface
+- Removed `updateHistoricalRecords()` from `PowerRankingsUpdater`
+- Deleted `scripts/history_update.php`
+- Updated 10 PHP files to use `ibl_team_info` instead of `ibl_team_history`
+- Updated 4 PHP files to use `vw_team_awards` instead of `ibl_team_awards`
+
+**Pattern:** This is the fourth migration in the denormalization-removal series (026: playoff series results view, 027: win/loss views, 028: stats table views, 030: team history table). Each replaces cached/denormalized data with views computed from canonical sources, eliminating sync code and ensuring data is always consistent.
+
+---
+
 ### 22. One-on-One Module (January 2026)
 
 **Summary:** Refactored One-on-One module with interface-driven architecture for player matchup simulation game.
@@ -560,13 +582,13 @@ All IBL5 modules have been refactored to the interface-driven architecture patte
 ## Infrastructure Improvements
 
 ### Database Optimization (Complete ✅)
-- 52 tables converted to InnoDB (ACID transactions, row-level locking)
+- 51 tables converted to InnoDB (ACID transactions, row-level locking)
 - 24 foreign key constraints for data integrity
 - 60+ performance indexes
 - 25 CHECK constraints for validation
 - Timestamps on 19 tables for API caching
 - UUIDs on 5 core tables for secure public IDs
-- 5 database views for optimized API queries
+- 23 database views replacing denormalized tables and optimizing API queries
 
 **Result:** 10-100x faster queries, 100% data integrity
 
@@ -595,6 +617,7 @@ All IBL5 modules have been refactored to the interface-driven architecture patte
 - **December 2025:** Compare_Players, Leaderboards, Standings modules complete
 - **January 5, 2026:** League_Stats, AwardHistory, Series_Records, One-on-One modules complete
 - **January 9, 2026:** 8 Display modules refactored (CapSpace, Draft_Pick_Locator, Franchise_History, Injuries, League_Starters, Next_Sim, Power_Rankings, Team_Schedule) - **30/30 modules complete (100%)** ✅
+- **February 2026:** Dropped `ibl_team_history` table, replaced with `vw_team_awards` and `vw_franchise_summary` views (migration 030)
 - **Target:** 80% test coverage by Q2 2026
 
 ---
@@ -623,5 +646,5 @@ All IBL5 modules have been refactored to the interface-driven architecture patte
 
 ---
 
-**Last Updated:** January 9, 2026  
+**Last Updated:** February 12, 2026
 **Maintained By:** Copilot Coding Agent

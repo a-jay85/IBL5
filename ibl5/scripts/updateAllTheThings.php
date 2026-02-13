@@ -78,7 +78,7 @@ try {
     flush();
 
     // Initialize components
-    $scheduleUpdater = new Updater\ScheduleUpdater($mysqli_db, $commonRepository, $season);
+    $scheduleUpdater = new Updater\ScheduleUpdater($mysqli_db, $season);
     echo "<p>✓ ScheduleUpdater initialized</p>";
     flush();
 

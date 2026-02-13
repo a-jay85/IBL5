@@ -98,7 +98,7 @@ jobs:
             cd www/IBL6
 
             echo "Installing dependencies..."
-            npm ci
+            npm ci --ignore-engines
 
             echo "Generating Prisma client..."
             npx prisma generate

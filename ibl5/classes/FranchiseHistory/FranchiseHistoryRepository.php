@@ -27,76 +27,112 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
     {
         $fiveSeasonsAgoEndingYear = $currentEndingYear - 4;
 
-        $query = "SELECT
-            ti.teamid, ti.team_name, ti.color1, ti.color2,
-            fs.totwins, fs.totloss, fs.winpct, fs.playoffs,
-            SUM(ibl_team_win_loss.wins) as five_season_wins,
-            SUM(ibl_team_win_loss.losses) as five_season_losses,
-            (SUM(ibl_team_win_loss.wins) + SUM(ibl_team_win_loss.losses)) as totalgames,
-            ROUND((SUM(ibl_team_win_loss.wins) / (SUM(ibl_team_win_loss.wins) + SUM(ibl_team_win_loss.losses))), 3) as five_season_winpct
-            FROM ibl_team_info ti
-            JOIN vw_franchise_summary fs ON fs.teamid = ti.teamid
-            INNER JOIN ibl_team_win_loss ON ibl_team_win_loss.currentname = ti.team_name
-            WHERE ti.teamid != ?
-            AND year BETWEEN ? AND ?
-            GROUP BY currentname
-            ORDER BY ti.teamid ASC";
+        // Query 1: All-time totals from vw_franchise_summary (no redundant ibl_team_win_loss JOIN)
+        /** @var list<array{teamid: int, team_name: string, color1: string, color2: string, totwins: int, totloss: int, winpct: string, playoffs: int, div_titles: int, conf_titles: int, ibl_titles: int, heat_titles: int}> $summaryRows */
+        $summaryRows = $this->fetchAll(
+            "SELECT ti.teamid, ti.team_name, ti.color1, ti.color2,
+                    fs.totwins, fs.totloss, fs.winpct, fs.playoffs,
+                    fs.div_titles, fs.conf_titles, fs.ibl_titles, fs.heat_titles
+             FROM ibl_team_info ti
+             JOIN vw_franchise_summary fs ON fs.teamid = ti.teamid
+             WHERE ti.teamid <> ?
+             ORDER BY ti.teamid ASC",
+            "i",
+            \League::FREE_AGENTS_TEAMID
+        );
 
-        /** @var array<int, array{team_name: string, teamid: int|string, color1: string, color2: string, totwins: int|string, totloss: int|string, winpct: string, five_season_wins: int|string, five_season_losses: int|string, five_season_winpct: string|null, totalgames: int|string, playoffs: int|string}> $teams */
-        $teams = $this->fetchAll(
-            $query,
-            "iii",
-            \League::FREE_AGENTS_TEAMID,
+        // Query 2: Rolling 5-season window from ibl_team_win_loss directly (avoids double materialization)
+        /** @var list<array{currentname: string, five_season_wins: int, five_season_losses: int}> $windowRows */
+        $windowRows = $this->fetchAll(
+            "SELECT currentname,
+                    CAST(SUM(wins) AS UNSIGNED) AS five_season_wins,
+                    CAST(SUM(losses) AS UNSIGNED) AS five_season_losses
+             FROM ibl_team_win_loss
+             WHERE year BETWEEN ? AND ?
+             GROUP BY currentname",
+            "ii",
             $fiveSeasonsAgoEndingYear,
             $currentEndingYear
         );
 
-        // Bulk-fetch playoff totals, HEAT totals, and title counts for all teams
-        $allPlayoffTotals = $this->getAllPlayoffTotals();
-        $allHeatTotals = $this->getAllHEATTotals();
-        $allTitleCounts = $this->getAllTitleCounts();
-
-        foreach ($teams as &$team) {
-            $teamName = $team['team_name'];
-            $playoffTotals = $allPlayoffTotals[$teamName] ?? ['wins' => 0, 'losses' => 0, 'winpct' => '.000'];
-            $team['playoff_total_wins'] = $playoffTotals['wins'];
-            $team['playoff_total_losses'] = $playoffTotals['losses'];
-            $team['playoff_winpct'] = $playoffTotals['winpct'];
-            $heatTotals = $allHeatTotals[$teamName] ?? ['wins' => 0, 'losses' => 0, 'winpct' => '.000'];
-            $team['heat_total_wins'] = $heatTotals['wins'];
-            $team['heat_total_losses'] = $heatTotals['losses'];
-            $team['heat_winpct'] = $heatTotals['winpct'];
-            $titleCounts = $allTitleCounts[$teamName] ?? ['heat_titles' => 0, 'div_titles' => 0, 'conf_titles' => 0, 'ibl_titles' => 0];
-            $team['heat_titles'] = $titleCounts['heat_titles'];
-            $team['div_titles'] = $titleCounts['div_titles'];
-            $team['conf_titles'] = $titleCounts['conf_titles'];
-            $team['ibl_titles'] = $titleCounts['ibl_titles'];
+        /** @var array<string, array{five_season_wins: int, five_season_losses: int}> $windowByTeam */
+        $windowByTeam = [];
+        foreach ($windowRows as $row) {
+            $windowByTeam[$row['currentname']] = [
+                'five_season_wins' => $row['five_season_wins'],
+                'five_season_losses' => $row['five_season_losses'],
+            ];
         }
 
+        // Bulk-fetch playoff totals and HEAT totals
+        $allPlayoffTotals = $this->getAllPlayoffTotals();
+        $allHeatTotals = $this->getAllHEATTotals();
+
         /** @var array<int, FranchiseRow> $teams */
+        $teams = [];
+        foreach ($summaryRows as $summary) {
+            $teamName = $summary['team_name'];
+            $window = $windowByTeam[$teamName] ?? ['five_season_wins' => 0, 'five_season_losses' => 0];
+            $fiveWins = $window['five_season_wins'];
+            $fiveLosses = $window['five_season_losses'];
+            $totalGames = $fiveWins + $fiveLosses;
+            $fiveWinpct = $totalGames > 0
+                ? number_format($fiveWins / $totalGames, 3)
+                : null;
+
+            $playoffTotals = $allPlayoffTotals[$teamName] ?? ['wins' => 0, 'losses' => 0, 'winpct' => '.000'];
+            $heatTotals = $allHeatTotals[$teamName] ?? ['wins' => 0, 'losses' => 0, 'winpct' => '.000'];
+
+            $teams[] = [
+                'teamid' => $summary['teamid'],
+                'team_name' => $teamName,
+                'color1' => $summary['color1'],
+                'color2' => $summary['color2'],
+                'totwins' => $summary['totwins'],
+                'totloss' => $summary['totloss'],
+                'winpct' => $summary['winpct'],
+                'playoffs' => $summary['playoffs'],
+                'five_season_wins' => $fiveWins,
+                'five_season_losses' => $fiveLosses,
+                'totalgames' => $totalGames,
+                'five_season_winpct' => $fiveWinpct,
+                'playoff_total_wins' => $playoffTotals['wins'],
+                'playoff_total_losses' => $playoffTotals['losses'],
+                'playoff_winpct' => $playoffTotals['winpct'],
+                'heat_total_wins' => $heatTotals['wins'],
+                'heat_total_losses' => $heatTotals['losses'],
+                'heat_winpct' => $heatTotals['winpct'],
+                'heat_titles' => $summary['heat_titles'],
+                'div_titles' => $summary['div_titles'],
+                'conf_titles' => $summary['conf_titles'],
+                'ibl_titles' => $summary['ibl_titles'],
+            ];
+        }
+
         return $teams;
     }
 
     /**
      * Get aggregated playoff game wins and losses for all teams in bulk
      *
-     * Derives game-level records from series results in vw_playoff_series_results:
-     * - When team is the winner: +winner_games wins, +loser_games losses
-     * - When team is the loser: +loser_games wins, +winner_games losses
+     * Uses a single SELECT from vw_playoff_series_results with conditional aggregation
+     * to compute both winner and loser game tallies without UNION ALL (avoids double materialization).
      *
-     * @return array<string, array{wins: int, losses: int, winpct: string}> Map of team name → playoff totals
+     * @return array<string, array{wins: int, losses: int, winpct: string}> Map of team name -> playoff totals
      */
     private function getAllPlayoffTotals(): array
     {
         $rows = $this->fetchAll(
             "SELECT
                 team_name,
-                SUM(CASE WHEN team_name = winner THEN winner_games ELSE loser_games END) AS total_wins,
-                SUM(CASE WHEN team_name = winner THEN loser_games ELSE winner_games END) AS total_losses
+                CAST(SUM(wins) AS UNSIGNED) AS total_wins,
+                CAST(SUM(losses) AS UNSIGNED) AS total_losses
             FROM (
-                SELECT winner AS team_name, winner, winner_games, loser_games FROM vw_playoff_series_results
+                SELECT winner AS team_name, winner_games AS wins, loser_games AS losses
+                FROM vw_playoff_series_results
                 UNION ALL
-                SELECT loser AS team_name, winner, winner_games, loser_games FROM vw_playoff_series_results
+                SELECT loser AS team_name, loser_games AS wins, winner_games AS losses
+                FROM vw_playoff_series_results
             ) AS combined
             GROUP BY team_name"
         );
@@ -104,9 +140,9 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
         /** @var array<string, array{wins: int, losses: int, winpct: string}> $result */
         $result = [];
         foreach ($rows as $row) {
-            /** @var array{team_name: string, total_wins: int|null, total_losses: int|null} $row */
-            $wins = $row['total_wins'] ?? 0;
-            $losses = $row['total_losses'] ?? 0;
+            /** @var array{team_name: string, total_wins: int, total_losses: int} $row */
+            $wins = $row['total_wins'];
+            $losses = $row['total_losses'];
             $totalGames = $wins + $losses;
             $winpct = $totalGames > 0
                 ? number_format($wins / $totalGames, 3)
@@ -146,36 +182,4 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
         return $result;
     }
 
-    /**
-     * Get all title counts for all teams in a single pivot query
-     *
-     * @return array<string, array{heat_titles: int, div_titles: int, conf_titles: int, ibl_titles: int}> Map of team name → title counts
-     */
-    private function getAllTitleCounts(): array
-    {
-        $rows = $this->fetchAll(
-            "SELECT
-                name,
-                SUM(CASE WHEN Award LIKE '%HEAT%' THEN 1 ELSE 0 END) AS heat_titles,
-                SUM(CASE WHEN Award LIKE '%Division%' THEN 1 ELSE 0 END) AS div_titles,
-                SUM(CASE WHEN Award LIKE '%Conference%' THEN 1 ELSE 0 END) AS conf_titles,
-                SUM(CASE WHEN Award LIKE '%IBL Champions%' THEN 1 ELSE 0 END) AS ibl_titles
-            FROM vw_team_awards
-            GROUP BY name"
-        );
-
-        /** @var array<string, array{heat_titles: int, div_titles: int, conf_titles: int, ibl_titles: int}> $result */
-        $result = [];
-        foreach ($rows as $row) {
-            /** @var array{name: string, heat_titles: int, div_titles: int, conf_titles: int, ibl_titles: int} $row */
-            $result[$row['name']] = [
-                'heat_titles' => (int) $row['heat_titles'],
-                'div_titles' => (int) $row['div_titles'],
-                'conf_titles' => (int) $row['conf_titles'],
-                'ibl_titles' => (int) $row['ibl_titles'],
-            ];
-        }
-
-        return $result;
-    }
 }

@@ -48,6 +48,9 @@
         <testsuite name="CareerLeaderboards Module Tests">
             <directory>tests/CareerLeaderboards</directory>
         </testsuite>
+        <testsuite name="Cache Module Tests">
+            <directory>tests/Cache</directory>
+        </testsuite>
         <testsuite name="SeasonLeaderboards Module Tests">
             <directory>tests/SeasonLeaderboards</directory>
         </testsuite>

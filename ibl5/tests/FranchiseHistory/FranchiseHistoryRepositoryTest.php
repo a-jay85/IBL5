@@ -12,8 +12,9 @@ use FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface;
 /**
  * FranchiseHistoryRepositoryTest - Tests for FranchiseHistoryRepository
  *
- * Tests verify that title counts are properly calculated from vw_team_awards.
- * This is a regression test to ensure titles are never returned as all zeros.
+ * Tests verify that title counts are sourced from vw_franchise_summary
+ * (which internally derives them from vw_team_awards) and that playoff
+ * records are derived from vw_playoff_series_results.
  *
  * @covers \FranchiseHistory\FranchiseHistoryRepository
  */
@@ -36,86 +37,54 @@ class FranchiseHistoryRepositoryTest extends TestCase
     }
 
     /**
-     * Integration test to verify title calculation behavior
+     * Verify that titles are sourced from vw_franchise_summary
      *
-     * This test uses reflection to verify that the getAllTitleCounts method exists.
-     * This prevents the regression where titles were directly read from a
-     * denormalized table instead of being calculated from vw_team_awards.
+     * vw_franchise_summary internally derives title counts from vw_team_awards,
+     * so querying it directly avoids redundant vw_team_awards materialization.
      */
-    public function testGetAllFranchiseHistoryCalculatesTitlesFromAwardsView(): void
+    public function testTitlesSourcedFromFranchiseSummaryView(): void
     {
-        $reflectionClass = new \ReflectionClass($this->repository);
-
-        // Verify the private getAllTitleCounts method exists (bulk title calculation)
-        $this->assertTrue(
-            $reflectionClass->hasMethod('getAllTitleCounts'),
-            'Repository must have getAllTitleCounts method to calculate titles from vw_team_awards'
-        );
-
-        $method = $reflectionClass->getMethod('getAllTitleCounts');
-
-        // Verify it's a callable method
-        $this->assertTrue(
-            $method->isPrivate() || $method->isPublic(),
-            'getAllTitleCounts must be a callable method'
-        );
-    }
-
-    /**
-     * Test that verifies the query logic for title counting
-     *
-     * This documents the expected behavior: titles must be counted from
-     * vw_team_awards, not read from denormalized columns.
-     */
-    public function testRepositoryMustQueryTeamAwardsForTitles(): void
-    {
-        // Get the source code of the repository to verify it queries vw_team_awards
         $reflectionClass = new \ReflectionClass($this->repository);
         $fileName = $reflectionClass->getFileName();
+        $this->assertIsString($fileName);
         $sourceCode = file_get_contents($fileName);
+        $this->assertIsString($sourceCode);
 
-        // Verify that the repository queries vw_team_awards view
+        // Verify the repository queries vw_franchise_summary (which contains title data)
         $this->assertStringContainsString(
-            'vw_team_awards',
+            'vw_franchise_summary',
             $sourceCode,
-            'Repository must query vw_team_awards view to count titles'
-        );
-
-        // Verify that titles are calculated dynamically (not just read from a table)
-        $this->assertStringContainsString(
-            "Award LIKE",
-            $sourceCode,
-            'Repository must use LIKE query to match award names'
+            'Repository must query vw_franchise_summary to get title counts'
         );
 
-        // Verify the title types are searched for
+        // Verify title fields are selected from the summary
         $this->assertStringContainsString(
-            'HEAT',
+            'heat_titles',
             $sourceCode,
-            'Repository must search for HEAT titles'
+            'Repository must include heat_titles from franchise summary'
         );
         $this->assertStringContainsString(
-            'Division',
+            'div_titles',
             $sourceCode,
-            'Repository must search for Division titles'
+            'Repository must include div_titles from franchise summary'
         );
         $this->assertStringContainsString(
-            'Conference',
+            'conf_titles',
             $sourceCode,
-            'Repository must search for Conference titles'
+            'Repository must include conf_titles from franchise summary'
         );
         $this->assertStringContainsString(
-            'IBL Champions',
+            'ibl_titles',
             $sourceCode,
-            'Repository must search for IBL Champions titles'
+            'Repository must include ibl_titles from franchise summary'
         );
     }
 
     /**
-     * Verify that getPlayoffTotals method exists and queries vw_playoff_series_results
+     * Verify that getAllPlayoffTotals method exists and queries vw_playoff_series_results
      *
      * This test documents the expected behavior: playoff game records must be
-     * derived from series results in vw_playoff_series_results using CASE expressions.
+     * derived from series results in vw_playoff_series_results.
      */
     public function testRepositoryQueriesPlayoffSeriesResultsViewForPlayoffTotals(): void
     {
@@ -128,7 +97,9 @@ class FranchiseHistoryRepositoryTest extends TestCase
         );
 
         $fileName = $reflectionClass->getFileName();
+        $this->assertIsString($fileName);
         $sourceCode = file_get_contents($fileName);
+        $this->assertIsString($sourceCode);
 
         // Verify that the repository queries vw_playoff_series_results view
         $this->assertStringContainsString(
@@ -137,31 +108,48 @@ class FranchiseHistoryRepositoryTest extends TestCase
             'Repository must query vw_playoff_series_results view to calculate playoff records'
         );
 
-        // Verify that playoff fields are assigned in the foreach loop
-        $this->assertMatchesRegularExpression(
-            '/\$team\[[\'"]playoff_total_wins[\'"]\]\s*=/',
+        // Verify that playoff fields are present in the result array
+        $this->assertStringContainsString(
+            "'playoff_total_wins'",
             $sourceCode,
-            'Repository must assign calculated playoff wins to team array'
+            'Repository must include playoff_total_wins in result'
         );
     }
 
     /**
-     * Regression test: Verify that title fields are overwritten
+     * Regression test: Verify that title fields are populated in results
      *
-     * This test documents that the repository MUST overwrite any title fields
-     * with calculated values from vw_team_awards.
+     * This test documents that the repository MUST include title fields
+     * in the returned franchise data.
      */
-    public function testTitleFieldsMustBeOverwrittenNotJustRead(): void
+    public function testTitleFieldsArePopulatedInResults(): void
     {
         $reflectionClass = new \ReflectionClass($this->repository);
         $fileName = $reflectionClass->getFileName();
+        $this->assertIsString($fileName);
         $sourceCode = file_get_contents($fileName);
+        $this->assertIsString($sourceCode);
 
-        // Verify that title fields are assigned (not just selected)
-        $this->assertMatchesRegularExpression(
-            '/\$team\[[\'"](heat_titles|div_titles|conf_titles|ibl_titles)[\'"]\]\s*=/',
+        // Verify that title fields are included in the result array
+        $this->assertStringContainsString(
+            "'heat_titles'",
             $sourceCode,
-            'Repository must assign calculated title values to team array (overwrite database values)'
+            'Repository result must include heat_titles field'
+        );
+        $this->assertStringContainsString(
+            "'div_titles'",
+            $sourceCode,
+            'Repository result must include div_titles field'
+        );
+        $this->assertStringContainsString(
+            "'conf_titles'",
+            $sourceCode,
+            'Repository result must include conf_titles field'
+        );
+        $this->assertStringContainsString(
+            "'ibl_titles'",
+            $sourceCode,
+            'Repository result must include ibl_titles field'
         );
     }
 }

@@ -276,6 +276,8 @@ CREATE TABLE `ibl_box_scores_teams` (
   KEY `idx_gt_3gm` (`game_type`,`game3GM`),
   KEY `idx_name` (`name`),
   KEY `idx_gt_date_teams` (`game_type`,`Date`,`visitorTeamID`,`homeTeamID`),
+  KEY `idx_gt_name_season` (`game_type`,`name`,`season_year`),
+  KEY `idx_date_visitor_home_gotd` (`Date`,`visitorTeamID`,`homeTeamID`,`gameOfThatDay`),
   CONSTRAINT `fk_boxscoreteam_home` FOREIGN KEY (`homeTeamID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscoreteam_visitor` FOREIGN KEY (`visitorTeamID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=49014 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -1472,7 +1474,8 @@ CREATE TABLE `ibl_team_awards` (
   `Award` varchar(350) NOT NULL,
   `ID` int(11) NOT NULL,
   PRIMARY KEY (`ID`),
-  KEY `idx_award` (`Award`)
+  KEY `idx_award` (`Award`),
+  KEY `idx_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

@@ -12,7 +12,7 @@ use FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface;
 /**
  * FranchiseHistoryRepositoryTest - Tests for FranchiseHistoryRepository
  *
- * Tests verify that title counts are properly calculated from ibl_team_awards.
+ * Tests verify that title counts are properly calculated from vw_team_awards.
  * This is a regression test to ensure titles are never returned as all zeros.
  *
  * @covers \FranchiseHistory\FranchiseHistoryRepository
@@ -39,17 +39,17 @@ class FranchiseHistoryRepositoryTest extends TestCase
      * Integration test to verify title calculation behavior
      *
      * This test uses reflection to verify that the getAllTitleCounts method exists.
-     * This prevents the regression where titles were directly read from
-     * ibl_team_history instead of being calculated from ibl_team_awards.
+     * This prevents the regression where titles were directly read from a
+     * denormalized table instead of being calculated from vw_team_awards.
      */
-    public function testGetAllFranchiseHistoryCalculatesTitlesFromAwardsTable(): void
+    public function testGetAllFranchiseHistoryCalculatesTitlesFromAwardsView(): void
     {
         $reflectionClass = new \ReflectionClass($this->repository);
 
         // Verify the private getAllTitleCounts method exists (bulk title calculation)
         $this->assertTrue(
             $reflectionClass->hasMethod('getAllTitleCounts'),
-            'Repository must have getAllTitleCounts method to calculate titles from ibl_team_awards'
+            'Repository must have getAllTitleCounts method to calculate titles from vw_team_awards'
         );
 
         $method = $reflectionClass->getMethod('getAllTitleCounts');
@@ -65,23 +65,23 @@ class FranchiseHistoryRepositoryTest extends TestCase
      * Test that verifies the query logic for title counting
      *
      * This documents the expected behavior: titles must be counted from
-     * ibl_team_awards, not read from ibl_team_history columns.
+     * vw_team_awards, not read from denormalized columns.
      */
     public function testRepositoryMustQueryTeamAwardsForTitles(): void
     {
-        // Get the source code of the repository to verify it queries ibl_team_awards
+        // Get the source code of the repository to verify it queries vw_team_awards
         $reflectionClass = new \ReflectionClass($this->repository);
         $fileName = $reflectionClass->getFileName();
         $sourceCode = file_get_contents($fileName);
 
-        // Verify that the repository queries ibl_team_awards table
+        // Verify that the repository queries vw_team_awards view
         $this->assertStringContainsString(
-            'ibl_team_awards',
+            'vw_team_awards',
             $sourceCode,
-            'Repository must query ibl_team_awards table to count titles'
+            'Repository must query vw_team_awards view to count titles'
         );
 
-        // Verify that titles are calculated dynamically (not just read from ibl_team_history)
+        // Verify that titles are calculated dynamically (not just read from a table)
         $this->assertStringContainsString(
             "Award LIKE",
             $sourceCode,
@@ -148,9 +148,8 @@ class FranchiseHistoryRepositoryTest extends TestCase
     /**
      * Regression test: Verify that title fields are overwritten
      *
-     * This test documents that the repository MUST overwrite the title fields
-     * from ibl_team_history (which may be stale/zero) with calculated values
-     * from ibl_team_awards.
+     * This test documents that the repository MUST overwrite any title fields
+     * with calculated values from vw_team_awards.
      */
     public function testTitleFieldsMustBeOverwrittenNotJustRead(): void
     {

@@ -89,62 +89,6 @@ class MaintenanceRepositoryTest extends TestCase
         $this->assertStringContainsString('Contract_AvgL', $queries[0]);
     }
 
-    public function testUpdateDivisionTitlesExecutesUpdate(): void
-    {
-        $this->mockDb->setReturnTrue(true);
-
-        $result = $this->repository->updateDivisionTitles();
-
-        $this->assertTrue($result);
-        $queries = $this->mockDb->getExecutedQueries();
-        $this->assertStringContainsString('UPDATE ibl_team_history', $queries[0]);
-        $this->assertStringContainsString('div_titles', $queries[0]);
-    }
-
-    public function testUpdateConferenceTitlesExecutesUpdate(): void
-    {
-        $this->mockDb->setReturnTrue(true);
-
-        $result = $this->repository->updateConferenceTitles();
-
-        $this->assertTrue($result);
-        $queries = $this->mockDb->getExecutedQueries();
-        $this->assertStringContainsString('conf_titles', $queries[0]);
-    }
-
-    public function testUpdateIblTitlesExecutesUpdate(): void
-    {
-        $this->mockDb->setReturnTrue(true);
-
-        $result = $this->repository->updateIblTitles();
-
-        $this->assertTrue($result);
-        $queries = $this->mockDb->getExecutedQueries();
-        $this->assertStringContainsString('ibl_titles', $queries[0]);
-    }
-
-    public function testUpdateHeatTitlesExecutesUpdate(): void
-    {
-        $this->mockDb->setReturnTrue(true);
-
-        $result = $this->repository->updateHeatTitles();
-
-        $this->assertTrue($result);
-        $queries = $this->mockDb->getExecutedQueries();
-        $this->assertStringContainsString('heat_titles', $queries[0]);
-    }
-
-    public function testUpdatePlayoffAppearancesExecutesUpdate(): void
-    {
-        $this->mockDb->setReturnTrue(true);
-
-        $result = $this->repository->updatePlayoffAppearances();
-
-        $this->assertTrue($result);
-        $queries = $this->mockDb->getExecutedQueries();
-        $this->assertStringContainsString('playoffs', $queries[0]);
-    }
-
     public function testGetSettingReturnsValue(): void
     {
         $this->mockDb->setMockData([

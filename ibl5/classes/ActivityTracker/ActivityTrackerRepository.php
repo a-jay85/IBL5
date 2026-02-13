@@ -25,7 +25,7 @@ class ActivityTrackerRepository extends \BaseMysqliRepository implements Activit
         /** @var list<ActivityRow> */
         return $this->fetchAll(
             "SELECT teamid, team_name, team_city, color1, color2, depth, sim_depth, asg_vote, eoy_vote
-             FROM ibl_team_history
+             FROM ibl_team_info
              WHERE teamid != ?
              ORDER BY teamid ASC",
             'i',

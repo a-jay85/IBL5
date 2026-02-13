@@ -54,14 +54,11 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
             $log .= $this->updateTeamStats($tid, $teamName, $stats);
         }
 
-        // Update historical records once after all teams are processed (not per-team)
-        $this->updateHistoricalRecords();
-
         \UI::displayDebugOutput($log, 'Power Rankings Update Log');
 
         // Reset the sim's Depth Chart sent status
         $this->execute(
-            "UPDATE ibl_team_history SET sim_depth = 'No Depth Chart'",
+            "UPDATE ibl_team_info SET sim_depth = 'No Depth Chart'",
             ""
         );
 
@@ -176,30 +173,5 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
             ranking score = {$ranking}<br>";
 
         return $log;
-    }
-
-    private function updateHistoricalRecords(): void
-    {
-        $this->execute(
-            "UPDATE ibl_team_history a
-            SET
-                totwins = (
-                    SELECT SUM(b.wins)
-                    FROM ibl_team_win_loss AS b
-                    WHERE a.team_name = b.currentname
-                ),
-                totloss = (
-                    SELECT SUM(b.losses)
-                    FROM ibl_team_win_loss AS b
-                    WHERE a.team_name = b.currentname
-                ),
-                winpct = (
-                    SELECT SUM(b.wins) / (SUM(b.wins) + SUM(b.losses))
-                    FROM ibl_team_win_loss AS b
-                    WHERE a.team_name = b.currentname
-                )
-            WHERE a.team_name != 'Free Agents'",
-            ""
-        );
     }
 }

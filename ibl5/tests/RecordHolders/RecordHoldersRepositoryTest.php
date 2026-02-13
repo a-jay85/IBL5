@@ -133,7 +133,7 @@ final class RecordHoldersRepositoryTest extends IntegrationTestCase
 
         $this->repository->getMostTitlesByType('Division');
 
-        $this->assertQueryExecuted('ibl_team_awards');
+        $this->assertQueryExecuted('vw_team_awards');
         $this->assertQueryExecuted('Division');
     }
 

@@ -90,21 +90,29 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Deploy and restart IBL6
+      - name: Build IBL6
+        if: steps.ibl6-changes.outputs.changed == 'true'
+        run: npm ci && npm run build
+        working-directory: IBL6
+
+      - name: Deploy IBL6 build to server
+        if: steps.ibl6-changes.outputs.changed == 'true'
+        run: |
+          rsync -az --delete -e "ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy" \
+            IBL6/build/ ${{ secrets.USERNAME }}@${{ secrets.HOST }}:www/IBL6/build/
+
+      - name: Install deps and restart IBL6
         if: steps.ibl6-changes.outputs.changed == 'true'
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
             set -e
             cd www/IBL6
 
-            echo "Installing dependencies..."
-            npm ci
+            echo "Installing production dependencies..."
+            npm ci --omit=dev
 
             echo "Generating Prisma client..."
             npx prisma generate
-
-            echo "Building SvelteKit..."
-            RAYON_NUM_THREADS=1 npm run build
 
             echo "Stopping old IBL6 process..."
             if [ -f ibl6.pid ] && kill -0 "$(cat ibl6.pid)" 2>/dev/null; then

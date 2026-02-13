@@ -104,7 +104,7 @@ jobs:
             npx prisma generate
 
             echo "Building SvelteKit..."
-            npm run build
+            RAYON_NUM_THREADS=1 npm run build
 
             echo "Stopping old IBL6 process..."
             if [ -f ibl6.pid ] && kill -0 "$(cat ibl6.pid)" 2>/dev/null; then

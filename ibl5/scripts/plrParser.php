@@ -162,7 +162,7 @@ while (!feof($plrFile)) {
     $PFDepth = intval(substr($line, 135, 1));
     $CDepth = intval(substr($line, 136, 1));
     $active = intval(substr($line, 137, 1));
-    // 138,2 = ?
+    // 138,2 = JSB5 internal sim engine variable (default 39, fluctuates during simulation)
     $injuryDaysLeft = intval(substr($line, 140, 4));
     $seasonGamesStarted = intval(substr($line, 144, 4));
     $seasonGamesPlayed = intval(substr($line, 148, 4));
@@ -208,19 +208,21 @@ while (!feof($plrFile)) {
     $bird = intval(substr($line, 288, 2));
     $currentContractYear = intval(substr($line, 290, 2));
     $totalContractYears = intval(substr($line, 292, 2));
-    // 294,4 = ?
+    // 294,4 = unused/reserved (always 0)
     $contractYear1 = intval(substr($line, 298, 4));
     $contractYear2 = intval(substr($line, 302, 4));
     $contractYear3 = intval(substr($line, 306, 4));
     $contractYear4 = intval(substr($line, 310, 4));
     $contractYear5 = intval(substr($line, 314, 4));
     $contractYear6 = intval(substr($line, 318, 4));
-    // 322,4 = ? (always 1111)
+    // 322,4 = constant sentinel (always 1111)
     $draftRound = intval(substr($line, 326, 2));
     $draftPickNumber = intval(substr($line, 328, 2));
-    // 330 = ?
+    $freeAgentSigningFlag = intval(substr($line, 330, 1)); // 1 = signed as free agent (always correlates with bird=1), 0 = drafted/traded/continuing
     $contractOwnedBy = intval(substr($line, 331, 2));
-    // 333-340 = ?
+    $currentTeamIndex = intval(substr($line, 333, 2)); // 0-based team index (tid - 1), -1 for free agents
+    $previousTeamIndex = intval(substr($line, 335, 2)); // 0-based previous team index (tid - 1), -1 = signed from free agency, differs from current = mid-season trade
+    $seasonAwards = trim(substr($line, 337, 4)); // per-player season awards/achievements (zeroed at HEAT, accumulated by Finals)
     $seasonHighPTS = intval(substr($line, 341, 2));
     $seasonHighREB = intval(substr($line, 343, 2));
     $seasonHighAST = intval(substr($line, 345, 2));
@@ -260,8 +262,9 @@ while (!feof($plrFile)) {
     $careerTVR = intval(substr($line, 497, 5));
     $careerBLK = intval(substr($line, 502, 5));
     $careerPF = intval(substr($line, 507, 5));
-    // 512-543 = blank
-    // 544-549 = ?
+    $injuryDescription = trim(substr($line, 512, 32)); // 32-char injury text (e.g. "Lower back pain", "Mild concussion"), blank when healthy
+    $playerMorale = intval(substr($line, 544, 2)); // player form/morale rating (1-9 scale), dynamic per sim run
+    // 546,4 = constant (always 1000)
     $heightInches = intval(substr($line, 550, 2));
     $weight = intval(substr($line, 552, 3));
     $rating2GA = intval(substr($line, 555, 3));

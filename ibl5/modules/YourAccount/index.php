@@ -146,7 +146,7 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
 
 function finishNewUser($username, $user_email, $user_password, $random_num, $gfx_check)
 {
-    global $stop, $EditedMessage, $adminmail, $sitename, $Default_Theme, $user_prefix, $db, $storyhome, $module_name, $nukeurl;
+    global $stop, $EditedMessage, $adminmail, $sitename, $Default_Theme, $user_prefix, $db, $storyhome, $module_name, $nukeurl, $authService;
     Nuke\Header::header();
     include "config.php";
     userCheck($username, $user_email);
@@ -167,8 +167,7 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
         $check_num = md5($check_num);
         $time = time();
         $finishlink = "$nukeurl/modules.php?name=$module_name&op=activate&username=$username&check_num=$check_num";
-        $new_password = md5($user_password);
-        $new_password = htmlspecialchars(stripslashes($new_password));
+        $new_password = $authService->hashPassword($user_password);
         $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
         $username = rtrim($username, "\\");
         $username = str_replace("'", "\'", $username);
@@ -760,11 +759,11 @@ function pass_lost()
 
 function logout()
 {
-    global $prefix, $db, $user, $cookie, $redirect;
-    cookiedecode($user);
-    $r_uid = $cookie[0];
-    $r_username = $cookie[1];
-    // SECURITY: Clear user cookie with secure options
+    global $prefix, $db, $user, $cookie, $redirect, $authService, $mysqli_db;
+    $r_username = $authService->getUsername();
+    // Clear session auth
+    $authService->logout();
+    // Clear legacy cookie (in case browser still has one)
     setcookie("user", "", [
         'expires' => 1,
         'path' => '/',
@@ -772,7 +771,13 @@ function logout()
         'httponly' => true,
         'samesite' => 'Strict',
     ]);
-    $db->sql_query("DELETE FROM " . $prefix . "_session WHERE uname='$r_username'");
+    // Remove session record
+    if ($r_username !== null) {
+        $stmt = $mysqli_db->prepare("DELETE FROM " . $prefix . "_session WHERE uname = ?");
+        $stmt->bind_param('s', $r_username);
+        $stmt->execute();
+        $stmt->close();
+    }
     $user = "";
     $cookie = "";
     Nuke\Header::header();
@@ -789,11 +794,11 @@ function logout()
 
 function mail_password($username, $code)
 {
-    global $sitename, $adminmail, $nukeurl, $user_prefix, $db, $module_name;
+    global $sitename, $adminmail, $nukeurl, $user_prefix, $db, $module_name, $authService, $mysqli_db;
     $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
     $username = rtrim($username, "\\");
     $username = str_replace("'", "\'", $username);
-    $sql = "SELECT user_email, user_password FROM " . $user_prefix . "_users WHERE username='$username'";
+    $sql = "SELECT user_email, user_actkey FROM " . $user_prefix . "_users WHERE username='$username'";
     $result = $db->sql_query($sql);
     if ($db->sql_numrows($result) == 0) {
         Nuke\Header::header();
@@ -805,138 +810,79 @@ function mail_password($username, $code)
         $host_name = $_SERVER['REMOTE_ADDR'];
         $row = $db->sql_fetchrow($result);
         $user_email = filter($row['user_email'], "nohtml");
-        $user_password = $row['user_password'];
-        $user_password = htmlspecialchars(stripslashes($user_password));
-        $areyou = substr($user_password, 0, 10);
-        if ($areyou == $code) {
+        // Use user_actkey as reset verification code (no longer derived from password hash)
+        $storedCode = $row['user_actkey'] ?? '';
+        if ($storedCode !== '' && $storedCode === $code) {
             $newpass = makepass();
             $message = "" . _USERACCOUNT . " '$username' " . _AT . " $sitename " . _HASTHISEMAIL . "  " . _AWEBUSERFROM . " $host_name " . _HASREQUESTED . "\n\n" . _YOURNEWPASSWORD . " $newpass\n\n " . _YOUCANCHANGE . " $nukeurl/modules.php?name=$module_name\n\n" . _IFYOUDIDNOTASK . "";
             $subject = "" . _USERPASSWORD4 . " $username";
             mail($user_email, $subject, $message, "From: $adminmail\nX-Mailer: PHP/" . phpversion());
-            /* Next step: add the new password to the database */
-            $cryptpass = md5($newpass);
-            $query = "UPDATE " . $user_prefix . "_users SET user_password='$cryptpass' WHERE username='$username'";
-            if (!$db->sql_query($query)) {
-                echo "" . _UPDATEFAILED . "";
-            }
+            /* Update password and clear the reset code */
+            $cryptpass = $authService->hashPassword($newpass);
+            $stmtReset = $mysqli_db->prepare("UPDATE " . $user_prefix . "_users SET user_password = ?, user_actkey = NULL WHERE username = ?");
+            $stmtReset->bind_param('ss', $cryptpass, $username);
+            $stmtReset->execute();
+            $stmtReset->close();
             Nuke\Header::header();
             OpenTable();
             echo "<center>" . _PASSWORD4 . " $username " . _MAILED . "<br><br>" . _GOBACK . "</center>";
             CloseTable();
             Nuke\Footer::footer();
-            /* If no Code, send it */
         } else {
-            $sql = "SELECT user_email, user_password FROM " . $user_prefix . "_users WHERE username='$username'";
-            $result = $db->sql_query($sql);
-            if ($db->sql_numrows($result) == 0) {
-                Nuke\Header::header();
-                OpenTable();
-                echo "<center>" . _SORRYNOUSERINFO . "</center>";
-                CloseTable();
-                Nuke\Footer::footer();
-            } else {
-                $host_name = $_SERVER['REMOTE_ADDR'];
-                $row = $db->sql_fetchrow($result);
-                $user_email = filter($row['user_email'], "nohtml");
-                $user_password = $row['user_password'];
-                $areyou = substr($user_password, 0, 10);
-                $message = "" . _USERACCOUNT . " '$username' " . _AT . " $sitename " . _HASTHISEMAIL . " " . _AWEBUSERFROM . " $host_name " . _CODEREQUESTED . "\n\n" . _YOURCODEIS . " $areyou \n\n" . _WITHTHISCODE . " $nukeurl/modules.php?name=$module_name&op=pass_lost\n" . _IFYOUDIDNOTASK2 . "";
-                $subject = "" . _CODEFOR . " $username";
-                mail($user_email, $subject, $message, "From: $adminmail\nX-Mailer: PHP/" . phpversion());
-                Nuke\Header::header();
-                OpenTable();
-                echo "<center>" . _CODEFOR . " $username " . _MAILED . "<br><br>" . _GOBACK . "</center>";
-                CloseTable();
-                Nuke\Footer::footer();
-            }
+            /* Generate a new reset code and email it */
+            $resetCode = substr(bin2hex(random_bytes(5)), 0, 10);
+            $stmtCode = $mysqli_db->prepare("UPDATE " . $user_prefix . "_users SET user_actkey = ? WHERE username = ?");
+            $stmtCode->bind_param('ss', $resetCode, $username);
+            $stmtCode->execute();
+            $stmtCode->close();
+            $message = "" . _USERACCOUNT . " '$username' " . _AT . " $sitename " . _HASTHISEMAIL . " " . _AWEBUSERFROM . " $host_name " . _CODEREQUESTED . "\n\n" . _YOURCODEIS . " $resetCode \n\n" . _WITHTHISCODE . " $nukeurl/modules.php?name=$module_name&op=pass_lost\n" . _IFYOUDIDNOTASK2 . "";
+            $subject = "" . _CODEFOR . " $username";
+            mail($user_email, $subject, $message, "From: $adminmail\nX-Mailer: PHP/" . phpversion());
+            Nuke\Header::header();
+            OpenTable();
+            echo "<center>" . _CODEFOR . " $username " . _MAILED . "<br><br>" . _GOBACK . "</center>";
+            CloseTable();
+            Nuke\Footer::footer();
         }
     }
 }
 
 function docookie($setuid, $setusername, $setpass, $setstorynum, $setumode, $setuorder, $setthold, $setnoscore, $setublockon, $settheme, $setcommentmax)
 {
-    $info = base64_encode("$setuid:$setusername:$setpass:$setstorynum:$setumode:$setuorder:$setthold:$setnoscore:$setublockon:$settheme:$setcommentmax");
-    // SECURITY: Set user cookie with secure options
-    $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
-    setcookie("user", "$info", [
-        'expires' => time() + 2592000,
-        'path' => '/',
-        'secure' => $isHttps,
-        'httponly' => true,
-        'samesite' => 'Strict',
-    ]);
+    // No-op: Auth is now session-based via AuthService. Retained for call-site compat.
 }
 
 function login($username, $user_password, $redirect, $mode, $f, $t, $random_num, $gfx_check)
 {
-    global $setinfo, $user_prefix, $db, $mysqli_db, $module_name, $pm_login, $prefix;
+    global $authService, $user_prefix, $db, $mysqli_db, $module_name, $pm_login, $prefix;
     $user_password = htmlspecialchars(stripslashes($user_password));
     include "config.php";
 
-    // SECURITY: Use prepared statement for user lookup
-    $stmt = $mysqli_db->prepare(
-        "SELECT user_password, user_id, storynum, umode, uorder, thold, noscore, ublockon, theme, commentmax
-         FROM " . $user_prefix . "_users WHERE username = ?"
-    );
-    $stmt->bind_param('s', $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $setinfo = $result->fetch_assoc();
-    $numRows = $result->num_rows;
-    $stmt->close();
+    // CAPTCHA check
+    $datekey = date("F j");
+    $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $random_num . $datekey));
+    $code = substr($rcode, 2, 6);
+    if (extension_loaded("gd") and $code != $gfx_check and ($gfx_chk == 2 or $gfx_chk == 4 or $gfx_chk == 5 or $gfx_chk == 7)) {
+        Header("Location: modules.php?name=$module_name&stop=1");
+        die();
+    }
 
-    $forward = str_replace("redirect=", "", "$redirect");
-    if (($numRows == 1) and ($setinfo['user_id'] != 1) and (!empty($setinfo['user_password']))) {
-        $dbpass = $setinfo['user_password'];
-        $non_crypt_pass = $user_password;
-        $old_crypt_pass = crypt($user_password, substr($dbpass, 0, 2));
-        $new_pass = md5($user_password);
-        if (($dbpass == $non_crypt_pass) or ($dbpass == $old_crypt_pass)) {
-            // SECURITY: Use prepared statement for password update
-            $stmtUpdate = $mysqli_db->prepare("UPDATE " . $user_prefix . "_users SET user_password = ? WHERE username = ?");
-            $stmtUpdate->bind_param('ss', $new_pass, $username);
-            $stmtUpdate->execute();
-            $stmtUpdate->close();
+    // Authenticate via AuthService (handles bcrypt + MD5 transitional upgrade)
+    if ($authService->attempt($username, $user_password)) {
+        $uname = $_SERVER['REMOTE_ADDR'];
 
-            // Re-fetch the password
-            $stmtPass = $mysqli_db->prepare("SELECT user_password FROM " . $user_prefix . "_users WHERE username = ?");
-            $stmtPass->bind_param('s', $username);
-            $stmtPass->execute();
-            $passResult = $stmtPass->get_result();
-            $row = $passResult->fetch_assoc();
-            $stmtPass->close();
-            $dbpass = $row['user_password'];
-        }
-        if ($dbpass != $new_pass) {
-            Header("Location: modules.php?name=$module_name&stop=1");
-            return;
-        }
-        $datekey = date("F j");
-        $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $random_num . $datekey));
-        $code = substr($rcode, 2, 6);
-        if (extension_loaded("gd") and $code != $gfx_check and ($gfx_chk == 2 or $gfx_chk == 4 or $gfx_chk == 5 or $gfx_chk == 7)) {
-            Header("Location: modules.php?name=$module_name&stop=1");
-            die();
-        } else {
-            // SECURITY: Regenerate session ID to prevent session fixation
-            if (session_status() === PHP_SESSION_ACTIVE) {
-                session_regenerate_id(true);
-            }
+        // Clean up guest session for this IP
+        $stmtDelSession = $mysqli_db->prepare("DELETE FROM " . $prefix . "_session WHERE uname = ? AND guest = '1'");
+        $stmtDelSession->bind_param('s', $uname);
+        $stmtDelSession->execute();
+        $stmtDelSession->close();
 
-            docookie($setinfo['user_id'], $username, $new_pass, $setinfo['storynum'], $setinfo['umode'], $setinfo['uorder'], $setinfo['thold'], $setinfo['noscore'], $setinfo['ublockon'], $setinfo['theme'], $setinfo['commentmax']);
-            $uname = $_SERVER['REMOTE_ADDR'];
+        // Record last IP
+        $stmtUpdateIp = $mysqli_db->prepare("UPDATE " . $prefix . "_users SET last_ip = ? WHERE username = ?");
+        $stmtUpdateIp->bind_param('ss', $uname, $username);
+        $stmtUpdateIp->execute();
+        $stmtUpdateIp->close();
 
-            // SECURITY: Use prepared statements for session cleanup
-            $stmtDelSession = $mysqli_db->prepare("DELETE FROM " . $prefix . "_session WHERE uname = ? AND guest = '1'");
-            $stmtDelSession->bind_param('s', $uname);
-            $stmtDelSession->execute();
-            $stmtDelSession->close();
-
-            $stmtUpdateIp = $mysqli_db->prepare("UPDATE " . $prefix . "_users SET last_ip = ? WHERE username = ?");
-            $stmtUpdateIp->bind_param('ss', $uname, $username);
-            $stmtUpdateIp->execute();
-            $stmtUpdateIp->close();
-        }
         Header("Location: modules.php?name=YourAccount&op=userinfo&bypass=1&username=$username");
     } else {
         Header("Location: modules.php?name=$module_name&stop=1");
@@ -1175,16 +1121,13 @@ function edituser()
 
 function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $user_aim, $user_yim, $user_msnm, $user_from, $user_occ, $user_interests, $newsletter, $user_viewemail, $user_allow_viewonline, $user_notify, $user_attachsig, $user_allowbbcode, $user_allowhtml, $user_allowsmile, $user_timezone, $user_dateformat, $user_sig, $bio, $user_password, $vpass, $username, $user_id)
 {
-    global $user, $cookie, $userinfo, $EditedMessage, $user_prefix, $db, $module_name, $minpass;
+    global $user, $cookie, $userinfo, $EditedMessage, $user_prefix, $db, $module_name, $minpass, $authService;
     $user_password = htmlspecialchars(stripslashes($user_password));
     cookiedecode($user);
     $check = $cookie[1];
     $check = filter($check, "nohtml", 1);
-    $check2 = $cookie[2];
     $row = \DatabaseConnection::fetchRow("SELECT user_id, user_password FROM nuke_users WHERE username = ?", [$check]);
     $vuid = intval($row['user_id']);
-    $ccpass = filter($row['user_password'], "nohtml", 1);
-    $ccpass = htmlspecialchars(stripslashes($ccpass));
     $user_sig = filter($user_sig, "", 1);
     $user_email = filter($user_email, "nohtml", 1);
     $femail = filter($femail, "nohtml", 1);
@@ -1199,7 +1142,8 @@ function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $us
     $user_interests = filter($user_interests, "nohtml", 1);
     $realname = filter($realname, "nohtml", 1);
     $user_avatar = "$user_avatar";
-    if (($user_id == $vuid) and ($check2 == $ccpass)) {
+    // Authorization: session-based auth verifies the user; compare user_id for ownership
+    if (is_user($user) and ($user_id == $vuid)) {
         if (!preg_match('#^http[s]?:\/\/#i', $user_website)) {
             $user_website = "http://" . $user_website;
         }
@@ -1217,7 +1161,7 @@ function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $us
             if (!empty($user_password)) {
                 cookiedecode($user);
                 $db->sql_query("LOCK TABLES " . $user_prefix . "_users WRITE");
-                $user_password = md5($user_password);
+                $user_password = $authService->hashPassword($user_password);
                 $newsletter = intval($newsletter);
                 $user_allow_viewonline = intval($user_allow_viewonline);
                 $user_notify = intval($user_notify);
@@ -1371,11 +1315,10 @@ function savehome($user_id, $username, $storynum, $ublockon, $ublock, $broadcast
     cookiedecode($user);
     $check = $cookie[1];
     $check = filter($check, "nohtml", 1);
-    $check2 = $cookie[2];
-    $row = \DatabaseConnection::fetchRow("SELECT user_id, user_password FROM nuke_users WHERE username = ?", [$check]);
+    $row = \DatabaseConnection::fetchRow("SELECT user_id FROM nuke_users WHERE username = ?", [$check]);
     $vuid = intval($row['user_id']);
-    $ccpass = filter($row['user_password'], "nohtml", 1);
-    if (($user_id == $vuid) and ($check2 == $ccpass)) {
+    // Authorization: session-based auth verifies the user; compare user_id for ownership
+    if (is_user($user) and ($user_id == $vuid)) {
         if (isset($ublockon)) {
             $ublockon = 1;
         } else {
@@ -1403,12 +1346,11 @@ function savetheme($user_id, $theme)
     $user_id = intval($user_id);
     $check = $cookie[1];
     $check = filter($check, "nohtml", 1);
-    $check2 = $cookie[2];
     $theme_error = "";
-    $row = \DatabaseConnection::fetchRow("SELECT user_id, user_password FROM nuke_users WHERE username = ?", [$check]);
+    $row = \DatabaseConnection::fetchRow("SELECT user_id FROM nuke_users WHERE username = ?", [$check]);
     $vuid = intval($row['user_id']);
-    $ccpass = filter($row['user_password'], "nohtml", 1);
-    if (($user_id == $vuid) and ($check2 == $ccpass)) {
+    // Authorization: session-based auth verifies the user; compare user_id for ownership
+    if (is_user($user) and ($user_id == $vuid)) {
         $db->sql_query("UPDATE " . $user_prefix . "_users SET user_style='$theme_id' WHERE user_id='$user_id'");
         $db->sql_query("UPDATE " . $user_prefix . "_users SET theme='$theme' WHERE user_id='$user_id'");
         getusrinfo($user);
@@ -1488,11 +1430,10 @@ function savecomm($user_id, $username, $umode, $uorder, $thold, $noscore, $comme
     global $user, $cookie, $userinfo, $user_prefix, $db, $module_name;
     cookiedecode($user);
     $check = $cookie[1];
-    $check2 = $cookie[2];
-    $row = \DatabaseConnection::fetchRow("SELECT user_id, user_password FROM nuke_users WHERE username = ?", [$check]);
+    $row = \DatabaseConnection::fetchRow("SELECT user_id FROM nuke_users WHERE username = ?", [$check]);
     $vuid = intval($row['user_id']);
-    $ccpass = filter($row['user_password'], "nohtml", 1);
-    if (($user_id == $vuid) and ($check2 == $ccpass)) {
+    // Authorization: session-based auth verifies the user; compare user_id for ownership
+    if (is_user($user) and ($user_id == $vuid)) {
         if (isset($noscore)) {
             $noscore = 1;
         } else {

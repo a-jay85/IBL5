@@ -187,5 +187,8 @@
         <testsuite name="Topics Module Tests">
             <directory>tests/Topics</directory>
         </testsuite>
+        <testsuite name="LeagueConfig Module Tests">
+            <directory>tests/LeagueConfig</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

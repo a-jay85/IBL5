@@ -51,6 +51,32 @@ echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="vie
     . '<link rel="stylesheet" href="' . $stylesheetPath . $cacheBuster . '">'
     . '</head><body>';
 
+// League config (.lge) check
+$season = new \Season($mysqli_db);
+$lgeRepo = new LeagueConfig\LeagueConfigRepository($mysqli_db);
+$lgeService = new LeagueConfig\LeagueConfigService($lgeRepo);
+$lgeView = new LeagueConfig\LeagueConfigView();
+
+$defaultLgePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5/IBL5.lge';
+
+if (!$lgeService->hasConfigForCurrentSeason($season->endingYear)) {
+    if (is_file($defaultLgePath)) {
+        $lgeResult = $lgeService->processLgeFile($defaultLgePath);
+        echo $lgeView->renderParseResult($lgeResult);
+
+        if ($lgeResult['success']) {
+            $discrepancies = $lgeService->crossCheckWithFranchiseSeasons(
+                $lgeResult['season_ending_year'],
+            );
+            if ($discrepancies !== []) {
+                echo $lgeView->renderCrossCheckResults($discrepancies);
+            }
+        }
+    } else {
+        echo $lgeView->renderLgeNeededNotification($season->endingYear);
+    }
+}
+
 $defaultScoPath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5/IBL5.sco';
 if (is_file($defaultScoPath)) {
     $processor = new Boxscore\BoxscoreProcessor($mysqli_db);

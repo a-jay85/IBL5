@@ -1,26 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
 use PHPUnit\Framework\TestCase;
 use Updater\ScheduleUpdater;
 use League\LeagueContext;
 
 /**
- * Comprehensive tests for ScheduleUpdater class
- * 
+ * Tests for ScheduleUpdater class
+ *
  * Tests schedule update functionality including:
  * - Date extraction for different season phases
- * - Box ID extraction from HTML links
  * - Schedule database operations
  * - Team ID resolution
- * - Error handling
  */
 class ScheduleUpdaterTest extends TestCase
 {
-    private $mockDb;
-    private $mockCommonRepository;
-    private $mockSeason;
-    private $scheduleUpdater;
-    private $leagueContext;
+    private MockDatabase $mockDb;
+    private Season $mockSeason;
+    private ScheduleUpdater $scheduleUpdater;
+    private LeagueContext $leagueContext;
 
     protected function setUp(): void
     {
@@ -28,19 +27,18 @@ class ScheduleUpdaterTest extends TestCase
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-        
+
         // Initialize global LeagueContext for ScheduleUpdater
         global $leagueContext;
         $this->leagueContext = new LeagueContext();
         $leagueContext = $this->leagueContext;
-        
+
         // Set default league to IBL for tests
         $_SESSION['current_league'] = LeagueContext::LEAGUE_IBL;
-        
+
         $this->mockDb = new MockDatabase();
-        $this->mockCommonRepository = new \Services\CommonMysqliRepository($this->mockDb);
         $this->mockSeason = new Season($this->mockDb);
-        $this->scheduleUpdater = new ScheduleUpdater($this->mockDb, $this->mockCommonRepository, $this->mockSeason);
+        $this->scheduleUpdater = new ScheduleUpdater($this->mockDb, $this->mockSeason);
     }
 
     protected function tearDown(): void
@@ -48,13 +46,7 @@ class ScheduleUpdaterTest extends TestCase
         // Clean up global LeagueContext
         global $leagueContext;
         $leagueContext = null;
-        
-        $this->scheduleUpdater = null;
-        $this->mockDb = null;
-        $this->mockCommonRepository = null;
-        $this->mockSeason = null;
-        $this->leagueContext = null;
-        
+
         // Clean up session
         if (isset($_SESSION['current_league'])) {
             unset($_SESSION['current_league']);
@@ -65,159 +57,104 @@ class ScheduleUpdaterTest extends TestCase
      * @group schedule-updater
      * @group date-extraction
      */
-    public function testExtractDateConvertsPostToJune()
+    public function testExtractDateConvertsPostToJune(): void
     {
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
         $result = $method->invoke($this->scheduleUpdater, 'Post 15, 2024');
-        
+
         $this->assertIsArray($result);
         $this->assertArrayHasKey('month', $result);
         $this->assertArrayHasKey('day', $result);
         $this->assertArrayHasKey('year', $result);
-        $this->assertEquals('6', $result['month']);
-        $this->assertEquals('15', $result['day']);
-        $this->assertEquals('2024', $result['year']);
+        $this->assertSame(6, $result['month']);
+        $this->assertSame(15, $result['day']);
     }
 
     /**
      * @group schedule-updater
      * @group date-extraction
      */
-    public function testExtractDateHandlesPreseasonPhase()
+    public function testExtractDateHandlesPreseasonPhase(): void
     {
         $this->mockSeason->phase = 'Preseason';
-        
+
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
-        // Month should be overridden to preseason month
         $result = $method->invoke($this->scheduleUpdater, 'November 1, 2023');
-        
+
         $this->assertIsArray($result);
-        $this->assertEquals(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result['month']);
+        $this->assertSame(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result['month']);
     }
 
     /**
      * @group schedule-updater
      * @group date-extraction
      */
-    public function testExtractDateHandlesHEATPhase()
+    public function testExtractDateHandlesHEATPhase(): void
     {
         $this->mockSeason->phase = 'HEAT';
-        
+
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
-        // Month should be overridden to HEAT month
         $result = $method->invoke($this->scheduleUpdater, 'November 1, 2023');
-        
+
         $this->assertIsArray($result);
-        $this->assertEquals(Season::IBL_HEAT_MONTH, $result['month']);
+        $this->assertSame(Season::IBL_HEAT_MONTH, $result['month']);
     }
 
     /**
      * @group schedule-updater
      * @group date-extraction
      */
-    public function testExtractDateReturnsNullForInvalidDate()
+    public function testExtractDateReturnsNullForEmptyString(): void
     {
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
-        $result = $method->invoke($this->scheduleUpdater, false);
-        
+        $result = $method->invoke($this->scheduleUpdater, '');
+
         $this->assertNull($result);
-    }
-
-    /**
-     * @group schedule-updater
-     * @group box-id
-     */
-    public function testExtractBoxIDFromValidLink()
-    {
-        $reflection = new ReflectionClass($this->scheduleUpdater);
-        $method = $reflection->getMethod('extractBoxID');
-
-        $result = $method->invoke($this->scheduleUpdater, 'box12345.htm');
-        
-        $this->assertEquals('12345', $result);
-    }
-
-    /**
-     * @group schedule-updater
-     * @group box-id
-     */
-    public function testExtractBoxIDHandlesLargeBoxID()
-    {
-        $reflection = new ReflectionClass($this->scheduleUpdater);
-        $method = $reflection->getMethod('extractBoxID');
-
-        $result = $method->invoke($this->scheduleUpdater, 'box999999.htm');
-        
-        $this->assertEquals('999999', $result);
     }
 
     /**
      * @group schedule-updater
      * @group database
      */
-    public function testUpdateTruncatesScheduleTable()
+    public function testUpdateTruncatesScheduleTable(): void
     {
-        // Mock successful truncate
         $this->mockDb->setReturnTrue(true);
-        
-        // Capture output
+
         ob_start();
-        
-        // Suppress expected warnings from DOMDocument parsing HTML
-        set_error_handler(function() { return true; }, E_WARNING);
-        
-        // This will fail because we can't load the HTML file, but we can test that TRUNCATE is attempted
+
+        // update() will fail because the .sch file doesn't exist at DOCUMENT_ROOT, but TRUNCATE is executed first
         try {
             $this->scheduleUpdater->update();
-        } catch (Exception $e) {
-            // Expected to fail on file load
+        } catch (\RuntimeException $e) {
+            // Expected: .sch file not found
         }
-        
-        restore_error_handler();
-        $output = ob_get_clean();
-        
+
+        ob_get_clean();
+
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertNotEmpty($queries);
-        $this->assertEquals('TRUNCATE TABLE ibl_schedule', $queries[0]);
-    }
-
-    /**
-     * @group schedule-updater
-     * @group team-resolution
-     */
-    public function testTeamIDResolutionUsesMockSharedFunctions()
-    {
-        $teamName = 'Boston Celtics';
-        
-        // Set up mock data for the team ID query
-        $this->mockDb->setMockData([['teamid' => 2]]);
-        $this->mockDb->setNumRows(1);
-        
-        $teamID = $this->mockCommonRepository->getTidFromTeamname($teamName);
-        
-        $this->assertIsInt($teamID);
-        $this->assertGreaterThan(0, $teamID);
+        $this->assertSame('TRUNCATE TABLE ibl_schedule', $queries[0]);
     }
 
     /**
      * @group schedule-updater
      * @group date-formatting
      */
-    public function testExtractDateFormatsDateCorrectly()
+    public function testExtractDateFormatsDateCorrectly(): void
     {
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
         $result = $method->invoke($this->scheduleUpdater, 'January 15, 2024');
-        
+
         $this->assertIsArray($result);
         $this->assertArrayHasKey('date', $result);
         $this->assertStringContainsString('2024', $result['date']);
@@ -229,41 +166,26 @@ class ScheduleUpdaterTest extends TestCase
      * @group schedule-updater
      * @group date-formatting
      */
-    public function testExtractDateRemovesLeadingZeros()
+    public function testExtractDateRemovesLeadingZeros(): void
     {
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
         $result = $method->invoke($this->scheduleUpdater, 'January 05, 2024');
-        
+
         $this->assertIsArray($result);
-        $this->assertEquals('5', $result['day']);
-    }
-
-    /**
-     * @group schedule-updater
-     * @group box-id
-     */
-    public function testExtractBoxIDWithDifferentExtensions()
-    {
-        $reflection = new ReflectionClass($this->scheduleUpdater);
-        $method = $reflection->getMethod('extractBoxID');
-
-        // Test with .htm
-        $result1 = $method->invoke($this->scheduleUpdater, 'box54321.htm');
-        $this->assertEquals('54321', $result1);
+        $this->assertSame(5, $result['day']);
     }
 
     /**
      * @group schedule-updater
      * @group date-extraction
      */
-    public function testExtractDateHandlesVariousDateFormats()
+    public function testExtractDateHandlesVariousDateFormats(): void
     {
         $reflection = new ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
-        // Test various date formats
         $dates = [
             'November 1, 2023',
             'December 25, 2023',

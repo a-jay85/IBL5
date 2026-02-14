@@ -35,6 +35,12 @@ jobs:
         env:
           DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
 
+      - name: Stop IBL6 to free resources for deploy
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            pkill -f "node build/index[.]js" && sleep 2 && echo "IBL6 stopped" || echo "IBL6 was not running"
+          '
+
       - name: Pull latest code on server
         run: ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} "cd www && git pull origin"
 
@@ -90,33 +96,38 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Deploy and restart IBL6
+      - name: Build IBL6
+        if: steps.ibl6-changes.outputs.changed == 'true'
+        run: npm ci && npm run build
+        working-directory: IBL6
+
+      - name: Deploy IBL6 build to server
+        if: steps.ibl6-changes.outputs.changed == 'true'
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} 'rm -rf www/IBL6/build'
+          scp -r -P ${{ secrets.PORT }} -i ~/.ssh/id_deploy IBL6/build ${{ secrets.USERNAME }}@${{ secrets.HOST }}:www/IBL6/
+
+      - name: Install IBL6 deps and deploy build
         if: steps.ibl6-changes.outputs.changed == 'true'
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
             set -e
             cd www/IBL6
 
-            echo "Installing dependencies..."
-            npm ci --ignore-engines
+            echo "Installing production dependencies..."
+            npm ci --omit=dev
 
             echo "Generating Prisma client..."
             npx prisma generate
+          '
 
-            echo "Building SvelteKit..."
-            npm run build
-
-            echo "Stopping old IBL6 process..."
-            if [ -f ibl6.pid ] && kill -0 "$(cat ibl6.pid)" 2>/dev/null; then
-              kill "$(cat ibl6.pid)"
-              sleep 2
-            fi
-
-            echo "Starting IBL6..."
+      - name: Start IBL6
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            cd www/IBL6
             mkdir -p logs
-            setsid node build/index.js > logs/ibl6.log 2>&1 < /dev/null &
+            setsid env PORT=3001 node build/index.js > logs/ibl6.log 2>&1 < /dev/null &
             echo $! > ibl6.pid
             sleep 1
-
-            echo "IBL6 deployed successfully (PID: $(cat ibl6.pid))"
+            echo "IBL6 started (PID: $(cat ibl6.pid))"
           '

@@ -6,6 +6,7 @@ namespace RecordHolders;
 
 use RecordHolders\Contracts\RecordBreakingDetectorInterface;
 use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
+use Utilities\BoxScoreUrlBuilder;
 
 /**
  * RecordBreakingDetector - Detects and announces broken/tied all-time IBL records.
@@ -19,6 +20,8 @@ use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
 class RecordBreakingDetector implements RecordBreakingDetectorInterface
 {
     private RecordHoldersRepositoryInterface $repository;
+
+    private const SITE_BASE_URL = 'https://iblhoops.net';
 
     /**
      * Player single-game stat expressions and labels.
@@ -160,13 +163,17 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
             if (isset($targetDates[$record['date']]) && $record['value'] === $topValue) {
                 $announcements[] = $this->formatPlayerRecordMessage(
                     $record['name'],
+                    $record['pid'],
                     $record['team_name'],
                     $record['value'],
                     $statUnit,
                     $previous['name'],
                     $previous['value'],
                     $gameTypeLabel,
-                    $isTied
+                    $isTied,
+                    $record['date'],
+                    $record['gameOfThatDay'],
+                    $record['BoxID']
                 );
             }
         }
@@ -216,7 +223,10 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
                     $previous['value'],
                     $gameTypeLabel,
                     $isTied,
-                    $isAscending
+                    $isAscending,
+                    $record['date'],
+                    $record['gameOfThatDay'],
+                    $record['BoxID']
                 );
             }
         }
@@ -243,13 +253,17 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
                 $gameTypeLabel = self::GAME_TYPE_LABELS[$gameType] ?? 'regular season';
                 $announcements[] = $this->formatQuadrupleDoubleMessage(
                     $qd['name'],
+                    $qd['pid'],
                     $qd['team_name'],
                     $qd['points'],
                     $qd['rebounds'],
                     $qd['assists'],
                     $qd['steals'],
                     $qd['blocks'],
-                    $gameTypeLabel
+                    $gameTypeLabel,
+                    $qd['date'],
+                    $qd['gameOfThatDay'],
+                    $qd['BoxID']
                 );
             }
         }
@@ -313,24 +327,33 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
      */
     private function formatPlayerRecordMessage(
         string $playerName,
+        int $pid,
         string $teamName,
         int $newValue,
         string $statUnit,
         string $previousHolder,
         int $previousValue,
         string $gameTypeLabel,
-        bool $isTied
+        bool $isTied,
+        string $date,
+        int $gameOfThatDay,
+        int $boxId
     ): string {
+        $playerLink = '[' . $playerName . '](' . self::SITE_BASE_URL . '/modules.php?name=Player&pa=showpage&pid=' . $pid . ')';
+        $boxScoreUrl = BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxId);
+        $statText = $newValue . ' ' . $statUnit;
+        $linkedStat = $boxScoreUrl !== '' ? '[**' . $statText . '**](' . $boxScoreUrl . ')' : '**' . $statText . '**';
+
         if ($isTied) {
             return "**IBL RECORD TIED!**\n"
-                . $playerName . ' (' . $teamName . ') just recorded **' . $newValue . ' ' . $statUnit
-                . '** in a ' . $gameTypeLabel . ' game, tying '
+                . $playerLink . ' (' . $teamName . ') just recorded ' . $linkedStat
+                . ' in a ' . $gameTypeLabel . ' game, tying '
                 . $previousHolder . "'s all-time record!";
         }
 
         return "**NEW IBL RECORD!**\n"
-            . $playerName . ' (' . $teamName . ') just recorded **' . $newValue . ' ' . $statUnit
-            . '** in a ' . $gameTypeLabel . ' game, breaking '
+            . $playerLink . ' (' . $teamName . ') just recorded ' . $linkedStat
+            . ' in a ' . $gameTypeLabel . ' game, breaking '
             . $previousHolder . "'s all-time record of " . $previousValue . ' ' . $statUnit . '!';
     }
 
@@ -345,20 +368,26 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         int $previousValue,
         string $gameTypeLabel,
         bool $isTied,
-        bool $isAscending
+        bool $isAscending,
+        string $date,
+        int $gameOfThatDay,
+        int $boxId
     ): string {
         $label = ($isAscending ? 'fewest ' : 'most ') . $statUnit;
+        $boxScoreUrl = BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxId);
+        $statText = $newValue . ' ' . $label;
+        $linkedStat = $boxScoreUrl !== '' ? '[**' . $statText . '**](' . $boxScoreUrl . ')' : '**' . $statText . '**';
 
         if ($isTied) {
             return "**IBL TEAM RECORD TIED!**\n"
-                . 'The ' . $teamName . ' just recorded **' . $newValue . ' ' . $label
-                . '** in a ' . $gameTypeLabel . ' game, tying '
+                . 'The ' . $teamName . ' just recorded ' . $linkedStat
+                . ' in a ' . $gameTypeLabel . ' game, tying '
                 . 'the ' . $previousTeam . "'s all-time record!";
         }
 
         return "**NEW IBL TEAM RECORD!**\n"
-            . 'The ' . $teamName . ' just recorded **' . $newValue . ' ' . $label
-            . '** in a ' . $gameTypeLabel . ' game, breaking '
+            . 'The ' . $teamName . ' just recorded ' . $linkedStat
+            . ' in a ' . $gameTypeLabel . ' game, breaking '
             . 'the ' . $previousTeam . "'s all-time record of " . $previousValue . ' ' . $label . '!';
     }
 
@@ -367,22 +396,31 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
      */
     private function formatQuadrupleDoubleMessage(
         string $playerName,
+        int $pid,
         string $teamName,
         int $points,
         int $rebounds,
         int $assists,
         int $steals,
         int $blocks,
-        string $gameTypeLabel
+        string $gameTypeLabel,
+        string $date,
+        int $gameOfThatDay,
+        int $boxId
     ): string {
+        $playerLink = '[' . $playerName . '](' . self::SITE_BASE_URL . '/modules.php?name=Player&pa=showpage&pid=' . $pid . ')';
+        $boxScoreUrl = BoxScoreUrlBuilder::buildUrl($date, $gameOfThatDay, $boxId);
+
         $stats = $points . 'pts/' . $rebounds . 'reb/' . $assists . 'ast/' . $steals . 'stl';
         if ($blocks >= 10) {
             $stats .= '/' . $blocks . 'blk';
         }
 
+        $linkedStats = $boxScoreUrl !== '' ? '[**' . $stats . '**](' . $boxScoreUrl . ')' : '**' . $stats . '**';
+
         return "**NEW QUADRUPLE DOUBLE!**\n"
-            . $playerName . ' (' . $teamName . ') recorded a quadruple double (**' . $stats
-            . '**) in a ' . $gameTypeLabel . ' game!';
+            . $playerLink . ' (' . $teamName . ') recorded a quadruple double (' . $linkedStats
+            . ') in a ' . $gameTypeLabel . ' game!';
     }
 
     /**

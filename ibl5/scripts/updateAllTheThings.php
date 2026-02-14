@@ -105,7 +105,7 @@ try {
     echo $view->renderInitStatus('ScheduleUpdater initialized');
     flush();
 
-    $standingsUpdater = new Updater\StandingsUpdater($mysqli_db, $commonRepository);
+    $standingsUpdater = new Updater\StandingsUpdater($mysqli_db, $season);
     echo $view->renderInitStatus('StandingsUpdater initialized');
     flush();
 

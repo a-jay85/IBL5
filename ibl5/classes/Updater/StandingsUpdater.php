@@ -5,42 +5,38 @@ declare(strict_types=1);
 namespace Updater;
 
 use Utilities\RecordParser;
+use Utilities\SeasonPhaseHelper;
 use Utilities\StandingsGrouper;
 
+/**
+ * Computes league standings from game results in ibl_schedule
+ * and conference/division assignments from ibl_league_config,
+ * then populates the ibl_standings table.
+ *
+ * @phpstan-type TeamStanding array{
+ *     tid: int,
+ *     teamName: string,
+ *     conference: string,
+ *     division: string,
+ *     wins: int,
+ *     losses: int,
+ *     homeWins: int,
+ *     homeLosses: int,
+ *     awayWins: int,
+ *     awayLosses: int,
+ *     confWins: int,
+ *     confLosses: int,
+ *     divWins: int,
+ *     divLosses: int
+ * }
+ * @phpstan-type TeamMapping array{conference: string, division: string, teamName: string}
+ */
 class StandingsUpdater extends \BaseMysqliRepository {
-    private \Services\CommonMysqliRepository $commonRepository;
+    private \Season $season;
 
-    /** @var array<string, int> Team name to ID lookup map */
-    private array $teamNameToIdMap = [];
-
-    public function __construct(object $db, \Services\CommonMysqliRepository $commonRepository) {
+    public function __construct(object $db, \Season $season) {
         parent::__construct($db);
-        $this->commonRepository = $commonRepository;
-    }
-
-    /**
-     * Pre-fetch all team name→ID mappings to avoid per-team lookups
-     */
-    private function preloadTeamNameMap(): void
-    {
-        /** @var list<array{team_name: string, teamid: int}> $rows */
-        $rows = $this->fetchAll(
-            "SELECT team_name, teamid FROM ibl_team_info WHERE teamid BETWEEN 1 AND ?",
-            "i",
-            \League::MAX_REAL_TEAMID
-        );
-
-        foreach ($rows as $row) {
-            $this->teamNameToIdMap[$row['team_name']] = $row['teamid'];
-        }
-    }
-
-    /**
-     * Look up team ID by name, using pre-loaded map with fallback
-     */
-    private function resolveTeamId(string $teamName): ?int
-    {
-        return $this->teamNameToIdMap[$teamName] ?? $this->commonRepository->getTidFromTeamname($teamName);
+        $this->season = $season;
     }
 
     protected function extractWins(string $record): int {
@@ -56,7 +52,6 @@ class StandingsUpdater extends \BaseMysqliRepository {
      */
     protected function assignGroupingsFor(string $region): array {
         $groupings = StandingsGrouper::getGroupingsFor($region);
-        // Return as indexed array for backwards compatibility with list() destructuring
         return [$groupings['grouping'], $groupings['groupingGB'], $groupings['groupingMagicNumber']];
     }
 
@@ -65,9 +60,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $this->execute('TRUNCATE TABLE ibl_standings', '');
         echo 'TRUNCATE TABLE ibl_standings<p>';
 
-        $this->preloadTeamNameMap();
-
-        $this->extractStandingsValues();
+        $this->computeAndInsertStandings();
 
         $this->updateMagicNumbers('Eastern');
         $this->updateMagicNumbers('Western');
@@ -80,202 +73,288 @@ class StandingsUpdater extends \BaseMysqliRepository {
         echo '<p>The ibl_standings table has been updated.<p>';
     }
 
-    protected function extractStandingsValues(): void {
-        echo '<p>Updating the conference standings for all teams...<p>';
+    /**
+     * Compute standings from ibl_schedule game results and insert into ibl_standings
+     */
+    protected function computeAndInsertStandings(): void {
+        echo '<p>Computing standings from game results...<p>';
 
-        /** @var string $documentRoot */
-        $documentRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
-        $standingsFilePath = $documentRoot . '/ibl5/ibl/IBL/Standings.htm';
-        $standings = new \DOMDocument();
-        $standings->loadHTMLFile($standingsFilePath);
-        $standings->preserveWhiteSpace = false;
-
-        $getRows = $standings->getElementsByTagName('tr');
-
-        // Safely navigate the DOM tree with null checks
-        $firstRow = $getRows->item(0);
-        if ($firstRow === null) {
-            echo '<p>Error: Unable to find standings table rows</p>';
+        $teamMap = $this->fetchTeamMap();
+        if ($teamMap === []) {
+            echo '<p>Error: No league config found for season ending year ' . $this->season->endingYear . '</p>';
             return;
         }
 
-        $conferenceContainer = $firstRow->childNodes->item(0);
-        if ($conferenceContainer === null) {
-            echo '<p>Error: Unable to find conference container in standings</p>';
-            return;
-        }
+        $games = $this->fetchPlayedGames();
 
-        $conferenceContent = $conferenceContainer->childNodes->item(0);
-        if ($conferenceContent === null) {
-            echo '<p>Error: Unable to find conference content in standings</p>';
-            return;
-        }
+        $standings = $this->initializeStandings($teamMap);
+        $standings = $this->tallyGameResults($games, $standings, $teamMap);
 
-        $rowsByConference = $conferenceContent->childNodes;
-
-        $divisionContainer = $firstRow->childNodes->item(1);
-        if ($divisionContainer === null) {
-            echo '<p>Error: Unable to find division container in standings</p>';
-            return;
-        }
-
-        $divisionContent = $divisionContainer->childNodes->item(0);
-        if ($divisionContent === null) {
-            echo '<p>Error: Unable to find division content in standings</p>';
-            return;
-        }
-
-        $rowsByDivision = $divisionContent->childNodes;
-
-        \UI::displayDebugOutput($this->processConferenceRows($rowsByConference), 'Conference Standings');
-        \UI::displayDebugOutput($this->processDivisionRows($rowsByDivision), 'Division Standings');
+        $this->computeAndInsertAll($standings, $teamMap);
     }
 
     /**
-     * @param \DOMNodeList<\DOMNode> $rowsByConference
+     * Fetch conference/division mapping from ibl_league_config for the current season
+     *
+     * @return array<int, TeamMapping> Map of tid → {conference, division, teamName}
      */
-    private function processConferenceRows(\DOMNodeList $rowsByConference): string {
-        $log = '';
-        $conference = '';
-
-        foreach ($rowsByConference as $row) {
-            $firstChild = $row->childNodes->item(0);
-            $teamName = ($firstChild !== null) ? ($firstChild->nodeValue ?? '') : '';
-            if (in_array($teamName, ['Eastern', 'Western'], true)) {
-                $conference = $teamName;
-            }
-            if (!in_array($teamName, ['Eastern', 'Western', 'team', ''], true)) {
-                $log .= $this->processTeamStandings($row, $conference);
-            }
-        }
-
-        return $log;
-    }
-
-    private function processTeamStandings(\DOMNode $row, string $conference): string {
-        $log = '';
-
-        $nodeValue0 = $row->childNodes->item(0) !== null ? ($row->childNodes->item(0)->nodeValue ?? '') : '';
-        $nodeValue1 = $row->childNodes->item(1) !== null ? ($row->childNodes->item(1)->nodeValue ?? '') : '';
-        $nodeValue2 = $row->childNodes->item(2) !== null ? ($row->childNodes->item(2)->nodeValue ?? '') : '';
-        $nodeValue3 = $row->childNodes->item(3) !== null ? ($row->childNodes->item(3)->nodeValue ?? '') : '';
-        $nodeValue4 = $row->childNodes->item(4) !== null ? ($row->childNodes->item(4)->nodeValue ?? '') : '';
-        $nodeValue5 = $row->childNodes->item(5) !== null ? ($row->childNodes->item(5)->nodeValue ?? '') : '';
-        $nodeValue6 = $row->childNodes->item(6) !== null ? ($row->childNodes->item(6)->nodeValue ?? '') : '';
-        $nodeValue7 = $row->childNodes->item(7) !== null ? ($row->childNodes->item(7)->nodeValue ?? '') : '';
-
-        $teamID = $this->resolveTeamId($nodeValue0);
-        $leagueRecord = $nodeValue1;
-        $pct = $nodeValue2;
-        $confGB = $nodeValue3;
-        $confRecord = $nodeValue4;
-        $divRecord = $nodeValue5;
-        $homeRecord = $nodeValue6;
-        $awayRecord = $nodeValue7;
-
-        $confWins = $this->extractWins($confRecord);
-        $confLosses = $this->extractLosses($confRecord);
-        $divWins = $this->extractWins($divRecord);
-        $divLosses = $this->extractLosses($divRecord);
-        $homeWins = $this->extractWins($homeRecord);
-        $homeLosses = $this->extractLosses($homeRecord);
-        $awayWins = $this->extractWins($awayRecord);
-        $awayLosses = $this->extractLosses($awayRecord);
-
-        $gamesUnplayed = 82 - $homeWins - $homeLosses - $awayWins - $awayLosses;
-
-        $teamNameTrimmed = rtrim($nodeValue0);
-
-        $this->execute(
-            "INSERT INTO ibl_standings (
-                tid,
-                team_name,
-                leagueRecord,
-                pct,
-                gamesUnplayed,
-                conference,
-                confGB,
-                confRecord,
-                divRecord,
-                homeRecord,
-                awayRecord,
-                confWins,
-                confLosses,
-                divWins,
-                divLosses,
-                homeWins,
-                homeLosses,
-                awayWins,
-                awayLosses
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            "isssissssssiiiiiiii",
-            $teamID,
-            $teamNameTrimmed,
-            $leagueRecord,
-            $pct,
-            $gamesUnplayed,
-            $conference,
-            $confGB,
-            $confRecord,
-            $divRecord,
-            $homeRecord,
-            $awayRecord,
-            $confWins,
-            $confLosses,
-            $divWins,
-            $divLosses,
-            $homeWins,
-            $homeLosses,
-            $awayWins,
-            $awayLosses
+    protected function fetchTeamMap(): array
+    {
+        /** @var list<array{team_slot: int, team_name: string, conference: string, division: string}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT team_slot, team_name, conference, division
+            FROM ibl_league_config
+            WHERE season_ending_year = ?",
+            "i",
+            $this->season->endingYear
         );
 
-        $log .= "Inserted standings for team: {$teamNameTrimmed}<br>";
-        return $log;
+        /** @var array<int, TeamMapping> $map */
+        $map = [];
+        foreach ($rows as $row) {
+            $map[$row['team_slot']] = [
+                'conference' => $row['conference'],
+                'division' => $row['division'],
+                'teamName' => $row['team_name'],
+            ];
+        }
+
+        return $map;
     }
 
     /**
-     * @param \DOMNodeList<\DOMNode> $rowsByDivision
+     * Fetch all played games from ibl_schedule for the current season
+     *
+     * @return list<array{Visitor: int, VScore: int, Home: int, HScore: int}>
      */
-    private function processDivisionRows(\DOMNodeList $rowsByDivision): string {
-        $log = '';
-        $division = '';
+    protected function fetchPlayedGames(): array
+    {
+        $month = SeasonPhaseHelper::getMonthForPhase($this->season->phase);
+        $startDate = $this->season->beginningYear . "-{$month}-01";
+        $endDate = $this->season->endingYear . "-05-30";
 
-        foreach ($rowsByDivision as $row) {
-            $firstChild = $row->childNodes->item(0);
-            $teamName = ($firstChild !== null) ? ($firstChild->nodeValue ?? '') : '';
-
-            if (in_array($teamName, ['Atlantic', 'Central', 'Midwest', 'Pacific'], true)) {
-                $division = $teamName;
-            }
-            if (!in_array($teamName, ['Atlantic', 'Central', 'Midwest', 'Pacific', 'team', ''], true)) {
-                $log .= $this->updateTeamDivision($row, $division);
-            }
-        }
-
-        return $log;
+        /** @var list<array{Visitor: int, VScore: int, Home: int, HScore: int}> */
+        return $this->fetchAll(
+            "SELECT Visitor, VScore, Home, HScore
+            FROM ibl_schedule
+            WHERE VScore > 0 AND HScore > 0
+            AND Date BETWEEN ? AND ?
+            ORDER BY Date ASC",
+            "ss",
+            $startDate,
+            $endDate
+        );
     }
 
-    private function updateTeamDivision(\DOMNode $row, string $division): string {
+    /**
+     * Initialize per-team standings counters to zero
+     *
+     * @param array<int, TeamMapping> $teamMap
+     * @return array<int, TeamStanding>
+     */
+    private function initializeStandings(array $teamMap): array
+    {
+        /** @var array<int, TeamStanding> $standings */
+        $standings = [];
+
+        foreach ($teamMap as $tid => $info) {
+            $standings[$tid] = [
+                'tid' => $tid,
+                'teamName' => $info['teamName'],
+                'conference' => $info['conference'],
+                'division' => $info['division'],
+                'wins' => 0,
+                'losses' => 0,
+                'homeWins' => 0,
+                'homeLosses' => 0,
+                'awayWins' => 0,
+                'awayLosses' => 0,
+                'confWins' => 0,
+                'confLosses' => 0,
+                'divWins' => 0,
+                'divLosses' => 0,
+            ];
+        }
+
+        return $standings;
+    }
+
+    /**
+     * Tally all game results into per-team standings
+     *
+     * @param list<array{Visitor: int, VScore: int, Home: int, HScore: int}> $games
+     * @param array<int, TeamStanding> $standings
+     * @param array<int, TeamMapping> $teamMap
+     * @return array<int, TeamStanding>
+     */
+    private function tallyGameResults(array $games, array $standings, array $teamMap): array
+    {
+        foreach ($games as $game) {
+            $visitorTid = $game['Visitor'];
+            $homeTid = $game['Home'];
+
+            if (!isset($standings[$visitorTid]) || !isset($standings[$homeTid])) {
+                continue;
+            }
+
+            /** @var TeamStanding $visitor */
+            $visitor = $standings[$visitorTid];
+            /** @var TeamStanding $home */
+            $home = $standings[$homeTid];
+
+            $visitorWon = $game['VScore'] > $game['HScore'];
+
+            if ($visitorWon) {
+                $visitor['wins']++;
+                $visitor['awayWins']++;
+                $home['losses']++;
+                $home['homeLosses']++;
+            } else {
+                $home['wins']++;
+                $home['homeWins']++;
+                $visitor['losses']++;
+                $visitor['awayLosses']++;
+            }
+
+            $sameConference = isset($teamMap[$visitorTid], $teamMap[$homeTid])
+                && $teamMap[$visitorTid]['conference'] === $teamMap[$homeTid]['conference'];
+
+            if ($sameConference) {
+                if ($visitorWon) {
+                    $visitor['confWins']++;
+                    $home['confLosses']++;
+                } else {
+                    $home['confWins']++;
+                    $visitor['confLosses']++;
+                }
+            }
+
+            $sameDivision = $sameConference
+                && $teamMap[$visitorTid]['division'] === $teamMap[$homeTid]['division'];
+
+            if ($sameDivision) {
+                if ($visitorWon) {
+                    $visitor['divWins']++;
+                    $home['divLosses']++;
+                } else {
+                    $home['divWins']++;
+                    $visitor['divLosses']++;
+                }
+            }
+
+            $standings[$visitorTid] = $visitor;
+            $standings[$homeTid] = $home;
+        }
+
+        return $standings;
+    }
+
+    /**
+     * Compute derived fields (pct, GB, records) and insert all teams into ibl_standings
+     *
+     * @param array<int, TeamStanding> $standings
+     * @param array<int, TeamMapping> $teamMap
+     */
+    private function computeAndInsertAll(array $standings, array $teamMap): void
+    {
+        // Group teams by conference to compute conference GB
+        /** @var array<string, list<TeamStanding>> $byConference */
+        $byConference = [];
+        /** @var array<string, list<TeamStanding>> $byDivision */
+        $byDivision = [];
+
+        foreach ($standings as $team) {
+            $byConference[$team['conference']][] = $team;
+            $byDivision[$team['division']][] = $team;
+        }
+
+        // Sort each group by pct DESC to find leaders
+        $pctSorter = static function (array $a, array $b): int {
+            /** @var int $winsA */
+            $winsA = $a['wins'];
+            /** @var int $lossesA */
+            $lossesA = $a['losses'];
+            /** @var int $winsB */
+            $winsB = $b['wins'];
+            /** @var int $lossesB */
+            $lossesB = $b['losses'];
+            $totalA = $winsA + $lossesA;
+            $totalB = $winsB + $lossesB;
+            $pctA = $totalA > 0 ? $winsA / $totalA : 0.0;
+            $pctB = $totalB > 0 ? $winsB / $totalB : 0.0;
+            return $pctB <=> $pctA;
+        };
+
+        /** @var array<string, float> $confLeaderGB */
+        $confLeaderGB = [];
+        foreach ($byConference as $conf => $teams) {
+            usort($teams, $pctSorter);
+            $leader = $teams[0];
+            $confLeaderGB[$conf] = ($leader['wins'] - $leader['losses']) / 2.0;
+        }
+
+        /** @var array<string, float> $divLeaderGB */
+        $divLeaderGB = [];
+        foreach ($byDivision as $div => $teams) {
+            usort($teams, $pctSorter);
+            $leader = $teams[0];
+            $divLeaderGB[$div] = ($leader['wins'] - $leader['losses']) / 2.0;
+        }
+
         $log = '';
 
-        $nodeValue0 = $row->childNodes->item(0) !== null ? ($row->childNodes->item(0)->nodeValue ?? '') : '';
-        $teamName = $nodeValue0;
-        $teamID = $this->resolveTeamId($teamName);
+        foreach ($standings as $team) {
+            $totalGames = $team['wins'] + $team['losses'];
+            $pct = $totalGames > 0 ? round($team['wins'] / $totalGames, 3) : 0.000;
+            $gamesUnplayed = 82 - $team['homeWins'] - $team['homeLosses'] - $team['awayWins'] - $team['awayLosses'];
 
-        $nodeValue3 = $row->childNodes->item(3) !== null ? ($row->childNodes->item(3)->nodeValue ?? '') : '';
-        $divGB = $nodeValue3;
+            $leagueRecord = $team['wins'] . '-' . $team['losses'];
+            $confRecord = $team['confWins'] . '-' . $team['confLosses'];
+            $divRecord = $team['divWins'] . '-' . $team['divLosses'];
+            $homeRecord = $team['homeWins'] . '-' . $team['homeLosses'];
+            $awayRecord = $team['awayWins'] . '-' . $team['awayLosses'];
 
-        $this->execute(
-            "UPDATE ibl_standings SET division = ?, divGB = ? WHERE tid = ?",
-            "ssi",
-            $division,
-            $divGB,
-            $teamID
-        );
+            $teamGB = ($team['wins'] - $team['losses']) / 2.0;
+            $confGB = $confLeaderGB[$team['conference']] - $teamGB;
+            $divGB = $divLeaderGB[$team['division']] - $teamGB;
 
-        $log .= "Updated division for team: {$teamName}<br>";
-        return $log;
+            $this->execute(
+                "INSERT INTO ibl_standings (
+                    tid, team_name, leagueRecord, pct, gamesUnplayed,
+                    conference, confGB, confRecord,
+                    division, divGB, divRecord,
+                    homeRecord, awayRecord,
+                    confWins, confLosses, divWins, divLosses,
+                    homeWins, homeLosses, awayWins, awayLosses
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "issdisdssdsssiiiiiiii",
+                $team['tid'],
+                $team['teamName'],
+                $leagueRecord,
+                $pct,
+                $gamesUnplayed,
+                $team['conference'],
+                $confGB,
+                $confRecord,
+                $team['division'],
+                $divGB,
+                $divRecord,
+                $homeRecord,
+                $awayRecord,
+                $team['confWins'],
+                $team['confLosses'],
+                $team['divWins'],
+                $team['divLosses'],
+                $team['homeWins'],
+                $team['homeLosses'],
+                $team['awayWins'],
+                $team['awayLosses']
+            );
+
+            $log .= "Inserted standings for team: {$team['teamName']}<br>";
+        }
+
+        \UI::displayDebugOutput($log, 'Computed Standings');
     }
 
     private function updateMagicNumbers(string $region): void {

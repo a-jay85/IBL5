@@ -67,7 +67,6 @@ if (!$lgeService->hasConfigForCurrentSeason($season->endingYear)) {
         if ($lgeResult['success']) {
             $discrepancies = $lgeService->crossCheckWithFranchiseSeasons(
                 $lgeResult['season_ending_year'],
-                $mysqli_db,
             );
             if ($discrepancies !== []) {
                 echo $lgeView->renderCrossCheckResults($discrepancies);

@@ -94,4 +94,28 @@ class LeagueConfigRepository extends \BaseMysqliRepository implements LeagueConf
             $seasonEndingYear,
         );
     }
+
+    /**
+     * @see LeagueConfigRepositoryInterface::getFranchiseTeamsBySeason()
+     */
+    public function getFranchiseTeamsBySeason(int $seasonEndingYear): array
+    {
+        $rows = $this->fetchAll(
+            'SELECT franchise_id, team_name FROM ibl_franchise_seasons WHERE season_ending_year = ? ORDER BY franchise_id ASC',
+            'i',
+            $seasonEndingYear,
+        );
+
+        /** @var array<int, string> $map */
+        $map = [];
+        foreach ($rows as $row) {
+            /** @var int $franchiseId */
+            $franchiseId = $row['franchise_id'];
+            /** @var string $teamName */
+            $teamName = $row['team_name'];
+            $map[$franchiseId] = $teamName;
+        }
+
+        return $map;
+    }
 }

@@ -92,7 +92,7 @@ class LeagueConfigService
      *
      * @return list<string> List of discrepancy messages (empty = all consistent)
      */
-    public function crossCheckWithFranchiseSeasons(int $seasonEndingYear, \mysqli $db): array
+    public function crossCheckWithFranchiseSeasons(int $seasonEndingYear): array
     {
         $discrepancies = [];
 
@@ -102,37 +102,7 @@ class LeagueConfigService
             return $discrepancies;
         }
 
-        $stmt = $db->prepare(
-            'SELECT franchise_id, team_name FROM ibl_franchise_seasons WHERE season_ending_year = ? ORDER BY franchise_id ASC',
-        );
-        if ($stmt === false) {
-            $discrepancies[] = 'Failed to query ibl_franchise_seasons: ' . $db->error;
-            return $discrepancies;
-        }
-
-        $stmt->bind_param('i', $seasonEndingYear);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if ($result === false) {
-            $discrepancies[] = 'Failed to get result set from ibl_franchise_seasons query';
-            $stmt->close();
-            return $discrepancies;
-        }
-
-        /** @var array<int, string> $franchiseMap */
-        $franchiseMap = [];
-
-        $row = $result->fetch_assoc();
-        while (is_array($row)) {
-            /** @var int $franchiseId */
-            $franchiseId = $row['franchise_id'];
-            /** @var string $teamName */
-            $teamName = $row['team_name'];
-            $franchiseMap[$franchiseId] = $teamName;
-            $row = $result->fetch_assoc();
-        }
-        $stmt->close();
+        $franchiseMap = $this->repository->getFranchiseTeamsBySeason($seasonEndingYear);
 
         if ($franchiseMap === []) {
             $discrepancies[] = 'No franchise_seasons data found for season ending ' . $seasonEndingYear;

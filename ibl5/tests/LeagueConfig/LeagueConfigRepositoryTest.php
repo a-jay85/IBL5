@@ -88,4 +88,28 @@ class LeagueConfigRepositoryTest extends IntegrationTestCase
         $this->assertCount(1, $result);
         $this->assertQueryExecuted('SELECT * FROM ibl_league_config');
     }
+
+    public function testGetFranchiseTeamsBySeasonExecutesQuery(): void
+    {
+        $this->mockDb->setMockData([
+            ['franchise_id' => 1, 'team_name' => 'Celtics'],
+            ['franchise_id' => 2, 'team_name' => 'Heat'],
+        ]);
+
+        $repository = new LeagueConfigRepository($this->mockDb);
+        $result = $repository->getFranchiseTeamsBySeason(2007);
+
+        $this->assertSame([1 => 'Celtics', 2 => 'Heat'], $result);
+        $this->assertQueryExecuted('SELECT franchise_id, team_name FROM ibl_franchise_seasons');
+    }
+
+    public function testGetFranchiseTeamsBySeasonReturnsEmptyForNoData(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $repository = new LeagueConfigRepository($this->mockDb);
+        $result = $repository->getFranchiseTeamsBySeason(2027);
+
+        $this->assertSame([], $result);
+    }
 }

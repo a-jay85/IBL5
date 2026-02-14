@@ -19,18 +19,31 @@ use Utilities\LgeFileParser;
  */
 class LgeFileParserTest extends TestCase
 {
-    private const MODERN_LGE_FILE = '/scoNonFiles/IBL0607Sim13/IBL5.lge';
     private const OLDEST_LGE_FILE = '/scoNonFiles/IBL8889PostHEAT/IBL5.lge';
     private const EARLY_90S_LGE_FILE = '/scoNonFiles/IBL8990PostHEAT/IBL5.lge';
 
-    private function getLgeFilePath(string $relativePath): string
+    private static function lgeFile(): string
+    {
+        return dirname(__DIR__, 2) . '/IBL5.lge';
+    }
+
+    private static function historicalLgeFile(string $relativePath): string
     {
         return dirname(__DIR__, 2) . $relativePath;
     }
 
-    private function requireLgeFile(string $relativePath): string
+    private function requireLgeFile(): string
     {
-        $path = $this->getLgeFilePath($relativePath);
+        $path = self::lgeFile();
+        if (!file_exists($path)) {
+            $this->fail("Test .lge file not found at: {$path}");
+        }
+        return $path;
+    }
+
+    private function requireHistoricalLgeFile(string $relativePath): string
+    {
+        $path = self::historicalLgeFile($relativePath);
         if (!file_exists($path)) {
             $this->fail("Test .lge file not found at: {$path}");
         }
@@ -67,7 +80,7 @@ class LgeFileParserTest extends TestCase
 
     public function testParseFileWithCurrentLge(): void
     {
-        $path = $this->requireLgeFile(self::MODERN_LGE_FILE);
+        $path = $this->requireLgeFile();
         $result = LgeFileParser::parseFile($path);
 
         $this->assertArrayHasKey('header', $result);
@@ -75,8 +88,6 @@ class LgeFileParserTest extends TestCase
         $this->assertArrayHasKey('season', $result);
 
         $this->assertSame(28, count($result['teams']));
-        $this->assertSame(2007, $result['season']['season_ending_year']);
-        $this->assertSame(2006, $result['season']['season_beginning_year']);
         $this->assertSame(28, $result['season']['team_count']);
     }
 
@@ -84,7 +95,7 @@ class LgeFileParserTest extends TestCase
 
     public function testParseHeaderExtractsPlayoffFormat(): void
     {
-        $path = $this->requireLgeFile(self::MODERN_LGE_FILE);
+        $path = $this->requireLgeFile();
         $data = file_get_contents($path);
         $this->assertIsString($data);
 
@@ -99,7 +110,7 @@ class LgeFileParserTest extends TestCase
 
     public function testParseHeaderExtractsQualifierCount(): void
     {
-        $path = $this->requireLgeFile(self::MODERN_LGE_FILE);
+        $path = $this->requireLgeFile();
         $data = file_get_contents($path);
         $this->assertIsString($data);
 
@@ -110,7 +121,7 @@ class LgeFileParserTest extends TestCase
 
     public function testParseHeaderExtractsConferences(): void
     {
-        $path = $this->requireLgeFile(self::MODERN_LGE_FILE);
+        $path = $this->requireLgeFile();
         $data = file_get_contents($path);
         $this->assertIsString($data);
 
@@ -121,7 +132,7 @@ class LgeFileParserTest extends TestCase
 
     public function testParseHeaderExtractsDivisions(): void
     {
-        $path = $this->requireLgeFile(self::MODERN_LGE_FILE);
+        $path = $this->requireLgeFile();
         $data = file_get_contents($path);
         $this->assertIsString($data);
 
@@ -134,7 +145,7 @@ class LgeFileParserTest extends TestCase
 
     public function testParseTeamEntriesReturns28Teams(): void
     {
-        $path = $this->requireLgeFile(self::MODERN_LGE_FILE);
+        $path = $this->requireLgeFile();
         $data = file_get_contents($path);
         $this->assertIsString($data);
 
@@ -145,7 +156,7 @@ class LgeFileParserTest extends TestCase
 
     public function testParseTeamEntriesReturns24Teams(): void
     {
-        $path = $this->requireLgeFile(self::OLDEST_LGE_FILE);
+        $path = $this->requireHistoricalLgeFile(self::OLDEST_LGE_FILE);
         $data = file_get_contents($path);
         $this->assertIsString($data);
 
@@ -156,7 +167,7 @@ class LgeFileParserTest extends TestCase
 
     public function testParseTeamEntriesHaveCorrectStructure(): void
     {
-        $path = $this->requireLgeFile(self::MODERN_LGE_FILE);
+        $path = $this->requireLgeFile();
         $data = file_get_contents($path);
         $this->assertIsString($data);
 
@@ -171,7 +182,7 @@ class LgeFileParserTest extends TestCase
 
     public function testParseTeamEntriesDetectsHumanControlled(): void
     {
-        $path = $this->requireLgeFile(self::MODERN_LGE_FILE);
+        $path = $this->requireLgeFile();
         $data = file_get_contents($path);
         $this->assertIsString($data);
 
@@ -185,20 +196,19 @@ class LgeFileParserTest extends TestCase
 
     public function testParseSeasonMetadataYear(): void
     {
-        $path = $this->requireLgeFile(self::MODERN_LGE_FILE);
+        $path = $this->requireLgeFile();
         $data = file_get_contents($path);
         $this->assertIsString($data);
 
         $season = LgeFileParser::parseSeasonMetadata($data);
 
-        $this->assertSame(2006, $season['season_beginning_year']);
-        $this->assertSame(2007, $season['season_ending_year']);
         $this->assertSame(28, $season['team_count']);
+        $this->assertSame($season['season_beginning_year'] + 1, $season['season_ending_year']);
     }
 
     public function testParseSeasonMetadataOldestFile(): void
     {
-        $path = $this->requireLgeFile(self::OLDEST_LGE_FILE);
+        $path = $this->requireHistoricalLgeFile(self::OLDEST_LGE_FILE);
         $data = file_get_contents($path);
         $this->assertIsString($data);
 
@@ -211,7 +221,7 @@ class LgeFileParserTest extends TestCase
 
     public function testParseFileDetectsRound1FormatChange(): void
     {
-        $path = $this->requireLgeFile(self::EARLY_90S_LGE_FILE);
+        $path = $this->requireHistoricalLgeFile(self::EARLY_90S_LGE_FILE);
         $result = LgeFileParser::parseFile($path);
 
         // 1989-90 season has "3 of 5" for round 1

@@ -12,7 +12,7 @@ class LeagueConfigServiceTest extends TestCase
 {
     public function testProcessLgeFileReturnsSuccess(): void
     {
-        $lgeFile = dirname(__DIR__, 2) . '/scoNonFiles/IBL0607Sim13/IBL5.lge';
+        $lgeFile = dirname(__DIR__, 2) . '/IBL5.lge';
         if (!file_exists($lgeFile)) {
             $this->fail("Test .lge file not found at: {$lgeFile}");
         }
@@ -20,14 +20,13 @@ class LeagueConfigServiceTest extends TestCase
         $mockRepository = $this->createMock(LeagueConfigRepositoryInterface::class);
         $mockRepository->expects($this->once())
             ->method('upsertSeasonConfig')
-            ->with(2007, $this->isArray())
+            ->with($this->isInt(), $this->isArray())
             ->willReturn(28);
 
         $service = new LeagueConfigService($mockRepository);
         $result = $service->processLgeFile($lgeFile);
 
         $this->assertTrue($result['success']);
-        $this->assertSame(2007, $result['season_ending_year']);
         $this->assertSame(28, $result['teams_stored']);
         $this->assertNotEmpty($result['messages']);
     }

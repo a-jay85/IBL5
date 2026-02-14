@@ -81,54 +81,6 @@ class SharedTest extends TestCase
     }
 
     /**
-     * Tests that isFreeAgencyModuleActive delegates to repository
-     *
-     * @test
-     */
-    public function testIsFreeAgencyModuleActiveDelegates(): void
-    {
-        $this->mockRepository
-            ->expects($this->once())
-            ->method('isFreeAgencyModuleActive')
-            ->willReturn(1);
-
-        $result = $this->shared->isFreeAgencyModuleActive();
-        $this->assertEquals(1, $result);
-    }
-
-    /**
-     * Tests isFreeAgencyModuleActive when module is inactive
-     *
-     * @test
-     */
-    public function testIsFreeAgencyModuleInactive(): void
-    {
-        $this->mockRepository
-            ->expects($this->once())
-            ->method('isFreeAgencyModuleActive')
-            ->willReturn(0);
-
-        $result = $this->shared->isFreeAgencyModuleActive();
-        $this->assertEquals(0, $result);
-    }
-
-    /**
-     * Tests isFreeAgencyModuleActive when module not found
-     *
-     * @test
-     */
-    public function testIsFreeAgencyModuleNotFound(): void
-    {
-        $this->mockRepository
-            ->expects($this->once())
-            ->method('isFreeAgencyModuleActive')
-            ->willReturn(null);
-
-        $result = $this->shared->isFreeAgencyModuleActive();
-        $this->assertNull($result);
-    }
-
-    /**
      * Tests resetSimContractExtensionAttempts delegates and handles output
      *
      * @test

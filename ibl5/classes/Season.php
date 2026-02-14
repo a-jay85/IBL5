@@ -199,8 +199,16 @@ class Season extends BaseMysqliRepository
     }
 
     /**
+     * Check if the current phase is Free Agency
+     */
+    public function isFreeAgencyPhase(): bool
+    {
+        return $this->phase === 'Free Agency';
+    }
+
+    /**
      * Get current season phase
-     * 
+     *
      * @return string Current season phase (e.g., 'Regular Season', 'Playoffs', 'Free Agency')
      */
     public function getSeasonPhase(): string

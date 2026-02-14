@@ -2,40 +2,68 @@
 
 declare(strict_types=1);
 
-// Backfill script: Scans scoNonFiles/[dir]/IBL5.lge, parses each,
-// and upserts via LeagueConfigService.
+// Backfill script: Recursively searches a user-specified folder for .lge files,
+// parses each, and upserts via LeagueConfigService.
 //
-// Usage: php scripts/lgeBackfill.php
+// Usage: php scripts/lgeBackfill.php /path/to/folder
 //
 // Multiple snapshots per season (HEAT + Finals) produce identical team data.
 // The upsert handles deduplication via the unique key on (season_ending_year, team_slot).
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+// Resolve project root from this script's location: scripts/ -> ibl5/
+$ibl5Root = dirname(__DIR__);
+$_SERVER['DOCUMENT_ROOT'] = dirname($ibl5Root);
+
+require $ibl5Root . '/mainfile.php';
 
 global $mysqli_db;
+
+if (!isset($argv[1]) || $argv[1] === '') {
+    echo "Usage: php scripts/lgeBackfill.php /path/to/folder\n";
+    echo "\nRecursively searches the folder for .lge files and imports them.\n";
+    exit(1);
+}
+
+$searchDir = realpath($argv[1]);
+if ($searchDir === false || !is_dir($searchDir)) {
+    echo "Directory not found: {$argv[1]}\n";
+    exit(1);
+}
 
 $lgeRepo = new LeagueConfig\LeagueConfigRepository($mysqli_db);
 $lgeService = new LeagueConfig\LeagueConfigService($lgeRepo);
 
-$pattern = $_SERVER['DOCUMENT_ROOT'] . '/ibl5/scoNonFiles/*/IBL5.lge';
-$files = glob($pattern);
+$iterator = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator($searchDir, RecursiveDirectoryIterator::SKIP_DOTS),
+);
 
-if ($files === false || $files === []) {
-    echo "No .lge files found matching: {$pattern}\n";
+/** @var list<string> $files */
+$files = [];
+foreach ($iterator as $fileInfo) {
+    /** @var SplFileInfo $fileInfo */
+    if ($fileInfo->isFile() && strtolower($fileInfo->getExtension()) === 'lge') {
+        $files[] = $fileInfo->getPathname();
+    }
+}
+
+if ($files === []) {
+    echo "No .lge files found in: {$searchDir}\n";
     exit(1);
 }
 
 sort($files);
 
-echo "Found " . count($files) . " .lge files to process.\n\n";
+echo "Searching: {$searchDir}\n";
+echo "Found " . count($files) . " .lge file(s) to process.\n\n";
 
 /** @var array<int, array{season: string, teams: int, files: int}> $seasonSummary */
 $seasonSummary = [];
 $errors = 0;
 
 foreach ($files as $file) {
-    $dirName = basename(dirname($file));
-    echo "Processing: {$dirName}/IBL5.lge ... ";
+    // Show path relative to the search directory
+    $relativePath = substr($file, strlen($searchDir) + 1);
+    echo "Processing: {$relativePath} ... ";
 
     $result = $lgeService->processLgeFile($file);
 

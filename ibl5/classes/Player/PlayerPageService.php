@@ -16,7 +16,7 @@ class PlayerPageService implements PlayerPageServiceInterface
     private PlayerStatsRepository $statsRepository;
     private PlayerViewFactory $viewFactory;
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         $this->repository = new PlayerRepository($db);
         $this->statsRepository = new PlayerStatsRepository($db);

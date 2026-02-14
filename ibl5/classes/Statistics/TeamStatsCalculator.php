@@ -16,12 +16,12 @@ namespace Statistics;
  */
 class TeamStatsCalculator
 {
-    private object $db;
+    private \mysqli $db;
 
     /** @var array<int, array{win: int, loss: int}>|null */
     private ?array $teamRecordsCache = null;
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
     }

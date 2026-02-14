@@ -23,7 +23,6 @@ use Extension\Contracts\ExtensionDatabaseOperationsInterface;
  */
 class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterface
 {
-    /** @var \mysqli */
     private \mysqli $db;
     private \Services\NewsService $newsService;
 
@@ -32,9 +31,8 @@ class ExtensionDatabaseOperations implements ExtensionDatabaseOperationsInterfac
      *
      * @param \mysqli $db mysqli connection
      */
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
-        /** @var \mysqli $db */
         $this->db = $db;
         $this->newsService = new \Services\NewsService($db);
     }

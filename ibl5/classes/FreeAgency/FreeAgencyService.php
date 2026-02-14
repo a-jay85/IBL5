@@ -16,12 +16,12 @@ class FreeAgencyService implements FreeAgencyServiceInterface
 {
     private FreeAgencyRepositoryInterface $repository;
     private FreeAgencyDemandRepositoryInterface $demandRepository;
-    private object $mysqli_db;
+    private \mysqli $mysqli_db;
 
     public function __construct(
         FreeAgencyRepositoryInterface $repository,
         FreeAgencyDemandRepositoryInterface $demandRepository,
-        object $mysqli_db
+        \mysqli $mysqli_db
     ) {
         $this->repository = $repository;
         $this->demandRepository = $demandRepository;

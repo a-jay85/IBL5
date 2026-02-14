@@ -65,24 +65,31 @@ abstract class IntegrationTestCase extends TestCase
     {
         $mockDb = $this->mockDb;
         
-        $GLOBALS['mysqli_db'] = new class($mockDb) {
+        $GLOBALS['mysqli_db'] = new class($mockDb) extends \mysqli {
             private \MockDatabase $mockDb;
             public int $connect_errno = 0;
             public ?string $connect_error = null;
 
             public function __construct(\MockDatabase $mockDb)
             {
+                // Don't call parent::__construct() to avoid real DB connection
                 $this->mockDb = $mockDb;
             }
 
-            public function prepare(string $query): \MockPreparedStatement
+            #[\ReturnTypeWillChange]
+            public function prepare(string $query): \MockPreparedStatement|false
             {
                 return new \MockPreparedStatement($this->mockDb, $query);
             }
 
-            public function query(string $query): mixed
+            #[\ReturnTypeWillChange]
+            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
             {
-                return $this->mockDb->sql_query($query);
+                $result = $this->mockDb->sql_query($query);
+                if ($result instanceof \MockDatabaseResult) {
+                    return false;
+                }
+                return (bool) $result;
             }
 
             public function real_escape_string(string $value): string

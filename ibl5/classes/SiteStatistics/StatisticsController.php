@@ -10,13 +10,13 @@ namespace SiteStatistics;
  */
 class StatisticsController
 {
-    private $db;
+    private \mysqli $db;
     private StatisticsRepository $repository;
     private StatisticsProcessor $processor;
     private StatisticsView $view;
     private string $moduleName;
 
-    public function __construct($db, string $moduleName, string $themeSel)
+    public function __construct(\mysqli $db, string $moduleName, string $themeSel)
     {
         $this->db = $db;
         $this->moduleName = $moduleName;

@@ -69,8 +69,8 @@ try {
     echo "<p>✓ CommonRepository initialized</p>";
     flush();
 
-    $sharedFunctions = new Shared($mysqli_db);
-    echo "<p>✓ Shared functions initialized</p>";
+    $sharedRepository = new Shared\SharedRepository($mysqli_db);
+    echo "<p>✓ Shared repository initialized</p>";
     flush();
 
     $season = new Season($mysqli_db);
@@ -114,7 +114,7 @@ try {
     // Reset extension attempts
     echo "<p>Resetting extension attempts...</p>";
     flush();
-    $sharedFunctions->resetSimContractExtensionAttempts();
+    $sharedRepository->resetSimContractExtensionAttempts();
     echo "<p>✓ Extension attempts reset</p>";
     flush();
 

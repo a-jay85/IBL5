@@ -6,12 +6,16 @@ namespace Trading;
 
 use BaseMysqliRepository;
 use Trading\Contracts\TradingRepositoryInterface;
+use Trading\Contracts\TradeCashRepositoryInterface;
 
 /**
- * TradingRepository - Database operations for trading system
+ * TradingRepository - Core trade offer CRUD database operations
  *
  * Extends BaseMysqliRepository for standardized prepared statement handling.
- * Centralizes all database queries for the Trading module.
+ * Handles core trade offer queries, player/pick lookups, and trade item management.
+ *
+ * Cash transaction methods are in TradeCashRepository.
+ * Queue/execution methods are in TradeExecutionRepository.
  *
  * @see TradingRepositoryInterface For method contracts
  * @see BaseMysqliRepository For base class documentation and error codes
@@ -22,26 +26,24 @@ use Trading\Contracts\TradingRepositoryInterface;
  * @phpstan-import-type TeamWithCityRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradingRepositoryInterface
- * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type TradingDraftPickRow from \Trading\Contracts\TradingRepositoryInterface
- * @phpstan-import-type CashTransactionData from \Trading\Contracts\TradingRepositoryInterface
- * @phpstan-import-type CashPlayerData from \Trading\Contracts\TradingRepositoryInterface
  */
 class TradingRepository extends BaseMysqliRepository implements TradingRepositoryInterface
 {
+    private TradeCashRepositoryInterface $cashRepository;
+
     /**
-     * Constructor - inherits from BaseMysqliRepository
-     * 
-     * @param object $db Active mysqli connection (or duck-typed mock during migration)
+     * Constructor
+     *
+     * @param \mysqli $db Active mysqli connection
+     * @param TradeCashRepositoryInterface|null $cashRepository Cash repository for deleteTradeOffer coordination
      * @throws \RuntimeException If connection is invalid (error code 1002)
-     * 
-     * TEMPORARY: Accepts duck-typed objects during mysqli migration for testing.
-     * Will be strictly \mysqli once migration completes.
      */
-    public function __construct(object $db)
+    public function __construct(\mysqli $db, ?TradeCashRepositoryInterface $cashRepository = null)
     {
         parent::__construct($db);
+        $this->cashRepository = $cashRepository ?? new TradeCashRepository($db);
     }
 
     /**
@@ -78,20 +80,6 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
         /** @var list<TradeInfoRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_trade_info"
-        );
-    }
-
-    /**
-     * @see TradingRepositoryInterface::getCashDetails()
-     */
-    public function getCashDetails(string $teamName, int $row): ?array
-    {
-        /** @var TradeCashRow|null */
-        return $this->fetchOne(
-            "SELECT * FROM ibl_trade_cash WHERE teamname = ? AND row = ?",
-            "si",
-            $teamName,
-            $row
         );
     }
 
@@ -152,22 +140,6 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * @see TradingRepositoryInterface::clearTradeInfo()
-     */
-    public function clearTradeInfo(): int
-    {
-        return $this->execute("DELETE FROM ibl_trade_info");
-    }
-
-    /**
-     * @see TradingRepositoryInterface::clearTradeCash()
-     */
-    public function clearTradeCash(): int
-    {
-        return $this->execute("DELETE FROM ibl_trade_cash");
-    }
-
-    /**
      * @see TradingRepositoryInterface::playerExistsInTrade()
      */
     public function playerExistsInTrade(int $playerId): bool
@@ -177,61 +149,8 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
             "i",
             $playerId
         );
-        
+
         return $result !== null;
-    }
-
-    /**
-     * @see TradingRepositoryInterface::insertPositiveCashTransaction()
-     */
-    public function insertPositiveCashTransaction(array $data): int
-    {
-        return $this->execute(
-            "INSERT INTO ibl_trade_cash (teamname, year1, year2, year3, year4, year5, year6, row) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            "siiiiiii",
-            $data['teamname'],
-            $data['year1'],
-            $data['year2'],
-            $data['year3'],
-            $data['year4'],
-            $data['year5'],
-            $data['year6'],
-            $data['row']
-        );
-    }
-
-    /**
-     * @see TradingRepositoryInterface::insertNegativeCashTransaction()
-     */
-    public function insertNegativeCashTransaction(array $data): int
-    {
-        return $this->execute(
-            "INSERT INTO ibl_trade_cash (teamname, year1, year2, year3, year4, year5, year6, row) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            "siiiiiii",
-            $data['teamname'],
-            -$data['year1'],
-            -$data['year2'],
-            -$data['year3'],
-            -$data['year4'],
-            -$data['year5'],
-            -$data['year6'],
-            $data['row']
-        );
-    }
-
-    /**
-     * @see TradingRepositoryInterface::deleteCashTransaction()
-     */
-    public function deleteCashTransaction(string $teamName, int $row): int
-    {
-        return $this->execute(
-            "DELETE FROM ibl_trade_cash WHERE teamname = ? AND row = ?",
-            "si",
-            $teamName,
-            $row
-        );
     }
 
     /**
@@ -241,7 +160,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     {
         // Determine parameter type string based on itemType type
         $typeString = is_string($itemType) ? "iissss" : "iiisss";
-        
+
         if ($_SERVER['SERVER_NAME'] === "localhost") {
             $approvalTeam = 'test';
         }
@@ -281,20 +200,6 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
             "SELECT * FROM ibl_trade_info WHERE tradeofferid = ? FOR UPDATE",
             "i",
             $offerId
-        );
-    }
-
-    /**
-     * @see TradingRepositoryInterface::getCashTransactionByOffer()
-     */
-    public function getCashTransactionByOffer(int $offerId, string $sendingTeam): ?array
-    {
-        /** @var TradeCashRow|null */
-        return $this->fetchOne(
-            "SELECT * FROM ibl_trade_cash WHERE tradeOfferID = ? AND sendingTeam = ?",
-            "is",
-            $offerId,
-            $sendingTeam
         );
     }
 
@@ -351,97 +256,12 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * @see TradingRepositoryInterface::insertTradeQueue()
-     */
-    public function insertTradeQueue(string $operationType, array $params, string $tradeLine): int
-    {
-        $paramsJson = json_encode($params, JSON_THROW_ON_ERROR);
-        return $this->execute(
-            "INSERT INTO ibl_trade_queue (operation_type, params, tradeline) VALUES (?, ?, ?)",
-            "sss",
-            $operationType,
-            $paramsJson,
-            $tradeLine
-        );
-    }
-
-    /**
-     * @see TradingRepositoryInterface::getQueuedTrades()
-     */
-    public function getQueuedTrades(): array
-    {
-        /** @var list<array{id: int, operation_type: string, params: string, tradeline: string}> */
-        return $this->fetchAll(
-            "SELECT id, operation_type, params, tradeline FROM ibl_trade_queue ORDER BY id ASC"
-        );
-    }
-
-    /**
-     * @see TradingRepositoryInterface::executeQueuedPlayerTransfer()
-     */
-    public function executeQueuedPlayerTransfer(int $playerId, string $teamName, int $teamId): int
-    {
-        return $this->execute(
-            "UPDATE ibl_plr SET teamname = ?, tid = ? WHERE pid = ?",
-            "sii",
-            $teamName,
-            $teamId,
-            $playerId
-        );
-    }
-
-    /**
-     * @see TradingRepositoryInterface::executeQueuedPickTransfer()
-     */
-    public function executeQueuedPickTransfer(int $pickId, string $newOwner): int
-    {
-        return $this->execute(
-            "UPDATE ibl_draft_picks SET ownerofpick = ? WHERE pickid = ?",
-            "si",
-            $newOwner,
-            $pickId
-        );
-    }
-
-    /**
-     * @see TradingRepositoryInterface::deleteQueuedTrade()
-     */
-    public function deleteQueuedTrade(int $queueId): int
-    {
-        return $this->execute(
-            "DELETE FROM ibl_trade_queue WHERE id = ?",
-            "i",
-            $queueId
-        );
-    }
-
-    /**
-     * @see TradingRepositoryInterface::clearTradeQueue()
-     */
-    public function clearTradeQueue(): int
-    {
-        return $this->execute("TRUNCATE TABLE ibl_trade_queue");
-    }
-
-    /**
      * @see TradingRepositoryInterface::deleteTradeInfoByOfferId()
      */
     public function deleteTradeInfoByOfferId(int $offerId): int
     {
         return $this->execute(
             "DELETE FROM ibl_trade_info WHERE tradeofferid = ?",
-            "i",
-            $offerId
-        );
-    }
-
-    /**
-     * @see TradingRepositoryInterface::deleteTradeCashByOfferId()
-     */
-    public function deleteTradeCashByOfferId(int $offerId): int
-    {
-        return $this->execute(
-            "DELETE FROM ibl_trade_cash WHERE tradeOfferID = ?",
             "i",
             $offerId
         );
@@ -476,70 +296,6 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
             throw new \RuntimeException('Failed to generate trade offer ID');
         }
         return $row['id'];
-    }
-
-    /**
-     * Insert a cash player record (positive or negative cash transaction)
-     *
-     * @param CashPlayerData $data Associative array with keys: ordinal, pid, name, tid, teamname, exp, cy, cyt, cy1-cy6, retired
-     * @return int Number of affected rows
-     */
-    public function insertCashPlayerRecord(array $data): int
-    {
-        return $this->execute(
-            "INSERT INTO `ibl_plr` 
-                (`ordinal`, `pid`, `name`, `tid`, `teamname`, `exp`, `cy`, `cyt`, `cy1`, `cy2`, `cy3`, `cy4`, `cy5`, `cy6`, `retired`) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            "iisisissiiiiiii",
-            $data['ordinal'],
-            $data['pid'],
-            $data['name'],
-            $data['tid'],
-            $data['teamname'],
-            $data['exp'],
-            $data['cy'],
-            $data['cyt'],
-            $data['cy1'],
-            $data['cy2'],
-            $data['cy3'],
-            $data['cy4'],
-            $data['cy5'],
-            $data['cy6'],
-            $data['retired']
-        );
-    }
-
-    /**
-     * Insert cash trade offer into ibl_trade_cash
-     * 
-     * @param int $tradeOfferId Trade offer ID
-     * @param string $sendingTeam Sending team name
-     * @param string $receivingTeam Receiving team name
-     * @param int $cy1 Cash year 1
-     * @param int $cy2 Cash year 2
-     * @param int $cy3 Cash year 3
-     * @param int $cy4 Cash year 4
-     * @param int $cy5 Cash year 5
-     * @param int $cy6 Cash year 6
-     * @return int Number of affected rows
-     */
-    public function insertCashTradeOffer(int $tradeOfferId, string $sendingTeam, string $receivingTeam, int $cy1, int $cy2, int $cy3, int $cy4, int $cy5, int $cy6): int
-    {
-        return $this->execute(
-            "INSERT INTO ibl_trade_cash 
-                (`tradeOfferID`, `sendingTeam`, `receivingTeam`, `cy1`, `cy2`, `cy3`, `cy4`, `cy5`, `cy6`) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            "issiiiiii",
-            $tradeOfferId,
-            $sendingTeam,
-            $receivingTeam,
-            $cy1,
-            $cy2,
-            $cy3,
-            $cy4,
-            $cy5,
-            $cy6
-        );
     }
 
     /**
@@ -591,22 +347,6 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * @see TradingRepositoryInterface::getTeamCashRecordsForSalary()
-     */
-    public function getTeamCashRecordsForSalary(int $teamId): array
-    {
-        /** @var list<TradingPlayerRow> */
-        return $this->fetchAll(
-            "SELECT pos, name, pid, ordinal, cy, cy1, cy2, cy3, cy4, cy5, cy6
-             FROM ibl_plr
-             WHERE tid = ? AND retired = 0 AND name LIKE '|%'
-             ORDER BY ordinal ASC",
-            "i",
-            $teamId
-        );
-    }
-
-    /**
      * @see TradingRepositoryInterface::getTeamDraftPicksForTrading()
      */
     public function getTeamDraftPicksForTrading(string $teamName): array
@@ -640,7 +380,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     public function deleteTradeOffer(int $offerId): void
     {
         $this->deleteTradeInfoByOfferId($offerId);
-        $this->deleteTradeCashByOfferId($offerId);
+        $this->cashRepository->deleteTradeCashByOfferId($offerId);
         $this->deleteTradeOfferById($offerId);
     }
 

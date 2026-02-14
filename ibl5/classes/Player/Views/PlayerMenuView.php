@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
+use Player\PlayerPageType;
+
 /**
  * PlayerMenuView - Renders player page navigation menu
  *
@@ -23,27 +25,27 @@ class PlayerMenuView
     {
         return [
             'General' => [
-                \PlayerPageType::OVERVIEW,
-                \PlayerPageType::SIM_STATS,
+                PlayerPageType::OVERVIEW,
+                PlayerPageType::SIM_STATS,
             ],
             'Regular Season' => [
-                \PlayerPageType::REGULAR_SEASON_AVERAGES,
-                \PlayerPageType::REGULAR_SEASON_TOTALS,
+                PlayerPageType::REGULAR_SEASON_AVERAGES,
+                PlayerPageType::REGULAR_SEASON_TOTALS,
             ],
             'Playoffs' => [
-                \PlayerPageType::PLAYOFF_AVERAGES,
-                \PlayerPageType::PLAYOFF_TOTALS,
+                PlayerPageType::PLAYOFF_AVERAGES,
+                PlayerPageType::PLAYOFF_TOTALS,
             ],
             'Special' => [
-                \PlayerPageType::HEAT_AVERAGES,
-                \PlayerPageType::HEAT_TOTALS,
-                \PlayerPageType::OLYMPIC_AVERAGES,
-                \PlayerPageType::OLYMPIC_TOTALS,
+                PlayerPageType::HEAT_AVERAGES,
+                PlayerPageType::HEAT_TOTALS,
+                PlayerPageType::OLYMPIC_AVERAGES,
+                PlayerPageType::OLYMPIC_TOTALS,
             ],
             'History' => [
-                \PlayerPageType::AWARDS_AND_NEWS,
-                \PlayerPageType::ONE_ON_ONE,
-                \PlayerPageType::RATINGS_AND_SALARY,
+                PlayerPageType::AWARDS_AND_NEWS,
+                PlayerPageType::ONE_ON_ONE,
+                PlayerPageType::RATINGS_AND_SALARY,
             ],
         ];
     }
@@ -78,19 +80,19 @@ class PlayerMenuView
     private static function getLabelKey(?int $pageType): string
     {
         return match ($pageType) {
-            \PlayerPageType::OVERVIEW => 'overview',
-            \PlayerPageType::SIM_STATS => 'sim',
-            \PlayerPageType::REGULAR_SEASON_AVERAGES => 'rs_avg',
-            \PlayerPageType::REGULAR_SEASON_TOTALS => 'rs_tot',
-            \PlayerPageType::PLAYOFF_AVERAGES => 'po_avg',
-            \PlayerPageType::PLAYOFF_TOTALS => 'po_tot',
-            \PlayerPageType::HEAT_AVERAGES => 'heat_avg',
-            \PlayerPageType::HEAT_TOTALS => 'heat_tot',
-            \PlayerPageType::OLYMPIC_AVERAGES => 'oly_avg',
-            \PlayerPageType::OLYMPIC_TOTALS => 'oly_tot',
-            \PlayerPageType::AWARDS_AND_NEWS => 'awards',
-            \PlayerPageType::ONE_ON_ONE => 'one_on_one',
-            \PlayerPageType::RATINGS_AND_SALARY => 'ratings',
+            PlayerPageType::OVERVIEW => 'overview',
+            PlayerPageType::SIM_STATS => 'sim',
+            PlayerPageType::REGULAR_SEASON_AVERAGES => 'rs_avg',
+            PlayerPageType::REGULAR_SEASON_TOTALS => 'rs_tot',
+            PlayerPageType::PLAYOFF_AVERAGES => 'po_avg',
+            PlayerPageType::PLAYOFF_TOTALS => 'po_tot',
+            PlayerPageType::HEAT_AVERAGES => 'heat_avg',
+            PlayerPageType::HEAT_TOTALS => 'heat_tot',
+            PlayerPageType::OLYMPIC_AVERAGES => 'oly_avg',
+            PlayerPageType::OLYMPIC_TOTALS => 'oly_tot',
+            PlayerPageType::AWARDS_AND_NEWS => 'awards',
+            PlayerPageType::ONE_ON_ONE => 'one_on_one',
+            PlayerPageType::RATINGS_AND_SALARY => 'ratings',
             default => 'overview',
         };
     }
@@ -112,7 +114,7 @@ class PlayerMenuView
         $activeGroupName = 'General';
         foreach ($groups as $groupName => $pageTypes) {
             foreach ($pageTypes as $pt) {
-                $isActive = ($currentPageType === $pt) || ($currentPageType === null && $pt === \PlayerPageType::OVERVIEW);
+                $isActive = ($currentPageType === $pt) || ($currentPageType === null && $pt === PlayerPageType::OVERVIEW);
                 if ($isActive) {
                     $activeGroupName = $groupName;
                     break 2;
@@ -138,9 +140,9 @@ class PlayerMenuView
                 <div class="plr-nav__pills">
                     <?php foreach ($pageTypes as $pageType):
                         $labelKey = self::getLabelKey($pageType);
-                        $label = $shortLabels[$labelKey] ?? \PlayerPageType::getDescription($pageType);
-                        $url = \PlayerPageType::getUrl($playerID, $pageType);
-                        $isActive = ($currentPageType === $pageType) || ($currentPageType === null && $pageType === \PlayerPageType::OVERVIEW);
+                        $label = $shortLabels[$labelKey] ?? PlayerPageType::getDescription($pageType);
+                        $url = PlayerPageType::getUrl($playerID, $pageType);
+                        $isActive = ($currentPageType === $pageType) || ($currentPageType === null && $pageType === PlayerPageType::OVERVIEW);
                         /** @var string $labelEscaped */
                         $labelEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($label);
                     ?>
@@ -156,9 +158,9 @@ class PlayerMenuView
                 ?>
                 <optgroup label="<?= $groupNameEscaped2 ?>">
                     <?php foreach ($pageTypes as $pageType):
-                        $label = \PlayerPageType::getDescription($pageType);
-                        $url = \PlayerPageType::getUrl($playerID, $pageType);
-                        $isActive = ($currentPageType === $pageType) || ($currentPageType === null && $pageType === \PlayerPageType::OVERVIEW);
+                        $label = PlayerPageType::getDescription($pageType);
+                        $url = PlayerPageType::getUrl($playerID, $pageType);
+                        $isActive = ($currentPageType === $pageType) || ($currentPageType === null && $pageType === PlayerPageType::OVERVIEW);
                         /** @var string $labelEscaped2 */
                         $labelEscaped2 = \Utilities\HtmlSanitizer::safeHtmlOutput($label);
                     ?>

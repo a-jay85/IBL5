@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Search\Contracts;
 
 /**
- * Interface for the Search service.
+ * Interface for the Search repository.
  *
  * Defines methods for searching stories, comments, and users,
  * and for retrieving filter options (topics, categories, authors).
@@ -20,7 +20,7 @@ namespace Search\Contracts;
  * @phpstan-type CategoryRow array{catId: int, title: string}
  * @phpstan-type TopicInfoRow array{topicImage: string, topicText: string}
  */
-interface SearchServiceInterface
+interface SearchRepositoryInterface
 {
     /**
      * Search for stories matching the given criteria.

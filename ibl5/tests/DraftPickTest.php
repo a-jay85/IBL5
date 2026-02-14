@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests;
 
 use PHPUnit\Framework\TestCase;
-use DraftPick;
+use Draft\DraftPick;
 
 /**
  * DraftPickTest - Tests for DraftPick entity class

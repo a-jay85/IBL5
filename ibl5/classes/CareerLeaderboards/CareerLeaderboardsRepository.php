@@ -33,7 +33,7 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
         'orb', 'reb', 'ast', 'stl', 'tvr', 'blk', 'pf'
     ];
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
     }

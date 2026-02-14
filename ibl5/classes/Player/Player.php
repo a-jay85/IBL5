@@ -17,8 +17,8 @@ use Player\Contracts\PlayerInterface;
  */
 class Player implements PlayerInterface
 {
-    /** @var object Database connection */
-    protected object $db;
+    /** @var \mysqli Database connection */
+    protected \mysqli $db;
 
     /** @var PlayerData|null Player data object */
     protected ?PlayerData $playerData = null;
@@ -260,11 +260,11 @@ class Player implements PlayerInterface
     /**
      * Create a Player instance from a player ID
      *
-     * @param object $db Database connection
+     * @param \mysqli $db Database connection
      * @param int $playerID Player unique identifier
      * @return self Populated Player instance
      */
-    public static function withPlayerID(object $db, int $playerID): self
+    public static function withPlayerID(\mysqli $db, int $playerID): self
     {
         $instance = new self();
         $instance->initialize($db);
@@ -276,11 +276,11 @@ class Player implements PlayerInterface
     /**
      * Create a Player instance from a player row array
      *
-     * @param object $db Database connection
+     * @param \mysqli $db Database connection
      * @param PlayerRow $plrRow Player row data from database
      * @return self Populated Player instance
      */
-    public static function withPlrRow(object $db, array $plrRow): self
+    public static function withPlrRow(\mysqli $db, array $plrRow): self
     {
         $instance = new self();
         $instance->initialize($db);
@@ -292,11 +292,11 @@ class Player implements PlayerInterface
     /**
      * Create a Player instance from a historical player row
      *
-     * @param object $db Database connection
+     * @param \mysqli $db Database connection
      * @param array<string, mixed> $plrRow Historical player row data
      * @return self Populated Player instance
      */
-    public static function withHistoricalPlrRow(object $db, array $plrRow): self
+    public static function withHistoricalPlrRow(\mysqli $db, array $plrRow): self
     {
         $instance = new self();
         $instance->initialize($db);
@@ -309,32 +309,12 @@ class Player implements PlayerInterface
     /**
      * Initialize the Player instance with database and repository
      *
-     * @param object $db Database connection
-     * @throws \RuntimeException If no mysqli connection is available
+     * @param \mysqli $db Database connection
      */
-    protected function initialize(object $db): void
+    protected function initialize(\mysqli $db): void
     {
         $this->db = $db;
-
-        // Use mysqli connection for PlayerRepository
-        // If $db is mysqli, use it; otherwise get global $mysqli_db
-        // In tests, global $mysqli_db should be a proper mysqli mock
-        if ($db instanceof \mysqli) {
-            $this->repository = new PlayerRepository($db);
-        } else {
-            // Legacy path: try global mysqli_db
-            global $mysqli_db;
-            if ($mysqli_db instanceof \mysqli) {
-                $this->repository = new PlayerRepository($mysqli_db);
-            } elseif (is_object($mysqli_db)) {
-                // Test environment: global $mysqli_db exists but is a mock duck-type
-                // Temporarily accept duck-typed objects during mysqli migration
-                $this->repository = new PlayerRepository($mysqli_db);
-            } else {
-                // No mysqli connection available
-                throw new \RuntimeException('PlayerRepository requires a mysqli connection. Please set up global $mysqli_db in tests.');
-            }
-        }
+        $this->repository = new PlayerRepository($db);
     }
 
     /**

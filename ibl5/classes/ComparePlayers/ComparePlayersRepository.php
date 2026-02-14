@@ -13,7 +13,7 @@ use ComparePlayers\Contracts\ComparePlayersRepositoryInterface;
  */
 class ComparePlayersRepository extends \BaseMysqliRepository implements ComparePlayersRepositoryInterface
 {
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
     }

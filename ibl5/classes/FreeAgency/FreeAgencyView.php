@@ -7,6 +7,7 @@ namespace FreeAgency;
 use FreeAgency\Contracts\FreeAgencyViewInterface;
 use Player\Player;
 use Player\PlayerImageHelper;
+use Team\Contracts\TeamQueryRepositoryInterface;
 use UI\TeamCellHelper;
 
 /**
@@ -18,10 +19,12 @@ use UI\TeamCellHelper;
 class FreeAgencyView implements FreeAgencyViewInterface
 {
     private \mysqli $mysqli_db;
+    private TeamQueryRepositoryInterface $teamQueryRepo;
 
     public function __construct(\mysqli $mysqli_db)
     {
         $this->mysqli_db = $mysqli_db;
+        $this->teamQueryRepo = new \Team\TeamQueryRepository($mysqli_db);
     }
 
     /**
@@ -105,7 +108,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     <?= $this->renderTableHeader('Players Under Contract', false, $team) ?>
     <tbody>
         <?php
-        $rosterRows = $team->getRosterUnderContractOrderedByOrdinalResult();
+        $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamID);
         foreach ($rosterRows as $playerRow): ?>
             <?php
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
@@ -174,7 +177,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     <?= $this->renderTableHeader('Contract Offers', false, $team) ?>
     <tbody>
         <?php
-        $offersResult = $team->getFreeAgencyOffersResult();
+        $offersResult = $this->teamQueryRepo->getFreeAgencyOffers($team->name);
         foreach ($offersResult as $offerRow): ?>
             <?php
             $playerID = $commonRepository->getPlayerIDFromPlayerName($offerRow['name']);
@@ -236,7 +239,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     <?= $this->renderTableHeader('Unsigned Free Agents', true, $team) ?>
     <tbody>
         <?php
-        $rosterRows = $team->getRosterUnderContractOrderedByOrdinalResult();
+        $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamID);
         foreach ($rosterRows as $playerRow): ?>
             <?php
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);

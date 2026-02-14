@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Trading\Contracts;
 
 /**
- * TradingRepositoryInterface - Contract for trading database operations
+ * TradingRepositoryInterface - Contract for core trade offer CRUD database operations
  *
- * Defines methods for accessing and modifying trade-related data in the database.
+ * Defines methods for accessing and modifying trade offer data in the database.
  * All implementations must use prepared statements for SQL injection protection.
+ *
+ * Cash transaction methods are in TradeCashRepositoryInterface.
+ * Queue/execution methods are in TradeExecutionRepositoryInterface.
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  *
@@ -17,11 +20,8 @@ namespace Trading\Contracts;
  * @phpstan-type TeamWithCityRow array{teamid: int, team_name: string, team_city: string, color1: string, color2: string}
  * @phpstan-type TradingPlayerRow array{pos: string, name: string, pid: int, ordinal: ?int, cy: ?int, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
  * @phpstan-type TradeInfoRow array{tradeofferid: int, itemid: int, itemtype: string, from: string, to: string, approval: string, created_at: string, updated_at: string}
- * @phpstan-type TradeCashRow array{tradeOfferID: int, sendingTeam: string, receivingTeam: string, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
  * @phpstan-type DraftPickRow array{pickid: int, ownerofpick: string, teampick: string, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
  * @phpstan-type TradingDraftPickRow array{pickid: int, ownerofpick: string, teampick: string, teampick_id: int, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
- * @phpstan-type CashTransactionData array{teamname: string, year1: int, year2: int, year3: int, year4: int, year5: int, year6: int, row: int}
- * @phpstan-type CashPlayerData array{ordinal: int, pid: int, name: string, tid: int, teamname: string, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, retired: int}
  */
 interface TradingRepositoryInterface
 {
@@ -48,15 +48,6 @@ interface TradingRepositoryInterface
     public function getTradeRows(): array;
 
     /**
-     * Get cash transaction details for a specific team and row
-     *
-     * @param string $teamName Team name
-     * @param int $row Row number
-     * @return TradeCashRow|null Cash details or null if not found
-     */
-    public function getCashDetails(string $teamName, int $row): ?array;
-
-    /**
      * Get players involved in a trade
      *
      * @param string $teamName Team name
@@ -76,7 +67,7 @@ interface TradingRepositoryInterface
 
     /**
      * Update player's team after trade
-     * 
+     *
      * @param int $playerId Player ID
      * @param string $newTeamName New team name
      * @param int $newTeamId New team ID
@@ -86,7 +77,7 @@ interface TradingRepositoryInterface
 
     /**
      * Update draft pick ownership after trade
-     * 
+     *
      * @param int $year Draft year
      * @param int $pick Draft pick number
      * @param string $newOwner New owner team name
@@ -95,51 +86,12 @@ interface TradingRepositoryInterface
     public function updateDraftPickOwner(int $year, int $pick, string $newOwner): int;
 
     /**
-     * Clear all trade info
-     * 
-     * @return int Number of rows affected
-     */
-    public function clearTradeInfo(): int;
-
-    /**
-     * Clear all trade cash data
-     * 
-     * @return int Number of rows affected
-     */
-    public function clearTradeCash(): int;
-
-    /**
      * Check if a player ID exists in trade players table
-     * 
+     *
      * @param int $playerId Player ID
      * @return bool True if exists
      */
     public function playerExistsInTrade(int $playerId): bool;
-
-    /**
-     * Insert positive cash transaction (team receiving cash)
-     *
-     * @param CashTransactionData $data Cash transaction data with keys: teamname, year1-6, row
-     * @return int Number of rows affected
-     */
-    public function insertPositiveCashTransaction(array $data): int;
-
-    /**
-     * Insert negative cash transaction (team sending cash)
-     *
-     * @param CashTransactionData $data Cash transaction data with keys: teamname, year1-6, row
-     * @return int Number of rows affected
-     */
-    public function insertNegativeCashTransaction(array $data): int;
-
-    /**
-     * Delete cash transaction for a team and row
-     * 
-     * @param string $teamName Team name
-     * @param int $row Row number
-     * @return int Number of rows affected
-     */
-    public function deleteCashTransaction(string $teamName, int $row): int;
 
     /**
      * Insert a trade item (player, pick, or cash consideration)
@@ -177,15 +129,6 @@ interface TradingRepositoryInterface
     public function getTradesByOfferIdForUpdate(int $offerId): array;
 
     /**
-     * Get cash transaction by offer ID and sending team
-     *
-     * @param int $offerId Trade offer ID
-     * @param string $sendingTeam Sending team name
-     * @return TradeCashRow|null Cash details with cy1-cy6 fields, or null if not found
-     */
-    public function getCashTransactionByOffer(int $offerId, string $sendingTeam): ?array;
-
-    /**
      * Get draft pick by pick ID
      *
      * @param int $pickId Pick ID
@@ -203,7 +146,7 @@ interface TradingRepositoryInterface
 
     /**
      * Check if a player ID exists in the database
-     * 
+     *
      * @param int $playerId Player ID to check
      * @return bool True if player exists, false otherwise
      */
@@ -211,7 +154,7 @@ interface TradingRepositoryInterface
 
     /**
      * Update draft pick owner
-     * 
+     *
      * @param int $pickId Pick ID
      * @param string $newOwner New owner team name
      * @return int Number of rows affected
@@ -219,73 +162,12 @@ interface TradingRepositoryInterface
     public function updateDraftPickOwnerById(int $pickId, string $newOwner): int;
 
     /**
-     * Insert trade into queue for deferred execution
-     *
-     * Stores structured data for safe execution via prepared statements.
-     *
-     * @param string $operationType Type of operation ('player_transfer' or 'pick_transfer')
-     * @param array<string, int|string> $params Operation parameters (e.g., player_id, team_name, team_id)
-     * @param string $tradeLine Trade description text
-     * @return int Number of rows affected
-     */
-    public function insertTradeQueue(string $operationType, array $params, string $tradeLine): int;
-
-    /**
-     * Get all queued trade operations
-     *
-     * @return list<array{id: int, operation_type: string, params: string, tradeline: string}> Queue entries
-     */
-    public function getQueuedTrades(): array;
-
-    /**
-     * Execute a queued player transfer
-     *
-     * @param int $playerId Player ID
-     * @param string $teamName New team name
-     * @param int $teamId New team ID
-     * @return int Number of affected rows
-     */
-    public function executeQueuedPlayerTransfer(int $playerId, string $teamName, int $teamId): int;
-
-    /**
-     * Execute a queued pick transfer
-     *
-     * @param int $pickId Pick ID
-     * @param string $newOwner New owner team name
-     * @return int Number of affected rows
-     */
-    public function executeQueuedPickTransfer(int $pickId, string $newOwner): int;
-
-    /**
-     * Delete a queued trade entry by ID
-     *
-     * @param int $queueId Queue entry ID
-     * @return int Number of affected rows
-     */
-    public function deleteQueuedTrade(int $queueId): int;
-
-    /**
-     * Clear all queued trades (used at start of preseason)
-     *
-     * @return int Number of affected rows
-     */
-    public function clearTradeQueue(): int;
-
-    /**
      * Delete trade info by offer ID
-     * 
+     *
      * @param int $offerId Trade offer ID
      * @return int Number of rows affected
      */
     public function deleteTradeInfoByOfferId(int $offerId): int;
-
-    /**
-     * Delete trade cash by offer ID
-     * 
-     * @param int $offerId Trade offer ID
-     * @return int Number of rows affected
-     */
-    public function deleteTradeCashByOfferId(int $offerId): int;
 
     /**
      * Get the last inserted ID
@@ -348,7 +230,7 @@ interface TradingRepositoryInterface
     public function getAllTradeOffers(): array;
 
     /**
-     * Delete a complete trade offer (info rows + cash rows)
+     * Delete a complete trade offer (info rows + cash rows + parent row)
      *
      * Removes all trade_info, trade_cash, and trade_offers records for a given offer ID.
      * Used when rejecting a trade offer.
@@ -368,17 +250,6 @@ interface TradingRepositoryInterface
      * @return int Number of active players on the team's roster
      */
     public function getTeamPlayerCount(string $teamName): int;
-
-    /**
-     * Get cash placeholder records for a team's salary calculation
-     *
-     * Returns cash transaction records (names starting with '|') that affect
-     * a team's salary cap totals but should not appear in the trading roster.
-     *
-     * @param int $teamId Team ID
-     * @return list<TradingPlayerRow> Cash placeholder rows with contract year data
-     */
-    public function getTeamCashRecordsForSalary(int $teamId): array;
 
     /**
      * Get all teams with city, name, colors and ID for trading UI

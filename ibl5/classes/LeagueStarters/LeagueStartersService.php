@@ -6,6 +6,7 @@ namespace LeagueStarters;
 
 use LeagueStarters\Contracts\LeagueStartersServiceInterface;
 use Player\Player;
+use Team\Contracts\TeamQueryRepositoryInterface;
 
 /**
  * LeagueStartersService - Business logic for league starters display
@@ -16,19 +17,21 @@ use Player\Player;
  */
 class LeagueStartersService implements LeagueStartersServiceInterface
 {
-    private object $db;
+    private \mysqli $db;
     private \League $league;
+    private TeamQueryRepositoryInterface $teamQueryRepo;
 
     /**
      * Constructor
      *
-     * @param object $db Database connection
+     * @param \mysqli $db Database connection
      * @param \League $league League object
      */
-    public function __construct(object $db, \League $league)
+    public function __construct(\mysqli $db, \League $league)
     {
         $this->db = $db;
         $this->league = $league;
+        $this->teamQueryRepo = new \Team\TeamQueryRepository($db);
     }
 
     /**
@@ -52,7 +55,7 @@ class LeagueStartersService implements LeagueStartersServiceInterface
             $team = \Team::initialize($this->db, $teamRow);
 
             foreach ($positions as $position) {
-                $playerId = $team->getLastSimStarterPlayerIDForPosition($position);
+                $playerId = $this->teamQueryRepo->getLastSimStarterPlayerIDForPosition($team->teamID, $position);
                 if ($playerId === 0) {
                     $playerId = 4040404;
                 }

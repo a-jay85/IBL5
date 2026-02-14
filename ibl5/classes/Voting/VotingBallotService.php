@@ -18,12 +18,12 @@ use Voting\Contracts\VotingBallotViewInterface;
  */
 class VotingBallotService implements VotingBallotServiceInterface
 {
-    private object $db;
+    private \mysqli $db;
 
     /**
-     * @param object $db Database connection for Player/PlayerStats instantiation
+     * @param \mysqli $db Database connection for Player/PlayerStats instantiation
      */
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
     }

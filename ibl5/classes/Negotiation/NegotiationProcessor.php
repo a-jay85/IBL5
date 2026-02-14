@@ -16,12 +16,12 @@ use Player\Player;
  */
 class NegotiationProcessor implements NegotiationProcessorInterface
 {
-    private object $db;
+    private \mysqli $db;
     private NegotiationRepositoryInterface $repository;
     private NegotiationValidator $validator;
     private NegotiationDemandCalculator $demandCalculator;
 
-    public function __construct(object $db, object $mysqli_db)
+    public function __construct(\mysqli $db, \mysqli $mysqli_db)
     {
         $this->db = $db;
         $this->repository = new NegotiationRepository($mysqli_db);

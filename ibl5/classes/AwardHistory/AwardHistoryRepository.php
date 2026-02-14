@@ -31,13 +31,11 @@ class AwardHistoryRepository extends BaseMysqliRepository implements AwardHistor
 
     /**
      * Constructor - inherits from BaseMysqliRepository
-     * 
-     * @param object $db Active mysqli connection (or duck-typed mock during testing)
+     *
+     * @param \mysqli $db Active mysqli connection
      * @throws \RuntimeException If connection is invalid (error code 1002)
-     * 
-     * TEMPORARY: Accepts duck-typed objects during migration for testing compatibility.
      */
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
     }

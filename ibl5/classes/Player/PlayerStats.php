@@ -147,7 +147,7 @@ class PlayerStats implements PlayerStatsInterface
     /**
      * @see PlayerStatsInterface::withPlayerID()
      */
-    public static function withPlayerID(object $db, int $playerID): self
+    public static function withPlayerID(\mysqli $db, int $playerID): self
     {
         $repository = new PlayerStatsRepository($db);
         $instance = new self($repository);
@@ -158,7 +158,7 @@ class PlayerStats implements PlayerStatsInterface
     /**
      * @see PlayerStatsInterface::withPlayerObject()
      */
-    public static function withPlayerObject(object $db, Player $player): PlayerStatsInterface
+    public static function withPlayerObject(\mysqli $db, Player $player): PlayerStatsInterface
     {
         $repository = new PlayerStatsRepository($db);
         $instance = new self($repository);
@@ -169,7 +169,7 @@ class PlayerStats implements PlayerStatsInterface
     /**
      * @see PlayerStatsInterface::withPlrRow()
      */
-    public static function withPlrRow(object $db, array $plrRow): PlayerStatsInterface
+    public static function withPlrRow(\mysqli $db, array $plrRow): PlayerStatsInterface
     {
         $repository = new PlayerStatsRepository($db);
         $instance = new self($repository);
@@ -181,7 +181,7 @@ class PlayerStats implements PlayerStatsInterface
     /**
      * @see PlayerStatsInterface::withHistoricalPlrRow()
      */
-    public static function withHistoricalPlrRow(object $db, array $plrRow): PlayerStatsInterface
+    public static function withHistoricalPlrRow(\mysqli $db, array $plrRow): PlayerStatsInterface
     {
         $repository = new PlayerStatsRepository($db);
         $instance = new self($repository);
@@ -192,7 +192,7 @@ class PlayerStats implements PlayerStatsInterface
     /**
      * @see PlayerStatsInterface::withBoxscoreInfoLine()
      */
-    public static function withBoxscoreInfoLine(object $db, string $playerInfoLine): PlayerStatsInterface
+    public static function withBoxscoreInfoLine(\mysqli $db, string $playerInfoLine): PlayerStatsInterface
     {
         $repository = new PlayerStatsRepository($db);
         $instance = new self($repository);

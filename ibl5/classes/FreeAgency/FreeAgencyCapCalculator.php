@@ -6,6 +6,7 @@ namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyCapCalculatorInterface;
 use Player\Player;
+use Team\Contracts\TeamQueryRepositoryInterface;
 
 /**
  * @see FreeAgencyCapCalculatorInterface
@@ -13,15 +14,23 @@ use Player\Player;
  */
 class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
 {
-    private object $mysqli_db;
+    private \mysqli $mysqli_db;
     private \Team $team;
     private \Season $season;
+    private TeamQueryRepositoryInterface $teamQueryRepo;
 
-    public function __construct(object $mysqli_db, \Team $team, \Season $season)
+    /**
+     * @param \mysqli $mysqli_db Database connection
+     * @param \Team $team Team entity
+     * @param \Season $season Season entity
+     * @param TeamQueryRepositoryInterface|null $teamQueryRepo Team query repository (created internally if not provided)
+     */
+    public function __construct(\mysqli $mysqli_db, \Team $team, \Season $season, ?TeamQueryRepositoryInterface $teamQueryRepo = null)
     {
         $this->mysqli_db = $mysqli_db;
         $this->team = $team;
         $this->season = $season;
+        $this->teamQueryRepo = $teamQueryRepo ?? new \Team\TeamQueryRepository($mysqli_db);
     }
 
     /**
@@ -147,8 +156,8 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
     public function calculateTeamCapMetrics(?string $excludeOfferPlayerName = null): array
     {
         // Fetch roster and offers data once, convert results to arrays
-        $rosterResult = $this->team->getRosterUnderContractOrderedByOrdinalResult();
-        $offersResult = $this->team->getFreeAgencyOffersResult();
+        $rosterResult = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($this->team->teamID);
+        $offersResult = $this->teamQueryRepo->getFreeAgencyOffers($this->team->name);
         
         // Convert mysqli_result to arrays
         $rosterData = [];

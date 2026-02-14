@@ -14,7 +14,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
     private \Season $season;
     private TeamStatsCalculator $statsCalculator;
 
-    public function __construct(object $db, \Season $season, ?TeamStatsCalculator $statsCalculator = null) {
+    public function __construct(\mysqli $db, \Season $season, ?TeamStatsCalculator $statsCalculator = null) {
         parent::__construct($db);
         $this->season = $season;
         $this->statsCalculator = $statsCalculator ?? new TeamStatsCalculator($db);

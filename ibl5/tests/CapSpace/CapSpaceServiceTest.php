@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use CapSpace\CapSpaceService;
 use CapSpace\Contracts\CapSpaceRepositoryInterface;
+use Team\Contracts\TeamQueryRepositoryInterface;
 
 /**
  * Testable subclass that exposes protected methods for testing
@@ -34,18 +35,22 @@ class CapSpaceServiceTest extends TestCase
     /** @var object&\PHPUnit\Framework\MockObject\MockObject */
     private object $mockDb;
 
+    /** @var TeamQueryRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private TeamQueryRepositoryInterface $mockTeamQueryRepo;
+
     private TestableCapSpaceService $service;
 
     protected function setUp(): void
     {
         $this->mockRepository = $this->createMock(CapSpaceRepositoryInterface::class);
         $this->mockDb = $this->createMock(\mysqli::class);
-        $this->service = new TestableCapSpaceService($this->mockRepository, $this->mockDb);
+        $this->mockTeamQueryRepo = $this->createMock(TeamQueryRepositoryInterface::class);
+        $this->service = new TestableCapSpaceService($this->mockRepository, $this->mockDb, $this->mockTeamQueryRepo);
     }
 
     /**
      * Test that MLE/LLE integer values are correctly converted to booleans
-     * 
+     *
      * Regression test for bug where $team->hasMLE === '1' always returned false
      * because database stores integers, not strings.
      */
@@ -53,12 +58,13 @@ class CapSpaceServiceTest extends TestCase
     {
         // Create a mock Team object with integer MLE/LLE values (as stored in database)
         $mockTeam = $this->createMockTeamWithMleLle(1, 1);
-        
+
         $mockSeason = $this->createMockSeason();
         $this->mockRepository->method('getPlayersUnderContractAfterSeason')->willReturn([]);
-        
+        $this->setupTeamQueryRepoDefaults();
+
         $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
-        
+
         // Verify boolean conversion works correctly with integer 1
         $this->assertIsBool($result['hasMLE'], 'hasMLE should be a boolean');
         $this->assertIsBool($result['hasLLE'], 'hasLLE should be a boolean');
@@ -69,12 +75,13 @@ class CapSpaceServiceTest extends TestCase
     public function testMleAndLleFlagsHandleIntegerZeroCorrectly(): void
     {
         $mockTeam = $this->createMockTeamWithMleLle(0, 0);
-        
+
         $mockSeason = $this->createMockSeason();
         $this->mockRepository->method('getPlayersUnderContractAfterSeason')->willReturn([]);
-        
+        $this->setupTeamQueryRepoDefaults();
+
         $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
-        
+
         $this->assertFalse($result['hasMLE'], 'hasMLE should be false when team has MLE=0');
         $this->assertFalse($result['hasLLE'], 'hasLLE should be false when team has LLE=0');
     }
@@ -82,12 +89,13 @@ class CapSpaceServiceTest extends TestCase
     public function testMleAndLleFlagsHandleMixedStates(): void
     {
         $mockTeam = $this->createMockTeamWithMleLle(1, 0);
-        
+
         $mockSeason = $this->createMockSeason();
         $this->mockRepository->method('getPlayersUnderContractAfterSeason')->willReturn([]);
-        
+        $this->setupTeamQueryRepoDefaults();
+
         $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
-        
+
         $this->assertTrue($result['hasMLE'], 'hasMLE should be true when team has MLE=1');
         $this->assertFalse($result['hasLLE'], 'hasLLE should be false when team has LLE=0');
     }
@@ -125,27 +133,29 @@ class CapSpaceServiceTest extends TestCase
     public function testFreeAgencySlotsCalculation(): void
     {
         $mockTeam = $this->createMockTeamWithMleLle(1, 1);
-        
+
         $mockSeason = $this->createMockSeason();
-        
+
         // Mock 5 players under contract (15 total slots - 5 = 10 FA slots)
         $contractedPlayers = array_fill(0, 5, ['cy' => 2024, 'cyt' => 2025]);
         $this->mockRepository->method('getPlayersUnderContractAfterSeason')->willReturn($contractedPlayers);
-        
+        $this->setupTeamQueryRepoDefaults();
+
         $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
-        
+
         $this->assertEquals(10, $result['freeAgencySlots']);
     }
 
     public function testAvailableSalaryStructure(): void
     {
         $mockTeam = $this->createMockTeamWithMleLle(1, 1);
-        
+
         $mockSeason = $this->createMockSeason();
         $this->mockRepository->method('getPlayersUnderContractAfterSeason')->willReturn([]);
-        
+        $this->setupTeamQueryRepoDefaults();
+
         $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
-        
+
         // Should have availableSalary for 6 years
         $this->assertArrayHasKey('availableSalary', $result);
         $this->assertCount(6, $result['availableSalary']);
@@ -156,17 +166,35 @@ class CapSpaceServiceTest extends TestCase
     public function testPositionSalariesStructure(): void
     {
         $mockTeam = $this->createMockTeamWithMleLle(1, 1);
-        
+
         $mockSeason = $this->createMockSeason();
         $this->mockRepository->method('getPlayersUnderContractAfterSeason')->willReturn([]);
-        
+        $this->setupTeamQueryRepoDefaults();
+
         $result = $this->service->publicProcessTeamCapData($mockTeam, $mockSeason);
-        
+
         $this->assertArrayHasKey('positionSalaries', $result);
         $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
         foreach ($positions as $position) {
             $this->assertArrayHasKey($position, $result['positionSalaries']);
         }
+    }
+
+    /**
+     * Set up default mock returns for TeamQueryRepository methods
+     */
+    private function setupTeamQueryRepoDefaults(): void
+    {
+        $this->mockTeamQueryRepo->method('getSalaryCapArray')->willReturn([
+            'year1' => 0,
+            'year2' => 0,
+            'year3' => 0,
+            'year4' => 0,
+            'year5' => 0,
+            'year6' => 0,
+        ]);
+        $this->mockTeamQueryRepo->method('getAllPlayersUnderContract')->willReturn([]);
+        $this->mockTeamQueryRepo->method('getTotalNextSeasonSalaries')->willReturn(0);
     }
 
     /**
@@ -186,20 +214,7 @@ class CapSpaceServiceTest extends TestCase
         $mockTeam->color2 = 'FFFFFF';
         $mockTeam->hasMLE = $hasMLE;
         $mockTeam->hasLLE = $hasLLE;
-        
-        // Mock the methods called by processTeamCapData
-        $mockTeam->method('getSalaryCapArray')->willReturn([
-            'year1' => 0,
-            'year2' => 0,
-            'year3' => 0,
-            'year4' => 0,
-            'year5' => 0,
-            'year6' => 0,
-        ]);
-        
-        $mockTeam->method('getPlayersUnderContractByPositionResult')->willReturn([]);
-        $mockTeam->method('getTotalNextSeasonSalariesFromPlrResult')->willReturn(0);
-        
+
         return $mockTeam;
     }
 

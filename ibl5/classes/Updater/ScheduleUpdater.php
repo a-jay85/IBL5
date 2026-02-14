@@ -32,7 +32,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         12 => 'December',
     ];
 
-    public function __construct(object $db, \Season $season) {
+    public function __construct(\mysqli $db, \Season $season) {
         parent::__construct($db);
         $this->season = $season;
     }

@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 2164 tests • ~80% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 2892 tests • ~80% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -12,7 +12,7 @@
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - ✅ Goal achieved with 2164 tests (~80% coverage). Comprehensive edge case testing complete.
+1. **Test Coverage → 80%** - ✅ Goal achieved with 2892 tests (~80% coverage). Comprehensive edge case testing complete.
 
    **Priority Integration Tests:** ✅ All Complete
    - ~~Waivers, DepthChart, RookieOption, Schedule, Standings, Voting~~
@@ -30,6 +30,24 @@
 ---
 
 ## Recent Updates
+
+### StandingsUpdater: Database-Driven Computation (Feb 14, 2026)
+
+**Impact:** Replaced HTML file parsing with database-driven standings computation, bringing total from 2164 to 2892 tests
+
+**Changes:**
+- `StandingsUpdater` now computes standings from `ibl_schedule` game results instead of parsing `Standings.htm`
+- Conference/division mappings read from `ibl_league_config` (per-season)
+- Replaced `CommonMysqliRepository` dependency with `Season` injection
+- Removed 7 HTML parsing methods, added 6 DB computation methods
+- Magic number / clinch logic unchanged
+
+**Test Coverage:**
+- StandingsUpdaterTest: 18 tests (total W/L, home/away splits, conf/div records, pct, GB, edge cases)
+
+**Status:** All 2892 tests passing ✅
+
+---
 
 ### Calculator Edge Case Tests Added (Jan 26, 2026)
 

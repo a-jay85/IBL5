@@ -82,7 +82,7 @@ try {
     echo "<p>✓ ScheduleUpdater initialized</p>";
     flush();
 
-    $standingsUpdater = new Updater\StandingsUpdater($mysqli_db, $commonRepository);
+    $standingsUpdater = new Updater\StandingsUpdater($mysqli_db, $season);
     echo "<p>✓ StandingsUpdater initialized</p>";
     flush();
 

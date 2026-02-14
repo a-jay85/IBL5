@@ -87,8 +87,8 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
     $user_viewemail = "0";
     userCheck($username, $user_email);
     $user_email = validate_mail($user_email);
-    $user_password = htmlspecialchars(stripslashes($user_password));
-    $user_password2 = htmlspecialchars(stripslashes($user_password2));
+    $user_password = stripslashes($user_password);
+    $user_password2 = stripslashes($user_password2);
     if (!$stop) {
         $datekey = date("F j");
         $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $_POST['random_num'] . $datekey));
@@ -152,7 +152,7 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
     userCheck($username, $user_email);
     $user_email = validate_mail($user_email);
     $user_regdate = date("M d, Y");
-    $user_password = htmlspecialchars(stripslashes($user_password));
+    $user_password = stripslashes($user_password);
     if (!isset($stop)) {
         $datekey = date("F j");
         $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $random_num . $datekey));
@@ -855,7 +855,7 @@ function docookie($setuid, $setusername, $setpass, $setstorynum, $setumode, $set
 function login($username, $user_password, $redirect, $mode, $f, $t, $random_num, $gfx_check)
 {
     global $authService, $user_prefix, $db, $mysqli_db, $module_name, $pm_login, $prefix;
-    $user_password = htmlspecialchars(stripslashes($user_password));
+    $user_password = stripslashes($user_password);
     include "config.php";
 
     // CAPTCHA check
@@ -1122,7 +1122,7 @@ function edituser()
 function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $user_aim, $user_yim, $user_msnm, $user_from, $user_occ, $user_interests, $newsletter, $user_viewemail, $user_allow_viewonline, $user_notify, $user_attachsig, $user_allowbbcode, $user_allowhtml, $user_allowsmile, $user_timezone, $user_dateformat, $user_sig, $bio, $user_password, $vpass, $username, $user_id)
 {
     global $user, $cookie, $userinfo, $EditedMessage, $user_prefix, $db, $module_name, $minpass, $authService;
-    $user_password = htmlspecialchars(stripslashes($user_password));
+    $user_password = stripslashes($user_password);
     cookiedecode($user);
     $check = $cookie[1];
     $check = filter($check, "nohtml", 1);
@@ -1143,7 +1143,7 @@ function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $us
     $realname = filter($realname, "nohtml", 1);
     $user_avatar = "$user_avatar";
     // Authorization: session-based auth verifies the user; compare user_id for ownership
-    if (is_user($user) and ($user_id == $vuid)) {
+    if (is_user($user) && ($user_id === $vuid)) {
         if (!preg_match('#^http[s]?:\/\/#i', $user_website)) {
             $user_website = "http://" . $user_website;
         }
@@ -1318,7 +1318,7 @@ function savehome($user_id, $username, $storynum, $ublockon, $ublock, $broadcast
     $row = \DatabaseConnection::fetchRow("SELECT user_id FROM nuke_users WHERE username = ?", [$check]);
     $vuid = intval($row['user_id']);
     // Authorization: session-based auth verifies the user; compare user_id for ownership
-    if (is_user($user) and ($user_id == $vuid)) {
+    if (is_user($user) && ($user_id === $vuid)) {
         if (isset($ublockon)) {
             $ublockon = 1;
         } else {
@@ -1350,7 +1350,7 @@ function savetheme($user_id, $theme)
     $row = \DatabaseConnection::fetchRow("SELECT user_id FROM nuke_users WHERE username = ?", [$check]);
     $vuid = intval($row['user_id']);
     // Authorization: session-based auth verifies the user; compare user_id for ownership
-    if (is_user($user) and ($user_id == $vuid)) {
+    if (is_user($user) && ($user_id === $vuid)) {
         $db->sql_query("UPDATE " . $user_prefix . "_users SET user_style='$theme_id' WHERE user_id='$user_id'");
         $db->sql_query("UPDATE " . $user_prefix . "_users SET theme='$theme' WHERE user_id='$user_id'");
         getusrinfo($user);
@@ -1433,7 +1433,7 @@ function savecomm($user_id, $username, $umode, $uorder, $thold, $noscore, $comme
     $row = \DatabaseConnection::fetchRow("SELECT user_id FROM nuke_users WHERE username = ?", [$check]);
     $vuid = intval($row['user_id']);
     // Authorization: session-based auth verifies the user; compare user_id for ownership
-    if (is_user($user) and ($user_id == $vuid)) {
+    if (is_user($user) && ($user_id === $vuid)) {
         if (isset($noscore)) {
             $noscore = 1;
         } else {

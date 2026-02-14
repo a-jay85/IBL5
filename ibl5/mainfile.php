@@ -261,6 +261,16 @@ require_once __DIR__ . "/db/db.php";
 // Initialize session-based AuthService for user authentication
 $authService = new \Auth\AuthService($mysqli_db);
 
+// Populate legacy $user global so modules.php and other code that calls
+// base64_decode($user) continues to work during the migration period.
+$user = '';
+if ($authService->isAuthenticated()) {
+    $cookieArray = $authService->getCookieArray();
+    if ($cookieArray !== null) {
+        $user = base64_encode(implode(':', $cookieArray));
+    }
+}
+
 require_once __DIR__ . "/includes/ipban.php";
 if (file_exists(__DIR__ . "/includes/custom_files/custom_mainfile.php")) {
     @include_once __DIR__ . "/includes/custom_files/custom_mainfile.php";

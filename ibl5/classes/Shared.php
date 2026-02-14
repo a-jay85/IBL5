@@ -68,16 +68,6 @@ class Shared
     }
 
     /**
-     * Checks if the Free Agency module is active in the system
-     *
-     * @return int|null Active status (typically 1 for active, 0 for inactive), or null if module not found
-     */
-    public function isFreeAgencyModuleActive(): ?int
-    {
-        return $this->sharedRepository->isFreeAgencyModuleActive();
-    }
-
-    /**
      * Resets the contract extension counter for all teams
      *
      * Outputs debug information to the browser during execution.

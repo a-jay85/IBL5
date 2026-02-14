@@ -51,13 +51,13 @@ class UI
      * @param \mysqli $db Database connection
      * @param iterable<int, array<string, mixed>> $result Player result set
      * @param \Team $team Team object
-     * @param \Shared $sharedFunctions Shared functions object
+     * @param \Season $season Season object
      * @param list<int> $starterPids Starter player IDs
      * @return string HTML table
      */
-    public static function contracts($db, $result, $team, $sharedFunctions, array $starterPids = []): string
+    public static function contracts($db, $result, $team, \Season $season, array $starterPids = []): string
     {
-        return UI\Tables\Contracts::render($db, $result, $team, $sharedFunctions, $starterPids);
+        return UI\Tables\Contracts::render($db, $result, $team, $season, $starterPids);
     }
 
     /**

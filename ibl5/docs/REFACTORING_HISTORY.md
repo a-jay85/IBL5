@@ -10,6 +10,41 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 
 ## Completed Refactorings
 
+### StandingsUpdater: Database-Driven Standings Computation (February 2026)
+
+**Summary:** Replaced HTML file parsing (`Standings.htm` via DOMDocument) with database-driven standings computation from `ibl_schedule` game results and `ibl_league_config` conference/division assignments.
+
+**Key Changes:**
+- Eliminated fragile HTML parsing dependency on sim engine output file
+- Standings now computed directly from `ibl_schedule` game results (wins/losses, home/away splits, conference/division records)
+- Conference/division mappings read from `ibl_league_config` (per-season assignments)
+- Replaced `CommonMysqliRepository` dependency with `Season` injection (matching `PowerRankingsUpdater` pattern)
+- Games back calculated per conference and per division
+
+**Methods Removed (HTML parsing):**
+- `extractStandingsValues()`, `processConferenceRows()`, `processTeamStandings()`, `processDivisionRows()`, `updateTeamDivision()`, `preloadTeamNameMap()`, `resolveTeamId()`
+
+**Methods Added (DB computation):**
+- `computeAndInsertStandings()` — orchestrator
+- `fetchTeamMap()` — queries `ibl_league_config`
+- `fetchPlayedGames()` — queries `ibl_schedule`
+- `initializeStandings()` — initializes per-team counters
+- `tallyGameResults()` — iterates games, computes all splits
+- `computeAndInsertAll()` — computes derived fields (pct, GB, records), inserts into `ibl_standings`
+
+**Methods Unchanged:**
+- `updateMagicNumbers()`, `checkIfRegionIsClinched()`, `checkIfPlayoffsClinched()`, `extractWins()`, `extractLosses()`, `assignGroupingsFor()`
+
+**Test Coverage:**
+- StandingsUpdaterTest: 18 tests covering total W/L, home/away splits, conference/division records, win percentage, games back, games unplayed, edge cases
+
+**Files Modified:**
+- `ibl5/classes/Updater/StandingsUpdater.php` — Major rewrite
+- `ibl5/scripts/updateAllTheThings.php` — Constructor arg change
+- `ibl5/tests/UpdateAllTheThings/StandingsUpdaterTest.php` — Full rewrite
+
+---
+
 ### Database: Drop ibl_team_history Table (February 2026)
 
 **Summary:** Dropped the denormalized `ibl_team_history` cache table and replaced it with computed database views (`vw_team_awards`, `vw_franchise_summary`). Continues the pattern from migrations 026-028 of replacing denormalized/cached tables with views computed from canonical data sources.
@@ -568,9 +603,8 @@ All IBL5 modules have been refactored to the interface-driven architecture patte
 
 ## Testing Progress
 
-**Total Test Files:** 103  
-**Total Tests:** 1060 tests  
-**Test Coverage:** ~60% (target: 80%)
+**Total Tests:** 2892 tests
+**Test Coverage:** ~80% (target: 80%) ✅
 
 **Test Frameworks:**
 - PHPUnit 12.4+ for unit testing
@@ -646,5 +680,5 @@ All IBL5 modules have been refactored to the interface-driven architecture patte
 
 ---
 
-**Last Updated:** February 12, 2026
+**Last Updated:** February 14, 2026
 **Maintained By:** Copilot Coding Agent

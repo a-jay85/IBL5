@@ -21,9 +21,9 @@ class CachedRecordHoldersService implements RecordHoldersServiceInterface
     private const TTL_SECONDS = 86400; // 24 hours
 
     private RecordHoldersServiceInterface $inner;
-    private object $db;
+    private \mysqli $db;
 
-    public function __construct(RecordHoldersServiceInterface $inner, object $db)
+    public function __construct(RecordHoldersServiceInterface $inner, \mysqli $db)
     {
         $this->inner = $inner;
         $this->db = $db;
@@ -65,9 +65,7 @@ class CachedRecordHoldersService implements RecordHoldersServiceInterface
      */
     public function invalidateCache(): void
     {
-        /** @var \mysqli $db */
-        $db = $this->db;
-        $stmt = $db->prepare("DELETE FROM `cache` WHERE `key` = ?");
+        $stmt = $this->db->prepare("DELETE FROM `cache` WHERE `key` = ?");
         if ($stmt === false) {
             return;
         }
@@ -84,9 +82,7 @@ class CachedRecordHoldersService implements RecordHoldersServiceInterface
      */
     private function readCache(): ?array
     {
-        /** @var \mysqli $db */
-        $db = $this->db;
-        $stmt = $db->prepare("SELECT `value`, `expiration` FROM `cache` WHERE `key` = ?");
+        $stmt = $this->db->prepare("SELECT `value`, `expiration` FROM `cache` WHERE `key` = ?");
         if ($stmt === false) {
             return null;
         }
@@ -134,9 +130,7 @@ class CachedRecordHoldersService implements RecordHoldersServiceInterface
             return;
         }
 
-        /** @var \mysqli $db */
-        $db = $this->db;
-        $stmt = $db->prepare("REPLACE INTO `cache` (`key`, `value`, `expiration`) VALUES (?, ?, ?)");
+        $stmt = $this->db->prepare("REPLACE INTO `cache` (`key`, `value`, `expiration`) VALUES (?, ?, ?)");
         if ($stmt === false) {
             return;
         }

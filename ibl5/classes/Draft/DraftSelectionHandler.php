@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Draft;
 
 use Draft\Contracts\DraftSelectionHandlerInterface;
+use Shared\Contracts\SharedRepositoryInterface;
 
 /**
  * @see DraftSelectionHandlerInterface
@@ -16,22 +17,17 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
     private \Services\CommonMysqliRepository $commonRepository;
     private DraftProcessor $processor;
     private DraftView $view;
-    private object $sharedFunctions;
-    /** @var \Season */
-    private object $season;
+    private SharedRepositoryInterface $sharedRepository;
+    private \Season $season;
 
-    /** @param \Season $season */
-    public function __construct(object $db, object $sharedFunctions, object $season)
+    public function __construct(\mysqli $db, SharedRepositoryInterface $sharedRepository, \Season $season)
     {
-        global $mysqli_db;
-        $this->sharedFunctions = $sharedFunctions;
+        $this->sharedRepository = $sharedRepository;
         $this->season = $season;
 
         $this->validator = new DraftValidator();
         $this->repository = new DraftRepository($db);
-        /** @var object $mysqliDb */
-        $mysqliDb = $mysqli_db;
-        $this->commonRepository = new \Services\CommonMysqliRepository($mysqliDb);
+        $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $this->processor = new DraftProcessor();
         $this->view = new DraftView();
     }
@@ -80,15 +76,13 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
         $teamOnTheClock = null;
         $discordIDOfTeamOnTheClock = null;
         if ($nextTeamDraftPick !== null) {
-            /** @var \Shared $sharedFuncs */
-            $sharedFuncs = $this->sharedFunctions;
-            $teamOnTheClock = $sharedFuncs->getCurrentOwnerOfDraftPick(
+            $teamOnTheClock = $this->sharedRepository->getCurrentOwnerOfDraftPick(
                 $this->season->endingYear,
                 $draftRound,
                 $nextTeamDraftPick
             );
             if ($teamOnTheClock !== null) {
-                $discordIDOfTeamOnTheClock = $this->commonRepository->getTeamDiscordID((string) $teamOnTheClock);
+                $discordIDOfTeamOnTheClock = $this->commonRepository->getTeamDiscordID($teamOnTheClock);
             }
         }
         \Discord::postToChannel('#general-chat', $message);

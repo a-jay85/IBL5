@@ -11,17 +11,15 @@ use FreeAgency\Contracts\FreeAgencyProcessorInterface;
  */
 class FreeAgencyProcessor implements FreeAgencyProcessorInterface
 {
-    private object $mysqli_db;
+    private \mysqli $mysqli_db;
     private FreeAgencyDemandCalculator $calculator;
     private FreeAgencyRepository $repository;
     private \Season $season;
 
-    public function __construct(object $mysqli_db)
+    public function __construct(\mysqli $mysqli_db)
     {
         $this->mysqli_db = $mysqli_db;
-        /** @var \mysqli $mysqliDb */
-        $mysqliDb = $this->mysqli_db;
-        $this->season = new \Season($mysqliDb);
+        $this->season = new \Season($mysqli_db);
 
         $demandRepository = new FreeAgencyDemandRepository($this->mysqli_db);
         $this->calculator = new FreeAgencyDemandCalculator($demandRepository);

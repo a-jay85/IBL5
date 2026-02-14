@@ -20,7 +20,7 @@ class Contracts
      * @param \mysqli $db Database connection
      * @param iterable<int, array<string, mixed>> $result Player result set
      * @param \Team $team Team object
-     * @param \Shared $sharedFunctions Shared functions object
+     * @param \Shared\Contracts\SharedRepositoryInterface $sharedFunctions Shared repository
      * @param list<int> $starterPids Starter player IDs
      * @return string HTML table
      */

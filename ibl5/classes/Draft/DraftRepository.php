@@ -20,7 +20,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
     const IBL_PLR_NAME_MAX_LENGTH = 32;  // Matches varchar(32) in ibl_plr.name
     const PARTIAL_NAME_MATCH_LENGTH = 30;  // For LIKE queries with diacritical differences
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
         $this->commonRepository = new \Services\CommonMysqliRepository($db);

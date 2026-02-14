@@ -193,10 +193,10 @@ class Boxscore
     /**
      * Delete preseason boxscores for both players and teams
      *
-     * @param object $db Active mysqli connection
+     * @param \mysqli $db Active mysqli connection
      * @return bool True if both deletions succeeded
      */
-    public static function deletePreseasonBoxScores(object $db): bool
+    public static function deletePreseasonBoxScores(\mysqli $db): bool
     {
         $repository = new \Boxscore\BoxscoreRepository($db);
         return $repository->deletePreseasonBoxScores();
@@ -205,11 +205,11 @@ class Boxscore
     /**
      * Delete H.E.A.T. tournament boxscores for both players and teams
      *
-     * @param object $db Active mysqli connection
+     * @param \mysqli $db Active mysqli connection
      * @param int $seasonStartingYear The year the season starts
      * @return bool True if both deletions succeeded
      */
-    public static function deleteHEATBoxScores(object $db, int $seasonStartingYear): bool
+    public static function deleteHEATBoxScores(\mysqli $db, int $seasonStartingYear): bool
     {
         $repository = new \Boxscore\BoxscoreRepository($db);
         return $repository->deleteHeatBoxScores($seasonStartingYear);
@@ -218,11 +218,11 @@ class Boxscore
     /**
      * Delete regular season and playoff boxscores for both players and teams
      *
-     * @param object $db Active mysqli connection
+     * @param \mysqli $db Active mysqli connection
      * @param int $seasonStartingYear The year the season starts
      * @return bool True if both deletions succeeded
      */
-    public static function deleteRegularSeasonAndPlayoffsBoxScores(object $db, int $seasonStartingYear): bool
+    public static function deleteRegularSeasonAndPlayoffsBoxScores(\mysqli $db, int $seasonStartingYear): bool
     {
         $repository = new \Boxscore\BoxscoreRepository($db);
         return $repository->deleteRegularSeasonAndPlayoffsBoxScores($seasonStartingYear);

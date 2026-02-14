@@ -80,22 +80,13 @@ class Shared
     /**
      * Resets the contract extension counter for all teams
      *
-     * Outputs debug information to the browser during execution.
-     *
      * @return void
      * @throws \RuntimeException If the database update fails
      */
     public function resetSimContractExtensionAttempts(): void
     {
-        echo '<p>Resetting sim contract extension attempts...<p>';
-
         try {
             $this->sharedRepository->resetSimContractExtensionAttempts();
-            \UI::displayDebugOutput(
-                "UPDATE ibl_team_info SET Used_Extension_This_Chunk = 0",
-                'Reset Sim Contract Extension Attempts SQL Query'
-            );
-            echo '<p>Sim contract extension attempts have been reset.<p>';
         } catch (\RuntimeException $e) {
             error_log("[Shared] " . $e->getMessage());
             throw $e;

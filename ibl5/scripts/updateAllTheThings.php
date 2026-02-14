@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 error_reporting(E_ALL);
 libxml_use_internal_errors(true);
 
@@ -38,104 +41,154 @@ if (!headers_sent()) {
     header('Cache-Control: no-cache');         // prevent proxy caching
 }
 
-// 5. Send initial padding — browsers won't start rendering until ~1 KB is received
-echo '<!DOCTYPE html><html><head><title>Updating…</title></head><body>';
-echo str_repeat(' ', 1024);
+global $mysqli_db;
+
+$view = new Updater\UpdaterView();
+
+$stylesheetPath = '/ibl5/themes/IBL/style/style.css';
+/** @var int|false $stylesheetMtime */
+$stylesheetMtime = filemtime($_SERVER['DOCUMENT_ROOT'] . $stylesheetPath);
+$cacheBuster = $stylesheetMtime !== false ? '?v=' . $stylesheetMtime : '';
+
+echo $view->renderPageOpen($stylesheetPath . $cacheBuster);
 flush();
 
-// Set up error handler to catch all errors
-set_error_handler(function ($errno, $errstr, $errfile, $errline) {
-    echo "<p style='color: red;'><b>ERROR [$errno]:</b> $errstr in $errfile on line $errline</p>";
+// Set up error handler to catch all errors with XSS-safe output
+set_error_handler(function (int $errno, string $errstr, string $errfile, int $errline) use ($view): bool {
+    /** @var string $safeMessage */
+    $safeMessage = \Utilities\HtmlSanitizer::safeHtmlOutput(
+        "[$errno] $errstr in $errfile on line $errline"
+    );
+    echo $view->renderStepError('PHP Error', (string) $safeMessage);
     flush();
     return false;
 });
 
-// Set up exception handler
-set_exception_handler(function ($exception) {
-    echo "<p style='color: red;'><b>EXCEPTION:</b> " . htmlspecialchars($exception->getMessage()) . " in " . htmlspecialchars($exception->getFile()) . " on line " . $exception->getLine() . "</p>";
-    echo "<pre style='color: red;'>" . htmlspecialchars($exception->getTraceAsString()) . "</pre>";
+// Set up exception handler with XSS-safe output
+set_exception_handler(function (\Throwable $exception) use ($view): void {
+    /** @var string $safeMessage */
+    $safeMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($exception->getMessage());
+    /** @var string $safeFile */
+    $safeFile = \Utilities\HtmlSanitizer::safeHtmlOutput($exception->getFile());
+    /** @var string $safeTrace */
+    $safeTrace = \Utilities\HtmlSanitizer::safeHtmlOutput($exception->getTraceAsString());
+
+    echo $view->renderStepError(
+        'Uncaught Exception',
+        (string) $safeMessage . ' in ' . (string) $safeFile . ' on line ' . $exception->getLine()
+    );
+    echo $view->renderLog((string) $safeTrace);
     flush();
 });
 
+$successCount = 0;
+$errorCount = 0;
+
 try {
-    // mainfile.php already loaded above for auth check
-
-    global $mysqli_db;
-
-    echo "<p>✓ mainfile.php loaded</p>";
+    // --- Initialization ---
+    echo $view->renderInitStatus('mainfile.php loaded');
     flush();
 
     $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
-    echo "<p>✓ CommonRepository initialized</p>";
+    echo $view->renderInitStatus('CommonRepository initialized');
     flush();
 
-    $sharedFunctions = new Shared($mysqli_db);
-    echo "<p>✓ Shared functions initialized</p>";
+    $sharedFunctions = new \Shared($mysqli_db);
+    echo $view->renderInitStatus('Shared functions initialized');
     flush();
 
-    $season = new Season($mysqli_db);
-    echo "<p>✓ Season initialized</p>";
+    $season = new \Season($mysqli_db);
+    echo $view->renderInitStatus('Season initialized');
     flush();
 
-    // Initialize components
     $scheduleUpdater = new Updater\ScheduleUpdater($mysqli_db, $season);
-    echo "<p>✓ ScheduleUpdater initialized</p>";
+    echo $view->renderInitStatus('ScheduleUpdater initialized');
     flush();
 
     $standingsUpdater = new Updater\StandingsUpdater($mysqli_db, $commonRepository);
-    echo "<p>✓ StandingsUpdater initialized</p>";
+    echo $view->renderInitStatus('StandingsUpdater initialized');
     flush();
 
     $powerRankingsUpdater = new Updater\PowerRankingsUpdater($mysqli_db, $season);
-    echo "<p>✓ PowerRankingsUpdater initialized</p>";
+    echo $view->renderInitStatus('PowerRankingsUpdater initialized');
     flush();
 
-    // Update schedule
-    echo "<p>Updating schedule...</p>";
+    // --- Step 1: Update schedule ---
+    echo $view->renderStepStart('Updating schedule...');
     flush();
+    ob_start();
     $scheduleUpdater->update();
-    echo "<p>✓ Schedule updated</p>";
+    $log = (string) ob_get_clean();
+    echo $view->renderStepComplete('Schedule updated');
+    if ($log !== '') {
+        echo $view->renderLog($log);
+    }
     flush();
+    $successCount++;
 
-    // Update standings
-    echo "<p>Updating standings...</p>";
+    // --- Step 2: Update standings ---
+    echo $view->renderStepStart('Updating standings...');
     flush();
+    ob_start();
     $standingsUpdater->update();
-    echo "<p>✓ Standings updated</p>";
+    $log = (string) ob_get_clean();
+    echo $view->renderStepComplete('Standings updated');
+    if ($log !== '') {
+        echo $view->renderLog($log);
+    }
     flush();
+    $successCount++;
 
-    // Update power rankings
-    echo "<p>Updating power rankings...</p>";
+    // --- Step 3: Update power rankings ---
+    echo $view->renderStepStart('Updating power rankings...');
     flush();
+    ob_start();
     $powerRankingsUpdater->update();
-    echo "<p>✓ Power rankings updated</p>";
+    $log = (string) ob_get_clean();
+    echo $view->renderStepComplete('Power rankings updated');
+    if ($log !== '') {
+        echo $view->renderLog($log);
+    }
     flush();
+    $successCount++;
 
-    // Reset extension attempts
-    echo "<p>Resetting extension attempts...</p>";
+    // --- Step 4: Reset extension attempts ---
+    echo $view->renderStepStart('Resetting extension attempts...');
     flush();
     $sharedFunctions->resetSimContractExtensionAttempts();
-    echo "<p>✓ Extension attempts reset</p>";
+    echo $view->renderStepComplete('Extension attempts reset');
     flush();
+    $successCount++;
 
-    // Extend active saved depth charts
-    echo "<p>Updating saved depth charts...</p>";
+    // --- Step 5: Extend active saved depth charts ---
+    echo $view->renderStepStart('Updating saved depth charts...');
     flush();
     $savedDcUpdater = new Updater\SavedDepthChartUpdater($mysqli_db);
-    $freshSeason = new Season($mysqli_db);
-    $savedDcCount = $savedDcUpdater->update($freshSeason->lastSimEndDate, $freshSeason->lastSimNumber);
-    echo "<p>✓ Saved depth charts updated ($savedDcCount active DCs extended)</p>";
+    ob_start();
+    $savedDcCount = $savedDcUpdater->update($season->lastSimEndDate, $season->lastSimNumber);
+    $log = (string) ob_get_clean();
+    echo $view->renderStepComplete('Saved depth charts updated', $savedDcCount . ' active DCs extended');
+    if ($log !== '') {
+        echo $view->renderLog($log);
+    }
+    flush();
+    $successCount++;
+
+    echo $view->renderSummary($successCount, $errorCount);
     flush();
 
-    echo '<p><b>All the things have been updated!</b></p>';
-    flush();
+} catch (\Exception $e) {
+    $errorCount++;
+    /** @var string $safeMessage */
+    $safeMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($e->getMessage());
+    /** @var string $safeTrace */
+    $safeTrace = \Utilities\HtmlSanitizer::safeHtmlOutput($e->getTraceAsString());
 
-} catch (Exception $e) {
-    echo "<p style='color: red;'><b>CAUGHT EXCEPTION:</b> " . htmlspecialchars($e->getMessage()) . "</p>";
-    echo "<pre style='color: red;'>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
+    echo $view->renderStepError('Exception', (string) $safeMessage);
+    echo $view->renderLog((string) $safeTrace);
+    echo $view->renderSummary($successCount, $errorCount);
     flush();
 }
 
-echo '<a href="/ibl5/index.php">Return to the IBL homepage</a>';
-echo '</body></html>';
+echo $view->renderPageClose();
 flush();

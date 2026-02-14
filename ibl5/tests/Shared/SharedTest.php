@@ -129,7 +129,7 @@ class SharedTest extends TestCase
     }
 
     /**
-     * Tests resetSimContractExtensionAttempts delegates and handles output
+     * Tests resetSimContractExtensionAttempts delegates to repository
      *
      * @test
      */
@@ -139,14 +139,7 @@ class SharedTest extends TestCase
             ->expects($this->once())
             ->method('resetSimContractExtensionAttempts');
 
-        // Should not throw exception
-        ob_start();
         $this->shared->resetSimContractExtensionAttempts();
-        $output = ob_get_clean();
-        
-        // Verify output is generated
-        $this->assertStringContainsString('Resetting sim contract extension attempts', $output);
-        $this->assertStringContainsString('been reset', $output);
     }
 
     /**
@@ -164,11 +157,6 @@ class SharedTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Database error');
 
-        try {
-            ob_start();
-            $this->shared->resetSimContractExtensionAttempts();
-        } finally {
-            ob_end_clean();
-        }
+        $this->shared->resetSimContractExtensionAttempts();
     }
 }

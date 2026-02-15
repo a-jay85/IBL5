@@ -153,7 +153,7 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
             $message = "" . _WELCOMETO . " $sitename!\n\n" . _YOUUSEDEMAIL . " ($user_email) " . _TOREGISTER . " $sitename.\n\n " . _TOFINISHUSER . "\n\n $finishlink\n\n " . _FOLLOWINGMEM . "\n\n" . _UNICKNAME . " $username\n" . _UPASSWORD . " $user_password";
             $subject = "" . _ACTIVATIONSUB . "";
             $from = "$adminmail";
-            mail($user_email, $subject, $message, "From: $from\nX-Mailer: PHP/" . phpversion());
+            \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $from);
             $accountView = new \YourAccount\YourAccountView();
             echo $accountView->renderRegistrationCompletePage($sitename);
         }
@@ -668,7 +668,7 @@ function mail_password($username, $code)
             $newpass = substr(bin2hex(random_bytes(5)), 0, 10);
             $message = "" . _USERACCOUNT . " '$username' " . _AT . " $sitename " . _HASTHISEMAIL . "  " . _AWEBUSERFROM . " $host_name " . _HASREQUESTED . "\n\n" . _YOURNEWPASSWORD . " $newpass\n\n " . _YOUCANCHANGE . " $nukeurl/modules.php?name=$module_name\n\n" . _IFYOUDIDNOTASK . "";
             $subject = "" . _USERPASSWORD4 . " $username";
-            mail($user_email, $subject, $message, "From: $adminmail\nX-Mailer: PHP/" . phpversion());
+            \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);
             /* Update password and clear the reset code */
             $cryptpass = $authService->hashPassword($newpass);
             $stmtReset = $mysqli_db->prepare("UPDATE " . $user_prefix . "_users SET user_password = ?, user_actkey = NULL WHERE username = ?");
@@ -687,7 +687,7 @@ function mail_password($username, $code)
             $stmtCode->close();
             $message = "" . _USERACCOUNT . " '$username' " . _AT . " $sitename " . _HASTHISEMAIL . " " . _AWEBUSERFROM . " $host_name " . _CODEREQUESTED . "\n\n" . _YOURCODEIS . " $resetCode \n\n" . _WITHTHISCODE . " $nukeurl/modules.php?name=$module_name&op=pass_lost\n" . _IFYOUDIDNOTASK2 . "";
             $subject = "" . _CODEFOR . " $username";
-            mail($user_email, $subject, $message, "From: $adminmail\nX-Mailer: PHP/" . phpversion());
+            \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);
             Nuke\Header::header();
             echo $accountView->renderCodeMailedPage($username);
             Nuke\Footer::footer();

@@ -193,5 +193,8 @@
         <testsuite name="YourAccount Module Tests">
             <directory>tests/YourAccount</directory>
         </testsuite>
+        <testsuite name="Mail Module Tests">
+            <directory>tests/Mail</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

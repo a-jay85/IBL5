@@ -30,6 +30,9 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- $module_name";
 
+// Render header first (populates $cookie via online() → cookiedecode())
+Nuke\Header::header();
+
 $username = strval($cookie[1] ?? '');
 $userTeamName = $commonRepository->getTeamnameFromUsername($username);
 $userTeam = Team::initialize($mysqli_db, $userTeamName);
@@ -57,9 +60,6 @@ foreach ($games as $index => $game) {
     $games[$index]['opposingStartingPF'] = $game['opposingStarters']['PF'];
     $games[$index]['opposingStartingC'] = $game['opposingStarters']['C'];
 }
-
-// Render page
-Nuke\Header::header();
 
 echo $view->render($games, $league->getSimLengthInDays());
 

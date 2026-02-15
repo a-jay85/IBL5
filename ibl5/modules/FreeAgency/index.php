@@ -70,12 +70,12 @@ function negotiate($pid)
 
     $pid = intval($pid);
 
-    // Get user team information
+    Nuke\Header::header();
+
+    // Get user team information (must be after header() which populates $cookie)
     $username = strval($cookie[1] ?? '');
     $userTeamName = $commonRepository->getTeamnameFromUsername($username);
     $teamID = $commonRepository->getTidFromTeamname($userTeamName);
-
-    Nuke\Header::header();
 
     $team = \Team::initialize($mysqli_db, $teamID);
     $season = new Season($mysqli_db);

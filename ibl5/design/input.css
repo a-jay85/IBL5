@@ -59,6 +59,7 @@
 @import './components/saved-depth-charts.css';
 @import './components/depth-chart-changes.css';
 @import './components/sco-parser.css';
+@import './components/updater.css';
 
 /* Site-wide layout wrapper (replaces legacy themeheader table) */
 .site-content {

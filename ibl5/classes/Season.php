@@ -138,6 +138,14 @@ class Season
     }
 
     /**
+     * Check if the current phase is Free Agency
+     */
+    public function isFreeAgencyPhase(): bool
+    {
+        return $this->phase === 'Free Agency';
+    }
+
+    /**
      * Get first box score date
      *
      * Delegates to SeasonQueryRepository.

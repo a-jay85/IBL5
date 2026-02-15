@@ -93,8 +93,8 @@ try {
     echo $view->renderInitStatus('CommonRepository initialized');
     flush();
 
-    $sharedFunctions = new \Shared($mysqli_db);
-    echo $view->renderInitStatus('Shared functions initialized');
+    $sharedRepository = new Shared\SharedRepository($mysqli_db);
+    echo $view->renderInitStatus('Shared repository initialized');
     flush();
 
     $season = new \Season($mysqli_db);
@@ -155,7 +155,7 @@ try {
     // --- Step 4: Reset extension attempts ---
     echo $view->renderStepStart('Resetting extension attempts...');
     flush();
-    $sharedFunctions->resetSimContractExtensionAttempts();
+    $sharedRepository->resetSimContractExtensionAttempts();
     echo $view->renderStepComplete('Extension attempts reset');
     flush();
     $successCount++;

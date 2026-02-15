@@ -7,32 +7,31 @@ namespace Tests\Trading;
 use PHPUnit\Framework\TestCase;
 use Trading\TradingService;
 use Trading\Contracts\TradingRepositoryInterface;
+use Trading\Contracts\TradeCashRepositoryInterface;
 
 class TradingServiceTest extends TestCase
 {
-    private object $mockDb;
+    private \mysqli $mockDb;
 
     protected function setUp(): void
     {
-        $this->mockDb = new class {
+        $this->mockDb = new class extends \mysqli {
             public int $connect_errno = 0;
             public ?string $connect_error = null;
 
-            public function prepare(string $query): object
+            public function __construct()
             {
-                return new class {
-                    public function bind_param(string $types, mixed &...$params): bool { return true; }
-                    public function execute(): bool { return true; }
-                    public function get_result(): object
-                    {
-                        return new class {
-                            public function fetch_assoc(): ?array { return null; }
-                        };
-                    }
-                };
+                // Don't call parent::__construct() to avoid real DB connection
             }
 
-            public function query(string $query): object|bool
+            #[\ReturnTypeWillChange]
+            public function prepare(string $query): \mysqli_stmt|false
+            {
+                return false;
+            }
+
+            #[\ReturnTypeWillChange]
+            public function query(string $query, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
             {
                 return false;
             }
@@ -174,6 +173,7 @@ class TradingServiceTest extends TestCase
     public function testGetTradeReviewPageDataReturnsEmptyOffersWhenNoneExist(): void
     {
         $mockRepo = $this->createMock(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createMock(\Services\CommonMysqliRepository::class);
 
         $mockCommon->expects($this->atLeastOnce())->method('getTeamnameFromUsername')
@@ -185,7 +185,7 @@ class TradingServiceTest extends TestCase
         $mockRepo->expects($this->once())->method('getAllTeamsWithCity')
             ->willReturn([]);
 
-        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
         $result = $service->getTradeReviewPageData('testuser');
 
         $this->assertSame('Lakers', $result['userTeam']);
@@ -196,6 +196,7 @@ class TradingServiceTest extends TestCase
     public function testGetTradeReviewPageDataFiltersToUserTeamOnly(): void
     {
         $mockRepo = $this->createMock(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createMock(\Services\CommonMysqliRepository::class);
 
         $mockCommon->expects($this->atLeastOnce())->method('getTeamnameFromUsername')
@@ -212,7 +213,7 @@ class TradingServiceTest extends TestCase
         $mockRepo->expects($this->once())->method('getAllTeamsWithCity')
             ->willReturn([]);
 
-        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
         $result = $service->getTradeReviewPageData('testuser');
 
         $this->assertCount(1, $result['tradeOffers']);
@@ -222,6 +223,7 @@ class TradingServiceTest extends TestCase
     public function testGetTradeReviewPageDataSetsHasHammerCorrectly(): void
     {
         $mockRepo = $this->createMock(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createMock(\Services\CommonMysqliRepository::class);
 
         $mockCommon->expects($this->atLeastOnce())->method('getTeamnameFromUsername')
@@ -238,7 +240,7 @@ class TradingServiceTest extends TestCase
         $mockRepo->expects($this->once())->method('getAllTeamsWithCity')
             ->willReturn([]);
 
-        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
         $result = $service->getTradeReviewPageData('testuser');
 
         $this->assertTrue($result['tradeOffers'][1]['hasHammer']);
@@ -248,6 +250,7 @@ class TradingServiceTest extends TestCase
     public function testGetTradeReviewPageDataBuildsTeamListExcludingFreeAgents(): void
     {
         $mockRepo = $this->createMock(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createMock(\Services\CommonMysqliRepository::class);
 
         $mockCommon->expects($this->atLeastOnce())->method('getTeamnameFromUsername')
@@ -262,7 +265,7 @@ class TradingServiceTest extends TestCase
                 ['teamid' => 0, 'team_name' => 'Free Agents', 'team_city' => '', 'color1' => '333333', 'color2' => 'FFFFFF'],
             ]);
 
-        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
         $result = $service->getTradeReviewPageData('testuser');
 
         $this->assertCount(1, $result['teams']);
@@ -276,6 +279,7 @@ class TradingServiceTest extends TestCase
     public function testCashWithMultipleYearsProducesMultipleItems(): void
     {
         $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
@@ -283,13 +287,13 @@ class TradingServiceTest extends TestCase
         $mockRepo->method('getAllTradeOffers')->willReturn([
             ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
-        $mockRepo->method('getCashTransactionByOffer')->willReturn([
+        $mockCashRepo->method('getCashTransactionByOffer')->willReturn([
             'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
             'cy1' => 100, 'cy2' => 200, 'cy3' => 150, 'cy4' => null, 'cy5' => null, 'cy6' => null,
         ]);
         $mockRepo->method('getAllTeamsWithCity')->willReturn([]);
 
-        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
         $result = $service->getTradeReviewPageData('testuser');
 
         $items = $result['tradeOffers'][1]['items'];
@@ -302,6 +306,7 @@ class TradingServiceTest extends TestCase
     public function testCashZeroAmountYearsAreOmitted(): void
     {
         $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
@@ -309,13 +314,13 @@ class TradingServiceTest extends TestCase
         $mockRepo->method('getAllTradeOffers')->willReturn([
             ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
-        $mockRepo->method('getCashTransactionByOffer')->willReturn([
+        $mockCashRepo->method('getCashTransactionByOffer')->willReturn([
             'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
             'cy1' => 0, 'cy2' => 200, 'cy3' => 0, 'cy4' => 0, 'cy5' => 300, 'cy6' => 0,
         ]);
         $mockRepo->method('getAllTeamsWithCity')->willReturn([]);
 
-        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
         $result = $service->getTradeReviewPageData('testuser');
 
         $items = $result['tradeOffers'][1]['items'];
@@ -327,6 +332,7 @@ class TradingServiceTest extends TestCase
     public function testCashYearLabelsAreCorrectlyComputed(): void
     {
         $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
@@ -334,13 +340,13 @@ class TradingServiceTest extends TestCase
         $mockRepo->method('getAllTradeOffers')->willReturn([
             ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
-        $mockRepo->method('getCashTransactionByOffer')->willReturn([
+        $mockCashRepo->method('getCashTransactionByOffer')->willReturn([
             'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
             'cy1' => 100, 'cy2' => 200, 'cy3' => 0, 'cy4' => 150, 'cy5' => null, 'cy6' => null,
         ]);
         $mockRepo->method('getAllTeamsWithCity')->willReturn([]);
 
-        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
         $result = $service->getTradeReviewPageData('testuser');
 
         $items = $result['tradeOffers'][1]['items'];
@@ -366,6 +372,7 @@ class TradingServiceTest extends TestCase
     public function testCashAllZeroProducesNoItems(): void
     {
         $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
@@ -373,13 +380,13 @@ class TradingServiceTest extends TestCase
         $mockRepo->method('getAllTradeOffers')->willReturn([
             ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
-        $mockRepo->method('getCashTransactionByOffer')->willReturn([
+        $mockCashRepo->method('getCashTransactionByOffer')->willReturn([
             'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
             'cy1' => 0, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0,
         ]);
         $mockRepo->method('getAllTeamsWithCity')->willReturn([]);
 
-        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
         $result = $service->getTradeReviewPageData('testuser');
 
         $items = $result['tradeOffers'][1]['items'];
@@ -389,6 +396,7 @@ class TradingServiceTest extends TestCase
     public function testCashNullDetailsProducesNoItems(): void
     {
         $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
@@ -396,10 +404,10 @@ class TradingServiceTest extends TestCase
         $mockRepo->method('getAllTradeOffers')->willReturn([
             ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
-        $mockRepo->method('getCashTransactionByOffer')->willReturn(null);
+        $mockCashRepo->method('getCashTransactionByOffer')->willReturn(null);
         $mockRepo->method('getAllTeamsWithCity')->willReturn([]);
 
-        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
         $result = $service->getTradeReviewPageData('testuser');
 
         $items = $result['tradeOffers'][1]['items'];
@@ -409,6 +417,7 @@ class TradingServiceTest extends TestCase
     public function testCashDescriptionIncludesTeamNames(): void
     {
         $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
 
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
@@ -416,13 +425,13 @@ class TradingServiceTest extends TestCase
         $mockRepo->method('getAllTradeOffers')->willReturn([
             ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
-        $mockRepo->method('getCashTransactionByOffer')->willReturn([
+        $mockCashRepo->method('getCashTransactionByOffer')->willReturn([
             'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
             'cy1' => 500, 'cy2' => null, 'cy3' => null, 'cy4' => null, 'cy5' => null, 'cy6' => null,
         ]);
         $mockRepo->method('getAllTeamsWithCity')->willReturn([]);
 
-        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb);
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
         $result = $service->getTradeReviewPageData('testuser');
 
         $items = $result['tradeOffers'][1]['items'];
@@ -439,9 +448,10 @@ class TradingServiceTest extends TestCase
     private function createServiceWithStubs(): TradingService
     {
         $stubRepo = $this->createStub(TradingRepositoryInterface::class);
+        $stubCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $stubCommon = $this->createStub(\Services\CommonMysqliRepository::class);
 
-        return new TradingService($stubRepo, $stubCommon, $this->mockDb);
+        return new TradingService($stubRepo, $stubCommon, $this->mockDb, $stubCashRepo);
     }
 
     private function createSeasonStub(string $phase): \Season

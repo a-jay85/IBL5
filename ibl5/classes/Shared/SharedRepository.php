@@ -15,7 +15,6 @@ use Shared\Contracts\SharedRepositoryInterface;
  * Responsibilities:
  * - Team awards and title tracking
  * - Draft pick ownership
- * - Module status queries
  * - Contract extension management
  *
  */
@@ -66,25 +65,6 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
         );
 
         return $result !== null ? $result['ownerofpick'] : null;
-    }
-
-    /**
-     * Checks if the Free Agency module is active in the system
-     *
-     * Queries the nuke_modules table to check if the Free_Agency module is enabled.
-     * Returns null if the module is not found.
-     *
-     * @return int|null Active status (typically 1 for active, 0 for inactive), or null if module not found
-     */
-    public function isFreeAgencyModuleActive(): ?int
-    {
-        /** @var array{active: int}|null $result */
-        $result = $this->fetchOne(
-            "SELECT active FROM nuke_modules WHERE title = 'FreeAgency' LIMIT 1",
-            "",
-        );
-
-        return $result !== null ? $result['active'] : null;
     }
 
     /**

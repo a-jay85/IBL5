@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Trading;
 
 use Trading\Contracts\TradeOfferInterface;
+use Trading\Contracts\TradeCashRepositoryInterface;
 
 /**
  * TradeOffer - Creates and manages trade offers
@@ -21,25 +22,23 @@ use Trading\Contracts\TradeOfferInterface;
  */
 class TradeOffer implements TradeOfferInterface
 {
-    /** @phpstan-var \mysqli */
-    protected object $db;
+    protected \mysqli $db;
     protected TradingRepository $repository;
+    protected TradeCashRepositoryInterface $cashRepository;
     protected \Services\CommonMysqliRepository $commonRepository;
     protected \Season $season;
     protected CashTransactionHandler $cashHandler;
     protected TradeValidator $validator;
     protected ?\Discord $discord;
 
-    /**
-     * @phpstan-param \mysqli $db
-     */
-    public function __construct(object $db, ?TradingRepository $repository = null)
+    public function __construct(\mysqli $db, ?TradingRepository $repository = null)
     {
         $this->db = $db;
         $this->repository = $repository ?? new TradingRepository($db);
+        $this->cashRepository = new TradeCashRepository($db);
         $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $this->season = new \Season($db);
-        $this->cashHandler = new CashTransactionHandler($db, $this->repository);
+        $this->cashHandler = new CashTransactionHandler($db, $this->repository, $this->cashRepository);
         $this->validator = new TradeValidator($db);
 
         // Initialize Discord with error handling (may fail if column doesn't exist)
@@ -230,7 +229,7 @@ class TradeOffer implements TradeOfferInterface
      */
     private function sumCashRecordSalaries(int $teamId): int
     {
-        $cashRecords = $this->repository->getTeamCashRecordsForSalary($teamId);
+        $cashRecords = $this->cashRepository->getTeamCashRecordsForSalary($teamId);
         $isOffseason = $this->season->phase === 'Playoffs'
             || $this->season->phase === 'Draft'
             || $this->season->phase === 'Free Agency';

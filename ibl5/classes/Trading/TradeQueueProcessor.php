@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Trading;
 
-use Trading\Contracts\TradingRepositoryInterface;
+use Trading\Contracts\TradeExecutionRepositoryInterface;
 
 /**
  * TradeQueueProcessor - Executes queued trade operations
@@ -19,11 +19,11 @@ use Trading\Contracts\TradingRepositoryInterface;
  */
 class TradeQueueProcessor
 {
-    private TradingRepositoryInterface $repository;
+    private TradeExecutionRepositoryInterface $executionRepository;
 
-    public function __construct(TradingRepositoryInterface $repository)
+    public function __construct(TradeExecutionRepositoryInterface $executionRepository)
     {
-        $this->repository = $repository;
+        $this->executionRepository = $executionRepository;
     }
 
     /**
@@ -36,7 +36,7 @@ class TradeQueueProcessor
      */
     public function processQueue(): array
     {
-        $queuedTrades = $this->repository->getQueuedTrades();
+        $queuedTrades = $this->executionRepository->getQueuedTrades();
         $processed = 0;
         $failed = 0;
         $messages = [];
@@ -47,7 +47,7 @@ class TradeQueueProcessor
             if ($result['success']) {
                 $processed++;
                 $messages[] = $trade['tradeline'];
-                $this->repository->deleteQueuedTrade($trade['id']);
+                $this->executionRepository->deleteQueuedTrade($trade['id']);
             } else {
                 $failed++;
                 $messages[] = "FAILED: " . $trade['tradeline'] . " - " . $result['error'];
@@ -121,7 +121,7 @@ class TradeQueueProcessor
         $teamName = $rawTeamName;
         $teamId = (int) $rawTeamId;
 
-        $affectedRows = $this->repository->executeQueuedPlayerTransfer($playerId, $teamName, $teamId);
+        $affectedRows = $this->executionRepository->executeQueuedPlayerTransfer($playerId, $teamName, $teamId);
 
         if ($affectedRows > 0) {
             return ['success' => true, 'error' => ''];
@@ -155,7 +155,7 @@ class TradeQueueProcessor
         $pickId = (int) $rawPickId;
         $newOwner = $rawNewOwner;
 
-        $affectedRows = $this->repository->executeQueuedPickTransfer($pickId, $newOwner);
+        $affectedRows = $this->executionRepository->executeQueuedPickTransfer($pickId, $newOwner);
 
         if ($affectedRows > 0) {
             return ['success' => true, 'error' => ''];
@@ -171,6 +171,6 @@ class TradeQueueProcessor
      */
     public function clearQueue(): int
     {
-        return $this->repository->clearTradeQueue();
+        return $this->executionRepository->clearTradeQueue();
     }
 }

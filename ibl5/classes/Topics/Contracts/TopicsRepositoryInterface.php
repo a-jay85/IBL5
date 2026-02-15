@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Topics\Contracts;
 
 /**
- * Interface for the Topics service.
+ * Interface for the Topics repository.
  *
  * Defines methods for retrieving news topics with their associated
  * article counts and recent stories.
  */
-interface TopicsServiceInterface
+interface TopicsRepositoryInterface
 {
     /**
      * Get all active topics with story counts and recent articles.

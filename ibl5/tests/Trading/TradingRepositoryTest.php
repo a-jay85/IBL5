@@ -176,20 +176,6 @@ class TradingRepositoryTest extends TestCase
     }
 
     // ============================================
-    // GET CASH DETAILS TESTS
-    // ============================================
-
-    public function testGetCashDetailsReturnsNullWhenNoData(): void
-    {
-        $repository = new TradingRepository($this->mockMysqliDb);
-        $this->mockDb->setMockData([]);
-
-        $result = $repository->getCashDetails('Test Team', 1);
-
-        $this->assertNull($result);
-    }
-
-    // ============================================
     // MULTIPLE INSTANCES TEST
     // ============================================
 

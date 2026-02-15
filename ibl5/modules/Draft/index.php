@@ -22,7 +22,7 @@ function userinfo($username)
     $season = new Season($mysqli_db);
     $repository = new DraftRepository($mysqli_db);
     $view = new DraftView();
-    $sharedFunctions = new \Shared($mysqli_db);
+    $sharedRepository = new \Shared\SharedRepository($mysqli_db);
 
     $stmt = $mysqli_db->prepare("SELECT * FROM " . $user_prefix . "_users WHERE username = ?");
     $stmt->bind_param('s', $username);
@@ -44,7 +44,7 @@ function userinfo($username)
 
     $pickOwner = null;
     if ($draft_round !== null && $draft_team !== null) {
-        $pickOwner = $sharedFunctions->getCurrentOwnerOfDraftPick($season->endingYear, $draft_round, $draft_team);
+        $pickOwner = $sharedRepository->getCurrentOwnerOfDraftPick($season->endingYear, $draft_round, $draft_team);
     }
 
     // Get all draft class players

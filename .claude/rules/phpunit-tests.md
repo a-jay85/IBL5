@@ -83,7 +83,22 @@ class ModuleServiceTest extends TestCase
 - Use data providers for similar cases
 - Use `@see` instead of `{@inheritdoc}`
 
+## Mock vs Stub
+
+Use `createStub()` when a test double only provides canned return values (no `expects()` calls). Use `createMock()` only when you need to verify interactions with `expects()`. PHPUnit 12 emits a notice when a mock object has no configured expectations.
+
+```php
+// ✅ No expectations — use createStub()
+$repo = $this->createStub(RepositoryInterface::class);
+$repo->method('findById')->willReturn($entity);
+
+// ✅ Has expectations — use createMock()
+$repo = $this->createMock(RepositoryInterface::class);
+$repo->expects($this->once())->method('save')->with($entity);
+```
+
 ## ❌ DON'T:
+- **NEVER** use `createMock()` when no `expects()` calls are configured — use `createStub()` instead
 - **NEVER** use `ReflectionClass` for private methods
 - **NEVER** use `markTestSkipped()` - delete instead
 - **NEVER** check SQL query structure (except security tests)

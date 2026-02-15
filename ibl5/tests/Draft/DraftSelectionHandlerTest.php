@@ -6,6 +6,7 @@ namespace Tests\Draft;
 
 use PHPUnit\Framework\TestCase;
 use Draft\DraftSelectionHandler;
+use Shared\Contracts\SharedRepositoryInterface;
 
 /**
  * DraftSelectionHandlerTest - Tests for draft pick selection handling
@@ -19,8 +20,8 @@ class DraftSelectionHandlerTest extends TestCase
 {
     private \MockDatabase $mockDb;
     private object $mockMysqliDb;
-    private object $mockSharedFunctions;
-    private object $mockSeason;
+    private SharedRepositoryInterface $mockSharedFunctions;
+    private \Season $mockSeason;
 
     protected function setUp(): void
     {
@@ -76,20 +77,16 @@ class DraftSelectionHandlerTest extends TestCase
 
     private function setupMockDependencies(): void
     {
-        // Mock Shared functions
-        $this->mockSharedFunctions = new class {
-            public function getCurrentOwnerOfDraftPick(int $year, int $round, int $pick): ?string
-            {
-                return 'Test Team';
-            }
-        };
+        // Stub SharedRepository (no expectations needed)
+        $stub = $this->createStub(SharedRepositoryInterface::class);
+        $stub->method('getCurrentOwnerOfDraftPick')->willReturn('Test Team');
+        $this->mockSharedFunctions = $stub;
         
         // Mock Season object
-        $this->mockSeason = new class {
-            public int $beginningYear = 2024;
-            public int $endingYear = 2025;
-            public string $phase = 'Draft';
-        };
+        $this->mockSeason = $this->createStub(\Season::class);
+        $this->mockSeason->beginningYear = 2024;
+        $this->mockSeason->endingYear = 2025;
+        $this->mockSeason->phase = 'Draft';
     }
 
     // ============================================

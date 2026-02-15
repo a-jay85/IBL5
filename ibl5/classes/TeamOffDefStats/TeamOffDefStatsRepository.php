@@ -23,9 +23,9 @@ use TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface;
 class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOffDefStatsRepositoryInterface
 {
     /**
-     * @param object $db Database connection (mysqli wrapper)
+     * @param \mysqli $db Database connection
      */
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
     }

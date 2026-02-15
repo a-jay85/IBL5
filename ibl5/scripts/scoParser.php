@@ -59,7 +59,7 @@ $lgeView = new LeagueConfig\LeagueConfigView();
 
 $defaultLgePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5/IBL5.lge';
 
-if (!$lgeService->hasConfigForCurrentSeason($season->endingYear)) {
+if (!$lgeRepo->hasConfigForSeason($season->endingYear)) {
     if (is_file($defaultLgePath)) {
         $lgeResult = $lgeService->processLgeFile($defaultLgePath);
         echo $lgeView->renderParseResult($lgeResult);

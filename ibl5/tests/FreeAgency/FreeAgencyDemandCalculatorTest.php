@@ -469,31 +469,6 @@ class FreeAgencyDemandCalculatorTest extends TestCase
 
     /**
      * @group demand-calculator
-     * @group player-demands
-     */
-    public function testGetPlayerDemandsReturnsRepositoryData(): void
-    {
-        // Arrange
-        $expectedDemands = [
-            'dem1' => 1000,
-            'dem2' => 1050,
-            'dem3' => 1100,
-            'dem4' => 1150,
-            'dem5' => 1200,
-            'dem6' => 1250,
-        ];
-
-        $this->mockRepository->playerDemands = $expectedDemands;
-
-        // Act
-        $result = $this->calculator->getPlayerDemands('Test Player');
-
-        // Assert
-        $this->assertEquals($expectedDemands, $result);
-    }
-
-    /**
-     * @group demand-calculator
      * @group combined-factors
      */
     public function testCombinedFactorsMultiplyCorrectly(): void

@@ -44,29 +44,4 @@ class LeagueConfigServiceTest extends TestCase
         $this->assertArrayHasKey('error', $result);
     }
 
-    public function testHasConfigDelegatesToRepository(): void
-    {
-        $mockRepository = $this->createMock(LeagueConfigRepositoryInterface::class);
-        $mockRepository->expects($this->once())
-            ->method('hasConfigForSeason')
-            ->with(2007)
-            ->willReturn(true);
-
-        $service = new LeagueConfigService($mockRepository);
-
-        $this->assertTrue($service->hasConfigForCurrentSeason(2007));
-    }
-
-    public function testHasConfigReturnsFalseWhenNoData(): void
-    {
-        $mockRepository = $this->createMock(LeagueConfigRepositoryInterface::class);
-        $mockRepository->expects($this->once())
-            ->method('hasConfigForSeason')
-            ->with(2027)
-            ->willReturn(false);
-
-        $service = new LeagueConfigService($mockRepository);
-
-        $this->assertFalse($service->hasConfigForCurrentSeason(2027));
-    }
 }

@@ -16,25 +16,6 @@ namespace Extension\Contracts;
 interface ExtensionOfferEvaluatorInterface
 {
     /**
-     * Calculates the total value, years, and average per year of an offer
-     * 
-     * Analyzes an offer array to determine its total value and structure.
-     * 
-     * @param array{year1: int, year2: int, year3: int, year4?: int, year5?: int} $offer
-     *        Contract offer with yearly salary amounts in thousands
-     * @return array{total: int, years: int, averagePerYear: float} Analysis result:
-     *         - 'total': int - Sum of all years
-     *         - 'years': int - Number of years (3, 4, or 5)
-     *         - 'averagePerYear': float - Average salary per year
-     * 
-     * IMPORTANT BEHAVIORS:
-     *  - If year5 == 0: 4 years
-     *  - If year4 == 0: 3 years
-     *  - Otherwise: 5 years
-     */
-    public function calculateOfferValue(array $offer): array;
-
-    /**
      * Calculates the winner modifier based on team wins/losses and player preference
      * 
      * Players who value winning adjust their demands based on team performance.

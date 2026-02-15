@@ -38,12 +38,20 @@ class AuthService implements AuthServiceInterface
     public function __construct(\mysqli $db, ?Auth $auth = null)
     {
         $this->db = $db;
-        $this->auth = $auth ?? new Auth(
-            PdoConnection::getInstance(),
-            null,
-            self::AUTH_TABLE_PREFIX,
-            true,
-        );
+        // Suppress E_DEPRECATED during Auth construction — delight-im/auth v9.0
+        // uses implicitly nullable parameters which PHP 8.4 deprecates.
+        // No upstream fix available; v9.0.0 is the latest release.
+        $previousLevel = error_reporting(error_reporting() & ~E_DEPRECATED);
+        try {
+            $this->auth = $auth ?? new Auth(
+                PdoConnection::getInstance(),
+                null,
+                self::AUTH_TABLE_PREFIX,
+                true,
+            );
+        } finally {
+            error_reporting($previousLevel);
+        }
     }
 
     public function attempt(string $username, string $password, ?int $rememberDuration = null): bool

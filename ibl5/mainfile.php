@@ -82,6 +82,9 @@ if (isset($_SERVER['HTTP_USER_AGENT']) && strstr($_SERVER['HTTP_USER_AGENT'], 'c
 // Load the autoloader for IBL5 classes (must be before League\LeagueContext usage)
 require_once __DIR__ . '/autoloader.php';
 
+// Load Composer autoloader for third-party packages (delight-im/auth, etc.)
+require_once __DIR__ . '/vendor/autoload.php';
+
 // SECURITY: Configure secure session cookie parameters before session_start()
 if (session_status() === PHP_SESSION_NONE) {
     // Detect HTTPS

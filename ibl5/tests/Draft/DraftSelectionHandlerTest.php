@@ -77,10 +77,10 @@ class DraftSelectionHandlerTest extends TestCase
 
     private function setupMockDependencies(): void
     {
-        // Mock SharedRepository
-        $mock = $this->createMock(SharedRepositoryInterface::class);
-        $mock->method('getCurrentOwnerOfDraftPick')->willReturn('Test Team');
-        $this->mockSharedFunctions = $mock;
+        // Stub SharedRepository (no expectations needed)
+        $stub = $this->createStub(SharedRepositoryInterface::class);
+        $stub->method('getCurrentOwnerOfDraftPick')->willReturn('Test Team');
+        $this->mockSharedFunctions = $stub;
         
         // Mock Season object
         $this->mockSeason = $this->createStub(\Season::class);

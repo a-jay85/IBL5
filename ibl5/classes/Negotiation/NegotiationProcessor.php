@@ -65,7 +65,7 @@ class NegotiationProcessor implements NegotiationProcessorInterface
         $demands = $this->demandCalculator->calculateDemands($player, $teamFactors);
         
         // Calculate available cap space
-        $capSpace = $this->calculateCapSpace($userTeamName);
+        $capSpace = $this->repository->getTeamCapSpaceNextSeason($userTeamName);
         
         // Determine max first year salary based on experience
         $maxYearOneSalary = \ContractRules::getMaxContractSalary($player->yearsOfExperience ?? 0);
@@ -101,19 +101,6 @@ class NegotiationProcessor implements NegotiationProcessorInterface
             'tradition_losses' => $teamData['Contract_AvgL'],
             'money_committed_at_position' => $moneyCommitted
         ];
-    }
-    
-
-    
-    /**
-     * Calculate available cap space for next season
-     * 
-     * @param string $teamName Team name
-     * @return int Available cap space
-     */
-    private function calculateCapSpace(string $teamName): int
-    {
-        return $this->repository->getTeamCapSpaceNextSeason($teamName);
     }
     
 }

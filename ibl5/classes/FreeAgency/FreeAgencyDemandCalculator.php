@@ -182,11 +182,4 @@ class FreeAgencyDemandCalculator implements FreeAgencyDemandCalculatorInterface
         return 1 + $factorPlayForWinner + $factorTradition + $factorLoyalty + $factorSecurity + $factorPlayingTime;
     }
 
-    /**
-     * @see FreeAgencyDemandCalculatorInterface::getPlayerDemands()
-     */
-    public function getPlayerDemands(string $playerName): array
-    {
-        return $this->repository->getPlayerDemands($playerName);
-    }
 }

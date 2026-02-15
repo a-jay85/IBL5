@@ -67,19 +67,4 @@ interface FreeAgencyDemandCalculatorInterface
         int $yearsInOffer
     ): float;
 
-    /**
-     * Get player's salary demands for all 6 contract years
-     * 
-     * Returns the "base" demands that a player states at the start of negotiation.
-     * These are unadjusted for the offering team's attributes (see calculatePerceivedValue).
-     * 
-     * The demands typically represent what the player thinks they deserve based on
-     * their ratings and experience, before team-specific modifiers are applied.
-     * 
-     * @param string $playerName Player name (used to look up demands in database)
-     * 
-     * @return array<string, int> Demands array with keys dem1-dem6, each an integer salary
-     *                            Indexed as: dem1, dem2, dem3, dem4, dem5, dem6
-     */
-    public function getPlayerDemands(string $playerName): array;
 }

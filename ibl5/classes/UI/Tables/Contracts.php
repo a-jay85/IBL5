@@ -20,15 +20,15 @@ class Contracts
      * @param \mysqli $db Database connection
      * @param iterable<int, array<string, mixed>> $result Player result set
      * @param \Team $team Team object
-     * @param \Shared\Contracts\SharedRepositoryInterface $sharedFunctions Shared repository
+     * @param \Season $season Season object
      * @param list<int> $starterPids Starter player IDs
      * @return string HTML table
      */
-    public static function render($db, $result, $team, $sharedFunctions, array $starterPids = []): string
+    public static function render($db, $result, $team, \Season $season, array $starterPids = []): string
     {
-        $season = new \Season($db);
+        $isFreeAgency = $season->isFreeAgencyPhase();
 
-        if ($sharedFunctions->isFreeAgencyModuleActive() === 1) {
+        if ($isFreeAgency) {
             $season->endingYear++;
         }
 
@@ -40,8 +40,8 @@ class Contracts
             /** @var PlayerRow $plrRow */
             $player = Player::withPlrRow($db, $plrRow);
 
-            // Calculate contract year offset based on free agency status
-            $yearOffset = ($sharedFunctions->isFreeAgencyModuleActive() === 0) ? 0 : 1;
+            // Calculate contract year offset based on free agency phase
+            $yearOffset = $isFreeAgency ? 1 : 0;
 
             // Build salary lookup from explicit properties
             $salaryByYear = [

@@ -88,23 +88,18 @@ class TeamService implements TeamServiceInterface
      */
     public function getTableOutput(int $teamID, ?string $yr, string $display): string
     {
-        $sharedRepository = new \Shared\SharedRepository($this->db);
         $season = new \Season($this->db);
 
-        $isFreeAgencyModuleActive = $sharedRepository->isFreeAgencyModuleActive();
+        $isFreeAgency = $season->isFreeAgencyPhase();
 
         if ($teamID === 0) {
-            if ($isFreeAgencyModuleActive === 0) {
-                $result = $this->repository->getFreeAgents(false);
-            } else {
-                $result = $this->repository->getFreeAgents(true);
-            }
+            $result = $this->repository->getFreeAgents($isFreeAgency);
         } elseif ($teamID === -1) {
             $result = $this->repository->getEntireLeagueRoster();
         } else {
             if ($yr !== null && $yr !== '') {
                 $result = $this->repository->getHistoricalRoster($teamID, $yr);
-            } elseif ($isFreeAgencyModuleActive === 1) {
+            } elseif ($isFreeAgency) {
                 $result = $this->repository->getFreeAgencyRoster($teamID);
             } else {
                 $result = $this->repository->getRosterUnderContract($teamID);
@@ -146,7 +141,7 @@ class TeamService implements TeamServiceInterface
         }
 
         $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $teamColor1, $teamColor2);
-        $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $sharedRepository, $starterPids);
+        $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $starterPids);
 
         return $switcher->wrap($tableHtml);
     }
@@ -192,7 +187,7 @@ class TeamService implements TeamServiceInterface
      * @param list<PlayerRow>|list<array<string, mixed>> $result
      * @param list<int> $starterPids
      */
-    private function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, \Shared\Contracts\SharedRepositoryInterface $sharedRepository, array $starterPids = []): string
+    private function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, array $starterPids = []): string
     {
         $yrStr = $yr ?? '';
         switch ($display) {
@@ -207,7 +202,7 @@ class TeamService implements TeamServiceInterface
             case 'playoffs':
                 return \UI::periodAverages($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids);
             case 'contracts':
-                return \UI::contracts($this->db, $result, $team, $sharedRepository, $starterPids);
+                return \UI::contracts($this->db, $result, $team, $season, $starterPids);
             default:
                 return \UI::ratings($this->db, $result, $team, $yrStr, $season, '', $starterPids);
         }

@@ -44,7 +44,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
     $service = new \ComparePlayers\ComparePlayersService($repository);
     $view = new \ComparePlayers\ComparePlayersView();
 
-    $playerNames = $service->getPlayerNames();
+    $playerNames = $repository->getAllPlayerNames();
 
     if (!isset($_POST['Player1'])) {
         echo $view->renderSearchForm($playerNames);

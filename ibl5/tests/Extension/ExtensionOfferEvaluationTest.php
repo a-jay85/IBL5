@@ -2,11 +2,12 @@
 
 use PHPUnit\Framework\TestCase;
 use Extension\ExtensionOfferEvaluator;
+use Services\CommonContractValidator;
 use Shared\SalaryConverter;
 
 /**
  * Tests for contract extension offer evaluation logic
- * 
+ *
  * Tests the complex player preference evaluation algorithm including:
  * - Offer value calculation
  * - Player demands calculation
@@ -15,16 +16,13 @@ use Shared\SalaryConverter;
  */
 class ExtensionOfferEvaluationTest extends TestCase
 {
-    private $offerEvaluator;
+    private ExtensionOfferEvaluator $offerEvaluator;
+    private CommonContractValidator $contractValidator;
 
     protected function setUp(): void
     {
         $this->offerEvaluator = new ExtensionOfferEvaluator();
-    }
-
-    protected function tearDown(): void
-    {
-        $this->offerEvaluator = null;
+        $this->contractValidator = new CommonContractValidator();
     }
 
     /**
@@ -43,7 +41,7 @@ class ExtensionOfferEvaluationTest extends TestCase
         ];
 
         // Act
-        $result = $this->offerEvaluator->calculateOfferValue($offer);
+        $result = $this->contractValidator->calculateOfferValue($offer);
 
         // Assert
         $this->assertEquals(3300, $result['total']); // 1000 + 1100 + 1200
@@ -67,7 +65,7 @@ class ExtensionOfferEvaluationTest extends TestCase
         ];
 
         // Act
-        $result = $this->offerEvaluator->calculateOfferValue($offer);
+        $result = $this->contractValidator->calculateOfferValue($offer);
 
         // Assert
         $this->assertEquals(6000, $result['total']);

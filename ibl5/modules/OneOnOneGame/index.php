@@ -69,7 +69,7 @@ function oneonone(): void
     echo $view->renderHeader();
 
     // Get players for form
-    $players = $service->getActivePlayers();
+    $players = $repository->getActivePlayers();
 
     // Render forms
     echo $view->renderPlayerSelectionForm($players, $player1, $player2);
@@ -95,7 +95,7 @@ function oneonone(): void
         // Replay mode - show old game
         $replayId = $gameidGet ?? $gameid;
         if ($replayId !== null) {
-            $gameData = $service->getGameReplay($replayId);
+            $gameData = $repository->getGameById($replayId);
             if ($gameData !== null) {
                 echo $view->renderGameReplay($gameData);
             } else {

@@ -164,13 +164,4 @@ class TradeQueueProcessor
         return ['success' => false, 'error' => "Pick transfer failed (0 rows affected)"];
     }
 
-    /**
-     * Clear all queued trades (used at start of preseason)
-     *
-     * @return int Number of cleared entries
-     */
-    public function clearQueue(): int
-    {
-        return $this->executionRepository->clearTradeQueue();
-    }
 }

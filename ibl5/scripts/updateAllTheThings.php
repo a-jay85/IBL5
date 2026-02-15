@@ -173,9 +173,9 @@ try {
     // --- Step 5: Extend active saved depth charts ---
     echo $view->renderStepStart('Updating saved depth charts...');
     flush();
-    $savedDcUpdater = new Updater\SavedDepthChartUpdater($mysqli_db);
+    $savedDcRepo = new SavedDepthChart\SavedDepthChartRepository($mysqli_db);
     ob_start();
-    $savedDcCount = $savedDcUpdater->update($season->lastSimEndDate, $season->lastSimNumber);
+    $savedDcCount = $savedDcRepo->extendActiveDepthCharts($season->lastSimEndDate, $season->lastSimNumber);
     $log = (string) ob_get_clean();
     echo $view->renderStepComplete('Saved depth charts updated', $savedDcCount . ' active DCs extended');
     if ($log !== '') {

@@ -80,14 +80,6 @@ class LeagueConfigService
     }
 
     /**
-     * Check if league config exists for the current season.
-     */
-    public function hasConfigForCurrentSeason(int $seasonEndingYear): bool
-    {
-        return $this->repository->hasConfigForSeason($seasonEndingYear);
-    }
-
-    /**
      * Cross-check ibl_league_config against ibl_franchise_seasons for a given season.
      *
      * @return list<string> List of discrepancy messages (empty = all consistent)

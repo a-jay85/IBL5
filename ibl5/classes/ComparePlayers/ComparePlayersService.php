@@ -20,14 +20,6 @@ class ComparePlayersService implements ComparePlayersServiceInterface
     }
 
     /**
-     * @see ComparePlayersServiceInterface::getPlayerNames()
-     */
-    public function getPlayerNames(): array
-    {
-        return $this->repository->getAllPlayerNames();
-    }
-
-    /**
      * @see ComparePlayersServiceInterface::comparePlayers()
      */
     public function comparePlayers(string $player1Name, string $player2Name): ?array

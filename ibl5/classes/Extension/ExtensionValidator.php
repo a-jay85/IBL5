@@ -5,25 +5,16 @@ declare(strict_types=1);
 namespace Extension;
 
 use Extension\Contracts\ExtensionValidatorInterface;
-use Services\CommonContractValidator;
 
 /**
  * ExtensionValidator - Validates contract extension offers
  *
- * Delegates common validation logic to CommonContractValidator while
- * handling Extension-specific validation (team eligibility flags).
+ * Handles Extension-specific validation (offer amounts, team eligibility flags).
  *
  * @see ExtensionValidatorInterface
  */
 class ExtensionValidator implements ExtensionValidatorInterface
 {
-    private CommonContractValidator $contractValidator;
-
-    public function __construct()
-    {
-        $this->contractValidator = new CommonContractValidator();
-    }
-
     /**
      * @see ExtensionValidatorInterface::validateOfferAmounts()
      *
@@ -46,30 +37,6 @@ class ExtensionValidator implements ExtensionValidatorInterface
         }
 
         return ['valid' => true, 'error' => null];
-    }
-
-    /**
-     * @see ExtensionValidatorInterface::validateMaximumYearOneOffer()
-     */
-    public function validateMaximumYearOneOffer(array $offer, int $yearsExperience): array
-    {
-        return $this->contractValidator->validateMaximumYearOne($offer, $yearsExperience);
-    }
-
-    /**
-     * @see ExtensionValidatorInterface::validateRaises()
-     */
-    public function validateRaises(array $offer, int $birdYears): array
-    {
-        return $this->contractValidator->validateRaises($offer, $birdYears);
-    }
-
-    /**
-     * @see ExtensionValidatorInterface::validateSalaryDecreases()
-     */
-    public function validateSalaryDecreases(array $offer): array
-    {
-        return $this->contractValidator->validateSalaryDecreases($offer);
     }
 
     /**

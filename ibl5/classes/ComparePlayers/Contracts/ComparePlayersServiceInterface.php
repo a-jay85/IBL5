@@ -13,20 +13,6 @@ namespace ComparePlayers\Contracts;
 interface ComparePlayersServiceInterface
 {
     /**
-     * Get all active player names for autocomplete
-     * 
-     * Simple pass-through to repository for player names.
-     * Used to populate JavaScript autocomplete dropdown on form.
-     * 
-     * @return array<int, string> Array of player names sorted alphabetically
-     * 
-     * Examples:
-     *  $names = $service->getPlayerNames();
-     *  // Returns ['Allen Iverson', 'Kobe Bryant', 'Tim Duncan', ...]
-     */
-    public function getPlayerNames(): array;
-
-    /**
      * Compare two players and return structured comparison data
      * 
      * Validates player names exist, retrieves their complete data,

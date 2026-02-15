@@ -62,8 +62,7 @@ class FreeAgencyService implements FreeAgencyServiceInterface
         /** @var array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
         $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
 
-        $calculator = new FreeAgencyDemandCalculator($this->demandRepository);
-        $demands = $calculator->getPlayerDemands($player->name ?? '');
+        $demands = $this->demandRepository->getPlayerDemands($player->name ?? '');
 
         $existingOffer = $this->getExistingOffer($team->name, $player->name ?? '');
 

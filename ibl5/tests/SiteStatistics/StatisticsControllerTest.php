@@ -6,7 +6,7 @@ use PHPUnit\Framework\TestCase;
 
 class StatisticsControllerTest extends TestCase
 {
-    private $mockDb;
+    private \mysqli $mockDb;
     private StatisticsController $controller;
 
     protected function setUp(): void
@@ -15,16 +15,21 @@ class StatisticsControllerTest extends TestCase
         $prefix = 'test';
         $user_prefix = 'nuke';
         $startdate = '2024-01-01';
-        
+
         $this->mockDb = $this->createMockDatabase();
         $this->controller = new StatisticsController($this->mockDb, 'SiteStatistics', 'TestTheme');
     }
 
-    private function createMockDatabase()
+    private function createMockDatabase(): \mysqli
     {
-        return new class {
+        return new class extends \mysqli {
             private array $queryResults = [];
             private int $queryIndex = 0;
+
+            public function __construct()
+            {
+                // Don't call parent::__construct() to avoid real DB connection
+            }
 
             public function setQueryResults(array $results): void
             {
@@ -32,12 +37,12 @@ class StatisticsControllerTest extends TestCase
                 $this->queryIndex = 0;
             }
 
-            public function sql_query(string $query)
+            public function sql_query(string $query): static
             {
                 return $this;
             }
 
-            public function sql_fetchrow($result): array|false
+            public function sql_fetchrow(mixed $result): array|false
             {
                 if ($this->queryIndex < count($this->queryResults)) {
                     return $this->queryResults[$this->queryIndex++];
@@ -45,7 +50,7 @@ class StatisticsControllerTest extends TestCase
                 return false;
             }
 
-            public function sql_numrows($result): int
+            public function sql_numrows(mixed $result): int
             {
                 if (isset($this->queryResults[0])) {
                     return count($this->queryResults);

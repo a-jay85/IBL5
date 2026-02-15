@@ -21,7 +21,7 @@ class NegotiationValidator implements NegotiationValidatorInterface
     private NegotiationRepositoryInterface $repository;
     private PlayerContractValidator $contractValidator;
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         $this->repository = new NegotiationRepository($db);
         $this->contractValidator = new PlayerContractValidator();

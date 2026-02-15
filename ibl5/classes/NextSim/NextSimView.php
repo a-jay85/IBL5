@@ -19,18 +19,18 @@ use Utilities\HtmlSanitizer;
  */
 class NextSimView implements NextSimViewInterface
 {
-    private object $db;
+    private \mysqli $db;
     private \Season $season;
     private string $moduleName;
 
     /**
      * Constructor
      *
-     * @param object $db Database connection
+     * @param \mysqli $db Database connection
      * @param \Season $season Current season
      * @param string $moduleName Module name
      */
-    public function __construct(object $db, \Season $season, string $moduleName)
+    public function __construct(\mysqli $db, \Season $season, string $moduleName)
     {
         $this->db = $db;
         $this->season = $season;
@@ -101,9 +101,7 @@ class NextSimView implements NextSimViewInterface
         // Render matchup ratings
         $html .= '<div>';
         $matchupPlayers = $this->prepareMatchupPlayers($gameData);
-        /** @var \mysqli $db */
-        $db = $this->db;
-        $html .= \UI::ratings($db, $matchupPlayers, $opposingTeam, '', $this->season, $this->moduleName);
+        $html .= \UI::ratings($this->db, $matchupPlayers, $opposingTeam, '', $this->season, $this->moduleName);
         $html .= '</div>';
         $html .= '</div>';
 

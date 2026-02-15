@@ -16,7 +16,7 @@ use SeriesRecords\Contracts\SeriesRecordsRepositoryInterface;
  */
 class SeriesRecordsRepository extends \BaseMysqliRepository implements SeriesRecordsRepositoryInterface
 {
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
     }

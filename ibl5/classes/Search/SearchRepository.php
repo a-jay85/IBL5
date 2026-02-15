@@ -5,20 +5,20 @@ declare(strict_types=1);
 namespace Search;
 
 use BaseMysqliRepository;
-use Search\Contracts\SearchServiceInterface;
+use Search\Contracts\SearchRepositoryInterface;
 
 /**
- * Service class for searching stories, comments, and users.
+ * Repository class for searching stories, comments, and users.
  *
  * Uses prepared statements for all database queries. Handles filtering
  * by topic, category, author, and date range for story searches.
  *
- * @phpstan-import-type StorySearchResult from Contracts\SearchServiceInterface
- * @phpstan-import-type CommentSearchResult from Contracts\SearchServiceInterface
- * @phpstan-import-type UserSearchResult from Contracts\SearchServiceInterface
- * @phpstan-import-type TopicRow from Contracts\SearchServiceInterface
- * @phpstan-import-type CategoryRow from Contracts\SearchServiceInterface
- * @phpstan-import-type TopicInfoRow from Contracts\SearchServiceInterface
+ * @phpstan-import-type StorySearchResult from Contracts\SearchRepositoryInterface
+ * @phpstan-import-type CommentSearchResult from Contracts\SearchRepositoryInterface
+ * @phpstan-import-type UserSearchResult from Contracts\SearchRepositoryInterface
+ * @phpstan-import-type TopicRow from Contracts\SearchRepositoryInterface
+ * @phpstan-import-type CategoryRow from Contracts\SearchRepositoryInterface
+ * @phpstan-import-type TopicInfoRow from Contracts\SearchRepositoryInterface
  *
  * @phpstan-type StoryDbRow array{sid: int, aid: string, informant: string, title: string, time: string, hometext: string, bodytext: string, comments: int, topic: int, topictext: string|null}
  * @phpstan-type CommentDbRow array{tid: int, sid: int, subject: string, date: string, name: string, article_title: string|null, reply_count: int}
@@ -28,9 +28,9 @@ use Search\Contracts\SearchServiceInterface;
  * @phpstan-type AuthorDbRow array{aid: string}
  * @phpstan-type TopicInfoDbRow array{topicimage: string, topictext: string}
  *
- * @see SearchServiceInterface
+ * @see SearchRepositoryInterface
  */
-class SearchService extends BaseMysqliRepository implements SearchServiceInterface
+class SearchRepository extends BaseMysqliRepository implements SearchRepositoryInterface
 {
     /** @var string Database table prefix */
     private string $prefix;
@@ -39,11 +39,11 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
     private string $userPrefix;
 
     /**
-     * @param object $db Active mysqli connection
+     * @param \mysqli $db Active mysqli connection
      * @param string $prefix Database table prefix (default: 'nuke')
      * @param string $userPrefix User table prefix (default: 'nuke')
      */
-    public function __construct(object $db, string $prefix = 'nuke', string $userPrefix = 'nuke')
+    public function __construct(\mysqli $db, string $prefix = 'nuke', string $userPrefix = 'nuke')
     {
         parent::__construct($db);
         $this->prefix = $prefix;
@@ -51,7 +51,7 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
     }
 
     /**
-     * @see SearchServiceInterface::searchStories()
+     * @see SearchRepositoryInterface::searchStories()
      * @return StorySearchResult
      */
     public function searchStories(
@@ -134,7 +134,7 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
     }
 
     /**
-     * @see SearchServiceInterface::searchComments()
+     * @see SearchRepositoryInterface::searchComments()
      * @return CommentSearchResult
      */
     public function searchComments(string $query, int $offset = 0, int $limit = 10): array
@@ -178,7 +178,7 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
     }
 
     /**
-     * @see SearchServiceInterface::searchUsers()
+     * @see SearchRepositoryInterface::searchUsers()
      * @return UserSearchResult
      */
     public function searchUsers(string $query, int $offset = 0, int $limit = 10): array
@@ -215,7 +215,7 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
     }
 
     /**
-     * @see SearchServiceInterface::getTopics()
+     * @see SearchRepositoryInterface::getTopics()
      * @return list<TopicRow>
      */
     public function getTopics(): array
@@ -237,7 +237,7 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
     }
 
     /**
-     * @see SearchServiceInterface::getCategories()
+     * @see SearchRepositoryInterface::getCategories()
      * @return list<CategoryRow>
      */
     public function getCategories(): array
@@ -259,7 +259,7 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
     }
 
     /**
-     * @see SearchServiceInterface::getAuthors()
+     * @see SearchRepositoryInterface::getAuthors()
      */
     public function getAuthors(): array
     {
@@ -277,7 +277,7 @@ class SearchService extends BaseMysqliRepository implements SearchServiceInterfa
     }
 
     /**
-     * @see SearchServiceInterface::getTopicInfo()
+     * @see SearchRepositoryInterface::getTopicInfo()
      * @return TopicInfoRow|null
      */
     public function getTopicInfo(int $topicId): ?array

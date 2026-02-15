@@ -15,10 +15,10 @@ class WaiversRepository extends BaseMysqliRepository implements WaiversRepositor
 {
     /**
      * Constructor
-     * 
-     * @param object $db Active mysqli connection (or duck-typed mock for testing)
+     *
+     * @param \mysqli $db Active mysqli connection
      */
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
     }

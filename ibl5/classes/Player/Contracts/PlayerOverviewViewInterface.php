@@ -25,7 +25,7 @@ interface PlayerOverviewViewInterface extends PlayerViewInterface
      * @param Player $player Player object with all data
      * @param PlayerStats $playerStats Player stats object
      * @param \Season $season Season object for date calculations
-     * @param \Shared $sharedFunctions Shared utility functions
+     * @param \Shared\Contracts\SharedRepositoryInterface $sharedRepository Shared repository
      * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string}|null $colorScheme Team color scheme for stats card styling
      * @return string Rendered HTML content
      */
@@ -34,7 +34,7 @@ interface PlayerOverviewViewInterface extends PlayerViewInterface
         Player $player,
         PlayerStats $playerStats,
         \Season $season,
-        \Shared $sharedFunctions,
+        \Shared\Contracts\SharedRepositoryInterface $sharedRepository,
         ?array $colorScheme = null
     ): string;
 }

@@ -20,9 +20,9 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     /**
      * Constructor
      *
-     * @param object $db Active mysqli connection
+     * @param \mysqli $db Active mysqli connection
      */
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
     }

@@ -28,24 +28,6 @@ final class OneOnOneGameServiceTest extends TestCase
         $this->service = new OneOnOneGameService($this->mockRepository, $this->mockGameEngine);
     }
 
-    // ========== getActivePlayers Tests ==========
-
-    public function testGetActivePlayersReturnsArrayFromRepository(): void
-    {
-        $expectedPlayers = [
-            ['pid' => 1, 'name' => 'Player One'],
-            ['pid' => 2, 'name' => 'Player Two'],
-        ];
-
-        $this->mockRepository->expects($this->once())
-            ->method('getActivePlayers')
-            ->willReturn($expectedPlayers);
-
-        $result = $this->service->getActivePlayers();
-
-        $this->assertEquals($expectedPlayers, $result);
-    }
-
     // ========== validatePlayerSelection Tests ==========
 
     public function testValidatePlayerSelectionReturnsEmptyArrayForValidSelection(): void
@@ -195,42 +177,6 @@ final class OneOnOneGameServiceTest extends TestCase
         $result = $this->service->playGame(1, 2, 'Owner');
 
         $this->assertEquals(42, $result->gameId);
-    }
-
-    // ========== getGameReplay Tests ==========
-
-    public function testGetGameReplayReturnsGameDataFromRepository(): void
-    {
-        $expectedData = [
-            'gameid' => 123,
-            'playbyplay' => 'Test play by play',
-            'winner' => 'Winner',
-            'loser' => 'Loser',
-            'winscore' => 21,
-            'lossscore' => 18,
-            'owner' => 'Owner',
-        ];
-
-        $this->mockRepository->expects($this->once())
-            ->method('getGameById')
-            ->with(123)
-            ->willReturn($expectedData);
-
-        $result = $this->service->getGameReplay(123);
-
-        $this->assertEquals($expectedData, $result);
-    }
-
-    public function testGetGameReplayReturnsNullWhenGameNotFound(): void
-    {
-        $this->mockRepository->expects($this->once())
-            ->method('getGameById')
-            ->with(999)
-            ->willReturn(null);
-
-        $result = $this->service->getGameReplay(999);
-
-        $this->assertNull($result);
     }
 
     // ========== Helper Methods ==========

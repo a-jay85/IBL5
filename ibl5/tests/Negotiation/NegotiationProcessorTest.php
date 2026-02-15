@@ -77,18 +77,8 @@ class NegotiationProcessorTest extends TestCase
 
     public function testProcessorCanBeInstantiated(): void
     {
-        $processor = new NegotiationProcessor($this->mockDb, $this->mockMysqliDb);
-        
-        $this->assertInstanceOf(NegotiationProcessor::class, $processor);
-    }
+        $processor = new NegotiationProcessor($this->mockMysqliDb);
 
-    public function testProcessorAcceptsBothDatabaseConnections(): void
-    {
-        $legacyDb = new \MockDatabase();
-        $modernDb = $this->mockMysqliDb;
-        
-        $processor = new NegotiationProcessor($legacyDb, $modernDb);
-        
         $this->assertInstanceOf(NegotiationProcessor::class, $processor);
     }
 
@@ -98,7 +88,7 @@ class NegotiationProcessorTest extends TestCase
 
     public function testProcessNegotiationReturnsErrorForInvalidPlayer(): void
     {
-        $processor = new NegotiationProcessor($this->mockDb, $this->mockMysqliDb);
+        $processor = new NegotiationProcessor($this->mockMysqliDb);
         
         // Empty mock data means player won't be found
         $this->mockDb->setMockData([]);
@@ -110,7 +100,7 @@ class NegotiationProcessorTest extends TestCase
 
     public function testProcessNegotiationReturnsHtmlOutput(): void
     {
-        $processor = new NegotiationProcessor($this->mockDb, $this->mockMysqliDb);
+        $processor = new NegotiationProcessor($this->mockMysqliDb);
         
         // Setup complete player data
         $this->mockDb->setMockData([$this->getCompletePlayerData()]);
@@ -128,7 +118,7 @@ class NegotiationProcessorTest extends TestCase
 
     public function testProcessorImplementsCorrectInterface(): void
     {
-        $processor = new NegotiationProcessor($this->mockDb, $this->mockMysqliDb);
+        $processor = new NegotiationProcessor($this->mockMysqliDb);
         
         $this->assertInstanceOf(
             \Negotiation\Contracts\NegotiationProcessorInterface::class,

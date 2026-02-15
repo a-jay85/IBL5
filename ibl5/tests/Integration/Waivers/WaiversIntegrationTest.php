@@ -621,6 +621,133 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $this->assertEmpty($this->validator->getErrors());
     }
 
+    // ========== ADDITIONAL COVERAGE TESTS ==========
+
+    /**
+     * @group integration
+     * @group waivers
+     * @group drop-success
+     */
+    public function testDropSetsOrdinalAndDroptime(): void
+    {
+        // Arrange
+        $playerID = 200;
+        $timestamp = time();
+
+        $this->mockDb->setAffectedRows(1);
+        $this->mockDb->setMockData([
+            $this->getBasePlayerData(['pid' => 200])
+        ]);
+
+        // Act
+        $result = $this->repository->dropPlayerToWaivers($playerID, $timestamp);
+
+        // Assert
+        $this->assertTrue($result);
+        $this->assertQueryExecuted('ordinal');
+        $this->assertQueryExecuted('droptime');
+        $this->assertQueryExecuted('UPDATE ibl_plr');
+    }
+
+    /**
+     * @group integration
+     * @group waivers
+     * @group contract
+     */
+    public function testClaimAssignsVetMinWhenNoExistingContract(): void
+    {
+        // Arrange
+        $playerData = $this->getBasePlayerData([
+            'cy' => 0,
+            'cyt' => 0,
+            'cy1' => 0,
+            'exp' => 5,
+        ]);
+        $season = $this->createMockSeason('Regular Season');
+
+        // Act
+        $result = $this->processor->determineContractData($playerData, $season);
+
+        // Assert
+        $this->assertFalse($result['hasExistingContract']);
+        $this->assertEquals(\ContractRules::getVeteranMinimumSalary(5), $result['salary']);
+    }
+
+    /**
+     * @group integration
+     * @group waivers
+     * @group contract
+     */
+    public function testClaimKeepsExistingContractWhenPresent(): void
+    {
+        // Arrange
+        $playerData = $this->getBasePlayerData([
+            'cy' => 2,
+            'cyt' => 3,
+            'cy1' => 500,
+            'cy2' => 550,
+            'cy3' => 600,
+            'exp' => 5,
+        ]);
+        $season = $this->createMockSeason('Regular Season');
+
+        // Act
+        $result = $this->processor->determineContractData($playerData, $season);
+
+        // Assert
+        $this->assertTrue($result['hasExistingContract']);
+        $this->assertEquals(550, $result['salary']);
+    }
+
+    /**
+     * @group integration
+     * @group waivers
+     * @group add-failure
+     */
+    public function testClaimBlockedWhenRosterFull(): void
+    {
+        // Act
+        $result = $this->validator->validateAdd(100, 0, 5000, 500);
+
+        // Assert
+        $this->assertFalse($result);
+        $errors = $this->validator->getErrors();
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('full roster', $errors[0]);
+    }
+
+    /**
+     * @group integration
+     * @group waivers
+     * @group add-failure
+     */
+    public function testClaimBlockedWhenOverCapWithHealthyRoster(): void
+    {
+        // Act - 3 slots = 12 healthy players, total 6800+500=7300 > 7000
+        $result = $this->validator->validateAdd(100, 3, 6800, 500);
+
+        // Assert
+        $this->assertFalse($result);
+        $errors = $this->validator->getErrors();
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('hard cap', $errors[0]);
+    }
+
+    /**
+     * @group integration
+     * @group waivers
+     * @group add-success
+     */
+    public function testClaimAllowedAtVetMinWhenUnderRosterMinimum(): void
+    {
+        // Act - 5 slots = 10 healthy players (<12), at cap but vet min salary
+        $result = $this->validator->validateAdd(100, 5, 7000, 103);
+
+        // Assert
+        $this->assertTrue($result);
+        $this->assertEmpty($this->validator->getErrors());
+    }
+
     // ========== HELPER METHODS ==========
 
     /**

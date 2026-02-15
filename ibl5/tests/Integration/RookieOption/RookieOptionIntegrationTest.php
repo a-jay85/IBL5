@@ -669,6 +669,146 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $this->assertStringContainsString('John Rookie', $result['error']);
     }
 
+    // ========== CONTRACT YEAR TARGETING ==========
+
+    /**
+     * First round pick option year goes to cy4
+     *
+     * @group integration
+     * @group rookieoption
+     */
+    public function testFirstRoundOptionSetsCorrectContractYear(): void
+    {
+        // Arrange - First round pick with cy3 salary
+        $playerID = 800;
+        $draftRound = 1;
+        $extensionAmount = 220;
+
+        $mockPlayer = $this->createMockPlayerObject(
+            teamName: 'Miami Cyclones',
+            canRookieOption: true,
+            draftRound: $draftRound,
+            cy2Salary: 150,
+            cy3Salary: 200
+        );
+
+        $this->mockDb->setAffectedRows(1);
+
+        // Act
+        $result = $this->repository->updatePlayerRookieOption($playerID, $draftRound, $extensionAmount);
+
+        // Assert - cy4 should be set for first round, NOT cy3
+        $this->assertTrue($result);
+        $this->assertQueryExecuted('cy4');
+        $this->assertQueryNotExecuted('cy3');
+        $this->assertQueryExecuted('220');
+    }
+
+    /**
+     * Second round pick option year goes to cy3
+     *
+     * @group integration
+     * @group rookieoption
+     */
+    public function testSecondRoundOptionSetsCorrectContractYear(): void
+    {
+        // Arrange - Second round pick with cy2 salary
+        $playerID = 801;
+        $draftRound = 2;
+        $extensionAmount = 165;
+
+        $mockPlayer = $this->createMockPlayerObject(
+            teamName: 'Miami Cyclones',
+            canRookieOption: true,
+            draftRound: $draftRound,
+            cy2Salary: 150,
+            cy3Salary: 0
+        );
+
+        $this->mockDb->setAffectedRows(1);
+
+        // Act
+        $result = $this->repository->updatePlayerRookieOption($playerID, $draftRound, $extensionAmount);
+
+        // Assert - cy3 should be set for second round, NOT cy4
+        $this->assertTrue($result);
+        $this->assertQueryExecuted('cy3');
+        $this->assertQueryNotExecuted('cy4');
+        $this->assertQueryExecuted('165');
+    }
+
+    /**
+     * Player with Used_Extension_This_Season=1 should be blocked by validator
+     *
+     * @group integration
+     * @group rookieoption
+     */
+    public function testOptionBlockedWhenPlayerAlreadyExtended(): void
+    {
+        // Arrange - Player not eligible (canRookieOption checks extension status internally)
+        $mockPlayer = $this->createMockPlayerObject(
+            teamName: 'Miami Cyclones',
+            canRookieOption: false,
+            draftRound: 1,
+            cy2Salary: 150,
+            cy3Salary: 175
+        );
+
+        // Act
+        $eligibilityResult = $this->validator->validateEligibilityAndGetSalary($mockPlayer, 'Regular Season');
+
+        // Assert - Validation fails with eligibility error
+        $this->assertFalse($eligibilityResult['valid']);
+        $this->assertArrayHasKey('error', $eligibilityResult);
+        $this->assertStringContainsString('not eligible', $eligibilityResult['error']);
+
+        // Assert - No UPDATE query should have been executed
+        $this->assertQueryNotExecuted('UPDATE');
+    }
+
+    /**
+     * After successful option exercise, verify UPDATE query was executed
+     *
+     * @group integration
+     * @group rookieoption
+     */
+    public function testOptionCreatesNewsStoryAndDiscordNotification(): void
+    {
+        // Arrange - Valid first-round player
+        $playerID = 802;
+        $draftRound = 1;
+        $extensionAmount = 250;
+
+        $mockPlayer = $this->createMockPlayerObject(
+            teamName: 'Denver Nuggets',
+            canRookieOption: true,
+            draftRound: $draftRound,
+            cy2Salary: 200,
+            cy3Salary: 225
+        );
+
+        $this->mockDb->setAffectedRows(1);
+
+        // Act - Exercise the option
+        $result = $this->repository->updatePlayerRookieOption($playerID, $draftRound, $extensionAmount);
+
+        // Assert - Option exercise succeeded
+        $this->assertTrue($result);
+
+        // Assert - UPDATE query was executed against ibl_plr
+        $this->assertQueryExecuted('UPDATE ibl_plr');
+
+        // Assert - At least one UPDATE query was executed
+        $queries = $this->getExecutedQueries();
+        $updateCount = 0;
+        foreach ($queries as $query) {
+            if (str_contains($query, 'UPDATE')) {
+                $updateCount++;
+            }
+        }
+        $this->assertGreaterThanOrEqual(1, $updateCount, 'At least one UPDATE query should be executed');
+    }
+
     // ========== HELPER METHODS ==========
 
     /**

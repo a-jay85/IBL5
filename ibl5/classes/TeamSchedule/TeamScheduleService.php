@@ -18,8 +18,7 @@ use TeamSchedule\Contracts\TeamScheduleServiceInterface;
  */
 class TeamScheduleService implements TeamScheduleServiceInterface
 {
-    /** @phpstan-var \mysqli */
-    private object $db;
+    private \mysqli $db;
 
     private TeamScheduleRepositoryInterface $repository;
 
@@ -29,11 +28,10 @@ class TeamScheduleService implements TeamScheduleServiceInterface
     /**
      * Constructor
      *
-     * @param object $db Database connection
+     * @param \mysqli $db Database connection
      * @param TeamScheduleRepositoryInterface $repository Team schedule repository
-     * @phpstan-param \mysqli $db
      */
-    public function __construct(object $db, TeamScheduleRepositoryInterface $repository)
+    public function __construct(\mysqli $db, TeamScheduleRepositoryInterface $repository)
     {
         $this->db = $db;
         $this->repository = $repository;

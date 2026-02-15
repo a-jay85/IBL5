@@ -14,11 +14,11 @@ use Utilities\HtmlSanitizer;
  * stories/comments/users, pagination, and external search links.
  *
  * @phpstan-import-type SearchPageData from Contracts\SearchViewInterface
- * @phpstan-import-type StoryResult from Contracts\SearchServiceInterface
- * @phpstan-import-type CommentResult from Contracts\SearchServiceInterface
- * @phpstan-import-type UserResult from Contracts\SearchServiceInterface
- * @phpstan-import-type TopicRow from Contracts\SearchServiceInterface
- * @phpstan-import-type CategoryRow from Contracts\SearchServiceInterface
+ * @phpstan-import-type StoryResult from Contracts\SearchRepositoryInterface
+ * @phpstan-import-type CommentResult from Contracts\SearchRepositoryInterface
+ * @phpstan-import-type UserResult from Contracts\SearchRepositoryInterface
+ * @phpstan-import-type TopicRow from Contracts\SearchRepositoryInterface
+ * @phpstan-import-type CategoryRow from Contracts\SearchRepositoryInterface
  *
  * @see SearchViewInterface
  */

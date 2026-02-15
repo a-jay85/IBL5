@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
+use Player\PlayerPageType;
 use Player\PlayerRepository;
 use Player\PlayerStatsRepository;
 use Player\Contracts\PlayerViewInterface;
@@ -41,19 +42,19 @@ class PlayerViewFactory
     public function createView(?int $pageType): object
     {
         return match ($pageType) {
-            \PlayerPageType::OVERVIEW => $this->createOverviewView(),
-            \PlayerPageType::AWARDS_AND_NEWS => $this->createAwardsAndNewsView(),
-            \PlayerPageType::ONE_ON_ONE => $this->createOneOnOneView(),
-            \PlayerPageType::REGULAR_SEASON_TOTALS => $this->createRegularSeasonTotalsView(),
-            \PlayerPageType::REGULAR_SEASON_AVERAGES => $this->createRegularSeasonAveragesView(),
-            \PlayerPageType::PLAYOFF_TOTALS => $this->createPlayoffTotalsView(),
-            \PlayerPageType::PLAYOFF_AVERAGES => $this->createPlayoffAveragesView(),
-            \PlayerPageType::HEAT_TOTALS => $this->createHeatTotalsView(),
-            \PlayerPageType::HEAT_AVERAGES => $this->createHeatAveragesView(),
-            \PlayerPageType::RATINGS_AND_SALARY => $this->createRatingsAndSalaryView(),
-            \PlayerPageType::SIM_STATS => $this->createSimStatsView(),
-            \PlayerPageType::OLYMPIC_TOTALS => $this->createOlympicTotalsView(),
-            \PlayerPageType::OLYMPIC_AVERAGES => $this->createOlympicAveragesView(),
+            PlayerPageType::OVERVIEW => $this->createOverviewView(),
+            PlayerPageType::AWARDS_AND_NEWS => $this->createAwardsAndNewsView(),
+            PlayerPageType::ONE_ON_ONE => $this->createOneOnOneView(),
+            PlayerPageType::REGULAR_SEASON_TOTALS => $this->createRegularSeasonTotalsView(),
+            PlayerPageType::REGULAR_SEASON_AVERAGES => $this->createRegularSeasonAveragesView(),
+            PlayerPageType::PLAYOFF_TOTALS => $this->createPlayoffTotalsView(),
+            PlayerPageType::PLAYOFF_AVERAGES => $this->createPlayoffAveragesView(),
+            PlayerPageType::HEAT_TOTALS => $this->createHeatTotalsView(),
+            PlayerPageType::HEAT_AVERAGES => $this->createHeatAveragesView(),
+            PlayerPageType::RATINGS_AND_SALARY => $this->createRatingsAndSalaryView(),
+            PlayerPageType::SIM_STATS => $this->createSimStatsView(),
+            PlayerPageType::OLYMPIC_TOTALS => $this->createOlympicTotalsView(),
+            PlayerPageType::OLYMPIC_AVERAGES => $this->createOlympicAveragesView(),
             default => $this->createOverviewView(),
         };
     }
@@ -64,7 +65,7 @@ class PlayerViewFactory
     public function createOverviewView(): PlayerOverviewView
     {
         $commonRepo = $this->commonRepository;
-        if ($commonRepo === null && isset($GLOBALS['mysqli_db']) && is_object($GLOBALS['mysqli_db'])) {
+        if ($commonRepo === null && isset($GLOBALS['mysqli_db']) && $GLOBALS['mysqli_db'] instanceof \mysqli) {
             $commonRepo = new CommonMysqliRepository($GLOBALS['mysqli_db']);
         }
         

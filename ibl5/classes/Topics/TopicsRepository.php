@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Topics;
 
 use BaseMysqliRepository;
-use Topics\Contracts\TopicsServiceInterface;
+use Topics\Contracts\TopicsRepositoryInterface;
 
 /**
- * Service class for retrieving news topics with articles.
+ * Repository class for retrieving news topics with articles.
  *
  * Queries the nuke_topics and nuke_stories tables to build a complete
  * view of all active topics with their story counts and recent articles.
@@ -16,25 +16,25 @@ use Topics\Contracts\TopicsServiceInterface;
  * @phpstan-type TopicDbRow array{topicid: int|string, topicname: string, topicimage: string, topictext: string, stories: int|string, total_reads: int|string}
  * @phpstan-type ArticleDbRow array{sid: int|string, catid: int|string, title: string, cat_title: string}
  *
- * @see TopicsServiceInterface
+ * @see TopicsRepositoryInterface
  */
-class TopicsService extends BaseMysqliRepository implements TopicsServiceInterface
+class TopicsRepository extends BaseMysqliRepository implements TopicsRepositoryInterface
 {
     /** @var string Database table prefix */
     private string $prefix;
 
     /**
-     * @param object $db Active mysqli connection
+     * @param \mysqli $db Active mysqli connection
      * @param string $prefix Database table prefix (default: 'nuke')
      */
-    public function __construct(object $db, string $prefix = 'nuke')
+    public function __construct(\mysqli $db, string $prefix = 'nuke')
     {
         parent::__construct($db);
         $this->prefix = $prefix;
     }
 
     /**
-     * @see TopicsServiceInterface::getTopicsWithArticles()
+     * @see TopicsRepositoryInterface::getTopicsWithArticles()
      */
     public function getTopicsWithArticles(): array
     {

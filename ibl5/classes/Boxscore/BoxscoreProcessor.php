@@ -26,15 +26,11 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
     public const DEFAULT_AWAY_NAME = 'Team Away';
     public const DEFAULT_HOME_NAME = 'Team Home';
 
-    /** @phpstan-var \mysqli */
-    protected object $db;
+    protected \mysqli $db;
     protected BoxscoreRepository $repository;
     protected \Season $season;
 
-    /**
-     * @phpstan-param \mysqli $db
-     */
-    public function __construct(object $db, ?BoxscoreRepository $repository = null, ?\Season $season = null)
+    public function __construct(\mysqli $db, ?BoxscoreRepository $repository = null, ?\Season $season = null)
     {
         $this->db = $db;
         $this->repository = $repository ?? new BoxscoreRepository($db);

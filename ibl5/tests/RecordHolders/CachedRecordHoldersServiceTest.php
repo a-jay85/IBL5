@@ -169,7 +169,7 @@ final class CachedRecordHoldersServiceTest extends TestCase
  * Simulates prepare/execute/get_result/fetch_assoc for SELECT, REPLACE, and DELETE
  * queries against the `cache` table.
  */
-class MockCacheDb
+class MockCacheDb extends \mysqli
 {
     /** @var array<string, array{value: string, expiration: int}> */
     private array $cacheStore = [];
@@ -179,6 +179,11 @@ class MockCacheDb
 
     public int $connect_errno = 0;
     public ?string $connect_error = null;
+
+    public function __construct()
+    {
+        // Don't call parent::__construct() to avoid real DB connection
+    }
 
     public function setCacheData(string $key, string $value, int $expiration): void
     {
@@ -203,6 +208,7 @@ class MockCacheDb
     /**
      * @return MockCacheStmt|false
      */
+    #[\ReturnTypeWillChange]
     public function prepare(string $query): MockCacheStmt|false
     {
         if ($this->prepareShouldFail) {

@@ -15,7 +15,7 @@ class StatisticsRepository extends \BaseMysqliRepository
     private string $prefix;
     private string $userPrefix;
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
         

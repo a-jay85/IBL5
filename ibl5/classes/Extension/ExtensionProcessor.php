@@ -7,6 +7,7 @@ namespace Extension;
 use Player\Player;
 use Shared\SalaryConverter;
 use Extension\Contracts\ExtensionProcessorInterface;
+use Team\Contracts\TeamQueryRepositoryInterface;
 
 /**
  * ExtensionProcessor - Processes contract extension offers
@@ -26,24 +27,24 @@ use Extension\Contracts\ExtensionProcessorInterface;
  */
 class ExtensionProcessor implements ExtensionProcessorInterface
 {
-    /** @var \mysqli */
     private \mysqli $db;
     private ExtensionValidator $validator;
     private ExtensionOfferEvaluator $evaluator;
     private ExtensionDatabaseOperations $dbOps;
+    private TeamQueryRepositoryInterface $teamQueryRepo;
 
     /**
      * Constructor
      *
      * @param \mysqli $db mysqli connection
      */
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
-        /** @var \mysqli $db */
         $this->db = $db;
         $this->validator = new ExtensionValidator();
         $this->evaluator = new ExtensionOfferEvaluator();
         $this->dbOps = new ExtensionDatabaseOperations($db);
+        $this->teamQueryRepo = new \Team\TeamQueryRepository($db);
     }
 
     /**
@@ -316,13 +317,13 @@ class ExtensionProcessor implements ExtensionProcessorInterface
                 $stmt->close();
             }
 
-            // Production: Use Team methods to calculate
+            // Production: Use TeamQueryRepository to calculate
             if ($position !== null) {
                 // Get players under contract at this position
-                $posResult = $team->getPlayersUnderContractByPositionResult($position);
+                $posResult = $this->teamQueryRepo->getPlayersUnderContractByPosition($team->name, $position);
 
                 // Calculate total next season salaries
-                return $team->getTotalNextSeasonSalariesFromPlrResult($posResult);
+                return $this->teamQueryRepo->getTotalNextSeasonSalaries($posResult);
             }
 
             return 0;

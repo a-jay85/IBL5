@@ -24,7 +24,7 @@ use Team\Contracts\TeamRepositoryInterface;
  */
 class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInterface
 {
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
     }

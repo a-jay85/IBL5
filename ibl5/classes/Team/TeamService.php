@@ -88,10 +88,10 @@ class TeamService implements TeamServiceInterface
      */
     public function getTableOutput(int $teamID, ?string $yr, string $display): string
     {
-        $sharedFunctions = new \Shared($this->db);
+        $sharedRepository = new \Shared\SharedRepository($this->db);
         $season = new \Season($this->db);
 
-        $isFreeAgencyModuleActive = $sharedFunctions->isFreeAgencyModuleActive();
+        $isFreeAgencyModuleActive = $sharedRepository->isFreeAgencyModuleActive();
 
         if ($teamID === 0) {
             if ($isFreeAgencyModuleActive === 0) {
@@ -146,7 +146,7 @@ class TeamService implements TeamServiceInterface
         }
 
         $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $teamColor1, $teamColor2);
-        $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $sharedFunctions, $starterPids);
+        $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $sharedRepository, $starterPids);
 
         return $switcher->wrap($tableHtml);
     }
@@ -192,7 +192,7 @@ class TeamService implements TeamServiceInterface
      * @param list<PlayerRow>|list<array<string, mixed>> $result
      * @param list<int> $starterPids
      */
-    private function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, \Shared $sharedFunctions, array $starterPids = []): string
+    private function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, \Shared\Contracts\SharedRepositoryInterface $sharedRepository, array $starterPids = []): string
     {
         $yrStr = $yr ?? '';
         switch ($display) {
@@ -207,7 +207,7 @@ class TeamService implements TeamServiceInterface
             case 'playoffs':
                 return \UI::periodAverages($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids);
             case 'contracts':
-                return \UI::contracts($this->db, $result, $team, $sharedFunctions, $starterPids);
+                return \UI::contracts($this->db, $result, $team, $sharedRepository, $starterPids);
             default:
                 return \UI::ratings($this->db, $result, $team, $yrStr, $season, '', $starterPids);
         }

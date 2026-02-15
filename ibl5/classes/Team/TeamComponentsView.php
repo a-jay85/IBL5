@@ -318,7 +318,8 @@ class TeamComponentsView implements TeamComponentsViewInterface
         global $mysqli_db;
         /** @var \mysqli $mysqli_db */
 
-        $resultPicks = $team->getDraftPicksResult();
+        $teamQueryRepo = new \Team\TeamQueryRepository($mysqli_db);
+        $resultPicks = $teamQueryRepo->getDraftPicks($team->name);
 
         $league = new \League($mysqli_db);
         $allTeamsResult = $league->getAllTeamsResult();
@@ -334,7 +335,7 @@ class TeamComponentsView implements TeamComponentsViewInterface
         $tableDraftPicks = '<ul class="draft-picks-list">';
 
         foreach ($resultPicks as $draftPickRow) {
-            $draftPick = new \DraftPick($draftPickRow);
+            $draftPick = new \Draft\DraftPick($draftPickRow);
 
             $draftPickOriginalTeamID = $teamsArray[$draftPick->originalTeam]->teamID;
             /** @var string $draftPickOriginalTeamCity */

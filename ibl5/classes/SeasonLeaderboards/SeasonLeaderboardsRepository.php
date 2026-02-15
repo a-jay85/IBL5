@@ -16,7 +16,7 @@ use SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface;
  */
 class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements SeasonLeaderboardsRepositoryInterface
 {
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
     }

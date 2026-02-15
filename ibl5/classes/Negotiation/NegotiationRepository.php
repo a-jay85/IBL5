@@ -13,7 +13,7 @@ use Negotiation\Contracts\NegotiationRepositoryInterface;
  */
 class NegotiationRepository extends BaseMysqliRepository implements NegotiationRepositoryInterface
 {
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
     }

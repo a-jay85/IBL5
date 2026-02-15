@@ -6,12 +6,13 @@ namespace Trading;
 
 use Trading\Contracts\TradingServiceInterface;
 use Trading\Contracts\TradingRepositoryInterface;
+use Trading\Contracts\TradeCashRepositoryInterface;
 
 /**
  * @see TradingServiceInterface
  *
  * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradingRepositoryInterface
- * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradeCashRepositoryInterface
  * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type TradingDraftPickRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradingRepositoryInterface
@@ -21,15 +22,18 @@ use Trading\Contracts\TradingRepositoryInterface;
 class TradingService implements TradingServiceInterface
 {
     private TradingRepositoryInterface $repository;
+    private TradeCashRepositoryInterface $cashRepository;
     private \Services\CommonMysqliRepository $commonRepository;
-    private object $mysqli_db;
+    private \mysqli $mysqli_db;
 
     public function __construct(
         TradingRepositoryInterface $repository,
         \Services\CommonMysqliRepository $commonRepository,
-        object $mysqli_db
+        \mysqli $mysqli_db,
+        ?TradeCashRepositoryInterface $cashRepository = null
     ) {
         $this->repository = $repository;
+        $this->cashRepository = $cashRepository ?? new TradeCashRepository($mysqli_db);
         $this->commonRepository = $commonRepository;
         $this->mysqli_db = $mysqli_db;
     }
@@ -55,12 +59,12 @@ class TradingService implements TradingServiceInterface
 
         $userPlayers = $this->repository->getTeamPlayersForTrading($userTeamId);
         $userPicks = $this->repository->getTeamDraftPicksForTrading($userTeam);
-        $userCashRecords = $this->repository->getTeamCashRecordsForSalary($userTeamId);
+        $userCashRecords = $this->cashRepository->getTeamCashRecordsForSalary($userTeamId);
         $userFutureSalary = $this->calculateFutureSalaries([...$userPlayers, ...$userCashRecords], $season);
 
         $partnerPlayers = $this->repository->getTeamPlayersForTrading($partnerTeamId);
         $partnerPicks = $this->repository->getTeamDraftPicksForTrading($partnerTeam);
-        $partnerCashRecords = $this->repository->getTeamCashRecordsForSalary($partnerTeamId);
+        $partnerCashRecords = $this->cashRepository->getTeamCashRecordsForSalary($partnerTeamId);
         $partnerFutureSalary = $this->calculateFutureSalaries([...$partnerPlayers, ...$partnerCashRecords], $season);
 
         // Calculate cash exchange year range
@@ -242,7 +246,7 @@ class TradingService implements TradingServiceInterface
      */
     private function resolveCashItems(string $from, string $to, int $offerId, int $seasonEndingYear): array
     {
-        $cashDetails = $this->repository->getCashTransactionByOffer($offerId, $from);
+        $cashDetails = $this->cashRepository->getCashTransactionByOffer($offerId, $from);
         $items = [];
 
         if ($cashDetails !== null) {

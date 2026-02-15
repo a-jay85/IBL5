@@ -10,7 +10,7 @@ declare(strict_types=1);
  *
  * Refactored to use the interface-driven architecture pattern.
  *
- * @see Topics\TopicsService For data retrieval
+ * @see Topics\TopicsRepository For data retrieval
  * @see Topics\TopicsView For HTML rendering
  */
 
@@ -18,7 +18,7 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use Topics\TopicsService;
+use Topics\TopicsRepository;
 use Topics\TopicsView;
 
 $module_name = basename(dirname(__FILE__));
@@ -36,7 +36,7 @@ $themePath = (is_dir("themes/{$ThemeSel}/images/topics/"))
     : (string) $tipath;
 
 // Initialize services
-$service = new TopicsService($mysqli_db, $prefix);
+$service = new TopicsRepository($mysqli_db, $prefix);
 $view = new TopicsView();
 
 // Get topics data

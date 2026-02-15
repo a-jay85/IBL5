@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
-use Tests\Integration\Mocks\TestDataFactory;
 use Tests\Integration\Mocks\MockDatabase;
 
 /**
@@ -162,30 +161,4 @@ abstract class IntegrationTestCase extends TestCase
         return $count;
     }
 
-    /**
-     * Setup common player data for tests
-     * @deprecated Use TestDataFactory::createPlayer() instead
-     */
-    protected function setupMockPlayer(array $overrides = []): array
-    {
-        return TestDataFactory::createPlayer($overrides);
-    }
-
-    /**
-     * Setup common team data for tests
-     * @deprecated Use TestDataFactory::createTeam() instead
-     */
-    protected function setupMockTeam(array $overrides = []): array
-    {
-        return TestDataFactory::createTeam($overrides);
-    }
-
-    /**
-     * Setup common season data for tests
-     * @deprecated Use TestDataFactory::createSeason() instead
-     */
-    protected function setupMockSeason(array $overrides = []): array
-    {
-        return TestDataFactory::createSeason($overrides);
-    }
 }

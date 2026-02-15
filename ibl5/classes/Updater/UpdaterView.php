@@ -141,12 +141,9 @@ class UpdaterView
             return '';
         }
 
-        return '<details class="updater-log">'
-            . '<summary class="updater-log__toggle">View log output</summary>'
-            . '<div class="updater-log__content">'
+        return '<div class="updater-log">'
             . '<div class="updater-log__body">' . $trimmed . '</div>'
-            . '</div>'
-            . '</details>';
+            . '</div>';
     }
 
     /**

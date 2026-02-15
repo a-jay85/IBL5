@@ -114,14 +114,13 @@ class UpdaterViewTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $result);
     }
 
-    public function testRenderLogShowsCollapsibleTerminal(): void
+    public function testRenderLogShowsTerminalBlock(): void
     {
         $result = $this->view->renderLog("UPDATE ibl_schedule SET ...\nDone.");
 
         $this->assertStringContainsString('updater-log', $result);
-        $this->assertStringContainsString('<details', $result);
-        $this->assertStringContainsString('View log output', $result);
         $this->assertStringContainsString('updater-log__body', $result);
+        $this->assertStringNotContainsString('<details', $result);
     }
 
     public function testRenderLogReturnsEmptyStringForEmptyOutput(): void

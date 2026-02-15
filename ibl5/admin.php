@@ -87,6 +87,7 @@ if ($the_first == 0) {
     die();
 }
 
+// Admin login via AuthService (delight-im/auth session-based)
 if (isset($aid) && (preg_match('/[^a-zA-Z0-9_-]/', trim($aid)))) {
     die("Begone");
 }
@@ -100,55 +101,37 @@ if ((isset($aid)) && (isset($pwd)) && (isset($op)) && ($op == "login")) {
         Header("Location: " . $admin_file . ".php");
         die();
     }
+    // CSRF validation for admin login
+    if (!\Utilities\CsrfGuard::validateSubmittedToken('admin_login')) {
+        Header("Location: " . $admin_file . ".php");
+        die();
+    }
     if (!empty($aid) and !empty($pwd)) {
-        $pwd = md5($pwd);
-        $result = $db->sql_query("SELECT pwd, admlanguage FROM " . $prefix . "_authors WHERE aid='$aid'");
-        list($rpwd, $admlanguage) = $db->sql_fetchrow($result);
-        $admlanguage = addslashes($admlanguage);
-        if ($rpwd == $pwd) {
-            $admin = base64_encode("$aid:$pwd:$admlanguage");
-            // SECURITY: Use secure cookie options
-            $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-                || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
-            setcookie("admin", $admin, [
-                'expires' => time() + 2592000,
-                'path' => '/',
-                'secure' => $isHttps,
-                'httponly' => true,
-                'samesite' => 'Strict',
-            ]);
+        // Authenticate via AuthService (session-based, no more MD5 cookies)
+        if ($authService->attempt($aid, $pwd) && $authService->isAdmin()) {
             unset($op);
+        } else {
+            // Login failed or user is not an admin
+            $authService->logout();
         }
     }
 }
 
 $admintest = 0;
 
-if (isset($admin) && !empty($admin)) {
-    $admin = addslashes(base64_decode($admin));
-    $admin = explode(":", $admin);
-    $aid = addslashes($admin[0]);
-    $pwd = $admin[1];
-    $admlanguage = $admin[2];
-    if (empty($aid) or empty($pwd)) {
-        $admintest = 0;
-        $alert = "<html>\n";
-        $alert .= "<title>INTRUDER ALERT!!!</title>\n";
-        $alert .= "<body bgcolor=\"#FFFFFF\" text=\"#000000\">\n\n<br><br><br>\n\n";
-        $alert .= "<center><img src=\"images/eyes.gif\" border=\"0\"><br><br>\n";
-        $alert .= "<font face=\"Verdana\" size=\"+4\"><b>Get Out!</b></font></center>\n";
-        $alert .= "</body>\n";
-        $alert .= "</html>\n";
-        die($alert);
-    }
-    $aid = substr($aid, 0, 25);
-    $result2 = $db->sql_query("SELECT name, pwd FROM " . $prefix . "_authors WHERE aid='$aid'");
-    if (!$result2) {
-        die("Selection from database failed!");
-    } else {
-        list($rname, $rpwd) = $db->sql_fetchrow($result2);
-        if ($rpwd == $pwd && !empty($rpwd)) {
-            $admintest = 1;
+// Session-based admin validation via AuthService
+if ($authService->isAuthenticated() && $authService->isAdmin()) {
+    $admintest = 1;
+    $aid = $authService->getUsername() ?? '';
+    // Look up admin language preference from nuke_authors (if still present)
+    $admlanguage = '';
+    $rname = '';
+    $authorResult = $db->sql_query("SELECT name, admlanguage FROM " . $prefix . "_authors WHERE aid='" . addslashes($aid) . "'");
+    if ($authorResult) {
+        $authorRow = $db->sql_fetchrow($authorResult);
+        if ($authorRow !== null && $authorRow !== false) {
+            $rname = $authorRow['name'] ?? $authorRow[0] ?? '';
+            $admlanguage = $authorRow['admlanguage'] ?? $authorRow[1] ?? '';
         }
     }
 }
@@ -188,6 +171,7 @@ function login()
     }
     echo "<tr><td>"
         . "<input type=\"hidden\" NAME=\"random_num\" value=\"$random_num\">"
+        . \Utilities\CsrfGuard::generateToken('admin_login') . ""
         . "<input type=\"hidden\" NAME=\"op\" value=\"login\">"
         . "<input type=\"submit\" VALUE=\"" . _LOGIN . "\">"
         . "</td></tr></table>"
@@ -475,14 +459,7 @@ if ($admintest) {
             break;
 
         case "logout":
-            // SECURITY: Clear cookie with proper options
-            setcookie("admin", "", [
-                'expires' => 1,
-                'path' => '/',
-                'secure' => (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
-                'httponly' => true,
-                'samesite' => 'Strict',
-            ]);
+            $authService->logout();
             $admin = "";
             Nuke\Header::header();
             OpenTable();

@@ -36,6 +36,7 @@ class ModuleAccessControl
      * @var list<string>
      */
     private const TRIVIA_HIDDEN_MODULES = [
+        'CareerLeaderboards',
         'Player',
         'SeasonLeaderboards',
     ];

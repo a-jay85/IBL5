@@ -288,187 +288,6 @@
 }
 
 /* ==========================================================================
-   Injury Report Block
-   ========================================================================== */
-
-.injury-block {
-    width: 100%;
-    max-width: 1400px;
-    margin: 0 auto var(--space-8);
-    font-family: var(--font-sans);
-    background: white;
-    border-radius: var(--radius-xl);
-    overflow: hidden;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--gray-100);
-}
-
-.injury-block__header {
-    background: linear-gradient(135deg, #dc2626, #b91c1c);
-    padding: var(--space-4) var(--space-6);
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-}
-
-.injury-block__icon {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: var(--radius-md);
-    color: white;
-}
-
-.injury-block__title {
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: white;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin: 0;
-}
-
-.injury-block__description {
-    padding: var(--space-3) var(--space-6);
-    background: #fef2f2;
-    border-bottom: 1px solid #fecaca;
-    font-size: 1.125rem;
-    color: #991b1b;
-}
-
-/* Responsive Table */
-.injury-table {
-    width: 100%;
-    border: 1px solid var(--gray-200, #e5e7eb);
-    border-collapse: collapse;
-}
-
-.injury-table th {
-    background: var(--gray-50);
-    padding: var(--space-3) var(--space-4);
-    text-align: left;
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--gray-500);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--gray-200);
-}
-
-.injury-table td {
-    padding: var(--space-3) var(--space-4);
-    border-bottom: 1px solid var(--gray-100);
-    font-size: 1.125rem;
-    color: var(--navy-800);
-}
-
-.injury-table tr:last-child td {
-    border-bottom: none;
-}
-
-.injury-table tr:hover td {
-    background: var(--gray-50);
-}
-
-.injury-table__team-name {
-    font-weight: 600;
-    color: var(--navy-900);
-}
-
-.injury-table__count {
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: 1rem;
-}
-
-.injury-table__count--warning {
-    color: #dc2626;
-}
-
-.injury-table__count--ok {
-    color: #16a34a;
-}
-
-.injury-table__status {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-full);
-    font-size: 1rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.injury-table__status--yes {
-    background: #fef2f2;
-    color: #dc2626;
-}
-
-.injury-table__status--no {
-    background: #f0fdf4;
-    color: #16a34a;
-}
-
-/* Mobile Cards for Injury Table */
-@media (max-width: 640px) {
-    .injury-block {
-        max-width: 100%;
-        overflow: hidden;
-    }
-
-    .injury-table,
-    .injury-table thead,
-    .injury-table tbody,
-    .injury-table th,
-    .injury-table td,
-    .injury-table tr {
-        display: block;
-        width: 100%;
-    }
-
-    .injury-table thead {
-        display: none;
-    }
-
-    .injury-table tr {
-        padding: var(--space-3);
-        border-bottom: 1px solid var(--gray-200);
-    }
-
-    .injury-table td {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: var(--space-1) 0;
-        border: none;
-        width: 100%;
-        box-sizing: border-box;
-    }
-
-    .injury-table td::before {
-        content: attr(data-label);
-        font-size: 1rem;
-        font-weight: 600;
-        color: var(--gray-500);
-        text-transform: uppercase;
-        letter-spacing: 0.02em;
-        flex-shrink: 0;
-    }
-
-    .injury-table__team-name,
-    .injury-table__count,
-    .injury-table__status {
-        text-align: right;
-    }
-}
-
-/* ==========================================================================
    News/Transactions Block
    ========================================================================== */
 
@@ -663,35 +482,7 @@
     margin-top: 0;
 }
 
-.ibl-title--large {
-    font-size: 2rem;
-    letter-spacing: 0.025em;
-    margin-bottom: var(--space-6);
-    padding-bottom: var(--space-4);
-    border-bottom: 2px solid var(--gray-200);
-    display: block;
-    position: relative;
-}
-
-.ibl-title--large::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    left: 0;
-    width: 60px;
-    height: 2px;
-    background: var(--accent-500);
-}
-
-.ibl-title--centered {
-    text-align: center;
-    display: block;
-    border-bottom: none;
-    padding-bottom: 0;
-    margin-bottom: var(--space-4);
-}
-
-/* .ibl-section-title removed — use .ibl-title--large instead */
+/* .ibl-title--large, .ibl-title--centered, .ibl-section-title removed — unused */
 
 /* ==========================================================================
    Responsive Grid Layouts
@@ -707,10 +498,6 @@
     grid-template-columns: repeat(3, 1fr);
 }
 
-.ibl-grid--2col {
-    grid-template-columns: repeat(2, 1fr);
-}
-
 @media (max-width: 1024px) {
     .ibl-grid--3col {
         grid-template-columns: repeat(2, 1fr);
@@ -718,8 +505,7 @@
 }
 
 @media (max-width: 640px) {
-    .ibl-grid--3col,
-    .ibl-grid--2col {
+    .ibl-grid--3col {
         grid-template-columns: 1fr;
     }
 }
@@ -1335,17 +1121,6 @@ a.schedule-jump-btn:hover {
     margin: 0 auto;
 }
 
-.next-sim-title {
-    font-family: var(--font-display);
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--navy-900);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    text-align: center;
-    margin-bottom: var(--space-6);
-}
-
 .next-sim-empty {
     text-align: center;
     color: var(--gray-500);
@@ -1427,14 +1202,6 @@ a.schedule-jump-btn:hover {
 /* ==========================================================================
    Contact List Module
    ========================================================================== */
-
-.contact-description {
-    font-family: var(--font-sans);
-    font-size: 1.125rem;
-    color: var(--gray-600);
-    text-align: center;
-    margin: 0 0 1.5rem 0;
-}
 
 /* Contact table overrides moved to tables.css */
 
@@ -1530,14 +1297,6 @@ html:has(.depth-chart-form) {
     aspect-ratio: 415 / 50;
     height: auto;
     margin: 0 auto 1rem;
-}
-
-.text-error {
-    color: var(--error-600);
-}
-
-.text-success {
-    color: var(--success-600);
 }
 
 .font-bold {

@@ -77,7 +77,7 @@ set_exception_handler(function (\Throwable $exception) use ($view): void {
         'Uncaught Exception',
         (string) $safeMessage . ' in ' . (string) $safeFile . ' on line ' . $exception->getLine()
     );
-    echo $view->renderLog((string) $safeTrace);
+    echo $view->renderLog('<pre>' . (string) $safeTrace . '</pre>');
     flush();
 });
 
@@ -185,7 +185,7 @@ try {
     $safeTrace = \Utilities\HtmlSanitizer::safeHtmlOutput($e->getTraceAsString());
 
     echo $view->renderStepError('Exception', (string) $safeMessage);
-    echo $view->renderLog((string) $safeTrace);
+    echo $view->renderLog('<pre>' . (string) $safeTrace . '</pre>');
     echo $view->renderSummary($successCount, $errorCount);
     flush();
 }

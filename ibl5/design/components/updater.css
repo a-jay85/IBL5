@@ -178,7 +178,7 @@
     overflow: hidden;
 }
 
-.updater-log__pre {
+.updater-log__body {
     font-family: var(--font-mono, monospace);
     font-size: 0.75rem;
     color: #94a3b8;
@@ -187,8 +187,30 @@
     padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
     max-height: 300px;
     overflow-y: auto;
-    white-space: pre-wrap;
     word-break: break-word;
+}
+
+/* --- Rendered HTML inside log body --- */
+
+.updater-log__body p {
+    margin: 0.25em 0;
+}
+
+.updater-log__body b,
+.updater-log__body strong {
+    color: #e2e8f0;
+    font-weight: 600;
+}
+
+.updater-log__body font[color="red"],
+.updater-log__body .text-error {
+    color: #f87171;
+}
+
+.updater-log__body pre {
+    margin: 0.5em 0;
+    white-space: pre-wrap;
+    color: #94a3b8;
 }
 
 /* ==========================================================================

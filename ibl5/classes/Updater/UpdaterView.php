@@ -128,7 +128,10 @@ class UpdaterView
     /**
      * Render captured output in a collapsible terminal-style log area
      *
-     * @param string $capturedOutput Raw output captured via ob_get_clean()
+     * Output is rendered as HTML (not escaped) because it originates from
+     * trusted internal updater classes, not from user input.
+     *
+     * @param string $capturedOutput Raw HTML output captured via ob_get_clean()
      * @return string HTML log area (empty string if no output)
      */
     public function renderLog(string $capturedOutput): string
@@ -138,13 +141,10 @@ class UpdaterView
             return '';
         }
 
-        /** @var string $safeOutput */
-        $safeOutput = HtmlSanitizer::safeHtmlOutput($trimmed);
-
         return '<details class="updater-log">'
             . '<summary class="updater-log__toggle">View log output</summary>'
             . '<div class="updater-log__content">'
-            . '<pre class="updater-log__pre">' . $safeOutput . '</pre>'
+            . '<div class="updater-log__body">' . $trimmed . '</div>'
             . '</div>'
             . '</details>';
     }

@@ -121,7 +121,7 @@ class UpdaterViewTest extends TestCase
         $this->assertStringContainsString('updater-log', $result);
         $this->assertStringContainsString('<details', $result);
         $this->assertStringContainsString('View log output', $result);
-        $this->assertStringContainsString('updater-log__pre', $result);
+        $this->assertStringContainsString('updater-log__body', $result);
     }
 
     public function testRenderLogReturnsEmptyStringForEmptyOutput(): void
@@ -130,12 +130,11 @@ class UpdaterViewTest extends TestCase
         $this->assertSame('', $this->view->renderLog('   '));
     }
 
-    public function testRenderLogEscapesHtmlInOutput(): void
+    public function testRenderLogRendersHtmlFromTrustedUpdaters(): void
     {
-        $result = $this->view->renderLog('<b>bold</b> & "quotes"');
+        $result = $this->view->renderLog('<p>Updating the ibl_schedule database table...</p>');
 
-        $this->assertStringNotContainsString('<b>bold</b>', $result);
-        $this->assertStringContainsString('&lt;b&gt;', $result);
+        $this->assertStringContainsString('<p>Updating the ibl_schedule database table...</p>', $result);
     }
 
     public function testRenderSummaryAllSuccess(): void

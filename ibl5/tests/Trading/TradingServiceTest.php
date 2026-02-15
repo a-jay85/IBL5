@@ -173,7 +173,7 @@ class TradingServiceTest extends TestCase
     public function testGetTradeReviewPageDataReturnsEmptyOffersWhenNoneExist(): void
     {
         $mockRepo = $this->createMock(TradingRepositoryInterface::class);
-        $mockCashRepo = $this->createMock(TradeCashRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createMock(\Services\CommonMysqliRepository::class);
 
         $mockCommon->expects($this->atLeastOnce())->method('getTeamnameFromUsername')
@@ -196,7 +196,7 @@ class TradingServiceTest extends TestCase
     public function testGetTradeReviewPageDataFiltersToUserTeamOnly(): void
     {
         $mockRepo = $this->createMock(TradingRepositoryInterface::class);
-        $mockCashRepo = $this->createMock(TradeCashRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createMock(\Services\CommonMysqliRepository::class);
 
         $mockCommon->expects($this->atLeastOnce())->method('getTeamnameFromUsername')
@@ -223,7 +223,7 @@ class TradingServiceTest extends TestCase
     public function testGetTradeReviewPageDataSetsHasHammerCorrectly(): void
     {
         $mockRepo = $this->createMock(TradingRepositoryInterface::class);
-        $mockCashRepo = $this->createMock(TradeCashRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createMock(\Services\CommonMysqliRepository::class);
 
         $mockCommon->expects($this->atLeastOnce())->method('getTeamnameFromUsername')
@@ -250,7 +250,7 @@ class TradingServiceTest extends TestCase
     public function testGetTradeReviewPageDataBuildsTeamListExcludingFreeAgents(): void
     {
         $mockRepo = $this->createMock(TradingRepositoryInterface::class);
-        $mockCashRepo = $this->createMock(TradeCashRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
         $mockCommon = $this->createMock(\Services\CommonMysqliRepository::class);
 
         $mockCommon->expects($this->atLeastOnce())->method('getTeamnameFromUsername')

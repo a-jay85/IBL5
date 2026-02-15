@@ -4,31 +4,31 @@ declare(strict_types=1);
 
 namespace Tests\Search;
 
-use Search\Contracts\SearchServiceInterface;
-use Search\SearchService;
+use Search\Contracts\SearchRepositoryInterface;
+use Search\SearchRepository;
 use Tests\Integration\IntegrationTestCase;
 
 /**
- * @covers \Search\SearchService
+ * @covers \Search\SearchRepository
  */
-class SearchServiceTest extends IntegrationTestCase
+class SearchRepositoryTest extends IntegrationTestCase
 {
-    private SearchService $service;
+    private SearchRepository $repository;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new SearchService($this->mockDb);
+        $this->repository = new SearchRepository($this->mockDb);
     }
 
-    public function testImplementsServiceInterface(): void
+    public function testImplementsRepositoryInterface(): void
     {
-        $this->assertInstanceOf(SearchServiceInterface::class, $this->service);
+        $this->assertInstanceOf(SearchRepositoryInterface::class, $this->repository);
     }
 
     public function testSearchStoriesReturnsEmptyForShortQuery(): void
     {
-        $result = $this->service->searchStories('ab');
+        $result = $this->repository->searchStories('ab');
 
         $this->assertSame([], $result['results']);
         $this->assertFalse($result['hasMore']);
@@ -51,7 +51,7 @@ class SearchServiceTest extends IntegrationTestCase
             ],
         ]);
 
-        $result = $this->service->searchStories('trade');
+        $result = $this->repository->searchStories('trade');
 
         $this->assertCount(1, $result['results']);
         $this->assertSame(1, $result['results'][0]['sid']);
@@ -79,7 +79,7 @@ class SearchServiceTest extends IntegrationTestCase
         }
         $this->mockDb->setMockData($rows);
 
-        $result = $this->service->searchStories('article');
+        $result = $this->repository->searchStories('article');
 
         $this->assertTrue($result['hasMore']);
         $this->assertCount(10, $result['results']);
@@ -87,7 +87,7 @@ class SearchServiceTest extends IntegrationTestCase
 
     public function testSearchCommentsReturnsEmptyForShortQuery(): void
     {
-        $result = $this->service->searchComments('ab');
+        $result = $this->repository->searchComments('ab');
 
         $this->assertSame([], $result['results']);
         $this->assertFalse($result['hasMore']);
@@ -107,7 +107,7 @@ class SearchServiceTest extends IntegrationTestCase
             ],
         ]);
 
-        $result = $this->service->searchComments('test');
+        $result = $this->repository->searchComments('test');
 
         $this->assertCount(1, $result['results']);
         $this->assertSame('Test Comment', $result['results'][0]['subject']);
@@ -116,7 +116,7 @@ class SearchServiceTest extends IntegrationTestCase
 
     public function testSearchUsersReturnsEmptyForShortQuery(): void
     {
-        $result = $this->service->searchUsers('ab');
+        $result = $this->repository->searchUsers('ab');
 
         $this->assertSame([], $result['results']);
     }
@@ -131,7 +131,7 @@ class SearchServiceTest extends IntegrationTestCase
             ],
         ]);
 
-        $result = $this->service->searchUsers('test');
+        $result = $this->repository->searchUsers('test');
 
         $this->assertCount(1, $result['results']);
         $this->assertSame('testuser', $result['results'][0]['username']);
@@ -143,7 +143,7 @@ class SearchServiceTest extends IntegrationTestCase
             ['topicid' => 1, 'topictext' => 'Basketball'],
         ]);
 
-        $result = $this->service->getTopics();
+        $result = $this->repository->getTopics();
 
         $this->assertCount(1, $result);
         $this->assertSame(1, $result[0]['topicId']);
@@ -156,7 +156,7 @@ class SearchServiceTest extends IntegrationTestCase
             ['catid' => 2, 'title' => 'Trades'],
         ]);
 
-        $result = $this->service->getCategories();
+        $result = $this->repository->getCategories();
 
         $this->assertCount(1, $result);
         $this->assertSame(2, $result[0]['catId']);
@@ -170,7 +170,7 @@ class SearchServiceTest extends IntegrationTestCase
             ['aid' => 'editor'],
         ]);
 
-        $result = $this->service->getAuthors();
+        $result = $this->repository->getAuthors();
 
         $this->assertSame(['admin', 'editor'], $result);
     }
@@ -181,7 +181,7 @@ class SearchServiceTest extends IntegrationTestCase
             ['topicimage' => 'basketball.gif', 'topictext' => 'Basketball'],
         ]);
 
-        $result = $this->service->getTopicInfo(1);
+        $result = $this->repository->getTopicInfo(1);
 
         $this->assertNotNull($result);
         $this->assertSame('basketball.gif', $result['topicImage']);
@@ -192,7 +192,7 @@ class SearchServiceTest extends IntegrationTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $result = $this->service->getTopicInfo(999);
+        $result = $this->repository->getTopicInfo(999);
 
         $this->assertNull($result);
     }

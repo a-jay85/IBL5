@@ -6,6 +6,7 @@ namespace Tests\Player;
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
+use Player\PlayerPageType;
 use Player\Views\PlayerViewFactory;
 use Player\PlayerRepository;
 use Player\PlayerStatsRepository;
@@ -66,91 +67,91 @@ class PlayerViewFactoryTest extends TestCase
 
     public function testCreateViewReturnsOverviewViewForOverviewPageType(): void
     {
-        $view = $this->factory->createView(\PlayerPageType::OVERVIEW);
+        $view = $this->factory->createView(PlayerPageType::OVERVIEW);
         
         $this->assertInstanceOf(PlayerOverviewView::class, $view);
     }
 
     public function testCreateViewReturnsSimStatsViewForSimStatsPageType(): void
     {
-        $view = $this->factory->createView(\PlayerPageType::SIM_STATS);
+        $view = $this->factory->createView(PlayerPageType::SIM_STATS);
         
         $this->assertInstanceOf(PlayerSimStatsView::class, $view);
     }
 
     public function testCreateViewReturnsRegularSeasonTotalsViewForRegularSeasonTotalsPageType(): void
     {
-        $view = $this->factory->createView(\PlayerPageType::REGULAR_SEASON_TOTALS);
+        $view = $this->factory->createView(PlayerPageType::REGULAR_SEASON_TOTALS);
         
         $this->assertInstanceOf(PlayerRegularSeasonTotalsView::class, $view);
     }
 
     public function testCreateViewReturnsRegularSeasonAveragesViewForRegularSeasonAveragesPageType(): void
     {
-        $view = $this->factory->createView(\PlayerPageType::REGULAR_SEASON_AVERAGES);
+        $view = $this->factory->createView(PlayerPageType::REGULAR_SEASON_AVERAGES);
         
         $this->assertInstanceOf(PlayerRegularSeasonAveragesView::class, $view);
     }
 
     public function testCreateViewReturnsPlayoffTotalsViewForPlayoffTotalsPageType(): void
     {
-        $view = $this->factory->createView(\PlayerPageType::PLAYOFF_TOTALS);
+        $view = $this->factory->createView(PlayerPageType::PLAYOFF_TOTALS);
         
         $this->assertInstanceOf(PlayerPlayoffTotalsView::class, $view);
     }
 
     public function testCreateViewReturnsPlayoffAveragesViewForPlayoffAveragesPageType(): void
     {
-        $view = $this->factory->createView(\PlayerPageType::PLAYOFF_AVERAGES);
+        $view = $this->factory->createView(PlayerPageType::PLAYOFF_AVERAGES);
         
         $this->assertInstanceOf(PlayerPlayoffAveragesView::class, $view);
     }
 
     public function testCreateViewReturnsHeatTotalsViewForHeatTotalsPageType(): void
     {
-        $view = $this->factory->createView(\PlayerPageType::HEAT_TOTALS);
+        $view = $this->factory->createView(PlayerPageType::HEAT_TOTALS);
         
         $this->assertInstanceOf(PlayerHeatTotalsView::class, $view);
     }
 
     public function testCreateViewReturnsHeatAveragesViewForHeatAveragesPageType(): void
     {
-        $view = $this->factory->createView(\PlayerPageType::HEAT_AVERAGES);
+        $view = $this->factory->createView(PlayerPageType::HEAT_AVERAGES);
         
         $this->assertInstanceOf(PlayerHeatAveragesView::class, $view);
     }
 
     public function testCreateViewReturnsOlympicTotalsViewForOlympicTotalsPageType(): void
     {
-        $view = $this->factory->createView(\PlayerPageType::OLYMPIC_TOTALS);
+        $view = $this->factory->createView(PlayerPageType::OLYMPIC_TOTALS);
         
         $this->assertInstanceOf(PlayerOlympicTotalsView::class, $view);
     }
 
     public function testCreateViewReturnsOlympicAveragesViewForOlympicAveragesPageType(): void
     {
-        $view = $this->factory->createView(\PlayerPageType::OLYMPIC_AVERAGES);
+        $view = $this->factory->createView(PlayerPageType::OLYMPIC_AVERAGES);
         
         $this->assertInstanceOf(PlayerOlympicAveragesView::class, $view);
     }
 
     public function testCreateViewReturnsRatingsAndSalaryViewForRatingsAndSalaryPageType(): void
     {
-        $view = $this->factory->createView(\PlayerPageType::RATINGS_AND_SALARY);
+        $view = $this->factory->createView(PlayerPageType::RATINGS_AND_SALARY);
         
         $this->assertInstanceOf(PlayerRatingsAndSalaryView::class, $view);
     }
 
     public function testCreateViewReturnsAwardsAndNewsViewForAwardsAndNewsPageType(): void
     {
-        $view = $this->factory->createView(\PlayerPageType::AWARDS_AND_NEWS);
+        $view = $this->factory->createView(PlayerPageType::AWARDS_AND_NEWS);
         
         $this->assertInstanceOf(PlayerAwardsAndNewsView::class, $view);
     }
 
     public function testCreateViewReturnsOneOnOneViewForOneOnOnePageType(): void
     {
-        $view = $this->factory->createView(\PlayerPageType::ONE_ON_ONE);
+        $view = $this->factory->createView(PlayerPageType::ONE_ON_ONE);
         
         $this->assertInstanceOf(PlayerOneOnOneView::class, $view);
     }

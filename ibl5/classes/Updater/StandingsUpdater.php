@@ -34,7 +34,7 @@ use Utilities\StandingsGrouper;
 class StandingsUpdater extends \BaseMysqliRepository {
     private \Season $season;
 
-    public function __construct(object $db, \Season $season) {
+    public function __construct(\mysqli $db, \Season $season) {
         parent::__construct($db);
         $this->season = $season;
     }

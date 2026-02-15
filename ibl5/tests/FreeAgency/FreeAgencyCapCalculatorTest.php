@@ -3,6 +3,7 @@
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyCapCalculator;
+use Team\Contracts\TeamQueryRepositoryInterface;
 
 /**
  * Comprehensive tests for FreeAgencyCapCalculator
@@ -19,12 +20,16 @@ class FreeAgencyCapCalculatorTest extends TestCase
     private $mockDb;
     private FreeAgencyCapCalculator $calculator;
 
+    /** @var TeamQueryRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private TeamQueryRepositoryInterface $mockTeamQueryRepo;
+
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
+        $this->mockTeamQueryRepo = $this->createMock(TeamQueryRepositoryInterface::class);
         $mockTeam = $this->createMockTeam();
         $mockSeason = $this->createMock(\Season::class);
-        $this->calculator = new FreeAgencyCapCalculator($this->mockDb, $mockTeam, $mockSeason);
+        $this->calculator = new FreeAgencyCapCalculator($this->mockDb, $mockTeam, $mockSeason, $this->mockTeamQueryRepo);
     }
 
     /**
@@ -34,16 +39,16 @@ class FreeAgencyCapCalculatorTest extends TestCase
     public function testCalculateTeamCapMetricsReturnsAllRequiredKeys(): void
     {
         // Arrange - Team is already set up in setUp()
-        
+
         // Act
         $result = $this->calculator->calculateTeamCapMetrics();
-        
+
         // Assert - All required keys present
         $this->assertArrayHasKey('totalSalaries', $result);
         $this->assertArrayHasKey('softCapSpace', $result);
         $this->assertArrayHasKey('hardCapSpace', $result);
         $this->assertArrayHasKey('rosterSpots', $result);
-        
+
         // Assert arrays contain 6 years
         $this->assertCount(6, $result['totalSalaries']);
         $this->assertCount(6, $result['softCapSpace']);
@@ -58,13 +63,14 @@ class FreeAgencyCapCalculatorTest extends TestCase
     public function testCalculateTeamCapMetricsWithNoPlayers(): void
     {
         // Arrange - Team with no players under contract
-        $team = $this->createMockTeamWithPlayers([]);
+        $team = $this->createMockTeamEntity();
         $mockSeason = $this->createMock(\Season::class);
-        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason);
-        
+        $mockTeamQueryRepo = $this->createMockTeamQueryRepo([], []);
+        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
+
         // Act
         $result = $calculator->calculateTeamCapMetrics();
-        
+
         // Assert - Should have full cap space and max roster spots
         $this->assertEquals(0, $result['totalSalaries'][0]);
         $this->assertEquals(League::SOFT_CAP_MAX, $result['softCapSpace'][0]);
@@ -90,19 +96,20 @@ class FreeAgencyCapCalculatorTest extends TestCase
                 'offer6' => 0,
             ]
         ];
-        
-        $team = $this->createMockTeamWithPlayersAndOffers($players, $offers);
+
+        $team = $this->createMockTeamEntity();
         $mockSeason = $this->createMock(\Season::class);
-        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason);
-        
+        $mockTeamQueryRepo = $this->createMockTeamQueryRepo($players, $offers);
+        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
+
         // Act
         $result = $calculator->calculateTeamCapMetrics();
-        
+
         // Assert - Offers should count toward cap and roster spots
         $this->assertEquals(800, $result['totalSalaries'][0]);
         $this->assertEquals(850, $result['totalSalaries'][1]);
         $this->assertEquals(900, $result['totalSalaries'][2]);
-        
+
         $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][0]);
         $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][1]);
         $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][2]);
@@ -116,10 +123,10 @@ class FreeAgencyCapCalculatorTest extends TestCase
     public function testHardCapIsAlwaysGreaterThanSoftCap(): void
     {
         // Arrange - Team is already set up in setUp()
-        
+
         // Act
         $result = $this->calculator->calculateTeamCapMetrics();
-        
+
         // Assert
         for ($i = 0; $i < 6; $i++) {
             $this->assertGreaterThan(
@@ -137,16 +144,16 @@ class FreeAgencyCapCalculatorTest extends TestCase
     public function testCalculateTeamCapMetricsWithExcludedPlayerReturnsAllRequiredKeys(): void
     {
         // Arrange - Team is already set up in setUp()
-        
+
         // Act
         $result = $this->calculator->calculateTeamCapMetrics('Test Player');
-        
+
         // Assert
         $this->assertArrayHasKey('totalSalaries', $result);
         $this->assertArrayHasKey('softCapSpace', $result);
         $this->assertArrayHasKey('hardCapSpace', $result);
         $this->assertArrayHasKey('rosterSpots', $result);
-        
+
         // Assert arrays contain 6 years
         $this->assertCount(6, $result['totalSalaries']);
         $this->assertCount(6, $result['softCapSpace']);
@@ -161,13 +168,14 @@ class FreeAgencyCapCalculatorTest extends TestCase
     public function testCalculateTeamCapMetricsExcludesPlayerOffer(): void
     {
         // Arrange - Set up mock team with offer for specific player
-        $team = $this->createMockTeamWithOfferToExclude('Test Player', 1000);
+        $team = $this->createMockTeamEntity();
         $mockSeason = $this->createMock(\Season::class);
-        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason);
-        
+        $mockTeamQueryRepo = $this->createMockTeamQueryRepo([], []);
+        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
+
         // Act
         $result = $calculator->calculateTeamCapMetrics('Test Player');
-        
+
         // Assert - Cap space should not include the excluded player's offer
         $this->assertIsInt($result['softCapSpace'][0]);
         $this->assertIsArray($result['rosterSpots']);
@@ -181,16 +189,16 @@ class FreeAgencyCapCalculatorTest extends TestCase
     public function testCapSpaceHardCapExceedsSoftCapByBuffer(): void
     {
         // Arrange - Team is already set up in setUp()
-        
+
         // Act
         $result = $this->calculator->calculateTeamCapMetrics('Test Player');
-        
+
         // Assert
         $buffer = League::HARD_CAP_MAX - League::SOFT_CAP_MAX;
-        
+
         for ($i = 0; $i < 6; $i++) {
             $expectedHardCap = $result['softCapSpace'][$i] + $buffer;
-            
+
             $this->assertEquals(
                 $expectedHardCap,
                 $result['hardCapSpace'][$i],
@@ -202,67 +210,47 @@ class FreeAgencyCapCalculatorTest extends TestCase
     // Helper Methods
 
     /**
-     * Create a basic mock team with no players or offers
+     * Create a basic mock team with no players or offers (used by setUp)
      */
-    private function createMockTeam()
+    private function createMockTeam(): \Team
     {
         $team = $this->createMock(Team::class);
         $team->name = 'Test Team';
-        
-        $team->method('getRosterUnderContractOrderedByOrdinalResult')
+        $team->teamID = 1;
+
+        $this->mockTeamQueryRepo->method('getRosterUnderContractOrderedByOrdinal')
             ->willReturn([]);
-        
-        $team->method('getFreeAgencyOffersResult')
+        $this->mockTeamQueryRepo->method('getFreeAgencyOffers')
             ->willReturn([]);
-        
+
         return $team;
     }
 
     /**
-     * Create a mock team with specific players
+     * Create a mock Team entity (just properties, no methods)
      */
-    private function createMockTeamWithPlayers(array $players)
-    {
-        $team = $this->createMock(Team::class);
-        $team->name = 'Test Team';
-        
-        $team->method('getRosterUnderContractOrderedByOrdinalResult')
-            ->willReturn($players);
-        
-        $team->method('getFreeAgencyOffersResult')
-            ->willReturn([]);
-        
-        return $team;
-    }
-
-    /**
-     * Create a mock team with specific players and offers
-     */
-    private function createMockTeamWithPlayersAndOffers(array $players, array $offers)
-    {
-        $team = $this->createMock(Team::class);
-        $team->name = 'Test Team';
-        
-        $team->method('getRosterUnderContractOrderedByOrdinalResult')
-            ->willReturn($players);
-        
-        $team->method('getFreeAgencyOffersResult')
-            ->willReturn($offers);
-        
-        return $team;
-    }
-
-    private function createMockTeamWithOfferToExclude(string $excludePlayerName, int $offerAmount): \Team
+    private function createMockTeamEntity(): \Team
     {
         $team = $this->createMock(\Team::class);
         $team->name = 'Test Team';
-        
-        $team->method('getRosterUnderContractOrderedByOrdinalResult')
-            ->willReturn([]);
-        
-        $team->method('getFreeAgencyOffersResult')
-            ->willReturn([]);
-        
+        $team->teamID = 1;
         return $team;
+    }
+
+    /**
+     * Create a mock TeamQueryRepository with specific roster and offers data
+     *
+     * @param list<array<string, mixed>> $players
+     * @param list<array<string, mixed>> $offers
+     * @return TeamQueryRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject
+     */
+    private function createMockTeamQueryRepo(array $players, array $offers): TeamQueryRepositoryInterface
+    {
+        $mock = $this->createMock(TeamQueryRepositoryInterface::class);
+        $mock->method('getRosterUnderContractOrderedByOrdinal')
+            ->willReturn($players);
+        $mock->method('getFreeAgencyOffers')
+            ->willReturn($offers);
+        return $mock;
     }
 }

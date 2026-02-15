@@ -6,6 +6,7 @@ namespace NextSim;
 
 use NextSim\Contracts\NextSimServiceInterface;
 use Player\Player;
+use Team\Contracts\TeamQueryRepositoryInterface;
 use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 
 /**
@@ -19,22 +20,23 @@ use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
  */
 class NextSimService implements NextSimServiceInterface
 {
-    /** @phpstan-var \mysqli */
-    private object $db;
+    private \mysqli $db;
 
     private TeamScheduleRepositoryInterface $teamScheduleRepository;
+
+    private TeamQueryRepositoryInterface $teamQueryRepo;
 
     /**
      * Constructor
      *
-     * @param object $db Database connection
+     * @param \mysqli $db Database connection
      * @param TeamScheduleRepositoryInterface $teamScheduleRepository Team schedule repository
-     * @phpstan-param \mysqli $db
      */
-    public function __construct(object $db, TeamScheduleRepositoryInterface $teamScheduleRepository)
+    public function __construct(\mysqli $db, TeamScheduleRepositoryInterface $teamScheduleRepository)
     {
         $this->db = $db;
         $this->teamScheduleRepository = $teamScheduleRepository;
+        $this->teamQueryRepo = new \Team\TeamQueryRepository($db);
     }
 
     /**
@@ -85,7 +87,7 @@ class NextSimService implements NextSimServiceInterface
         $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
 
         foreach ($positions as $position) {
-            $playerId = $team->getCurrentlySetStarterPlayerIDForPosition($position);
+            $playerId = $this->teamQueryRepo->getCurrentlySetStarterPlayerIDForPosition($team->teamID, $position);
             $starters[$position] = Player::withPlayerID($this->db, $playerId);
         }
 
@@ -104,7 +106,7 @@ class NextSimService implements NextSimServiceInterface
         $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
 
         foreach ($positions as $position) {
-            $playerId = $opposingTeam->getLastSimStarterPlayerIDForPosition($position);
+            $playerId = $this->teamQueryRepo->getLastSimStarterPlayerIDForPosition($opposingTeam->teamID, $position);
             $starters[$position] = Player::withPlayerID($this->db, $playerId);
         }
 

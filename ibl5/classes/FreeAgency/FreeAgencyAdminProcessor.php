@@ -4,40 +4,29 @@ declare(strict_types=1);
 
 namespace FreeAgency;
 
-use BaseMysqliRepository;
 use FreeAgency\Contracts\FreeAgencyAdminProcessorInterface;
+use FreeAgency\Contracts\FreeAgencyAdminRepositoryInterface;
 use Player\Player;
 
 /**
  * Processes admin free agency operations
  *
- * Handles the administrative workflow for processing free agency day results
- * with secure prepared statements for all database operations.
+ * Handles the administrative workflow for processing free agency day results.
+ * Database operations are delegated to FreeAgencyAdminRepository.
  *
  * @see FreeAgencyAdminProcessorInterface
  *
- * @phpstan-type OfferRow array{
- *     name: string,
- *     team: string,
- *     pid: int,
- *     offer1: int,
- *     offer2: int,
- *     offer3: int,
- *     offer4: int,
- *     offer5: int,
- *     offer6: int,
- *     bird: int,
- *     MLE: int,
- *     LLE: int,
- *     random: int,
- *     perceivedvalue: float
- * }
+ * @phpstan-import-type OfferRow from FreeAgencyAdminRepositoryInterface
  */
-class FreeAgencyAdminProcessor extends BaseMysqliRepository implements FreeAgencyAdminProcessorInterface
+class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
 {
-    public function __construct(object $db)
+    private FreeAgencyAdminRepositoryInterface $repository;
+    private \mysqli $db;
+
+    public function __construct(FreeAgencyAdminRepositoryInterface $repository, \mysqli $db)
     {
-        parent::__construct($db);
+        $this->repository = $repository;
+        $this->db = $db;
     }
 
     /**
@@ -46,13 +35,7 @@ class FreeAgencyAdminProcessor extends BaseMysqliRepository implements FreeAgenc
     public function processDay(int $day): array
     {
         // Get all offers with bird years, ordered by player then perceived value
-        $offers = $this->fetchAll(
-            "SELECT ibl_fa_offers.*, ibl_plr.bird, ibl_plr.pid
-             FROM ibl_fa_offers
-             JOIN ibl_plr ON ibl_fa_offers.name = ibl_plr.name
-             ORDER BY ibl_fa_offers.name ASC, ibl_fa_offers.perceivedvalue DESC",
-            ""
-        );
+        $offers = $this->repository->getAllOffersWithBirdYears();
 
         $signings = [];
         $rejections = [];
@@ -63,7 +46,6 @@ class FreeAgencyAdminProcessor extends BaseMysqliRepository implements FreeAgenc
         $discordText = '';
 
         $processedPlayers = [];
-        $lastPlayerName = '';
 
         foreach ($offers as $row) {
             /** @var OfferRow $row */
@@ -186,8 +168,6 @@ class FreeAgencyAdminProcessor extends BaseMysqliRepository implements FreeAgenc
                 $offeringTeamDiscordId = (string) ($offeringTeam->discordID ?? '');
                 $discordText .= $this->buildOfferLine($offeringTeamName, $offer1, $offer2, $offer3, $offer4, $offer5, $offer6, $offeringTeamDiscordId);
             }
-
-            $lastPlayerName = $playerName;
         }
 
         return [
@@ -216,31 +196,17 @@ class FreeAgencyAdminProcessor extends BaseMysqliRepository implements FreeAgenc
 
         foreach ($signings as $signing) {
             // Update player contract
-            $affected = $this->execute(
-                "UPDATE ibl_plr
-                 SET cy = 0,
-                     cy1 = ?,
-                     cy2 = ?,
-                     cy3 = ?,
-                     cy4 = ?,
-                     cy5 = ?,
-                     cy6 = ?,
-                     teamname = ?,
-                     cyt = ?,
-                     tid = ?
-                 WHERE pid = ?
-                 LIMIT 1",
-                "iiiiiisiii",
+            $affected = $this->repository->updatePlayerContract(
+                $signing['playerId'],
+                $signing['teamName'],
+                $signing['teamId'],
+                $signing['offerYears'],
                 $signing['offers']['offer1'],
                 $signing['offers']['offer2'],
                 $signing['offers']['offer3'],
                 $signing['offers']['offer4'],
                 $signing['offers']['offer5'],
-                $signing['offers']['offer6'],
-                $signing['teamName'],
-                $signing['offerYears'],
-                $signing['teamId'],
-                $signing['playerId']
+                $signing['offers']['offer6']
             );
 
             if ($affected > 0) {
@@ -251,36 +217,18 @@ class FreeAgencyAdminProcessor extends BaseMysqliRepository implements FreeAgenc
 
             // Mark MLE as used if applicable
             if ($signing['usedMle']) {
-                $this->execute(
-                    "UPDATE ibl_team_info SET HasMLE = 0 WHERE team_name = ? LIMIT 1",
-                    "s",
-                    $signing['teamName']
-                );
+                $this->repository->markMleUsed($signing['teamName']);
             }
 
             // Mark LLE as used if applicable
             if ($signing['usedLle']) {
-                $this->execute(
-                    "UPDATE ibl_team_info SET HasLLE = 0 WHERE team_name = ? LIMIT 1",
-                    "s",
-                    $signing['teamName']
-                );
+                $this->repository->markLleUsed($signing['teamName']);
             }
         }
 
         // Insert news story if there were signings
         if ($successCount > 0 && $newsHomeText !== '' && $newsBodyText !== '') {
-            $currentTime = date('Y-m-d H:i:s');
-            $affected = $this->execute(
-                "INSERT INTO nuke_stories
-                 (catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, ihome, alanguage, acomm, haspoll, pollID, associated)
-                 VALUES (8, 'chibul', ?, ?, ?, ?, 0, 0, 29, 'chibul', '', 0, 'english', 0, 0, 0, '29-')",
-                "ssss",
-                $newsTitle,
-                $currentTime,
-                $newsHomeText,
-                $newsBodyText
-            );
+            $affected = $this->repository->insertNewsStory($newsTitle, $newsHomeText, $newsBodyText);
 
             if ($affected > 0) {
                 $successCount++;
@@ -318,8 +266,7 @@ class FreeAgencyAdminProcessor extends BaseMysqliRepository implements FreeAgenc
      */
     public function clearOffers(): array
     {
-        // Use DELETE instead of TRUNCATE for prepared statement compatibility
-        $this->execute("DELETE FROM ibl_fa_offers", "");
+        $this->repository->clearAllOffers();
 
         return [
             'success' => true,
@@ -359,15 +306,13 @@ class FreeAgencyAdminProcessor extends BaseMysqliRepository implements FreeAgenc
 
     /**
      * Get player demands adjusted for the current day
+     *
+     * Fetches raw demand data from repository and applies the day-adjusted
+     * demand calculation formula.
      */
     private function getPlayerDemands(string $playerName, int $day): float
     {
-        /** @var array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int}|null $demRow */
-        $demRow = $this->fetchOne(
-            "SELECT dem1, dem2, dem3, dem4, dem5, dem6 FROM ibl_demands WHERE name = ?",
-            "s",
-            $playerName
-        );
+        $demRow = $this->repository->getPlayerDemands($playerName);
 
         if ($demRow === null) {
             return 0.0;

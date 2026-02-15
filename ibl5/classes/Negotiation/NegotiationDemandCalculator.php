@@ -25,7 +25,7 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
     private const RAW_SCORE_BASELINE = 700; // Sam Mack's baseline score
     private const DEMANDS_FACTOR = 3; // Trial-and-error multiplier
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         $this->repository = new NegotiationRepository($db);
     }

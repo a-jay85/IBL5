@@ -78,11 +78,18 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
      */
     public function resetSimContractExtensionAttempts(): void
     {
+        echo '<p>Resetting sim contract extension attempts...<p>';
+
         try {
             $this->execute(
                 "UPDATE ibl_team_info SET Used_Extension_This_Chunk = 0",
                 ""
             );
+            \UI::displayDebugOutput(
+                "UPDATE ibl_team_info SET Used_Extension_This_Chunk = 0",
+                'Reset Sim Contract Extension Attempts SQL Query'
+            );
+            echo '<p>Sim contract extension attempts have been reset.<p>';
         } catch (\Exception $e) {
             $errorMessage = 'Failed to reset sim contract extension attempts: ' . $e->getMessage();
             error_log("[Shared] Database error: {$errorMessage}");

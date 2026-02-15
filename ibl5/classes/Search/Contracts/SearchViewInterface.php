@@ -10,11 +10,11 @@ namespace Search\Contracts;
  * Defines methods for rendering the search page including the form,
  * results, and pagination.
  *
- * @phpstan-import-type StoryResult from SearchServiceInterface
- * @phpstan-import-type CommentResult from SearchServiceInterface
- * @phpstan-import-type UserResult from SearchServiceInterface
- * @phpstan-import-type TopicRow from SearchServiceInterface
- * @phpstan-import-type CategoryRow from SearchServiceInterface
+ * @phpstan-import-type StoryResult from SearchRepositoryInterface
+ * @phpstan-import-type CommentResult from SearchRepositoryInterface
+ * @phpstan-import-type UserResult from SearchRepositoryInterface
+ * @phpstan-import-type TopicRow from SearchRepositoryInterface
+ * @phpstan-import-type CategoryRow from SearchRepositoryInterface
  *
  * @phpstan-type SearchPageData array{
  *     query: string,

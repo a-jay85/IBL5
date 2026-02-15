@@ -13,9 +13,9 @@ use Cache\Contracts\DatabaseCacheInterface;
  */
 class DatabaseCache implements DatabaseCacheInterface
 {
-    private object $db;
+    private \mysqli $db;
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
     }
@@ -27,9 +27,7 @@ class DatabaseCache implements DatabaseCacheInterface
      */
     public function get(string $key): ?array
     {
-        /** @var \mysqli $db */
-        $db = $this->db;
-        $stmt = $db->prepare("SELECT `value`, `expiration` FROM `cache` WHERE `key` = ?");
+        $stmt = $this->db->prepare("SELECT `value`, `expiration` FROM `cache` WHERE `key` = ?");
         if ($stmt === false) {
             return null;
         }
@@ -77,9 +75,7 @@ class DatabaseCache implements DatabaseCacheInterface
             return;
         }
 
-        /** @var \mysqli $db */
-        $db = $this->db;
-        $stmt = $db->prepare("REPLACE INTO `cache` (`key`, `value`, `expiration`) VALUES (?, ?, ?)");
+        $stmt = $this->db->prepare("REPLACE INTO `cache` (`key`, `value`, `expiration`) VALUES (?, ?, ?)");
         if ($stmt === false) {
             return;
         }
@@ -95,9 +91,7 @@ class DatabaseCache implements DatabaseCacheInterface
      */
     public function delete(string $key): void
     {
-        /** @var \mysqli $db */
-        $db = $this->db;
-        $stmt = $db->prepare("DELETE FROM `cache` WHERE `key` = ?");
+        $stmt = $this->db->prepare("DELETE FROM `cache` WHERE `key` = ?");
         if ($stmt === false) {
             return;
         }

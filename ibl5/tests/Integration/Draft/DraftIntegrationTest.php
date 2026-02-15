@@ -7,6 +7,7 @@ namespace Tests\Integration\Draft;
 use Tests\Integration\IntegrationTestCase;
 use Tests\Integration\Mocks\TestDataFactory;
 use Draft\DraftSelectionHandler;
+use Shared\Contracts\SharedRepositoryInterface;
 
 /**
  * Integration tests for complete draft selection workflows
@@ -26,26 +27,22 @@ use Draft\DraftSelectionHandler;
 class DraftIntegrationTest extends IntegrationTestCase
 {
     private DraftSelectionHandler $handler;
-    private object $mockSharedFunctions;
-    private object $mockSeason;
+    private SharedRepositoryInterface $mockSharedFunctions;
+    private \Season $mockSeason;
 
     protected function setUp(): void
     {
         parent::setUp();
         
-        // Create mock SharedFunctions
-        $this->mockSharedFunctions = new class {
-            public function getCurrentOwnerOfDraftPick(int $year, int $round, int $pick): ?string
-            {
-                return 'Miami Cyclones';
-            }
-        };
+        // Create mock SharedRepository
+        $mock = $this->createMock(SharedRepositoryInterface::class);
+        $mock->method('getCurrentOwnerOfDraftPick')->willReturn('Miami Cyclones');
+        $this->mockSharedFunctions = $mock;
 
         // Create mock Season
-        $this->mockSeason = new class {
-            public int $endingYear = 2025;
-            public string $freeAgencyNotificationsState = 'Off';
-        };
+        $this->mockSeason = $this->createStub(\Season::class);
+        $this->mockSeason->endingYear = 2025;
+        $this->mockSeason->freeAgencyNotificationsState = 'Off';
 
         $this->handler = new DraftSelectionHandler(
             $this->mockDb,

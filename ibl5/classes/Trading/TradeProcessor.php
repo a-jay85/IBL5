@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Trading;
 
 use Trading\Contracts\TradeProcessorInterface;
+use Trading\Contracts\TradeCashRepositoryInterface;
+use Trading\Contracts\TradeExecutionRepositoryInterface;
 
 /**
  * TradeProcessor - Executes trades
@@ -15,31 +17,31 @@ use Trading\Contracts\TradeProcessorInterface;
  * @see TradeProcessorInterface
  *
  * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradingRepositoryInterface
- * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradeCashRepositoryInterface
  * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class TradeProcessor implements TradeProcessorInterface
 {
-    /** @phpstan-var \mysqli */
-    protected object $db;
+    protected \mysqli $db;
     protected TradingRepository $repository;
+    protected TradeCashRepositoryInterface $cashRepository;
+    protected TradeExecutionRepositoryInterface $executionRepository;
     protected \Services\CommonMysqliRepository $commonRepository;
     protected \Season $season;
     protected CashTransactionHandler $cashHandler;
     protected \Services\NewsService $newsService;
     protected ?\Discord $discord;
 
-    /**
-     * @phpstan-param \mysqli $db
-     */
-    public function __construct(object $db, ?TradingRepository $repository = null)
+    public function __construct(\mysqli $db, ?TradingRepository $repository = null)
     {
         $this->db = $db;
         $this->repository = $repository ?? new TradingRepository($db);
+        $this->cashRepository = new TradeCashRepository($db);
+        $this->executionRepository = new TradeExecutionRepository($db);
         $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $this->season = new \Season($db);
-        $this->cashHandler = new CashTransactionHandler($db, $this->repository);
+        $this->cashHandler = new CashTransactionHandler($db, $this->repository, $this->cashRepository);
         $this->newsService = new \Services\NewsService($db);
 
         // Initialize Discord with error handling
@@ -146,8 +148,8 @@ class TradeProcessor implements TradeProcessorInterface
     {
         $uniquePid = $this->cashHandler->generateUniquePid($itemId);
 
-        // Get cash details from repository
-        $cashDetails = $this->repository->getCashTransactionByOffer($offerId, $offeringTeamName);
+        // Get cash details from cash repository
+        $cashDetails = $this->cashRepository->getCashTransactionByOffer($offerId, $offeringTeamName);
 
         if ($cashDetails === null) {
             return ['success' => false, 'tradeLine' => ''];
@@ -270,7 +272,7 @@ class TradeProcessor implements TradeProcessorInterface
                 'team_name' => $teamName,
                 'team_id' => $teamId,
             ];
-            $this->repository->insertTradeQueue('player_transfer', $params, $tradeLine);
+            $this->executionRepository->insertTradeQueue('player_transfer', $params, $tradeLine);
         }
     }
 
@@ -289,16 +291,16 @@ class TradeProcessor implements TradeProcessorInterface
                 'pick_id' => $pickId,
                 'new_owner' => $newOwner,
             ];
-            $this->repository->insertTradeQueue('pick_transfer', $params, $tradeLine);
+            $this->executionRepository->insertTradeQueue('pick_transfer', $params, $tradeLine);
         }
     }
 
     /**
      * Create news story for the trade
-     * 
+     *
      * Creates a news story with category ID 2 (Trade News) and topic ID 31 (IBL News).
      * Also sends email notification in production.
-     * 
+     *
      * @param string $storytitle Story title
      * @param string $storytext Story text with full trade details
      * @return void
@@ -309,10 +311,10 @@ class TradeProcessor implements TradeProcessorInterface
         // Topic ID 31 is typically 'IBL News' or general league news
         $categoryID = 2;
         $topicID = 31;
-        
+
         // NewsService handles escaping internally, so pass raw strings
         $this->newsService->createNewsStory($categoryID, $topicID, $storytitle, $storytext);
-        
+
         // Send email notification
         if ($_SERVER['SERVER_NAME'] !== "localhost") {
             $recipient = 'ibldepthcharts@gmail.com';
@@ -324,9 +326,9 @@ class TradeProcessor implements TradeProcessorInterface
 
     /**
      * Send notifications (Discord, email) for the trade
-     * 
+     *
      * Posts trade announcement to Discord #trades and #general-chat channels.
-     * 
+     *
      * @param string $offeringTeamName Offering team
      * @param string $listeningTeamName Listening team
      * @param string $storytext Full story text with trade details

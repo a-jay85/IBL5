@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 /**
  * Season - IBL season information and configuration
- * 
- * Extends BaseMysqliRepository for standardized database access.
- * Provides season phase, dates, settings, and configuration.
- * 
+ *
+ * Entity class providing season phase, dates, settings, and configuration.
+ * Database queries are delegated to SeasonQueryRepository.
+ *
  * @property string $phase Current season phase
  * @property int $beginningYear Season beginning year
  * @property int $endingYear Season ending year
@@ -22,10 +22,8 @@ declare(strict_types=1);
  * @property string $allowTrades Allow trades status
  * @property string $allowWaivers Allow waivers status
  * @property string $freeAgencyNotificationsState Free agency notifications state
- * 
- * @see BaseMysqliRepository For base class documentation and error codes
  */
-class Season extends BaseMysqliRepository
+class Season
 {
     public string $phase;
 
@@ -64,18 +62,21 @@ class Season extends BaseMysqliRepository
     const IBL_ALL_STAR_BREAK_END_DAY = 4;     // Feb 4 - last day with no regular season games
     const IBL_POST_ALL_STAR_FIRST_DAY = 5;    // Feb 5 - first valid sim day after break
 
+    private \mysqli $db;
+    private Season\Contracts\SeasonQueryRepositoryInterface $queryRepo;
+
     /**
      * Constructor - initializes season data from database
-     * 
+     *
      * @param \mysqli $db Active mysqli connection
-     * @throws \RuntimeException If connection is invalid (error code 1002)
      */
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
-        parent::__construct($db);
+        $this->db = $db;
+        $this->queryRepo = new Season\SeasonQueryRepository($db);
 
         // Bulk-fetch all needed settings in a single query
-        $settings = $this->getBulkSettings([
+        $settings = $this->queryRepo->getBulkSettings([
             'Current Season Phase',
             'Current Season Ending Year',
             'Allow Trades',
@@ -93,9 +94,9 @@ class Season extends BaseMysqliRepository
         $this->playoffsStartDate = new \DateTime("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-01");
         $this->playoffsEndDate = new \DateTime("$this->endingYear-" . Season::IBL_PLAYOFF_MONTH . "-30");
 
-        $this->lastRegularSeasonGameDate = $this->getLastRegularSeasonGameDate();
+        $this->lastRegularSeasonGameDate = $this->queryRepo->getLastRegularSeasonGameDate($this->endingYear);
 
-        $arrayLastSimDates = $this->getLastSimDatesArray();
+        $arrayLastSimDates = $this->queryRepo->getLastSimDatesArray();
         $this->lastSimNumber = $arrayLastSimDates["Sim"];
         $this->lastSimStartDate = $arrayLastSimDates["Start Date"];
         $this->lastSimEndDate = $arrayLastSimDates["End Date"];
@@ -118,15 +119,13 @@ class Season extends BaseMysqliRepository
      */
     public function getPhaseSpecificSimNumber(): int
     {
-        return $this->calculatePhaseSimNumber($this->lastSimNumber, $this->phase, $this->endingYear);
+        return $this->queryRepo->calculatePhaseSimNumber($this->lastSimNumber, $this->phase, $this->endingYear);
     }
 
     /**
      * Calculate phase-specific sim number for any sim/phase/season combination
      *
-     * Counts sims within the phase's date range up to the given overall sim number.
-     * Uses `End Date` (not `Start Date`) because the first sim of a phase can have
-     * a Start Date in the prior phase's month.
+     * Delegates to SeasonQueryRepository.
      *
      * @param int $overallSimNumber The overall sim number to calculate for
      * @param string $phase The season phase
@@ -135,157 +134,38 @@ class Season extends BaseMysqliRepository
      */
     public function calculatePhaseSimNumber(int $overallSimNumber, string $phase, int $seasonYear): int
     {
-        $beginningYear = $seasonYear - 1;
-
-        switch ($phase) {
-            case 'Preseason':
-                $phaseStartDate = sprintf('%d-%02d-01', self::IBL_PRESEASON_YEAR, self::IBL_REGULAR_SEASON_STARTING_MONTH);
-                $phaseEndDate = sprintf('%d-%02d-30', self::IBL_PRESEASON_YEAR + 1, self::IBL_REGULAR_SEASON_ENDING_MONTH);
-                break;
-            case 'HEAT':
-                $phaseStartDate = sprintf('%d-%02d-01', $beginningYear, self::IBL_HEAT_MONTH);
-                $phaseEndDate = sprintf('%d-%02d-30', $beginningYear, self::IBL_HEAT_MONTH);
-                break;
-            case 'Playoffs':
-                $phaseStartDate = sprintf('%d-%02d-01', $seasonYear, self::IBL_PLAYOFF_MONTH);
-                $phaseEndDate = sprintf('%d-%02d-30', $seasonYear, self::IBL_PLAYOFF_MONTH);
-                break;
-            default: // Regular Season (and fallback for other phases)
-                $phaseStartDate = sprintf('%d-%02d-01', $beginningYear, self::IBL_REGULAR_SEASON_STARTING_MONTH);
-                $phaseEndDate = sprintf('%d-%02d-30', $seasonYear, self::IBL_REGULAR_SEASON_ENDING_MONTH);
-                break;
-        }
-
-        /** @var array{cnt: int}|null $result */
-        $result = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM ibl_sim_dates WHERE `End Date` BETWEEN ? AND ? AND Sim <= ?",
-            "ssi",
-            $phaseStartDate,
-            $phaseEndDate,
-            $overallSimNumber
-        );
-
-        $phaseSimNumber = $result['cnt'] ?? 0;
-
-        // Fallback to overall sim number for non-game phases (Draft, Free Agency, etc.)
-        return $phaseSimNumber > 0 ? $phaseSimNumber : $overallSimNumber;
-    }
-
-    /**
-     * Bulk-fetch multiple settings in a single query
-     *
-     * @param list<string> $names Setting names to fetch
-     * @return array<string, string> Map of setting name → value
-     */
-    private function getBulkSettings(array $names): array
-    {
-        $placeholders = implode(',', array_fill(0, count($names), '?'));
-        $types = str_repeat('s', count($names));
-
-        /** @var list<array{name: string, value: string}> $rows */
-        $rows = $this->fetchAll(
-            "SELECT name, value FROM ibl_settings WHERE name IN ({$placeholders})",
-            $types,
-            ...$names
-        );
-
-        /** @var array<string, string> $map */
-        $map = [];
-        foreach ($rows as $row) {
-            $map[$row['name']] = $row['value'];
-        }
-
-        return $map;
-    }
-
-    /**
-     * Get current season phase
-     * 
-     * @return string Current season phase (e.g., 'Regular Season', 'Playoffs', 'Free Agency')
-     */
-    public function getSeasonPhase(): string
-    {
-        /** @var array{value: string}|null $result */
-        $result = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
-            "s",
-            "Current Season Phase"
-        );
-
-        return $result['value'] ?? '';
-    }
-
-    /**
-     * Get season ending year
-     * 
-     * @return string Season ending year (e.g., '2024')
-     */
-    public function getSeasonEndingYear(): string
-    {
-        /** @var array{value: string}|null $result */
-        $result = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
-            "s",
-            "Current Season Ending Year"
-        );
-
-        return $result['value'] ?? '';
+        return $this->queryRepo->calculatePhaseSimNumber($overallSimNumber, $phase, $seasonYear);
     }
 
     /**
      * Get first box score date
-     * 
+     *
+     * Delegates to SeasonQueryRepository.
+     *
      * @return string First box score date from database
      */
     public function getFirstBoxScoreDate(): string
     {
-        /** @var array{Date: string}|null $result */
-        $result = $this->fetchOne(
-            "SELECT Date FROM ibl_box_scores ORDER BY Date ASC LIMIT 1"
-        );
-
-        return $result['Date'] ?? '';
+        return $this->queryRepo->getFirstBoxScoreDate();
     }
 
     /**
      * Get last box score date
-     * 
+     *
+     * Delegates to SeasonQueryRepository.
+     *
      * @return string Last box score date from database
      */
     public function getLastBoxScoreDate(): string
     {
-        /** @var array{Date: string}|null $result */
-        $result = $this->fetchOne(
-            "SELECT Date FROM ibl_box_scores ORDER BY Date DESC LIMIT 1"
-        );
-
-        return $result['Date'] ?? '';
-    }
-
-    /**
-     * Get last sim dates array
-     *
-     * Returns the most recent simulation date range from ibl_sim_dates.
-     * Note: 'Start Date' and 'End Date' columns are DATE type in schema.
-     *
-     * @return array{Sim: int, 'Start Date': string, 'End Date': string}
-     */
-    public function getLastSimDatesArray(): array
-    {
-        /** @var array{Sim: int, 'Start Date': string, 'End Date': string}|null $result */
-        $result = $this->fetchOne(
-            "SELECT * FROM ibl_sim_dates ORDER BY sim DESC LIMIT 1"
-        );
-
-        return $result ?? ['Sim' => 0, 'Start Date' => '', 'End Date' => ''];
+        return $this->queryRepo->getLastBoxScoreDate();
     }
 
     /**
      * Set last sim dates array
-     * 
-     * Inserts a new simulation date range into ibl_sim_dates.
-     * Note: 'Start Date' and 'End Date' columns are DATE type in schema.
-     * 
+     *
+     * Delegates to SeasonQueryRepository.
+     *
      * @param string $newSimNumber New sim number
      * @param string $newSimStartDate New sim start date (YYYY-MM-DD format)
      * @param string $newSimEndDate New sim end date (YYYY-MM-DD format)
@@ -293,35 +173,7 @@ class Season extends BaseMysqliRepository
      */
     public function setLastSimDatesArray(string $newSimNumber, string $newSimStartDate, string $newSimEndDate): int
     {
-        return $this->execute(
-            "INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES (?, ?, ?)",
-            "sss",
-            $newSimNumber,
-            $newSimStartDate,
-            $newSimEndDate
-        );
-    }
-
-    /**
-     * Get the last regular season game date from the schedule
-     *
-     * Fetches MAX(Date) from ibl_schedule before the playoffs start date.
-     * Used to detect the RS-to-Playoffs gap for sim date projections.
-     *
-     * @return string|null Last RS game date (YYYY-MM-DD), or null if no schedule data
-     */
-    private function getLastRegularSeasonGameDate(): ?string
-    {
-        $playoffsStart = sprintf('%d-%02d-01', $this->endingYear, self::IBL_PLAYOFF_MONTH);
-
-        /** @var array{max_date: string|null}|null $result */
-        $result = $this->fetchOne(
-            "SELECT MAX(Date) AS max_date FROM ibl_schedule WHERE Date < ?",
-            "s",
-            $playoffsStart
-        );
-
-        return ($result !== null && $result['max_date'] !== null) ? $result['max_date'] : null;
+        return $this->queryRepo->setLastSimDatesArray($newSimNumber, $newSimStartDate, $newSimEndDate);
     }
 
     /**
@@ -372,56 +224,5 @@ class Season extends BaseMysqliRepository
         }
 
         return $projectedNextSimEndDate;
-    }
-
-    /**
-     * Get allow trades status
-     * 
-     * @return string Status of allowing trades ('Yes' or 'No')
-     */
-    public function getAllowTradesStatus(): string
-    {
-        /** @var array{value: string}|null $result */
-        $result = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
-            "s",
-            "Allow Trades"
-        );
-
-        return $result['value'] ?? '';
-    }
-
-    /**
-     * Get allow waivers status
-     * 
-     * @return string Status of allowing waivers ('Yes' or 'No')
-     */
-    public function getAllowWaiversStatus(): string
-    {
-        /** @var array{value: string}|null $result */
-        $result = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
-            "s",
-            "Allow Waiver Moves"
-        );
-
-        return $result['value'] ?? '';
-    }
-
-    /**
-     * Get free agency notifications state
-     * 
-     * @return string State of free agency notifications ('On' or 'Off')
-     */
-    public function getFreeAgencyNotificationsState(): string
-    {
-        /** @var array{value: string}|null $result */
-        $result = $this->fetchOne(
-            "SELECT value FROM ibl_settings WHERE name = ? LIMIT 1",
-            "s",
-            "Free Agency Notifications"
-        );
-
-        return $result['value'] ?? '';
     }
 }

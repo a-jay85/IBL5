@@ -10,7 +10,7 @@ declare(strict_types=1);
  *
  * Refactored to use the interface-driven architecture pattern.
  *
- * @see Search\SearchService For data retrieval
+ * @see Search\SearchRepository For data retrieval
  * @see Search\SearchView For HTML rendering
  */
 
@@ -18,7 +18,7 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-use Search\SearchService;
+use Search\SearchRepository;
 use Search\SearchView;
 
 $module_name = basename(dirname(__FILE__));
@@ -48,7 +48,7 @@ if ($query !== '' && strlen($query) < 3) {
 $pagetitle = "- " . _SEARCH;
 
 // Initialize services
-$service = new SearchService($mysqli_db, $prefix, $user_prefix);
+$service = new SearchRepository($mysqli_db, $prefix, $user_prefix);
 $view = new SearchView();
 
 // Get topic context for header display

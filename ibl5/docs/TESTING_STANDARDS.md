@@ -1,13 +1,13 @@
 # IBL5 Testing Standards
 
-**Purpose:** Comprehensive testing guidelines for PHPUnit 12.4+ in the IBL5 codebase.  
+**Purpose:** Comprehensive testing guidelines for PHPUnit 13+ in the IBL5 codebase.  
 **When to reference:** Writing tests, reviewing test code, setting up test infrastructure.
 
 ---
 
 ## Testing Requirements
 
-- **Framework**: PHPUnit 12.4+ compatibility required
+- **Framework**: PHPUnit 13+ compatibility required
 - **Test Location**: All tests in `ibl5/tests/` directory
 - **PR Completion Criteria**: No warnings or failures allowed
 - Always run the full test suite before stopping work on a PR
@@ -234,11 +234,11 @@ private InterfaceName $mockObject;
 
 ---
 
-## PHPUnit 12.x Command Syntax
+## PHPUnit 13.x Command Syntax
 
-**PHPUnit 12.x has different options than older versions. Key differences:**
+**PHPUnit 13.x has different options than older versions. Key differences:**
 
-### ❌ WRONG - These do NOT exist in PHPUnit 12.x:
+### ❌ WRONG - These do NOT exist in PHPUnit 13.x:
 ```bash
 vendor/bin/phpunit -v                      # Unknown option "-v"
 vendor/bin/phpunit --verbose               # Unknown option "--verbose"
@@ -271,7 +271,7 @@ vendor/bin/phpunit --coverage-html dir     # HTML coverage report
 vendor/bin/phpunit --help                  # Show all available options
 ```
 
-**Important:** PHPUnit 12.x does NOT have `-v`/`--verbose`. Use `--display-all-issues` to see issue details.
+**Important:** PHPUnit 13.x does NOT have `-v`/`--verbose`. Use `--display-all-issues` to see issue details.
 
 **Reference:** Check available options with `vendor/bin/phpunit --help`.
 

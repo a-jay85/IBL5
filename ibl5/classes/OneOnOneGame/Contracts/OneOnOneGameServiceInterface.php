@@ -18,15 +18,6 @@ use OneOnOneGame\OneOnOneGameResult;
 interface OneOnOneGameServiceInterface
 {
     /**
-     * Get all active players for game selection
-     * 
-     * Returns players available for selection in the game form.
-     * 
-     * @return array<int, array{pid: int, name: string}> Array of players
-     */
-    public function getActivePlayers(): array;
-
-    /**
      * Play a new One-on-One game between two players
      * 
      * Validates player selection, loads player data, runs the game
@@ -51,16 +42,6 @@ interface OneOnOneGameServiceInterface
      * @return array<string> Array of validation error messages (empty if valid)
      */
     public function validatePlayerSelection(?int $player1Id, ?int $player2Id): array;
-
-    /**
-     * Get a previously played game for replay
-     *
-     * Retrieves a stored game by its ID for display.
-     *
-     * @param int $gameId The game ID to retrieve
-     * @return GameRecord|null Game data or null if not found
-     */
-    public function getGameReplay(int $gameId): ?array;
 
     /**
      * Post game result to Discord

@@ -31,16 +31,6 @@ class OneOnOneGameService implements OneOnOneGameServiceInterface
     }
 
     /**
-     * @see OneOnOneGameServiceInterface::getActivePlayers()
-     *
-     * @return array<int, array{pid: int, name: string}>
-     */
-    public function getActivePlayers(): array
-    {
-        return $this->repository->getActivePlayers();
-    }
-
-    /**
      * @see OneOnOneGameServiceInterface::playGame()
      */
     public function playGame(int $player1Id, int $player2Id, string $owner): OneOnOneGameResult
@@ -97,16 +87,6 @@ class OneOnOneGameService implements OneOnOneGameServiceInterface
         }
 
         return $errors;
-    }
-
-    /**
-     * @see OneOnOneGameServiceInterface::getGameReplay()
-     *
-     * @return GameRecord|null
-     */
-    public function getGameReplay(int $gameId): ?array
-    {
-        return $this->repository->getGameById($gameId);
     }
 
     /**

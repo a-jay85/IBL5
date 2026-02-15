@@ -21,13 +21,6 @@ class ComparePlayersServiceTest extends TestCase
         $this->service = new ComparePlayersService($this->mockRepository);
     }
 
-    public function testGetPlayerNamesReturnsArray(): void
-    {
-        $result = $this->service->getPlayerNames();
-
-        $this->assertIsArray($result);
-    }
-
     public function testComparePlayersReturnsNullForEmptyPlayer1(): void
     {
         $result = $this->service->comparePlayers('', 'Kobe Bryant');

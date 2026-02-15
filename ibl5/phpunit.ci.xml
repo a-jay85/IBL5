@@ -127,5 +127,11 @@
         <testsuite name="Integration Tests">
             <directory>tests/Integration</directory>
         </testsuite>
+        <testsuite name="Auth Module Tests">
+            <directory>tests/Auth</directory>
+        </testsuite>
+        <testsuite name="Database Module Tests">
+            <directory>tests/Database</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

@@ -55,12 +55,12 @@ function negotiate($playerID)
     global $prefix, $db, $mysqli_db, $cookie;
 
     $playerID = intval($playerID);
-    
-    // Get user's team name using existing CommonRepository
-    $commonRepository = new CommonMysqliRepository($mysqli_db);
-    $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
 
     Nuke\Header::header();
+
+    // Get user's team name using existing CommonRepository (must be after header() which populates $cookie)
+    $commonRepository = new CommonMysqliRepository($mysqli_db);
+    $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
 
     // Use NegotiationProcessor to handle all business logic
     $processor = new NegotiationProcessor($mysqli_db);
@@ -71,7 +71,7 @@ function negotiate($playerID)
 
 function rookieoption($pid)
 {
-    global $db, $cookie, $mysqli_db;
+    global $cookie, $mysqli_db;
 
     // Initialize dependencies
     $commonRepository = new CommonMysqliRepository($mysqli_db);
@@ -79,13 +79,13 @@ function rookieoption($pid)
     $validator = new RookieOptionValidator();
     $formView = new RookieOptionFormView();
 
-    // Get user's team name
-    $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
-
     // Load player
-    $player = Player::withPlayerID($db, $pid);
+    $player = Player::withPlayerID($mysqli_db, $pid);
 
     Nuke\Header::header();
+
+    // Get user's team name (must be after header() which populates $cookie)
+    $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
 
     // Validate player ownership
     $ownershipValidation = $validator->validatePlayerOwnership($player, $userTeamName);

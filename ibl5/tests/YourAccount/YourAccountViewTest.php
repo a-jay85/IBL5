@@ -9,7 +9,7 @@ use YourAccount\YourAccountView;
  * Tests for YourAccountView rendering methods.
  *
  * Verifies HTML structure, XSS safety, correct form fields,
- * and cross-navigation links for all auth pages.
+ * CSRF tokens, and cross-navigation links for all auth pages.
  */
 class YourAccountViewTest extends TestCase
 {
@@ -18,6 +18,10 @@ class YourAccountViewTest extends TestCase
     protected function setUp(): void
     {
         $this->view = new YourAccountView();
+        // Ensure session is available for CSRF token generation
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
     }
 
     // =========================================================================
@@ -43,6 +47,30 @@ class YourAccountViewTest extends TestCase
         $this->assertStringContainsString('name="op" value="login"', $result);
         $this->assertStringContainsString('ibl-btn--primary', $result);
         $this->assertStringContainsString('ibl-btn--block', $result);
+    }
+
+    public function testRenderLoginPageContainsCsrfToken(): void
+    {
+        $result = $this->view->renderLoginPage(null, null, 123456, false);
+
+        $this->assertStringContainsString('name="_csrf_token"', $result);
+    }
+
+    public function testRenderLoginPageContainsRememberMeCheckbox(): void
+    {
+        $result = $this->view->renderLoginPage(null, null, 123456, false);
+
+        $this->assertStringContainsString('name="remember_me"', $result);
+        $this->assertStringContainsString('Remember me', $result);
+    }
+
+    public function testRenderLoginPageContainsHiddenFieldsForForumRedirect(): void
+    {
+        $result = $this->view->renderLoginPage(null, null, 123456, false, 'reply', '5', '10');
+
+        $this->assertStringContainsString('name="mode" value="reply"', $result);
+        $this->assertStringContainsString('name="f" value="5"', $result);
+        $this->assertStringContainsString('name="t" value="10"', $result);
     }
 
     public function testRenderLoginPageShowsErrorWhenProvided(): void
@@ -170,6 +198,13 @@ class YourAccountViewTest extends TestCase
         $this->assertStringContainsString('name="op" value="finish"', $result);
     }
 
+    public function testRenderRegistrationConfirmPageContainsCsrfToken(): void
+    {
+        $result = $this->view->renderRegistrationConfirmPage('TestUser', 'test@example.com', 'secret', 123, 'abc');
+
+        $this->assertStringContainsString('name="_csrf_token"', $result);
+    }
+
     public function testRenderRegistrationConfirmPageEscapesXss(): void
     {
         $result = $this->view->renderRegistrationConfirmPage('<script>alert(1)</script>', 'test@test.com', 'pw', 1, 'x');
@@ -214,7 +249,7 @@ class YourAccountViewTest extends TestCase
     }
 
     // =========================================================================
-    // Forgot Password Page
+    // Forgot Password Page (email-based, delight-auth)
     // =========================================================================
 
     public function testRenderForgotPasswordPageReturnsHtml(): void
@@ -223,9 +258,24 @@ class YourAccountViewTest extends TestCase
 
         $this->assertStringContainsString('auth-page', $result);
         $this->assertStringContainsString('Reset Password', $result);
-        $this->assertStringContainsString('name="username"', $result);
-        $this->assertStringContainsString('name="code"', $result);
+        $this->assertStringContainsString('name="user_email"', $result);
+        $this->assertStringContainsString('type="email"', $result);
         $this->assertStringContainsString('name="op" value="mailpasswd"', $result);
+    }
+
+    public function testRenderForgotPasswordPageContainsCsrfToken(): void
+    {
+        $result = $this->view->renderForgotPasswordPage();
+
+        $this->assertStringContainsString('name="_csrf_token"', $result);
+    }
+
+    public function testRenderForgotPasswordPageDoesNotContainUsernameField(): void
+    {
+        $result = $this->view->renderForgotPasswordPage();
+
+        $this->assertStringNotContainsString('name="username"', $result);
+        $this->assertStringNotContainsString('name="code"', $result);
     }
 
     public function testRenderForgotPasswordPageContainsCrossNavLinks(): void
@@ -237,39 +287,111 @@ class YourAccountViewTest extends TestCase
     }
 
     // =========================================================================
-    // Code Mailed Page
+    // Reset Email Sent Page
     // =========================================================================
 
-    public function testRenderCodeMailedPageShowsInfo(): void
+    public function testRenderResetEmailSentPageShowsInfo(): void
     {
-        $result = $this->view->renderCodeMailedPage('TestUser');
+        $result = $this->view->renderResetEmailSentPage();
 
         $this->assertStringContainsString('auth-status__icon--info', $result);
-        $this->assertStringContainsString('Code Sent', $result);
-        $this->assertStringContainsString('TestUser', $result);
-        $this->assertStringContainsString('Enter Reset Code', $result);
+        $this->assertStringContainsString('Check Your Email', $result);
+        $this->assertStringContainsString('Back to Sign In', $result);
     }
 
-    public function testRenderCodeMailedPageEscapesXss(): void
+    public function testRenderResetEmailSentPageDoesNotRevealEmailExistence(): void
     {
-        $result = $this->view->renderCodeMailedPage('<img src=x onerror=alert(1)>');
+        $result = $this->view->renderResetEmailSentPage();
 
-        $this->assertStringNotContainsString('<img src=x', $result);
-        $this->assertStringContainsString('&lt;img', $result);
+        $this->assertStringContainsString('If an account exists', $result);
     }
 
     // =========================================================================
-    // Password Mailed Page
+    // Reset Password Page (selector/token form)
     // =========================================================================
 
-    public function testRenderPasswordMailedPageShowsSuccess(): void
+    public function testRenderResetPasswordPageReturnsHtml(): void
     {
-        $result = $this->view->renderPasswordMailedPage('TestUser');
+        $result = $this->view->renderResetPasswordPage('abc123', 'token456');
+
+        $this->assertStringContainsString('auth-page', $result);
+        $this->assertStringContainsString('Reset Password', $result);
+        $this->assertStringContainsString('Enter your new password', $result);
+    }
+
+    public function testRenderResetPasswordPageContainsFormFields(): void
+    {
+        $result = $this->view->renderResetPasswordPage('abc123', 'token456');
+
+        $this->assertStringContainsString('name="new_password"', $result);
+        $this->assertStringContainsString('name="new_password2"', $result);
+        $this->assertStringContainsString('name="selector" value="abc123"', $result);
+        $this->assertStringContainsString('name="token" value="token456"', $result);
+        $this->assertStringContainsString('name="op" value="do_reset_password"', $result);
+    }
+
+    public function testRenderResetPasswordPageContainsCsrfToken(): void
+    {
+        $result = $this->view->renderResetPasswordPage('abc123', 'token456');
+
+        $this->assertStringContainsString('name="_csrf_token"', $result);
+    }
+
+    public function testRenderResetPasswordPageEscapesSelectorAndToken(): void
+    {
+        $result = $this->view->renderResetPasswordPage('"><script>xss</script>', 'normal');
+
+        $this->assertStringNotContainsString('<script>xss</script>', $result);
+        $this->assertStringContainsString('&lt;script&gt;', $result);
+    }
+
+    public function testRenderResetPasswordPageContainsSignInLink(): void
+    {
+        $result = $this->view->renderResetPasswordPage('abc', 'def');
+
+        $this->assertStringContainsString('Back to Sign In', $result);
+    }
+
+    // =========================================================================
+    // Password Reset Success Page
+    // =========================================================================
+
+    public function testRenderPasswordResetSuccessPageShowsSuccess(): void
+    {
+        $result = $this->view->renderPasswordResetSuccessPage();
 
         $this->assertStringContainsString('auth-status__icon--success', $result);
-        $this->assertStringContainsString('Password Reset', $result);
-        $this->assertStringContainsString('TestUser', $result);
+        $this->assertStringContainsString('Password Changed', $result);
         $this->assertStringContainsString('Sign In', $result);
+    }
+
+    // =========================================================================
+    // Password Reset Error Page
+    // =========================================================================
+
+    public function testRenderPasswordResetErrorPageShowsError(): void
+    {
+        $result = $this->view->renderPasswordResetErrorPage('Token has expired');
+
+        $this->assertStringContainsString('auth-status__icon--error', $result);
+        $this->assertStringContainsString('Reset Error', $result);
+        $this->assertStringContainsString('Token has expired', $result);
+        $this->assertStringContainsString('Try Again', $result);
+    }
+
+    public function testRenderPasswordResetErrorPageEscapesXss(): void
+    {
+        $result = $this->view->renderPasswordResetErrorPage('<script>alert(1)</script>');
+
+        $this->assertStringNotContainsString('<script>alert(1)</script>', $result);
+        $this->assertStringContainsString('&lt;script&gt;', $result);
+    }
+
+    public function testRenderPasswordResetErrorPageLinksToForgotPassword(): void
+    {
+        $result = $this->view->renderPasswordResetErrorPage('Error');
+
+        $this->assertStringContainsString('op=pass_lost', $result);
     }
 
     // =========================================================================

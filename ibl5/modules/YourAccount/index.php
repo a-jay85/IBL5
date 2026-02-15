@@ -121,12 +121,19 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
 function finishNewUser($username, $user_email, $user_password, $random_num, $gfx_check)
 {
     global $stop, $EditedMessage, $adminmail, $sitename, $Default_Theme, $user_prefix, $db, $storyhome, $module_name, $nukeurl, $authService;
+
+    // CSRF validation
+    if (!\Utilities\CsrfGuard::validateSubmittedToken('register')) {
+        Header("Location: modules.php?name=$module_name&op=new_user");
+        die();
+    }
+
     Nuke\Header::header();
     include "config.php";
     userCheck($username, $user_email);
     $user_email = validate_mail($user_email);
-    $user_regdate = date("M d, Y");
     $user_password = stripslashes($user_password);
+    $accountView = new \YourAccount\YourAccountView();
     if (!isset($stop)) {
         $datekey = date("F j");
         $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $random_num . $datekey));
@@ -135,68 +142,76 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
             Header("Location: modules.php?name=$module_name");
             die();
         }
-        mt_srand((double) microtime() * 1000000);
-        $maxran = 1000000;
-        $check_num = mt_rand(0, $maxran);
-        $check_num = md5($check_num);
-        $time = time();
-        $finishlink = "$nukeurl/modules.php?name=$module_name&op=activate&username=$username&check_num=$check_num";
-        $new_password = $authService->hashPassword($user_password);
         $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
         $username = rtrim($username, "\\");
-        $username = str_replace("'", "\'", $username);
         $user_email = filter($user_email, "nohtml", 1);
-        $result = \DatabaseConnection::query("INSERT INTO nuke_users_temp (user_id, username, user_email, user_password, user_regdate, check_num, time) VALUES (NULL, ?, ?, ?, ?, ?, ?)", [$username, $user_email, $new_password, $user_regdate, $check_num, $time]);
-        if (!$result) {
-            echo "" . _ERROR . "<br>";
-        } else {
-            $message = "" . _WELCOMETO . " $sitename!\n\n" . _YOUUSEDEMAIL . " ($user_email) " . _TOREGISTER . " $sitename.\n\n " . _TOFINISHUSER . "\n\n $finishlink\n\n " . _FOLLOWINGMEM . "\n\n" . _UNICKNAME . " $username\n" . _UPASSWORD . " $user_password";
-            $subject = "" . _ACTIVATIONSUB . "";
-            $from = "$adminmail";
-            \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $from);
-            $accountView = new \YourAccount\YourAccountView();
+
+        try {
+            // Register via delight-im/auth with email verification callback
+            $authService->register($user_email, $user_password, $username, static function (string $selector, string $token) use ($sitename, $adminmail, $nukeurl, $module_name, $user_email, $username): void {
+                $finishlink = "$nukeurl/modules.php?name=$module_name&op=confirm_email&selector=" . urlencode($selector) . "&token=" . urlencode($token);
+                $message = "" . _WELCOMETO . " $sitename!\n\n" . _YOUUSEDEMAIL . " ($user_email) " . _TOREGISTER . " $sitename.\n\n " . _TOFINISHUSER . "\n\n $finishlink\n\n " . _FOLLOWINGMEM . "\n\n" . _UNICKNAME . " $username";
+                $subject = "" . _ACTIVATIONSUB . "";
+                $from = "$adminmail";
+                mail($user_email, $subject, $message, "From: $from\nX-Mailer: PHP/" . phpversion());
+            });
+
             echo $accountView->renderRegistrationCompletePage($sitename);
+        } catch (\RuntimeException) {
+            $error = $authService->getLastError() ?? _ERROR;
+            echo $accountView->renderRegistrationErrorPage((string) $error);
         }
     } else {
-        echo "$stop";
+        echo $accountView->renderRegistrationErrorPage((string) $stop);
     }
     Nuke\Footer::footer();
 }
 
 function activate($username, $check_num)
 {
-    global $db, $user_prefix, $module_name, $language, $prefix;
-    $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
-    $username = rtrim($username, "\\");
-    $username = str_replace("'", "\'", $username);
-    $past = time() - 86400;
-    \DatabaseConnection::query("DELETE FROM nuke_users_temp WHERE time < ?", [$past]);
-    $row = \DatabaseConnection::fetchRow("SELECT * FROM nuke_users_temp WHERE username = ? AND check_num = ?", [$username, $check_num]);
-    if ($row !== null) {
-        $user_password = htmlspecialchars(stripslashes($row['user_password']));
-        if ($check_num == $row['check_num']) {
-            \DatabaseConnection::query("INSERT INTO nuke_users (user_id, username, user_email, user_password, user_avatar, user_avatar_type, user_regdate, user_lang) VALUES (NULL, ?, ?, ?, '', '3', ?, ?)", [$row['username'], $row['user_email'], $user_password, $row['user_regdate'], $language]);
-            \DatabaseConnection::query("DELETE FROM nuke_users_temp WHERE username = ? AND check_num = ?", [$username, $check_num]);
-            Nuke\Header::header();
-            $accountView = new \YourAccount\YourAccountView();
-            echo $accountView->renderActivationSuccessPage((string) $row['username']);
-            Nuke\Footer::footer();
-            die();
-        } else {
-            Nuke\Header::header();
-            $accountView = new \YourAccount\YourAccountView();
-            echo $accountView->renderActivationErrorPage('mismatch');
-            Nuke\Footer::footer();
-            die();
-        }
-    } else {
+    // Legacy activation route — redirect to confirm_email if selector/token params present
+    global $module_name;
+    if (isset($_GET['selector']) && isset($_GET['token'])) {
+        confirm_email();
+        return;
+    }
+
+    // Fallback for any remaining legacy activation links
+    Nuke\Header::header();
+    $accountView = new \YourAccount\YourAccountView();
+    echo $accountView->renderActivationErrorPage('expired');
+    Nuke\Footer::footer();
+    die();
+}
+
+function confirm_email()
+{
+    global $authService, $module_name;
+    $selector = isset($_GET['selector']) ? trim($_GET['selector']) : '';
+    $token = isset($_GET['token']) ? trim($_GET['token']) : '';
+
+    if ($selector === '' || $token === '') {
         Nuke\Header::header();
         $accountView = new \YourAccount\YourAccountView();
-        echo $accountView->renderActivationErrorPage('expired');
+        echo $accountView->renderActivationErrorPage('mismatch');
         Nuke\Footer::footer();
         die();
     }
 
+    try {
+        $authService->confirmEmail($selector, $token);
+        Nuke\Header::header();
+        $accountView = new \YourAccount\YourAccountView();
+        echo $accountView->renderActivationSuccessPage('User');
+        Nuke\Footer::footer();
+    } catch (\RuntimeException) {
+        $error = $authService->getLastError() ?? 'expired';
+        Nuke\Header::header();
+        $accountView = new \YourAccount\YourAccountView();
+        echo $accountView->renderActivationErrorPage($error);
+        Nuke\Footer::footer();
+    }
+    die();
 }
 
 function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
@@ -572,7 +587,10 @@ function main($user)
             $stop ? (string) $stop : null,
             isset($redirect) ? (string) $redirect : null,
             $random_num,
-            $showCaptcha
+            $showCaptcha,
+            isset($mode) ? (string) $mode : '',
+            isset($f) ? (string) $f : '',
+            isset($t) ? (string) $t : ''
         );
         Nuke\Footer::footer();
     } elseif (is_user($user)) {
@@ -645,54 +663,101 @@ function logout()
     Nuke\Footer::footer();
 }
 
-function mail_password($username, $code)
+function reset_password_form()
 {
-    global $sitename, $adminmail, $nukeurl, $user_prefix, $db, $module_name, $authService, $mysqli_db;
-    $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
-    $username = rtrim($username, "\\");
-    $username = str_replace("'", "\'", $username);
-    $sql = "SELECT user_email, user_actkey FROM " . $user_prefix . "_users WHERE username='$username'";
-    $result = $db->sql_query($sql);
-    $accountView = new \YourAccount\YourAccountView();
-    if ($db->sql_numrows($result) == 0) {
-        Nuke\Header::header();
-        echo $accountView->renderUserNotFoundPage();
-        Nuke\Footer::footer();
-    } else {
-        $host_name = $_SERVER['REMOTE_ADDR'];
-        $row = $db->sql_fetchrow($result);
-        $user_email = filter($row['user_email'], "nohtml");
-        // Use user_actkey as reset verification code (no longer derived from password hash)
-        $storedCode = $row['user_actkey'] ?? '';
-        if ($storedCode !== '' && $storedCode === $code) {
-            $newpass = substr(bin2hex(random_bytes(5)), 0, 10);
-            $message = "" . _USERACCOUNT . " '$username' " . _AT . " $sitename " . _HASTHISEMAIL . "  " . _AWEBUSERFROM . " $host_name " . _HASREQUESTED . "\n\n" . _YOURNEWPASSWORD . " $newpass\n\n " . _YOUCANCHANGE . " $nukeurl/modules.php?name=$module_name\n\n" . _IFYOUDIDNOTASK . "";
-            $subject = "" . _USERPASSWORD4 . " $username";
-            \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);
-            /* Update password and clear the reset code */
-            $cryptpass = $authService->hashPassword($newpass);
-            $stmtReset = $mysqli_db->prepare("UPDATE " . $user_prefix . "_users SET user_password = ?, user_actkey = NULL WHERE username = ?");
-            $stmtReset->bind_param('ss', $cryptpass, $username);
-            $stmtReset->execute();
-            $stmtReset->close();
-            Nuke\Header::header();
-            echo $accountView->renderPasswordMailedPage($username);
-            Nuke\Footer::footer();
-        } else {
-            /* Generate a new reset code and email it */
-            $resetCode = substr(bin2hex(random_bytes(5)), 0, 10);
-            $stmtCode = $mysqli_db->prepare("UPDATE " . $user_prefix . "_users SET user_actkey = ? WHERE username = ?");
-            $stmtCode->bind_param('ss', $resetCode, $username);
-            $stmtCode->execute();
-            $stmtCode->close();
-            $message = "" . _USERACCOUNT . " '$username' " . _AT . " $sitename " . _HASTHISEMAIL . " " . _AWEBUSERFROM . " $host_name " . _CODEREQUESTED . "\n\n" . _YOURCODEIS . " $resetCode \n\n" . _WITHTHISCODE . " $nukeurl/modules.php?name=$module_name&op=pass_lost\n" . _IFYOUDIDNOTASK2 . "";
-            $subject = "" . _CODEFOR . " $username";
-            \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);
-            Nuke\Header::header();
-            echo $accountView->renderCodeMailedPage($username);
-            Nuke\Footer::footer();
-        }
+    global $user, $module_name;
+    if (is_user($user)) {
+        Header("Location: modules.php?name=$module_name");
+        die();
     }
+    $selector = isset($_GET['selector']) ? htmlspecialchars(trim($_GET['selector'])) : '';
+    $token = isset($_GET['token']) ? htmlspecialchars(trim($_GET['token'])) : '';
+    if ($selector === '' || $token === '') {
+        Header("Location: modules.php?name=$module_name&op=pass_lost");
+        die();
+    }
+    Nuke\Header::header();
+    $accountView = new \YourAccount\YourAccountView();
+    echo $accountView->renderResetPasswordPage($selector, $token);
+    Nuke\Footer::footer();
+}
+
+function do_reset_password()
+{
+    global $authService, $module_name;
+
+    // CSRF validation
+    if (!\Utilities\CsrfGuard::validateSubmittedToken('reset_password')) {
+        Header("Location: modules.php?name=$module_name&op=pass_lost");
+        die();
+    }
+
+    $selector = isset($_POST['selector']) ? trim($_POST['selector']) : '';
+    $token = isset($_POST['token']) ? trim($_POST['token']) : '';
+    $newPassword = isset($_POST['new_password']) ? $_POST['new_password'] : '';
+    $newPassword2 = isset($_POST['new_password2']) ? $_POST['new_password2'] : '';
+
+    $accountView = new \YourAccount\YourAccountView();
+
+    if ($newPassword !== $newPassword2) {
+        Nuke\Header::header();
+        echo $accountView->renderPasswordResetErrorPage('The passwords you entered do not match. Please go back and try again.');
+        Nuke\Footer::footer();
+        return;
+    }
+
+    try {
+        $authService->resetPassword($selector, $token, $newPassword);
+        Nuke\Header::header();
+        echo $accountView->renderPasswordResetSuccessPage();
+        Nuke\Footer::footer();
+    } catch (\RuntimeException) {
+        $error = $authService->getLastError() ?? 'An error occurred while resetting your password.';
+        Nuke\Header::header();
+        echo $accountView->renderPasswordResetErrorPage((string) $error);
+        Nuke\Footer::footer();
+    }
+}
+
+function mail_password()
+{
+    global $sitename, $adminmail, $nukeurl, $module_name, $authService;
+
+    // CSRF validation
+    if (!\Utilities\CsrfGuard::validateSubmittedToken('forgot_password')) {
+        Header("Location: modules.php?name=$module_name&op=pass_lost");
+        die();
+    }
+
+    $user_email = isset($_POST['user_email']) ? filter($_POST['user_email'], "nohtml", 1) : '';
+    $accountView = new \YourAccount\YourAccountView();
+    if ($user_email === '') {
+        Nuke\Header::header();
+        echo $accountView->renderPasswordResetErrorPage('Please enter your email address.');
+        Nuke\Footer::footer();
+        return;
+    }
+
+    // Use delight-im/auth's built-in password reset with secure tokens
+    $authService->forgotPassword($user_email, static function (string $selector, string $token) use ($sitename, $adminmail, $nukeurl, $module_name, $user_email): void {
+        $resetLink = "$nukeurl/modules.php?name=$module_name&op=reset_password&selector=" . urlencode($selector) . "&token=" . urlencode($token);
+        $message = "" . _PASSWORDRESETREQUEST . " $sitename.\n\n"
+            . "" . _CLICKRESETLINK . "\n\n$resetLink\n\n"
+            . "" . _LINKEXPIRES6HOURS . "\n\n"
+            . "" . _IFYOUDIDNOTASK . "";
+        $subject = "" . _PASSWORDRESET . " - $sitename";
+        mail($user_email, $subject, $message, "From: $adminmail\nX-Mailer: PHP/" . phpversion());
+    });
+
+    // Always show success message (don't reveal if email exists)
+    Nuke\Header::header();
+    $lastError = $authService->getLastError();
+    if ($lastError !== null) {
+        echo $accountView->renderPasswordResetErrorPage((string) $lastError);
+    } else {
+        echo $accountView->renderResetEmailSentPage();
+    }
+    Nuke\Footer::footer();
 }
 
 function docookie($setuid, $setusername, $setpass, $setstorynum, $setumode, $setuorder, $setthold, $setnoscore, $setublockon, $settheme, $setcommentmax)
@@ -703,6 +768,13 @@ function docookie($setuid, $setusername, $setpass, $setstorynum, $setumode, $set
 function login($username, $user_password, $redirect, $mode, $f, $t, $random_num, $gfx_check)
 {
     global $authService, $user_prefix, $db, $mysqli_db, $module_name, $pm_login, $prefix;
+
+    // CSRF validation
+    if (!\Utilities\CsrfGuard::validateSubmittedToken('login')) {
+        Header("Location: modules.php?name=$module_name&stop=1");
+        die();
+    }
+
     $user_password = stripslashes($user_password);
     include "config.php";
 
@@ -1568,7 +1640,7 @@ switch ($op) {
         break;
 
     case "mailpasswd":
-        mail_password($username, $code);
+        mail_password();
         break;
 
     case "userinfo":
@@ -1639,6 +1711,18 @@ switch ($op) {
 
     case "activate":
         activate($username, $check_num);
+        break;
+
+    case "confirm_email":
+        confirm_email();
+        break;
+
+    case "reset_password":
+        reset_password_form();
+        break;
+
+    case "do_reset_password":
+        do_reset_password();
         break;
 
     case "CoolSize":

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace YourAccount;
 
+use Utilities\CsrfGuard;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -128,8 +129,11 @@ class YourAccountView
      * @param string|null $redirect Module to redirect to after login
      * @param int $randomNum Random number for CAPTCHA
      * @param bool $showCaptcha Whether to show the CAPTCHA field
+     * @param string $mode Forum mode parameter
+     * @param string $f Forum parameter
+     * @param string $t Forum topic parameter
      */
-    public function renderLoginPage(?string $error, ?string $redirect, int $randomNum, bool $showCaptcha): string
+    public function renderLoginPage(?string $error, ?string $redirect, int $randomNum, bool $showCaptcha, string $mode = '', string $f = '', string $t = ''): string
     {
         ob_start();
         ?>
@@ -168,11 +172,28 @@ class YourAccountView
                     <?= $this->renderCaptchaSection($randomNum) ?>
                 <?php endif; ?>
 
+                <div class="ibl-form-group">
+                    <label style="display: flex; align-items: center; gap: var(--space-2); cursor: pointer;">
+                        <input type="checkbox" name="remember_me" value="1">
+                        <span style="font-size: 1rem; color: var(--gray-600);">Remember me</span>
+                    </label>
+                </div>
+
                 <?php
                 /** @var string $safeRedirect */
                 $safeRedirect = HtmlSanitizer::safeHtmlOutput($redirect ?? '');
+                /** @var string $safeMode */
+                $safeMode = HtmlSanitizer::safeHtmlOutput($mode);
+                /** @var string $safeF */
+                $safeF = HtmlSanitizer::safeHtmlOutput($f);
+                /** @var string $safeT */
+                $safeT = HtmlSanitizer::safeHtmlOutput($t);
                 ?>
                 <input type="hidden" name="redirect" value="<?= $safeRedirect ?>">
+                <input type="hidden" name="mode" value="<?= $safeMode ?>">
+                <input type="hidden" name="f" value="<?= $safeF ?>">
+                <input type="hidden" name="t" value="<?= $safeT ?>">
+                <?= CsrfGuard::generateToken('login') ?>
                 <input type="hidden" name="op" value="login">
                 <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">Sign In</button>
             </form>
@@ -315,6 +336,7 @@ class YourAccountView
                 <input type="hidden" name="username" value="<?= $safeUsername ?>">
                 <input type="hidden" name="user_email" value="<?= $safeEmail ?>">
                 <input type="hidden" name="user_password" value="<?= $safePassword ?>">
+                <?= CsrfGuard::generateToken('register') ?>
                 <input type="hidden" name="op" value="finish">
                 <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">Complete Registration</button>
             </form>
@@ -391,7 +413,7 @@ class YourAccountView
     }
 
     /**
-     * Render the forgot password page.
+     * Render the forgot password page (email-based reset via delight-auth).
      */
     public function renderForgotPasswordPage(): string
     {
@@ -402,33 +424,25 @@ class YourAccountView
     <div class="auth-card ibl-card">
         <div class="ibl-card__header">
             <h1 class="ibl-card__title">Reset Password</h1>
-            <p class="ibl-card__subtitle">We'll email you a reset code</p>
+            <p class="ibl-card__subtitle">We'll email you a reset link</p>
         </div>
         <div class="ibl-card__body">
             <div style="margin-bottom: var(--space-4); font-size: 1rem; color: var(--gray-600); line-height: 1.5;">
-                Enter your username to receive a reset code by email. If you already have a code, enter it below.
+                Enter your email address and we'll send you a link to reset your password.
             </div>
 
             <form action="modules.php?name=YourAccount" method="post">
                 <div class="ibl-form-group">
-                    <label class="ibl-label ibl-label--required" for="reset-username">Username</label>
+                    <label class="ibl-label ibl-label--required" for="reset-email">Email Address</label>
                     <div class="auth-input-wrapper">
-                        <?= $this->userIcon() ?>
-                        <input type="text" name="username" id="reset-username" class="ibl-input auth-input--with-icon" maxlength="25" required placeholder="Enter your username" autocomplete="username">
+                        <?= $this->emailIcon() ?>
+                        <input type="email" name="user_email" id="reset-email" class="ibl-input auth-input--with-icon" maxlength="255" required placeholder="Enter your email address" autocomplete="email">
                     </div>
                 </div>
 
-                <div class="ibl-form-group">
-                    <label class="ibl-label" for="reset-code">Confirmation Code</label>
-                    <div class="auth-input-wrapper">
-                        <?= $this->keyIcon() ?>
-                        <input type="text" name="code" id="reset-code" class="ibl-input auth-input--with-icon" maxlength="10" placeholder="Enter code (if you have one)">
-                    </div>
-                    <div class="ibl-form-help">Leave blank if requesting a new code.</div>
-                </div>
-
+                <?= CsrfGuard::generateToken('forgot_password') ?>
                 <input type="hidden" name="op" value="mailpasswd">
-                <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">Send Reset Code</button>
+                <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">Send Reset Link</button>
             </form>
         </div>
         <div class="ibl-card__footer">
@@ -445,13 +459,12 @@ class YourAccountView
     }
 
     /**
-     * Render the "reset code has been emailed" status page.
+     * Render the "reset email sent" status page.
+     *
+     * Generic message for security — does not reveal whether the email exists.
      */
-    public function renderCodeMailedPage(string $username): string
+    public function renderResetEmailSentPage(): string
     {
-        /** @var string $safeUsername */
-        $safeUsername = HtmlSanitizer::safeHtmlOutput($username);
-
         ob_start();
         ?>
 <div class="auth-page">
@@ -461,12 +474,12 @@ class YourAccountView
                 <div class="auth-status__icon auth-status__icon--info">
                     <?= $this->infoIcon() ?>
                 </div>
-                <div class="auth-status__title">Code Sent</div>
+                <div class="auth-status__title">Check Your Email</div>
                 <div class="auth-status__message">
-                    A reset code for <strong><?= $safeUsername ?></strong> has been emailed. Check your inbox and return to the password reset page to enter the code.
+                    If an account exists with that email address, we've sent a password reset link. Please check your inbox and follow the instructions.
                 </div>
                 <div class="auth-status__action">
-                    <a href="modules.php?name=YourAccount&amp;op=pass_lost" class="ibl-btn ibl-btn--primary">Enter Reset Code</a>
+                    <a href="modules.php?name=YourAccount" class="ibl-btn ibl-btn--primary">Back to Sign In</a>
                 </div>
             </div>
         </div>
@@ -477,13 +490,65 @@ class YourAccountView
     }
 
     /**
-     * Render the "new password has been emailed" status page.
+     * Render the reset password form (selector/token from email link).
      */
-    public function renderPasswordMailedPage(string $username): string
+    public function renderResetPasswordPage(string $selector, string $token): string
     {
-        /** @var string $safeUsername */
-        $safeUsername = HtmlSanitizer::safeHtmlOutput($username);
+        /** @var string $safeSelector */
+        $safeSelector = HtmlSanitizer::safeHtmlOutput($selector);
+        /** @var string $safeToken */
+        $safeToken = HtmlSanitizer::safeHtmlOutput($token);
 
+        ob_start();
+        ?>
+<div class="auth-page">
+    <?= $this->renderLogo() ?>
+    <div class="auth-card ibl-card">
+        <div class="ibl-card__header">
+            <h1 class="ibl-card__title">Reset Password</h1>
+            <p class="ibl-card__subtitle">Enter your new password</p>
+        </div>
+        <div class="ibl-card__body">
+            <form action="modules.php?name=YourAccount" method="post">
+                <div class="ibl-form-group">
+                    <label class="ibl-label ibl-label--required" for="reset-new-password">New Password</label>
+                    <div class="auth-input-wrapper">
+                        <?= $this->lockIcon() ?>
+                        <input type="password" name="new_password" id="reset-new-password" class="ibl-input auth-input--with-icon" maxlength="60" required placeholder="Enter new password" autocomplete="new-password">
+                    </div>
+                </div>
+
+                <div class="ibl-form-group">
+                    <label class="ibl-label ibl-label--required" for="reset-confirm-password">Confirm Password</label>
+                    <div class="auth-input-wrapper">
+                        <?= $this->lockIcon() ?>
+                        <input type="password" name="new_password2" id="reset-confirm-password" class="ibl-input auth-input--with-icon" maxlength="60" required placeholder="Re-enter new password" autocomplete="new-password">
+                    </div>
+                </div>
+
+                <input type="hidden" name="selector" value="<?= $safeSelector ?>">
+                <input type="hidden" name="token" value="<?= $safeToken ?>">
+                <?= CsrfGuard::generateToken('reset_password') ?>
+                <input type="hidden" name="op" value="do_reset_password">
+                <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">Reset Password</button>
+            </form>
+        </div>
+        <div class="ibl-card__footer">
+            <div class="auth-links">
+                <a href="modules.php?name=YourAccount">Back to Sign In</a>
+            </div>
+        </div>
+    </div>
+</div>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render the password reset success page.
+     */
+    public function renderPasswordResetSuccessPage(): string
+    {
         ob_start();
         ?>
 <div class="auth-page">
@@ -493,12 +558,42 @@ class YourAccountView
                 <div class="auth-status__icon auth-status__icon--success">
                     <?= $this->checkIcon() ?>
                 </div>
-                <div class="auth-status__title">Password Reset</div>
+                <div class="auth-status__title">Password Changed</div>
                 <div class="auth-status__message">
-                    A new password for <strong><?= $safeUsername ?></strong> has been sent to your email. You can now sign in with your new password.
+                    Your password has been reset successfully. You can now sign in with your new password.
                 </div>
                 <div class="auth-status__action">
                     <a href="modules.php?name=YourAccount" class="ibl-btn ibl-btn--primary">Sign In</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render a password reset error page.
+     */
+    public function renderPasswordResetErrorPage(string $error): string
+    {
+        /** @var string $safeError */
+        $safeError = HtmlSanitizer::safeHtmlOutput($error);
+
+        ob_start();
+        ?>
+<div class="auth-page">
+    <div class="auth-card ibl-card">
+        <div class="ibl-card__body">
+            <div class="auth-status">
+                <div class="auth-status__icon auth-status__icon--error">
+                    <?= $this->errorIcon() ?>
+                </div>
+                <div class="auth-status__title">Reset Error</div>
+                <div class="auth-status__message"><?= $safeError ?></div>
+                <div class="auth-status__action">
+                    <a href="modules.php?name=YourAccount&amp;op=pass_lost" class="ibl-btn ibl-btn--primary">Try Again</a>
                 </div>
             </div>
         </div>

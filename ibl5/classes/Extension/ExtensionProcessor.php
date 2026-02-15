@@ -7,6 +7,7 @@ namespace Extension;
 use Player\Player;
 use Shared\SalaryConverter;
 use Extension\Contracts\ExtensionProcessorInterface;
+use Services\CommonContractValidator;
 use Team\Contracts\TeamQueryRepositoryInterface;
 
 /**
@@ -30,6 +31,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
     private \mysqli $db;
     private ExtensionValidator $validator;
     private ExtensionOfferEvaluator $evaluator;
+    private CommonContractValidator $contractValidator;
     private ExtensionDatabaseOperations $dbOps;
     private TeamQueryRepositoryInterface $teamQueryRepo;
 
@@ -43,6 +45,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         $this->db = $db;
         $this->validator = new ExtensionValidator();
         $this->evaluator = new ExtensionOfferEvaluator();
+        $this->contractValidator = new CommonContractValidator();
         $this->dbOps = new ExtensionDatabaseOperations($db);
         $this->teamQueryRepo = new \Team\TeamQueryRepository($db);
     }
@@ -89,7 +92,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             ];
         }
 
-        $maxOfferValidation = $this->validator->validateMaximumYearOneOffer($offer, $player->yearsOfExperience ?? 0);
+        $maxOfferValidation = $this->contractValidator->validateMaximumYearOne($offer, $player->yearsOfExperience ?? 0);
         if ($maxOfferValidation['valid'] !== true) {
             return [
                 'success' => false,
@@ -97,7 +100,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             ];
         }
 
-        $raisesValidation = $this->validator->validateRaises($offer, $player->birdYears ?? 0);
+        $raisesValidation = $this->contractValidator->validateRaises($offer, $player->birdYears ?? 0);
         if ($raisesValidation['valid'] !== true) {
             return [
                 'success' => false,
@@ -105,7 +108,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             ];
         }
 
-        $decreasesValidation = $this->validator->validateSalaryDecreases($offer);
+        $decreasesValidation = $this->contractValidator->validateSalaryDecreases($offer);
         if ($decreasesValidation['valid'] !== true) {
             return [
                 'success' => false,
@@ -133,7 +136,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         ];
 
         if ($demands === null) {
-            $offerData = $this->evaluator->calculateOfferValue($offer);
+            $offerData = $this->contractValidator->calculateOfferValue($offer);
             $offerAvg = $offerData['averagePerYear'];
             $demandAvg = $offerAvg * 0.85;
             $demands = [
@@ -159,7 +162,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         /** @var ExtensionOffer $demands */
         $evaluation = $this->evaluator->evaluateOffer($offer, $demands, $teamFactors, $playerPreferences);
 
-        $offerData = $this->evaluator->calculateOfferValue($offer);
+        $offerData = $this->contractValidator->calculateOfferValue($offer);
         $offerTotal = $offerData['total'];
         $offerYears = $offerData['years'];
         $offerInMillions = SalaryConverter::convertToMillions($offerTotal);

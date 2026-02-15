@@ -77,7 +77,7 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
         $playerRatings = $this->getPlayerRatings($player);
         
         // Get market maximums for normalization
-        $marketMaximums = $this->getMarketMaximums();
+        $marketMaximums = $this->repository->getMarketMaximums();
         
         // Calculate raw scores (each rating as percentage of market max)
         $rawScore = $this->calculateRawScore($playerRatings, $marketMaximums);
@@ -139,16 +139,6 @@ class NegotiationDemandCalculator implements NegotiationDemandCalculatorInterfac
             'to' => $player->ratingTransitionOffense ?? 0,
             'td' => $player->ratingTransitionDefense ?? 0
         ];
-    }
-    
-    /**
-     * Get market maximum values for each rating category
-     *
-     * @return MarketMaximums Market maximums
-     */
-    private function getMarketMaximums(): array
-    {
-        return $this->repository->getMarketMaximums();
     }
     
     /**

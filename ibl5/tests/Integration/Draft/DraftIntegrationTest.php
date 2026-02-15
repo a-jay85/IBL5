@@ -34,10 +34,10 @@ class DraftIntegrationTest extends IntegrationTestCase
     {
         parent::setUp();
         
-        // Create mock SharedRepository
-        $mock = $this->createMock(SharedRepositoryInterface::class);
-        $mock->method('getCurrentOwnerOfDraftPick')->willReturn('Miami Cyclones');
-        $this->mockSharedFunctions = $mock;
+        // Stub SharedRepository (no expectations needed)
+        $stub = $this->createStub(SharedRepositoryInterface::class);
+        $stub->method('getCurrentOwnerOfDraftPick')->willReturn('Miami Cyclones');
+        $this->mockSharedFunctions = $stub;
 
         // Create mock Season
         $this->mockSeason = $this->createStub(\Season::class);

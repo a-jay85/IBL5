@@ -12,12 +12,12 @@ $querySuccessful = false;
 if (isset($_POST['query'])) {
     switch ($_POST['query']) {
         case 'Activate Player and Season Leaders modules after Trivia':
-            $queryString = "UPDATE nuke_modules SET active = 1 WHERE title = 'Player' OR title = 'SeasonLeaderboards';";
-            $successText = "Player and Season Leaders modules have been activated.";
+            $queryString = "UPDATE ibl_settings SET value = 'Off' WHERE name = 'Trivia Mode'";
+            $successText = "Trivia Mode has been turned off. Player and Season Leaders modules are now accessible.";
             break;
         case 'Deactivate Player and Season Leaders modules for Trivia':
-            $queryString = "UPDATE nuke_modules SET active = 0 WHERE title = 'Player' OR title = 'SeasonLeaderboards';";
-            $successText = "Player and Season Leaders modules have been deactivated.";
+            $queryString = "UPDATE ibl_settings SET value = 'On' WHERE name = 'Trivia Mode'";
+            $successText = "Trivia Mode has been turned on. Player and Season Leaders modules are now hidden.";
             break;
         case 'Reset All Contract Extensions':
             $queryString = "UPDATE ibl_team_info SET Used_Extension_This_Season = 0;";

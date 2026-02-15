@@ -5,79 +5,87 @@ declare(strict_types=1);
 namespace Auth;
 
 use Auth\Contracts\AuthServiceInterface;
-use Database\PdoConnection;
-use Delight\Auth\Auth;
-use Delight\Auth\Role;
 
 /**
- * AuthService - Wraps delight-im/auth for user authentication
+ * AuthService - Session-based user authentication with bcrypt password hashing
  *
- * Provides login, registration, email verification, password reset,
- * remember-me, login throttling, and admin role checking while maintaining
- * backward compatibility with legacy PHP-Nuke $cookie/$userinfo globals.
+ * Replaces legacy PHP-Nuke MD5/base64-cookie auth with:
+ * - bcrypt password hashing via password_hash() (cost 12)
+ * - PHP native sessions as the source of truth
+ * - Transparent MD5-to-bcrypt migration on first login
+ * - Backward-compatible getCookieArray() for legacy $cookie[] references
  *
- * @phpstan-import-type UserRow from AuthServiceInterface
+ * Admin auth (nuke_authors / is_admin()) is NOT handled here.
+ *
+ * @phpstan-type UserRow array{user_id: int, username: string, user_password: string, storynum: int, umode: string, uorder: int, thold: int, noscore: int, ublockon: int, theme: string, commentmax: int, user_email: string, user_regdate: string, name: string}
  */
 class AuthService implements AuthServiceInterface
 {
     private const BCRYPT_COST = 12;
 
-    private const AUTH_TABLE_PREFIX = 'auth_';
+    private const SESSION_USER_ID = 'auth_user_id';
+    private const SESSION_USERNAME = 'auth_username';
 
     private \mysqli $db;
-    private Auth $auth;
-    private ?string $lastError = null;
 
     /** @var array<string, float|int|string|null>|null Cached user info row */
     private ?array $cachedUserInfo = null;
 
-    /**
-     * @param \mysqli $db MySQLi connection for profile queries (nuke_users)
-     * @param Auth|null $auth Optional Auth instance (for testing; production uses PdoConnection singleton)
-     */
-    public function __construct(\mysqli $db, ?Auth $auth = null)
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
-        $this->auth = $auth ?? new Auth(
-            PdoConnection::getInstance(),
-            null,
-            self::AUTH_TABLE_PREFIX,
-            true,
-        );
     }
 
-    public function attempt(string $username, string $password, ?int $rememberDuration = null): bool
+    public function attempt(string $username, string $password): bool
     {
-        $this->lastError = null;
-
-        try {
-            $this->auth->loginWithUsername($username, $password, $rememberDuration);
-            $this->cachedUserInfo = null;
-            return true;
-        } catch (\Delight\Auth\UnknownUsernameException) {
-            $this->lastError = 'Invalid username or password.';
-            return false;
-        } catch (\Delight\Auth\AmbiguousUsernameException) {
-            $this->lastError = 'Invalid username or password.';
-            return false;
-        } catch (\Delight\Auth\InvalidPasswordException) {
-            $this->lastError = 'Invalid username or password.';
-            return false;
-        } catch (\Delight\Auth\EmailNotVerifiedException) {
-            $this->lastError = 'Please verify your email address before logging in.';
-            return false;
-        } catch (\Delight\Auth\TooManyRequestsException) {
-            $this->lastError = 'Too many login attempts. Please try again later.';
-            return false;
-        } catch (\Delight\Auth\AuthError) {
-            $this->lastError = 'An authentication error occurred. Please try again.';
+        $stmt = $this->db->prepare(
+            'SELECT user_id, username, user_password FROM nuke_users WHERE username = ?'
+        );
+        if ($stmt === false) {
             return false;
         }
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result === false) {
+            $stmt->close();
+            return false;
+        }
+        /** @var array{user_id: int, username: string, user_password: string}|null $row */
+        $row = $result->fetch_assoc();
+        $stmt->close();
+
+        if ($row === null) {
+            return false;
+        }
+
+        $storedHash = $row['user_password'];
+
+        // 1. Try bcrypt verification first
+        if (password_verify($password, $storedHash)) {
+            // Re-hash if cost parameters have changed
+            if (password_needs_rehash($storedHash, PASSWORD_BCRYPT, ['cost' => self::BCRYPT_COST])) {
+                $this->upgradeHash($row['username'], $password);
+            }
+            $this->startSession($row['user_id'], $row['username']);
+            return true;
+        }
+
+        // 2. MD5 transitional fallback — upgrade hash on success
+        if ($storedHash !== '' && md5($password) === $storedHash) {
+            $this->upgradeHash($row['username'], $password);
+            $this->startSession($row['user_id'], $row['username']);
+            return true;
+        }
+
+        return false;
     }
 
     public function isAuthenticated(): bool
     {
-        return $this->auth->isLoggedIn();
+        return isset($_SESSION[self::SESSION_USER_ID])
+            && is_int($_SESSION[self::SESSION_USER_ID])
+            && $_SESSION[self::SESSION_USER_ID] > 0;
     }
 
     public function getUserId(): ?int
@@ -85,8 +93,9 @@ class AuthService implements AuthServiceInterface
         if (!$this->isAuthenticated()) {
             return null;
         }
-
-        return $this->auth->getUserId();
+        $userId = $_SESSION[self::SESSION_USER_ID];
+        \assert(is_int($userId));
+        return $userId;
     }
 
     public function getUsername(): ?string
@@ -94,8 +103,9 @@ class AuthService implements AuthServiceInterface
         if (!$this->isAuthenticated()) {
             return null;
         }
-
-        return $this->auth->getUsername();
+        $username = $_SESSION[self::SESSION_USERNAME];
+        \assert(is_string($username));
+        return $username;
     }
 
     public function getUserInfo(): ?array
@@ -104,18 +114,18 @@ class AuthService implements AuthServiceInterface
             return null;
         }
 
-        $username = $this->getUsername();
-        if ($username === null) {
-            return null;
-        }
-
         // Return cached info if available and username matches
         if ($this->cachedUserInfo !== null) {
             $cachedUsername = $this->cachedUserInfo['username'] ?? '';
             \assert(is_string($cachedUsername));
-            if ($cachedUsername === $username) {
+            if ($cachedUsername === $this->getUsername()) {
                 return $this->cachedUserInfo;
             }
+        }
+
+        $username = $this->getUsername();
+        if ($username === null) {
+            return null;
         }
 
         $stmt = $this->db->prepare('SELECT * FROM nuke_users WHERE username = ?');
@@ -150,6 +160,7 @@ class AuthService implements AuthServiceInterface
 
         /** @var array{user_id: int, username: string, user_password: string, storynum: int|string, umode: string, uorder: int|string, thold: int|string, noscore: int|string, ublockon: int|string, theme: string, commentmax: int|string} $userInfo */
 
+        // Match the legacy cookie format: uid:username:password:storynum:umode:uorder:thold:noscore:ublockon:theme:commentmax
         return [
             (int) $userInfo['user_id'],
             $userInfo['username'],
@@ -167,11 +178,10 @@ class AuthService implements AuthServiceInterface
 
     public function logout(): void
     {
-        try {
-            $this->auth->logOut();
-        } catch (\Delight\Auth\AuthError) {
-            // Best-effort logout — session destruction may fail in edge cases
-        }
+        unset(
+            $_SESSION[self::SESSION_USER_ID],
+            $_SESSION[self::SESSION_USERNAME],
+        );
         $this->cachedUserInfo = null;
     }
 
@@ -180,145 +190,34 @@ class AuthService implements AuthServiceInterface
         return password_hash($password, PASSWORD_BCRYPT, ['cost' => self::BCRYPT_COST]);
     }
 
-    public function isAdmin(): bool
+    /**
+     * Start an authenticated session for the given user
+     */
+    private function startSession(int $userId, string $username): void
     {
-        if (!$this->isAuthenticated()) {
-            return false;
+        // Regenerate session ID to prevent session fixation
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
         }
 
-        try {
-            return $this->auth->hasRole(Role::ADMIN);
-        } catch (\Delight\Auth\AuthError) {
-            return false;
-        }
-    }
+        $_SESSION[self::SESSION_USER_ID] = $userId;
+        $_SESSION[self::SESSION_USERNAME] = $username;
 
-    public function register(string $email, string $password, string $username, ?callable $emailCallback = null): int
-    {
-        $this->lastError = null;
-
-        try {
-            $userId = $this->auth->registerWithUniqueUsername($email, $password, $username, $emailCallback);
-
-            // Create a matching profile row in nuke_users
-            $this->createNukeUserProfile($userId, $username, $email, $password);
-
-            return $userId;
-        } catch (\Delight\Auth\InvalidEmailException) {
-            $this->lastError = 'The email address is invalid.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\InvalidPasswordException) {
-            $this->lastError = 'The password is invalid or too short.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\UserAlreadyExistsException) {
-            $this->lastError = 'A user with this email address already exists.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\DuplicateUsernameException) {
-            $this->lastError = 'This username is already taken.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\TooManyRequestsException) {
-            $this->lastError = 'Too many registration attempts. Please try again later.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\AuthError $e) {
-            $this->lastError = 'Registration failed. Please try again.';
-            throw new \RuntimeException($this->lastError, 0, $e);
-        }
-    }
-
-    public function confirmEmail(string $selector, string $token): array
-    {
-        $this->lastError = null;
-
-        try {
-            $emailPair = $this->auth->confirmEmailAndSignIn($selector, $token);
-            /** @var array<string, mixed> */
-            return ['old_email' => $emailPair[0] ?? null, 'new_email' => $emailPair[1] ?? null];
-        } catch (\Delight\Auth\InvalidSelectorTokenPairException) {
-            $this->lastError = 'Invalid or expired confirmation link.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\TokenExpiredException) {
-            $this->lastError = 'This confirmation link has expired. Please register again.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\UserAlreadyExistsException) {
-            $this->lastError = 'This email has already been confirmed.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\TooManyRequestsException) {
-            $this->lastError = 'Too many attempts. Please try again later.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\AuthError $e) {
-            $this->lastError = 'Email confirmation failed. Please try again.';
-            throw new \RuntimeException($this->lastError, 0, $e);
-        }
-    }
-
-    public function forgotPassword(string $email, callable $callback): void
-    {
-        $this->lastError = null;
-
-        try {
-            $this->auth->forgotPassword($email, $callback);
-        } catch (\Delight\Auth\InvalidEmailException) {
-            // Silently ignore — don't reveal whether the email exists
-        } catch (\Delight\Auth\EmailNotVerifiedException) {
-            // Silently ignore — don't reveal account status
-        } catch (\Delight\Auth\ResetDisabledException) {
-            // Silently ignore — don't reveal account status
-        } catch (\Delight\Auth\TooManyRequestsException) {
-            $this->lastError = 'Too many password reset attempts. Please try again later.';
-        } catch (\Delight\Auth\AuthError) {
-            // Silently ignore — don't reveal internal errors for password reset
-        }
-    }
-
-    public function resetPassword(string $selector, string $token, string $newPassword): void
-    {
-        $this->lastError = null;
-
-        try {
-            $this->auth->resetPassword($selector, $token, $newPassword);
-        } catch (\Delight\Auth\InvalidSelectorTokenPairException) {
-            $this->lastError = 'Invalid or expired password reset link.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\TokenExpiredException) {
-            $this->lastError = 'This password reset link has expired. Please request a new one.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\ResetDisabledException) {
-            $this->lastError = 'Password reset is not available for this account.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\InvalidPasswordException) {
-            $this->lastError = 'The new password is invalid or too short.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\TooManyRequestsException) {
-            $this->lastError = 'Too many attempts. Please try again later.';
-            throw new \RuntimeException($this->lastError);
-        } catch (\Delight\Auth\AuthError $e) {
-            $this->lastError = 'Password reset failed. Please try again.';
-            throw new \RuntimeException($this->lastError, 0, $e);
-        }
-    }
-
-    public function getLastError(): ?string
-    {
-        return $this->lastError;
+        // Clear cached user info so it gets re-fetched
+        $this->cachedUserInfo = null;
     }
 
     /**
-     * Create a matching nuke_users profile row for a newly registered user
-     *
-     * This ensures legacy code that queries nuke_users for profile data continues working.
+     * Upgrade a user's password hash from MD5 to bcrypt
      */
-    private function createNukeUserProfile(int $userId, string $username, string $email, string $password): void
+    private function upgradeHash(string $username, string $plaintext): void
     {
-        $hashedPassword = $this->hashPassword($password);
-        $regDate = date('F d, Y');
-
-        $stmt = $this->db->prepare(
-            'INSERT INTO nuke_users (user_id, username, user_email, user_password, user_regdate, storynum, umode, uorder, thold, noscore, ublockon, theme, commentmax) VALUES (?, ?, ?, ?, ?, 10, \'\', 0, 0, 0, 0, \'\', 4096)',
-        );
+        $newHash = $this->hashPassword($plaintext);
+        $stmt = $this->db->prepare('UPDATE nuke_users SET user_password = ? WHERE username = ?');
         if ($stmt === false) {
             return;
         }
-        $stmt->bind_param('issss', $userId, $username, $email, $hashedPassword, $regDate);
+        $stmt->bind_param('ss', $newHash, $username);
         $stmt->execute();
         $stmt->close();
     }

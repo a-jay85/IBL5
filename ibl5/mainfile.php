@@ -172,10 +172,17 @@ foreach ($_REQUEST as $key => $value) {
     }
 }
 
-// Admin auth is now session-based via AuthService (delight-im/auth)
-// Legacy admin cookie block has been removed — admin status is checked via $authService->isAdmin()
-// Initialize $admin to empty string for backward compatibility with callers of is_admin($admin)
-$admin = '';
+// This block of code makes sure $admin is a COOKIE (admin auth is legacy, untouched)
+if (isset($admin) && $admin != $_COOKIE['admin']) {
+    die("Illegal Operation");
+}
+
+if (isset($_COOKIE['admin'])) {
+    $admin = base64_decode($_COOKIE['admin']);
+    $admin = addslashes($admin);
+    $admin = base64_encode($admin);
+}
+// User auth is now session-based via AuthService — legacy cookie is ignored
 
 // Die message for not allowed HTML tags
 $htmltags = "<center><img src=\"images/logo.gif\"><br><br><b>";
@@ -381,13 +388,31 @@ function get_lang($module)
 
 function is_admin($admin)
 {
-    // Session-based admin auth via AuthService (delight-im/auth) — the $admin parameter is kept for signature compat
-    global $authService;
     static $adminSave;
+    if (!$admin) {return 0;}
     if (isset($adminSave)) {
         return $adminSave;
     }
-    return $adminSave = $authService->isAdmin() ? 1 : 0;
+
+    if (!is_array($admin)) {
+        $admin = base64_decode($admin);
+        $admin = addslashes($admin);
+        $admin = explode(':', $admin);
+    }
+    $aid = $admin[0];
+    $pwd = $admin[1];
+    $aid = substr(addslashes($aid), 0, 25);
+    if (!empty($aid) && !empty($pwd)) {
+        global $prefix, $db;
+        $sql = "SELECT pwd FROM " . $prefix . "_authors WHERE aid='$aid'";
+        $result = $db->sql_query($sql);
+        $pass = $db->sql_fetchrow($result);
+        $db->sql_freeresult($result);
+        if ($pass[0] == $pwd && !empty($pass[0])) {
+            return $adminSave = 1;
+        }
+    }
+    return $adminSave = 0;
 }
 
 function is_user($user)

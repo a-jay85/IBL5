@@ -30,7 +30,7 @@ class NegotiationIntegrationTest extends IntegrationTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->processor = new NegotiationProcessor($this->mockDb, $this->mockDb);
+        $this->processor = new NegotiationProcessor($GLOBALS['mysqli_db']);
         
         // Prevent any external calls during tests
         $_SERVER['SERVER_NAME'] = 'localhost';

@@ -147,13 +147,13 @@ class UpdaterView
     }
 
     /**
-     * Render captured output in a terminal-style log area
+     * Render captured output as muted inline log content
      *
      * Output is rendered as HTML (not escaped) because it originates from
      * trusted internal updater classes, not from user input.
      *
      * @param string $capturedOutput Raw HTML output captured via ob_get_clean()
-     * @return string HTML log area (empty string if no output)
+     * @return string HTML log content (empty string if no output)
      */
     public function renderLog(string $capturedOutput): string
     {
@@ -162,9 +162,7 @@ class UpdaterView
             return '';
         }
 
-        return '<div class="updater-log">'
-            . '<div class="updater-log__body">' . $trimmed . '</div>'
-            . '</div>';
+        return '<div class="updater-log">' . $trimmed . '</div>';
     }
 
     /**

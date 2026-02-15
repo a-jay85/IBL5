@@ -139,12 +139,12 @@ class UpdaterViewTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $result);
     }
 
-    public function testRenderLogShowsTerminalBlock(): void
+    public function testRenderLogShowsInlineContent(): void
     {
         $result = $this->view->renderLog("UPDATE ibl_schedule SET ...\nDone.");
 
         $this->assertStringContainsString('updater-log', $result);
-        $this->assertStringContainsString('updater-log__body', $result);
+        $this->assertStringNotContainsString('updater-log__body', $result);
         $this->assertStringNotContainsString('<details', $result);
     }
 

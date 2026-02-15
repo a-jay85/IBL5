@@ -1,0 +1,237 @@
+/**
+ * Updater - Post-Simulation Update Pipeline UI
+ *
+ * Clean operations log with grouped sections and minimal visual accents.
+ * Renders progressive output as a readable step-by-step log.
+ */
+
+/* ==========================================================================
+   Page Override & Container
+   ========================================================================== */
+
+body:has(> .updater) {
+    width: auto;
+    max-width: none;
+    padding-top: 0;
+    background: var(--gray-50, #f9fafb);
+}
+
+.updater {
+    max-width: 620px;
+    margin: var(--space-8, 2rem) auto;
+    padding: 0 var(--space-4, 1rem);
+    font-family: var(--font-sans, 'Barlow', sans-serif);
+}
+
+/* ==========================================================================
+   Title
+   ========================================================================== */
+
+.updater__title {
+    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-size: 1.25rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray-800, #1f2937);
+    margin: 0 0 var(--space-6, 1.5rem);
+    padding-bottom: var(--space-3, 0.75rem);
+    border-bottom: 2px solid var(--gray-800, #1f2937);
+}
+
+/* ==========================================================================
+   Sections
+   ========================================================================== */
+
+.updater-section {
+    margin-bottom: var(--space-6, 1.5rem);
+}
+
+.updater-section__label {
+    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--gray-400, #9ca3af);
+    margin-bottom: var(--space-2, 0.5rem);
+}
+
+/* ==========================================================================
+   Initialization Lines
+   ========================================================================== */
+
+.updater-init {
+    font-size: 0.8125rem;
+    color: var(--gray-400, #9ca3af);
+    line-height: 1.8;
+}
+
+.updater-init__check {
+    color: var(--success-500, #22c55e);
+    font-weight: 700;
+    font-size: 0.75rem;
+}
+
+/* ==========================================================================
+   Step Lines
+   ========================================================================== */
+
+.updater-step {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2, 0.5rem);
+    padding: var(--space-1, 0.25rem) 0;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--gray-700, #374151);
+}
+
+/* --- Running State --- */
+
+.updater-step--running {
+    color: var(--gray-400, #9ca3af);
+    font-weight: 400;
+}
+
+/* Hide running indicator once its step completes (progressive output keeps both in DOM) */
+.updater-step--running:has(~ .updater-step) {
+    display: none;
+}
+
+/* --- Icon --- */
+
+.updater-step__icon {
+    flex-shrink: 0;
+    width: 0.875rem;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.875rem;
+    line-height: 1;
+}
+
+.updater-step--success .updater-step__icon {
+    color: var(--success-600, #16a34a);
+}
+
+.updater-step--error .updater-step__icon {
+    color: var(--error-600, #dc2626);
+}
+
+/* --- Spinner --- */
+
+.updater-step__spinner {
+    width: 0.875rem;
+    height: 0.875rem;
+    border: 2px solid var(--gray-200, #e5e7eb);
+    border-top-color: var(--gray-400, #9ca3af);
+    border-radius: 50%;
+    animation: updater-spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes updater-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* --- Label --- */
+
+.updater-step__label {
+    font-family: var(--font-sans, 'Barlow', sans-serif);
+}
+
+/* --- Detail (optional secondary text) --- */
+
+.updater-step__detail {
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: var(--gray-400, #9ca3af);
+}
+
+.updater-step__detail::before {
+    content: '\b7';
+    margin-right: var(--space-1, 0.25rem);
+    color: var(--gray-300, #d1d5db);
+}
+
+/* --- Inline error message --- */
+
+.updater-step__error {
+    flex-basis: 100%;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: var(--error-600, #dc2626);
+    padding: var(--space-1, 0.25rem) 0 var(--space-1, 0.25rem) calc(0.875rem + var(--space-2, 0.5rem));
+}
+
+/* ==========================================================================
+   Log Content
+   ========================================================================== */
+
+.updater-log {
+    font-size: 0.75rem;
+    color: var(--gray-400, #9ca3af);
+    line-height: 1.6;
+    padding: 0 0 var(--space-1, 0.25rem) calc(0.875rem + var(--space-2, 0.5rem));
+    word-break: break-word;
+}
+
+.updater-log p {
+    margin: 0.125em 0;
+}
+
+.updater-log b,
+.updater-log strong {
+    color: var(--gray-600, #4b5563);
+    font-weight: 600;
+}
+
+.updater-log font[color="red"],
+.updater-log .text-error {
+    color: var(--error-500, #ef4444);
+}
+
+.updater-log pre {
+    margin: 0.25em 0;
+    white-space: pre-wrap;
+}
+
+/* ==========================================================================
+   Summary
+   ========================================================================== */
+
+.updater-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3, 0.75rem);
+    padding: var(--space-3, 0.75rem) 0;
+    border-top: 2px solid var(--gray-800, #1f2937);
+}
+
+.updater-summary__status {
+    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.updater-summary__status--success {
+    color: var(--success-600, #16a34a);
+}
+
+.updater-summary__status--error {
+    color: var(--error-600, #dc2626);
+}
+
+/* ==========================================================================
+   Return Link
+   ========================================================================== */
+
+.updater__return {
+    display: block;
+    text-align: center;
+    margin-top: var(--space-4, 1rem);
+}

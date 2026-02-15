@@ -34,7 +34,8 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         // Extract and sanitize input
         /** @var string $teamName */
         $teamName = $postData['teamname'] ?? '';
-        $playerID = (int) ($postData['playerID'] ?? 0);
+        $rawPlayerID = $postData['playerID'] ?? 0;
+        $playerID = is_numeric($rawPlayerID) ? (int) $rawPlayerID : 0;
 
         // Load player object
         $player = \Player\Player::withPlayerID($this->mysqli_db, $playerID);
@@ -119,7 +120,8 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         /** @var array{softCapSpace: array<int, int>, hardCapSpace: array<int, int>, totalSalaries: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
         $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0] + $existingOfferYear1;
 
-        $offerType = (int) ($postData['offerType'] ?? 0);
+        $rawOfferType = $postData['offerType'] ?? 0;
+        $offerType = is_numeric($rawOfferType) ? (int) $rawOfferType : 0;
 
         // Parse offer amounts based on exception type
         if (OfferType::isVeteranMinimum($offerType)) {
@@ -149,12 +151,18 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
             $offer6 = $offerType >= 6 ? $mleOffers[5] : 0;
         } else {
             // Custom offer
-            $offer1 = (int) ($postData['offeryear1'] ?? 0);
-            $offer2 = (int) ($postData['offeryear2'] ?? 0);
-            $offer3 = (int) ($postData['offeryear3'] ?? 0);
-            $offer4 = (int) ($postData['offeryear4'] ?? 0);
-            $offer5 = (int) ($postData['offeryear5'] ?? 0);
-            $offer6 = (int) ($postData['offeryear6'] ?? 0);
+            $raw1 = $postData['offeryear1'] ?? 0;
+            $raw2 = $postData['offeryear2'] ?? 0;
+            $raw3 = $postData['offeryear3'] ?? 0;
+            $raw4 = $postData['offeryear4'] ?? 0;
+            $raw5 = $postData['offeryear5'] ?? 0;
+            $raw6 = $postData['offeryear6'] ?? 0;
+            $offer1 = is_numeric($raw1) ? (int) $raw1 : 0;
+            $offer2 = is_numeric($raw2) ? (int) $raw2 : 0;
+            $offer3 = is_numeric($raw3) ? (int) $raw3 : 0;
+            $offer4 = is_numeric($raw4) ? (int) $raw4 : 0;
+            $offer5 = is_numeric($raw5) ? (int) $raw5 : 0;
+            $offer6 = is_numeric($raw6) ? (int) $raw6 : 0;
         }
 
         return [

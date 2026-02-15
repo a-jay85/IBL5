@@ -270,18 +270,6 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
     </article>';
 }
 
-function themesidebox($title, $content)
-{
-    $safeTitle = \Utilities\HtmlSanitizer::safeHtmlOutput($title);
-
-    echo '<aside class="ibl-sidebar-block">
-        <header class="ibl-sidebar-block__header">
-            <h3 class="ibl-sidebar-block__title">' . $safeTitle . '</h3>
-        </header>
-        <div class="ibl-sidebar-block__body">' . $content . '</div>
-    </aside>';
-}
-
 /**
  * Center block for homepage content (Leaders, News, etc.)
  * Modern responsive container styling

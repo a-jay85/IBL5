@@ -560,28 +560,12 @@ function render_blocks($side, $blockfile, $title, $content, $bid, $url)
     }
     if (empty($url)) {
         if (empty($blockfile)) {
-            if ($side == "c") {
-                themecenterbox($title, $content);
-            } elseif ($side == "d") {
-                themecenterbox($title, $content);
-            } else {
-                themesidebox($title, $content);
-            }
+            themecenterbox($title, $content);
         } else {
-            if ($side == "c") {
-                blockfileinc($title, $blockfile, 1);
-            } elseif ($side == "d") {
-                blockfileinc($title, $blockfile, 1);
-            } else {
-                blockfileinc($title, $blockfile);
-            }
+            blockfileinc($title, $blockfile, 1);
         }
     } else {
-        if ($side == "c" or $side == "d") {
-            headlines($bid, 1);
-        } else {
-            headlines($bid);
-        }
+        headlines($bid, 1);
     }
 }
 
@@ -635,11 +619,7 @@ function blocks($side)
                     return;
                 }
             }
-            if ($row['bkey'] == "admin") {
-                adminblock();
-            } elseif ($row['bkey'] == "userbox") {
-                userblock();
-            } elseif (empty($row['bkey'])) {
+            if (empty($row['bkey'])) {
                 if ($view == 0) {
                     render_blocks($side, $blockfile, $title, $content, $bid, $url);
                 } elseif ($view == 1 and is_user($user) || is_admin($admin)) {
@@ -789,13 +769,7 @@ function blockfileinc($title, $blockfile, $side = 0)
     if (empty($content)) {
         $content = _BLOCKPROBLEM2;
     }
-    if ($side == 1) {
-        themecenterbox($blockfiletitle, $content);
-    } elseif ($side == 2) {
-        themecenterbox($blockfiletitle, $content);
-    } else {
-        themesidebox($blockfiletitle, $content);
-    }
+    themecenterbox($blockfiletitle, $content);
 }
 
 
@@ -1061,32 +1035,6 @@ if (!function_exists("themepreview")) {
     }
 }
 
-function adminblock()
-{
-    global $admin, $prefix, $db, $admin_file;
-    if (is_admin($admin)) {
-        $sql = "SELECT title, content FROM " . $prefix . "_blocks WHERE bkey='admin'";
-        $result = $db->sql_query($sql);
-        while (list($title, $content) = $db->sql_fetchrow($result)) {
-            $content = filter($content);
-            $title = filter($title, "nohtml");
-            $content = "<span class=\"content\">" . $content . "</span>";
-            themesidebox($title, $content);
-        }
-        $title = _WAITINGCONT;
-        $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_queue"));
-        $content = "<span class=\"content\">";
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=submissions\">" . _SUBMISSIONS . "</a>: $num<br>";
-        $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_newlink"));
-        $brokenl = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_modrequest WHERE brokenlink='1'"));
-        $modreql = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_modrequest WHERE brokenlink='0'"));
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=Links\">" . _WLINKS . "</a>: $num<br>";
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=LinksListModRequests\">" . _MODREQLINKS . "</a>: $modreql<br>";
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=LinksListBrokenLinks\">" . _BROKENLINKS . "</a>: $brokenl<br>";
-        themesidebox($title, $content);
-    }
-}
-
 function loginbox()
 {
     global $user, $sitekey, $gfx_chk;
@@ -1114,23 +1062,7 @@ function loginbox()
         $boxstuff .= "<input type=\"hidden\" name=\"op\" value=\"login\">";
         $boxstuff .= "<input type=\"submit\" value=\"" . _LOGIN . "\"></font></center></form>";
         $boxstuff .= "<center><font class=\"content\">" . _ASREGISTERED . "</font></center>";
-        themesidebox($title, $boxstuff);
-    }
-}
-
-function userblock()
-{
-    global $user, $cookie, $db, $user_prefix, $userinfo;
-    if (is_user($user)) {
-        getusrinfo($user);
-        if ($userinfo['ublockon']) {
-            $sql = "SELECT ublock FROM " . $user_prefix . "_users WHERE user_id='$cookie[0]'";
-            $result = $db->sql_query($sql);
-            $row = $db->sql_fetchrow($result);
-            $ublock = intval($row['ublock']);
-            $title = _MENUFOR . " " . $cookie[1];
-            themesidebox($title, $ublock);
-        }
+        themecenterbox($title, $boxstuff);
     }
 }
 
@@ -1168,11 +1100,7 @@ function headlines($bid, $cenbox = 0)
             $content = "";
             $db->sql_query("UPDATE " . $prefix . "_blocks SET content='$content', time='$btime' WHERE bid='$bid'");
             $cont = 0;
-            if ($cenbox == 0) {
-                themesidebox($title, $content);
-            } else {
-                themecenterbox($title, $content);
-            }
+            themecenterbox($title, $content);
             return;
         }
         if ($fp) {
@@ -1201,11 +1129,7 @@ function headlines($bid, $cenbox = 0)
                     $content = "";
                     $db->sql_query("UPDATE " . $prefix . "_blocks SET content='$content', time='$btime' WHERE bid='$bid'");
                     $cont = 0;
-                    if ($cenbox == 0) {
-                        themesidebox($title, $content);
-                    } else {
-                        themecenterbox($title, $content);
-                    }
+                    themecenterbox($title, $content);
                     return;
                 } else {
                     if (strcmp($link, $title2) and !empty($items[$i])) {
@@ -1225,11 +1149,7 @@ function headlines($bid, $cenbox = 0)
     } elseif (($cont == 0) or (empty($content))) {
         $content = "<font class=\"content\">" . _RSSPROBLEM . "</font>";
     }
-    if ($cenbox == 0) {
-        themesidebox($title, $content);
-    } else {
-        themecenterbox($title, $content);
-    }
+    themecenterbox($title, $content);
 }
 
 function automated_news()

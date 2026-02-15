@@ -86,6 +86,9 @@ $errorCount = 0;
 
 try {
     // --- Initialization ---
+    echo $view->renderSectionOpen('Initialization');
+    flush();
+
     echo $view->renderInitStatus('mainfile.php loaded');
     flush();
 
@@ -111,6 +114,13 @@ try {
 
     $powerRankingsUpdater = new Updater\PowerRankingsUpdater($mysqli_db, $season);
     echo $view->renderInitStatus('PowerRankingsUpdater initialized');
+    flush();
+
+    echo $view->renderSectionClose();
+    flush();
+
+    // --- Pipeline ---
+    echo $view->renderSectionOpen('Pipeline');
     flush();
 
     // --- Step 1: Update schedule ---
@@ -173,6 +183,9 @@ try {
     }
     flush();
     $successCount++;
+
+    echo $view->renderSectionClose();
+    flush();
 
     echo $view->renderSummary($successCount, $errorCount);
     flush();

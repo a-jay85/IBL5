@@ -1,29 +1,60 @@
 /**
  * Updater - Post-Simulation Update Pipeline UI
  *
- * Admin-facing progressive output for updateAllTheThings.php.
- * Styled as a step-by-step operations pipeline with terminal log areas.
+ * Clean operations log with grouped sections and minimal visual accents.
+ * Renders progressive output as a readable step-by-step log.
  */
 
 /* ==========================================================================
-   Layout Container
+   Page Override & Container
    ========================================================================== */
 
-/* Override base.css body width for standalone updater page */
 body:has(> .updater) {
     width: auto;
     max-width: none;
     padding-top: 0;
+    background: var(--gray-50, #f9fafb);
 }
 
 .updater {
-    max-width: 680px;
+    max-width: 620px;
     margin: var(--space-8, 2rem) auto;
     padding: 0 var(--space-4, 1rem);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4, 1rem);
     font-family: var(--font-sans, 'Barlow', sans-serif);
+}
+
+/* ==========================================================================
+   Title
+   ========================================================================== */
+
+.updater__title {
+    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-size: 1.25rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gray-800, #1f2937);
+    margin: 0 0 var(--space-6, 1.5rem);
+    padding-bottom: var(--space-3, 0.75rem);
+    border-bottom: 2px solid var(--gray-800, #1f2937);
+}
+
+/* ==========================================================================
+   Sections
+   ========================================================================== */
+
+.updater-section {
+    margin-bottom: var(--space-6, 1.5rem);
+}
+
+.updater-section__label {
+    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--gray-400, #9ca3af);
+    margin-bottom: var(--space-2, 0.5rem);
 }
 
 /* ==========================================================================
@@ -32,31 +63,26 @@ body:has(> .updater) {
 
 .updater-init {
     font-size: 0.8125rem;
-    color: var(--gray-500, #6b7280);
-    line-height: 1.6;
-    padding: 0 var(--space-1, 0.25rem);
+    color: var(--gray-400, #9ca3af);
+    line-height: 1.8;
 }
 
 .updater-init__check {
-    color: var(--success-600, #16a34a);
+    color: var(--success-500, #22c55e);
     font-weight: 700;
+    font-size: 0.75rem;
 }
 
 /* ==========================================================================
-   Step Progress Indicators
+   Step Lines
    ========================================================================== */
 
 .updater-step {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    width: fit-content;
-    max-width: 100%;
     gap: var(--space-2, 0.5rem);
-    padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
-    border-radius: var(--radius-md, 0.375rem);
-    border-left: 3px solid var(--gray-300, #d1d5db);
-    background: var(--gray-50, #f9fafb);
+    padding: var(--space-1, 0.25rem) 0;
     font-size: 0.9375rem;
     font-weight: 500;
     color: var(--gray-700, #374151);
@@ -65,50 +91,18 @@ body:has(> .updater) {
 /* --- Running State --- */
 
 .updater-step--running {
-    border-left-color: var(--accent-500, #f97316);
-    background: var(--accent-100, #ffedd5);
-    color: var(--gray-800, #1f2937);
+    color: var(--gray-400, #9ca3af);
+    font-weight: 400;
 }
 
-/* --- Success State --- */
-
-.updater-step--success {
-    border-left-color: var(--success-600, #16a34a);
-    background: var(--success-100, #dcfce7);
-    color: var(--gray-800, #1f2937);
-}
-
-/* --- Error State --- */
-
-.updater-step--error {
-    border-left-color: var(--error-600, #dc2626);
-    background: var(--error-100, #fee2e2);
-    color: var(--gray-800, #1f2937);
-}
-
-/* --- Spinner (running state) --- */
-
-.updater-step__spinner {
-    width: 1rem;
-    height: 1rem;
-    border: 2px solid var(--gray-300, #d1d5db);
-    border-top-color: var(--accent-500, #f97316);
-    border-radius: 50%;
-    animation: updater-spin 0.7s linear infinite;
-    flex-shrink: 0;
-}
-
-@keyframes updater-spin {
-    to { transform: rotate(360deg); }
-}
-
-/* --- Icon (success/error checkmark or X) --- */
+/* --- Icon --- */
 
 .updater-step__icon {
     flex-shrink: 0;
-    width: 1rem;
+    width: 0.875rem;
     text-align: center;
     font-weight: 700;
+    font-size: 0.875rem;
     line-height: 1;
 }
 
@@ -118,6 +112,22 @@ body:has(> .updater) {
 
 .updater-step--error .updater-step__icon {
     color: var(--error-600, #dc2626);
+}
+
+/* --- Spinner --- */
+
+.updater-step__spinner {
+    width: 0.875rem;
+    height: 0.875rem;
+    border: 2px solid var(--gray-200, #e5e7eb);
+    border-top-color: var(--gray-400, #9ca3af);
+    border-radius: 50%;
+    animation: updater-spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes updater-spin {
+    to { transform: rotate(360deg); }
 }
 
 /* --- Label --- */
@@ -131,26 +141,31 @@ body:has(> .updater) {
 .updater-step__detail {
     font-size: 0.8125rem;
     font-weight: 400;
-    color: var(--gray-500, #6b7280);
+    color: var(--gray-400, #9ca3af);
 }
 
-/* --- Inline alert inside error step --- */
+.updater-step__detail::before {
+    content: '\b7';
+    margin-right: var(--space-1, 0.25rem);
+    color: var(--gray-300, #d1d5db);
+}
 
-.updater-step .ibl-alert {
+/* --- Inline error message --- */
+
+.updater-step__error {
     flex-basis: 100%;
-    margin: var(--space-2, 0.5rem) 0 0;
     font-size: 0.8125rem;
+    font-weight: 400;
+    color: var(--error-600, #dc2626);
+    padding: var(--space-1, 0.25rem) 0 var(--space-1, 0.25rem) calc(0.875rem + var(--space-2, 0.5rem));
 }
 
 /* ==========================================================================
-   Collapsible Terminal Log
+   Terminal Log
    ========================================================================== */
 
 .updater-log {
-    margin-top: calc(-1 * var(--space-2, 0.5rem));
-    margin-bottom: var(--space-1, 0.25rem);
-    width: fit-content;
-    max-width: 100%;
+    margin: var(--space-1, 0.25rem) 0 var(--space-2, 0.5rem);
     background: var(--navy-900, #0f172a);
     border-radius: var(--radius-md, 0.375rem);
     overflow: hidden;
@@ -192,27 +207,36 @@ body:has(> .updater) {
 }
 
 /* ==========================================================================
-   Summary Section
+   Summary
    ========================================================================== */
 
 .updater-summary {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    width: fit-content;
-    gap: var(--space-2, 0.5rem);
+    gap: var(--space-3, 0.75rem);
     padding: var(--space-3, 0.75rem) 0;
+    border-top: 2px solid var(--gray-800, #1f2937);
 }
 
-/* --- Error badge variant (reuses .ibl-badge pattern) --- */
+.updater-summary__status {
+    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
 
-.ibl-badge--error {
-    background: #fef2f2;
-    color: #dc2626;
+.updater-summary__status--success {
+    color: var(--success-600, #16a34a);
+}
+
+.updater-summary__status--error {
+    color: var(--error-600, #dc2626);
 }
 
 /* ==========================================================================
-   Return Button
+   Return Link
    ========================================================================== */
 
 .updater__return {

@@ -28,7 +28,7 @@ class UpdaterViewTest extends TestCase
         $this->assertStringContainsString('<html lang="en">', $result);
         $this->assertStringContainsString('Update All The Things', $result);
         $this->assertStringContainsString('style.css', $result);
-        $this->assertStringContainsString('ibl-card', $result);
+        $this->assertStringContainsString('updater__title', $result);
     }
 
     public function testRenderPageOpenEscapesStylesheetPath(): void
@@ -39,6 +39,31 @@ class UpdaterViewTest extends TestCase
         $this->assertStringNotContainsString('"onclick="', $result);
         $this->assertStringContainsString('&amp;', $result);
         $this->assertStringContainsString('&quot;', $result);
+    }
+
+    public function testRenderSectionOpenReturnsLabelledSection(): void
+    {
+        $result = $this->view->renderSectionOpen('Initialization');
+
+        $this->assertStringContainsString('updater-section', $result);
+        $this->assertStringContainsString('updater-section__label', $result);
+        $this->assertStringContainsString('Initialization', $result);
+        $this->assertStringContainsString('<section', $result);
+    }
+
+    public function testRenderSectionOpenEscapesXss(): void
+    {
+        $result = $this->view->renderSectionOpen('<script>alert(1)</script>');
+
+        $this->assertStringNotContainsString('<script>', $result);
+        $this->assertStringContainsString('&lt;script&gt;', $result);
+    }
+
+    public function testRenderSectionCloseReturnsSectionTag(): void
+    {
+        $result = $this->view->renderSectionClose();
+
+        $this->assertSame('</section>', $result);
     }
 
     public function testRenderInitStatusReturnsCheckmark(): void
@@ -91,14 +116,14 @@ class UpdaterViewTest extends TestCase
         $this->assertStringNotContainsString('updater-step__detail', $result);
     }
 
-    public function testRenderStepErrorShowsXAndAlert(): void
+    public function testRenderStepErrorShowsXAndErrorMessage(): void
     {
         $result = $this->view->renderStepError('Schedule', 'Connection refused');
 
         $this->assertStringContainsString('updater-step--error', $result);
         $this->assertStringContainsString('&#10007;', $result);
         $this->assertStringContainsString('Schedule', $result);
-        $this->assertStringContainsString('ibl-alert--error', $result);
+        $this->assertStringContainsString('updater-step__error', $result);
         $this->assertStringContainsString('Connection refused', $result);
     }
 
@@ -141,9 +166,9 @@ class UpdaterViewTest extends TestCase
         $result = $this->view->renderSummary(5, 0);
 
         $this->assertStringContainsString('updater-summary', $result);
-        $this->assertStringContainsString('ibl-badge--success', $result);
+        $this->assertStringContainsString('updater-summary__status--success', $result);
         $this->assertStringContainsString('5 steps completed', $result);
-        $this->assertStringNotContainsString('ibl-badge--error', $result);
+        $this->assertStringNotContainsString('updater-summary__status--error', $result);
     }
 
     public function testRenderSummarySingleStep(): void
@@ -157,9 +182,9 @@ class UpdaterViewTest extends TestCase
     {
         $result = $this->view->renderSummary(3, 2);
 
-        $this->assertStringContainsString('ibl-badge--success', $result);
+        $this->assertStringContainsString('updater-summary__status--success', $result);
         $this->assertStringContainsString('3 succeeded', $result);
-        $this->assertStringContainsString('ibl-badge--error', $result);
+        $this->assertStringContainsString('updater-summary__status--error', $result);
         $this->assertStringContainsString('2 failed', $result);
     }
 

@@ -7,15 +7,15 @@ namespace Updater;
 use Utilities\HtmlSanitizer;
 
 /**
- * UpdaterView - Renders the admin update page with progressive output
+ * UpdaterView - Renders the admin update page as a clean operations log
  *
  * Provides structured HTML rendering for the updateAllTheThings script,
- * replacing raw inline HTML with styled, XSS-safe output.
+ * with grouped sections and minimal visual accents.
  */
 class UpdaterView
 {
     /**
-     * Render the page opening: doctype, head with fonts/stylesheet, body open, card header
+     * Render the page opening: doctype, head with fonts/stylesheet, body open, title
      *
      * @param string $stylesheetPath Path to the compiled stylesheet
      * @return string HTML page opening
@@ -36,11 +36,32 @@ class UpdaterView
             . '</head><body>'
             . str_repeat(' ', 1024)
             . '<div class="updater">'
-            . '<div class="ibl-card">'
-            . '<div class="ibl-card__header">'
-            . '<h1 class="ibl-card__title">Update All The Things</h1>'
-            . '</div>'
-            . '<div class="ibl-card__body">';
+            . '<h1 class="updater__title">Update All The Things</h1>';
+    }
+
+    /**
+     * Open a labelled section group
+     *
+     * @param string $label Section heading (e.g. "Initialization", "Pipeline")
+     * @return string HTML section opening with label
+     */
+    public function renderSectionOpen(string $label): string
+    {
+        /** @var string $safeLabel */
+        $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
+
+        return '<section class="updater-section">'
+            . '<div class="updater-section__label">' . $safeLabel . '</div>';
+    }
+
+    /**
+     * Close a section group
+     *
+     * @return string HTML section closing tag
+     */
+    public function renderSectionClose(): string
+    {
+        return '</section>';
     }
 
     /**
@@ -121,12 +142,12 @@ class UpdaterView
         return '<div class="updater-step updater-step--error">'
             . '<span class="updater-step__icon">&#10007;</span>'
             . '<span class="updater-step__label">' . $safeLabel . '</span>'
-            . '<div class="ibl-alert ibl-alert--error">' . $safeError . '</div>'
+            . '<div class="updater-step__error">' . $safeError . '</div>'
             . '</div>';
     }
 
     /**
-     * Render captured output in a collapsible terminal-style log area
+     * Render captured output in a terminal-style log area
      *
      * Output is rendered as HTML (not escaped) because it originates from
      * trusted internal updater classes, not from user input.
@@ -147,7 +168,7 @@ class UpdaterView
     }
 
     /**
-     * Render summary badges showing success/error counts
+     * Render summary status line showing success/error counts
      *
      * @param int $successCount Number of successful steps
      * @param int $errorCount Number of failed steps
@@ -158,12 +179,12 @@ class UpdaterView
         $html = '<div class="updater-summary">';
 
         if ($errorCount === 0) {
-            $html .= '<span class="ibl-badge ibl-badge--success">'
+            $html .= '<span class="updater-summary__status updater-summary__status--success">'
                 . $successCount . ' step' . ($successCount !== 1 ? 's' : '') . ' completed</span>';
         } else {
-            $html .= '<span class="ibl-badge ibl-badge--success">'
+            $html .= '<span class="updater-summary__status updater-summary__status--success">'
                 . $successCount . ' succeeded</span>'
-                . '<span class="ibl-badge ibl-badge--error">'
+                . '<span class="updater-summary__status updater-summary__status--error">'
                 . $errorCount . ' failed</span>';
         }
 
@@ -173,14 +194,13 @@ class UpdaterView
     }
 
     /**
-     * Render the page closing: "Return to IBL" button and close tags
+     * Render the page closing: "Return to IBL" link and close tags
      *
      * @return string HTML page closing
      */
     public function renderPageClose(): string
     {
-        return '</div></div>'
-            . '<a href="/ibl5/index.php" class="ibl-btn updater__return">Return to IBL</a>'
+        return '<a href="/ibl5/index.php" class="ibl-btn updater__return">Return to IBL</a>'
             . '</div>'
             . '</body></html>';
     }

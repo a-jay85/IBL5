@@ -103,7 +103,7 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
             die();
         }
         if (empty($user_password) and empty($user_password2)) {
-            $user_password = makepass();
+            $user_password = substr(bin2hex(random_bytes(5)), 0, 10);
         } elseif ($user_password != $user_password2) {
             title("" . _NEWUSERERROR . "");
             OpenTable();
@@ -813,7 +813,7 @@ function mail_password($username, $code)
         // Use user_actkey as reset verification code (no longer derived from password hash)
         $storedCode = $row['user_actkey'] ?? '';
         if ($storedCode !== '' && $storedCode === $code) {
-            $newpass = makepass();
+            $newpass = substr(bin2hex(random_bytes(5)), 0, 10);
             $message = "" . _USERACCOUNT . " '$username' " . _AT . " $sitename " . _HASTHISEMAIL . "  " . _AWEBUSERFROM . " $host_name " . _HASREQUESTED . "\n\n" . _YOURNEWPASSWORD . " $newpass\n\n " . _YOUCANCHANGE . " $nukeurl/modules.php?name=$module_name\n\n" . _IFYOUDIDNOTASK . "";
             $subject = "" . _USERPASSWORD4 . " $username";
             \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);

@@ -7,7 +7,8 @@ namespace Tests\Integration\Mocks;
 /**
  * Factory for creating test data fixtures
  *
- * Provides standardized mock data for players, teams, and seasons
+ * Provides standardized mock data for players, teams, seasons,
+ * draft picks, trade offers, and free agency offers
  * used across integration tests.
  */
 class TestDataFactory
@@ -145,5 +146,157 @@ class TestDataFactory
         ];
 
         return array_merge($defaults, $overrides);
+    }
+
+    /**
+     * Create mock draft pick data with optional overrides
+     *
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    public static function createDraftPick(array $overrides = []): array
+    {
+        $defaults = [
+            'draft_id' => 1,
+            'year' => 2025,
+            'team' => 'Test Team',
+            'player' => '',
+            'round' => 1,
+            'pick' => 1,
+            'date' => null,
+            'uuid' => 'test-draft-uuid-001',
+        ];
+
+        return array_merge($defaults, $overrides);
+    }
+
+    /**
+     * Create mock draft class prospect data with optional overrides
+     *
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    public static function createDraftClassProspect(array $overrides = []): array
+    {
+        $defaults = [
+            'id' => 1,
+            'name' => 'Test Prospect',
+            'pos' => 'PG',
+            'age' => 19,
+            'team' => '',
+            'drafted' => 0,
+            'ranking' => 1.0,
+            'invite' => '',
+            'sta' => 50,
+            'talent' => 50,
+            'skill' => 50,
+            'intangibles' => 50,
+            'fga' => 50,
+            'fgp' => 50,
+            'fta' => 50,
+            'ftp' => 50,
+            'tga' => 50,
+            'tgp' => 50,
+            'orb' => 50,
+            'drb' => 50,
+            'ast' => 50,
+            'stl' => 50,
+            'tvr' => 50,
+            'blk' => 50,
+            'oo' => 50,
+            'do' => 50,
+            'po' => 50,
+            'to' => 50,
+            'od' => 50,
+            'dd' => 50,
+            'pd' => 50,
+            'td' => 50,
+        ];
+
+        return array_merge($defaults, $overrides);
+    }
+
+    /**
+     * Create mock trade offer data with optional overrides
+     *
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    public static function createTradeOffer(array $overrides = []): array
+    {
+        $defaults = [
+            'id' => 1,
+            'created_at' => '2025-01-15 12:00:00',
+        ];
+
+        return array_merge($defaults, $overrides);
+    }
+
+    /**
+     * Create mock trade item data with optional overrides
+     *
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    public static function createTradeItem(array $overrides = []): array
+    {
+        $defaults = [
+            'id' => 1,
+            'tradeofferid' => 1,
+            'itemid' => 100,
+            'itemtype' => '1', // '1' = player, '0' = pick, 'cash' = cash
+            'from' => 'Test Team',
+            'to' => 'Other Team',
+            'approval' => 'pending',
+        ];
+
+        return array_merge($defaults, $overrides);
+    }
+
+    /**
+     * Create mock free agency offer data with optional overrides
+     *
+     * @param array<string, mixed> $overrides
+     * @return array<string, mixed>
+     */
+    public static function createFreeAgentOffer(array $overrides = []): array
+    {
+        $defaults = [
+            'primary_key' => 1,
+            'name' => 'Test Player',
+            'team' => 'Test Team',
+            'offer1' => 500,
+            'offer2' => 550,
+            'offer3' => 600,
+            'offer4' => 0,
+            'offer5' => 0,
+            'offer6' => 0,
+            'modifier' => 1.0,
+            'random' => 0.0,
+            'perceivedvalue' => 550.0,
+            'MLE' => 0,
+            'LLE' => 0,
+            'offer_type' => 0,
+        ];
+
+        return array_merge($defaults, $overrides);
+    }
+
+    /**
+     * Wrap items with a 'total' field for paginated controller tests.
+     *
+     * MockDatabase returns the same data for all queries, so controllers
+     * that call both countX() and getX() need each row to include a 'total'
+     * field so the COUNT(*) query works correctly.
+     *
+     * @param array<int, array<string, mixed>> $items
+     * @return array<int, array<string, mixed>>
+     */
+    public static function createPaginatedData(array $items, int $total): array
+    {
+        return array_map(
+            static fn(array $item): array => array_merge($item, ['total' => $total]),
+            $items
+        );
     }
 }

@@ -420,6 +420,184 @@ class ExtensionIntegrationTest extends IntegrationTestCase
         $this->assertStringContainsString('#extensions', $result['discordChannel']);
     }
 
+    /**
+     * @group integration
+     * @group bird-rights
+     */
+    public function testBirdRightsThresholdExactlyThreeYears(): void
+    {
+        // Arrange - Bird years = 3 is the exact threshold for Bird Rights (12.5% raises allowed)
+        $this->setupBirdRightsThresholdScenario();
+
+        $extensionData = [
+            'teamName' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offer' => [
+                'year1' => 1000,
+                'year2' => 1125, // 12.5% raise exactly, allowed at bird=3
+                'year3' => 1250, // Max raise is 125/yr (12.5% of year1), so 1125+125=1250
+                'year4' => 0,
+                'year5' => 0
+            ]
+        ];
+
+        // Act
+        $result = $this->extensionProcessor->processExtension($extensionData);
+
+        // Assert - 12.5% raise should be allowed at exactly the Bird Rights threshold
+        $this->assertTrue($result['success']);
+    }
+
+    /**
+     * @group integration
+     * @group bird-rights
+     */
+    public function testBirdRightsBelowThreshold(): void
+    {
+        // Arrange - Bird years = 2 means no Bird Rights (max 10% raise)
+        $this->setupBasicExtensionScenario();
+
+        $extensionData = [
+            'teamName' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offer' => [
+                'year1' => 1000,
+                'year2' => 1125, // 12.5% raise exceeds 10% limit without Bird Rights
+                'year3' => 1125, // Valid (no raise)
+                'year4' => 0,
+                'year5' => 0
+            ]
+        ];
+
+        // Act
+        $result = $this->extensionProcessor->processExtension($extensionData);
+
+        // Assert - 12.5% raise should be rejected without Bird Rights (bird=2)
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('raise', $result['error']);
+    }
+
+    /**
+     * @group integration
+     * @group player-preferences
+     */
+    public function testExtensionRejectedByLowLoyaltyPlayer(): void
+    {
+        // Arrange - Player with low loyalty on a losing team
+        $this->setupLowLoyaltyPlayerScenario();
+
+        $extensionData = [
+            'teamName' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offer' => [
+                'year1' => 900,
+                'year2' => 950,
+                'year3' => 1000,
+                'year4' => 0,
+                'year5' => 0
+            ]
+        ];
+
+        // Act
+        $result = $this->extensionProcessor->processExtension($extensionData);
+
+        // Assert - Legal offer but rejected due to low loyalty and losing team
+        $this->assertTrue($result['success']);
+        $this->assertFalse($result['accepted']);
+    }
+
+    /**
+     * @group integration
+     * @group player-preferences
+     */
+    public function testExtensionAcceptedByHighLoyaltyPlayer(): void
+    {
+        // Arrange - Player with high loyalty (loyalty=5)
+        $this->setupHighLoyaltyPlayerScenario();
+
+        $extensionData = [
+            'teamName' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offer' => [
+                'year1' => 850,  // Below market for 6yr exp player
+                'year2' => 900,
+                'year3' => 950,
+                'year4' => 0,
+                'year5' => 0
+            ]
+        ];
+
+        // Act
+        $result = $this->extensionProcessor->processExtension($extensionData);
+
+        // Assert - High loyalty player accepts below-market offer
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['accepted']);
+        $this->assertArrayHasKey('modifier', $result);
+        $this->assertGreaterThan(1.0, $result['modifier']); // Loyalty boosts modifier above 1.0
+    }
+
+    /**
+     * @group integration
+     * @group validation-failures
+     */
+    public function testUsedExtensionThisChunkBlocksSecondAttempt(): void
+    {
+        // Arrange - Already used extension this sim chunk
+        $this->setupAlreadyUsedChunkScenario();
+
+        $extensionData = [
+            'teamName' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offer' => [
+                'year1' => 1000,
+                'year2' => 1100,
+                'year3' => 1200,
+                'year4' => 0,
+                'year5' => 0
+            ]
+        ];
+
+        // Act
+        $result = $this->extensionProcessor->processExtension($extensionData);
+
+        // Assert - Blocked by per-chunk extension limit
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('already used your extension for this sim', $result['error']);
+
+        // Verify no contract updates were made
+        $this->assertQueryNotExecuted('UPDATE ibl_plr');
+    }
+
+    /**
+     * @group integration
+     * @group validation-failures
+     */
+    public function testMaxContractEnforcementByExperience(): void
+    {
+        // Arrange - exp=5 means max salary is 1063 for 0-6 years experience
+        $this->setupBasicExtensionScenario();
+
+        $extensionData = [
+            'teamName' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offer' => [
+                'year1' => 1064, // Just one over the max of 1063
+                'year2' => 1100,
+                'year3' => 1200,
+                'year4' => 0,
+                'year5' => 0
+            ]
+        ];
+
+        // Act
+        $result = $this->extensionProcessor->processExtension($extensionData);
+
+        // Assert - Rejected because year1 exceeds max for experience level
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('over the maximum allowed', $result['error']);
+    }
+
     // ==== HELPER METHODS TO SET UP TEST SCENARIOS ====
 
     private function setupSuccessfulExtensionScenario(): void
@@ -697,6 +875,104 @@ class ExtensionIntegrationTest extends IntegrationTestCase
                 'catid' => 1,
                 'counter' => 10,
                 'topicid' => 5
+            ])
+        ]);
+    }
+
+    private function setupBirdRightsThresholdScenario(): void
+    {
+        $this->mockDb->setMockData([
+            array_merge($this->getBasePlayerData(), [
+                // Team info fields
+                'Used_Extension_This_Season' => 0,
+                'Used_Extension_This_Chunk' => 0,
+                'Contract_Wins' => 50,
+                'Contract_Losses' => 32,
+                'Contract_AvgW' => 2500,
+                'Contract_AvgL' => 2000,
+                'money_committed_at_position' => 0,
+                // Player info fields
+                'pid' => 8,
+                'ordinal' => 8,
+                'name' => 'Bird Threshold Player',
+                'nickname' => 'Birdy',
+                'age' => 28,
+                'exp' => 6,
+                'bird' => 3, // Exactly at Bird Rights threshold
+                'cy' => 1,
+                'cyt' => 1,
+                'winner' => 3,
+                'tradition' => 3,
+                'loyalty' => 3,
+                'playingTime' => 3,
+                'security' => 3,
+                'cy1' => 900,
+                'cy2' => 0,
+                'cy3' => 0,
+                'cy4' => 0,
+                'cy5' => 0,
+                'cy6' => 0,
+                // News story fields
+                'catid' => 1,
+                'counter' => 10,
+                'topicid' => 5
+            ])
+        ]);
+    }
+
+    private function setupLowLoyaltyPlayerScenario(): void
+    {
+        $this->mockDb->setMockData([
+            array_merge($this->getBasePlayerData(), [
+                // Team info fields - losing team
+                'Used_Extension_This_Season' => 0,
+                'Used_Extension_This_Chunk' => 0,
+                'Contract_Wins' => 20,
+                'Contract_Losses' => 62,
+                'Contract_AvgW' => 1200,
+                'Contract_AvgL' => 3800,
+                'money_committed_at_position' => 0,
+                // Player info fields
+                'pid' => 9,
+                'ordinal' => 9,
+                'name' => 'Disloyal Player',
+                'nickname' => 'Leaver',
+                'age' => 26,
+                'exp' => 5,
+                'bird' => 2,
+                'cy' => 1,
+                'cyt' => 1,
+                // Low loyalty, high winner preference - wants to leave losing team
+                'loyalty' => 1,
+                'winner' => 5,
+                'tradition' => 5,
+                'playingTime' => 3,
+                'security' => 3,
+                'cy1' => 800,
+                'cy2' => 0,
+                'cy3' => 0,
+                'cy4' => 0,
+                'cy5' => 0,
+                'cy6' => 0,
+                // News story fields
+                'catid' => 1,
+                'counter' => 10,
+                'topicid' => 5
+            ])
+        ]);
+    }
+
+    private function setupAlreadyUsedChunkScenario(): void
+    {
+        $this->mockDb->setMockData([
+            array_merge($this->getBasePlayerData(), [
+                'Used_Extension_This_Season' => 0,
+                'Used_Extension_This_Chunk' => 1, // Already used this chunk
+                'name' => 'Test Player',
+                'pid' => 10,
+                'ordinal' => 10,
+                'exp' => 5,
+                'bird' => 2
             ])
         ]);
     }

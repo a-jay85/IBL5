@@ -2,10 +2,11 @@
 
 use PHPUnit\Framework\TestCase;
 use Extension\ExtensionValidator;
+use Services\CommonContractValidator;
 
 /**
  * Comprehensive tests for contract extension validation logic
- * 
+ *
  * Tests all validation rules from modules/Player/extension.php including:
  * - Zero contract amount validation
  * - Extension usage validation (per sim and per season)
@@ -15,16 +16,13 @@ use Extension\ExtensionValidator;
  */
 class ExtensionValidationTest extends TestCase
 {
-    private $extensionValidator;
+    private ExtensionValidator $extensionValidator;
+    private CommonContractValidator $contractValidator;
 
     protected function setUp(): void
     {
         $this->extensionValidator = new ExtensionValidator();
-    }
-
-    protected function tearDown(): void
-    {
-        $this->extensionValidator = null;
+        $this->contractValidator = new CommonContractValidator();
     }
 
     /**
@@ -216,7 +214,7 @@ class ExtensionValidationTest extends TestCase
         $yearsExperience = 5;
 
         // Act
-        $result = $this->extensionValidator->validateMaximumYearOneOffer($offer, $yearsExperience);
+        $result = $this->contractValidator->validateMaximumYearOne($offer, $yearsExperience);
 
         // Assert
         $this->assertFalse($result['valid']);
@@ -234,7 +232,7 @@ class ExtensionValidationTest extends TestCase
         $yearsExperience = 5;
 
         // Act
-        $result = $this->extensionValidator->validateMaximumYearOneOffer($offer, $yearsExperience);
+        $result = $this->contractValidator->validateMaximumYearOne($offer, $yearsExperience);
 
         // Assert
         $this->assertTrue($result['valid']);
@@ -251,7 +249,7 @@ class ExtensionValidationTest extends TestCase
         $yearsExperience = 8;
 
         // Act
-        $result = $this->extensionValidator->validateMaximumYearOneOffer($offer, $yearsExperience);
+        $result = $this->contractValidator->validateMaximumYearOne($offer, $yearsExperience);
 
         // Assert
         $this->assertFalse($result['valid']);
@@ -268,7 +266,7 @@ class ExtensionValidationTest extends TestCase
         $yearsExperience = 12;
 
         // Act
-        $result = $this->extensionValidator->validateMaximumYearOneOffer($offer, $yearsExperience);
+        $result = $this->contractValidator->validateMaximumYearOne($offer, $yearsExperience);
 
         // Assert
         $this->assertTrue($result['valid']);
@@ -283,7 +281,7 @@ class ExtensionValidationTest extends TestCase
     public function testRejectsIllegalRaises($offer, $birdYears, $expectedErrorYear)
     {
         // Act
-        $result = $this->extensionValidator->validateRaises($offer, $birdYears);
+        $result = $this->contractValidator->validateRaises($offer, $birdYears);
 
         // Assert
         $this->assertFalse($result['valid']);
@@ -308,7 +306,7 @@ class ExtensionValidationTest extends TestCase
         $birdYears = 2;
 
         // Act
-        $result = $this->extensionValidator->validateRaises($offer, $birdYears);
+        $result = $this->contractValidator->validateRaises($offer, $birdYears);
 
         // Assert
         $this->assertTrue($result['valid']);
@@ -331,7 +329,7 @@ class ExtensionValidationTest extends TestCase
         $birdYears = 3;
 
         // Act
-        $result = $this->extensionValidator->validateRaises($offer, $birdYears);
+        $result = $this->contractValidator->validateRaises($offer, $birdYears);
 
         // Assert
         $this->assertTrue($result['valid']);
@@ -346,7 +344,7 @@ class ExtensionValidationTest extends TestCase
     public function testRejectsSalaryDecreasesBetweenYears($offer, $expectedErrorYear)
     {
         // Act
-        $result = $this->extensionValidator->validateSalaryDecreases($offer);
+        $result = $this->contractValidator->validateSalaryDecreases($offer);
 
         // Assert
         $this->assertFalse($result['valid']);
@@ -369,7 +367,7 @@ class ExtensionValidationTest extends TestCase
         ];
 
         // Act
-        $result = $this->extensionValidator->validateSalaryDecreases($offer);
+        $result = $this->contractValidator->validateSalaryDecreases($offer);
 
         // Assert
         $this->assertTrue($result['valid']);

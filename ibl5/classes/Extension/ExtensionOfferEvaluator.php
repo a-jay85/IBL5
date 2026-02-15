@@ -25,14 +25,6 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
     }
 
     /**
-     * @see ExtensionOfferEvaluatorInterface::calculateOfferValue()
-     */
-    public function calculateOfferValue(array $offer): array
-    {
-        return $this->contractValidator->calculateOfferValue($offer);
-    }
-
-    /**
      * @see ExtensionOfferEvaluatorInterface::calculateWinnerModifier()
      */
     public function calculateWinnerModifier(array $teamFactors, array $playerPreferences): float
@@ -85,8 +77,8 @@ class ExtensionOfferEvaluator implements ExtensionOfferEvaluatorInterface
      */
     public function evaluateOffer(array $offer, array $demands, array $teamFactors, array $playerPreferences): array
     {
-        $offerData = $this->calculateOfferValue($offer);
-        $demandsData = $this->calculateOfferValue($demands);
+        $offerData = $this->contractValidator->calculateOfferValue($offer);
+        $demandsData = $this->contractValidator->calculateOfferValue($demands);
         
         $modifier = $this->calculateCombinedModifier($teamFactors, $playerPreferences);
         

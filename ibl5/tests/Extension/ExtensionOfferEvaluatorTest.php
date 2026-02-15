@@ -7,6 +7,7 @@ namespace Tests\Extension;
 use PHPUnit\Framework\TestCase;
 use Extension\ExtensionOfferEvaluator;
 use Extension\Contracts\ExtensionOfferEvaluatorInterface;
+use Services\CommonContractValidator;
 
 /**
  * ExtensionOfferEvaluatorTest - Tests for ExtensionOfferEvaluator
@@ -14,10 +15,12 @@ use Extension\Contracts\ExtensionOfferEvaluatorInterface;
 class ExtensionOfferEvaluatorTest extends TestCase
 {
     private ExtensionOfferEvaluator $evaluator;
+    private CommonContractValidator $contractValidator;
 
     protected function setUp(): void
     {
         $this->evaluator = new ExtensionOfferEvaluator();
+        $this->contractValidator = new CommonContractValidator();
     }
 
     // ============================================
@@ -46,7 +49,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
     {
         $offer = [1 => 5000000, 2 => 5500000];
 
-        $result = $this->evaluator->calculateOfferValue($offer);
+        $result = $this->contractValidator->calculateOfferValue($offer);
 
         $this->assertIsArray($result);
     }
@@ -55,7 +58,7 @@ class ExtensionOfferEvaluatorTest extends TestCase
     {
         $offer = [1 => 5000000, 2 => 5500000];
 
-        $result = $this->evaluator->calculateOfferValue($offer);
+        $result = $this->contractValidator->calculateOfferValue($offer);
 
         $this->assertArrayHasKey('averagePerYear', $result);
     }

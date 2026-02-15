@@ -34,8 +34,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         // Extract and sanitize input
         /** @var string $teamName */
         $teamName = $postData['teamname'] ?? '';
-        /** @var int $playerID */
-        $playerID = $postData['playerID'] ?? 0;
+        $playerID = (int) ($postData['playerID'] ?? 0);
 
         // Load player object
         $player = \Player\Player::withPlayerID($this->mysqli_db, $playerID);
@@ -120,8 +119,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         /** @var array{softCapSpace: array<int, int>, hardCapSpace: array<int, int>, totalSalaries: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
         $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0] + $existingOfferYear1;
 
-        /** @var int $offerType */
-        $offerType = $postData['offerType'] ?? 0;
+        $offerType = (int) ($postData['offerType'] ?? 0);
 
         // Parse offer amounts based on exception type
         if (OfferType::isVeteranMinimum($offerType)) {
@@ -151,18 +149,12 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
             $offer6 = $offerType >= 6 ? $mleOffers[5] : 0;
         } else {
             // Custom offer
-            /** @var int $offer1 */
-            $offer1 = $postData['offeryear1'] ?? 0;
-            /** @var int $offer2 */
-            $offer2 = $postData['offeryear2'] ?? 0;
-            /** @var int $offer3 */
-            $offer3 = $postData['offeryear3'] ?? 0;
-            /** @var int $offer4 */
-            $offer4 = $postData['offeryear4'] ?? 0;
-            /** @var int $offer5 */
-            $offer5 = $postData['offeryear5'] ?? 0;
-            /** @var int $offer6 */
-            $offer6 = $postData['offeryear6'] ?? 0;
+            $offer1 = (int) ($postData['offeryear1'] ?? 0);
+            $offer2 = (int) ($postData['offeryear2'] ?? 0);
+            $offer3 = (int) ($postData['offeryear3'] ?? 0);
+            $offer4 = (int) ($postData['offeryear4'] ?? 0);
+            $offer5 = (int) ($postData['offeryear5'] ?? 0);
+            $offer6 = (int) ($postData['offeryear6'] ?? 0);
         }
 
         return [

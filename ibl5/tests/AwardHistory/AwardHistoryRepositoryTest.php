@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use AwardHistory\AwardHistoryRepository;
 
@@ -138,60 +139,35 @@ final class AwardHistoryRepositoryTest extends TestCase
         $this->assertEmpty($result['results']);
     }
 
-    public function testSearchAwardsSortColumnWhitelistSortby1(): void
+    #[DataProvider('validSortByProvider')]
+    public function testSearchAwardsSortColumnWhitelist(int $sortBy): void
     {
         $this->mockDb->setMockData([
             ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
         ]);
 
         $repository = new AwardHistoryRepository($this->mockDb);
-        
+
         // Should not throw exception for valid sortby value
         $result = $repository->searchAwards([
             'name' => null,
             'award' => null,
             'year' => null,
-            'sortby' => 1, // name
+            'sortby' => $sortBy,
         ]);
 
         $this->assertIsArray($result);
     }
 
-    public function testSearchAwardsSortColumnWhitelistSortby2(): void
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function validSortByProvider(): array
     {
-        $this->mockDb->setMockData([
-            ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
-        ]);
-
-        $repository = new AwardHistoryRepository($this->mockDb);
-        
-        // Should not throw exception for valid sortby value
-        $result = $repository->searchAwards([
-            'name' => null,
-            'award' => null,
-            'year' => null,
-            'sortby' => 2, // Award
-        ]);
-
-        $this->assertIsArray($result);
-    }
-
-    public function testSearchAwardsSortColumnWhitelistSortby3(): void
-    {
-        $this->mockDb->setMockData([
-            ['year' => 2025, 'Award' => 'MVP', 'name' => 'Johnson', 'table_ID' => 1],
-        ]);
-
-        $repository = new AwardHistoryRepository($this->mockDb);
-        
-        // Should not throw exception for valid sortby value
-        $result = $repository->searchAwards([
-            'name' => null,
-            'award' => null,
-            'year' => null,
-            'sortby' => 3, // year
-        ]);
-
-        $this->assertIsArray($result);
+        return [
+            'sort by name' => [1],
+            'sort by award' => [2],
+            'sort by year' => [3],
+        ];
     }
 }

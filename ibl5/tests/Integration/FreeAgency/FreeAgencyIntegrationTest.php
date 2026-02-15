@@ -228,6 +228,227 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
         $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
     }
 
+    // ========== ADDITIONAL VALIDATION FAILURE SCENARIOS ==========
+
+    /**
+     * @group integration
+     * @group validation-failures
+     */
+    public function testOfferBelowVetMinRejected(): void
+    {
+        // Arrange
+        $this->setupSuccessfulOfferScenario();
+
+        // Veteran minimum for exp=5 is 70 (from ContractRules::VETERAN_MINIMUM_SALARIES)
+        $postData = [
+            'teamname' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offeryear1' => 50, // Below vet min of 70 for exp=5
+            'offeryear2' => 0,
+            'offeryear3' => 0,
+            'offeryear4' => 0,
+            'offeryear5' => 0,
+            'offeryear6' => 0,
+            'offerType' => 0, // Custom offer
+        ];
+
+        // Act
+        $result = $this->processor->processOfferSubmission($postData);
+
+        // Assert
+        $this->assertIsArray($result);
+        $this->assertFalse($result['success']);
+        $this->assertSame('validation_error', $result['type']);
+        $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
+    }
+
+    /**
+     * @group integration
+     * @group validation-failures
+     */
+    public function testOfferExceedsMaxContractRejected(): void
+    {
+        // Arrange
+        $this->setupSuccessfulOfferScenario();
+
+        // Max contract for exp=5 (0-6 years bracket) is 1063
+        $postData = [
+            'teamname' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offeryear1' => 1100, // Exceeds max contract of 1063 for exp=5
+            'offeryear2' => 0,
+            'offeryear3' => 0,
+            'offeryear4' => 0,
+            'offeryear5' => 0,
+            'offeryear6' => 0,
+            'offerType' => 0, // Custom offer
+        ];
+
+        // Act
+        $result = $this->processor->processOfferSubmission($postData);
+
+        // Assert
+        $this->assertIsArray($result);
+        $this->assertFalse($result['success']);
+        $this->assertSame('validation_error', $result['type']);
+        $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
+    }
+
+    /**
+     * @group integration
+     * @group validation-failures
+     */
+    public function testRaisesExceedStandardLimitRejected(): void
+    {
+        // Arrange - base data has bird_years=0 (no Bird Rights)
+        $this->setupSuccessfulOfferScenario();
+
+        // Standard raise limit is 10%. For offer1=500, max raise = round(500 * 0.10) = 50
+        // So offer2 max is 550. Offering 600 is a 100 increase, which exceeds 50.
+        $postData = [
+            'teamname' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offeryear1' => 500,
+            'offeryear2' => 600, // 20% raise, exceeds 10% standard limit
+            'offeryear3' => 0,
+            'offeryear4' => 0,
+            'offeryear5' => 0,
+            'offeryear6' => 0,
+            'offerType' => 0, // Custom offer
+        ];
+
+        // Act
+        $result = $this->processor->processOfferSubmission($postData);
+
+        // Assert
+        $this->assertIsArray($result);
+        $this->assertFalse($result['success']);
+        $this->assertSame('validation_error', $result['type']);
+        $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
+    }
+
+    /**
+     * @group integration
+     * @group bird-rights
+     */
+    public function testBirdRightsRaisesAllowed(): void
+    {
+        // Arrange - player with Bird Rights (bird_years=3, same team)
+        $this->setupBirdRightsOfferScenario();
+
+        // Bird Rights raise limit is 12.5%. For offer1=500, max raise = round(500 * 0.125) = 63
+        // So offer2 max is 563. Offering 562 is within the limit.
+        $postData = [
+            'teamname' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offeryear1' => 500,
+            'offeryear2' => 562, // 12.4% raise, within Bird Rights 12.5% limit
+            'offeryear3' => 0,
+            'offeryear4' => 0,
+            'offeryear5' => 0,
+            'offeryear6' => 0,
+            'offerType' => 0, // Custom offer
+        ];
+
+        // Act
+        $result = $this->processor->processOfferSubmission($postData);
+
+        // Assert
+        $this->assertIsArray($result);
+        $this->assertTrue($result['success']);
+        $this->assertSame('offer_success', $result['type']);
+        $this->assertQueryExecuted('INSERT INTO ibl_fa_offers');
+    }
+
+    /**
+     * @group integration
+     * @group validation-failures
+     */
+    public function testMLEOfferWhenAlreadyUsedRejected(): void
+    {
+        // Arrange - team has already used their MLE (HasMLE=0)
+        $this->setupMLEAlreadyUsedScenario();
+
+        $postData = [
+            'teamname' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offerType' => 3, // 3-year MLE
+        ];
+
+        // Act
+        $result = $this->processor->processOfferSubmission($postData);
+
+        // Assert
+        $this->assertIsArray($result);
+        $this->assertFalse($result['success']);
+        $this->assertSame('validation_error', $result['type']);
+        $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
+    }
+
+    /**
+     * @group integration
+     * @group validation-failures
+     */
+    public function testOfferWithGapInContractYearsRejected(): void
+    {
+        // Arrange
+        $this->setupSuccessfulOfferScenario();
+
+        // Gap in contract years: year 2 is 0, but year 3 has a value
+        $postData = [
+            'teamname' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offeryear1' => 500,
+            'offeryear2' => 0,   // Gap
+            'offeryear3' => 600, // Resuming after gap
+            'offeryear4' => 0,
+            'offeryear5' => 0,
+            'offeryear6' => 0,
+            'offerType' => 0, // Custom offer
+        ];
+
+        // Act
+        $result = $this->processor->processOfferSubmission($postData);
+
+        // Assert
+        $this->assertIsArray($result);
+        $this->assertFalse($result['success']);
+        $this->assertSame('validation_error', $result['type']);
+        $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
+    }
+
+    /**
+     * @group integration
+     * @group validation-failures
+     */
+    public function testOfferWithZeroFirstYearRejected(): void
+    {
+        // Arrange
+        $this->setupSuccessfulOfferScenario();
+
+        // Zero first year is not allowed
+        $postData = [
+            'teamname' => 'Miami Cyclones',
+            'playerID' => 1,
+            'offeryear1' => 0,
+            'offeryear2' => 0,
+            'offeryear3' => 0,
+            'offeryear4' => 0,
+            'offeryear5' => 0,
+            'offeryear6' => 0,
+            'offerType' => 0, // Custom offer
+        ];
+
+        // Act
+        $result = $this->processor->processOfferSubmission($postData);
+
+        // Assert
+        $this->assertIsArray($result);
+        $this->assertFalse($result['success']);
+        $this->assertSame('validation_error', $result['type']);
+        $this->assertQueryNotExecuted('INSERT INTO ibl_fa_offers');
+    }
+
     // ========== OFFER DELETION ==========
 
     /**
@@ -349,6 +570,46 @@ class FreeAgencyIntegrationTest extends IntegrationTestCase
                 'Salary_Cap' => 8250,
                 'Tax_Line' => 10000,
                 'HasMLE' => 0,
+                'HasLLE' => 0,
+                'tid' => 0,
+                'teamname' => 'Free Agent',
+                'freeAgencyNotificationsState' => 'Off',
+            ])
+        ]);
+    }
+
+    private function setupBirdRightsOfferScenario(): void
+    {
+        $this->mockDb->setMockData([
+            array_merge($this->getBaseFreeAgentData(), [
+                // Player is on the offering team (required for Bird Rights)
+                'tid' => 1,
+                'teamname' => 'Miami Cyclones',
+                'bird_years' => 3,
+                'bird' => 3,
+                // Team has cap space
+                'Salary_Total' => 5000,
+                'Salary_Cap' => 8250,
+                'Tax_Line' => 10000,
+                'HasMLE' => 0,
+                'HasLLE' => 0,
+                // Player is not signed (cy=0 means not in current contract)
+                'cy' => 0,
+                'cy1' => 0,
+                'freeAgencyNotificationsState' => 'Off',
+            ])
+        ]);
+    }
+
+    private function setupMLEAlreadyUsedScenario(): void
+    {
+        $this->mockDb->setMockData([
+            array_merge($this->getBaseFreeAgentData(), [
+                // Team is over the cap but has already used MLE
+                'Salary_Total' => 9000,
+                'Salary_Cap' => 8250,
+                'Tax_Line' => 10000,
+                'HasMLE' => 0, // MLE already used
                 'HasLLE' => 0,
                 'tid' => 0,
                 'teamname' => 'Free Agent',

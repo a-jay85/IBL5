@@ -157,6 +157,8 @@ $_protected_globals = [
     'GLOBALS', 'this',
     // League context
     'leagueContext',
+    // Authentication service
+    'authService',
 ];
 
 $sanitize_rules = array("newlang" => "/[a-z][a-z]/i", "redirect" => "/[a-z0-9]*/i");
@@ -170,22 +172,17 @@ foreach ($_REQUEST as $key => $value) {
     }
 }
 
-// This block of code makes sure $admin and $user are COOKIES
-if ((isset($admin) && $admin != $_COOKIE['admin']) or (isset($user) && $user != $_COOKIE['user'])) {
+// This block of code makes sure $admin is a COOKIE (admin auth is legacy, untouched)
+if (isset($admin) && $admin != $_COOKIE['admin']) {
     die("Illegal Operation");
 }
-
 
 if (isset($_COOKIE['admin'])) {
     $admin = base64_decode($_COOKIE['admin']);
     $admin = addslashes($admin);
     $admin = base64_encode($admin);
 }
-if (isset($_COOKIE['user'])) {
-    $user = base64_decode($_COOKIE['user']);
-    $user = addslashes($user);
-    $user = base64_encode($user);
-}
+// User auth is now session-based via AuthService — legacy cookie is ignored
 
 // Die message for not allowed HTML tags
 $htmltags = "<center><img src=\"images/logo.gif\"><br><br><b>";
@@ -260,6 +257,19 @@ if (!$dbname) {
 }
 
 require_once __DIR__ . "/db/db.php";
+
+// Initialize session-based AuthService for user authentication
+$authService = new \Auth\AuthService($mysqli_db);
+
+// Populate legacy $user global so modules.php and other code that calls
+// base64_decode($user) continues to work during the migration period.
+$user = '';
+if ($authService->isAuthenticated()) {
+    $cookieArray = $authService->getCookieArray();
+    if ($cookieArray !== null) {
+        $user = base64_encode(implode(':', $cookieArray));
+    }
+}
 
 require_once __DIR__ . "/includes/ipban.php";
 if (file_exists(__DIR__ . "/includes/custom_files/custom_mainfile.php")) {
@@ -407,31 +417,13 @@ function is_admin($admin)
 
 function is_user($user)
 {
-    if (!$user) {return 0;}
+    // Session-based auth via AuthService — the $user parameter is kept for signature compat
+    global $authService;
     static $userSave;
     if (isset($userSave)) {
         return $userSave;
     }
-
-    if (!is_array($user)) {
-        $user = base64_decode($user);
-        $user = addslashes($user);
-        $user = explode(":", $user);
-    }
-    $uid = $user[0];
-    $pwd = $user[2];
-    $uid = intval($uid);
-    if (!empty($uid) and !empty($pwd)) {
-        global $db, $user_prefix;
-        $sql = "SELECT user_password FROM " . $user_prefix . "_users WHERE user_id='$uid'";
-        $result = $db->sql_query($sql);
-        list($row) = $db->sql_fetchrow($result);
-        $db->sql_freeresult($result);
-        if ($row == $pwd && !empty($row)) {
-            return $userSave = 1;
-        }
-    }
-    return $userSave = 0;
+    return $userSave = $authService->isAuthenticated() ? 1 : 0;
 }
 
 function is_group($user, $name)
@@ -809,46 +801,27 @@ function blockfileinc($title, $blockfile, $side = 0)
 
 function cookiedecode($user)
 {
-    global $cookie, $db, $user_prefix;
-    static $pass;
-    if (!is_array($user)) {
-        $user = base64_decode($user);
-        $user = addslashes($user);
-        $cookie = explode(":", $user);
-    } else {
-        $cookie = $user;
+    // Session-based auth — populate global $cookie from AuthService
+    global $cookie, $authService;
+    $cookieArray = $authService->getCookieArray();
+    if ($cookieArray !== null) {
+        $cookie = $cookieArray;
+        return $cookie;
     }
-    if (!isset($pass) and isset($cookie[1])) {
-        $sql = "SELECT user_password FROM " . $user_prefix . "_users WHERE username='$cookie[1]'";
-        $result = $db->sql_query($sql);
-        list($pass) = $db->sql_fetchrow($result);
-        $db->sql_freeresult($result);
-    }
-    if (isset($cookie[2]) and ($cookie[2] == $pass) and (!empty($pass))) {return $cookie;}
+    return null;
 }
 
 function getusrinfo($user)
 {
-    global $user_prefix, $db, $userinfo, $cookie;
-    if (!$user or empty($user)) {
-        return null;
+    // Session-based auth — populate global $userinfo from AuthService
+    global $userinfo, $authService;
+    $info = $authService->getUserInfo();
+    if ($info !== null) {
+        $userinfo = $info;
+        return $userinfo;
     }
-    cookiedecode($user);
-    $user = $cookie;
-    if (isset($userrow) and is_array($userrow)) {
-        if ($userrow['username'] == $user[1] && $userrow['user_password'] == $user[2]) {
-            return $userrow;
-        }
-    }
-    $sql = "SELECT * FROM " . $user_prefix . "_users WHERE username='$user[1]' AND user_password='$user[2]'";
-    $result = $db->sql_query($sql);
-    if ($db->sql_numrows($result) == 1) {
-        static $userrow;
-        $userrow = $db->sql_fetchrow($result);
-        return $userinfo = $userrow;
-    }
-    $db->sql_freeresult($result);
     unset($userinfo);
+    return null;
 }
 
 function FixQuotes($what = "")

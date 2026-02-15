@@ -63,7 +63,7 @@ function negotiate($playerID)
     Nuke\Header::header();
 
     // Use NegotiationProcessor to handle all business logic
-    $processor = new NegotiationProcessor($db, $mysqli_db);
+    $processor = new NegotiationProcessor($mysqli_db);
     echo $processor->processNegotiation($playerID, $userTeamName, $prefix);
 
     Nuke\Footer::footer();

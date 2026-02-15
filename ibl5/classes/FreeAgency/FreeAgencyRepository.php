@@ -25,10 +25,10 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
     /**
      * Constructor - inherits from BaseMysqliRepository
      *
-     * @param object $db Active mysqli connection (or duck-typed mock during migration)
+     * @param \mysqli $db Active mysqli connection
      * @throws \RuntimeException If connection is invalid (error code 1002)
      */
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
     }

@@ -19,7 +19,7 @@ class SeasonAverages
     /**
      * Render the season averages table
      *
-     * @param object $db Database connection
+     * @param \mysqli $db Database connection
      * @param iterable<int, Player|array<string, mixed>> $result Player result set
      * @param \Team $team Team object
      * @param string $yr Year filter (empty for current season)
@@ -27,7 +27,7 @@ class SeasonAverages
      * @param string $moduleName Module name
      * @return string HTML table
      */
-    public static function render(object $db, $result, \Team $team, string $yr, array $starterPids = [], string $moduleName = ""): string
+    public static function render(\mysqli $db, $result, \Team $team, string $yr, array $starterPids = [], string $moduleName = ""): string
     {
         $playerRows = [];
         foreach ($result as $plrRow) {
@@ -63,7 +63,6 @@ class SeasonAverages
             ];
         }
 
-        /** @var \mysqli $db */
         $season = new \Season($db);
         $teamStats = \TeamStats::withTeamName($db, $team->name, $season->endingYear);
 

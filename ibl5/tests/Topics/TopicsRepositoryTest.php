@@ -5,32 +5,32 @@ declare(strict_types=1);
 namespace Tests\Topics;
 
 use Tests\Integration\IntegrationTestCase;
-use Topics\Contracts\TopicsServiceInterface;
-use Topics\TopicsService;
+use Topics\Contracts\TopicsRepositoryInterface;
+use Topics\TopicsRepository;
 
 /**
- * @covers \Topics\TopicsService
+ * @covers \Topics\TopicsRepository
  */
-class TopicsServiceTest extends IntegrationTestCase
+class TopicsRepositoryTest extends IntegrationTestCase
 {
-    private TopicsService $service;
+    private TopicsRepository $repository;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new TopicsService($this->mockDb);
+        $this->repository = new TopicsRepository($this->mockDb);
     }
 
-    public function testImplementsServiceInterface(): void
+    public function testImplementsRepositoryInterface(): void
     {
-        $this->assertInstanceOf(TopicsServiceInterface::class, $this->service);
+        $this->assertInstanceOf(TopicsRepositoryInterface::class, $this->repository);
     }
 
     public function testGetTopicsWithArticlesReturnsEmptyWhenNoTopics(): void
     {
         $this->mockDb->setMockData([]);
 
-        $result = $this->service->getTopicsWithArticles();
+        $result = $this->repository->getTopicsWithArticles();
 
         $this->assertSame([], $result);
     }
@@ -54,7 +54,7 @@ class TopicsServiceTest extends IntegrationTestCase
             ],
         ]);
 
-        $result = $this->service->getTopicsWithArticles();
+        $result = $this->repository->getTopicsWithArticles();
 
         $this->assertCount(1, $result);
         $this->assertSame(1, $result[0]['topicId']);
@@ -80,7 +80,7 @@ class TopicsServiceTest extends IntegrationTestCase
             ],
         ]);
 
-        $result = $this->service->getTopicsWithArticles();
+        $result = $this->repository->getTopicsWithArticles();
 
         $this->assertSame(3, $result[0]['topicId']);
         $this->assertSame(10, $result[0]['storyCount']);
@@ -100,7 +100,7 @@ class TopicsServiceTest extends IntegrationTestCase
             ],
         ]);
 
-        $result = $this->service->getTopicsWithArticles();
+        $result = $this->repository->getTopicsWithArticles();
 
         $this->assertSame([], $result[0]['recentArticles']);
     }

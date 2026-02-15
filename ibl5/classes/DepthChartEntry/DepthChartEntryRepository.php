@@ -14,7 +14,7 @@ use DepthChartEntry\Contracts\DepthChartEntryRepositoryInterface;
  */
 class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthChartEntryRepositoryInterface
 {
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         parent::__construct($db);
     }

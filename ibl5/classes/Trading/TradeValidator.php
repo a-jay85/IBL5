@@ -16,19 +16,17 @@ use Trading\Contracts\TradeValidatorInterface;
  */
 class TradeValidator implements TradeValidatorInterface
 {
-    protected object $db;
+    protected \mysqli $db;
     protected TradingRepository $repository;
-    protected \Shared $sharedFunctions;
+    protected \Shared\Contracts\SharedRepositoryInterface $sharedRepository;
     protected \Season $season;
 
-    public function __construct(object $db)
+    public function __construct(\mysqli $db)
     {
         $this->db = $db;
         $this->repository = new TradingRepository($db);
-        $this->sharedFunctions = new \Shared($db);
-        /** @var \mysqli $mysqliDb */
-        $mysqliDb = $db;
-        $this->season = new \Season($mysqliDb);
+        $this->sharedRepository = new \Shared\SharedRepository($db);
+        $this->season = new \Season($db);
     }
 
     /**

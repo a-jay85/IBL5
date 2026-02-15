@@ -259,31 +259,19 @@ if ($row['radminsuper'] == 1) {
         $blockfile = filter($row['blockfile'], "nohtml");
         if ($bkey == "main") {
             mainblock();
-        } elseif ($bkey == "admin") {
-            adminblock();
         } elseif ($bkey == "modules") {
             modules_block();
         } elseif ($bkey == "category") {
             category();
-        } elseif ($bkey == "userbox") {
-            userblock();
         } elseif (empty($bkey)) {
             if (empty($url)) {
                 if (empty($blockfile)) {
-                    if ($bposition == "c") {
-                        themecenterbox($title, $content);
-                    } else {
-                        themesidebox($title, $content);
-                    }
+                    themecenterbox($title, $content);
                 } else {
-                    if ($bposition == "c") {
-                        blockfileinc($title, $blockfile, 1);
-                    } else {
-                        blockfileinc($title, $blockfile);
-                    }
+                    blockfileinc($title, $blockfile, 1);
                 }
             } else {
-                headlines($bid);
+                headlines($bid, 1);
             }
         }
         echo "</center>";
@@ -803,7 +791,7 @@ if ($row['radminsuper'] == 1) {
             OpenTable();
             if (!empty($content)) {
                 echo "<center>" . _BLOCKPREVIEW . " <i>$title</i><br><br>";
-                themesidebox($title, $content);
+                themecenterbox($title, $content);
             } else {
                 echo "<center><i>$title</i><br><br>";
             }

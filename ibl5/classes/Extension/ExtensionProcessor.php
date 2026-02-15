@@ -181,6 +181,11 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             if (class_exists('Discord')) {
                 $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
                 \Discord::postToChannel('#extensions', $hometext);
+
+                $serverName = $_SERVER['SERVER_NAME'] ?? 'localhost';
+                if ($serverName !== 'localhost' && $serverName !== '127.0.0.1') {
+                    \Discord::postToChannel('#general-chat', $hometext);
+                }
             }
 
             // Send email notification (only on non-localhost)

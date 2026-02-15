@@ -29,9 +29,6 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- $module_name";
 
-$username = strval($cookie[1] ?? '');
-$userTeamName = $commonRepository->getTeamnameFromUsername($username);
-$userTeam = Team::initialize($mysqli_db, $userTeamName);
 $league = new League($mysqli_db);
 
 // Initialize services
@@ -42,8 +39,12 @@ $view = new LeagueStartersView($mysqli_db, $season, $module_name);
 $startersByPosition = $service->getAllStartersByPosition();
 $display = $_REQUEST['display'] ?? 'ratings';
 
-// Render page
+// Render header first (populates $cookie via online() → cookiedecode())
 Nuke\Header::header();
+
+$username = strval($cookie[1] ?? '');
+$userTeamName = $commonRepository->getTeamnameFromUsername($username);
+$userTeam = Team::initialize($mysqli_db, $userTeamName);
 
 echo $view->render($startersByPosition, $userTeam, $display);
 

@@ -219,6 +219,43 @@ After completing a module refactoring or significant feature, update these files
 ### Production Validation
 After refactoring, compare output against iblhoops.net. Results must match exactly.
 
+### Post-Plan-Approval Workflow (Mandatory)
+
+**This workflow is MANDATORY.** After any plan is finalized and the user approves it, Claude MUST execute this entire workflow autonomously without waiting for user prompts between steps. Do not ask "should I proceed?" — just execute each step in order.
+
+#### Phase 1: Branch & Worktree Setup
+1. Create a new branch from `master` with a descriptive name (e.g., `feat/feature-name`, `fix/bug-name`, `refactor/module-name`)
+2. Create a new git worktree in the `worktrees/` directory: `git worktree add worktrees/<branch-name> <branch-name>`
+3. Change working directory to the new worktree
+
+#### Phase 2: Implementation
+4. Implement the approved plan in the worktree
+5. Run the full PHPUnit test suite — fix any failures, notices, deprecations, or warnings until clean
+6. Run PHPStan (`composer run analyse`) — fix any errors above baseline until clean
+
+#### Phase 3: Commit, Push & PR
+7. Run `/commit-commands:commit-push-pr` to commit all changes, push the branch, and open a PR
+
+#### Phase 4: Code Review
+8. Run `/code-review:code-review` on the PR
+9. If code review finds issues at or above the configured threshold: fix all issues immediately, then commit the fixes (use `/commit-commands:commit` and push)
+10. Re-run `/code-review:code-review` to verify — repeat until clean
+
+#### Phase 5: Security Review
+11. Run `/security-audit` on the changed files
+12. If security review finds any issues: fix all issues immediately, then commit the fixes (use `/commit-commands:commit` and push)
+13. Re-run `/security-audit` to verify — repeat until clean
+
+#### Phase 6: Final Verification
+14. Run the full PHPUnit test suite one final time — confirm zero failures, errors, notices, deprecations, or risky tests
+15. Run PHPStan one final time — confirm zero errors above baseline
+16. Report completion to the user with a summary of what was done
+
+**Important notes:**
+- If any step fails repeatedly (3+ attempts), stop and ask the user for guidance
+- The worktree keeps `master` clean while working on the feature branch
+- After the PR is merged, clean up the worktree with `git worktree remove worktrees/<branch-name>`
+
 ## Progressive Loading
 
 Context-aware rules auto-load when relevant:

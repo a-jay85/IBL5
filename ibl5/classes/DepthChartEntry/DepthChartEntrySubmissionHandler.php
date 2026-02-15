@@ -200,17 +200,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
         if ($realPath !== false && $expectedPath !== false && strpos($realPath, $expectedPath) === 0) {
             $bytesWritten = file_put_contents($filename, $convertedContent);
             if ($bytesWritten !== false && $bytesWritten > 0) {
-                if (isset($_SERVER['SERVER_NAME']) && $_SERVER['SERVER_NAME'] !== "localhost") {
-                    // SECURITY: Sanitize email subject to prevent header injection
-                    $emailSubject = \Utilities\EmailSanitizer::sanitizeSubject($teamName . " Depth Chart");
-                    $recipient = 'ibldepthcharts@gmail.com';
-
-                    $headers = "From: ibldepthcharts@gmail.com\r\n";
-                    $headers .= "Reply-To: ibldepthcharts@gmail.com\r\n";
-                    $headers .= "X-Mailer: PHP/" . phpversion();
-
-                    mail($recipient, $emailSubject, $convertedContent, $headers);
-                }
+                \Mail\MailService::fromConfig()->send('ibldepthcharts@gmail.com', $teamName . " Depth Chart", $convertedContent, 'ibldepthcharts@gmail.com');
             } else {
                 echo "<font color=red>Depth chart failed to save properly; please contact the commissioner.</font>";
             }

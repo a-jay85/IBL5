@@ -190,5 +190,8 @@
         <testsuite name="LeagueConfig Module Tests">
             <directory>tests/LeagueConfig</directory>
         </testsuite>
+        <testsuite name="Mail Module Tests">
+            <directory>tests/Mail</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

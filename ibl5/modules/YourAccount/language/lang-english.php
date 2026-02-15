@@ -243,16 +243,3 @@ define("_KARMABADREF", "Users marked with <i>Bad Karma</i> can post comments but
 define("_KARMADEVIL", "Devil Karma");
 define("_KARMADEVILHLP", "This user is a devil and his comments will not be published");
 define("_KARMADEVILREF", "Users marked with <i>Devil Karma</i> are very bad. This users are not allowed to post comments. All his content is just ignored and nothing will be published.");
-
-// Auth migration: delight-im/auth integration
-define("_REMEMBERME", "Remember me");
-define("_PASSWORDRESET", "Password Reset");
-define("_RESETPASSWORD", "Reset Password");
-define("_ENTERNEWPASSWORD", "Enter your new password below.");
-define("_NEWPASSWORD", "New Password");
-define("_CONFIRMPASSWORD", "Confirm Password");
-define("_PASSWORDCHANGED", "Your password has been changed successfully. You can now log in with your new password.");
-define("_PASSWORDRESETREQUEST", "A password reset has been requested for your account at");
-define("_CLICKRESETLINK", "Click the link below to reset your password:");
-define("_LINKEXPIRES6HOURS", "This link will expire in 6 hours.");
-define("_RESETEMAILSENT", "If an account with that email address exists, a password reset link has been sent. Please check your inbox.");

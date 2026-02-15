@@ -132,7 +132,6 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
             . "<input type=\"hidden\" name=\"username\" value=\"$username\">"
             . "<input type=\"hidden\" name=\"user_email\" value=\"$user_email\">"
             . "<input type=\"hidden\" name=\"user_password\" value=\"$user_password\">"
-            . \Utilities\CsrfGuard::generateToken('register') . ""
             . "<input type=\"hidden\" name=\"op\" value=\"finish\"><br><br>"
             . "<input type=\"submit\" value=\"" . _FINISH . "\"> &nbsp;&nbsp;" . _GOBACK . "</form></center>";
         CloseTable();
@@ -148,17 +147,11 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
 function finishNewUser($username, $user_email, $user_password, $random_num, $gfx_check)
 {
     global $stop, $EditedMessage, $adminmail, $sitename, $Default_Theme, $user_prefix, $db, $storyhome, $module_name, $nukeurl, $authService;
-
-    // CSRF validation
-    if (!\Utilities\CsrfGuard::validateSubmittedToken('register')) {
-        Header("Location: modules.php?name=$module_name&op=new_user");
-        die();
-    }
-
     Nuke\Header::header();
     include "config.php";
     userCheck($username, $user_email);
     $user_email = validate_mail($user_email);
+    $user_regdate = date("M d, Y");
     $user_password = stripslashes($user_password);
     if (!isset($stop)) {
         $datekey = date("F j");
@@ -168,20 +161,25 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
             Header("Location: modules.php?name=$module_name");
             die();
         }
+        mt_srand((double) microtime() * 1000000);
+        $maxran = 1000000;
+        $check_num = mt_rand(0, $maxran);
+        $check_num = md5($check_num);
+        $time = time();
+        $finishlink = "$nukeurl/modules.php?name=$module_name&op=activate&username=$username&check_num=$check_num";
+        $new_password = $authService->hashPassword($user_password);
         $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
         $username = rtrim($username, "\\");
+        $username = str_replace("'", "\'", $username);
         $user_email = filter($user_email, "nohtml", 1);
-
-        try {
-            // Register via delight-im/auth with email verification callback
-            $authService->register($user_email, $user_password, $username, static function (string $selector, string $token) use ($sitename, $adminmail, $nukeurl, $module_name, $user_email, $username): void {
-                $finishlink = "$nukeurl/modules.php?name=$module_name&op=confirm_email&selector=" . urlencode($selector) . "&token=" . urlencode($token);
-                $message = "" . _WELCOMETO . " $sitename!\n\n" . _YOUUSEDEMAIL . " ($user_email) " . _TOREGISTER . " $sitename.\n\n " . _TOFINISHUSER . "\n\n $finishlink\n\n " . _FOLLOWINGMEM . "\n\n" . _UNICKNAME . " $username";
-                $subject = "" . _ACTIVATIONSUB . "";
-                $from = "$adminmail";
-                mail($user_email, $subject, $message, "From: $from\nX-Mailer: PHP/" . phpversion());
-            });
-
+        $result = \DatabaseConnection::query("INSERT INTO nuke_users_temp (user_id, username, user_email, user_password, user_regdate, check_num, time) VALUES (NULL, ?, ?, ?, ?, ?, ?)", [$username, $user_email, $new_password, $user_regdate, $check_num, $time]);
+        if (!$result) {
+            echo "" . _ERROR . "<br>";
+        } else {
+            $message = "" . _WELCOMETO . " $sitename!\n\n" . _YOUUSEDEMAIL . " ($user_email) " . _TOREGISTER . " $sitename.\n\n " . _TOFINISHUSER . "\n\n $finishlink\n\n " . _FOLLOWINGMEM . "\n\n" . _UNICKNAME . " $username\n" . _UPASSWORD . " $user_password";
+            $subject = "" . _ACTIVATIONSUB . "";
+            $from = "$adminmail";
+            mail($user_email, $subject, $message, "From: $from\nX-Mailer: PHP/" . phpversion());
             title("$sitename: " . _USERREGLOGIN . "");
             OpenTable();
             echo "<center><b>" . _ACCOUNTCREATED . "</b><br><br>";
@@ -189,12 +187,6 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
                 . "<br><br>"
                 . "" . _FINISHUSERCONF . "<br><br>"
                 . "" . _THANKSUSER . " $sitename!</center>";
-            CloseTable();
-        } catch (\RuntimeException) {
-            $error = $authService->getLastError() ?? _ERROR;
-            OpenTable();
-            echo "<center><font class=\"title\"><b>Registration Error!</b></font><br><br>";
-            echo "<font class=\"content\">" . htmlspecialchars($error) . "<br>" . _GOBACK . "</font></center>";
             CloseTable();
         }
     } else {
@@ -205,59 +197,44 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
 
 function activate($username, $check_num)
 {
-    // Legacy activation route — redirect to confirm_email if selector/token params present
-    global $module_name;
-    if (isset($_GET['selector']) && isset($_GET['token'])) {
-        confirm_email();
-        return;
-    }
-
-    // Fallback for any remaining legacy activation links
-    Nuke\Header::header();
-    title("" . _ACTIVATIONERROR . "");
-    OpenTable();
-    echo "<center>" . _ACTERROR2 . "<br><br>"
-        . "Please <a href=\"modules.php?name=$module_name&op=new_user\">register again</a> to receive a new activation link.</center>";
-    CloseTable();
-    Nuke\Footer::footer();
-    die();
-}
-
-function confirm_email()
-{
-    global $authService, $module_name;
-    $selector = isset($_GET['selector']) ? trim($_GET['selector']) : '';
-    $token = isset($_GET['token']) ? trim($_GET['token']) : '';
-
-    if ($selector === '' || $token === '') {
+    global $db, $user_prefix, $module_name, $language, $prefix;
+    $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
+    $username = rtrim($username, "\\");
+    $username = str_replace("'", "\'", $username);
+    $past = time() - 86400;
+    \DatabaseConnection::query("DELETE FROM nuke_users_temp WHERE time < ?", [$past]);
+    $row = \DatabaseConnection::fetchRow("SELECT * FROM nuke_users_temp WHERE username = ? AND check_num = ?", [$username, $check_num]);
+    if ($row !== null) {
+        $user_password = htmlspecialchars(stripslashes($row['user_password']));
+        if ($check_num == $row['check_num']) {
+            \DatabaseConnection::query("INSERT INTO nuke_users (user_id, username, user_email, user_password, user_avatar, user_avatar_type, user_regdate, user_lang) VALUES (NULL, ?, ?, ?, '', '3', ?, ?)", [$row['username'], $row['user_email'], $user_password, $row['user_regdate'], $language]);
+            \DatabaseConnection::query("DELETE FROM nuke_users_temp WHERE username = ? AND check_num = ?", [$username, $check_num]);
+            Nuke\Header::header();
+            title("" . _ACTIVATIONYES . "");
+            OpenTable();
+            echo "<center><b>" . htmlspecialchars($row['username']) . ":</b> " . _ACTMSG . "</center>";
+            CloseTable();
+            Nuke\Footer::footer();
+            die();
+        } else {
+            Nuke\Header::header();
+            title("" . _ACTIVATIONERROR . "");
+            OpenTable();
+            echo "<center>" . _ACTERROR1 . "</center>";
+            CloseTable();
+            Nuke\Footer::footer();
+            die();
+        }
+    } else {
         Nuke\Header::header();
         title("" . _ACTIVATIONERROR . "");
         OpenTable();
-        echo "<center>" . _ACTERROR1 . "</center>";
+        echo "<center>" . _ACTERROR2 . "</center>";
         CloseTable();
         Nuke\Footer::footer();
         die();
     }
 
-    try {
-        $authService->confirmEmail($selector, $token);
-        Nuke\Header::header();
-        title("" . _ACTIVATIONYES . "");
-        OpenTable();
-        echo "<center>" . _ACTMSG . "<br><br>"
-            . "<a href=\"modules.php?name=$module_name\">" . _USERLOGIN . "</a></center>";
-        CloseTable();
-        Nuke\Footer::footer();
-    } catch (\RuntimeException) {
-        $error = $authService->getLastError() ?? _ACTERROR1;
-        Nuke\Header::header();
-        title("" . _ACTIVATIONERROR . "");
-        OpenTable();
-        echo "<center>" . htmlspecialchars($error) . "</center>";
-        CloseTable();
-        Nuke\Footer::footer();
-    }
-    die();
 }
 
 function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
@@ -650,12 +627,10 @@ function main($user)
                     . "<tr><td colspan='2'>" . _TYPESECCODE . ": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
                     . "<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
             }
-            echo "<tr><td colspan='2'><label><input type=\"checkbox\" name=\"remember_me\" value=\"1\"> " . _REMEMBERME . "</label></td></tr>\n"
-                . "</table><input type=\"hidden\" name=\"redirect\" value=\"$redirect\">\n"
+            echo "</table><input type=\"hidden\" name=\"redirect\" value=\"$redirect\">\n"
                 . "<input type=\"hidden\" name=\"mode\" value=$mode>\n"
                 . "<input type=\"hidden\" name=\"f\" value=$f>\n"
                 . "<input type=\"hidden\" name=\"t\" value=$t>\n"
-                . \Utilities\CsrfGuard::generateToken('login') . "\n"
                 . "<input type=\"hidden\" name=\"op\" value=\"login\">\n"
                 . "<input type=\"submit\" value=\"" . _LOGIN . "\"></form><br>\n\n"
                 . "<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">" . _PASSWORDLOST . "</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">" . _REGNEWUSER . "</a> ]</font></center>\n";
@@ -768,8 +743,8 @@ function pass_lost()
             . "" . _NOPROBLEM . "<br><br>\n"
             . "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
             . "<table border=\"0\"><tr><td>\n"
-            . "" . _EMAIL . ":</td><td><input type=\"email\" name=\"user_email\" size=\"30\" maxlength=\"255\"></td></tr></table><br>\n"
-            . \Utilities\CsrfGuard::generateToken('forgot_password') . "\n"
+            . "" . _NICKNAME . ":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
+            . "<tr><td>" . _CONFIRMATIONCODE . ":</td><td><input type=\"text\" name=\"code\" size=\"11\" maxlength=\"10\"></td></tr></table><br>\n"
             . "<input type=\"hidden\" name=\"op\" value=\"mailpasswd\">\n"
             . "<input type=\"submit\" value=\"" . _SENDPASSWORD . "\"></form><br>\n"
             . "<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name\">" . _USERLOGIN . "</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">" . _REGNEWUSER . "</a> ]</font></center>\n";
@@ -779,82 +754,6 @@ function pass_lost()
         global $cookie;
         cookiedecode($user);
         userinfo($cookie[1]);
-    }
-}
-
-function reset_password_form()
-{
-    global $user, $module_name;
-    if (is_user($user)) {
-        Header("Location: modules.php?name=$module_name");
-        die();
-    }
-    $selector = isset($_GET['selector']) ? htmlspecialchars(trim($_GET['selector'])) : '';
-    $token = isset($_GET['token']) ? htmlspecialchars(trim($_GET['token'])) : '';
-    if ($selector === '' || $token === '') {
-        Header("Location: modules.php?name=$module_name&op=pass_lost");
-        die();
-    }
-    Nuke\Header::header();
-    OpenTable();
-    echo "<center><font class=\"title\"><b>" . _PASSWORDRESET . "</b></font></center>\n";
-    CloseTable();
-    echo "<br>\n";
-    OpenTable();
-    echo "<b>" . _ENTERNEWPASSWORD . "</b><br><br>\n"
-        . "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
-        . "<table border=\"0\">\n"
-        . "<tr><td>" . _NEWPASSWORD . ":</td><td><input type=\"password\" name=\"new_password\" size=\"20\" maxlength=\"60\"></td></tr>\n"
-        . "<tr><td>" . _CONFIRMPASSWORD . ":</td><td><input type=\"password\" name=\"new_password2\" size=\"20\" maxlength=\"60\"></td></tr>\n"
-        . "</table><br>\n"
-        . "<input type=\"hidden\" name=\"selector\" value=\"$selector\">\n"
-        . "<input type=\"hidden\" name=\"token\" value=\"$token\">\n"
-        . \Utilities\CsrfGuard::generateToken('reset_password') . "\n"
-        . "<input type=\"hidden\" name=\"op\" value=\"do_reset_password\">\n"
-        . "<input type=\"submit\" value=\"" . _RESETPASSWORD . "\"></form>\n";
-    CloseTable();
-    Nuke\Footer::footer();
-}
-
-function do_reset_password()
-{
-    global $authService, $module_name;
-
-    // CSRF validation
-    if (!\Utilities\CsrfGuard::validateSubmittedToken('reset_password')) {
-        Header("Location: modules.php?name=$module_name&op=pass_lost");
-        die();
-    }
-
-    $selector = isset($_POST['selector']) ? trim($_POST['selector']) : '';
-    $token = isset($_POST['token']) ? trim($_POST['token']) : '';
-    $newPassword = isset($_POST['new_password']) ? $_POST['new_password'] : '';
-    $newPassword2 = isset($_POST['new_password2']) ? $_POST['new_password2'] : '';
-
-    if ($newPassword !== $newPassword2) {
-        Nuke\Header::header();
-        OpenTable();
-        echo "<center><b>" . _PASSDIFFERENT . "</b><br><br>" . _GOBACK . "</center>";
-        CloseTable();
-        Nuke\Footer::footer();
-        return;
-    }
-
-    try {
-        $authService->resetPassword($selector, $token, $newPassword);
-        Nuke\Header::header();
-        OpenTable();
-        echo "<center><b>" . _PASSWORDCHANGED . "</b><br><br>"
-            . "<a href=\"modules.php?name=$module_name\">" . _USERLOGIN . "</a></center>";
-        CloseTable();
-        Nuke\Footer::footer();
-    } catch (\RuntimeException) {
-        $error = $authService->getLastError() ?? _ERROR;
-        Nuke\Header::header();
-        OpenTable();
-        echo "<center><b>" . htmlspecialchars($error) . "</b><br><br>" . _GOBACK . "</center>";
-        CloseTable();
-        Nuke\Footer::footer();
     }
 }
 
@@ -893,48 +792,59 @@ function logout()
     Nuke\Footer::footer();
 }
 
-function mail_password()
+function mail_password($username, $code)
 {
-    global $sitename, $adminmail, $nukeurl, $module_name, $authService;
-
-    // CSRF validation
-    if (!\Utilities\CsrfGuard::validateSubmittedToken('forgot_password')) {
-        Header("Location: modules.php?name=$module_name&op=pass_lost");
-        die();
-    }
-
-    $user_email = isset($_POST['user_email']) ? filter($_POST['user_email'], "nohtml", 1) : '';
-    if ($user_email === '') {
+    global $sitename, $adminmail, $nukeurl, $user_prefix, $db, $module_name, $authService, $mysqli_db;
+    $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
+    $username = rtrim($username, "\\");
+    $username = str_replace("'", "\'", $username);
+    $sql = "SELECT user_email, user_actkey FROM " . $user_prefix . "_users WHERE username='$username'";
+    $result = $db->sql_query($sql);
+    if ($db->sql_numrows($result) == 0) {
         Nuke\Header::header();
         OpenTable();
         echo "<center>" . _SORRYNOUSERINFO . "</center>";
         CloseTable();
         Nuke\Footer::footer();
-        return;
-    }
-
-    // Use delight-im/auth's built-in password reset with secure tokens
-    $authService->forgotPassword($user_email, static function (string $selector, string $token) use ($sitename, $adminmail, $nukeurl, $module_name, $user_email): void {
-        $resetLink = "$nukeurl/modules.php?name=$module_name&op=reset_password&selector=" . urlencode($selector) . "&token=" . urlencode($token);
-        $message = "" . _PASSWORDRESETREQUEST . " $sitename.\n\n"
-            . "" . _CLICKRESETLINK . "\n\n$resetLink\n\n"
-            . "" . _LINKEXPIRES6HOURS . "\n\n"
-            . "" . _IFYOUDIDNOTASK . "";
-        $subject = "" . _PASSWORDRESET . " - $sitename";
-        mail($user_email, $subject, $message, "From: $adminmail\nX-Mailer: PHP/" . phpversion());
-    });
-
-    // Always show success message (don't reveal if email exists)
-    Nuke\Header::header();
-    OpenTable();
-    $lastError = $authService->getLastError();
-    if ($lastError !== null) {
-        echo "<center>" . htmlspecialchars($lastError) . "<br><br>" . _GOBACK . "</center>";
     } else {
-        echo "<center>" . _RESETEMAILSENT . "<br><br>" . _GOBACK . "</center>";
+        $host_name = $_SERVER['REMOTE_ADDR'];
+        $row = $db->sql_fetchrow($result);
+        $user_email = filter($row['user_email'], "nohtml");
+        // Use user_actkey as reset verification code (no longer derived from password hash)
+        $storedCode = $row['user_actkey'] ?? '';
+        if ($storedCode !== '' && $storedCode === $code) {
+            $newpass = makepass();
+            $message = "" . _USERACCOUNT . " '$username' " . _AT . " $sitename " . _HASTHISEMAIL . "  " . _AWEBUSERFROM . " $host_name " . _HASREQUESTED . "\n\n" . _YOURNEWPASSWORD . " $newpass\n\n " . _YOUCANCHANGE . " $nukeurl/modules.php?name=$module_name\n\n" . _IFYOUDIDNOTASK . "";
+            $subject = "" . _USERPASSWORD4 . " $username";
+            mail($user_email, $subject, $message, "From: $adminmail\nX-Mailer: PHP/" . phpversion());
+            /* Update password and clear the reset code */
+            $cryptpass = $authService->hashPassword($newpass);
+            $stmtReset = $mysqli_db->prepare("UPDATE " . $user_prefix . "_users SET user_password = ?, user_actkey = NULL WHERE username = ?");
+            $stmtReset->bind_param('ss', $cryptpass, $username);
+            $stmtReset->execute();
+            $stmtReset->close();
+            Nuke\Header::header();
+            OpenTable();
+            echo "<center>" . _PASSWORD4 . " $username " . _MAILED . "<br><br>" . _GOBACK . "</center>";
+            CloseTable();
+            Nuke\Footer::footer();
+        } else {
+            /* Generate a new reset code and email it */
+            $resetCode = substr(bin2hex(random_bytes(5)), 0, 10);
+            $stmtCode = $mysqli_db->prepare("UPDATE " . $user_prefix . "_users SET user_actkey = ? WHERE username = ?");
+            $stmtCode->bind_param('ss', $resetCode, $username);
+            $stmtCode->execute();
+            $stmtCode->close();
+            $message = "" . _USERACCOUNT . " '$username' " . _AT . " $sitename " . _HASTHISEMAIL . " " . _AWEBUSERFROM . " $host_name " . _CODEREQUESTED . "\n\n" . _YOURCODEIS . " $resetCode \n\n" . _WITHTHISCODE . " $nukeurl/modules.php?name=$module_name&op=pass_lost\n" . _IFYOUDIDNOTASK2 . "";
+            $subject = "" . _CODEFOR . " $username";
+            mail($user_email, $subject, $message, "From: $adminmail\nX-Mailer: PHP/" . phpversion());
+            Nuke\Header::header();
+            OpenTable();
+            echo "<center>" . _CODEFOR . " $username " . _MAILED . "<br><br>" . _GOBACK . "</center>";
+            CloseTable();
+            Nuke\Footer::footer();
+        }
     }
-    CloseTable();
-    Nuke\Footer::footer();
 }
 
 function docookie($setuid, $setusername, $setpass, $setstorynum, $setumode, $setuorder, $setthold, $setnoscore, $setublockon, $settheme, $setcommentmax)
@@ -945,13 +855,6 @@ function docookie($setuid, $setusername, $setpass, $setstorynum, $setumode, $set
 function login($username, $user_password, $redirect, $mode, $f, $t, $random_num, $gfx_check)
 {
     global $authService, $user_prefix, $db, $mysqli_db, $module_name, $pm_login, $prefix;
-
-    // CSRF validation
-    if (!\Utilities\CsrfGuard::validateSubmittedToken('login')) {
-        Header("Location: modules.php?name=$module_name&stop=1");
-        die();
-    }
-
     $user_password = stripslashes($user_password);
     include "config.php";
 
@@ -964,13 +867,8 @@ function login($username, $user_password, $redirect, $mode, $f, $t, $random_num,
         die();
     }
 
-    // Remember-me: 30 days if checkbox was checked, null for session-only
-    $rememberDuration = (isset($_POST['remember_me']) && $_POST['remember_me'] === '1')
-        ? (int) (60 * 60 * 24 * 30)
-        : null;
-
-    // Authenticate via AuthService (delight-im/auth with remember-me and throttling)
-    if ($authService->attempt($username, $user_password, $rememberDuration)) {
+    // Authenticate via AuthService (handles bcrypt + MD5 transitional upgrade)
+    if ($authService->attempt($username, $user_password)) {
         $uname = $_SERVER['REMOTE_ADDR'];
 
         // Clean up guest session for this IP
@@ -1822,7 +1720,7 @@ switch ($op) {
         break;
 
     case "mailpasswd":
-        mail_password();
+        mail_password($username, $code);
         break;
 
     case "userinfo":
@@ -1893,18 +1791,6 @@ switch ($op) {
 
     case "activate":
         activate($username, $check_num);
-        break;
-
-    case "confirm_email":
-        confirm_email();
-        break;
-
-    case "reset_password":
-        reset_password_form();
-        break;
-
-    case "do_reset_password":
-        do_reset_password();
         break;
 
     case "CoolSize":

@@ -21,9 +21,9 @@ class NegotiationProcessor implements NegotiationProcessorInterface
     private NegotiationValidator $validator;
     private NegotiationDemandCalculator $demandCalculator;
 
-    public function __construct(\mysqli $db, \mysqli $mysqli_db)
+    public function __construct(\mysqli $mysqli_db)
     {
-        $this->db = $db;
+        $this->db = $mysqli_db;
         $this->repository = new NegotiationRepository($mysqli_db);
         $this->validator = new NegotiationValidator($mysqli_db);
         $this->demandCalculator = new NegotiationDemandCalculator($mysqli_db);

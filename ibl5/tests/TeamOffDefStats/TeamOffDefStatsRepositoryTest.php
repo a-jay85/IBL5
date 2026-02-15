@@ -145,52 +145,34 @@ class TeamOffDefStatsRepositoryTest extends TestCase
      * @param array $data Data to return from query
      * @return object Mock database
      */
-    private function createMockDatabase(array $data): object
+    private function createMockDatabase(array $data): \mysqli
     {
         // Create wrapper object that mimics the database wrapper
-        return new class ($data) {
+        return new class ($data) extends \mysqli {
             private array $data;
 
             public function __construct(array $data)
             {
+                // Don't call parent::__construct() to avoid real DB connection
                 $this->data = $data;
             }
 
-            public function query(string $sql): object
+            #[\ReturnTypeWillChange]
+            public function query(string $sql, int $resultMode = MYSQLI_STORE_RESULT): \mysqli_result|bool
             {
-                $data = $this->data;
-                return new class ($data) {
-                    private array $data;
-                    private int $index = 0;
-
-                    public function __construct(array $data)
-                    {
-                        $this->data = $data;
-                    }
-
-                    public function fetch_assoc(): ?array
-                    {
-                        if ($this->index < count($this->data)) {
-                            return $this->data[$this->index++];
-                        }
-                        return null;
-                    }
-
-                    public function fetch_all(int $mode = MYSQLI_ASSOC): array
-                    {
-                        return $this->data;
-                    }
-                };
+                return false;
             }
 
-            public function prepare(string $sql): object
+            #[\ReturnTypeWillChange]
+            public function prepare(string $sql): \mysqli_stmt|false
             {
                 $data = $this->data;
-                return new class ($data) {
+                return new class ($data) extends \mysqli_stmt {
                     private array $data;
 
                     public function __construct(array $data)
                     {
+                        // Don't call parent::__construct()
                         $this->data = $data;
                     }
 
@@ -199,24 +181,25 @@ class TeamOffDefStatsRepositoryTest extends TestCase
                         return true;
                     }
 
-                    public function execute(): bool
+                    public function execute(?array $params = null): bool
                     {
                         return true;
                     }
 
-                    public function get_result(): object
+                    public function get_result(): \mysqli_result|false
                     {
                         $data = $this->data;
-                        return new class ($data) {
+                        return new class ($data) extends \mysqli_result {
                             private array $data;
                             private int $index = 0;
 
                             public function __construct(array $data)
                             {
+                                // Don't call parent::__construct()
                                 $this->data = $data;
                             }
 
-                            public function fetch_assoc(): ?array
+                            public function fetch_assoc(): array|null|false
                             {
                                 if ($this->index < count($this->data)) {
                                     return $this->data[$this->index++];
@@ -231,8 +214,9 @@ class TeamOffDefStatsRepositoryTest extends TestCase
                         };
                     }
 
-                    public function close(): void
+                    public function close(): true
                     {
+                        return true;
                     }
                 };
             }

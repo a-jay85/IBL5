@@ -142,8 +142,8 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
             case 'chunk':
                 return \UI::periodAverages($this->db, $team, $season);
             case 'contracts':
-                $sharedFunctions = new \Shared($this->db);
-                return \UI::contracts($this->db, $result, $team, $sharedFunctions);
+                $sharedRepository = new \Shared\SharedRepository($this->db);
+                return \UI::contracts($this->db, $result, $team, $sharedRepository);
             default:
                 return \UI::ratings($this->db, $result, $team, '', $season);
         }

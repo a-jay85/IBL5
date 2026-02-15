@@ -20,6 +20,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 global $mysqli_db, $admin;
 
 use FreeAgency\FreeAgencyAdminProcessor;
+use FreeAgency\FreeAgencyAdminRepository;
 use Utilities\CsrfGuard;
 use Utilities\HtmlSanitizer;
 
@@ -38,7 +39,8 @@ if ($day < 1 || $day > 12) {
     $day = 1;
 }
 
-$processor = new FreeAgencyAdminProcessor($mysqli_db);
+$repository = new FreeAgencyAdminRepository($mysqli_db);
+$processor = new FreeAgencyAdminProcessor($repository, $mysqli_db);
 $actionMessage = '';
 $actionCompleted = false;
 

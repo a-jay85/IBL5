@@ -18,7 +18,7 @@ use Utilities\HtmlSanitizer;
  */
 class LeagueStartersView implements LeagueStartersViewInterface
 {
-    private object $db;
+    private \mysqli $db;
     private \Season $season;
     private string $moduleName;
 
@@ -34,11 +34,11 @@ class LeagueStartersView implements LeagueStartersViewInterface
     /**
      * Constructor
      *
-     * @param object $db Database connection
+     * @param \mysqli $db Database connection
      * @param \Season $season Current season
      * @param string $moduleName Module name
      */
-    public function __construct(object $db, \Season $season, string $moduleName)
+    public function __construct(\mysqli $db, \Season $season, string $moduleName)
     {
         $this->db = $db;
         $this->season = $season;
@@ -87,17 +87,15 @@ class LeagueStartersView implements LeagueStartersViewInterface
      */
     private function renderTableForDisplay(string $display, array $result, \Team $team): string
     {
-        /** @var \mysqli $db */
-        $db = $this->db;
         switch ($display) {
             case 'total_s':
-                return \UI::seasonTotals($db, $result, $team, '', [], $this->moduleName);
+                return \UI::seasonTotals($this->db, $result, $team, '', [], $this->moduleName);
             case 'avg_s':
-                return \UI::seasonAverages($db, $result, $team, '', [], $this->moduleName);
+                return \UI::seasonAverages($this->db, $result, $team, '', [], $this->moduleName);
             case 'per36mins':
-                return \UI::per36Minutes($db, $result, $team, '', [], $this->moduleName);
+                return \UI::per36Minutes($this->db, $result, $team, '', [], $this->moduleName);
             default:
-                return \UI::ratings($db, $result, $team, '', $this->season, $this->moduleName);
+                return \UI::ratings($this->db, $result, $team, '', $this->season, $this->moduleName);
         }
     }
 }

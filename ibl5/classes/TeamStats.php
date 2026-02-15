@@ -103,7 +103,7 @@ class TeamStats
         $this->repository = $repository;
     }
 
-    public static function withTeamName(object $db, string $teamName, int $seasonYear): self
+    public static function withTeamName(\mysqli $db, string $teamName, int $seasonYear): self
     {
         $repository = new TeamOffDefStatsRepository($db);
         $instance = new self($repository);

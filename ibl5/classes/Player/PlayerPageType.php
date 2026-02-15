@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Player;
+
 class PlayerPageType
 {
     const OVERVIEW = null;

@@ -17,47 +17,47 @@ interface PlayerStatsInterface
     /**
      * Create a PlayerStats instance by loading player data by ID
      * 
-     * @param object $db Database connection object
+     * @param \mysqli $db Database connection
      * @param int $playerID Player ID to load
      * @return self Populated PlayerStats instance
      */
-    public static function withPlayerID(object $db, int $playerID): self;
+    public static function withPlayerID(\mysqli $db, int $playerID): self;
 
     /**
      * Create a PlayerStats instance from a Player object
      * 
-     * @param object $db Database connection object
+     * @param \mysqli $db Database connection
      * @param Player $player Player object to load stats for
      * @return self Populated PlayerStats instance
      */
-    public static function withPlayerObject(object $db, Player $player): self;
+    public static function withPlayerObject(\mysqli $db, Player $player): self;
 
     /**
      * Create a PlayerStats instance from a current player database row
      * 
-     * @param object $db Database connection object
+     * @param \mysqli $db Database connection
      * @param array<string, mixed> $plrRow Raw database row from ibl_plr
      * @return self Populated PlayerStats instance
      */
-    public static function withPlrRow(object $db, array $plrRow): self;
+    public static function withPlrRow(\mysqli $db, array $plrRow): self;
 
     /**
      * Create a PlayerStats instance from a historical player database row
      * 
-     * @param object $db Database connection object
+     * @param \mysqli $db Database connection
      * @param array<string, mixed> $plrRow Raw database row from ibl_hist
      * @return self Populated PlayerStats instance
      */
-    public static function withHistoricalPlrRow(object $db, array $plrRow): self;
+    public static function withHistoricalPlrRow(\mysqli $db, array $plrRow): self;
 
     /**
      * Create a PlayerStats instance from a boxscore info line
      * 
      * Parses the fixed-width boxscore line format used in game data files.
      * 
-     * @param object $db Database connection object
+     * @param \mysqli $db Database connection
      * @param string $playerInfoLine Fixed-width player info line from boxscore
      * @return self Populated PlayerStats instance
      */
-    public static function withBoxscoreInfoLine(object $db, string $playerInfoLine): self;
+    public static function withBoxscoreInfoLine(\mysqli $db, string $playerInfoLine): self;
 }

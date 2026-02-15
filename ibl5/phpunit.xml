@@ -190,5 +190,8 @@
         <testsuite name="LeagueConfig Module Tests">
             <directory>tests/LeagueConfig</directory>
         </testsuite>
+        <testsuite name="YourAccount Module Tests">
+            <directory>tests/YourAccount</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

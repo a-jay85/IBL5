@@ -93,53 +93,27 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
         $datekey = date("F j");
         $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $_POST['random_num'] . $datekey));
         $code = substr($rcode, 2, 6);
+        $accountView = new \YourAccount\YourAccountView();
         if (extension_loaded("gd") and $code != $gfx_check and ($gfx_chk == 3 or $gfx_chk == 4 or $gfx_chk == 6 or $gfx_chk == 7)) {
-            title("" . _NEWUSERERROR . "");
-            OpenTable();
-            echo "<center><b>" . _SECCODEINCOR . "</b><br><br>"
-                . "" . _GOBACK . "</center>";
-            CloseTable();
+            echo $accountView->renderRegistrationErrorPage('The security code was incorrect.');
             Nuke\Footer::footer();
             die();
         }
         if (empty($user_password) and empty($user_password2)) {
             $user_password = makepass();
         } elseif ($user_password != $user_password2) {
-            title("" . _NEWUSERERROR . "");
-            OpenTable();
-            echo "<center><b>" . _PASSDIFFERENT . "</b><br><br>" . _GOBACK . "</center>";
-            CloseTable();
+            echo $accountView->renderRegistrationErrorPage('The passwords you entered do not match.');
             Nuke\Footer::footer();
             die();
         } elseif ($user_password == $user_password2 and strlen($user_password) < $minpass) {
-            title("" . _NEWUSERERROR . "");
-            OpenTable();
-            echo "<center>" . _YOUPASSMUSTBE . " <b>$minpass</b> " . _CHARLONG . "<br><br>" . _GOBACK . "</center>";
-            CloseTable();
+            echo $accountView->renderRegistrationErrorPage("Your password must be at least $minpass characters long.");
             Nuke\Footer::footer();
             die();
         }
-        title("$sitename: " . _USERREGLOGIN . "");
-        OpenTable();
-        echo "<center><b>" . _USERFINALSTEP . "</b><br><br>$username, " . _USERCHECKDATA . "</center><br><br>"
-            . "<table align='center' border='0'>"
-            . "<tr><td><b>" . _UUSERNAME . ":</b> $username<br></td></tr>"
-            . "<tr><td><b>" . _EMAIL . ":</b> $user_email</td></tr></table><br><br>"
-            . "<center><b>" . _NOTE . "</b> " . _YOUWILLRECEIVE . "";
-        echo "<form action=\"modules.php?name=$module_name\" method=\"post\">"
-            . "<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">"
-            . "<input type=\"hidden\" name=\"gfx_check\" value=\"$gfx_check\">"
-            . "<input type=\"hidden\" name=\"username\" value=\"$username\">"
-            . "<input type=\"hidden\" name=\"user_email\" value=\"$user_email\">"
-            . "<input type=\"hidden\" name=\"user_password\" value=\"$user_password\">"
-            . "<input type=\"hidden\" name=\"op\" value=\"finish\"><br><br>"
-            . "<input type=\"submit\" value=\"" . _FINISH . "\"> &nbsp;&nbsp;" . _GOBACK . "</form></center>";
-        CloseTable();
+        echo $accountView->renderRegistrationConfirmPage($username, $user_email, $user_password, (int) $random_num, (string) $gfx_check);
     } else {
-        OpenTable();
-        echo "<center><font class=\"title\"><b>Registration Error!</b></font><br><br>";
-        echo "<font class=\"content\">$stop<br>" . _GOBACK . "</font></center>";
-        CloseTable();
+        $accountView = new \YourAccount\YourAccountView();
+        echo $accountView->renderRegistrationErrorPage((string) $stop);
     }
     Nuke\Footer::footer();
 }
@@ -180,14 +154,8 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
             $subject = "" . _ACTIVATIONSUB . "";
             $from = "$adminmail";
             mail($user_email, $subject, $message, "From: $from\nX-Mailer: PHP/" . phpversion());
-            title("$sitename: " . _USERREGLOGIN . "");
-            OpenTable();
-            echo "<center><b>" . _ACCOUNTCREATED . "</b><br><br>";
-            echo "" . _YOUAREREGISTERED . ""
-                . "<br><br>"
-                . "" . _FINISHUSERCONF . "<br><br>"
-                . "" . _THANKSUSER . " $sitename!</center>";
-            CloseTable();
+            $accountView = new \YourAccount\YourAccountView();
+            echo $accountView->renderRegistrationCompletePage($sitename);
         }
     } else {
         echo "$stop";
@@ -210,27 +178,21 @@ function activate($username, $check_num)
             \DatabaseConnection::query("INSERT INTO nuke_users (user_id, username, user_email, user_password, user_avatar, user_avatar_type, user_regdate, user_lang) VALUES (NULL, ?, ?, ?, '', '3', ?, ?)", [$row['username'], $row['user_email'], $user_password, $row['user_regdate'], $language]);
             \DatabaseConnection::query("DELETE FROM nuke_users_temp WHERE username = ? AND check_num = ?", [$username, $check_num]);
             Nuke\Header::header();
-            title("" . _ACTIVATIONYES . "");
-            OpenTable();
-            echo "<center><b>" . htmlspecialchars($row['username']) . ":</b> " . _ACTMSG . "</center>";
-            CloseTable();
+            $accountView = new \YourAccount\YourAccountView();
+            echo $accountView->renderActivationSuccessPage((string) $row['username']);
             Nuke\Footer::footer();
             die();
         } else {
             Nuke\Header::header();
-            title("" . _ACTIVATIONERROR . "");
-            OpenTable();
-            echo "<center>" . _ACTERROR1 . "</center>";
-            CloseTable();
+            $accountView = new \YourAccount\YourAccountView();
+            echo $accountView->renderActivationErrorPage('mismatch');
             Nuke\Footer::footer();
             die();
         }
     } else {
         Nuke\Header::header();
-        title("" . _ACTIVATIONERROR . "");
-        OpenTable();
-        echo "<center>" . _ACTERROR2 . "</center>";
-        CloseTable();
+        $accountView = new \YourAccount\YourAccountView();
+        echo $accountView->renderActivationErrorPage('expired');
         Nuke\Footer::footer();
         die();
     }
@@ -601,41 +563,17 @@ function main($user)
     global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
     if (!is_user($user)) {
         Nuke\Header::header();
-        if ($stop) {
-            OpenTable();
-            echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
-            CloseTable();
-            echo "<br>\n";
-        } else {
-            OpenTable();
-            echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
-            CloseTable();
-            echo "<br>\n";
-        }
-        if (!is_user($user)) {
-            OpenTable();
-            mt_srand((double) microtime() * 1000000);
-            $maxran = 1000000;
-            $random_num = mt_rand(0, $maxran);
-            echo "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
-                . "<b>" . _USERLOGIN . "</b><br><br>\n"
-                . "<table border=\"0\"><tr><td>\n"
-                . "" . _NICKNAME . ":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
-                . "<tr><td>" . _PASSWORD . ":</td><td><input type=\"password\" name=\"user_password\" size=\"15\" maxlength=\"20\"></td></tr>\n";
-            if (extension_loaded("gd") and ($gfx_chk == 2 or $gfx_chk == 4 or $gfx_chk == 5 or $gfx_chk == 7)) {
-                echo "<tr><td colspan='2'>" . _SECURITYCODE . ": <img src='?gfx=gfx&random_num=$random_num' border='1' alt='" . _SECURITYCODE . "' title='" . _SECURITYCODE . "'></td></tr>\n"
-                    . "<tr><td colspan='2'>" . _TYPESECCODE . ": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
-                    . "<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
-            }
-            echo "</table><input type=\"hidden\" name=\"redirect\" value=\"$redirect\">\n"
-                . "<input type=\"hidden\" name=\"mode\" value=$mode>\n"
-                . "<input type=\"hidden\" name=\"f\" value=$f>\n"
-                . "<input type=\"hidden\" name=\"t\" value=$t>\n"
-                . "<input type=\"hidden\" name=\"op\" value=\"login\">\n"
-                . "<input type=\"submit\" value=\"" . _LOGIN . "\"></form><br>\n\n"
-                . "<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">" . _PASSWORDLOST . "</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">" . _REGNEWUSER . "</a> ]</font></center>\n";
-            CloseTable();
-        }
+        mt_srand((double) microtime() * 1000000);
+        $maxran = 1000000;
+        $random_num = mt_rand(0, $maxran);
+        $showCaptcha = extension_loaded("gd") && ($gfx_chk == 2 || $gfx_chk == 4 || $gfx_chk == 5 || $gfx_chk == 7);
+        $accountView = new \YourAccount\YourAccountView();
+        echo $accountView->renderLoginPage(
+            $stop ? (string) $stop : null,
+            isset($redirect) ? (string) $redirect : null,
+            $random_num,
+            $showCaptcha
+        );
         Nuke\Footer::footer();
     } elseif (is_user($user)) {
         global $cookie;
@@ -646,81 +584,15 @@ function main($user)
 
 function new_user()
 {
-    global $my_headlines, $module_name, $db, $gfx_chk, $user, $prefix;
+    global $gfx_chk, $user;
     if (!is_user($user)) {
         mt_srand((double) microtime() * 1000000);
         $maxran = 1000000;
         $random_num = mt_rand(0, $maxran);
+        $showCaptcha = extension_loaded("gd") && ($gfx_chk == 3 || $gfx_chk == 4 || $gfx_chk == 6 || $gfx_chk == 7);
         Nuke\Header::header();
-        OpenTable();
-        echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
-        CloseTable();
-        echo "<br>\n";
-        OpenTable();
-        echo "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
-            . "<b>" . _REGNEWUSER . "</b> (" . _ALLREQUIRED . ")<br><br>\n"
-            . "<table cellpadding=\"0\" cellspacing=\"10\" border=\"0\">\n"
-            . "<tr><td>" . _NICKNAME . ":</td><td><input type=\"text\" name=\"username\" size=\"30\" maxlength=\"25\"></td></tr>\n"
-            . "<tr><td>" . _EMAIL . ":</td><td><input type=\"text\" name=\"user_email\" size=\"30\" maxlength=\"255\"></td></tr>\n"
-            . "<tr><td>" . _PASSWORD . ":</td><td><input type=\"password\" name=\"user_password\" size=\"11\" maxlength=\"40\"></td></tr>\n"
-            . "<tr><td>" . _RETYPEPASSWORD . ":</td><td><input type=\"password\" name=\"user_password2\" size=\"11\" maxlength=\"40\"><br><font class=\"tiny\">(" . _BLANKFORAUTO . ")</font></td></tr>\n";
-        if (extension_loaded("gd") and ($gfx_chk == 3 or $gfx_chk == 4 or $gfx_chk == 6 or $gfx_chk == 7)) {
-            echo "<tr><td>" . _SECURITYCODE . ":</td><td><img src='?gfx=gfx&random_num=$random_num' border='1' alt='" . _SECURITYCODE . "' title='" . _SECURITYCODE . "'></td></tr>\n"
-                . "<tr><td>" . _TYPESECCODE . ":</td><td><input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
-                . "<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
-        }
-        echo "<tr><td colspan='2'>\n"
-            . "<input type=\"hidden\" name=\"op\" value=\"new user\">\n"
-            . "<input type=\"submit\" value=\"" . _NEWUSER . "\">\n"
-            . "</td></tr></table>\n"
-            . "</form>\n"
-            . "<br>\n"
-            . "" . _YOUWILLRECEIVE . "<br><br>\n"
-            . "" . _COOKIEWARNING . "<br>\n"
-            . "" . _ASREGUSER . "<br>\n"
-            . "<ul>\n"
-            . "<li>" . _ASREG1 . "\n"
-            . "<li>" . _ASREG2 . "\n"
-            . "<li>" . _ASREG3 . "\n"
-            . "<li>" . _ASREG4 . "\n"
-            . "<li>" . _ASREG5 . "\n";
-        $handle = opendir('themes');
-        $thmcount = 0;
-        while ($file = readdir($handle)) {
-            if ((!str_contains($file, '.') and file_exists("themes/$file/theme.php"))) {
-                $thmcount++;
-            }
-        }
-        closedir($handle);
-        if ($thmcount > 1) {
-            echo "<li>" . _ASREG6 . "\n";
-        }
-        $sql = "SELECT custom_title FROM " . $prefix . "_modules WHERE active='1' AND view='1' AND inmenu='1'";
-        $result = $db->sql_query($sql);
-        while ($row = $db->sql_fetchrow($result)) {
-            $custom_title = filter($row['custom_title'], "nohtml");
-            if (!empty($custom_title)) {
-                echo "<li>" . _ACCESSTO . " $custom_title\n";
-            }
-        }
-        $sql = "SELECT title FROM " . $prefix . "_blocks WHERE active='1' AND view='1'";
-        $result = $db->sql_query($sql);
-        while ($row = $db->sql_fetchrow($result)) {
-            $b_title = filter($row['title'], "nohtml");
-            if (!empty($b_title)) {
-                echo "<li>" . _ACCESSTO . " $b_title\n";
-            }
-        }
-
-        if ($my_headlines == 1) {
-            echo "<li>" . _READHEADLINES . "\n";
-        }
-        echo "<li>" . _ASREG7 . "\n"
-            . "</ul>\n"
-            . "" . _REGISTERNOW . "<br>\n"
-            . "" . _WEDONTGIVE . "<br><br>\n"
-            . "<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name\">" . _USERLOGIN . "</a> | <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">" . _PASSWORDLOST . "</a> ]</font></center>\n";
-        CloseTable();
+        $accountView = new \YourAccount\YourAccountView();
+        echo $accountView->renderRegisterPage($random_num, $showCaptcha);
         Nuke\Footer::footer();
     } elseif (is_user($user)) {
         global $cookie;
@@ -731,24 +603,11 @@ function new_user()
 
 function pass_lost()
 {
-    global $user, $module_name;
+    global $user;
     if (!is_user($user)) {
         Nuke\Header::header();
-        OpenTable();
-        echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
-        CloseTable();
-        echo "<br>\n";
-        OpenTable();
-        echo "<b>" . _PASSWORDLOST . "</b><br><br>\n"
-            . "" . _NOPROBLEM . "<br><br>\n"
-            . "<form action=\"modules.php?name=$module_name\" method=\"post\">\n"
-            . "<table border=\"0\"><tr><td>\n"
-            . "" . _NICKNAME . ":</td><td><input type=\"text\" name=\"username\" size=\"15\" maxlength=\"25\"></td></tr>\n"
-            . "<tr><td>" . _CONFIRMATIONCODE . ":</td><td><input type=\"text\" name=\"code\" size=\"11\" maxlength=\"10\"></td></tr></table><br>\n"
-            . "<input type=\"hidden\" name=\"op\" value=\"mailpasswd\">\n"
-            . "<input type=\"submit\" value=\"" . _SENDPASSWORD . "\"></form><br>\n"
-            . "<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name\">" . _USERLOGIN . "</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">" . _REGNEWUSER . "</a> ]</font></center>\n";
-        CloseTable();
+        $accountView = new \YourAccount\YourAccountView();
+        echo $accountView->renderForgotPasswordPage();
         Nuke\Footer::footer();
     } elseif (is_user($user)) {
         global $cookie;
@@ -781,14 +640,8 @@ function logout()
     $user = "";
     $cookie = "";
     Nuke\Header::header();
-    OpenTable();
-    if (!empty($redirect)) {
-        echo "<META HTTP-EQUIV=\"refresh\" content=\"3;URL=modules.php?name=$redirect\">";
-    } else {
-        echo "<META HTTP-EQUIV=\"refresh\" content=\"3;URL=index.php\">";
-    }
-    echo "<center><font class=\"option\"><b>" . _YOUARELOGGEDOUT . "</b></font></center>";
-    CloseTable();
+    $accountView = new \YourAccount\YourAccountView();
+    echo $accountView->renderLogoutPage(!empty($redirect) ? (string) $redirect : null);
     Nuke\Footer::footer();
 }
 
@@ -800,11 +653,10 @@ function mail_password($username, $code)
     $username = str_replace("'", "\'", $username);
     $sql = "SELECT user_email, user_actkey FROM " . $user_prefix . "_users WHERE username='$username'";
     $result = $db->sql_query($sql);
+    $accountView = new \YourAccount\YourAccountView();
     if ($db->sql_numrows($result) == 0) {
         Nuke\Header::header();
-        OpenTable();
-        echo "<center>" . _SORRYNOUSERINFO . "</center>";
-        CloseTable();
+        echo $accountView->renderUserNotFoundPage();
         Nuke\Footer::footer();
     } else {
         $host_name = $_SERVER['REMOTE_ADDR'];
@@ -824,9 +676,7 @@ function mail_password($username, $code)
             $stmtReset->execute();
             $stmtReset->close();
             Nuke\Header::header();
-            OpenTable();
-            echo "<center>" . _PASSWORD4 . " $username " . _MAILED . "<br><br>" . _GOBACK . "</center>";
-            CloseTable();
+            echo $accountView->renderPasswordMailedPage($username);
             Nuke\Footer::footer();
         } else {
             /* Generate a new reset code and email it */
@@ -839,9 +689,7 @@ function mail_password($username, $code)
             $subject = "" . _CODEFOR . " $username";
             mail($user_email, $subject, $message, "From: $adminmail\nX-Mailer: PHP/" . phpversion());
             Nuke\Header::header();
-            OpenTable();
-            echo "<center>" . _CODEFOR . " $username " . _MAILED . "<br><br>" . _GOBACK . "</center>";
-            CloseTable();
+            echo $accountView->renderCodeMailedPage($username);
             Nuke\Footer::footer();
         }
     }

@@ -155,8 +155,8 @@ class NavigationView
         }
 
         return [
-            ['label' => 'Topics', 'url' => 'modules.php?name=Topics'],
-            ['label' => 'Create Account', 'url' => 'modules.php?name=YourAccount&op=new_user'],
+            ['label' => 'Sign Up', 'url' => 'modules.php?name=YourAccount&op=new_user'],
+            ['label' => 'Forgot Password', 'url' => 'modules.php?name=YourAccount&op=pass_lost'],
         ];
     }
 

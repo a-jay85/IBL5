@@ -4,77 +4,8 @@
  * Styles for:
  * - Main navigation bar
  * - Mobile navigation
- * - Breadcrumbs
  * - Tab navigation
- * - Pagination
  */
-
-/* ==========================================================================
-   Main Navigation (handled by NavigationView.php)
-   These are utility classes for nav-related components
-   ========================================================================== */
-
-.ibl-nav-link {
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--gray-600);
-    text-decoration: none;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    transition: all var(--transition-fast);
-}
-
-.ibl-nav-link:hover {
-    color: var(--accent-500);
-    background: var(--gray-100);
-}
-
-.ibl-nav-link--active {
-    color: var(--accent-500);
-    background: rgba(249, 115, 22, 0.1);
-}
-
-/* ==========================================================================
-   Breadcrumbs
-   ========================================================================== */
-
-.ibl-breadcrumbs {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    font-size: 1rem;
-    color: var(--gray-500);
-    margin-bottom: var(--space-4);
-}
-
-.ibl-breadcrumbs__item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-}
-
-.ibl-breadcrumbs__link {
-    color: var(--gray-600);
-    text-decoration: none;
-    transition: color var(--transition-fast);
-}
-
-.ibl-breadcrumbs__link:hover {
-    color: var(--accent-500);
-}
-
-.ibl-breadcrumbs__separator {
-    color: var(--gray-300);
-}
-
-.ibl-breadcrumbs__current {
-    color: var(--navy-800);
-    font-weight: 500;
-}
 
 /* ==========================================================================
    Tab Navigation
@@ -230,57 +161,6 @@
     color: white;
     background: rgba(0, 0, 0, 0.15);
     border-bottom-color: white;
-}
-
-/* ==========================================================================
-   Pagination
-   ========================================================================== */
-
-.ibl-pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-1);
-    margin: var(--space-6) 0;
-}
-
-.ibl-pagination__item {
-    min-width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--navy-800);
-    text-decoration: none;
-    background: white;
-    border: 1px solid var(--gray-200);
-    border-radius: var(--radius-md);
-    transition: all var(--transition-fast);
-}
-
-.ibl-pagination__item:hover {
-    border-color: var(--accent-500);
-    color: var(--accent-500);
-}
-
-.ibl-pagination__item--active {
-    background: var(--accent-500);
-    border-color: var(--accent-500);
-    color: white;
-}
-
-.ibl-pagination__item--disabled {
-    color: var(--gray-300);
-    cursor: not-allowed;
-    pointer-events: none;
-}
-
-.ibl-pagination__ellipsis {
-    color: var(--gray-400);
-    padding: 0 var(--space-2);
 }
 
 /* ==========================================================================

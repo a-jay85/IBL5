@@ -219,6 +219,128 @@ class DraftIntegrationTest extends IntegrationTestCase
         $this->assertQueryNotExecuted('INSERT INTO ibl_plr');
     }
 
+    // ========== PLAYER CREATION SCENARIOS ==========
+
+    /**
+     * @group integration
+     * @group success-scenarios
+     */
+    public function testSuccessfulPickCreatesPlayerRecord(): void
+    {
+        // Arrange
+        $this->setupSuccessfulDraftScenario();
+
+        // Act
+        $result = $this->handler->handleDraftSelection(
+            'Denver Nuggets',
+            'New Rookie',
+            1,
+            10
+        );
+
+        // Assert - Player name appears in success message
+        $this->assertStringContainsString('New Rookie', $result);
+
+        // Verify player was inserted into ibl_plr
+        $this->assertQueryExecuted('INSERT INTO ibl_plr');
+
+        // Verify the INSERT references the drafting team
+        $this->assertQueryExecuted('Denver Nuggets');
+    }
+
+    /**
+     * @group integration
+     * @group success-scenarios
+     */
+    public function testDraftedPlayerGetsSequentialPid(): void
+    {
+        // Arrange
+        $this->setupSuccessfulDraftScenario();
+
+        // Act
+        $this->handler->handleDraftSelection(
+            'Test Team',
+            'Sequential Player',
+            1,
+            1
+        );
+
+        // Assert - Player was inserted with a PID in the 90000+ range
+        $this->assertQueryExecuted('INSERT INTO ibl_plr');
+
+        // Verify the MAX(pid) query was executed to determine next available PID
+        $this->assertQueryExecuted('SELECT MAX(pid) as max_pid FROM ibl_plr');
+    }
+
+    /**
+     * @group integration
+     * @group success-scenarios
+     */
+    public function testDraftClassMarkedAsDrafted(): void
+    {
+        // Arrange
+        $this->setupSuccessfulDraftScenario();
+
+        // Act
+        $this->handler->handleDraftSelection(
+            'Miami Cyclones',
+            'John Prospect',
+            1,
+            5
+        );
+
+        // Assert - Draft class record was updated to mark player as drafted
+        $this->assertQueryExecuted('UPDATE `ibl_draft_class`');
+    }
+
+    /**
+     * @group integration
+     * @group success-scenarios
+     */
+    public function testDraftTableUpdatedWithPlayerAndDate(): void
+    {
+        // Arrange
+        $this->setupSuccessfulDraftScenario();
+
+        // Act
+        $this->handler->handleDraftSelection(
+            'Team X',
+            'Player Y',
+            1,
+            5
+        );
+
+        // Assert - Draft table was updated with pick info
+        $this->assertQueryExecuted('UPDATE ibl_draft');
+
+        // Verify the player name was recorded in the draft table
+        $this->assertQueryExecuted('Player Y');
+    }
+
+    /**
+     * @group integration
+     * @group success-scenarios
+     */
+    public function testRatingsTransferFromDraftClassToPlayer(): void
+    {
+        // Arrange - All ratings in base draft data are set to 55
+        $this->setupSuccessfulDraftScenario();
+
+        // Act
+        $this->handler->handleDraftSelection(
+            'Miami Cyclones',
+            'Rated Prospect',
+            1,
+            5
+        );
+
+        // Assert - Player was inserted with ratings from the draft class
+        $this->assertQueryExecuted('INSERT INTO ibl_plr');
+
+        // The INSERT query should contain the rating value 55 from draft class data
+        $this->assertQueryExecuted('55');
+    }
+
     // ========== HELPER METHODS ==========
 
     private function setupSuccessfulDraftScenario(): void

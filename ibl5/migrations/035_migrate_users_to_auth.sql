@@ -21,7 +21,7 @@ SELECT
     1,  -- verified: all existing users are pre-verified
     1,  -- resettable: allow password resets
     0,  -- roles_mask: regular user (no special roles)
-    UNIX_TIMESTAMP(STR_TO_DATE(nu.user_regdate, '%M %d, %Y')),  -- convert regdate string to unix timestamp
+    COALESCE(UNIX_TIMESTAMP(STR_TO_DATE(NULLIF(nu.user_regdate, ''), '%M %d, %Y')), 0),  -- convert regdate string to unix timestamp (0 for empty/invalid)
     NULL  -- last_login: unknown
 FROM nuke_users nu
 WHERE nu.user_id > 0

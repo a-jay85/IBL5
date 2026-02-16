@@ -5,6 +5,18 @@ declare(strict_types=1);
 namespace Auth;
 
 use Auth\Contracts\AuthServiceInterface;
+use Database\PdoConnection;
+use Delight\Auth\Auth;
+use Delight\Auth\AuthError;
+use Delight\Auth\DuplicateUsernameException;
+use Delight\Auth\EmailNotVerifiedException;
+use Delight\Auth\InvalidEmailException;
+use Delight\Auth\InvalidPasswordException;
+use Delight\Auth\InvalidSelectorTokenPairException;
+use Delight\Auth\ResetDisabledException;
+use Delight\Auth\TokenExpiredException;
+use Delight\Auth\TooManyRequestsException;
+use Delight\Auth\UserAlreadyExistsException;
 
 /**
  * AuthService - Session-based user authentication with bcrypt password hashing
@@ -28,12 +40,28 @@ class AuthService implements AuthServiceInterface
 
     private \mysqli $db;
 
+    private ?Auth $auth;
+
+    private ?string $lastError = null;
+
     /** @var array<string, float|int|string|null>|null Cached user info row */
     private ?array $cachedUserInfo = null;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?Auth $auth = null)
     {
         $this->db = $db;
+        $this->auth = $auth;
+    }
+
+    /**
+     * Get the delight-im/auth instance, creating it lazily if needed.
+     */
+    private function getAuth(): Auth
+    {
+        if ($this->auth === null) {
+            $this->auth = new Auth(PdoConnection::getInstance(), null, 'auth_', true);
+        }
+        return $this->auth;
     }
 
     public function attempt(string $username, string $password): bool
@@ -205,6 +233,175 @@ class AuthService implements AuthServiceInterface
 
         // Clear cached user info so it gets re-fetched
         $this->cachedUserInfo = null;
+    }
+
+    public function register(string $email, string $password, string $username, ?callable $emailCallback = null): int
+    {
+        $this->lastError = null;
+
+        try {
+            /** @var int $userId */
+            $userId = $this->getAuth()->registerWithUniqueUsername($email, $password, $username, $emailCallback);
+            return $userId;
+        } catch (InvalidEmailException) {
+            $this->lastError = 'The email address is invalid.';
+            throw new \RuntimeException($this->lastError);
+        } catch (InvalidPasswordException) {
+            $this->lastError = 'The password is invalid. Please choose a stronger password.';
+            throw new \RuntimeException($this->lastError);
+        } catch (UserAlreadyExistsException) {
+            $this->lastError = 'A user with this email address already exists.';
+            throw new \RuntimeException($this->lastError);
+        } catch (DuplicateUsernameException) {
+            $this->lastError = 'This username is already taken. Please choose another.';
+            throw new \RuntimeException($this->lastError);
+        } catch (TooManyRequestsException) {
+            $this->lastError = 'Too many requests. Please try again later.';
+            throw new \RuntimeException($this->lastError);
+        } catch (AuthError $e) {
+            $this->lastError = 'An unexpected error occurred during registration.';
+            throw new \RuntimeException($this->lastError, 0, $e);
+        }
+    }
+
+    /**
+     * @see AuthServiceInterface::confirmEmail()
+     *
+     * @return array<int|string, string>
+     */
+    public function confirmEmail(string $selector, string $token): array
+    {
+        $this->lastError = null;
+
+        try {
+            /** @var array<int|string, string> $emailBeforeAndAfter */
+            $emailBeforeAndAfter = $this->getAuth()->confirmEmailAndSignIn($selector, $token);
+
+            // Create nuke_users profile so the rest of the site sees this user
+            $authUserId = $this->getAuth()->getUserId();
+            $authUsername = $this->getAuth()->getUsername();
+            $authEmail = $this->getAuth()->getEmail();
+
+            if ($authUsername !== null && $authEmail !== null) {
+                $this->createNukeUserProfile($authUserId, $authUsername, $authEmail);
+            }
+
+            return $emailBeforeAndAfter;
+        } catch (InvalidSelectorTokenPairException) {
+            $this->lastError = 'mismatch';
+            throw new \RuntimeException($this->lastError);
+        } catch (TokenExpiredException) {
+            $this->lastError = 'expired';
+            throw new \RuntimeException($this->lastError);
+        } catch (UserAlreadyExistsException) {
+            $this->lastError = 'mismatch';
+            throw new \RuntimeException($this->lastError);
+        } catch (TooManyRequestsException) {
+            $this->lastError = 'expired';
+            throw new \RuntimeException($this->lastError);
+        } catch (AuthError $e) {
+            $this->lastError = 'expired';
+            throw new \RuntimeException($this->lastError, 0, $e);
+        }
+    }
+
+    public function forgotPassword(string $email, callable $callback): void
+    {
+        $this->lastError = null;
+
+        try {
+            $this->getAuth()->forgotPassword($email, $callback);
+        } catch (InvalidEmailException) {
+            // Don't reveal whether email exists — silently succeed
+        } catch (EmailNotVerifiedException) {
+            // Don't reveal account status — silently succeed
+        } catch (ResetDisabledException) {
+            // Don't reveal account status — silently succeed
+        } catch (TooManyRequestsException) {
+            $this->lastError = 'Too many requests. Please try again later.';
+        } catch (AuthError $e) {
+            $this->lastError = 'An error occurred. Please try again later.';
+        }
+    }
+
+    public function resetPassword(string $selector, string $token, string $newPassword): void
+    {
+        $this->lastError = null;
+
+        try {
+            /** @var array<string, string> $resetData */
+            $resetData = $this->getAuth()->resetPassword($selector, $token, $newPassword);
+
+            // Also update password in nuke_users for backward compat
+            $newHash = $this->hashPassword($newPassword);
+            $stmt = $this->db->prepare('UPDATE nuke_users SET user_password = ? WHERE user_email = ?');
+            if ($stmt !== false) {
+                $email = $resetData['email'];
+                $stmt->bind_param('ss', $newHash, $email);
+                $stmt->execute();
+                $stmt->close();
+            }
+        } catch (InvalidSelectorTokenPairException) {
+            $this->lastError = 'This password reset link is invalid. Please request a new one.';
+            throw new \RuntimeException($this->lastError);
+        } catch (TokenExpiredException) {
+            $this->lastError = 'This password reset link has expired. Please request a new one.';
+            throw new \RuntimeException($this->lastError);
+        } catch (ResetDisabledException) {
+            $this->lastError = 'Password reset is disabled for this account.';
+            throw new \RuntimeException($this->lastError);
+        } catch (InvalidPasswordException) {
+            $this->lastError = 'The new password is invalid. Please choose a stronger password.';
+            throw new \RuntimeException($this->lastError);
+        } catch (TooManyRequestsException) {
+            $this->lastError = 'Too many requests. Please try again later.';
+            throw new \RuntimeException($this->lastError);
+        } catch (AuthError $e) {
+            $this->lastError = 'An error occurred while resetting your password.';
+            throw new \RuntimeException($this->lastError, 0, $e);
+        }
+    }
+
+    public function getLastError(): ?string
+    {
+        return $this->lastError;
+    }
+
+    /**
+     * Create a nuke_users profile for a newly confirmed user.
+     *
+     * This allows the rest of the site (which queries nuke_users) to see the user.
+     */
+    private function createNukeUserProfile(int $authUserId, string $username, string $email): void
+    {
+        // Check if profile already exists
+        $checkStmt = $this->db->prepare('SELECT user_id FROM nuke_users WHERE username = ?');
+        if ($checkStmt === false) {
+            return;
+        }
+        $checkStmt->bind_param('s', $username);
+        $checkStmt->execute();
+        $checkResult = $checkStmt->get_result();
+        if ($checkResult !== false && $checkResult->num_rows > 0) {
+            $checkStmt->close();
+            return; // Profile already exists
+        }
+        $checkStmt->close();
+
+        $regdate = date('M d, Y');
+        $defaultTheme = '';
+        $stmt = $this->db->prepare(
+            'INSERT INTO nuke_users (username, user_email, user_regdate, user_password, theme, user_lang) VALUES (?, ?, ?, ?, ?, ?)'
+        );
+        if ($stmt === false) {
+            return;
+        }
+        // Store a placeholder bcrypt hash — the real password is managed by delight-auth
+        $placeholderHash = 'delight-auth:' . $authUserId;
+        $language = 'english';
+        $stmt->bind_param('ssssss', $username, $email, $regdate, $placeholderHash, $defaultTheme, $language);
+        $stmt->execute();
+        $stmt->close();
     }
 
     /**

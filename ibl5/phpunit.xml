@@ -3,6 +3,9 @@
          colors="true"
          testdox="true">
     <testsuites>
+        <testsuite name="Auth Module Tests">
+            <directory>tests/Auth</directory>
+        </testsuite>
         <testsuite name="Services Tests">
             <directory>tests/Services</directory>
         </testsuite>

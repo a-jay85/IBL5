@@ -75,52 +75,9 @@ function userCheck($username, $user_email)
     return $stop;
 }
 
-function confirmNewUser($username, $user_email, $user_password, $user_password2, $random_num, $gfx_check)
+function finishNewUser(): void
 {
-    global $stop, $EditedMessage, $sitename, $module_name, $minpass;
-    Nuke\Header::header();
-    include "config.php";
-    $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
-    $username = rtrim($username, "\\");
-    $username = str_replace("'", "\'", $username);
-    $user_email = filter($user_email, "nohtml");
-    $user_viewemail = "0";
-    userCheck($username, $user_email);
-    $user_email = validate_mail($user_email);
-    $user_password = stripslashes($user_password);
-    $user_password2 = stripslashes($user_password2);
-    if (!$stop) {
-        $datekey = date("F j");
-        $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $_POST['random_num'] . $datekey));
-        $code = substr($rcode, 2, 6);
-        $accountView = new \YourAccount\YourAccountView();
-        if (extension_loaded("gd") and $code != $gfx_check and ($gfx_chk == 3 or $gfx_chk == 4 or $gfx_chk == 6 or $gfx_chk == 7)) {
-            echo $accountView->renderRegistrationErrorPage('The security code was incorrect.');
-            Nuke\Footer::footer();
-            die();
-        }
-        if (empty($user_password) and empty($user_password2)) {
-            $user_password = substr(bin2hex(random_bytes(5)), 0, 10);
-        } elseif ($user_password != $user_password2) {
-            echo $accountView->renderRegistrationErrorPage('The passwords you entered do not match.');
-            Nuke\Footer::footer();
-            die();
-        } elseif ($user_password == $user_password2 and strlen($user_password) < $minpass) {
-            echo $accountView->renderRegistrationErrorPage("Your password must be at least $minpass characters long.");
-            Nuke\Footer::footer();
-            die();
-        }
-        echo $accountView->renderRegistrationConfirmPage($username, $user_email, $user_password, (int) $random_num, (string) $gfx_check);
-    } else {
-        $accountView = new \YourAccount\YourAccountView();
-        echo $accountView->renderRegistrationErrorPage((string) $stop);
-    }
-    Nuke\Footer::footer();
-}
-
-function finishNewUser($username, $user_email, $user_password, $random_num, $gfx_check)
-{
-    global $stop, $EditedMessage, $adminmail, $sitename, $Default_Theme, $user_prefix, $db, $storyhome, $module_name, $nukeurl, $authService;
+    global $adminmail, $sitename, $module_name, $nukeurl, $authService;
 
     // CSRF validation
     if (!\Utilities\CsrfGuard::validateSubmittedToken('register')) {
@@ -130,39 +87,55 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
 
     Nuke\Header::header();
     include "config.php";
-    userCheck($username, $user_email);
-    $user_email = validate_mail($user_email);
+
+    $username = isset($_POST['username']) && is_string($_POST['username']) ? $_POST['username'] : '';
+    $user_email = isset($_POST['user_email']) && is_string($_POST['user_email']) ? $_POST['user_email'] : '';
+    $user_password = isset($_POST['user_password']) && is_string($_POST['user_password']) ? $_POST['user_password'] : '';
+    $user_password2 = isset($_POST['user_password2']) && is_string($_POST['user_password2']) ? $_POST['user_password2'] : '';
+
+    $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username)), ENT_QUOTES, 'UTF-8'), 0, 25);
+    $username = rtrim($username, "\\");
+    $user_email = filter($user_email, "nohtml", 1);
     $user_password = stripslashes($user_password);
+    $user_password2 = stripslashes($user_password2);
+
     $accountView = new \YourAccount\YourAccountView();
-    if (!isset($stop)) {
-        $datekey = date("F j");
-        $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $random_num . $datekey));
-        $code = substr($rcode, 2, 6);
-        if (extension_loaded("gd") and $code != $gfx_check and ($gfx_chk == 3 or $gfx_chk == 4 or $gfx_chk == 6 or $gfx_chk == 7)) {
-            Header("Location: modules.php?name=$module_name");
-            die();
-        }
-        $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
-        $username = rtrim($username, "\\");
-        $user_email = filter($user_email, "nohtml", 1);
 
-        try {
-            // Register via delight-im/auth with email verification callback
-            $authService->register($user_email, $user_password, $username, static function (string $selector, string $token) use ($sitename, $adminmail, $nukeurl, $module_name, $user_email, $username): void {
-                $finishlink = "$nukeurl/modules.php?name=$module_name&op=confirm_email&selector=" . urlencode($selector) . "&token=" . urlencode($token);
-                $message = "" . _WELCOMETO . " $sitename!\n\n" . _YOUUSEDEMAIL . " ($user_email) " . _TOREGISTER . " $sitename.\n\n " . _TOFINISHUSER . "\n\n $finishlink\n\n " . _FOLLOWINGMEM . "\n\n" . _UNICKNAME . " $username";
-                $subject = "" . _ACTIVATIONSUB . "";
-                \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);
-            });
-
-            echo $accountView->renderRegistrationCompletePage($sitename);
-        } catch (\RuntimeException) {
-            $error = $authService->getLastError() ?? _ERROR;
-            echo $accountView->renderRegistrationErrorPage((string) $error);
-        }
-    } else {
-        echo $accountView->renderRegistrationErrorPage((string) $stop);
+    // Password validation
+    if ($user_password === '' && $user_password2 === '') {
+        $user_password = substr(bin2hex(random_bytes(5)), 0, 10);
+    } elseif ($user_password !== $user_password2) {
+        echo $accountView->renderRegistrationErrorPage('The passwords you entered do not match.');
+        Nuke\Footer::footer();
+        die();
+    } elseif (strlen($user_password) < (int) ($minpass ?? 5)) {
+        echo $accountView->renderRegistrationErrorPage("Your password must be at least " . (int) ($minpass ?? 5) . " characters long.");
+        Nuke\Footer::footer();
+        die();
     }
+
+    // Basic username validation (keep as safety net; delight-auth also validates uniqueness)
+    if ($username === '' || preg_match('/[^a-zA-Z0-9_-]/', $username) === 1) {
+        echo $accountView->renderRegistrationErrorPage('Invalid username. Only letters, numbers, underscores and hyphens are allowed.');
+        Nuke\Footer::footer();
+        die();
+    }
+
+    try {
+        // Register via delight-im/auth with email verification callback
+        $authService->register($user_email, $user_password, $username, static function (string $selector, string $token) use ($sitename, $adminmail, $nukeurl, $module_name, $user_email, $username): void {
+            $finishlink = "$nukeurl/modules.php?name=$module_name&op=confirm_email&selector=" . urlencode($selector) . "&token=" . urlencode($token);
+            $message = "" . _WELCOMETO . " $sitename!\n\n" . _YOUUSEDEMAIL . " ($user_email) " . _TOREGISTER . " $sitename.\n\n " . _TOFINISHUSER . "\n\n $finishlink\n\n " . _FOLLOWINGMEM . "\n\n" . _UNICKNAME . " $username";
+            $subject = "" . _ACTIVATIONSUB . "";
+            \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);
+        });
+
+        echo $accountView->renderRegistrationCompletePage($sitename);
+    } catch (\RuntimeException) {
+        $error = $authService->getLastError() ?? _ERROR;
+        echo $accountView->renderRegistrationErrorPage((string) $error);
+    }
+
     Nuke\Footer::footer();
 }
 
@@ -601,15 +574,11 @@ function main($user)
 
 function new_user()
 {
-    global $gfx_chk, $user;
+    global $user;
     if (!is_user($user)) {
-        mt_srand((double) microtime() * 1000000);
-        $maxran = 1000000;
-        $random_num = mt_rand(0, $maxran);
-        $showCaptcha = extension_loaded("gd") && ($gfx_chk == 3 || $gfx_chk == 4 || $gfx_chk == 6 || $gfx_chk == 7);
         Nuke\Header::header();
         $accountView = new \YourAccount\YourAccountView();
-        echo $accountView->renderRegisterPage($random_num, $showCaptcha);
+        echo $accountView->renderRegisterPage();
         Nuke\Footer::footer();
     } elseif (is_user($user)) {
         global $cookie;
@@ -1630,12 +1599,8 @@ switch ($op) {
         lost_pass();
         break;
 
-    case "new user":
-        confirmNewUser($username, $user_email, $user_password, $user_password2, $random_num, $gfx_check);
-        break;
-
     case "finish":
-        finishNewUser($username, $user_email, $user_password, $random_num, $gfx_check);
+        finishNewUser();
         break;
 
     case "mailpasswd":

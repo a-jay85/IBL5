@@ -143,7 +143,7 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderRegisterPageReturnsHtml(): void
     {
-        $result = $this->view->renderRegisterPage(123456, false);
+        $result = $this->view->renderRegisterPage();
 
         $this->assertStringContainsString('auth-page', $result);
         $this->assertStringContainsString('Create Account', $result);
@@ -152,65 +152,35 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderRegisterPageContainsFormFields(): void
     {
-        $result = $this->view->renderRegisterPage(123456, false);
+        $result = $this->view->renderRegisterPage();
 
         $this->assertStringContainsString('name="username"', $result);
         $this->assertStringContainsString('name="user_email"', $result);
         $this->assertStringContainsString('name="user_password"', $result);
         $this->assertStringContainsString('name="user_password2"', $result);
-        $this->assertStringContainsString('name="op" value="new user"', $result);
+        $this->assertStringContainsString('name="op" value="finish"', $result);
+    }
+
+    public function testRenderRegisterPageContainsCsrfToken(): void
+    {
+        $result = $this->view->renderRegisterPage();
+
+        $this->assertStringContainsString('name="_csrf_token"', $result);
     }
 
     public function testRenderRegisterPageContainsCrossNavLinks(): void
     {
-        $result = $this->view->renderRegisterPage(123456, false);
+        $result = $this->view->renderRegisterPage();
 
         $this->assertStringContainsString('Already have an account?', $result);
         $this->assertStringContainsString('modules.php?name=YourAccount"', $result);
     }
 
-    public function testRenderRegisterPageShowsCaptchaWhenEnabled(): void
-    {
-        $result = $this->view->renderRegisterPage(888, true);
-
-        $this->assertStringContainsString('name="gfx_check"', $result);
-        $this->assertStringContainsString('name="random_num" value="888"', $result);
-    }
-
     public function testRenderRegisterPageContainsEmailActivationNotice(): void
     {
-        $result = $this->view->renderRegisterPage(123456, false);
+        $result = $this->view->renderRegisterPage();
 
         $this->assertStringContainsString('activation link', $result);
-    }
-
-    // =========================================================================
-    // Registration Confirm Page
-    // =========================================================================
-
-    public function testRenderRegistrationConfirmPageShowsUserData(): void
-    {
-        $result = $this->view->renderRegistrationConfirmPage('TestUser', 'test@example.com', 'secret', 123, 'abc');
-
-        $this->assertStringContainsString('Confirm Registration', $result);
-        $this->assertStringContainsString('TestUser', $result);
-        $this->assertStringContainsString('test@example.com', $result);
-        $this->assertStringContainsString('name="op" value="finish"', $result);
-    }
-
-    public function testRenderRegistrationConfirmPageContainsCsrfToken(): void
-    {
-        $result = $this->view->renderRegistrationConfirmPage('TestUser', 'test@example.com', 'secret', 123, 'abc');
-
-        $this->assertStringContainsString('name="_csrf_token"', $result);
-    }
-
-    public function testRenderRegistrationConfirmPageEscapesXss(): void
-    {
-        $result = $this->view->renderRegistrationConfirmPage('<script>alert(1)</script>', 'test@test.com', 'pw', 1, 'x');
-
-        $this->assertStringNotContainsString('<script>alert(1)</script>', $result);
-        $this->assertStringContainsString('&lt;script&gt;', $result);
     }
 
     // =========================================================================

@@ -214,10 +214,10 @@ class YourAccountView
     /**
      * Render the registration page.
      *
-     * @param int $randomNum Random number for CAPTCHA
-     * @param bool $showCaptcha Whether to show the CAPTCHA field
+     * Posts directly to op=finish (single-step registration). delight-auth
+     * provides built-in throttling, so no CAPTCHA is needed.
      */
-    public function renderRegisterPage(int $randomNum, bool $showCaptcha): string
+    public function renderRegisterPage(): string
     {
         ob_start();
         ?>
@@ -263,11 +263,8 @@ class YourAccountView
                     </div>
                 </div>
 
-                <?php if ($showCaptcha): ?>
-                    <?= $this->renderCaptchaSection($randomNum) ?>
-                <?php endif; ?>
-
-                <input type="hidden" name="op" value="new user">
+                <?= CsrfGuard::generateToken('register') ?>
+                <input type="hidden" name="op" value="finish">
                 <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">Create Account</button>
             </form>
 
@@ -278,72 +275,6 @@ class YourAccountView
         <div class="ibl-card__footer">
             <div class="auth-links">
                 <a href="modules.php?name=YourAccount">Already have an account? Sign in</a>
-            </div>
-        </div>
-    </div>
-</div>
-        <?php
-        return (string) ob_get_clean();
-    }
-
-    /**
-     * Render the registration confirmation page (step 2 — verify your data before finalizing).
-     */
-    public function renderRegistrationConfirmPage(
-        string $username,
-        string $email,
-        string $password,
-        int $randomNum,
-        string $gfxCheck
-    ): string {
-        /** @var string $safeUsername */
-        $safeUsername = HtmlSanitizer::safeHtmlOutput($username);
-        /** @var string $safeEmail */
-        $safeEmail = HtmlSanitizer::safeHtmlOutput($email);
-        /** @var string $safePassword */
-        $safePassword = HtmlSanitizer::safeHtmlOutput($password);
-        /** @var string $safeGfxCheck */
-        $safeGfxCheck = HtmlSanitizer::safeHtmlOutput($gfxCheck);
-
-        ob_start();
-        ?>
-<div class="auth-page">
-    <?= $this->renderLogo() ?>
-    <div class="auth-card ibl-card">
-        <div class="ibl-card__header">
-            <h1 class="ibl-card__title">Confirm Registration</h1>
-            <p class="ibl-card__subtitle">Please verify your details</p>
-        </div>
-        <div class="ibl-card__body">
-            <div style="margin-bottom: var(--space-4); font-size: 1.125rem; line-height: 1.6;">
-                <div style="display: flex; gap: var(--space-2); margin-bottom: var(--space-2);">
-                    <strong style="color: var(--gray-600);">Username:</strong>
-                    <span><?= $safeUsername ?></span>
-                </div>
-                <div style="display: flex; gap: var(--space-2);">
-                    <strong style="color: var(--gray-600);">Email:</strong>
-                    <span><?= $safeEmail ?></span>
-                </div>
-            </div>
-
-            <div class="ibl-alert ibl-alert--info">
-                You will receive an email with an activation link. Please check your inbox.
-            </div>
-
-            <form action="modules.php?name=YourAccount" method="post">
-                <input type="hidden" name="random_num" value="<?= $randomNum ?>">
-                <input type="hidden" name="gfx_check" value="<?= $safeGfxCheck ?>">
-                <input type="hidden" name="username" value="<?= $safeUsername ?>">
-                <input type="hidden" name="user_email" value="<?= $safeEmail ?>">
-                <input type="hidden" name="user_password" value="<?= $safePassword ?>">
-                <?= CsrfGuard::generateToken('register') ?>
-                <input type="hidden" name="op" value="finish">
-                <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">Complete Registration</button>
-            </form>
-        </div>
-        <div class="ibl-card__footer">
-            <div class="auth-links">
-                <a href="modules.php?name=YourAccount&amp;op=new_user">Go back</a>
             </div>
         </div>
     </div>

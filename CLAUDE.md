@@ -214,7 +214,7 @@ After completing a module refactoring or significant feature, update these files
 - `STRATEGIC_PRIORITIES.md` — mark module complete
 - `REFACTORING_HISTORY.md` — add entry for the work done
 - `ibl5/classes/ModuleName/README.md` — create module README
-- `DEVELOPMENT_GUIDE.md` — update module counts and status
+- `ibl5/docs/DEVELOPMENT_GUIDE.md` — update module counts and status
 
 ### Production Validation
 After refactoring, compare output against iblhoops.net. Results must match exactly.
@@ -279,8 +279,8 @@ Context-aware rules auto-load when relevant:
 | Resource | Location |
 |----------|----------|
 | Schema | `ibl5/schema.sql` |
-| Development status | `DEVELOPMENT_GUIDE.md` |
-| Database guide | `DATABASE_GUIDE.md` |
-| MAMP connection | `ibl5/MAMP_DATABASE_CONNECTION.md` |
-| API patterns | `API_GUIDE.md` |
+| Development status | `ibl5/docs/DEVELOPMENT_GUIDE.md` |
+| Database guide | `ibl5/docs/DATABASE_GUIDE.md` |
+| MAMP connection | `ibl5/docs/DEVELOPMENT_ENVIRONMENT.md` |
+| API patterns | `ibl5/docs/API_GUIDE.md` |
 | Interface examples | `classes/Player/Contracts/`, `classes/FreeAgency/Contracts/` |

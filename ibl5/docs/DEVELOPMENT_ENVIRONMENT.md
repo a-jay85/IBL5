@@ -100,6 +100,8 @@ vendor/bin/phpcs --version                 # Should show PHP_CodeSniffer version
 | `Composer install fails` | Check `.github/workflows/cache-dependencies.yml` workflow logs |
 | `Tests fail to run` | Verify cache-dependencies workflow completed successfully |
 | `Cache outdated` | Manually trigger "Cache PHP Dependencies" workflow |
+| `Authentication plugin error` | You're using Homebrew's mysql client — use MAMP's: `/Applications/MAMP/Library/bin/mysql80/bin/mysql` |
+| `Can't connect via socket` | Check socket exists: `/Applications/MAMP/tmp/mysql/mysql.sock`. Ensure MAMP is running. |
 
 ---
 
@@ -175,6 +177,32 @@ if (DatabaseConnection::testConnection()) {
   -D iblhoops_ibl5 \
   -e "SELECT COUNT(*) as table_count FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'iblhoops_ibl5';"
 ```
+
+### Homebrew MySQL Client Incompatibility
+
+**Do NOT use** the Homebrew-installed `mysql` command:
+```bash
+# WRONG - Will fail with authentication plugin error
+mysql -h 127.0.0.1 -u root -p'root' iblhoops_ibl5
+```
+
+**Always use** MAMP's bundled mysql client:
+```bash
+# CORRECT - Use MAMP's mysql client with socket
+/Applications/MAMP/Library/bin/mysql80/bin/mysql \
+  --socket=/Applications/MAMP/tmp/mysql/mysql.sock \
+  -u root -p'root' \
+  iblhoops_ibl5
+```
+
+**Why?** Homebrew's MySQL 9.x client expects plugins that MAMP's MySQL 8.0 server doesn't provide. The PHP mysqli extension works fine because it uses a different connection method.
+
+### Why the Socket Path Matters
+
+- **Command-line MySQL client:** Uses port 3306 directly
+- **PHP mysqli:** Requires explicit socket path to connect locally
+- **MAMP Socket Location:** `/Applications/MAMP/tmp/mysql/mysql.sock`
+- **DatabaseConnection class:** Automatically handles this
 
 ### Security Notes
 

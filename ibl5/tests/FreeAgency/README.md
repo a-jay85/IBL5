@@ -201,4 +201,4 @@ All tests follow IBL5 testing standards:
 - ❌ No testing SQL query structure (except security tests)
 - ❌ No redundant tests that add no value
 
-**Reference:** See `ibl5/docs/TEST_REFACTORING_SUMMARY.md` for complete testing best practices.
+**Reference:** See `ibl5/docs/archive/TEST_REFACTORING_SUMMARY.md` for complete testing best practices.

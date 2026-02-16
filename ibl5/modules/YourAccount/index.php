@@ -60,15 +60,7 @@ function userCheck($username, $user_email)
         $stop = _NICKTAKEN;
     }
 
-    if (\DatabaseConnection::fetchValue("SELECT COUNT(*) FROM nuke_users_temp WHERE username = ?", [$username]) > 0) {
-        $stop = _NICKTAKEN;
-    }
-
     if (\DatabaseConnection::fetchValue("SELECT COUNT(*) FROM nuke_users WHERE user_email = ?", [$user_email]) > 0) {
-        $stop = _EMAILREGISTERED;
-    }
-
-    if (\DatabaseConnection::fetchValue("SELECT COUNT(*) FROM nuke_users_temp WHERE user_email = ?", [$user_email]) > 0) {
         $stop = _EMAILREGISTERED;
     }
 
@@ -554,9 +546,17 @@ function main($user)
         $maxran = 1000000;
         $random_num = mt_rand(0, $maxran);
         $showCaptcha = extension_loaded("gd") && ($gfx_chk == 2 || $gfx_chk == 4 || $gfx_chk == 5 || $gfx_chk == 7);
+
+        // Check for specific error from session (e.g., email not verified, throttled)
+        $errorMessage = $stop ? (string) $stop : null;
+        if ($errorMessage === null && isset($_SESSION['login_error']) && is_string($_SESSION['login_error'])) {
+            $errorMessage = $_SESSION['login_error'];
+            unset($_SESSION['login_error']);
+        }
+
         $accountView = new \YourAccount\YourAccountView();
         echo $accountView->renderLoginPage(
-            $stop ? (string) $stop : null,
+            $errorMessage,
             isset($redirect) ? (string) $redirect : null,
             $random_num,
             $showCaptcha,
@@ -728,11 +728,6 @@ function mail_password()
     Nuke\Footer::footer();
 }
 
-function docookie($setuid, $setusername, $setpass, $setstorynum, $setumode, $setuorder, $setthold, $setnoscore, $setublockon, $settheme, $setcommentmax)
-{
-    // No-op: Auth is now session-based via AuthService. Retained for call-site compat.
-}
-
 function login($username, $user_password, $redirect, $mode, $f, $t, $random_num, $gfx_check)
 {
     global $authService, $user_prefix, $db, $mysqli_db, $module_name, $pm_login, $prefix;
@@ -773,7 +768,13 @@ function login($username, $user_password, $redirect, $mode, $f, $t, $random_num,
 
         Header("Location: modules.php?name=YourAccount&op=userinfo&bypass=1&username=$username");
     } else {
-        Header("Location: modules.php?name=$module_name&stop=1");
+        $specificError = $authService->getLastError();
+        if ($specificError !== null) {
+            $_SESSION['login_error'] = $specificError;
+            Header("Location: modules.php?name=$module_name");
+        } else {
+            Header("Location: modules.php?name=$module_name&stop=1");
+        }
     }
 }
 
@@ -1060,7 +1061,7 @@ function saveuser($realname, $user_email, $femail, $user_website, $user_icq, $us
                 \DatabaseConnection::query("UPDATE nuke_users SET name=?, user_email=?, femail=?, user_website=?, user_password=?, bio=?, user_icq=?, user_occ=?, user_from=?, user_interests=?, user_sig=?, user_aim=?, user_yim=?, user_msnm=?, newsletter=?, user_viewemail=?, user_allow_viewonline=?, user_notify=?, user_attachsig=?, user_allowbbcode=?, user_allowhtml=?, user_allowsmile=?, user_timezone=?, user_dateformat=? WHERE user_id=?", [$realname, $user_email, $femail, $user_website, $user_password, $bio, $user_icq, $user_occ, $user_from, $user_interests, $user_sig, $user_aim, $user_yim, $user_msnm, $newsletter, $user_viewemail, $user_allow_viewonline, $user_notify, $user_attachsig, $user_allowbbcode, $user_allowhtml, $user_allowsmile, $user_timezone, $user_dateformat, $user_id]);
                 $userinfo = \DatabaseConnection::fetchRow("SELECT user_id, username, user_password, storynum, umode, uorder, thold, noscore, ublockon, theme, commentmax FROM nuke_users WHERE username = ? AND user_password = ?", [$username, $user_password]);
                 if ($userinfo !== null) {
-                    docookie($userinfo['user_id'], $userinfo['username'], $userinfo['user_password'], $userinfo['storynum'], $userinfo['umode'], $userinfo['uorder'], $userinfo['thold'], $userinfo['noscore'], $userinfo['ublockon'], $userinfo['theme'], $userinfo['commentmax']);
+
                 } else {
                     echo "<center>" . _SOMETHINGWRONG . "</center><br>";
                 }
@@ -1216,7 +1217,7 @@ function savehome($user_id, $username, $storynum, $ublockon, $ublock, $broadcast
         $ublock = FixQuotes($ublock);
         $db->sql_query("UPDATE " . $user_prefix . "_users SET storynum='$storynum', ublockon='$ublockon', ublock='$ublock', broadcast='$broadcast' WHERE user_id='$user_id'");
         getusrinfo($user);
-        docookie($userinfo['user_id'], $userinfo['username'], $userinfo['user_password'], $userinfo['storynum'], $userinfo['umode'], $userinfo['uorder'], $userinfo['thold'], $userinfo['noscore'], $userinfo['ublockon'], $userinfo['theme'], $userinfo['commentmax']);
+
         Header("Location: modules.php?name=$module_name");
     }
 }
@@ -1242,7 +1243,7 @@ function savetheme($user_id, $theme)
         $db->sql_query("UPDATE " . $user_prefix . "_users SET user_style='$theme_id' WHERE user_id='$user_id'");
         $db->sql_query("UPDATE " . $user_prefix . "_users SET theme='$theme' WHERE user_id='$user_id'");
         getusrinfo($user);
-        docookie($userinfo['user_id'], $userinfo['username'], $userinfo['user_password'], $userinfo['storynum'], $userinfo['umode'], $userinfo['uorder'], $userinfo['thold'], $userinfo['noscore'], $userinfo['ublockon'], $userinfo['theme'], $userinfo['commentmax']);
+
         Header("Location: modules.php?name=$module_name&theme=$theme");
     }
 }
@@ -1330,7 +1331,7 @@ function savecomm($user_id, $username, $umode, $uorder, $thold, $noscore, $comme
 
         $db->sql_query("UPDATE " . $user_prefix . "_users SET umode='$umode', uorder='$uorder', thold='$thold', noscore='$noscore', commentmax='$commentmax' WHERE user_id='$user_id'");
         getusrinfo($user);
-        docookie($userinfo['user_id'], $userinfo['username'], $userinfo['user_password'], $userinfo['storynum'], $userinfo['umode'], $userinfo['uorder'], $userinfo['thold'], $userinfo['noscore'], $userinfo['ublockon'], $userinfo['theme'], $userinfo['commentmax']);
+
         Header("Location: modules.php?name=$module_name");
     }
 }

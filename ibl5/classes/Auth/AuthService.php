@@ -99,6 +99,9 @@ class AuthService implements AuthServiceInterface
             return false;
         } catch (AuthError) {
             // Unexpected auth error — fall through to legacy path
+        } catch (\Error $e) {
+            // Delight-auth classes not available (e.g. Composer autoloader not loaded) —
+            // fall through to legacy path so login still works
         }
 
         // 2. Legacy nuke_users fallback (bcrypt / MD5 transitional)

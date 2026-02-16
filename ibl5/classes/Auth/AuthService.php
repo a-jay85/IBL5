@@ -85,8 +85,12 @@ class AuthService implements AuthServiceInterface
             $this->syncPasswordToNukeUsers($username, $password);
 
             return true;
-        } catch (UnknownUsernameException | InvalidPasswordException) {
-            // Not in delight-auth or wrong password — fall through to legacy path
+        } catch (UnknownUsernameException) {
+            // Not in delight-auth — fall through to legacy nuke_users path
+        } catch (InvalidPasswordException) {
+            // User IS in delight-auth but password is wrong — do NOT fall through to legacy
+            // path, otherwise an old synced hash in nuke_users could accept a stale password
+            return false;
         } catch (EmailNotVerifiedException) {
             $this->lastError = 'Please verify your email address before logging in. Check your inbox for a confirmation link.';
             return false;

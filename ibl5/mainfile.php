@@ -1094,7 +1094,12 @@ function loginbox(): void
         $currentModule = $_GET['name'] ?? '';
         $redirect = is_string($currentModule) && $currentModule !== '' ? $currentModule : '';
         $redirectParam = $redirect !== '' ? '&redirect=' . urlencode($redirect) : '';
-        header('Location: modules.php?name=YourAccount' . $redirectParam);
+        $url = 'modules.php?name=YourAccount' . $redirectParam;
+        // Use JS redirect — callers have already sent output via Nuke\Header::header()
+        /** @var string $safeUrl */
+        $safeUrl = \Utilities\HtmlSanitizer::safeHtmlOutput($url);
+        echo '<script>window.location.href="' . $safeUrl . '";</script>';
+        echo '<noscript><meta http-equiv="refresh" content="0;url=' . $safeUrl . '"></noscript>';
         die();
     }
 }

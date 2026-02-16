@@ -33,43 +33,43 @@ function userCheck($username, $user_email)
     $user_email = filter($user_email, "nohtml", 1);
     global $stop, $user_prefix, $db;
     if ((!$user_email) || (empty($user_email)) || (filter_var($user_email, FILTER_VALIDATE_EMAIL) === false)) {
-        $stop = "<center>" . _ERRORINVEMAIL . "</center><br>";
+        $stop = _ERRORINVEMAIL;
     }
 
     if (strrpos($user_email, ' ') > 0) {
-        $stop = "<center>" . _ERROREMAILSPACES . "</center>";
+        $stop = _ERROREMAILSPACES;
     }
 
     if ((!$username) || (empty($username)) || (preg_match('/[^a-zA-Z0-9_-]/', $username))) {
-        $stop = "<center>" . _ERRORINVNICK . "</center><br>";
+        $stop = _ERRORINVNICK;
     }
 
     if (strlen($username) > 25) {
-        $stop = "<center>" . _NICK2LONG . "</center>";
+        $stop = _NICK2LONG;
     }
 
     if (preg_match('/^((root)|(adm)|(linux)|(webmaster)|(admin)|(god)|(administrator)|(administrador)|(nobody)|(anonymous)|(anonimo)|(an\x{00e1}nimo)|(operator)|(JackFromWales4u2))$/iu', $username)) {
-        $stop = "<center>" . _NAMERESERVED . "</center>";
+        $stop = _NAMERESERVED;
     }
 
     if (strrpos($username, ' ') > 0) {
-        $stop = "<center>" . _NICKNOSPACES . "</center>";
+        $stop = _NICKNOSPACES;
     }
 
     if (\DatabaseConnection::fetchValue("SELECT COUNT(*) FROM nuke_users WHERE username = ?", [$username]) > 0) {
-        $stop = "<center>" . _NICKTAKEN . "</center><br>";
+        $stop = _NICKTAKEN;
     }
 
     if (\DatabaseConnection::fetchValue("SELECT COUNT(*) FROM nuke_users_temp WHERE username = ?", [$username]) > 0) {
-        $stop = "<center>" . _NICKTAKEN . "</center><br>";
+        $stop = _NICKTAKEN;
     }
 
     if (\DatabaseConnection::fetchValue("SELECT COUNT(*) FROM nuke_users WHERE user_email = ?", [$user_email]) > 0) {
-        $stop = "<center>" . _EMAILREGISTERED . "</center><br>";
+        $stop = _EMAILREGISTERED;
     }
 
     if (\DatabaseConnection::fetchValue("SELECT COUNT(*) FROM nuke_users_temp WHERE user_email = ?", [$user_email]) > 0) {
-        $stop = "<center>" . _EMAILREGISTERED . "</center><br>";
+        $stop = _EMAILREGISTERED;
     }
 
     return $stop;

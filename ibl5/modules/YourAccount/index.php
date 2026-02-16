@@ -152,8 +152,7 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
                 $finishlink = "$nukeurl/modules.php?name=$module_name&op=confirm_email&selector=" . urlencode($selector) . "&token=" . urlencode($token);
                 $message = "" . _WELCOMETO . " $sitename!\n\n" . _YOUUSEDEMAIL . " ($user_email) " . _TOREGISTER . " $sitename.\n\n " . _TOFINISHUSER . "\n\n $finishlink\n\n " . _FOLLOWINGMEM . "\n\n" . _UNICKNAME . " $username";
                 $subject = "" . _ACTIVATIONSUB . "";
-                $from = "$adminmail";
-                mail($user_email, $subject, $message, "From: $from\nX-Mailer: PHP/" . phpversion());
+                \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);
             });
 
             echo $accountView->renderRegistrationCompletePage($sitename);
@@ -746,7 +745,7 @@ function mail_password()
             . "" . _LINKEXPIRES6HOURS . "\n\n"
             . "" . _IFYOUDIDNOTASK . "";
         $subject = "" . _PASSWORDRESET . " - $sitename";
-        mail($user_email, $subject, $message, "From: $adminmail\nX-Mailer: PHP/" . phpversion());
+        \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);
     });
 
     // Always show success message (don't reveal if email exists)

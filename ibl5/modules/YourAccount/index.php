@@ -77,7 +77,7 @@ function userCheck($username, $user_email)
 
 function finishNewUser(): void
 {
-    global $adminmail, $sitename, $module_name, $nukeurl, $authService;
+    global $adminmail, $sitename, $module_name, $nukeurl, $authService, $minpass;
 
     // CSRF validation
     if (!\Utilities\CsrfGuard::validateSubmittedToken('register')) {

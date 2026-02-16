@@ -27,7 +27,7 @@ class TeamStatsCalculator
     }
 
     /**
-     * Pre-fetch all team records from ibl_power into a lookup array.
+     * Pre-fetch all team records from ibl_standings into a lookup array.
      * Call once before processing multiple teams to avoid N+1 queries.
      */
     public function preloadTeamRecords(): void
@@ -41,7 +41,7 @@ class TeamStatsCalculator
         if (method_exists($this->db, 'fetchAll')) {
             /** @var list<array{TeamID: int, win: int, loss: int}> $rows */
             $rows = $this->db->fetchAll(
-                "SELECT TeamID, win, loss FROM ibl_power WHERE TeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID,
+                "SELECT tid AS TeamID, wins AS win, losses AS loss FROM ibl_standings WHERE tid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID,
                 ""
             );
 
@@ -183,7 +183,7 @@ class TeamStatsCalculator
         if (method_exists($this->db, 'fetchOne')) {
             /** @var array{win: int, loss: int}|null $result */
             $result = $this->db->fetchOne(
-                "SELECT win, loss FROM ibl_power WHERE TeamID = ?",
+                "SELECT wins AS win, losses AS loss FROM ibl_standings WHERE tid = ?",
                 "i",
                 $teamId
             );

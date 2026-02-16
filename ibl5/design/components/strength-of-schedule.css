@@ -1,0 +1,99 @@
+/* ============================================================
+   Strength of Schedule - Tier Indicators & SOS Display
+   ============================================================ */
+
+/* SOS Tier Dot (standard size for team schedule) */
+.sos-tier-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin: 0 4px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* SOS Tier Dot Small (for league schedule) */
+.sos-tier-dot--sm {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin: 0 2px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+/* Tier Color Classes (shared by dots, badges, and next-sim) */
+.sos-tier--elite {
+  background-color: #ef4444;
+}
+
+.sos-tier--strong {
+  background-color: #f97316;
+}
+
+.sos-tier--average {
+  background-color: #eab308;
+}
+
+.sos-tier--weak {
+  background-color: #84cc16;
+}
+
+.sos-tier--bottom {
+  background-color: #22c55e;
+}
+
+/* NextSim Opponent Tier Badge */
+.next-sim-opponent-tier {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* SOS Summary Bar (remaining SOS for team schedule) */
+.sos-summary {
+  text-align: center;
+  padding: 4px 12px;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.sos-summary__label {
+  font-weight: 600;
+}
+
+.sos-summary__value {
+  font-weight: 700;
+  color: var(--color-text-primary, #111827);
+}
+
+.sos-summary__rank {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+/* Tier Legend */
+.sos-legend {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 4px 0 8px;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #6b7280);
+  flex-wrap: wrap;
+}
+
+.sos-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

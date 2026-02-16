@@ -82,7 +82,7 @@ if (isset($_POST['query'])) {
             break;
         case 'Set Free Agency factors for PFW':
             if ($season->phase == 'Draft' or $season->phase == 'Free Agency') {
-                $queryString = "UPDATE ibl_team_info info, ibl_power power SET Contract_Wins = power.win, Contract_Losses = power.loss WHERE power.TeamID = info.teamid;";
+                $queryString = "UPDATE ibl_team_info info JOIN ibl_standings s ON s.tid = info.teamid SET Contract_Wins = s.wins, Contract_Losses = s.losses;";
                 $successText = "The columns that affect each team's Play For Winner demand factor have been updated to match this past season's ($season->endingYear) win/loss records.";
             } else {
                 $failureText = "Sorry, that button can only be used during the Draft or Free Agency.<br>The FA demands formula requires the current season to be finished before calculating factors.";

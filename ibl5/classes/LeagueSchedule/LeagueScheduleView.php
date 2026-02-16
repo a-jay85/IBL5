@@ -162,6 +162,10 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
         $html .= '<a href="' . $visitorTeamUrl . '" class="schedule-game__team-link">';
         $html .= '<span class="schedule-game__team' . $vClass . '"><span class="schedule-game__team-text">' . $safeVisitorTeam . '</span> <span class="schedule-game__record">(' . $safeVisitorRecord . ')</span></span>';
         $html .= '</a>';
+        $visitorTier = $game['visitorTier'] ?? '';
+        if ($game['isUnplayed'] && $visitorTier !== '') {
+            $html .= '<span class="sos-tier-dot--sm sos-tier--' . $visitorTier . '" title="' . $visitorTier . '"></span>';
+        }
         $html .= '<a href="' . $visitorTeamUrl . '" class="schedule-game__logo-link"><img class="schedule-game__logo" src="images/logo/new' . $game['visitor'] . '.png" alt="" width="25" height="25" loading="lazy"></a>';
 
         // Scores + @
@@ -183,6 +187,10 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
         $safeHomeRecord = HtmlSanitizer::safeHtmlOutput($game['homeRecord']);
 
         $html .= '<a href="' . $homeTeamUrl . '" class="schedule-game__logo-link"><img class="schedule-game__logo" src="images/logo/new' . $game['home'] . '.png" alt="" width="25" height="25" loading="lazy"></a>';
+        $homeTier = $game['homeTier'] ?? '';
+        if ($game['isUnplayed'] && $homeTier !== '') {
+            $html .= '<span class="sos-tier-dot--sm sos-tier--' . $homeTier . '" title="' . $homeTier . '"></span>';
+        }
         $html .= '<a href="' . $homeTeamUrl . '" class="schedule-game__team-link">';
         $html .= '<span class="schedule-game__team' . $hClass . '"><span class="schedule-game__team-text">' . $safeHomeTeam . '</span> <span class="schedule-game__record">(' . $safeHomeRecord . ')</span></span>';
         $html .= '</a>';

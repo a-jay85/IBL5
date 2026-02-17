@@ -2,6 +2,7 @@
 
 use Player\Player;
 use Player\PlayerPageController;
+use Player\PlayerRepository;
 use RookieOption\RookieOptionValidator;
 use RookieOption\RookieOptionFormView;
 use RookieOption\RookieOptionController;
@@ -31,16 +32,10 @@ function showpage($playerID, $pageView): void
 
     // Resolve UUID to numeric PID if a UUID string was passed instead of an integer
     if (!is_numeric($playerID) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string) $playerID)) {
-        $stmt = $mysqli_db->prepare("SELECT pid FROM ibl_plr WHERE uuid = ?");
-        $uuidStr = (string) $playerID;
-        $stmt->bind_param('s', $uuidStr);
-        $stmt->execute();
-        $uuidResult = $stmt->get_result();
-        $uuidRow = $uuidResult->fetch_assoc();
-        $stmt->close();
-        $resolvedPid = is_array($uuidRow) ? ($uuidRow['pid'] ?? null) : null;
+        $playerRepo = new PlayerRepository($mysqli_db);
+        $resolvedPid = $playerRepo->getPlayerIdByUuid((string) $playerID);
         if ($resolvedPid !== null) {
-            $playerID = (int) $resolvedPid;
+            $playerID = $resolvedPid;
         }
     }
     $playerID = (int) $playerID;
@@ -55,7 +50,7 @@ function showpage($playerID, $pageView): void
 
 function negotiate($playerID)
 {
-    global $prefix, $db, $mysqli_db, $cookie;
+    global $prefix, $mysqli_db, $cookie;
 
     $playerID = intval($playerID);
 

@@ -21,6 +21,7 @@ if (!defined('MODULE_FILE')) {
 use LeagueSchedule\LeagueScheduleRepository;
 use LeagueSchedule\LeagueScheduleService;
 use LeagueSchedule\LeagueScheduleView;
+use Standings\StandingsRepository;
 use TeamSchedule\TeamScheduleRepository;
 use TeamSchedule\TeamScheduleService;
 use TeamSchedule\TeamScheduleView;
@@ -30,6 +31,15 @@ global $cookie, $mysqli_db;
 $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 $season = new Season($mysqli_db);
 $league = new League($mysqli_db);
+
+// Load power rankings for SOS tier indicators
+$standingsRepo = new StandingsRepository($mysqli_db);
+$allStreakData = $standingsRepo->getAllStreakData();
+/** @var array<int, float> $teamPowerRankings */
+$teamPowerRankings = [];
+foreach ($allStreakData as $tid => $data) {
+    $teamPowerRankings[$tid] = (float)$data['ranking'];
+}
 
 // Check for team ID parameter
 $teamID = isset($_GET['teamID']) ? (int)$_GET['teamID'] : 0;
@@ -46,14 +56,24 @@ Nuke\Header::header();
 if ($isValidTeam) {
     // Team-specific schedule with colors, logo, and win/loss tracking
     $teamScheduleRepository = new TeamScheduleRepository($mysqli_db);
-    $service = new TeamScheduleService($mysqli_db, $teamScheduleRepository);
+    $service = new TeamScheduleService($mysqli_db, $teamScheduleRepository, $teamPowerRankings);
     $view = new TeamScheduleView();
+
+    // Set remaining SOS summary for the team
+    $teamStreakData = $allStreakData[$teamID] ?? null;
+    if ($teamStreakData !== null) {
+        $view->setSosSummary([
+            'remaining_sos' => $teamStreakData['remaining_sos'],
+            'remaining_sos_rank' => $teamStreakData['remaining_sos_rank'],
+        ]);
+    }
+
     $games = $service->getProcessedSchedule($teamID, $season);
     echo $view->render($team, $games, $league->getSimLengthInDays(), $season->phase);
 } else {
     // League-wide schedule
     $repository = new LeagueScheduleRepository($mysqli_db);
-    $service = new LeagueScheduleService($repository);
+    $service = new LeagueScheduleService($repository, $teamPowerRankings);
     $view = new LeagueScheduleView();
     $pageData = $service->getSchedulePageData($season, $league, $commonRepository);
     echo $view->render($pageData);

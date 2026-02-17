@@ -64,6 +64,14 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
         $html .= '</div>';
         $html .= '</div>';
 
+        $html .= '<div class="sos-legend">';
+        $html .= '<span class="sos-legend__item"><span class="sos-tier-dot sos-tier--elite"></span> Elite</span>';
+        $html .= '<span class="sos-legend__item"><span class="sos-tier-dot sos-tier--strong"></span> Strong</span>';
+        $html .= '<span class="sos-legend__item"><span class="sos-tier-dot sos-tier--average"></span> Average</span>';
+        $html .= '<span class="sos-legend__item"><span class="sos-tier-dot sos-tier--weak"></span> Weak</span>';
+        $html .= '<span class="sos-legend__item"><span class="sos-tier-dot sos-tier--bottom"></span> Bottom</span>';
+        $html .= '</div>';
+
         return $html;
     }
 
@@ -152,6 +160,14 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
 
         $html = '<div class="' . $gameClass . '" id="' . $gameId . '" data-home-team-id="' . $game['home'] . '" data-visitor-team-id="' . $game['visitor'] . '">';
 
+        // Far left: visitor SOS tier indicator
+        $visitorTier = $game['visitorTier'] ?? '';
+        $html .= '<span class="schedule-game__sos-indicator">';
+        if ($game['isUnplayed'] && $visitorTier !== '') {
+            $html .= '<span class="sos-tier-dot--sm sos-tier--' . $visitorTier . '" title="' . $visitorTier . '"></span>';
+        }
+        $html .= '</span>';
+
         // Visitor team + logo
         $vClass = $game['visitorWon'] ? ' schedule-game__team--win' : '';
         /** @var string $safeVisitorTeam */
@@ -186,6 +202,14 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
         $html .= '<a href="' . $homeTeamUrl . '" class="schedule-game__team-link">';
         $html .= '<span class="schedule-game__team' . $hClass . '"><span class="schedule-game__team-text">' . $safeHomeTeam . '</span> <span class="schedule-game__record">(' . $safeHomeRecord . ')</span></span>';
         $html .= '</a>';
+
+        // Far right: home SOS tier indicator
+        $homeTier = $game['homeTier'] ?? '';
+        $html .= '<span class="schedule-game__sos-indicator">';
+        if ($game['isUnplayed'] && $homeTier !== '') {
+            $html .= '<span class="sos-tier-dot--sm sos-tier--' . $homeTier . '" title="' . $homeTier . '"></span>';
+        }
+        $html .= '</span>';
 
         $html .= '</div>';
 

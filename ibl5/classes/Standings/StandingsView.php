@@ -147,6 +147,8 @@ class StandingsView implements StandingsViewInterface
                     <th>Last 10<br>W-L</th>
                     <th>Streak</th>
                     <th>Power<br>Rank</th>
+                    <th>SOS</th>
+                    <th>Rem.<br>SOS</th>
                 </tr>
             </thead>
             <tbody>
@@ -190,6 +192,8 @@ class StandingsView implements StandingsViewInterface
         $streak = $streakData['streak'] ?? 0;
         $streakSortKey = ($streakData['streak_type'] ?? '') === 'W' ? $streak : -$streak;
         $rating = $streakData['ranking'] ?? 0;
+        $sos = $streakData['sos'] ?? 0;
+        $remainingSos = $streakData['remaining_sos'] ?? 0;
 
         // Get Pythagorean win percentage from pre-loaded data
         $pythagoreanStats = $this->allPythagoreanStats[$teamId] ?? null;
@@ -232,6 +236,8 @@ class StandingsView implements StandingsViewInterface
             <td><?= $lastWin; ?>-<?= $lastLoss; ?></td>
             <td sorttable_customkey="<?= $streakSortKey; ?>"><?= $streakType; ?> <?= $streak; ?></td>
             <td><span class="ibl-stat-highlight"><?= $rating; ?></span></td>
+            <td><?= number_format((float)$sos, 3); ?></td>
+            <td><?= number_format((float)$remainingSos, 3); ?></td>
         </tr>
         <?php
         return (string) ob_get_clean();

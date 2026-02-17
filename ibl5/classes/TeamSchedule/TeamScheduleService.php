@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TeamSchedule;
 
+use StrengthOfSchedule\StrengthOfScheduleCalculator;
 use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 use TeamSchedule\Contracts\TeamScheduleServiceInterface;
 
@@ -25,16 +26,21 @@ class TeamScheduleService implements TeamScheduleServiceInterface
     /** @var array<int, \Team> */
     private array $teamCache = [];
 
+    /** @var array<int, float> Power rankings by team ID (0.0-100.0) */
+    private array $teamPowerRankings;
+
     /**
      * Constructor
      *
      * @param \mysqli $db Database connection
      * @param TeamScheduleRepositoryInterface $repository Team schedule repository
+     * @param array<int, float> $teamPowerRankings Optional power rankings for SOS tier indicators
      */
-    public function __construct(\mysqli $db, TeamScheduleRepositoryInterface $repository)
+    public function __construct(\mysqli $db, TeamScheduleRepositoryInterface $repository, array $teamPowerRankings = [])
     {
         $this->db = $db;
         $this->repository = $repository;
+        $this->teamPowerRankings = $teamPowerRankings;
     }
 
     /**
@@ -64,6 +70,11 @@ class TeamScheduleService implements TeamScheduleServiceInterface
 
             $dateFormat = $game->dateObject instanceof \DateTime ? $game->dateObject->format('F') : '';
 
+            $opponentRanking = $this->teamPowerRankings[$opposingTeamId] ?? 0.0;
+            $opponentTier = $this->teamPowerRankings !== []
+                ? StrengthOfScheduleCalculator::assignTier($opponentRanking)
+                : '';
+
             $row = [
                 'game' => $game,
                 'currentMonth' => $dateFormat,
@@ -77,6 +88,7 @@ class TeamScheduleService implements TeamScheduleServiceInterface
                 'streak' => '',
                 'winLossColor' => '',
                 'isUnplayed' => $game->isUnplayed,
+                'opponentTier' => $opponentTier,
             ];
 
             if ($game->isUnplayed) {

@@ -81,7 +81,9 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
     public function getTeams(): array
     {
         /** @var list<TeamRow> $rows */
-        $rows = $this->fetchAll("SELECT * FROM ibl_power WHERE TeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . " ORDER BY TeamID ASC");
+        $rows = $this->fetchAll(
+            "SELECT teamid AS TeamID, team_name AS Team FROM ibl_team_info WHERE teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . " ORDER BY teamid ASC"
+        );
         return $rows;
     }
 

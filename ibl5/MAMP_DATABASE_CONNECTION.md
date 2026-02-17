@@ -24,40 +24,9 @@ Verify the database is accessible using credentials from `ibl5/config.php`:
 - Socket: `/Applications/MAMP/tmp/mysql/mysql.sock` (required for PHP mysqli)
 - Username & Password: See `ibl5/config.php` (`$dbuname` and `$dbpass`)
 
-## Using DatabaseConnection Helper (Recommended for Tests)
+## PHP mysqli Connection
 
-The `DatabaseConnection` class in `ibl5/classes/DatabaseConnection.php` provides a convenient API:
-
-```php
-<?php
-require_once __DIR__ . '/mainfile.php';
-
-// Fetch a single row with prepared statements
-$player = DatabaseConnection::fetchRow("SELECT * FROM ibl_plr WHERE pid = ?", [123]);
-
-// Fetch multiple rows
-$players = DatabaseConnection::fetchAll("SELECT * FROM ibl_plr LIMIT 10");
-
-// Get a single value
-$count = DatabaseConnection::fetchValue("SELECT COUNT(*) FROM ibl_plr");
-
-// Test connection
-$isConnected = DatabaseConnection::testConnection();
-
-// Get status info
-$status = DatabaseConnection::getStatus();
-// Returns: ['connected' => bool, 'host' => '...', 'database' => '...', 'version' => '...']
-```
-
-**Key Benefits:**
-- Automatic socket handling
-- Built-in error handling
-- Supports prepared statements
-- Connection pooling (reuses connection)
-
-## Direct mysqli Connection (For Advanced Use)
-
-If you need direct mysqli access with the correct socket, use credentials from `ibl5/config.php`:
+Use credentials from `ibl5/config.php`:
 
 ```php
 <?php
@@ -85,7 +54,7 @@ $mysqli_db->set_charset('utf8mb4');
 - **Command-line MySQL client:** Uses port 3306 directly
 - **PHP mysqli:** Requires explicit socket path to connect locally
 - **MAMP Socket Location:** `/Applications/MAMP/tmp/mysql/mysql.sock`
-- **DatabaseConnection class:** Automatically handles this
+- **App bootstrap (`db/db.php`):** Automatically handles this
 
 ## Important Notes
 
@@ -93,17 +62,6 @@ $mysqli_db->set_charset('utf8mb4');
 2. **Production data** - The database contains real IBL data. Always backup before destructive operations
 3. **Prepared statements** - Always use prepared statements for security
 4. **Test isolation** - Consider using transactions for tests to avoid permanent changes
-
-## Testing Database Connection
-
-Run the connection tests:
-
-```bash
-cd ibl5
-vendor/bin/phpunit tests/DatabaseConnectionTest.php
-```
-
-All tests should pass with ✔ marks.
 
 ## Troubleshooting
 
@@ -138,4 +96,3 @@ mysql -h 127.0.0.1 -u root -p'root' iblhoops_ibl5
 
 - See `.github/copilot-instructions.md` for full Copilot agent setup
 - See `DATABASE_GUIDE.md` for schema reference and query patterns
-- See `ibl5/classes/DatabaseConnection.php` for implementation details

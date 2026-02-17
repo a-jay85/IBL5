@@ -180,9 +180,17 @@ interface PlayerRepositoryInterface
 
     /**
      * Get one-on-one game losses for a player
-     * 
+     *
      * @param string $playerName Player name (exact match)
      * @return array<array<string, mixed>> Array of one-on-one game records where player lost
      */
     public function getOneOnOneLosses(string $playerName): array;
+
+    /**
+     * Resolve a player UUID to a numeric player ID
+     *
+     * @param string $uuid The player's UUID
+     * @return int|null The player's numeric ID, or null if not found
+     */
+    public function getPlayerIdByUuid(string $uuid): ?int;
 }

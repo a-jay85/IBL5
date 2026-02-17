@@ -190,5 +190,8 @@
         <testsuite name="LeagueConfig Module Tests">
             <directory>tests/LeagueConfig</directory>
         </testsuite>
+        <testsuite name="StrengthOfSchedule Module Tests">
+            <directory>tests/StrengthOfSchedule</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

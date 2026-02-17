@@ -9,7 +9,7 @@ namespace NextSim\Contracts;
  *
  * Defines methods for processing next simulation game data.
  *
- * @phpstan-type NextSimGameData array{game: \Game, date: \DateTime, dayNumber: int, opposingTeam: \Team, locationPrefix: string, opposingStarters: array<string, \Player\Player>}
+ * @phpstan-type NextSimGameData array{game: \Game, date: \DateTime, dayNumber: int, opposingTeam: \Team, locationPrefix: string, opposingStarters: array<string, \Player\Player>, opponentTier: string, opponentPowerRanking: float}
  *
  * @see \NextSim\NextSimService For the concrete implementation
  */

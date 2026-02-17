@@ -95,7 +95,14 @@ class NextSimView implements NextSimViewInterface
         $html .= '<img src="./images/logo/new' . $opposingTeamId . '.png" alt="Team Logo" class="next-sim-mobile-logo" width="50" height="50">';
         $html .= '</a>';
         $html .= '</div>';
-        $html .= '<div class="next-sim-record"><h2>' . $seasonRecord . '</h2></div>';
+        $html .= '<div class="next-sim-record"><h2>' . $seasonRecord . '</h2>';
+        if (isset($gameData['opponentTier']) && is_string($gameData['opponentTier']) && $gameData['opponentTier'] !== '') {
+            $tier = $gameData['opponentTier'];
+            /** @var string $safeTierLabel */
+            $safeTierLabel = HtmlSanitizer::safeHtmlOutput(ucfirst($tier));
+            $html .= '<span class="next-sim-opponent-tier sos-tier--' . $tier . '">' . $safeTierLabel . '</span>';
+        }
+        $html .= '</div>';
         $html .= '</div>';
 
         // Render matchup ratings

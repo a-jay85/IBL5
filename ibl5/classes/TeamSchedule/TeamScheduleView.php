@@ -22,6 +22,18 @@ use Utilities\HtmlSanitizer;
  */
 class TeamScheduleView implements TeamScheduleViewInterface
 {
+    /** @var array{remaining_sos: float|string, remaining_sos_rank: int}|null */
+    private ?array $sosSummary = null;
+
+    /**
+     * Set remaining SOS summary data for display
+     *
+     * @param array{remaining_sos: float|string, remaining_sos_rank: int} $sosSummary
+     */
+    public function setSosSummary(array $sosSummary): void
+    {
+        $this->sosSummary = $sosSummary;
+    }
     /**
      * @see TeamScheduleViewInterface::render()
      *
@@ -112,6 +124,26 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $html .= '<p class="schedule-highlight-note">Next sim: ' . $simLengthInDays . ' days</p>';
         $html .= '</div>';
         $html .= '</div>';
+
+        // SOS summary and tier legend
+        if ($this->sosSummary !== null) {
+            $rsos = number_format((float)$this->sosSummary['remaining_sos'], 3);
+            $rsosRank = (int)$this->sosSummary['remaining_sos_rank'];
+            $html .= '<div class="sos-summary">';
+            $html .= '<span class="sos-summary__label">Remaining SOS:</span> ';
+            $html .= '<span class="sos-summary__value">' . $rsos . '</span>';
+            $html .= ' <span class="sos-summary__rank">(#' . $rsosRank . ')</span>';
+            $html .= '</div>';
+        }
+
+        $html .= '<div class="sos-legend">';
+        $html .= '<span class="sos-legend__item"><span class="sos-tier-dot sos-tier--elite"></span> Elite</span>';
+        $html .= '<span class="sos-legend__item"><span class="sos-tier-dot sos-tier--strong"></span> Strong</span>';
+        $html .= '<span class="sos-legend__item"><span class="sos-tier-dot sos-tier--average"></span> Average</span>';
+        $html .= '<span class="sos-legend__item"><span class="sos-tier-dot sos-tier--weak"></span> Weak</span>';
+        $html .= '<span class="sos-legend__item"><span class="sos-tier-dot sos-tier--bottom"></span> Bottom</span>';
+        $html .= '</div>';
+
         return $html;
     }
 
@@ -286,7 +318,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
         }
         $html .= '</span></a>';
 
-        // Streak column on right (single line)
+        // Streak column (includes tier dot for unplayed games)
         $html .= $this->renderStreakColumn($row);
 
         $html .= '</div>';
@@ -301,6 +333,10 @@ class TeamScheduleView implements TeamScheduleViewInterface
     private function renderStreakColumn(array $row): string
     {
         if ($row['isUnplayed']) {
+            $opponentTier = $row['opponentTier'] ?? '';
+            if ($opponentTier !== '') {
+                return '<span class="schedule-game__streak"><span class="sos-tier-dot sos-tier--' . $opponentTier . '" title="' . $opponentTier . '"></span></span>';
+            }
             return '<span class="schedule-game__streak"></span>';
         }
 

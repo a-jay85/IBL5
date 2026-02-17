@@ -318,11 +318,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
         }
         $html .= '</span></a>';
 
-        // Tier dot + Streak column on right
-        $opponentTier = $row['opponentTier'] ?? '';
-        if ($row['isUnplayed'] && $opponentTier !== '') {
-            $html .= '<span class="sos-tier-dot sos-tier--' . $opponentTier . '" title="' . $opponentTier . '"></span>';
-        }
+        // Streak column (includes tier dot for unplayed games)
         $html .= $this->renderStreakColumn($row);
 
         $html .= '</div>';
@@ -337,6 +333,10 @@ class TeamScheduleView implements TeamScheduleViewInterface
     private function renderStreakColumn(array $row): string
     {
         if ($row['isUnplayed']) {
+            $opponentTier = $row['opponentTier'] ?? '';
+            if ($opponentTier !== '') {
+                return '<span class="schedule-game__streak"><span class="sos-tier-dot sos-tier--' . $opponentTier . '" title="' . $opponentTier . '"></span></span>';
+            }
             return '<span class="schedule-game__streak"></span>';
         }
 

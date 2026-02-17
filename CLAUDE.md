@@ -32,7 +32,7 @@ cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary -c php
 
 **Token-saving tip:** When merely checking if tests pass (not debugging failures), append `| tail -n 3` to commands to output only the final summary. Example: `cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary | tail -n 3`
 
-**Note:** PHPUnit 12.x has no `-v`/`--verbose`. Use `--display-all-issues` instead. See `phpunit-tests.md` for full testing rules and completion criteria.
+**Note:** PHPUnit 13.x has no `-v`/`--verbose`. Use `--display-all-issues` instead. See `phpunit-tests.md` for full testing rules and completion criteria.
 
 ### Static Analysis (PHPStan)
 
@@ -77,6 +77,10 @@ ibl5/classes/
 
 ### Legacy (Non-IBL) Modules
 - **SiteStatistics:** A legacy PHP-Nuke module for tracking site visitor/page-view statistics. It is **not** basketball- or IBL-related and should be deprioritized against core IBL modules during refactoring or feature work.
+
+### OneOnOneGame Warning
+`classes/OneOnOneGame/` is NOT a representation of how the Jump Shot Basketball (JSB) simulation engine works. It was created as a mini-game by fans of JSB, and may have similarities in logic, but it should not be interpreted as a faithful representation of how the JSB engine works. In terms of using it to understand JSB, pretend it does not exist.
+
 
 ### Key Patterns
 - **Repository:** Database queries via prepared statements

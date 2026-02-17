@@ -4,7 +4,7 @@ paths: ibl5/tests/**/*.php
 
 # PHPUnit Testing Rules
 
-## PHPUnit 12.4+ Syntax
+## PHPUnit 13+ Syntax
 ```bash
 # ✅ CORRECT commands
 vendor/bin/phpunit tests/Module/
@@ -15,13 +15,13 @@ vendor/bin/phpunit --display-all-issues     # Show ALL issues (deprecations, war
 # 💾 Token-saving: When just checking if tests pass (not debugging)
 vendor/bin/phpunit | tail -n 3              # Show only final summary lines
 
-# ❌ WRONG - These options don't exist in PHPUnit 12.x
+# ❌ WRONG - These options don't exist in PHPUnit 13.x
 vendor/bin/phpunit -v
 vendor/bin/phpunit --verbose
 ```
 
 ## Display Issue Details
-PHPUnit 12.x only shows summary counts by default. To see full details:
+PHPUnit 13.x only shows summary counts by default. To see full details:
 - `--display-all-issues` - **Recommended:** shows everything
 - `--display-deprecations`, `--display-warnings`, `--display-notices` - specific types
 
@@ -85,7 +85,7 @@ class ModuleServiceTest extends TestCase
 
 ## Mock vs Stub
 
-Use `createStub()` when a test double only provides canned return values (no `expects()` calls). Use `createMock()` only when you need to verify interactions with `expects()`. PHPUnit 12 emits a notice when a mock object has no configured expectations.
+Use `createStub()` when a test double only provides canned return values (no `expects()` calls). Use `createMock()` only when you need to verify interactions with `expects()`. PHPUnit emits a notice when a mock object has no configured expectations.
 
 ```php
 // ✅ No expectations — use createStub()

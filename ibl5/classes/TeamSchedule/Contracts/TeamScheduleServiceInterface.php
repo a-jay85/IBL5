@@ -20,7 +20,8 @@ namespace TeamSchedule\Contracts;
  *     losses: int,
  *     streak: string,
  *     winLossColor: string,
- *     isUnplayed: bool
+ *     isUnplayed: bool,
+ *     opponentTier: string
  * }
  *
  * @see \TeamSchedule\TeamScheduleService For the concrete implementation

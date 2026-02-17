@@ -104,7 +104,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     {
         /** @var StreakRow|null */
         return $this->fetchOne(
-            "SELECT last_win, last_loss, streak_type, streak, ranking FROM ibl_power WHERE TeamID = ?",
+            "SELECT last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM ibl_power WHERE TeamID = ?",
             "i",
             $teamId
         );
@@ -144,9 +144,9 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      */
     public function getAllStreakData(): array
     {
-        /** @var list<array{TeamID: int, last_win: int, last_loss: int, streak_type: string, streak: int, ranking: int}> $rows */
+        /** @var list<array{TeamID: int, last_win: int, last_loss: int, streak_type: string, streak: int, ranking: int, sos: float|string, remaining_sos: float|string, sos_rank: int, remaining_sos_rank: int}> $rows */
         $rows = $this->fetchAll(
-            "SELECT TeamID, last_win, last_loss, streak_type, streak, ranking FROM ibl_power",
+            "SELECT TeamID, last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM ibl_power",
             ""
         );
 
@@ -159,6 +159,10 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
                 'streak_type' => $row['streak_type'],
                 'streak' => $row['streak'],
                 'ranking' => $row['ranking'],
+                'sos' => $row['sos'],
+                'remaining_sos' => $row['remaining_sos'],
+                'sos_rank' => $row['sos_rank'],
+                'remaining_sos_rank' => $row['remaining_sos_rank'],
             ];
         }
 

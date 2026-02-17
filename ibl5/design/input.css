@@ -60,6 +60,7 @@
 @import './components/depth-chart-changes.css';
 @import './components/sco-parser.css';
 @import './components/updater.css';
+@import './components/strength-of-schedule.css';
 
 /* Site-wide layout wrapper (replaces legacy themeheader table) */
 .site-content {

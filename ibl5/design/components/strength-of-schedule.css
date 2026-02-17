@@ -55,7 +55,6 @@
   color: #fff;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-left: 6px;
   vertical-align: middle;
 }
 
@@ -96,4 +95,11 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+/* SOS indicator cell in league schedule grid (far-left / far-right) */
+.schedule-game__sos-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

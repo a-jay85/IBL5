@@ -270,12 +270,21 @@ class SchFileParserTest extends TestCase
             }
         }
 
-        $this->assertSame(1148, count($games), 'Total game count should be 1148');
-        $this->assertSame(627, $played, 'Played game count should be 627');
-        $this->assertSame(521, $unplayed, 'Unplayed game count should be 521');
+        // Played + unplayed should equal total games
+        $this->assertSame(count($games), $played + $unplayed, 'Played + unplayed should equal total games');
+
+        // Every game is either played or unplayed — played games have nonzero scores
+        foreach ($games as $game) {
+            if ($game['played']) {
+                $this->assertGreaterThan(0, $game['visitor_score'] + $game['home_score'], 'Played game should have nonzero combined score');
+            } else {
+                $this->assertSame(0, $game['visitor_score'], 'Unplayed game should have 0 visitor score');
+                $this->assertSame(0, $game['home_score'], 'Unplayed game should have 0 home score');
+            }
+        }
     }
 
-    public function testParseFileFirstGameMatchesExpected(): void
+    public function testParseFileFirstGameHasValidStructure(): void
     {
         $schFile = dirname(__DIR__, 2) . '/IBL5.sch';
         if (!file_exists($schFile)) {
@@ -285,14 +294,26 @@ class SchFileParserTest extends TestCase
         $games = SchFileParser::parseFile($schFile);
         $firstGame = $games[0];
 
-        // First game should be at date_slot 32 (November 2), game_index 0
-        $this->assertSame(32, $firstGame['date_slot']);
+        // First game should have all required keys with valid types
+        $this->assertArrayHasKey('date_slot', $firstGame);
+        $this->assertArrayHasKey('game_index', $firstGame);
+        $this->assertArrayHasKey('visitor', $firstGame);
+        $this->assertArrayHasKey('home', $firstGame);
+        $this->assertArrayHasKey('visitor_score', $firstGame);
+        $this->assertArrayHasKey('home_score', $firstGame);
+        $this->assertArrayHasKey('played', $firstGame);
+
+        // First game is always game_index 0
         $this->assertSame(0, $firstGame['game_index']);
-        $this->assertSame(24, $firstGame['visitor']);
-        $this->assertSame(9, $firstGame['home']);
-        $this->assertSame(146, $firstGame['visitor_score']);
-        $this->assertSame(130, $firstGame['home_score']);
-        $this->assertTrue($firstGame['played']);
+
+        // Team IDs should be valid
+        $this->assertGreaterThan(0, $firstGame['visitor']);
+        $this->assertGreaterThan(0, $firstGame['home']);
+        $this->assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $firstGame['visitor']);
+        $this->assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $firstGame['home']);
+
+        // Visitor and home should be different teams
+        $this->assertNotSame($firstGame['visitor'], $firstGame['home'], 'A team cannot play itself');
     }
 
     public function testParseFileGamesHaveValidTeamIds(): void

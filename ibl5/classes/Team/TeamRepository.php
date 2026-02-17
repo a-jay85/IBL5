@@ -51,7 +51,15 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var PowerRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_power WHERE Team = ?",
+            "SELECT s.tid, s.team_name, s.leagueRecord, s.wins, s.losses, s.pct,
+                s.conference, s.division, s.confRecord, s.divRecord, s.divGB,
+                s.homeRecord, s.awayRecord, s.gamesUnplayed,
+                p.ranking, p.last_win, p.last_loss, p.streak_type, p.streak,
+                p.sos, p.remaining_sos
+            FROM ibl_standings s
+            JOIN ibl_power p ON s.tid = p.TeamID
+            JOIN ibl_team_info t ON s.tid = t.teamid
+            WHERE t.team_name = ?",
             "s",
             $teamName
         );
@@ -65,7 +73,15 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<PowerRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_power WHERE Division = ? ORDER BY gb DESC",
+            "SELECT s.tid, s.team_name, s.leagueRecord, s.wins, s.losses, s.pct,
+                s.conference, s.division, s.confRecord, s.divRecord, s.divGB,
+                s.homeRecord, s.awayRecord, s.gamesUnplayed,
+                p.ranking, p.last_win, p.last_loss, p.streak_type, p.streak,
+                p.sos, p.remaining_sos
+            FROM ibl_standings s
+            JOIN ibl_power p ON s.tid = p.TeamID
+            WHERE s.division = ?
+            ORDER BY s.divGB ASC",
             "s",
             $division
         );
@@ -79,7 +95,15 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
     {
         /** @var list<PowerRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_power WHERE Conference = ? ORDER BY gb DESC",
+            "SELECT s.tid, s.team_name, s.leagueRecord, s.wins, s.losses, s.pct,
+                s.conference, s.division, s.confRecord, s.divRecord, s.divGB,
+                s.homeRecord, s.awayRecord, s.gamesUnplayed,
+                p.ranking, p.last_win, p.last_loss, p.streak_type, p.streak,
+                p.sos, p.remaining_sos
+            FROM ibl_standings s
+            JOIN ibl_power p ON s.tid = p.TeamID
+            WHERE s.conference = ?
+            ORDER BY s.confGB ASC",
             "s",
             $conference
         );

@@ -27,7 +27,7 @@ $pagetitle = "- Player Archives";
  */
 function showpage($playerID, $pageView): void
 {
-    global $db, $mysqli_db, $cookie;
+    global $mysqli_db, $cookie;
 
     // Resolve UUID to numeric PID if a UUID string was passed instead of an integer
     if (!is_numeric($playerID) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string) $playerID)) {

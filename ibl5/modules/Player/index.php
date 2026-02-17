@@ -31,11 +31,14 @@ function showpage($playerID, $pageView): void
 
     // Resolve UUID to numeric PID if a UUID string was passed instead of an integer
     if (!is_numeric($playerID) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string) $playerID)) {
-        $resolvedPid = DatabaseConnection::fetchValue(
-            "SELECT pid FROM ibl_plr WHERE uuid = ?",
-            [(string) $playerID],
-            'pid'
-        );
+        $stmt = $mysqli_db->prepare("SELECT pid FROM ibl_plr WHERE uuid = ?");
+        $uuidStr = (string) $playerID;
+        $stmt->bind_param('s', $uuidStr);
+        $stmt->execute();
+        $uuidResult = $stmt->get_result();
+        $uuidRow = $uuidResult->fetch_assoc();
+        $stmt->close();
+        $resolvedPid = is_array($uuidRow) ? ($uuidRow['pid'] ?? null) : null;
         if ($resolvedPid !== null) {
             $playerID = (int) $resolvedPid;
         }

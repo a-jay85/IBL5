@@ -86,7 +86,7 @@ vendor/bin/phpunit --filter testRenderPlayerHeader    # Run specific test
 
 ```bash
 cd ibl5
-vendor/bin/phpunit --version               # Should show PHPUnit 12.4.3+
+vendor/bin/phpunit --version               # Should show PHPUnit 13.0+
 vendor/bin/phpcs --version                 # Should show PHP_CodeSniffer version
 ```
 

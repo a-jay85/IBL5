@@ -281,7 +281,7 @@ vendor/bin/phpunit --help                  # Show all available options
 
 When writing tests that need database data:
 
-1. **Query actual data:** Use DatabaseConnection to fetch real player/team/game data
+1. **Query actual data:** Use `$mysqli_db` or repository classes to fetch real player/team/game data
 2. **Use transactions:** Wrap test operations in transactions that rollback
 3. **Static data preferred:** Cache frequently-used test data rather than querying repeatedly
 

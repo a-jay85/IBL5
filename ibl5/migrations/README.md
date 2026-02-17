@@ -229,7 +229,6 @@ This is a PHP configuration change, not a SQL migration. It enables native type 
 
 **Files Modified:**
 - `ibl5/db/db.php` - Main application database connection
-- `ibl5/classes/DatabaseConnection.php` - Test helper connection
 
 **Code Change:**
 ```php

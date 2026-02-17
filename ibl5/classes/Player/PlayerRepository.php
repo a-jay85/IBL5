@@ -544,19 +544,34 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
 
     /**
      * Get one-on-one game losses for a player
-     * 
+     *
      * @see PlayerRepositoryInterface::getOneOnOneLosses()
      */
     public function getOneOnOneLosses(string $playerName): array
     {
         return $this->fetchAll(
-            "SELECT o.gameid, o.winner, o.loser, o.winscore, o.lossscore, p.pid as winner_pid 
-             FROM ibl_one_on_one o 
-             LEFT JOIN ibl_plr p ON o.winner = p.name 
-             WHERE o.loser = ? 
+            "SELECT o.gameid, o.winner, o.loser, o.winscore, o.lossscore, p.pid as winner_pid
+             FROM ibl_one_on_one o
+             LEFT JOIN ibl_plr p ON o.winner = p.name
+             WHERE o.loser = ?
              ORDER BY o.gameid ASC",
             "s",
             $playerName
         );
+    }
+
+    /**
+     * @see PlayerRepositoryInterface::getPlayerIdByUuid()
+     */
+    public function getPlayerIdByUuid(string $uuid): ?int
+    {
+        /** @var array{pid: int}|null $row */
+        $row = $this->fetchOne(
+            "SELECT pid FROM ibl_plr WHERE uuid = ?",
+            "s",
+            $uuid
+        );
+
+        return $row !== null ? $row['pid'] : null;
     }
 }

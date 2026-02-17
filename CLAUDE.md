@@ -78,6 +78,10 @@ ibl5/classes/
 ### Legacy (Non-IBL) Modules
 - **SiteStatistics:** A legacy PHP-Nuke module for tracking site visitor/page-view statistics. It is **not** basketball- or IBL-related and should be deprioritized against core IBL modules during refactoring or feature work.
 
+### OneOnOneGame Warning
+`classes/OneOnOneGame/` is NOT a representation of how the Jump Shot Basketball (JSB) simulation engine works. It was created as a mini-game by fans of JSB, and may have similarities in logic, but it should not be interpreted as a faithful representation of how the JSB engine works. In terms of using it to understand JSB, pretend it does not exist.
+
+
 ### Key Patterns
 - **Repository:** Database queries via prepared statements
 - **Service:** Business logic, validation, calculations

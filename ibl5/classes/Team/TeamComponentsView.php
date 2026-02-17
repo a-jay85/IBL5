@@ -160,36 +160,34 @@ class TeamComponentsView implements TeamComponentsViewInterface
             return '';
         }
 
-        $win = $powerData['win'];
-        $loss = $powerData['loss'];
-        $gb = $powerData['gb'];
+        $wins = $powerData['wins'];
+        $losses = $powerData['losses'];
+        $divGB = $powerData['divGB'] ?? 0.0;
         /** @var string $division */
-        $division = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['Division']);
+        $division = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['division']);
         /** @var string $conference */
-        $conference = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['Conference']);
-        $home_win = $powerData['home_win'];
-        $home_loss = $powerData['home_loss'];
-        $road_win = $powerData['road_win'];
-        $road_loss = $powerData['road_loss'];
+        $conference = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['conference']);
+        /** @var string $homeRecord */
+        $homeRecord = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['homeRecord']);
+        /** @var string $awayRecord */
+        $awayRecord = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['awayRecord']);
         $last_win = $powerData['last_win'];
         $last_loss = $powerData['last_loss'];
 
-        $divisionStandings = $this->repository->getDivisionStandings($powerData['Division']);
-        $gbbase = $divisionStandings[0]['gb'] ?? 0.0;
-        $gb = $gbbase - $gb;
+        $divisionStandings = $this->repository->getDivisionStandings($powerData['division']);
 
         $Div_Pos = 1;
         foreach ($divisionStandings as $index => $standing) {
-            if ($standing['Team'] === $team->name) {
+            if ($standing['team_name'] === $team->name) {
                 $Div_Pos = $index + 1;
                 break;
             }
         }
 
-        $conferenceStandings = $this->repository->getConferenceStandings($powerData['Conference']);
+        $conferenceStandings = $this->repository->getConferenceStandings($powerData['conference']);
         $Conf_Pos = 1;
         foreach ($conferenceStandings as $index => $standing) {
-            if ($standing['Team'] === $team->name) {
+            if ($standing['team_name'] === $team->name) {
                 $Conf_Pos = $index + 1;
                 break;
             }
@@ -215,7 +213,7 @@ class TeamComponentsView implements TeamComponentsViewInterface
         }
 
         $output .= '<span class="team-info-list__label">Record</span>'
-            . "<span class=\"team-info-list__value\">$win-$loss</span>"
+            . "<span class=\"team-info-list__value\">" . (int) $wins . '-' . (int) $losses . '</span>'
             . '<span class="team-info-list__label">Arena</span>'
             . "<span class=\"team-info-list__value\">$arena</span>";
 
@@ -225,16 +223,17 @@ class TeamComponentsView implements TeamComponentsViewInterface
                 . "<span class=\"team-info-list__value\">$capacity</span>";
         }
 
+        $gbDisplay = (float) $divGB;
         $output .= '<span class="team-info-list__label">Conference</span>'
             . "<span class=\"team-info-list__value\">$conference ($Conf_Pos" . $this->ordinalSuffix($Conf_Pos) . ")</span>"
             . '<span class="team-info-list__label">Division</span>'
             . "<span class=\"team-info-list__value\">$division ($Div_Pos" . $this->ordinalSuffix($Div_Pos) . ")</span>"
             . '<span class="team-info-list__label">Games Back</span>'
-            . "<span class=\"team-info-list__value\">$gb</span>"
+            . "<span class=\"team-info-list__value\">$gbDisplay</span>"
             . '<span class="team-info-list__label">Home</span>'
-            . "<span class=\"team-info-list__value\">$home_win-$home_loss</span>"
+            . "<span class=\"team-info-list__value\">$homeRecord</span>"
             . '<span class="team-info-list__label">Road</span>'
-            . "<span class=\"team-info-list__value\">$road_win-$road_loss</span>"
+            . "<span class=\"team-info-list__value\">$awayRecord</span>"
             . '<span class="team-info-list__label">Last 10</span>'
             . "<span class=\"team-info-list__value\">$last_win-$last_loss</span>"
             . '</div>';

@@ -82,7 +82,8 @@ function main(mixed $user): void
         Nuke\Footer::footer();
     } elseif (is_user($user)) {
         global $cookie;
-        userinfo((string)$cookie[1]);
+        cookiedecode($user);
+        userinfo((string)($cookie[1] ?? ''));
     }
 }
 

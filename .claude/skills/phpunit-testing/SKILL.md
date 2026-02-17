@@ -1,13 +1,13 @@
 ---
 name: phpunit-testing
-description: PHPUnit 12.4+ test writing with behavior-focused patterns and mock objects for IBL5. Use when writing tests, creating test files, or reviewing test quality.
+description: PHPUnit 13+ test writing with behavior-focused patterns and mock objects for IBL5. Use when writing tests, creating test files, or reviewing test quality.
 ---
 
 # IBL5 PHPUnit Testing
 
-Write PHPUnit 12.4+ tests following behavior-focused testing principles.
+Write PHPUnit 13+ tests following behavior-focused testing principles.
 
-## PHPUnit 12.x Commands
+## PHPUnit 13.x Commands
 
 ```bash
 # ✅ CORRECT
@@ -17,13 +17,13 @@ vendor/bin/phpunit --testsuite "Module Tests"
 vendor/bin/phpunit -c phpunit.ci.xml        # Use specific config file
 vendor/bin/phpunit --display-all-issues     # Show ALL issues (deprecations, warnings, etc.)
 
-# ❌ WRONG - These do NOT exist in PHPUnit 12.x
+# ❌ WRONG - These do NOT exist in PHPUnit 13.x
 vendor/bin/phpunit -v
 vendor/bin/phpunit --verbose
 ```
 
 ### Display Issue Details
-PHPUnit 12.x only shows summary counts by default. To see full details:
+PHPUnit 13.x only shows summary counts by default. To see full details:
 - `--display-all-issues` - **Recommended:** shows everything (deprecations, warnings, notices)
 - `--display-deprecations`, `--display-warnings`, `--display-notices` - specific types
 

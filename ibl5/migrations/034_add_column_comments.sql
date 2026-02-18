@@ -1,6 +1,7 @@
 -- Migration: 034_add_column_comments.sql
 -- Purpose: Add descriptive COMMENT to all uncommented columns across ibl_ tables,
---          and correct 2 inaccurate existing comments on ibl_plr.do and ibl_plr.dd.
+--          correct 2 inaccurate existing comments on ibl_plr.do and ibl_plr.dd,
+--          and fix game2GM/game2GA/r_2ga/r_2gp comments (said "FG" but these are two-point only).
 -- Convention: Skip commenting created_at, updated_at, uuid, and id (auto-increment PK) columns.
 -- Date: 2026-02-16
 
@@ -42,6 +43,9 @@ ALTER TABLE `ibl_box_scores` MODIFY COLUMN `pos` varchar(2) COLLATE utf8mb4_unic
 ALTER TABLE `ibl_box_scores` MODIFY COLUMN `pid` int DEFAULT NULL COMMENT 'FK to ibl_plr.pid';
 ALTER TABLE `ibl_box_scores` MODIFY COLUMN `visitorTID` int DEFAULT NULL COMMENT 'Visiting team ID (FK to ibl_team_info)';
 ALTER TABLE `ibl_box_scores` MODIFY COLUMN `homeTID` int DEFAULT NULL COMMENT 'Home team ID (FK to ibl_team_info)';
+-- Fix inaccurate comments from migration 004 (said "Field goals" but these are two-point only)
+ALTER TABLE `ibl_box_scores` MODIFY COLUMN `game2GM` tinyint unsigned DEFAULT NULL COMMENT 'Two-point field goals made';
+ALTER TABLE `ibl_box_scores` MODIFY COLUMN `game2GA` tinyint unsigned DEFAULT NULL COMMENT 'Two-point field goals attempted';
 
 -- =============================================================================
 -- ibl_box_scores_teams (skip generated columns: game_type, season_year, calc_*)
@@ -68,8 +72,8 @@ ALTER TABLE `ibl_box_scores_teams` MODIFY COLUMN `homeQ3points` int DEFAULT NULL
 ALTER TABLE `ibl_box_scores_teams` MODIFY COLUMN `homeQ4points` int DEFAULT NULL COMMENT 'Home Q4 points';
 ALTER TABLE `ibl_box_scores_teams` MODIFY COLUMN `homeOTpoints` int DEFAULT NULL COMMENT 'Home overtime points';
 ALTER TABLE `ibl_box_scores_teams` MODIFY COLUMN `gameMIN` int DEFAULT NULL COMMENT 'Total game minutes';
-ALTER TABLE `ibl_box_scores_teams` MODIFY COLUMN `game2GM` int DEFAULT NULL COMMENT 'Field goals made';
-ALTER TABLE `ibl_box_scores_teams` MODIFY COLUMN `game2GA` int DEFAULT NULL COMMENT 'Field goals attempted';
+ALTER TABLE `ibl_box_scores_teams` MODIFY COLUMN `game2GM` int DEFAULT NULL COMMENT 'Two-point field goals made';
+ALTER TABLE `ibl_box_scores_teams` MODIFY COLUMN `game2GA` int DEFAULT NULL COMMENT 'Two-point field goals attempted';
 ALTER TABLE `ibl_box_scores_teams` MODIFY COLUMN `gameFTM` int DEFAULT NULL COMMENT 'Free throws made';
 ALTER TABLE `ibl_box_scores_teams` MODIFY COLUMN `gameFTA` int DEFAULT NULL COMMENT 'Free throws attempted';
 ALTER TABLE `ibl_box_scores_teams` MODIFY COLUMN `game3GM` int DEFAULT NULL COMMENT 'Three pointers made';
@@ -86,12 +90,12 @@ ALTER TABLE `ibl_box_scores_teams` MODIFY COLUMN `gamePF` int DEFAULT NULL COMME
 -- ibl_demands
 -- =============================================================================
 ALTER TABLE `ibl_demands` MODIFY COLUMN `name` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Player name (PK, FK to ibl_plr.name)';
-ALTER TABLE `ibl_demands` MODIFY COLUMN `dem1` int NOT NULL DEFAULT '0' COMMENT 'FA preference priority 1 weight';
-ALTER TABLE `ibl_demands` MODIFY COLUMN `dem2` int NOT NULL DEFAULT '0' COMMENT 'FA preference priority 2 weight';
-ALTER TABLE `ibl_demands` MODIFY COLUMN `dem3` int NOT NULL DEFAULT '0' COMMENT 'FA preference priority 3 weight';
-ALTER TABLE `ibl_demands` MODIFY COLUMN `dem4` int NOT NULL DEFAULT '0' COMMENT 'FA preference priority 4 weight';
-ALTER TABLE `ibl_demands` MODIFY COLUMN `dem5` int NOT NULL DEFAULT '0' COMMENT 'FA preference priority 5 weight';
-ALTER TABLE `ibl_demands` MODIFY COLUMN `dem6` int NOT NULL DEFAULT '0' COMMENT 'FA preference priority 6 weight';
+ALTER TABLE `ibl_demands` MODIFY COLUMN `dem1` int NOT NULL DEFAULT '0' COMMENT 'FA year 1 day 1 demand';
+ALTER TABLE `ibl_demands` MODIFY COLUMN `dem2` int NOT NULL DEFAULT '0' COMMENT 'FA year 2 day 1 demand';
+ALTER TABLE `ibl_demands` MODIFY COLUMN `dem3` int NOT NULL DEFAULT '0' COMMENT 'FA year 3 day 1 demand';
+ALTER TABLE `ibl_demands` MODIFY COLUMN `dem4` int NOT NULL DEFAULT '0' COMMENT 'FA year 4 day 1 demand';
+ALTER TABLE `ibl_demands` MODIFY COLUMN `dem5` int NOT NULL DEFAULT '0' COMMENT 'FA year 5 day 1 demand';
+ALTER TABLE `ibl_demands` MODIFY COLUMN `dem6` int NOT NULL DEFAULT '0' COMMENT 'FA year 6 day 1 demand';
 
 -- =============================================================================
 -- ibl_draft
@@ -105,9 +109,9 @@ ALTER TABLE `ibl_draft` MODIFY COLUMN `date` datetime DEFAULT NULL COMMENT 'Date
 -- =============================================================================
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `name` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Prospect name';
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `team` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'College or club team';
-ALTER TABLE `ibl_draft_class` MODIFY COLUMN `talent` int NOT NULL DEFAULT '0' COMMENT 'Overall talent evaluation score';
-ALTER TABLE `ibl_draft_class` MODIFY COLUMN `skill` int NOT NULL DEFAULT '0' COMMENT 'Technical skill evaluation score';
-ALTER TABLE `ibl_draft_class` MODIFY COLUMN `intangibles` int NOT NULL DEFAULT '0' COMMENT 'Intangibles evaluation score';
+ALTER TABLE `ibl_draft_class` MODIFY COLUMN `talent` int NOT NULL DEFAULT '0' COMMENT 'Talent off-season progression rating';
+ALTER TABLE `ibl_draft_class` MODIFY COLUMN `skill` int NOT NULL DEFAULT '0' COMMENT 'Skill  off-season progression rating';
+ALTER TABLE `ibl_draft_class` MODIFY COLUMN `intangibles` int NOT NULL DEFAULT '0' COMMENT 'Intangibles off-season progression rating';
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `ranking` float DEFAULT '0' COMMENT 'Combined draft ranking';
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `invite` mediumtext COLLATE utf8mb4_unicode_ci COMMENT 'Combine/tryout invite details';
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `drafted` int DEFAULT '0' COMMENT '0=undrafted, 1=drafted';
@@ -180,8 +184,8 @@ ALTER TABLE `ibl_hist` MODIFY COLUMN `pid` int NOT NULL DEFAULT '0' COMMENT 'Pla
 ALTER TABLE `ibl_hist` MODIFY COLUMN `name` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Player name (denormalized snapshot)';
 ALTER TABLE `ibl_hist` MODIFY COLUMN `team` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Team name (denormalized snapshot)';
 ALTER TABLE `ibl_hist` MODIFY COLUMN `teamid` int NOT NULL DEFAULT '0' COMMENT 'Team ID (FK to ibl_team_info)';
-ALTER TABLE `ibl_hist` MODIFY COLUMN `r_2ga` int NOT NULL DEFAULT '0' COMMENT 'Rating: FG attempts';
-ALTER TABLE `ibl_hist` MODIFY COLUMN `r_2gp` int NOT NULL DEFAULT '0' COMMENT 'Rating: FG percentage';
+ALTER TABLE `ibl_hist` MODIFY COLUMN `r_2ga` int NOT NULL DEFAULT '0' COMMENT 'Rating: 2P attempts';
+ALTER TABLE `ibl_hist` MODIFY COLUMN `r_2gp` int NOT NULL DEFAULT '0' COMMENT 'Rating: 2P percentage';
 ALTER TABLE `ibl_hist` MODIFY COLUMN `r_fta` int NOT NULL DEFAULT '0' COMMENT 'Rating: FT attempts';
 ALTER TABLE `ibl_hist` MODIFY COLUMN `r_ftp` int NOT NULL DEFAULT '0' COMMENT 'Rating: FT percentage';
 ALTER TABLE `ibl_hist` MODIFY COLUMN `r_3ga` int NOT NULL DEFAULT '0' COMMENT 'Rating: 3P attempts';

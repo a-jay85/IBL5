@@ -113,7 +113,7 @@ function finishNewUser(): void
     try {
         // Register via delight-im/auth with email verification callback
         $authService->register($user_email, $user_password, $username, static function (string $selector, string $token) use ($sitename, $adminmail, $nukeurl, $module_name, $user_email, $username): void {
-            $finishlink = rtrim($nukeurl, '/') . "/modules.php?name=$module_name&op=confirm_email&selector=" . urlencode($selector) . "&token=" . urlencode($token);
+            $finishlink = rtrim($nukeurl, '/') . "/ibl5/modules.php?name=$module_name&op=confirm_email&selector=" . urlencode($selector) . "&token=" . urlencode($token);
             $message = "" . _WELCOMETO . " $sitename!\n\n" . _YOUUSEDEMAIL . " ($user_email) " . _TOREGISTER . " $sitename.\n\n " . _TOFINISHUSER . "\n\n $finishlink\n\n " . _FOLLOWINGMEM . "\n\n" . _UNICKNAME . " $username";
             $subject = "" . _ACTIVATIONSUB . "";
             \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);

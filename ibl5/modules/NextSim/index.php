@@ -44,7 +44,7 @@ foreach ($allStreakData as $tid => $data) {
 Nuke\Header::header();
 
 $username = strval($cookie[1] ?? '');
-$userTeamName = $commonRepository->getTeamnameFromUsername($username);
+$userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
 $userTeam = Team::initialize($mysqli_db, $userTeamName);
 $league = new League($mysqli_db);
 

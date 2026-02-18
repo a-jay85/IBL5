@@ -1096,18 +1096,21 @@ function loginbox(): void
 {
     global $user, $authService;
     if (!$authService->isAuthenticated()) {
-        $currentModule = $_GET['name'] ?? '';
-        $redirect = is_string($currentModule) && $currentModule !== '' ? $currentModule : '';
-        $redirectParam = $redirect !== '' ? '&redirect=' . urlencode($redirect) : '';
-        $url = 'modules.php?name=YourAccount' . $redirectParam;
+        // Store the full original query string in session so login() can redirect back
+        $queryString = $_SERVER['QUERY_STRING'] ?? '';
+        if (is_string($queryString) && $queryString !== '') {
+            $_SESSION['redirect_after_login'] = $queryString;
+        }
+        $url = 'modules.php?name=YourAccount';
         // Use JS redirect — callers have already sent output via Nuke\Header::header()
-        /** @var string $safeUrl */
-        $safeUrl = \Utilities\HtmlSanitizer::safeHtmlOutput($url);
-        echo '<script>window.location.href="' . $safeUrl . '";</script>';
-        echo '<noscript><meta http-equiv="refresh" content="0;url=' . $safeUrl . '"></noscript>';
+        $jsUrl = addslashes($url);
+        echo '<script>window.location.href="' . $jsUrl . '";</script>';
+        echo '<noscript><meta http-equiv="refresh" content="0;url=' . $jsUrl . '"></noscript>';
         die();
     }
 }
+
+require_once __DIR__ . '/includes/buildRedirectUrl.php';
 
 function userblock()
 {

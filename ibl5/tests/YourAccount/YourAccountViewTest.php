@@ -30,7 +30,7 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderLoginPageReturnsHtml(): void
     {
-        $result = $this->view->renderLoginPage(null, null, 123456, false);
+        $result = $this->view->renderLoginPage(null, 123456, false);
 
         $this->assertStringContainsString('auth-page', $result);
         $this->assertStringContainsString('auth-card', $result);
@@ -40,7 +40,7 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderLoginPageContainsFormFields(): void
     {
-        $result = $this->view->renderLoginPage(null, null, 123456, false);
+        $result = $this->view->renderLoginPage(null, 123456, false);
 
         $this->assertStringContainsString('name="username"', $result);
         $this->assertStringContainsString('name="user_password"', $result);
@@ -51,31 +51,22 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderLoginPageContainsCsrfToken(): void
     {
-        $result = $this->view->renderLoginPage(null, null, 123456, false);
+        $result = $this->view->renderLoginPage(null, 123456, false);
 
         $this->assertStringContainsString('name="_csrf_token"', $result);
     }
 
     public function testRenderLoginPageContainsRememberMeCheckbox(): void
     {
-        $result = $this->view->renderLoginPage(null, null, 123456, false);
+        $result = $this->view->renderLoginPage(null, 123456, false);
 
         $this->assertStringContainsString('name="remember_me"', $result);
         $this->assertStringContainsString('Remember me', $result);
     }
 
-    public function testRenderLoginPageContainsHiddenFieldsForForumRedirect(): void
-    {
-        $result = $this->view->renderLoginPage(null, null, 123456, false, 'reply', '5', '10');
-
-        $this->assertStringContainsString('name="mode" value="reply"', $result);
-        $this->assertStringContainsString('name="f" value="5"', $result);
-        $this->assertStringContainsString('name="t" value="10"', $result);
-    }
-
     public function testRenderLoginPageShowsErrorWhenProvided(): void
     {
-        $result = $this->view->renderLoginPage('Login failed', null, 123456, false);
+        $result = $this->view->renderLoginPage('Login failed', 123456, false);
 
         $this->assertStringContainsString('ibl-alert--error', $result);
         $this->assertStringContainsString('Login was incorrect', $result);
@@ -83,29 +74,14 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderLoginPageHidesErrorWhenNull(): void
     {
-        $result = $this->view->renderLoginPage(null, null, 123456, false);
+        $result = $this->view->renderLoginPage(null, 123456, false);
 
         $this->assertStringNotContainsString('ibl-alert--error', $result);
     }
 
-    public function testRenderLoginPageIncludesRedirect(): void
-    {
-        $result = $this->view->renderLoginPage(null, 'Trading', 123456, false);
-
-        $this->assertStringContainsString('name="redirect" value="Trading"', $result);
-    }
-
-    public function testRenderLoginPageEscapesRedirect(): void
-    {
-        $result = $this->view->renderLoginPage(null, '"><script>xss</script>', 123456, false);
-
-        $this->assertStringNotContainsString('<script>xss</script>', $result);
-        $this->assertStringContainsString('&lt;script&gt;', $result);
-    }
-
     public function testRenderLoginPageShowsCaptchaWhenEnabled(): void
     {
-        $result = $this->view->renderLoginPage(null, null, 999, true);
+        $result = $this->view->renderLoginPage(null, 999, true);
 
         $this->assertStringContainsString('name="gfx_check"', $result);
         $this->assertStringContainsString('name="random_num" value="999"', $result);
@@ -114,14 +90,14 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderLoginPageHidesCaptchaWhenDisabled(): void
     {
-        $result = $this->view->renderLoginPage(null, null, 999, false);
+        $result = $this->view->renderLoginPage(null, 999, false);
 
         $this->assertStringNotContainsString('name="gfx_check"', $result);
     }
 
     public function testRenderLoginPageContainsCrossNavLinks(): void
     {
-        $result = $this->view->renderLoginPage(null, null, 123456, false);
+        $result = $this->view->renderLoginPage(null, 123456, false);
 
         $this->assertStringContainsString('Forgot password?', $result);
         $this->assertStringContainsString('Create an account', $result);
@@ -131,7 +107,7 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderLoginPageContainsLogo(): void
     {
-        $result = $this->view->renderLoginPage(null, null, 123456, false);
+        $result = $this->view->renderLoginPage(null, 123456, false);
 
         $this->assertStringContainsString('auth-logo', $result);
         $this->assertStringContainsString('auth-logo__icon', $result);
@@ -406,34 +382,6 @@ class YourAccountViewTest extends TestCase
         $this->assertStringContainsString('auth-status__icon--error', $result);
         $this->assertStringContainsString('expired', $result);
         $this->assertStringContainsString('Register Again', $result);
-    }
-
-    // =========================================================================
-    // Logout Page
-    // =========================================================================
-
-    public function testRenderLogoutPageShowsMessage(): void
-    {
-        $result = $this->view->renderLogoutPage(null);
-
-        $this->assertStringContainsString('auth-status__icon--info', $result);
-        $this->assertStringContainsString('Logged Out', $result);
-        $this->assertStringContainsString('meta http-equiv="refresh"', $result);
-        $this->assertStringContainsString('index.php', $result);
-    }
-
-    public function testRenderLogoutPageUsesRedirect(): void
-    {
-        $result = $this->view->renderLogoutPage('Trading');
-
-        $this->assertStringContainsString('modules.php?name=Trading', $result);
-    }
-
-    public function testRenderLogoutPageUsesDefaultRedirectForEmpty(): void
-    {
-        $result = $this->view->renderLogoutPage('');
-
-        $this->assertStringContainsString('index.php', $result);
     }
 
     // =========================================================================

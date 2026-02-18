@@ -126,14 +126,10 @@ class YourAccountView
      * Render the login page.
      *
      * @param string|null $error Error message to display, or null for no error
-     * @param string|null $redirect Module to redirect to after login
      * @param int $randomNum Random number for CAPTCHA
      * @param bool $showCaptcha Whether to show the CAPTCHA field
-     * @param string $mode Forum mode parameter
-     * @param string $f Forum parameter
-     * @param string $t Forum topic parameter
      */
-    public function renderLoginPage(?string $error, ?string $redirect, int $randomNum, bool $showCaptcha, string $mode = '', string $f = '', string $t = ''): string
+    public function renderLoginPage(?string $error, int $randomNum, bool $showCaptcha): string
     {
         ob_start();
         ?>
@@ -179,20 +175,6 @@ class YourAccountView
                     </label>
                 </div>
 
-                <?php
-                /** @var string $safeRedirect */
-                $safeRedirect = HtmlSanitizer::safeHtmlOutput($redirect ?? '');
-                /** @var string $safeMode */
-                $safeMode = HtmlSanitizer::safeHtmlOutput($mode);
-                /** @var string $safeF */
-                $safeF = HtmlSanitizer::safeHtmlOutput($f);
-                /** @var string $safeT */
-                $safeT = HtmlSanitizer::safeHtmlOutput($t);
-                ?>
-                <input type="hidden" name="redirect" value="<?= $safeRedirect ?>">
-                <input type="hidden" name="mode" value="<?= $safeMode ?>">
-                <input type="hidden" name="f" value="<?= $safeF ?>">
-                <input type="hidden" name="t" value="<?= $safeT ?>">
                 <?= CsrfGuard::generateToken('login') ?>
                 <input type="hidden" name="op" value="login">
                 <button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--block">Sign In</button>
@@ -592,44 +574,6 @@ class YourAccountView
                 <div class="auth-status__message"><?= $message ?></div>
                 <div class="auth-status__action">
                     <a href="modules.php?name=YourAccount&amp;op=new_user" class="ibl-btn ibl-btn--primary">Register Again</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-        <?php
-        return (string) ob_get_clean();
-    }
-
-    /**
-     * Render the logout page with auto-redirect.
-     */
-    public function renderLogoutPage(?string $redirect): string
-    {
-        if ($redirect !== null && $redirect !== '') {
-            $redirectUrl = 'modules.php?name=' . urlencode($redirect);
-        } else {
-            $redirectUrl = 'index.php';
-        }
-        /** @var string $safeRedirectUrl */
-        $safeRedirectUrl = HtmlSanitizer::safeHtmlOutput($redirectUrl);
-
-        ob_start();
-        ?>
-<meta http-equiv="refresh" content="3;URL=<?= $safeRedirectUrl ?>">
-<div class="auth-page">
-    <div class="auth-card ibl-card">
-        <div class="ibl-card__body">
-            <div class="auth-status">
-                <div class="auth-status__icon auth-status__icon--info">
-                    <?= $this->infoIcon() ?>
-                </div>
-                <div class="auth-status__title">Logged Out</div>
-                <div class="auth-status__message">
-                    You have been logged out successfully. Redirecting you shortly&hellip;
-                </div>
-                <div class="auth-status__action">
-                    <a href="<?= $safeRedirectUrl ?>" class="ibl-btn ibl-btn--ghost">Go Now</a>
                 </div>
             </div>
         </div>

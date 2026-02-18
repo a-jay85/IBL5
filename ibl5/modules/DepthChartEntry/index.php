@@ -19,16 +19,9 @@ function userinfo($username)
 
 function main($user)
 {
-    global $stop;
     if (!is_user($user)) {
-        Nuke\Header::header();
-        echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
-        echo "<br>";
-        if (!is_user($user)) {
-            loginbox();
-        }
-        Nuke\Footer::footer();
-    } elseif (is_user($user)) {
+        loginbox();
+    } else {
         global $cookie;
         cookiedecode($user);
         userinfo($cookie[1]);

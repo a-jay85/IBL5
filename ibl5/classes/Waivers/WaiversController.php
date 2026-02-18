@@ -56,12 +56,12 @@ class WaiversController implements WaiversControllerInterface
      */
     public function handleWaiverRequest($user, string $action): void
     {
-        $season = new \Season($this->db);
-
         if (!is_user($user)) {
-            $this->handleNotLoggedIn();
+            loginbox();
             return;
         }
+
+        $season = new \Season($this->db);
 
         if ($season->allowWaivers !== "Yes") {
             $this->view->renderWaiversClosed();
@@ -73,16 +73,6 @@ class WaiversController implements WaiversControllerInterface
         $username = (string) ($cookie[1] ?? '');
         $this->executeWaiverOperation($username, $action);
     }
-
-    private function handleNotLoggedIn(): void
-    {
-        /** @var mixed $stop */
-        global $stop;
-
-        /** @var string $message */
-        $message = ($stop !== null && $stop !== false && $stop !== 0 && $stop !== '' && $stop !== '0') ? _LOGININCOR : _USERREGLOGIN;
-        $this->view->renderNotLoggedIn($message);
-    }
     
     /**
      * @see WaiversControllerInterface::executeWaiverOperation()
@@ -92,9 +82,7 @@ class WaiversController implements WaiversControllerInterface
         $userInfo = $this->commonRepository->getUserByUsername($username);
 
         if ($userInfo === null) {
-            /** @var string $loginMessage */
-            $loginMessage = _USERREGLOGIN;
-            $this->view->renderNotLoggedIn($loginMessage);
+            loginbox();
             return;
         }
 

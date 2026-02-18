@@ -22,7 +22,11 @@ use NextSim\NextSimView;
 use Standings\StandingsRepository;
 use TeamSchedule\TeamScheduleRepository;
 
-global $db, $cookie, $mysqli_db;
+global $db, $cookie, $user, $mysqli_db;
+
+if (!is_user($user)) {
+    loginbox();
+}
 
 $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 $season = new Season($mysqli_db);
@@ -44,7 +48,7 @@ foreach ($allStreakData as $tid => $data) {
 Nuke\Header::header();
 
 $username = strval($cookie[1] ?? '');
-$userTeamName = $commonRepository->getTeamnameFromUsername($username);
+$userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
 $userTeam = Team::initialize($mysqli_db, $userTeamName);
 $league = new League($mysqli_db);
 

@@ -74,16 +74,16 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
 }
 
 /**
- * Main entry point - validate user and display interface
+ * Main entry point - display interface for all users (no login required)
  */
 function main($user): void
 {
-    if (!is_user($user)) {
-        loginbox();
-    } else {
+    if (is_user($user)) {
         global $cookie;
         cookiedecode($user);
         userinfo($cookie[1]);
+    } else {
+        userinfo('', 1);
     }
 }
 

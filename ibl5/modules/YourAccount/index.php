@@ -113,7 +113,8 @@ function finishNewUser(): void
     try {
         // Register via delight-im/auth with email verification callback
         $authService->register($user_email, $user_password, $username, static function (string $selector, string $token) use ($sitename, $adminmail, $nukeurl, $module_name, $user_email, $username): void {
-            $finishlink = rtrim($nukeurl, '/') . "/ibl5/modules.php?name=$module_name&op=confirm_email&selector=" . urlencode($selector) . "&token=" . urlencode($token);
+            $baseUrl = str_replace('http://', 'https://', rtrim($nukeurl, '/'));
+            $finishlink = "$baseUrl/ibl5/modules.php?name=$module_name&op=confirm_email&selector=" . urlencode($selector) . "&token=" . urlencode($token);
             $message = "" . _WELCOMETO . " $sitename!\n\n" . _YOUUSEDEMAIL . " ($user_email) " . _TOREGISTER . " $sitename.\n\n " . _TOFINISHUSER . "\n\n $finishlink\n\n " . _FOLLOWINGMEM . "\n\n" . _UNICKNAME . " $username";
             $subject = "" . _ACTIVATIONSUB . "";
             \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);
@@ -358,7 +359,8 @@ function mail_password()
 
     // Use delight-im/auth's built-in password reset with secure tokens
     $authService->forgotPassword($user_email, static function (string $selector, string $token) use ($sitename, $adminmail, $nukeurl, $module_name, $user_email): void {
-        $resetLink = rtrim($nukeurl, '/') . "/ibl5/modules.php?name=$module_name&op=reset_password&selector=" . urlencode($selector) . "&token=" . urlencode($token);
+        $baseUrl = str_replace('http://', 'https://', rtrim($nukeurl, '/'));
+        $resetLink = "$baseUrl/ibl5/modules.php?name=$module_name&op=reset_password&selector=" . urlencode($selector) . "&token=" . urlencode($token);
         $message = "A password reset was requested for your account at $sitename.\n\n"
             . "Click the link below to reset your password:\n\n$resetLink\n\n"
             . "This link will expire in 6 hours.\n\n"

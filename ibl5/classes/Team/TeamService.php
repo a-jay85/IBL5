@@ -182,12 +182,41 @@ class TeamService implements TeamServiceInterface
     }
 
     /**
-     * Render the appropriate table HTML based on display type
+     * @see TeamServiceInterface::getRosterAndStarters()
+     * @return array{roster: list<array<string, mixed>>, starterPids: list<int>}
+     */
+    public function getRosterAndStarters(int $teamID): array
+    {
+        $season = new \Season($this->db);
+        $isFreeAgency = $season->isFreeAgencyPhase();
+
+        if ($isFreeAgency) {
+            $result = $this->repository->getFreeAgencyRoster($teamID);
+        } else {
+            $result = $this->repository->getRosterUnderContract($teamID);
+        }
+
+        /** @var list<int> $starterPids */
+        $starterPids = [];
+        if ($teamID > 0) {
+            $starters = $this->extractStartersData($result);
+            foreach ($starters as $data) {
+                if ($data['pid'] !== null) {
+                    $starterPids[] = $data['pid'];
+                }
+            }
+        }
+
+        return ['roster' => $result, 'starterPids' => $starterPids];
+    }
+
+    /**
+     * @see TeamServiceInterface::renderTableForDisplay()
      *
      * @param list<PlayerRow>|list<array<string, mixed>> $result
      * @param list<int> $starterPids
      */
-    private function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, array $starterPids = []): string
+    public function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, array $starterPids = []): string
     {
         $yrStr = $yr ?? '';
         switch ($display) {

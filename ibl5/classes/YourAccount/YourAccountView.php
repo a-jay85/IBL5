@@ -602,44 +602,6 @@ class YourAccountView
     }
 
     /**
-     * Render the logout page with auto-redirect.
-     */
-    public function renderLogoutPage(?string $redirect): string
-    {
-        if ($redirect !== null && $redirect !== '') {
-            $redirectUrl = 'modules.php?name=' . urlencode($redirect);
-        } else {
-            $redirectUrl = 'index.php';
-        }
-        /** @var string $safeRedirectUrl */
-        $safeRedirectUrl = HtmlSanitizer::safeHtmlOutput($redirectUrl);
-
-        ob_start();
-        ?>
-<meta http-equiv="refresh" content="3;URL=<?= $safeRedirectUrl ?>">
-<div class="auth-page">
-    <div class="auth-card ibl-card">
-        <div class="ibl-card__body">
-            <div class="auth-status">
-                <div class="auth-status__icon auth-status__icon--info">
-                    <?= $this->infoIcon() ?>
-                </div>
-                <div class="auth-status__title">Logged Out</div>
-                <div class="auth-status__message">
-                    You have been logged out successfully. Redirecting you shortly&hellip;
-                </div>
-                <div class="auth-status__action">
-                    <a href="<?= $safeRedirectUrl ?>" class="ibl-btn ibl-btn--ghost">Go Now</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-        <?php
-        return (string) ob_get_clean();
-    }
-
-    /**
      * Render a "user not found" error page for password reset.
      */
     public function renderUserNotFoundPage(): string

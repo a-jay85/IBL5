@@ -409,34 +409,6 @@ class YourAccountViewTest extends TestCase
     }
 
     // =========================================================================
-    // Logout Page
-    // =========================================================================
-
-    public function testRenderLogoutPageShowsMessage(): void
-    {
-        $result = $this->view->renderLogoutPage(null);
-
-        $this->assertStringContainsString('auth-status__icon--info', $result);
-        $this->assertStringContainsString('Logged Out', $result);
-        $this->assertStringContainsString('meta http-equiv="refresh"', $result);
-        $this->assertStringContainsString('index.php', $result);
-    }
-
-    public function testRenderLogoutPageUsesRedirect(): void
-    {
-        $result = $this->view->renderLogoutPage('Trading');
-
-        $this->assertStringContainsString('modules.php?name=Trading', $result);
-    }
-
-    public function testRenderLogoutPageUsesDefaultRedirectForEmpty(): void
-    {
-        $result = $this->view->renderLogoutPage('');
-
-        $this->assertStringContainsString('index.php', $result);
-    }
-
-    // =========================================================================
     // User Not Found Page
     // =========================================================================
 

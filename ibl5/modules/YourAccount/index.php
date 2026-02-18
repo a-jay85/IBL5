@@ -280,11 +280,9 @@ function logout()
     }
     $user = "";
     $cookie = "";
-    Nuke\Header::header();
-    $accountView = new \YourAccount\YourAccountView();
-    $validRedirect = (is_string($redirect) && preg_match('/^[A-Za-z0-9_]+$/', $redirect) === 1) ? $redirect : null;
-    echo $accountView->renderLogoutPage($validRedirect);
-    Nuke\Footer::footer();
+    $_SESSION['flash_success'] = 'You have successfully logged out.';
+    Header("Location: index.php");
+    exit;
 }
 
 function reset_password_form()

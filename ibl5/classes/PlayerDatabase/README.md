@@ -126,6 +126,6 @@ cd ibl5 && vendor/bin/phpunit tests/PlayerDatabase/
 
 ## Related Documentation
 
-- [DEVELOPMENT_GUIDE.md](../../DEVELOPMENT_GUIDE.md) - Overall development standards
+- [DEVELOPMENT_GUIDE.md](../../docs/DEVELOPMENT_GUIDE.md) - Overall development standards
 - [DepthChartEntry SECURITY.md](../DepthChartEntry/SECURITY.md) - Security patterns reference
 - [Leaderboards README](../Leaderboards/) - Similar refactoring pattern

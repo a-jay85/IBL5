@@ -14,7 +14,7 @@ Update documentation incrementally during refactoring PRs.
 | `ibl5/docs/STRATEGIC_PRIORITIES.md` | Module completion summaries | Mark module complete |
 | `ibl5/docs/REFACTORING_HISTORY.md` | Detailed refactoring timeline | Add entry for each module |
 | `ibl5/classes/ModuleName/README.md` | Component architecture | Create during refactoring |
-| `DEVELOPMENT_GUIDE.md` | Status counts, priorities | Update module counts |
+| `ibl5/docs/DEVELOPMENT_GUIDE.md` | Status counts, priorities | Update module counts |
 
 ## PR Documentation Checklist
 
@@ -90,10 +90,8 @@ $result = $service->doSomething($params);
 
 ### 4. Update DEVELOPMENT_GUIDE.md
 
-- Increment module count: "15/23" → "16/23"
-- Update percentage: "65% complete" → "70% complete"
-- Move module from priorities to completed
 - Update test count if changed
+- Update module completion status
 
 ## File Naming Standards
 

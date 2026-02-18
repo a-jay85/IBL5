@@ -75,8 +75,8 @@ After refactoring, compare localhost against iblhoops.net. Output must match exa
 
 ## Resources
 
-- [DEVELOPMENT_GUIDE.md](../DEVELOPMENT_GUIDE.md) - Status & priorities
-- [DATABASE_GUIDE.md](../DATABASE_GUIDE.md) - Schema reference
+- [DEVELOPMENT_GUIDE.md](../ibl5/docs/DEVELOPMENT_GUIDE.md) - Status & priorities
+- [DATABASE_GUIDE.md](../ibl5/docs/DATABASE_GUIDE.md) - Schema reference
 - [SKILLS_GUIDE.md](SKILLS_GUIDE.md) - Progressive loading architecture
 - `.claude/rules/` - Path-conditional rules (auto-load by file)
 - `.github/skills/` - Task-discovery skills (auto-load by intent)

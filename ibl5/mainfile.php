@@ -91,7 +91,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
     // Set secure session cookie options
     session_set_cookie_params([
-        'lifetime' => 0,               // Session cookie (expires on browser close)
+        'lifetime' => 604800,
         'path' => '/',
         'domain' => '',
         'secure' => $isHttps,          // Only HTTPS

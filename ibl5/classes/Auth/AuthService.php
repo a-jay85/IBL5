@@ -363,7 +363,7 @@ class AuthService implements AuthServiceInterface
             // Don't reveal account status — silently succeed
         } catch (TooManyRequestsException) {
             $this->lastError = 'Too many requests. Please try again later.';
-        } catch (AuthError $e) {
+        } catch (AuthError) {
             $this->lastError = 'An error occurred. Please try again later.';
         }
     }

@@ -769,8 +769,8 @@ Based on analysis of foreign key constraints and current production schema statu
 ## Documentation Structure
 
 **Active Documentation:**
-- **DATABASE_OPTIMIZATION_GUIDE.md** - Authoritative optimization reference
-- **DATABASE_GUIDE.md** - Developer quick reference
+- **[DATABASE_OPTIMIZATION_GUIDE.md](../docs/archive/DATABASE_OPTIMIZATION_GUIDE.md)** - Optimization reference (archived)
+- **[DATABASE_GUIDE.md](../docs/DATABASE_GUIDE.md)** - Developer quick reference
 - **ibl5/migrations/README.md** - This file
 - **MIGRATION_004_FIXES.md** - Migration 004 correction details
 
@@ -783,7 +783,7 @@ Based on analysis of foreign key constraints and current production schema statu
 ## Support
 
 For issues or questions:
-1. Check DATABASE_OPTIMIZATION_GUIDE.md for current strategy
+1. Check `docs/archive/DATABASE_OPTIMIZATION_GUIDE.md` for historical optimization strategy
 2. Check troubleshooting section above
 3. Review logs: `/var/log/mysql/error.log`
 4. Check application logs

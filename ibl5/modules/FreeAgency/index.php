@@ -47,7 +47,7 @@ function display()
     Nuke\Header::header();
 
     $username = strval($cookie[1] ?? '');
-    $teamName = $commonRepository->getTeamnameFromUsername($username);
+    $teamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
     $team = Team::initialize($mysqli_db, $teamName);
 
     // Service assembles data, view renders it
@@ -74,8 +74,8 @@ function negotiate($pid)
 
     // Get user team information (must be after header() which populates $cookie)
     $username = strval($cookie[1] ?? '');
-    $userTeamName = $commonRepository->getTeamnameFromUsername($username);
-    $teamID = $commonRepository->getTidFromTeamname($userTeamName);
+    $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
+    $teamID = $commonRepository->getTidFromTeamname($userTeamName) ?? 0;
 
     $team = \Team::initialize($mysqli_db, $teamID);
     $season = new Season($mysqli_db);

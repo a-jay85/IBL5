@@ -6,6 +6,7 @@ namespace LeagueSchedule;
 
 use LeagueSchedule\Contracts\LeagueScheduleRepositoryInterface;
 use LeagueSchedule\Contracts\LeagueScheduleServiceInterface;
+use StrengthOfSchedule\StrengthOfScheduleCalculator;
 
 /**
  * LeagueScheduleService - Business logic for league-wide schedule display
@@ -23,9 +24,17 @@ class LeagueScheduleService implements LeagueScheduleServiceInterface
 {
     private LeagueScheduleRepositoryInterface $repository;
 
-    public function __construct(LeagueScheduleRepositoryInterface $repository)
+    /** @var array<int, float> Power rankings by team ID (0.0-100.0) */
+    private array $teamPowerRankings;
+
+    /**
+     * @param LeagueScheduleRepositoryInterface $repository
+     * @param array<int, float> $teamPowerRankings Optional power rankings for SOS tier indicators
+     */
+    public function __construct(LeagueScheduleRepositoryInterface $repository, array $teamPowerRankings = [])
     {
         $this->repository = $repository;
+        $this->teamPowerRankings = $teamPowerRankings;
     }
 
     /**
@@ -89,6 +98,13 @@ class LeagueScheduleService implements LeagueScheduleServiceInterface
             $visitorTeam = $commonRepo->getTeamnameFromTeamID($visitor);
             $homeTeam = $commonRepo->getTeamnameFromTeamID($home);
 
+            $visitorTier = $this->teamPowerRankings !== []
+                ? StrengthOfScheduleCalculator::assignTier($this->teamPowerRankings[$visitor] ?? 0.0)
+                : '';
+            $homeTier = $this->teamPowerRankings !== []
+                ? StrengthOfScheduleCalculator::assignTier($this->teamPowerRankings[$home] ?? 0.0)
+                : '';
+
             $gamesByMonth[$monthKey]['dates'][$date][] = [
                 'date' => $date,
                 'visitor' => $visitor,
@@ -106,6 +122,8 @@ class LeagueScheduleService implements LeagueScheduleServiceInterface
                 'isUpcoming' => $isUpcoming,
                 'visitorWon' => ($visitorScore > $homeScore),
                 'homeWon' => ($homeScore > $visitorScore),
+                'visitorTier' => $visitorTier,
+                'homeTier' => $homeTier,
             ];
         }
 

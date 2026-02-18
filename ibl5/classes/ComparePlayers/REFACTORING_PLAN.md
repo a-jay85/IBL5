@@ -333,8 +333,8 @@ ibl5/tests/ComparePlayers/
 ## Related Files
 
 - **Schema**: `ibl5/schema.sql` (ibl_plr table)
-- **Database Guide**: `DATABASE_GUIDE.md`
-- **Development Guide**: `DEVELOPMENT_GUIDE.md`
+- **Database Guide**: `ibl5/docs/DATABASE_GUIDE.md`
+- **Development Guide**: `ibl5/docs/DEVELOPMENT_GUIDE.md`
 - **Reference Modules**: PlayerDatabase, FreeAgency, Player
 - **Service Class**: `ibl5/classes/Services/DatabaseService.php`
 

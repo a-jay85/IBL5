@@ -111,7 +111,7 @@ class StandingsViewTest extends TestCase
         $this->mockRepository->method('getStandingsByRegion')
             ->willReturn($teamData);
         $this->mockRepository->method('getAllStreakData')
-            ->willReturn([1 => ['last_win' => 5, 'last_loss' => 5, 'streak_type' => 'W', 'streak' => 2, 'ranking' => 10]]);
+            ->willReturn([1 => ['last_win' => 5, 'last_loss' => 5, 'streak_type' => 'W', 'streak' => 2, 'ranking' => 10, 'sos' => 0.500, 'remaining_sos' => 0.480, 'sos_rank' => 5, 'remaining_sos_rank' => 8]]);
         $this->mockRepository->method('getAllPythagoreanStats')
             ->willReturn([1 => ['pointsScored' => 2000, 'pointsAllowed' => 1800]]);
 
@@ -151,7 +151,7 @@ class StandingsViewTest extends TestCase
         $this->mockRepository->method('getStandingsByRegion')
             ->willReturn($teamData);
         $this->mockRepository->method('getAllStreakData')
-            ->willReturn([1 => ['last_win' => 5, 'last_loss' => 5, 'streak_type' => 'W', 'streak' => 2, 'ranking' => 10]]);
+            ->willReturn([1 => ['last_win' => 5, 'last_loss' => 5, 'streak_type' => 'W', 'streak' => 2, 'ranking' => 10, 'sos' => 0.500, 'remaining_sos' => 0.480, 'sos_rank' => 5, 'remaining_sos_rank' => 8]]);
         $this->mockRepository->method('getAllPythagoreanStats')
             ->willReturn([1 => ['pointsScored' => 2000, 'pointsAllowed' => 1800]]);
 
@@ -228,7 +228,7 @@ class StandingsViewTest extends TestCase
         $this->mockRepository->method('getStandingsByRegion')
             ->willReturn($teamData);
         $this->mockRepository->method('getAllStreakData')
-            ->willReturn([1 => ['last_win' => 8, 'last_loss' => 2, 'streak_type' => 'W', 'streak' => 5, 'ranking' => 3]]);
+            ->willReturn([1 => ['last_win' => 8, 'last_loss' => 2, 'streak_type' => 'W', 'streak' => 5, 'ranking' => 3, 'sos' => 0.550, 'remaining_sos' => 0.520, 'sos_rank' => 3, 'remaining_sos_rank' => 4]]);
         $this->mockRepository->method('getAllPythagoreanStats')
             ->willReturn([1 => ['pointsScored' => 2000, 'pointsAllowed' => 1800]]);
 
@@ -265,7 +265,7 @@ class StandingsViewTest extends TestCase
         $this->mockRepository->method('getStandingsByRegion')
             ->willReturn($teamData);
         $this->mockRepository->method('getAllStreakData')
-            ->willReturn([1 => ['last_win' => 7, 'last_loss' => 3, 'streak_type' => 'W', 'streak' => 3, 'ranking' => 5]]);
+            ->willReturn([1 => ['last_win' => 7, 'last_loss' => 3, 'streak_type' => 'W', 'streak' => 3, 'ranking' => 5, 'sos' => 0.480, 'remaining_sos' => 0.510, 'sos_rank' => 7, 'remaining_sos_rank' => 6]]);
         $this->mockRepository->method('getAllPythagoreanStats')
             ->willReturn([1 => ['pointsScored' => 2000, 'pointsAllowed' => 1800]]);
 
@@ -302,7 +302,7 @@ class StandingsViewTest extends TestCase
         $this->mockRepository->method('getStandingsByRegion')
             ->willReturn($teamData);
         $this->mockRepository->method('getAllStreakData')
-            ->willReturn([1 => ['last_win' => 6, 'last_loss' => 4, 'streak_type' => 'L', 'streak' => 1, 'ranking' => 15]]);
+            ->willReturn([1 => ['last_win' => 6, 'last_loss' => 4, 'streak_type' => 'L', 'streak' => 1, 'ranking' => 15, 'sos' => 0.450, 'remaining_sos' => 0.490, 'sos_rank' => 10, 'remaining_sos_rank' => 9]]);
         $this->mockRepository->method('getAllPythagoreanStats')
             ->willReturn([1 => ['pointsScored' => 2000, 'pointsAllowed' => 1800]]);
 
@@ -347,6 +347,47 @@ class StandingsViewTest extends TestCase
 
         // Should not throw an error; should display 0-0 for last 10
         $this->assertStringContainsString('0-0', $result);
+    }
+
+    public function testRenderRegionDisplaysSosColumns(): void
+    {
+        $teamData = [
+            [
+                'tid' => 1,
+                'team_name' => 'Celtics',
+                'leagueRecord' => '5-3',
+                'pct' => '0.625',
+                'gamesBack' => '0.0',
+                'magicNumber' => 75,
+                'gamesUnplayed' => 74,
+                'confRecord' => '3-2',
+                'divRecord' => '1-1',
+                'homeRecord' => '3-1',
+                'awayRecord' => '2-2',
+                'homeGames' => 4,
+                'awayGames' => 4,
+                'clinchedConference' => 0,
+                'clinchedDivision' => 0,
+                'clinchedPlayoffs' => 0,
+                'color1' => '000000',
+                'color2' => 'FFFFFF',
+            ],
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')
+            ->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')
+            ->willReturn([1 => ['last_win' => 5, 'last_loss' => 5, 'streak_type' => 'W', 'streak' => 2, 'ranking' => 10, 'sos' => 0.523, 'remaining_sos' => 0.471, 'sos_rank' => 4, 'remaining_sos_rank' => 12]]);
+        $this->mockRepository->method('getAllPythagoreanStats')
+            ->willReturn([1 => ['pointsScored' => 2000, 'pointsAllowed' => 1800]]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        // Header columns
+        $this->assertStringContainsString('SOS', $result);
+        // Data values (3 decimal places)
+        $this->assertStringContainsString('0.523', $result);
+        $this->assertStringContainsString('0.471', $result);
     }
 
     public function testRenderRegionEscapesTeamName(): void

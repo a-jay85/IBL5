@@ -11,7 +11,7 @@ namespace Standings\Contracts;
  * Implementations must provide data for conferences, divisions, and team streaks.
  *
  * @phpstan-type StandingsRow array{tid: int, team_name: string, leagueRecord: string, pct: string, gamesBack: string, confRecord: string, divRecord: string, homeRecord: string, awayRecord: string, gamesUnplayed: int, magicNumber: int|string, clinchedConference: int, clinchedDivision: int, clinchedPlayoffs: int, homeGames: int, awayGames: int, color1: string, color2: string}
- * @phpstan-type StreakRow array{last_win: int, last_loss: int, streak_type: string, streak: int, ranking: int}
+ * @phpstan-type StreakRow array{last_win: int, last_loss: int, streak_type: string, streak: int, ranking: int, sos: float|string, remaining_sos: float|string, sos_rank: int, remaining_sos_rank: int}
  * @phpstan-type PythagoreanStats array{pointsScored: int, pointsAllowed: int}
  *
  * @see \Standings\StandingsRepository For the concrete implementation

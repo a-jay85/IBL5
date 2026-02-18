@@ -320,17 +320,19 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
             $this->execute(
                 "INSERT INTO ibl_standings (
-                    tid, team_name, leagueRecord, pct, gamesUnplayed,
+                    tid, team_name, leagueRecord, wins, losses, pct, gamesUnplayed,
                     conference, confGB, confRecord,
                     division, divGB, divRecord,
                     homeRecord, awayRecord,
                     confWins, confLosses, divWins, divLosses,
                     homeWins, homeLosses, awayWins, awayLosses
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                "issdisdssdsssiiiiiiii",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "issiidisdssdsssiiiiiiii",
                 $team['tid'],
                 $team['teamName'],
                 $leagueRecord,
+                $team['wins'],
+                $team['losses'],
                 $pct,
                 $gamesUnplayed,
                 $team['conference'],

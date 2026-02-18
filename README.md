@@ -1,95 +1,111 @@
 # IBL5 - Internet Basketball League
 
-Internet-based fantasy basketball site powered by Jump Shot Basketball simulation engine.
+A fantasy basketball league website powered by the Jump Shot Basketball simulation engine. Managers draft, trade, and manage rosters of simulated players competing in a structured league season.
 
-## 🚀 Quick Start by Role
+## Tech Stack
 
-### 👨‍💻 Application Developer
-1. [**DEVELOPMENT_GUIDE.md**](DEVELOPMENT_GUIDE.md) - Priorities, testing, refactoring workflow
-2. [**DATABASE_GUIDE.md**](DATABASE_GUIDE.md) - Schema, tables, query patterns
-3. [**API_GUIDE.md**](API_GUIDE.md) - API design, authentication, caching
+- **Backend:** PHP 8.3, MariaDB 10.6
+- **Local Dev:** MAMP (macOS)
+- **Testing:** PHPUnit 12, PHPStan (level max + strict-rules + bleedingEdge)
+- **CI/CD:** GitHub Actions
+- **Frontend:** Tailwind CSS 4, vanilla JS
 
-### 🗄️ Database Administrator
-1. [**DATABASE_OPTIMIZATION_GUIDE.md**](DATABASE_OPTIMIZATION_GUIDE.md) - Schema optimization, migration roadmap
-2. [**ibl5/migrations/README.md**](ibl5/migrations/README.md) - Migration procedures
-3. [**DATABASE_GUIDE.md**](DATABASE_GUIDE.md) - Schema reference
+## Quick Start
 
-### 🚀 DevOps/Deployment
-1. [**PRODUCTION_DEPLOYMENT_GUIDE.md**](PRODUCTION_DEPLOYMENT_GUIDE.md) - Deployment procedures
-2. [**DATABASE_OPTIMIZATION_GUIDE.md**](DATABASE_OPTIMIZATION_GUIDE.md) - Database changes context
+```bash
+# 1. Clone
+git clone https://github.com/your-org/IBL5.git && cd IBL5
 
-## 📊 Current Status
+# 2. Install dependencies
+cd ibl5 && composer install
 
-**Code Quality:**
-- 15 IBL modules refactored (65% complete)
-- **Interface-driven architecture** implemented in PlayerDatabase, FreeAgency, Player (proven pattern)
-- 219 tests passing (596 assertions) 
-- ~48% test coverage (target: 80%)
-- Next priority: Compare_Players Module (403 lines)
+# 3. Configure database (MAMP must be running)
+cp classes/DatabaseConnection.php.template classes/DatabaseConnection.php
+# Edit DatabaseConnection.php with your MAMP credentials from config.php
 
-**Database:**
-- ✅ InnoDB (52 tables) - 10-100x faster
-- ✅ Foreign keys (24) - Data integrity
-- ✅ CHECK constraints (25) - Validation
-- ✅ API-ready - UUIDs, timestamps, views
-- ✅ Phases 1-4 complete
+# 4. Run tests
+vendor/bin/phpunit
+```
 
-## 📚 Documentation
+See [DEVELOPMENT_ENVIRONMENT.md](ibl5/docs/DEVELOPMENT_ENVIRONMENT.md) for detailed setup including MAMP configuration and dependency caching.
 
-**📖 [Complete Documentation Index](ibl5/docs/README.md)** - Navigate all documentation
+## Project Structure
 
-### Architecture & Best Practices
-- **[Interface-Driven Architecture Pattern](.github/copilot-instructions.md#%EF%B8%8F-critical-interface-driven-architecture-pattern)** - Interfaces as contracts in PlayerDatabase, FreeAgency, Player modules
-- [Copilot Coding Agent Instructions](.github/copilot-instructions.md) - Complete development standards
+```
+IBL5/
+├── ibl5/
+│   ├── classes/              # 30 modules (Repository/Service/View pattern)
+│   │   ├── Player/           #   Each module has Contracts/ for interfaces
+│   │   ├── FreeAgency/
+│   │   ├── Trading/
+│   │   └── ...
+│   ├── tests/                # PHPUnit test suites
+│   ├── docs/                 # Project documentation
+│   ├── migrations/           # SQL migration scripts
+│   ├── modules/              # Legacy PHP-Nuke entry points
+│   ├── db/                   # Database connection setup
+│   ├── design/               # CSS source files (Tailwind)
+│   └── schema.sql            # Database schema reference
+├── .claude/                  # Claude Code rules and skills
+├── .github/                  # CI/CD workflows, Copilot instructions
+└── CLAUDE.md                 # AI agent instructions
+```
 
-### Core Guides (Root)
-- [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) - Development standards & priorities
-- [DATABASE_GUIDE.md](DATABASE_GUIDE.md) - Schema reference for developers
-- [DATABASE_OPTIMIZATION_GUIDE.md](DATABASE_OPTIMIZATION_GUIDE.md) - Optimization roadmap
-- [API_GUIDE.md](API_GUIDE.md) - RESTful API development
-- [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md) - Deployment procedures
+## Architecture
 
-### Project Documentation (ibl5/docs/)
-- [REFACTORING_HISTORY.md](ibl5/docs/REFACTORING_HISTORY.md) - Complete refactoring timeline
-- [STRATEGIC_PRIORITIES.md](ibl5/docs/STRATEGIC_PRIORITIES.md) - Strategic analysis & next priorities
-- [STATISTICS_FORMATTING_GUIDE.md](ibl5/docs/STATISTICS_FORMATTING_GUIDE.md) - StatsFormatter usage
+All 30 IBL modules use an **interface-driven Repository/Service/View** pattern:
 
-### Component Documentation (With Code & Interfaces)
-- [PlayerDatabase/](ibl5/classes/PlayerDatabase/) - 4 interfaces, 4 classes, 54 tests, SQL injection fixed ✅
-- [FreeAgency/](ibl5/classes/FreeAgency/) - 7 interfaces, 6 classes, 11 tests ✅
-- [Player/](ibl5/classes/Player/) - 9 interfaces, 8 classes, 84 tests ✅
-- [Statistics/](ibl5/classes/Statistics/) - StatsFormatter and StatsSanitizer
-- [DepthChart/](ibl5/classes/DepthChart/) - Security patterns + SECURITY.md
-- [Draft/](ibl5/classes/Draft/) - Draft module
-- [Migrations/](ibl5/migrations/) - Database migration procedures
+```
+Module/
+├── Contracts/
+│   ├── ModuleRepositoryInterface.php
+│   ├── ModuleServiceInterface.php
+│   └── ModuleViewInterface.php
+├── ModuleRepository.php      # Database queries (prepared statements)
+├── ModuleService.php         # Business logic, validation
+└── ModuleView.php            # HTML rendering (XSS-protected)
+```
 
-### Historical Documents (.archive/)
-Previous completion summaries and detailed reports preserved for reference.
+See `ibl5/classes/Player/` for a canonical example.
 
-## 🤖 Skills Architecture (Progressive Loading)
+## Testing
 
-Context-aware skills auto-load when relevant, reducing token usage by 50-85%.
+```bash
+cd ibl5
 
-**Path-Conditional** (`.claude/rules/`):
-- Edit `classes/**/*.php` → loads [php-classes.md](.claude/rules/php-classes.md)
-- Edit `tests/**/*.php` → loads [phpunit-tests.md](.claude/rules/phpunit-tests.md)
-- Edit `*View.php` → loads [view-rendering.md](.claude/rules/view-rendering.md)
+# Run all tests
+vendor/bin/phpunit
 
-**Task-Discovery** (`.github/skills/`):
-- Refactoring → [refactoring-workflow/](.github/skills/refactoring-workflow/)
-- Security audit → [security-audit/](.github/skills/security-audit/)
-- Testing → [phpunit-testing/](.github/skills/phpunit-testing/)
-- Stats formatting → [basketball-stats/](.github/skills/basketball-stats/)
-- Code review → [code-review/](.github/skills/code-review/)
+# Run a specific module's tests
+vendor/bin/phpunit tests/Player/
 
-**Creating Skills:** See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md) for the validation checklist.
+# Run static analysis
+composer run analyse
+```
 
-## 🔍 Common Tasks
+**Current:** 2976 tests, 14387 assertions | PHPStan level max
 
-**"How do I refactor a module using interfaces?"** → [refactoring-workflow/](.github/skills/refactoring-workflow/)  
-**"How do I deploy to production?"** → [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md)  
-**"How do I query the database?"** → [DATABASE_GUIDE.md](DATABASE_GUIDE.md)  
-**"What should I work on next?"** → [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md)  
-**"How do I build an API endpoint?"** → [API_GUIDE.md](API_GUIDE.md)  
-**"How do I format statistics?"** → [basketball-stats/](.github/skills/basketball-stats/)  
-**"What's been refactored?"** → [REFACTORING_HISTORY.md](ibl5/docs/REFACTORING_HISTORY.md)
+## Documentation
+
+All project documentation lives in [`ibl5/docs/`](ibl5/docs/README.md):
+
+| Guide | Description |
+|-------|-------------|
+| [DEVELOPMENT_GUIDE.md](ibl5/docs/DEVELOPMENT_GUIDE.md) | Development standards and priorities |
+| [DATABASE_GUIDE.md](ibl5/docs/DATABASE_GUIDE.md) | Schema reference and query patterns |
+| [API_GUIDE.md](ibl5/docs/API_GUIDE.md) | REST API design (planned) |
+| [REFACTORING_HISTORY.md](ibl5/docs/REFACTORING_HISTORY.md) | Complete module refactoring timeline |
+| [STRATEGIC_PRIORITIES.md](ibl5/docs/STRATEGIC_PRIORITIES.md) | Post-refactoring roadmap |
+| [DEVELOPMENT_ENVIRONMENT.md](ibl5/docs/DEVELOPMENT_ENVIRONMENT.md) | MAMP setup, dependency caching |
+
+For AI agents, see [CLAUDE.md](CLAUDE.md).
+
+## Current Status
+
+| Metric | Value |
+|--------|-------|
+| Modules refactored | 30/30 (100%) |
+| Tests | 2976 (14387 assertions) |
+| Test coverage | ~80% |
+| Database | 52 InnoDB tables, 23 views, 84 legacy MyISAM |
+| Architecture | Interface-driven Repository/Service/View |

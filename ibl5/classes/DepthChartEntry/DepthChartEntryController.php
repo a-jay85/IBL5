@@ -6,11 +6,12 @@ namespace DepthChartEntry;
 
 use DepthChartEntry\Contracts\DepthChartEntryControllerInterface;
 use SavedDepthChart\SavedDepthChartService;
+use Team\Contracts\TeamServiceInterface;
+use Team\TeamRepository;
+use Team\TeamService;
 use UI\Components\TableViewSwitcher;
 
 /**
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
- *
  * @see DepthChartEntryControllerInterface
  */
 class DepthChartEntryController implements DepthChartEntryControllerInterface
@@ -19,6 +20,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     private DepthChartEntryRepository $repository;
     private DepthChartEntryView $view;
     private \Services\CommonMysqliRepository $commonRepository;
+    private TeamServiceInterface $teamService;
 
     public function __construct(\mysqli $db)
     {
@@ -26,8 +28,10 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $this->repository = new DepthChartEntryRepository($db);
         $this->view = new DepthChartEntryView();
         $this->commonRepository = new \Services\CommonMysqliRepository($db);
+        $teamRepository = new TeamRepository($db);
+        $this->teamService = new TeamService($db, $teamRepository);
     }
-    
+
     /**
      * @see DepthChartEntryControllerInterface::displayForm()
      */
@@ -97,7 +101,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
 
         \Nuke\Footer::footer();
     }
-    
+
     /**
      * @see DepthChartEntryControllerInterface::getTableOutput()
      */
@@ -106,8 +110,8 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $season = new \Season($this->db);
         $team = \Team::initialize($this->db, $teamID);
 
-        $teamName = $team->name;
-        $playersResult = $this->repository->getPlayersOnTeam($teamName, $teamID);
+        // Delegate roster + starters to TeamService (single source of truth)
+        $rosterData = $this->teamService->getRosterAndStarters($teamID);
 
         $tabDefinitions = [
             'ratings' => 'Ratings',
@@ -120,32 +124,9 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
 
         $baseUrl = 'modules.php?name=DepthChartEntry';
         $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $team->color1, $team->color2);
-        $tableHtml = $this->renderTableForDisplay($display, $playersResult, $team, $season);
+        $tableHtml = $this->teamService->renderTableForDisplay($display, $rosterData['roster'], $team, null, $season, $rosterData['starterPids']);
 
         return $switcher->wrap($tableHtml);
-    }
-
-    /**
-     * Render the appropriate table HTML based on display type
-     *
-     * @param list<PlayerRow> $result
-     */
-    private function renderTableForDisplay(string $display, array $result, \Team $team, \Season $season): string
-    {
-        switch ($display) {
-            case 'total_s':
-                return \UI::seasonTotals($this->db, $result, $team, '');
-            case 'avg_s':
-                return \UI::seasonAverages($this->db, $result, $team, '');
-            case 'per36mins':
-                return \UI::per36Minutes($this->db, $result, $team, '');
-            case 'chunk':
-                return \UI::periodAverages($this->db, $team, $season);
-            case 'contracts':
-                return \UI::contracts($this->db, $result, $team, $season);
-            default:
-                return \UI::ratings($this->db, $result, $team, '', $season);
-        }
     }
 
     private function getUserTeamName(string $username): string

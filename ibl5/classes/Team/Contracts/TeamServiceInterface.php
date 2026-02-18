@@ -72,4 +72,29 @@ interface TeamServiceInterface
      * @return string Complete table HTML with tab navigation
      */
     public function getTableOutput(int $teamID, ?string $yr, string $display): string;
+
+    /**
+     * Get roster data and starter PIDs for a team
+     *
+     * Encapsulates the roster-fetching + starterPids extraction logic so that
+     * other modules (e.g. DepthChartEntry) can reuse Team's roster data,
+     * including cash transaction placeholders and starter highlighting.
+     *
+     * @param int $teamID Team ID (>0 = specific team)
+     * @return array{roster: list<array<string, mixed>>, starterPids: list<int>}
+     */
+    public function getRosterAndStarters(int $teamID): array;
+
+    /**
+     * Render the appropriate table HTML based on display type
+     *
+     * @param string $display Display mode (ratings, total_s, avg_s, per36mins, chunk, playoffs, contracts)
+     * @param list<PlayerRow>|list<array<string, mixed>> $result Roster data
+     * @param \Team $team Team object
+     * @param ?string $yr Historical year (null for current)
+     * @param \Season $season Season object
+     * @param list<int> $starterPids Player IDs of starters for highlighting
+     * @return string Table HTML
+     */
+    public function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, array $starterPids = []): string;
 }

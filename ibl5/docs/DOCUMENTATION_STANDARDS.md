@@ -7,21 +7,20 @@
 
 ## Documentation Locations
 
-### 1. Root Directory (Essential Technical Guides Only)
-- Place ONLY core technical guides that developers need frequently
-- Maximum of 6-8 files to keep root uncluttered
-- Examples: README.md, DEVELOPMENT_GUIDE.md, DATABASE_GUIDE.md, API_GUIDE.md
-- **DO NOT** place completion summaries, strategic planning docs, or historical reports here
+### 1. Root Directory (Minimal)
+- **Only** `README.md` and `CLAUDE.md` live at the repo root
+- README.md is the project introduction; CLAUDE.md is AI agent instructions
+- **DO NOT** place guides, summaries, or technical docs at root
 
-### 2. `ibl5/docs/` (Project Documentation)
-- **Purpose**: Strategic planning, historical tracking, testing guides
+### 2. `ibl5/docs/` (All Project Documentation)
+- **Purpose**: Primary home for all project documentation
 - **Place here**:
-  - Strategic analysis documents (STRATEGIC_PRIORITIES.md)
+  - Development guides (DEVELOPMENT_GUIDE.md, DATABASE_GUIDE.md, API_GUIDE.md)
+  - Strategic planning documents (STRATEGIC_PRIORITIES.md)
   - Consolidated refactoring history (REFACTORING_HISTORY.md)
-  - Testing best practices (TEST_REFACTORING_SUMMARY.md)
-  - Process documentation
-  - Planning documents
-- **DO NOT** place component-specific or module-specific docs here
+  - Environment setup (DEVELOPMENT_ENVIRONMENT.md)
+  - Documentation standards (this file)
+- **DO NOT** place component-specific docs here
 
 ### 3. Component READMEs (With Code)
 - **Purpose**: Document specific classes, modules, or features
@@ -34,12 +33,16 @@
 - **When to create**: When refactoring a module or creating a new class
 - **Keep updated**: Update when module architecture changes
 
-### 4. `.archive/` (Historical Documents)
-- **Purpose**: Preserve completed work and superseded documentation
+### 4. `ibl5/docs/archive/` (Recent Historical Documents)
+- **Purpose**: Preserve recently completed work and superseded documentation
 - **Place here**:
-  - Completed refactoring summaries (after consolidating into REFACTORING_HISTORY.md)
+  - Completed optimization guides
   - Superseded guides or plans
-  - Historical completion reports
+  - Individual module refactoring summaries (after consolidating into REFACTORING_HISTORY.md)
+
+### 5. `.archive/` (Older Historical Documents)
+- **Purpose**: Preserve older historical documentation
+- Contains 40+ detailed refactoring summaries and completion reports
 - **DO NOT** delete historical docs - archive them for reference
 
 ---
@@ -60,9 +63,9 @@
 - Update `ibl5/docs/README.md` index
 
 **3. Technical Guides:**
-- Create in root directory only if essential and frequently referenced
+- Create in `ibl5/docs/` directory
 - Consider if content belongs in existing guide instead
-- Update main README.md navigation section
+- Update `ibl5/docs/README.md` index and main README.md if needed
 
 **4. Component Documentation:**
 - Create README.md in the class/module directory
@@ -108,7 +111,7 @@
 - Add examples where helpful
 
 ### Cross-References
-- Use relative paths: `../DEVELOPMENT_GUIDE.md` or `ibl5/docs/REFACTORING_HISTORY.md`
+- Use relative paths: `DEVELOPMENT_GUIDE.md` (same directory) or `../classes/Player/README.md`
 - Test all links before committing
 - Update all references when moving files
 
@@ -161,9 +164,9 @@
 **2. After PR Merge**:
 - Add key points to `ibl5/docs/REFACTORING_HISTORY.md` under "Completed Refactorings"
 - Create `ibl5/classes/FreeAgency/README.md` for component architecture
-- Move `FREE_AGENCY_REFACTORING_SUMMARY.md` to `.archive/`
+- Move `FREE_AGENCY_REFACTORING_SUMMARY.md` to `ibl5/docs/archive/` or `.archive/`
 - Update `ibl5/docs/README.md` index
-- Update `DEVELOPMENT_GUIDE.md` to mark FreeAgency as complete
+- Update `ibl5/docs/DEVELOPMENT_GUIDE.md` to mark FreeAgency as complete
 
 **3. Update References**:
 - Verify links in README.md
@@ -189,7 +192,7 @@
 - [ ] `STRATEGIC_PRIORITIES.md` updated with module completion summary
 - [ ] `REFACTORING_HISTORY.md` updated with detailed refactoring section
 - [ ] Component README.md created in `ibl5/classes/ModuleName/`
-- [ ] `DEVELOPMENT_GUIDE.md` updated (refactoring count, status)
+- [ ] `ibl5/docs/DEVELOPMENT_GUIDE.md` updated (refactoring count, status)
 - [ ] `ibl5/docs/README.md` updated if new docs created
 - [ ] All internal documentation links verified and working
 - [ ] No "TODO" comments about documentation left in code or docs

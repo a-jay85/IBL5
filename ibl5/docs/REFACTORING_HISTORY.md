@@ -659,9 +659,10 @@ All IBL5 modules have been refactored to the interface-driven architecture patte
 ## References
 
 ### Active Documentation
-- [DEVELOPMENT_GUIDE.md](../../DEVELOPMENT_GUIDE.md) - Current priorities and workflow
+- [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) - Current priorities and workflow
 - [STRATEGIC_PRIORITIES.md](STRATEGIC_PRIORITIES.md) - Strategic analysis and next priorities
 - [README.md](../../README.md) - Project overview
+
 
 ### Component Documentation
 - [Statistics README](../classes/Statistics/README.md) - StatsFormatter usage

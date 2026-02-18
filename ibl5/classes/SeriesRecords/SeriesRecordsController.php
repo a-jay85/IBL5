@@ -107,29 +107,25 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
     }
 
     /**
-     * Main entry point - handles authentication and routing
+     * Main entry point - display series records for all users (no login required)
      *
      * @param mixed $user The global $user cookie array
      * @return void
      */
     public function main(mixed $user): void
     {
-        /** @var array<int, string> $cookie */
-        global $cookie;
+        if (is_user($user)) {
+            /** @var array<int, string> $cookie */
+            global $cookie;
+            cookiedecode($user);
+            $username = $cookie[1] ?? '';
 
-        if (!is_user($user)) {
-            loginbox();
-            return;
+            if ($username !== '') {
+                $this->displayForUser($username);
+                return;
+            }
         }
 
-        cookiedecode($user);
-        $username = $cookie[1] ?? '';
-
-        if ($username === '') {
-            $this->displaySeriesRecords(0);
-            return;
-        }
-
-        $this->displayForUser($username);
+        $this->displaySeriesRecords(0);
     }
 }

@@ -24,11 +24,11 @@ Quick reference for frequently-used patterns not covered in CLAUDE.md.
 ```php
 $repo->getUserByUsername(string $username): ?array
 $repo->getTeamByName(string $teamName): ?array
-$repo->getPlayerByID(int $pid): ?array
-$repo->getTeamnameFromUsername(string $username): string  // Returns "Free Agents" if none
-$repo->getTidFromTeamname(string $teamName): int
+$repo->getPlayerByID(int $playerID): ?array
+$repo->getTeamnameFromUsername(?string $username): ?string  // Returns "Free Agents" if null/empty; null if not found
+$repo->getTidFromTeamname(string $teamName): ?int
 $repo->getTeamTotalSalary(string $teamName): int
-$repo->getTeamDiscordID(string $teamName): ?string
+$repo->getTeamDiscordID(string $teamName): ?int
 ```
 
 ## Validation Return Patterns

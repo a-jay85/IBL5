@@ -154,8 +154,8 @@ class NavigationView
         }
 
         return [
-            ['label' => 'Topics', 'url' => 'modules.php?name=Topics'],
-            ['label' => 'Create Account', 'url' => 'modules.php?name=YourAccount&op=new_user'],
+            ['label' => 'Sign Up', 'url' => 'modules.php?name=YourAccount&op=new_user'],
+            ['label' => 'Forgot Password', 'url' => 'modules.php?name=YourAccount&op=pass_lost'],
         ];
     }
 
@@ -165,7 +165,8 @@ class NavigationView
      */
     private function renderLoginForm(): string
     {
-        return '
+        ob_start();
+        ?>
         <div class="px-4 pt-4 pb-3">
             <form action="modules.php?name=YourAccount" method="post" class="space-y-3">
                 <!-- Username field -->
@@ -211,6 +212,7 @@ class NavigationView
                 </div>
 
                 <input type="hidden" name="op" value="login">
+                <?= \Utilities\CsrfGuard::generateToken('login') ?>
 
                 <!-- Submit button -->
                 <button
@@ -224,7 +226,8 @@ class NavigationView
 
         <!-- Divider -->
         <div class="border-t border-white/10 mx-4"></div>
-        ';
+        <?php
+        return (string) ob_get_clean();
     }
 
     /**
@@ -233,7 +236,8 @@ class NavigationView
      */
     private function renderMobileLoginForm(): string
     {
-        return '
+        ob_start();
+        ?>
         <div class="px-5 pt-4 pb-4 bg-gradient-to-b from-accent-500/10 to-transparent">
             <form action="modules.php?name=YourAccount" method="post" class="space-y-3">
                 <!-- Username field -->
@@ -279,6 +283,7 @@ class NavigationView
                 </div>
 
                 <input type="hidden" name="op" value="login">
+                <?= \Utilities\CsrfGuard::generateToken('login') ?>
 
                 <!-- Submit button -->
                 <button
@@ -289,7 +294,8 @@ class NavigationView
                 </button>
             </form>
         </div>
-        ';
+        <?php
+        return (string) ob_get_clean();
     }
 
     /**

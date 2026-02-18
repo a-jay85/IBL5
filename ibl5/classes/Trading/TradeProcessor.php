@@ -316,12 +316,7 @@ class TradeProcessor implements TradeProcessorInterface
         $this->newsService->createNewsStory($categoryID, $topicID, $storytitle, $storytext);
 
         // Send email notification
-        if ($_SERVER['SERVER_NAME'] !== "localhost") {
-            $recipient = 'ibldepthcharts@gmail.com';
-            // SECURITY: Sanitize email subject to prevent header injection
-            $safeSubject = \Utilities\EmailSanitizer::sanitizeSubject($storytitle);
-            mail($recipient, $safeSubject, $storytext, "From: trades@iblhoops.net");
-        }
+        \Mail\MailService::fromConfig()->send('ibldepthcharts@gmail.com', $storytitle, $storytext, 'trades@iblhoops.net');
     }
 
     /**

@@ -555,12 +555,14 @@ function login($username, $user_password, $redirect, $mode, $f, $t, $random_num,
                 Header("Location: index.php");
             }
         }
+        exit;
     } else {
         $redirectParam = '';
         if (is_string($redirect) && preg_match('/^[A-Za-z0-9_]+$/', $redirect)) {
             $redirectParam = '&redirect=' . rawurlencode($redirect);
         }
         Header("Location: modules.php?name=$module_name&stop=1" . $redirectParam);
+        exit;
     }
 }
 

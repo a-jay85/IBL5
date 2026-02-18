@@ -6,6 +6,7 @@ namespace NextSim;
 
 use NextSim\Contracts\NextSimServiceInterface;
 use Player\Player;
+use StrengthOfSchedule\StrengthOfScheduleCalculator;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 
@@ -26,17 +27,22 @@ class NextSimService implements NextSimServiceInterface
 
     private TeamQueryRepositoryInterface $teamQueryRepo;
 
+    /** @var array<int, float> Power rankings by team ID (0.0-100.0) */
+    private array $teamPowerRankings;
+
     /**
      * Constructor
      *
      * @param \mysqli $db Database connection
      * @param TeamScheduleRepositoryInterface $teamScheduleRepository Team schedule repository
+     * @param array<int, float> $teamPowerRankings Optional power rankings for SOS tier indicators
      */
-    public function __construct(\mysqli $db, TeamScheduleRepositoryInterface $teamScheduleRepository)
+    public function __construct(\mysqli $db, TeamScheduleRepositoryInterface $teamScheduleRepository, array $teamPowerRankings = [])
     {
         $this->db = $db;
         $this->teamScheduleRepository = $teamScheduleRepository;
         $this->teamQueryRepo = new \Team\TeamQueryRepository($db);
+        $this->teamPowerRankings = $teamPowerRankings;
     }
 
     /**
@@ -61,7 +67,9 @@ class NextSimService implements NextSimServiceInterface
             $gameDate = new \DateTime($game->date);
             $dayNumber = $gameDate->diff($lastSimEndDateObject)->format('%a');
 
-            $opposingTeam = \Team::initialize($this->db, $game->getOpposingTeamID($teamId));
+            $opposingTeamId = $game->getOpposingTeamID($teamId);
+            $opposingTeam = \Team::initialize($this->db, $opposingTeamId);
+            $opponentRanking = $this->teamPowerRankings[$opposingTeamId] ?? 0.0;
 
             $games[] = [
                 'game' => $game,
@@ -70,6 +78,10 @@ class NextSimService implements NextSimServiceInterface
                 'opposingTeam' => $opposingTeam,
                 'locationPrefix' => $game->getUserTeamLocationPrefix($teamId),
                 'opposingStarters' => $this->getOpposingStartingLineup($opposingTeam),
+                'opponentTier' => $this->teamPowerRankings !== []
+                    ? StrengthOfScheduleCalculator::assignTier($opponentRanking)
+                    : '',
+                'opponentPowerRanking' => $opponentRanking,
             ];
         }
 

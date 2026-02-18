@@ -16,7 +16,7 @@ namespace Team\Contracts;
  * @phpstan-import-type TeamInfoRow from \Services\CommonMysqliRepository
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  *
- * @phpstan-type PowerRow array{TeamID: int, Team: string, Division: string, Conference: string, ranking: float, win: int, loss: int, gb: float, conf_win: int, conf_loss: int, div_win: int, div_loss: int, home_win: int, home_loss: int, road_win: int, road_loss: int, last_win: int, last_loss: int, streak_type: string, streak: int, created_at: string, updated_at: string}
+ * @phpstan-type PowerRow array{tid: int, team_name: string, leagueRecord: string, wins: int, losses: int, pct: float|string, conference: string, division: string, confRecord: string, divRecord: string, divGB: float|string|null, homeRecord: string, awayRecord: string, gamesUnplayed: int, ranking: float, last_win: int, last_loss: int, streak_type: string, streak: int, sos: float|string, remaining_sos: float|string}
  * @phpstan-type BannerRow array{year: int, currentname: string, bannername: string, bannertype: int}
  * @phpstan-type GMTenureRow array{id: int, franchise_id: int, gm_username: string, start_season_year: int, end_season_year: int|null, is_mid_season_start: int, is_mid_season_end: int}
  * @phpstan-type GMAwardRow array{year: int, Award: string, name: string, table_ID: int}

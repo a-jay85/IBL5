@@ -128,7 +128,7 @@ public function testEscapesUserInput()
 }
 ```
 
-**Reference**: See `ibl5/docs/TEST_REFACTORING_SUMMARY.md` for complete refactoring history and additional examples.
+**Reference**: See `ibl5/docs/archive/TEST_REFACTORING_SUMMARY.md` for complete refactoring history and additional examples.
 
 ---
 

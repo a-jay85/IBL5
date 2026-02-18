@@ -197,7 +197,7 @@ function redirectLoggedInUser()
 
 function main($user)
 {
-    global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
+    global $stop, $module_name, $gfx_chk;
     if (!is_user($user)) {
         Nuke\Header::header();
         mt_srand((double) microtime() * 1000000);
@@ -215,12 +215,8 @@ function main($user)
         $accountView = new \YourAccount\YourAccountView();
         echo $accountView->renderLoginPage(
             $errorMessage,
-            isset($redirect) ? (string) $redirect : null,
             $random_num,
-            $showCaptcha,
-            isset($mode) ? (string) $mode : '',
-            isset($f) ? (string) $f : '',
-            isset($t) ? (string) $t : ''
+            $showCaptcha
         );
         Nuke\Footer::footer();
     } elseif (is_user($user)) {
@@ -382,7 +378,7 @@ function mail_password()
     Nuke\Footer::footer();
 }
 
-function login($username, $user_password, $redirect, $mode, $f, $t, $random_num, $gfx_check)
+function login($username, $user_password, $random_num, $gfx_check)
 {
     global $authService, $user_prefix, $db, $mysqli_db, $module_name, $pm_login, $prefix;
 
@@ -400,11 +396,7 @@ function login($username, $user_password, $redirect, $mode, $f, $t, $random_num,
     $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $random_num . $datekey));
     $code = substr($rcode, 2, 6);
     if (extension_loaded("gd") and $code != $gfx_check and ($gfx_chk == 2 or $gfx_chk == 4 or $gfx_chk == 5 or $gfx_chk == 7)) {
-        $redirectParam = '';
-        if (is_string($redirect) && preg_match('/^[A-Za-z0-9_]+$/', $redirect)) {
-            $redirectParam = '&redirect=' . rawurlencode($redirect);
-        }
-        Header("Location: modules.php?name=$module_name&stop=1" . $redirectParam);
+        Header("Location: modules.php?name=$module_name&stop=1");
         die();
     }
 
@@ -424,9 +416,10 @@ function login($username, $user_password, $redirect, $mode, $f, $t, $random_num,
         $stmtUpdateIp->execute();
         $stmtUpdateIp->close();
 
-        // Redirect to the requested module, or the user's team page, or the homepage
-        if (is_string($redirect) && preg_match('/^[A-Za-z0-9_]+$/', $redirect)) {
-            Header("Location: modules.php?name=" . rawurlencode($redirect));
+        // Redirect to the stored original URL, or the user's team page, or the homepage
+        $redirectUrl = buildRedirectUrl();
+        if ($redirectUrl !== null) {
+            Header("Location: " . $redirectUrl);
         } else {
             // Look up user's team and redirect there
             $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
@@ -445,16 +438,13 @@ function login($username, $user_password, $redirect, $mode, $f, $t, $random_num,
         exit;
     } else {
         // Login failure — preserve specific error from AuthService (e.g., email not verified)
+        // Session redirect value persists automatically for retry
         $specificError = $authService->getLastError();
-        $redirectParam = '';
-        if (is_string($redirect) && preg_match('/^[A-Za-z0-9_]+$/', $redirect)) {
-            $redirectParam = '&redirect=' . rawurlencode($redirect);
-        }
         if ($specificError !== null) {
             $_SESSION['login_error'] = $specificError;
-            Header("Location: modules.php?name=$module_name" . $redirectParam);
+            Header("Location: modules.php?name=$module_name");
         } else {
-            Header("Location: modules.php?name=$module_name&stop=1" . $redirectParam);
+            Header("Location: modules.php?name=$module_name&stop=1");
         }
         exit;
     }
@@ -480,7 +470,7 @@ switch ($op) {
         break;
 
     case "login":
-        login($username, $user_password, $redirect, $mode, $f, $t, $random_num, $gfx_check);
+        login($username, $user_password, $random_num, $gfx_check);
         break;
 
     case "pass_lost":

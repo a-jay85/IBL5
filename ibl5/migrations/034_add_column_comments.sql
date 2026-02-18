@@ -112,8 +112,6 @@ ALTER TABLE `ibl_draft_class` MODIFY COLUMN `team` varchar(128) COLLATE utf8mb4_
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `talent` int NOT NULL DEFAULT '0' COMMENT 'Talent off-season progression rating';
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `skill` int NOT NULL DEFAULT '0' COMMENT 'Skill  off-season progression rating';
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `intangibles` int NOT NULL DEFAULT '0' COMMENT 'Intangibles off-season progression rating';
-ALTER TABLE `ibl_draft_class` MODIFY COLUMN `ranking` float DEFAULT '0' COMMENT 'Combined draft ranking';
-ALTER TABLE `ibl_draft_class` MODIFY COLUMN `invite` mediumtext COLLATE utf8mb4_unicode_ci COMMENT 'Combine/tryout invite details';
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `drafted` int DEFAULT '0' COMMENT '0=undrafted, 1=drafted';
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `sta` int DEFAULT '0' COMMENT 'Stamina rating';
 

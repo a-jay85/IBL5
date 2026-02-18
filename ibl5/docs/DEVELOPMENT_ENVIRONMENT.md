@@ -100,6 +100,8 @@ vendor/bin/phpcs --version                 # Should show PHP_CodeSniffer version
 | `Composer install fails` | Check `.github/workflows/cache-dependencies.yml` workflow logs |
 | `Tests fail to run` | Verify cache-dependencies workflow completed successfully |
 | `Cache outdated` | Manually trigger "Cache PHP Dependencies" workflow |
+| `Authentication plugin error` | You're using Homebrew's mysql client — use MAMP's: `/Applications/MAMP/Library/bin/mysql80/bin/mysql` |
+| `Can't connect via socket` | Check socket exists: `/Applications/MAMP/tmp/mysql/mysql.sock`. Ensure MAMP is running. |
 
 ---
 
@@ -121,50 +123,6 @@ vendor/bin/phpcs --version                 # Should show PHP_CodeSniffer version
 - **Socket:** `/Applications/MAMP/tmp/mysql/mysql.sock`
 - **Credentials Location:** See `ibl5/config.php` (in `.gitignore`)
 
-### Setting Up DatabaseConnection for Tests
-
-1. **Copy the template file:**
-   ```bash
-   cd ibl5/classes
-   cp DatabaseConnection.php.template DatabaseConnection.php
-   ```
-
-2. **Add your credentials:**
-   - Find credentials in `ibl5/config.php` (`$dbuname`, `$dbpass`, `$dbname`)
-   - Replace `REPLACE_ME_*` placeholders in `DatabaseConnection.php`
-
-3. **Verify .gitignore:**
-   - `DatabaseConnection.php` is in `.gitignore` and will never be committed
-
-### PHP Connection Using DatabaseConnection
-
-```php
-<?php
-// Use the helper class for database access in tests
-$player = DatabaseConnection::fetchRow("SELECT * FROM ibl_plr WHERE pid = ?", [123]);
-
-// Fetch multiple rows
-$players = DatabaseConnection::fetchAll("SELECT * FROM ibl_plr LIMIT 10");
-
-// Fetch a single value
-$playerCount = DatabaseConnection::fetchValue("SELECT COUNT(*) FROM ibl_plr");
-
-// Test connection
-if (DatabaseConnection::testConnection()) {
-    echo "Connected to database successfully";
-}
-```
-
-**Key Features:**
-- Automatically handles MAMP socket path
-- Static methods for simple queries
-- Supports prepared statements with parameter binding
-- Includes error handling and connection validation
-- UTF-8 charset automatically set
-
-**Location:** `ibl5/classes/DatabaseConnection.php` (autoloaded, not committed)  
-**Template:** `ibl5/classes/DatabaseConnection.php.template`
-
 ### Command Line Verification
 
 ```bash
@@ -176,10 +134,34 @@ if (DatabaseConnection::testConnection()) {
   -e "SELECT COUNT(*) as table_count FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'iblhoops_ibl5';"
 ```
 
+### Homebrew MySQL Client Incompatibility
+
+**Do NOT use** the Homebrew-installed `mysql` command:
+```bash
+# WRONG - Will fail with authentication plugin error
+mysql -h 127.0.0.1 -u root -p'root' iblhoops_ibl5
+```
+
+**Always use** MAMP's bundled mysql client:
+```bash
+# CORRECT - Use MAMP's mysql client with socket
+/Applications/MAMP/Library/bin/mysql80/bin/mysql \
+  --socket=/Applications/MAMP/tmp/mysql/mysql.sock \
+  -u root -p'root' \
+  iblhoops_ibl5
+```
+
+**Why?** Homebrew's MySQL 9.x client expects plugins that MAMP's MySQL 8.0 server doesn't provide. The PHP mysqli extension works fine because it uses a different connection method.
+
+### Why the Socket Path Matters
+
+- **Command-line MySQL client:** Uses port 3306 directly
+- **PHP mysqli:** Requires explicit socket path to connect locally
+- **MAMP Socket Location:** `/Applications/MAMP/tmp/mysql/mysql.sock`
+- **DatabaseConnection class:** Automatically handles this
+
 ### Security Notes
 
-- **Credentials in Code:** `DatabaseConnection.php` contains hardcoded credentials for development only
-- **Git Protection:** `DatabaseConnection.php` is in `.gitignore` - NEVER committed
-- **Never Share:** Do not copy this file or credentials outside local development
-- **Template Only:** Only `DatabaseConnection.php.template` is version controlled
+- **Credentials Location:** Database credentials live in `ibl5/config.php` (gitignored)
+- **Never Share:** Do not copy credentials outside local development
 - **Production Data:** Local database contains production IBL data - be careful with destructive queries

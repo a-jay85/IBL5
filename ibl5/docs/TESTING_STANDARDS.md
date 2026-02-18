@@ -128,7 +128,7 @@ public function testEscapesUserInput()
 }
 ```
 
-**Reference**: See `ibl5/docs/TEST_REFACTORING_SUMMARY.md` for complete refactoring history and additional examples.
+**Reference**: See `ibl5/docs/archive/TEST_REFACTORING_SUMMARY.md` for complete refactoring history and additional examples.
 
 ---
 
@@ -281,7 +281,7 @@ vendor/bin/phpunit --help                  # Show all available options
 
 When writing tests that need database data:
 
-1. **Query actual data:** Use DatabaseConnection to fetch real player/team/game data
+1. **Query actual data:** Use `$mysqli_db` or repository classes to fetch real player/team/game data
 2. **Use transactions:** Wrap test operations in transactions that rollback
 3. **Static data preferred:** Cache frequently-used test data rather than querying repeatedly
 

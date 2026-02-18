@@ -14,7 +14,9 @@ class Footer
         $mtimeParts = explode(" ", $mtime);
         $end_time = (float) $mtimeParts[1] + (float) $mtimeParts[0];
         $total_time = $end_time - $start_time;
-        $total_time_str = _PAGEGENERATION . " " . substr((string) $total_time, 0, 4) . " " . _SECONDS;
+        $pageGenLabel = defined('_PAGEGENERATION') ? \_PAGEGENERATION : 'Page Generation:';
+        $secondsLabel = defined('_SECONDS') ? \_SECONDS : 'seconds';
+        $total_time_str = $pageGenLabel . " " . substr((string) $total_time, 0, 4) . " " . $secondsLabel;
 
         echo "<!-- " . $total_time_str . " -->\n";
     }

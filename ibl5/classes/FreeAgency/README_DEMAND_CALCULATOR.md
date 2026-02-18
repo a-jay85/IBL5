@@ -310,5 +310,5 @@ This refactoring demonstrates the pattern for making other classes testable:
 - [Repository Pattern](https://martinfowler.com/eaaCatalog/repository.html)
 - [Dependency Injection](https://en.wikipedia.org/wiki/Dependency_injection)
 - [PHPUnit Documentation](https://phpunit.de/documentation.html)
-- [IBL5 Development Guide](../../DEVELOPMENT_GUIDE.md)
+- [IBL5 Development Guide](../../docs/DEVELOPMENT_GUIDE.md)
 - [IBL5 Testing Standards](../../.github/copilot-instructions.md#testing-requirements)

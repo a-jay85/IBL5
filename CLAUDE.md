@@ -96,7 +96,7 @@ Classes autoload from `ibl5/classes/`. Never use `require_once`.
 - **Schema is reference-only:** `schema.sql` is a snapshot of production's database schema. Never edit it directly to make schema changes. Instead, create migration files. `schema.sql` will not be reimported into production.
 - Use `$mysqli_db` (modern MySQLi) over legacy `$db`
 - 51 InnoDB tables with foreign keys, 84 legacy MyISAM tables, 23 database views
-- **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on both `$mysqli_db` (in `db/db.php`) and `DatabaseConnection` (in `classes/DatabaseConnection.php`). INT columns return PHP `int`, FLOAT columns return PHP `float`, VARCHAR/TEXT columns return PHP `string`. Compare with native types accordingly (e.g., `=== 0` for INT columns, `=== '0'` for VARCHAR columns). The legacy `$db` connection does NOT have native types.
+- **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on `$mysqli_db` (in `db/db.php`). INT columns return PHP `int`, FLOAT columns return PHP `float`, VARCHAR/TEXT columns return PHP `string`. Compare with native types accordingly (e.g., `=== 0` for INT columns, `=== '0'` for VARCHAR columns). The legacy `$db` connection does NOT have native types.
 
 ### Local MAMP Database Connection
 
@@ -114,15 +114,6 @@ require_once 'autoloader.php';
 include 'config.php';
 include 'db/db.php';
 // $mysqli_db and $db are now available globally
-```
-
-**PHP Connection (for tests/standalone):**
-```php
-// Use DatabaseConnection helper class
-require_once 'classes/DatabaseConnection.php';
-$player = DatabaseConnection::fetchRow("SELECT * FROM ibl_plr WHERE pid = ?", [123]);
-$players = DatabaseConnection::fetchAll("SELECT * FROM ibl_plr LIMIT 10");
-$count = DatabaseConnection::fetchValue("SELECT COUNT(*) FROM ibl_plr");
 ```
 
 **Command Line Access:**
@@ -218,7 +209,7 @@ After completing a module refactoring or significant feature, update these files
 - `STRATEGIC_PRIORITIES.md` — mark module complete
 - `REFACTORING_HISTORY.md` — add entry for the work done
 - `ibl5/classes/ModuleName/README.md` — create module README
-- `DEVELOPMENT_GUIDE.md` — update module counts and status
+- `ibl5/docs/DEVELOPMENT_GUIDE.md` — update module counts and status
 
 ### Production Validation
 After refactoring, compare output against iblhoops.net. Results must match exactly.
@@ -283,8 +274,8 @@ Context-aware rules auto-load when relevant:
 | Resource | Location |
 |----------|----------|
 | Schema | `ibl5/schema.sql` |
-| Development status | `DEVELOPMENT_GUIDE.md` |
-| Database guide | `DATABASE_GUIDE.md` |
-| MAMP connection | `ibl5/MAMP_DATABASE_CONNECTION.md` |
-| API patterns | `API_GUIDE.md` |
+| Development status | `ibl5/docs/DEVELOPMENT_GUIDE.md` |
+| Database guide | `ibl5/docs/DATABASE_GUIDE.md` |
+| MAMP connection | `ibl5/docs/DEVELOPMENT_ENVIRONMENT.md` |
+| API patterns | `ibl5/docs/API_GUIDE.md` |
 | Interface examples | `classes/Player/Contracts/`, `classes/FreeAgency/Contracts/` |

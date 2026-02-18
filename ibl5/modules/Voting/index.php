@@ -43,7 +43,7 @@ function userinfo(string $username): void
     }
 
     $voterTeamName = (string)($userRow['user_ibl_team'] ?? '');
-    $tid = $commonRepository->getTidFromTeamname($voterTeamName);
+    $tid = $commonRepository->getTidFromTeamname($voterTeamName) ?? 0;
 
     $formAction = ($season->phase === 'Regular Season')
         ? 'modules/Voting/ASGVote.php'

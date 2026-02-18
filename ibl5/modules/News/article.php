@@ -145,7 +145,7 @@ if ($stmtCounter !== false) {
 
 $artpage = 1;
 $pagetitle = "- $title";
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 $artpage = 0;
 
 formatTimestamp($time);
@@ -203,4 +203,4 @@ include "modules/$module_name/associates.php";
 // The old comments.php was a security vulnerability (SQL injection)
 // Comments can be re-implemented with proper security if needed
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

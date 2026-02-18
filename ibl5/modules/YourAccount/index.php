@@ -78,7 +78,7 @@ function userCheck($username, $user_email)
 function confirmNewUser($username, $user_email, $user_password, $user_password2, $random_num, $gfx_check)
 {
     global $stop, $EditedMessage, $sitename, $module_name, $minpass;
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     include "config.php";
     $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
     $username = rtrim($username, "\\");
@@ -99,7 +99,7 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
             echo "<center><b>" . _SECCODEINCOR . "</b><br><br>"
                 . "" . _GOBACK . "</center>";
             CloseTable();
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
             die();
         }
         if (empty($user_password) and empty($user_password2)) {
@@ -109,14 +109,14 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
             OpenTable();
             echo "<center><b>" . _PASSDIFFERENT . "</b><br><br>" . _GOBACK . "</center>";
             CloseTable();
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
             die();
         } elseif ($user_password == $user_password2 and strlen($user_password) < $minpass) {
             title("" . _NEWUSERERROR . "");
             OpenTable();
             echo "<center>" . _YOUPASSMUSTBE . " <b>$minpass</b> " . _CHARLONG . "<br><br>" . _GOBACK . "</center>";
             CloseTable();
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
             die();
         }
         title("$sitename: " . _USERREGLOGIN . "");
@@ -141,13 +141,13 @@ function confirmNewUser($username, $user_email, $user_password, $user_password2,
         echo "<font class=\"content\">$stop<br>" . _GOBACK . "</font></center>";
         CloseTable();
     }
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function finishNewUser($username, $user_email, $user_password, $random_num, $gfx_check)
 {
     global $stop, $EditedMessage, $adminmail, $sitename, $Default_Theme, $user_prefix, $db, $storyhome, $module_name, $nukeurl, $authService;
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     include "config.php";
     userCheck($username, $user_email);
     $user_email = validate_mail($user_email);
@@ -192,7 +192,7 @@ function finishNewUser($username, $user_email, $user_password, $random_num, $gfx
     } else {
         echo "$stop";
     }
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function activate($username, $check_num)
@@ -209,29 +209,29 @@ function activate($username, $check_num)
         if ($check_num == $row['check_num']) {
             \DatabaseConnection::query("INSERT INTO nuke_users (user_id, username, user_email, user_password, user_avatar, user_avatar_type, user_regdate, user_lang) VALUES (NULL, ?, ?, ?, '', '3', ?, ?)", [$row['username'], $row['user_email'], $user_password, $row['user_regdate'], $language]);
             \DatabaseConnection::query("DELETE FROM nuke_users_temp WHERE username = ? AND check_num = ?", [$username, $check_num]);
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             title("" . _ACTIVATIONYES . "");
             OpenTable();
             echo "<center><b>" . htmlspecialchars($row['username']) . ":</b> " . _ACTMSG . "</center>";
             CloseTable();
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
             die();
         } else {
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             title("" . _ACTIVATIONERROR . "");
             OpenTable();
             echo "<center>" . _ACTERROR1 . "</center>";
             CloseTable();
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
             die();
         }
     } else {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         title("" . _ACTIVATIONERROR . "");
         OpenTable();
         echo "<center>" . _ACTERROR2 . "</center>";
         CloseTable();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
         die();
     }
 
@@ -251,7 +251,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         cookiedecode($user);
     }
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     OpenTable();
     echo "<center>";
     if ($username != '') // SecurityReason.com Fix 2005 [sp3x]
@@ -593,14 +593,14 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0)
         echo "<li><a href=\"modules.php?name=News&file=article&sid=$sid\">$title</a><br>";
     }
     CloseTable();
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function main($user)
 {
     global $stop, $module_name, $redirect, $mode, $t, $f, $gfx_chk;
     if (!is_user($user)) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         if ($stop) {
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _LOGININCOR . "</b></font></center>\n";
@@ -636,7 +636,7 @@ function main($user)
                 . "<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">" . _PASSWORDLOST . "</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">" . _REGNEWUSER . "</a> ]</font></center>\n";
             CloseTable();
         }
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);
@@ -651,7 +651,7 @@ function new_user()
         mt_srand((double) microtime() * 1000000);
         $maxran = 1000000;
         $random_num = mt_rand(0, $maxran);
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
         CloseTable();
@@ -721,7 +721,7 @@ function new_user()
             . "" . _WEDONTGIVE . "<br><br>\n"
             . "<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name\">" . _USERLOGIN . "</a> | <a href=\"modules.php?name=$module_name&amp;op=pass_lost\">" . _PASSWORDLOST . "</a> ]</font></center>\n";
         CloseTable();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);
@@ -733,7 +733,7 @@ function pass_lost()
 {
     global $user, $module_name;
     if (!is_user($user)) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _USERREGLOGIN . "</b></font></center>\n";
         CloseTable();
@@ -749,7 +749,7 @@ function pass_lost()
             . "<input type=\"submit\" value=\"" . _SENDPASSWORD . "\"></form><br>\n"
             . "<center><font class=\"content\">[ <a href=\"modules.php?name=$module_name\">" . _USERLOGIN . "</a> | <a href=\"modules.php?name=$module_name&amp;op=new_user\">" . _REGNEWUSER . "</a> ]</font></center>\n";
         CloseTable();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);
@@ -780,7 +780,7 @@ function logout()
     }
     $user = "";
     $cookie = "";
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     OpenTable();
     if (!empty($redirect)) {
         echo "<META HTTP-EQUIV=\"refresh\" content=\"3;URL=modules.php?name=$redirect\">";
@@ -789,7 +789,7 @@ function logout()
     }
     echo "<center><font class=\"option\"><b>" . _YOUARELOGGEDOUT . "</b></font></center>";
     CloseTable();
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function mail_password($username, $code)
@@ -801,11 +801,11 @@ function mail_password($username, $code)
     $sql = "SELECT user_email, user_actkey FROM " . $user_prefix . "_users WHERE username='$username'";
     $result = $db->sql_query($sql);
     if ($db->sql_numrows($result) == 0) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         OpenTable();
         echo "<center>" . _SORRYNOUSERINFO . "</center>";
         CloseTable();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } else {
         $host_name = $_SERVER['REMOTE_ADDR'];
         $row = $db->sql_fetchrow($result);
@@ -823,11 +823,11 @@ function mail_password($username, $code)
             $stmtReset->bind_param('ss', $cryptpass, $username);
             $stmtReset->execute();
             $stmtReset->close();
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             OpenTable();
             echo "<center>" . _PASSWORD4 . " $username " . _MAILED . "<br><br>" . _GOBACK . "</center>";
             CloseTable();
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
         } else {
             /* Generate a new reset code and email it */
             $resetCode = substr(bin2hex(random_bytes(5)), 0, 10);
@@ -838,11 +838,11 @@ function mail_password($username, $code)
             $message = "" . _USERACCOUNT . " '$username' " . _AT . " $sitename " . _HASTHISEMAIL . " " . _AWEBUSERFROM . " $host_name " . _CODEREQUESTED . "\n\n" . _YOURCODEIS . " $resetCode \n\n" . _WITHTHISCODE . " $nukeurl/modules.php?name=$module_name&op=pass_lost\n" . _IFYOUDIDNOTASK2 . "";
             $subject = "" . _CODEFOR . " $username";
             mail($user_email, $subject, $message, "From: $adminmail\nX-Mailer: PHP/" . phpversion());
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             OpenTable();
             echo "<center>" . _CODEFOR . " $username " . _MAILED . "<br><br>" . _GOBACK . "</center>";
             CloseTable();
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
         }
     }
 }
@@ -895,7 +895,7 @@ function edituser()
     cookiedecode($user);
     getusrinfo($user);
     if ((is_user($user)) and (strtolower($userinfo['username']) == strtolower($cookie[1])) and ($userinfo['user_password'] == $cookie[2])) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _PERSONALINFO . "</b></font></center>";
         CloseTable();
@@ -1113,7 +1113,7 @@ function edituser()
             . "<INPUT class=mainoption type=submit value=Save&nbsp;Avatar>"
             . "</form></TD></TR></TABLE>";
         CloseTable();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } else {
         main($user);
     }
@@ -1191,7 +1191,7 @@ function edithome()
     cookiedecode($user);
     getusrinfo($user);
     if ((is_user($user)) and (strtolower($userinfo['username']) == strtolower($cookie[1])) and ($userinfo['user_password'] == $cookie[2])) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _HOMECONFIG . "</b></font></center>";
         CloseTable();
@@ -1239,7 +1239,7 @@ function edithome()
             . "<input type=\"submit\" value=\"" . _SAVECHANGES . "\">"
             . "</form>";
         CloseTable();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } else {
         main($user);
     }
@@ -1257,7 +1257,7 @@ function chgtheme()
             Header("Location: modules.php?name=$module_name");
             die();
         }
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _THEMESELECTION . "</b></font></center>";
         CloseTable();
@@ -1303,7 +1303,7 @@ function chgtheme()
             . "<input type=\"submit\" value=\"" . _SAVECHANGES . "\">"
             . "</form>";
         CloseTable();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } else {
         main($user);
     }
@@ -1365,7 +1365,7 @@ function editcomm()
     cookiedecode($user);
     getusrinfo($user);
     if ((is_user($user)) and (strtolower($userinfo['username']) == strtolower($cookie[1])) and ($userinfo['user_password'] == $cookie[2])) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _COMMENTSCONFIG . "</b></font></center>";
         CloseTable();
@@ -1419,7 +1419,7 @@ function editcomm()
     <?php
 CloseTable();
         echo "<br><br>";
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } else {
         main($user);
     }
@@ -1452,7 +1452,7 @@ function avatarlist($avatarcategory)
     global $user, $userinfo, $cookie, $module_name;
     cookiedecode($user);
     getusrinfo($user);
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     if ((is_user($user)) and (strtolower($userinfo['username']) == strtolower($cookie[1])) and ($userinfo['user_password'] == $cookie[2])) { // SecurityReason Fix 2005 - sp3x -> check if we are user if not then Access Denied
         $avatarcatname = ereg_replace("_", "&nbsp;", $avatarcategory);
         $avatarcategory = htmlspecialchars($avatarcategory); //SecurityReason Fix 2005 - sp3x
@@ -1503,7 +1503,7 @@ function avatarlist($avatarcategory)
             . "<br></center>";
         $d->close();
         CloseTable();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } else {
         die("Access Denied");
     }
@@ -1518,7 +1518,7 @@ function avatarsave($avatar, $category)
     if (is_user($user) and $allow_avatar_local) {
         getusrinfo($user);
         cookiedecode($user);
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         title("Avatar Selection Successful!");
         OpenTable();
         Nuke\Navbar::nav();
@@ -1534,7 +1534,7 @@ function avatarsave($avatar, $category)
             echo "<center><b>Error:</b> Wrong avatar format! Avatars can only be gif, jpg, or png format.<br />" . _GOBACK . "</center>";
         }
         CloseTable();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     }
 }
 
@@ -1546,7 +1546,7 @@ function avatarlinksave($avatar)
     if (is_user($user) and $allow_avatar_remote) {
         getusrinfo($user);
         cookiedecode($user);
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         title("Avatar Selection Successful!");
         OpenTable();
         Nuke\Navbar::nav();
@@ -1562,7 +1562,7 @@ function avatarlinksave($avatar)
             echo "<center><b>Error:</b> Wrong avatar format! Avatars can only be gif, jpg, or png format.<br />" . _GOBACK . "</center>";
         }
         CloseTable();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     }
 }
 
@@ -1580,7 +1580,7 @@ function broadcast($the_message, $who)
         $who = $cookie[1];
         $the_message = filter($the_message, "nohtml", 1);
         if ($broadcast_msg == 1) {
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             title("" . _BROADCAST . "");
             OpenTable();
             $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_public_messages WHERE who='$who'"));
@@ -1594,7 +1594,7 @@ function broadcast($the_message, $who)
                 echo "<center>" . _BROADCASTNOTSENT . "<br><br>[ <a href=\"modules.php?name=$module_name\">" . _RETURNPAGE . "</a> ]</center>";
             }
             CloseTable();
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
         } else {
             echo "I don't like you...";
         }

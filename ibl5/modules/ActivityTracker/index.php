@@ -23,7 +23,7 @@ use ActivityTracker\ActivityTrackerView;
 
 global $mysqli_db;
 
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 $repository = new ActivityTrackerRepository($mysqli_db);
 $view = new ActivityTrackerView();
@@ -31,4 +31,4 @@ $view = new ActivityTrackerView();
 $teams = $repository->getTeamActivity();
 echo $view->render($teams);
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

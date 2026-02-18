@@ -134,7 +134,7 @@ function themefooter()
 {
     global $bgcolor1;
     echo "</div>"; // closes .site-content
-    Nuke\Footer::renderPageGenerationTime();
+    PageLayout\PageLayout::renderPageGenerationTime();
 }
 
 function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext, $notes, $morelink, $topicname, $topicimage, $topictext)

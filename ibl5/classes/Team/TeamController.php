@@ -64,7 +64,7 @@ class TeamController implements TeamControllerInterface
             // Invalid display value is silently ignored (falls back to 'ratings')
         }
 
-        \Nuke\Header::header();
+        \PageLayout\PageLayout::header();
 
         $userTeamName = '';
         global $user;
@@ -82,7 +82,7 @@ class TeamController implements TeamControllerInterface
             $pageData = $this->service->getTeamPageData($teamID, $yr, $display, $userTeamName);
         } catch (\RuntimeException $e) {
             echo '<div class="ibl-alert ibl-alert--error">Team not found.</div>';
-            \Nuke\Footer::footer();
+            \PageLayout\PageLayout::footer();
         }
 
         echo $this->view->render($pageData);
@@ -100,7 +100,7 @@ class TeamController implements TeamControllerInterface
         echo '<script>window.IBL_AJAX_TABS_CONFIG = ' . $jsConfig . ';</script>';
         echo '<script src="jslib/ajax-tabs.js" defer></script>';
 
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::footer();
     }
 
     /**
@@ -108,7 +108,7 @@ class TeamController implements TeamControllerInterface
      */
     public function displayMenu(): void
     {
-        \Nuke\Header::header();
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::header();
+        \PageLayout\PageLayout::footer();
     }
 }

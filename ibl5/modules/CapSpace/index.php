@@ -29,7 +29,7 @@ $season = new Season($mysqli_db);
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 // Initialize services
 $repository = new CapSpaceRepository($mysqli_db);
@@ -47,4 +47,4 @@ echo $view->render(
     $displayYears['endingYear']
 );
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

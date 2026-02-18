@@ -38,8 +38,8 @@ $view = new InjuriesView();
 $injuredPlayers = $service->getInjuredPlayersWithTeams();
 
 // Render page
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 echo $view->render($injuredPlayers);
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

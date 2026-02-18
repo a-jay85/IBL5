@@ -31,8 +31,8 @@ $season = new Season($mysqli_db);
 $view = new Standings\StandingsView($repository, $season->endingYear);
 
 // Render and output the standings
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     
     echo $view->render();
 
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();

@@ -36,7 +36,7 @@ function oneonone(): void
 {
     global $prefix, $mysqli_db, $user, $cookie;
     
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     cookiedecode($user);
 
     // Get current user info
@@ -104,5 +104,5 @@ function oneonone(): void
         }
     }
 
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }

@@ -23,7 +23,7 @@ use SeasonArchive\SeasonArchiveView;
 
 global $mysqli_db;
 
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 $repository = new SeasonArchiveRepository($mysqli_db);
 $service = new SeasonArchiveService($repository);
@@ -58,4 +58,4 @@ if ($year > 0) {
     echo $view->renderIndex($seasons, $teamColors, $playerIds, $teamIds);
 }
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

@@ -26,13 +26,13 @@ function main($user)
 {
     global $stop;
     if (!is_user($user)) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
         echo "<br>";
         if (!is_user($user)) {
             loginbox();
         }
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } elseif (is_user($user)) {
         display();
     }
@@ -44,7 +44,7 @@ function display()
     $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
     $season = new Season($mysqli_db);
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
 
     $username = strval($cookie[1] ?? '');
     $teamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
@@ -60,7 +60,7 @@ function display()
     $result = $_GET['result'] ?? null;
     echo $view->render($mainPageData, $result);
 
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function negotiate($pid)
@@ -70,7 +70,7 @@ function negotiate($pid)
 
     $pid = intval($pid);
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
 
     // Get user team information (must be after header() which populates $cookie)
     $username = strval($cookie[1] ?? '');
@@ -94,7 +94,7 @@ function negotiate($pid)
     $error = $_GET['error'] ?? null;
     echo $view->render($negotiationData, $error);
 
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function processOffer()

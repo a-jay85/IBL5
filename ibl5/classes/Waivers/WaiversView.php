@@ -125,12 +125,12 @@ class WaiversView implements WaiversViewInterface
      */
     public function renderNotLoggedIn(string $message): void
     {
-        \Nuke\Header::header();
+        \PageLayout\PageLayout::header();
         /** @var string $messageEscaped */
         $messageEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($message);
         echo '<div class="text-center"><strong class="ibl-title">' . $messageEscaped . '</strong></div>';
         loginbox();
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::footer();
     }
     
     /**
@@ -138,8 +138,8 @@ class WaiversView implements WaiversViewInterface
      */
     public function renderWaiversClosed(): void
     {
-        \Nuke\Header::header();
+        \PageLayout\PageLayout::header();
         echo "Sorry, but players may not be added from or dropped to waivers at the present time.";
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::footer();
     }
 }

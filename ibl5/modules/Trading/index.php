@@ -15,8 +15,8 @@ $pagetitle = "- Team Pages";
 
 function menu()
 {
-    Nuke\Header::header();
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::header();
+    PageLayout\PageLayout::footer();
 }
 
 function tradeoffer($username)
@@ -32,9 +32,9 @@ function tradeoffer($username)
     $pageData['result'] = $_GET['result'] ?? null;
     $pageData['error'] = $_GET['error'] ?? null;
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     echo $view->renderTradeOfferForm($pageData);
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function tradereview($username)
@@ -50,9 +50,9 @@ function tradereview($username)
     $pageData['result'] = $_GET['result'] ?? null;
     $pageData['error'] = $_GET['error'] ?? null;
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     echo $view->renderTradeReview($pageData);
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function reviewtrade($user)
@@ -61,7 +61,7 @@ function reviewtrade($user)
     $season = new Season($mysqli_db);
 
     if (!is_user($user)) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         if ($stop) {
             echo '<div style="text-align: center;"><span class="title"><strong>' . _LOGININCOR . '</strong></span></div>' . "\n";
         } else {
@@ -70,7 +70,7 @@ function reviewtrade($user)
         if (!is_user($user)) {
             loginbox();
         }
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } elseif (is_user($user)) {
         if ($season->allowTrades === 'Yes') {
             global $cookie;
@@ -78,9 +78,9 @@ function reviewtrade($user)
             tradereview(strval($cookie[1] ?? ''));
         } else {
             $view = new TradingView();
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             echo $view->renderTradesClosed($season);
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
         }
     }
 }
@@ -90,7 +90,7 @@ function offertrade($user)
     global $stop;
 
     if (!is_user($user)) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         if ($stop) {
             echo '<div style="text-align: center;"><span class="title"><strong>' . _LOGININCOR . '</strong></span></div>' . "\n";
         } else {
@@ -99,7 +99,7 @@ function offertrade($user)
         if (!is_user($user)) {
             loginbox();
         }
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);

@@ -37,7 +37,7 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
      */
     public function displaySeriesRecords(int $userTeamId): void
     {
-        \Nuke\Header::header();
+        \PageLayout\PageLayout::header();
 
         // Get all teams and series records
         $teams = $this->repository->getTeamsForSeriesRecords();
@@ -50,7 +50,7 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
         // Render the table
         echo $this->view->renderSeriesRecordsTable($teams, $seriesMatrix, $userTeamId, $numTeams);
 
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::footer();
     }
 
     /**
@@ -61,7 +61,7 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
         /** @var bool $stop */
         global $stop;
 
-        \Nuke\Header::header();
+        \PageLayout\PageLayout::header();
         /** @var string $loginMessage */
         $loginMessage = $stop === true ? _LOGININCOR : _USERREGLOGIN;
         echo '<div style="text-align: center;"><strong class="title">'
@@ -69,7 +69,7 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
             . '</strong></div>';
         echo '<br>';
         loginbox();
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::footer();
     }
 
     /**

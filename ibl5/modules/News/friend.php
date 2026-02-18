@@ -36,7 +36,7 @@ function FriendSend($sid)
     global $user, $cookie, $prefix, $db, $user_prefix, $module_name;
     $sid = intval($sid);
     if (!isset($sid)) {die();}
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     $row = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories WHERE sid='$sid'"));
     $title = filter($row['title'], "nohtml");
     title("" . _FRIEND . "");
@@ -62,7 +62,7 @@ function FriendSend($sid)
         . "<input type=\"submit\" value=" . _SEND . ">\n"
         . "</form>\n";
     CloseTable();
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function SendStory($sid, $yname, $ymail, $fname, $fmail)
@@ -90,13 +90,13 @@ function SendStory($sid, $yname, $ymail, $fname, $fmail)
 
 function StorySent($title, $fname)
 {
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     $title = filter($title, "nohtml");
     $fname = filter($fname, "nohtml");
     OpenTable();
     echo "<center><font class=\"content\">" . _FSTORY . " <b>$title</b> " . _HASSENT . " $fname... " . _THANKS . "</font></center>";
     CloseTable();
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 switch ($op) {

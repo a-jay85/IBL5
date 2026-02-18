@@ -45,7 +45,7 @@ $view = new \PlayerDatabase\PlayerDatabaseView($service);
 $searchResult = $service->search($_POST);
 
 // Render page
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 echo '<h2 class="ibl-title">Player Search</h2>';
 
@@ -67,4 +67,4 @@ if (!empty($_POST)) {
     echo $view->renderTableFooter();
 }
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

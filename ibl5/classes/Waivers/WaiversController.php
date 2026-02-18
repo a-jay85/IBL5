@@ -252,7 +252,7 @@ class WaiversController implements WaiversControllerInterface
     {
         $display = isset($_REQUEST['display']) && is_string($_REQUEST['display']) ? $_REQUEST['display'] : 'ratings';
 
-        \Nuke\Header::header();
+        \PageLayout\PageLayout::header();
 
         $team = \Team::initialize($this->db, $userInfo['user_ibl_team']);
 
@@ -302,7 +302,7 @@ class WaiversController implements WaiversControllerInterface
         $tableHtml = $this->renderTableForDisplay($display, $tableResult, $styleTeam, $season);
         echo $switcher->wrap($tableHtml);
 
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::footer();
     }
 
     /**

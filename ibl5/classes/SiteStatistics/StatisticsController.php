@@ -131,7 +131,7 @@ class StatisticsController
         $this->view->renderBackLinks();
         
         CloseTable();
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::footer();
     }
 
     /**
@@ -148,7 +148,7 @@ class StatisticsController
         $parts = explode("-", $now);
         $currentMonth = (int)$parts[1];
         
-        \Nuke\Header::header();
+        \PageLayout\PageLayout::header();
         title("$sitename " . _STATS);
         opentable();
         
@@ -166,7 +166,7 @@ class StatisticsController
         $this->view->renderDetailNavigation();
         
         closetable();
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::footer();
     }
 
     /**
@@ -184,7 +184,7 @@ class StatisticsController
         $parts = explode("-", $now);
         $currentDate = (int)$parts[0];
         
-        \Nuke\Header::header();
+        \PageLayout\PageLayout::header();
         title("$sitename " . _STATS);
         opentable();
         
@@ -203,7 +203,7 @@ class StatisticsController
         $this->view->renderDetailNavigation();
         
         closetable();
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::footer();
     }
 
     /**
@@ -218,7 +218,7 @@ class StatisticsController
     {
         global $sitename;
         
-        \Nuke\Header::header();
+        \PageLayout\PageLayout::header();
         title("$sitename " . _STATS);
         opentable();
         
@@ -237,6 +237,6 @@ class StatisticsController
         $this->view->renderDetailNavigation();
         
         closetable();
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::footer();
     }
 }

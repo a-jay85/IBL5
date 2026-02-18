@@ -41,7 +41,7 @@ foreach ($allStreakData as $tid => $data) {
 }
 
 // Render header first (populates $cookie via online() → cookiedecode())
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 $username = strval($cookie[1] ?? '');
 $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
@@ -73,4 +73,4 @@ foreach ($games as $index => $game) {
 
 echo $view->render($games, $league->getSimLengthInDays());
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

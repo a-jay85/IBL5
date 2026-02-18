@@ -21,13 +21,13 @@ function main($user)
 {
     global $stop;
     if (!is_user($user)) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
         echo "<br>";
         if (!is_user($user)) {
             loginbox();
         }
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } elseif (is_user($user)) {
         global $cookie;
         cookiedecode($user);
@@ -39,12 +39,12 @@ function submit()
 {
     global $mysqli_db;
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
 
     $handler = new DepthChartEntry\DepthChartEntrySubmissionHandler($mysqli_db);
     $handler->handleSubmission($_POST);
 
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function tabApi()

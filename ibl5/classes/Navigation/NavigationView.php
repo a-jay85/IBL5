@@ -212,6 +212,12 @@ class NavigationView
                 </div>
 
                 <input type="hidden" name="op" value="login">
+                <?php
+                $currentQuery = parse_url($this->requestUri ?? '', PHP_URL_QUERY);
+                /** @var string $safeQuery */
+                $safeQuery = HtmlSanitizer::safeHtmlOutput(is_string($currentQuery) ? $currentQuery : '');
+                ?>
+                <input type="hidden" name="redirect_query" value="<?= $safeQuery ?>">
                 <?= \Utilities\CsrfGuard::generateToken('login') ?>
 
                 <!-- Submit button -->
@@ -283,6 +289,12 @@ class NavigationView
                 </div>
 
                 <input type="hidden" name="op" value="login">
+                <?php
+                $mobileCurrentQuery = parse_url($this->requestUri ?? '', PHP_URL_QUERY);
+                /** @var string $safeMobileQuery */
+                $safeMobileQuery = HtmlSanitizer::safeHtmlOutput(is_string($mobileCurrentQuery) ? $mobileCurrentQuery : '');
+                ?>
+                <input type="hidden" name="redirect_query" value="<?= $safeMobileQuery ?>">
                 <?= \Utilities\CsrfGuard::generateToken('login') ?>
 
                 <!-- Submit button -->

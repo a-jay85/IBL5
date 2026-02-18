@@ -416,6 +416,12 @@ function login($username, $user_password, $random_num, $gfx_check)
         $stmtUpdateIp->execute();
         $stmtUpdateIp->close();
 
+        // Check for redirect from nav login form (overrides loginbox session value)
+        $redirectQuery = $_POST['redirect_query'] ?? '';
+        if (is_string($redirectQuery) && $redirectQuery !== '') {
+            $_SESSION['redirect_after_login'] = $redirectQuery;
+        }
+
         // Redirect to the stored original URL, or the user's team page, or the homepage
         $redirectUrl = buildRedirectUrl();
         if ($redirectUrl !== null) {

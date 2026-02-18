@@ -78,15 +78,9 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
  */
 function main($user): void
 {
-    global $stop;
     if (!is_user($user)) {
-        Nuke\Header::header();
-        echo '<div class="ibl-empty-state"><p class="ibl-empty-state__text">' . ($stop ? _LOGININCOR : _USERREGLOGIN) . '</p></div>';
-        if (!is_user($user)) {
-            loginbox();
-        }
-        Nuke\Footer::footer();
-    } elseif (is_user($user)) {
+        loginbox();
+    } else {
         global $cookie;
         cookiedecode($user);
         userinfo($cookie[1]);

@@ -149,7 +149,6 @@ class NavigationView
     {
         if ($this->isLoggedIn) {
             return [
-                ['label' => 'Your Account', 'url' => 'modules.php?name=YourAccount'],
                 ['label' => 'Logout', 'url' => 'modules.php?name=YourAccount&op=logout'],
             ];
         }

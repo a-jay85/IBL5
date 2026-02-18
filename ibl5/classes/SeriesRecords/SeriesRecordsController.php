@@ -54,25 +54,6 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
     }
 
     /**
-     * @see SeriesRecordsControllerInterface::displayLoginPrompt()
-     */
-    public function displayLoginPrompt(): void
-    {
-        /** @var bool $stop */
-        global $stop;
-
-        \Nuke\Header::header();
-        /** @var string $loginMessage */
-        $loginMessage = $stop === true ? _LOGININCOR : _USERREGLOGIN;
-        echo '<div style="text-align: center;"><strong class="title">'
-            . $loginMessage
-            . '</strong></div>';
-        echo '<br>';
-        loginbox();
-        \Nuke\Footer::footer();
-    }
-
-    /**
      * @see SeriesRecordsControllerInterface::displayForUser()
      */
     public function displayForUser(string $username): void
@@ -84,7 +65,7 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
         $userInfo = $this->fetchUserInfo($username, $user_prefix);
 
         if ($userInfo === null) {
-            $this->displayLoginPrompt();
+            $this->displaySeriesRecords(0);
             return;
         }
 
@@ -137,7 +118,7 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
         global $cookie;
 
         if (!is_user($user)) {
-            $this->displayLoginPrompt();
+            loginbox();
             return;
         }
 
@@ -145,7 +126,7 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
         $username = $cookie[1] ?? '';
 
         if ($username === '') {
-            $this->displayLoginPrompt();
+            $this->displaySeriesRecords(0);
             return;
         }
 

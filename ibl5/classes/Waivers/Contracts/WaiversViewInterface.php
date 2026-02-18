@@ -85,27 +85,6 @@ interface WaiversViewInterface
     ): string;
 
     /**
-     * Renders the not logged in message
-     * 
-     * Displays an error message and login form for unauthenticated users
-     * attempting to access the waiver wire.
-     * 
-     * @param string $message Message to display (typically _LOGININCOR or _USERREGLOGIN)
-     * @return void Outputs HTML directly with Nuke header/footer
-     * 
-     * **HTML Structure:**
-     * - Nuke header
-     * - Top menu
-     * - Error message
-     * - Login box
-     * - Nuke footer
-     * 
-     * **Security:**
-     * - Message is HTML-escaped
-     */
-    public function renderNotLoggedIn(string $message): void;
-
-    /**
      * Renders the waivers closed message
      * 
      * Displays a message indicating that waiver wire transactions are not

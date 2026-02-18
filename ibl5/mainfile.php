@@ -1037,33 +1037,13 @@ if (!function_exists("themepreview")) {
 
 function loginbox()
 {
-    global $user, $sitekey, $gfx_chk;
-    mt_srand((double) microtime() * 1000000);
-    $maxran = 1000000;
-    $random_num = mt_rand(0, $maxran);
-    $datekey = date("F j");
-    $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $random_num . $datekey));
-    $code = substr($rcode, 2, 6);
-    if (!is_user($user)) {
-        $title = _LOGIN;
-        $boxstuff = "<form action=\"modules.php?name=YourAccount\" method=\"post\">";
-        $boxstuff .= "<center><font class=\"content\">" . _NICKNAME . "<br>";
-        $boxstuff .= "<input type=\"text\" name=\"username\" size=\"8\" maxlength=\"25\"><br>";
-        $boxstuff .= "" . _PASSWORD . "<br>";
-        $boxstuff .= "<input type=\"password\" name=\"user_password\" size=\"8\" maxlength=\"20\"><br>";
-        if (extension_loaded("gd") and ($gfx_chk == 2 or $gfx_chk == 4 or $gfx_chk == 5 or $gfx_chk == 7)) {
-            $boxstuff .= "" . _SECURITYCODE . ": <img src='?gfx=gfx&amp;random_num=$random_num' border='1' alt='" . _SECURITYCODE . "' title='" . _SECURITYCODE . "'><br>\n";
-            $boxstuff .= "" . _TYPESECCODE . "<br><input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\">\n";
-            $boxstuff .= "<input type=\"hidden\" name=\"random_num\" value=\"$random_num\"><br>\n";
-        } else {
-            $boxstuff .= "<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">";
-            $boxstuff .= "<input type=\"hidden\" name=\"gfx_check\" value=\"$code\">";
-        }
-        $boxstuff .= "<input type=\"hidden\" name=\"op\" value=\"login\">";
-        $boxstuff .= "<input type=\"submit\" value=\"" . _LOGIN . "\"></font></center></form>";
-        $boxstuff .= "<center><font class=\"content\">" . _ASREGISTERED . "</font></center>";
-        themecenterbox($title, $boxstuff);
+    global $name;
+    $redirect = '';
+    if (isset($name) && is_string($name) && $name !== '' && $name !== 'YourAccount') {
+        $redirect = '&redirect=' . rawurlencode($name);
     }
+    header('Location: modules.php?name=YourAccount' . $redirect);
+    exit;
 }
 
 function getTopics($s_sid)

@@ -57,21 +57,12 @@ function tradereview($username)
 
 function reviewtrade($user)
 {
-    global $stop, $mysqli_db;
+    global $mysqli_db;
     $season = new Season($mysqli_db);
 
     if (!is_user($user)) {
-        Nuke\Header::header();
-        if ($stop) {
-            echo '<div style="text-align: center;"><span class="title"><strong>' . _LOGININCOR . '</strong></span></div>' . "\n";
-        } else {
-            echo '<div style="text-align: center;"><span class="title"><strong>' . _USERREGLOGIN . '</strong></span></div>' . "\n";
-        }
-        if (!is_user($user)) {
-            loginbox();
-        }
-        Nuke\Footer::footer();
-    } elseif (is_user($user)) {
+        loginbox();
+    } else {
         if ($season->allowTrades === 'Yes') {
             global $cookie;
             cookiedecode($user);
@@ -87,20 +78,9 @@ function reviewtrade($user)
 
 function offertrade($user)
 {
-    global $stop;
-
     if (!is_user($user)) {
-        Nuke\Header::header();
-        if ($stop) {
-            echo '<div style="text-align: center;"><span class="title"><strong>' . _LOGININCOR . '</strong></span></div>' . "\n";
-        } else {
-            echo '<div style="text-align: center;"><span class="title"><strong>' . _USERREGLOGIN . '</strong></span></div>' . "\n";
-        }
-        if (!is_user($user)) {
-            loginbox();
-        }
-        Nuke\Footer::footer();
-    } elseif (is_user($user)) {
+        loginbox();
+    } else {
         global $cookie;
         cookiedecode($user);
         tradeoffer(strval($cookie[1] ?? ''));

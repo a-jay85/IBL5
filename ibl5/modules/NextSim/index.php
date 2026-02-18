@@ -22,7 +22,11 @@ use NextSim\NextSimView;
 use Standings\StandingsRepository;
 use TeamSchedule\TeamScheduleRepository;
 
-global $db, $cookie, $mysqli_db;
+global $db, $cookie, $user, $mysqli_db;
+
+if (!is_user($user)) {
+    loginbox();
+}
 
 $commonRepository = new Services\CommonMysqliRepository($mysqli_db);
 $season = new Season($mysqli_db);

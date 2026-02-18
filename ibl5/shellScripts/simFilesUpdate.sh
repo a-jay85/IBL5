@@ -4,7 +4,7 @@
 # Updates sim files on production server and merges production into master
 # This script:
 # 1. SSHes to production server
-# 2. Stages and commits sim files (IBL5.plr, IBL5.sco, schedule, standings)
+# 2. Stages and commits sim files (IBL5.plr, IBL5.sco, IBL5.lge, IBL5.sch, standings)
 # 3. Pushes changes to origin/production
 # 4. Pulls production and master branches locally
 # 5. Merges production into master and pushes to origin
@@ -39,10 +39,10 @@ echo -e "${BLUE}========================================${NC}"
 echo ""
 
 # ============================================
-# Part 1: Update sim files on production
+# Part 1: Committing sim files on production
 # ============================================
 
-echo -e "${YELLOW}Part 1: Updating sim files on production server...${NC}"
+echo -e "${YELLOW}Part 1: Committing sim files on production server...${NC}"
 echo ""
 
 # SSH to production server and execute commands
@@ -62,8 +62,11 @@ ssh "${PROD_HOST}" << 'EOF'
   git add --force ibl5/IBL5.sco || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.sco\033[0m"; exit 1; }
   echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.sco\033[0m"
 
-  git add --force ibl5/ibl/IBL/Schedule.htm || { echo -e "\033[0;31m[Production] Error: Failed to stage Schedule.htm\033[0m"; exit 1; }
-  echo -e "\033[0;32m[Production] ✓ Staged ibl5/ibl/IBL/Schedule.htm\033[0m"
+  git add --force ibl5/IBL5.lge || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.lge\033[0m"; exit 1; }
+  echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.lge\033[0m"
+
+  git add --force ibl5/IBL5.sch || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.sch\033[0m"; exit 1; }
+  echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.sch\033[0m"
 
   git add --force ibl5/ibl/IBL/Standings.htm || { echo -e "\033[0;31m[Production] Error: Failed to stage Standings.htm\033[0m"; exit 1; }
   echo -e "\033[0;32m[Production] ✓ Staged ibl5/ibl/IBL/Standings.htm\033[0m"

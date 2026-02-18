@@ -23,7 +23,9 @@ namespace LeagueSchedule\Contracts;
  *     isUnplayed: bool,
  *     isUpcoming: bool,
  *     visitorWon: bool,
- *     homeWon: bool
+ *     homeWon: bool,
+ *     visitorTier: string,
+ *     homeTier: string
  * }
  *
  * @phpstan-type MonthData array{label: string, dates: array<string, list<LeagueGame>>}

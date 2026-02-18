@@ -19,6 +19,7 @@ if (!defined('MODULE_FILE')) {
 
 use NextSim\NextSimService;
 use NextSim\NextSimView;
+use Standings\StandingsRepository;
 use TeamSchedule\TeamScheduleRepository;
 
 global $db, $cookie, $mysqli_db;
@@ -30,6 +31,15 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- $module_name";
 
+// Load power rankings for SOS tier indicators
+$standingsRepo = new StandingsRepository($mysqli_db);
+$allStreakData = $standingsRepo->getAllStreakData();
+/** @var array<int, float> $teamPowerRankings */
+$teamPowerRankings = [];
+foreach ($allStreakData as $tid => $data) {
+    $teamPowerRankings[$tid] = (float)$data['ranking'];
+}
+
 // Render header first (populates $cookie via online() → cookiedecode())
 Nuke\Header::header();
 
@@ -40,7 +50,7 @@ $league = new League($mysqli_db);
 
 // Initialize services
 $teamScheduleRepository = new TeamScheduleRepository($mysqli_db);
-$service = new NextSimService($mysqli_db, $teamScheduleRepository);
+$service = new NextSimService($mysqli_db, $teamScheduleRepository, $teamPowerRankings);
 $view = new NextSimView($mysqli_db, $season, $module_name);
 
 // Get next sim games

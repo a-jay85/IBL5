@@ -33,11 +33,7 @@ function userinfo(string $username): void
     $season = new \Season($mysqli_db);
     $league = new \League($mysqli_db);
 
-    // Use prepared statement to prevent SQL injection
-    $userRow = \DatabaseConnection::fetchRow(
-        "SELECT * FROM nuke_users WHERE username = ?",
-        [$username]
-    );
+    $userRow = $commonRepository->getUserByUsername($username);
 
     if ($userRow === null) {
         Nuke\Header::header();
@@ -86,7 +82,8 @@ function main(mixed $user): void
         Nuke\Footer::footer();
     } elseif (is_user($user)) {
         global $cookie;
-        userinfo((string)$cookie[1]);
+        cookiedecode($user);
+        userinfo((string)($cookie[1] ?? ''));
     }
 }
 

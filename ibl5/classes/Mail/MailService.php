@@ -169,6 +169,7 @@ class MailService implements MailServiceInterface
             $subject,
             strlen($body)
         ));
+        error_log('[MailService] Body: ' . $body);
         return true;
     }
 

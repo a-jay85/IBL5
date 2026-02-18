@@ -435,7 +435,7 @@ class AuthService implements AuthServiceInterface
         $regdate = date('M d, Y');
         $defaultTheme = '';
         $stmt = $this->db->prepare(
-            'INSERT INTO nuke_users (username, user_email, user_regdate, user_password, theme, user_lang) VALUES (?, ?, ?, ?, ?, ?)'
+            'INSERT INTO nuke_users (username, user_email, user_regdate, user_password, theme, user_lang, user_avatar, bio, ublock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         if ($stmt === false) {
             return;
@@ -443,7 +443,8 @@ class AuthService implements AuthServiceInterface
         // Store a placeholder bcrypt hash — the real password is managed by delight-auth
         $placeholderHash = 'delight-auth:' . $authUserId;
         $language = 'english';
-        $stmt->bind_param('ssssss', $username, $email, $regdate, $placeholderHash, $defaultTheme, $language);
+        $emptyText = '';
+        $stmt->bind_param('sssssssss', $username, $email, $regdate, $placeholderHash, $defaultTheme, $language, $emptyText, $emptyText, $emptyText);
         $stmt->execute();
         $stmt->close();
     }

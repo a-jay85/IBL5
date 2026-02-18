@@ -285,7 +285,7 @@ function main($user)
                     . "<tr><td colspan='2'>" . _TYPESECCODE . ": <input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\"></td></tr>\n"
                     . "<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">\n";
             }
-            echo "</table><input type=\"hidden\" name=\"redirect\" value=\"$redirect\">\n"
+            echo "</table><input type=\"hidden\" name=\"redirect\" value=\"" . htmlspecialchars(is_string($redirect) ? $redirect : '', ENT_QUOTES, 'UTF-8') . "\">\n"
                 . "<input type=\"hidden\" name=\"mode\" value=$mode>\n"
                 . "<input type=\"hidden\" name=\"f\" value=$f>\n"
                 . "<input type=\"hidden\" name=\"t\" value=$t>\n"
@@ -437,8 +437,8 @@ function logout()
     $cookie = "";
     Nuke\Header::header();
     OpenTable();
-    if (!empty($redirect)) {
-        echo "<META HTTP-EQUIV=\"refresh\" content=\"3;URL=modules.php?name=$redirect\">";
+    if (is_string($redirect) && preg_match('/^[A-Za-z0-9_]+$/', $redirect) === 1) {
+        echo "<META HTTP-EQUIV=\"refresh\" content=\"3;URL=modules.php?name=" . htmlspecialchars($redirect, ENT_QUOTES, 'UTF-8') . "\">";
     } else {
         echo "<META HTTP-EQUIV=\"refresh\" content=\"3;URL=index.php\">";
     }

@@ -1039,7 +1039,7 @@ function loginbox()
 {
     global $name;
     $redirect = '';
-    if (isset($name) && is_string($name) && $name !== '' && $name !== 'YourAccount') {
+    if (isset($name) && is_string($name) && $name !== '' && $name !== 'YourAccount' && preg_match('/^[A-Za-z0-9_]+$/', $name) === 1) {
         $redirect = '&redirect=' . rawurlencode($name);
     }
     header('Location: modules.php?name=YourAccount' . $redirect);

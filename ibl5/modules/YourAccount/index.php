@@ -358,12 +358,12 @@ function mail_password()
 
     // Use delight-im/auth's built-in password reset with secure tokens
     $authService->forgotPassword($user_email, static function (string $selector, string $token) use ($sitename, $adminmail, $nukeurl, $module_name, $user_email): void {
-        $resetLink = "$nukeurl/modules.php?name=$module_name&op=reset_password&selector=" . urlencode($selector) . "&token=" . urlencode($token);
-        $message = "" . _PASSWORDRESETREQUEST . " $sitename.\n\n"
-            . "" . _CLICKRESETLINK . "\n\n$resetLink\n\n"
-            . "" . _LINKEXPIRES6HOURS . "\n\n"
-            . "" . _IFYOUDIDNOTASK . "";
-        $subject = "" . _PASSWORDRESET . " - $sitename";
+        $resetLink = rtrim($nukeurl, '/') . "/ibl5/modules.php?name=$module_name&op=reset_password&selector=" . urlencode($selector) . "&token=" . urlencode($token);
+        $message = "A password reset was requested for your account at $sitename.\n\n"
+            . "Click the link below to reset your password:\n\n$resetLink\n\n"
+            . "This link will expire in 6 hours.\n\n"
+            . "If you did not request this, you can safely ignore this email.";
+        $subject = "Password Reset - $sitename";
         \Mail\MailService::fromConfig()->send($user_email, $subject, $message, $adminmail);
     });
 

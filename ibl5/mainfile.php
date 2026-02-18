@@ -1101,10 +1101,13 @@ function loginbox(): void
         $redirectParam = $redirect !== '' ? '&redirect=' . urlencode($redirect) : '';
         $url = 'modules.php?name=YourAccount' . $redirectParam;
         // Use JS redirect — callers have already sent output via Nuke\Header::header()
-        /** @var string $safeUrl */
-        $safeUrl = \Utilities\HtmlSanitizer::safeHtmlOutput($url);
-        echo '<script>window.location.href="' . $safeUrl . '";</script>';
-        echo '<noscript><meta http-equiv="refresh" content="0;url=' . $safeUrl . '"></noscript>';
+        // Escape for JS string context (not HTML entity encoding, which would turn & into &amp;)
+        $jsUrl = addslashes($url);
+        // Escape for HTML attribute context in <meta> tag
+        /** @var string $metaUrl */
+        $metaUrl = \Utilities\HtmlSanitizer::safeHtmlOutput($url);
+        echo '<script>window.location.href="' . $jsUrl . '";</script>';
+        echo '<noscript><meta http-equiv="refresh" content="0;url=' . $metaUrl . '"></noscript>';
         die();
     }
 }

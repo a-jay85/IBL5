@@ -13,12 +13,6 @@ get_lang($module_name);
 
 $pagetitle = "- Team Pages";
 
-function menu()
-{
-    Nuke\Header::header();
-    Nuke\Footer::footer();
-}
-
 function tradeoffer($username)
 {
     global $partner, $mysqli_db;
@@ -97,6 +91,6 @@ switch ($op) {
         break;
 
     default:
-        menu();
+        reviewtrade($user);
         break;
 }

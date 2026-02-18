@@ -110,7 +110,7 @@ ALTER TABLE `ibl_draft` MODIFY COLUMN `date` datetime DEFAULT NULL COMMENT 'Date
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `name` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Prospect name';
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `team` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'College or club team';
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `talent` int NOT NULL DEFAULT '0' COMMENT 'Talent off-season progression rating';
-ALTER TABLE `ibl_draft_class` MODIFY COLUMN `skill` int NOT NULL DEFAULT '0' COMMENT 'Skill  off-season progression rating';
+ALTER TABLE `ibl_draft_class` MODIFY COLUMN `skill` int NOT NULL DEFAULT '0' COMMENT 'Skill off-season progression rating';
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `intangibles` int NOT NULL DEFAULT '0' COMMENT 'Intangibles off-season progression rating';
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `drafted` int DEFAULT '0' COMMENT '0=undrafted, 1=drafted';
 ALTER TABLE `ibl_draft_class` MODIFY COLUMN `sta` int DEFAULT '0' COMMENT 'Stamina rating';

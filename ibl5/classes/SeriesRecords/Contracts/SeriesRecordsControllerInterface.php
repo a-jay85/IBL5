@@ -35,15 +35,6 @@ interface SeriesRecordsControllerInterface
     public function displaySeriesRecords(int $userTeamId): void;
 
     /**
-     * Handle the main entry point for unauthenticated users
-     * 
-     * Prompts user to log in if not authenticated.
-     * 
-     * @return void Outputs HTML directly
-     */
-    public function displayLoginPrompt(): void;
-
-    /**
      * Handle the main entry point for authenticated users
      * 
      * Retrieves user's team and delegates to displaySeriesRecords.

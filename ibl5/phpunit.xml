@@ -3,6 +3,9 @@
          colors="true"
          testdox="true">
     <testsuites>
+        <testsuite name="Auth Module Tests">
+            <directory>tests/Auth</directory>
+        </testsuite>
         <testsuite name="Services Tests">
             <directory>tests/Services</directory>
         </testsuite>
@@ -189,6 +192,12 @@
         </testsuite>
         <testsuite name="LeagueConfig Module Tests">
             <directory>tests/LeagueConfig</directory>
+        </testsuite>
+        <testsuite name="YourAccount Module Tests">
+            <directory>tests/YourAccount</directory>
+        </testsuite>
+        <testsuite name="Mail Module Tests">
+            <directory>tests/Mail</directory>
         </testsuite>
         <testsuite name="StrengthOfSchedule Module Tests">
             <directory>tests/StrengthOfSchedule</directory>

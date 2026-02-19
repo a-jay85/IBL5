@@ -110,6 +110,6 @@ $data = [
 ];
 
 // Render page
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 echo $view->render($data);
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

@@ -36,7 +36,7 @@ if ($isFirstLoad) {
 }
 
 // Render page
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 echo '<h2 class="ibl-title">Season Leaders</h2>';
 
@@ -66,4 +66,4 @@ foreach ($rows as $row) {
 // Render table footer
 echo $view->renderTableFooter();
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

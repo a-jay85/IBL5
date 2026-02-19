@@ -43,9 +43,9 @@ function showpage($playerID, $pageView): void
 
     $controller = new PlayerPageController($mysqli_db);
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     echo $controller->renderPage($playerID, $pageView, strval($cookie[1] ?? ''));
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function negotiate($playerID)
@@ -54,7 +54,7 @@ function negotiate($playerID)
 
     $playerID = intval($playerID);
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
 
     // Get user's team name using existing CommonRepository (must be after header() which populates $cookie)
     $commonRepository = new CommonMysqliRepository($mysqli_db);
@@ -64,7 +64,7 @@ function negotiate($playerID)
     $processor = new NegotiationProcessor($mysqli_db);
     echo $processor->processNegotiation($playerID, $userTeamName, $prefix);
 
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function rookieoption($pid)
@@ -80,7 +80,7 @@ function rookieoption($pid)
     // Load player
     $player = Player::withPlayerID($mysqli_db, $pid);
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
 
     // Get user's team name (must be after header() which populates $cookie)
     $userTeamName = $commonRepository->getTeamnameFromUsername(strval($cookie[1] ?? ''));
@@ -90,7 +90,7 @@ function rookieoption($pid)
     if (!$ownershipValidation['valid']) {
         echo '<div class="ibl-alert ibl-alert--error">' . \Utilities\HtmlSanitizer::safeHtmlOutput($ownershipValidation['error']) . '</div>';
         echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
         return;
     }
 
@@ -99,7 +99,7 @@ function rookieoption($pid)
     if (!$eligibilityValidation['valid']) {
         echo '<div class="ibl-alert ibl-alert--error">' . \Utilities\HtmlSanitizer::safeHtmlOutput($eligibilityValidation['error']) . '</div>';
         echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
         return;
     }
 
@@ -114,7 +114,7 @@ function rookieoption($pid)
     // Render form
     echo $formView->renderForm($player, $userTeamName, $rookieOptionValue, $error, $result, $from);
 
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function processrookieoption()

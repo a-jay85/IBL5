@@ -1102,7 +1102,7 @@ function loginbox(): void
             $_SESSION['redirect_after_login'] = $queryString;
         }
         $url = 'modules.php?name=YourAccount';
-        // Use JS redirect — callers have already sent output via Nuke\Header::header()
+        // Use JS redirect — callers have already sent output via PageLayout::header()
         $jsUrl = addslashes($url);
         echo '<script>window.location.href="' . $jsUrl . '";</script>';
         echo '<noscript><meta http-equiv="refresh" content="0;url=' . $jsUrl . '"></noscript>';

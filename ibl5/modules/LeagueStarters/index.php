@@ -40,7 +40,7 @@ $startersByPosition = $service->getAllStartersByPosition();
 $display = $_REQUEST['display'] ?? 'ratings';
 
 // Render header first (populates $cookie via online() → cookiedecode())
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 $username = strval($cookie[1] ?? '');
 $userTeamName = $commonRepository->getTeamnameFromUsername($username);
@@ -48,4 +48,4 @@ $userTeam = Team::initialize($mysqli_db, $userTeamName);
 
 echo $view->render($startersByPosition, $userTeam, $display);
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

@@ -36,8 +36,8 @@ $view = new RecordHoldersView();
 
 $records = $service->getAllRecords();
 
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 echo $view->render($records);
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

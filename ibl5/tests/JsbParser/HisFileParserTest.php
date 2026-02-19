@@ -12,39 +12,74 @@ use PHPUnit\Framework\TestCase;
  */
 class HisFileParserTest extends TestCase
 {
-    private string $hisFilePath;
-
-    protected function setUp(): void
+    /**
+     * Build a synthetic .his file with known season data.
+     *
+     * @param list<array{lines: list<string>}> $seasons Each season's team lines
+     */
+    private function buildHisFile(array $seasons): string
     {
-        $this->hisFilePath = dirname(__DIR__, 2) . '/IBL5.his';
+        $content = '';
+        foreach ($seasons as $season) {
+            foreach ($season['lines'] as $line) {
+                $content .= $line . "\r\n";
+            }
+            $content .= "\r\n"; // blank line between seasons
+        }
+        return $content;
     }
 
     public function testParseFileReturnsSeasonsArray(): void
     {
-        if (!file_exists($this->hisFilePath)) {
-            $this->markTestSkipped('.his file not available');
+        $hisData = $this->buildHisFile([
+            ['lines' => [
+                'Clippers (62-20)  defeat the  Raptors (59-23) 4 games to 3 in the championship (1988)',
+                'Raptors (59-23) lose to the Clippers (62-20) 4 games to 3 in the championship (1988)',
+                'Celtics (24-58) (1988)',
+            ]],
+        ]);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'his_test_');
+        $this->assertIsString($tmpFile);
+        file_put_contents($tmpFile, $hisData);
+
+        try {
+            $result = HisFileParser::parseFile($tmpFile);
+
+            $this->assertNotEmpty($result);
+            $this->assertArrayHasKey('year', $result[0]);
+            $this->assertArrayHasKey('teams', $result[0]);
+        } finally {
+            unlink($tmpFile);
         }
-
-        $result = HisFileParser::parseFile($this->hisFilePath);
-
-        $this->assertNotEmpty($result);
-        $this->assertArrayHasKey('year', $result[0]);
-        $this->assertArrayHasKey('teams', $result[0]);
     }
 
     public function testParseFileIncludesMultipleSeasons(): void
     {
-        if (!file_exists($this->hisFilePath)) {
-            $this->markTestSkipped('.his file not available');
+        $seasons = [];
+        for ($y = 1988; $y <= 1999; $y++) {
+            $seasons[] = ['lines' => [
+                "Clippers (62-20)  defeat the  Raptors (59-23) 4 games to 3 in the championship ({$y})",
+                "Raptors (59-23) lose to the Clippers (62-20) 4 games to 3 in the championship ({$y})",
+                "Celtics (24-58) ({$y})",
+            ]];
         }
 
-        $result = HisFileParser::parseFile($this->hisFilePath);
+        $hisData = $this->buildHisFile($seasons);
 
-        // Should have many seasons (1988 onward)
-        $this->assertGreaterThan(10, count($result));
+        $tmpFile = tempnam(sys_get_temp_dir(), 'his_test_');
+        $this->assertIsString($tmpFile);
+        file_put_contents($tmpFile, $hisData);
 
-        // First season should be 1988
-        $this->assertSame(1988, $result[0]['year']);
+        try {
+            $result = HisFileParser::parseFile($tmpFile);
+
+            $this->assertCount(12, $result);
+            $this->assertSame(1988, $result[0]['year']);
+            $this->assertSame(1999, $result[11]['year']);
+        } finally {
+            unlink($tmpFile);
+        }
     }
 
     public function testParseTeamLineWithChampionship(): void
@@ -145,38 +180,68 @@ class HisFileParserTest extends TestCase
 
     public function testAllTeamsHavePositiveWins(): void
     {
-        if (!file_exists($this->hisFilePath)) {
-            $this->markTestSkipped('.his file not available');
-        }
+        $hisData = $this->buildHisFile([
+            ['lines' => [
+                'Clippers (62-20)  defeat the  Raptors (59-23) 4 games to 3 in the championship (1988)',
+                'Raptors (59-23) lose to the Clippers (62-20) 4 games to 3 in the championship (1988)',
+                'Celtics (24-58) (1988)',
+                'Heat (41-41) (1988)',
+            ]],
+        ]);
 
-        $result = HisFileParser::parseFile($this->hisFilePath);
+        $tmpFile = tempnam(sys_get_temp_dir(), 'his_test_');
+        $this->assertIsString($tmpFile);
+        file_put_contents($tmpFile, $hisData);
 
-        foreach ($result as $season) {
-            foreach ($season['teams'] as $team) {
-                $totalGames = $team['wins'] + $team['losses'];
-                $this->assertGreaterThan(0, $totalGames, $team['name'] . ' in ' . $season['year'] . ' should have played games');
+        try {
+            $result = HisFileParser::parseFile($tmpFile);
+
+            foreach ($result as $season) {
+                foreach ($season['teams'] as $team) {
+                    $totalGames = $team['wins'] + $team['losses'];
+                    $this->assertGreaterThan(0, $totalGames, $team['name'] . ' in ' . $season['year'] . ' should have played games');
+                }
             }
+        } finally {
+            unlink($tmpFile);
         }
     }
 
     public function testEachSeasonHasExactlyOneChampion(): void
     {
-        if (!file_exists($this->hisFilePath)) {
-            $this->markTestSkipped('.his file not available');
-        }
+        $hisData = $this->buildHisFile([
+            ['lines' => [
+                'Clippers (62-20)  defeat the  Raptors (59-23) 4 games to 3 in the championship (1988)',
+                'Raptors (59-23) lose to the Clippers (62-20) 4 games to 3 in the championship (1988)',
+                'Celtics (24-58) (1988)',
+            ]],
+            ['lines' => [
+                'Heat (55-27)  defeat the  Nets (50-32) 4 games to 1 in the championship (1989)',
+                'Nets (50-32) lose to the Heat (55-27) 4 games to 1 in the championship (1989)',
+                'Lakers (30-52) (1989)',
+            ]],
+        ]);
 
-        $result = HisFileParser::parseFile($this->hisFilePath);
+        $tmpFile = tempnam(sys_get_temp_dir(), 'his_test_');
+        $this->assertIsString($tmpFile);
+        file_put_contents($tmpFile, $hisData);
 
-        foreach ($result as $season) {
-            $champions = array_filter(
-                $season['teams'],
-                static fn (array $team): bool => $team['won_championship'] === 1
-            );
-            $this->assertCount(
-                1,
-                $champions,
-                'Season ' . $season['year'] . ' should have exactly 1 champion, found ' . count($champions)
-            );
+        try {
+            $result = HisFileParser::parseFile($tmpFile);
+
+            foreach ($result as $season) {
+                $champions = array_filter(
+                    $season['teams'],
+                    static fn (array $team): bool => $team['won_championship'] === 1
+                );
+                $this->assertCount(
+                    1,
+                    $champions,
+                    'Season ' . $season['year'] . ' should have exactly 1 champion, found ' . count($champions)
+                );
+            }
+        } finally {
+            unlink($tmpFile);
         }
     }
 }

@@ -151,7 +151,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
                 is_draft_pick = VALUES(is_draft_pick),
                 draft_pick_year = VALUES(draft_pick_year),
                 source_file = VALUES(source_file)',
-            'iiiiisiiisisiss',
+            'iiiiisiiisiiiis',
             $record['season_year'],
             $record['transaction_month'],
             $record['transaction_day'],

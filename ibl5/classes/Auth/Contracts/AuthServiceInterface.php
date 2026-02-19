@@ -77,4 +77,56 @@ interface AuthServiceInterface
      * @return string The bcrypt hash
      */
     public function hashPassword(string $password): string;
+
+    /**
+     * Register a new user via delight-im/auth with unique username enforcement
+     *
+     * @param string $email User's email address
+     * @param string $password Plaintext password
+     * @param string $username Desired username
+     * @param callable|null $emailCallback Called with (selector, token) to send verification email
+     * @return int The new user's ID in the auth system
+     * @throws \RuntimeException on validation or duplicate errors (check getLastError() for message)
+     */
+    public function register(string $email, string $password, string $username, ?callable $emailCallback = null): int;
+
+    /**
+     * Confirm a user's email via selector/token and sign them in
+     *
+     * On success, also creates the nuke_users profile for site-wide compatibility.
+     *
+     * @param string $selector The selector from the confirmation URL
+     * @param string $token The token from the confirmation URL
+     * @return array<int|string, string> Email before and after confirmation
+     * @throws \RuntimeException on invalid/expired token (check getLastError() for message)
+     */
+    public function confirmEmail(string $selector, string $token): array;
+
+    /**
+     * Initiate a password reset by sending a reset link via callback
+     *
+     * @param string $email The user's email address
+     * @param callable $callback Called with (selector, token) to send the reset email
+     * @throws \RuntimeException on error (check getLastError() for message)
+     */
+    public function forgotPassword(string $email, callable $callback): void;
+
+    /**
+     * Reset a user's password using the selector/token from the reset email
+     *
+     * Also updates the password in nuke_users for backward compatibility.
+     *
+     * @param string $selector The selector from the reset URL
+     * @param string $token The token from the reset URL
+     * @param string $newPassword The new plaintext password
+     * @throws \RuntimeException on invalid/expired token (check getLastError() for message)
+     */
+    public function resetPassword(string $selector, string $token, string $newPassword): void;
+
+    /**
+     * Get the last error message from a failed auth operation
+     *
+     * @return string|null The error message, or null if no error
+     */
+    public function getLastError(): ?string;
 }

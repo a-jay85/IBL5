@@ -67,20 +67,9 @@ function userinfo(string $username): void
  */
 function main(mixed $user): void
 {
-    global $stop;
-
     if (!is_user($user)) {
-        Nuke\Header::header();
-        if ($stop) {
-            echo '<div class="ibl-alert ibl-alert--error">' . _LOGININCOR . '</div>';
-        } else {
-            echo '<div class="ibl-alert ibl-alert--error">' . _USERREGLOGIN . '</div>';
-        }
-        if (!is_user($user)) {
-            loginbox();
-        }
-        Nuke\Footer::footer();
-    } elseif (is_user($user)) {
+        loginbox();
+    } else {
         global $cookie;
         cookiedecode($user);
         userinfo((string)($cookie[1] ?? ''));

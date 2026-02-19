@@ -1,0 +1,221 @@
+/**
+ * IBL5 Auth Page Components
+ *
+ * Breeze-inspired centered card layout for:
+ * - Login
+ * - Registration
+ * - Password Reset
+ * - Account Activation
+ * - Logout
+ */
+
+/* ==========================================================================
+   Auth Page Container
+   Full-viewport centered layout
+   ========================================================================== */
+
+.auth-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 50vh;
+    padding: var(--space-8) var(--space-4);
+}
+
+/* ==========================================================================
+   Auth Card
+   Extends .ibl-card with auth-specific sizing and centering
+   ========================================================================== */
+
+.auth-card {
+    width: 100%;
+    max-width: 440px;
+    margin: 0 auto;
+}
+
+.auth-card .ibl-card__header {
+    text-align: center;
+    padding: var(--space-6) var(--space-6) var(--space-4);
+}
+
+.auth-card .ibl-card__body {
+    padding: var(--space-4) var(--space-6) var(--space-6);
+}
+
+.auth-card .ibl-card__footer {
+    text-align: center;
+    padding: var(--space-4) var(--space-6);
+}
+
+/* ==========================================================================
+   Auth Input with Icon
+   Left-padded input with positioned SVG icon
+   ========================================================================== */
+
+.auth-input-wrapper {
+    position: relative;
+}
+
+.auth-input-wrapper .auth-input__icon {
+    position: absolute;
+    left: var(--space-3);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-400);
+    width: 20px;
+    height: 20px;
+    pointer-events: none;
+}
+
+.auth-input--with-icon {
+    padding-left: calc(var(--space-3) + 20px + var(--space-2));
+}
+
+/* ==========================================================================
+   Auth Cross-Navigation Links
+   ========================================================================== */
+
+.auth-links {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+}
+
+.auth-links a {
+    color: var(--accent-500);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color var(--transition-fast);
+}
+
+.auth-links a:hover {
+    color: var(--accent-600);
+    text-decoration: underline;
+}
+
+.auth-links__divider {
+    color: var(--gray-300);
+    user-select: none;
+}
+
+/* ==========================================================================
+   Auth Logo (basketball icon above the card)
+   ========================================================================== */
+
+.auth-logo {
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--space-4);
+}
+
+.auth-logo__icon {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-full);
+    background: var(--gradient-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-glow);
+}
+
+.auth-logo__icon svg {
+    width: 28px;
+    height: 28px;
+    color: white;
+}
+
+/* ==========================================================================
+   Auth Status Pages (Activation, Password Mailed, Logout)
+   ========================================================================== */
+
+.auth-status {
+    text-align: center;
+    padding: var(--space-6);
+}
+
+.auth-status__icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto var(--space-4);
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-status__icon--success {
+    background: var(--success-100);
+    color: var(--success-600);
+}
+
+.auth-status__icon--error {
+    background: var(--error-100);
+    color: var(--error-600);
+}
+
+.auth-status__icon--info {
+    background: var(--info-100);
+    color: var(--info-600);
+}
+
+.auth-status__title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-800);
+    margin-bottom: var(--space-2);
+}
+
+.auth-status__message {
+    font-family: var(--font-sans);
+    font-size: 1.125rem;
+    color: var(--gray-600);
+    line-height: 1.6;
+    margin-bottom: var(--space-4);
+}
+
+.auth-status__action {
+    display: inline-flex;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 480px) {
+    .auth-page {
+        padding: var(--space-6) var(--space-3);
+    }
+
+    .auth-card {
+        max-width: 100%;
+    }
+
+    .auth-card .ibl-card__header {
+        padding: var(--space-4) var(--space-4) var(--space-3);
+    }
+
+    .auth-card .ibl-card__body {
+        padding: var(--space-3) var(--space-4) var(--space-4);
+    }
+
+    .auth-card .ibl-card__footer {
+        padding: var(--space-3) var(--space-4);
+    }
+
+    .auth-links {
+        flex-direction: column;
+        gap: var(--space-1);
+    }
+
+    .auth-links__divider {
+        display: none;
+    }
+}

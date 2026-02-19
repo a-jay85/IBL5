@@ -184,6 +184,25 @@ try {
     flush();
     $successCount++;
 
+    // --- Step 6: Parse JSB engine files ---
+    echo $view->renderStepStart('Parsing JSB engine files...');
+    flush();
+
+    $jsbRepo = new JsbParser\JsbImportRepository($mysqli_db);
+    $jsbResolver = new JsbParser\PlayerIdResolver($mysqli_db);
+    $jsbService = new JsbParser\JsbImportService($jsbRepo, $jsbResolver);
+
+    $jsbBasePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5';
+    ob_start();
+    $jsbResult = $jsbService->processCurrentSeason($jsbBasePath, $season);
+    $log = (string) ob_get_clean();
+    echo $view->renderStepComplete('JSB files parsed', $jsbResult->summary());
+    if ($log !== '') {
+        echo $view->renderLog($log);
+    }
+    flush();
+    $successCount++;
+
     echo $view->renderSectionClose();
     flush();
 

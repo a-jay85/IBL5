@@ -11,6 +11,16 @@ class PageLayout
         online();
         self::renderHead();
         include "includes/counter.php";
+        if (
+            isset($_SESSION['flash_success'])
+            && is_string($_SESSION['flash_success'])
+            && $_SESSION['flash_success'] !== ''
+        ) {
+            /** @var string $flashMessage */
+            $flashMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_success']);
+            unset($_SESSION['flash_success']);
+            echo '<div class="ibl-alert ibl-alert--success">' . $flashMessage . '</div>';
+        }
         if (defined('HOME_FILE')) {
             message_box();
             blocks("Center");

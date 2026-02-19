@@ -1,6 +1,8 @@
 <?php
 
-// PHP-Nuke language constants (loaded at runtime by get_lang())
+// PHP-Nuke language constants (loaded at runtime by get_lang() or mainfile.php)
+// Language
+define('_CHARSET', '');
 // Footer
 define('_PAGEGENERATION', '');
 define('_SECONDS', '');

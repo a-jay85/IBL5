@@ -108,7 +108,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function AddCategory()
     {
         global $admin_file;
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _CATEGORIESADMIN . "</b></font></center>";
@@ -133,7 +133,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $result = $db->sql_query("select title from " . $prefix . "_stories_cat where catid='$catid'");
         list($title) = $db->sql_fetchrow($result);
         $title = filter($title, "nohtml");
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _CATEGORIESADMIN . "</b></font></center>";
@@ -178,7 +178,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $result = $db->sql_query("select title from " . $prefix . "_stories_cat where catid='$cat'");
         list($title) = $db->sql_fetchrow($result);
         $title = filter($title, "nohtml");
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _CATEGORIESADMIN . "</b></font></center>";
@@ -242,7 +242,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         $result = $db->sql_query("select title from " . $prefix . "_stories_cat where catid='$catid'");
         list($title) = $db->sql_fetchrow($result);
         $title = filter($title, "nohtml");
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _CATEGORIESADMIN . "</b></font></center>";
@@ -297,7 +297,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
                 return;
             }
         }
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _CATEGORIESADMIN . "</b></font></center>";
@@ -327,7 +327,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
                 return;
             }
         }
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _CATEGORIESADMIN . "</b></font></center>";
@@ -405,7 +405,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         list($aaid) = $db->sql_fetchrow($result2);
         $aaid = substr("$aaid", 0, 25);
         if (($radminarticle == 1) and ($aaid == $aid) or ($radminsuper == 1)) {
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             $result = $db->sql_query("select catid, aid, title, time, hometext, bodytext, topic, informant, notes, ihome, alanguage, acomm from " . $prefix . "_autonews where anid='$anid'");
             list($catid, $aid, $title, $time, $hometext, $bodytext, $topic, $informant, $notes, $ihome, $alanguage, $acomm) = $db->sql_fetchrow($result);
             $catid = intval($catid);
@@ -579,7 +579,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             CloseTable();
             include 'footer.php';
         } else {
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _ARTICLEADMIN . "</b></font></center>";
@@ -641,7 +641,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             }
             Header("Location: " . $admin_file . ".php?op=adminMain");
         } else {
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _ARTICLEADMIN . "</b></font></center>";
@@ -659,7 +659,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function displayStory($qid)
     {
         global $user, $subject, $story, $bgcolor1, $bgcolor2, $anonymous, $user_prefix, $prefix, $db, $multilingual, $admin_file;
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _SUBMISSIONSADMIN . "</b></font></center>";
@@ -909,7 +909,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function previewStory($automated, $year, $day, $month, $hour, $min, $qid, $uid, $author, $subject, $hometext, $bodytext, $topic, $notes, $catid, $ihome, $alanguage, $acomm, $pollTitle, $optionText, $assotop)
     {
         global $user, $boxstuff, $anonymous, $bgcolor1, $bgcolor2, $user_prefix, $prefix, $db, $multilingual, $admin_file;
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _ARTICLEADMIN . "</b></font></center>";
@@ -1274,7 +1274,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
         list($aaid) = $db->sql_fetchrow($result2);
         $aaid = substr("$aaid", 0, 25);
         if (($radminarticle == 1) and ($aaid == $aid) or ($radminsuper == 1)) {
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _ARTICLEADMIN . "</b></font></center>";
@@ -1387,7 +1387,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
             CloseTable();
             include 'footer.php';
         } else {
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _ARTICLEADMIN . "</b></font></center>";
@@ -1440,7 +1440,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
                 }
                 Header("Location: " . $admin_file . ".php");
             } else {
-                Nuke\Header::header();
+                PageLayout\PageLayout::header();
                 GraphicAdmin();
                 OpenTable();
                 echo "<center><font class=\"title\"><b>" . _ARTICLEADMIN . "</b></font></center>";
@@ -1453,7 +1453,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
                 include "footer.php";
             }
         } else {
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             GraphicAdmin();
             OpenTable();
             echo "<center><font class=\"title\"><b>" . _ARTICLEADMIN . "</b></font></center>";
@@ -1512,7 +1512,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function adminStory()
     {
         global $prefix, $db, $language, $multilingual, $admin_file;
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _ARTICLEADMIN . "</b></font></center>";
@@ -1720,7 +1720,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     function previewAdminStory($automated, $year, $day, $month, $hour, $min, $subject, $hometext, $bodytext, $topic, $catid, $ihome, $alanguage, $acomm, $pollTitle, $optionText, $assotop)
     {
         global $user, $bgcolor1, $bgcolor2, $prefix, $db, $alanguage, $multilingual, $admin_file;
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         if ($topic < 1) {
             $topic = 1;
         }
@@ -2018,7 +2018,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     {
         global $admin, $bgcolor1, $bgcolor2, $prefix, $db, $radminsuper, $anonymous, $multilingual, $admin_file, $user_prefix;
         $dummy = 0;
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         GraphicAdmin();
         OpenTable();
         echo "<center><font class=\"title\"><b>" . _SUBMISSIONSADMIN . "</b></font></center>";
@@ -2194,7 +2194,7 @@ if ($row2['radminsuper'] == 1 || $auth_user == 1) {
     }
 
 } else {
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     GraphicAdmin();
     OpenTable();
     echo "<center><b>" . _ERROR . "</b><br><br>You do not have administration permission for module \"$module_name\"</center>";

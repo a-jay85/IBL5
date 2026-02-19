@@ -47,8 +47,8 @@ $view = new SeasonHighsView();
 $data = $service->getSeasonHighsData($seasonPhase);
 
 // Render page
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 echo $view->render($seasonPhase, $data);
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

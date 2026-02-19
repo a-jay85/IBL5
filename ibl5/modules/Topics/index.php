@@ -43,6 +43,6 @@ $view = new TopicsView();
 $topics = $service->getTopicsWithArticles();
 
 // Render page
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 echo $view->render($topics, $themePath);
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

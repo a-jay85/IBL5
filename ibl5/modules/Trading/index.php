@@ -26,9 +26,9 @@ function tradeoffer($username)
     $pageData['result'] = $_GET['result'] ?? null;
     $pageData['error'] = $_GET['error'] ?? null;
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     echo $view->renderTradeOfferForm($pageData);
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function tradereview($username)
@@ -44,9 +44,9 @@ function tradereview($username)
     $pageData['result'] = $_GET['result'] ?? null;
     $pageData['error'] = $_GET['error'] ?? null;
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     echo $view->renderTradeReview($pageData);
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function reviewtrade($user)
@@ -63,9 +63,9 @@ function reviewtrade($user)
             tradereview(strval($cookie[1] ?? ''));
         } else {
             $view = new TradingView();
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             echo $view->renderTradesClosed($season);
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
         }
     }
 }

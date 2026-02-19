@@ -51,7 +51,7 @@ if ($teamID > 0) {
     $isValidTeam = ($team->teamID > 0);
 }
 
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 if ($isValidTeam) {
     // Team-specific schedule with colors, logo, and win/loss tracking
@@ -79,4 +79,4 @@ if ($isValidTeam) {
     echo $view->render($pageData);
 }
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

@@ -38,7 +38,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
     $teamlogo = $userinfo['user_ibl_team'] ?? '';
     $tid = $commonRepository->getTidFromTeamname($teamlogo);
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
 
     $repository = new \ComparePlayers\ComparePlayersRepository($mysqli_db);
     $service = new \ComparePlayers\ComparePlayersService($repository);
@@ -55,7 +55,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
         if (strlen($player1Name) > 100 || strlen($player2Name) > 100) {
             echo '<div class="ibl-empty-state"><p class="ibl-empty-state__text">Player names must be 100 characters or less.</p></div>';
             echo $view->renderSearchForm($playerNames);
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
             return;
         }
 
@@ -70,7 +70,7 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
         }
     }
 
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 /**

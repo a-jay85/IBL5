@@ -25,7 +25,7 @@ if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 global $mysqli_db;
 $season = new Season($mysqli_db);
@@ -35,4 +35,4 @@ $controller = new VotingResultsController($service, $renderer, $season);
 
 echo $controller->render();
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

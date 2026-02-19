@@ -30,7 +30,7 @@ $filters = [
 ];
 
 // Render page
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 echo '<h2 class="ibl-title">Career Leaderboards</h2>';
 
@@ -72,4 +72,4 @@ if ($filters['submitted'] != null) {
     }
 }
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

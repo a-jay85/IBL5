@@ -45,7 +45,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $teamID = $this->commonRepository->getTidFromTeamname($teamName) ?? 0;
         $team = \Team::initialize($this->db, $teamID);
 
-        \Nuke\Header::header();
+        \PageLayout\PageLayout::header();
 
         echo '<h2 class="ibl-title">Depth Chart Entry</h2>';
         $this->view->renderTeamLogo($teamID);
@@ -99,7 +99,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         echo '<script>window.IBL_AJAX_TABS_CONFIG = ' . $ajaxTabsConfig . ';</script>';
         echo '<script src="jslib/ajax-tabs.js" defer></script>';
 
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::footer();
     }
 
     /**

@@ -32,7 +32,7 @@ $view = new \AwardHistory\AwardHistoryView($service);
 $searchResult = $service->search($_POST);
 
 // Render page
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 echo '<h2 class="ibl-title">Player Awards</h2>';
 echo $view->renderSearchForm($searchResult['params']);
@@ -48,4 +48,4 @@ if ($searchResult['count'] > 0) {
 
 echo $view->renderTableFooter();
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

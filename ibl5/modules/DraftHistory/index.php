@@ -53,7 +53,7 @@ if ($isValidTeam) {
 }
 
 // Render page
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 if ($isValidTeam) {
     echo $view->renderTeamHistory($team, $repository->getDraftPicksByTeam($team->name));
@@ -62,4 +62,4 @@ if ($isValidTeam) {
     echo $view->render($year, $startYear, $endYear, $draftPicks);
 }
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

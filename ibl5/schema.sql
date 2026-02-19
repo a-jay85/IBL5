@@ -1353,28 +1353,6 @@ SET character_set_client = utf8;
 SET character_set_client = @saved_cs_client;
 
 --
--- Table structure for table `ibl_playoff_results`
---
-
-DROP TABLE IF EXISTS `ibl_playoff_results`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `ibl_playoff_results` (
-  `year` smallint(5) unsigned NOT NULL COMMENT 'Playoff year',
-  `round` tinyint(3) unsigned NOT NULL COMMENT 'Playoff round',
-  `winner` varchar(32) NOT NULL DEFAULT '' COMMENT 'Series-winning team name',
-  `loser` varchar(32) NOT NULL DEFAULT '' COMMENT 'Series-losing team name',
-  `loser_games` int(11) NOT NULL DEFAULT 0 COMMENT 'Games won by losing team in series',
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  PRIMARY KEY (`id`),
-  KEY `idx_year` (`year`),
-  KEY `idx_round` (`round`),
-  KEY `idx_winner` (`winner`),
-  KEY `idx_loser` (`loser`)
-) ENGINE=InnoDB AUTO_INCREMENT=278 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Temporary table structure for view `ibl_playoff_stats`
 --
 
@@ -1600,46 +1578,6 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
-
---
--- Table structure for table `ibl_plr_chunk`
---
-
-DROP TABLE IF EXISTS `ibl_plr_chunk`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `ibl_plr_chunk` (
-  `active` int(11) NOT NULL DEFAULT 0 COMMENT 'On depth chart at chunk time',
-  `pid` int(11) NOT NULL DEFAULT 0 COMMENT 'FK to ibl_plr.pid',
-  `ordinal` int(11) NOT NULL COMMENT 'Roster sort order',
-  `name` varchar(32) NOT NULL COMMENT 'Player name (snapshot)',
-  `tid` int(11) NOT NULL DEFAULT 0 COMMENT 'Team ID',
-  `teamname` varchar(32) NOT NULL DEFAULT '' COMMENT 'Team name (snapshot)',
-  `pos` varchar(4) NOT NULL COMMENT 'Primary position',
-  `altpos` varchar(4) NOT NULL DEFAULT '' COMMENT 'Alternate position',
-  `stats_gs` int(11) NOT NULL DEFAULT 0 COMMENT 'Games started in chunk',
-  `stats_gm` int(11) NOT NULL DEFAULT 0 COMMENT 'Games played in chunk',
-  `stats_min` int(11) NOT NULL DEFAULT 0 COMMENT 'Minutes played in chunk',
-  `stats_fgm` int(11) NOT NULL DEFAULT 0 COMMENT 'Field goals made in chunk',
-  `stats_fga` int(11) NOT NULL DEFAULT 0 COMMENT 'Field goals attempted in chunk',
-  `stats_ftm` int(11) NOT NULL DEFAULT 0 COMMENT 'Free throws made in chunk',
-  `stats_fta` int(11) NOT NULL DEFAULT 0 COMMENT 'Free throws attempted in chunk',
-  `stats_3gm` int(11) NOT NULL DEFAULT 0 COMMENT 'Three pointers made in chunk',
-  `stats_3ga` int(11) NOT NULL DEFAULT 0 COMMENT 'Three pointers attempted in chunk',
-  `stats_orb` int(11) NOT NULL DEFAULT 0 COMMENT 'Offensive rebounds in chunk',
-  `stats_drb` int(11) NOT NULL DEFAULT 0 COMMENT 'Defensive rebounds in chunk',
-  `stats_ast` int(11) NOT NULL DEFAULT 0 COMMENT 'Assists in chunk',
-  `stats_stl` int(11) NOT NULL DEFAULT 0 COMMENT 'Steals in chunk',
-  `stats_to` int(11) NOT NULL DEFAULT 0 COMMENT 'Turnovers in chunk',
-  `stats_blk` int(11) NOT NULL DEFAULT 0 COMMENT 'Blocks in chunk',
-  `stats_pf` int(11) NOT NULL DEFAULT 0 COMMENT 'Personal fouls in chunk',
-  `chunk` int(11) DEFAULT NULL COMMENT 'Sim chunk number',
-  `qa` decimal(11,2) NOT NULL DEFAULT 0.00 COMMENT 'Quality assessment score',
-  `Season` int(11) NOT NULL COMMENT 'Season year',
-  KEY `pid` (`pid`),
-  CONSTRAINT `fk_plr_chunk_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
 
 --
 -- Table structure for table `ibl_power`
@@ -1979,7 +1917,6 @@ CREATE TABLE `ibl_team_info` (
   `Contract_Losses` int(11) NOT NULL DEFAULT 0 COMMENT 'Losses from last season for FA Play for Winner weight',
   `Contract_AvgW` int(11) NOT NULL DEFAULT 0 COMMENT 'Avg wins from last five seasons for FA Tradition weight',
   `Contract_AvgL` int(11) NOT NULL DEFAULT 0 COMMENT 'Avg losses from last five seasons for FA Tradition weight',
-  `Contract_Coach` decimal(3,2) NOT NULL DEFAULT 0.00 COMMENT 'Playoff record for FA Coach weight (currently unused)',
   `Used_Extension_This_Chunk` int(11) NOT NULL DEFAULT 0 COMMENT '1=used extension in current sim chunk',
   `Used_Extension_This_Season` int(11) DEFAULT 0 COMMENT '1=used extension this season',
   `HasMLE` int(11) NOT NULL DEFAULT 0 COMMENT '1=Mid-Level Exception already used',
@@ -2355,104 +2292,6 @@ CREATE TABLE `nuke_banned_ip` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `nuke_banner`
---
-
-DROP TABLE IF EXISTS `nuke_banner`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_banner` (
-  `bid` int(11) NOT NULL AUTO_INCREMENT,
-  `cid` int(11) NOT NULL DEFAULT 0,
-  `name` varchar(50) NOT NULL DEFAULT '',
-  `imptotal` int(11) NOT NULL DEFAULT 0,
-  `impmade` int(11) NOT NULL DEFAULT 0,
-  `clicks` int(11) NOT NULL DEFAULT 0,
-  `imageurl` varchar(100) NOT NULL DEFAULT '',
-  `clickurl` varchar(200) NOT NULL DEFAULT '',
-  `alttext` varchar(255) NOT NULL DEFAULT '',
-  `date` datetime DEFAULT NULL,
-  `dateend` datetime DEFAULT NULL,
-  `position` int(11) NOT NULL DEFAULT 0,
-  `active` tinyint(1) NOT NULL DEFAULT 1,
-  `ad_class` varchar(5) NOT NULL DEFAULT '',
-  `ad_code` mediumtext NOT NULL,
-  `ad_width` int(11) DEFAULT 0,
-  `ad_height` int(11) DEFAULT 0,
-  PRIMARY KEY (`bid`),
-  KEY `cid` (`cid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_banner_clients`
---
-
-DROP TABLE IF EXISTS `nuke_banner_clients`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_banner_clients` (
-  `cid` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(60) NOT NULL DEFAULT '',
-  `contact` varchar(60) NOT NULL DEFAULT '',
-  `email` varchar(60) NOT NULL DEFAULT '',
-  `login` varchar(10) NOT NULL DEFAULT '',
-  `passwd` varchar(10) NOT NULL DEFAULT '',
-  `extrainfo` mediumtext NOT NULL,
-  PRIMARY KEY (`cid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_banner_plans`
---
-
-DROP TABLE IF EXISTS `nuke_banner_plans`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_banner_plans` (
-  `pid` int(11) NOT NULL AUTO_INCREMENT,
-  `active` tinyint(1) NOT NULL DEFAULT 0,
-  `name` varchar(255) NOT NULL DEFAULT '',
-  `description` mediumtext NOT NULL,
-  `delivery` varchar(10) NOT NULL DEFAULT '',
-  `delivery_type` varchar(25) NOT NULL DEFAULT '',
-  `price` varchar(25) NOT NULL DEFAULT '0',
-  `buy_links` mediumtext NOT NULL,
-  PRIMARY KEY (`pid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_banner_positions`
---
-
-DROP TABLE IF EXISTS `nuke_banner_positions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_banner_positions` (
-  `apid` int(11) NOT NULL AUTO_INCREMENT,
-  `position_number` int(11) NOT NULL DEFAULT 0,
-  `position_name` varchar(255) NOT NULL DEFAULT '',
-  PRIMARY KEY (`apid`),
-  KEY `position_number` (`position_number`)
-) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_banner_terms`
---
-
-DROP TABLE IF EXISTS `nuke_banner_terms`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_banner_terms` (
-  `terms_body` mediumtext NOT NULL,
-  `country` varchar(255) NOT NULL DEFAULT ''
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `nuke_blocks`
 --
 
@@ -2482,23 +2321,6 @@ CREATE TABLE `nuke_blocks` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `nuke_cities`
---
-
-DROP TABLE IF EXISTS `nuke_cities`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_cities` (
-  `id` mediumint(9) NOT NULL DEFAULT 0,
-  `local_id` mediumint(9) NOT NULL DEFAULT 0,
-  `city` varchar(65) NOT NULL DEFAULT '',
-  `cc` char(2) NOT NULL DEFAULT '',
-  `country` varchar(35) NOT NULL DEFAULT '',
-  PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `nuke_comments`
 --
 
@@ -2523,33 +2345,6 @@ CREATE TABLE `nuke_comments` (
   KEY `pid` (`pid`),
   KEY `sid` (`sid`)
 ) ENGINE=MyISAM AUTO_INCREMENT=62 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_comments_moderated`
---
-
-DROP TABLE IF EXISTS `nuke_comments_moderated`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_comments_moderated` (
-  `tid` int(11) NOT NULL AUTO_INCREMENT,
-  `pid` int(11) NOT NULL DEFAULT 0,
-  `sid` int(11) NOT NULL DEFAULT 0,
-  `date` datetime DEFAULT NULL,
-  `name` varchar(60) NOT NULL DEFAULT '',
-  `email` varchar(60) DEFAULT NULL,
-  `url` varchar(60) DEFAULT NULL,
-  `host_name` varchar(60) DEFAULT NULL,
-  `subject` varchar(85) NOT NULL DEFAULT '',
-  `comment` mediumtext NOT NULL,
-  `score` tinyint(4) NOT NULL DEFAULT 0,
-  `reason` tinyint(4) NOT NULL DEFAULT 0,
-  `last_moderation_ip` varchar(15) DEFAULT '0',
-  PRIMARY KEY (`tid`),
-  KEY `pid` (`pid`),
-  KEY `sid` (`sid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2613,21 +2408,6 @@ CREATE TABLE `nuke_config` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `nuke_confirm`
---
-
-DROP TABLE IF EXISTS `nuke_confirm`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_confirm` (
-  `confirm_id` char(32) NOT NULL DEFAULT '',
-  `session_id` char(32) NOT NULL DEFAULT '',
-  `code` char(6) NOT NULL DEFAULT '',
-  PRIMARY KEY (`session_id`,`confirm_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `nuke_counter`
 --
 
@@ -2638,38 +2418,6 @@ CREATE TABLE `nuke_counter` (
   `type` varchar(80) NOT NULL DEFAULT '',
   `var` varchar(80) NOT NULL DEFAULT '',
   `count` int(10) unsigned NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_faqanswer`
---
-
-DROP TABLE IF EXISTS `nuke_faqanswer`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_faqanswer` (
-  `id` tinyint(4) NOT NULL AUTO_INCREMENT,
-  `id_cat` tinyint(4) NOT NULL DEFAULT 0,
-  `question` varchar(255) DEFAULT '',
-  `answer` mediumtext DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `id_cat` (`id_cat`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_faqcategories`
---
-
-DROP TABLE IF EXISTS `nuke_faqcategories`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_faqcategories` (
-  `id_cat` tinyint(4) NOT NULL AUTO_INCREMENT,
-  `categories` varchar(255) DEFAULT NULL,
-  `flanguage` varchar(30) NOT NULL DEFAULT '',
-  PRIMARY KEY (`id_cat`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2731,23 +2479,6 @@ CREATE TABLE `nuke_links_categories` (
   `cdescription` mediumtext NOT NULL,
   `parentid` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`cid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_links_editorials`
---
-
-DROP TABLE IF EXISTS `nuke_links_editorials`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_links_editorials` (
-  `linkid` int(11) NOT NULL DEFAULT 0,
-  `adminid` varchar(60) NOT NULL DEFAULT '',
-  `editorialtimestamp` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `editorialtext` mediumtext NOT NULL,
-  `editorialtitle` varchar(100) NOT NULL DEFAULT '',
-  PRIMARY KEY (`linkid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2820,25 +2551,6 @@ CREATE TABLE `nuke_links_newlink` (
   PRIMARY KEY (`lid`),
   KEY `cid` (`cid`),
   KEY `sid` (`sid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_links_votedata`
---
-
-DROP TABLE IF EXISTS `nuke_links_votedata`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_links_votedata` (
-  `ratingdbid` int(11) NOT NULL AUTO_INCREMENT,
-  `ratinglid` int(11) NOT NULL DEFAULT 0,
-  `ratinguser` varchar(60) NOT NULL DEFAULT '',
-  `rating` int(11) NOT NULL DEFAULT 0,
-  `ratinghostname` varchar(60) NOT NULL DEFAULT '',
-  `ratingcomments` mediumtext NOT NULL,
-  `ratingtimestamp` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  PRIMARY KEY (`ratingdbid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2965,76 +2677,6 @@ CREATE TABLE `nuke_poll_desc` (
   `comments` int(11) DEFAULT 0,
   PRIMARY KEY (`pollID`)
 ) ENGINE=MyISAM AUTO_INCREMENT=53 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_pollcomments`
---
-
-DROP TABLE IF EXISTS `nuke_pollcomments`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_pollcomments` (
-  `tid` int(11) NOT NULL AUTO_INCREMENT,
-  `pid` int(11) NOT NULL DEFAULT 0,
-  `pollID` int(11) NOT NULL DEFAULT 0,
-  `date` datetime DEFAULT NULL,
-  `name` varchar(60) NOT NULL DEFAULT '',
-  `email` varchar(60) DEFAULT NULL,
-  `url` varchar(60) DEFAULT NULL,
-  `host_name` varchar(60) DEFAULT NULL,
-  `subject` varchar(60) NOT NULL DEFAULT '',
-  `comment` mediumtext NOT NULL,
-  `score` tinyint(4) NOT NULL DEFAULT 0,
-  `reason` tinyint(4) NOT NULL DEFAULT 0,
-  `last_moderation_ip` varchar(15) DEFAULT '0',
-  PRIMARY KEY (`tid`),
-  KEY `pid` (`pid`),
-  KEY `pollID` (`pollID`)
-) ENGINE=MyISAM AUTO_INCREMENT=64 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_pollcomments_moderated`
---
-
-DROP TABLE IF EXISTS `nuke_pollcomments_moderated`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_pollcomments_moderated` (
-  `tid` int(11) NOT NULL AUTO_INCREMENT,
-  `pid` int(11) NOT NULL DEFAULT 0,
-  `pollID` int(11) NOT NULL DEFAULT 0,
-  `date` datetime DEFAULT NULL,
-  `name` varchar(60) NOT NULL DEFAULT '',
-  `email` varchar(60) DEFAULT NULL,
-  `url` varchar(60) DEFAULT NULL,
-  `host_name` varchar(60) DEFAULT NULL,
-  `subject` varchar(60) NOT NULL DEFAULT '',
-  `comment` mediumtext NOT NULL,
-  `score` tinyint(4) NOT NULL DEFAULT 0,
-  `reason` tinyint(4) NOT NULL DEFAULT 0,
-  `last_moderation_ip` varchar(15) DEFAULT '0',
-  PRIMARY KEY (`tid`),
-  KEY `pid` (`pid`),
-  KEY `pollID` (`pollID`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_public_messages`
---
-
-DROP TABLE IF EXISTS `nuke_public_messages`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_public_messages` (
-  `mid` int(11) NOT NULL AUTO_INCREMENT,
-  `content` varchar(255) NOT NULL DEFAULT '',
-  `date` varchar(14) DEFAULT NULL,
-  `who` varchar(25) NOT NULL DEFAULT '',
-  PRIMARY KEY (`mid`)
-) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -3407,71 +3049,6 @@ DELIMITER ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
--- Table structure for table `nuke_users_temp`
---
-
-DROP TABLE IF EXISTS `nuke_users_temp`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_users_temp` (
-  `user_id` int(11) NOT NULL AUTO_INCREMENT,
-  `username` varchar(25) NOT NULL DEFAULT '',
-  `user_email` varchar(255) NOT NULL DEFAULT '',
-  `user_password` varchar(255) NOT NULL DEFAULT '',
-  `user_regdate` varchar(20) NOT NULL DEFAULT '',
-  `check_num` varchar(50) NOT NULL DEFAULT '',
-  `time` varchar(14) NOT NULL DEFAULT '',
-  PRIMARY KEY (`user_id`)
-) ENGINE=MyISAM AUTO_INCREMENT=11594 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `olympic_stats`
---
-
-DROP TABLE IF EXISTS `olympic_stats`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `olympic_stats` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `year` int(11) NOT NULL DEFAULT 0,
-  `pos` char(2) NOT NULL DEFAULT '',
-  `name` varchar(32) NOT NULL DEFAULT '',
-  `team` varchar(32) NOT NULL DEFAULT '',
-  `games` int(11) NOT NULL DEFAULT 0,
-  `minutes` int(11) NOT NULL DEFAULT 0,
-  `fgm` int(11) NOT NULL DEFAULT 0,
-  `fga` int(11) NOT NULL DEFAULT 0,
-  `ftm` int(11) NOT NULL DEFAULT 0,
-  `fta` int(11) NOT NULL DEFAULT 0,
-  `tgm` int(11) NOT NULL DEFAULT 0,
-  `tga` int(11) NOT NULL DEFAULT 0,
-  `orb` int(11) NOT NULL DEFAULT 0,
-  `reb` int(11) NOT NULL DEFAULT 0,
-  `ast` int(11) NOT NULL DEFAULT 0,
-  `stl` int(11) NOT NULL DEFAULT 0,
-  `tvr` int(11) NOT NULL DEFAULT 0,
-  `blk` int(11) NOT NULL DEFAULT 0,
-  `pf` int(11) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `id` (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `online`
---
-
-DROP TABLE IF EXISTS `online`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `online` (
-  `username` mediumtext NOT NULL,
-  `timeout` mediumtext NOT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `password_reset_tokens`
 --
 
@@ -3484,104 +3061,6 @@ CREATE TABLE `password_reset_tokens` (
   `created_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `poll`
---
-
-DROP TABLE IF EXISTS `poll`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `poll` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `questions`
---
-
-DROP TABLE IF EXISTS `questions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `questions` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `pid` int(11) NOT NULL,
-  `question` varchar(255) NOT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `responses`
---
-
-DROP TABLE IF EXISTS `responses`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `responses` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `qid` int(11) NOT NULL,
-  `ip` varchar(16) NOT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `sessions`
---
-
-DROP TABLE IF EXISTS `sessions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `sessions` (
-  `id` varchar(255) NOT NULL,
-  `user_id` bigint(20) unsigned DEFAULT NULL,
-  `ip_address` varchar(45) DEFAULT NULL,
-  `user_agent` text DEFAULT NULL,
-  `payload` longtext NOT NULL,
-  `last_activity` int(11) NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `sessions_user_id_index` (`user_id`),
-  KEY `sessions_last_activity_index` (`last_activity`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `user_online`
---
-
-DROP TABLE IF EXISTS `user_online`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `user_online` (
-  `session` char(100) NOT NULL DEFAULT '',
-  `time` int(11) NOT NULL DEFAULT 0
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `users`
---
-
-DROP TABLE IF EXISTS `users`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `users` (
-  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL,
-  `email` varchar(255) NOT NULL,
-  `email_verified_at` timestamp NULL DEFAULT NULL,
-  `password` varchar(255) NOT NULL,
-  `remember_token` varchar(100) DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `users_email_unique` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

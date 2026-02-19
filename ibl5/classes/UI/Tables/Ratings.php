@@ -32,20 +32,13 @@ class Ratings
     // TODO: simplify this by refactoring Player initialization logic out of this method
     {
         $playerRows = [];
-        $i = 0;
         foreach ($data as $plrRow) {
             if ($yr === "") {
                 if ($plrRow instanceof Player) {
                     $player = $plrRow;
-                    if ($moduleName === "NextSim") {
-                        $isHighlight = (($i % 2) !== 0);
-                    } else {
-                        $isHighlight = false;
-                    }
                 } elseif (is_array($plrRow)) {
                     /** @var PlayerRow $plrRow */
                     $player = Player::withPlrRow($db, $plrRow);
-                    $isHighlight = false;
                 } else {
                     continue;
                 }
@@ -60,7 +53,6 @@ class Ratings
                     continue;
                 }
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
-                $isHighlight = false;
             }
 
             $injuryReturnDate = $player->getInjuryReturnDate($season->lastSimEndDate);
@@ -68,13 +60,9 @@ class Ratings
 
             $playerRows[] = [
                 'player' => $player,
-                'isHighlight' => $isHighlight,
                 'injuryDays' => $injuryDays,
                 'injuryReturnDate' => $injuryReturnDate,
-                'addSeparator' => (($i % 2) === 0 && $moduleName === "NextSim" && $i > 0),
             ];
-
-            $i++;
         }
 
         ob_start();
@@ -126,15 +114,8 @@ class Ratings
     <tbody>
 <?php foreach ($playerRows as $row):
     $player = $row['player'];
-    // Column count: 35 base + 1 optional Team column = 36 max
-    $colCount = ($moduleName === "LeagueStarters") ? 36 : 35;
-    if ($row['addSeparator']): ?>
-        <tr class="ratings-separator">
-        <td colspan="<?= $colCount ?>" style="background-color: var(--team-color-primary); height: 3px; padding: 0;">
-        </td>
-        </tr>
-<?php endif; ?>
-        <tr<?= $row['isHighlight'] ? ' class="ratings-highlight"' : '' ?><?php if ($moduleName === "LeagueStarters"): ?> data-team-id="<?= $player->teamID ?? 0 ?>"<?php endif; ?>>
+?>
+        <tr<?php if ($moduleName === "LeagueStarters"): ?> data-team-id="<?= $player->teamID ?? 0 ?>"<?php endif; ?>>
 <?php if ($moduleName === "LeagueStarters"):
     echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamID ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
 endif; ?>

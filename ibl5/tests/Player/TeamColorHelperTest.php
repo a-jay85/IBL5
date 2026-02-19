@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Player\Tests;
+namespace Tests\Player;
 
 use PHPUnit\Framework\TestCase;
 use Player\Views\TeamColorHelper;

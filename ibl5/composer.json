@@ -19,6 +19,16 @@
         "analyse": "vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=1G",
         "analyse:baseline": "vendor/bin/phpstan analyse --configuration=phpstan.neon --generate-baseline --memory-limit=1G"
     },
+    "autoload": {
+        "psr-4": {
+            "": "classes/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
     "config": {
         "allow-plugins": {
             "phpstan/extension-installer": true

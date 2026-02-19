@@ -163,4 +163,11 @@ interface TeamRepositoryInterface
      * @return list<FranchiseSeasonRow> Rows ordered by season_year ASC
      */
     public function getFranchiseSeasons(int $franchiseId): array;
+
+    /**
+     * Get all real teams (teamid 1..MAX_REAL_TEAMID) ordered by team_name
+     *
+     * @return list<array{teamid: int, team_name: string}> Team rows
+     */
+    public function getAllTeams(): array;
 }

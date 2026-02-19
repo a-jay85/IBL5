@@ -294,6 +294,9 @@
         }, 200);
     });
 
+    // Expose globally so ajax-tabs.js can re-run after content swaps
+    window.IBL_refreshResponsiveTables = initResponsiveTables;
+
     // Run on DOM ready
     function init() {
         initResponsiveTables();

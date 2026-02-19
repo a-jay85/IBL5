@@ -313,13 +313,17 @@ class AuthService implements AuthServiceInterface
      *
      * @return array<int|string, string>
      */
+    /**
+     * Confirm a user's email and sign them in via delight-auth.
+     *
+     * @return array{username: string} Confirmed username
+     */
     public function confirmEmail(string $selector, string $token): array
     {
         $this->lastError = null;
 
         try {
-            /** @var array<int|string, string> $emailBeforeAndAfter */
-            $emailBeforeAndAfter = $this->getAuth()->confirmEmailAndSignIn($selector, $token);
+            $this->getAuth()->confirmEmailAndSignIn($selector, $token);
 
             // Create nuke_users profile so the rest of the site sees this user
             $authUserId = $this->getAuth()->getUserId();
@@ -330,7 +334,7 @@ class AuthService implements AuthServiceInterface
                 $this->createNukeUserProfile($authUserId, $authUsername, $authEmail);
             }
 
-            return $emailBeforeAndAfter;
+            return ['username' => $authUsername ?? 'User'];
         } catch (InvalidSelectorTokenPairException) {
             $this->lastError = 'mismatch';
             throw new \RuntimeException($this->lastError);

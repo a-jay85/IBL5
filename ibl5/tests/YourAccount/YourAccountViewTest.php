@@ -69,7 +69,7 @@ class YourAccountViewTest extends TestCase
         $result = $this->view->renderLoginPage('Login failed', 123456, false);
 
         $this->assertStringContainsString('ibl-alert--error', $result);
-        $this->assertStringContainsString('Login was incorrect', $result);
+        $this->assertStringContainsString('Login failed', $result);
     }
 
     public function testRenderLoginPageHidesErrorWhenNull(): void

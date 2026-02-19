@@ -161,10 +161,11 @@ function confirm_email()
     }
 
     try {
-        $authService->confirmEmail($selector, $token);
+        $result = $authService->confirmEmail($selector, $token);
+        $confirmedUsername = $result['username'];
         Nuke\Header::header();
         $accountView = new \YourAccount\YourAccountView();
-        echo $accountView->renderActivationSuccessPage('User');
+        echo $accountView->renderActivationSuccessPage($confirmedUsername);
         Nuke\Footer::footer();
     } catch (\RuntimeException) {
         $error = $authService->getLastError() ?? 'expired';
@@ -207,10 +208,12 @@ function main($user)
         $showCaptcha = extension_loaded("gd") && ($gfx_chk == 2 || $gfx_chk == 4 || $gfx_chk == 5 || $gfx_chk == 7);
 
         // Check for specific error from session (e.g., email not verified, throttled)
-        $errorMessage = $stop ? (string) $stop : null;
-        if ($errorMessage === null && isset($_SESSION['login_error']) && is_string($_SESSION['login_error'])) {
+        $errorMessage = null;
+        if (isset($_SESSION['login_error']) && is_string($_SESSION['login_error'])) {
             $errorMessage = $_SESSION['login_error'];
             unset($_SESSION['login_error']);
+        } elseif ($stop) {
+            $errorMessage = 'Login was incorrect. Please try again.';
         }
 
         $accountView = new \YourAccount\YourAccountView();
@@ -289,8 +292,8 @@ function reset_password_form()
         Header("Location: modules.php?name=$module_name");
         die();
     }
-    $selector = isset($_GET['selector']) ? htmlspecialchars(trim($_GET['selector'])) : '';
-    $token = isset($_GET['token']) ? htmlspecialchars(trim($_GET['token'])) : '';
+    $selector = isset($_GET['selector']) ? trim($_GET['selector']) : '';
+    $token = isset($_GET['token']) ? trim($_GET['token']) : '';
     if ($selector === '' || $token === '') {
         Header("Location: modules.php?name=$module_name&op=pass_lost");
         die();
@@ -311,10 +314,10 @@ function do_reset_password()
         die();
     }
 
-    $selector = isset($_POST['selector']) ? trim($_POST['selector']) : '';
-    $token = isset($_POST['token']) ? trim($_POST['token']) : '';
-    $newPassword = isset($_POST['new_password']) ? $_POST['new_password'] : '';
-    $newPassword2 = isset($_POST['new_password2']) ? $_POST['new_password2'] : '';
+    $selector = isset($_POST['selector']) && is_string($_POST['selector']) ? trim($_POST['selector']) : '';
+    $token = isset($_POST['token']) && is_string($_POST['token']) ? trim($_POST['token']) : '';
+    $newPassword = isset($_POST['new_password']) && is_string($_POST['new_password']) ? $_POST['new_password'] : '';
+    $newPassword2 = isset($_POST['new_password2']) && is_string($_POST['new_password2']) ? $_POST['new_password2'] : '';
 
     $accountView = new \YourAccount\YourAccountView();
 

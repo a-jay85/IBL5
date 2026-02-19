@@ -143,7 +143,8 @@ class YourAccountView
         <div class="ibl-card__body">
             <?php if ($error !== null): ?>
                 <div class="ibl-alert ibl-alert--error">
-                    Login was incorrect. Please try again.
+                    <?php /** @var string $sanitizedError */ $sanitizedError = \Utilities\HtmlSanitizer::safeHtmlOutput($error); ?>
+                    <?= $sanitizedError ?>
                 </div>
             <?php endif; ?>
 

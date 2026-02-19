@@ -1,0 +1,85 @@
+/**
+ * Team Split Stats - Dropdown view selector
+ *
+ * Replaces the .ibl-tabs bar when split stats are available.
+ * Uses team colors via CSS custom properties.
+ */
+
+/* ==========================================================================
+   View Dropdown Container
+   ========================================================================== */
+
+.ibl-view-dropdown {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2) var(--space-3);
+    background: color-mix(in srgb, var(--team-tab-bg-color) 15%, white);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+/* ==========================================================================
+   View Select
+   ========================================================================== */
+
+.ibl-view-select {
+    width: 100%;
+    max-width: 320px;
+    padding: var(--space-1) var(--space-1);
+    text-align: center;
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: color-mix(in srgb, var(--team-tab-bg-color) 85%, black);
+    background-color: color-mix(in srgb, var(--team-tab-bg-color) 8%, white);
+    border: 2px solid color-mix(in srgb, var(--team-tab-bg-color) 30%, white);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 12px;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ibl-view-select:hover {
+    border-color: color-mix(in srgb, var(--team-tab-bg-color) 50%, white);
+}
+
+.ibl-view-select:focus {
+    outline: none;
+    border-color: var(--team-tab-active-color);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--team-tab-active-color) 25%, transparent);
+}
+
+.ibl-view-select optgroup {
+    font-weight: 700;
+    font-style: normal;
+    color: var(--gray-700);
+}
+
+.ibl-view-select option {
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--gray-800);
+    padding: var(--space-1);
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 640px) {
+    .ibl-view-dropdown {
+        padding: var(--space-1) var(--space-2);
+    }
+
+    .ibl-view-select {
+        max-width: 100%;
+        font-size: 0.8rem;
+    }
+}

@@ -30,7 +30,7 @@ function theindex($new_topic = "0")
     } else {
         $querylang = "";
     }
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     automated_news();
     if (isset($userinfo['storynum']) and $user_news == 1) {
         $storynum = $userinfo['storynum'];
@@ -118,7 +118,7 @@ function theindex($new_topic = "0")
         $morelink = implode(' | ', $morelink_parts);
         themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
     }
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 if (!(isset($new_topic))) {$new_topic = 0;}

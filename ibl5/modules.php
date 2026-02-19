@@ -38,11 +38,11 @@ if (isset($name) && $name == $_REQUEST['name']) {
     $accessControl = new Module\ModuleAccessControl($season, $leagueContext, $mysqli_db);
 
     if (!$accessControl->isModuleAccessible($name) && !is_admin($admin)) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         OpenTable();
         echo "<center>" . _MODULENOTACTIVE . "<br><br>" . _GOBACK . "</center>";
         CloseTable();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } else {
         if (!isset($file) or $file != $_REQUEST['file']) {
             $file = "index";
@@ -71,11 +71,11 @@ if (isset($name) && $name == $_REQUEST['name']) {
         if (file_exists($modpath)) {
             include $modpath;
         } else {
-            Nuke\Header::header();
+            PageLayout\PageLayout::header();
             OpenTable();
             echo "<br><center>Sorry, such file doesn't exist...</center><br>";
             CloseTable();
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
         }
     }
 } else {

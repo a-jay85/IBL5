@@ -35,8 +35,8 @@ $view = new AllStarAppearancesView();
 $appearances = $repository->getAllStarAppearances();
 
 // Render page
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 echo $view->render($appearances);
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

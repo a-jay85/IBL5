@@ -30,7 +30,7 @@ function userinfo($username)
     $result2 = $stmt->get_result();
     $userinfo = $result2->fetch_assoc();
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
 
     $teamlogo = $userinfo['user_ibl_team'];
     $tid = $commonRepository->getTidFromTeamname($teamlogo);
@@ -53,7 +53,7 @@ function userinfo($username)
     // Render the draft interface
     echo $view->renderDraftInterface($players, $teamlogo, $pickOwner, $draft_round, $draft_pick, $season->endingYear, $tid);
 
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function main($user)

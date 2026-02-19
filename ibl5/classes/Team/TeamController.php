@@ -15,11 +15,13 @@ use Team\Contracts\TeamViewInterface;
  */
 class TeamController implements TeamControllerInterface
 {
+    private \mysqli $db;
     private TeamServiceInterface $service;
     private TeamViewInterface $view;
 
     public function __construct(\mysqli $db)
     {
+        $this->db = $db;
         $repository = new TeamRepository($db);
         $this->service = new TeamService($db, $repository);
         $this->view = new TeamView();
@@ -36,6 +38,7 @@ class TeamController implements TeamControllerInterface
         'chunk',
         'playoffs',
         'contracts',
+        'split',
     ];
 
     /**
@@ -64,6 +67,22 @@ class TeamController implements TeamControllerInterface
             // Invalid display value is silently ignored (falls back to 'ratings')
         }
 
+        // Validate split parameter when display=split
+        $split = null;
+        if ($display === 'split' && isset($_REQUEST['split']) && is_string($_REQUEST['split'])) {
+            $splitRepo = new SplitStatsRepository($this->db);
+            $rawSplit = $_REQUEST['split'];
+            if (in_array($rawSplit, $splitRepo->getValidSplitKeys(), true)) {
+                $split = $rawSplit;
+            } else {
+                // Invalid split key falls back to ratings
+                $display = 'ratings';
+            }
+        } elseif ($display === 'split') {
+            // display=split without a split key falls back to ratings
+            $display = 'ratings';
+        }
+
         \PageLayout\PageLayout::header();
 
         $userTeamName = '';
@@ -79,7 +98,7 @@ class TeamController implements TeamControllerInterface
         }
 
         try {
-            $pageData = $this->service->getTeamPageData($teamID, $yr, $display, $userTeamName);
+            $pageData = $this->service->getTeamPageData($teamID, $yr, $display, $userTeamName, $split);
         } catch (\RuntimeException $e) {
             echo '<div class="ibl-alert ibl-alert--error">Team not found.</div>';
             \PageLayout\PageLayout::footer();
@@ -87,7 +106,7 @@ class TeamController implements TeamControllerInterface
 
         echo $this->view->render($pageData);
 
-        // Output JS configuration for AJAX tab switching
+        // Output JS configuration for AJAX tab/dropdown switching
         $params = ['teamID' => $teamID];
         if ($yr !== null) {
             $params['yr'] = $yr;

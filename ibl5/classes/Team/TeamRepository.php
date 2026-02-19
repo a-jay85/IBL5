@@ -306,4 +306,16 @@ class TeamRepository extends \BaseMysqliRepository implements TeamRepositoryInte
             $franchiseId
         );
     }
+
+    /**
+     * @see TeamRepositoryInterface::getAllTeams()
+     * @return list<array{teamid: int, team_name: string}>
+     */
+    public function getAllTeams(): array
+    {
+        /** @var list<array{teamid: int, team_name: string}> */
+        return $this->fetchAll(
+            "SELECT teamid, team_name FROM ibl_team_info WHERE teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . " ORDER BY team_name ASC"
+        );
+    }
 }

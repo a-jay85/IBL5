@@ -19,12 +19,15 @@ class TeamApiHandler
         'chunk',
         'playoffs',
         'contracts',
+        'split',
     ];
 
+    private \mysqli $db;
     private TeamService $service;
 
     public function __construct(\mysqli $db)
     {
+        $this->db = $db;
         $repository = new TeamRepository($db);
         $this->service = new TeamService($db, $repository);
     }
@@ -51,7 +54,21 @@ class TeamApiHandler
             }
         }
 
-        $html = $this->service->getTableOutput($teamID, $yr, $display);
+        // Validate split parameter when display=split
+        $split = null;
+        if ($display === 'split' && isset($_GET['split']) && is_string($_GET['split'])) {
+            $splitRepo = new SplitStatsRepository($this->db);
+            $rawSplit = $_GET['split'];
+            if (in_array($rawSplit, $splitRepo->getValidSplitKeys(), true)) {
+                $split = $rawSplit;
+            } else {
+                $display = 'ratings';
+            }
+        } elseif ($display === 'split') {
+            $display = 'ratings';
+        }
+
+        $html = $this->service->getTableOutput($teamID, $yr, $display, $split);
 
         echo json_encode(['html' => $html], JSON_THROW_ON_ERROR);
     }

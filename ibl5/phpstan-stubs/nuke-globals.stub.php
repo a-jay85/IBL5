@@ -56,6 +56,9 @@ define('END_TRANSACTION', 1);
 /** @return void */
 function loginbox(): void {}
 
+/** @return string|null */
+function buildRedirectUrl(): ?string { return null; }
+
 /** @return bool */
 function is_user(mixed $cookie): bool { return false; }
 

@@ -119,20 +119,7 @@ class WaiversView implements WaiversViewInterface
 
         return "<option value=\"{$playerID}\">{$displayText}</option>";
     }
-    
-    /**
-     * @see WaiversViewInterface::renderNotLoggedIn()
-     */
-    public function renderNotLoggedIn(string $message): void
-    {
-        \PageLayout\PageLayout::header();
-        /** @var string $messageEscaped */
-        $messageEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($message);
-        echo '<div class="text-center"><strong class="ibl-title">' . $messageEscaped . '</strong></div>';
-        loginbox();
-        \PageLayout\PageLayout::footer();
-    }
-    
+
     /**
      * @see WaiversViewInterface::renderWaiversClosed()
      */

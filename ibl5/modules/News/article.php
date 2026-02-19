@@ -78,16 +78,6 @@ if ($save && is_user($user)) {
     }
 
     getusrinfo($user);
-    $info = base64_encode("$userinfo[user_id]:$userinfo[username]:$userinfo[user_password]:$userinfo[storynum]:$userinfo[umode]:$userinfo[uorder]:$userinfo[thold]:$userinfo[noscore]");
-    // SECURITY: Set user cookie with secure options
-    $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
-    setcookie("user", "$info", [
-        'expires' => time() + $cookieusrtime,
-        'path' => '/',
-        'secure' => $isHttps,
-        'httponly' => true,
-        'samesite' => 'Strict',
-    ]);
 }
 
 // Comment system removed - was deprecated and insecure

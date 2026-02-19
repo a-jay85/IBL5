@@ -24,16 +24,9 @@ $pagetitle = "- Free Agency System";
 
 function main($user)
 {
-    global $stop;
     if (!is_user($user)) {
-        PageLayout\PageLayout::header();
-        echo "<center><font class=\"title\"><b>" . ($stop ? _LOGININCOR : _USERREGLOGIN) . "</b></font></center>";
-        echo "<br>";
-        if (!is_user($user)) {
-            loginbox();
-        }
-        PageLayout\PageLayout::footer();
-    } elseif (is_user($user)) {
+        loginbox();
+    } else {
         display();
     }
 }

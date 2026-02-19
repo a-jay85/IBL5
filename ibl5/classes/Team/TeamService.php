@@ -6,6 +6,7 @@ namespace Team;
 
 use Team\Contracts\TeamServiceInterface;
 use Team\Contracts\TeamRepositoryInterface;
+use UI\Components\TableViewDropdown;
 use UI\Components\TableViewSwitcher;
 
 /**
@@ -32,7 +33,7 @@ class TeamService implements TeamServiceInterface
      * @see TeamServiceInterface::getTeamPageData()
      * @return TeamPageData
      */
-    public function getTeamPageData(int $teamID, ?string $yr, string $display, string $userTeamName = ''): array
+    public function getTeamPageData(int $teamID, ?string $yr, string $display, string $userTeamName = '', ?string $split = null): array
     {
         global $leagueContext;
         /** @var \League\LeagueContext $leagueContext */
@@ -45,7 +46,7 @@ class TeamService implements TeamServiceInterface
 
         $insertyear = ($yr !== null && $yr !== '') ? "&yr=$yr" : "";
 
-        $tableOutput = $this->getTableOutput($teamID, $yr, $display);
+        $tableOutput = $this->getTableOutput($teamID, $yr, $display, $split);
 
         $isActualTeam = ($teamID !== 0);
 
@@ -86,7 +87,7 @@ class TeamService implements TeamServiceInterface
     /**
      * @see TeamServiceInterface::getTableOutput()
      */
-    public function getTableOutput(int $teamID, ?string $yr, string $display): string
+    public function getTableOutput(int $teamID, ?string $yr, string $display, ?string $split = null): string
     {
         $season = new \Season($this->db);
 
@@ -107,6 +108,35 @@ class TeamService implements TeamServiceInterface
         }
 
         $insertyear = ($yr !== null && $yr !== '') ? "&yr=$yr" : "";
+        $baseUrl = "modules.php?name=Team&op=team&teamID=$teamID" . $insertyear;
+        $teamData = $this->repository->getTeam($teamID);
+        $teamColor1 = is_string($teamData['color1'] ?? null) ? $teamData['color1'] : '000000';
+        $teamColor2 = is_string($teamData['color2'] ?? null) ? $teamData['color2'] : 'FFFFFF';
+
+        $team = \Team::initialize($this->db, $teamID);
+
+        /** @var list<int> $starterPids */
+        $starterPids = [];
+        if ($teamID > 0 && ($yr === null || $yr === '')) {
+            $starters = $this->extractStartersData($result);
+            foreach ($starters as $data) {
+                if ($data['pid'] !== null) {
+                    $starterPids[] = $data['pid'];
+                }
+            }
+        }
+
+        $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $starterPids, $split);
+
+        // Use dropdown for actual teams in current season; tabs for everything else
+        $useDropdown = $teamID > 0 && ($yr === null || $yr === '');
+
+        if ($useDropdown) {
+            $dropdownGroups = $this->buildDropdownGroups($season);
+            $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
+            $dropdown = new TableViewDropdown($dropdownGroups, $activeValue, $baseUrl, $teamColor1, $teamColor2);
+            return $dropdown->wrap($tableHtml);
+        }
 
         $tabDefinitions = [
             'ratings' => 'Ratings',
@@ -122,27 +152,7 @@ class TeamService implements TeamServiceInterface
 
         $tabDefinitions['contracts'] = 'Contracts';
 
-        $baseUrl = "modules.php?name=Team&op=team&teamID=$teamID" . $insertyear;
-        $teamData = $this->repository->getTeam($teamID);
-        $teamColor1 = $teamData['color1'] ?? '000000';
-        $teamColor2 = $teamData['color2'] ?? 'FFFFFF';
-
-        $team = \Team::initialize($this->db, $teamID);
-
-        /** @var list<int> $starterPids */
-        $starterPids = [];
-        if ($teamID > 0 && ($yr === null || $yr === '')) {
-            $starters = $this->extractStartersData($result);
-            foreach ($starters as $data) {
-                if ($data['pid'] !== null) {
-                    $starterPids[] = $data['pid'];
-                }
-            }
-        }
-
         $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $teamColor1, $teamColor2);
-        $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $starterPids);
-
         return $switcher->wrap($tableHtml);
     }
 
@@ -216,7 +226,7 @@ class TeamService implements TeamServiceInterface
      * @param list<PlayerRow>|list<array<string, mixed>> $result
      * @param list<int> $starterPids
      */
-    public function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, array $starterPids = []): string
+    public function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, array $starterPids = [], ?string $split = null): string
     {
         $yrStr = $yr ?? '';
         switch ($display) {
@@ -232,6 +242,8 @@ class TeamService implements TeamServiceInterface
                 return \UI::periodAverages($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids);
             case 'contracts':
                 return \UI::contracts($this->db, $result, $team, $season, $starterPids);
+            case 'split':
+                return $this->renderSplitStats($team, $season, $split ?? 'home', $starterPids);
             default:
                 return \UI::ratings($this->db, $result, $team, $yrStr, $season, '', $starterPids);
         }
@@ -311,4 +323,104 @@ class TeamService implements TeamServiceInterface
         ];
     }
 
+    /**
+     * Render split stats table for a given split key
+     *
+     * @param list<int> $starterPids
+     */
+    private function renderSplitStats(\Team $team, \Season $season, string $splitKey, array $starterPids): string
+    {
+        $splitRepo = new SplitStatsRepository($this->db);
+        $teamID = $team->teamID;
+        $rows = $splitRepo->getSplitStats($teamID, $season->endingYear, $splitKey);
+        $splitLabel = $splitRepo->getSplitLabel($splitKey);
+
+        return \UI\Tables\SplitStats::render($rows, $team, $splitLabel, $starterPids);
+    }
+
+    /**
+     * Build the optgroup structure for the dropdown view selector
+     *
+     * @return array<string, array<string, string>>
+     */
+    private function buildDropdownGroups(\Season $season): array
+    {
+        $groups = [];
+
+        // Views group
+        $views = [
+            'ratings' => 'Ratings',
+            'total_s' => 'Season Totals',
+            'avg_s' => 'Season Averages',
+            'per36mins' => 'Per 36 Minutes',
+            'chunk' => 'Sim Averages',
+        ];
+
+        if (in_array($season->phase, ["Playoffs", "Draft", "Free Agency"], true)) {
+            $views['playoffs'] = 'Playoffs Averages';
+        }
+
+        $views['contracts'] = 'Contracts';
+        $groups['Views'] = $views;
+
+        // Location
+        $groups['Location'] = [
+            'split:home' => 'Home',
+            'split:road' => 'Road',
+        ];
+
+        // Result
+        $groups['Result'] = [
+            'split:wins' => 'Wins',
+            'split:losses' => 'Losses',
+        ];
+
+        // Season Half
+        $groups['Season Half'] = [
+            'split:pre_allstar' => 'Pre All-Star',
+            'split:post_allstar' => 'Post All-Star',
+        ];
+
+        // By Month
+        $months = [
+            11 => 'November',
+            12 => 'December',
+            1 => 'January',
+            2 => 'February',
+            3 => 'March',
+            4 => 'April',
+            5 => 'May',
+        ];
+        $byMonth = [];
+        foreach ($months as $num => $name) {
+            $byMonth['split:month_' . $num] = $name;
+        }
+        $groups['By Month'] = $byMonth;
+
+        // vs. Division
+        $vsDivision = [];
+        foreach (\League::DIVISION_NAMES as $division) {
+            $vsDivision['split:div_' . strtolower($division)] = 'vs. ' . $division;
+        }
+        $groups['vs. Division'] = $vsDivision;
+
+        // vs. Conference
+        $vsConference = [];
+        foreach (\League::CONFERENCE_NAMES as $conference) {
+            $vsConference['split:conf_' . strtolower($conference)] = 'vs. ' . $conference;
+        }
+        $groups['vs. Conference'] = $vsConference;
+
+        // vs. Team
+        $allTeams = $this->repository->getAllTeams();
+        $vsTeam = [];
+        foreach ($allTeams as $teamRow) {
+            $tid = $teamRow['teamid'];
+            $teamName = $teamRow['team_name'];
+            $vsTeam['split:vs_' . $tid] = 'vs. ' . $teamName;
+        }
+        $groups['vs. Team'] = $vsTeam;
+
+        return $groups;
+    }
 }

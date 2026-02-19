@@ -44,7 +44,7 @@ if (!is_user($user)) {
     }
 
     // Render header first (populates $cookie via online() → cookiedecode())
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
 
     $username = strval($cookie[1] ?? '');
     $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
@@ -76,5 +76,5 @@ if (!is_user($user)) {
 
     echo $view->render($games, $league->getSimLengthInDays());
 
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }

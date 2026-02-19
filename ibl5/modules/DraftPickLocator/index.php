@@ -40,8 +40,8 @@ $view = new DraftPickLocatorView();
 $teamsWithPicks = $service->getAllTeamsWithPicks();
 
 // Render page
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 echo $view->render($teamsWithPicks, $season->endingYear);
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

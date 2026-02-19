@@ -74,7 +74,7 @@ function finishNewUser(): void
         die();
     }
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     include "config.php";
 
     $username = isset($_POST['username']) && is_string($_POST['username']) ? $_POST['username'] : '';
@@ -95,18 +95,18 @@ function finishNewUser(): void
         $user_password = substr(bin2hex(random_bytes(5)), 0, 10);
     } elseif ($user_password !== $user_password2) {
         echo $accountView->renderRegistrationErrorPage('The passwords you entered do not match.');
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
         die();
     } elseif (strlen($user_password) < (int) ($minpass ?? 5)) {
         echo $accountView->renderRegistrationErrorPage("Your password must be at least " . (int) ($minpass ?? 5) . " characters long.");
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
         die();
     }
 
     // Basic username validation (keep as safety net; delight-auth also validates uniqueness)
     if ($username === '' || preg_match('/[^a-zA-Z0-9_-]/', $username) === 1) {
         echo $accountView->renderRegistrationErrorPage('Invalid username. Only letters, numbers, underscores and hyphens are allowed.');
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
         die();
     }
 
@@ -126,7 +126,7 @@ function finishNewUser(): void
         echo $accountView->renderRegistrationErrorPage((string) $error);
     }
 
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function activate($username, $check_num)
@@ -139,10 +139,10 @@ function activate($username, $check_num)
     }
 
     // Fallback for any remaining legacy activation links
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     $accountView = new \YourAccount\YourAccountView();
     echo $accountView->renderActivationErrorPage('expired');
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
     die();
 }
 
@@ -153,26 +153,26 @@ function confirm_email()
     $token = isset($_GET['token']) ? trim($_GET['token']) : '';
 
     if ($selector === '' || $token === '') {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         $accountView = new \YourAccount\YourAccountView();
         echo $accountView->renderActivationErrorPage('mismatch');
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
         die();
     }
 
     try {
         $result = $authService->confirmEmail($selector, $token);
         $confirmedUsername = $result['username'];
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         $accountView = new \YourAccount\YourAccountView();
         echo $accountView->renderActivationSuccessPage($confirmedUsername);
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } catch (\RuntimeException) {
         $error = $authService->getLastError() ?? 'expired';
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         $accountView = new \YourAccount\YourAccountView();
         echo $accountView->renderActivationErrorPage($error);
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     }
     die();
 }
@@ -201,7 +201,7 @@ function main($user)
 {
     global $stop, $module_name, $gfx_chk;
     if (!is_user($user)) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         mt_srand((double) microtime() * 1000000);
         $maxran = 1000000;
         $random_num = mt_rand(0, $maxran);
@@ -222,7 +222,7 @@ function main($user)
             $random_num,
             $showCaptcha
         );
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } elseif (is_user($user)) {
         cookiedecode($user);
         redirectLoggedInUser();
@@ -233,10 +233,10 @@ function new_user()
 {
     global $user;
     if (!is_user($user)) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         $accountView = new \YourAccount\YourAccountView();
         echo $accountView->renderRegisterPage();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } elseif (is_user($user)) {
         cookiedecode($user);
         redirectLoggedInUser();
@@ -247,10 +247,10 @@ function pass_lost()
 {
     global $user;
     if (!is_user($user)) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         $accountView = new \YourAccount\YourAccountView();
         echo $accountView->renderForgotPasswordPage();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } elseif (is_user($user)) {
         cookiedecode($user);
         redirectLoggedInUser();
@@ -298,10 +298,10 @@ function reset_password_form()
         Header("Location: modules.php?name=$module_name&op=pass_lost");
         die();
     }
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     $accountView = new \YourAccount\YourAccountView();
     echo $accountView->renderResetPasswordPage($selector, $token);
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function do_reset_password()
@@ -322,22 +322,22 @@ function do_reset_password()
     $accountView = new \YourAccount\YourAccountView();
 
     if ($newPassword !== $newPassword2) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         echo $accountView->renderPasswordResetErrorPage('The passwords you entered do not match. Please go back and try again.');
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
         return;
     }
 
     try {
         $authService->resetPassword($selector, $token, $newPassword);
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         echo $accountView->renderPasswordResetSuccessPage();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     } catch (\RuntimeException) {
         $error = $authService->getLastError() ?? 'An error occurred while resetting your password.';
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         echo $accountView->renderPasswordResetErrorPage((string) $error);
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     }
 }
 
@@ -354,9 +354,9 @@ function mail_password()
     $user_email = isset($_POST['user_email']) ? filter($_POST['user_email'], "nohtml", 1) : '';
     $accountView = new \YourAccount\YourAccountView();
     if ($user_email === '') {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         echo $accountView->renderPasswordResetErrorPage('Please enter your email address.');
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
         return;
     }
 
@@ -373,14 +373,14 @@ function mail_password()
     });
 
     // Always show success message (don't reveal if email exists)
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     $lastError = $authService->getLastError();
     if ($lastError !== null) {
         echo $accountView->renderPasswordResetErrorPage((string) $lastError);
     } else {
         echo $accountView->renderResetEmailSentPage();
     }
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function login($username, $user_password, $random_num, $gfx_check)

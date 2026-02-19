@@ -32,12 +32,12 @@ function submit()
 {
     global $mysqli_db;
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
 
     $handler = new DepthChartEntry\DepthChartEntrySubmissionHandler($mysqli_db);
     $handler->handleSubmission($_POST);
 
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 function tabApi()

@@ -36,9 +36,9 @@ function userinfo(string $username): void
     $userRow = $commonRepository->getUserByUsername($username);
 
     if ($userRow === null) {
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         echo '<div class="ibl-alert ibl-alert--error">User not found.</div>';
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
         return;
     }
 
@@ -55,9 +55,9 @@ function userinfo(string $username): void
 
     $categories = $service->getBallotData($voterTeamName, $season, $league);
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     echo $view->renderBallotForm($formAction, $voterTeamName, $tid, $season->phase, $categories);
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 
 /**

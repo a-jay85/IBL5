@@ -55,7 +55,7 @@ class StatisticsView
     ): void {
         global $sitename, $textcolor2;
         
-        \Nuke\Header::header();
+        \PageLayout\PageLayout::header();
         title("$sitename " . _STATS);
         OpenTable();
         OpenTable();
@@ -76,7 +76,7 @@ class StatisticsView
         $this->renderMiscStats($miscCounts);
         
         CloseTable();
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::footer();
     }
 
     /**
@@ -228,7 +228,7 @@ class StatisticsView
     ): void {
         global $sitename;
         
-        \Nuke\Header::header();
+        \PageLayout\PageLayout::header();
         title("$sitename " . _STATS);
         
         $total++;

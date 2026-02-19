@@ -322,16 +322,16 @@ class PlayerStats implements PlayerStatsInterface
      */
     protected function fillHistorical(array $plrRow): void
     {
-        /** @var array{gm: ?int, min: ?int, fgm: ?int, fga: ?int, ftm: ?int, fta: ?int, '3gm': ?int, '3ga': ?int, orb: ?int, reb: ?int, ast: ?int, stl: ?int, blk: ?int, tvr: ?int, pf: ?int, ...} $plrRow */
+        /** @var array{games: ?int, minutes: ?int, fgm: ?int, fga: ?int, ftm: ?int, fta: ?int, tgm: ?int, tga: ?int, orb: ?int, reb: ?int, ast: ?int, stl: ?int, blk: ?int, tvr: ?int, pf: ?int, ...} $plrRow */
         $this->seasonGamesStarted = 0;
-        $this->seasonGamesPlayed = $plrRow['gm'] ?? 0;
-        $this->seasonMinutes = $plrRow['min'] ?? 0;
+        $this->seasonGamesPlayed = $plrRow['games'] ?? 0;
+        $this->seasonMinutes = $plrRow['minutes'] ?? 0;
         $this->seasonFieldGoalsMade = $plrRow['fgm'] ?? 0;
         $this->seasonFieldGoalsAttempted = $plrRow['fga'] ?? 0;
         $this->seasonFreeThrowsMade = $plrRow['ftm'] ?? 0;
         $this->seasonFreeThrowsAttempted = $plrRow['fta'] ?? 0;
-        $this->seasonThreePointersMade = $plrRow['3gm'] ?? 0;
-        $this->seasonThreePointersAttempted = $plrRow['3ga'] ?? 0;
+        $this->seasonThreePointersMade = $plrRow['tgm'] ?? 0;
+        $this->seasonThreePointersAttempted = $plrRow['tga'] ?? 0;
         $this->seasonOffensiveRebounds = $plrRow['orb'] ?? 0;
         $this->seasonTotalRebounds = $plrRow['reb'] ?? 0;
         $this->seasonDefensiveRebounds = $this->seasonTotalRebounds - $this->seasonOffensiveRebounds;

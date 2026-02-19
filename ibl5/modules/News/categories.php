@@ -44,20 +44,20 @@ function theindex($catid)
     $result = $db->sql_query("SELECT sid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, acomm FROM " . $prefix . "_stories where catid='$catid' $querylang ORDER BY sid DESC limit $storynum");
     while ($row = $db->sql_fetchrow($result)) {
         $s_sid = intval($row['sid']);
-        $aid = filter($row['aid'], "nohtml");
-        $title = filter($row['title'], "nohtml");
+        $aid = $row['aid'];
+        /** @var string $title */
+        $title = \Utilities\HtmlSanitizer::safeHtmlOutput($row['title']);
         $time = $row['time'];
-        $hometext = filter($row['hometext']);
-        $bodytext = filter($row['bodytext']);
+        $hometext = $row['hometext'];
+        $bodytext = $row['bodytext'];
         $comments = intval($row['comments']);
         $counter = intval($row['counter']);
         $topic = intval($row['topic']);
-        $informant = filter($row['informant'], "nohtml");
-        $notes = filter($row['notes']);
+        $informant = $row['informant'];
+        $notes = $row['notes'];
         $acomm = intval($row['acomm']);
         getTopics($s_sid);
         formatTimestamp($time);
-        $subject = filter($subject, "nohtml");
         $introcount = strlen($hometext);
         $fullcount = strlen($bodytext);
         $totalcount = $introcount + $fullcount;
@@ -81,7 +81,8 @@ function theindex($catid)
         $morelink = str_replace(" |  | ", " | ", $morelink);
         $sid = intval($s_sid);
         $row2 = $db->sql_fetchrow($db->sql_query("select title from " . $prefix . "_stories_cat where catid='$catid'"));
-        $title1 = filter($row2['title'], "nohtml");
+        /** @var string $title1 */
+        $title1 = \Utilities\HtmlSanitizer::safeHtmlOutput($row2['title']);
         $title = "$title1: $title";
         themeindex($aid, $informant, $datetime, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
     }

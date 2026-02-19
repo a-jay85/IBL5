@@ -77,7 +77,8 @@ function theindex($new_topic = "0")
         $counter = intval($row['counter']);
         $topic = intval($row['topic']);
         $informant = $row['informant'];
-        $notes = $row['notes'];
+        /** @var string $notes */
+        $notes = \Utilities\HtmlSanitizer::safeHtmlOutput($row['notes']);
         $acomm = intval($row['acomm']);
         if ($catid > 0) {
             $row2 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));

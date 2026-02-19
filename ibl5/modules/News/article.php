@@ -116,7 +116,8 @@ $hometext = $row['hometext'] ?? '';
 $bodytext = $row['bodytext'] ?? '';
 $topic = (int) ($row['topic'] ?? 0);
 $informant = $row['informant'] ?? '';
-$notes = $row['notes'] ?? '';
+/** @var string $notes */
+$notes = \Utilities\HtmlSanitizer::safeHtmlOutput($row['notes'] ?? '');
 $acomm = (int) ($row['acomm'] ?? 0);
 $haspoll = (int) ($row['haspoll'] ?? 0);
 $pollID = (int) ($row['pollID'] ?? 0);

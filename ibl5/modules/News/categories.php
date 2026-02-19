@@ -54,7 +54,8 @@ function theindex($catid)
         $counter = intval($row['counter']);
         $topic = intval($row['topic']);
         $informant = $row['informant'];
-        $notes = $row['notes'];
+        /** @var string $notes */
+        $notes = \Utilities\HtmlSanitizer::safeHtmlOutput($row['notes']);
         $acomm = intval($row['acomm']);
         getTopics($s_sid);
         formatTimestamp($time);

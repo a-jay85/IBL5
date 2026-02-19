@@ -160,6 +160,15 @@
                 .then(function (data) {
                     isLoading = false;
                     if (data.html) {
+                        // Clear inline width constraints set by responsive-tables.js
+                        // so the container can resize to fit the new table content
+                        container.style.width = '';
+                        container.style.maxWidth = '';
+                        var wrapper = container.closest('.table-scroll-wrapper');
+                        if (wrapper) {
+                            wrapper.style.maxWidth = '';
+                        }
+
                         container.innerHTML = data.html;
 
                         // Re-initialize sorting on the new table
@@ -173,6 +182,11 @@
                         if (newSelect) {
                             var selectValue = split ? 'split:' + split : display;
                             newSelect.value = selectValue;
+                        }
+
+                        // Re-run responsive table logic to re-measure and re-constrain
+                        if (typeof window.IBL_refreshResponsiveTables === 'function') {
+                            window.IBL_refreshResponsiveTables();
                         }
                     }
                 })

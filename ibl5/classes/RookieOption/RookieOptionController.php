@@ -69,10 +69,9 @@ class RookieOptionController implements RookieOptionControllerInterface
         \Discord::postToChannel(self::DISCORD_CHANNEL, $discordMessage);
 
         // Send email notification
-        // SECURITY: Sanitize email subject to prevent header injection
-        $emailSubject = \Utilities\EmailSanitizer::sanitizeSubject("Rookie Extension Option - " . $playerName);
+        $emailSubject = "Rookie Extension Option - " . $playerName;
         $emailBody = $discordMessage;
-        $emailSuccess = mail(self::NOTIFICATION_EMAIL_RECIPIENT, $emailSubject, $emailBody, "From: " . self::NOTIFICATION_EMAIL_SENDER);
+        $emailSuccess = \Mail\MailService::fromConfig()->send(self::NOTIFICATION_EMAIL_RECIPIENT, $emailSubject, $emailBody, self::NOTIFICATION_EMAIL_SENDER);
 
         // Create news story if email succeeded
         if ($emailSuccess) {

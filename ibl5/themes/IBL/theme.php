@@ -63,7 +63,7 @@ function FormatStoryModern($thetext, $notes, $aid, $informant)
 
     if ("$aid" != "$informant" && !empty($informant)) {
         echo '<p class="news-article__attribution">
-            ' . _WRITES . ': <a href="modules.php?name=YourAccount&amp;op=userinfo&amp;username=' . \Utilities\HtmlSanitizer::safeHtmlOutput($informant) . '">' . \Utilities\HtmlSanitizer::safeHtmlOutput($informant) . '</a>
+            ' . _WRITES . ': ' . \Utilities\HtmlSanitizer::safeHtmlOutput($informant) . '
         </p>';
     }
 }
@@ -228,7 +228,7 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
             $safeInformant = \Utilities\HtmlSanitizer::safeHtmlOutput($informant);
             $contributorHtml = '<span class="news-article__meta-item">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                ' . _CONTRIBUTEDBY . ' <a href="modules.php?name=YourAccount&amp;op=userinfo&amp;username=' . $safeInformant . '">' . $safeInformant . '</a>
+                ' . _CONTRIBUTEDBY . ' ' . $safeInformant . '
             </span>';
         } else {
             $contributorHtml = '<span class="news-article__meta-item">' . _CONTRIBUTEDBY . ' ' . $anonymous . '</span>';

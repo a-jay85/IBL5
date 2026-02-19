@@ -440,15 +440,16 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         $safeOrder = $order === 'ASC' ? 'ASC' : 'DESC';
 
         $query = "SELECT
-                currentname AS team_name,
-                year,
-                wins,
-                losses
-            FROM ibl_team_win_loss
-            WHERE currentname != 'Free Agents'
-                AND (wins + losses) > 0
-            ORDER BY (wins / (wins + losses)) {$safeOrder},
-                wins {$safeOrder}
+                twl.currentname AS team_name,
+                twl.year,
+                twl.wins,
+                twl.losses
+            FROM ibl_team_win_loss twl
+            JOIN ibl_team_info ti ON ti.team_name = twl.currentname
+            WHERE ti.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
+                AND (twl.wins + twl.losses) > 0
+            ORDER BY (twl.wins / (twl.wins + twl.losses)) {$safeOrder},
+                twl.wins {$safeOrder}
             LIMIT 5";
 
         $rows = $this->fetchAll($query);

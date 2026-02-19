@@ -132,10 +132,4 @@ class SeriesRecordsControllerTest extends TestCase
         $this->assertTrue(method_exists($controller, 'displaySeriesRecords'));
     }
 
-    public function testHasDisplayLoginPromptMethod(): void
-    {
-        $controller = new SeriesRecordsController($this->mockDb);
-
-        $this->assertTrue(method_exists($controller, 'displayLoginPrompt'));
-    }
 }

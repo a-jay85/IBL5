@@ -82,6 +82,11 @@ if (isset($_SERVER['HTTP_USER_AGENT']) && strstr($_SERVER['HTTP_USER_AGENT'], 'c
 // Load the autoloader for IBL5 classes (must be before League\LeagueContext usage)
 require_once __DIR__ . '/autoloader.php';
 
+// Load Composer autoloader for third-party packages (delight-im/auth, phpmailer, etc.)
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+}
+
 // SECURITY: Configure secure session cookie parameters before session_start()
 if (session_status() === PHP_SESSION_NONE) {
     // Detect HTTPS
@@ -560,12 +565,28 @@ function render_blocks($side, $blockfile, $title, $content, $bid, $url)
     }
     if (empty($url)) {
         if (empty($blockfile)) {
-            themecenterbox($title, $content);
+            if ($side == "c") {
+                themecenterbox($title, $content);
+            } elseif ($side == "d") {
+                themecenterbox($title, $content);
+            } else {
+                themesidebox($title, $content);
+            }
         } else {
-            blockfileinc($title, $blockfile, 1);
+            if ($side == "c") {
+                blockfileinc($title, $blockfile, 1);
+            } elseif ($side == "d") {
+                blockfileinc($title, $blockfile, 1);
+            } else {
+                blockfileinc($title, $blockfile);
+            }
         }
     } else {
-        headlines($bid, 1);
+        if ($side == "c" or $side == "d") {
+            headlines($bid, 1);
+        } else {
+            headlines($bid);
+        }
     }
 }
 
@@ -619,7 +640,11 @@ function blocks($side)
                     return;
                 }
             }
-            if (empty($row['bkey'])) {
+            if ($row['bkey'] == "admin") {
+                adminblock();
+            } elseif ($row['bkey'] == "userbox") {
+                userblock();
+            } elseif (empty($row['bkey'])) {
                 if ($view == 0) {
                     render_blocks($side, $blockfile, $title, $content, $bid, $url);
                 } elseif ($view == 1 and is_user($user) || is_admin($admin)) {
@@ -769,7 +794,13 @@ function blockfileinc($title, $blockfile, $side = 0)
     if (empty($content)) {
         $content = _BLOCKPROBLEM2;
     }
-    themecenterbox($blockfiletitle, $content);
+    if ($side == 1) {
+        themecenterbox($blockfiletitle, $content);
+    } elseif ($side == 2) {
+        themecenterbox($blockfiletitle, $content);
+    } else {
+        themesidebox($blockfiletitle, $content);
+    }
 }
 
 
@@ -1035,34 +1066,65 @@ if (!function_exists("themepreview")) {
     }
 }
 
-function loginbox()
+function adminblock()
 {
-    global $user, $sitekey, $gfx_chk;
-    mt_srand((double) microtime() * 1000000);
-    $maxran = 1000000;
-    $random_num = mt_rand(0, $maxran);
-    $datekey = date("F j");
-    $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $random_num . $datekey));
-    $code = substr($rcode, 2, 6);
-    if (!is_user($user)) {
-        $title = _LOGIN;
-        $boxstuff = "<form action=\"modules.php?name=YourAccount\" method=\"post\">";
-        $boxstuff .= "<center><font class=\"content\">" . _NICKNAME . "<br>";
-        $boxstuff .= "<input type=\"text\" name=\"username\" size=\"8\" maxlength=\"25\"><br>";
-        $boxstuff .= "" . _PASSWORD . "<br>";
-        $boxstuff .= "<input type=\"password\" name=\"user_password\" size=\"8\" maxlength=\"20\"><br>";
-        if (extension_loaded("gd") and ($gfx_chk == 2 or $gfx_chk == 4 or $gfx_chk == 5 or $gfx_chk == 7)) {
-            $boxstuff .= "" . _SECURITYCODE . ": <img src='?gfx=gfx&amp;random_num=$random_num' border='1' alt='" . _SECURITYCODE . "' title='" . _SECURITYCODE . "'><br>\n";
-            $boxstuff .= "" . _TYPESECCODE . "<br><input type=\"text\" NAME=\"gfx_check\" SIZE=\"7\" MAXLENGTH=\"6\">\n";
-            $boxstuff .= "<input type=\"hidden\" name=\"random_num\" value=\"$random_num\"><br>\n";
-        } else {
-            $boxstuff .= "<input type=\"hidden\" name=\"random_num\" value=\"$random_num\">";
-            $boxstuff .= "<input type=\"hidden\" name=\"gfx_check\" value=\"$code\">";
+    global $admin, $prefix, $db, $admin_file;
+    if (is_admin($admin)) {
+        $sql = "SELECT title, content FROM " . $prefix . "_blocks WHERE bkey='admin'";
+        $result = $db->sql_query($sql);
+        while (list($title, $content) = $db->sql_fetchrow($result)) {
+            $content = filter($content);
+            $title = filter($title, "nohtml");
+            $content = "<span class=\"content\">" . $content . "</span>";
+            themesidebox($title, $content);
         }
-        $boxstuff .= "<input type=\"hidden\" name=\"op\" value=\"login\">";
-        $boxstuff .= "<input type=\"submit\" value=\"" . _LOGIN . "\"></font></center></form>";
-        $boxstuff .= "<center><font class=\"content\">" . _ASREGISTERED . "</font></center>";
-        themecenterbox($title, $boxstuff);
+        $title = _WAITINGCONT;
+        $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_queue"));
+        $content = "<span class=\"content\">";
+        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=submissions\">" . _SUBMISSIONS . "</a>: $num<br>";
+        $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_newlink"));
+        $brokenl = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_modrequest WHERE brokenlink='1'"));
+        $modreql = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_modrequest WHERE brokenlink='0'"));
+        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=Links\">" . _WLINKS . "</a>: $num<br>";
+        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=LinksListModRequests\">" . _MODREQLINKS . "</a>: $modreql<br>";
+        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=LinksListBrokenLinks\">" . _BROKENLINKS . "</a>: $brokenl<br>";
+        themesidebox($title, $content);
+    }
+}
+
+function loginbox(): void
+{
+    global $user, $authService;
+    if (!$authService->isAuthenticated()) {
+        // Store the full original query string in session so login() can redirect back
+        $queryString = $_SERVER['QUERY_STRING'] ?? '';
+        if (is_string($queryString) && $queryString !== '') {
+            $_SESSION['redirect_after_login'] = $queryString;
+        }
+        $url = 'modules.php?name=YourAccount';
+        // Use JS redirect — callers have already sent output via Nuke\Header::header()
+        $jsUrl = addslashes($url);
+        echo '<script>window.location.href="' . $jsUrl . '";</script>';
+        echo '<noscript><meta http-equiv="refresh" content="0;url=' . $jsUrl . '"></noscript>';
+        die();
+    }
+}
+
+require_once __DIR__ . '/includes/buildRedirectUrl.php';
+
+function userblock()
+{
+    global $user, $cookie, $db, $user_prefix, $userinfo;
+    if (is_user($user)) {
+        getusrinfo($user);
+        if ($userinfo['ublockon']) {
+            $sql = "SELECT ublock FROM " . $user_prefix . "_users WHERE user_id='$cookie[0]'";
+            $result = $db->sql_query($sql);
+            $row = $db->sql_fetchrow($result);
+            $ublock = intval($row['ublock']);
+            $title = _MENUFOR . " " . $cookie[1];
+            themesidebox($title, $ublock);
+        }
     }
 }
 
@@ -1100,7 +1162,11 @@ function headlines($bid, $cenbox = 0)
             $content = "";
             $db->sql_query("UPDATE " . $prefix . "_blocks SET content='$content', time='$btime' WHERE bid='$bid'");
             $cont = 0;
-            themecenterbox($title, $content);
+            if ($cenbox == 0) {
+                themesidebox($title, $content);
+            } else {
+                themecenterbox($title, $content);
+            }
             return;
         }
         if ($fp) {
@@ -1129,7 +1195,11 @@ function headlines($bid, $cenbox = 0)
                     $content = "";
                     $db->sql_query("UPDATE " . $prefix . "_blocks SET content='$content', time='$btime' WHERE bid='$bid'");
                     $cont = 0;
-                    themecenterbox($title, $content);
+                    if ($cenbox == 0) {
+                        themesidebox($title, $content);
+                    } else {
+                        themecenterbox($title, $content);
+                    }
                     return;
                 } else {
                     if (strcmp($link, $title2) and !empty($items[$i])) {
@@ -1149,7 +1219,11 @@ function headlines($bid, $cenbox = 0)
     } elseif (($cont == 0) or (empty($content))) {
         $content = "<font class=\"content\">" . _RSSPROBLEM . "</font>";
     }
-    themecenterbox($title, $content);
+    if ($cenbox == 0) {
+        themesidebox($title, $content);
+    } else {
+        themecenterbox($title, $content);
+    }
 }
 
 function automated_news()

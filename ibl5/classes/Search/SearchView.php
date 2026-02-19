@@ -342,7 +342,7 @@ class SearchView implements SearchViewInterface
             if ($informant !== '') {
                 /** @var string $safeContributedBy */
                 $safeContributedBy = HtmlSanitizer::safeHtmlOutput(_CONTRIBUTEDBY);
-                $output .= '<span class="search-result__meta-item">' . $safeContributedBy . ' <a href="modules.php?name=YourAccount&amp;op=userinfo&amp;username=' . $informant . '">' . $informant . '</a></span>';
+                $output .= '<span class="search-result__meta-item">' . $safeContributedBy . ' ' . $informant . '</span>';
             }
 
             /** @var string $safePostedBy */
@@ -428,7 +428,7 @@ class SearchView implements SearchViewInterface
                 $safePostedBy = HtmlSanitizer::safeHtmlOutput(_POSTEDBY);
                 /** @var string $safeOn */
                 $safeOn = HtmlSanitizer::safeHtmlOutput(_ON);
-                $output .= '<span class="search-result__meta-item">' . $safePostedBy . ' <a href="modules.php?name=YourAccount&amp;op=userinfo&amp;username=' . $name . '">' . $name . '</a> ' . $safeOn . ' ' . $date . '</span>';
+                $output .= '<span class="search-result__meta-item">' . $safePostedBy . ' ' . $name . ' ' . $safeOn . ' ' . $date . '</span>';
             }
 
             if ($articleTitle !== '') {
@@ -473,7 +473,7 @@ class SearchView implements SearchViewInterface
 
             $output .= '<div class="search-result search-result--compact" style="animation-delay: ' . $delay . 'ms">';
             $output .= '<div class="search-result__header">';
-            $output .= '<a href="modules.php?name=YourAccount&amp;op=userinfo&amp;username=' . $username . '" class="search-result__title">' . $username . '</a>';
+            $output .= '<span class="search-result__title">' . $username . '</span>';
             $output .= '<span class="search-result__subtitle">' . $displayName . '</span>';
             $output .= '</div>';
 

@@ -107,7 +107,7 @@ $controller->main($user);
 - `BaseMysqliRepository` - Base class for prepared statement execution
 - `Services\CommonMysqliRepository` - Team ID lookup from team name
 - `Utilities\HtmlSanitizer` - XSS protection for output
-- `Nuke\Header`, `Nuke\Footer` - Page frame rendering
+- `PageLayout\PageLayout` - Page frame rendering
 
 ## Related Modules
 

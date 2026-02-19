@@ -67,7 +67,7 @@ if (str_contains($name, "..") || (isset($file) && str_contains($file, "..")) || 
         include $modpath;
     } else {
         define('INDEX_FILE', true);
-        Nuke\Header::header();
+        PageLayout\PageLayout::header();
         OpenTable();
         if (is_admin($admin)) {
             echo "<center><font class=\"\"><b>" . _HOMEPROBLEM . "</b></font><br><br>[ <a href=\"" . $admin_file . ".php?op=modules\">" . _ADDAHOME . "</a> ]</center>";
@@ -75,6 +75,6 @@ if (str_contains($name, "..") || (isset($file) && str_contains($file, "..")) || 
             echo "<center>" . _HOMEPROBLEMUSER . "</center>";
         }
         CloseTable();
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
     }
 }

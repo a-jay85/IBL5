@@ -41,7 +41,7 @@ function negotiate($playerID)
     $commonRepository = new Services\CommonRepository($db);
     $userTeamName = $commonRepository->getTeamnameFromUsername($cookie[1]);
 
-    Nuke\Header::header();
+    PageLayout\PageLayout::header();
     OpenTable();
 
     // Use NegotiationProcessor to handle all business logic
@@ -49,7 +49,7 @@ function negotiate($playerID)
     echo $processor->processNegotiation($playerID, $userTeamName, $prefix);
 
     CloseTable();
-    Nuke\Footer::footer();
+    PageLayout\PageLayout::footer();
 }
 ```
 

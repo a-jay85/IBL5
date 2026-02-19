@@ -6,7 +6,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 use Utilities\HtmlSanitizer;
 
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 echo "<HTML><HEAD><TITLE>ASG Voting Result</TITLE></HEAD><BODY>";
 
@@ -64,7 +64,7 @@ foreach ($positions as $abbreviation => $label) {
         if (strpos($$varName, $Team_Name) !== false) {
             $court = (strpos($abbreviation, 'F') !== false) ? 'Frontcourt' : 'Backcourt';
             echo "<font color='red'>Sorry, you cannot vote for your own player ($court: " . HtmlSanitizer::safeHtmlOutput($$varName) . ").<p>Please go back, unselect that player, select a different player not on your team, and try again.<br></font>";
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
             exit;
         }
     }
@@ -76,7 +76,7 @@ foreach ($positions as $abbreviation => $label) {
         $varName = $abbreviation . $i;
         if (empty($$varName)) {
             echo "<font color='red'>Sorry, you selected less than FOUR $label players.<p>Please go back, select FOUR players, and try again.<br></font>";
-            Nuke\Footer::footer();
+            PageLayout\PageLayout::footer();
             exit;
         }
     }
@@ -86,7 +86,7 @@ foreach ($positions as $abbreviation => $label) {
 foreach ($positions as $abbreviation => $label) {
     if (isset($_POST[$abbreviation]) && count($_POST[$abbreviation]) > 4) {
         echo "<font color='red'>Sorry, you selected more than four $label players.<p>Please go back, select FOUR players, and try again.</font>";
-        Nuke\Footer::footer();
+        PageLayout\PageLayout::footer();
         exit;
     }
 }
@@ -132,4 +132,4 @@ if ($stmt->execute()) {
     $stmt->close();
 }
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

@@ -37,8 +37,8 @@ $view = new TransactionHistoryView();
 $pageData = $service->getPageData($_GET);
 
 // Render page
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 echo $view->render($pageData);
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

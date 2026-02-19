@@ -6,7 +6,7 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 use Utilities\HtmlSanitizer;
 
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 echo "<HTML><HEAD><TITLE>End of Year Voting Result</TITLE></HEAD><BODY>";
 
@@ -148,4 +148,4 @@ if (strpos($MVP1, $Team_Name) !== false) {
     $stmtUpdateTime->close();
 
 }
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

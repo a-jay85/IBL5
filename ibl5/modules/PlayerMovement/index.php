@@ -33,6 +33,6 @@ $view = new PlayerMovementView();
 
 $movements = $repository->getPlayerMovements($previousSeasonEndingYear);
 
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 echo $view->render($movements);
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

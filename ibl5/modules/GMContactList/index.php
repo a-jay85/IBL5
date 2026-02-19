@@ -35,8 +35,8 @@ $view = new GMContactListView();
 $contacts = $repository->getAllTeamContacts();
 
 // Render page
-Nuke\Header::header();
+PageLayout\PageLayout::header();
 
 echo $view->render($contacts);
 
-Nuke\Footer::footer();
+PageLayout\PageLayout::footer();

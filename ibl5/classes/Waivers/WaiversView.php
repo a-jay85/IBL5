@@ -125,8 +125,8 @@ class WaiversView implements WaiversViewInterface
      */
     public function renderWaiversClosed(): void
     {
-        \Nuke\Header::header();
+        \PageLayout\PageLayout::header();
         echo "Sorry, but players may not be added from or dropped to waivers at the present time.";
-        \Nuke\Footer::footer();
+        \PageLayout\PageLayout::footer();
     }
 }

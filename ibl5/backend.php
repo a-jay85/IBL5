@@ -42,7 +42,7 @@ echo "<language>$backend_language</language>\n\n";
 while ($row = $db->sql_fetchrow($result)) {
     $rsid = intval($row['sid']);
     $rtitle = strip_tags($row['title']);
-    $rtext = strip_tags($row['hometext']);
+    $rtext = strip_tags(preg_replace('/<br\s*\/?>/i', ' ', $row['hometext']));
     echo "<item>\n";
     echo "<title>" . htmlentities($rtitle) . "</title>\n";
     echo "<link>$nukeurl/modules.php?name=News&amp;file=article&amp;sid=$rsid</link>\n";

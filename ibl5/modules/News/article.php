@@ -108,14 +108,16 @@ $row = $result->fetch_assoc();
 $stmt->close();
 
 $catid = (int) ($row['catid'] ?? 0);
-$aaid = filter($row['aid'] ?? '', "nohtml");
+$aaid = $row['aid'] ?? '';
 $time = $row['time'] ?? '';
-$title = filter($row['title'] ?? '', "nohtml");
-$hometext = filter($row['hometext'] ?? '');
-$bodytext = filter($row['bodytext'] ?? '');
+/** @var string $title */
+$title = \Utilities\HtmlSanitizer::safeHtmlOutput($row['title'] ?? '');
+$hometext = $row['hometext'] ?? '';
+$bodytext = $row['bodytext'] ?? '';
 $topic = (int) ($row['topic'] ?? 0);
-$informant = filter($row['informant'] ?? '', "nohtml");
-$notes = filter($row['notes'] ?? '');
+$informant = $row['informant'] ?? '';
+/** @var string $notes */
+$notes = \Utilities\HtmlSanitizer::safeHtmlOutput($row['notes'] ?? '');
 $acomm = (int) ($row['acomm'] ?? 0);
 $haspoll = (int) ($row['haspoll'] ?? 0);
 $pollID = (int) ($row['pollID'] ?? 0);
@@ -139,10 +141,6 @@ PageLayout\PageLayout::header();
 $artpage = 0;
 
 formatTimestamp($time);
-$title = filter($title, "nohtml");
-$hometext = filter($hometext);
-$bodytext = filter($bodytext);
-$notes = filter($notes);
 if (!empty($notes)) {
     $notes = "\n\n<b>" . _NOTE . "</b> <i>$notes</i>";
 } else {
@@ -172,7 +170,8 @@ if ($catid !== 0) {
         $stmtCat->close();
 
         if ($row2 !== null) {
-            $title1 = filter($row2['title'] ?? '', "nohtml");
+            /** @var string $title1 */
+            $title1 = \Utilities\HtmlSanitizer::safeHtmlOutput($row2['title'] ?? '');
             $title = "<a href=\"modules.php?name=$module_name&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
         }
     }

@@ -95,7 +95,6 @@ class NavigationView
                     ['label' => 'Draft Pick Locator', 'url' => 'modules.php?name=DraftPickLocator'],
                     ['label' => 'Cap Space', 'url' => 'modules.php?name=CapSpace'],
                     ['label' => 'Free Agency Preview', 'url' => 'modules.php?name=FreeAgencyPreview'],
-                    ['label' => 'Topics (News)', 'url' => 'modules.php?name=Topics'],
                     ['label' => 'Contract List', 'url' => 'modules.php?name=ContractList'],
                     ['label' => 'Player Movement', 'url' => 'modules.php?name=PlayerMovement'],
                     ['label' => 'JSB Export', 'url' => 'ibl/IBL'],
@@ -132,6 +131,7 @@ class NavigationView
                     ['label' => 'Discord Server', 'url' => 'https://discord.com/invite/QXwBQxR', 'external' => true],
                     ['label' => 'Prime Time Football', 'url' => 'http://www.thakfu.com/ptf/index.php', 'external' => true],
                     ['label' => 'Activity Tracker', 'url' => 'modules.php?name=ActivityTracker'],
+                    ['label' => 'Topics (News)', 'url' => 'modules.php?name=Topics'],
                     $this->isLoggedIn && $this->teamId !== null
                         ? ['label' => 'GM Contact List', 'url' => 'modules.php?name=GMContactList']
                         : null,

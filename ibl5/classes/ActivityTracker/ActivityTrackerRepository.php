@@ -26,10 +26,10 @@ class ActivityTrackerRepository extends \BaseMysqliRepository implements Activit
         return $this->fetchAll(
             "SELECT teamid, team_name, team_city, color1, color2, depth, sim_depth, asg_vote, eoy_vote
              FROM ibl_team_info
-             WHERE teamid != ?
+             WHERE teamid BETWEEN 1 AND ?
              ORDER BY teamid ASC",
             'i',
-            \League::FREE_AGENTS_TEAMID
+            \League::MAX_REAL_TEAMID
         );
     }
 }

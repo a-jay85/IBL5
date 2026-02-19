@@ -120,7 +120,12 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
     {
         /** @var list<HeatWinLossRow> */
         return $this->fetchAll(
-            "SELECT year, currentname, namethatyear, wins, losses FROM ibl_heat_win_loss WHERE year = ? ORDER BY wins DESC, losses ASC",
+            "SELECT hwl.year, hwl.currentname, hwl.namethatyear, hwl.wins, hwl.losses
+            FROM ibl_heat_win_loss hwl
+            JOIN ibl_team_info ti ON ti.team_name = hwl.currentname
+            WHERE hwl.year = ?
+                AND ti.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
+            ORDER BY hwl.wins DESC, hwl.losses ASC",
             "i",
             $heatYear
         );

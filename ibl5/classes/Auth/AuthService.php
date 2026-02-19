@@ -92,10 +92,10 @@ class AuthService implements AuthServiceInterface
             // path, otherwise an old synced hash in nuke_users could accept a stale password
             return false;
         } catch (EmailNotVerifiedException) {
-            $this->lastError = 'Please verify your email address before logging in. Check your inbox for a confirmation link.';
+            $this->lastError = "Please verify your email address.\nCheck your inbox or spam folder for a confirmation link.";
             return false;
         } catch (TooManyRequestsException) {
-            $this->lastError = 'Too many login attempts. Please try again later.';
+            $this->lastError = "Too many login attempts.\nPlease try again later.";
             return false;
         } catch (AuthError) {
             // Unexpected auth error — fall through to legacy path

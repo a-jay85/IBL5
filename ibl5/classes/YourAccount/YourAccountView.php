@@ -144,7 +144,7 @@ class YourAccountView
             <?php if ($error !== null): ?>
                 <div class="ibl-alert ibl-alert--error">
                     <?php /** @var string $sanitizedError */ $sanitizedError = \Utilities\HtmlSanitizer::safeHtmlOutput($error); ?>
-                    <?= $sanitizedError ?>
+                    <?= nl2br($sanitizedError) ?>
                 </div>
             <?php endif; ?>
 
@@ -283,10 +283,11 @@ class YourAccountView
                 <div class="auth-status__icon auth-status__icon--success">
                     <?= $this->checkIcon() ?>
                 </div>
-                <div class="auth-status__title">Account Created</div>
+                <div class="auth-status__title"><?= $safeSiteName ?> Account Created</div>
                 <div class="auth-status__message">
-                    Your account has been registered successfully. An activation email has been sent to your inbox.<br><br>
-                    Please click the link in the email to activate your account. Thank you for joining <?= $safeSiteName ?>!
+                    An activation email has been sent.<br><br>
+                    Please click the link in your email to activate your account.<br><br>
+                    Thanks for joining!
                 </div>
                 <div class="auth-status__action">
                     <a href="modules.php?name=YourAccount" class="ibl-btn ibl-btn--primary">Sign In</a>

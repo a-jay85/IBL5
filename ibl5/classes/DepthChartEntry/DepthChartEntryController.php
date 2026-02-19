@@ -9,7 +9,7 @@ use SavedDepthChart\SavedDepthChartService;
 use Team\Contracts\TeamServiceInterface;
 use Team\TeamRepository;
 use Team\TeamService;
-use UI\Components\TableViewSwitcher;
+use UI\Components\TableViewDropdown;
 
 /**
  * @see DepthChartEntryControllerInterface
@@ -113,20 +113,22 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         // Delegate roster + starters to TeamService (single source of truth)
         $rosterData = $this->teamService->getRosterAndStarters($teamID);
 
-        $tabDefinitions = [
-            'ratings' => 'Ratings',
-            'total_s' => 'Season Totals',
-            'avg_s' => 'Season Averages',
-            'per36mins' => 'Per 36 Minutes',
-            'chunk' => 'Sim Averages',
-            'contracts' => 'Contracts',
+        $groups = [
+            'Views' => [
+                'ratings' => 'Ratings',
+                'total_s' => 'Season Totals',
+                'avg_s' => 'Season Averages',
+                'per36mins' => 'Per 36 Minutes',
+                'chunk' => 'Sim Averages',
+                'contracts' => 'Contracts',
+            ],
         ];
 
         $baseUrl = 'modules.php?name=DepthChartEntry';
-        $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $team->color1, $team->color2);
+        $dropdown = new TableViewDropdown($groups, $display, $baseUrl, $team->color1, $team->color2);
         $tableHtml = $this->teamService->renderTableForDisplay($display, $rosterData['roster'], $team, null, $season, $rosterData['starterPids']);
 
-        return $switcher->wrap($tableHtml);
+        return $dropdown->wrap($tableHtml);
     }
 
     private function getUserTeamName(string $username): string

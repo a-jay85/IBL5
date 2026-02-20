@@ -49,32 +49,18 @@ if (!is_user($user)) {
     $username = strval($cookie[1] ?? '');
     $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
     $userTeam = Team::initialize($mysqli_db, $userTeamName);
-    $league = new League($mysqli_db);
 
     // Initialize services
     $teamScheduleRepository = new TeamScheduleRepository($mysqli_db);
     $service = new NextSimService($mysqli_db, $teamScheduleRepository, $teamPowerRankings);
-    $view = new NextSimView($mysqli_db, $season, $module_name);
+    $view = new NextSimView($season);
 
     // Get next sim games
     $games = $service->getNextSimGames($userTeam->teamID, $season);
 
-    // Add user starters to each game for comparison
     $userStarters = $service->getUserStartingLineup($userTeam);
-    foreach ($games as $index => $game) {
-        $games[$index]['userStartingPG'] = $userStarters['PG'];
-        $games[$index]['userStartingSG'] = $userStarters['SG'];
-        $games[$index]['userStartingSF'] = $userStarters['SF'];
-        $games[$index]['userStartingPF'] = $userStarters['PF'];
-        $games[$index]['userStartingC'] = $userStarters['C'];
-        $games[$index]['opposingStartingPG'] = $game['opposingStarters']['PG'];
-        $games[$index]['opposingStartingSG'] = $game['opposingStarters']['SG'];
-        $games[$index]['opposingStartingSF'] = $game['opposingStarters']['SF'];
-        $games[$index]['opposingStartingPF'] = $game['opposingStarters']['PF'];
-        $games[$index]['opposingStartingC'] = $game['opposingStarters']['C'];
-    }
 
-    echo $view->render($games, $league->getSimLengthInDays());
+    echo $view->render($games, $userTeam, $userStarters);
 
     PageLayout\PageLayout::footer();
 }

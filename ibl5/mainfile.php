@@ -172,77 +172,12 @@ foreach ($_REQUEST as $key => $value) {
     }
 }
 
-// This block of code makes sure $admin is a COOKIE (admin auth is legacy, untouched)
-if (isset($admin) && $admin != $_COOKIE['admin']) {
-    die("Illegal Operation");
-}
-
 if (isset($_COOKIE['admin'])) {
     $admin = base64_decode($_COOKIE['admin']);
     $admin = addslashes($admin);
     $admin = base64_encode($admin);
 }
 // User auth is now session-based via AuthService — legacy cookie is ignored
-
-// Die message for not allowed HTML tags
-$htmltags = "<center><img src=\"images/logo.gif\"><br><br><b>";
-$htmltags .= "The html tags you attempted to use are not allowed</b><br><br>";
-$htmltags .= "[ <a href=\"javascript:history.go(-1)\"><b>Go Back</b></a> ]</center>";
-
-if (!defined('ADMIN_FILE')) {
-    foreach ($_GET as $sec_key => $secvalue) {
-        if (
-            (preg_match('/<[^>]*script*"?[^>]*/i', $secvalue)) ||
-            (preg_match('/<[^>]*object*"?[^>]*/i', $secvalue)) ||
-            (preg_match('/<[^>]*iframe*"?[^>]*/i', $secvalue)) ||
-            (preg_match('/<[^>]*applet*"?[^>]*/i', $secvalue)) ||
-            (preg_match('/<[^>]*meta*"?[^>]*/i', $secvalue)) ||
-            (preg_match('/<[^>]*style*"?[^>]*/i', $secvalue)) ||
-            (preg_match('/<[^>]*form*"?[^>]*/i', $secvalue)) ||
-            (preg_match('/<[^>]*img*"?[^>]*/i', $secvalue)) ||
-            (preg_match('/<[^>]*onmouseover *"?[^>]*/i', $secvalue)) ||
-            (preg_match('/<[^>]*body *"?[^>]*/i', $secvalue)) ||
-            (preg_match('/\([^>]*"?[^)]*\)/i', $secvalue)) ||
-            (preg_match('/"/i', $secvalue)) ||
-            (preg_match('/forum_admin/i', $sec_key)) ||
-            (preg_match('/inside_mod/i', $sec_key))
-        ) {
-            die($htmltags);
-        }
-    }
-
-    foreach ($_POST as $secvalue) {
-        if (is_array($secvalue)) {
-            foreach ($secvalue as $arrayElementValue) {
-                if (
-                    (preg_match('/<[^>]*iframe*"?[^>]*/i', $arrayElementValue)) ||
-                    (preg_match('/<[^>]*object*"?[^>]*/i', $arrayElementValue)) ||
-                    (preg_match('/<[^>]*applet*"?[^>]*/i', $arrayElementValue)) ||
-                    (preg_match('/<[^>]*meta*"?[^>]*/i', $arrayElementValue)) ||
-                    (preg_match('/<[^>]*onmouseover*"?[^>]*/i', $arrayElementValue)) ||
-                    (preg_match('/<[^>]script*"?[^>]*/i', $arrayElementValue)) ||
-                    (preg_match('/<[^>]*body*"?[^>]*/i', $arrayElementValue)) ||
-                    (preg_match('/<[^>]style*"?[^>]*/i', $arrayElementValue))
-                ) {
-                    die($htmltags);
-                }
-            }
-        } else {
-            if (
-                (preg_match('/<[^>]*iframe*"?[^>]*/i', $secvalue)) ||
-                (preg_match('/<[^>]*object*"?[^>]*/i', $secvalue)) ||
-                (preg_match('/<[^>]*applet*"?[^>]*/i', $secvalue)) ||
-                (preg_match('/<[^>]*meta*"?[^>]*/i', $secvalue)) ||
-                (preg_match('/<[^>]*onmouseover*"?[^>]*/i', $secvalue)) ||
-                (preg_match('/<[^>]script*"?[^>]*/i', $secvalue)) ||
-                (preg_match('/<[^>]*body*"?[^>]*/i', $secvalue)) ||
-                (preg_match('/<[^>]style*"?[^>]*/i', $secvalue))
-            ) {
-                die($htmltags);
-            }
-        }
-    }
-}
 
 // Include the required files - Load appropriate config based on league selection
 $currentLeague = $_SESSION['current_league'] ?? $_COOKIE[\League\LeagueContext::COOKIE_NAME] ?? 'ibl';
@@ -426,77 +361,6 @@ function is_user($user)
     return $userSave = $authService->isAuthenticated() ? 1 : 0;
 }
 
-function is_group($user, $name)
-{
-    global $prefix, $db, $mysqli_db, $user_prefix, $cookie, $user;
-    if (is_user($user)) {
-        if (!is_array($user)) {
-            $cookie = cookiedecode($user);
-            $uid = intval($cookie[0]);
-        } else {
-            $uid = intval($user[0]);
-        }
-        $result = $db->sql_query("SELECT points FROM " . $user_prefix . "_users WHERE user_id='$uid'");
-        $row = $db->sql_fetchrow($result);
-        $points = intval($row['points']);
-        $db->sql_freeresult($result);
-        $stmt_grp = $mysqli_db->prepare("SELECT mod_group FROM " . $prefix . "_modules WHERE title = ?");
-        $stmt_grp->bind_param('s', $name);
-        $stmt_grp->execute();
-        $grpResult = $stmt_grp->get_result();
-        $grpRow = $grpResult->fetch_assoc();
-        $mod_group = (int)($grpRow['mod_group'] ?? 0);
-        $stmt_grp->close();
-        $result3 = $db->sql_query("SELECT points FROM " . $prefix . "_groups WHERE id='$mod_group'");
-        $row3 = $db->sql_fetchrow($result3);
-        $grp = intval($row3['points']);
-        $db->sql_freeresult($result3);
-        if (($points >= 0 and $points >= $grp) or $mod_group == 0) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-$postString = "";
-foreach ($_POST as $postkey => $postvalue) {
-    if ($postString > "") {
-        $postString .= "&" . $postkey . "=" . $postvalue;
-    } else {
-        $postString .= $postkey . "=" . $postvalue;
-    }
-}
-str_replace("%09", "%20", $postString);
-$postString_64 = base64_decode($postString);
-if ((!isset($admin) or (isset($admin) and !is_admin($admin))) and (stristr($postString, '%20union%20')) or (stristr($postString, '*/union/*')) or (stristr($postString, ' union ')) or (stristr($postString_64, '%20union%20')) or (stristr($postString_64, '*/union/*')) or (stristr($postString_64, ' union ')) or (stristr($postString_64, '+union+')) or (stristr($postString, 'http-equiv')) or (stristr($postString_64, 'http-equiv')) or (stristr($postString, 'alert(')) or (stristr($postString_64, 'alert(')) or (stristr($postString, 'javascript:')) or (stristr($postString_64, 'javascript:')) or (stristr($postString, 'document.cookie')) or (stristr($postString_64, 'document.cookie')) or (stristr($postString, 'onmouseover=')) or (stristr($postString_64, 'onmouseover=')) or (stristr($postString, 'document.location')) or (stristr($postString_64, 'document.location'))) {
-    header("Location: index.php");
-    die();
-}
-
-// Additional security (Union, CLike, XSS)
-//Union Tap
-//Copyright Zhen-Xjell 2004 http://nukecops.com
-//Beta 3 Code to prevent UNION SQL Injections
-unset($matches);
-unset($loc);
-if (isset($_SERVER['QUERY_STRING'])) {
-    if (preg_match("/([OdWo5NIbpuU4V2iJT0n]{5}) /", rawurldecode($loc = $_SERVER['QUERY_STRING']), $matches)) {
-        die('Illegal Operation');
-    }
-}
-if (!isset($admin) or (isset($admin) and !is_admin($admin))) {
-    $queryString = $_SERVER['QUERY_STRING'];
-    if (($_SERVER['PHP_SELF'] != "/index.php") or !isset($url)) {
-        if (stristr($queryString, 'http://')) {
-            die('Illegal Operation');
-        }
-
-    }
-    if ((stristr($queryString, '%20union%20')) or (stristr($queryString, '/*')) or (stristr($queryString, '*/union/*')) or (stristr($queryString, 'c2nyaxb0')) or (stristr($queryString, '+union+')) or ((stristr($queryString, 'cmd=')) and (!stristr($queryString, '&cmd'))) or ((stristr($queryString, 'exec')) and (!stristr($queryString, 'execu'))) or (stristr($queryString, 'concat'))) {
-        die('Illegal Operation');
-    }
-}
-
 function update_points($id)
 {
     global $user_prefix, $prefix, $db, $user;
@@ -560,28 +424,12 @@ function render_blocks($side, $blockfile, $title, $content, $bid, $url)
     }
     if (empty($url)) {
         if (empty($blockfile)) {
-            if ($side == "c") {
-                themecenterbox($title, $content);
-            } elseif ($side == "d") {
-                themecenterbox($title, $content);
-            } else {
-                themesidebox($title, $content);
-            }
+            themecenterbox($title, $content);
         } else {
-            if ($side == "c") {
-                blockfileinc($title, $blockfile, 1);
-            } elseif ($side == "d") {
-                blockfileinc($title, $blockfile, 1);
-            } else {
-                blockfileinc($title, $blockfile);
-            }
+            blockfileinc($title, $blockfile, 1);
         }
     } else {
-        if ($side == "c" or $side == "d") {
-            headlines($bid, 1);
-        } else {
-            headlines($bid);
-        }
+        headlines($bid, 1);
     }
 }
 
@@ -635,11 +483,7 @@ function blocks($side)
                     return;
                 }
             }
-            if ($row['bkey'] == "admin") {
-                adminblock();
-            } elseif ($row['bkey'] == "userbox") {
-                userblock();
-            } elseif (empty($row['bkey'])) {
+            if (empty($row['bkey'])) {
                 if ($view == 0) {
                     render_blocks($side, $blockfile, $title, $content, $bid, $url);
                 } elseif ($view == 1 and is_user($user) || is_admin($admin)) {
@@ -789,13 +633,7 @@ function blockfileinc($title, $blockfile, $side = 0)
     if (empty($content)) {
         $content = _BLOCKPROBLEM2;
     }
-    if ($side == 1) {
-        themecenterbox($blockfiletitle, $content);
-    } elseif ($side == 2) {
-        themecenterbox($blockfiletitle, $content);
-    } else {
-        themesidebox($blockfiletitle, $content);
-    }
+    themecenterbox($blockfiletitle, $content);
 }
 
 
@@ -1061,32 +899,6 @@ if (!function_exists("themepreview")) {
     }
 }
 
-function adminblock()
-{
-    global $admin, $prefix, $db, $admin_file;
-    if (is_admin($admin)) {
-        $sql = "SELECT title, content FROM " . $prefix . "_blocks WHERE bkey='admin'";
-        $result = $db->sql_query($sql);
-        while (list($title, $content) = $db->sql_fetchrow($result)) {
-            $content = filter($content);
-            $title = filter($title, "nohtml");
-            $content = "<span class=\"content\">" . $content . "</span>";
-            themesidebox($title, $content);
-        }
-        $title = _WAITINGCONT;
-        $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_queue"));
-        $content = "<span class=\"content\">";
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=submissions\">" . _SUBMISSIONS . "</a>: $num<br>";
-        $num = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_newlink"));
-        $brokenl = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_modrequest WHERE brokenlink='1'"));
-        $modreql = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_links_modrequest WHERE brokenlink='0'"));
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=Links\">" . _WLINKS . "</a>: $num<br>";
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=LinksListModRequests\">" . _MODREQLINKS . "</a>: $modreql<br>";
-        $content .= "<strong><big>&middot;</big></strong>&nbsp;<a href=\"" . $admin_file . ".php?op=LinksListBrokenLinks\">" . _BROKENLINKS . "</a>: $brokenl<br>";
-        themesidebox($title, $content);
-    }
-}
-
 function loginbox(): void
 {
     global $user, $authService;
@@ -1106,22 +918,6 @@ function loginbox(): void
 }
 
 require_once __DIR__ . '/includes/buildRedirectUrl.php';
-
-function userblock()
-{
-    global $user, $cookie, $db, $user_prefix, $userinfo;
-    if (is_user($user)) {
-        getusrinfo($user);
-        if ($userinfo['ublockon']) {
-            $sql = "SELECT ublock FROM " . $user_prefix . "_users WHERE user_id='$cookie[0]'";
-            $result = $db->sql_query($sql);
-            $row = $db->sql_fetchrow($result);
-            $ublock = intval($row['ublock']);
-            $title = _MENUFOR . " " . $cookie[1];
-            themesidebox($title, $ublock);
-        }
-    }
-}
 
 function getTopics($s_sid)
 {
@@ -1157,11 +953,7 @@ function headlines($bid, $cenbox = 0)
             $content = "";
             $db->sql_query("UPDATE " . $prefix . "_blocks SET content='$content', time='$btime' WHERE bid='$bid'");
             $cont = 0;
-            if ($cenbox == 0) {
-                themesidebox($title, $content);
-            } else {
-                themecenterbox($title, $content);
-            }
+            themecenterbox($title, $content);
             return;
         }
         if ($fp) {
@@ -1190,11 +982,7 @@ function headlines($bid, $cenbox = 0)
                     $content = "";
                     $db->sql_query("UPDATE " . $prefix . "_blocks SET content='$content', time='$btime' WHERE bid='$bid'");
                     $cont = 0;
-                    if ($cenbox == 0) {
-                        themesidebox($title, $content);
-                    } else {
-                        themecenterbox($title, $content);
-                    }
+                    themecenterbox($title, $content);
                     return;
                 } else {
                     if (strcmp($link, $title2) and !empty($items[$i])) {
@@ -1214,11 +1002,7 @@ function headlines($bid, $cenbox = 0)
     } elseif (($cont == 0) or (empty($content))) {
         $content = "<font class=\"content\">" . _RSSPROBLEM . "</font>";
     }
-    if ($cenbox == 0) {
-        themesidebox($title, $content);
-    } else {
-        themecenterbox($title, $content);
-    }
+    themecenterbox($title, $content);
 }
 
 function automated_news()
@@ -1283,16 +1067,6 @@ function automated_news()
     $db->sql_freeresult($result);
 }
 
-if (!function_exists("themecenterbox")) {
-    function themecenterbox($title, $content)
-    {
-        OpenTable();
-        echo "<center><font class=\"option\"><b>$title</b></font></center><br>" . $content;
-        CloseTable();
-        echo "<br>";
-    }
-}
-
 function get_theme()
 {
     global $user, $userinfo, $Default_Theme, $name, $op;
@@ -1317,14 +1091,6 @@ function get_theme()
     static $ThemeSelSave;
     $ThemeSelSave = $ThemeSel;
     return $ThemeSelSave;
-}
-
-function removecrlf($str)
-{
-    // Function for Security Fix by Ulf Harnhammar, VSU Security 2002
-    // Looks like I don't have so bad track record of security reports as Ulf believes
-    // He decided to not contact me, but I'm always here, digging on the net
-    return strtr($str, "\015\012", ' ');
 }
 
 function validate_mail($email)

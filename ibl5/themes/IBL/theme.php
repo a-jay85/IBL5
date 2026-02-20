@@ -1,6 +1,5 @@
 <?php
 
-$lnkcolor = "#336699";
 if ($_SERVER['SERVER_NAME'] != "localhost") {
     $bgcolor1 = "#EEEEEE";
 } else {
@@ -10,8 +9,6 @@ $bgcolor2 = "#CCCCCC";
 $bgcolor3 = "#AAAAAA";
 $textcolor1 = "#000000";
 $textcolor2 = "#000000";
-$theme_home = "Web_Links";
-$hr = 1; # 1 to have horizonal rule in comments instead of table bgcolor
 
 /**
  * @deprecated Use CSS classes directly: <div class="ibl-card">
@@ -44,28 +41,6 @@ function OpenTable2()
 function CloseTable()
 {
     echo "</td></tr></table></td></tr></table>\n";
-}
-
-/**
- * Modern story formatting for the redesigned news blocks
- */
-function FormatStoryModern($thetext, $notes, $aid, $informant)
-{
-    global $anonymous;
-
-    echo $thetext;
-
-    if (!empty($notes)) {
-        echo '<div class="news-article__note">
-            <strong>' . _NOTE . ':</strong> <em>' . $notes . '</em>
-        </div>';
-    }
-
-    if ("$aid" != "$informant" && !empty($informant)) {
-        echo '<p class="news-article__attribution">
-            ' . _WRITES . ': ' . \Utilities\HtmlSanitizer::safeHtmlOutput($informant) . '
-        </p>';
-    }
 }
 
 function themeheader()
@@ -190,7 +165,19 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
         </header>
         <div class="news-article__body">';
 
-    FormatStoryModern($thetext, $notes, $aid, $informant);
+    echo $thetext;
+
+    if (!empty($notes)) {
+        echo '<div class="news-article__note">
+            <strong>' . _NOTE . ':</strong> <em>' . $notes . '</em>
+        </div>';
+    }
+
+    if ("$aid" != "$informant" && !empty($informant)) {
+        echo '<p class="news-article__attribution">
+            ' . _WRITES . ': ' . \Utilities\HtmlSanitizer::safeHtmlOutput($informant) . '
+        </p>';
+    }
 
     echo '</div>
         <footer class="news-article__footer">

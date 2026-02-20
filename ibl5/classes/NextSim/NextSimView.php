@@ -296,18 +296,18 @@ class NextSimView implements NextSimViewInterface
         if ($gameData === null) {
             // User row: team icon
 
-            return '<td class="next-sim-game-info-cell">'
+            return '<td class="next-sim-game-info-cell"><span>'
                 . '<img src="./images/logo/new' . $teamId . '.png" alt="" class="next-sim-game-logo" width="20" height="20">'
-                . '</td>';
+                . '</span></td>';
         }
 
         // Opponent row: @/vs + team logo
         /** @var string $locationPrefixSafe */
         $locationPrefixSafe = HtmlSanitizer::safeHtmlOutput($gameData['locationPrefix']);
 
-        return '<td class="next-sim-game-info-cell">'
+        return '<td class="next-sim-game-info-cell"><span>'
             . $locationPrefixSafe . ' '
             . '<img src="./images/logo/new' . $teamId . '.png" alt="" class="next-sim-game-logo" width="20" height="20">'
-            . '</td>';
+            . '</span></td>';
     }
 }

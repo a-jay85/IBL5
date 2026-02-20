@@ -1205,12 +1205,40 @@ a.schedule-jump-btn:hover {
     font-weight: 700;
 }
 
+/* Player + Game cells: team-colored background + text (matches ibl-team-cell--colored) */
+.next-sim-row--user .ibl-player-cell,
+.next-sim-row--opponent .ibl-player-cell,
+.next-sim-row--user .next-sim-game-info-cell,
+.next-sim-row--opponent .next-sim-game-info-cell {
+    background-color: var(--team-color-primary);
+    color: var(--team-color-secondary);
+}
+
+.next-sim-row--user .ibl-player-cell a,
+.next-sim-row--opponent .ibl-player-cell a {
+    color: var(--team-color-secondary);
+}
+
+.next-sim-row--user .ibl-player-cell a:hover,
+.next-sim-row--opponent .ibl-player-cell a:hover {
+    opacity: 0.85;
+}
+
 /* Game info cell layout */
-.next-sim-game-info-cell {
+td.next-sim-game-info-cell {
     white-space: nowrap;
     font-size: 0.8rem;
     font-weight: 600;
     padding: var(--space-1) var(--space-2);
+    height: 100%;
+}
+
+td.next-sim-game-info-cell > span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1);
+    height: 100%;
 }
 
 /* Small inline team logo used in game info cells and schedule strip */
@@ -1230,8 +1258,9 @@ a.schedule-jump-btn:hover {
         background: var(--accent-100, #ffedd5);
     }
 
+    .next-sim-row--user .sticky-col.ibl-player-cell,
     .next-sim-row--opponent .sticky-col {
-        background: color-mix(in srgb, var(--team-color-primary) 6%, white);
+        background: var(--team-color-primary);
     }
 
     .ibl-data-table tbody tr.next-sim-row--user:nth-child(odd):hover .sticky-col,

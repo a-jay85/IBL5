@@ -20,6 +20,12 @@ class JsbImportService implements JsbImportServiceInterface
     /** @var int Auto-incrementing trade group ID for grouping trade items */
     private int $nextTradeGroupId = 1;
 
+    /**
+     * MySQL affected_rows for INSERT ... ON DUPLICATE KEY UPDATE:
+     * 1 = new row inserted, 2 = existing row updated, 0 = no change.
+     */
+    private const AFFECTED_ROWS_INSERTED = 1;
+
     public function __construct(JsbImportRepository $repository, PlayerIdResolver $resolver)
     {
         $this->repository = $repository;
@@ -105,7 +111,7 @@ class JsbImportService implements JsbImportServiceInterface
                 }
 
                 try {
-                    $this->repository->upsertHistRecord([
+                    $affected = $this->repository->upsertHistRecord([
                         'pid' => $pid,
                         'name' => $histData['name'],
                         'year' => $histData['year'],
@@ -128,7 +134,7 @@ class JsbImportService implements JsbImportServiceInterface
                         'pf' => $histData['pf'],
                         'pts' => $histData['pts'],
                     ]);
-                    $result->addInserted();
+                    $this->recordUpsertResult($affected, $result);
                 } catch (\RuntimeException $e) {
                     $result->addError('Hist upsert failed for ' . $histData['name'] . ': ' . $e->getMessage());
                 }
@@ -196,7 +202,7 @@ class JsbImportService implements JsbImportServiceInterface
                 $teamId = $this->repository->resolveTeamIdByName($team['name']);
 
                 try {
-                    $this->repository->upsertHistoryRecord([
+                    $affected = $this->repository->upsertHistoryRecord([
                         'season_year' => $season['year'],
                         'team_name' => $team['name'],
                         'teamid' => $teamId,
@@ -208,7 +214,7 @@ class JsbImportService implements JsbImportServiceInterface
                         'won_championship' => $team['won_championship'],
                         'source_file' => $sourceLabel,
                     ]);
-                    $result->addInserted();
+                    $this->recordUpsertResult($affected, $result);
                 } catch (\RuntimeException $e) {
                     $result->addError('History upsert failed for ' . $team['name'] . ' (' . $season['year'] . '): ' . $e->getMessage());
                 }
@@ -240,14 +246,14 @@ class JsbImportService implements JsbImportServiceInterface
                 $playerName = $this->repository->getPlayerName($pid);
 
                 try {
-                    $this->repository->upsertAllStarRoster([
+                    $affected = $this->repository->upsertAllStarRoster([
                         'season_year' => $seasonYear,
                         'event_type' => $eventType,
                         'roster_slot' => $slot + 1,
                         'pid' => $pid,
                         'player_name' => $playerName,
                     ]);
-                    $result->addInserted();
+                    $this->recordUpsertResult($affected, $result);
                 } catch (\RuntimeException $e) {
                     $result->addError('All-Star roster upsert failed: ' . $e->getMessage());
                 }
@@ -323,7 +329,7 @@ class JsbImportService implements JsbImportServiceInterface
             $pid = $participants[$slot] ?? null;
 
             try {
-                $this->repository->upsertAllStarScore([
+                $affected = $this->repository->upsertAllStarScore([
                     'season_year' => $seasonYear,
                     'contest_type' => $contestType,
                     'round' => $round,
@@ -331,7 +337,7 @@ class JsbImportService implements JsbImportServiceInterface
                     'pid' => $pid,
                     'score' => $score,
                 ]);
-                $result->addInserted();
+                $this->recordUpsertResult($affected, $result);
             } catch (\RuntimeException $e) {
                 $result->addError('All-Star score upsert failed: ' . $e->getMessage());
             }
@@ -352,7 +358,7 @@ class JsbImportService implements JsbImportServiceInterface
         }
 
         try {
-            $this->repository->upsertTransaction([
+            $affected = $this->repository->upsertTransaction([
                 'season_year' => $transaction['year'],
                 'transaction_month' => $transaction['month'],
                 'transaction_day' => $transaction['day'],
@@ -368,7 +374,7 @@ class JsbImportService implements JsbImportServiceInterface
                 'draft_pick_year' => null,
                 'source_file' => $sourceLabel,
             ]);
-            $result->addInserted();
+            $this->recordUpsertResult($affected, $result);
         } catch (\RuntimeException $e) {
             $result->addError('Injury transaction upsert failed: ' . $e->getMessage());
         }
@@ -399,7 +405,7 @@ class JsbImportService implements JsbImportServiceInterface
             $isDraftPick = $item['marker'] === TrnFileParser::TRADE_MARKER_DRAFT_PICK ? 1 : 0;
 
             try {
-                $this->repository->upsertTransaction([
+                $affected = $this->repository->upsertTransaction([
                     'season_year' => $transaction['year'],
                     'transaction_month' => $transaction['month'],
                     'transaction_day' => $transaction['day'],
@@ -415,7 +421,7 @@ class JsbImportService implements JsbImportServiceInterface
                     'draft_pick_year' => $item['draft_year'],
                     'source_file' => $sourceLabel,
                 ]);
-                $result->addInserted();
+                $this->recordUpsertResult($affected, $result);
             } catch (\RuntimeException $e) {
                 $result->addError('Trade transaction upsert failed: ' . $e->getMessage());
             }
@@ -438,7 +444,7 @@ class JsbImportService implements JsbImportServiceInterface
         $isRelease = $transaction['type'] === TrnFileParser::TYPE_WAIVER_RELEASE;
 
         try {
-            $this->repository->upsertTransaction([
+            $affected = $this->repository->upsertTransaction([
                 'season_year' => $transaction['year'],
                 'transaction_month' => $transaction['month'],
                 'transaction_day' => $transaction['day'],
@@ -454,9 +460,23 @@ class JsbImportService implements JsbImportServiceInterface
                 'draft_pick_year' => null,
                 'source_file' => $sourceLabel,
             ]);
-            $result->addInserted();
+            $this->recordUpsertResult($affected, $result);
         } catch (\RuntimeException $e) {
             $result->addError('Waiver transaction upsert failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Record an upsert result based on MySQL affected_rows.
+     *
+     * @param int $affectedRows 1=inserted, 2=updated, 0=unchanged
+     */
+    private function recordUpsertResult(int $affectedRows, JsbImportResult $result): void
+    {
+        if ($affectedRows === self::AFFECTED_ROWS_INSERTED) {
+            $result->addInserted();
+        } else {
+            $result->addUpdated();
         }
     }
 

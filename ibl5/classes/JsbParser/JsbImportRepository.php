@@ -78,9 +78,9 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     /**
      * @see JsbImportRepositoryInterface::upsertHistRecord()
      */
-    public function upsertHistRecord(array $record): bool
+    public function upsertHistRecord(array $record): int
     {
-        $affected = $this->execute(
+        return $this->execute(
             'INSERT INTO ibl_hist
                 (pid, name, year, team, teamid, games, minutes, fgm, fga, ftm, fta, tgm, tga, orb, reb, ast, stl, blk, tvr, pf, pts)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -126,17 +126,14 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
             $record['pf'],
             $record['pts']
         );
-
-        return $affected >= 0;
     }
 
     /**
      * @see JsbImportRepositoryInterface::upsertTransaction()
      */
-    public function upsertTransaction(array $record): bool
+    public function upsertTransaction(array $record): int
     {
-        // Build query with nullable fields handled explicitly
-        $affected = $this->execute(
+        return $this->execute(
             'INSERT INTO ibl_jsb_transactions
                 (season_year, transaction_month, transaction_day, transaction_type,
                  pid, player_name, from_teamid, to_teamid,
@@ -167,16 +164,14 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
             $record['draft_pick_year'],
             $record['source_file']
         );
-
-        return $affected >= 0;
     }
 
     /**
      * @see JsbImportRepositoryInterface::upsertHistoryRecord()
      */
-    public function upsertHistoryRecord(array $record): bool
+    public function upsertHistoryRecord(array $record): int
     {
-        $affected = $this->execute(
+        return $this->execute(
             'INSERT INTO ibl_jsb_history
                 (season_year, team_name, teamid, wins, losses, made_playoffs,
                  playoff_result, playoff_round_reached, won_championship, source_file)
@@ -202,16 +197,14 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
             $record['won_championship'],
             $record['source_file']
         );
-
-        return $affected >= 0;
     }
 
     /**
      * @see JsbImportRepositoryInterface::upsertAllStarRoster()
      */
-    public function upsertAllStarRoster(array $record): bool
+    public function upsertAllStarRoster(array $record): int
     {
-        $affected = $this->execute(
+        return $this->execute(
             'INSERT INTO ibl_jsb_allstar_rosters
                 (season_year, event_type, roster_slot, pid, player_name)
             VALUES (?, ?, ?, ?, ?)
@@ -225,16 +218,14 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
             $record['pid'],
             $record['player_name']
         );
-
-        return $affected >= 0;
     }
 
     /**
      * @see JsbImportRepositoryInterface::upsertAllStarScore()
      */
-    public function upsertAllStarScore(array $record): bool
+    public function upsertAllStarScore(array $record): int
     {
-        $affected = $this->execute(
+        return $this->execute(
             'INSERT INTO ibl_jsb_allstar_scores
                 (season_year, contest_type, round, participant_slot, pid, score)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -249,8 +240,6 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
             $record['pid'],
             $record['score']
         );
-
-        return $affected >= 0;
     }
 
     /**

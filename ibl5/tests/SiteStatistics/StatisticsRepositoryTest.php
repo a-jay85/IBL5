@@ -1,8 +1,9 @@
 <?php
 
-namespace SiteStatistics;
+namespace Tests\SiteStatistics;
 
 use PHPUnit\Framework\TestCase;
+use SiteStatistics\StatisticsRepository;
 use Tests\Integration\Mocks\MockPreparedStatement;
 use Tests\Integration\Mocks\MockDatabaseResult;
 

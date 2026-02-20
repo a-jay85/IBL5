@@ -202,5 +202,8 @@
         <testsuite name="StrengthOfSchedule Module Tests">
             <directory>tests/StrengthOfSchedule</directory>
         </testsuite>
+        <testsuite name="JsbParser Module Tests">
+            <directory>tests/JsbParser</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

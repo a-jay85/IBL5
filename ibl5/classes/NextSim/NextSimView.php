@@ -294,24 +294,19 @@ class NextSimView implements NextSimViewInterface
         $teamId = $team->teamID;
 
         if ($gameData === null) {
-            // User row: team name with orange highlight
-            /** @var string $safeTeamName */
-            $safeTeamName = HtmlSanitizer::safeHtmlOutput($team->city . ' ' . $team->name);
+            // User row: team icon
 
             return '<td class="next-sim-game-info-cell">'
-                . '<img src="./images/logo/new' . $teamId . '.png" alt="" class="next-sim-game-logo" width="20" height="20"> '
-                . '<span class="next-sim-user-label">' . $safeTeamName . '</span>'
+                . '<img src="./images/logo/new' . $teamId . '.png" alt="" class="next-sim-game-logo" width="20" height="20">'
                 . '</td>';
         }
 
-        // Opponent row: Day N @/vs + team logo
-        /** @var string $dayNumberSafe */
-        $dayNumberSafe = HtmlSanitizer::safeHtmlOutput((string)$gameData['dayNumber']);
+        // Opponent row: @/vs + team logo
         /** @var string $locationPrefixSafe */
         $locationPrefixSafe = HtmlSanitizer::safeHtmlOutput($gameData['locationPrefix']);
 
         return '<td class="next-sim-game-info-cell">'
-            . 'Day ' . $dayNumberSafe . ' ' . $locationPrefixSafe . ' '
+            . $locationPrefixSafe . ' '
             . '<img src="./images/logo/new' . $teamId . '.png" alt="" class="next-sim-game-logo" width="20" height="20">'
             . '</td>';
     }

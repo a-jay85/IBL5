@@ -1202,9 +1202,6 @@ a.schedule-jump-btn:hover {
 
 /* Game info cell layout */
 .next-sim-game-info-cell {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
     white-space: nowrap;
     font-size: 0.8rem;
     font-weight: 600;
@@ -1213,6 +1210,7 @@ a.schedule-jump-btn:hover {
 
 /* Small inline team logo used in game info cells and schedule strip */
 .next-sim-game-logo {
+    display: inline;
     width: 20px;
     height: 20px;
     object-fit: contain;

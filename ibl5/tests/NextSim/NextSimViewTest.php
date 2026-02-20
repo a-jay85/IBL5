@@ -124,13 +124,13 @@ class NextSimViewTest extends TestCase
         $this->assertStringContainsString('--team-color-secondary', $result);
     }
 
-    public function testRenderContainsUserTeamLabel(): void
+    public function testRenderContainsUserRowWithTeamLogo(): void
     {
         $games = $this->createGameData();
         $result = $this->view->render($games, $this->userTeam, $this->userStarters);
 
-        $this->assertStringContainsString('next-sim-user-label', $result);
-        $this->assertStringContainsString('Test Team', $result);
+        $this->assertStringContainsString('next-sim-row--user', $result);
+        $this->assertStringContainsString('next-sim-game-info-cell', $result);
     }
 
     public function testScheduleStripContainsGameDayInfo(): void

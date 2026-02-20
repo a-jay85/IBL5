@@ -46,7 +46,7 @@ class NextSimView implements NextSimViewInterface
      * @param array<int, NextSimGameData> $games Processed game data
      * @param array<string, Player> $userStarters User's starting lineup by position
      */
-    public function render(array $games, int $simLengthInDays, \Team $userTeam, array $userStarters): string
+    public function render(array $games, \Team $userTeam, array $userStarters): string
     {
         $html = '<div class="next-sim-container">';
         $html .= '<h2 class="ibl-title">Next Sim</h2>';

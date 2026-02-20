@@ -49,7 +49,6 @@ if (!is_user($user)) {
     $username = strval($cookie[1] ?? '');
     $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
     $userTeam = Team::initialize($mysqli_db, $userTeamName);
-    $league = new League($mysqli_db);
 
     // Initialize services
     $teamScheduleRepository = new TeamScheduleRepository($mysqli_db);
@@ -61,7 +60,7 @@ if (!is_user($user)) {
 
     $userStarters = $service->getUserStartingLineup($userTeam);
 
-    echo $view->render($games, $league->getSimLengthInDays(), $userTeam, $userStarters);
+    echo $view->render($games, $userTeam, $userStarters);
 
     PageLayout\PageLayout::footer();
 }

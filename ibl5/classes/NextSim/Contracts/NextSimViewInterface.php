@@ -19,10 +19,9 @@ interface NextSimViewInterface
      * Render the complete next sim display
      *
      * @param array<int, NextSimGameData> $games Processed game data
-     * @param int $simLengthInDays Simulation length in days
      * @param \Team $userTeam User's team object
      * @param array<string, \Player\Player> $userStarters User's starting lineup by position
      * @return string HTML output
      */
-    public function render(array $games, int $simLengthInDays, \Team $userTeam, array $userStarters): string;
+    public function render(array $games, \Team $userTeam, array $userStarters): string;
 }

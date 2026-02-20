@@ -60,21 +60,21 @@ class NextSimViewTest extends TestCase
 
     public function testRenderReturnsString(): void
     {
-        $result = $this->view->render([], 7, $this->userTeam, $this->userStarters);
+        $result = $this->view->render([], $this->userTeam, $this->userStarters);
 
         $this->assertIsString($result);
     }
 
     public function testRenderContainsTitle(): void
     {
-        $result = $this->view->render([], 7, $this->userTeam, $this->userStarters);
+        $result = $this->view->render([], $this->userTeam, $this->userStarters);
 
         $this->assertStringContainsString('Next Sim', $result);
     }
 
     public function testRenderShowsNoGamesMessage(): void
     {
-        $result = $this->view->render([], 7, $this->userTeam, $this->userStarters);
+        $result = $this->view->render([], $this->userTeam, $this->userStarters);
 
         $this->assertStringContainsString('No games projected next sim', $result);
     }
@@ -82,7 +82,7 @@ class NextSimViewTest extends TestCase
     public function testRenderWithGamesContainsScheduleStrip(): void
     {
         $games = $this->createGameData();
-        $result = $this->view->render($games, 7, $this->userTeam, $this->userStarters);
+        $result = $this->view->render($games, $this->userTeam, $this->userStarters);
 
         $this->assertStringContainsString('next-sim-schedule-strip', $result);
     }
@@ -90,7 +90,7 @@ class NextSimViewTest extends TestCase
     public function testRenderWithGamesContainsAllPositionSections(): void
     {
         $games = $this->createGameData();
-        $result = $this->view->render($games, 7, $this->userTeam, $this->userStarters);
+        $result = $this->view->render($games, $this->userTeam, $this->userStarters);
 
         $this->assertStringContainsString('Point Guards', $result);
         $this->assertStringContainsString('Shooting Guards', $result);
@@ -102,7 +102,7 @@ class NextSimViewTest extends TestCase
     public function testRenderContainsUserRow(): void
     {
         $games = $this->createGameData();
-        $result = $this->view->render($games, 7, $this->userTeam, $this->userStarters);
+        $result = $this->view->render($games, $this->userTeam, $this->userStarters);
 
         $this->assertStringContainsString('next-sim-row--user', $result);
     }
@@ -110,7 +110,7 @@ class NextSimViewTest extends TestCase
     public function testRenderContainsOpponentRow(): void
     {
         $games = $this->createGameData();
-        $result = $this->view->render($games, 7, $this->userTeam, $this->userStarters);
+        $result = $this->view->render($games, $this->userTeam, $this->userStarters);
 
         $this->assertStringContainsString('next-sim-row--opponent', $result);
     }
@@ -118,7 +118,7 @@ class NextSimViewTest extends TestCase
     public function testRenderContainsPerRowTeamColorInlineStyles(): void
     {
         $games = $this->createGameData();
-        $result = $this->view->render($games, 7, $this->userTeam, $this->userStarters);
+        $result = $this->view->render($games, $this->userTeam, $this->userStarters);
 
         $this->assertStringContainsString('--team-color-primary', $result);
         $this->assertStringContainsString('--team-color-secondary', $result);
@@ -127,7 +127,7 @@ class NextSimViewTest extends TestCase
     public function testRenderContainsUserTeamLabel(): void
     {
         $games = $this->createGameData();
-        $result = $this->view->render($games, 7, $this->userTeam, $this->userStarters);
+        $result = $this->view->render($games, $this->userTeam, $this->userStarters);
 
         $this->assertStringContainsString('next-sim-user-label', $result);
         $this->assertStringContainsString('Test Team', $result);
@@ -136,7 +136,7 @@ class NextSimViewTest extends TestCase
     public function testScheduleStripContainsGameDayInfo(): void
     {
         $games = $this->createGameData();
-        $result = $this->view->render($games, 7, $this->userTeam, $this->userStarters);
+        $result = $this->view->render($games, $this->userTeam, $this->userStarters);
 
         $this->assertStringContainsString('Day 1', $result);
     }
@@ -144,7 +144,7 @@ class NextSimViewTest extends TestCase
     public function testPositionSectionContainsGameColumn(): void
     {
         $games = $this->createGameData();
-        $result = $this->view->render($games, 7, $this->userTeam, $this->userStarters);
+        $result = $this->view->render($games, $this->userTeam, $this->userStarters);
 
         $this->assertStringContainsString('<th>Game</th>', $result);
     }

@@ -398,7 +398,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
             $yearsLinked = $this->renderFranchiseYearLinks($record['years'], $teamTid);
 
             $output .= '<tr>';
-            $output .= '<td><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></td>';
+            $output .= '<td><a href="' . TeamCellHelper::teamPageUrl($teamTid) . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
             $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
             $output .= '<td>' . $yearsLinked . '</td>';
             $output .= '</tr>';
@@ -594,10 +594,15 @@ class RecordHoldersView implements RecordHoldersViewInterface
             ? '<a href="' . $safeBoxScoreUrl . '">' . $safeDate . '</a>'
             : $safeDate;
 
+        $teamTid = $record['teamTid'];
+        $teamYr = (int) $record['teamYr'];
+        $oppTid = $record['oppTid'];
+        $oppYr = (int) $record['oppYr'];
+
         $output = '<tr>';
-        $output .= '<td><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></td>';
+        $output .= '<td><a href="' . TeamCellHelper::teamPageUrl($teamTid, $teamYr) . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
         $output .= '<td>' . $dateCell . '</td>';
-        $output .= '<td><img src="images/topics/' . $safeOppTeam . '.png" alt="' . strtoupper($safeOppTeam) . '"></td>';
+        $output .= '<td><a href="' . TeamCellHelper::teamPageUrl($oppTid, $oppYr) . '"><img src="images/topics/' . $safeOppTeam . '.png" alt="' . strtoupper($safeOppTeam) . '"></a></td>';
         $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
         $output .= '</tr>';
 

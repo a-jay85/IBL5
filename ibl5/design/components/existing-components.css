@@ -1279,6 +1279,11 @@ td.next-sim-game-info-cell > span {
     .next-sim-row--opponent:hover .sticky-col {
         background: var(--team-row-hover-bg);
     }
+
+    .next-sim-schedule-strip {
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+    }
 }
 
 /* ==========================================================================

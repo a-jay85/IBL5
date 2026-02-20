@@ -692,7 +692,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
      * Format a date for display based on game type.
      *
      * Regular season / Playoffs: "January 16, 1996"
-     * HEAT: "1995 HEAT" (using the beginning year of the season)
+     * HEAT: "HEAT\nOctober 16, 1995" (newline-separated for two-line display)
      */
     private function formatDateDisplay(string $date, string $gameType): string
     {
@@ -706,8 +706,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         }
 
         if ($gameType === 'heat') {
-            $year = (int) date('Y', $timestamp);
-            return $year . ' HEAT';
+            return "HEAT\n" . date('F j, Y', $timestamp);
         }
 
         return date('F j, Y', $timestamp);

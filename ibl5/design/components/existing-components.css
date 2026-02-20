@@ -1181,15 +1181,20 @@ a.schedule-jump-btn:hover {
     --team-row-hover-bg: color-mix(in srgb, var(--team-color-primary) 12%, white);
 }
 
-.next-sim-row--user {
-    background: color-mix(in srgb, var(--team-color-primary) 10%, white);
+.ibl-data-table tbody tr.next-sim-row--user:nth-child(odd),
+.ibl-data-table tbody tr.next-sim-row--user:nth-child(even) {
+    background-color: var(--accent-100, #ffedd5);
+}
+
+.ibl-data-table tbody tr.next-sim-row--user:nth-child(odd):hover,
+.ibl-data-table tbody tr.next-sim-row--user:nth-child(even):hover {
+    background-color: var(--accent-200, #fed7aa);
 }
 
 .next-sim-row--opponent {
     background: color-mix(in srgb, var(--team-color-primary) 6%, white);
 }
 
-.next-sim-row--user:hover,
 .next-sim-row--opponent:hover {
     background: var(--team-row-hover-bg);
 }
@@ -1220,15 +1225,20 @@ a.schedule-jump-btn:hover {
 
 /* Mobile: sticky-col backgrounds match per-row team colors */
 @media (max-width: 768px) {
-    .next-sim-row--user .sticky-col {
-        background: color-mix(in srgb, var(--team-color-primary) 10%, white);
+    .ibl-data-table tbody tr.next-sim-row--user:nth-child(odd) .sticky-col,
+    .ibl-data-table tbody tr.next-sim-row--user:nth-child(even) .sticky-col {
+        background: var(--accent-100, #ffedd5);
     }
 
     .next-sim-row--opponent .sticky-col {
         background: color-mix(in srgb, var(--team-color-primary) 6%, white);
     }
 
-    .next-sim-row--user:hover .sticky-col,
+    .ibl-data-table tbody tr.next-sim-row--user:nth-child(odd):hover .sticky-col,
+    .ibl-data-table tbody tr.next-sim-row--user:nth-child(even):hover .sticky-col {
+        background: var(--accent-200, #fed7aa);
+    }
+
     .next-sim-row--opponent:hover .sticky-col {
         background: var(--team-row-hover-bg);
     }

@@ -63,8 +63,48 @@ class NextSimView implements NextSimViewInterface
         }
 
         $html .= '</div>';
+        $html .= $this->renderColumnHighlightScript();
 
         return $html;
+    }
+
+    /**
+     * Render the column highlight script for position tables
+     */
+    private function renderColumnHighlightScript(): string
+    {
+        return '<script>
+document.querySelectorAll(".next-sim-position-section .team-table").forEach(function(table){
+    var tbody=table.querySelector("tbody");
+    if(!tbody)return;
+    function getHoverColor(row){
+        var t=document.createElement("span");
+        t.style.cssText="position:absolute;visibility:hidden";
+        t.style.backgroundColor=row.classList.contains("next-sim-row--user")
+            ?"var(--accent-200,#fed7aa)":"var(--team-row-hover-bg)";
+        row.appendChild(t);
+        var c=getComputedStyle(t).backgroundColor;
+        row.removeChild(t);
+        return c;
+    }
+    function clear(){
+        tbody.querySelectorAll(".next-sim-col-hover").forEach(function(c){
+            c.classList.remove("next-sim-col-hover");c.style.removeProperty("background-color");
+        });
+    }
+    tbody.addEventListener("mouseover",function(e){
+        var td=e.target.closest("td");
+        if(!td)return;
+        var ci=td.cellIndex,bg=getHoverColor(td.parentElement);
+        clear();
+        tbody.querySelectorAll("tr").forEach(function(row){
+            var cell=row.cells[ci];
+            if(cell){cell.classList.add("next-sim-col-hover");cell.style.backgroundColor=bg;}
+        });
+    });
+    tbody.addEventListener("mouseleave",clear);
+});
+</script>';
     }
 
     /**

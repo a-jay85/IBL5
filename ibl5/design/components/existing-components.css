@@ -1182,6 +1182,8 @@ a.schedule-jump-btn:hover {
     margin-bottom: var(--space-6);
 }
 
+/* Column highlight on hover — color set inline by JS to match hovered row */
+
 /* Per-row team color overrides */
 .next-sim-position-section .team-table tr[style*="--team-color-primary"] {
     --team-row-hover-bg: color-mix(in srgb, var(--team-color-primary) 12%, white);
@@ -1194,7 +1196,7 @@ a.schedule-jump-btn:hover {
 
 .ibl-data-table tbody tr.next-sim-row--user:nth-child(odd):hover,
 .ibl-data-table tbody tr.next-sim-row--user:nth-child(even):hover {
-    background-color: var(--accent-200, #fed7aa);
+    background-color: var(--accent-200, #fed7aa) !important;
 }
 
 .next-sim-row--opponent {

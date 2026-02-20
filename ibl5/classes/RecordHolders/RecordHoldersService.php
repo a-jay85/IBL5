@@ -403,13 +403,16 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         /** @var list<FormattedTeamGameRecord> $formatted */
         $formatted = [];
         foreach ($dbRecords as $record) {
+            $seasonYear = $this->dateToSeasonEndingYear($record['date']);
             $formatted[] = [
                 'teamAbbr' => $this->getTeamAbbreviation($record['tid']),
                 'teamTid' => $record['tid'],
+                'teamYr' => (string) $seasonYear,
                 'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['gameOfThatDay'], $record['BoxID']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], 'regularSeason'),
                 'oppAbbr' => $this->getTeamAbbreviation($record['oppTid']),
                 'oppTid' => $record['oppTid'],
+                'oppYr' => (string) $seasonYear,
                 'amount' => (string) $record['value'],
             ];
         }
@@ -427,13 +430,16 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         /** @var list<FormattedTeamGameRecord> $formatted */
         $formatted = [];
         foreach ($dbRecords as $record) {
+            $seasonYear = $this->dateToSeasonEndingYear($record['date']);
             $formatted[] = [
                 'teamAbbr' => $this->getTeamAbbreviation($record['winner_tid']),
                 'teamTid' => $record['winner_tid'],
+                'teamYr' => (string) $seasonYear,
                 'boxScoreUrl' => $this->buildBoxScoreUrl($record['date'], $record['gameOfThatDay'], $record['BoxID']),
                 'dateDisplay' => $this->formatDateDisplay($record['date'], 'regularSeason'),
                 'oppAbbr' => $this->getTeamAbbreviation($record['loser_tid']),
                 'oppTid' => $record['loser_tid'],
+                'oppYr' => (string) $seasonYear,
                 'amount' => (string) $record['margin'],
             ];
         }

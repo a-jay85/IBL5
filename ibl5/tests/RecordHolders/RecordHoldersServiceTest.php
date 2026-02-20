@@ -112,7 +112,7 @@ final class RecordHoldersServiceTest extends TestCase
 
         $heatRecords = $result['playerSingleGame']['heat'];
         $firstCategory = array_values($heatRecords)[0];
-        $this->assertSame('1994 HEAT', $firstCategory[0]['dateDisplay']);
+        $this->assertSame("HEAT\nOctober 12, 1994", $firstCategory[0]['dateDisplay']);
     }
 
     public function testDetectsTiesInRecords(): void

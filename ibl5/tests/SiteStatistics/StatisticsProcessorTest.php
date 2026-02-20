@@ -1,8 +1,9 @@
 <?php
 
-namespace SiteStatistics;
+namespace Tests\SiteStatistics;
 
 use PHPUnit\Framework\TestCase;
+use SiteStatistics\StatisticsProcessor;
 
 class StatisticsProcessorTest extends TestCase
 {

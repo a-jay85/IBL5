@@ -16,9 +16,8 @@ if (!defined('DIRECTORY_SEPARATOR')) {
     define('DIRECTORY_SEPARATOR', '/');
 }
 
-// Load the IBL5 autoloader FIRST
-// This handles both application classes (classes/) and test helpers (tests/)
-require_once __DIR__ . '/../autoloader.php';
+// Load Composer autoloader (handles both application classes and test helpers via PSR-4)
+require_once __DIR__ . '/../vendor/autoload.php';
 
 // Now that autoloader is registered, define class aliases for backward compatibility
 // This maps the old global mock classes to the new namespaced ones

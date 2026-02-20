@@ -9,7 +9,7 @@ declare(strict_types=1);
  * used in free agency calculations.
  */
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/autoloader.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/vendor/autoload.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/config.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/db/db.php';
 

@@ -12,7 +12,7 @@ set_time_limit(0);
 
 $_SERVER['DOCUMENT_ROOT'] = dirname(__DIR__, 2);
 $_SERVER['SERVER_NAME'] = in_array('--production', $argv, true) ? 'iblhoops.net' : 'localhost';
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/autoloader.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/vendor/autoload.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/config.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/db/db.php';
 

@@ -104,7 +104,8 @@ class NextSimView implements NextSimViewInterface
         /** @var string $gameDate */
         $gameDate = HtmlSanitizer::safeHtmlOutput($gameData['game']->date);
 
-        $html = '<div class="next-sim-day-row" title="' . $gameDate . '">';
+        $html = '<div class="next-sim-day-row">';
+        $html .= '<div class="next-sim-game-date">' . $gameDate . '</div>';
         $html .= '<div class="next-sim-day-label">Day ' . $dayNumberSafe . ' ' . $locationPrefixSafe . '</div>';
         $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $opposingTeamId . '">';
         $html .= '<img src="./images/logo/new' . $opposingTeamId . '.png" alt="" class="next-sim-game-logo" width="20" height="20">';
@@ -137,7 +138,7 @@ class NextSimView implements NextSimViewInterface
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
 
         $html = '<div class="next-sim-position-section">';
-        $html .= '<h3 class="ibl-section-title">' . $safeLabel . '</h3>';
+        $html .= '<h3 class="ibl-table-title">' . $safeLabel . '</h3>';
         $html .= $this->renderPositionTable($games, $position, $userTeam, $userStarters);
         $html .= '</div>';
 
@@ -293,11 +294,14 @@ class NextSimView implements NextSimViewInterface
     {
         $teamId = $team->teamID;
 
+        $teamLink = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId;
+        $logoImg = '<img src="./images/logo/new' . $teamId . '.png" alt="" class="next-sim-game-logo" width="20" height="20">';
+
         if ($gameData === null) {
             // User row: team icon
 
             return '<td class="next-sim-game-info-cell"><span>'
-                . '<img src="./images/logo/new' . $teamId . '.png" alt="" class="next-sim-game-logo" width="20" height="20">'
+                . '<a href="' . $teamLink . '">' . $logoImg . '</a>'
                 . '</span></td>';
         }
 
@@ -307,7 +311,7 @@ class NextSimView implements NextSimViewInterface
 
         return '<td class="next-sim-game-info-cell"><span>'
             . $locationPrefixSafe . ' '
-            . '<img src="./images/logo/new' . $teamId . '.png" alt="" class="next-sim-game-logo" width="20" height="20">'
+            . '<a href="' . $teamLink . '">' . $logoImg . '</a>'
             . '</span></td>';
     }
 }

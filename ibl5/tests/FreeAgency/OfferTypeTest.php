@@ -1,7 +1,8 @@
 <?php
 
-namespace FreeAgency;
+namespace Tests\FreeAgency;
 
+use FreeAgency\OfferType;
 use PHPUnit\Framework\TestCase;
 
 /**

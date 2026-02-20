@@ -12,7 +12,7 @@ declare(strict_types=1);
  * Usage: php migrations/migrate_gm_awards.php [--dry-run]
  */
 
-require_once __DIR__ . '/../autoloader.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 include __DIR__ . '/../config.php';
 include __DIR__ . '/../db/db.php';
 

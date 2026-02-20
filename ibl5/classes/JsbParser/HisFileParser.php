@@ -126,12 +126,8 @@ class HisFileParser implements HisFileParserInterface
         $lower = strtolower($playoffText);
 
         // Championship winner: contains "defeat the" or "defeat  the" (double space in some files)
+        // In JSB .his files, "defeat the" only appears in championship results
         if (preg_match('/defeat\s+the/', $lower) === 1) {
-            // Check what round it was in
-            if (str_contains($lower, 'championship')) {
-                return ['round' => 'championship', 'won_championship' => 1];
-            }
-            // "defeat the X in the championship" - this IS the championship
             return ['round' => 'championship', 'won_championship' => 1];
         }
 

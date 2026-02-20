@@ -22,7 +22,7 @@ interface JsbImportRepositoryInterface
     /**
      * Upsert a transaction record from .trn data.
      *
-     * @param array{season_year: int, transaction_month: int, transaction_day: int, transaction_type: int, pid: int|null, player_name: string|null, from_teamid: int|null, to_teamid: int|null, injury_games_missed: int|null, injury_description: string|null, trade_group_id: int|null, is_draft_pick: int, draft_pick_year: int|null, source_file: string|null} $record
+     * @param array{season_year: int, transaction_month: int, transaction_day: int, transaction_type: int, pid: int, player_name: string|null, from_teamid: int, to_teamid: int, injury_games_missed: int|null, injury_description: string|null, trade_group_id: int|null, is_draft_pick: int, draft_pick_year: int|null, source_file: string|null} $record
      * @return bool True if row was inserted or updated
      */
     public function upsertTransaction(array $record): bool;

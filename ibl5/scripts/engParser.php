@@ -8,7 +8,7 @@ declare(strict_types=1);
  * Parses the .eng file from JSB simulation to read player energy values.
  */
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/autoloader.php';
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/vendor/autoload.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/config.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/db/db.php';
 

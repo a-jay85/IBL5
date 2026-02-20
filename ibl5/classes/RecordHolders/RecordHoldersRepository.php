@@ -78,6 +78,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 WHEN h.teamid = bs.visitorTID THEN bs.homeTID
                 ELSE bs.visitorTID END
             WHERE {$dateFilter}
+                AND bs.visitorTID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
+                AND bs.homeTID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             ORDER BY value DESC, bs.Date ASC
             LIMIT 5";
 
@@ -129,6 +131,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 ROUND(h.{$safeColumn} / h.{$safeGames}, 1) AS value
             FROM ibl_hist h
             WHERE h.{$safeGames} >= ?
+                AND h.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             ORDER BY value DESC
             LIMIT 5";
 
@@ -193,6 +196,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 + (CASE WHEN bs.gameSTL >= 10 THEN 1 ELSE 0 END)
                 + (CASE WHEN bs.gameBLK >= 10 THEN 1 ELSE 0 END)
             ) >= 4
+                AND bs.visitorTID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
+                AND bs.homeTID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             ORDER BY bs.Date ASC";
 
         $rows = $this->fetchAll($query);
@@ -279,6 +284,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID
                 ELSE bs.visitorTeamID END
             WHERE {$dateFilter}
+                AND bs.visitorTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
+                AND bs.homeTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             ORDER BY value {$safeOrder}, bs.Date ASC
             LIMIT 5";
 
@@ -340,6 +347,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             LEFT JOIN ibl_team_info opp ON opp.teamid = CASE
                 WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID
                 ELSE bs.visitorTeamID END
+            WHERE bs.visitorTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
+                AND bs.homeTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             ORDER BY value {$safeOrder}, bs.Date ASC
             LIMIT 5";
 
@@ -395,6 +404,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                         THEN bs.homeTeamID ELSE bs.visitorTeamID END AS loser_id
                 FROM vw_team_total_score bs
                 WHERE {$dateFilter}
+                    AND bs.visitorTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
+                    AND bs.homeTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
                 GROUP BY bs.Date, bs.visitorTeamID, bs.homeTeamID
             ) sub
             JOIN ibl_team_info winner_t ON winner_t.teamid = sub.winner_id
@@ -494,6 +505,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 homeScore
             FROM vw_team_total_score
             WHERE {$regularSeasonFilter}
+                AND visitorTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
+                AND homeTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             GROUP BY Date, visitorTeamID, homeTeamID
             ORDER BY Date ASC"
         );
@@ -779,6 +792,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     WHEN h.teamid = bs.visitorTID THEN bs.homeTID
                     ELSE bs.visitorTID END
                 WHERE {$dateFilter}
+                    AND bs.visitorTID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
+                    AND bs.homeTID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
                 ORDER BY value DESC, bs.Date ASC
                 LIMIT 5)";
         }
@@ -846,6 +861,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID
                     ELSE bs.visitorTeamID END
                 WHERE {$dateFilter}
+                    AND bs.visitorTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
+                    AND bs.homeTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
                 ORDER BY value {$safeOrder}, bs.Date ASC
                 LIMIT 5)";
         }
@@ -907,6 +924,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     ROUND(h.{$safeColumn} / h.{$safeGames}, 1) AS value
                 FROM ibl_hist h
                 WHERE h.{$safeGames} >= {$minGames}
+                    AND h.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
                 ORDER BY value DESC
                 LIMIT 5)";
         }

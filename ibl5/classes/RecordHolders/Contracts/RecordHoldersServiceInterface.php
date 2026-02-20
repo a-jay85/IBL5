@@ -36,10 +36,12 @@ namespace RecordHolders\Contracts;
  * @phpstan-type FormattedTeamGameRecord array{
  *     teamAbbr: string,
  *     teamTid: int,
+ *     teamYr: string,
  *     boxScoreUrl: string,
  *     dateDisplay: string,
  *     oppAbbr: string,
  *     oppTid: int,
+ *     oppYr: string,
  *     amount: string
  * }
  *

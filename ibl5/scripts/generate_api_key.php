@@ -46,7 +46,7 @@ if (!in_array($rateLimitTier, $validTiers, true)) {
 $_SERVER['SERVER_NAME'] = 'localhost';
 $_SERVER['SCRIPT_FILENAME'] = __FILE__;
 
-require_once __DIR__ . '/../autoloader.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db/db.php';
 

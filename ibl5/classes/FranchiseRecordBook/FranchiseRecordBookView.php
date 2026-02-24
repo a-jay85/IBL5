@@ -7,6 +7,7 @@ namespace FranchiseRecordBook;
 use FranchiseRecordBook\Contracts\FranchiseRecordBookRepositoryInterface;
 use FranchiseRecordBook\Contracts\FranchiseRecordBookServiceInterface;
 use JsbParser\JsbImportRepository;
+use BasketballStats\StatsFormatter;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -37,12 +38,12 @@ class FranchiseRecordBookView
         $html .= $this->renderTitle($data);
 
         if ($data['singleSeason'] !== []) {
-            $html .= '<h3 class="ibl-title" style="font-size: 1.25rem; margin-top: 1.5rem;">Single-Season Records</h3>';
+            $html .= '<h3 class="ibl-title record-book-section-title">Single-Season Records</h3>';
             $html .= $this->renderRecordSection($data['singleSeason'], 'single_season');
         }
 
         if ($data['career'] !== []) {
-            $html .= '<h3 class="ibl-title" style="font-size: 1.25rem; margin-top: 1.5rem;">Career Records</h3>';
+            $html .= '<h3 class="ibl-title record-book-section-title">Career Records</h3>';
             $html .= $this->renderRecordSection($data['career'], 'career');
         }
 
@@ -160,7 +161,7 @@ class FranchiseRecordBookView
                 <td><?= $record['season_year'] !== null ? (int) $record['season_year'] : '' ?></td>
                 <?php endif; ?>
                 <?php if ($recordType === 'career' && !$isPercentage): ?>
-                <td><?= $record['career_total'] !== null ? number_format((int) $record['career_total']) : '' ?></td>
+                <td><?= $record['career_total'] !== null ? StatsFormatter::formatTotal($record['career_total']) : '' ?></td>
                 <?php endif; ?>
                 <td><?= $this->resolveTeamName((int) ($record['team_of_record'] ?? 0)) ?></td>
             </tr>
@@ -185,9 +186,9 @@ class FranchiseRecordBookView
         $value = (float) $statValue;
 
         if ($isPercentage) {
-            return number_format($value, 4);
+            return StatsFormatter::formatWithDecimals($value, 3);
         }
-        return number_format($value, 2);
+        return StatsFormatter::formatAverage($value);
     }
 
     /**

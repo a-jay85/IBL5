@@ -7,7 +7,7 @@ namespace FranchiseRecordBook\Contracts;
 /**
  * Interface for franchise record book database operations.
  *
- * @phpstan-type AlltimeRecord array{id: int, scope: string, team_id: int|null, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int|null, pid: int|null, stat_value: string, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}
+ * @phpstan-type AlltimeRecord array{id: int, scope: string, team_id: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int|null, pid: int|null, stat_value: string, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}
  * @phpstan-type TeamInfo array{teamid: int, team_name: string, color1: string, color2: string}
  */
 interface FranchiseRecordBookRepositoryInterface

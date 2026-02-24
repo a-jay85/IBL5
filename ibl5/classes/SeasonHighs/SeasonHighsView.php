@@ -255,6 +255,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
             /** @var string $playerName */
             $playerName = HtmlSanitizer::safeHtmlOutput($record['player_name']);
             $value = (int) $record['stat_value'];
+            $seasonYear = (int) $record['record_season_year'];
             $position = $record['player_position'] !== null && $record['player_position'] !== ''
                 ? $record['player_position'] . ' '
                 : '';
@@ -265,7 +266,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
     <td class=\"rank-cell\">{$rank}</td>
     <td class=\"name-cell\">{$safePosition}{$playerName}</td>
     <td class=\"value-cell\">{$value}</td>
-    <td class=\"date-cell\">{$record['record_season_year']}</td>
+    <td class=\"date-cell\">{$seasonYear}</td>
 </tr>";
         }
 

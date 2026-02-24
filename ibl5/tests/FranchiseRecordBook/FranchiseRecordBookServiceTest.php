@@ -25,7 +25,7 @@ class FranchiseRecordBookServiceTest extends TestCase
     }
 
     /**
-     * @return array{id: int, scope: string, team_id: int|null, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int|null, pid: int|null, stat_value: string, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}
+     * @return array{id: int, scope: string, team_id: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int|null, pid: int|null, stat_value: string, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}
      */
     private function makeRecord(
         string $statCategory = 'ppg',

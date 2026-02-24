@@ -24,8 +24,6 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
      */
     public function getTeamSingleSeasonRecords(int $teamId, int $limit = 10): array
     {
-        $totalLimit = $limit * 8; // 8 stat categories
-
         /** @var list<AlltimeRecord> $rows */
         $rows = $this->fetchAll(
             "SELECT id, scope, team_id, record_type, stat_category, ranking,

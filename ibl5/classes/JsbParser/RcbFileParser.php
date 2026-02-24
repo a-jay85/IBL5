@@ -151,7 +151,7 @@ class RcbFileParser implements RcbFileParserInterface
      * Parse the all-time records section (lines 0-49).
      *
      * @param list<string> $lines All lines from the file
-     * @return list<array{scope: string, team_id: int|null, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int, stat_value: float, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}>
+     * @return list<array{scope: string, team_id: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int, stat_value: float, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}>
      */
     private static function parseAlltimeSection(array $lines): array
     {
@@ -163,7 +163,7 @@ class RcbFileParser implements RcbFileParserInterface
             // Process each group (0 = league, 1-28 = teams, 29-32 = reserved)
             for ($group = 0; $group <= 28; $group++) {
                 $scope = $group === 0 ? 'league' : 'team';
-                $teamId = $group === 0 ? null : $group;
+                $teamId = $group;
 
                 // Process each entry within the group
                 for ($entryIdx = 0; $entryIdx < self::ENTRIES_PER_GROUP; $entryIdx++) {
@@ -245,7 +245,7 @@ class RcbFileParser implements RcbFileParserInterface
      * Parse the current season records section (lines 50-82).
      *
      * @param list<string> $lines All lines from the file
-     * @return list<array{scope: string, team_id: int|null, context: string, stat_category: string, ranking: int, player_name: string, player_position: string, car_block_id: int, stat_value: int, season_year: int}>
+     * @return list<array{scope: string, team_id: int, context: string, stat_category: string, ranking: int, player_name: string, player_position: string, car_block_id: int, stat_value: int, season_year: int}>
      */
     private static function parseCurrentSeasonSection(array $lines): array
     {
@@ -260,7 +260,7 @@ class RcbFileParser implements RcbFileParserInterface
 
             // Line 50 (lineIdx 0) = league-wide, lines 51-82 (lineIdx 1-32) = team-specific
             $scope = $lineIdx === 0 ? 'league' : 'team';
-            $teamId = $lineIdx === 0 ? null : $lineIdx;
+            $teamId = $lineIdx;
 
             // 160 entries = 10 rankings × 16 stat/context combos
             for ($entryIdx = 0; $entryIdx < self::ENTRIES_PER_SEASON_LINE; $entryIdx++) {

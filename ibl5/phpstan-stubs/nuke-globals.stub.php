@@ -97,7 +97,7 @@ function themefooter(): void {}
 function getusrinfo(mixed $user): ?array { return null; }
 
 /** @return bool */
-function is_admin(mixed $admin): bool { return false; }
+function is_admin(mixed $admin = null): bool { return false; }
 
 /** @return string */
 function formatTimestamp(int|string $timestamp): string { return ''; }

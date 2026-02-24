@@ -132,7 +132,6 @@ class PlayerMenuView
     <td colspan="2">
         <nav class="plr-nav" style="--plr-nav-accent: <?= $primaryColor ?>; --plr-nav-accent-dark: <?= $primaryDark ?>;" aria-label="Player page navigation">
             <?php foreach ($groups as $groupName => $pageTypes):
-                /** @var string $groupNameEscaped */
                 $groupNameEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($groupName);
             ?>
             <div class="plr-nav__group">
@@ -143,7 +142,6 @@ class PlayerMenuView
                         $label = $shortLabels[$labelKey] ?? PlayerPageType::getDescription($pageType);
                         $url = PlayerPageType::getUrl($playerID, $pageType);
                         $isActive = ($currentPageType === $pageType) || ($currentPageType === null && $pageType === PlayerPageType::OVERVIEW);
-                        /** @var string $labelEscaped */
                         $labelEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($label);
                     ?>
                     <a href="<?= $url ?>" class="plr-nav__pill<?= $isActive ? ' plr-nav__pill--active' : '' ?>"><?= $labelEscaped ?></a>
@@ -153,7 +151,6 @@ class PlayerMenuView
             <?php endforeach; ?>
             <select class="plr-nav__mobile-select" onchange="if(this.value) window.location.href=this.value;" aria-label="Navigate player pages">
                 <?php foreach ($groups as $groupName => $pageTypes):
-                    /** @var string $groupNameEscaped2 */
                     $groupNameEscaped2 = \Utilities\HtmlSanitizer::safeHtmlOutput($groupName);
                 ?>
                 <optgroup label="<?= $groupNameEscaped2 ?>">
@@ -161,7 +158,6 @@ class PlayerMenuView
                         $label = PlayerPageType::getDescription($pageType);
                         $url = PlayerPageType::getUrl($playerID, $pageType);
                         $isActive = ($currentPageType === $pageType) || ($currentPageType === null && $pageType === PlayerPageType::OVERVIEW);
-                        /** @var string $labelEscaped2 */
                         $labelEscaped2 = \Utilities\HtmlSanitizer::safeHtmlOutput($label);
                     ?>
                     <option value="<?= $url ?>" <?= $isActive ? 'selected' : '' ?>><?= $labelEscaped2 ?></option>

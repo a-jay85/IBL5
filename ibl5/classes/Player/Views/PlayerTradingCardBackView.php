@@ -177,7 +177,6 @@ HTML;
     private static function renderAllStarPill(string $label, int $value): string
     {
         $safeValue = (string) $value;
-        /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
         
         return <<<HTML

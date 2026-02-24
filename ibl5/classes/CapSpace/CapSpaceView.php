@@ -63,11 +63,8 @@ class CapSpaceView implements CapSpaceViewInterface
 
         // Position columns (current year only)
         foreach (\JSB::PLAYER_POSITIONS as $position) {
-            /** @var string $safeBeginningYear */
             $safeBeginningYear = HtmlSanitizer::safeHtmlOutput($beginningYear);
-            /** @var string $safeEndingYear */
             $safeEndingYear = HtmlSanitizer::safeHtmlOutput($endingYear);
-            /** @var string $safePosition */
             $safePosition = HtmlSanitizer::safeHtmlOutput($position);
             $html .= '<th>' . $safeBeginningYear . '-<br>';
             $html .= $safeEndingYear . '<br>';
@@ -118,7 +115,6 @@ class CapSpaceView implements CapSpaceViewInterface
         $years = ['year1', 'year2', 'year3', 'year4', 'year5', 'year6'];
         foreach ($years as $year) {
             $html .= '<td>';
-            /** @var string $safeSalary */
             $safeSalary = HtmlSanitizer::safeHtmlOutput($teamData['availableSalary'][$year]);
             $html .= $safeSalary;
             $html .= '</td>';
@@ -129,7 +125,6 @@ class CapSpaceView implements CapSpaceViewInterface
         // Position salary columns
         foreach (\JSB::PLAYER_POSITIONS as $position) {
             $html .= '<td>';
-            /** @var string $safePositionSalary */
             $safePositionSalary = HtmlSanitizer::safeHtmlOutput($teamData['positionSalaries'][$position] ?? 0);
             $html .= $safePositionSalary;
             $html .= '</td>';
@@ -139,7 +134,6 @@ class CapSpaceView implements CapSpaceViewInterface
 
         // FA Slots
         $html .= '<td>';
-        /** @var string $safeFaSlots */
         $safeFaSlots = HtmlSanitizer::safeHtmlOutput($teamData['freeAgencySlots']);
         $html .= $safeFaSlots;
         $html .= '</td>';

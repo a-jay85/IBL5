@@ -41,7 +41,6 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
 
         foreach ($players as $player) {
             $pid = $player['pid'];
-            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($player['name']);
             $selected = ($pid === $selectedPlayer1) ? ' selected' : '';
             $html .= '<option value="' . $pid . '"' . $selected . '>' . $name . '</option>' . "\n";
@@ -56,7 +55,6 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
 
         foreach ($players as $player) {
             $pid = $player['pid'];
-            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($player['name']);
             $selected = ($pid === $selectedPlayer2) ? ' selected' : '';
             $html .= '<option value="' . $pid . '"' . $selected . '>' . $name . '</option>' . "\n";
@@ -100,7 +98,6 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
 
         $html = '<div class="ibl-alert ibl-alert--error">';
         foreach ($errors as $error) {
-            /** @var string $sanitizedError */
             $sanitizedError = HtmlSanitizer::safeHtmlOutput($error);
             $html .= $sanitizedError . "<br>\n";
         }
@@ -130,13 +127,10 @@ class OneOnOneGameView implements OneOnOneGameViewInterface
     public function renderGameReplay(array $gameData): string
     {
         $gameId = $gameData['gameid'];
-        /** @var string $winner */
         $winner = HtmlSanitizer::safeHtmlOutput($gameData['winner']);
-        /** @var string $loser */
         $loser = HtmlSanitizer::safeHtmlOutput($gameData['loser']);
         $winScore = $gameData['winscore'];
         $lossScore = $gameData['lossscore'];
-        /** @var string $owner */
         $owner = HtmlSanitizer::safeHtmlOutput($gameData['owner']);
         // Play-by-play is already sanitized when generated, don't double-escape
         $playByPlay = $gameData['playbyplay'];

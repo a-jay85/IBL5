@@ -62,15 +62,12 @@ class TableViewDropdown
         $html .= '<select class="ibl-view-select">';
 
         foreach ($this->groups as $groupLabel => $options) {
-            /** @var string $safeGroupLabel */
             $safeGroupLabel = HtmlSanitizer::safeHtmlOutput($groupLabel);
             $html .= '<optgroup label="' . $safeGroupLabel . '">';
 
             foreach ($options as $value => $label) {
                 $selected = ($value === $this->activeValue) ? ' selected' : '';
-                /** @var string $safeValue */
                 $safeValue = HtmlSanitizer::safeHtmlOutput($value);
-                /** @var string $safeLabel */
                 $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
                 $html .= '<option value="' . $safeValue . '"' . $selected . '>' . $safeLabel . '</option>';
             }
@@ -82,7 +79,6 @@ class TableViewDropdown
 
         // Hidden noscript fallback link
         $html .= '<noscript>';
-        /** @var string $safeBaseUrl */
         $safeBaseUrl = HtmlSanitizer::safeHtmlOutput($this->baseUrl . '&display=ratings');
         $html .= '<a href="' . $safeBaseUrl . '">Back to Ratings</a>';
         $html .= '</noscript>';

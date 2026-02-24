@@ -17,18 +17,12 @@ class HtmlSanitizer
      *
      * @param mixed $value The value to prepare for HTML output (string, int, float, bool, array, object, null)
      * @param int $flags Optional htmlspecialchars flags (default: ENT_QUOTES | ENT_HTML5)
-     * @return mixed The prepared value:
-     *               - null: returned as-is
-     *               - bool: converted to 'true' or 'false'
-     *               - int/float: converted to string (no escaping needed)
-     *               - string: SQL-unescaped and HTML-escaped
-     *               - array/object: JSON-encoded and HTML-escaped
      */
-    public static function safeHtmlOutput(mixed $value, int $flags = ENT_QUOTES | ENT_HTML5): mixed
+    public static function safeHtmlOutput(mixed $value, int $flags = ENT_QUOTES | ENT_HTML5): string
     {
-        // Null values pass through unchanged
+        // Null values become empty string (identical behavior in echo/template output context)
         if ($value === null) {
-            return null;
+            return '';
         }
 
         // Booleans convert to string representation (no HTML escaping needed)

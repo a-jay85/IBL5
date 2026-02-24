@@ -31,7 +31,6 @@ class ComparePlayersView implements ComparePlayersViewInterface
         // Build datalist options for autocomplete
         $datalistHtml = '<datalist id="player-names">';
         foreach ($playerNames as $name) {
-            /** @var string $nameSafe */
             $nameSafe = HtmlSanitizer::safeHtmlOutput(stripslashes($name));
             $datalistHtml .= '<option value="' . $nameSafe . '">';
         }
@@ -97,7 +96,6 @@ class ComparePlayersView implements ComparePlayersViewInterface
         $output .= '<table class="sortable ibl-data-table responsive-table">';
         $output .= '<thead><tr>';
         foreach ($headers as $h) {
-            /** @var string $hSafe */
             $hSafe = HtmlSanitizer::safeHtmlOutput($h);
             $output .= '<th>' . $hSafe . '</th>';
         }
@@ -121,7 +119,6 @@ class ComparePlayersView implements ComparePlayersViewInterface
     {
         $pid = $player['pid'];
         $name = $player['name'];
-        /** @var string $posSafe */
         $posSafe = HtmlSanitizer::safeHtmlOutput($player['pos']);
         $output = '<tr>';
         $output .= '<td>' . $posSafe . '</td>';
@@ -173,7 +170,6 @@ class ComparePlayersView implements ComparePlayersViewInterface
         $output .= '<table class="sortable ibl-data-table responsive-table">';
         $output .= '<thead><tr>';
         foreach ($headers as $h) {
-            /** @var string $hSafe */
             $hSafe = HtmlSanitizer::safeHtmlOutput($h);
             $output .= '<th>' . $hSafe . '</th>';
         }
@@ -202,7 +198,6 @@ class ComparePlayersView implements ComparePlayersViewInterface
         $tgm = (int)$player['stats_3gm'];
         $pts = 2 * $fgm + $ftm + $tgm;
 
-        /** @var string $posSafe */
         $posSafe = HtmlSanitizer::safeHtmlOutput($player['pos']);
         $output = '<tr>';
         $output .= '<td>' . $posSafe . '</td>';
@@ -249,7 +244,6 @@ class ComparePlayersView implements ComparePlayersViewInterface
         $output .= '<table class="sortable ibl-data-table responsive-table">';
         $output .= '<thead><tr>';
         foreach ($headers as $h) {
-            /** @var string $hSafe */
             $hSafe = HtmlSanitizer::safeHtmlOutput($h);
             $output .= '<th>' . $hSafe . '</th>';
         }
@@ -274,7 +268,6 @@ class ComparePlayersView implements ComparePlayersViewInterface
         $pid = $player['pid'];
         $name = $player['name'];
 
-        /** @var string $posSafe */
         $posSafe = HtmlSanitizer::safeHtmlOutput($player['pos']);
         $output = '<tr>';
         $output .= '<td>' . $posSafe . '</td>';

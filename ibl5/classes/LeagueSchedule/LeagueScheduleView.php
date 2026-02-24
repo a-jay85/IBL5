@@ -58,7 +58,6 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
             $html .= '</a>';
         }
 
-        /** @var string $safeDays */
         $safeDays = HtmlSanitizer::safeHtmlOutput($simLengthDays);
         $html .= '<p class="schedule-highlight-note">Next sim length: ' . $safeDays . ' days</p>';
         $html .= '</div>';
@@ -153,7 +152,6 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
         }
 
         $gameId = 'game-' . $game['boxid'];
-        /** @var string $boxScoreUrl */
         $boxScoreUrl = HtmlSanitizer::safeHtmlOutput($game['boxScoreUrl']);
         $visitorTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $game['visitor'];
         $homeTeamUrl = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $game['home'];
@@ -170,9 +168,7 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
 
         // Visitor team + logo
         $vClass = $game['visitorWon'] ? ' schedule-game__team--win' : '';
-        /** @var string $safeVisitorTeam */
         $safeVisitorTeam = HtmlSanitizer::safeHtmlOutput($game['visitorTeam']);
-        /** @var string $safeVisitorRecord */
         $safeVisitorRecord = HtmlSanitizer::safeHtmlOutput($game['visitorRecord']);
 
         $html .= '<a href="' . $visitorTeamUrl . '" class="schedule-game__team-link">';
@@ -193,9 +189,7 @@ class LeagueScheduleView implements LeagueScheduleViewInterface
         }
 
         // Home logo + team
-        /** @var string $safeHomeTeam */
         $safeHomeTeam = HtmlSanitizer::safeHtmlOutput($game['homeTeam']);
-        /** @var string $safeHomeRecord */
         $safeHomeRecord = HtmlSanitizer::safeHtmlOutput($game['homeRecord']);
 
         $html .= '<a href="' . $homeTeamUrl . '" class="schedule-game__logo-link"><img class="schedule-game__logo" src="images/logo/new' . $game['home'] . '.png" alt="" width="25" height="25" loading="lazy"></a>';

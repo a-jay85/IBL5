@@ -135,13 +135,9 @@ document.querySelectorAll(".next-sim-position-section .team-table").forEach(func
         $opposingTeam = $gameData['opposingTeam'];
         $opposingTeamId = $opposingTeam->teamID;
 
-        /** @var string $dayNumberSafe */
         $dayNumberSafe = HtmlSanitizer::safeHtmlOutput((string)$gameData['dayNumber']);
-        /** @var string $locationPrefixSafe */
         $locationPrefixSafe = HtmlSanitizer::safeHtmlOutput($gameData['locationPrefix']);
-        /** @var string $seasonRecord */
         $seasonRecord = HtmlSanitizer::safeHtmlOutput($opposingTeam->seasonRecord ?? '');
-        /** @var string $gameDate */
         $gameDate = HtmlSanitizer::safeHtmlOutput($gameData['game']->date);
 
         $html = '<div class="next-sim-day-row">';
@@ -154,7 +150,6 @@ document.querySelectorAll(".next-sim-position-section .team-table").forEach(func
 
         if (is_string($gameData['opponentTier']) && $gameData['opponentTier'] !== '') {
             $tier = $gameData['opponentTier'];
-            /** @var string $safeTierLabel */
             $safeTierLabel = HtmlSanitizer::safeHtmlOutput(ucfirst($tier));
             $html .= '<span class="next-sim-opponent-tier sos-tier--' . $tier . '">' . $safeTierLabel . '</span>';
         }
@@ -174,7 +169,6 @@ document.querySelectorAll(".next-sim-position-section .team-table").forEach(func
     private function renderPositionSection(array $games, string $position, \Team $userTeam, array $userStarters): string
     {
         $label = self::POSITION_LABELS[$position] ?? $position;
-        /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
 
         $html = '<div class="next-sim-position-section">';
@@ -346,7 +340,6 @@ document.querySelectorAll(".next-sim-position-section .team-table").forEach(func
         }
 
         // Opponent row: @/vs + team logo
-        /** @var string $locationPrefixSafe */
         $locationPrefixSafe = HtmlSanitizer::safeHtmlOutput($gameData['locationPrefix']);
 
         return '<td class="next-sim-game-info-cell"><span>'

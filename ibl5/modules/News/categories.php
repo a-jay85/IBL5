@@ -45,7 +45,6 @@ function theindex($catid)
     while ($row = $db->sql_fetchrow($result)) {
         $s_sid = intval($row['sid']);
         $aid = $row['aid'];
-        /** @var string $title */
         $title = \Utilities\HtmlSanitizer::safeHtmlOutput($row['title']);
         $time = $row['time'];
         $hometext = $row['hometext'];
@@ -54,7 +53,6 @@ function theindex($catid)
         $counter = intval($row['counter']);
         $topic = intval($row['topic']);
         $informant = $row['informant'];
-        /** @var string $notes */
         $notes = \Utilities\HtmlSanitizer::safeHtmlOutput($row['notes']);
         $acomm = intval($row['acomm']);
         getTopics($s_sid);
@@ -82,7 +80,6 @@ function theindex($catid)
         $morelink = str_replace(" |  | ", " | ", $morelink);
         $sid = intval($s_sid);
         $row2 = $db->sql_fetchrow($db->sql_query("select title from " . $prefix . "_stories_cat where catid='$catid'"));
-        /** @var string $title1 */
         $title1 = \Utilities\HtmlSanitizer::safeHtmlOutput($row2['title']);
         $title = "$title1: $title";
         themeindex($aid, $informant, $datetime, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);

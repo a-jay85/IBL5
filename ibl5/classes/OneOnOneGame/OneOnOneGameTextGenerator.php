@@ -196,9 +196,7 @@ class OneOnOneGameTextGenerator
      */
     public function getCoinFlipText(bool $isHeads, string $player1Name, string $player2Name): string
     {
-        /** @var string $player1Name */
         $player1Name = HtmlSanitizer::safeHtmlOutput($player1Name);
-        /** @var string $player2Name */
         $player2Name = HtmlSanitizer::safeHtmlOutput($player2Name);
 
         if ($isHeads) {
@@ -218,9 +216,7 @@ class OneOnOneGameTextGenerator
      */
     public function getScoreText(string $player1Name, int $player1Score, string $player2Name, int $player2Score): string
     {
-        /** @var string $player1Name */
         $player1Name = HtmlSanitizer::safeHtmlOutput($player1Name);
-        /** @var string $player2Name */
         $player2Name = HtmlSanitizer::safeHtmlOutput($player2Name);
 
         return '<strong style="font-weight: bold;">SCORE: ' . $player1Name . ' ' . $player1Score . ', ' . $player2Name . ' ' . $player2Score . '</strong><p>';
@@ -231,9 +227,7 @@ class OneOnOneGameTextGenerator
      */
     public function getFoulText(string $defender, string $attacker): string
     {
-        /** @var string $defender */
         $defender = HtmlSanitizer::safeHtmlOutput($defender);
-        /** @var string $attacker */
         $attacker = HtmlSanitizer::safeHtmlOutput($attacker);
 
         return "{$defender} fouls {$attacker}.<br>";
@@ -244,9 +238,7 @@ class OneOnOneGameTextGenerator
      */
     public function getStealPlayText(string $defender, string $attacker): string
     {
-        /** @var string $defender */
         $defender = HtmlSanitizer::safeHtmlOutput($defender);
-        /** @var string $attacker */
         $attacker = HtmlSanitizer::safeHtmlOutput($attacker);
 
         return "{$defender} " . $this->getStealText() . " {$attacker}.<br>";
@@ -257,7 +249,6 @@ class OneOnOneGameTextGenerator
      */
     public function getReboundText(string $playerName, bool $isOffensive): string
     {
-        /** @var string $playerName */
         $playerName = HtmlSanitizer::safeHtmlOutput($playerName);
 
         if ($isOffensive) {

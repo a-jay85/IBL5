@@ -34,7 +34,6 @@ class TeamCellHelper implements TeamCellHelperInterface
 
         $href = $linkUrl !== '' ? $linkUrl : self::teamPageUrl($teamId);
 
-        /** @var string $safeName */
         $safeName = $nameHtml !== '' ? $nameHtml : HtmlSanitizer::safeHtmlOutput($teamName);
 
         return '<td class="' . $classes . '" style="background-color: #' . $safeColor1 . ';">'
@@ -56,7 +55,6 @@ class TeamCellHelper implements TeamCellHelperInterface
         string $freeAgentText = 'Free Agent',
     ): string {
         if ($teamId === 0) {
-            /** @var string $safeFreeAgentText */
             $safeFreeAgentText = HtmlSanitizer::safeHtmlOutput($freeAgentText);
             if ($extraClasses !== '') {
                 return '<td class="' . $extraClasses . '">' . $safeFreeAgentText . '</td>';

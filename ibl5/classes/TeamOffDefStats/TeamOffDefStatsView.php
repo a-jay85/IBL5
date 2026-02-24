@@ -385,9 +385,7 @@ class TeamOffDefStatsView implements TeamOffDefStatsViewInterface
     private function renderTeamCell(array $team, string $label): string
     {
         $teamId = $team['teamid'];
-        /** @var string $name */
         $name = HtmlSanitizer::safeHtmlOutput($team['team_name']);
-        /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
         $nameHtml = $name . ' ' . $safeLabel;
 

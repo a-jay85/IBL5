@@ -35,13 +35,10 @@ class AwardHistoryView implements AwardHistoryViewInterface
      */
     public function renderSearchForm(array $params): string
     {
-        /** @var string $name */
         $name = HtmlSanitizer::safeHtmlOutput($params['name'] ?? '');
-        /** @var string $award */
         $award = HtmlSanitizer::safeHtmlOutput($params['award'] ?? '');
         $yearRaw = $params['year'];
         $yearStr = $yearRaw !== null ? (string) $yearRaw : '';
-        /** @var string $year */
         $year = HtmlSanitizer::safeHtmlOutput($yearStr);
         $sortby = $params['sortby'] ?? 3;
 
@@ -77,7 +74,6 @@ class AwardHistoryView implements AwardHistoryViewInterface
             $id = 'sort-' . $value;
             $output .= '<label class="player-awards-sort__option" for="' . $id . '">';
             $output .= '<input type="radio" name="aw_sortby" value="' . $value . '" id="' . $id . '"' . $checked . '>';
-            /** @var string $safeLabel */
             $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
             $output .= ' <span>' . $safeLabel . '</span>';
             $output .= '</label>';
@@ -117,16 +113,13 @@ class AwardHistoryView implements AwardHistoryViewInterface
      */
     public function renderAwardRow(array $award, int $rowIndex): string
     {
-        /** @var string $year */
         $year = HtmlSanitizer::safeHtmlOutput((string)($award['year'] ?? ''));
-        /** @var string $awardName */
         $awardName = HtmlSanitizer::safeHtmlOutput($award['Award'] ?? '');
         $pid = (int)($award['pid'] ?? 0);
 
         if ($pid > 0) {
             $playerCell = PlayerImageHelper::renderFlexiblePlayerCell($pid, $award['name'] ?? '');
         } else {
-            /** @var string $escapedName */
             $escapedName = HtmlSanitizer::safeHtmlOutput($award['name'] ?? '');
             $playerCell = '<td>' . $escapedName . '</td>';
         }

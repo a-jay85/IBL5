@@ -319,8 +319,12 @@ class RcbFileParser implements RcbFileParserInterface
         $teamOfRecord = (int) trim(substr($data, 44, 2));
         $seasonYear = (int) trim(substr($data, 46, 4));
 
-        // Skip entries with no meaningful data
-        if ($carBlockId === 0 && $statRaw === 0) {
+        // Empty slots: JSB fills unused ranking positions with recycled memory.
+        // Valid entries always have nonzero stat values and alphabetic-only names.
+        if ($statRaw === 0) {
+            return null;
+        }
+        if (preg_match('/\d/', $playerName) === 1) {
             return null;
         }
 
@@ -352,8 +356,12 @@ class RcbFileParser implements RcbFileParserInterface
         $statRaw = (int) trim(substr($data, 43, 6));
         $teamOfRecord = (int) trim(substr($data, 49, 2));
 
-        // Skip entries with no meaningful data
-        if ($carBlockId === 0 && $statRaw === 0) {
+        // Empty slots: JSB fills unused ranking positions with recycled memory.
+        // Valid entries always have nonzero stat values and alphabetic-only names.
+        if ($statRaw === 0) {
+            return null;
+        }
+        if (preg_match('/\d/', $playerName) === 1) {
             return null;
         }
 
@@ -394,8 +402,12 @@ class RcbFileParser implements RcbFileParserInterface
         $statValue = (int) trim(substr($data, 38, 3));
         $seasonYear = (int) trim(substr($data, 41, 4));
 
-        // Skip entries with no meaningful data
-        if ($playerName === '' || ($carBlockId === 0 && $statValue === 0)) {
+        // Empty slots: JSB fills unused ranking positions with recycled memory.
+        // Valid entries always have nonzero stat values and alphabetic-only names.
+        if ($playerName === '' || $statValue === 0) {
+            return null;
+        }
+        if (preg_match('/\d/', $playerName) === 1) {
             return null;
         }
 

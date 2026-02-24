@@ -37,7 +37,7 @@ $qlen = isset($qlen) ? intval($qlen) : 0;
 $offset = 10;
 $max = $min + $offset;
 
-global $admin, $prefix, $user_prefix, $mysqli_db, $module_name, $articlecomm, $admin_file;
+global $prefix, $user_prefix, $mysqli_db, $module_name, $articlecomm;
 
 // Redirect if query is too short
 if ($query !== '' && strlen($query) < 3) {
@@ -103,8 +103,6 @@ $data = [
     'authors' => $authors,
     'results' => $results,
     'hasMore' => $hasMore,
-    'isAdmin' => (bool) is_admin($admin),
-    'adminFile' => (string) $admin_file,
     'articleComm' => (bool) ($articlecomm ?? false),
     'error' => $error,
 ];

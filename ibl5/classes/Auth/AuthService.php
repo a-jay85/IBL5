@@ -28,7 +28,6 @@ use Delight\Auth\UserAlreadyExistsException;
  * - Transparent MD5-to-bcrypt migration on first login
  * - Backward-compatible getCookieArray() for legacy $cookie[] references
  *
- * Admin auth (nuke_authors / is_admin()) is NOT handled here.
  *
  * @phpstan-type UserRow array{user_id: int, username: string, user_password: string, storynum: int, umode: string, uorder: int, thold: int, noscore: int, ublockon: int, theme: string, commentmax: int, user_email: string, user_regdate: string, name: string}
  */
@@ -178,6 +177,53 @@ class AuthService implements AuthServiceInterface
         $username = $_SESSION[self::SESSION_USERNAME];
         \assert(is_string($username));
         return $username;
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->hasRole(\Delight\Auth\Role::ADMIN);
+    }
+
+    public function hasRole(int $role): bool
+    {
+        // First check session cache (set on previous call or during login)
+        if (isset($_SESSION['auth_roles']) && is_int($_SESSION['auth_roles'])) {
+            return ($_SESSION['auth_roles'] & $role) === $role;
+        }
+
+        // Fallback: query auth_users for legacy login path
+        $username = $this->getUsername();
+        if ($username === null) {
+            return false;
+        }
+
+        $stmt = $this->db->prepare('SELECT roles_mask FROM auth_users WHERE username = ?');
+        if ($stmt === false) {
+            return false;
+        }
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result === false) {
+            $stmt->close();
+            return false;
+        }
+        /** @var array{roles_mask: int}|null $row */
+        $row = $result->fetch_assoc();
+        $stmt->close();
+
+        if ($row === null) {
+            // Cache the miss so we don't re-query on every page load
+            $_SESSION['auth_roles'] = 0;
+            return false;
+        }
+
+        $rolesMask = $row['roles_mask'];
+
+        // Cache in session for subsequent checks
+        $_SESSION['auth_roles'] = $rolesMask;
+
+        return ($rolesMask & $role) === $role;
     }
 
     public function getUserInfo(): ?array

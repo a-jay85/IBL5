@@ -277,11 +277,11 @@ class SearchView implements SearchViewInterface
         } elseif ($type === 'users') {
             /** @var list<UserResult> $userResults */
             $userResults = $results;
-            $output .= $this->renderUserResults($userResults, $data['isAdmin'], $data['adminFile']);
+            $output .= $this->renderUserResults($userResults);
         } else {
             /** @var list<StoryResult> $storyResults */
             $storyResults = $results;
-            $output .= $this->renderStoryResults($storyResults, $data['isAdmin'], $data['adminFile']);
+            $output .= $this->renderStoryResults($storyResults);
         }
 
         $output .= $this->renderPagination($data);
@@ -294,10 +294,8 @@ class SearchView implements SearchViewInterface
      * Render story search results.
      *
      * @param list<StoryResult> $results Story results
-     * @param bool $isAdmin Whether the current user is an admin
-     * @param string $adminFile Admin file path
      */
-    private function renderStoryResults(array $results, bool $isAdmin, string $adminFile): string
+    private function renderStoryResults(array $results): string
     {
         $output = '<div class="search-results__list">';
 
@@ -345,16 +343,6 @@ class SearchView implements SearchViewInterface
                 $output .= $comments . ' ' . $safeUComments;
             }
             $output .= '</span>';
-
-            if ($isAdmin) {
-                $safeAdminFile = HtmlSanitizer::safeHtmlOutput($adminFile);
-                $safeEdit = HtmlSanitizer::safeHtmlOutput(_EDIT);
-                $safeDelete = HtmlSanitizer::safeHtmlOutput(_DELETE);
-                $output .= '<span class="search-result__admin">';
-                $output .= '<a href="' . $safeAdminFile . '.php?op=EditStory&amp;sid=' . $sid . '">' . $safeEdit . '</a>';
-                $output .= '<a href="' . $safeAdminFile . '.php?op=RemoveStory&amp;sid=' . $sid . '">' . $safeDelete . '</a>';
-                $output .= '</span>';
-            }
 
             $output .= '</div></div>';
         }
@@ -417,7 +405,7 @@ class SearchView implements SearchViewInterface
      *
      * @param list<UserResult> $results
      */
-    private function renderUserResults(array $results, bool $isAdmin, string $adminFile): string
+    private function renderUserResults(array $results): string
     {
         $output = '<div class="search-results__list">';
 
@@ -435,17 +423,6 @@ class SearchView implements SearchViewInterface
             $output .= '<span class="search-result__title">' . $username . '</span>';
             $output .= '<span class="search-result__subtitle">' . $displayName . '</span>';
             $output .= '</div>';
-
-            if ($isAdmin) {
-                $safeAdminFile = HtmlSanitizer::safeHtmlOutput($adminFile);
-                $safeEdit = HtmlSanitizer::safeHtmlOutput(_EDIT);
-                $safeDelete = HtmlSanitizer::safeHtmlOutput(_DELETE);
-                $output .= '<div class="search-result__meta">';
-                $output .= '<span class="search-result__admin">';
-                $output .= '<a href="' . $safeAdminFile . '.php?chng_uid=' . $userId . '&amp;op=modifyUser">' . $safeEdit . '</a>';
-                $output .= '<a href="' . $safeAdminFile . '.php?op=delUser&amp;chng_uid=' . $userId . '">' . $safeDelete . '</a>';
-                $output .= '</span></div>';
-            }
 
             $output .= '</div>';
         }

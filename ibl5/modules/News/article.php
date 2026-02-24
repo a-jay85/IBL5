@@ -1,9 +1,6 @@
 <?php
 
-if (!strpos($_SERVER['PHP_SELF'], 'admin.php')) {
-    #show right panel:
-    define('INDEX_FILE', true);
-}
+define('INDEX_FILE', true);
 /************************************************************************/
 /* PHP-NUKE: Web Portal System                                          */
 /* ===========================                                          */
@@ -110,11 +107,13 @@ $stmt->close();
 $catid = (int) ($row['catid'] ?? 0);
 $aaid = $row['aid'] ?? '';
 $time = $row['time'] ?? '';
+/** @var string $title */
 $title = \Utilities\HtmlSanitizer::safeHtmlOutput($row['title'] ?? '');
 $hometext = $row['hometext'] ?? '';
 $bodytext = $row['bodytext'] ?? '';
 $topic = (int) ($row['topic'] ?? 0);
 $informant = $row['informant'] ?? '';
+/** @var string $notes */
 $notes = \Utilities\HtmlSanitizer::safeHtmlOutput($row['notes'] ?? '');
 $acomm = (int) ($row['acomm'] ?? 0);
 $haspoll = (int) ($row['haspoll'] ?? 0);
@@ -168,6 +167,7 @@ if ($catid !== 0) {
         $stmtCat->close();
 
         if ($row2 !== null) {
+            /** @var string $title1 */
             $title1 = \Utilities\HtmlSanitizer::safeHtmlOutput($row2['title'] ?? '');
             $title = "<a href=\"modules.php?name=$module_name&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
         }

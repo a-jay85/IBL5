@@ -15,23 +15,16 @@ class DebugOutput
     private static int $debugId = 0;
 
     /**
-     * Check if current user is an admin
+     * Check if current user is an admin via AuthService
      *
      * @return bool True if user is admin
      */
     private static function isAdmin(): bool
     {
-        // Check for admin cookie (PHP-Nuke admin authentication)
-        if (isset($_COOKIE['admin']) && $_COOKIE['admin'] !== '') {
-            return true;
+        global $authService;
+        if ($authService instanceof \Auth\AuthService) {
+            return $authService->isAdmin();
         }
-
-        // Also check global $admin variable (set by PHP-Nuke auth)
-        global $admin;
-        if (isset($admin) && $admin !== '') {
-            return true;
-        }
-
         return false;
     }
 

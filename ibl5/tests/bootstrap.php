@@ -19,6 +19,36 @@ if (!defined('DIRECTORY_SEPARATOR')) {
 // Load Composer autoloader (handles both application classes and test helpers via PSR-4)
 require_once __DIR__ . '/../vendor/autoload.php';
 
+// In git worktrees, vendor/ is symlinked to the main repo. Composer resolves $baseDir
+// through the symlink, so it loads classes from the main repo instead of the worktree.
+// Prepend the worktree's classes/ and tests/ directories so modified files are used.
+if (is_link(__DIR__ . '/../vendor')) {
+    $worktreeClasses = realpath(__DIR__ . '/../classes');
+    $worktreeTests = realpath(__DIR__ . '/../tests');
+    if ($worktreeClasses !== false || $worktreeTests !== false) {
+        // Register a prepend autoloader that checks the worktree's directories first
+        spl_autoload_register(static function (string $class) use ($worktreeClasses, $worktreeTests): void {
+            // Check Tests\ namespace in worktree tests/ dir
+            if ($worktreeTests !== false && str_starts_with($class, 'Tests\\')) {
+                $relative = substr($class, 6); // Strip 'Tests\' prefix
+                $file = $worktreeTests . '/' . str_replace('\\', '/', $relative) . '.php';
+                if (file_exists($file)) {
+                    require $file;
+                    return;
+                }
+            }
+            // Check fallback namespace in worktree classes/ dir
+            if ($worktreeClasses !== false) {
+                $file = $worktreeClasses . '/' . str_replace('\\', '/', $class) . '.php';
+                if (file_exists($file)) {
+                    require $file;
+                    return;
+                }
+            }
+        }, true, true); // throw = true, prepend = true
+    }
+}
+
 // Now that autoloader is registered, define class aliases for backward compatibility
 // This maps the old global mock classes to the new namespaced ones
 class_alias('Tests\\Integration\\Mocks\\MockDatabase', 'MockDatabase');

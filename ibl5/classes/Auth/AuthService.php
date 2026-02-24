@@ -213,6 +213,8 @@ class AuthService implements AuthServiceInterface
         $stmt->close();
 
         if ($row === null) {
+            // Cache the miss so we don't re-query on every page load
+            $_SESSION['auth_roles'] = 0;
             return false;
         }
 

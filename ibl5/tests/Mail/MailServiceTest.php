@@ -67,11 +67,11 @@ class MailServiceTest extends TestCase
 
     public function testFromConfigReturnsValidService(): void
     {
-        // fromConfig() loads mail.config.php if it exists, else example, else defaults.
-        // The result depends on the local environment, so just verify we get a valid transport.
+        // fromConfig() loads whatever config file exists on disk (or falls back to defaults).
+        // We can't assert a specific transport because local mail.config.php may differ.
         $service = MailService::fromConfig();
 
-        $this->assertContains($service->getTransport(), ['smtp', 'mail', 'log']);
+        $this->assertContains($service->getTransport(), ['log', 'mail', 'smtp']);
     }
 
     public function testSubjectSanitizationStripsNewlines(): void

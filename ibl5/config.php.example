@@ -36,10 +36,6 @@ if (stristr(htmlentities($_SERVER['PHP_SELF']), "config.php")) {
 #                    must write here the url of the subscription
 #                    information/renewal page. This will send by
 #                    email if set.
-# $admin_file: Administration panel filename. "admin" by default for
-#   		   "admin.php". To improve security please rename the file
-#              "admin.php" and change the $admin_file value to the
-#              new filename (without the extension .php)
 ######################################################################
 
 $dbhost = "localhost";
@@ -51,7 +47,6 @@ $user_prefix = "nuke";
 $dbtype = "MySQL";
 $sitekey = "key";
 $subscription_url = "";
-$admin_file = "file";
 
 /**********************************************************************/
 /* You finished to configure the Database. Now you can change all     */

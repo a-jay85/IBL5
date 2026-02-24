@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS `ibl_rcb_alltime_records` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `scope` ENUM('league', 'team') NOT NULL,
-    `team_id` TINYINT UNSIGNED DEFAULT NULL COMMENT 'NULL for league scope; JSB team ID 1-28 for team scope',
+    `team_id` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 for league scope; JSB team ID 1-28 for team scope',
     `record_type` ENUM('single_season', 'career') NOT NULL,
     `stat_category` ENUM('ppg','pts','rpg','trb','apg','ast','spg','stl','bpg','blk','fg_pct','ft_pct','three_pct') NOT NULL,
     `ranking` TINYINT UNSIGNED NOT NULL COMMENT 'Ranking position 1-50',
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS `ibl_rcb_season_records` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     `season_year` SMALLINT UNSIGNED NOT NULL COMMENT 'IBL season year this data belongs to',
     `scope` ENUM('league', 'team') NOT NULL,
-    `team_id` TINYINT UNSIGNED DEFAULT NULL COMMENT 'NULL for league scope; JSB team ID 1-28 for team scope',
+    `team_id` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 for league scope; JSB team ID 1-28 for team scope',
     `context` ENUM('home', 'away') NOT NULL,
     `stat_category` ENUM('pts','reb','ast','stl','blk','two_gm','three_gm','ftm') NOT NULL,
     `ranking` TINYINT UNSIGNED NOT NULL COMMENT 'Ranking position 1-10',

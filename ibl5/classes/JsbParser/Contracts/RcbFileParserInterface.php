@@ -17,7 +17,7 @@ interface RcbFileParserInterface
      * Parse a complete .rcb file.
      *
      * @param string $filePath Path to the .rcb file
-     * @return array{alltime: list<array{scope: string, team_id: int|null, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int, stat_value: float, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}>, currentSeason: list<array{scope: string, team_id: int|null, context: string, stat_category: string, ranking: int, player_name: string, player_position: string, car_block_id: int, stat_value: int, season_year: int}>}
+     * @return array{alltime: list<array{scope: string, team_id: int, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int, stat_value: float, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null}>, currentSeason: list<array{scope: string, team_id: int, context: string, stat_category: string, ranking: int, player_name: string, player_position: string, car_block_id: int, stat_value: int, season_year: int}>}
      * @throws \RuntimeException If file cannot be read or has invalid structure
      */
     public static function parseFile(string $filePath): array;

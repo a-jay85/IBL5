@@ -1841,4 +1841,9 @@ td.ibl-team-cell--colored {
     font-variant-numeric: tabular-nums;
 }
 
+.record-book-section-title {
+    font-size: 1.25rem;
+    margin-top: 1.5rem;
+}
+
 } /* end @layer components */

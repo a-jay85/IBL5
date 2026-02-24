@@ -223,7 +223,7 @@ class RcbFileParserTest extends TestCase
             $record = array_values($ppgRecords)[0];
 
             $this->assertSame('league', $record['scope']);
-            $this->assertNull($record['team_id']);
+            $this->assertSame(0, $record['team_id']);
             $this->assertSame('single_season', $record['record_type']);
             $this->assertSame('ppg', $record['stat_category']);
             $this->assertSame(1, $record['ranking']);
@@ -349,7 +349,7 @@ class RcbFileParserTest extends TestCase
 
             $record = $season[0];
             $this->assertSame('league', $record['scope']);
-            $this->assertNull($record['team_id']);
+            $this->assertSame(0, $record['team_id']);
             $this->assertSame('away', $record['context']);
             $this->assertSame('pts', $record['stat_category']);
             $this->assertSame(1, $record['ranking']);

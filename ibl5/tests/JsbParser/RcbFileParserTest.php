@@ -175,6 +175,59 @@ class RcbFileParserTest extends TestCase
         $this->assertNull(RcbFileParser::parseCurrentSeasonEntry($entry));
     }
 
+    public function testSingleSeasonEntryWithZeroStatReturnsNull(): void
+    {
+        $entry = $this->buildAlltimeSingleSeasonEntry('Karl Malone', 77042, 0, 5, 1998);
+        $this->assertNull(RcbFileParser::parseAlltimeSingleSeasonEntry($entry));
+    }
+
+    public function testSingleSeasonEntryWithDigitsInNameReturnsNull(): void
+    {
+        $entry = $this->buildAlltimeSingleSeasonEntry('12191989 121981', 77042, 96, 5, 1998);
+        $this->assertNull(RcbFileParser::parseAlltimeSingleSeasonEntry($entry));
+    }
+
+    public function testCareerEntryWithZeroStatReturnsNull(): void
+    {
+        $entry = $this->buildAlltimeCareerEntry('Karl Malone', 77042, 500, 0, 5);
+        $this->assertNull(RcbFileParser::parseAlltimeCareerEntry($entry));
+    }
+
+    public function testCareerEntryWithDigitsInNameReturnsNull(): void
+    {
+        $entry = $this->buildAlltimeCareerEntry('0 0 0 0 02278131', 77042, 500, 96, 5);
+        $this->assertNull(RcbFileParser::parseAlltimeCareerEntry($entry));
+    }
+
+    public function testCurrentSeasonEntryWithZeroStatReturnsNull(): void
+    {
+        $entry = $this->buildCurrentSeasonEntry('PG', 'Karl Malone', 3851, 0, 2006);
+        $this->assertNull(RcbFileParser::parseCurrentSeasonEntry($entry));
+    }
+
+    public function testCurrentSeasonEntryWithDigitsInNameReturnsNull(): void
+    {
+        $entry = $this->buildCurrentSeasonEntry('PG', '12191989 Player', 3851, 73, 2006);
+        $this->assertNull(RcbFileParser::parseCurrentSeasonEntry($entry));
+    }
+
+    public function testValidEntryWithAlphabeticNameAndNonzeroStatPasses(): void
+    {
+        $entry = $this->buildAlltimeSingleSeasonEntry('Karl Malone', 500, 2921, 14, 1989);
+        $result = RcbFileParser::parseAlltimeSingleSeasonEntry($entry);
+
+        $this->assertNotNull($result);
+        $this->assertSame('Karl Malone', $result['player_name']);
+        $this->assertSame(2921, $result['stat_raw']);
+    }
+
+    public function testGarbageEntryWithNonzeroCarBlockIdAndZeroStatReturnsNull(): void
+    {
+        // Previously this passed because carBlockId !== 0
+        $entry = $this->buildAlltimeSingleSeasonEntry('Garbage Name', 77042, 0, 5, 1998);
+        $this->assertNull(RcbFileParser::parseAlltimeSingleSeasonEntry($entry));
+    }
+
     public function testDecodeStatValueForAverage(): void
     {
         // PPG: 3611 → 36.11

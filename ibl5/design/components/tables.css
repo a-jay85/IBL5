@@ -881,7 +881,7 @@ td.ibl-team-cell--colored {
    ========================================================================== */
 
 .ibl-player-cell {
-    text-align: left;
+    text-align: left !important;
     white-space: nowrap;
     vertical-align: middle;
 }

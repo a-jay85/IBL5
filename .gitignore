@@ -6,6 +6,7 @@
 error_log
 node_modules
 vendor/
+worktrees/
 nohup.out
 /phpmyadmin
 *.phar

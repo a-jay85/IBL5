@@ -31,8 +31,6 @@ namespace Search\Contracts;
  *     authors: list<string>,
  *     results: list<StoryResult>|list<CommentResult>|list<UserResult>|null,
  *     hasMore: bool,
- *     isAdmin: bool,
- *     adminFile: string,
  *     articleComm: bool,
  *     error: string
  * }

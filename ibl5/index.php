@@ -12,7 +12,7 @@
 /************************************************************************/
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
-global $prefix, $db, $admin_file;
+global $prefix, $db;
 
 $modpath = '';
 define('MODULE_FILE', true);
@@ -21,7 +21,7 @@ $row = $db->sql_fetchrow($db->sql_query("SELECT main_module from " . $prefix . "
 $name = $row['main_module'];
 define('HOME_FILE', true);
 
-if (isset($url) and is_admin($admin)) {
+if (isset($url) and is_admin()) {
     $url = urldecode($url);
     echo "<meta http-equiv=\"refresh\" content=\"0; url=$url\">";
     die();
@@ -69,11 +69,7 @@ if (str_contains($name, "..") || (isset($file) && str_contains($file, "..")) || 
         define('INDEX_FILE', true);
         PageLayout\PageLayout::header();
         OpenTable();
-        if (is_admin($admin)) {
-            echo "<center><font class=\"\"><b>" . _HOMEPROBLEM . "</b></font><br><br>[ <a href=\"" . $admin_file . ".php?op=modules\">" . _ADDAHOME . "</a> ]</center>";
-        } else {
-            echo "<center>" . _HOMEPROBLEMUSER . "</center>";
-        }
+        echo "<center>" . _HOMEPROBLEMUSER . "</center>";
         CloseTable();
         PageLayout\PageLayout::footer();
     }

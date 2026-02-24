@@ -1,8 +1,6 @@
 <?php
-if (!strpos($_SERVER['PHP_SELF'], 'admin.php')) {
-    #show right panel:
-    define('INDEX_FILE', true);
-}
+
+define('INDEX_FILE', true);
 /************************************************************************/
 /* PHP-NUKE: Web Portal System                                          */
 /* ===========================                                          */

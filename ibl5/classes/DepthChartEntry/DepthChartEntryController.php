@@ -37,8 +37,25 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
      */
     public function displayForm(string $username): void
     {
-        /** @var string $display */
-        $display = $_REQUEST['display'] ?? 'ratings';
+        $display = 'ratings';
+        if (isset($_REQUEST['display']) && is_string($_REQUEST['display'])) {
+            $display = $_REQUEST['display'];
+        }
+
+        // Validate split parameter when display=split
+        $split = null;
+        if ($display === 'split' && isset($_REQUEST['split']) && is_string($_REQUEST['split'])) {
+            $splitRepo = new \Team\SplitStatsRepository($this->db);
+            $rawSplit = $_REQUEST['split'];
+            if (in_array($rawSplit, $splitRepo->getValidSplitKeys(), true)) {
+                $split = $rawSplit;
+            } else {
+                $display = 'ratings';
+            }
+        } elseif ($display === 'split') {
+            $display = 'ratings';
+        }
+
         $season = new \Season($this->db);
 
         $teamName = $this->getUserTeamName($username);
@@ -77,7 +94,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $this->view->renderFormFooter();
 
         echo '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
-        echo $this->getTableOutput($teamID, $display);
+        echo $this->getTableOutput($teamID, $display, $split);
         echo '</div></div>';
 
         // Output JS configuration for saved depth charts
@@ -105,7 +122,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     /**
      * @see DepthChartEntryControllerInterface::getTableOutput()
      */
-    public function getTableOutput(int $teamID, string $display): string
+    public function getTableOutput(int $teamID, string $display, ?string $split = null): string
     {
         $season = new \Season($this->db);
         $team = \Team::initialize($this->db, $teamID);
@@ -113,20 +130,12 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         // Delegate roster + starters to TeamService (single source of truth)
         $rosterData = $this->teamService->getRosterAndStarters($teamID);
 
-        $groups = [
-            'Views' => [
-                'ratings' => 'Ratings',
-                'total_s' => 'Season Totals',
-                'avg_s' => 'Season Averages',
-                'per36mins' => 'Per 36 Minutes',
-                'chunk' => 'Sim Averages',
-                'contracts' => 'Contracts',
-            ],
-        ];
+        $groups = $this->teamService->buildDropdownGroups($season);
 
+        $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
         $baseUrl = 'modules.php?name=DepthChartEntry';
-        $dropdown = new TableViewDropdown($groups, $display, $baseUrl, $team->color1, $team->color2);
-        $tableHtml = $this->teamService->renderTableForDisplay($display, $rosterData['roster'], $team, null, $season, $rosterData['starterPids']);
+        $dropdown = new TableViewDropdown($groups, $activeValue, $baseUrl, $team->color1, $team->color2);
+        $tableHtml = $this->teamService->renderTableForDisplay($display, $rosterData['roster'], $team, null, $season, $rosterData['starterPids'], $split);
 
         return $dropdown->wrap($tableHtml);
     }

@@ -74,6 +74,14 @@ sed -i '' "s/  */ /g" "${DUMP_FILE}"
 
 echo "✓ DEFINER clauses removed successfully"
 
+# Step 1.6: Remove DEFAULT uuid() expressions (MariaDB 10.2+ syntax unsupported by MySQL 5.7)
+echo ""
+echo "Step 1.6: Removing DEFAULT uuid() expressions for MySQL 5.7 compatibility..."
+
+sed -i '' "s/ DEFAULT uuid()/ DEFAULT NULL/g" "${DUMP_FILE}"
+
+echo "✓ DEFAULT uuid() expressions replaced with DEFAULT NULL"
+
 # Step 2: Import to local database
 echo ""
 echo "Step 2: Importing to local database..."

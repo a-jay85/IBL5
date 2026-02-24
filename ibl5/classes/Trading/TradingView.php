@@ -43,18 +43,24 @@ class TradingView implements TradingViewInterface
         $partnerColor1 = TableStyles::sanitizeColor($pageData['partnerTeamColor1']);
         $partnerColor2 = TableStyles::sanitizeColor($pageData['partnerTeamColor2']);
 
+        // Restore previous form selections after a failed trade attempt
+        /** @var array{checkedItems: array<string, true>, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>}|null $previousFormData */
+        $previousFormData = $pageData['previousFormData'] ?? null;
+        /** @var array<string, true> $checkedItems */
+        $checkedItems = $previousFormData['checkedItems'] ?? [];
+
         // Build player + pick rows for both teams, tracking the form field counter
         $k = 0;
-        $userPlayerRows = $this->buildPlayerRows($pageData['userPlayers'], $pageData['seasonPhase'], $k);
+        $userPlayerRows = $this->buildPlayerRows($pageData['userPlayers'], $pageData['seasonPhase'], $k, $checkedItems);
         $k = $userPlayerRows['nextK'];
-        $userPickRows = $this->buildPickRows($pageData['userPicks'], $k);
+        $userPickRows = $this->buildPickRows($pageData['userPicks'], $k, $checkedItems);
         $k = $userPickRows['nextK'];
 
         $switchCounter = $k;
 
-        $partnerPlayerRows = $this->buildPlayerRows($pageData['partnerPlayers'], $pageData['seasonPhase'], $k);
+        $partnerPlayerRows = $this->buildPlayerRows($pageData['partnerPlayers'], $pageData['seasonPhase'], $k, $checkedItems);
         $k = $partnerPlayerRows['nextK'];
-        $partnerPickRows = $this->buildPickRows($pageData['partnerPicks'], $k);
+        $partnerPickRows = $this->buildPickRows($pageData['partnerPicks'], $k, $checkedItems);
         $k = $partnerPickRows['nextK'];
         $k--;
 
@@ -120,7 +126,7 @@ class TradingView implements TradingViewInterface
             </div>
         </div>
 <?= $this->renderCapTotals($pageData, $seasonEndingYear, $userTeam, $partnerTeam) ?>
-<?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam) ?>
+<?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $previousFormData) ?>
         <div style="text-align: center; padding: 1rem;">
             <input type="hidden" name="fieldsCounter" value="<?= (int) $k ?>">
             <button type="submit" class="ibl-btn ibl-btn--primary">Make Trade Offer</button>
@@ -270,9 +276,10 @@ class TradingView implements TradingViewInterface
      * @param list<TradingPlayerRow> $players Player rows from repository
      * @param string $seasonPhase Current season phase
      * @param int $startK Starting form field counter
+     * @param array<string, true> $checkedItems Previously checked items keyed by "type:id"
      * @return array{html: string, nextK: int}
      */
-    private function buildPlayerRows(array $players, string $seasonPhase, int $startK): array
+    private function buildPlayerRows(array $players, string $seasonPhase, int $startK, array $checkedItems = []): array
     {
         $k = $startK;
         $isOffseason = ($seasonPhase === 'Playoffs' || $seasonPhase === 'Draft' || $seasonPhase === 'Free Agency');
@@ -301,12 +308,14 @@ class TradingView implements TradingViewInterface
             $contractAmount = ($contractYear < 7) ? ($row["cy{$contractYear}"] ?? 0) : 0;
             ?>
 <tr>
-<?php if ($contractAmount !== 0 && $ordinal <= \JSB::WAIVERS_ORDINAL): ?>
+<?php if ($contractAmount !== 0 && $ordinal <= \JSB::WAIVERS_ORDINAL):
+    $wasChecked = isset($checkedItems['1:' . $pid]);
+?>
     <td>
         <input type="hidden" name="index<?= $k ?>" value="<?= $pid ?>">
         <input type="hidden" name="contract<?= $k ?>" value="<?= $contractAmount ?>">
         <input type="hidden" name="type<?= $k ?>" value="1">
-        <input type="checkbox" name="check<?= $k ?>">
+        <input type="checkbox" name="check<?= $k ?>"<?= $wasChecked ? ' checked' : '' ?>>
     </td>
 <?php else: ?>
     <td>
@@ -333,9 +342,10 @@ class TradingView implements TradingViewInterface
      *
      * @param list<TradingDraftPickRow> $picks Draft pick rows from repository
      * @param int $startK Starting form field counter
+     * @param array<string, true> $checkedItems Previously checked items keyed by "type:id"
      * @return array{html: string, nextK: int}
      */
-    private function buildPickRows(array $picks, int $startK): array
+    private function buildPickRows(array $picks, int $startK, array $checkedItems = []): array
     {
         $k = $startK;
 
@@ -349,11 +359,12 @@ class TradingView implements TradingViewInterface
             $pickRound = $row['round'];
             $pickNotes = $row['notes'];
             ?>
+<?php $wasPickChecked = isset($checkedItems['0:' . $pickId]); ?>
 <tr>
     <td>
         <input type="hidden" name="index<?= $k ?>" value="<?= $pickId ?>">
         <input type="hidden" name="type<?= $k ?>" value="0">
-        <input type="checkbox" name="check<?= $k ?>">
+        <input type="checkbox" name="check<?= $k ?>"<?= $wasPickChecked ? ' checked' : '' ?>>
     </td>
     <td></td>
     <td class="ibl-player-cell">
@@ -420,8 +431,10 @@ class TradingView implements TradingViewInterface
 
     /**
      * Render the cash exchange section of the trade form
+     *
+     * @param array{checkedItems: array<string, true>, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>}|null $previousFormData
      */
-    private function renderCashExchange(int $seasonEndingYear, string $seasonPhase, int $cashStartYear, int $cashEndYear, string $userTeam, string $partnerTeam): string
+    private function renderCashExchange(int $seasonEndingYear, string $seasonPhase, int $cashStartYear, int $cashEndYear, string $userTeam, string $partnerTeam, ?array $previousFormData = null): string
     {
         ob_start();
         ?>
@@ -433,15 +446,19 @@ class TradingView implements TradingViewInterface
     /** @var string $yearLabelEscaped */
     $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
 ?>
+    <?php
+    $prevUserCash = $previousFormData['userSendsCash'][$i] ?? 0;
+    $prevPartnerCash = $previousFormData['partnerSendsCash'][$i] ?? 0;
+    ?>
     <tr>
         <td style="text-align: left;">
             <strong><?= $userTeam ?></strong> send
-            <input type="number" name="userSendsCash<?= $i ?>" value="0" min="0" max="2000" style="width: 80px;">
+            <input type="number" name="userSendsCash<?= $i ?>" value="<?= $prevUserCash ?>" min="0" max="2000" style="width: 80px;">
             for <?= $yearLabelEscaped ?>
         </td>
         <td style="text-align: right;">
             <strong><?= $partnerTeam ?></strong> send
-            <input type="number" name="partnerSendsCash<?= $i ?>" value="0" min="0" max="2000" style="width: 80px;">
+            <input type="number" name="partnerSendsCash<?= $i ?>" value="<?= $prevPartnerCash ?>" min="0" max="2000" style="width: 80px;">
             for <?= $yearLabelEscaped ?>
         </td>
     </tr>

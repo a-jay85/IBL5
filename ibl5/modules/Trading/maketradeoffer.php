@@ -56,6 +56,20 @@ try {
 if ($result['success']) {
     header('Location: /ibl5/modules.php?name=Trading&op=reviewtrade&result=offer_sent');
 } else {
+    // Store checked items and cash amounts in session so the form can restore them
+    $checkedItems = [];
+    for ($j = 0; $j < $tradeData['fieldsCounter']; $j++) {
+        if (($tradeData['check'][$j] ?? null) === 'on') {
+            $itemKey = ($tradeData['type'][$j] ?? '0') . ':' . ($tradeData['index'][$j] ?? '0');
+            $checkedItems[$itemKey] = true;
+        }
+    }
+    $_SESSION['tradeFormData'] = [
+        'checkedItems' => $checkedItems,
+        'userSendsCash' => $tradeData['userSendsCash'],
+        'partnerSendsCash' => $tradeData['partnerSendsCash'],
+    ];
+
     $error = $result['error'] ?? ($result['errors'] ? implode('; ', $result['errors']) : 'Unknown error');
     header('Location: /ibl5/modules.php?name=Trading&op=offertrade&partner=' . rawurlencode($tradeData['listeningTeam']) . '&error=' . rawurlencode($error));
 }

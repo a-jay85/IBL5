@@ -82,11 +82,13 @@ class PlayerImageHelper implements PlayerImageHelperInterface
     {
         $starterClass = in_array($playerID, $starterPids, true) ? ' is-starter' : '';
         $thumbnail = str_contains($displayName, '|') ? '' : self::renderThumbnail($playerID);
+        $abbreviated = self::abbreviateFirstName($displayName);
 
         return '<td class="sticky-col ibl-player-cell' . $starterClass . '">'
             . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'
             . $thumbnail
-            . '<span class="ibl-player-cell__name">' . $displayName . '</span>'
+            . '<span class="ibl-player-cell__name ibl-player-cell__name--full">' . $displayName . '</span>'
+            . '<span class="ibl-player-cell__name ibl-player-cell__name--abbrev">' . $abbreviated . '</span>'
             . '</a></td>';
     }
 
@@ -136,6 +138,20 @@ class PlayerImageHelper implements PlayerImageHelperInterface
         $thumbnail = $hasPipe ? '' : self::renderThumbnail($playerID);
 
         return ['thumbnail' => $thumbnail, 'name' => $cleanName];
+    }
+
+    /**
+     * Abbreviate a player's first name to a single initial.
+     * e.g. "Andre Iguodala^" → "A. Iguodala^"
+     */
+    private static function abbreviateFirstName(string $displayName): string
+    {
+        $spacePos = strpos($displayName, ' ');
+        if ($spacePos === false || $spacePos === 0) {
+            return $displayName;
+        }
+
+        return mb_substr($displayName, 0, 1) . '.' . substr($displayName, $spacePos);
     }
 
     public static function isValidPlayerID(int|float|string|null $playerID): bool

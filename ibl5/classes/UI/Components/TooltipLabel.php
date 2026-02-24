@@ -31,7 +31,6 @@ class TooltipLabel
             return $displayValue;
         }
 
-        /** @var string $safeTooltip */
         $safeTooltip = HtmlSanitizer::safeHtmlOutput($tooltipText);
 
         $classes = $cssClass !== '' ? 'ibl-tooltip ' . $cssClass : 'ibl-tooltip';

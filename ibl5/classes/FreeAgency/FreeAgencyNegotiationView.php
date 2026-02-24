@@ -46,7 +46,6 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
 
         // Error banner from PRG redirect
         if ($error !== null) {
-            /** @var string $sanitizedError */
             $sanitizedError = \Utilities\HtmlSanitizer::safeHtmlOutput($error);
             ?>
 <div class="ibl-alert ibl-alert--error"><?= $sanitizedError ?></div>

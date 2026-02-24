@@ -65,9 +65,7 @@ class TopicsView implements TopicsViewInterface
      */
     private function renderPageHeader(): string
     {
-        /** @var string $activeTopics */
         $activeTopics = HtmlSanitizer::safeHtmlOutput(_ACTIVETOPICS);
-        /** @var string $click2list */
         $click2list = HtmlSanitizer::safeHtmlOutput(_CLICK2LIST);
 
         return '<div class="topics-page">
@@ -80,7 +78,6 @@ class TopicsView implements TopicsViewInterface
      */
     private function renderSearchForm(): string
     {
-        /** @var string $search */
         $search = HtmlSanitizer::safeHtmlOutput(_SEARCH);
 
         return '<form action="modules.php?name=Search" method="post" class="topics-search">
@@ -121,17 +118,13 @@ class TopicsView implements TopicsViewInterface
     private function renderTopicCard(array $topic, string $themePath, int $index): string
     {
         $topicId = $topic['topicId'];
-        /** @var string $topicText */
         $topicText = HtmlSanitizer::safeHtmlOutput($topic['topicText']);
         $storyCount = $topic['storyCount'];
         $totalReads = $topic['totalReads'];
-        /** @var string $imagePath */
         $imagePath = HtmlSanitizer::safeHtmlOutput($themePath . $topic['topicImage']);
         $delay = min($index * 30, 600);
 
-        /** @var string $totNews */
         $totNews = HtmlSanitizer::safeHtmlOutput(_TOTNEWS);
-        /** @var string $totReads */
         $totReads = HtmlSanitizer::safeHtmlOutput(_TOTREADS);
 
         $output = '<div class="topic-card" style="animation-delay: ' . $delay . 'ms">';
@@ -153,14 +146,12 @@ class TopicsView implements TopicsViewInterface
             $output .= $this->renderArticleList($topic['recentArticles']);
 
             if ($storyCount > 10) {
-                /** @var string $more */
                 $more = HtmlSanitizer::safeHtmlOutput(_MORE);
                 $output .= '<div class="topic-card__more">';
                 $output .= '<a href="modules.php?name=News&amp;new_topic=' . $topicId . '">' . $more . ' &rarr;</a>';
                 $output .= '</div>';
             }
         } else {
-            /** @var string $noNewsYet */
             $noNewsYet = HtmlSanitizer::safeHtmlOutput(_NONEWSYET);
             $output .= '<p class="topic-card__empty">' . $noNewsYet . '</p>';
         }
@@ -181,10 +172,8 @@ class TopicsView implements TopicsViewInterface
 
         foreach ($articles as $article) {
             $sid = $article['sid'];
-            /** @var string $title */
             $title = HtmlSanitizer::safeHtmlOutput($article['title']);
             $catId = $article['catId'];
-            /** @var string $catTitle */
             $catTitle = HtmlSanitizer::safeHtmlOutput($article['catTitle']);
 
             $output .= '<li class="topic-card__article">';
@@ -207,7 +196,6 @@ class TopicsView implements TopicsViewInterface
      */
     private function renderEmptyState(): string
     {
-        /** @var string $noNewsYet */
         $noNewsYet = HtmlSanitizer::safeHtmlOutput(_NONEWSYET);
 
         return '<div class="ibl-empty-state">

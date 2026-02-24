@@ -60,7 +60,6 @@ class TeamScheduleService implements TeamScheduleServiceInterface
         $lossStreak = 0;
 
         foreach ($teamSchedule as $gameRow) {
-            /** @var array{Date: string, BoxID: int, Visitor: int, Home: int, VScore: int, HScore: int} $gameRow */
             $game = new \Game($gameRow);
             $opposingTeamId = $game->getOpposingTeamID($teamId);
             if (!isset($this->teamCache[$opposingTeamId])) {

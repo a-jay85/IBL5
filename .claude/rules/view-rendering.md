@@ -31,16 +31,7 @@ Replace deprecated tags:
 | `border=1` | `style="border: 1px solid #000; border-collapse: collapse;"` |
 
 ## CSS Centralization
-When inline styles repeat 2+ times, extract to `<style>` block:
-
-```html
-<style>
-.data-cell { border: 1px solid #000; padding: 4px; }
-.player-name { font-weight: bold; color: #333; }
-</style>
-
-<td class="data-cell"><span class="player-name">...</span></td>
-```
+When inline styles repeat 2+ times, extract to a CSS file in `ibl5/design/components/`. Never write `<style>` blocks in PHP view files — all CSS must be centralized. For dynamic team colors, use CSS custom properties set via inline `style` attributes on container elements, with the corresponding rules in centralized CSS files.
 
 ## Statistics Display
 Use `BasketballStats\StatsFormatter` — see `php-classes.md` for method list.

@@ -45,7 +45,6 @@ function theindex($new_topic = "0")
         $result_a = $db->sql_query("SELECT topictext FROM " . $prefix . "_topics WHERE topicid='$new_topic'");
         $row_a = $db->sql_fetchrow($result_a);
         $numrows_a = $db->sql_numrows($result_a);
-        /** @var string $topic_title */
         $topic_title = \Utilities\HtmlSanitizer::safeHtmlOutput($row_a['topictext']);
         OpenTable();
         if ($numrows_a == 0) {
@@ -68,7 +67,6 @@ function theindex($new_topic = "0")
         $s_sid = intval($row['sid']);
         $catid = intval($row['catid']);
         $aid = $row['aid'];
-        /** @var string $title */
         $title = \Utilities\HtmlSanitizer::safeHtmlOutput($row['title']);
         $time = $row['time'];
         $hometext = $row['hometext'];
@@ -77,12 +75,10 @@ function theindex($new_topic = "0")
         $counter = intval($row['counter']);
         $topic = intval($row['topic']);
         $informant = $row['informant'];
-        /** @var string $notes */
         $notes = \Utilities\HtmlSanitizer::safeHtmlOutput($row['notes']);
         $acomm = intval($row['acomm']);
         if ($catid > 0) {
             $row2 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));
-            /** @var string $cattitle */
             $cattitle = \Utilities\HtmlSanitizer::safeHtmlOutput($row2['title']);
         }
         getTopics($s_sid);
@@ -115,7 +111,6 @@ function theindex($new_topic = "0")
         $sid = intval($s_sid);
         if ($catid != 0) {
             $row3 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));
-            /** @var string $title1 */
             $title1 = \Utilities\HtmlSanitizer::safeHtmlOutput($row3['title']);
             $title = "<a class='readmore' href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
         }

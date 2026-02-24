@@ -60,7 +60,6 @@ class PlayerOneOnOneView implements PlayerOneOnOneViewInterface
         foreach ($wins as $game) {
             /** @var array{gameid: int, winner: string, loser: string, winscore: int, lossscore: int, loser_pid: int|null} $game */
             $gameId = $game['gameid'];
-            /** @var string $loser */
             $loser = HtmlSanitizer::safeHtmlOutput($game['loser']);
             $loserPid = $game['loser_pid'];
             $winScore = $game['winscore'];
@@ -82,7 +81,6 @@ class PlayerOneOnOneView implements PlayerOneOnOneViewInterface
         foreach ($losses as $game) {
             /** @var array{gameid: int, winner: string, loser: string, winscore: int, lossscore: int, winner_pid: int|null} $game */
             $gameId = $game['gameid'];
-            /** @var string $winner */
             $winner = HtmlSanitizer::safeHtmlOutput($game['winner']);
             $winnerPid = $game['winner_pid'];
             $winScore = $game['winscore'];

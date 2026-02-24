@@ -30,10 +30,8 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
         int $capSpace,
         int $maxYearOneSalary
     ): string {
-        /** @var string $playerName */
         $playerName = HtmlSanitizer::safeHtmlOutput($player->name ?? '');
         $playerID = $player->playerID ?? 0;
-        /** @var string $teamName */
         $teamName = HtmlSanitizer::safeHtmlOutput($player->teamName ?? '');
         
         // Build demand display
@@ -175,7 +173,6 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
      */
     public static function renderError(string $error): string
     {
-        /** @var string $escaped */
         $escaped = HtmlSanitizer::safeHtmlOutput($error);
         return '<p>' . $escaped . '</p>';
     }
@@ -185,9 +182,7 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
      */
     public static function renderHeader(Player $player): string
     {
-        /** @var string $playerPos */
         $playerPos = HtmlSanitizer::safeHtmlOutput($player->position ?? '');
-        /** @var string $playerName */
         $playerName = HtmlSanitizer::safeHtmlOutput($player->name ?? '');
 
         return "<b>{$playerPos} {$playerName}</b> - Contract Demands:<br>";

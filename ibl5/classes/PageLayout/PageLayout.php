@@ -16,7 +16,6 @@ class PageLayout
             && is_string($_SESSION['flash_success'])
             && $_SESSION['flash_success'] !== ''
         ) {
-            /** @var string $flashMessage */
             $flashMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_success']);
             unset($_SESSION['flash_success']);
             echo '<div class="ibl-alert ibl-alert--success">' . $flashMessage . '</div>';

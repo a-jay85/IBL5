@@ -27,10 +27,8 @@ class TradingView implements TradingViewInterface
     {
         /** @var array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<TradingDraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<TradingDraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string, result?: string, error?: string} $pageData */
 
-        /** @var string $userTeam */
         $userTeam = HtmlSanitizer::safeHtmlOutput($pageData['userTeam']);
         $userTeamId = $pageData['userTeamId'];
-        /** @var string $partnerTeam */
         $partnerTeam = HtmlSanitizer::safeHtmlOutput($pageData['partnerTeam']);
         $partnerTeamId = $pageData['partnerTeamId'];
         $seasonEndingYear = $pageData['seasonEndingYear'];
@@ -146,7 +144,6 @@ class TradingView implements TradingViewInterface
     {
         /** @var array{userTeam: string, userTeamId: int, tradeOffers: array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>}>, teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>, result?: string, error?: string} $pageData */
 
-        /** @var string $userTeam */
         $userTeam = HtmlSanitizer::safeHtmlOutput($pageData['userTeam']);
         $userTeamId = $pageData['userTeamId'];
         $tradeOffers = $pageData['tradeOffers'];
@@ -217,9 +214,7 @@ class TradingView implements TradingViewInterface
 <?php foreach ($teams as $team): ?>
         <?php
         $teamId = $team['teamid'];
-        /** @var string $teamName */
         $teamName = HtmlSanitizer::safeHtmlOutput($team['name']);
-        /** @var string $fullName */
         $fullName = HtmlSanitizer::safeHtmlOutput($team['fullName']);
         $partnerUrl = 'modules.php?name=Trading&amp;op=offertrade&amp;partner=' . $teamName;
         ?>
@@ -243,7 +238,6 @@ class TradingView implements TradingViewInterface
     private function renderResultBanner(?string $result, ?string $error): string
     {
         if ($error !== null) {
-            /** @var string $errorEscaped */
             $errorEscaped = HtmlSanitizer::safeHtmlOutput($error);
             return '<div class="ibl-alert ibl-alert--error">' . $errorEscaped . '</div>';
         }
@@ -265,7 +259,6 @@ class TradingView implements TradingViewInterface
         }
 
         $banner = $banners[$result];
-        /** @var string $messageEscaped */
         $messageEscaped = HtmlSanitizer::safeHtmlOutput($banner['message']);
         return '<div class="ibl-alert ' . $banner['class'] . '">' . $messageEscaped . '</div>';
     }
@@ -289,10 +282,8 @@ class TradingView implements TradingViewInterface
             $pid = $row['pid'];
             $ordinal = $row['ordinal'] ?? 0;
             $contractYear = $row['cy'] ?? 0;
-            /** @var string $playerPosition */
             $playerPosition = HtmlSanitizer::safeHtmlOutput($row['pos']);
             $resolved = PlayerImageHelper::resolvePlayerDisplay($pid, $row['name']);
-            /** @var string $playerName */
             $playerName = HtmlSanitizer::safeHtmlOutput((string) $resolved['name']);
             /** @var string $thumbnail */
             $thumbnail = $resolved['thumbnail'];
@@ -353,7 +344,6 @@ class TradingView implements TradingViewInterface
         foreach ($picks as $row) {
             $pickId = $row['pickid'];
             $pickYear = $row['year'];
-            /** @var string $pickTeam */
             $pickTeam = HtmlSanitizer::safeHtmlOutput($row['teampick']);
             $pickTeamId = $row['teampick_id'];
             $pickRound = $row['round'];
@@ -372,7 +362,6 @@ class TradingView implements TradingViewInterface
         <div>
             <?= $pickYear ?> R<?= $pickRound ?> <a href="./modules.php?name=Team&amp;op=team&amp;teamID=<?= $pickTeamId ?>"><span class="ibl-team-cell__text"><?= $pickTeam ?></span></a>
 <?php if ($pickNotes !== null && $pickNotes !== ''):
-    /** @var string $pickNotesEscaped */
     $pickNotesEscaped = HtmlSanitizer::safeHtmlOutput($pickNotes);
 ?>
             <div class="draft-picks-list__notes"><?= $pickNotesEscaped ?></div>
@@ -415,7 +404,6 @@ class TradingView implements TradingViewInterface
     <tbody>
 <?php for ($z = 0; $z < $seasonsToDisplay; $z++):
     $yearLabel = ($displayEndingYear + $z - 1) . '-' . ($displayEndingYear + $z);
-    /** @var string $yearLabelEscaped */
     $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
 ?>
     <tr>
@@ -443,7 +431,6 @@ class TradingView implements TradingViewInterface
     <tbody>
 <?php for ($i = $cashStartYear; $i <= $cashEndYear; $i++):
     $yearLabel = ($seasonEndingYear - 2 + $i) . '-' . ($seasonEndingYear - 1 + $i);
-    /** @var string $yearLabelEscaped */
     $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
 ?>
     <?php
@@ -476,7 +463,6 @@ class TradingView implements TradingViewInterface
      */
     private function renderTradeOfferCard(int $offerId, array $offer, string $userTeam): string
     {
-        /** @var string $oppositeTeam */
         $oppositeTeam = HtmlSanitizer::safeHtmlOutput($offer['oppositeTeam']);
 
         ob_start();
@@ -504,12 +490,10 @@ class TradingView implements TradingViewInterface
     <div class="trade-offer-items">
 <?php foreach ($offer['items'] as $item): ?>
     <?php if ($item['description'] !== ''):
-        /** @var string $descriptionEscaped */
         $descriptionEscaped = HtmlSanitizer::safeHtmlOutput($item['description']);
     ?>
         <p><?= $descriptionEscaped ?></p>
         <?php if ($item['notes'] !== null):
-            /** @var string $notesEscaped */
             $notesEscaped = HtmlSanitizer::safeHtmlOutput($item['notes']);
         ?>
             <p style="margin-left: 1rem; font-style: italic; color: var(--gray-600);"><?= $notesEscaped ?></p>

@@ -163,13 +163,9 @@ class TeamComponentsView implements TeamComponentsViewInterface
         $wins = $powerData['wins'];
         $losses = $powerData['losses'];
         $divGB = $powerData['divGB'] ?? 0.0;
-        /** @var string $division */
         $division = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['division']);
-        /** @var string $conference */
         $conference = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['conference']);
-        /** @var string $homeRecord */
         $homeRecord = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['homeRecord']);
-        /** @var string $awayRecord */
         $awayRecord = \Utilities\HtmlSanitizer::safeHtmlOutput($powerData['awayRecord']);
         $last_win = $powerData['last_win'];
         $last_loss = $powerData['last_loss'];
@@ -193,14 +189,11 @@ class TeamComponentsView implements TeamComponentsViewInterface
             }
         }
 
-        /** @var string $teamName */
         $teamName = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
-        /** @var string $arena */
         $arena = \Utilities\HtmlSanitizer::safeHtmlOutput($team->arena);
 
         $franchiseSeasons = $this->repository->getFranchiseSeasons($team->teamID);
         $fkaRaw = $this->buildFormerlyKnownAs($franchiseSeasons, $team->city, $team->name);
-        /** @var string $fka */
         $fka = $fkaRaw !== null ? \Utilities\HtmlSanitizer::safeHtmlOutput($fkaRaw) : '';
 
         $output = '<div class="team-info-list">'
@@ -337,11 +330,8 @@ class TeamComponentsView implements TeamComponentsViewInterface
             $draftPick = new \Draft\DraftPick($draftPickRow);
 
             $draftPickOriginalTeamID = $teamsArray[$draftPick->originalTeam]->teamID;
-            /** @var string $draftPickOriginalTeamCity */
             $draftPickOriginalTeamCity = \Utilities\HtmlSanitizer::safeHtmlOutput($teamsArray[$draftPick->originalTeam]->city);
-            /** @var string $draftPickYear */
             $draftPickYear = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $draftPick->year);
-            /** @var string $draftPickOriginalTeamName */
             $draftPickOriginalTeamName = \Utilities\HtmlSanitizer::safeHtmlOutput($draftPick->originalTeam);
             $draftPickRound = $draftPick->round;
 
@@ -352,7 +342,6 @@ class TeamComponentsView implements TeamComponentsViewInterface
                 . "<a href=\"modules.php?name=Team&amp;op=team&amp;teamID=$draftPickOriginalTeamID\">$draftPickYear R$draftPickRound $draftPickOriginalTeamCity $draftPickOriginalTeamName</a>";
 
             if ($draftPick->notes !== null && $draftPick->notes !== '') {
-                /** @var string $notesSafe */
                 $notesSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($draftPick->notes);
                 $tableDraftPicks .= '<div class="draft-picks-list__notes">'
                     . $notesSafe . '</div>';
@@ -402,7 +391,6 @@ class TeamComponentsView implements TeamComponentsViewInterface
             $heatHistory,
             $team->teamID,
             static function (array $record): string {
-                /** @var string $name */
                 $name = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
                 return $record['year'] . ' ' . $name;
             },
@@ -432,7 +420,6 @@ class TeamComponentsView implements TeamComponentsViewInterface
 
         foreach ($playoffResults as $playoff) {
             $round = $playoff['round'];
-            /** @var string $year */
             $year = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $playoff['year']);
             $winner = $playoff['winner'];
             $loser = $playoff['loser'];
@@ -449,9 +436,7 @@ class TeamComponentsView implements TeamComponentsViewInterface
                 continue;
             }
 
-            /** @var string $winnerSafe */
             $winnerSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($playoff['winner_name_that_year']);
-            /** @var string $loserSafe */
             $loserSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($playoff['loser_name_that_year']);
 
             $winnerGames = $playoff['winner_games'];
@@ -518,7 +503,6 @@ class TeamComponentsView implements TeamComponentsViewInterface
             static function (array $record): string {
                 $yearwl = (string) $record['year'];
                 $prevYear = (int) $yearwl - 1;
-                /** @var string $name */
                 $name = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
                 return $prevYear . '-' . $yearwl . ' ' . $name;
             },
@@ -567,7 +551,6 @@ class TeamComponentsView implements TeamComponentsViewInterface
             $start = $tenure['start_season_year'];
             $end = $tenure['end_season_year'];
             $endLabel = $end === null ? 'Present' : (string) $end;
-            /** @var string $username */
             $username = \Utilities\HtmlSanitizer::safeHtmlOutput($tenure['gm_username']);
             $output .= "<li><span class=\"award-year\">$start-$endLabel</span> $username</li>";
         }
@@ -592,7 +575,6 @@ class TeamComponentsView implements TeamComponentsViewInterface
 
         foreach ($awards as $award) {
             $year = $award['year'];
-            /** @var string $awardName */
             $awardName = \Utilities\HtmlSanitizer::safeHtmlOutput($award['Award']);
             $output .= "<li><span class=\"award-year\">$year</span> $awardName</li>";
         }
@@ -617,7 +599,6 @@ class TeamComponentsView implements TeamComponentsViewInterface
 
         foreach ($awards as $record) {
             $year = $record['year'];
-            /** @var string $sanitizedAward */
             $sanitizedAward = \Utilities\HtmlSanitizer::safeHtmlOutput($record['Award']);
             $output .= "<li><span class=\"award-year\">$year</span> $sanitizedAward</li>";
         }

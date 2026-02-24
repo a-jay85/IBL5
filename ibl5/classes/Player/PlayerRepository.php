@@ -12,10 +12,14 @@ use Player\Contracts\PlayerRepositoryInterface;
  *
  * Extends BaseMysqliRepository for standardized prepared statement handling.
  *
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type AwardRow from PlayerRepositoryInterface
+ * @phpstan-import-type PlayerNewsRow from PlayerRepositoryInterface
+ * @phpstan-import-type OneOnOneWinRow from PlayerRepositoryInterface
+ * @phpstan-import-type OneOnOneLossRow from PlayerRepositoryInterface
+ *
  * @see PlayerRepositoryInterface For method contracts
  * @see BaseMysqliRepository For base class documentation and error codes
- *
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryInterface
 {
@@ -476,10 +480,12 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
 
     /**
      * @see PlayerRepositoryInterface::getAwards()
-     * @return array<int, array<string, mixed>>
+     *
+     * @return list<AwardRow>
      */
     public function getAwards(string $playerName): array
     {
+        /** @var list<AwardRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_awards WHERE name = ? ORDER BY year ASC",
             "s",
@@ -503,14 +509,17 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
 
     /**
      * Get news articles mentioning a player
-     * 
+     *
      * @see PlayerRepositoryInterface::getPlayerNews()
+     *
+     * @return list<PlayerNewsRow>
      */
     public function getPlayerNews(string $playerName): array
     {
         $searchPattern = '%' . $playerName . '%';
         $searchPatternII = '%' . $playerName . ' II%';
-        
+
+        /** @var list<PlayerNewsRow> */
         return $this->fetchAll(
             "SELECT sid, title, time FROM nuke_stories 
              WHERE (hometext LIKE ? OR bodytext LIKE ?) 
@@ -526,11 +535,14 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
 
     /**
      * Get one-on-one game wins for a player
-     * 
+     *
      * @see PlayerRepositoryInterface::getOneOnOneWins()
+     *
+     * @return list<OneOnOneWinRow>
      */
     public function getOneOnOneWins(string $playerName): array
     {
+        /** @var list<OneOnOneWinRow> */
         return $this->fetchAll(
             "SELECT o.gameid, o.winner, o.loser, o.winscore, o.lossscore, p.pid as loser_pid 
              FROM ibl_one_on_one o 
@@ -546,9 +558,12 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      * Get one-on-one game losses for a player
      *
      * @see PlayerRepositoryInterface::getOneOnOneLosses()
+     *
+     * @return list<OneOnOneLossRow>
      */
     public function getOneOnOneLosses(string $playerName): array
     {
+        /** @var list<OneOnOneLossRow> */
         return $this->fetchAll(
             "SELECT o.gameid, o.winner, o.loser, o.winscore, o.lossscore, p.pid as winner_pid
              FROM ibl_one_on_one o

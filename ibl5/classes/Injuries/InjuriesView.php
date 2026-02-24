@@ -108,7 +108,6 @@ class InjuriesView implements InjuriesViewInterface
     {
         $playerID = $player['playerID'];
         $teamID = $player['teamID'];
-        /** @var string $position */
         $position = HtmlSanitizer::safeHtmlOutput($player['position']);
         $daysRemaining = $player['daysRemaining'];
         $returnDate = $player['returnDate'] ?? '';

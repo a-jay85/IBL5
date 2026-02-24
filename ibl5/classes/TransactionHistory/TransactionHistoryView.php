@@ -71,7 +71,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             <select name="cat">
                 <option value="0">All Categories</option>
                 <?php foreach ($categories as $catId => $catName): ?>
-                    <option value="<?= $catId ?>"<?= $selectedCategory === $catId ? ' selected' : '' ?>><?php /** @var string $catNameSafe */ $catNameSafe = HtmlSanitizer::safeHtmlOutput($catName); echo $catNameSafe; ?></option>
+                    <option value="<?= $catId ?>"<?= $selectedCategory === $catId ? ' selected' : '' ?>><?php $catNameSafe = HtmlSanitizer::safeHtmlOutput($catName); echo $catNameSafe; ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -89,7 +89,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             <select name="month">
                 <option value="0">All Months</option>
                 <?php foreach ($monthNames as $num => $name): ?>
-                    <option value="<?= $num ?>"<?= $selectedMonth === $num ? ' selected' : '' ?>><?php /** @var string $nameSafe */ $nameSafe = HtmlSanitizer::safeHtmlOutput($name); echo $nameSafe; ?></option>
+                    <option value="<?= $num ?>"<?= $selectedMonth === $num ? ' selected' : '' ?>><?php $nameSafe = HtmlSanitizer::safeHtmlOutput($name); echo $nameSafe; ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -126,11 +126,8 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             $catName = $categories[$catId] ?? 'Unknown';
             $timestamp = strtotime($row['time']);
             $date = date('M j, Y', $timestamp !== false ? $timestamp : 0);
-            /** @var string $dateSafe */
             $dateSafe = HtmlSanitizer::safeHtmlOutput($date);
-            /** @var string $catNameSafe */
             $catNameSafe = HtmlSanitizer::safeHtmlOutput($catName);
-            /** @var string $titleSafe */
             $titleSafe = HtmlSanitizer::safeHtmlOutput($row['title']);
             ?>
             <tr>

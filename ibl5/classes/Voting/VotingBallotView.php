@@ -34,9 +34,7 @@ class VotingBallotView implements VotingBallotViewInterface
         $isASG = ($phase === 'Regular Season');
         $formName = $isASG ? 'ASGVote' : 'EOYVote';
 
-        /** @var string $safeFormAction */
         $safeFormAction = HtmlSanitizer::safeHtmlOutput($formAction);
-        /** @var string $safeVoterTeam */
         $safeVoterTeam = HtmlSanitizer::safeHtmlOutput($voterTeamName);
 
         $html = "<form name=\"{$formName}\" method=\"post\" action=\"{$safeFormAction}\">";
@@ -80,9 +78,7 @@ function ShowAndHide{$categoryCode}() {
      */
     private function renderCategoryHeader(string $code, string $title, string $instruction): string
     {
-        /** @var string $safeTitle */
         $safeTitle = HtmlSanitizer::safeHtmlOutput($title);
-        /** @var string $safeInstruction */
         $safeInstruction = HtmlSanitizer::safeHtmlOutput($instruction);
 
         return "<div class=\"voting-category\" onclick=\"ShowAndHide{$code}()\">"
@@ -167,9 +163,7 @@ function ShowAndHide{$categoryCode}() {
         /** @var string $teamName */
         $teamName = $candidate['teamName'] ?? '';
 
-        /** @var string $safeName */
         $safeName = HtmlSanitizer::safeHtmlOutput($name);
-        /** @var string $safeTeamName */
         $safeTeamName = HtmlSanitizer::safeHtmlOutput($teamName);
         $safeValue = $safeName . ', ' . $safeTeamName;
 

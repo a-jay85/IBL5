@@ -70,7 +70,6 @@ class CardBaseStyles
         
         $name = $playerData['name'];
         $position = $playerData['position'];
-        /** @var string $imageUrl */
         $imageUrl = HtmlSanitizer::safeHtmlOutput($playerData['imageUrl']);
         $teamID = $playerData['teamID'];
         $teamName = $playerData['teamName'];
@@ -147,27 +146,16 @@ HTML;
      */
     public static function preparePlayerData(Player $player, int $playerID): array
     {
-        /** @var string $name */
         $name = HtmlSanitizer::safeHtmlOutput($player->name);
-        /** @var string $nickname */
         $nickname = HtmlSanitizer::safeHtmlOutput($player->nickname ?? '');
-        /** @var string $position */
         $position = HtmlSanitizer::safeHtmlOutput($player->position);
-        /** @var string $teamName */
         $teamName = HtmlSanitizer::safeHtmlOutput($player->teamName);
-        /** @var string $age */
         $age = HtmlSanitizer::safeHtmlOutput((string) ($player->age ?? 0));
-        /** @var string $height */
         $height = HtmlSanitizer::safeHtmlOutput(($player->heightFeet ?? 0) . "'" . ($player->heightInches ?? 0) . '"');
-        /** @var string $weight */
         $weight = HtmlSanitizer::safeHtmlOutput((string) ($player->weightPounds ?? 0));
-        /** @var string $college */
         $college = HtmlSanitizer::safeHtmlOutput($player->collegeName ?? 'N/A');
-        /** @var string $draftRound */
         $draftRound = HtmlSanitizer::safeHtmlOutput((string) ($player->draftRound ?? 0));
-        /** @var string $draftPick */
         $draftPick = HtmlSanitizer::safeHtmlOutput((string) ($player->draftPickNumber ?? 0));
-        /** @var string $draftTeam */
         $draftTeam = HtmlSanitizer::safeHtmlOutput($player->draftTeamOriginalName ?? '');
 
         return [

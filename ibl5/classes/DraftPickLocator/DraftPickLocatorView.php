@@ -66,7 +66,6 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
         $html .= '<tr><th rowspan="2" class="sticky-col sticky-corner">Team</th>';
         for ($i = 0; $i < 6; $i++) {
             $year = $currentEndingYear + $i;
-            /** @var string $safeYear */
             $safeYear = HtmlSanitizer::safeHtmlOutput((string)$year);
             $html .= '<th colspan="2">' . $safeYear . '</th>';
         }
@@ -146,9 +145,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
                 $html .= '<td class="draft-pick-own">';
             } else {
                 if ($ownerInfo !== null) {
-                    /** @var string $bgColor */
                     $bgColor = HtmlSanitizer::safeHtmlOutput($ownerInfo['color1']);
-                    /** @var string $textColor */
                     $textColor = HtmlSanitizer::safeHtmlOutput($ownerInfo['color2']);
                     $html .= '<td class="draft-pick-traded" style="background-color: #' . $bgColor . '; color: #' . $textColor . ';">';
                 } else {
@@ -156,7 +153,6 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
                 }
             }
 
-            /** @var string $escapedOwner */
             $escapedOwner = HtmlSanitizer::safeHtmlOutput($ownerOfPick);
             if ($ownerInfo !== null) {
                 $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $ownerInfo['teamId'] . '" style="color: inherit; text-decoration: none;">';

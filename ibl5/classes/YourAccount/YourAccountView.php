@@ -143,7 +143,7 @@ class YourAccountView
         <div class="ibl-card__body">
             <?php if ($error !== null): ?>
                 <div class="ibl-alert ibl-alert--error">
-                    <?php /** @var string $sanitizedError */ $sanitizedError = \Utilities\HtmlSanitizer::safeHtmlOutput($error); ?>
+                    <?php $sanitizedError = \Utilities\HtmlSanitizer::safeHtmlOutput($error); ?>
                     <?= nl2br($sanitizedError) ?>
                 </div>
             <?php endif; ?>
@@ -271,7 +271,6 @@ class YourAccountView
      */
     public function renderRegistrationCompletePage(string $siteName): string
     {
-        /** @var string $safeSiteName */
         $safeSiteName = HtmlSanitizer::safeHtmlOutput($siteName);
 
         ob_start();
@@ -305,7 +304,6 @@ class YourAccountView
      */
     public function renderRegistrationErrorPage(string $error): string
     {
-        /** @var string $safeError */
         $safeError = HtmlSanitizer::safeHtmlOutput($error);
 
         ob_start();
@@ -409,9 +407,7 @@ class YourAccountView
      */
     public function renderResetPasswordPage(string $selector, string $token): string
     {
-        /** @var string $safeSelector */
         $safeSelector = HtmlSanitizer::safeHtmlOutput($selector);
-        /** @var string $safeToken */
         $safeToken = HtmlSanitizer::safeHtmlOutput($token);
 
         ob_start();
@@ -493,7 +489,6 @@ class YourAccountView
      */
     public function renderPasswordResetErrorPage(string $error): string
     {
-        /** @var string $safeError */
         $safeError = HtmlSanitizer::safeHtmlOutput($error);
 
         ob_start();
@@ -523,7 +518,6 @@ class YourAccountView
      */
     public function renderActivationSuccessPage(string $username): string
     {
-        /** @var string $safeUsername */
         $safeUsername = HtmlSanitizer::safeHtmlOutput($username);
 
         ob_start();

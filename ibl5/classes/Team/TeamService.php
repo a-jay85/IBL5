@@ -343,7 +343,7 @@ class TeamService implements TeamServiceInterface
      *
      * @return array<string, array<string, string>>
      */
-    private function buildDropdownGroups(\Season $season): array
+    public function buildDropdownGroups(\Season $season): array
     {
         $groups = [];
 

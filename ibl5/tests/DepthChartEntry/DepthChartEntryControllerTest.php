@@ -100,9 +100,40 @@ class DepthChartEntryControllerTest extends TestCase
     {
         $controller1 = new DepthChartEntryController($this->mockMysqliDb);
         $controller2 = new DepthChartEntryController($this->mockMysqliDb);
-        
+
         $this->assertInstanceOf(DepthChartEntryController::class, $controller1);
         $this->assertInstanceOf(DepthChartEntryController::class, $controller2);
         $this->assertNotSame($controller1, $controller2);
+    }
+
+    // ============================================
+    // getTableOutput() SIGNATURE TESTS
+    // ============================================
+
+    public function testGetTableOutputAcceptsSplitParameter(): void
+    {
+        $method = new \ReflectionMethod(DepthChartEntryController::class, 'getTableOutput');
+        $params = $method->getParameters();
+
+        $this->assertCount(3, $params);
+        $this->assertSame('teamID', $params[0]->getName());
+        $this->assertSame('display', $params[1]->getName());
+        $this->assertSame('split', $params[2]->getName());
+        $this->assertTrue($params[2]->isOptional());
+        $this->assertTrue($params[2]->allowsNull());
+        $this->assertNull($params[2]->getDefaultValue());
+    }
+
+    public function testInterfaceDeclaresGetTableOutputWithSplitParameter(): void
+    {
+        $method = new \ReflectionMethod(
+            \DepthChartEntry\Contracts\DepthChartEntryControllerInterface::class,
+            'getTableOutput'
+        );
+        $params = $method->getParameters();
+
+        $this->assertCount(3, $params);
+        $this->assertSame('split', $params[2]->getName());
+        $this->assertTrue($params[2]->isOptional());
     }
 }

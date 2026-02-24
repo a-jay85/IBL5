@@ -98,7 +98,6 @@ class PlayerImageHelper implements PlayerImageHelperInterface
     public static function renderPlayerLink(int $playerID, string $rawName): string
     {
         $resolved = self::resolvePlayerDisplay($playerID, $rawName);
-        /** @var string $safeName */
         $safeName = \Utilities\HtmlSanitizer::safeHtmlOutput($resolved['name']);
 
         return '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'

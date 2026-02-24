@@ -228,7 +228,6 @@ class NavigationView
                 <input type="hidden" name="op" value="login">
                 <?php
                 $currentQuery = parse_url($this->requestUri ?? '', PHP_URL_QUERY);
-                /** @var string $safeQuery */
                 $safeQuery = HtmlSanitizer::safeHtmlOutput(is_string($currentQuery) ? $currentQuery : '');
                 ?>
                 <input type="hidden" name="redirect_query" value="<?= $safeQuery ?>">
@@ -319,7 +318,6 @@ class NavigationView
                 <input type="hidden" name="op" value="login">
                 <?php
                 $mobileCurrentQuery = parse_url($this->requestUri ?? '', PHP_URL_QUERY);
-                /** @var string $safeMobileQuery */
                 $safeMobileQuery = HtmlSanitizer::safeHtmlOutput(is_string($mobileCurrentQuery) ? $mobileCurrentQuery : '');
                 ?>
                 <input type="hidden" name="redirect_query" value="<?= $safeMobileQuery ?>">
@@ -402,16 +400,13 @@ class NavigationView
                 . '</span>';
         }
 
-        /** @var string $label */
         $label = HtmlSanitizer::safeHtmlOutput($link['label'] ?? '');
-        /** @var string $url */
         $url = HtmlSanitizer::safeHtmlOutput($link['url'] ?? '');
         $external = $link['external'] ?? false;
         $badge = $link['badge'] ?? null;
 
         $target = $external ? ' target="_blank" rel="noopener noreferrer"' : '';
         $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
-        /** @var string $safeBadge */
         $safeBadge = $badge !== null ? HtmlSanitizer::safeHtmlOutput($badge) : '';
         $badgeHtml = $badge !== null ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2 tracking-wide">' . $safeBadge . '</span>' : '';
 
@@ -442,7 +437,6 @@ class NavigationView
         if ($icon !== '') {
             $html .= '<span class="text-accent-500 group-hover:text-accent-400 transition-colors">' . $icon . '</span>';
         }
-        /** @var string $safeTitle */
         $safeTitle = HtmlSanitizer::safeHtmlOutput($title);
         $html .= '<span>' . $safeTitle . '</span>';
         $html .= '<svg class="w-3 h-3 opacity-50 group-hover:opacity-100 transition-all duration-200 group-hover:translate-y-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
@@ -515,7 +509,6 @@ class NavigationView
         if ($icon !== '') {
             $html .= '<span class="text-accent-500">' . $icon . '</span>';
         }
-        /** @var string $safeMobileTitle */
         $safeMobileTitle = HtmlSanitizer::safeHtmlOutput($title);
         $html .= '<span class="font-display text-lg font-semibold">' . $safeMobileTitle . '</span>';
         $html .= '</span>';
@@ -539,16 +532,13 @@ class NavigationView
                 continue;
             }
 
-            /** @var string $label */
             $label = HtmlSanitizer::safeHtmlOutput($link['label'] ?? '');
-            /** @var string $url */
             $url = HtmlSanitizer::safeHtmlOutput($link['url'] ?? '');
             $external = $link['external'] ?? false;
             $badge = $link['badge'] ?? null;
 
             $target = $external ? ' target="_blank" rel="noopener noreferrer"' : '';
             $externalIcon = $external ? ' <svg class="w-3 h-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' : '';
-            /** @var string $safeMobileBadge */
             $safeMobileBadge = $badge !== null ? HtmlSanitizer::safeHtmlOutput($badge) : '';
             $badgeHtml = $badge !== null ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2">' . $safeMobileBadge . '</span>' : '';
 
@@ -617,7 +607,6 @@ class NavigationView
         $conferenceOrder = ['Western', 'Eastern'];
         foreach ($conferenceOrder as $conference) {
             $html .= '<div>';
-            /** @var string $safeConference */
             $safeConference = HtmlSanitizer::safeHtmlOutput($conference);
             $html .= '<div class="uppercase font-display text-xs tracking-wider text-accent-400 mb-3">' . $safeConference . ' Conference</div>';
 
@@ -628,12 +617,10 @@ class NavigationView
                 if ($divIndex > 0) {
                     $html .= '<div class="mt-3"></div>';
                 }
-                /** @var string $safeDivision */
                 $safeDivision = HtmlSanitizer::safeHtmlOutput($division);
                 $html .= '<div class="uppercase font-display text-xs tracking-wider text-gray-400 mb-1.5">' . $safeDivision . '</div>';
                 foreach ($teams as $team) {
                     $teamId = $team['teamid'];
-                    /** @var string $teamName */
                     $teamName = HtmlSanitizer::safeHtmlOutput($team['team_city'] . ' ' . $team['team_name']);
                     $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="nav-dropdown-item flex items-center gap-2 px-2 py-1.5 text-sm font-display text-gray-300 hover:text-white hover:bg-white/5 rounded transition-all duration-150">';
                     $html .= '<span class="inline-flex items-center justify-center" style="width:27px;height:27px;flex-shrink:0"><img src="images/logo/new' . $teamId . '.png" alt="" style="max-height:27px;max-width:27px;width:auto;height:auto" loading="lazy"></span>';
@@ -701,7 +688,6 @@ class NavigationView
         // Conference -> Division -> Teams
         foreach ($conferenceOrder as $conference) {
             $html .= '<div class="px-5 pt-3 pb-1">';
-            /** @var string $safeMobileConf */
             $safeMobileConf = HtmlSanitizer::safeHtmlOutput($conference);
             $html .= '<div class="uppercase font-display text-xs tracking-wider text-accent-400">' . $safeMobileConf . ' Conference</div>';
             $html .= '</div>';
@@ -716,13 +702,11 @@ class NavigationView
             }
             foreach ($divisions as $division => $teams) {
                 $html .= '<div class="px-5 pt-2 pb-1">';
-                /** @var string $safeMobileDiv */
                 $safeMobileDiv = HtmlSanitizer::safeHtmlOutput($division);
                 $html .= '<div class="uppercase font-display text-xs tracking-wider text-gray-400">' . $safeMobileDiv . '</div>';
                 $html .= '</div>';
                 foreach ($teams as $team) {
                     $teamId = $team['teamid'];
-                    /** @var string $teamName */
                     $teamName = HtmlSanitizer::safeHtmlOutput($team['team_city'] . ' ' . $team['team_name']);
                     $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId . '" class="flex items-center gap-2.5 px-5 py-2.5 pl-10 text-base font-display text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">';
                     $html .= '<span class="inline-flex items-center justify-center" style="width:27px;height:27px;flex-shrink:0"><img src="images/logo/new' . $teamId . '.png" alt="" style="max-height:27px;max-width:27px;width:auto;height:auto" loading="lazy"></span>';
@@ -754,9 +738,7 @@ class NavigationView
             $title = 'Switch to production';
         }
 
-        /** @var string $safeUrl */
         $safeUrl = HtmlSanitizer::safeHtmlOutput($url);
-        /** @var string $safeTitle */
         $safeTitle = HtmlSanitizer::safeHtmlOutput($title);
 
         return '<a href="' . $safeUrl . '" class="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center rounded-full opacity-40 hover:opacity-100 transition-opacity duration-200 overflow-visible" title="' . $safeTitle . '" style="color: #0EA5E9; contain: layout;">'
@@ -894,7 +876,7 @@ class NavigationView
                             </div>
                             <div>
                                 <div class="text-xs text-gray-500 uppercase tracking-wide">Welcome back</div>
-                                <?php /** @var string $safeUsername */ $safeUsername = HtmlSanitizer::safeHtmlOutput($this->username); ?>
+                                <?php $safeUsername = HtmlSanitizer::safeHtmlOutput($this->username); ?>
                                 <div class="text-white font-semibold"><?= $safeUsername ?></div>
                             </div>
                         </div>

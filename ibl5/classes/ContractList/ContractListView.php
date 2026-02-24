@@ -84,9 +84,7 @@ class ContractListView implements ContractListViewInterface
         foreach ($contracts as $contract) {
             $pid = $contract['pid'];
             $tid = $contract['tid'];
-            /** @var string $pos */
             $pos = HtmlSanitizer::safeHtmlOutput($contract['pos']);
-            /** @var string $bird */
             $bird = HtmlSanitizer::safeHtmlOutput($contract['bird']);
             $con1 = $contract['con1'];
             $con2 = $contract['con2'];

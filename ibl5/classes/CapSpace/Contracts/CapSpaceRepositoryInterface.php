@@ -19,7 +19,7 @@ interface CapSpaceRepositoryInterface
     /**
      * Get all teams for salary cap display
      *
-     * @return array<int, array<string, mixed>> Array of team data
+     * @return list<TeamInfoRow> Team data ordered by teamid
      */
     public function getAllTeams(): array;
 
@@ -27,7 +27,7 @@ interface CapSpaceRepositoryInterface
      * Get players under contract for a team after current season
      *
      * @param int $teamId Team ID
-     * @return array<int, array<string, mixed>> Array of contract data
+     * @return list<ContractRow> Contract year data for players with remaining years
      */
     public function getPlayersUnderContractAfterSeason(int $teamId): array;
 }

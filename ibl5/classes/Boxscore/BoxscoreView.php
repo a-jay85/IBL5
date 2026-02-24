@@ -48,13 +48,13 @@ class BoxscoreView
         <?php if ($result['messages'] !== []): ?>
         <div class="sco-log">
             <?php foreach ($result['messages'] as $message): ?>
-            <?php /** @var string $safeMessage */ $safeMessage = HtmlSanitizer::safeHtmlOutput($message); ?>
+            <?php $safeMessage = HtmlSanitizer::safeHtmlOutput($message); ?>
             <p class="sco-log__message"><?= $safeMessage ?></p>
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
         <?php if (isset($result['error']) && $result['error'] !== ''): ?>
-        <?php /** @var string $safeError */ $safeError = HtmlSanitizer::safeHtmlOutput($result['error']); ?>
+        <?php $safeError = HtmlSanitizer::safeHtmlOutput($result['error']); ?>
         <div class="ibl-alert ibl-alert--error"><strong>Error:</strong> <?= $safeError ?></div>
         <?php endif; ?>
     </div>
@@ -82,7 +82,7 @@ class BoxscoreView
     <div class="ibl-card__body">
         <div class="sco-log">
             <?php foreach ($result['messages'] as $message): ?>
-            <?php /** @var string $safeMessage */ $safeMessage = HtmlSanitizer::safeHtmlOutput($message); ?>
+            <?php $safeMessage = HtmlSanitizer::safeHtmlOutput($message); ?>
             <p class="sco-log__message"><?= $safeMessage ?></p>
             <?php endforeach; ?>
         </div>
@@ -118,12 +118,12 @@ class BoxscoreView
         <div class="all-star-rename" data-record-id="<?= (int) $entry['id'] ?>">
             <h3 class="all-star-rename__heading">
                 <?= (int) $entry['seasonYear'] ?> All-Star Game &mdash;
-                <?php /** @var string $safeLabel */ $safeLabel = HtmlSanitizer::safeHtmlOutput($entry['teamLabel']); ?>
+                <?php $safeLabel = HtmlSanitizer::safeHtmlOutput($entry['teamLabel']); ?>
                 <?= $safeLabel ?>
             </h3>
             <div class="all-star-rename__players">
                 <?php foreach ($entry['players'] as $player): ?>
-                <?php /** @var string $safeName */ $safeName = HtmlSanitizer::safeHtmlOutput($player); ?>
+                <?php $safeName = HtmlSanitizer::safeHtmlOutput($player); ?>
                 <span class="all-star-rename__chip"><?= $safeName ?></span>
                 <?php endforeach; ?>
             </div>

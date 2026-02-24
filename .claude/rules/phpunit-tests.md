@@ -6,16 +6,16 @@ paths: ibl5/tests/**/*.php
 
 ## PHPUnit 13+ Syntax
 ```bash
-# ✅ CORRECT commands
+# CORRECT commands
 vendor/bin/phpunit tests/Module/
 vendor/bin/phpunit --filter testMethodName
 vendor/bin/phpunit -c phpunit.ci.xml        # Use specific config
 vendor/bin/phpunit --display-all-issues     # Show ALL issues (deprecations, warnings, etc.)
 
-# 💾 Token-saving: When just checking if tests pass (not debugging)
+# Token-saving: When just checking if tests pass (not debugging)
 vendor/bin/phpunit | tail -n 3              # Show only final summary lines
 
-# ❌ WRONG - These options don't exist in PHPUnit 13.x
+# WRONG - These options don't exist in PHPUnit 13.x
 vendor/bin/phpunit -v
 vendor/bin/phpunit --verbose
 ```
@@ -49,10 +49,10 @@ class ModuleServiceTest extends TestCase
     {
         // Arrange
         $input = ['key' => 'value'];
-        
+
         // Act
         $result = $this->service->publicMethod($input);
-        
+
         // Assert
         $this->assertTrue($result->isValid());
     }
@@ -76,7 +76,7 @@ class ModuleServiceTest extends TestCase
 }
 ```
 
-## ✅ DO:
+## DO:
 - Test behaviors through public APIs only
 - Use descriptive test names
 - Test one behavior per test
@@ -88,16 +88,16 @@ class ModuleServiceTest extends TestCase
 Use `createStub()` when a test double only provides canned return values (no `expects()` calls). Use `createMock()` only when you need to verify interactions with `expects()`. PHPUnit emits a notice when a mock object has no configured expectations.
 
 ```php
-// ✅ No expectations — use createStub()
+// No expectations — use createStub()
 $repo = $this->createStub(RepositoryInterface::class);
 $repo->method('findById')->willReturn($entity);
 
-// ✅ Has expectations — use createMock()
+// Has expectations — use createMock()
 $repo = $this->createMock(RepositoryInterface::class);
 $repo->expects($this->once())->method('save')->with($entity);
 ```
 
-## ❌ DON'T:
+## DON'T:
 - **NEVER** use `createMock()` when no `expects()` calls are configured — use `createStub()` instead
 - **NEVER** use `ReflectionClass` for private methods
 - **NEVER** use `markTestSkipped()` - delete instead
@@ -110,6 +110,46 @@ Register in `ibl5/phpunit.xml`:
     <directory>tests/ModuleName</directory>
 </testsuite>
 ```
+
+## Integration Test Setup
+
+```php
+// Integration test setup
+class MyTest extends IntegrationTestCase {
+    protected function setUp(): void {
+        parent::setUp();  // Sets up $this->mockDb
+    }
+}
+
+// Test data factory
+$player = TestDataFactory::createPlayer(['pid' => 1, 'name' => 'Test']);
+$team = TestDataFactory::createTeam(['team_name' => 'Miami']);
+$season = TestDataFactory::createSeason(['Phase' => 'Regular Season']);
+
+// Assert queries
+$this->assertQueryExecuted('UPDATE ibl_plr');
+$this->assertQueryNotExecuted('DELETE');
+```
+
+### MockDatabase returns the SAME data for ALL queries
+
+`MockDatabase::setMockData()` sets one shared data pool. Every `SELECT` query (via `sql_query()` -> `MockPreparedStatement::execute()`) returns the same `mockData` rows. This means:
+
+**Problem:** When a controller calls both `countX()` (runs `SELECT COUNT(*) AS total`) and `getX()` (runs `SELECT * FROM ...`), both queries get the same mock rows. The COUNT query's `fetchOne()` returns the first data row (not a `{total: N}` row), and `$row['total']` fails with "Undefined array key" -> returns null -> `TypeError` on the `: int` return type.
+
+**Fix:** Include `'total' => N` in mock data rows so the COUNT query finds it:
+```php
+$this->mockDb->setMockData([
+    [
+        'uuid' => 'test-uuid',
+        'name' => 'Test',
+        // ... domain data ...
+        'total' => 1, // Mock COUNT(*) result reuses same data
+    ],
+]);
+```
+
+**When this matters:** Any controller test where the controller calls both a `count*()` method and a `get*()` / `fetch*()` method on the same repository (i.e., paginated list controllers like `PlayerListController`, `GameListController`, `LeadersController`). Unpaginated controllers (e.g., `StandingsController`, `InjuriesController`) don't call count methods and aren't affected.
 
 ## Completion Criteria
 

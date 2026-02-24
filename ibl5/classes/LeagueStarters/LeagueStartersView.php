@@ -66,7 +66,6 @@ class LeagueStartersView implements LeagueStartersViewInterface
         $html .= '<div class="space-y-4">';
 
         foreach (self::POSITION_LABELS as $position => $label) {
-            /** @var string $labelSafe */
             $labelSafe = HtmlSanitizer::safeHtmlOutput($label);
             $html .= '<div>';
             $html .= '<h2 class="ibl-table-title">' . $labelSafe . '</h2>';

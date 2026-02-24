@@ -72,7 +72,6 @@ class PlayerOlympicAveragesView implements PlayerOlympicAveragesViewInterface
         foreach ($olympicsStats as $row) {
             /** @var array{team: string, year: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $row */
             $year = $row['year'];
-            /** @var string $team */
             $team = HtmlSanitizer::safeHtmlOutput($row['team']);
             $gm = $row['games'];
 

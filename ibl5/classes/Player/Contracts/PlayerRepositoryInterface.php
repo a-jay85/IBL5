@@ -13,6 +13,11 @@ use Player\PlayerData;
  * Handles all data transformation from raw database rows to PlayerData objects.
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ *
+ * @phpstan-type AwardRow array{year: int, name: string, Award: string}
+ * @phpstan-type PlayerNewsRow array{sid: int, title: string, time: string}
+ * @phpstan-type OneOnOneWinRow array{gameid: int, winner: string, loser: string, winscore: int, lossscore: int, loser_pid: ?int}
+ * @phpstan-type OneOnOneLossRow array{gameid: int, winner: string, loser: string, winscore: int, lossscore: int, winner_pid: ?int}
  */
 interface PlayerRepositoryInterface
 {
@@ -121,9 +126,9 @@ interface PlayerRepositoryInterface
 
     /**
      * Get all awards for a player ordered by year
-     * 
+     *
      * @param string $playerName Player name (exact match)
-     * @return array<array<string, mixed>> Array of award records ordered by year ASC
+     * @return list<AwardRow> Award records ordered by year ASC
      */
     public function getAwards(string $playerName): array;
 
@@ -161,20 +166,20 @@ interface PlayerRepositoryInterface
 
     /**
      * Get news articles mentioning a player
-     * 
+     *
      * Searches nuke_stories for articles mentioning the player name.
      * Excludes articles that mention "player II" to avoid false matches.
-     * 
+     *
      * @param string $playerName Player name (exact match)
-     * @return array<array<string, mixed>> Array of article records (sid, title, time) ordered by time DESC
+     * @return list<PlayerNewsRow> Article records (sid, title, time) ordered by time DESC
      */
     public function getPlayerNews(string $playerName): array;
 
     /**
      * Get one-on-one game wins for a player
-     * 
+     *
      * @param string $playerName Player name (exact match)
-     * @return array<array<string, mixed>> Array of one-on-one game records where player won
+     * @return list<OneOnOneWinRow> Game records where player won
      */
     public function getOneOnOneWins(string $playerName): array;
 
@@ -182,7 +187,7 @@ interface PlayerRepositoryInterface
      * Get one-on-one game losses for a player
      *
      * @param string $playerName Player name (exact match)
-     * @return array<array<string, mixed>> Array of one-on-one game records where player lost
+     * @return list<OneOnOneLossRow> Game records where player lost
      */
     public function getOneOnOneLosses(string $playerName): array;
 

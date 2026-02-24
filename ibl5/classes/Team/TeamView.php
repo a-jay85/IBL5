@@ -21,7 +21,6 @@ class TeamView implements TeamViewInterface
     {
         $teamID = $pageData['teamID'];
         $team = $pageData['team'];
-        /** @var string $imagesPath */
         $imagesPath = \Utilities\HtmlSanitizer::safeHtmlOutput($pageData['imagesPath']);
         $yr = $pageData['yr'];
         $isActualTeam = $pageData['isActualTeam'];
@@ -43,9 +42,7 @@ class TeamView implements TeamViewInterface
         $franchiseHtml = $isActualTeam ? "<div style=\"max-width: 1115px; margin: 0 auto;\">$franchiseHistoryCard</div>" : "";
         $raftersHtml = $isActualTeam ? "<div class=\"team-page-rafters\">$rafters</div>" : "";
 
-        /** @var string $yrSafe */
         $yrSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($yr ?? '');
-        /** @var string $teamNameSafe */
         $teamNameSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
         $yearHeading = ($yr !== null && $yr !== '')
             ? "<h1 class=\"ibl-title\">$yrSafe $teamNameSafe</h1>"
@@ -99,7 +96,6 @@ class TeamView implements TeamViewInterface
                 $partnerParam = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
                 $tradeButton = '<a href="modules.php?name=Trading&amp;op=offertrade&amp;partner=' . urlencode($team->name) . '" class="team-action-link">Trade</a>';
                 if ($team->discordID !== null) {
-                    /** @var string $discordIDSafe */
                     $discordIDSafe = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $team->discordID);
                     $discordButton = '<a href="https://discord.com/users/' . $discordIDSafe . '" class="team-action-link" target="_blank" rel="noopener noreferrer">Discord</a>';
                 }

@@ -9,6 +9,9 @@ use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 /**
  * TeamScheduleRepository - Database operations for team schedules
  *
+ * @phpstan-import-type ScheduleRow from TeamScheduleRepositoryInterface
+ * @phpstan-import-type ProjectedGameRow from TeamScheduleRepositoryInterface
+ *
  * @see TeamScheduleRepositoryInterface For the interface contract
  */
 class TeamScheduleRepository extends \BaseMysqliRepository implements TeamScheduleRepositoryInterface
@@ -16,10 +19,11 @@ class TeamScheduleRepository extends \BaseMysqliRepository implements TeamSchedu
     /**
      * @see TeamScheduleRepositoryInterface::getSchedule()
      *
-     * @return array<int, array<string, mixed>>
+     * @return list<ScheduleRow>
      */
     public function getSchedule(int $teamID): array
     {
+        /** @var list<ScheduleRow> */
         return $this->fetchAll(
             "SELECT s.*, bst.gameOfThatDay
             FROM ibl_schedule s
@@ -39,10 +43,11 @@ class TeamScheduleRepository extends \BaseMysqliRepository implements TeamSchedu
     /**
      * @see TeamScheduleRepositoryInterface::getProjectedGamesNextSimResult()
      *
-     * @return array<int, array<string, mixed>>
+     * @return list<ProjectedGameRow>
      */
     public function getProjectedGamesNextSimResult(int $teamID, string $lastSimEndDate, string $projectedNextSimEndDate): array
     {
+        /** @var list<ProjectedGameRow> */
         return $this->fetchAll(
             "SELECT * FROM `ibl_schedule`
              WHERE (Visitor = ? OR Home = ?)

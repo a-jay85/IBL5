@@ -86,7 +86,7 @@ class PlayerImageHelper implements PlayerImageHelperInterface
         return '<td class="sticky-col ibl-player-cell' . $starterClass . '">'
             . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'
             . $thumbnail
-            . $displayName
+            . '<span class="ibl-player-cell__name">' . $displayName . '</span>'
             . '</a></td>';
     }
 

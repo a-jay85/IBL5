@@ -33,5 +33,10 @@ Replace deprecated tags:
 ## CSS Centralization
 When inline styles repeat 2+ times, extract to a CSS file in `ibl5/design/components/`. Never write `<style>` blocks in PHP view files — all CSS must be centralized. For dynamic team colors, use CSS custom properties set via inline `style` attributes on container elements, with the corresponding rules in centralized CSS files.
 
+**Before writing new CSS**, check if a style already exists in `ibl5/design/`. Key files:
+- `components/tables.css`, `components/cards.css`, `components/existing-components.css`, `tokens/colors.css`
+- Reuse existing classes (`.ibl-card`, `.ibl-stat-highlight`, `.ibl-title`, `.ibl-data-table`) instead of creating duplicates
+- Module-specific table overrides go in `tables.css` as new sections (pattern: `.allstar-table`, `.contact-table`, `.record-table`)
+
 ## Statistics Display
 Use `BasketballStats\StatsFormatter` — see `php-classes.md` for method list.

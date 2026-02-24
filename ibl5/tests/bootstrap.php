@@ -19,6 +19,17 @@ if (!defined('DIRECTORY_SEPARATOR')) {
 // Load Composer autoloader (handles both application classes and test helpers via PSR-4)
 require_once __DIR__ . '/../vendor/autoload.php';
 
+// When running in a git worktree, the symlinked vendor autoloader resolves class paths
+// relative to the main repo. Prepend the local classes/ directory so worktree-specific
+// classes are found first. This is harmless in the main repo (same path).
+spl_autoload_register(static function (string $class): void {
+    $classPath = str_replace('\\', '/', $class);
+    $file = __DIR__ . '/../classes/' . $classPath . '.php';
+    if (file_exists($file)) {
+        require_once $file;
+    }
+}, true, true);
+
 // Now that autoloader is registered, define class aliases for backward compatibility
 // This maps the old global mock classes to the new namespaced ones
 class_alias('Tests\\Integration\\Mocks\\MockDatabase', 'MockDatabase');

@@ -24,6 +24,8 @@ namespace SeasonHighs\Contracts;
  *     gameOfThatDay?: int
  * }
  *
+ * @phpstan-type RcbSeasonHighEntry array{stat_category: string, ranking: int, player_name: string, player_position: string|null, stat_value: int, record_season_year: int}
+ *
  * @phpstan-type SeasonHighsData array{
  *     playerHighs: array<string, list<SeasonHighEntry>>,
  *     teamHighs: array<string, list<SeasonHighEntry>>
@@ -38,4 +40,11 @@ interface SeasonHighsServiceInterface
      * @return SeasonHighsData
      */
     public function getSeasonHighsData(string $seasonPhase): array;
+
+    /**
+     * Get RCB-sourced home/away single-game records.
+     *
+     * @return array{home: array<string, list<RcbSeasonHighEntry>>, away: array<string, list<RcbSeasonHighEntry>>}
+     */
+    public function getHomeAwayHighs(): array;
 }

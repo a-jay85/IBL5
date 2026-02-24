@@ -13,6 +13,7 @@ use SeasonHighs\Contracts\SeasonHighsRepositoryInterface;
  * Calculates date ranges and retrieves season high stats.
  *
  * @phpstan-import-type SeasonHighsData from SeasonHighsServiceInterface
+ * @phpstan-import-type RcbSeasonHighEntry from SeasonHighsServiceInterface
  *
  * @see SeasonHighsServiceInterface For the interface contract
  */
@@ -78,6 +79,79 @@ class SeasonHighsService implements SeasonHighsServiceInterface
             'playerHighs' => $playerHighs,
             'teamHighs' => $teamHighs,
         ];
+    }
+
+    /**
+     * RCB stat category display labels.
+     *
+     * @var array<string, string>
+     */
+    private const RCB_STAT_LABELS = [
+        'pts' => 'Points',
+        'reb' => 'Rebounds',
+        'ast' => 'Assists',
+        'stl' => 'Steals',
+        'blk' => 'Blocks',
+        'two_gm' => 'Field Goals Made',
+        'three_gm' => 'Three Pointers Made',
+        'ftm' => 'Free Throws Made',
+    ];
+
+    /**
+     * Display order for RCB stat categories.
+     *
+     * @var list<string>
+     */
+    private const RCB_STAT_ORDER = ['pts', 'reb', 'ast', 'stl', 'blk', 'two_gm', 'three_gm', 'ftm'];
+
+    /**
+     * @see SeasonHighsServiceInterface::getHomeAwayHighs()
+     *
+     * @return array{home: array<string, list<RcbSeasonHighEntry>>, away: array<string, list<RcbSeasonHighEntry>>}
+     */
+    public function getHomeAwayHighs(): array
+    {
+        $seasonYear = $this->season->beginningYear;
+
+        $homeRecords = $this->repository->getRcbSeasonHighs($seasonYear, 'home');
+        $awayRecords = $this->repository->getRcbSeasonHighs($seasonYear, 'away');
+
+        return [
+            'home' => $this->groupRcbByCategory($homeRecords),
+            'away' => $this->groupRcbByCategory($awayRecords),
+        ];
+    }
+
+    /**
+     * Group RCB season records by stat category in display order.
+     *
+     * @param list<RcbSeasonHighEntry> $records
+     * @return array<string, list<RcbSeasonHighEntry>>
+     */
+    private function groupRcbByCategory(array $records): array
+    {
+        /** @var array<string, list<RcbSeasonHighEntry>> $grouped */
+        $grouped = [];
+        foreach (self::RCB_STAT_ORDER as $category) {
+            $grouped[$category] = [];
+        }
+
+        foreach ($records as $record) {
+            $category = $record['stat_category'];
+            if (array_key_exists($category, $grouped)) {
+                $grouped[$category][] = $record;
+            }
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * Get the display label for an RCB stat category.
+     */
+    public static function getRcbStatLabel(string $category): string
+    {
+        return self::RCB_STAT_LABELS[$category] ?? $category;
     }
 
     /**

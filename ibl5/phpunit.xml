@@ -205,5 +205,8 @@
         <testsuite name="JsbParser Module Tests">
             <directory>tests/JsbParser</directory>
         </testsuite>
+        <testsuite name="FranchiseRecordBook Module Tests">
+            <directory>tests/FranchiseRecordBook</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

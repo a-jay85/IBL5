@@ -98,10 +98,10 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
         $rows = $this->fetchAll(
             "SELECT teamid, team_name, color1, color2
              FROM ibl_team_info
-             WHERE teamid <> ?
+             WHERE teamid BETWEEN 1 AND ?
              ORDER BY team_name ASC",
             'i',
-            \League::FREE_AGENTS_TEAMID
+            \League::MAX_REAL_TEAMID
         );
 
         return $rows;

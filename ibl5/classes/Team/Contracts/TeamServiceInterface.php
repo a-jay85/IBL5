@@ -101,4 +101,16 @@ interface TeamServiceInterface
      * @return string Table HTML
      */
     public function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, array $starterPids = [], ?string $split = null): string;
+
+    /**
+     * Build the optgroup structure for the dropdown view selector
+     *
+     * Returns grouped options for the TableViewDropdown component, including
+     * all standard views, split stat categories, and conditional playoffs.
+     * Used by both Team and DepthChartEntry modules.
+     *
+     * @param \Season $season Season object (used to determine playoff availability)
+     * @return array<string, array<string, string>> Groups keyed by label, each containing value => label pairs
+     */
+    public function buildDropdownGroups(\Season $season): array;
 }

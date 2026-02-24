@@ -17,7 +17,9 @@ class DepthChartEntryApiHandler
         'avg_s',
         'per36mins',
         'chunk',
+        'playoffs',
         'contracts',
+        'split',
     ];
 
     private \mysqli $db;
@@ -41,8 +43,22 @@ class DepthChartEntryApiHandler
             }
         }
 
+        // Validate split parameter when display=split
+        $split = null;
+        if ($display === 'split' && isset($_GET['split']) && is_string($_GET['split'])) {
+            $splitRepo = new \Team\SplitStatsRepository($this->db);
+            $rawSplit = $_GET['split'];
+            if (in_array($rawSplit, $splitRepo->getValidSplitKeys(), true)) {
+                $split = $rawSplit;
+            } else {
+                $display = 'ratings';
+            }
+        } elseif ($display === 'split') {
+            $display = 'ratings';
+        }
+
         $controller = new DepthChartEntryController($this->db);
-        $html = $controller->getTableOutput($teamID, $display);
+        $html = $controller->getTableOutput($teamID, $display, $split);
 
         echo json_encode(['html' => $html], JSON_THROW_ON_ERROR);
     }

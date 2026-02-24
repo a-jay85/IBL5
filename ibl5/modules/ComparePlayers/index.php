@@ -49,8 +49,8 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
     if (!isset($_POST['Player1'])) {
         echo $view->renderSearchForm($playerNames);
     } else {
-        $player1Name = filter_input(INPUT_POST, 'Player1', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
-        $player2Name = filter_input(INPUT_POST, 'Player2', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
+        $player1Name = trim((string) ($_POST['Player1'] ?? ''));
+        $player2Name = trim((string) ($_POST['Player2'] ?? ''));
 
         if (strlen($player1Name) > 100 || strlen($player2Name) > 100) {
             echo '<div class="ibl-empty-state"><p class="ibl-empty-state__text">Player names must be 100 characters or less.</p></div>';

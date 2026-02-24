@@ -11,6 +11,9 @@ use CapSpace\Contracts\CapSpaceRepositoryInterface;
  *
  * Retrieves team salary and roster data for cap display.
  *
+ * @phpstan-import-type TeamInfoRow from CapSpaceRepositoryInterface
+ * @phpstan-import-type ContractRow from CapSpaceRepositoryInterface
+ *
  * @see CapSpaceRepositoryInterface For the interface contract
  * @see \BaseMysqliRepository For base class documentation
  */
@@ -19,10 +22,11 @@ class CapSpaceRepository extends \BaseMysqliRepository implements CapSpaceReposi
     /**
      * @see CapSpaceRepositoryInterface::getAllTeams()
      *
-     * @return array<int, array<string, mixed>>
+     * @return list<TeamInfoRow>
      */
     public function getAllTeams(): array
     {
+        /** @var list<TeamInfoRow> */
         return $this->fetchAll(
             "SELECT * FROM ibl_team_info WHERE teamid BETWEEN 1 AND ? ORDER BY teamid ASC",
             "i",
@@ -33,10 +37,11 @@ class CapSpaceRepository extends \BaseMysqliRepository implements CapSpaceReposi
     /**
      * @see CapSpaceRepositoryInterface::getPlayersUnderContractAfterSeason()
      *
-     * @return array<int, array<string, mixed>>
+     * @return list<ContractRow>
      */
     public function getPlayersUnderContractAfterSeason(int $teamId): array
     {
+        /** @var list<ContractRow> */
         return $this->fetchAll(
             "SELECT cy, cyt FROM ibl_plr
              WHERE retired = 0

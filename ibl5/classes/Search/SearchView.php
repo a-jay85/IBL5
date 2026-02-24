@@ -61,7 +61,6 @@ class SearchView implements SearchViewInterface
             $title = $searchIn . ' ' . $topicText;
         }
 
-        /** @var string $safeTitle */
         $safeTitle = HtmlSanitizer::safeHtmlOutput($title);
         return '<h2 class="ibl-title">' . $safeTitle . '</h2>';
     }
@@ -73,7 +72,6 @@ class SearchView implements SearchViewInterface
      */
     private function renderSearchForm(array $data): string
     {
-        /** @var string $query */
         $query = HtmlSanitizer::safeHtmlOutput($data['query']);
         $type = $data['type'];
 
@@ -84,7 +82,6 @@ class SearchView implements SearchViewInterface
         $output .= '<div class="ibl-search search-form__search-bar">';
         $output .= '<svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
         $output .= '<input type="text" name="query" class="ibl-search__input" value="' . $query . '" placeholder="Search...">';
-        /** @var string $safeSearch */
         $safeSearch = HtmlSanitizer::safeHtmlOutput(_SEARCH);
         $output .= '<button type="submit" class="ibl-search__btn">' . $safeSearch . '</button>';
         $output .= '</div></div>';
@@ -99,7 +96,6 @@ class SearchView implements SearchViewInterface
 
         // Search type radio buttons
         $output .= '<div class="search-form__types">';
-        /** @var string $safeSearchOn */
         $safeSearchOn = HtmlSanitizer::safeHtmlOutput(_SEARCHON);
         $output .= '<span class="search-form__types-label">' . $safeSearchOn . '</span>';
         /** @var string $storiesLabel */
@@ -130,13 +126,11 @@ class SearchView implements SearchViewInterface
     private function renderTopicSelect(array $topics, int $selectedTopic): string
     {
         $output = '<select name="topic" class="search-form__select">';
-        /** @var string $safeAllTopics */
         $safeAllTopics = HtmlSanitizer::safeHtmlOutput(_ALLTOPICS);
         $output .= '<option value="">' . $safeAllTopics . '</option>';
 
         foreach ($topics as $topic) {
             $topicId = $topic['topicId'];
-            /** @var string $topicText */
             $topicText = HtmlSanitizer::safeHtmlOutput($topic['topicText']);
             $selected = ($topicId === $selectedTopic) ? ' selected' : '';
             $output .= '<option value="' . $topicId . '"' . $selected . '>' . $topicText . '</option>';
@@ -154,13 +148,11 @@ class SearchView implements SearchViewInterface
     private function renderCategorySelect(array $categories, int $selectedCategory): string
     {
         $output = '<select name="category" class="search-form__select">';
-        /** @var string $safeArticles */
         $safeArticles = HtmlSanitizer::safeHtmlOutput(_ARTICLES);
         $output .= '<option value="0">' . $safeArticles . '</option>';
 
         foreach ($categories as $cat) {
             $catId = $cat['catId'];
-            /** @var string $title */
             $title = HtmlSanitizer::safeHtmlOutput($cat['title']);
             $selected = ($catId === $selectedCategory) ? ' selected' : '';
             $output .= '<option value="' . $catId . '"' . $selected . '>' . $title . '</option>';
@@ -178,12 +170,10 @@ class SearchView implements SearchViewInterface
     private function renderAuthorSelect(array $authors, string $selectedAuthor): string
     {
         $output = '<select name="author" class="search-form__select">';
-        /** @var string $safeAllAuthors */
         $safeAllAuthors = HtmlSanitizer::safeHtmlOutput(_ALLAUTHORS);
         $output .= '<option value="">' . $safeAllAuthors . '</option>';
 
         foreach ($authors as $authorName) {
-            /** @var string $safe */
             $safe = HtmlSanitizer::safeHtmlOutput($authorName);
             $selected = ($authorName === $selectedAuthor) ? ' selected' : '';
             $output .= '<option value="' . $safe . '"' . $selected . '>' . $safe . '</option>';
@@ -223,7 +213,6 @@ class SearchView implements SearchViewInterface
 
         foreach ($options as $value => $label) {
             $selected = ($value === $selectedDays) ? ' selected' : '';
-            /** @var string $safeLabel */
             $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
             $output .= '<option value="' . $value . '"' . $selected . '>' . $safeLabel . '</option>';
         }
@@ -240,7 +229,6 @@ class SearchView implements SearchViewInterface
         $checked = ($value === $selectedType || ($selectedType === '' && $value === 'stories')) ? ' checked' : '';
         $id = 'search-type-' . $value;
 
-        /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
         return '<label class="search-form__type" for="' . $id . '">
             <input type="radio" name="type" value="' . $value . '" id="' . $id . '"' . $checked . '>
@@ -253,7 +241,6 @@ class SearchView implements SearchViewInterface
      */
     private function renderError(string $error): string
     {
-        /** @var string $safeError */
         $safeError = HtmlSanitizer::safeHtmlOutput($error);
         return '<div class="ibl-alert ibl-alert--error search-error">' . $safeError . '</div>';
     }
@@ -273,12 +260,10 @@ class SearchView implements SearchViewInterface
         }
 
         $output = '<div class="search-results">';
-        /** @var string $safeSearchResults */
         $safeSearchResults = HtmlSanitizer::safeHtmlOutput(_SEARCHRESULTS);
         $output .= '<h3 class="search-results__heading">' . $safeSearchResults . '</h3>';
 
         if (count($results) === 0) {
-            /** @var string $safeNoMatches */
             $safeNoMatches = HtmlSanitizer::safeHtmlOutput(_NOMATCHES);
             $output .= '<div class="ibl-empty-state"><p class="ibl-empty-state__text">' . $safeNoMatches . '</p></div>';
             $output .= '</div>';
@@ -316,17 +301,12 @@ class SearchView implements SearchViewInterface
 
         foreach ($results as $index => $result) {
             $sid = $result['sid'];
-            /** @var string $title */
             $title = HtmlSanitizer::safeHtmlOutput($result['title']);
-            /** @var string $aid */
             $aid = HtmlSanitizer::safeHtmlOutput($result['aid']);
-            /** @var string $informant */
             $informant = HtmlSanitizer::safeHtmlOutput($result['informant']);
-            /** @var string $time */
             $time = HtmlSanitizer::safeHtmlOutput(formatTimestamp($result['time']));
             $comments = $result['comments'];
             $topicId = $result['topicId'];
-            /** @var string $topicText */
             $topicText = HtmlSanitizer::safeHtmlOutput($result['topicText']);
             $delay = min($index * 40, 400);
 
@@ -338,34 +318,27 @@ class SearchView implements SearchViewInterface
             $output .= '<div class="search-result__meta">';
 
             if ($informant !== '') {
-                /** @var string $safeContributedBy */
                 $safeContributedBy = HtmlSanitizer::safeHtmlOutput(_CONTRIBUTEDBY);
                 $output .= '<span class="search-result__meta-item">' . $safeContributedBy . ' ' . $informant . '</span>';
             }
 
-            /** @var string $safePostedBy */
             $safePostedBy = HtmlSanitizer::safeHtmlOutput(_POSTEDBY);
-            /** @var string $safeOn */
             $safeOn = HtmlSanitizer::safeHtmlOutput(_ON);
             $output .= '<span class="search-result__meta-item">' . $safePostedBy . ' ' . $aid . ' ' . $safeOn . ' ' . $time . '</span>';
 
             if ($topicText !== '') {
-                /** @var string $safeTopic */
                 $safeTopic = HtmlSanitizer::safeHtmlOutput(_TOPIC);
                 $output .= '<span class="search-result__meta-item">' . $safeTopic . ': <a href="modules.php?name=Search&amp;query=&amp;topic=' . $topicId . '">' . $topicText . '</a></span>';
             }
 
             $output .= '<span class="search-result__meta-item">';
             if ($comments === 0) {
-                /** @var string $safeNoComments */
                 $safeNoComments = HtmlSanitizer::safeHtmlOutput(_NOCOMMENTS);
                 $output .= $safeNoComments;
             } elseif ($comments === 1) {
-                /** @var string $safeUComment */
                 $safeUComment = HtmlSanitizer::safeHtmlOutput(_UCOMMENT);
                 $output .= $comments . ' ' . $safeUComment;
             } else {
-                /** @var string $safeUComments */
                 $safeUComments = HtmlSanitizer::safeHtmlOutput(_UCOMMENTS);
                 $output .= $comments . ' ' . $safeUComments;
             }
@@ -390,13 +363,9 @@ class SearchView implements SearchViewInterface
         foreach ($results as $index => $result) {
             $tid = $result['tid'];
             $sid = $result['sid'];
-            /** @var string $subject */
             $subject = HtmlSanitizer::safeHtmlOutput($result['subject']);
-            /** @var string $date */
             $date = HtmlSanitizer::safeHtmlOutput(formatTimestamp($result['date']));
-            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($result['name']);
-            /** @var string $articleTitle */
             $articleTitle = HtmlSanitizer::safeHtmlOutput($result['articleTitle']);
             $replyCount = $result['replyCount'];
             $delay = min($index * 40, 400);
@@ -409,22 +378,18 @@ class SearchView implements SearchViewInterface
             $output .= '<div class="search-result__meta">';
 
             if ($name !== '') {
-                /** @var string $safePostedBy */
                 $safePostedBy = HtmlSanitizer::safeHtmlOutput(_POSTEDBY);
-                /** @var string $safeOn */
                 $safeOn = HtmlSanitizer::safeHtmlOutput(_ON);
                 $output .= '<span class="search-result__meta-item">' . $safePostedBy . ' ' . $name . ' ' . $safeOn . ' ' . $date . '</span>';
             }
 
             if ($articleTitle !== '') {
-                /** @var string $safeAttachArt */
                 $safeAttachArt = HtmlSanitizer::safeHtmlOutput(_ATTACHART);
                 $output .= '<span class="search-result__meta-item">' . $safeAttachArt . ': ' . $articleTitle . '</span>';
             }
 
             /** @var string $replyLabel */
             $replyLabel = ($replyCount === 1) ? _SREPLY : _SREPLIES;
-            /** @var string $safeReplyLabel */
             $safeReplyLabel = HtmlSanitizer::safeHtmlOutput($replyLabel);
             $output .= '<span class="search-result__meta-item">' . $replyCount . ' ' . $safeReplyLabel . '</span>';
 
@@ -446,13 +411,10 @@ class SearchView implements SearchViewInterface
 
         foreach ($results as $index => $result) {
             $userId = $result['userId'];
-            /** @var string $username */
             $username = HtmlSanitizer::safeHtmlOutput($result['username']);
-            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($result['name']);
             $delay = min($index * 40, 400);
 
-            /** @var string $safeNoName */
             $safeNoName = HtmlSanitizer::safeHtmlOutput(_NONAME);
             $displayName = ($name !== '') ? $name : $safeNoName;
 
@@ -496,7 +458,6 @@ class SearchView implements SearchViewInterface
         if ($hasPrev) {
             $prev = $min - $offset;
             $output .= '<a href="modules.php?name=Search&amp;author=' . $author . '&amp;topic=' . $topic . '&amp;min=' . $prev . '&amp;query=' . $query . '&amp;type=' . $type . '&amp;category=' . $category . '" class="search-pagination__link search-pagination__link--prev">';
-            /** @var string $safePrevMatches */
             $safePrevMatches = HtmlSanitizer::safeHtmlOutput(_PREVMATCHES);
             $output .= '&larr; ' . $safePrevMatches;
             $output .= '</a>';
@@ -505,7 +466,6 @@ class SearchView implements SearchViewInterface
         if ($hasMore) {
             $next = $min + $offset;
             $output .= '<a href="modules.php?name=Search&amp;author=' . $author . '&amp;topic=' . $topic . '&amp;min=' . $next . '&amp;query=' . $query . '&amp;type=' . $type . '&amp;category=' . $category . '" class="search-pagination__link search-pagination__link--next">';
-            /** @var string $safeNextMatches */
             $safeNextMatches = HtmlSanitizer::safeHtmlOutput(_NEXTMATCHES);
             $output .= $safeNextMatches . ' &rarr;';
             $output .= '</a>';

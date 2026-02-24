@@ -51,7 +51,6 @@ class PlayerTradingCardFrontView
         // Additional front-card specific data
         $expYears = (string) ($player->yearsOfExperience ?? 0);
         $birdYears = (string) ($player->birdYears ?? 0);
-        /** @var string $contractSafe */
         $contractSafe = HtmlSanitizer::safeHtmlOutput($contractDisplay);
 
         $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);

@@ -131,7 +131,6 @@ class PlayerPageController
         }
 
         $banner = $resultBanners[$result];
-        /** @var string $safeMessage */
         $safeMessage = HtmlSanitizer::safeHtmlOutput($banner['message']);
         return '<tr><td colspan="2"><div class="ibl-alert ' . $banner['class'] . '">' . $safeMessage . '</div></td></tr>';
     }

@@ -31,13 +31,9 @@ class ActivityTrackerView implements ActivityTrackerViewInterface
             $color1 = $row['color1'];
             $color2 = $row['color2'];
 
-            /** @var string $depth */
             $depth = HtmlSanitizer::safeHtmlOutput($row['depth']);
-            /** @var string $simDepth */
             $simDepth = HtmlSanitizer::safeHtmlOutput($row['sim_depth']);
-            /** @var string $asgVote */
             $asgVote = HtmlSanitizer::safeHtmlOutput($row['asg_vote']);
-            /** @var string $eoyVote */
             $eoyVote = HtmlSanitizer::safeHtmlOutput($row['eoy_vote']);
 
             $teamCell = \UI\TeamCellHelper::renderTeamCell($teamId, $teamDisplay, $color1, $color2);

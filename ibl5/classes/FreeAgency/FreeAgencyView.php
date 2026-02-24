@@ -80,7 +80,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
         }
 
         $banner = $banners[$result];
-        /** @var string $safeMessage */
         $safeMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($banner['message']);
         return '<div class="ibl-alert ' . $banner['class'] . '">' . $safeMessage . '</div>';
     }

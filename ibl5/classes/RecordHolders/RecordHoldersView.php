@@ -237,7 +237,6 @@ class RecordHoldersView implements RecordHoldersViewInterface
         $output .= $this->renderCategoryHeading($category);
         $output .= '<table class="ibl-data-table record-table record-table--5col">';
         $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount"></colgroup>';
-        /** @var string $safeStatLabel */
         $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
         $output .= '<thead><tr><th>Player</th><th>Team</th><th>Date</th><th>Opponent</th><th>' . $safeStatLabel . '</th></tr></thead>';
         $output .= '<tbody>';
@@ -264,19 +263,14 @@ class RecordHoldersView implements RecordHoldersViewInterface
         $output .= $this->renderCategoryHeading($category);
         $output .= '<table class="ibl-data-table record-table record-table--4col-season">';
         $output .= '<colgroup><col class="col-player"><col class="col-team"><col class="col-season"><col class="col-amount"></colgroup>';
-        /** @var string $safeStatLabel */
         $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
         $output .= '<thead><tr><th>Player</th><th>Team</th><th>Season</th><th>' . $safeStatLabel . '</th></tr></thead>';
         $output .= '<tbody>';
 
         foreach ($categoryRecords as $record) {
-            /** @var string $safeName */
             $safeName = HtmlSanitizer::safeHtmlOutput($record['name']);
-            /** @var string $safeTeam */
             $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
-            /** @var string $safeSeason */
             $safeSeason = HtmlSanitizer::safeHtmlOutput($record['season']);
-            /** @var string $safeAmount */
             $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
             $pid = $record['pid'];
             $teamTid = $record['teamTid'];
@@ -313,7 +307,6 @@ class RecordHoldersView implements RecordHoldersViewInterface
         $output .= $this->renderCategoryHeading($category);
         $output .= '<table class="ibl-data-table record-table record-table--4col-team">';
         $output .= '<colgroup><col class="col-team"><col class="col-date"><col class="col-opponent"><col class="col-amount"></colgroup>';
-        /** @var string $safeStatLabel */
         $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
         $output .= '<thead><tr><th>Team</th><th>Date</th><th>Opponent</th><th>' . $safeStatLabel . '</th></tr></thead>';
         $output .= '<tbody>';
@@ -340,17 +333,13 @@ class RecordHoldersView implements RecordHoldersViewInterface
         $output .= $this->renderCategoryHeading($category);
         $output .= '<table class="ibl-data-table record-table record-table--3col-team-season">';
         $output .= '<colgroup><col class="col-team"><col class="col-season"><col class="col-amount"></colgroup>';
-        /** @var string $safeStatLabel */
         $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
         $output .= '<thead><tr><th>Team</th><th>Season</th><th>' . $safeStatLabel . '</th></tr></thead>';
         $output .= '<tbody>';
 
         foreach ($categoryRecords as $record) {
-            /** @var string $safeTeam */
             $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
-            /** @var string $safeSeason */
             $safeSeason = HtmlSanitizer::safeHtmlOutput($record['season']);
-            /** @var string $safeAmount */
             $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
             $teamTid = $record['teamTid'];
             $teamYr = (int) $record['teamYr'];
@@ -382,15 +371,12 @@ class RecordHoldersView implements RecordHoldersViewInterface
         $output .= $this->renderCategoryHeading($category);
         $output .= '<table class="ibl-data-table record-table record-table--3col-franchise">';
         $output .= '<colgroup><col class="col-team"><col class="col-amount"><col class="col-years"></colgroup>';
-        /** @var string $safeStatLabel */
         $safeStatLabel = HtmlSanitizer::safeHtmlOutput($statLabel);
         $output .= '<thead><tr><th>Team</th><th>' . $safeStatLabel . '</th><th>Years</th></tr></thead>';
         $output .= '<tbody>';
 
         foreach ($categoryRecords as $record) {
-            /** @var string $safeTeam */
             $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
-            /** @var string $safeAmount */
             $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
             $teamTid = $record['teamTid'];
 
@@ -427,7 +413,6 @@ class RecordHoldersView implements RecordHoldersViewInterface
         $output .= '<thead><tr><th>Player</th><th>Team</th><th>Apps</th><th colspan="2">Years</th></tr></thead>';
         $output .= '<tbody>';
 
-        /** @var string $safeName */
         $safeName = HtmlSanitizer::safeHtmlOutput($allStar['name']);
         $pid = $allStar['pid'];
         $amount = (int) $allStar['amount'];
@@ -438,7 +423,6 @@ class RecordHoldersView implements RecordHoldersViewInterface
             $teamTids = explode(',', $allStar['teamTids']);
             foreach ($teams as $i => $team) {
                 $safeTid = (int) ($teamTids[$i] ?? 0);
-                /** @var string $safeTeam */
                 $safeTeam = HtmlSanitizer::safeHtmlOutput($team);
                 $teamLogos .= '<a href="../online/team.php?tid=' . $safeTid . '">'
                     . '<img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '">'
@@ -446,7 +430,6 @@ class RecordHoldersView implements RecordHoldersViewInterface
             }
         }
 
-        /** @var string $safeYears */
         $safeYears = HtmlSanitizer::safeHtmlOutput($allStar['years']);
         $years = $allStar['years'] !== '' ? str_replace(', ', '<br>', $safeYears) : '';
 
@@ -486,7 +469,6 @@ class RecordHoldersView implements RecordHoldersViewInterface
         $yearList = explode(', ', $years);
         $linked = [];
         foreach ($yearList as $year) {
-            /** @var string $safeYear */
             $safeYear = HtmlSanitizer::safeHtmlOutput(trim($year));
             $yearInt = (int) trim($year);
             if ($yearInt > 0) {
@@ -503,7 +485,6 @@ class RecordHoldersView implements RecordHoldersViewInterface
      */
     private function renderCategoryHeading(string $category): string
     {
-        /** @var string $safeCategory */
         $safeCategory = HtmlSanitizer::safeHtmlOutput($category);
         return '<h3 class="record-category__title">' . $safeCategory . '</h3>';
     }
@@ -531,14 +512,10 @@ class RecordHoldersView implements RecordHoldersViewInterface
      */
     private function renderPlayerRecordRow(array $record, bool $multiLineAmount = false): string
     {
-        /** @var string $safeName */
         $safeName = HtmlSanitizer::safeHtmlOutput($record['name']);
-        /** @var string $safeTeam */
         $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
-        /** @var string $safeDate */
         $safeDate = HtmlSanitizer::safeHtmlOutput($record['dateDisplay']);
         $safeDate = str_replace("\n", '<br>', $safeDate);
-        /** @var string $safeOppTeam */
         $safeOppTeam = HtmlSanitizer::safeHtmlOutput($record['oppAbbr']);
         $pid = $record['pid'];
         $teamTid = $record['teamTid'];
@@ -546,13 +523,11 @@ class RecordHoldersView implements RecordHoldersViewInterface
         $oppTid = $record['oppTid'];
         $oppYr = (int) $record['oppYr'];
 
-        /** @var string $safeAmountRaw */
         $safeAmountRaw = HtmlSanitizer::safeHtmlOutput($record['amount']);
         $amount = $multiLineAmount
             ? str_replace("\n", '<br>', $safeAmountRaw)
             : $safeAmountRaw;
 
-        /** @var string $safeBoxScoreUrl */
         $safeBoxScoreUrl = HtmlSanitizer::safeHtmlOutput($record['boxScoreUrl']);
         $dateCell = $record['boxScoreUrl'] !== ''
             ? '<a href="' . $safeBoxScoreUrl . '">' . $safeDate . '</a>'
@@ -579,16 +554,11 @@ class RecordHoldersView implements RecordHoldersViewInterface
      */
     private function renderTeamGameRow(array $record): string
     {
-        /** @var string $safeTeam */
         $safeTeam = HtmlSanitizer::safeHtmlOutput($record['teamAbbr']);
-        /** @var string $safeDate */
         $safeDate = HtmlSanitizer::safeHtmlOutput($record['dateDisplay']);
-        /** @var string $safeOppTeam */
         $safeOppTeam = HtmlSanitizer::safeHtmlOutput($record['oppAbbr']);
-        /** @var string $safeAmount */
         $safeAmount = HtmlSanitizer::safeHtmlOutput($record['amount']);
 
-        /** @var string $safeBoxScoreUrl */
         $safeBoxScoreUrl = HtmlSanitizer::safeHtmlOutput($record['boxScoreUrl']);
         $dateCell = $record['boxScoreUrl'] !== ''
             ? '<a href="' . $safeBoxScoreUrl . '">' . $safeDate . '</a>'

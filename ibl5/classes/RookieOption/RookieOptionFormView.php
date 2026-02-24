@@ -20,15 +20,11 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
     public function renderForm(Player $player, string $teamName, int $rookieOptionValue, ?string $error = null, ?string $result = null, ?string $from = null): string
     {
         $playerID = $player->playerID ?? 0;
-        /** @var string $playerPosition */
         $playerPosition = HtmlSanitizer::safeHtmlOutput($player->position ?? '');
-        /** @var string $playerName */
         $playerName = HtmlSanitizer::safeHtmlOutput($player->name ?? '');
-        /** @var string $teamNameEscaped */
         $teamNameEscaped = HtmlSanitizer::safeHtmlOutput($teamName);
         $playerImageUrl = PlayerImageHelper::getImageUrl($playerID);
         if ($from !== null) {
-            /** @var string $fromEscaped */
             $fromEscaped = HtmlSanitizer::safeHtmlOutput($from);
         } else {
             $fromEscaped = '';
@@ -38,7 +34,6 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
 
         // Error banner from PRG redirect
         if ($error !== null) {
-            /** @var string $safeError */
             $safeError = HtmlSanitizer::safeHtmlOutput($error);
             ?>
 <div class="ibl-alert ibl-alert--error"><?= $safeError ?></div>
@@ -105,7 +100,6 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
         }
 
         $banner = $banners[$result];
-        /** @var string $safeMessage */
         $safeMessage = HtmlSanitizer::safeHtmlOutput($banner['message']);
         return '<div class="ibl-alert ' . $banner['class'] . '">' . $safeMessage . '</div>';
     }

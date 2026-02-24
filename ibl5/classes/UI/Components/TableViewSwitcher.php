@@ -88,12 +88,9 @@ class TableViewSwitcher
     private function buildTab(string $tabKey, string $tabLabel): string
     {
         $activeClass = ($this->activeTab === $tabKey) ? ' ibl-tab--active' : '';
-        /** @var string $href */
         $href = HtmlSanitizer::safeHtmlOutput($this->baseUrl . '&display=' . $tabKey);
-        /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($tabLabel);
 
-        /** @var string $safeKey */
         $safeKey = HtmlSanitizer::safeHtmlOutput($tabKey);
 
         return '<a href="' . $href . '" class="ibl-tab' . $activeClass . '" data-display="' . $safeKey . '">' . $safeLabel . '</a>';

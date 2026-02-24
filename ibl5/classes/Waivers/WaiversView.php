@@ -26,9 +26,7 @@ class WaiversView implements WaiversViewInterface
         ?string $result = null,
         ?string $error = null
     ): void {
-        /** @var string $teamNameEscaped */
         $teamNameEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($teamName);
-        /** @var string $actionEscaped */
         $actionEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($action);
 
         ob_start();
@@ -72,7 +70,6 @@ class WaiversView implements WaiversViewInterface
     private function renderResultBanner(?string $result, ?string $error): string
     {
         if ($error !== null) {
-            /** @var string $errorEscaped */
             $errorEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($error);
             return '<div class="ibl-alert ibl-alert--error">' . $errorEscaped . '</div>';
         }
@@ -91,7 +88,6 @@ class WaiversView implements WaiversViewInterface
         }
 
         $banner = $banners[$result];
-        /** @var string $messageEscaped */
         $messageEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($banner['message']);
         return '<div class="ibl-alert ' . $banner['class'] . '">' . $messageEscaped . '</div>';
     }
@@ -105,11 +101,8 @@ class WaiversView implements WaiversViewInterface
         string $contract,
         string $waitTime = ''
     ): string {
-        /** @var string $playerNameEscaped */
         $playerNameEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($playerName);
-        /** @var string $contractEscaped */
         $contractEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($contract);
-        /** @var string $waitTimeEscaped */
         $waitTimeEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($waitTime);
 
         $displayText = "{$playerNameEscaped} {$contractEscaped}";

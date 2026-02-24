@@ -55,7 +55,6 @@ flush();
 
 // Set up error handler to catch all errors with XSS-safe output
 set_error_handler(function (int $errno, string $errstr, string $errfile, int $errline) use ($view): bool {
-    /** @var string $safeMessage */
     $safeMessage = \Utilities\HtmlSanitizer::safeHtmlOutput(
         "[$errno] $errstr in $errfile on line $errline"
     );
@@ -66,11 +65,8 @@ set_error_handler(function (int $errno, string $errstr, string $errfile, int $er
 
 // Set up exception handler with XSS-safe output
 set_exception_handler(function (\Throwable $exception) use ($view): void {
-    /** @var string $safeMessage */
     $safeMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($exception->getMessage());
-    /** @var string $safeFile */
     $safeFile = \Utilities\HtmlSanitizer::safeHtmlOutput($exception->getFile());
-    /** @var string $safeTrace */
     $safeTrace = \Utilities\HtmlSanitizer::safeHtmlOutput($exception->getTraceAsString());
 
     echo $view->renderStepError(
@@ -211,9 +207,7 @@ try {
 
 } catch (\Exception $e) {
     $errorCount++;
-    /** @var string $safeMessage */
     $safeMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($e->getMessage());
-    /** @var string $safeTrace */
     $safeTrace = \Utilities\HtmlSanitizer::safeHtmlOutput($e->getTraceAsString());
 
     echo $view->renderStepError('Exception', (string) $safeMessage);

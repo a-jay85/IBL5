@@ -126,14 +126,10 @@ class PlayerOverviewView implements PlayerOverviewViewInterface
 
             $awayTeam = $this->commonRepository->getTeamnameFromTeamID($row['homeTID']);
             $homeTeam = $this->commonRepository->getTeamnameFromTeamID($row['visitorTID']);
-            /** @var string $safeDate */
             $safeDate = HtmlSanitizer::safeHtmlOutput($row['Date']);
             $boxScoreUrl = \Utilities\BoxScoreUrlBuilder::buildUrl($row['Date'], (int) ($row['gameOfThatDay'] ?? 0), (int) ($row['BoxID'] ?? 0));
-            /** @var string $safeBoxScoreUrl */
             $safeBoxScoreUrl = HtmlSanitizer::safeHtmlOutput($boxScoreUrl);
-            /** @var string $safeAwayTeam */
             $safeAwayTeam = HtmlSanitizer::safeHtmlOutput($awayTeam);
-            /** @var string $safeHomeTeam */
             $safeHomeTeam = HtmlSanitizer::safeHtmlOutput($homeTeam);
             ?>
     <tr>

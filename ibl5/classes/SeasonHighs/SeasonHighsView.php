@@ -27,7 +27,6 @@ class SeasonHighsView implements SeasonHighsViewInterface
      */
     public function render(string $seasonPhase, array $data): string
     {
-        /** @var string $safePhase */
         $safePhase = HtmlSanitizer::safeHtmlOutput($seasonPhase);
         $output = '<h2 class="ibl-title">Season Highs</h2>';
         $output .= $this->renderPlayerHighs($safePhase, $data['playerHighs']);
@@ -86,7 +85,6 @@ class SeasonHighsView implements SeasonHighsViewInterface
      */
     private function renderStatTable(string $statName, array $stats, bool $isPlayerStats = false): string
     {
-        /** @var string $safeName */
         $safeName = HtmlSanitizer::safeHtmlOutput($statName);
 
         // Use 5 columns for player stats (with Team), 4 columns for team stats
@@ -100,9 +98,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
 
         foreach ($stats as $index => $row) {
             $rank = $index + 1;
-            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($row['name']);
-            /** @var string $date */
             $date = HtmlSanitizer::safeHtmlOutput($row['date']);
             $value = $row['value'];
             $tid = 0;
@@ -140,7 +136,6 @@ class SeasonHighsView implements SeasonHighsViewInterface
                 $row['boxId'] ?? 0
             );
             if ($boxScoreUrl !== '') {
-                /** @var string $safeUrl */
                 $safeUrl = HtmlSanitizer::safeHtmlOutput($boxScoreUrl);
                 /** @var string $date */
                 $date = "<a href=\"{$safeUrl}\">{$date}</a>";

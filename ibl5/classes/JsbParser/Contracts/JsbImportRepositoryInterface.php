@@ -66,4 +66,20 @@ interface JsbImportRepositoryInterface
      * @return int|null Database teamid, or null if not found
      */
     public function resolveTeamIdByName(string $teamName): ?int;
+
+    /**
+     * Upsert an all-time record from .rcb data.
+     *
+     * @param array{scope: string, team_id: int|null, record_type: string, stat_category: string, ranking: int, player_name: string, car_block_id: int, pid: int|null, stat_value: float, stat_raw: int, team_of_record: int|null, season_year: int|null, career_total: int|null, source_file: string|null} $record
+     * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
+     */
+    public function upsertRcbAlltimeRecord(array $record): int;
+
+    /**
+     * Upsert a current season record from .rcb data.
+     *
+     * @param array{season_year: int, scope: string, team_id: int|null, context: string, stat_category: string, ranking: int, player_name: string, player_position: string|null, car_block_id: int, pid: int|null, stat_value: int, record_season_year: int, source_file: string|null} $record
+     * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
+     */
+    public function upsertRcbSeasonRecord(array $record): int;
 }

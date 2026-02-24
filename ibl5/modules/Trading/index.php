@@ -26,6 +26,10 @@ function tradeoffer($username)
     $pageData['result'] = $_GET['result'] ?? null;
     $pageData['error'] = $_GET['error'] ?? null;
 
+    // Restore previous form selections from session (after a failed trade attempt)
+    $pageData['previousFormData'] = $_SESSION['tradeFormData'] ?? null;
+    unset($_SESSION['tradeFormData']);
+
     PageLayout\PageLayout::header();
     echo $view->renderTradeOfferForm($pageData);
     PageLayout\PageLayout::footer();

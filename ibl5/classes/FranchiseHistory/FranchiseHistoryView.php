@@ -97,26 +97,22 @@ class FranchiseHistoryView implements FranchiseHistoryViewInterface
         // All-time record
         $allTimeWins = (int)$team['totwins'];
         $allTimeLosses = (int)$team['totloss'];
-        /** @var string $allTimeWinpct */
         $allTimeWinpct = HtmlSanitizer::safeHtmlOutput($team['winpct']);
         $html .= '<td style="white-space: nowrap;" sorttable_customkey="' . $allTimeWinpct . '">' . $allTimeWins . '-' . $allTimeLosses . ' (' . $allTimeWinpct . ')</td>';
 
         // Last five seasons record
         $fiveSeasonWins = (int)$team['five_season_wins'];
         $fiveSeasonLosses = (int)$team['five_season_losses'];
-        /** @var string $fiveSeasonWinpct */
         $fiveSeasonWinpct = HtmlSanitizer::safeHtmlOutput($team['five_season_winpct'] ?? '');
         $html .= '<td style="white-space: nowrap;" sorttable_customkey="' . $fiveSeasonWinpct . '">' . $fiveSeasonWins . '-' . $fiveSeasonLosses . ' (' . $fiveSeasonWinpct . ')</td>';
 
         // Record columns
         $playoffWins = (int)$team['playoff_total_wins'];
         $playoffLosses = (int)$team['playoff_total_losses'];
-        /** @var string $playoffWinpct */
         $playoffWinpct = HtmlSanitizer::safeHtmlOutput($team['playoff_winpct']);
         $html .= '<td style="white-space: nowrap;" sorttable_customkey="' . $playoffWinpct . '">' . $playoffWins . '-' . $playoffLosses . ' (' . $playoffWinpct . ')</td>';
         $heatWins = (int)$team['heat_total_wins'];
         $heatLosses = (int)$team['heat_total_losses'];
-        /** @var string $heatWinpct */
         $heatWinpct = HtmlSanitizer::safeHtmlOutput($team['heat_winpct']);
         $html .= '<td style="white-space: nowrap;" sorttable_customkey="' . $heatWinpct . '">' . $heatWins . '-' . $heatLosses . ' (' . $heatWinpct . ')</td>';
 

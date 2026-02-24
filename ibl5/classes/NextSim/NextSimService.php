@@ -62,7 +62,6 @@ class NextSimService implements NextSimServiceInterface
         $games = [];
 
         foreach ($projectedGames as $gameRow) {
-            /** @var array{Date: string, BoxID: int, Visitor: int, Home: int, VScore: int, HScore: int} $gameRow */
             $game = new \Game($gameRow);
             $gameDate = new \DateTime($game->date);
             $dayNumber = $gameDate->diff($lastSimEndDateObject)->format('%a');

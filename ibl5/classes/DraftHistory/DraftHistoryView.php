@@ -46,7 +46,6 @@ class DraftHistoryView implements DraftHistoryViewInterface
      */
     public function renderTeamHistory(\Team $team, array $draftPicks): string
     {
-        /** @var string $teamName */
         $teamName = HtmlSanitizer::safeHtmlOutput($team->name);
         $teamId = $team->teamID;
 
@@ -129,13 +128,10 @@ class DraftHistoryView implements DraftHistoryViewInterface
 
         foreach ($draftPicks as $pick) {
             $pid = $pick['pid'];
-            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($pick['name']);
-            /** @var string $pos */
             $pos = HtmlSanitizer::safeHtmlOutput($pick['pos']);
             $round = $pick['draftround'];
             $pickNo = $pick['draftpickno'];
-            /** @var string $college */
             $college = HtmlSanitizer::safeHtmlOutput($pick['college']);
 
             // Team cell styling
@@ -197,14 +193,11 @@ class DraftHistoryView implements DraftHistoryViewInterface
 
         foreach ($draftPicks as $pick) {
             $pid = $pick['pid'];
-            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($pick['name']);
-            /** @var string $pos */
             $pos = HtmlSanitizer::safeHtmlOutput($pick['pos']);
             $round = $pick['draftround'];
             $pickNo = $pick['draftpickno'];
             $draftYear = $pick['draftyear'];
-            /** @var string $college */
             $college = HtmlSanitizer::safeHtmlOutput($pick['college']);
             $isRetired = $pick['retired'] !== 0;
 

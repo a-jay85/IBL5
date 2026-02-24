@@ -107,7 +107,6 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
         foreach ($freeAgents as $player) {
             $pid = $player['pid'];
             $tid = $player['tid'];
-            /** @var string $pos */
             $pos = HtmlSanitizer::safeHtmlOutput($player['pos']);
             $age = $player['age'];
 

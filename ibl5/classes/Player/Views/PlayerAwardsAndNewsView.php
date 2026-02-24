@@ -50,9 +50,7 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
         <?php
         /** @var list<array{year: int, name: string, Award: string, prim: int}> $awards */
         foreach ($awards as $award) {
-            /** @var string $year */
             $year = HtmlSanitizer::safeHtmlOutput((string) $award['year']);
-            /** @var string $type */
             $type = HtmlSanitizer::safeHtmlOutput($award['Award']);
             ?>
     <tr>
@@ -72,9 +70,7 @@ class PlayerAwardsAndNewsView implements PlayerAwardsAndNewsViewInterface
             foreach ($articles as $article): ?>
                 <?php
                 $sid = $article['sid'];
-                /** @var string $title */
                 $title = HtmlSanitizer::safeHtmlOutput($article['title']);
-                /** @var string $time */
                 $time = HtmlSanitizer::safeHtmlOutput($article['time']);
                 ?>
                 * <a href="modules.php?name=News&file=article&sid=<?= $sid ?>&mode=&order=0&thold=0"><?= $title ?></a> (<?= $time ?>)<br>

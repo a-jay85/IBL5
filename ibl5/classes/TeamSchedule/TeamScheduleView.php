@@ -41,12 +41,9 @@ class TeamScheduleView implements TeamScheduleViewInterface
      */
     public function render(\Team $team, array $games, int $simLengthInDays, string $seasonPhase): string
     {
-        /** @var string $color1 */
         $color1 = HtmlSanitizer::safeHtmlOutput($team->color1);
-        /** @var string $color2 */
         $color2 = HtmlSanitizer::safeHtmlOutput($team->color2);
         $teamId = $team->teamID;
-        /** @var string $teamName */
         $teamName = HtmlSanitizer::safeHtmlOutput($team->name);
 
         // Organize games by month and date
@@ -162,9 +159,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
             $monthLabel = $data['label'];
             $monthTimestamp = strtotime($monthKey . '-01');
             $abbrev = (is_int($monthTimestamp) && $monthTimestamp !== 0) ? date('M', $monthTimestamp) : '';
-            /** @var string $safeLabel */
             $safeLabel = HtmlSanitizer::safeHtmlOutput($monthLabel);
-            /** @var string $safeAbbrev */
             $safeAbbrev = HtmlSanitizer::safeHtmlOutput($abbrev);
             $html .= '<a href="#team-month-' . $monthKey . '" class="ibl-jump-menu__link schedule-months__link" onclick="scrollToMonth(event, \'' . $monthKey . '\')">';
             $html .= '<span class="schedule-months__full">' . $safeLabel . '</span>';
@@ -190,7 +185,6 @@ class TeamScheduleView implements TeamScheduleViewInterface
             if ($isPlayoffPhase && $monthKey === $playoffMonthKey) {
                 $headerClass .= ' schedule-month__header--playoffs';
             }
-            /** @var string $safeLabel */
             $safeLabel = HtmlSanitizer::safeHtmlOutput($data['label']);
             $html .= '<div class="' . $headerClass . '">' . $safeLabel . '</div>';
 
@@ -274,9 +268,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
         }
 
         // Visitor team + logo (same as League Schedule)
-        /** @var string $safeVisitorName */
         $safeVisitorName = HtmlSanitizer::safeHtmlOutput($visitorName);
-        /** @var string $safeVisitorRecord */
         $safeVisitorRecord = HtmlSanitizer::safeHtmlOutput($visitorRecord);
         $html .= '<a href="' . $visitorUrl . '" class="schedule-game__team-link">';
         $html .= '<span class="schedule-game__team' . $vWinClass . '"><span class="schedule-game__team-text">' . $safeVisitorName . '</span>';
@@ -304,9 +296,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
         }
 
         // Home logo + team (same as League Schedule)
-        /** @var string $safeHomeName */
         $safeHomeName = HtmlSanitizer::safeHtmlOutput($homeName);
-        /** @var string $safeHomeRecord */
         $safeHomeRecord = HtmlSanitizer::safeHtmlOutput($homeRecord);
         $html .= '<a href="' . $homeUrl . '" class="schedule-game__logo-link">';
         $html .= '<img class="schedule-game__logo" src="images/logo/new' . $homeTeamId . '.png" alt="" width="25" height="25" loading="lazy">';

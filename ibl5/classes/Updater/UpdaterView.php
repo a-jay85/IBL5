@@ -22,7 +22,6 @@ class UpdaterView
      */
     public function renderPageOpen(string $stylesheetPath): string
     {
-        /** @var string $safeStylesheet */
         $safeStylesheet = HtmlSanitizer::safeHtmlOutput($stylesheetPath);
 
         return '<!DOCTYPE html>'
@@ -47,7 +46,6 @@ class UpdaterView
      */
     public function renderSectionOpen(string $label): string
     {
-        /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
 
         return '<section class="updater-section">'
@@ -72,7 +70,6 @@ class UpdaterView
      */
     public function renderInitStatus(string $label): string
     {
-        /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
 
         return '<div class="updater-init">'
@@ -89,7 +86,6 @@ class UpdaterView
      */
     public function renderStepStart(string $label): string
     {
-        /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
 
         return '<div class="updater-step updater-step--running">'
@@ -107,7 +103,6 @@ class UpdaterView
      */
     public function renderStepComplete(string $label, string $detail = ''): string
     {
-        /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
 
         $html = '<div class="updater-step updater-step--success">'
@@ -115,7 +110,6 @@ class UpdaterView
             . '<span class="updater-step__label">' . $safeLabel . '</span>';
 
         if ($detail !== '') {
-            /** @var string $safeDetail */
             $safeDetail = HtmlSanitizer::safeHtmlOutput($detail);
             $html .= '<span class="updater-step__detail">' . $safeDetail . '</span>';
         }
@@ -134,9 +128,7 @@ class UpdaterView
      */
     public function renderStepError(string $label, string $error): string
     {
-        /** @var string $safeLabel */
         $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
-        /** @var string $safeError */
         $safeError = HtmlSanitizer::safeHtmlOutput($error);
 
         return '<div class="updater-step updater-step--error">'

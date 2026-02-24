@@ -63,13 +63,10 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
     public function simulateGame(array $player1Data, array $player2Data, string $owner): OneOnOneGameResult
     {
         $result = new OneOnOneGameResult();
-        /** @var string $sanitizedOwner */
         $sanitizedOwner = HtmlSanitizer::safeHtmlOutput($owner);
         $result->owner = $sanitizedOwner;
-        /** @var string $sanitizedP1Name */
         $sanitizedP1Name = HtmlSanitizer::safeHtmlOutput($player1Data['name']);
         $result->player1Name = $sanitizedP1Name;
-        /** @var string $sanitizedP2Name */
         $sanitizedP2Name = HtmlSanitizer::safeHtmlOutput($player2Data['name']);
         $result->player2Name = $sanitizedP2Name;
 
@@ -148,9 +145,7 @@ class OneOnOneGameEngine implements OneOnOneGameEngineInterface
         bool $isPlayer1OnOffense,
         int $possession
     ): void {
-        /** @var string $offenseName */
         $offenseName = HtmlSanitizer::safeHtmlOutput($offenseData['name']);
-        /** @var string $defenseName */
         $defenseName = HtmlSanitizer::safeHtmlOutput($defenseData['name']);
         
         $possessionResult = $this->calculatePossessionResult($offenseData, $defenseData);

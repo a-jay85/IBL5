@@ -59,7 +59,6 @@ class PlayerHeatStatsView implements PlayerHeatStatsViewInterface
         <?php
         foreach ($heatStats as $stats) {
             /** @var array{year: int, pos: string, pid: int, name: string, team: string, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, tvr: int, blk: int, pf: int, pts: int} $stats */
-            /** @var string $team */
             $team = HtmlSanitizer::safeHtmlOutput($stats['team']);
             $drb = $stats['reb'] - $stats['orb'];
 
@@ -135,7 +134,6 @@ class PlayerHeatStatsView implements PlayerHeatStatsViewInterface
                 continue;
             }
 
-            /** @var string $team */
             $team = HtmlSanitizer::safeHtmlOutput($stats['team']);
             $drb = $stats['reb'] - $stats['orb'];
 

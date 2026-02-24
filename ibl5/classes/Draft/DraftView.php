@@ -19,7 +19,6 @@ class DraftView implements DraftViewInterface
      */
     public function renderValidationError(string $errorMessage): string
     {
-        /** @var string $errorMessage */
         $errorMessage = HtmlSanitizer::safeHtmlOutput($errorMessage);
         $retryInstructions = $this->getRetryInstructions($errorMessage);
 
@@ -42,7 +41,6 @@ class DraftView implements DraftViewInterface
         $html .= '<img src="images/logo/' . $tid . '.jpg" alt="Team Logo" class="team-logo-banner">';
 
         $html .= "<form name='draft_form' action='/ibl5/modules/Draft/draft_selection.php' method='POST'>";
-        /** @var string $safeTeamLogo */
         $safeTeamLogo = HtmlSanitizer::safeHtmlOutput($teamLogo);
         $html .= "<input type='hidden' name='teamname' value='" . $safeTeamLogo . "'>";
         $html .= "<input type='hidden' name='draft_round' value='$draftRound'>";
@@ -103,7 +101,6 @@ class DraftView implements DraftViewInterface
 
         foreach ($players as $player) {
             $isPlayerDrafted = $player['drafted'];
-            /** @var string $playerName */
             $playerName = HtmlSanitizer::safeHtmlOutput($player['name']);
             $rowClass = ($isPlayerDrafted !== 0 && $isPlayerDrafted !== null) ? ' class="drafted"' : '';
 
@@ -121,9 +118,7 @@ class DraftView implements DraftViewInterface
                     <td class="sticky-col-2" style="white-space: nowrap;">' . $playerName . '</td>';
             }
 
-            /** @var string $safePos */
             $safePos = HtmlSanitizer::safeHtmlOutput($player['pos']);
-            /** @var string $safeTeam */
             $safeTeam = HtmlSanitizer::safeHtmlOutput($player['team']);
             $html .= '
             <td>' . $safePos . '</td>

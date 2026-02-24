@@ -74,7 +74,6 @@ class PlayerRegularSeasonAveragesView implements PlayerRegularSeasonAveragesView
         <?php
         foreach ($historicalStats as $row) {
             $year = $row['year'];
-            /** @var string $team */
             $team = HtmlSanitizer::safeHtmlOutput($row['team']);
             $teamId = $row['teamid'];
             $gm = $row['games'];

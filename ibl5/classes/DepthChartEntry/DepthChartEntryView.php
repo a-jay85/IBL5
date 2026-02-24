@@ -112,17 +112,11 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
      */
     public function renderFormHeader(string $teamLogo, int $teamID, array $slotNames): void
     {
-        /** @var string $teamLogoEscaped */
         $teamLogoEscaped = HtmlSanitizer::safeHtmlOutput($teamLogo);
-        /** @var string $slot0 */
         $slot0 = HtmlSanitizer::safeHtmlOutput($slotNames[0]);
-        /** @var string $slot1 */
         $slot1 = HtmlSanitizer::safeHtmlOutput($slotNames[1]);
-        /** @var string $slot2 */
         $slot2 = HtmlSanitizer::safeHtmlOutput($slotNames[2]);
-        /** @var string $slot3 */
         $slot3 = HtmlSanitizer::safeHtmlOutput($slotNames[3]);
-        /** @var string $slot4 */
         $slot4 = HtmlSanitizer::safeHtmlOutput($slotNames[4]);
         echo '<form name="DepthChartEntry" method="post" action="modules.php?name=DepthChartEntry&amp;op=submit" class="depth-chart-form">
             <input type="hidden" name="Team_Name" value="' . $teamLogoEscaped . '">
@@ -161,7 +155,6 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         $player_name = $player['name'];
         $player_inj = $player['injured'] ?? 0;
 
-        /** @var string $player_name_html */
         $player_name_html = HtmlSanitizer::safeHtmlOutput($player_name);
 
         $player_staminacap = ($player['sta'] ?? 0) + 40;
@@ -304,11 +297,9 @@ JAVASCRIPT;
         echo '<label for="saved-dc-select" class="saved-dc-label">Load Saved Depth Chart:</label>';
         echo '<div class="saved-dc-select-wrapper">';
         echo '<select id="saved-dc-select" class="saved-dc-select">';
-        /** @var string $currentLiveLabelHtml */
         $currentLiveLabelHtml = HtmlSanitizer::safeHtmlOutput($currentLiveLabel);
         echo '<option value="0">' . $currentLiveLabelHtml . '</option>';
         foreach ($options as $option) {
-            /** @var string $labelHtml */
             $labelHtml = HtmlSanitizer::safeHtmlOutput($option['label']);
             echo '<option value="' . $option['id'] . '">' . $labelHtml . '</option>';
         }
@@ -336,13 +327,11 @@ JAVASCRIPT;
             echo '<div class="text-center"><span class="underline">Your depth chart has been submitted and e-mailed successfully. Thank you.</span></div><p>';
         }
 
-        /** @var string $teamNameHtml */
         $teamNameHtml = HtmlSanitizer::safeHtmlOutput($teamName);
         echo $teamNameHtml . ' Depth Chart Submission<br><table class="ibl-data-table">';
         echo '<thead><tr>
             <th>Name</th>';
         foreach (\JSB::PLAYER_POSITIONS as $position) {
-            /** @var string $posHtml */
             $posHtml = HtmlSanitizer::safeHtmlOutput($position);
             echo '<th>' . $posHtml . '</th>';
         }
@@ -356,7 +345,6 @@ JAVASCRIPT;
         </tr></thead><tbody>';
 
         foreach ($playerData as $player) {
-            /** @var string $nameHtml */
             $nameHtml = HtmlSanitizer::safeHtmlOutput($player['name']);
             echo '<tr>
                 <td>' . $nameHtml . '</td>';

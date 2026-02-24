@@ -41,13 +41,11 @@ class VotingResultsTableRenderer implements VotingResultsTableRendererInterface
      */
     private function renderTable(string $title, array $rows): string
     {
-        /** @var string $escapedTitle */
         $escapedTitle = HtmlSanitizer::safeHtmlOutput($title);
 
         /** @var list<string> $rowsHtml */
         $rowsHtml = [];
         foreach ($rows as $row) {
-            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($row['name']);
             $votes = $row['votes'];
             $pid = $row['pid'] ?? 0;

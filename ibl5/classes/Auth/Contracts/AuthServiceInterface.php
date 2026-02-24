@@ -46,6 +46,21 @@ interface AuthServiceInterface
     public function getUsername(): ?string;
 
     /**
+     * Check if the authenticated user has the ADMIN role
+     *
+     * @return bool True if the user is an admin
+     */
+    public function isAdmin(): bool;
+
+    /**
+     * Check if the authenticated user has a specific role (bitmask check)
+     *
+     * @param int $role The role bitmask to check (use \Delight\Auth\Role constants)
+     * @return bool True if the user has the role
+     */
+    public function hasRole(int $role): bool;
+
+    /**
      * Get the full user info row for the authenticated user
      *
      * @return array<string, mixed>|null User row from nuke_users or null if not authenticated

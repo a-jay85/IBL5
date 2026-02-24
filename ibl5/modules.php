@@ -33,11 +33,11 @@ if (isset($name) && $name == $_REQUEST['name']) {
     }
 
     // Phase-based access control (replaces nuke_modules query)
-    global $mysqli_db, $admin, $leagueContext;
+    global $mysqli_db, $leagueContext;
     $season = new Season($mysqli_db);
     $accessControl = new Module\ModuleAccessControl($season, $leagueContext, $mysqli_db);
 
-    if (!$accessControl->isModuleAccessible($name) && !is_admin($admin)) {
+    if (!$accessControl->isModuleAccessible($name) && !is_admin()) {
         PageLayout\PageLayout::header();
         OpenTable();
         echo "<center>" . _MODULENOTACTIVE . "<br><br>" . _GOBACK . "</center>";

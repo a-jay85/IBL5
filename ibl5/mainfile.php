@@ -148,9 +148,9 @@ $_protected_globals = [
     // Database connection objects
     'db', 'mysqli_db',
     // Authentication state
-    'admin', 'user', 'cookie', 'userinfo',
+    'user', 'cookie', 'userinfo',
     // PHP-Nuke core configuration
-    'nukeurl', 'sitename', 'adminmail', 'admin_file',
+    'nukeurl', 'sitename', 'adminmail',
     // Session/superglobals
     '_SESSION', '_COOKIE', '_SERVER', '_ENV', '_FILES', '_GET', '_POST', '_REQUEST',
     // Internal PHP
@@ -172,12 +172,7 @@ foreach ($_REQUEST as $key => $value) {
     }
 }
 
-if (isset($_COOKIE['admin'])) {
-    $admin = base64_decode($_COOKIE['admin']);
-    $admin = addslashes($admin);
-    $admin = base64_encode($admin);
-}
-// User auth is now session-based via AuthService — legacy cookie is ignored
+// Auth is now session-based via AuthService — legacy admin/user cookies are ignored
 
 // Include the required files - Load appropriate config based on league selection
 $currentLeague = $_SESSION['current_league'] ?? $_COOKIE[\League\LeagueContext::COOKIE_NAME] ?? 'ibl';
@@ -209,14 +204,6 @@ if ($authService->isAuthenticated()) {
 require_once __DIR__ . "/includes/ipban.php";
 if (file_exists(__DIR__ . "/includes/custom_files/custom_mainfile.php")) {
     @include_once __DIR__ . "/includes/custom_files/custom_mainfile.php";
-}
-
-if (!defined('FORUM_ADMIN')) {
-    if (empty($admin_file)) {
-        die("You must set a value for admin_file in config.php");
-    } elseif (!empty($admin_file) && !file_exists(__DIR__ . "/" . $admin_file . ".php")) {
-        die("The admin_file you defined in config.php does not exist");
-    }
 }
 
 define('NUKE_FILE', true);
@@ -321,33 +308,15 @@ function get_lang($module)
     }
 }
 
-function is_admin($admin)
+function is_admin($admin = null)
 {
+    // Session-based auth via AuthService — the $admin parameter is kept for signature compat
+    global $authService;
     static $adminSave;
-    if (!$admin) {return 0;}
     if (isset($adminSave)) {
         return $adminSave;
     }
-
-    if (!is_array($admin)) {
-        $admin = base64_decode($admin);
-        $admin = addslashes($admin);
-        $admin = explode(':', $admin);
-    }
-    $aid = $admin[0];
-    $pwd = $admin[1];
-    $aid = substr(addslashes($aid), 0, 25);
-    if (!empty($aid) && !empty($pwd)) {
-        global $prefix, $db;
-        $sql = "SELECT pwd FROM " . $prefix . "_authors WHERE aid='$aid'";
-        $result = $db->sql_query($sql);
-        $pass = $db->sql_fetchrow($result);
-        $db->sql_freeresult($result);
-        if ($pass[0] == $pwd && !empty($pass[0])) {
-            return $adminSave = 1;
-        }
-    }
-    return $adminSave = 0;
+    return $adminSave = $authService->isAdmin() ? 1 : 0;
 }
 
 function is_user($user)
@@ -435,7 +404,7 @@ function render_blocks($side, $blockfile, $title, $content, $bid, $url)
 
 function blocks($side)
 {
-    global $storynum, $prefix, $multilingual, $currentlang, $db, $admin, $user;
+    global $storynum, $prefix, $multilingual, $currentlang, $db, $user;
     if ($multilingual == 1) {
         $querylang = "AND (blanguage='$currentlang' OR blanguage='')";
     } else {
@@ -486,11 +455,11 @@ function blocks($side)
             if (empty($row['bkey'])) {
                 if ($view == 0) {
                     render_blocks($side, $blockfile, $title, $content, $bid, $url);
-                } elseif ($view == 1 and is_user($user) || is_admin($admin)) {
+                } elseif ($view == 1 and is_user($user) || is_admin()) {
                     render_blocks($side, $blockfile, $title, $content, $bid, $url);
-                } elseif ($view == 2 and is_admin($admin)) {
+                } elseif ($view == 2 and is_admin()) {
                     render_blocks($side, $blockfile, $title, $content, $bid, $url);
-                } elseif ($view == 3 and !is_user($user) || is_admin($admin)) {
+                } elseif ($view == 3 and !is_user($user) || is_admin()) {
                     render_blocks($side, $blockfile, $title, $content, $bid, $url);
                 }
             }
@@ -501,7 +470,7 @@ function blocks($side)
 
 function message_box()
 {
-    global $bgcolor1, $bgcolor2, $user, $admin, $cookie, $textcolor2, $prefix, $multilingual, $currentlang, $db, $admin_file;
+    global $bgcolor1, $bgcolor2, $user, $cookie, $textcolor2, $prefix, $multilingual, $currentlang, $db;
     if ($multilingual == 1) {
         $querylang = "AND (mlanguage='$currentlang' OR mlanguage='')";
     } else {
@@ -538,43 +507,30 @@ function message_box()
                     OpenTable();
                     echo "<center><font class=\"option\" color=\"$textcolor2\"><b>$title</b></font></center><br>\n"
                         . "<font class=\"content\">$content</font>";
-                    if (is_admin($admin)) {
-                        echo "<br><br><center><font class=\"content\">[ " . _MVIEWSUBUSERS . " - $remain - <a href=\"" . $admin_file . ".php?op=editmsg&amp;mid=$mid\">" . _EDIT . "</a> ]</font></center>";
-                    }
                     CloseTable();
                     echo "<br>";
-                } elseif ($view == 4 and is_admin($admin)) {
-                    OpenTable();
-                    echo "<center><font class=\"option\" color=\"$textcolor2\"><b>$title</b></font></center><br>\n"
-                        . "<font class=\"content\">$content</font>"
-                        . "<br><br><center><font class=\"content\">[ " . _MVIEWADMIN . " - $remain - <a href=\"" . $admin_file . ".php?op=editmsg&amp;mid=$mid\">" . _EDIT . "</a> ]</font></center>";
-                    CloseTable();
-                    echo "<br>";
-                } elseif ($view == 3 and is_user($user) || is_admin($admin)) {
+                } elseif ($view == 4 and is_admin()) {
                     OpenTable();
                     echo "<center><font class=\"option\" color=\"$textcolor2\"><b>$title</b></font></center><br>\n"
                         . "<font class=\"content\">$content</font>";
-                    if (is_admin($admin)) {
-                        echo "<br><br><center><font class=\"content\">[ " . _MVIEWUSERS . " - $remain - <a href=\"" . $admin_file . ".php?op=editmsg&amp;mid=$mid\">" . _EDIT . "</a> ]</font></center>";
-                    }
                     CloseTable();
                     echo "<br>";
-                } elseif ($view == 2 and !is_user($user) || is_admin($admin)) {
+                } elseif ($view == 3 and is_user($user) || is_admin()) {
                     OpenTable();
                     echo "<center><font class=\"option\" color=\"$textcolor2\"><b>$title</b></font></center><br>\n"
                         . "<font class=\"content\">$content</font>";
-                    if (is_admin($admin)) {
-                        echo "<br><br><center><font class=\"content\">[ " . _MVIEWANON . " - $remain - <a href=\"" . $admin_file . ".php?op=editmsg&amp;mid=$mid\">" . _EDIT . "</a> ]</font></center>";
-                    }
+                    CloseTable();
+                    echo "<br>";
+                } elseif ($view == 2 and !is_user($user) || is_admin()) {
+                    OpenTable();
+                    echo "<center><font class=\"option\" color=\"$textcolor2\"><b>$title</b></font></center><br>\n"
+                        . "<font class=\"content\">$content</font>";
                     CloseTable();
                     echo "<br>";
                 } elseif ($view == 1) {
                     OpenTable();
                     echo "<center><font class=\"option\" color=\"$textcolor2\"><b>$title</b></font></center><br>\n"
                         . "<font class=\"content\">$content</font>";
-                    if (is_admin($admin)) {
-                        echo "<br><br><center><font class=\"content\">[ " . _MVIEWALL . " - $remain - <a href=\"" . $admin_file . ".php?op=editmsg&amp;mid=$mid\">" . _EDIT . "</a> ]</font></center>";
-                    }
                     CloseTable();
                     echo "<br>";
                 }

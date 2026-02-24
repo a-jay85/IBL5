@@ -176,19 +176,8 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
 
     public static function footer(): never
     {
-        /** @var string $name */
-        global $name;
-        /** @var string $admin */
-        global $admin;
         if (defined('HOME_FILE')) {
             blocks("Down");
-        }
-        $phpSelfRaw = $_SERVER['PHP_SELF'] ?? '';
-        $phpSelf = is_string($phpSelfRaw) ? $phpSelfRaw : '';
-        $nameStr = is_string($name) ? $name : '';
-        if (basename($phpSelf) !== "index.php" and defined('MODULE_FILE') and (file_exists("modules/$nameStr/admin/panel.php") && is_admin($admin))) {
-            echo "<br>";
-            include "modules/$nameStr/admin/panel.php";
         }
         themefooter();
         echo "</body>\n</html>";

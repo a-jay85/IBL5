@@ -17,7 +17,7 @@ declare(strict_types=1);
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
-global $mysqli_db, $admin;
+global $mysqli_db;
 
 use FreeAgency\FreeAgencyAdminProcessor;
 use FreeAgency\FreeAgencyAdminRepository;
@@ -25,7 +25,7 @@ use Utilities\CsrfGuard;
 use Utilities\HtmlSanitizer;
 
 // Admin authentication check
-if (!is_admin($admin)) {
+if (!is_admin()) {
     header('HTTP/1.1 403 Forbidden');
     echo '<h1>403 Forbidden</h1><p>Admin access required.</p>';
     exit;

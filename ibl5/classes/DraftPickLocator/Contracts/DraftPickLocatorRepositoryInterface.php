@@ -26,15 +26,15 @@ interface DraftPickLocatorRepositoryInterface
     /**
      * Get draft picks for a specific team
      *
-     * @param string $teamName Team name
+     * @param int $teamId Team ID (ibl_team_info.teamid)
      * @return list<array{ownerofpick: string, year: int, round: int}>
      */
-    public function getDraftPicksForTeam(string $teamName): array;
+    public function getDraftPicksForTeam(int $teamId): array;
 
     /**
-     * Get all draft picks grouped by team pick name
+     * Get all draft picks grouped by team pick ID
      *
-     * @return array<string, list<array{ownerofpick: string, year: int, round: int}>>
+     * @return array<int, list<array{ownerofpick: string, year: int, round: int}>>
      */
     public function getAllDraftPicksGroupedByTeam(): array;
 }

@@ -76,10 +76,11 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
         $teamOnTheClock = null;
         $discordIDOfTeamOnTheClock = null;
         if ($nextTeamDraftPick !== null) {
+            $nextTeamTid = $this->commonRepository->getTidFromTeamname($nextTeamDraftPick) ?? 0;
             $teamOnTheClock = $this->sharedRepository->getCurrentOwnerOfDraftPick(
                 $this->season->endingYear,
                 $draftRound,
-                $nextTeamDraftPick
+                $nextTeamTid
             );
             if ($teamOnTheClock !== null) {
                 $discordIDOfTeamOnTheClock = $this->commonRepository->getTeamDiscordID($teamOnTheClock);

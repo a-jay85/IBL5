@@ -13,7 +13,7 @@ use Player\Player;
  * Extracted from the Team entity class to separate query concerns from entity state.
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
- * @phpstan-type DraftPickRow array{pickid: int, ownerofpick: string, teampick: string, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
+ * @phpstan-type DraftPickRow array{pickid: int, ownerofpick: string, owner_tid: int, teampick: string, teampick_tid: int, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
  * @phpstan-type FreeAgencyOfferRow array{pid: int, tid: int, team: string, name: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, ...}
  */
 interface TeamQueryRepositoryInterface
@@ -35,9 +35,10 @@ interface TeamQueryRepositoryInterface
     /**
      * Get draft picks owned by a team
      *
+     * @param int $teamId Team ID (ibl_team_info.teamid)
      * @return list<DraftPickRow> Array of draft pick rows
      */
-    public function getDraftPicks(string $teamName): array;
+    public function getDraftPicks(int $teamId): array;
 
     /**
      * Get free agency offers made by a team

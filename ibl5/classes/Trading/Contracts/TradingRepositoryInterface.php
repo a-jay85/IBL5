@@ -157,9 +157,10 @@ interface TradingRepositoryInterface
      *
      * @param int $pickId Pick ID
      * @param string $newOwner New owner team name
+     * @param int $newOwnerId New owner team ID
      * @return int Number of rows affected
      */
-    public function updateDraftPickOwnerById(int $pickId, string $newOwner): int;
+    public function updateDraftPickOwnerById(int $pickId, string $newOwner, int $newOwnerId): int;
 
     /**
      * Delete trade info by offer ID
@@ -215,10 +216,10 @@ interface TradingRepositoryInterface
      *
      * Returns all draft picks owned by a team, ordered by year and round.
      *
-     * @param string $teamName Team name (ownerofpick value)
+     * @param int $teamId Team ID (owner_tid value)
      * @return list<TradingDraftPickRow> Draft pick rows with teampick team ID
      */
-    public function getTeamDraftPicksForTrading(string $teamName): array;
+    public function getTeamDraftPicksForTrading(int $teamId): array;
 
     /**
      * Get all trade offers ordered by offer ID

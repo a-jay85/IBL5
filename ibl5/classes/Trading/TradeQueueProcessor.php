@@ -144,6 +144,7 @@ class TradeQueueProcessor
 
         $rawPickId = $params['pick_id'];
         $rawNewOwner = $params['new_owner'];
+        $rawNewOwnerId = $params['new_owner_id'] ?? 0;
 
         if (!is_int($rawPickId) && !is_string($rawPickId)) {
             return ['success' => false, 'error' => 'Invalid pick_id type'];
@@ -154,8 +155,9 @@ class TradeQueueProcessor
 
         $pickId = (int) $rawPickId;
         $newOwner = $rawNewOwner;
+        $newOwnerId = is_int($rawNewOwnerId) ? $rawNewOwnerId : (is_string($rawNewOwnerId) ? (int) $rawNewOwnerId : 0);
 
-        $affectedRows = $this->executionRepository->executeQueuedPickTransfer($pickId, $newOwner);
+        $affectedRows = $this->executionRepository->executeQueuedPickTransfer($pickId, $newOwner, $newOwnerId);
 
         if ($affectedRows > 0) {
             return ['success' => true, 'error' => ''];

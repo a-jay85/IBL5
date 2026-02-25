@@ -46,9 +46,10 @@ interface TradeExecutionRepositoryInterface
      *
      * @param int $pickId Pick ID
      * @param string $newOwner New owner team name
+     * @param int $newOwnerId New owner team ID
      * @return int Number of affected rows
      */
-    public function executeQueuedPickTransfer(int $pickId, string $newOwner): int;
+    public function executeQueuedPickTransfer(int $pickId, string $newOwner, int $newOwnerId): int;
 
     /**
      * Delete a queued trade entry by ID

@@ -39,38 +39,38 @@ class DraftPickLocatorRepository extends \BaseMysqliRepository implements DraftP
      *
      * @return list<array{ownerofpick: string, year: int, round: int}>
      */
-    public function getDraftPicksForTeam(string $teamName): array
+    public function getDraftPicksForTeam(int $teamId): array
     {
         /** @var list<array{ownerofpick: string, year: int, round: int}> */
         return $this->fetchAll(
             "SELECT ownerofpick, year, round
              FROM ibl_draft_picks
-             WHERE teampick = ?
+             WHERE teampick_tid = ?
              ORDER BY year, round ASC",
-            "s",
-            $teamName
+            "i",
+            $teamId
         );
     }
 
     /**
      * @see DraftPickLocatorRepositoryInterface::getAllDraftPicksGroupedByTeam()
      *
-     * @return array<string, list<array{ownerofpick: string, year: int, round: int}>>
+     * @return array<int, list<array{ownerofpick: string, year: int, round: int}>>
      */
     public function getAllDraftPicksGroupedByTeam(): array
     {
-        /** @var list<array{teampick: string, ownerofpick: string, year: int, round: int}> $rows */
+        /** @var list<array{teampick_tid: int, ownerofpick: string, year: int, round: int}> $rows */
         $rows = $this->fetchAll(
-            "SELECT teampick, ownerofpick, year, round
+            "SELECT teampick_tid, ownerofpick, year, round
              FROM ibl_draft_picks
-             ORDER BY teampick, year, round ASC"
+             ORDER BY teampick_tid, year, round ASC"
         );
 
-        /** @var array<string, list<array{ownerofpick: string, year: int, round: int}>> $grouped */
+        /** @var array<int, list<array{ownerofpick: string, year: int, round: int}>> $grouped */
         $grouped = [];
         foreach ($rows as $row) {
-            $teamPick = $row['teampick'];
-            $grouped[$teamPick][] = [
+            $teamId = $row['teampick_tid'];
+            $grouped[$teamId][] = [
                 'ownerofpick' => $row['ownerofpick'],
                 'year' => $row['year'],
                 'round' => $row['round'],

@@ -54,7 +54,7 @@ class DraftPickLocatorServiceTest extends TestCase
             ['teamid' => 1, 'team_city' => 'Boston', 'team_name' => 'Celtics', 'color1' => '00FF00', 'color2' => 'FFFFFF'],
         ];
         $allPicks = [
-            'Celtics' => [
+            1 => [
                 ['ownerofpick' => 'Celtics', 'year' => 2025, 'round' => 1],
             ],
         ];
@@ -109,9 +109,9 @@ class DraftPickLocatorServiceTest extends TestCase
         ];
 
         $allPicks = [
-            'Team A' => [['ownerofpick' => 'Team A', 'year' => 2025, 'round' => 1]],
-            'Team B' => [['ownerofpick' => 'Team B', 'year' => 2025, 'round' => 1]],
-            'Team C' => [['ownerofpick' => 'Team C', 'year' => 2025, 'round' => 1]],
+            1 => [['ownerofpick' => 'Team A', 'year' => 2025, 'round' => 1]],
+            2 => [['ownerofpick' => 'Team B', 'year' => 2025, 'round' => 1]],
+            3 => [['ownerofpick' => 'Team C', 'year' => 2025, 'round' => 1]],
         ];
 
         $this->mockRepository->method('getAllTeams')->willReturn($teams);

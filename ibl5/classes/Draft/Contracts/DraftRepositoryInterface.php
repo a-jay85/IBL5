@@ -50,7 +50,7 @@ namespace Draft\Contracts;
  *     sta: int|null
  * }
  *
- * @phpstan-type DraftPickRow = array{team: string, round: int, pick: int}
+ * @phpstan-type DraftPickRow = array{team: string, tid: int, round: int, pick: int}
  */
 interface DraftRepositoryInterface
 {

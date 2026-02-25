@@ -58,12 +58,12 @@ class TradingService implements TradingServiceInterface
         $partnerTeamId = $partnerTeamData !== null ? $partnerTeamData['teamid'] : 0;
 
         $userPlayers = $this->repository->getTeamPlayersForTrading($userTeamId);
-        $userPicks = $this->repository->getTeamDraftPicksForTrading($userTeam);
+        $userPicks = $this->repository->getTeamDraftPicksForTrading($userTeamId);
         $userCashRecords = $this->cashRepository->getTeamCashRecordsForSalary($userTeamId);
         $userFutureSalary = $this->calculateFutureSalaries([...$userPlayers, ...$userCashRecords], $season);
 
         $partnerPlayers = $this->repository->getTeamPlayersForTrading($partnerTeamId);
-        $partnerPicks = $this->repository->getTeamDraftPicksForTrading($partnerTeam);
+        $partnerPicks = $this->repository->getTeamDraftPicksForTrading($partnerTeamId);
         $partnerCashRecords = $this->cashRepository->getTeamCashRecordsForSalary($partnerTeamId);
         $partnerFutureSalary = $this->calculateFutureSalaries([...$partnerPlayers, ...$partnerCashRecords], $season);
 

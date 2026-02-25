@@ -191,11 +191,14 @@ class TradeProcessor implements TradeProcessorInterface
                     $pickData['teampick'] . " Round " .
                     $pickData['round'] . " draft pick to the $listeningTeamName.<br>";
 
+        // Resolve team ID for the new owner
+        $listeningTeamId = $this->commonRepository->getTidFromTeamname($listeningTeamName) ?? 0;
+
         // Update pick ownership using repository
-        $affectedRows = $this->repository->updateDraftPickOwnerById($itemId, $listeningTeamName);
+        $affectedRows = $this->repository->updateDraftPickOwnerById($itemId, $listeningTeamName, $listeningTeamId);
 
         // Queue structured data for deferred execution during certain season phases
-        $this->queuePickTransfer($itemId, $listeningTeamName, $tradeLine);
+        $this->queuePickTransfer($itemId, $listeningTeamName, $listeningTeamId, $tradeLine);
 
         return [
             'success' => ($affectedRows > 0),
@@ -281,15 +284,17 @@ class TradeProcessor implements TradeProcessorInterface
      *
      * @param int $pickId Pick ID
      * @param string $newOwner New owner team name
+     * @param int $newOwnerId New owner team ID
      * @param string $tradeLine Trade description for tracking
      * @return void
      */
-    protected function queuePickTransfer(int $pickId, string $newOwner, string $tradeLine): void
+    protected function queuePickTransfer(int $pickId, string $newOwner, int $newOwnerId, string $tradeLine): void
     {
         if ($this->shouldQueueTrades()) {
             $params = [
                 'pick_id' => $pickId,
                 'new_owner' => $newOwner,
+                'new_owner_id' => $newOwnerId,
             ];
             $this->executionRepository->insertTradeQueue('pick_transfer', $params, $tradeLine);
         }

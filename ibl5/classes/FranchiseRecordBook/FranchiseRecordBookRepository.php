@@ -26,13 +26,19 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
     {
         /** @var list<AlltimeRecord> $rows */
         $rows = $this->fetchAll(
-            "SELECT id, scope, team_id, record_type, stat_category, ranking,
-                    player_name, car_block_id, pid, stat_value, stat_raw,
-                    team_of_record, season_year, career_total
-             FROM ibl_rcb_alltime_records
-             WHERE scope = 'team' AND team_id = ? AND record_type = 'single_season'
-               AND ranking <= ?
-             ORDER BY stat_category, ranking",
+            "SELECT r.id, r.scope, r.team_id, r.record_type, r.stat_category, r.ranking,
+                    r.player_name, r.car_block_id,
+                    COALESCE(r.pid, plr.pid) AS pid,
+                    r.stat_value, r.stat_raw,
+                    r.team_of_record, r.season_year, r.career_total
+             FROM ibl_rcb_alltime_records r
+             LEFT JOIN (
+               SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
+               FROM ibl_plr GROUP BY clean_name
+             ) plr ON plr.clean_name = r.player_name
+             WHERE r.scope = 'team' AND r.team_id = ? AND r.record_type = 'single_season'
+               AND r.ranking <= ?
+             ORDER BY r.stat_category, r.ranking",
             'ii',
             $teamId,
             $limit
@@ -50,13 +56,19 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
     {
         /** @var list<AlltimeRecord> $rows */
         $rows = $this->fetchAll(
-            "SELECT id, scope, team_id, record_type, stat_category, ranking,
-                    player_name, car_block_id, pid, stat_value, stat_raw,
-                    team_of_record, season_year, career_total
-             FROM ibl_rcb_alltime_records
-             WHERE scope = 'league' AND record_type = 'career'
-               AND ranking <= ?
-             ORDER BY stat_category, ranking",
+            "SELECT r.id, r.scope, r.team_id, r.record_type, r.stat_category, r.ranking,
+                    r.player_name, r.car_block_id,
+                    COALESCE(r.pid, plr.pid) AS pid,
+                    r.stat_value, r.stat_raw,
+                    r.team_of_record, r.season_year, r.career_total
+             FROM ibl_rcb_alltime_records r
+             LEFT JOIN (
+               SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
+               FROM ibl_plr GROUP BY clean_name
+             ) plr ON plr.clean_name = r.player_name
+             WHERE r.scope = 'league' AND r.record_type = 'career'
+               AND r.ranking <= ?
+             ORDER BY r.stat_category, r.ranking",
             'i',
             $limit
         );
@@ -73,13 +85,19 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
     {
         /** @var list<AlltimeRecord> $rows */
         $rows = $this->fetchAll(
-            "SELECT id, scope, team_id, record_type, stat_category, ranking,
-                    player_name, car_block_id, pid, stat_value, stat_raw,
-                    team_of_record, season_year, career_total
-             FROM ibl_rcb_alltime_records
-             WHERE scope = 'league' AND record_type = 'single_season'
-               AND ranking <= ?
-             ORDER BY stat_category, ranking",
+            "SELECT r.id, r.scope, r.team_id, r.record_type, r.stat_category, r.ranking,
+                    r.player_name, r.car_block_id,
+                    COALESCE(r.pid, plr.pid) AS pid,
+                    r.stat_value, r.stat_raw,
+                    r.team_of_record, r.season_year, r.career_total
+             FROM ibl_rcb_alltime_records r
+             LEFT JOIN (
+               SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
+               FROM ibl_plr GROUP BY clean_name
+             ) plr ON plr.clean_name = r.player_name
+             WHERE r.scope = 'league' AND r.record_type = 'single_season'
+               AND r.ranking <= ?
+             ORDER BY r.stat_category, r.ranking",
             'i',
             $limit
         );

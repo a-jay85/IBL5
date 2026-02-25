@@ -146,9 +146,14 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
         $likeQuery = '%' . $query . '%';
         $sql = "SELECT c.tid, c.sid, c.subject, c.date, c.name,
                        s.title AS article_title,
-                       (SELECT COUNT(*) FROM {$this->prefix}_comments c2 WHERE c2.pid = c.tid) AS reply_count
+                       COALESCE(rc.reply_count, 0) AS reply_count
                 FROM {$this->prefix}_comments c
                 LEFT JOIN {$this->prefix}_stories s ON c.sid = s.sid
+                LEFT JOIN (
+                    SELECT pid, COUNT(*) AS reply_count
+                    FROM {$this->prefix}_comments
+                    GROUP BY pid
+                ) rc ON rc.pid = c.tid
                 WHERE (c.subject LIKE ? OR c.comment LIKE ?)
                 ORDER BY c.date DESC
                 LIMIT ?, ?";

@@ -1647,6 +1647,7 @@ CREATE TABLE `ibl_plr` (
   KEY `idx_tid` (`tid`),
   KEY `idx_active` (`active`),
   KEY `idx_retired` (`retired`),
+  KEY `idx_retired_ordinal` (`retired`,`ordinal`),
   KEY `idx_tid_active` (`tid`,`active`),
   KEY `idx_pos` (`pos`),
   KEY `idx_draftyear` (`draftyear`),

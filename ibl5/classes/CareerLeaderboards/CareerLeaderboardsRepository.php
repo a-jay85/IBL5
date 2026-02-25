@@ -98,14 +98,14 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
                 WHERE $whereClause
                 GROUP BY pid
                 ORDER BY $sortColumn DESC"
-                . ($limit > 0 ? " LIMIT $limit" : "") . ";";
+                . " LIMIT " . ($limit > 0 ? $limit : 500) . ";";
         } else {
             $query = "SELECT h.*, p.retired
                 FROM $tableKey h
                 LEFT JOIN ibl_plr p ON h.pid = p.pid
                 WHERE $whereClause
                 ORDER BY $sortColumn DESC"
-                . ($limit > 0 ? " LIMIT $limit" : "") . ";";
+                . " LIMIT " . ($limit > 0 ? $limit : 500) . ";";
         }
 
         /** @var list<CareerStatsRow> $rows */

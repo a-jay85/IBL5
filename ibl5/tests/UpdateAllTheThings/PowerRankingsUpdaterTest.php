@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-
 namespace Tests\UpdateAllTheThings;
+
 use PHPUnit\Framework\TestCase;
 use Updater\PowerRankingsUpdater;
 use Statistics\TeamStatsCalculator;

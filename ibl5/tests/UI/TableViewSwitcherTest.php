@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-
 namespace Tests\UI;
+
 use PHPUnit\Framework\TestCase;
 use UI\Components\TableViewSwitcher;
 

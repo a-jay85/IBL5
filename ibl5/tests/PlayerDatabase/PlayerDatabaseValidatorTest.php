@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-
 namespace Tests\PlayerDatabase;
+
 use PHPUnit\Framework\TestCase;
 use PlayerDatabase\PlayerDatabaseValidator;
 

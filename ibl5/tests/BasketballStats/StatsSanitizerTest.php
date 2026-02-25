@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-
 namespace Tests\BasketballStats;
+
 use PHPUnit\Framework\TestCase;
 use BasketballStats\StatsSanitizer;
 

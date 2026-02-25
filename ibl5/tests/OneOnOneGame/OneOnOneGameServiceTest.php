@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-
 namespace Tests\OneOnOneGame;
+
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use OneOnOneGame\OneOnOneGameService;

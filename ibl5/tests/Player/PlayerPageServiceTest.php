@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-
 namespace Tests\Player;
+
 use PHPUnit\Framework\TestCase;
 use Player\PlayerPageService;
 use Player\Player;

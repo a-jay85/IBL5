@@ -34,8 +34,8 @@ interface FreeAgencyDemandRepositoryInterface
     /**
      * Get player contract demands
      *
-     * @param string $playerName Player name
+     * @param int $playerID Player ID
      * @return PlayerDemandsRow
      */
-    public function getPlayerDemands(string $playerName): array;
+    public function getPlayerDemands(int $playerID): array;
 }

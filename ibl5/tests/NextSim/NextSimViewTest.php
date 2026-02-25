@@ -149,6 +149,61 @@ class NextSimViewTest extends TestCase
         $this->assertStringContainsString('<th>Game</th>', $result);
     }
 
+    public function testRenderPositionTableReturnsTableWithHeaders(): void
+    {
+        $games = $this->createGameData();
+        $result = $this->view->renderPositionTable($games, 'PG', $this->userTeam, $this->userStarters);
+
+        $this->assertStringContainsString('<table', $result);
+        $this->assertStringContainsString('<th>Game</th>', $result);
+        $this->assertStringContainsString('<th>Age</th>', $result);
+        $this->assertStringContainsString('<th>2ga</th>', $result);
+    }
+
+    public function testRenderScheduleStripContainsStripClass(): void
+    {
+        $games = $this->createGameData();
+        $result = $this->view->renderScheduleStrip($games);
+
+        $this->assertStringContainsString('next-sim-schedule-strip', $result);
+    }
+
+    public function testRenderTabbedPositionTableContainsTabs(): void
+    {
+        $games = $this->createGameData();
+        $result = $this->view->renderTabbedPositionTable($games, 'PG', $this->userTeam, $this->userStarters);
+
+        $this->assertStringContainsString('ibl-tabs', $result);
+        foreach (NextSimView::POSITION_LABELS as $key => $label) {
+            $this->assertStringContainsString('data-display="' . $key . '"', $result);
+            $this->assertStringContainsString($label, $result);
+        }
+    }
+
+    public function testRenderTabbedPositionTableMarksActiveTab(): void
+    {
+        $games = $this->createGameData();
+        $result = $this->view->renderTabbedPositionTable($games, 'SF', $this->userTeam, $this->userStarters);
+
+        // The active tab should have ibl-tab--active class
+        $this->assertMatchesRegularExpression('/class="ibl-tab ibl-tab--active"[^>]*data-display="SF"/', $result);
+    }
+
+    public function testRenderTabbedPositionTableWrapsInPositionSection(): void
+    {
+        $games = $this->createGameData();
+        $result = $this->view->renderTabbedPositionTable($games, 'PG', $this->userTeam, $this->userStarters);
+
+        $this->assertStringContainsString('next-sim-position-section', $result);
+    }
+
+    public function testRenderColumnHighlightScriptDefinesGlobalFunction(): void
+    {
+        $result = $this->view->renderColumnHighlightScript();
+
+        $this->assertStringContainsString('IBL_initNextSimHighlight', $result);
+    }
+
     /**
      * @return array<int, array{game: \Game, date: \DateTime, dayNumber: int, opposingTeam: \Team, locationPrefix: string, opposingStarters: array<string, Player>, opponentTier: string, opponentPowerRanking: float}>
      */

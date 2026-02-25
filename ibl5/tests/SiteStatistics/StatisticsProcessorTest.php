@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\SiteStatistics;
 
 use PHPUnit\Framework\TestCase;

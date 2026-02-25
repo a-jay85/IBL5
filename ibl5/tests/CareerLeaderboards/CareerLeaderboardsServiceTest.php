@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+
+namespace Tests\CareerLeaderboards;
 use PHPUnit\Framework\TestCase;
 use CareerLeaderboards\CareerLeaderboardsService;
 

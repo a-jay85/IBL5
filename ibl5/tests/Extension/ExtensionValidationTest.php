@@ -1,6 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Extension;
+
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Extension\ExtensionValidator;
 use Services\CommonContractValidator;
 
@@ -274,10 +279,8 @@ class ExtensionValidationTest extends TestCase
 
     /**
      * @group validation
-     * @group raises
-     * @dataProvider invalidRaiseProvider
-     */
-    #[\PHPUnit\Framework\Attributes\DataProvider('invalidRaiseProvider')]
+     * @group raises     */
+        #[DataProvider('invalidRaiseProvider')]
     public function testRejectsIllegalRaises($offer, $birdYears, $expectedErrorYear)
     {
         // Act
@@ -337,10 +340,8 @@ class ExtensionValidationTest extends TestCase
 
     /**
      * @group validation
-     * @group salary-decrease
-     * @dataProvider salaryDecreaseProvider
-     */
-    #[\PHPUnit\Framework\Attributes\DataProvider('salaryDecreaseProvider')]
+     * @group salary-decrease     */
+        #[DataProvider('salaryDecreaseProvider')]
     public function testRejectsSalaryDecreasesBetweenYears($offer, $expectedErrorYear)
     {
         // Act

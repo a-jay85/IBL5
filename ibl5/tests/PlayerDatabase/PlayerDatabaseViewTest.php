@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+
+namespace Tests\PlayerDatabase;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use PlayerDatabase\PlayerDatabaseService;

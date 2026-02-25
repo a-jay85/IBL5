@@ -122,14 +122,4 @@ class RookieOptionControllerTest extends TestCase
         $this->assertInstanceOf(RookieOptionControllerInterface::class, $controller);
     }
 
-    // ============================================
-    // METHOD EXISTENCE TESTS
-    // ============================================
-
-    public function testHasProcessRookieOptionMethod(): void
-    {
-        $controller = new RookieOptionController($this->mockDb);
-
-        $this->assertTrue(method_exists($controller, 'processRookieOption'));
-    }
 }

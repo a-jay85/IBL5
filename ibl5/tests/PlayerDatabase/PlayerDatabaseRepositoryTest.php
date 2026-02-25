@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+
+namespace Tests\PlayerDatabase;
 use PHPUnit\Framework\TestCase;
 use PlayerDatabase\PlayerDatabaseRepository;
 
@@ -18,7 +20,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = $this->createMock(mysqli::class);
+        $this->mockDb = $this->createMock(\mysqli::class);
         $this->repository = new PlayerDatabaseRepository($this->mockDb);
     }
 
@@ -26,8 +28,8 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
     public function testSearchPlayersPreparesQueryWithNoFilters(): void
     {
-        $mockStmt = $this->createMock(mysqli_stmt::class);
-        $mockResult = $this->createMock(mysqli_result::class);
+        $mockStmt = $this->createMock(\mysqli_stmt::class);
+        $mockResult = $this->createMock(\mysqli_result::class);
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
@@ -102,8 +104,8 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
     public function testSearchPlayersExcludesRetiredWhenActiveIs0(): void
     {
-        $mockStmt = $this->createMock(mysqli_stmt::class);
-        $mockResult = $this->createMock(mysqli_result::class);
+        $mockStmt = $this->createMock(\mysqli_stmt::class);
+        $mockResult = $this->createMock(\mysqli_result::class);
 
         $this->mockDb->expects($this->once())
             ->method('prepare')
@@ -135,7 +137,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
     public function testSearchPlayersUsesLikeForNameSearch(): void
     {
-        $mockResult = $this->createMock(mysqli_result::class);
+        $mockResult = $this->createMock(\mysqli_result::class);
         $mockStmt = $this->createMockStmt($mockResult, 's');
 
         $this->mockDb->expects($this->once())
@@ -157,7 +159,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
     public function testSearchPlayersUsesLikeForCollegeSearch(): void
     {
-        $mockResult = $this->createMock(mysqli_result::class);
+        $mockResult = $this->createMock(\mysqli_result::class);
         $mockStmt = $this->createMockStmt($mockResult, 's');
 
         $this->mockDb->expects($this->once())
@@ -179,7 +181,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
     public function testSearchPlayersUsesExactMatchForPosition(): void
     {
-        $mockResult = $this->createMock(mysqli_result::class);
+        $mockResult = $this->createMock(\mysqli_result::class);
         $mockStmt = $this->createMockStmt($mockResult, 's');
 
         $this->mockDb->expects($this->once())
@@ -201,7 +203,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
     public function testSearchPlayersUsesLessThanOrEqualForAge(): void
     {
-        $mockResult = $this->createMock(mysqli_result::class);
+        $mockResult = $this->createMock(\mysqli_result::class);
         $mockStmt = $this->createMockStmt($mockResult, 'i');
 
         $this->mockDb->expects($this->once())
@@ -223,7 +225,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
     public function testSearchPlayersUsesGreaterThanOrEqualForRatings(): void
     {
-        $mockResult = $this->createMock(mysqli_result::class);
+        $mockResult = $this->createMock(\mysqli_result::class);
         $mockStmt = $this->createMockStmt($mockResult, 'i');
 
         $this->mockDb->expects($this->once())
@@ -251,7 +253,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
     public function testGetPlayerByIdReturnsPlayerWhenFound(): void
     {
-        $mockResult = $this->createMock(mysqli_result::class);
+        $mockResult = $this->createMock(\mysqli_result::class);
         $mockStmt = $this->createMockStmt($mockResult, 'i');
 
         $this->mockDb->expects($this->once())
@@ -273,7 +275,7 @@ final class PlayerDatabaseRepositoryTest extends TestCase
 
     public function testGetPlayerByIdReturnsNullWhenNotFound(): void
     {
-        $mockResult = $this->createMock(mysqli_result::class);
+        $mockResult = $this->createMock(\mysqli_result::class);
         $mockStmt = $this->createMockStmt($mockResult, 'i');
 
         $this->mockDb->expects($this->once())
@@ -298,15 +300,15 @@ final class PlayerDatabaseRepositoryTest extends TestCase
      * PHPUnit's mysqli_stmt mock tracks "closed" state, so we need to configure
      * the mock to not enforce strict ordering.
      * 
-     * @param mysqli_result&\PHPUnit\Framework\MockObject\MockObject $mockResult
+     * @param \mysqli_result&\PHPUnit\Framework\MockObject\MockObject $mockResult
      * @param string|null $expectedBindTypes Expected type string for bind_param
-     * @return mysqli_stmt&\PHPUnit\Framework\MockObject\MockObject
+     * @return \mysqli_stmt&\PHPUnit\Framework\MockObject\MockObject
      */
     private function createMockStmt(
         \PHPUnit\Framework\MockObject\MockObject $mockResult,
         ?string $expectedBindTypes = null
     ): \PHPUnit\Framework\MockObject\MockObject {
-        $mockStmt = $this->getMockBuilder(mysqli_stmt::class)
+        $mockStmt = $this->getMockBuilder(\mysqli_stmt::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['bind_param', 'execute', 'get_result', 'close'])
             ->getMock();

@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Draft;
+
 use PHPUnit\Framework\TestCase;
 use Draft\DraftProcessor;
 
@@ -50,7 +54,7 @@ class DraftProcessorTest extends TestCase
         $baseMessage = 'Draft announcement';
         $message = $this->processor->createNextTeamMessage(
             $baseMessage,
-            '123456789',  // Discord ID
+            123456789,  // Discord ID
             2024
         );
 

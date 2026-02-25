@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Player;
+
 use PHPUnit\Framework\TestCase;
 use Player\PlayerNameDecorator;
 use Player\PlayerData;
@@ -32,7 +36,7 @@ class PlayerNameDecoratorTest extends TestCase
         $playerData = new PlayerData();
         $playerData->name = "John Doe";
         $playerData->teamID = 5;
-        $playerData->ordinal = JSB::WAIVERS_ORDINAL + 1;
+        $playerData->ordinal = \JSB::WAIVERS_ORDINAL + 1;
         $playerData->contractCurrentYear = 1;
         $playerData->contractTotalYears = 3;
         

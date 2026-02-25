@@ -125,17 +125,6 @@ class ExtensionProcessorTest extends TestCase
     }
 
     // ============================================
-    // METHOD EXISTENCE TESTS
-    // ============================================
-
-    public function testHasProcessExtensionMethod(): void
-    {
-        $processor = new ExtensionProcessor($this->mockDb);
-
-        $this->assertTrue(method_exists($processor, 'processExtension'));
-    }
-
-    // ============================================
     // ERROR HANDLING TESTS
     // ============================================
 

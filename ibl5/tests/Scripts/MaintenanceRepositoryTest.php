@@ -14,12 +14,12 @@ use Tests\Integration\Mocks\MockDatabase;
  */
 class MaintenanceRepositoryTest extends TestCase
 {
-    private MockDatabase $mockDb;
+    private \MockDatabase $mockDb;
     private MaintenanceRepository $repository;
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
+        $this->mockDb = new \MockDatabase();
         $this->repository = new MaintenanceRepository($this->mockDb);
     }
 

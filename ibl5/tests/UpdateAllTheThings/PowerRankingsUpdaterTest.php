@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+
+namespace Tests\UpdateAllTheThings;
 use PHPUnit\Framework\TestCase;
 use Updater\PowerRankingsUpdater;
 use Statistics\TeamStatsCalculator;
@@ -36,13 +38,13 @@ class TestablePowerRankingsUpdater extends PowerRankingsUpdater
  */
 class PowerRankingsUpdaterTest extends TestCase
 {
-    private MockDatabase $mockDb;
+    private \MockDatabase $mockDb;
     private \Season $mockSeason;
     private TestablePowerRankingsUpdater $powerRankingsUpdater;
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
+        $this->mockDb = new \MockDatabase();
         $this->mockSeason = new \Season($this->mockDb);
         $this->powerRankingsUpdater = new TestablePowerRankingsUpdater($this->mockDb, $this->mockSeason);
     }

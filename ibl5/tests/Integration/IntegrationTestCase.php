@@ -32,7 +32,7 @@ abstract class IntegrationTestCase extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mockDb = new MockDatabase();
+        $this->mockDb = new \MockDatabase();
         $this->injectGlobalMockDb();
     }
 

@@ -140,17 +140,6 @@ class TradeProcessorTest extends TestCase
     }
 
     // ============================================
-    // METHOD EXISTENCE TESTS
-    // ============================================
-
-    public function testHasProcessTradeMethod(): void
-    {
-        $processor = new TradeProcessor($this->mockDb);
-
-        $this->assertTrue(method_exists($processor, 'processTrade'));
-    }
-
-    // ============================================
     // PROCESS TRADE TESTS
     // ============================================
 

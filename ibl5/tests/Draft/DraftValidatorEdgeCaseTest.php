@@ -377,9 +377,7 @@ class DraftValidatorEdgeCaseTest extends TestCase
     // DATA PROVIDER TESTS
     // ============================================
 
-    /**
-     * @dataProvider specialCharacterNamesProvider
-     */
+    /**     */
     #[DataProvider('specialCharacterNamesProvider')]
     public function testAcceptsSpecialCharacterNames(string $playerName): void
     {
@@ -404,9 +402,7 @@ class DraftValidatorEdgeCaseTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider invalidPlayerNameProvider
-     */
+    /**     */
     #[DataProvider('invalidPlayerNameProvider')]
     public function testRejectsInvalidPlayerNames(?string $playerName): void
     {

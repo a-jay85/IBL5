@@ -92,7 +92,6 @@
 
             <file>tests/SeasonTest.php</file>
             <file>tests/TeamTest.php</file>
-            <file>tests/BoxscoreTest.php</file>
         </testsuite>
         <testsuite name="SeriesRecords Module Tests">
             <directory>tests/SeriesRecords</directory>
@@ -216,6 +215,11 @@
         </testsuite>
         <testsuite name="CSS Architecture Tests">
             <directory>tests/CSS</directory>
+        <testsuite name="Module Tests">
+            <directory>tests/Module</directory>
+        </testsuite>
+        <testsuite name="Season Module Tests">
+            <directory>tests/Season</directory>
         </testsuite>
     </testsuites>
 </phpunit>

@@ -123,12 +123,4 @@ class DraftViewTest extends TestCase
         $this->assertStringContainsString('draft_pick', $result);
     }
 
-    // ============================================
-    // METHOD EXISTENCE TESTS
-    // ============================================
-
-    public function testHasRenderPlayerTableMethod(): void
-    {
-        $this->assertTrue(method_exists($this->view, 'renderPlayerTable'));
-    }
 }

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+
+namespace Tests\Player;
 use PHPUnit\Framework\TestCase;
 use Player\PlayerPageService;
 use Player\Player;
@@ -14,7 +16,7 @@ class PlayerPageServiceTest extends TestCase
     protected function setUp(): void
     {
         // Mock database connection
-        $this->db = new MockDatabase();
+        $this->db = new \MockDatabase();
         $this->service = new PlayerPageService($this->db);
     }
 
@@ -193,7 +195,7 @@ class PlayerPageServiceTest extends TestCase
 
     private function createMockTeam(string $name, int $hasUsedExtension): object
     {
-        $team = new stdClass();
+        $team = new \stdClass();
         $team->name = $name;
         $team->hasUsedExtensionThisSeason = $hasUsedExtension;
         return $team;
@@ -201,7 +203,7 @@ class PlayerPageServiceTest extends TestCase
 
     private function createMockSeason(string $phase): object
     {
-        $season = new stdClass();
+        $season = new \stdClass();
         $season->phase = $phase;
         return $season;
     }

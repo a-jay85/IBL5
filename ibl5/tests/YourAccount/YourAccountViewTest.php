@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+
+namespace Tests\YourAccount;
 use PHPUnit\Framework\TestCase;
 use YourAccount\YourAccountView;
 

@@ -439,9 +439,7 @@ class FreeAgencyOfferValidatorEdgeCaseTest extends TestCase
     // DATA PROVIDER TESTS
     // ============================================
 
-    /**
-     * @dataProvider birdYearsRaiseProvider
-     */
+    /**     */
     #[DataProvider('birdYearsRaiseProvider')]
     public function testBirdYearsAffectsMaxRaise(
         int $birdYears,

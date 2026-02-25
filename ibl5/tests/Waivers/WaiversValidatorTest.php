@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Waivers;
+
 use PHPUnit\Framework\TestCase;
 use Waivers\WaiversValidator;
 

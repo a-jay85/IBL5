@@ -322,6 +322,65 @@ class TradingViewTest extends TestCase
     }
 
     // ============================================
+    // COMPARISON PANEL TESTS
+    // ============================================
+
+    public function testRenderTradeOfferFormContainsComparisonPanel(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('id="trade-comparison-panel"', $html);
+        $this->assertStringContainsString('trade-comparison', $html);
+        $this->assertStringContainsString('Player Comparison', $html);
+    }
+
+    public function testRenderTradeOfferFormContainsComparisonTeamSections(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('data-side="user"', $html);
+        $this->assertStringContainsString('data-side="partner"', $html);
+        $this->assertStringContainsString('Lakers sends', $html);
+        $this->assertStringContainsString('Celtics sends', $html);
+    }
+
+    public function testRenderTradeOfferFormContainsTradeConfigJson(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('window.IBL_TRADE_CONFIG', $html);
+        $this->assertStringContainsString('comparison-api', $html);
+        $this->assertStringContainsString('"hardCap":', $html);
+        $this->assertStringContainsString('"userPlayerContracts":', $html);
+        $this->assertStringContainsString('"partnerPlayerContracts":', $html);
+    }
+
+    public function testRenderTradeOfferFormLoadsComparisonJs(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('trade-comparison.js', $html);
+    }
+
+    public function testRenderTradeOfferFormConfigContainsTeamIds(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('"userTeamId":1', $html);
+        $this->assertStringContainsString('"partnerTeamId":2', $html);
+    }
+
+    // ============================================
     // RESULT BANNER TESTS
     // ============================================
 
@@ -596,6 +655,8 @@ class TradingViewTest extends TestCase
             'userTeamColor2' => 'FDB927',
             'partnerTeamColor1' => '007A33',
             'partnerTeamColor2' => 'FFFFFF',
+            'userPlayerContracts' => [],
+            'partnerPlayerContracts' => [],
             'result' => null,
             'error' => null,
         ];

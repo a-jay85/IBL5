@@ -158,6 +158,26 @@ class UpdaterView
     }
 
     /**
+     * Render trusted HTML inline within the pipeline's visual framework.
+     *
+     * Used for embedding output from other View classes (BoxscoreView, LeagueConfigView)
+     * that generate their own HTML. Content is wrapped in the updater-log div to match
+     * the pipeline's styling.
+     *
+     * @param string $trustedHtml HTML from a trusted internal view class
+     * @return string Wrapped HTML (empty string if input is blank)
+     */
+    public function renderInlineHtml(string $trustedHtml): string
+    {
+        $trimmed = trim($trustedHtml);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        return '<div class="updater-log">' . $trimmed . '</div>';
+    }
+
+    /**
      * Render summary status line showing success/error counts
      *
      * @param int $successCount Number of successful steps

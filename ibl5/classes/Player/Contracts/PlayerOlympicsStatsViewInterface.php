@@ -16,18 +16,18 @@ interface PlayerOlympicsStatsViewInterface
      * 
      * Shows season-by-season Olympics totals for all statistical categories.
      * 
-     * @param string $playerName Player name to fetch stats for
+     * @param int $playerID Player ID to fetch stats for
      * @return string HTML for Olympics totals table
      */
-    public function renderOlympicsTotals(string $playerName): string;
+    public function renderOlympicsTotals(int $playerID): string;
 
     /**
      * Render Olympics averages table
-     * 
+     *
      * Shows season-by-season Olympics per-game averages for all statistical categories.
-     * 
-     * @param string $playerName Player name to fetch stats for
+     *
+     * @param int $playerID Player ID to fetch stats for
      * @return string HTML for Olympics averages table
      */
-    public function renderOlympicsAverages(string $playerName): string;
+    public function renderOlympicsAverages(int $playerID): string;
 }

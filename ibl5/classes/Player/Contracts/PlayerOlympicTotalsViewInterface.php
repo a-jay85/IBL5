@@ -17,8 +17,8 @@ interface PlayerOlympicTotalsViewInterface extends PlayerViewInterface
      * Shows totals for each Olympics season including games, minutes,
      * and all statistical categories, plus a career totals row at the bottom.
      * 
-     * @param string $playerName Player name to fetch stats for
+     * @param int $playerID Player ID to fetch stats for
      * @return string Rendered HTML content
      */
-    public function renderTotals(string $playerName): string;
+    public function renderTotals(int $playerID): string;
 }

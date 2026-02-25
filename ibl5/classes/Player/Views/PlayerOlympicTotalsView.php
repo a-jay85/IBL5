@@ -36,9 +36,9 @@ class PlayerOlympicTotalsView implements PlayerOlympicTotalsViewInterface
     /**
      * @see PlayerOlympicTotalsViewInterface::renderTotals()
      */
-    public function renderTotals(string $playerName): string
+    public function renderTotals(int $playerID): string
     {
-        $olympicsStats = $this->repository->getOlympicsStats($playerName);
+        $olympicsStats = $this->repository->getOlympicsStats($playerID);
 
         // Initialize career totals
         $carTotals = [

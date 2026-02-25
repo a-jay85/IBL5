@@ -91,13 +91,16 @@ if (session_status() === PHP_SESSION_NONE) {
 
     // Set secure session cookie options
     session_set_cookie_params([
-        'lifetime' => 604800,
+        'lifetime' => 604800,  // 7 days
         'path' => '/',
         'domain' => '',
         'secure' => $isHttps,          // Only HTTPS
         'httponly' => true,            // Prevent JavaScript access
         'samesite' => 'Lax',           // CSRF protection (Lax for login redirects)
     ]);
+
+    // Match server-side session lifetime to cookie lifetime (7 days)
+    ini_set('session.gc_maxlifetime', '604800');
 
     session_start();
 }

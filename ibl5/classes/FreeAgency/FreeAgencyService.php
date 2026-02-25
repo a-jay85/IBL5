@@ -60,11 +60,11 @@ class FreeAgencyService implements FreeAgencyServiceInterface
 
         $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $team, $season);
         /** @var array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
-        $capMetrics = $capCalculator->calculateTeamCapMetrics($player->name);
+        $capMetrics = $capCalculator->calculateTeamCapMetrics($player->playerID);
 
         $demands = $this->demandRepository->getPlayerDemands($player->playerID ?? 0);
 
-        $existingOffer = $this->getExistingOffer($team->name, $player->name ?? '');
+        $existingOffer = $this->getExistingOffer($team->teamID, $player->playerID ?? 0);
 
         $amendedCapSpace = $capMetrics['softCapSpace'][0] + $existingOffer['offer1'];
         $hasExistingOffer = $existingOffer['offer1'] > 0;
@@ -87,9 +87,9 @@ class FreeAgencyService implements FreeAgencyServiceInterface
     /**
      * @see FreeAgencyServiceInterface::getExistingOffer()
      */
-    public function getExistingOffer(string $teamName, string $playerName): array
+    public function getExistingOffer(int $tid, int $pid): array
     {
-        $offer = $this->repository->getExistingOffer($teamName, $playerName);
+        $offer = $this->repository->getExistingOffer($tid, $pid);
 
         if ($offer === null) {
             return [

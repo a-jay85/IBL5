@@ -61,9 +61,9 @@ interface FreeAgencyServiceInterface
      *
      * Returns the offer data with integer values, or all-zeros if no offer exists.
      *
-     * @param string $teamName Team name
-     * @param string $playerName Player name
+     * @param int $tid Team ID
+     * @param int $pid Player ID
      * @return array<string, int> Offer with keys offer1-6, all integers
      */
-    public function getExistingOffer(string $teamName, string $playerName): array;
+    public function getExistingOffer(int $tid, int $pid): array;
 }

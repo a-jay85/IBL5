@@ -30,9 +30,9 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
     {
         /** @var list<OfferRow> */
         return $this->fetchAll(
-            "SELECT ibl_fa_offers.*, ibl_plr.bird, ibl_plr.pid
+            "SELECT ibl_fa_offers.*, ibl_plr.bird
              FROM ibl_fa_offers
-             JOIN ibl_plr ON ibl_fa_offers.name = ibl_plr.name
+             JOIN ibl_plr ON ibl_fa_offers.pid = ibl_plr.pid
              ORDER BY ibl_fa_offers.name ASC, ibl_fa_offers.perceivedvalue DESC",
             ""
         );

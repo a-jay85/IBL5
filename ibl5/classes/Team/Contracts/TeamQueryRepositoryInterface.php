@@ -42,9 +42,10 @@ interface TeamQueryRepositoryInterface
     /**
      * Get free agency offers made by a team
      *
+     * @param int $teamId Team ID
      * @return list<FreeAgencyOfferRow> Array of offer rows
      */
-    public function getFreeAgencyOffers(string $teamName): array;
+    public function getFreeAgencyOffers(int $teamId): array;
 
     /**
      * Get free agency roster ordered by name

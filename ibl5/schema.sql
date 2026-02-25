@@ -581,8 +581,10 @@ DROP TABLE IF EXISTS `ibl_fa_offers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ibl_fa_offers` (
-  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (FK to ibl_plr.name)',
-  `team` varchar(32) NOT NULL DEFAULT '' COMMENT 'Offering team name (FK to ibl_team_info)',
+  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (kept for backward compat reads)',
+  `pid` int(11) NOT NULL DEFAULT 0 COMMENT 'Player ID (FK to ibl_plr.pid)',
+  `team` varchar(32) NOT NULL DEFAULT '' COMMENT 'Offering team name (kept for backward compat reads)',
+  `tid` int(11) NOT NULL DEFAULT 0 COMMENT 'Team ID (FK to ibl_team_info.teamid)',
   `offer1` int(11) NOT NULL DEFAULT 0 COMMENT 'Salary offer year 1 (thousands)',
   `offer2` int(11) NOT NULL DEFAULT 0 COMMENT 'Salary offer year 2 (thousands)',
   `offer3` int(11) NOT NULL DEFAULT 0 COMMENT 'Salary offer year 3 (thousands)',
@@ -602,8 +604,9 @@ CREATE TABLE `ibl_fa_offers` (
   KEY `idx_name` (`name`),
   KEY `idx_team` (`team`),
   KEY `idx_offer_type` (`offer_type`),
-  CONSTRAINT `fk_faoffer_player` FOREIGN KEY (`name`) REFERENCES `ibl_plr` (`name`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `fk_faoffer_team` FOREIGN KEY (`team`) REFERENCES `ibl_team_info` (`team_name`) ON DELETE CASCADE ON UPDATE CASCADE
+  KEY `idx_tid_pid` (`tid`,`pid`),
+  CONSTRAINT `fk_faoffer_pid` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_faoffer_tid` FOREIGN KEY (`tid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -3783,7 +3786,7 @@ SET character_set_client = @saved_cs_client;
 /*!50001 SET collation_connection      = utf8mb4_general_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
 /*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY INVOKER */
-/*!50001 VIEW `vw_free_agency_offers` AS select `fa`.`primary_key` AS `offer_id`,`p`.`uuid` AS `player_uuid`,`p`.`pid` AS `pid`,`p`.`name` AS `player_name`,`p`.`pos` AS `position`,`p`.`age` AS `age`,`t`.`uuid` AS `team_uuid`,`t`.`teamid` AS `teamid`,`t`.`team_city` AS `team_city`,`t`.`team_name` AS `team_name`,concat(`t`.`team_city`,' ',`t`.`team_name`) AS `full_team_name`,`fa`.`offer1` AS `year1_amount`,`fa`.`offer2` AS `year2_amount`,`fa`.`offer3` AS `year3_amount`,`fa`.`offer4` AS `year4_amount`,`fa`.`offer5` AS `year5_amount`,`fa`.`offer6` AS `year6_amount`,`fa`.`offer1` + `fa`.`offer2` + `fa`.`offer3` + `fa`.`offer4` + `fa`.`offer5` + `fa`.`offer6` AS `total_contract_value`,`fa`.`modifier` AS `modifier`,`fa`.`random` AS `random`,`fa`.`perceivedvalue` AS `perceived_value`,`fa`.`MLE` AS `is_mle`,`fa`.`LLE` AS `is_lle`,`fa`.`created_at` AS `created_at`,`fa`.`updated_at` AS `updated_at` from ((`ibl_fa_offers` `fa` join `ibl_plr` `p` on(`fa`.`name` = `p`.`name`)) join `ibl_team_info` `t` on(`fa`.`team` = `t`.`team_name`)) */;
+/*!50001 VIEW `vw_free_agency_offers` AS select `fa`.`primary_key` AS `offer_id`,`p`.`uuid` AS `player_uuid`,`p`.`pid` AS `pid`,`p`.`name` AS `player_name`,`p`.`pos` AS `position`,`p`.`age` AS `age`,`t`.`uuid` AS `team_uuid`,`t`.`teamid` AS `teamid`,`t`.`team_city` AS `team_city`,`t`.`team_name` AS `team_name`,concat(`t`.`team_city`,' ',`t`.`team_name`) AS `full_team_name`,`fa`.`offer1` AS `year1_amount`,`fa`.`offer2` AS `year2_amount`,`fa`.`offer3` AS `year3_amount`,`fa`.`offer4` AS `year4_amount`,`fa`.`offer5` AS `year5_amount`,`fa`.`offer6` AS `year6_amount`,`fa`.`offer1` + `fa`.`offer2` + `fa`.`offer3` + `fa`.`offer4` + `fa`.`offer5` + `fa`.`offer6` AS `total_contract_value`,`fa`.`modifier` AS `modifier`,`fa`.`random` AS `random`,`fa`.`perceivedvalue` AS `perceived_value`,`fa`.`MLE` AS `is_mle`,`fa`.`LLE` AS `is_lle`,`fa`.`created_at` AS `created_at`,`fa`.`updated_at` AS `updated_at` from ((`ibl_fa_offers` `fa` join `ibl_plr` `p` on(`fa`.`pid` = `p`.`pid`)) join `ibl_team_info` `t` on(`fa`.`tid` = `t`.`teamid`)) */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;

@@ -1,0 +1,118 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DraftOrder;
+
+use DraftOrder\Contracts\DraftOrderServiceInterface;
+use DraftOrder\Contracts\DraftOrderViewInterface;
+use UI\TeamCellHelper;
+use Utilities\HtmlSanitizer;
+
+/**
+ * @phpstan-import-type DraftSlot from DraftOrderServiceInterface
+ * @phpstan-import-type DraftOrderResult from DraftOrderServiceInterface
+ * @see DraftOrderViewInterface
+ */
+class DraftOrderView implements DraftOrderViewInterface
+{
+    private const LOTTERY_PLAYOFF_BOUNDARY = 12;
+
+    /** @param DraftOrderResult $draftOrder */
+    public function render(array $draftOrder, int $seasonYear): string
+    {
+        $html = '<div class="draft-order-container">';
+        $html .= $this->renderTitle($seasonYear);
+        $html .= $this->renderDescription();
+        $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1');
+        $html .= $this->renderRoundTable($draftOrder['round2'], 'Round 2');
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    private function renderTitle(int $seasonYear): string
+    {
+        return '<h2>' . HtmlSanitizer::safeHtmlOutput($seasonYear) . ' Projected Draft Order</h2>';
+    }
+
+    private function renderDescription(): string
+    {
+        return '<p class="draft-order-description">'
+            . 'If the draft were held today, this is the projected pick order based on current standings. '
+            . 'Non-playoff teams (picks 1-12) are ordered by worst record first. '
+            . 'Playoff teams (picks 13-28) are ordered by regular season record.'
+            . '</p>';
+    }
+
+    /**
+     * @param list<DraftSlot> $slots
+     */
+    private function renderRoundTable(array $slots, string $roundLabel): string
+    {
+        $html = '<h3>' . HtmlSanitizer::safeHtmlOutput($roundLabel) . '</h3>';
+        $html .= '<div class="table-container">';
+        $html .= '<table class="ibl-data-table draft-order-table">';
+        $html .= '<thead><tr>';
+        $html .= '<th>Pick</th>';
+        $html .= '<th>Team</th>';
+        $html .= '<th>Record</th>';
+        $html .= '<th>Owner</th>';
+        $html .= '<th>Notes</th>';
+        $html .= '</tr></thead>';
+        $html .= '<tbody>';
+
+        foreach ($slots as $slot) {
+            if ($slot['pick'] === self::LOTTERY_PLAYOFF_BOUNDARY + 1) {
+                $html .= $this->renderSeparatorRow();
+            }
+            $html .= $this->renderPickRow($slot);
+        }
+
+        $html .= '</tbody></table>';
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    private function renderSeparatorRow(): string
+    {
+        return '<tr class="draft-order-separator">'
+            . '<td colspan="5">Playoff Teams</td>'
+            . '</tr>';
+    }
+
+    /** @param DraftSlot $slot */
+    private function renderPickRow(array $slot): string
+    {
+        $rowClass = $slot['isTraded'] ? ' class="draft-order-traded"' : '';
+        $html = '<tr' . $rowClass . '>';
+
+        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['pick']) . '</td>';
+
+        $html .= TeamCellHelper::renderTeamCell(
+            $slot['teamId'],
+            $slot['teamName'],
+            $slot['color1'],
+            $slot['color2'],
+        );
+
+        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['wins']) . '-' . HtmlSanitizer::safeHtmlOutput($slot['losses']) . '</td>';
+
+        if ($slot['isTraded']) {
+            $html .= TeamCellHelper::renderTeamCell(
+                $slot['ownerId'],
+                $slot['ownerName'],
+                $slot['ownerColor1'],
+                $slot['ownerColor2'],
+            );
+        } else {
+            $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['ownerName']) . '</td>';
+        }
+
+        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['notes']) . '</td>';
+
+        $html .= '</tr>';
+        return $html;
+    }
+}

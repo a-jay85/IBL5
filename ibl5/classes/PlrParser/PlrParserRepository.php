@@ -187,8 +187,8 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `r_foul` = VALUES(`r_foul`)";
 
         // Build types: ordinal(i) name(s) age(i) pid(i) tid(i) peak(i) pos(s)
-        // + 100 more int columns, then at the end retired(i) r_foul(i)
-        // Total: 108 params — 2 strings (name, pos) and 106 ints
+        // + remaining int columns, then at the end retired(i) r_foul(i)
+        // Total: 121 params — 2 strings (name, pos) and 119 ints
         $types = 'isiiiis'   // ordinal, name, age, pid, tid, peak, pos
             . 'iiiiiiii'     // oo, od, do, dd, po, pd, to, td
             . 'ii'           // Clutch, Consistency
@@ -404,8 +404,8 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
 
         // 42 params: pid(i) name(s) year(i) team(s) teamid(i) + 37 ints
         $types = 'isisi'     // pid, name, year, team, teamid
-            . 'iiiiiii'      // games..tga
-            . 'iiiiiii'      // orb..pts (7)
+            . 'iiiiiiii'     // games, minutes, fgm, fga, ftm, fta, tgm, tga (8)
+            . 'iiiiiiii'     // orb, reb, ast, stl, blk, tvr, pf, pts (8)
             . 'iiiiii'       // r_2ga..r_3gp
             . 'iiiiii'       // r_orb..r_tvr
             . 'iiiiiiii'     // r_oo..r_td

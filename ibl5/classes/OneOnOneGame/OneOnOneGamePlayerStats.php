@@ -16,6 +16,8 @@ class OneOnOneGamePlayerStats
     public int $fieldGoalsAttempted = 0;
     public int $threePointersMade = 0;
     public int $threePointersAttempted = 0;
+    public int $freeThrowsMade = 0;
+    public int $freeThrowsAttempted = 0;
     public int $offensiveRebounds = 0;
     public int $totalRebounds = 0;
     public int $steals = 0;

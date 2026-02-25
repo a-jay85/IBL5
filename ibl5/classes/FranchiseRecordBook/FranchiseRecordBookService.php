@@ -82,13 +82,12 @@ class FranchiseRecordBookService implements FranchiseRecordBookServiceInterface
     public function getTeamRecordBook(int $teamId): array
     {
         $singleSeasonRecords = $this->repository->getTeamSingleSeasonRecords($teamId);
-        $careerRecords = $this->repository->getLeagueCareerRecords();
         $team = $this->repository->getTeamInfo($teamId);
         $teams = $this->repository->getAllTeams();
 
         return [
             'singleSeason' => $this->groupByCategory($singleSeasonRecords, self::SINGLE_SEASON_STAT_ORDER),
-            'career' => $this->groupByCategory($careerRecords, self::CAREER_STAT_ORDER),
+            'career' => [],
             'team' => $team,
             'teams' => $teams,
             'scope' => 'team',

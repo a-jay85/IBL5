@@ -132,24 +132,31 @@ try {
 
     if ($lgeRepo->hasConfigForSeason($season->endingYear)) {
         echo $view->renderStepComplete('League config', 'Already imported for ' . $season->endingYear);
+        $successCount++;
     } elseif (!is_file($defaultLgePath)) {
         echo $view->renderStepComplete('League config', 'No IBL5.lge file found (skipped)');
+        $successCount++;
     } else {
         $lgeResult = $lgeService->processLgeFile($defaultLgePath);
-        echo $view->renderStepComplete('League config imported');
         echo $view->renderInlineHtml($lgeView->renderParseResult($lgeResult));
 
         if ($lgeResult['success']) {
+            echo $view->renderStepComplete('League config imported');
             $discrepancies = $lgeService->crossCheckWithFranchiseSeasons(
                 $lgeResult['season_ending_year'],
             );
             if ($discrepancies !== []) {
                 echo $view->renderInlineHtml($lgeView->renderCrossCheckResults($discrepancies));
             }
+            $successCount++;
+        } else {
+            /** @var string $lgeError */
+            $lgeError = $lgeResult['error'] ?? 'Unknown error';
+            echo $view->renderStepError('League config import failed', $lgeError);
+            $errorCount++;
         }
     }
     flush();
-    $successCount++;
 
     // --- Step 2: Parse player file (.plr) ---
     echo $view->renderStepStart('Parsing player file (.plr)...');

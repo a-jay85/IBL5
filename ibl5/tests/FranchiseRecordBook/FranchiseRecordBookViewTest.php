@@ -72,7 +72,7 @@ class FranchiseRecordBookViewTest extends TestCase
 
         $html = $this->view->render($data);
 
-        $this->assertStringContainsString('<td>Retired</td>', $html);
+        $this->assertStringContainsString('<td class="record-book-retired-cell">Retired</td>', $html);
     }
 
     public function testCareerRecordWithTeamShowsTeamCell(): void
@@ -89,7 +89,7 @@ class FranchiseRecordBookViewTest extends TestCase
 
         $html = $this->view->render($data);
 
-        $this->assertStringNotContainsString('<td>Retired</td>', $html);
+        $this->assertStringNotContainsString('Retired</td>', $html);
         $this->assertStringContainsString('Test Team', $html);
     }
 
@@ -109,7 +109,7 @@ class FranchiseRecordBookViewTest extends TestCase
 
         $html = $this->view->render($data);
 
-        $this->assertStringNotContainsString('<td>Retired</td>', $html);
+        $this->assertStringNotContainsString('Retired</td>', $html);
         $this->assertStringContainsString('<td></td>', $html);
     }
 }

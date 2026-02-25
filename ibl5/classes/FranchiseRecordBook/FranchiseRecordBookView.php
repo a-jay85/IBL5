@@ -235,7 +235,7 @@ class FranchiseRecordBookView
     {
         if ($teamId <= 0 || !isset($this->teamLookup[$teamId])) {
             if ($recordType === 'career') {
-                return '<td>Retired</td>';
+                return '<td class="record-book-retired-cell">Retired</td>';
             }
             return '<td></td>';
         }

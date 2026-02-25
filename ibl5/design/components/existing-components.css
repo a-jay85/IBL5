@@ -1102,12 +1102,12 @@ a.schedule-jump-btn:hover {
     white-space: nowrap;
 }
 
-.txn-badge--1  { background: #e3f2fd; color: #1565c0; }
-.txn-badge--2  { background: #fff3e0; color: #e65100; }
-.txn-badge--3  { background: #e8f5e9; color: #2e7d32; }
-.txn-badge--8  { background: #fce4ec; color: #c2185b; }
-.txn-badge--10 { background: #f3e5f5; color: #7b1fa2; }
-.txn-badge--14 { background: #e0f7fa; color: #00838f; }
+.txn-badge--1  { background: var(--txn-bg-trade,     #e3f2fd); color: var(--txn-fg-trade,     #1565c0); }
+.txn-badge--2  { background: var(--txn-bg-fa,        #fff3e0); color: var(--txn-fg-fa,        #e65100); }
+.txn-badge--3  { background: var(--txn-bg-waiver,    #e8f5e9); color: var(--txn-fg-waiver,    #2e7d32); }
+.txn-badge--8  { background: var(--txn-bg-extension, #fce4ec); color: var(--txn-fg-extension, #c2185b); }
+.txn-badge--10 { background: var(--txn-bg-draft,     #f3e5f5); color: var(--txn-fg-draft,     #7b1fa2); }
+.txn-badge--14 { background: var(--txn-bg-release,   #e0f7fa); color: var(--txn-fg-release,   #00838f); }
 
 /* Transaction table overrides moved to tables.css */
 

@@ -27,7 +27,7 @@ class NextSimView implements NextSimViewInterface
     private \Season $season;
 
     /** @var array<string, string> Position abbreviation to full name */
-    private const POSITION_LABELS = [
+    public const POSITION_LABELS = [
         'PG' => 'Point Guards',
         'SG' => 'Shooting Guards',
         'SF' => 'Small Forwards',
@@ -70,49 +70,56 @@ class NextSimView implements NextSimViewInterface
 
     /**
      * Render the column highlight script for position tables
+     *
+     * Defines a global `window.IBL_initNextSimHighlight` function so AJAX tab
+     * swaps can re-initialize highlights on freshly inserted tables. The
+     * function is also auto-called on initial page load.
      */
-    private function renderColumnHighlightScript(): string
+    public function renderColumnHighlightScript(): string
     {
         return '<script>
-document.querySelectorAll(".next-sim-position-section .team-table").forEach(function(table){
-    var tbody=table.querySelector("tbody");
-    if(!tbody)return;
-    function getHoverColor(row){
-        var t=document.createElement("span");
-        t.style.cssText="position:absolute;visibility:hidden";
-        t.style.backgroundColor=row.classList.contains("next-sim-row--user")
-            ?"var(--accent-200,#fed7aa)":"var(--team-row-hover-bg)";
-        row.appendChild(t);
-        var c=getComputedStyle(t).backgroundColor;
-        row.removeChild(t);
-        return c;
-    }
-    function clear(){
-        tbody.querySelectorAll(".next-sim-col-hover").forEach(function(c){
-            c.classList.remove("next-sim-col-hover");c.style.removeProperty("background-color");
+window.IBL_initNextSimHighlight=function(root){
+    (root||document).querySelectorAll(".next-sim-position-section .team-table").forEach(function(table){
+        var tbody=table.querySelector("tbody");
+        if(!tbody)return;
+        function getHoverColor(row){
+            var t=document.createElement("span");
+            t.style.cssText="position:absolute;visibility:hidden";
+            t.style.backgroundColor=row.classList.contains("next-sim-row--user")
+                ?"var(--accent-200,#fed7aa)":"var(--team-row-hover-bg)";
+            row.appendChild(t);
+            var c=getComputedStyle(t).backgroundColor;
+            row.removeChild(t);
+            return c;
+        }
+        function clear(){
+            tbody.querySelectorAll(".next-sim-col-hover").forEach(function(c){
+                c.classList.remove("next-sim-col-hover");c.style.removeProperty("background-color");
+            });
+        }
+        tbody.addEventListener("mouseover",function(e){
+            var td=e.target.closest("td");
+            if(!td)return;
+            var ci=td.cellIndex,bg=getHoverColor(td.parentElement);
+            clear();
+            tbody.querySelectorAll("tr").forEach(function(row){
+                var cell=row.cells[ci];
+                if(cell){cell.classList.add("next-sim-col-hover");cell.style.backgroundColor=bg;}
+            });
         });
-    }
-    tbody.addEventListener("mouseover",function(e){
-        var td=e.target.closest("td");
-        if(!td)return;
-        var ci=td.cellIndex,bg=getHoverColor(td.parentElement);
-        clear();
-        tbody.querySelectorAll("tr").forEach(function(row){
-            var cell=row.cells[ci];
-            if(cell){cell.classList.add("next-sim-col-hover");cell.style.backgroundColor=bg;}
-        });
+        tbody.addEventListener("mouseleave",clear);
     });
-    tbody.addEventListener("mouseleave",clear);
-});
+};
+window.IBL_initNextSimHighlight();
 </script>';
     }
 
     /**
-     * Render the horizontal schedule strip of compact game cards
+     * @see NextSimViewInterface::renderScheduleStrip()
      *
      * @param array<int, NextSimGameData> $games Processed game data
      */
-    private function renderScheduleStrip(array $games): string
+    public function renderScheduleStrip(array $games): string
     {
         $html = '<div class="next-sim-schedule-strip">';
 
@@ -123,6 +130,21 @@ document.querySelectorAll(".next-sim-position-section .team-table").forEach(func
         $html .= '</div>';
 
         return $html;
+    }
+
+    /**
+     * @see NextSimViewInterface::renderTabbedPositionTable()
+     *
+     * @param array<int, NextSimGameData> $games Processed game data
+     * @param array<string, Player> $userStarters User's starting lineup by position
+     */
+    public function renderTabbedPositionTable(array $games, string $activePosition, \Team $userTeam, array $userStarters): string
+    {
+        $tabs = self::POSITION_LABELS;
+        $switcher = new \UI\Components\TableViewSwitcher($tabs, $activePosition, 'modules.php?name=NextSim', $userTeam->color1, $userTeam->color2);
+        $tableHtml = $this->renderPositionTable($games, $activePosition, $userTeam, $userStarters);
+
+        return '<div class="next-sim-position-section">' . $switcher->wrap($tableHtml) . '</div>';
     }
 
     /**
@@ -180,12 +202,12 @@ document.querySelectorAll(".next-sim-position-section .team-table").forEach(func
     }
 
     /**
-     * Render the full ratings table for a single position
+     * @see NextSimViewInterface::renderPositionTable()
      *
      * @param array<int, NextSimGameData> $games Processed game data
      * @param array<string, Player> $userStarters User's starting lineup by position
      */
-    private function renderPositionTable(array $games, string $position, \Team $userTeam, array $userStarters): string
+    public function renderPositionTable(array $games, string $position, \Team $userTeam, array $userStarters): string
     {
         $tableStyle = TableStyles::inlineVars($userTeam->color1, $userTeam->color2);
 

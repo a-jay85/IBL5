@@ -94,6 +94,11 @@ switch ($op) {
         offertrade($user);
         break;
 
+    case "comparison-api":
+        $handler = new Trading\TradeComparisonApiHandler($mysqli_db);
+        $handler->handle();
+        break;
+
     default:
         reviewtrade($user);
         break;

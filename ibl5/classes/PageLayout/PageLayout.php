@@ -98,8 +98,6 @@ class PageLayout
         if (file_exists("themes/$ThemeSel/images/favicon.ico")) {
             echo "<link REL=\"shortcut icon\" HREF=\"{$relativePath}themes/$ThemeSel/images/favicon.ico\" TYPE=\"image/x-icon\">\n";
         }
-        echo "<link rel=\"alternate\" type=\"application/rss+xml\" title=\"RSS\" href=\"{$relativePath}backend.php\">\n";
-
         // Google Fonts (inlined from includes/custom_files/custom_head.php)
         echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
         echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';

@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace DepthChartEntry;
 
 use DepthChartEntry\Contracts\DepthChartEntryControllerInterface;
+use NextSim\NextSimService;
+use NextSim\NextSimView;
 use SavedDepthChart\SavedDepthChartService;
+use Standings\StandingsRepository;
 use Team\Contracts\TeamServiceInterface;
 use Team\TeamRepository;
 use Team\TeamService;
+use TeamSchedule\TeamScheduleRepository;
 use UI\Components\TableViewDropdown;
 
 /**
@@ -116,6 +120,9 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         echo '<script>window.IBL_AJAX_TABS_CONFIG = ' . $ajaxTabsConfig . ';</script>';
         echo '<script src="jslib/ajax-tabs.js" defer></script>';
 
+        // NextSim position tables section
+        $this->renderNextSimSection($teamID, $team, $season);
+
         \PageLayout\PageLayout::footer();
     }
 
@@ -138,6 +145,48 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $tableHtml = $this->teamService->renderTableForDisplay($display, $rosterData['roster'], $team, null, $season, $rosterData['starterPids'], $split);
 
         return $dropdown->wrap($tableHtml);
+    }
+
+    private function renderNextSimSection(int $teamID, \Team $team, \Season $season): void
+    {
+        // Load power rankings for SOS tier indicators
+        $standingsRepo = new StandingsRepository($this->db);
+        $allStreakData = $standingsRepo->getAllStreakData();
+        /** @var array<int, float> $teamPowerRankings */
+        $teamPowerRankings = [];
+        foreach ($allStreakData as $tid => $data) {
+            $teamPowerRankings[$tid] = (float) $data['ranking'];
+        }
+
+        $teamScheduleRepository = new TeamScheduleRepository($this->db);
+        $nextSimService = new NextSimService($this->db, $teamScheduleRepository, $teamPowerRankings);
+        $nextSimView = new NextSimView($season);
+
+        $games = $nextSimService->getNextSimGames($teamID, $season);
+        $userStarters = $nextSimService->getUserStartingLineup($team);
+
+        echo '<div class="next-sim-depth-chart-section">';
+        echo '<h2 class="ibl-title">Next Sim</h2>';
+
+        if ($games === []) {
+            echo '<div class="next-sim-empty">No games projected next sim!</div>';
+        } else {
+            echo $nextSimView->renderScheduleStrip($games);
+            echo '<div class="nextsim-tab-container">';
+            echo $nextSimView->renderTabbedPositionTable($games, 'PG', $team, $userStarters);
+            echo '</div>';
+            echo $nextSimView->renderColumnHighlightScript();
+        }
+
+        echo '</div>';
+
+        // Output JS configuration for NextSim AJAX tab switching
+        $nextSimTabsConfig = json_encode([
+            'apiBaseUrl' => 'modules.php?name=DepthChartEntry&op=nextsim-api',
+            'params' => ['teamID' => $teamID],
+        ], JSON_THROW_ON_ERROR);
+        echo '<script>window.IBL_NEXTSIM_TABS_CONFIG = ' . $nextSimTabsConfig . ';</script>';
+        echo '<script src="jslib/nextsim-tabs.js" defer></script>';
     }
 
     private function getUserTeamName(string $username): string

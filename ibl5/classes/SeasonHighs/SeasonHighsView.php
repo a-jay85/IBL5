@@ -15,7 +15,7 @@ use Utilities\HtmlSanitizer;
  *
  * @phpstan-import-type SeasonHighEntry from SeasonHighsServiceInterface
  * @phpstan-import-type SeasonHighsData from SeasonHighsServiceInterface
- * @phpstan-import-type RcbSeasonHighEntry from SeasonHighsServiceInterface
+ * @phpstan-import-type RcbDiscrepancy from SeasonHighsServiceInterface
  *
  * @see SeasonHighsViewInterface
  */
@@ -28,6 +28,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
      */
     public function render(string $seasonPhase, array $data): string
     {
+        /** @var string $safePhase */
         $safePhase = HtmlSanitizer::safeHtmlOutput($seasonPhase);
         $output = '<h2 class="ibl-title">Season Highs</h2>';
         $output .= $this->renderPlayerHighs($safePhase, $data['playerHighs']);
@@ -86,6 +87,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
      */
     private function renderStatTable(string $statName, array $stats, bool $isPlayerStats = false): string
     {
+        /** @var string $safeName */
         $safeName = HtmlSanitizer::safeHtmlOutput($statName);
 
         // Use 5 columns for player stats (with Team), 4 columns for team stats
@@ -99,7 +101,9 @@ class SeasonHighsView implements SeasonHighsViewInterface
 
         foreach ($stats as $index => $row) {
             $rank = $index + 1;
+            /** @var string $name */
             $name = HtmlSanitizer::safeHtmlOutput($row['name']);
+            /** @var string $date */
             $date = HtmlSanitizer::safeHtmlOutput($row['date']);
             $value = $row['value'];
             $tid = 0;
@@ -137,6 +141,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
                 $row['boxId'] ?? 0
             );
             if ($boxScoreUrl !== '') {
+                /** @var string $safeUrl */
                 $safeUrl = HtmlSanitizer::safeHtmlOutput($boxScoreUrl);
                 /** @var string $date */
                 $date = "<a href=\"{$safeUrl}\">{$date}</a>";
@@ -171,98 +176,73 @@ class SeasonHighsView implements SeasonHighsViewInterface
     /**
      * @see SeasonHighsViewInterface::renderHomeAwayHighs()
      *
-     * @param array{home: array<string, list<RcbSeasonHighEntry>>, away: array<string, list<RcbSeasonHighEntry>>} $data
+     * @param array{home: array<string, list<SeasonHighEntry>>, away: array<string, list<SeasonHighEntry>>} $data
+     * @param list<RcbDiscrepancy> $discrepancies
      */
-    public function renderHomeAwayHighs(array $data): string
+    public function renderHomeAwayHighs(string $seasonPhase, array $data, array $discrepancies): string
     {
+        /** @var string $safePhase */
+        $safePhase = HtmlSanitizer::safeHtmlOutput($seasonPhase);
+
         $output = '';
 
-        if ($this->hasRcbData($data['home'])) {
-            $output .= '<h2 class="ibl-table-title">Home Game Highs</h2>';
-            $output .= '<div class="ibl-grid ibl-grid--3col">';
-            $output .= $this->renderRcbStatTables($data['home']);
-            $output .= '</div>';
+        $output .= '<h2 class="ibl-table-title">Players\' ' . $safePhase . ' Home Highs</h2>';
+        $output .= '<div class="ibl-grid ibl-grid--3col">';
+        foreach ($data['home'] as $statName => $stats) {
+            $output .= $this->renderStatTable($statName, $stats, true);
         }
+        $output .= '</div>';
 
-        if ($this->hasRcbData($data['away'])) {
-            $output .= '<h2 class="ibl-table-title">Away Game Highs</h2>';
-            $output .= '<div class="ibl-grid ibl-grid--3col">';
-            $output .= $this->renderRcbStatTables($data['away']);
-            $output .= '</div>';
+        $output .= '<h2 class="ibl-table-title">Players\' ' . $safePhase . ' Away Highs</h2>';
+        $output .= '<div class="ibl-grid ibl-grid--3col">';
+        foreach ($data['away'] as $statName => $stats) {
+            $output .= $this->renderStatTable($statName, $stats, true);
+        }
+        $output .= '</div>';
+
+        if ($discrepancies !== []) {
+            $output .= $this->renderDiscrepancies($discrepancies);
         }
 
         return $output;
     }
 
     /**
-     * Check if RCB data has any non-empty categories.
+     * Render discrepancy panel comparing box score vs RCB data.
      *
-     * @param array<string, list<RcbSeasonHighEntry>> $categories
+     * @param list<RcbDiscrepancy> $discrepancies
      */
-    private function hasRcbData(array $categories): bool
+    private function renderDiscrepancies(array $discrepancies): string
     {
-        foreach ($categories as $records) {
-            if ($records !== []) {
-                return true;
-            }
-        }
-        return false;
-    }
+        $output = '<div class="season-highs-discrepancy-panel">';
+        $output .= '<h3 class="discrepancy-panel-title">Data Validation: Box Score vs RCB Discrepancies</h3>';
+        $output .= '<table class="ibl-data-table">';
+        $output .= '<thead><tr>'
+            . '<th>Context</th>'
+            . '<th>Stat</th>'
+            . '<th>Box Score</th>'
+            . '<th>RCB</th>'
+            . '</tr></thead>';
+        $output .= '<tbody>';
 
-    /**
-     * Render stat tables for RCB season records.
-     *
-     * @param array<string, list<RcbSeasonHighEntry>> $categories
-     */
-    private function renderRcbStatTables(array $categories): string
-    {
-        $output = '';
-        foreach ($categories as $category => $records) {
-            if ($records === []) {
-                continue;
-            }
-            $label = SeasonHighsService::getRcbStatLabel($category);
-            $output .= $this->renderRcbStatTable($label, $records);
-        }
-        return $output;
-    }
+        foreach ($discrepancies as $d) {
+            /** @var string $safeContext */
+            $safeContext = HtmlSanitizer::safeHtmlOutput(ucfirst($d['context']));
+            /** @var string $safeStat */
+            $safeStat = HtmlSanitizer::safeHtmlOutput($d['stat']);
+            /** @var string $safeBoxPlayer */
+            $safeBoxPlayer = HtmlSanitizer::safeHtmlOutput($d['boxPlayer']);
+            /** @var string $safeRcbPlayer */
+            $safeRcbPlayer = HtmlSanitizer::safeHtmlOutput($d['rcbPlayer']);
+            $boxValue = $d['boxValue'];
+            $rcbValue = $d['rcbValue'];
 
-    /**
-     * Render a single RCB stat table.
-     *
-     * @param string $statLabel Display label
-     * @param list<RcbSeasonHighEntry> $records
-     */
-    private function renderRcbStatTable(string $statLabel, array $records): string
-    {
-        /** @var string $safeName */
-        $safeName = HtmlSanitizer::safeHtmlOutput($statLabel);
-
-        $output = '<div class="stat-table-wrapper">
-        <table class="ibl-data-table stat-table">
-            <thead>
-                <tr><th colspan="4">' . $safeName . '</th></tr>
-            </thead>
-            <tbody>';
-
-        foreach ($records as $record) {
-            $rank = (int) $record['ranking'];
-            /** @var string $playerName */
-            $playerName = HtmlSanitizer::safeHtmlOutput($record['player_name']);
-            $value = (int) $record['stat_value'];
-            $seasonYear = (int) $record['record_season_year'];
-            $position = $record['player_position'] !== null && $record['player_position'] !== ''
-                ? $record['player_position'] . ' '
-                : '';
-            /** @var string $safePosition */
-            $safePosition = HtmlSanitizer::safeHtmlOutput($position);
-
-            $output .= "<tr>
-    <td class=\"rank-cell\">{$rank}</td>
-    <td class=\"name-cell\">{$safePosition}{$playerName}</td>
-    <td class=\"value-cell\">{$value}</td>
-    <td class=\"date-cell\">{$seasonYear}</td>
-</tr>";
+            $output .= '<tr>'
+                . "<td>{$safeContext}</td>"
+                . "<td>{$safeStat}</td>"
+                . "<td>{$safeBoxPlayer}: {$boxValue}</td>"
+                . "<td>{$safeRcbPlayer}: {$rcbValue}</td>"
+                . '</tr>';
         }
 
         $output .= '</tbody></table></div>';

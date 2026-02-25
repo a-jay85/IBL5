@@ -13,7 +13,8 @@ use SeasonHighs\Contracts\SeasonHighsRepositoryInterface;
  * Calculates date ranges and retrieves season high stats.
  *
  * @phpstan-import-type SeasonHighsData from SeasonHighsServiceInterface
- * @phpstan-import-type RcbSeasonHighEntry from SeasonHighsServiceInterface
+ * @phpstan-import-type SeasonHighEntry from SeasonHighsServiceInterface
+ * @phpstan-import-type RcbDiscrepancy from SeasonHighsServiceInterface
  *
  * @see SeasonHighsServiceInterface For the interface contract
  */
@@ -38,6 +39,40 @@ class SeasonHighsService implements SeasonHighsServiceInterface
         'Free Throws Made' => '`gameFTM`',
         'Three Pointers Made' => '`game3GM`',
     ];
+
+    /**
+     * Stats used for home/away highs (no TURNOVERS — RCB doesn't track it).
+     *
+     * @var array<string, string>
+     */
+    private const HOME_AWAY_STATS = [
+        'POINTS' => '(`game2GM`*2) + `gameFTM` + (`game3GM`*3)',
+        'REBOUNDS' => '(`gameORB` + `gameDRB`)',
+        'ASSISTS' => '`gameAST`',
+        'STEALS' => '`gameSTL`',
+        'BLOCKS' => '`gameBLK`',
+        'Field Goals Made' => '(`game2GM` + `game3GM`)',
+        'Three Pointers Made' => '`game3GM`',
+        'Free Throws Made' => '`gameFTM`',
+    ];
+
+    /**
+     * Map RCB stat categories to box score stat names for cross-validation.
+     *
+     * @var array<string, string>
+     */
+    private const RCB_TO_STAT_MAP = [
+        'pts' => 'POINTS',
+        'reb' => 'REBOUNDS',
+        'ast' => 'ASSISTS',
+        'stl' => 'STEALS',
+        'blk' => 'BLOCKS',
+        'two_gm' => 'Field Goals Made',
+        'three_gm' => 'Three Pointers Made',
+        'ftm' => 'Free Throws Made',
+    ];
+
+    private const HOME_AWAY_LIMIT = 10;
 
     public function __construct(SeasonHighsRepositoryInterface $repository, \Season $season)
     {
@@ -82,76 +117,129 @@ class SeasonHighsService implements SeasonHighsServiceInterface
     }
 
     /**
-     * RCB stat category display labels.
-     *
-     * @var array<string, string>
-     */
-    private const RCB_STAT_LABELS = [
-        'pts' => 'Points',
-        'reb' => 'Rebounds',
-        'ast' => 'Assists',
-        'stl' => 'Steals',
-        'blk' => 'Blocks',
-        'two_gm' => 'Field Goals Made',
-        'three_gm' => 'Three Pointers Made',
-        'ftm' => 'Free Throws Made',
-    ];
-
-    /**
-     * Display order for RCB stat categories.
-     *
-     * @var list<string>
-     */
-    private const RCB_STAT_ORDER = ['pts', 'reb', 'ast', 'stl', 'blk', 'two_gm', 'three_gm', 'ftm'];
-
-    /**
      * @see SeasonHighsServiceInterface::getHomeAwayHighs()
      *
-     * @return array{home: array<string, list<RcbSeasonHighEntry>>, away: array<string, list<RcbSeasonHighEntry>>}
+     * @return array{home: array<string, list<SeasonHighEntry>>, away: array<string, list<SeasonHighEntry>>}
      */
-    public function getHomeAwayHighs(): array
+    public function getHomeAwayHighs(string $seasonPhase): array
     {
-        $seasonYear = $this->season->beginningYear;
+        $dateRange = $this->getDateRangeForPhase($seasonPhase);
 
-        $homeRecords = $this->repository->getRcbSeasonHighs($seasonYear, 'home');
-        $awayRecords = $this->repository->getRcbSeasonHighs($seasonYear, 'away');
+        /** @var array<string, list<SeasonHighEntry>> $homeHighs */
+        $homeHighs = [];
+        /** @var array<string, list<SeasonHighEntry>> $awayHighs */
+        $awayHighs = [];
+
+        foreach (self::HOME_AWAY_STATS as $statName => $statExpression) {
+            $homeHighs[$statName] = $this->repository->getSeasonHighs(
+                $statExpression,
+                $statName,
+                '',
+                $dateRange['start'],
+                $dateRange['end'],
+                self::HOME_AWAY_LIMIT,
+                'home'
+            );
+
+            $awayHighs[$statName] = $this->repository->getSeasonHighs(
+                $statExpression,
+                $statName,
+                '',
+                $dateRange['start'],
+                $dateRange['end'],
+                self::HOME_AWAY_LIMIT,
+                'away'
+            );
+        }
 
         return [
-            'home' => $this->groupRcbByCategory($homeRecords),
-            'away' => $this->groupRcbByCategory($awayRecords),
+            'home' => $homeHighs,
+            'away' => $awayHighs,
         ];
     }
 
     /**
-     * Group RCB season records by stat category in display order.
+     * @see SeasonHighsServiceInterface::validateAgainstRcb()
      *
-     * @param list<RcbSeasonHighEntry> $records
-     * @return array<string, list<RcbSeasonHighEntry>>
+     * @param array{home: array<string, list<SeasonHighEntry>>, away: array<string, list<SeasonHighEntry>>} $homeAwayData
+     * @return list<RcbDiscrepancy>
      */
-    private function groupRcbByCategory(array $records): array
+    public function validateAgainstRcb(array $homeAwayData, int $seasonYear): array
     {
-        /** @var array<string, list<RcbSeasonHighEntry>> $grouped */
-        $grouped = [];
-        foreach (self::RCB_STAT_ORDER as $category) {
-            $grouped[$category] = [];
-        }
+        /** @var list<RcbDiscrepancy> $discrepancies */
+        $discrepancies = [];
 
-        foreach ($records as $record) {
-            $category = $record['stat_category'];
-            if (array_key_exists($category, $grouped)) {
-                $grouped[$category][] = $record;
+        foreach (['home', 'away'] as $context) {
+            $rcbRecords = $this->repository->getRcbSeasonHighs($seasonYear, $context);
+            if ($rcbRecords === []) {
+                continue;
+            }
+
+            // Index RCB #1 records by stat category
+            /** @var array<string, array{player_name: string, stat_value: int}> $rcbTop */
+            $rcbTop = [];
+            foreach ($rcbRecords as $record) {
+                if ($record['ranking'] === 1 && !array_key_exists($record['stat_category'], $rcbTop)) {
+                    $rcbTop[$record['stat_category']] = [
+                        'player_name' => $record['player_name'],
+                        'stat_value' => $record['stat_value'],
+                    ];
+                }
+            }
+
+            foreach (self::RCB_TO_STAT_MAP as $rcbCategory => $boxStatName) {
+                if (!isset($rcbTop[$rcbCategory])) {
+                    continue;
+                }
+
+                $boxEntries = $homeAwayData[$context][$boxStatName] ?? [];
+                if ($boxEntries === []) {
+                    continue;
+                }
+
+                $boxTop = $boxEntries[0];
+                $rcbEntry = $rcbTop[$rcbCategory];
+
+                $valuesMatch = $boxTop['value'] === $rcbEntry['stat_value'];
+                $namesMatch = $this->namesMatch($boxTop['name'], $rcbEntry['player_name']);
+
+                if (!$valuesMatch || !$namesMatch) {
+                    $discrepancies[] = [
+                        'context' => $context,
+                        'stat' => $boxStatName,
+                        'boxValue' => $boxTop['value'],
+                        'boxPlayer' => $boxTop['name'],
+                        'rcbValue' => $rcbEntry['stat_value'],
+                        'rcbPlayer' => $rcbEntry['player_name'],
+                    ];
+                }
             }
         }
 
-        return $grouped;
+        return $discrepancies;
     }
 
     /**
-     * Get the display label for an RCB stat category.
+     * Compare player names with tolerance for RCB truncation.
+     *
+     * RCB names may be truncated compared to full names in ibl_plr.
+     * Uses case-insensitive prefix matching.
      */
-    public static function getRcbStatLabel(string $category): string
+    private function namesMatch(string $boxName, string $rcbName): bool
     {
-        return self::RCB_STAT_LABELS[$category] ?? $category;
+        $boxLower = strtolower(trim($boxName));
+        $rcbLower = strtolower(trim($rcbName));
+
+        if ($boxLower === $rcbLower) {
+            return true;
+        }
+
+        // RCB name may be a prefix of the full box score name (truncation)
+        if ($rcbLower !== '' && str_starts_with($boxLower, $rcbLower)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

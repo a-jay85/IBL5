@@ -45,12 +45,13 @@ $view = new SeasonHighsView();
 
 // Get season highs data
 $data = $service->getSeasonHighsData($seasonPhase);
-$homeAwayData = $service->getHomeAwayHighs();
+$homeAwayData = $service->getHomeAwayHighs($seasonPhase);
+$discrepancies = $service->validateAgainstRcb($homeAwayData, $season->beginningYear);
 
 // Render page
 PageLayout\PageLayout::header();
 
 echo $view->render($seasonPhase, $data);
-echo $view->renderHomeAwayHighs($homeAwayData);
+echo $view->renderHomeAwayHighs($seasonPhase, $homeAwayData, $discrepancies);
 
 PageLayout\PageLayout::footer();

@@ -48,6 +48,14 @@ function tabApi()
     $handler->handle();
 }
 
+function nextSimApi()
+{
+    global $mysqli_db;
+
+    $handler = new NextSim\NextSimTabApiHandler($mysqli_db);
+    $handler->handle();
+}
+
 function api($user)
 {
     global $mysqli_db, $cookie;
@@ -102,6 +110,9 @@ switch ($op) {
         break;
     case "tab-api":
         tabApi();
+        break;
+    case "nextsim-api":
+        nextSimApi();
         break;
     case "api":
         api($user);

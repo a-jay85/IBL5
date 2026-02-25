@@ -334,66 +334,66 @@
 /* Main nav links (Home link and direct links) */
 nav .group > a:link,
 nav .group > a:visited {
-    color: #e5e7eb !important; /* gray-200 */
+    color: var(--gray-200) !important;
     font-size: 1rem !important;
     font-weight: 500 !important;
 }
 
 nav .group > a:hover {
-    color: #ffffff !important;
+    color: white !important;
 }
 
 /* Desktop dropdown links */
 .nav-dropdown-item:link {
-    color: #e5e7eb; /* gray-200 */
+    color: var(--gray-200);
     font-family: var(--font-display);
 }
 
 .nav-dropdown-item:visited {
-    color: #fdba74; /* accent-300 - visited state */
+    color: var(--accent-300);
 }
 
 .nav-dropdown-item:hover {
-    color: #ffffff !important;
+    color: white !important;
     background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
 /* Inline links within rawHtml nav items (e.g. "Waivers: Add | Drop") */
 span.nav-dropdown-item a:link {
-    color: #e5e7eb;
+    color: var(--gray-200);
     text-decoration: underline;
     text-underline-offset: 2px;
 }
 span.nav-dropdown-item a:visited {
-    color: #fdba74;
+    color: var(--accent-300);
 }
 span.nav-dropdown-item a:hover {
-    color: #ffffff;
+    color: white;
 }
 
 /* Mobile menu links */
 #nav-mobile-menu a:link {
-    color: #e5e7eb; /* gray-200 */
+    color: var(--gray-200);
     font-family: var(--font-display);
 }
 
 #nav-mobile-menu a:visited {
-    color: #fdba74; /* accent-300 */
+    color: var(--accent-300);
 }
 
 #nav-mobile-menu a:hover {
-    color: #ffffff !important;
+    color: white !important;
 }
 
 /* Mobile section buttons (not links) */
 #nav-mobile-menu .mobile-dropdown-btn {
-    color: #ffffff;
+    color: white;
 }
 
 /* Mobile home link */
 #nav-mobile-menu > div > a:link,
 #nav-mobile-menu > div > a:visited {
-    color: #ffffff;
+    color: white;
 }
 
 /* ==========================================================================

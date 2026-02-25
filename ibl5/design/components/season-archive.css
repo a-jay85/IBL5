@@ -7,6 +7,9 @@
  * Migrated from SeasonArchiveView::renderStyles()
  */
 
+@layer components {
+
+
 /* Navigation bar */
 .season-archive-nav {
     display: flex;
@@ -102,3 +105,5 @@
 .bracket-round-start td {
     border-top: 2px solid var(--gray-300, #d1d5db);
 }
+
+} /* end @layer components */

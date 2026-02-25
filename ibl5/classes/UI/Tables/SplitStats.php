@@ -92,35 +92,35 @@ class SplitStats
     </thead>
     <tbody>
 <?php if ($playerRows === []): ?>
-        <tr><td colspan="25" style="text-align: center; padding: 2rem; color: var(--gray-500);">No games found for <strong><?= $safeSplitLabel ?></strong> split.</td></tr>
+        <tr><td colspan="25" style="padding: 2rem; color: var(--gray-500);">No games found for <strong><?= $safeSplitLabel ?></strong> split.</td></tr>
 <?php endif; ?>
 <?php foreach ($playerRows as $row): ?>
         <tr>
             <td><?= htmlspecialchars($row['pos']) ?></td>
             <?= PlayerImageHelper::renderPlayerCell($row['pid'], $row['name'], $starterPids) ?>
-            <td style="text-align: center;"><?= $row['games'] ?></td>
-            <td style="text-align: center;"><?= $row['min'] ?></td>
+            <td><?= $row['games'] ?></td>
+            <td><?= $row['min'] ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= $row['fgm'] ?></td>
-            <td style="text-align: center;"><?= $row['fga'] ?></td>
-            <td style="text-align: center;"><?= $row['fgp'] ?></td>
+            <td><?= $row['fgm'] ?></td>
+            <td><?= $row['fga'] ?></td>
+            <td><?= $row['fgp'] ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><?= $row['ftm'] ?></td>
-            <td style="text-align: center;"><?= $row['fta'] ?></td>
-            <td style="text-align: center;"><?= $row['ftp'] ?></td>
+            <td><?= $row['ftm'] ?></td>
+            <td><?= $row['fta'] ?></td>
+            <td><?= $row['ftp'] ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><?= $row['tgm'] ?></td>
-            <td style="text-align: center;"><?= $row['tga'] ?></td>
-            <td style="text-align: center;"><?= $row['tgp'] ?></td>
+            <td><?= $row['tgm'] ?></td>
+            <td><?= $row['tga'] ?></td>
+            <td><?= $row['tgp'] ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= $row['orb'] ?></td>
-            <td style="text-align: center;"><?= $row['reb'] ?></td>
-            <td style="text-align: center;"><?= $row['ast'] ?></td>
-            <td style="text-align: center;"><?= $row['stl'] ?></td>
-            <td style="text-align: center;"><?= $row['tov'] ?></td>
-            <td style="text-align: center;"><?= $row['blk'] ?></td>
-            <td style="text-align: center;"><?= $row['pf'] ?></td>
-            <td style="text-align: center;"><?= $row['pts'] ?></td>
+            <td><?= $row['orb'] ?></td>
+            <td><?= $row['reb'] ?></td>
+            <td><?= $row['ast'] ?></td>
+            <td><?= $row['stl'] ?></td>
+            <td><?= $row['tov'] ?></td>
+            <td><?= $row['blk'] ?></td>
+            <td><?= $row['pf'] ?></td>
+            <td><?= $row['pts'] ?></td>
         </tr>
 <?php endforeach; ?>
     </tbody>

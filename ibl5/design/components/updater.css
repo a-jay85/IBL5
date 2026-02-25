@@ -5,6 +5,9 @@
  * Renders progressive output as a readable step-by-step log.
  */
 
+@layer components {
+
+
 /* ==========================================================================
    Page Override & Container
    ========================================================================== */
@@ -235,3 +238,5 @@ body:has(> .updater) {
     text-align: center;
     margin-top: var(--space-4, 1rem);
 }
+
+} /* end @layer components */

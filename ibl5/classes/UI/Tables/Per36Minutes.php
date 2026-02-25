@@ -135,31 +135,31 @@ class Per36Minutes
 endif; ?>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', $starterPids) ?>
-            <td style="text-align: center;"><?= $playerStats->seasonGamesPlayed ?></td>
-            <td style="text-align: center;"><?= $playerStats->seasonGamesStarted ?></td>
-            <td style="text-align: center;"><?= $row['stats_mpg'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_per36Min'] ?></td>
+            <td><?= $playerStats->seasonGamesPlayed ?></td>
+            <td><?= $playerStats->seasonGamesStarted ?></td>
+            <td><?= $row['stats_mpg'] ?></td>
+            <td><?= $row['stats_per36Min'] ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= $row['stats_fgm'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_fga'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_fgp'] ?></td>
+            <td><?= $row['stats_fgm'] ?></td>
+            <td><?= $row['stats_fga'] ?></td>
+            <td><?= $row['stats_fgp'] ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><?= $row['stats_ftm'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_fta'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_ftp'] ?></td>
+            <td><?= $row['stats_ftm'] ?></td>
+            <td><?= $row['stats_fta'] ?></td>
+            <td><?= $row['stats_ftp'] ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><?= $row['stats_tgm'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_tga'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_tgp'] ?></td>
+            <td><?= $row['stats_tgm'] ?></td>
+            <td><?= $row['stats_tga'] ?></td>
+            <td><?= $row['stats_tgp'] ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= $row['stats_opg'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_rpg'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_apg'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_spg'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_tpg'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_bpg'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_fpg'] ?></td>
-            <td style="text-align: center;"><?= $row['stats_ppg'] ?></td>
+            <td><?= $row['stats_opg'] ?></td>
+            <td><?= $row['stats_rpg'] ?></td>
+            <td><?= $row['stats_apg'] ?></td>
+            <td><?= $row['stats_spg'] ?></td>
+            <td><?= $row['stats_tpg'] ?></td>
+            <td><?= $row['stats_bpg'] ?></td>
+            <td><?= $row['stats_fpg'] ?></td>
+            <td><?= $row['stats_ppg'] ?></td>
         </tr>
 <?php endforeach; ?>
     </tbody>

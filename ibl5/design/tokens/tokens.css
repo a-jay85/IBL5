@@ -13,6 +13,8 @@
  * Note: Google Fonts import is in input.css (must be at top of stylesheet)
  */
 
+@layer components {
+
 :root {
     /* ========================================================================
        Color Aliases (source of truth: @theme in input.css)
@@ -125,3 +127,5 @@
     --gradient-navy-header: linear-gradient(135deg, var(--navy-800), var(--navy-900));
     --gradient-accent: linear-gradient(135deg, var(--accent-500), var(--accent-600));
 }
+
+} /* end @layer components */

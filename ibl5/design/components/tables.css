@@ -1846,7 +1846,7 @@ td.ibl-team-cell--colored {
     margin-top: 1.5rem;
 }
 
-.record-book-retired-cell {
+td.record-book-retired-cell {
     text-align: left;
     padding-left: calc(0.5rem + 24px + 0.5rem) !important;
 }

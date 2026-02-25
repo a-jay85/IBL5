@@ -5,6 +5,13 @@
  * Migrated from PlayerViewStyles::getStyles()
  */
 
+/* Legacy player page colors (intentionally retro) */
+:root {
+    --player-legacy-header: #0000cc;
+    --player-legacy-danger: #ff0000;
+    --player-legacy-highlight: #ffbb00;
+}
+
 /* ==========================================================================
    Shared Table Base — all player-view tables share these properties
    ========================================================================== */
@@ -29,8 +36,8 @@
 
 /* Table header row - replaces bgcolor=#0000cc and <font color=#ffffff> */
 .player-table-header {
-    background-color: #0000cc;
-    color: #ffffff;
+    background-color: var(--player-legacy-header);
+    color: white;
     font-weight: bold;
     text-align: center;
 }
@@ -70,7 +77,7 @@
 
 /* Colors - replaces <font color="..."> */
 .text-white {
-    color: #ffffff;
+    color: white;
 }
 
 /* ==========================================================================
@@ -133,22 +140,22 @@
 }
 
 .rookie-option-used {
-    background-color: #ff0000;
-    color: #ffffff;
+    background-color: var(--player-legacy-danger);
+    color: white;
 }
 
 .renegotiation-button {
-    background-color: #ff0000;
+    background-color: var(--player-legacy-danger);
 }
 
 .renegotiation-button a {
-    color: #ffffff;
+    color: white;
     text-decoration: none;
     font-weight: bold;
 }
 
 .rookie-option-button {
-    background-color: #ffbb00;
+    background-color: var(--player-legacy-highlight);
 }
 
 .rookie-option-button a {

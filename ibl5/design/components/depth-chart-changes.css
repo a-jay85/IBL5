@@ -15,6 +15,20 @@
  * protanopia, deuteranopia, or tritanopia via luminance contrast alone.
  */
 
+/* Glow intensity scale (lightest → strongest) */
+:root {
+    --dc-glow-bg-1: #fff1e0;
+    --dc-glow-border-1: #f0ad6e;
+    --dc-glow-bg-2: #ffe4c4;
+    --dc-glow-border-2: #e8943e;
+    --dc-glow-bg-3: #ffd6a5;
+    --dc-glow-border-3: #e07d20;
+    --dc-glow-bg-4: #ffc580;
+    --dc-glow-border-4: #d96c0c;
+    --dc-glow-bg-5: #ffb35c;
+    --dc-glow-border-5: #c05600;
+}
+
 /* Base transition for smooth appearance across all properties */
 .depth-chart-form select {
     transition: box-shadow 0.25s ease,
@@ -23,39 +37,39 @@
 }
 
 /* Level 1 – detectable hint (categorical change, small numeric diff)
-   Background: warm cream (#fff1e0) — ~4% darker than white for luminance-based detection
+   Background: warm cream — ~4% darker than white for luminance-based detection
    Border: soft orange-brown, visible shift from default gray-300 */
 .depth-chart-form select.dc-glow-1 {
-    background-color: #fff1e0;
-    border-color: #f0ad6e;
+    background-color: var(--dc-glow-bg-1);
+    border-color: var(--dc-glow-border-1);
     box-shadow: 0 0 4px 1px rgba(249, 115, 22, 0.3);
 }
 
 /* Level 2 – noticeable change */
 .depth-chart-form select.dc-glow-2 {
-    background-color: #ffe4c4;
-    border-color: #e8943e;
+    background-color: var(--dc-glow-bg-2);
+    border-color: var(--dc-glow-border-2);
     box-shadow: 0 0 6px 2px rgba(249, 115, 22, 0.4);
 }
 
 /* Level 3 – moderate change */
 .depth-chart-form select.dc-glow-3 {
-    background-color: #ffd6a5;
-    border-color: #e07d20;
+    background-color: var(--dc-glow-bg-3);
+    border-color: var(--dc-glow-border-3);
     box-shadow: 0 0 8px 3px rgba(249, 115, 22, 0.5);
 }
 
 /* Level 4 – significant change */
 .depth-chart-form select.dc-glow-4 {
-    background-color: #ffc580;
-    border-color: #d96c0c;
+    background-color: var(--dc-glow-bg-4);
+    border-color: var(--dc-glow-border-4);
     box-shadow: 0 0 10px 3px rgba(249, 115, 22, 0.65);
 }
 
 /* Level 5 – maximum change (e.g. position No → 1st)
    Deep amber background with bold orange border and strong glow */
 .depth-chart-form select.dc-glow-5 {
-    background-color: #ffb35c;
-    border-color: #c05600;
+    background-color: var(--dc-glow-bg-5);
+    border-color: var(--dc-glow-border-5);
     box-shadow: 0 0 14px 4px rgba(249, 115, 22, 0.85);
 }

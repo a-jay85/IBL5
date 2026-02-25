@@ -1,0 +1,129 @@
+/**
+ * Trade Comparison Panel
+ *
+ * Dynamic player comparison panel shown on the trade offer form.
+ * Displays stat tables for selected players, grouped by team side.
+ */
+
+/* ==========================================================================
+   Panel Container
+   ========================================================================== */
+
+.trade-comparison {
+    margin-top: var(--space-4);
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+}
+
+/* ==========================================================================
+   Header
+   ========================================================================== */
+
+.trade-comparison__header {
+    background: linear-gradient(135deg, #111827 0%, #1a2234 100%);
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-align: center;
+    padding: var(--space-2) var(--space-4);
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+}
+
+/* ==========================================================================
+   Two-Column Grid (stacks on mobile)
+   ========================================================================== */
+
+.trade-comparison__grid {
+    display: flex;
+    gap: var(--space-4);
+    padding: var(--space-4);
+}
+
+.trade-comparison__team {
+    flex: 1;
+    min-width: 0;
+}
+
+@media (max-width: 640px) {
+    .trade-comparison__grid {
+        flex-direction: column;
+    }
+}
+
+/* ==========================================================================
+   Team Name Sub-header
+   ========================================================================== */
+
+.trade-comparison__team-name {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-align: center;
+    padding: var(--space-2) 0;
+    margin-bottom: var(--space-2);
+    border-bottom: 2px solid var(--gray-200);
+    color: var(--gray-700, #374151);
+}
+
+/* ==========================================================================
+   States: Empty / Loading
+   ========================================================================== */
+
+.trade-comparison__empty {
+    text-align: center;
+    padding: var(--space-6) var(--space-4);
+    color: var(--gray-400, #9ca3af);
+    font-style: italic;
+}
+
+.trade-comparison__loading {
+    text-align: center;
+    padding: var(--space-6) var(--space-4);
+    color: var(--gray-500, #6b7280);
+}
+
+.trade-comparison__loading::after {
+    content: '';
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    margin-left: var(--space-2);
+    border: 2px solid var(--gray-300, #d1d5db);
+    border-top-color: var(--gray-600, #4b5563);
+    border-radius: 50%;
+    animation: trade-comparison-spin 0.6s linear infinite;
+    vertical-align: middle;
+}
+
+@keyframes trade-comparison-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Cap Total Delta Indicators
+   ========================================================================== */
+
+.trade-comparison__delta {
+    font-weight: 600;
+}
+
+.trade-comparison__delta--over {
+    color: #dc2626;
+}
+
+/* ==========================================================================
+   Dropdown Overrides for Comparison Panel
+   ========================================================================== */
+
+.trade-comparison .ibl-view-dropdown {
+    margin-bottom: var(--space-2);
+}
+
+.trade-comparison .ibl-view-select {
+    width: 100%;
+}

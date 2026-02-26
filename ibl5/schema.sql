@@ -1569,6 +1569,7 @@ CREATE TABLE `ibl_plr` (
   `cy4` smallint(6) DEFAULT 0 COMMENT 'Salary for contract year 4 (thousands, negative=cash from other team)',
   `cy5` smallint(6) DEFAULT 0 COMMENT 'Salary for contract year 5 (thousands, negative=cash from other team)',
   `cy6` smallint(6) DEFAULT 0 COMMENT 'Salary for contract year 6 (thousands, negative=cash from other team)',
+  `fa_signing_flag` tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Free agent signing flag (1=signed as FA, 0=drafted/traded/continuing)',
   `sh_pts` smallint(5) unsigned DEFAULT 0 COMMENT 'Season high points',
   `sh_reb` smallint(5) unsigned DEFAULT 0 COMMENT 'Season high rebounds',
   `sh_ast` smallint(5) unsigned DEFAULT 0 COMMENT 'Season high assists',

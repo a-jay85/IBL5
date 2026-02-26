@@ -31,13 +31,13 @@ export async function GET() {
 			teams: teams,
 			timestamp: new Date().toISOString()
 		});
-	} catch (err) {
+	} catch (err: unknown) {
 		console.error('❌ Failed to fetch teams:', err);
 
 		return json(
 			{
 				success: false,
-				error: err.message,
+				error: err instanceof Error ? err.message : 'Unknown error',
 				timestamp: new Date().toISOString()
 			},
 			{ status: 500 }

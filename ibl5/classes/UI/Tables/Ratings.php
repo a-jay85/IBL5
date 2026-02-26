@@ -120,44 +120,44 @@ class Ratings
     echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamID ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
 endif; ?>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids) ?>
-            <td style="text-align: center;"><?= htmlspecialchars($player->position ?? '') ?></td>
-            <td style="text-align: center;"><?= (int)$player->age ?></td>
+            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><?= (int)$player->age ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= (int)$player->ratingFieldGoalAttempts ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingFieldGoalPercentage ?></td>
+            <td><?= (int)$player->ratingFieldGoalAttempts ?></td>
+            <td><?= (int)$player->ratingFieldGoalPercentage ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><?= (int)$player->ratingFreeThrowAttempts ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingFreeThrowPercentage ?></td>
+            <td><?= (int)$player->ratingFreeThrowAttempts ?></td>
+            <td><?= (int)$player->ratingFreeThrowPercentage ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><?= (int)$player->ratingThreePointAttempts ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingThreePointPercentage ?></td>
+            <td><?= (int)$player->ratingThreePointAttempts ?></td>
+            <td><?= (int)$player->ratingThreePointPercentage ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= (int)$player->ratingOffensiveRebounds ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingDefensiveRebounds ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingAssists ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingSteals ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingTurnovers ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingBlocks ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingFouls ?></td>
+            <td><?= (int)$player->ratingOffensiveRebounds ?></td>
+            <td><?= (int)$player->ratingDefensiveRebounds ?></td>
+            <td><?= (int)$player->ratingAssists ?></td>
+            <td><?= (int)$player->ratingSteals ?></td>
+            <td><?= (int)$player->ratingTurnovers ?></td>
+            <td><?= (int)$player->ratingBlocks ?></td>
+            <td><?= (int)$player->ratingFouls ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= (int)$player->ratingOutsideOffense ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingDriveOffense ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingPostOffense ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingTransitionOffense ?></td>
+            <td><?= (int)$player->ratingOutsideOffense ?></td>
+            <td><?= (int)$player->ratingDriveOffense ?></td>
+            <td><?= (int)$player->ratingPostOffense ?></td>
+            <td><?= (int)$player->ratingTransitionOffense ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><?= (int)$player->ratingOutsideDefense ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingDriveDefense ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingPostDefense ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingTransitionDefense ?></td>
+            <td><?= (int)$player->ratingOutsideDefense ?></td>
+            <td><?= (int)$player->ratingDriveDefense ?></td>
+            <td><?= (int)$player->ratingPostDefense ?></td>
+            <td><?= (int)$player->ratingTransitionDefense ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= (int)$player->ratingClutch ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingConsistency ?></td>
+            <td><?= (int)$player->ratingClutch ?></td>
+            <td><?= (int)$player->ratingConsistency ?></td>
             <td class="sep-team"></td>
             <?php
                 $injDays = (int) $row['injuryDays'];
                 $injReturn = $row['injuryReturnDate'];
             ?>
-            <td style="text-align: center;"><?= ($injDays > 0 && $injReturn !== '')
+            <td><?= ($injDays > 0 && $injReturn !== '')
                 ? TooltipLabel::render((string) $injDays, 'Returns: ' . $injReturn)
                 : (string) $injDays ?></td>
         </tr>

@@ -5,6 +5,9 @@
  * Migrated from PlayerViewStyles::getStyles()
  */
 
+@layer components {
+
+
 /* Legacy player page colors (intentionally retro) */
 :root {
     --player-legacy-header: #0000cc;
@@ -163,3 +166,5 @@
     text-decoration: none;
     font-weight: bold;
 }
+
+} /* end @layer components */

@@ -7,6 +7,9 @@
  * - News articles
  */
 
+@layer components {
+
+
 /* ==========================================================================
    Shared Card Base — common properties for all card containers
    ========================================================================== */
@@ -427,3 +430,4 @@
     font-weight: 600;
 }
 
+} /* end @layer components */

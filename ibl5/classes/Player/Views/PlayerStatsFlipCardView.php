@@ -149,14 +149,14 @@ class PlayerStatsFlipCardView
     public static function renderOlympics(
         PlayerOlympicAveragesView $averagesView,
         PlayerOlympicTotalsView $totalsView,
-        string $playerName,
+        int $playerID,
         ?\mysqli $db = null,
         int $teamID = 0
     ): string {
         $colorScheme = CardBaseStyles::getColorSchemeForTeam($db, $teamID);
         return self::render(
-            $averagesView->renderAverages($playerName),
-            $totalsView->renderTotals($playerName),
+            $averagesView->renderAverages($playerID),
+            $totalsView->renderTotals($playerID),
             'Olympics',
             true,
             $colorScheme

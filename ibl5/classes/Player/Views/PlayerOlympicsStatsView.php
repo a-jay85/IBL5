@@ -28,9 +28,9 @@ class PlayerOlympicsStatsView implements PlayerOlympicsStatsViewInterface
     /**
      * @see PlayerOlympicsStatsViewInterface::renderOlympicsTotals()
      */
-    public function renderOlympicsTotals(string $playerName): string
+    public function renderOlympicsTotals(int $playerID): string
     {
-        $olympicsStats = $this->repository->getOlympicsStats($playerName);
+        $olympicsStats = $this->repository->getOlympicsStats($playerID);
 
         ob_start();
         ?>
@@ -98,12 +98,12 @@ class PlayerOlympicsStatsView implements PlayerOlympicsStatsViewInterface
     /**
      * Render Olympics averages table
      *
-     * @param string $playerName Player name to fetch stats for
+     * @param int $playerID Player ID to fetch stats for
      * @return string HTML for Olympics averages table
      */
-    public function renderOlympicsAverages(string $playerName): string
+    public function renderOlympicsAverages(int $playerID): string
     {
-        $olympicsStats = $this->repository->getOlympicsStats($playerName);
+        $olympicsStats = $this->repository->getOlympicsStats($playerID);
 
         ob_start();
         ?>

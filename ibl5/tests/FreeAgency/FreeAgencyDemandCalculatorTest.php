@@ -25,7 +25,7 @@ class MockDemandRepository implements FreeAgencyDemandRepositoryInterface
         return $this->positionSalaryCommitment;
     }
 
-    public function getPlayerDemands(string $playerName): array
+    public function getPlayerDemands(int $playerID): array
     {
         return $this->playerDemands;
     }

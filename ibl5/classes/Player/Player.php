@@ -439,7 +439,7 @@ class Player implements PlayerInterface
      */
     public function getFreeAgencyDemands(): array
     {
-        return $this->repository->getFreeAgencyDemands($this->name ?? '');
+        return $this->repository->getFreeAgencyDemands($this->playerID ?? 0);
     }
 
     /**

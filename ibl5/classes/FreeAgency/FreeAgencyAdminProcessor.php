@@ -93,7 +93,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             $newsBodyText .= "The {$offeringTeamName} offered {$playerName} a {$offerYears}-year deal worth a total of {$offerTotal} million dollars.<br>\n";
 
             // Get demands for this player
-            $demands = $this->getPlayerDemands($playerName, $day);
+            $demands = $this->getPlayerDemands($playerId, $day);
 
             // Check if offer is auto-rejected (under half of demands)
             if ($perceivedValue <= $demands / 2) {
@@ -310,9 +310,9 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
      * Fetches raw demand data from repository and applies the day-adjusted
      * demand calculation formula.
      */
-    private function getPlayerDemands(string $playerName, int $day): float
+    private function getPlayerDemands(int $playerID, int $day): float
     {
-        $demRow = $this->repository->getPlayerDemands($playerName);
+        $demRow = $this->repository->getPlayerDemands($playerID);
 
         if ($demRow === null) {
             return 0.0;

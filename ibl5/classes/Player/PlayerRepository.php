@@ -310,12 +310,12 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      * 
      * Uses fetchOne from BaseMysqliRepository with prepared statement.
      */
-    public function getFreeAgencyDemands(string $playerName): array
+    public function getFreeAgencyDemands(int $playerID): array
     {
         $row = $this->fetchOne(
-            "SELECT * FROM ibl_demands WHERE name = ?",
-            "s",
-            $playerName
+            "SELECT * FROM ibl_demands WHERE pid = ?",
+            "i",
+            $playerID
         );
 
         // Return demand array or empty array with all keys set to 0
@@ -469,12 +469,12 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
      * @see PlayerRepositoryInterface::getOlympicsStats()
      * @return array<int, array<string, mixed>>
      */
-    public function getOlympicsStats(string $playerName): array
+    public function getOlympicsStats(int $playerID): array
     {
         return $this->fetchAll(
-            "SELECT * FROM ibl_olympics_stats WHERE name = ? ORDER BY year ASC",
-            "s",
-            $playerName
+            "SELECT * FROM ibl_olympics_stats WHERE pid = ? ORDER BY year ASC",
+            "i",
+            $playerID
         );
     }
 

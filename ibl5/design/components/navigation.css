@@ -7,6 +7,9 @@
  * - Tab navigation
  */
 
+@layer components {
+
+
 /* ==========================================================================
    Tab Navigation
    ========================================================================== */
@@ -93,7 +96,7 @@
     padding: var(--space-1) var(--space-3);
     border-radius: var(--radius-md);
     border: 2px solid color-mix(in srgb, var(--team-tab-bg-color) 50%, black);
-    background: color-mix(in srgb, var(--team-tab-bg-color) 15%, white) !important;
+    background: color-mix(in srgb, var(--team-tab-bg-color) 15%, white);
     color: color-mix(in srgb, var(--team-tab-bg-color) 75%, black);
     transition: all var(--transition-fast);
 }
@@ -334,13 +337,13 @@
 /* Main nav links (Home link and direct links) */
 nav .group > a:link,
 nav .group > a:visited {
-    color: var(--gray-200) !important;
-    font-size: 1rem !important;
-    font-weight: 500 !important;
+    color: var(--gray-200);
+    font-size: 1rem;
+    font-weight: 500;
 }
 
 nav .group > a:hover {
-    color: white !important;
+    color: white;
 }
 
 /* Desktop dropdown links */
@@ -354,8 +357,8 @@ nav .group > a:hover {
 }
 
 .nav-dropdown-item:hover {
-    color: white !important;
-    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: white;
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 /* Inline links within rawHtml nav items (e.g. "Waivers: Add | Drop") */
@@ -382,7 +385,7 @@ span.nav-dropdown-item a:hover {
 }
 
 #nav-mobile-menu a:hover {
-    color: white !important;
+    color: white;
 }
 
 /* Mobile section buttons (not links) */
@@ -553,3 +556,5 @@ span.nav-dropdown-item a:hover {
     pointer-events: none;
     mix-blend-mode: overlay;
 }
+
+} /* end @layer components */

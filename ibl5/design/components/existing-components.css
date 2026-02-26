@@ -6,6 +6,9 @@
  * preserving all the existing functionality.
  */
 
+@layer components {
+
+
 /* ==========================================================================
    Leaders Grid Layout (Side-by-Side on Desktop)
    ========================================================================== */
@@ -1958,3 +1961,5 @@ table.sortable thead th {
         margin-left: 0;
     }
 }
+
+} /* end @layer components */

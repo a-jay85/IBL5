@@ -1,5 +1,8 @@
 /* Saved Depth Charts - Dropdown, loading state, traded-player indicators */
 
+@layer components {
+
+
 .saved-dc-dropdown-container {
     text-align: center;
     margin: 0.75rem 0;
@@ -77,3 +80,5 @@ tr.depth-chart-traded-player select {
     vertical-align: middle;
     letter-spacing: 0.03em;
 }
+
+} /* end @layer components */

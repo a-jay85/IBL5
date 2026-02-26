@@ -120,10 +120,10 @@ When debugging CSS layout issues, immediately check for inherited properties lik
 ## Mandatory Rules
 
 ### XSS Protection
-Use `Utilities\HtmlSanitizer::safeHtmlOutput()` on ALL output (database results, user input, error messages). The method accepts `mixed` and returns `string` — no type annotations needed at call sites.
+Use `Utilities\HtmlSanitizer::safeHtmlOutput()` (or its short alias `HtmlSanitizer::e()`) on ALL output (database results, user input, error messages). Both methods accept `mixed` and return `string` — no type annotations needed at call sites. Prefer `e()` in View templates for brevity.
 
 ### Type Safety (Strict Types)
-Every PHP file must have `declare(strict_types=1);` at the top. Additional requirements:
+Every PHP file must have `declare(strict_types=1);` at the top (enforced by PHPStan custom rule `RequireStrictTypesRule`). Additional requirements:
 
 - **Typed properties:** All class properties must have type declarations
 - **Typed methods:** All parameters and return types must be declared
@@ -132,7 +132,7 @@ Every PHP file must have `declare(strict_types=1);` at the top. Additional requi
 
 ### CSS & HTML Rules
 - All CSS must go in `ibl5/design/components/`. Never write `<style>` blocks or CSS-generating methods in PHP class files.
-- Use `BasketballStats\StatsFormatter` for all stats — never `number_format()` directly.
+- Use `BasketballStats\StatsFormatter` for all stats — `number_format()` is banned by PHPStan custom rule `BanNumberFormatRule` (except inside StatsFormatter itself).
 - See `view-rendering.md` for HTML modernization and deprecated-tag replacement table.
 
 ### PR Documentation Checklist

@@ -131,25 +131,18 @@ $this->assertQueryExecuted('UPDATE ibl_plr');
 $this->assertQueryNotExecuted('DELETE');
 ```
 
-### MockDatabase returns the SAME data for ALL queries
+### MockDatabase Query Routing
 
-`MockDatabase::setMockData()` sets one shared data pool. Every `SELECT` query (via `sql_query()` -> `MockPreparedStatement::execute()`) returns the same `mockData` rows. This means:
-
-**Problem:** When a controller calls both `countX()` (runs `SELECT COUNT(*) AS total`) and `getX()` (runs `SELECT * FROM ...`), both queries get the same mock rows. The COUNT query's `fetchOne()` returns the first data row (not a `{total: N}` row), and `$row['total']` fails with "Undefined array key" -> returns null -> `TypeError` on the `: int` return type.
-
-**Fix:** Include `'total' => N` in mock data rows so the COUNT query finds it:
+**Preferred approach:** Use `onQuery()` to route different SQL patterns to different result sets:
 ```php
-$this->mockDb->setMockData([
-    [
-        'uuid' => 'test-uuid',
-        'name' => 'Test',
-        // ... domain data ...
-        'total' => 1, // Mock COUNT(*) result reuses same data
-    ],
-]);
+// Route COUNT queries to a count result, data queries to player rows
+$this->mockDb->onQuery('SELECT COUNT', [['total' => 1]]);
+$this->mockDb->setMockData([['pid' => 1, 'name' => 'Player']]);
 ```
 
-**When this matters:** Any controller test where the controller calls both a `count*()` method and a `get*()` / `fetch*()` method on the same repository (i.e., paginated list controllers like `PlayerListController`, `GameListController`, `LeadersController`). Unpaginated controllers (e.g., `StandingsController`, `InjuriesController`) don't call count methods and aren't affected.
+`onQuery(string $pattern, array $rows)` registers a regex pattern (case-insensitive) that is checked **before** all other MockDatabase routing. Use it whenever a test's code-under-test runs multiple different queries (e.g., paginated controllers that call both `countX()` and `getX()`).
+
+**Legacy approach (still works):** `setMockData()` sets a single shared data pool for all unmatched SELECT queries. Old tests that include `'total' => N` in every row still function correctly — no migration needed.
 
 ## Completion Criteria
 

@@ -50,7 +50,7 @@ if (!$validator->validateX(...)) {
 
 | Issue | Correct Approach |
 |-------|------------------|
-| Contract year salary | If `cy=2`, read `cy2` field (not `cy1`) |
+| Contract year salary | Use `PlayerContractCalculator::getCurrentSeasonSalary()` for typed access. For raw arrays: if `cy=2`, read `cy2` field (not `cy1`) |
 | Native types enabled | `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is on — INT columns return PHP `int`, VARCHAR columns return PHP `string`. Compare accordingly: `=== 0` for INT, `=== '0'` for VARCHAR |
 | Retired players | `retired` is TINYINT — check `retired === 0` (int) |
 | Free agents | `tid` is INT — check `tid === 0` or empty username |
@@ -61,4 +61,4 @@ if (!$validator->validateX(...)) {
 | Trade itemtype | `itemtype` is VARCHAR — compare with `=== '0'`, `=== '1'`, `=== 'cash'` |
 | Division guards | Use `=== 0` or `=== 0.0`, not `== 0` |
 | Sticky columns + overflow | Never set `overflow: hidden` on a table that uses `position: sticky` cells — it breaks sticky. Use `.ibl-data-table:not(.responsive-table)` for overflow clipping so `.responsive-table` tables (which have sticky columns) are excluded |
-| PHP-Nuke functions & PHPStan | Functions like `is_user()`, `getusrinfo()`, `cookiedecode()` are defined in `mainfile.php`. Before using one in a class, check `phpstan-stubs/nuke-globals.stub.php` — if the function isn't stubbed, add it or PHPStan will report `function.notFound` |
+| PHP-Nuke functions | For new code, use `Utilities\NukeCompat` adapter (injectable, mockable) instead of calling global functions directly. Legacy stubs are in `phpstan-stubs/nuke-globals.stub.php` — add new stubs if calling globals directly |

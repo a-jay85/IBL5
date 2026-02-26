@@ -5,12 +5,15 @@ paths: "**/*View.php"
 # View Rendering Rules
 
 ## XSS Protection (MANDATORY)
-ALL dynamic content must use `Utilities\HtmlSanitizer::safeHtmlOutput()`:
+ALL dynamic content must use `HtmlSanitizer::e()` (short alias) or `HtmlSanitizer::safeHtmlOutput()`:
 
 ```php
-// ✅ CORRECT
+// ✅ CORRECT (prefer e() for brevity in templates)
+<?= \Utilities\HtmlSanitizer::e($playerName) ?>
+<?= \Utilities\HtmlSanitizer::e($row['name']) ?>
+
+// ✅ ALSO CORRECT (full method name)
 <?= \Utilities\HtmlSanitizer::safeHtmlOutput($playerName) ?>
-<?= \Utilities\HtmlSanitizer::safeHtmlOutput($row['name']) ?>
 
 // ❌ VULNERABLE
 <?= $playerName ?>

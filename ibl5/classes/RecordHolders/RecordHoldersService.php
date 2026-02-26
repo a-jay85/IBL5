@@ -323,7 +323,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
                     'teamTid' => $record['teamid'],
                     'teamYr' => (string) $record['year'],
                     'season' => $this->formatSeasonYearRange($record['year']),
-                    'amount' => number_format((float) $record['value'], 1),
+                    'amount' => \BasketballStats\StatsFormatter::formatWithDecimals((float) $record['value'], 1),
                 ];
             }
 

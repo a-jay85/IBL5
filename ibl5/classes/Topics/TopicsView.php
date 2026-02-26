@@ -135,9 +135,9 @@ class TopicsView implements TopicsViewInterface
         $output .= '<div class="topic-card__meta">';
         $output .= '<h3 class="topic-card__title"><a href="modules.php?name=News&amp;topic=' . $topicId . '">' . $topicText . '</a></h3>';
         $output .= '<div class="topic-card__stats">';
-        $output .= '<span class="topic-card__stat"><strong>' . number_format($storyCount) . '</strong> ' . $totNews . '</span>';
+        $output .= '<span class="topic-card__stat"><strong>' . \BasketballStats\StatsFormatter::formatTotal($storyCount) . '</strong> ' . $totNews . '</span>';
         $output .= '<span class="topic-card__stat-separator"></span>';
-        $output .= '<span class="topic-card__stat"><strong>' . number_format($totalReads) . '</strong> ' . $totReads . '</span>';
+        $output .= '<span class="topic-card__stat"><strong>' . \BasketballStats\StatsFormatter::formatTotal($totalReads) . '</strong> ' . $totReads . '</span>';
         $output .= '</div></div></div>';
 
         $output .= '<div class="topic-card__body">';

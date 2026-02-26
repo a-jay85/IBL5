@@ -162,7 +162,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
      */
     private function renderContractOffers(\Team $team, array $capMetrics): string
     {
-        $commonRepository = new \Services\CommonMysqliRepository($this->mysqli_db);
         $teamId = $team->teamID;
         $teamNameStr = htmlspecialchars($team->name);
         $color1 = htmlspecialchars($team->color1);

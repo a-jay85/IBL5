@@ -137,32 +137,34 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
         $this->assertSame('averages', $result);
     }
 
-    public function testRebuildCacheWarmsAllEightTables(): void
+    public function testRebuildCacheWarmsAllTwelveTables(): void
     {
         $mockInner = $this->createMock(CareerLeaderboardsRepositoryInterface::class);
         $repository = new CachedCareerLeaderboardsRepository($mockInner, $this->cache);
 
         $sampleResult = ['result' => [['pid' => 1, 'name' => 'Test', 'pts' => 100, 'retired' => 0]], 'count' => 1];
 
-        $mockInner->expects($this->exactly(8))
+        $mockInner->expects($this->exactly(12))
             ->method('getLeaderboards')
             ->willReturn($sampleResult);
 
         $repository->rebuildCache();
 
-        // Verify all 8 keys are cached
+        // Verify all 12 keys are cached
         $tables = [
             'ibl_hist', 'ibl_season_career_avgs',
             'ibl_playoff_career_totals', 'ibl_playoff_career_avgs',
             'ibl_heat_career_totals', 'ibl_heat_career_avgs',
             'ibl_olympics_career_totals', 'ibl_olympics_career_avgs',
+            'ibl_rookie_career_totals', 'ibl_sophomore_career_totals',
+            'ibl_allstar_career_totals', 'ibl_allstar_career_avgs',
         ];
         foreach ($tables as $table) {
             $this->assertNotNull($this->cache->get('career_leaderboards:' . $table));
         }
     }
 
-    public function testInvalidateCacheDeletesAllEightKeys(): void
+    public function testInvalidateCacheDeletesAllTwelveKeys(): void
     {
         $stubInner = $this->createStub(CareerLeaderboardsRepositoryInterface::class);
         $repository = new CachedCareerLeaderboardsRepository($stubInner, $this->cache);
@@ -173,6 +175,8 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
             'ibl_playoff_career_totals', 'ibl_playoff_career_avgs',
             'ibl_heat_career_totals', 'ibl_heat_career_avgs',
             'ibl_olympics_career_totals', 'ibl_olympics_career_avgs',
+            'ibl_rookie_career_totals', 'ibl_sophomore_career_totals',
+            'ibl_allstar_career_totals', 'ibl_allstar_career_avgs',
         ];
         foreach ($tables as $table) {
             $this->cache->set('career_leaderboards:' . $table, [['pid' => 1]], 86400);

@@ -168,11 +168,19 @@ final class CareerLeaderboardsServiceTest extends TestCase
         $boardTypes = $this->service->getBoardTypes();
 
         $this->assertIsArray($boardTypes);
-        $this->assertCount(8, $boardTypes);
+        $this->assertCount(12, $boardTypes);
         $this->assertArrayHasKey('ibl_hist', $boardTypes);
         $this->assertEquals('Regular Season Totals', $boardTypes['ibl_hist']);
         $this->assertArrayHasKey('ibl_season_career_avgs', $boardTypes);
         $this->assertEquals('Regular Season Averages', $boardTypes['ibl_season_career_avgs']);
+        $this->assertArrayHasKey('ibl_rookie_career_totals', $boardTypes);
+        $this->assertEquals('Rookie Game Totals', $boardTypes['ibl_rookie_career_totals']);
+        $this->assertArrayHasKey('ibl_sophomore_career_totals', $boardTypes);
+        $this->assertEquals('Sophomore Game Totals', $boardTypes['ibl_sophomore_career_totals']);
+        $this->assertArrayHasKey('ibl_allstar_career_totals', $boardTypes);
+        $this->assertEquals('All-Star Game Totals', $boardTypes['ibl_allstar_career_totals']);
+        $this->assertArrayHasKey('ibl_allstar_career_avgs', $boardTypes);
+        $this->assertEquals('All-Star Game Averages', $boardTypes['ibl_allstar_career_avgs']);
     }
 
     public function testGetSortCategories(): void

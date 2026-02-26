@@ -2,21 +2,21 @@
  * IBL5 Base Styles
  *
  * Essential global styles that cannot be achieved with Tailwind utilities:
- * - CSS reset and box-sizing (@layer reset)
- * - Body/HTML overflow management (@layer reset)
- * - Legacy PHP-Nuke element normalization (@layer legacy)
- * - Legacy PHP-Nuke class compatibility (@layer legacy)
- * - Mobile forced layouts for legacy tables (@layer overrides)
+ * - CSS reset and box-sizing (@layer base)
+ * - Body/HTML overflow management (@layer base)
+ * - Legacy PHP-Nuke element normalization (@layer base)
+ * - Legacy PHP-Nuke class compatibility (@layer base)
+ * - Mobile forced layouts for legacy tables (@layer components)
  *
  * Note: Utility classes like .text-center, .font-bold, .bg-white, etc.
  * are provided by Tailwind CSS and should NOT be duplicated here.
  */
 
 /* ==========================================================================
-   CSS Reset & Box Sizing — @layer reset (lowest priority)
+   CSS Reset & Box Sizing — @layer base
    ========================================================================== */
 
-@layer reset {
+@layer base {
 
 *, *::before, *::after {
     box-sizing: border-box;
@@ -38,13 +38,13 @@ body {
     margin: 0;
 }
 
-} /* end @layer reset */
+} /* end @layer base (reset) */
 
 /* ==========================================================================
-   Legacy PHP-Nuke Styles — @layer legacy
+   Legacy PHP-Nuke Styles — @layer base
    ========================================================================== */
 
-@layer legacy {
+@layer base {
 
 /* --- Element Normalization ---
    These styles normalize deprecated HTML elements that still exist in
@@ -162,17 +162,18 @@ img {
     overflow: hidden;
 }
 
-} /* end @layer legacy */
+} /* end @layer base (legacy) */
 
 /* ==========================================================================
-   Mobile Layout Fixes for Legacy Tables — @layer overrides
+   Mobile Layout Fixes for Legacy Tables — @layer components
 
    PHP-Nuke uses nested tables for layout. These rules force them to
-   stack vertically on mobile devices. Uses @layer overrides so they
-   beat both legacy and component styles without needing !important.
+   stack vertically on mobile devices. Uses @layer components so they
+   beat base styles without needing !important. Higher specificity +
+   later source order ensures they override other component rules.
    ========================================================================== */
 
-@layer overrides {
+@layer components {
 
 @media (max-width: 768px) {
     body > table,
@@ -199,4 +200,4 @@ img {
     }
 }
 
-} /* end @layer overrides */
+} /* end @layer components (mobile overrides) */

@@ -430,11 +430,11 @@
 
 /* ==========================================================================
    Player Stats Card - Horizontal Layout
-   @layer overrides — beats .ibl-data-table styles in @layer components
-   without needing !important.
+   Higher specificity (.player-stats-card table td > .ibl-data-table td)
+   + later source order ensures these beat other component rules.
    ========================================================================== */
 
-@layer overrides {
+@layer components {
 
 .player-stats-card {
     background: linear-gradient(145deg, var(--card-grad-start) 0%, var(--card-grad-mid) 20%, var(--card-grad-mid) 80%, var(--card-grad-end) 100%);
@@ -602,7 +602,7 @@
     }
 }
 
-} /* end @layer overrides */
+} /* end @layer components (player stats card) */
 
 /* ==========================================================================
    Remaining Card Components — @layer components (continued)

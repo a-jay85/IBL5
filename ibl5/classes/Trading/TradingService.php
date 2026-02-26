@@ -41,7 +41,7 @@ class TradingService implements TradingServiceInterface
     /**
      * @see TradingServiceInterface::getTradeOfferPageData()
      *
-     * @return array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<TradingDraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<TradingDraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string, userPlayerContracts: array<int, list<int>>, partnerPlayerContracts: array<int, list<int>>}
+     * @return array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<TradingDraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<TradingDraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string, userPlayerContracts: array<int, list<int>>, partnerPlayerContracts: array<int, list<int>>, comparisonDropdownGroups: array<string, array<string, string>>}
      */
     public function getTradeOfferPageData(string $username, string $partnerTeam): array
     {
@@ -74,6 +74,11 @@ class TradingService implements TradingServiceInterface
             $cashStartYear = 2;
         }
 
+        // Build shared comparison dropdown groups (all stat dimensions from team page)
+        $teamRepository = new \Team\TeamRepository($mysqliDb);
+        $teamService = new \Team\TeamService($mysqliDb, $teamRepository);
+        $comparisonDropdownGroups = $teamService->buildDropdownGroups($season);
+
         return [
             'userTeam' => $userTeam,
             'userTeamId' => $userTeamId,
@@ -95,6 +100,7 @@ class TradingService implements TradingServiceInterface
             'partnerTeamColor2' => $partnerTeamData !== null ? $partnerTeamData['color2'] : 'ffffff',
             'userPlayerContracts' => $this->buildContractsMap($userPlayers, $season->phase),
             'partnerPlayerContracts' => $this->buildContractsMap($partnerPlayers, $season->phase),
+            'comparisonDropdownGroups' => $comparisonDropdownGroups,
         ];
     }
 

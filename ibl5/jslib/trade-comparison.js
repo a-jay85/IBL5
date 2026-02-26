@@ -45,7 +45,7 @@
     // State
     var debounceTimer = null;
     var abortControllers = { user: null, partner: null };
-    var currentDisplay = { user: 'ratings', partner: 'ratings' };
+    var currentDisplay = 'ratings';
 
     // ========================================================================
     // COMPARISON PANEL LOGIC
@@ -115,8 +115,13 @@
 
         var url = config.apiBaseUrl
             + '&pids=' + encodeURIComponent(pids.join(','))
-            + '&teamID=' + encodeURIComponent(teamID)
-            + '&display=' + encodeURIComponent(display);
+            + '&teamID=' + encodeURIComponent(teamID);
+
+        if (display.indexOf('split:') === 0) {
+            url += '&display=split&split=' + encodeURIComponent(display.substring(6));
+        } else {
+            url += '&display=' + encodeURIComponent(display);
+        }
 
         fetch(url, { signal: abortControllers[side].signal })
             .then(function (response) {
@@ -136,12 +141,6 @@
                     }
 
                     container.innerHTML = data.html;
-
-                    // Restore dropdown selection
-                    var select = container.querySelector('.ibl-view-select');
-                    if (select) {
-                        select.value = display;
-                    }
 
                     // Re-initialize sorting
                     if (typeof sorttable !== 'undefined') {
@@ -175,8 +174,8 @@
 
         panel.style.display = anyChecked ? '' : 'none';
 
-        fetchComparison('user', checked.user, config.userTeamId, currentDisplay.user);
-        fetchComparison('partner', checked.partner, config.partnerTeamId, currentDisplay.partner);
+        fetchComparison('user', checked.user, config.userTeamId, currentDisplay);
+        fetchComparison('partner', checked.partner, config.partnerTeamId, currentDisplay);
     }
 
     /**
@@ -197,32 +196,14 @@
         }
     });
 
-    // Delegated dropdown change listener for comparison panel
-    panel.addEventListener('change', function (e) {
-        var select = e.target.closest('.ibl-view-select');
-        if (!select) {
-            return;
-        }
-
-        var teamEl = select.closest('.trade-comparison__team');
-        if (!teamEl) {
-            return;
-        }
-
-        var side = teamEl.getAttribute('data-side');
-        if (side !== 'user' && side !== 'partner') {
-            return;
-        }
-
-        var display = select.value;
-        currentDisplay[side] = display;
-
-        var checked = getCheckedPids();
-        var pids = side === 'user' ? checked.user : checked.partner;
-        var teamID = side === 'user' ? config.userTeamId : config.partnerTeamId;
-
-        fetchComparison(side, pids, teamID, display);
-    });
+    // Shared dropdown change listener
+    var sharedDropdown = document.getElementById('trade-comparison-display');
+    if (sharedDropdown) {
+        sharedDropdown.addEventListener('change', function () {
+            currentDisplay = sharedDropdown.value;
+            refreshComparison();
+        });
+    }
 
     // ========================================================================
     // LIVE CAP TOTALS LOGIC

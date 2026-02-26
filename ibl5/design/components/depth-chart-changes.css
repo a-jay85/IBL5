@@ -15,6 +15,9 @@
  * protanopia, deuteranopia, or tritanopia via luminance contrast alone.
  */
 
+@layer components {
+
+
 /* Glow intensity scale (lightest → strongest) */
 :root {
     --dc-glow-bg-1: #fff1e0;
@@ -73,3 +76,5 @@
     border-color: var(--dc-glow-border-5);
     box-shadow: 0 0 14px 4px rgba(249, 115, 22, 0.85);
 }
+
+} /* end @layer components */

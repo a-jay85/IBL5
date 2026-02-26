@@ -11,6 +11,33 @@
  * - .ibl-data-table: Primary data table (navy header, alternating rows)
  */
 
+@layer components {
+
+/* ==========================================================================
+   STICKY TABLE DECISION TREE
+
+   Pattern 1: .table-scroll-wrapper > .table-scroll-container
+              → Simple horizontal scroll (no sticky columns)
+              → Table: .ibl-data-table
+
+   Pattern 2: .table-scroll-wrapper > .table-scroll-container
+              → Mobile sticky left column(s) that freeze while rest scrolls
+              → Table: .ibl-data-table.responsive-table
+              → Columns: .sticky-col (1 col) / .sticky-col-1 + .sticky-col-2 (2 cols)
+
+   Pattern 3: .sticky-scroll-wrapper > .sticky-scroll-container
+              → Both-axis scroll: sticky header AND sticky first column
+              → Table: .ibl-data-table.sticky-table
+              → Columns: .sticky-col + .sticky-corner (header intersection)
+
+   OVERFLOW RULES:
+   - .ibl-data-table: overflow: hidden (for border-radius clipping)
+   - .responsive-table (mobile): overflow: visible (required for position: sticky)
+   - .sticky-table: overflow: visible (same reason)
+   - .sticky-scroll-wrapper: overflow: auto (provides the scroll viewport)
+   - NEVER set overflow: hidden on elements containing position: sticky cells
+   ========================================================================== */
+
 /* ==========================================================================
    Primary Data Table (.ibl-data-table)
 
@@ -215,7 +242,7 @@
 
 /* Team-colored hover */
 .team-table tbody tr:hover {
-    background-color: var(--team-row-hover-bg) !important;
+    background-color: var(--team-row-hover-bg);
 }
 
 /* Team-colored link hover */
@@ -228,7 +255,7 @@
 .team-table td.sep-team {
     border-left: 0.5px solid var(--team-sep-color);
     border-right: 0.5px solid var(--team-sep-color);
-    padding: 0 !important;
+    padding: 0;
 }
 
 /* Weak separators (gray, same as before) */
@@ -236,13 +263,13 @@
 .team-table td.sep-weak {
     border-left: 0.5px solid var(--gray-200, #e5e7eb);
     border-right: 0.5px solid var(--gray-200, #e5e7eb);
-    padding: 0 !important;
+    padding: 0;
 }
 
 /* Salary column left alignment */
 .team-table th.salary,
 .team-table td.salary {
-    text-align: left !important;
+    text-align: left;
 }
 
 /* Team-colored tfoot */
@@ -260,16 +287,16 @@
 
 /* Ratings highlight rows (team-colored) */
 .team-table tr.ratings-highlight {
-    background-color: var(--team-row-highlight-bg) !important;
+    background-color: var(--team-row-highlight-bg);
 }
 
 .team-table tr.ratings-highlight:hover {
-    background-color: var(--team-row-highlight-hover-bg) !important;
+    background-color: var(--team-row-highlight-hover-bg);
 }
 
 /* Ratings separator row (zero-padding divider) */
 .team-table tr.ratings-separator td {
-    padding: 0 !important;
+    padding: 0;
 }
 
 /* ==========================================================================
@@ -529,30 +556,30 @@
 
     .table-scroll-container {
         display: block;
-        overflow-x: scroll !important;
+        overflow-x: scroll;
         overflow-y: visible;
         -webkit-overflow-scrolling: touch;
         touch-action: pan-x pan-y;
-        padding: 0 !important;
+        padding: 0;
         /* Width set by JavaScript for iOS compatibility */
     }
 
     /* Remove border-radius and padding on mobile for edge-to-edge tables */
     .standings-table-container {
-        border-radius: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
+        border-radius: 0;
+        padding: 0;
+        margin: 0;
     }
 
     .table-scroll-wrapper {
-        padding: 0 !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
+        padding: 0;
+        margin-left: 0;
+        margin-right: 0;
     }
 
     .standings-table {
-        margin-left: 0 !important;
-        margin-right: 0 !important;
+        margin-left: 0;
+        margin-right: 0;
     }
 }
 
@@ -630,15 +657,15 @@
 /* Disable any injected .table-scroll-wrapper / .table-scroll-container
    that would add extra overflow:hidden and break sticky positioning */
 .sticky-scroll-wrapper .table-scroll-wrapper {
-    overflow: visible !important;
+    overflow: visible;
 }
 
 .sticky-scroll-wrapper .table-scroll-wrapper::after {
-    display: none !important;
+    display: none;
 }
 
 .sticky-scroll-wrapper .table-scroll-container {
-    overflow: visible !important;
+    overflow: visible;
 }
 
 /* Table — remove the border-radius/shadow/overflow that .ibl-data-table sets,
@@ -803,10 +830,9 @@ tbody tr.user-team-row:nth-child(even):hover {
 }
 
 /* Team Cell with Colors - combines logo + team-specific background/text.
-   padding-inline !important is needed: .ibl-data-table th/td (0,1,1) outspecifies
-   this class (0,1,0), so the shorthand `padding` would win without it. */
-.ibl-team-cell--colored {
-    padding-inline: 0.5rem !important;
+   Specificity (0,2,0) beats .ibl-data-table th/td (0,1,1) for padding override */
+.ibl-data-table .ibl-team-cell--colored {
+    padding-inline: 0.5rem;
 }
 
 /* Left-align td cells only; th cells keep the default center from .ibl-data-table th.
@@ -845,10 +871,10 @@ td.ibl-team-cell--colored {
     }
 
     /* Center the logo when text is hidden */
-    .ibl-team-cell--colored {
-        text-align: center !important;
-        padding-left: 0rem !important;
-        padding-right: 0rem !important;
+    .ibl-data-table .ibl-team-cell--colored {
+        text-align: center;
+        padding-left: 0rem;
+        padding-right: 0rem;
     }
 
     .ibl-team-cell--colored .ibl-team-cell__name {
@@ -875,9 +901,9 @@ td.ibl-team-cell--colored {
     }
 
     .trading-team-select .ibl-team-cell--colored {
-        text-align: left !important;
-        padding-left: 0.75rem !important;
-        padding-right: 0.75rem !important;
+        text-align: left;
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
     }
 
     .trading-team-select .ibl-team-cell--colored .ibl-team-cell__name {
@@ -896,8 +922,9 @@ td.ibl-team-cell--colored {
    Player Name Cell
    ========================================================================== */
 
-.ibl-player-cell {
-    text-align: left !important;
+/* Specificity (0,2,0) beats .ibl-data-table td (0,1,1) for text-align override */
+.ibl-data-table .ibl-player-cell {
+    text-align: left;
     white-space: nowrap;
     vertical-align: middle;
 }
@@ -1415,8 +1442,9 @@ td.ibl-team-cell--colored {
 
 /* .league-stats-user-row replaced by .user-team-row (user-team-highlighter.js) */
 
-.league-stats-team-cell {
-    text-align: left !important;
+/* Specificity (0,2,0) beats .ibl-data-table td (0,1,1) for text-align override */
+.ibl-data-table .league-stats-team-cell {
+    text-align: left;
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-sm);
 }
@@ -1678,3 +1706,4 @@ td.ibl-team-cell--colored {
     border-bottom: 1px solid var(--gray-200);
 }
 
+} /* end @layer components */

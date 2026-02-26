@@ -2,6 +2,9 @@
    Strength of Schedule - Tier Indicators & SOS Display
    ============================================================ */
 
+@layer components {
+
+
 /* SOS tier scale: 5-color gradient from hardest to easiest */
 :root {
     --sos-tier-elite: var(--error-500);     /* #ef4444 - hardest */
@@ -112,3 +115,5 @@
   align-items: center;
   justify-content: center;
 }
+
+} /* end @layer components */

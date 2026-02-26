@@ -157,8 +157,40 @@ class LeagueContext
     }
 
     /**
+     * Check if the current league is Olympics
+     */
+    public function isOlympics(): bool
+    {
+        return $this->getCurrentLeague() === self::LEAGUE_OLYMPICS;
+    }
+
+    /**
+     * Resolve table name based on current league context
+     *
+     * For IBL context, returns the input table name unchanged.
+     * For Olympics context, maps IBL table names to their Olympics equivalents.
+     * Unmapped table names are returned unchanged.
+     */
+    public function getTableName(string $iblTableName): string
+    {
+        if (!$this->isOlympics()) {
+            return $iblTableName;
+        }
+
+        return match ($iblTableName) {
+            'ibl_box_scores' => 'ibl_olympics_box_scores',
+            'ibl_box_scores_teams' => 'ibl_olympics_box_scores_teams',
+            'ibl_schedule' => 'ibl_olympics_schedule',
+            'ibl_standings' => 'ibl_olympics_standings',
+            'ibl_power' => 'ibl_olympics_power',
+            'ibl_team_info' => 'ibl_olympics_team_info',
+            default => $iblTableName,
+        };
+    }
+
+    /**
      * Validate if a league identifier is valid
-     * 
+     *
      * @param string $league League identifier to validate
      * @return bool True if valid, false otherwise
      */

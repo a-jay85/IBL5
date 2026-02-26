@@ -41,7 +41,7 @@ class TradingService implements TradingServiceInterface
     /**
      * @see TradingServiceInterface::getTradeOfferPageData()
      *
-     * @return array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<TradingDraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<TradingDraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string}
+     * @return array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<TradingDraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<TradingDraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string, userPlayerContracts: array<int, list<int>>, partnerPlayerContracts: array<int, list<int>>, comparisonDropdownGroups: array<string, array<string, string>>}
      */
     public function getTradeOfferPageData(string $username, string $partnerTeam): array
     {
@@ -74,6 +74,11 @@ class TradingService implements TradingServiceInterface
             $cashStartYear = 2;
         }
 
+        // Build shared comparison dropdown groups (all stat dimensions from team page)
+        $teamRepository = new \Team\TeamRepository($mysqliDb);
+        $teamService = new \Team\TeamService($mysqliDb, $teamRepository);
+        $comparisonDropdownGroups = $teamService->buildDropdownGroups($season);
+
         return [
             'userTeam' => $userTeam,
             'userTeamId' => $userTeamId,
@@ -93,6 +98,9 @@ class TradingService implements TradingServiceInterface
             'userTeamColor2' => $userTeamData !== null ? $userTeamData['color2'] : 'ffffff',
             'partnerTeamColor1' => $partnerTeamData !== null ? $partnerTeamData['color1'] : '000000',
             'partnerTeamColor2' => $partnerTeamData !== null ? $partnerTeamData['color2'] : 'ffffff',
+            'userPlayerContracts' => $this->buildContractsMap($userPlayers, $season->phase),
+            'partnerPlayerContracts' => $this->buildContractsMap($partnerPlayers, $season->phase),
+            'comparisonDropdownGroups' => $comparisonDropdownGroups,
         ];
     }
 
@@ -353,6 +361,48 @@ class TradingService implements TradingServiceInterface
         return $phase === 'Playoffs'
             || $phase === 'Draft'
             || $phase === 'Free Agency';
+    }
+
+    /**
+     * Build PID-keyed contract salary arrays for JavaScript cap totals
+     *
+     * Each PID maps to a 6-element array of annual salaries aligned to display years
+     * (index 0 = current/next year, index 5 = year 6). Contract year offset adjusts
+     * for offseason phase.
+     *
+     * @param list<TradingPlayerRow> $players Player rows from repository
+     * @return array<int, list<int>> PID-keyed salary arrays (6 years each)
+     */
+    public function buildContractsMap(array $players, string $seasonPhase): array
+    {
+        $isOffseason = $this->isOffseasonPhase($seasonPhase);
+        $map = [];
+
+        foreach ($players as $row) {
+            $pid = $row['pid'];
+            $contractYear = $row['cy'] ?? 0;
+
+            if ($isOffseason) {
+                $contractYear++;
+            }
+            if ($contractYear === 0) {
+                $contractYear = 1;
+            }
+
+            $salaries = [0, 0, 0, 0, 0, 0];
+            $i = 0;
+            $cy = $contractYear;
+            while ($cy < 7 && $i < 6) {
+                $rawValue = $row["cy{$cy}"] ?? 0;
+                $salaries[$i] = is_int($rawValue) ? $rawValue : 0;
+                $cy++;
+                $i++;
+            }
+
+            $map[$pid] = $salaries;
+        }
+
+        return $map;
     }
 
     /**

@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Updater;
 
+use League\LeagueContext;
 use Utilities\UuidGenerator;
 use Utilities\SchFileParser;
 use Utilities\DateParser;
 
 class ScheduleUpdater extends \BaseMysqliRepository {
     private \Season $season;
+    private ?LeagueContext $leagueContext;
 
     /** @var array<int, string> Team ID to name lookup (for logging) */
     private array $teamIdToNameMap = [];
@@ -32,18 +34,24 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         12 => 'December',
     ];
 
-    public function __construct(\mysqli $db, \Season $season) {
+    public function __construct(\mysqli $db, \Season $season, ?LeagueContext $leagueContext = null) {
         parent::__construct($db);
         $this->season = $season;
+        $this->leagueContext = $leagueContext;
     }
 
     /**
      * @return array{date: string, year: int, month: int, day: int}|null
      */
     protected function extractDate(string $rawDate): ?array {
-        global $leagueContext;
-        /** @var \League\LeagueContext|null $leagueContext */
-        $currentLeague = $leagueContext !== null ? $leagueContext->getCurrentLeague() : 'IBL';
+        // Use injected LeagueContext, fall back to global, then default to IBL
+        if ($this->leagueContext !== null) {
+            $currentLeague = $this->leagueContext->getCurrentLeague();
+        } else {
+            global $leagueContext;
+            /** @var LeagueContext|null $leagueContext */
+            $currentLeague = $leagueContext !== null ? $leagueContext->getCurrentLeague() : 'IBL';
+        }
 
         if ($rawDate === '') {
             return null;
@@ -65,13 +73,25 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     }
 
     /**
+     * Resolve a table name through LeagueContext (if set), else return as-is
+     */
+    private function resolveTable(string $iblTableName): string
+    {
+        return $this->leagueContext !== null
+            ? $this->leagueContext->getTableName($iblTableName)
+            : $iblTableName;
+    }
+
+    /**
      * Pre-fetch team ID→name mappings for logging
      */
     private function preloadTeamNameMap(): void
     {
+        $teamInfoTable = $this->resolveTable('ibl_team_info');
+
         /** @var list<array{team_name: string, teamid: int}> $rows */
         $rows = $this->fetchAll(
-            "SELECT team_name, teamid FROM ibl_team_info WHERE teamid BETWEEN 1 AND ?",
+            "SELECT team_name, teamid FROM {$teamInfoTable} WHERE teamid BETWEEN 1 AND ?",
             "i",
             \League::MAX_REAL_TEAMID
         );
@@ -102,12 +122,14 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     }
 
     public function update(): void {
-        echo 'Updating the ibl_schedule database table...<p>';
+        $scheduleTable = $this->resolveTable('ibl_schedule');
+
+        echo "Updating the {$scheduleTable} database table...<p>";
 
         $log = '';
 
-        $this->execute('TRUNCATE TABLE ibl_schedule', '');
-        $log .= 'TRUNCATE TABLE ibl_schedule<p>';
+        $this->execute("TRUNCATE TABLE {$scheduleTable}", '');
+        $log .= "TRUNCATE TABLE {$scheduleTable}<p>";
 
         $this->preloadTeamNameMap();
 
@@ -170,7 +192,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
             try {
                 $this->execute(
-                    "INSERT INTO ibl_schedule (
+                    "INSERT INTO {$scheduleTable} (
                         Year,
                         BoxID,
                         Date,
@@ -199,8 +221,8 @@ class ScheduleUpdater extends \BaseMysqliRepository {
             }
         }
 
-        \UI::displayDebugOutput($log, 'ibl_schedule SQL Queries');
+        \UI::displayDebugOutput($log, "{$scheduleTable} SQL Queries");
 
-        echo 'The ibl_schedule database table has been updated.<p>';
+        echo "The {$scheduleTable} database table has been updated.<p>";
     }
 }

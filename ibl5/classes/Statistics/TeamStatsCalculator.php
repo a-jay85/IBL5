@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Statistics;
 
+use League\LeagueContext;
+
 /**
  * TeamStatsCalculator - Calculate team statistics from game data
  *
@@ -17,17 +19,23 @@ namespace Statistics;
 class TeamStatsCalculator
 {
     private \mysqli $db;
+    private ?LeagueContext $leagueContext;
+    private string $standingsTable;
 
     /** @var array<int, array{win: int, loss: int}>|null */
     private ?array $teamRecordsCache = null;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         $this->db = $db;
+        $this->leagueContext = $leagueContext;
+        $this->standingsTable = $this->leagueContext !== null
+            ? $this->leagueContext->getTableName('ibl_standings')
+            : 'ibl_standings';
     }
 
     /**
-     * Pre-fetch all team records from ibl_standings into a lookup array.
+     * Pre-fetch all team records from standings into a lookup array.
      * Call once before processing multiple teams to avoid N+1 queries.
      */
     public function preloadTeamRecords(): void
@@ -41,7 +49,7 @@ class TeamStatsCalculator
         if (method_exists($this->db, 'fetchAll')) {
             /** @var list<array{TeamID: int, win: int, loss: int}> $rows */
             $rows = $this->db->fetchAll(
-                "SELECT tid AS TeamID, wins AS win, losses AS loss FROM ibl_standings WHERE tid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID,
+                "SELECT tid AS TeamID, wins AS win, losses AS loss FROM {$this->standingsTable}",
                 ""
             );
 
@@ -183,7 +191,7 @@ class TeamStatsCalculator
         if (method_exists($this->db, 'fetchOne')) {
             /** @var array{win: int, loss: int}|null $result */
             $result = $this->db->fetchOne(
-                "SELECT wins AS win, losses AS loss FROM ibl_standings WHERE tid = ?",
+                "SELECT wins AS win, losses AS loss FROM {$this->standingsTable} WHERE tid = ?",
                 "i",
                 $teamId
             );

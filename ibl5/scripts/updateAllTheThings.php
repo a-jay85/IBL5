@@ -43,6 +43,15 @@ if (!headers_sent()) {
 
 global $mysqli_db;
 
+// Detect league context from URL parameter, session, or cookie
+$leagueContext = new League\LeagueContext();
+$leagueRaw = $_GET['league'] ?? null;
+if (is_string($leagueRaw) && ($leagueRaw === League\LeagueContext::LEAGUE_OLYMPICS || $leagueRaw === League\LeagueContext::LEAGUE_IBL)) {
+    $leagueContext->setLeague($leagueRaw);
+}
+$isOlympics = $leagueContext->isOlympics();
+$leagueLabel = $isOlympics ? 'Olympics' : 'IBL';
+
 $view = new Updater\UpdaterView();
 
 $stylesheetPath = '/ibl5/themes/IBL/style/style.css';
@@ -100,16 +109,16 @@ try {
     echo $view->renderInitStatus('Season initialized');
     flush();
 
-    $scheduleUpdater = new Updater\ScheduleUpdater($mysqli_db, $season);
-    echo $view->renderInitStatus('ScheduleUpdater initialized');
+    $scheduleUpdater = new Updater\ScheduleUpdater($mysqli_db, $season, $leagueContext);
+    echo $view->renderInitStatus("ScheduleUpdater initialized ({$leagueLabel})");
     flush();
 
-    $standingsUpdater = new Updater\StandingsUpdater($mysqli_db, $season);
-    echo $view->renderInitStatus('StandingsUpdater initialized');
+    $standingsUpdater = new Updater\StandingsUpdater($mysqli_db, $season, $leagueContext);
+    echo $view->renderInitStatus("StandingsUpdater initialized ({$leagueLabel})");
     flush();
 
-    $powerRankingsUpdater = new Updater\PowerRankingsUpdater($mysqli_db, $season);
-    echo $view->renderInitStatus('PowerRankingsUpdater initialized');
+    $powerRankingsUpdater = new Updater\PowerRankingsUpdater($mysqli_db, $season, null, $leagueContext);
+    echo $view->renderInitStatus("PowerRankingsUpdater initialized ({$leagueLabel})");
     flush();
 
     echo $view->renderSectionClose();
@@ -158,46 +167,49 @@ try {
     flush();
     $successCount++;
 
-    // --- Step 4: Reset extension attempts ---
-    echo $view->renderStepStart('Resetting extension attempts...');
-    flush();
-    $sharedRepository->resetSimContractExtensionAttempts();
-    echo $view->renderStepComplete('Extension attempts reset');
-    flush();
-    $successCount++;
+    // --- Steps 4-6: IBL-only operations (skipped for Olympics) ---
+    if (!$isOlympics) {
+        // --- Step 4: Reset extension attempts ---
+        echo $view->renderStepStart('Resetting extension attempts...');
+        flush();
+        $sharedRepository->resetSimContractExtensionAttempts();
+        echo $view->renderStepComplete('Extension attempts reset');
+        flush();
+        $successCount++;
 
-    // --- Step 5: Extend active saved depth charts ---
-    echo $view->renderStepStart('Updating saved depth charts...');
-    flush();
-    $savedDcRepo = new SavedDepthChart\SavedDepthChartRepository($mysqli_db);
-    ob_start();
-    $savedDcCount = $savedDcRepo->extendActiveDepthCharts($season->lastSimEndDate, $season->lastSimNumber);
-    $log = (string) ob_get_clean();
-    echo $view->renderStepComplete('Saved depth charts updated', $savedDcCount . ' active DCs extended');
-    if ($log !== '') {
-        echo $view->renderLog($log);
+        // --- Step 5: Extend active saved depth charts ---
+        echo $view->renderStepStart('Updating saved depth charts...');
+        flush();
+        $savedDcRepo = new SavedDepthChart\SavedDepthChartRepository($mysqli_db);
+        ob_start();
+        $savedDcCount = $savedDcRepo->extendActiveDepthCharts($season->lastSimEndDate, $season->lastSimNumber);
+        $log = (string) ob_get_clean();
+        echo $view->renderStepComplete('Saved depth charts updated', $savedDcCount . ' active DCs extended');
+        if ($log !== '') {
+            echo $view->renderLog($log);
+        }
+        flush();
+        $successCount++;
+
+        // --- Step 6: Parse JSB engine files ---
+        echo $view->renderStepStart('Parsing JSB engine files...');
+        flush();
+
+        $jsbRepo = new JsbParser\JsbImportRepository($mysqli_db);
+        $jsbResolver = new JsbParser\PlayerIdResolver($mysqli_db);
+        $jsbService = new JsbParser\JsbImportService($jsbRepo, $jsbResolver);
+
+        $jsbBasePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5';
+        ob_start();
+        $jsbResult = $jsbService->processCurrentSeason($jsbBasePath, $season);
+        $log = (string) ob_get_clean();
+        echo $view->renderStepComplete('JSB files parsed', $jsbResult->summary());
+        if ($log !== '') {
+            echo $view->renderLog($log);
+        }
+        flush();
+        $successCount++;
     }
-    flush();
-    $successCount++;
-
-    // --- Step 6: Parse JSB engine files ---
-    echo $view->renderStepStart('Parsing JSB engine files...');
-    flush();
-
-    $jsbRepo = new JsbParser\JsbImportRepository($mysqli_db);
-    $jsbResolver = new JsbParser\PlayerIdResolver($mysqli_db);
-    $jsbService = new JsbParser\JsbImportService($jsbRepo, $jsbResolver);
-
-    $jsbBasePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5';
-    ob_start();
-    $jsbResult = $jsbService->processCurrentSeason($jsbBasePath, $season);
-    $log = (string) ob_get_clean();
-    echo $view->renderStepComplete('JSB files parsed', $jsbResult->summary());
-    if ($log !== '') {
-        echo $view->renderLog($log);
-    }
-    flush();
-    $successCount++;
 
     echo $view->renderSectionClose();
     flush();

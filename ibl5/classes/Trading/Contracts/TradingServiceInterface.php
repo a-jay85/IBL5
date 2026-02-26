@@ -38,7 +38,10 @@ interface TradingServiceInterface
      *     userTeamColor1: string,
      *     userTeamColor2: string,
      *     partnerTeamColor1: string,
-     *     partnerTeamColor2: string
+     *     partnerTeamColor2: string,
+     *     userPlayerContracts: array<int, list<int>>,
+     *     partnerPlayerContracts: array<int, list<int>>,
+     *     comparisonDropdownGroups: array<string, array<string, string>>
      * }
      */
     public function getTradeOfferPageData(string $username, string $partnerTeam): array;

@@ -282,8 +282,70 @@ class LeagueContextTest extends TestCase
     {
         // Don't set any league, should default to ibl
         $config = $this->leagueContext->getConfig();
-        
+
         $this->assertEquals('Internet Basketball League', $config['title']);
         $this->assertEquals('IBL', $config['short_name']);
+    }
+
+    // ---- isOlympics() tests ----
+
+    public function testIsOlympicsReturnsFalseForIblContext(): void
+    {
+        $_SESSION['current_league'] = 'ibl';
+        $this->assertFalse($this->leagueContext->isOlympics());
+    }
+
+    public function testIsOlympicsReturnsTrueForOlympicsContext(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+        $this->assertTrue($this->leagueContext->isOlympics());
+    }
+
+    public function testIsOlympicsReturnsFalseByDefault(): void
+    {
+        $this->assertFalse($this->leagueContext->isOlympics());
+    }
+
+    // ---- getTableName() tests ----
+
+    public function testGetTableNameReturnsIblTableNamesForIblContext(): void
+    {
+        $_SESSION['current_league'] = 'ibl';
+
+        $this->assertSame('ibl_box_scores', $this->leagueContext->getTableName('ibl_box_scores'));
+        $this->assertSame('ibl_box_scores_teams', $this->leagueContext->getTableName('ibl_box_scores_teams'));
+        $this->assertSame('ibl_schedule', $this->leagueContext->getTableName('ibl_schedule'));
+        $this->assertSame('ibl_standings', $this->leagueContext->getTableName('ibl_standings'));
+        $this->assertSame('ibl_power', $this->leagueContext->getTableName('ibl_power'));
+        $this->assertSame('ibl_team_info', $this->leagueContext->getTableName('ibl_team_info'));
+    }
+
+    public function testGetTableNameReturnsOlympicsTableNamesForOlympicsContext(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+
+        $this->assertSame('ibl_olympics_box_scores', $this->leagueContext->getTableName('ibl_box_scores'));
+        $this->assertSame('ibl_olympics_box_scores_teams', $this->leagueContext->getTableName('ibl_box_scores_teams'));
+        $this->assertSame('ibl_olympics_schedule', $this->leagueContext->getTableName('ibl_schedule'));
+        $this->assertSame('ibl_olympics_standings', $this->leagueContext->getTableName('ibl_standings'));
+        $this->assertSame('ibl_olympics_power', $this->leagueContext->getTableName('ibl_power'));
+        $this->assertSame('ibl_olympics_team_info', $this->leagueContext->getTableName('ibl_team_info'));
+        $this->assertSame('ibl_olympics_league_config', $this->leagueContext->getTableName('ibl_league_config'));
+    }
+
+    public function testGetTableNameReturnsInputUnchangedForUnmappedTables(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+
+        $this->assertSame('ibl_plr', $this->leagueContext->getTableName('ibl_plr'));
+        $this->assertSame('ibl_hist', $this->leagueContext->getTableName('ibl_hist'));
+        $this->assertSame('some_other_table', $this->leagueContext->getTableName('some_other_table'));
+    }
+
+    public function testGetTableNameReturnsIblTableNamesByDefault(): void
+    {
+        // No league set — defaults to IBL
+        $this->assertSame('ibl_schedule', $this->leagueContext->getTableName('ibl_schedule'));
+        $this->assertSame('ibl_power', $this->leagueContext->getTableName('ibl_power'));
     }
 }

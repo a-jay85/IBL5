@@ -34,15 +34,19 @@ export async function GET() {
 			active_connections: processlist.length,
 			timestamp: new Date().toISOString()
 		});
-	} catch (err) {
+	} catch (err: unknown) {
 		console.error('Database test failed:', err);
+
+		const message = err instanceof Error ? err.message : 'Unknown error';
+		const code = err != null && typeof err === 'object' && 'code' in err ? (err as { code: string }).code : undefined;
+		const sqlState = err != null && typeof err === 'object' && 'sqlState' in err ? (err as { sqlState: string }).sqlState : undefined;
 
 		return json(
 			{
 				success: false,
-				error: err.message,
-				code: err.code,
-				sqlState: err.sqlState,
+				error: message,
+				code,
+				sqlState,
 				timestamp: new Date().toISOString()
 			},
 			{ status: 500 }

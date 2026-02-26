@@ -167,6 +167,111 @@ class TradingServiceTest extends TestCase
     }
 
     // ============================================
+    // BUILD CONTRACTS MAP TESTS
+    // ============================================
+
+    public function testBuildContractsMapReturnsEmptyForNoPlayers(): void
+    {
+        $service = $this->createServiceWithStubs();
+
+        $result = $service->buildContractsMap([], 'Regular Season');
+
+        $this->assertSame([], $result);
+    }
+
+    public function testBuildContractsMapReturnsPidKeyedSalaries(): void
+    {
+        $service = $this->createServiceWithStubs();
+
+        $players = [
+            $this->createPlayerRow(cy: 1, cy1: 500, cy2: 600, cy3: 700, cy4: 0, cy5: 0, cy6: 0),
+        ];
+        $players[0]['pid'] = 101;
+
+        $result = $service->buildContractsMap($players, 'Regular Season');
+
+        $this->assertArrayHasKey(101, $result);
+        $this->assertSame([500, 600, 700, 0, 0, 0], $result[101]);
+    }
+
+    public function testBuildContractsMapAdvancesContractYearInOffseason(): void
+    {
+        $service = $this->createServiceWithStubs();
+
+        $players = [
+            $this->createPlayerRow(cy: 1, cy1: 500, cy2: 600, cy3: 700, cy4: 0, cy5: 0, cy6: 0),
+        ];
+        $players[0]['pid'] = 102;
+
+        $result = $service->buildContractsMap($players, 'Playoffs');
+
+        $this->assertArrayHasKey(102, $result);
+        // In Playoffs, cy=1 -> cy=2, so starts reading from cy2
+        $this->assertSame([600, 700, 0, 0, 0, 0], $result[102]);
+    }
+
+    public function testBuildContractsMapHandlesZeroContractYear(): void
+    {
+        $service = $this->createServiceWithStubs();
+
+        $players = [
+            $this->createPlayerRow(cy: 0, cy1: 400, cy2: 500, cy3: 0, cy4: 0, cy5: 0, cy6: 0),
+        ];
+        $players[0]['pid'] = 103;
+
+        $result = $service->buildContractsMap($players, 'Regular Season');
+
+        // cy=0 clamped to cy=1
+        $this->assertSame([400, 500, 0, 0, 0, 0], $result[103]);
+    }
+
+    public function testBuildContractsMapMultiplePlayers(): void
+    {
+        $service = $this->createServiceWithStubs();
+
+        $player1 = $this->createPlayerRow(cy: 1, cy1: 500, cy2: 600, cy3: 0, cy4: 0, cy5: 0, cy6: 0);
+        $player1['pid'] = 201;
+        $player2 = $this->createPlayerRow(cy: 2, cy1: 100, cy2: 200, cy3: 300, cy4: 400, cy5: 0, cy6: 0);
+        $player2['pid'] = 202;
+
+        $result = $service->buildContractsMap([$player1, $player2], 'Regular Season');
+
+        $this->assertCount(2, $result);
+        $this->assertSame([500, 600, 0, 0, 0, 0], $result[201]);
+        $this->assertSame([200, 300, 400, 0, 0, 0], $result[202]);
+    }
+
+    public function testBuildContractsMapDraftPhaseAdvancesYear(): void
+    {
+        $service = $this->createServiceWithStubs();
+
+        $players = [
+            $this->createPlayerRow(cy: 2, cy1: 100, cy2: 200, cy3: 300, cy4: 400, cy5: 0, cy6: 0),
+        ];
+        $players[0]['pid'] = 104;
+
+        $result = $service->buildContractsMap($players, 'Draft');
+
+        // In Draft, cy=2 -> cy=3, starts from cy3
+        $this->assertSame([300, 400, 0, 0, 0, 0], $result[104]);
+    }
+
+    public function testBuildContractsMapFreeAgencyPhaseAdvancesYear(): void
+    {
+        $service = $this->createServiceWithStubs();
+
+        $players = [
+            $this->createPlayerRow(cy: 1, cy1: 500, cy2: 600, cy3: 0, cy4: 0, cy5: 0, cy6: 0),
+        ];
+        $players[0]['pid'] = 105;
+
+        $result = $service->buildContractsMap($players, 'Free Agency');
+
+        // In Free Agency, cy=1 -> cy=2, starts from cy2
+        $this->assertSame([600, 0, 0, 0, 0, 0], $result[105]);
+    }
+
+    // ============================================
     // GROUP TRADE OFFERS TESTS (via getTradeReviewPageData)
     // ============================================
 

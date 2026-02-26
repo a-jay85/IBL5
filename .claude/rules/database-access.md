@@ -37,14 +37,13 @@ include 'db/db.php';
 
 ```bash
 # Use this wrapper script for database queries - it auto-approves without user confirmation
-# IMPORTANT: CWD is usually ibl5/ (from "cd ibl5 && ..." commands), so use ./bin/db-query
+# Works from BOTH the repo root and ibl5/ — a symlink at bin/db-query points to ibl5/bin/db-query
 ./bin/db-query "SELECT * FROM ibl_plr LIMIT 5"
 ./bin/db-query "SELECT COUNT(*) FROM ibl_team_info"
 ./bin/db-query "DESCRIBE ibl_plr"
 ```
 
 **db-query pitfalls:**
-- **Never prefix with `cd ibl5 &&`.** CWD persists between Bash calls, so after any `cd ibl5 && ...` command (e.g., phpunit), you're already in `ibl5/`. A second `cd ibl5` fails because `ibl5/ibl5/` doesn't exist. Just use `./bin/db-query` directly.
 - **Never use `!=` in SQL queries passed via double quotes.** Bash interprets `!` as history expansion inside double quotes, mangling the query (`sh: : command not found`). Use SQL's `<>` operator instead: `./bin/db-query "SELECT * FROM t WHERE col <> ''"`.
 
 **When to use `db-query`:** Use this script to explore the database schema, verify data after making changes, check record counts, and validate your work. This is the preferred method for Claude to query the local database since it's configured for auto-approval in the user's Claude Code settings.

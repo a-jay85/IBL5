@@ -1,12 +1,3 @@
-/**
- * IBL5 Card Components
- *
- * Shared card/block styles used across:
- * - SeasonHighsView
- * - DraftView
- * - News articles
- */
-
 @layer components {
 
 
@@ -84,7 +75,6 @@
     margin-right: auto;
 }
 
-/* .ibl-centerbox__title now shares rule with .ibl-card__title above */
 .ibl-centerbox__header {
     background: var(--gradient-navy-header);
     padding: var(--space-4) var(--space-6);

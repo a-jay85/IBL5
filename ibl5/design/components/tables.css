@@ -1,16 +1,3 @@
-/**
- * IBL5 Table Components
- *
- * Consolidated table styles used across all data tables:
- * - StandingsView, LeagueStatsView, InjuriesView
- * - SeasonLeadersView, LeaderboardsView, DraftView
- * - ContractListView, SeasonHighsView, DraftHistoryView
- * - And all other data display tables
- *
- * Classes:
- * - .ibl-data-table: Primary data table (navy header, alternating rows)
- */
-
 @layer components {
 
 /* ==========================================================================
@@ -37,6 +24,7 @@
    - .sticky-scroll-wrapper: overflow: auto (provides the scroll viewport)
    - NEVER set overflow: hidden on elements containing position: sticky cells
    ========================================================================== */
+
 
 /* ==========================================================================
    Primary Data Table (.ibl-data-table)

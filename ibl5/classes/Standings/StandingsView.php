@@ -220,7 +220,7 @@ class StandingsView implements StandingsViewInterface
         <tr data-team-id="<?= $teamId; ?>">
             <?= TeamCellHelper::renderTeamCell($teamId, $team['team_name'], $team['color1'], $team['color2'], 'sticky-col', '', $teamName) ?>
             <td><?= $leagueRecord; ?></td>
-            <td><?= $pct; ?></td>
+            <td><?= \BasketballStats\StatsFormatter::formatWithDecimals((float)$pct, 3); ?></td>
             <td><?= $pythagoreanPct; ?></td>
             <td><?= $gamesBack; ?></td>
             <td><?= $magicNumber; ?></td>

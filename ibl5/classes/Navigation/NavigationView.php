@@ -359,7 +359,7 @@ class NavigationView
             ];
 
             if ($this->allowWaivers === 'Yes') {
-                $links[] = ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=waive">Waive</a>'];
+                $links[] = ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add" class="text-gray-300 hover:text-white no-underline transition-colors">Add</a> | <a href="modules.php?name=Waivers&amp;action=waive" class="text-gray-300 hover:text-white no-underline transition-colors">Waive</a>'];
             }
 
             if ($this->seasonPhase === 'Draft') {

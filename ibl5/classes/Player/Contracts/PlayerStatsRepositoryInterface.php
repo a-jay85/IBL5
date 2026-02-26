@@ -134,30 +134,30 @@ interface PlayerStatsRepositoryInterface
      * 
      * Queries ibl_olympics_stats table for all Olympics season records.
      * 
-     * @param string $playerName Player name (exact match)
+     * @param int $playerID Player ID
      * @return array<array<string, mixed>> Array of Olympics stat records ordered by year ASC
      */
-    public function getOlympicsStats(string $playerName): array;
+    public function getOlympicsStats(int $playerID): array;
 
     /**
      * Get Olympics career totals for a player
      *
      * Queries ibl_olympics_career_totals table for aggregated career totals.
      *
-     * @param string $playerName Player name (exact match)
+     * @param int $playerID Player ID
      * @return CareerTotalsRow|null Career totals row or null if not found
      */
-    public function getOlympicsCareerTotals(string $playerName): ?array;
+    public function getOlympicsCareerTotals(int $playerID): ?array;
 
     /**
      * Get Olympics career averages for a player
      *
      * Queries ibl_olympics_career_avgs table for aggregated career averages.
      *
-     * @param string $playerName Player name (exact match)
+     * @param int $playerID Player ID
      * @return CareerAveragesRow|null Career averages row or null if not found
      */
-    public function getOlympicsCareerAverages(string $playerName): ?array;
+    public function getOlympicsCareerAverages(int $playerID): ?array;
 
     /**
      * Get regular season career averages for a player

@@ -25,16 +25,47 @@
    (e.g., bg-navy-800, text-accent-500, font-display). These values match what
    the CDN play script previously provided at runtime. */
 @theme {
-  /* Navy palette (used in navigation, dropdowns) */
+  /* Navy palette */
   --color-navy-900: #0a0f1a;
   --color-navy-800: #111827;
   --color-navy-700: #1a2234;
   --color-navy-600: #243044;
 
   /* Accent palette (orange) */
+  --color-accent-600: #ea580c;
   --color-accent-500: #f97316;
   --color-accent-400: #fb923c;
   --color-accent-300: #fdba74;
+  --color-accent-200: #fed7aa;
+  --color-accent-100: #ffedd5;
+
+  /* Status: Success */
+  --color-success-600: #16a34a;
+  --color-success-500: #22c55e;
+  --color-success-200: #bbf7d0;
+  --color-success-100: #dcfce7;
+  --color-success-50: #f0fdf4;
+
+  /* Status: Error */
+  --color-error-600: #dc2626;
+  --color-error-500: #ef4444;
+  --color-error-200: #fecaca;
+  --color-error-100: #fee2e2;
+  --color-error-50: #fef2f2;
+
+  /* Status: Warning */
+  --color-warning-600: #d97706;
+  --color-warning-500: #f59e0b;
+  --color-warning-200: #fde68a;
+  --color-warning-100: #fef3c7;
+  --color-warning-50: #fffbeb;
+
+  /* Status: Info */
+  --color-info-600: #2563eb;
+  --color-info-500: #3b82f6;
+  --color-info-200: #bfdbfe;
+  --color-info-100: #dbeafe;
+  --color-info-50: #eff6ff;
 
   /* Font families */
   --font-display: 'Barlow Condensed', sans-serif;
@@ -42,7 +73,7 @@
 }
 
 /* Design Tokens (CSS Custom Properties) */
-@import './tokens/colors.css';
+@import './tokens/tokens.css';
 
 /* Base Styles (CSS reset, legacy element normalization, PHP-Nuke classes) */
 @import './base.css';

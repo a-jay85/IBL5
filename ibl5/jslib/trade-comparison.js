@@ -298,16 +298,20 @@
             }
         }
 
-        // Update each cap total row
-        var capTable = document.querySelector('.trading-cap-totals');
-        if (!capTable) {
+        // Update each cap total row (two separate card tables)
+        var userCapTable = document.querySelector('.trading-cap-totals[data-side="user"]');
+        var partnerCapTable = document.querySelector('.trading-cap-totals[data-side="partner"]');
+        if (!userCapTable || !partnerCapTable) {
             return;
         }
 
-        var rows = capTable.querySelectorAll('tbody tr');
-        for (var z = 0; z < seasonsToDisplay && z < rows.length; z++) {
-            var cells = rows[z].querySelectorAll('td');
-            if (cells.length < 2) {
+        var userRows = userCapTable.querySelectorAll('tbody tr');
+        var partnerRows = partnerCapTable.querySelectorAll('tbody tr');
+
+        for (var z = 0; z < seasonsToDisplay && z < userRows.length; z++) {
+            var userCell = userRows[z].querySelector('td');
+            var partnerCell = partnerRows[z] ? partnerRows[z].querySelector('td') : null;
+            if (!userCell || !partnerCell) {
                 continue;
             }
 
@@ -329,17 +333,17 @@
             var yearLabel = (displayEndingYear + z - 1) + '-' + (displayEndingYear + z);
 
             if (anyChanges) {
-                cells[0].innerHTML = '<strong>' + escapeHtml(config.userTeam) + '</strong> in ' + escapeHtml(yearLabel) + ': '
+                userCell.innerHTML = escapeHtml(yearLabel) + ': '
                     + userBase + ' &rarr; '
                     + '<span class="trade-comparison__delta' + (userPost > config.hardCap ? ' trade-comparison__delta--over' : '') + '">'
                     + userPost + '</span>';
-                cells[1].innerHTML = '<strong>' + escapeHtml(config.partnerTeam) + '</strong> in ' + escapeHtml(yearLabel) + ': '
+                partnerCell.innerHTML = escapeHtml(yearLabel) + ': '
                     + partnerBase + ' &rarr; '
                     + '<span class="trade-comparison__delta' + (partnerPost > config.hardCap ? ' trade-comparison__delta--over' : '') + '">'
                     + partnerPost + '</span>';
             } else {
-                cells[0].innerHTML = '<strong>' + escapeHtml(config.userTeam) + '</strong> in ' + escapeHtml(yearLabel) + ': ' + userBase;
-                cells[1].innerHTML = '<strong>' + escapeHtml(config.partnerTeam) + '</strong> in ' + escapeHtml(yearLabel) + ': ' + partnerBase;
+                userCell.innerHTML = escapeHtml(yearLabel) + ': ' + userBase;
+                partnerCell.innerHTML = escapeHtml(yearLabel) + ': ' + partnerBase;
             }
         }
     }
@@ -353,10 +357,10 @@
         return div.innerHTML;
     }
 
-    // Listen for cash input changes
-    var cashTable = document.querySelector('.trading-cash-exchange');
-    if (cashTable) {
-        cashTable.addEventListener('input', function (e) {
+    // Listen for cash input changes (two card tables)
+    var cashTables = document.querySelectorAll('.trading-cash-exchange');
+    for (var ct = 0; ct < cashTables.length; ct++) {
+        cashTables[ct].addEventListener('input', function (e) {
             if (e.target.type === 'number') {
                 updateCapTotals();
             }

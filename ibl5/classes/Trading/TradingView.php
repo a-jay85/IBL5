@@ -83,7 +83,7 @@ class TradingView implements TradingViewInterface
                             <th colspan="4"><img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="team-logo-banner" style="margin-bottom: 0;"></th>
                         </tr>
                         <tr>
-                            <th>Select</th>
+                            <th></th>
                             <th>Pos</th>
                             <th>Name</th>
                             <th>Salary</th>
@@ -110,7 +110,7 @@ class TradingView implements TradingViewInterface
                             <th colspan="4"><img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="team-logo-banner" style="margin-bottom: 0;"></th>
                         </tr>
                         <tr>
-                            <th>Select</th>
+                            <th></th>
                             <th>Pos</th>
                             <th>Name</th>
                             <th>Salary</th>

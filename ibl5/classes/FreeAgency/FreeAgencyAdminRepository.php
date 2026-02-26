@@ -79,7 +79,8 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
                  cy6 = ?,
                  teamname = ?,
                  cyt = ?,
-                 tid = ?
+                 tid = ?,
+                 fa_signing_flag = 1
              WHERE pid = ?
              LIMIT 1",
             "iiiiiisiii",

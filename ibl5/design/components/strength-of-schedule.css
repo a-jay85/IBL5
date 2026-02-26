@@ -2,6 +2,15 @@
    Strength of Schedule - Tier Indicators & SOS Display
    ============================================================ */
 
+/* SOS tier scale: 5-color gradient from hardest to easiest */
+:root {
+    --sos-tier-elite: var(--error-500);     /* #ef4444 - hardest */
+    --sos-tier-strong: var(--accent-500);    /* #f97316 */
+    --sos-tier-average: #eab308;             /* yellow - no token match */
+    --sos-tier-weak: #84cc16;               /* lime - no token match */
+    --sos-tier-bottom: var(--success-500);   /* #22c55e - easiest */
+}
+
 /* SOS Tier Dot (standard size for team schedule) */
 .sos-tier-dot {
   display: inline-block;
@@ -26,23 +35,23 @@
 
 /* Tier Color Classes (shared by dots, badges, and next-sim) */
 .sos-tier--elite {
-  background-color: #ef4444;
+  background-color: var(--sos-tier-elite);
 }
 
 .sos-tier--strong {
-  background-color: #f97316;
+  background-color: var(--sos-tier-strong);
 }
 
 .sos-tier--average {
-  background-color: #eab308;
+  background-color: var(--sos-tier-average);
 }
 
 .sos-tier--weak {
-  background-color: #84cc16;
+  background-color: var(--sos-tier-weak);
 }
 
 .sos-tier--bottom {
-  background-color: #22c55e;
+  background-color: var(--sos-tier-bottom);
 }
 
 /* NextSim Opponent Tier Badge */

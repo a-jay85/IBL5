@@ -1,0 +1,127 @@
+/**
+ * IBL5 Design Tokens
+ *
+ * Color source of truth: @theme block in input.css
+ * This file provides:
+ *   1. Color aliases — bridge var(--navy-800) → var(--color-navy-800) for the
+ *      850+ existing references in component CSS
+ *   2. Non-color tokens — typography, spacing, radius, shadows, transitions, gradients
+ *
+ * New code should prefer Tailwind utility classes (e.g. bg-navy-800)
+ * or the canonical --color-* variables (e.g. var(--color-navy-800)).
+ *
+ * Note: Google Fonts import is in input.css (must be at top of stylesheet)
+ */
+
+:root {
+    /* ========================================================================
+       Color Aliases (source of truth: @theme in input.css)
+       ======================================================================== */
+
+    /* Navy palette */
+    --navy-900: var(--color-navy-900);
+    --navy-800: var(--color-navy-800);
+    --navy-700: var(--color-navy-700);
+    --navy-600: var(--color-navy-600);
+
+    /* Accent (Orange/Amber) */
+    --accent-600: var(--color-accent-600);
+    --accent-500: var(--color-accent-500);
+    --accent-400: var(--color-accent-400);
+    --accent-300: var(--color-accent-300);
+    --accent-200: var(--color-accent-200);
+    --accent-100: var(--color-accent-100);
+
+    /* Status: Success */
+    --success-600: var(--color-success-600);
+    --success-500: var(--color-success-500);
+    --success-200: var(--color-success-200);
+    --success-100: var(--color-success-100);
+    --success-50: var(--color-success-50);
+
+    /* Status: Error */
+    --error-600: var(--color-error-600);
+    --error-500: var(--color-error-500);
+    --error-200: var(--color-error-200);
+    --error-100: var(--color-error-100);
+    --error-50: var(--color-error-50);
+
+    /* Status: Warning */
+    --warning-600: var(--color-warning-600);
+    --warning-500: var(--color-warning-500);
+    --warning-200: var(--color-warning-200);
+    --warning-100: var(--color-warning-100);
+    --warning-50: var(--color-warning-50);
+
+    /* Status: Info */
+    --info-600: var(--color-info-600);
+    --info-500: var(--color-info-500);
+    --info-200: var(--color-info-200);
+    --info-100: var(--color-info-100);
+    --info-50: var(--color-info-50);
+
+    /* Neutrals (not in @theme — Tailwind provides gray-* natively) */
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+
+    /* ========================================================================
+       Typography
+       ======================================================================== */
+    --font-sans: 'Barlow', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Barlow Condensed', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+    /* ========================================================================
+       Spacing Scale
+       ======================================================================== */
+    --space-0: 0;
+    --space-1: 0.25rem;   /* 4px */
+    --space-2: 0.5rem;    /* 8px */
+    --space-3: 0.75rem;   /* 12px */
+    --space-4: 1rem;      /* 16px */
+    --space-5: 1.25rem;   /* 20px */
+    --space-6: 1.5rem;    /* 24px */
+    --space-8: 2rem;      /* 32px */
+    --space-10: 2.5rem;   /* 40px */
+    --space-12: 3rem;     /* 48px */
+
+    /* ========================================================================
+       Border Radius
+       ======================================================================== */
+    --radius-sm: 0.25rem;   /* 4px */
+    --radius-md: 0.375rem;  /* 6px */
+    --radius-lg: 0.5rem;    /* 8px */
+    --radius-xl: 0.75rem;   /* 12px */
+    --radius-2xl: 1rem;     /* 16px */
+    --radius-full: 9999px;
+
+    /* ========================================================================
+       Shadows
+       ======================================================================== */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    --shadow-glow: 0 0 20px rgb(249 115 22 / 0.3);
+
+    /* ========================================================================
+       Transitions
+       ======================================================================== */
+    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* ========================================================================
+       Gradients (computed from color aliases)
+       ======================================================================== */
+    --gradient-navy-header: linear-gradient(135deg, var(--navy-800), var(--navy-900));
+    --gradient-accent: linear-gradient(135deg, var(--accent-500), var(--accent-600));
+}

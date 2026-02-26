@@ -359,7 +359,7 @@ class NavigationView
             ];
 
             if ($this->allowWaivers === 'Yes') {
-                $links[] = ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add" class="text-gray-300 hover:text-white no-underline transition-colors">Add</a> | <a href="modules.php?name=Waivers&amp;action=waive" class="text-gray-300 hover:text-white no-underline transition-colors">Waive</a>'];
+                $links[] = ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=waive">Waive</a>'];
             }
 
             if ($this->seasonPhase === 'Draft') {
@@ -395,7 +395,7 @@ class NavigationView
     private function renderDropdownLink(array $link): string
     {
         if (isset($link['rawHtml'])) {
-            return '<span class="nav-dropdown-item block px-4 py-2.5 text-base font-display text-gray-300 border-l-2 border-transparent">'
+            return '<span class="nav-dropdown-item">'
                 . $link['rawHtml']
                 . '</span>';
         }
@@ -410,7 +410,7 @@ class NavigationView
         $safeBadge = $badge !== null ? HtmlSanitizer::safeHtmlOutput($badge) : '';
         $badgeHtml = $badge !== null ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2 tracking-wide">' . $safeBadge . '</span>' : '';
 
-        return '<a href="' . $url . '"' . $target . ' class="nav-dropdown-item block px-4 py-2.5 text-base font-display text-gray-300 hover:text-white hover:bg-white/5 transition-all duration-150 border-l-2 border-transparent hover:border-accent-500">'
+        return '<a href="' . $url . '"' . $target . ' class="nav-dropdown-item">'
             . '<span class="flex items-center justify-between">'
             . '<span>' . $label . $badgeHtml . '</span>'
             . $externalIcon
@@ -526,7 +526,7 @@ class NavigationView
 
         foreach ($links as $link) {
             if (isset($link['rawHtml'])) {
-                $html .= '<span class="block px-5 py-3 pl-14 text-base font-display text-gray-400 border-l-2 border-transparent">'
+                $html .= '<span class="mobile-dropdown-link">'
                     . $link['rawHtml']
                     . '</span>';
                 continue;
@@ -542,7 +542,7 @@ class NavigationView
             $safeMobileBadge = $badge !== null ? HtmlSanitizer::safeHtmlOutput($badge) : '';
             $badgeHtml = $badge !== null ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-base font-bold bg-accent-500 text-white ml-2">' . $safeMobileBadge . '</span>' : '';
 
-            $html .= '<a href="' . $url . '"' . $target . ' class="flex items-center justify-between px-5 py-3 pl-14 text-base font-display text-gray-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-accent-500 transition-all">'
+            $html .= '<a href="' . $url . '"' . $target . ' class="mobile-dropdown-link flex items-center justify-between">'
                 . '<span>' . $label . $badgeHtml . '</span>'
                 . $externalIcon
                 . '</a>';

@@ -200,6 +200,16 @@
     padding: 0;
 }
 
+/* Neutralize .ibl-data-table chrome when embedded inside a card flush body —
+   the card itself provides border, shadow, and border-radius. */
+.team-card__body--flush > .ibl-data-table {
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    margin: 0;
+    width: 100%;
+}
+
 /* Team info list — key/value pairs inside team-card */
 .team-info-list {
     display: grid;

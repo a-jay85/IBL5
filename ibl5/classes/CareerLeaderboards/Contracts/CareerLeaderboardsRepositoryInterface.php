@@ -8,7 +8,7 @@ namespace CareerLeaderboards\Contracts;
  * CareerLeaderboardsRepositoryInterface - Career Leaderboards database operations
  *
  * Handles all database operations for career statistics across
- * multiple table types (regular season, playoffs, H.E.A.T., Olympics).
+ * multiple table types (regular season, playoffs, H.E.A.T., Olympics, Rookie, Sophomore, All-Star).
  *
  * @phpstan-type CareerStatsRow array{pid: int, name: string, games: int|float|string, minutes: int|float|string, fgm: int|float|string, fga: int|float|string, fgpct?: float|string|null, ftm: int|float|string, fta: int|float|string, ftpct?: float|string|null, tgm: int|float|string, tga: int|float|string, tpct?: float|string|null, orb: int|float|string, reb: int|float|string, ast: int|float|string, stl: int|float|string, tvr: int|float|string, blk: int|float|string, pf: int|float|string, pts: int|float|string, retired: int|string}
  * @phpstan-type LeaderboardResult array{result: list<CareerStatsRow>, count: int}
@@ -36,6 +36,10 @@ interface CareerLeaderboardsRepositoryInterface
      * - ibl_heat_career_avgs
      * - ibl_olympics_career_totals
      * - ibl_olympics_career_avgs
+     * - ibl_rookie_career_totals
+     * - ibl_sophomore_career_totals
+     * - ibl_allstar_career_totals
+     * - ibl_allstar_career_avgs
      *
      * **Valid Sort Columns:**
      * pts, games, minutes, fgm, fga, fgpct, ftm, fta, ftpct,
@@ -71,6 +75,7 @@ interface CareerLeaderboardsRepositoryInterface
      * - ibl_playoff_career_avgs
      * - ibl_heat_career_avgs
      * - ibl_olympics_career_avgs
+     * - ibl_allstar_career_avgs
      *
      * **Total Tables:**
      * All other tables including ibl_hist

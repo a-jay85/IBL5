@@ -24,7 +24,7 @@ interface CareerLeaderboardsRepositoryInterface
      * @param string $tableKey Table name (must be in whitelist)
      * @param string $sortColumn Column name to sort by (must be in whitelist)
      * @param int $activeOnly 1 to exclude retired players, 0 to include all
-     * @param int $limit Maximum records to return (0 for default cap of 500)
+     * @param int $limit Maximum records to return (0 for default cap of 5000)
      * @return LeaderboardResult Result with keys 'result' and 'count'
      *
      * **Valid Tables:**

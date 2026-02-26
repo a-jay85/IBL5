@@ -14,6 +14,12 @@ use CareerLeaderboards\Contracts\CareerLeaderboardsRepositoryInterface;
  */
 class CareerLeaderboardsRepository extends \BaseMysqliRepository implements CareerLeaderboardsRepositoryInterface
 {
+    /**
+     * Default safety limit when $limit = 0 (fetch all rows).
+     * Must exceed the largest career table row count (currently ~1258).
+     */
+    private const DEFAULT_SAFETY_LIMIT = 5000;
+
     // Whitelist of valid table names to prevent SQL injection
     private const VALID_TABLES = [
         'ibl_hist',
@@ -98,14 +104,14 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
                 WHERE $whereClause
                 GROUP BY pid
                 ORDER BY $sortColumn DESC"
-                . " LIMIT " . ($limit > 0 ? $limit : 500) . ";";
+                . " LIMIT " . ($limit > 0 ? $limit : self::DEFAULT_SAFETY_LIMIT) . ";";
         } else {
             $query = "SELECT h.*, p.retired
                 FROM $tableKey h
                 LEFT JOIN ibl_plr p ON h.pid = p.pid
                 WHERE $whereClause
                 ORDER BY $sortColumn DESC"
-                . " LIMIT " . ($limit > 0 ? $limit : 500) . ";";
+                . " LIMIT " . ($limit > 0 ? $limit : self::DEFAULT_SAFETY_LIMIT) . ";";
         }
 
         /** @var list<CareerStatsRow> $rows */

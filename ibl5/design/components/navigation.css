@@ -272,9 +272,14 @@
    ========================================================================== */
 
 .nav-dropdown-item {
+    display: block;
+    padding: 0.625rem 1rem; /* py-2.5 px-4 */
+    font-size: 1rem;
+    font-family: var(--font-display);
+    border-left: 2px solid transparent;
     opacity: 0;
     transform: translateY(6px);
-    transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+    transition: all 0.15s ease-out, opacity 0.2s ease-out, transform 0.2s ease-out;
 }
 
 .group:hover .nav-dropdown-item {
@@ -349,7 +354,6 @@ nav .group > a:hover {
 /* Desktop dropdown links */
 .nav-dropdown-item:link {
     color: var(--gray-200);
-    font-family: var(--font-display);
 }
 
 .nav-dropdown-item:visited {
@@ -359,6 +363,7 @@ nav .group > a:hover {
 .nav-dropdown-item:hover {
     color: white;
     background-color: rgba(255, 255, 255, 0.05);
+    border-left-color: var(--color-accent-500);
 }
 
 /* Inline links within rawHtml nav items (e.g. "Waivers: Add | Drop") */
@@ -386,6 +391,22 @@ span.nav-dropdown-item a:hover {
 
 #nav-mobile-menu a:hover {
     color: white;
+}
+
+/* Mobile dropdown link items (both <a> and rawHtml <span>) */
+.mobile-dropdown-link {
+    display: block;
+    padding: 0.75rem 1.25rem 0.75rem 3.5rem; /* py-3 px-5 pl-14 */
+    font-size: 1rem;
+    font-family: var(--font-display);
+    border-left: 2px solid transparent;
+    transition: all 0.15s ease-out;
+}
+
+.mobile-dropdown-link:hover {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-left-color: var(--color-accent-500);
 }
 
 /* Mobile section buttons (not links) */

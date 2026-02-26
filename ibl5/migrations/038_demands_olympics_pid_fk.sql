@@ -5,7 +5,7 @@
 
 -- Step 1: ibl_demands — add pid column and populate from ibl_plr
 ALTER TABLE ibl_demands ADD COLUMN pid INT NOT NULL DEFAULT 0 AFTER name;
-UPDATE ibl_demands d JOIN ibl_plr p ON d.name = p.name SET d.pid = p.pid;
+UPDATE ibl_demands d JOIN ibl_plr p ON d.name = p.name AND p.retired = 0 SET d.pid = p.pid;
 
 -- Drop old name-based FK, add pid-based FK
 ALTER TABLE ibl_demands DROP FOREIGN KEY fk_demands_player;
@@ -14,7 +14,7 @@ ALTER TABLE ibl_demands ADD INDEX idx_pid (pid);
 
 -- Step 2: ibl_olympics_stats — add pid column and populate from ibl_plr
 ALTER TABLE ibl_olympics_stats ADD COLUMN pid INT NOT NULL DEFAULT 0 AFTER name;
-UPDATE ibl_olympics_stats os JOIN ibl_plr p ON os.name = p.name SET os.pid = p.pid;
+UPDATE ibl_olympics_stats os JOIN ibl_plr p ON os.name = p.name AND p.retired = 0 SET os.pid = p.pid;
 
 -- Drop old name-based FK, add pid-based FK
 ALTER TABLE ibl_olympics_stats DROP FOREIGN KEY fk_olympics_stats_name;

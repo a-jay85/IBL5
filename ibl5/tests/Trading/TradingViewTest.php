@@ -363,6 +363,48 @@ class TradingViewTest extends TestCase
         $this->assertStringContainsString('"partnerTeamId":2', $html);
     }
 
+    public function testRenderTradeOfferFormContainsSharedDropdownWithOptgroups(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+        $pageData['comparisonDropdownGroups'] = [
+            'Views' => [
+                'ratings' => 'Ratings',
+                'total_s' => 'Season Totals',
+                'avg_s' => 'Season Averages',
+                'per36mins' => 'Per 36 Minutes',
+                'chunk' => 'Sim Averages',
+                'playoffs' => 'Playoff Averages',
+                'contracts' => 'Contracts',
+            ],
+            'Location' => [
+                'split:home' => 'Home',
+                'split:road' => 'Road',
+            ],
+        ];
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('id="trade-comparison-display"', $html);
+        $this->assertStringContainsString('trade-comparison__shared-dropdown', $html);
+        $this->assertStringContainsString('<optgroup label="Views">', $html);
+        $this->assertStringContainsString('<optgroup label="Location">', $html);
+        $this->assertStringContainsString('value="ratings"', $html);
+        $this->assertStringContainsString('value="split:home"', $html);
+        $this->assertStringContainsString('value="split:road"', $html);
+        $this->assertStringContainsString(' selected', $html);
+    }
+
+    public function testRenderTradeOfferFormOmitsDropdownWhenGroupsEmpty(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+        $pageData['comparisonDropdownGroups'] = [];
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringNotContainsString('trade-comparison__shared-dropdown', $html);
+        $this->assertStringNotContainsString('id="trade-comparison-display"', $html);
+    }
+
     // ============================================
     // RESULT BANNER TESTS
     // ============================================
@@ -515,6 +557,13 @@ class TradingViewTest extends TestCase
             'partnerTeamColor2' => 'FFFFFF',
             'userPlayerContracts' => [],
             'partnerPlayerContracts' => [],
+            'comparisonDropdownGroups' => [
+                'Views' => [
+                    'ratings' => 'Ratings',
+                    'total_s' => 'Season Totals',
+                    'avg_s' => 'Season Averages',
+                ],
+            ],
             'result' => null,
             'error' => null,
         ];

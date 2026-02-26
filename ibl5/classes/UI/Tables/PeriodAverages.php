@@ -21,10 +21,11 @@ class PeriodAverages
      * @param string|null|\DateTime $startDate Start date for the period (defaults to last sim)
      * @param string|null|\DateTime $endDate End date for the period (defaults to last sim)
      * @param list<int> $starterPids Starter player IDs
+     * @param list<int> $pidFilter When non-empty, only include these player PIDs
      * @return string HTML table
      * @throws \Exception If database connection is invalid
      */
-    public static function render(\mysqli $db, $team, $season, $startDate = null, $endDate = null, array $starterPids = []): string
+    public static function render(\mysqli $db, $team, $season, $startDate = null, $endDate = null, array $starterPids = [], array $pidFilter = []): string
     {
         if ($startDate === null && $endDate === null) {
             // default to last simulated period
@@ -43,6 +44,17 @@ class PeriodAverages
         $teamID = (int)$team->teamID;
 
         // Use prepared statement for date filtering
+        // Build optional PID filter clause
+        $pidFilterClause = '';
+        $pidFilterTypes = '';
+        $pidFilterParams = [];
+        if ($pidFilter !== []) {
+            $placeholders = implode(',', array_fill(0, count($pidFilter), '?'));
+            $pidFilterClause = " AND bs.pid IN ({$placeholders})";
+            $pidFilterTypes = str_repeat('i', count($pidFilter));
+            $pidFilterParams = $pidFilter;
+        }
+
         $query = "SELECT p.name,
             bs.pos,
             bs.pid,
@@ -74,16 +86,19 @@ class PeriodAverages
             AND p.tid = ?
             AND p.retired = 0
             AND p.name NOT LIKE '%|%'
+            {$pidFilterClause}
         GROUP  BY p.name, bs.pos, bs.pid
         ORDER  BY p.name ASC";
-        
+
         // Use mysqli prepared statement directly
         $stmt = $db->prepare($query);
         if ($stmt === false) {
             throw new \Exception('Prepare failed: ' . $db->error);
         }
-        
-        $stmt->bind_param('sssii', $startDate, $endDate, $teamID, $teamID, $teamID);
+
+        $types = 'sssii' . $pidFilterTypes;
+        $params = [$startDate, $endDate, $teamID, $teamID, $teamID, ...$pidFilterParams];
+        $stmt->bind_param($types, ...$params);
         if (!$stmt->execute()) {
             throw new \Exception('Execute failed: ' . $stmt->error);
         }

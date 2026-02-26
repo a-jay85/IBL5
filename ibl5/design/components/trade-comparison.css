@@ -2,7 +2,8 @@
  * Trade Comparison Panel
  *
  * Dynamic player comparison panel shown on the trade offer form.
- * Displays stat tables for selected players, grouped by team side.
+ * Displays stat tables for selected players, stacked vertically
+ * with a shared dropdown for all stat dimensions.
  */
 
 /* ==========================================================================
@@ -35,24 +36,38 @@
 }
 
 /* ==========================================================================
-   Two-Column Grid (stacks on mobile)
+   Shared Dropdown (between header and grid)
+   ========================================================================== */
+
+.trade-comparison__shared-dropdown {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-3) var(--space-4) 0;
+}
+
+.trade-comparison__shared-dropdown .ibl-view-select {
+    max-width: 300px;
+    width: 100%;
+}
+
+/* Hide per-team dropdowns injected by API responses */
+.trade-comparison .team-table-caption .ibl-view-dropdown {
+    display: none;
+}
+
+/* ==========================================================================
+   Stacked Grid (vertical layout)
    ========================================================================== */
 
 .trade-comparison__grid {
     display: flex;
+    flex-direction: column;
     gap: var(--space-4);
     padding: var(--space-4);
 }
 
 .trade-comparison__team {
-    flex: 1;
     min-width: 0;
-}
-
-@media (max-width: 640px) {
-    .trade-comparison__grid {
-        flex-direction: column;
-    }
 }
 
 /* ==========================================================================
@@ -114,16 +129,4 @@
 
 .trade-comparison__delta--over {
     color: #dc2626;
-}
-
-/* ==========================================================================
-   Dropdown Overrides for Comparison Panel
-   ========================================================================== */
-
-.trade-comparison .ibl-view-dropdown {
-    margin-bottom: var(--space-2);
-}
-
-.trade-comparison .ibl-view-select {
-    width: 100%;
 }

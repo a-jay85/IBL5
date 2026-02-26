@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Updater;
 
+use League\LeagueContext;
 use Statistics\TeamStatsCalculator;
 use StrengthOfSchedule\StrengthOfScheduleCalculator;
 use Utilities\SeasonPhaseHelper;
@@ -14,30 +15,46 @@ use Utilities\SeasonPhaseHelper;
 class PowerRankingsUpdater extends \BaseMysqliRepository {
     private \Season $season;
     private TeamStatsCalculator $statsCalculator;
+    private ?LeagueContext $leagueContext;
 
-    public function __construct(\mysqli $db, \Season $season, ?TeamStatsCalculator $statsCalculator = null) {
+    public function __construct(\mysqli $db, \Season $season, ?TeamStatsCalculator $statsCalculator = null, ?LeagueContext $leagueContext = null) {
         parent::__construct($db);
         $this->season = $season;
         $this->statsCalculator = $statsCalculator ?? new TeamStatsCalculator($db);
+        $this->leagueContext = $leagueContext;
+    }
+
+    /**
+     * Resolve a table name through LeagueContext (if set), else return as-is
+     */
+    private function resolveTable(string $iblTableName): string
+    {
+        return $this->leagueContext !== null
+            ? $this->leagueContext->getTableName($iblTableName)
+            : $iblTableName;
     }
 
     public function update(): void {
-        echo '<p>Updating the ibl_power database table...<p>';
+        $powerTable = $this->resolveTable('ibl_power');
+        $teamInfoTable = $this->resolveTable('ibl_team_info');
+        $isOlympics = $this->leagueContext !== null && $this->leagueContext->isOlympics();
+
+        echo "<p>Updating the {$powerTable} database table...<p>";
 
         $log = '';
 
         $teams = $this->fetchAll(
             "SELECT TeamID, streak_type, streak
-            FROM ibl_power
+            FROM {$powerTable}
             WHERE TeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             ORDER BY TeamID ASC",
             ""
         );
 
-        // Load team names from ibl_team_info for log messages
+        // Load team names for log messages
         /** @var list<array{teamid: int, team_name: string}> $teamInfoRows */
         $teamInfoRows = $this->fetchAll(
-            "SELECT teamid, team_name FROM ibl_team_info WHERE teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID,
+            "SELECT teamid, team_name FROM {$teamInfoTable} WHERE teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID,
             ""
         );
         /** @var array<int, string> $teamNames */
@@ -72,13 +89,15 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         // Calculate and store Strength of Schedule
         $this->calculateAndStoreSos($allPlayedGames, $month);
 
-        // Reset the sim's Depth Chart sent status
-        $this->execute(
-            "UPDATE ibl_team_info SET sim_depth = 'No Depth Chart'",
-            ""
-        );
+        // Reset the sim's Depth Chart sent status (IBL-only — Olympics doesn't have sim depth)
+        if (!$isOlympics) {
+            $this->execute(
+                "UPDATE {$teamInfoTable} SET sim_depth = 'No Depth Chart'",
+                ""
+            );
+        }
 
-        echo '<p>The ibl_power table has been updated.<p>';
+        echo "<p>The {$powerTable} table has been updated.<p>";
     }
 
     protected function determineMonth(): int {
@@ -92,13 +111,14 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
      */
     private function fetchAllPlayedGames(int $month): array
     {
+        $scheduleTable = $this->resolveTable('ibl_schedule');
         $startDate = $this->season->beginningYear . "-$month-01";
         $endDate = $this->season->endingYear . "-05-30";
 
         /** @var list<array{Visitor: int, VScore: int, Home: int, HScore: int}> */
         return $this->fetchAll(
             "SELECT Visitor, VScore, Home, HScore
-            FROM ibl_schedule
+            FROM {$scheduleTable}
             WHERE VScore > 0 AND HScore > 0
             AND Date BETWEEN ? AND ?
             ORDER BY Date ASC",
@@ -115,13 +135,14 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
      */
     private function fetchAllUnplayedGames(int $month): array
     {
+        $scheduleTable = $this->resolveTable('ibl_schedule');
         $startDate = $this->season->beginningYear . "-$month-01";
         $endDate = $this->season->endingYear . "-05-30";
 
         /** @var list<array{Visitor: int, Home: int}> */
         return $this->fetchAll(
             "SELECT Visitor, Home
-            FROM ibl_schedule
+            FROM {$scheduleTable}
             WHERE VScore = 0 AND HScore = 0
             AND Date BETWEEN ? AND ?
             ORDER BY Date ASC",
@@ -181,6 +202,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
      * @param TeamStats $stats
      */
     private function updateTeamStats(int $tid, string $teamName, array $stats): string {
+        $powerTable = $this->resolveTable('ibl_power');
         $log = '';
 
         $winPoints = $stats['winPoints'] + $stats['wins'];
@@ -190,9 +212,9 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
             ? round(($winPoints / $totalPoints) * 100, 1)
             : 0;
 
-        // Update ibl_power (slim schema: only ranking, last 10, streak)
+        // Update power table (slim schema: only ranking, last 10, streak)
         $this->execute(
-            "UPDATE ibl_power SET
+            "UPDATE {$powerTable} SET
             last_win = ?,
             last_loss = ?,
             streak_type = ?,
@@ -222,12 +244,15 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
      */
     private function calculateAndStoreSos(array $allPlayedGames, int $month): void
     {
+        $standingsTable = $this->resolveTable('ibl_standings');
+        $powerTable = $this->resolveTable('ibl_power');
+
         echo '<p>Calculating Strength of Schedule...<p>';
 
-        // Load team win percentages from ibl_standings
+        // Load team win percentages from standings
         /** @var list<array{tid: int, wins: int, losses: int}> $standingsRows */
         $standingsRows = $this->fetchAll(
-            "SELECT tid, wins, losses FROM ibl_standings WHERE tid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID,
+            "SELECT tid, wins, losses FROM {$standingsTable} WHERE tid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID,
             ""
         );
 
@@ -279,7 +304,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         $sosRanks = StrengthOfScheduleCalculator::rankTeams($sosValues);
         $remainingSosRanks = StrengthOfScheduleCalculator::rankTeams($remainingSosValues);
 
-        // Store SOS values in ibl_power
+        // Store SOS values in power table
         $sosLog = '';
         for ($tid = 1; $tid <= \League::MAX_REAL_TEAMID; $tid++) {
             $sos = $sosValues[$tid] ?? 0.0;
@@ -288,7 +313,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
             $remainingSosRank = $remainingSosRanks[$tid] ?? 0;
 
             $this->execute(
-                "UPDATE ibl_power SET
+                "UPDATE {$powerTable} SET
                 sos = ?,
                 remaining_sos = ?,
                 sos_rank = ?,

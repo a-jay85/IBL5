@@ -202,4 +202,59 @@ class ScheduleUpdaterTest extends TestCase
             $this->assertArrayHasKey('year', $result);
         }
     }
+
+    /**
+     * @group schedule-updater
+     * @group league-context
+     */
+    public function testConstructorAcceptsOptionalLeagueContext(): void
+    {
+        $updater = new ScheduleUpdater($this->mockDb, $this->mockSeason, $this->leagueContext);
+        $this->assertInstanceOf(ScheduleUpdater::class, $updater);
+    }
+
+    /**
+     * @group schedule-updater
+     * @group league-context
+     */
+    public function testConstructorAcceptsNullLeagueContext(): void
+    {
+        $updater = new ScheduleUpdater($this->mockDb, $this->mockSeason, null);
+        $this->assertInstanceOf(ScheduleUpdater::class, $updater);
+    }
+
+    /**
+     * @group schedule-updater
+     * @group league-context
+     */
+    public function testOlympicsContextTruncatesOlympicsScheduleTable(): void
+    {
+        $olympicsContext = $this->createStub(LeagueContext::class);
+        $olympicsContext->method('getCurrentLeague')->willReturn(LeagueContext::LEAGUE_OLYMPICS);
+        $olympicsContext->method('isOlympics')->willReturn(true);
+        $olympicsContext->method('getTableName')->willReturnCallback(
+            static function (string $table): string {
+                return match ($table) {
+                    'ibl_schedule' => 'ibl_olympics_schedule',
+                    'ibl_team_info' => 'ibl_olympics_team_info',
+                    default => $table,
+                };
+            }
+        );
+
+        $updater = new ScheduleUpdater($this->mockDb, $this->mockSeason, $olympicsContext);
+        $this->mockDb->setReturnTrue(true);
+
+        ob_start();
+        try {
+            $updater->update();
+        } catch (\RuntimeException) {
+            // Expected: .sch file not found
+        }
+        ob_get_clean();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertNotEmpty($queries);
+        $this->assertSame('TRUNCATE TABLE ibl_olympics_schedule', $queries[0]);
+    }
 }

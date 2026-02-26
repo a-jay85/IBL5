@@ -6,8 +6,16 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 global $mysqli_db;
 
+// Detect league context
+$leagueContext = new League\LeagueContext();
+$leagueRaw = $_GET['league'] ?? null;
+if (is_string($leagueRaw) && ($leagueRaw === League\LeagueContext::LEAGUE_OLYMPICS || $leagueRaw === League\LeagueContext::LEAGUE_IBL)) {
+    $leagueContext->setLeague($leagueRaw);
+}
+$isOlympics = $leagueContext->isOlympics();
+
 $view = new Boxscore\BoxscoreView();
-$repository = new Boxscore\BoxscoreRepository($mysqli_db);
+$repository = new Boxscore\BoxscoreRepository($mysqli_db, $leagueContext);
 
 $isRenameRequest = isset($_POST['renameTeamId']) && isset($_POST['renameTeamName']);
 
@@ -79,11 +87,11 @@ if (!$lgeRepo->hasConfigForSeason($season->endingYear)) {
 
 $defaultScoPath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5/IBL5.sco';
 if (is_file($defaultScoPath)) {
-    $processor = new Boxscore\BoxscoreProcessor($mysqli_db);
+    $processor = new Boxscore\BoxscoreProcessor($mysqli_db, null, null, $leagueContext);
     $result = $processor->processScoFile($defaultScoPath, 0, '');
     echo $view->renderParseLog($result);
 
-    // Process All-Star Weekend games from the same file
+    // Process All-Star Weekend games from the same file (skipped for Olympics)
     $allStarResult = $processor->processAllStarGames($defaultScoPath, 0);
     echo $view->renderAllStarLog($allStarResult);
 }

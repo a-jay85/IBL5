@@ -253,4 +253,17 @@ class PowerRankingsUpdaterTest extends TestCase
         $this->assertEquals(7, $result['winsInLast10Games']);
         $this->assertEquals(3, $result['lossesInLast10Games']);
     }
+
+    public function testConstructorAcceptsOptionalLeagueContext(): void
+    {
+        $leagueContext = $this->createStub(\League\LeagueContext::class);
+        $updater = new PowerRankingsUpdater($this->mockDb, $this->mockSeason, null, $leagueContext);
+        $this->assertInstanceOf(PowerRankingsUpdater::class, $updater);
+    }
+
+    public function testConstructorAcceptsNullLeagueContext(): void
+    {
+        $updater = new PowerRankingsUpdater($this->mockDb, $this->mockSeason, null, null);
+        $this->assertInstanceOf(PowerRankingsUpdater::class, $updater);
+    }
 }

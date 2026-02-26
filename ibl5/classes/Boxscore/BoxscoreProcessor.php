@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Boxscore;
 
 use Boxscore\Contracts\BoxscoreProcessorInterface;
+use League\LeagueContext;
 use Player\PlayerStats;
 use Utilities\UuidGenerator;
 
@@ -29,11 +30,13 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
     protected \mysqli $db;
     protected BoxscoreRepository $repository;
     protected \Season $season;
+    private ?LeagueContext $leagueContext;
 
-    public function __construct(\mysqli $db, ?BoxscoreRepository $repository = null, ?\Season $season = null)
+    public function __construct(\mysqli $db, ?BoxscoreRepository $repository = null, ?\Season $season = null, ?LeagueContext $leagueContext = null)
     {
         $this->db = $db;
-        $this->repository = $repository ?? new BoxscoreRepository($db);
+        $this->leagueContext = $leagueContext;
+        $this->repository = $repository ?? new BoxscoreRepository($db, $leagueContext);
         $this->season = $season ?? new \Season($db);
     }
 
@@ -129,6 +132,15 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
     ): array {
         /** @var list<string> $messages */
         $messages = [];
+
+        // Olympics doesn't have All-Star games
+        if ($this->leagueContext !== null && $this->leagueContext->isOlympics()) {
+            return [
+                'success' => true,
+                'messages' => ['All-Star games skipped (Olympics context).'],
+                'skipped' => 'Olympics context',
+            ];
+        }
 
         $operatingSeasonEndingYear = $seasonEndingYear > 0 ? $seasonEndingYear : $this->season->endingYear;
 

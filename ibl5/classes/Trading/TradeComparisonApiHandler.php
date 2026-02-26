@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Trading;
 
-use UI\Components\TableViewDropdown;
-
 /**
  * AJAX JSON endpoint handler for trade comparison panel
  *
@@ -20,16 +18,9 @@ class TradeComparisonApiHandler
         'avg_s',
         'per36mins',
         'contracts',
-    ];
-
-    private const DROPDOWN_GROUPS = [
-        'Views' => [
-            'ratings' => 'Ratings',
-            'total_s' => 'Totals',
-            'avg_s' => 'Averages',
-            'per36mins' => 'Per 36',
-            'contracts' => 'Contracts',
-        ],
+        'split',
+        'chunk',
+        'playoffs',
     ];
 
     private const MAX_PIDS = 20;
@@ -59,6 +50,21 @@ class TradeComparisonApiHandler
 
         $display = $this->validateDisplay();
 
+        // Validate split parameter when display is 'split'
+        $split = null;
+        if ($display === 'split') {
+            if (isset($_GET['split']) && is_string($_GET['split'])) {
+                $splitRepo = new \Team\SplitStatsRepository($this->db);
+                if (in_array($_GET['split'], $splitRepo->getValidSplitKeys(), true)) {
+                    $split = $_GET['split'];
+                } else {
+                    $display = 'ratings';
+                }
+            } else {
+                $display = 'ratings';
+            }
+        }
+
         $players = $this->fetchPlayersByPids($pids);
         if ($players === []) {
             echo json_encode(['html' => ''], JSON_THROW_ON_ERROR);
@@ -68,18 +74,9 @@ class TradeComparisonApiHandler
         $team = \Team::initialize($this->db, $teamID);
         $season = new \Season($this->db);
 
-        $tableHtml = $this->renderTable($display, $players, $team, $season);
+        $tableHtml = $this->renderTable($display, $players, $team, $season, $pids, $split);
 
-        $dropdown = new TableViewDropdown(
-            self::DROPDOWN_GROUPS,
-            $display,
-            '',
-            $team->color1,
-            $team->color2
-        );
-        $wrappedHtml = $dropdown->wrap($tableHtml);
-
-        echo json_encode(['html' => $wrappedHtml], JSON_THROW_ON_ERROR);
+        echo json_encode(['html' => $tableHtml], JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -189,8 +186,9 @@ class TradeComparisonApiHandler
      * Render the appropriate table for the given display mode
      *
      * @param list<array<string, mixed>> $players Player rows
+     * @param list<int> $pids Player IDs for filtering aggregate queries
      */
-    private function renderTable(string $display, array $players, \Team $team, \Season $season): string
+    private function renderTable(string $display, array $players, \Team $team, \Season $season, array $pids, ?string $split = null): string
     {
         switch ($display) {
             case 'total_s':
@@ -201,6 +199,17 @@ class TradeComparisonApiHandler
                 return \UI::per36Minutes($this->db, $players, $team, '');
             case 'contracts':
                 return \UI::contracts($this->db, $players, $team, $season);
+            case 'split':
+                $splitRepo = new \Team\SplitStatsRepository($this->db);
+                $splitKey = $split ?? 'home';
+                $rows = $splitRepo->getSplitStats($team->teamID, $season->endingYear, $splitKey);
+                $rows = array_values(array_filter($rows, static fn (array $r): bool => in_array($r['pid'], $pids, true)));
+                $splitLabel = $splitRepo->getSplitLabel($splitKey);
+                return \UI\Tables\SplitStats::render($rows, $team, $splitLabel);
+            case 'chunk':
+                return \UI::periodAverages($this->db, $team, $season, null, null, [], $pids);
+            case 'playoffs':
+                return \UI::periodAverages($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, [], $pids);
             default:
                 return \UI::ratings($this->db, $players, $team, '', $season);
         }

@@ -182,6 +182,77 @@ class TradeComparisonApiHandlerTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function testHandleFallsBackToRatingsWhenSplitDisplayWithoutSplitParam(): void
+    {
+        // display=split but no split parameter — should fallback to ratings
+        $_GET = ['pids' => '1,2', 'teamID' => '1', 'display' => 'split'];
+
+        $handler = new TradeComparisonApiHandler($this->mockDb);
+
+        ob_start();
+        $handler->handle();
+        $output = (string) ob_get_clean();
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        // DB prepare returns false, so we get empty HTML (validated PIDs but no players fetched)
+        $this->assertSame('', $decoded['html']);
+    }
+
+    public function testHandleAcceptsChunkDisplayMode(): void
+    {
+        $_GET = ['pids' => '1', 'teamID' => '1', 'display' => 'chunk'];
+
+        $handler = new TradeComparisonApiHandler($this->mockDb);
+
+        ob_start();
+        $handler->handle();
+        $output = (string) ob_get_clean();
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        // DB prepare fails, so empty result
+        $this->assertSame('', $decoded['html']);
+    }
+
+    public function testHandleAcceptsPlayoffsDisplayMode(): void
+    {
+        $_GET = ['pids' => '1', 'teamID' => '1', 'display' => 'playoffs'];
+
+        $handler = new TradeComparisonApiHandler($this->mockDb);
+
+        ob_start();
+        $handler->handle();
+        $output = (string) ob_get_clean();
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertSame('', $decoded['html']);
+    }
+
+    public function testHandleFallsBackToRatingsForInvalidSplitKey(): void
+    {
+        $_GET = ['pids' => '1', 'teamID' => '1', 'display' => 'split', 'split' => 'invalid_key'];
+
+        $handler = new TradeComparisonApiHandler($this->mockDb);
+
+        ob_start();
+        $handler->handle();
+        $output = (string) ob_get_clean();
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertSame('', $decoded['html']);
+    }
+
     protected function tearDown(): void
     {
         $_GET = [];

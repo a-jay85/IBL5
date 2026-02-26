@@ -125,6 +125,23 @@ class TradingView implements TradingViewInterface
         </div>
         <div id="trade-comparison-panel" class="trade-comparison" style="display: none;">
             <div class="trade-comparison__header">Player Comparison</div>
+<?php
+/** @var array<string, array<string, string>> $comparisonDropdownGroups */
+$comparisonDropdownGroups = $pageData['comparisonDropdownGroups'] ?? [];
+if ($comparisonDropdownGroups !== []):
+?>
+            <div class="trade-comparison__shared-dropdown">
+                <select id="trade-comparison-display" class="ibl-view-select">
+<?php foreach ($comparisonDropdownGroups as $groupLabel => $options): ?>
+                    <optgroup label="<?= HtmlSanitizer::safeHtmlOutput($groupLabel) ?>">
+<?php foreach ($options as $value => $label): ?>
+                        <option value="<?= HtmlSanitizer::safeHtmlOutput($value) ?>"<?= $value === 'ratings' ? ' selected' : '' ?>><?= HtmlSanitizer::safeHtmlOutput($label) ?></option>
+<?php endforeach; ?>
+                    </optgroup>
+<?php endforeach; ?>
+                </select>
+            </div>
+<?php endif; ?>
             <div class="trade-comparison__grid">
                 <div class="trade-comparison__team" data-side="user">
                     <div class="trade-comparison__team-name"><?= $userTeam ?> sends</div>

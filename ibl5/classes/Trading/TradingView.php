@@ -157,8 +157,8 @@ if ($comparisonDropdownGroups !== []):
                 </div>
             </div>
         </div>
-<?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $previousFormData) ?>
-<?= $this->renderCapTotals($pageData, $seasonEndingYear, $userTeam, $partnerTeam) ?>
+<?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2, $previousFormData) ?>
+<?= $this->renderCapTotals($pageData, $seasonEndingYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2) ?>
         <div style="text-align: center; padding: 1rem;">
             <input type="hidden" name="fieldsCounter" value="<?= (int) $k ?>">
             <button type="submit" class="ibl-btn ibl-btn--primary">Make Trade Offer</button>
@@ -438,7 +438,7 @@ $tradeConfig = [
      *
      * @param array{userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonPhase: string} $pageData
      */
-    private function renderCapTotals(array $pageData, int $seasonEndingYear, string $userTeam, string $partnerTeam): string
+    private function renderCapTotals(array $pageData, int $seasonEndingYear, string $userTeam, string $partnerTeam, string $userColor1, string $userColor2, string $partnerColor1, string $partnerColor2): string
     {
         $userFutureSalary = $pageData['userFutureSalary'];
         $partnerFutureSalary = $pageData['partnerFutureSalary'];
@@ -454,20 +454,39 @@ $tradeConfig = [
 
         ob_start();
         ?>
-<table class="ibl-data-table trading-cap-totals" data-no-responsive style="width: 100%; margin-top: 1rem;">
-    <thead><tr><th colspan="2">Cap Totals</th></tr></thead>
-    <tbody>
+<div class="trading-layout__section-title">Cap Totals</div>
+<div class="trading-layout__rosters">
+    <div class="trading-layout__card">
+        <table class="ibl-data-table trading-cap-totals team-table" data-no-responsive data-side="user" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>;">
+            <thead><tr><th><?= $userTeam ?></th></tr></thead>
+            <tbody>
 <?php for ($z = 0; $z < $seasonsToDisplay; $z++):
     $yearLabel = ($displayEndingYear + $z - 1) . '-' . ($displayEndingYear + $z);
     $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
 ?>
-    <tr>
-        <td style="text-align: left;"><strong><?= $userTeam ?></strong> in <?= $yearLabelEscaped ?>: <?= $userFutureSalary['player'][$z] ?></td>
-        <td style="text-align: right;"><strong><?= $partnerTeam ?></strong> in <?= $yearLabelEscaped ?>: <?= $partnerFutureSalary['player'][$z] ?></td>
-    </tr>
+            <tr>
+                <td><?= $yearLabelEscaped ?>: <?= $userFutureSalary['player'][$z] ?></td>
+            </tr>
 <?php endfor; ?>
-    </tbody>
-</table>
+            </tbody>
+        </table>
+    </div>
+    <div class="trading-layout__card">
+        <table class="ibl-data-table trading-cap-totals team-table" data-no-responsive data-side="partner" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>;">
+            <thead><tr><th><?= $partnerTeam ?></th></tr></thead>
+            <tbody>
+<?php for ($z = 0; $z < $seasonsToDisplay; $z++):
+    $yearLabel = ($displayEndingYear + $z - 1) . '-' . ($displayEndingYear + $z);
+    $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
+?>
+            <tr>
+                <td><?= $yearLabelEscaped ?>: <?= $partnerFutureSalary['player'][$z] ?></td>
+            </tr>
+<?php endfor; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
         <?php
         return (string) ob_get_clean();
     }
@@ -477,36 +496,51 @@ $tradeConfig = [
      *
      * @param array{checkedItems: array<string, true>, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>}|null $previousFormData
      */
-    private function renderCashExchange(int $seasonEndingYear, string $seasonPhase, int $cashStartYear, int $cashEndYear, string $userTeam, string $partnerTeam, ?array $previousFormData = null): string
+    private function renderCashExchange(int $seasonEndingYear, string $seasonPhase, int $cashStartYear, int $cashEndYear, string $userTeam, string $partnerTeam, string $userColor1, string $userColor2, string $partnerColor1, string $partnerColor2, ?array $previousFormData = null): string
     {
         ob_start();
         ?>
-<table class="ibl-data-table trading-cash-exchange" data-no-responsive style="width: 100%; margin-top: 1rem;">
-    <thead><tr><th colspan="2">Cash Exchange</th></tr></thead>
-    <tbody>
+<div class="trading-layout__section-title">Cash Exchange</div>
+<div class="trading-layout__rosters">
+    <div class="trading-layout__card">
+        <table class="ibl-data-table trading-cash-exchange team-table" data-no-responsive data-side="user" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>;">
+            <thead><tr><th><?= $userTeam ?> sends</th></tr></thead>
+            <tbody>
 <?php for ($i = $cashStartYear; $i <= $cashEndYear; $i++):
     $yearLabel = ($seasonEndingYear - 2 + $i) . '-' . ($seasonEndingYear - 1 + $i);
     $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
-?>
-    <?php
     $prevUserCash = $previousFormData['userSendsCash'][$i] ?? 0;
-    $prevPartnerCash = $previousFormData['partnerSendsCash'][$i] ?? 0;
-    ?>
-    <tr>
-        <td style="text-align: left;">
-            <strong><?= $userTeam ?></strong> send
-            <input type="number" name="userSendsCash<?= $i ?>" value="<?= $prevUserCash ?>" min="0" max="2000" style="width: 80px;">
-            for <?= $yearLabelEscaped ?>
-        </td>
-        <td style="text-align: right;">
-            <strong><?= $partnerTeam ?></strong> send
-            <input type="number" name="partnerSendsCash<?= $i ?>" value="<?= $prevPartnerCash ?>" min="0" max="2000" style="width: 80px;">
-            for <?= $yearLabelEscaped ?>
-        </td>
-    </tr>
+?>
+            <tr>
+                <td>
+                    <input type="number" name="userSendsCash<?= $i ?>" value="<?= $prevUserCash ?>" min="0" max="2000">
+                    for <?= $yearLabelEscaped ?>
+                </td>
+            </tr>
 <?php endfor; ?>
-    </tbody>
-</table>
+            </tbody>
+        </table>
+    </div>
+    <div class="trading-layout__card">
+        <table class="ibl-data-table trading-cash-exchange team-table" data-no-responsive data-side="partner" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>;">
+            <thead><tr><th><?= $partnerTeam ?> sends</th></tr></thead>
+            <tbody>
+<?php for ($i = $cashStartYear; $i <= $cashEndYear; $i++):
+    $yearLabel = ($seasonEndingYear - 2 + $i) . '-' . ($seasonEndingYear - 1 + $i);
+    $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
+    $prevPartnerCash = $previousFormData['partnerSendsCash'][$i] ?? 0;
+?>
+            <tr>
+                <td>
+                    <input type="number" name="partnerSendsCash<?= $i ?>" value="<?= $prevPartnerCash ?>" min="0" max="2000">
+                    for <?= $yearLabelEscaped ?>
+                </td>
+            </tr>
+<?php endfor; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
         <?php
         return (string) ob_get_clean();
     }

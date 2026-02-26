@@ -1313,21 +1313,30 @@ td.ibl-team-cell--colored {
     word-break: break-word;
 }
 
-/* Cap totals table */
-.trading-cap-totals th {
+/* Section title for cash exchange & cap totals */
+.trading-layout__section-title {
+    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+    font-weight: 700;
+    font-size: 1.1rem;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 0.5rem 0.75rem;
+    letter-spacing: 0.025em;
     text-align: center;
+    color: var(--gray-600, #4b5563);
+    margin-top: var(--space-4, 1rem);
+    margin-bottom: var(--space-2, 0.5rem);
 }
 
-.trading-cap-totals td {
-    padding: 0.5rem 0.75rem;
+/* Cap totals & cash exchange card tables */
+.trading-cap-totals,
+.trading-cash-exchange {
+    width: 100%;
+    table-layout: fixed;
 }
 
-/* Cash exchange table */
+.trading-cap-totals td,
 .trading-cash-exchange td {
     padding: 0.5rem 0.75rem;
+    text-align: center;
 }
 
 .trading-cash-exchange input[type="number"] {

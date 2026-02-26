@@ -1240,18 +1240,13 @@ td.ibl-team-cell--colored {
    - Trade offer review cards
    ========================================================================== */
 
-/* Trading layout — flex container replacing former layout table */
+/* Trading layout — page container */
 .trading-layout {
     text-align: center;
     margin: 0 auto;
 }
 
-.trading-layout__rosters {
-    display: flex;
-    gap: var(--space-2);
-    justify-content: center;
-}
-
+/* Roster card flex sizing — wider than .team-cards-row > .team-card default */
 .trading-layout__card {
     flex: 1 1 0;
     max-width: 450px;
@@ -1301,32 +1296,7 @@ td.ibl-team-cell--colored {
     word-break: break-word;
 }
 
-/* Section title for cash exchange & cap totals */
-.trading-layout__section-title {
-    font-family: var(--font-display, 'Barlow Condensed', sans-serif);
-    font-weight: 700;
-    font-size: 1.1rem;
-    text-transform: uppercase;
-    letter-spacing: 0.025em;
-    text-align: center;
-    color: var(--gray-600, #4b5563);
-    margin-top: var(--space-4, 1rem);
-    margin-bottom: var(--space-2, 0.5rem);
-}
-
-/* Cap totals & cash exchange card tables */
-.trading-cap-totals,
-.trading-cash-exchange {
-    width: 100%;
-    table-layout: fixed;
-}
-
-.trading-cap-totals td,
-.trading-cash-exchange td {
-    padding: 0.5rem 0.75rem;
-    text-align: center;
-}
-
+/* Cash exchange number input */
 .trading-cash-exchange input[type="number"] {
     width: 80px;
     padding: 0.25rem 0.5rem;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Trading;
 
+use Services\CommonMysqliRepository;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
 
 /**
@@ -15,15 +16,19 @@ use Trading\Contracts\TradeExecutionRepositoryInterface;
  *
  * @phpstan-type QueuedTradeRow array{id: int, operation_type: string, params: string, tradeline: string}
  * @phpstan-type PlayerTransferParams array{player_id: int, team_name: string, team_id: int}
- * @phpstan-type PickTransferParams array{pick_id: int, new_owner: string}
+ * @phpstan-type PickTransferParams array{pick_id: int, new_owner: string, new_owner_id?: int}
  */
 class TradeQueueProcessor
 {
     private TradeExecutionRepositoryInterface $executionRepository;
+    private CommonMysqliRepository $commonRepository;
 
-    public function __construct(TradeExecutionRepositoryInterface $executionRepository)
-    {
+    public function __construct(
+        TradeExecutionRepositoryInterface $executionRepository,
+        CommonMysqliRepository $commonRepository
+    ) {
         $this->executionRepository = $executionRepository;
+        $this->commonRepository = $commonRepository;
     }
 
     /**
@@ -133,6 +138,10 @@ class TradeQueueProcessor
     /**
      * Execute a pick transfer operation
      *
+     * Resolves new_owner_id from params if available, otherwise falls back to
+     * looking up the tid from the team name string. This handles pre-migration
+     * queued trades that only have the team name, not the team ID.
+     *
      * @param array<string, mixed> $params Parameters from queue
      * @return array{success: bool, error: string}
      */
@@ -144,7 +153,6 @@ class TradeQueueProcessor
 
         $rawPickId = $params['pick_id'];
         $rawNewOwner = $params['new_owner'];
-        $rawNewOwnerId = $params['new_owner_id'] ?? 0;
 
         if (!is_int($rawPickId) && !is_string($rawPickId)) {
             return ['success' => false, 'error' => 'Invalid pick_id type'];
@@ -155,7 +163,15 @@ class TradeQueueProcessor
 
         $pickId = (int) $rawPickId;
         $newOwner = $rawNewOwner;
-        $newOwnerId = is_int($rawNewOwnerId) ? $rawNewOwnerId : (is_string($rawNewOwnerId) ? (int) $rawNewOwnerId : 0);
+
+        // Resolve new_owner_id: use params if available, otherwise look up tid from team name
+        $rawNewOwnerId = $params['new_owner_id'] ?? null;
+        if ($rawNewOwnerId !== null) {
+            $newOwnerId = is_int($rawNewOwnerId) ? $rawNewOwnerId : (is_string($rawNewOwnerId) ? (int) $rawNewOwnerId : 0);
+        } else {
+            // Fallback for pre-migration queued trades that lack new_owner_id
+            $newOwnerId = $this->commonRepository->getTidFromTeamname($newOwner) ?? 0;
+        }
 
         $affectedRows = $this->executionRepository->executeQueuedPickTransfer($pickId, $newOwner, $newOwnerId);
 

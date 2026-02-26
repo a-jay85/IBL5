@@ -1,3 +1,4 @@
+ibl5/migrations/*.sql linguist-generated=true
 *.car filter=lfs diff=lfs merge=lfs -text
 *.sco filter=lfs diff=lfs merge=lfs -text
 *.plr filter=lfs diff=lfs merge=lfs -text

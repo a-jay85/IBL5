@@ -17,8 +17,8 @@ interface PlayerOlympicAveragesViewInterface extends PlayerViewInterface
      * Shows per-game averages for each Olympics season including minutes,
      * shooting percentages, and all statistical categories.
      * 
-     * @param string $playerName Player name to fetch stats for
+     * @param int $playerID Player ID to fetch stats for
      * @return string Rendered HTML content
      */
-    public function renderAverages(string $playerName): string;
+    public function renderAverages(int $playerID): string;
 }

@@ -100,7 +100,7 @@ class PlayerStatsRepositoryTest extends TestCase
         $this->mockResult->method('fetch_assoc')
             ->willReturnOnConsecutiveCalls($testData[0], null);
         
-        $result = $this->repository->getOlympicsStats('Test Player');
+        $result = $this->repository->getOlympicsStats(1);
         
         $this->assertIsArray($result);
     }
@@ -177,7 +177,7 @@ class PlayerStatsRepositoryTest extends TestCase
     {
         $this->mockResult->method('fetch_assoc')->willReturn(null);
         
-        $result = $this->repository->getOlympicsCareerAverages('Test Player');
+        $result = $this->repository->getOlympicsCareerAverages(1);
         
         $this->assertNull($result);
     }

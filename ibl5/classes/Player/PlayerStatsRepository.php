@@ -176,12 +176,12 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
     /**
      * @see PlayerStatsRepositoryInterface::getOlympicsStats()
      */
-    public function getOlympicsStats(string $playerName): array
+    public function getOlympicsStats(int $playerID): array
     {
         return $this->fetchAll(
-            "SELECT * FROM ibl_olympics_stats WHERE name = ? ORDER BY year ASC",
-            "s",
-            $playerName
+            "SELECT * FROM ibl_olympics_stats WHERE pid = ? ORDER BY year ASC",
+            "i",
+            $playerID
         );
     }
 
@@ -189,13 +189,13 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
      * @see PlayerStatsRepositoryInterface::getOlympicsCareerTotals()
      * @return CareerTotalsRow|null
      */
-    public function getOlympicsCareerTotals(string $playerName): ?array
+    public function getOlympicsCareerTotals(int $playerID): ?array
     {
         /** @var CareerTotalsRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_olympics_career_totals WHERE name = ?",
-            "s",
-            $playerName
+            "SELECT * FROM ibl_olympics_career_totals WHERE pid = ?",
+            "i",
+            $playerID
         );
     }
 
@@ -203,13 +203,13 @@ class PlayerStatsRepository extends BaseMysqliRepository implements PlayerStatsR
      * @see PlayerStatsRepositoryInterface::getOlympicsCareerAverages()
      * @return CareerAveragesRow|null
      */
-    public function getOlympicsCareerAverages(string $playerName): ?array
+    public function getOlympicsCareerAverages(int $playerID): ?array
     {
         /** @var CareerAveragesRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_olympics_career_avgs WHERE name = ?",
-            "s",
-            $playerName
+            "SELECT * FROM ibl_olympics_career_avgs WHERE pid = ?",
+            "i",
+            $playerID
         );
     }
 

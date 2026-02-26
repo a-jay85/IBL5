@@ -68,10 +68,10 @@ interface PlayerRepositoryInterface
      * Returns an array with dem1-dem6 keys representing the base demand for years 1-6.
      * These are the demands before team/player modifiers are applied.
      * 
-     * @param string $playerName The player's name (exact match required)
+     * @param int $playerID The player's ID
      * @return array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int} Base demands by year
      */
-    public function getFreeAgencyDemands(string $playerName): array;
+    public function getFreeAgencyDemands(int $playerID): array;
 
     /**
      * Get player statistics by player ID
@@ -159,10 +159,10 @@ interface PlayerRepositoryInterface
     /**
      * Get Olympics stats for a player ordered by year
      * 
-     * @param string $playerName Player name (exact match)
+     * @param int $playerID Player ID
      * @return array<array<string, mixed>> Array of Olympics stat records ordered by year ASC
      */
-    public function getOlympicsStats(string $playerName): array;
+    public function getOlympicsStats(int $playerID): array;
 
     /**
      * Get news articles mentioning a player

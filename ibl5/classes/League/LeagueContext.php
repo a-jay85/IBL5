@@ -184,6 +184,7 @@ class LeagueContext
             'ibl_standings' => 'ibl_olympics_standings',
             'ibl_power' => 'ibl_olympics_power',
             'ibl_team_info' => 'ibl_olympics_team_info',
+            'ibl_league_config' => 'ibl_olympics_league_config',
             default => $iblTableName,
         };
     }

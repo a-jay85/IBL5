@@ -20,7 +20,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
     public function __construct(\mysqli $db, \Season $season, ?TeamStatsCalculator $statsCalculator = null, ?LeagueContext $leagueContext = null) {
         parent::__construct($db);
         $this->season = $season;
-        $this->statsCalculator = $statsCalculator ?? new TeamStatsCalculator($db);
+        $this->statsCalculator = $statsCalculator ?? new TeamStatsCalculator($db, $leagueContext);
         $this->leagueContext = $leagueContext;
     }
 
@@ -46,7 +46,6 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         $teams = $this->fetchAll(
             "SELECT TeamID, streak_type, streak
             FROM {$powerTable}
-            WHERE TeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             ORDER BY TeamID ASC",
             ""
         );
@@ -54,7 +53,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         // Load team names for log messages
         /** @var list<array{teamid: int, team_name: string}> $teamInfoRows */
         $teamInfoRows = $this->fetchAll(
-            "SELECT teamid, team_name FROM {$teamInfoTable} WHERE teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID,
+            "SELECT teamid, team_name FROM {$teamInfoTable}",
             ""
         );
         /** @var array<int, string> $teamNames */
@@ -252,7 +251,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         // Load team win percentages from standings
         /** @var list<array{tid: int, wins: int, losses: int}> $standingsRows */
         $standingsRows = $this->fetchAll(
-            "SELECT tid, wins, losses FROM {$standingsTable} WHERE tid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID,
+            "SELECT tid, wins, losses FROM {$standingsTable}",
             ""
         );
 
@@ -278,13 +277,14 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
         $allUnplayedGames = $this->fetchAllUnplayedGames($month);
         $unplayedByTeam = $this->partitionUnplayedGamesByTeam($allUnplayedGames);
 
-        // Calculate SOS and remaining SOS per team
+        // Calculate SOS and remaining SOS per team (data-driven from standings)
+        $teamIds = array_keys($teamWinPcts);
         /** @var array<int, float> $sosValues */
         $sosValues = [];
         /** @var array<int, float> $remainingSosValues */
         $remainingSosValues = [];
 
-        for ($tid = 1; $tid <= \League::MAX_REAL_TEAMID; $tid++) {
+        foreach ($teamIds as $tid) {
             $teamPlayedGames = $playedByTeam[$tid] ?? [];
             $teamUnplayedGames = $unplayedByTeam[$tid] ?? [];
 
@@ -306,7 +306,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
 
         // Store SOS values in power table
         $sosLog = '';
-        for ($tid = 1; $tid <= \League::MAX_REAL_TEAMID; $tid++) {
+        foreach ($teamIds as $tid) {
             $sos = $sosValues[$tid] ?? 0.0;
             $remainingSos = $remainingSosValues[$tid] ?? 0.0;
             $sosRank = $sosRanks[$tid] ?? 0;

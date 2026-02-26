@@ -87,7 +87,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $this->checkIfLeagueClinched();
 
         echo '<p>Magic numbers for all teams have been updated.<p>';
-        echo '<p>The ibl_standings table has been updated.<p>';
+        echo "<p>The {$standingsTable} table has been updated.<p>";
     }
 
     /**
@@ -111,16 +111,18 @@ class StandingsUpdater extends \BaseMysqliRepository {
     }
 
     /**
-     * Fetch conference/division mapping from ibl_league_config for the current season
+     * Fetch conference/division mapping from league config table for the current season
      *
      * @return array<int, TeamMapping> Map of tid → {conference, division, teamName}
      */
     protected function fetchTeamMap(): array
     {
+        $leagueConfigTable = $this->resolveTable('ibl_league_config');
+
         /** @var list<array{team_slot: int, team_name: string, conference: string, division: string}> $rows */
         $rows = $this->fetchAll(
             "SELECT team_slot, team_name, conference, division
-            FROM ibl_league_config
+            FROM {$leagueConfigTable}
             WHERE season_ending_year = ?",
             "i",
             $this->season->endingYear

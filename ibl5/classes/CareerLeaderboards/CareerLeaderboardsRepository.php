@@ -30,6 +30,10 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
         'ibl_heat_career_avgs',
         'ibl_olympics_career_totals',
         'ibl_olympics_career_avgs',
+        'ibl_rookie_career_totals',
+        'ibl_sophomore_career_totals',
+        'ibl_allstar_career_totals',
+        'ibl_allstar_career_avgs',
     ];
 
     // Whitelist of valid sort columns
@@ -133,6 +137,7 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
             'ibl_playoff_career_avgs',
             'ibl_heat_career_avgs',
             'ibl_olympics_career_avgs',
+            'ibl_allstar_career_avgs',
         ];
 
         return in_array($tableKey, $avgTables, true) ? 'averages' : 'totals';

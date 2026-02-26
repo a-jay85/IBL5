@@ -10,7 +10,7 @@ use CareerLeaderboards\Contracts\CareerLeaderboardsRepositoryInterface;
 /**
  * CachedCareerLeaderboardsRepository - Caching decorator for CareerLeaderboardsRepositoryInterface.
  *
- * Caches full unsorted result sets per table key (8 entries total).
+ * Caches full unsorted result sets per table key (12 entries total).
  * On cache hit, filters by active-only, sorts by the requested column,
  * and slices for limit — all in PHP. This avoids running slow database
  * view queries on every sort/filter change.
@@ -32,6 +32,10 @@ class CachedCareerLeaderboardsRepository implements CareerLeaderboardsRepository
         'ibl_heat_career_avgs',
         'ibl_olympics_career_totals',
         'ibl_olympics_career_avgs',
+        'ibl_rookie_career_totals',
+        'ibl_sophomore_career_totals',
+        'ibl_allstar_career_totals',
+        'ibl_allstar_career_avgs',
     ];
 
     private CareerLeaderboardsRepositoryInterface $inner;
@@ -101,7 +105,7 @@ class CachedCareerLeaderboardsRepository implements CareerLeaderboardsRepository
     }
 
     /**
-     * Rebuild cache for all 8 table keys.
+     * Rebuild cache for all 12 table keys.
      *
      * Fetches full result sets from the inner repository and stores them.
      * Called by the warm-cache CLI script and optionally after game simulations.
@@ -119,7 +123,7 @@ class CachedCareerLeaderboardsRepository implements CareerLeaderboardsRepository
     }
 
     /**
-     * Invalidate cache for all 8 table keys.
+     * Invalidate cache for all 12 table keys.
      */
     public function invalidateCache(): void
     {

@@ -113,6 +113,10 @@ class CareerLeaderboardsService implements CareerLeaderboardsServiceInterface
             'ibl_heat_career_avgs' => 'H.E.A.T. Averages',
             'ibl_olympics_career_totals' => 'Olympic Totals',
             'ibl_olympics_career_avgs' => 'Olympic Averages',
+            'ibl_rookie_career_totals' => 'Rookie Game Totals',
+            'ibl_sophomore_career_totals' => 'Sophomore Game Totals',
+            'ibl_allstar_career_totals' => 'All-Star Game Totals',
+            'ibl_allstar_career_avgs' => 'All-Star Game Averages',
         ];
     }
 

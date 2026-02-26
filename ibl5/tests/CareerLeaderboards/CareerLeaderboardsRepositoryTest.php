@@ -16,6 +16,9 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         $this->assertEquals('totals', $repository->getTableType('ibl_playoff_career_totals'));
         $this->assertEquals('totals', $repository->getTableType('ibl_heat_career_totals'));
         $this->assertEquals('totals', $repository->getTableType('ibl_olympics_career_totals'));
+        $this->assertEquals('totals', $repository->getTableType('ibl_rookie_career_totals'));
+        $this->assertEquals('totals', $repository->getTableType('ibl_sophomore_career_totals'));
+        $this->assertEquals('totals', $repository->getTableType('ibl_allstar_career_totals'));
     }
 
     public function testGetTableTypeIdentifiesAverages(): void
@@ -27,6 +30,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         $this->assertEquals('averages', $repository->getTableType('ibl_playoff_career_avgs'));
         $this->assertEquals('averages', $repository->getTableType('ibl_heat_career_avgs'));
         $this->assertEquals('averages', $repository->getTableType('ibl_olympics_career_avgs'));
+        $this->assertEquals('averages', $repository->getTableType('ibl_allstar_career_avgs'));
     }
 
     public function testGetLeaderboardsRejectsInvalidTableName(): void

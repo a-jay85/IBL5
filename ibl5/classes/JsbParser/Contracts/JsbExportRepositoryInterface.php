@@ -21,12 +21,6 @@ interface JsbExportRepositoryInterface
      *     pid: int,
      *     name: string,
      *     tid: int,
-     *     dc_PGDepth: int,
-     *     dc_SGDepth: int,
-     *     dc_SFDepth: int,
-     *     dc_PFDepth: int,
-     *     dc_CDepth: int,
-     *     dc_active: int,
      *     bird: int,
      *     cy: int,
      *     cyt: int,
@@ -35,7 +29,8 @@ interface JsbExportRepositoryInterface
      *     cy3: int,
      *     cy4: int,
      *     cy5: int,
-     *     cy6: int
+     *     cy6: int,
+     *     fa_signing_flag: int
      * }> Keyed by pid
      */
     public function getAllPlayerChangeableFields(): array;

@@ -18,18 +18,14 @@ class JsbExportService implements JsbExportServiceInterface
 
     /**
      * Map of database field names to PlrFileWriter field names.
-     * The dc_ prefix fields in the DB map to non-prefixed depth chart fields in the .plr file.
+     *
+     * Depth chart fields (dc_PGDepth–dc_CDepth, dc_active) are intentionally excluded —
+     * those are managed by DepthChartEntry and not exported to the .plr file.
      *
      * @var array<string, string>
      */
     private const DB_TO_PLR_FIELD_MAP = [
         'tid' => 'tid',
-        'dc_PGDepth' => 'PGDepth',
-        'dc_SGDepth' => 'SGDepth',
-        'dc_SFDepth' => 'SFDepth',
-        'dc_PFDepth' => 'PFDepth',
-        'dc_CDepth' => 'CDepth',
-        'dc_active' => 'active',
         'bird' => 'bird',
         'cy' => 'cy',
         'cyt' => 'cyt',
@@ -39,6 +35,7 @@ class JsbExportService implements JsbExportServiceInterface
         'cy4' => 'cy4',
         'cy5' => 'cy5',
         'cy6' => 'cy6',
+        'fa_signing_flag' => 'freeAgentSigningFlag',
     ];
 
     /**
@@ -231,7 +228,7 @@ class JsbExportService implements JsbExportServiceInterface
      * Compare database values to file values and build change set.
      *
      * @param string $line The current player record from the .plr file
-     * @param array{pid: int, name: string, tid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, bird: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int} $dbPlayer
+     * @param array{pid: int, name: string, tid: int, bird: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, fa_signing_flag: int} $dbPlayer
      * @return array<string, int> Map of PlrFileWriter field name → new value (only fields that differ)
      */
     private function buildChangeSet(string $line, array $dbPlayer): array

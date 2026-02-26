@@ -43,10 +43,10 @@ interface JsbExportRepositoryInterface
     public function getAllPlayerChangeableFields(): array;
 
     /**
-     * Get completed trade transactions for TRN export.
+     * Get completed trade transactions for TRN export, filtered by season start date.
      *
-     * Returns trade items grouped by trade offer ID, for the current season.
-     *
+     * @param string $seasonStartDate ISO date string (e.g., '2025-07-01') — only trades
+     *                                 created on or after this date are included
      * @return list<array{
      *     tradeofferid: int,
      *     itemid: int,
@@ -56,5 +56,5 @@ interface JsbExportRepositoryInterface
      *     created_at: string
      * }>
      */
-    public function getCompletedTradeItems(): array;
+    public function getCompletedTradeItems(string $seasonStartDate): array;
 }

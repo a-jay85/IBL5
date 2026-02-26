@@ -76,17 +76,18 @@ class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepo
     /**
      * @see JsbExportRepositoryInterface::getCompletedTradeItems()
      */
-    public function getCompletedTradeItems(): array
+    public function getCompletedTradeItems(string $seasonStartDate): array
     {
         $rows = $this->fetchAll(
             'SELECT ti.tradeofferid, ti.itemid, ti.itemtype,
                     ti.`from`, ti.`to`, ti.created_at
              FROM ibl_trade_info ti
              INNER JOIN ibl_trade_offers to2 ON ti.tradeofferid = to2.id
-             WHERE ti.approval = ?
+             WHERE ti.approval = ? AND ti.created_at >= ?
              ORDER BY ti.tradeofferid, ti.id',
-            's',
+            'ss',
             'approved',
+            $seasonStartDate,
         );
 
         $result = [];

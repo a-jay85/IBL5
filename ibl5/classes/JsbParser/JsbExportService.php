@@ -44,8 +44,8 @@ class JsbExportService implements JsbExportServiceInterface
     ];
 
     /**
-     * Reverse mapping of JSB team names to their IDs.
-     * Built from JsbImportRepository::JSB_TEAM_NAMES for resolving team names to JSB IDs.
+     * Maps current database team names to JSB team IDs.
+     * For renamed franchises, uses current DB names (see JsbImportRepository::TEAM_NAME_ALIASES).
      *
      * @var array<string, int>
      */
@@ -158,11 +158,11 @@ class JsbExportService implements JsbExportServiceInterface
     /**
      * @see JsbExportServiceInterface::exportTrnFile()
      */
-    public function exportTrnFile(string $outputPath): PlrWriteResult
+    public function exportTrnFile(string $outputPath, string $seasonStartDate): PlrWriteResult
     {
         $result = new PlrWriteResult();
 
-        $tradeItems = $this->repository->getCompletedTradeItems();
+        $tradeItems = $this->repository->getCompletedTradeItems($seasonStartDate);
         $result->addMessage('Found ' . count($tradeItems) . ' trade items in database');
 
         // Group trade items by tradeofferid to build trade records

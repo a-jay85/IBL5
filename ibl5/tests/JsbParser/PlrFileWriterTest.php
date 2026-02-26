@@ -190,22 +190,26 @@ class PlrFileWriterTest extends TestCase
         $this->assertSame(4, PlrFileWriter::readField($modified, 'previousTeamIndex'));
     }
 
-    public function testDerivedFreeAgentSigningFlagWhenBirdIsOne(): void
+    public function testBirdChangeDoesNotAutoDeriveFreeAgentSigningFlag(): void
     {
         $record = $this->buildSyntheticRecord(1, 12345, 5, 3);
 
+        // Changing bird should NOT auto-update freeAgentSigningFlag.
+        // The flag distinguishes FA signings from drafts/trades and cannot be
+        // inferred from bird alone (drafted players also have bird=1 in year 1).
         $modified = PlrFileWriter::applyChangesToRecord($record, ['bird' => 1]);
 
-        $this->assertSame(1, PlrFileWriter::readField($modified, 'freeAgentSigningFlag'));
+        // freeAgentSigningFlag should remain unchanged (0 from buildSyntheticRecord)
+        $this->assertSame(0, PlrFileWriter::readField($modified, 'freeAgentSigningFlag'));
     }
 
-    public function testDerivedFreeAgentSigningFlagWhenBirdIsNotOne(): void
+    public function testFreeAgentSigningFlagCanBeSetExplicitly(): void
     {
         $record = $this->buildSyntheticRecord(1, 12345, 5, 1);
 
-        $modified = PlrFileWriter::applyChangesToRecord($record, ['bird' => 3]);
+        $modified = PlrFileWriter::applyChangesToRecord($record, ['freeAgentSigningFlag' => 1]);
 
-        $this->assertSame(0, PlrFileWriter::readField($modified, 'freeAgentSigningFlag'));
+        $this->assertSame(1, PlrFileWriter::readField($modified, 'freeAgentSigningFlag'));
     }
 
     public function testApplyChangesThrowsForUnknownField(): void
@@ -246,7 +250,7 @@ class PlrFileWriterTest extends TestCase
 
         $this->assertSame(10, PlrFileWriter::readField($modified, 'exp'));
         $this->assertSame(4, PlrFileWriter::readField($modified, 'bird'));
-        // bird != 1, so freeAgentSigningFlag should be 0
+        // freeAgentSigningFlag unchanged — bird does not auto-derive it
         $this->assertSame(0, PlrFileWriter::readField($modified, 'freeAgentSigningFlag'));
     }
 

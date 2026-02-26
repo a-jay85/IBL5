@@ -188,13 +188,6 @@ class PlrFileWriter implements PlrFileWriterInterface
             $modified = self::applyDerivedTidFields($modified, $newTid, $oldTid);
         }
 
-        // Auto-update freeAgentSigningFlag when bird changes
-        if (isset($changes['bird']) && !isset($changes['freeAgentSigningFlag'])) {
-            $faFlag = $changes['bird'] === 1 ? 1 : 0;
-            $formatted = PlrFieldSerializer::formatInt($faFlag, self::WIDTH_FA_SIGNING_FLAG);
-            $modified = substr_replace($modified, $formatted, self::OFFSET_FA_SIGNING_FLAG, self::WIDTH_FA_SIGNING_FLAG);
-        }
-
         if (strlen($modified) !== $originalLength) {
             throw new \RuntimeException(
                 'Record length changed from ' . $originalLength . ' to ' . strlen($modified)

@@ -84,6 +84,7 @@ use Utilities\HtmlSanitizer;
 
 $repository = new JsbExportRepository($mysqli_db);
 $service = new JsbExportService($repository);
+$season = new Season($mysqli_db);
 
 $basePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5';
 $plrInput = $basePath . '/IBL5.plr';
@@ -138,7 +139,8 @@ if (!file_exists($plrInput)) {
 
 echo '<h2>TRN Export</h2>';
 
-$trnResult = $service->exportTrnFile($trnOutput);
+$seasonStartDate = $season->beginningYear . '-07-01';
+$trnResult = $service->exportTrnFile($trnOutput, $seasonStartDate);
 
 foreach ($trnResult->messages as $msg) {
     $class = str_starts_with($msg, 'ERROR') ? 'error' : '';

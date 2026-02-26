@@ -77,7 +77,7 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
             $fiveLosses = $window['five_season_losses'];
             $totalGames = $fiveWins + $fiveLosses;
             $fiveWinpct = $totalGames > 0
-                ? number_format($fiveWins / $totalGames, 3)
+                ? \BasketballStats\StatsFormatter::formatPercentage($fiveWins, $totalGames)
                 : null;
 
             $playoffTotals = $allPlayoffTotals[$teamName] ?? ['wins' => 0, 'losses' => 0, 'winpct' => '.000'];
@@ -145,7 +145,7 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
             $losses = $row['total_losses'];
             $totalGames = $wins + $losses;
             $winpct = $totalGames > 0
-                ? number_format($wins / $totalGames, 3)
+                ? \BasketballStats\StatsFormatter::formatPercentage($wins, $totalGames)
                 : '.000';
             $result[$row['team_name']] = ['wins' => $wins, 'losses' => $losses, 'winpct' => $winpct];
         }
@@ -174,7 +174,7 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
             $losses = $row['total_losses'] ?? 0;
             $totalGames = $wins + $losses;
             $winpct = $totalGames > 0
-                ? number_format($wins / $totalGames, 3)
+                ? \BasketballStats\StatsFormatter::formatPercentage($wins, $totalGames)
                 : '.000';
             $result[$row['currentname']] = ['wins' => $wins, 'losses' => $losses, 'winpct' => $winpct];
         }

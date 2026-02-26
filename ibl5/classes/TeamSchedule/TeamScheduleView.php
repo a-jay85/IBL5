@@ -124,7 +124,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
 
         // SOS summary and tier legend
         if ($this->sosSummary !== null) {
-            $rsos = number_format((float)$this->sosSummary['remaining_sos'], 3);
+            $rsos = \BasketballStats\StatsFormatter::formatWithDecimals((float)$this->sosSummary['remaining_sos'], 3);
             $rsosRank = (int)$this->sosSummary['remaining_sos_rank'];
             $html .= '<div class="sos-summary">';
             $html .= '<span class="sos-summary__label">Remaining SOS:</span> ';

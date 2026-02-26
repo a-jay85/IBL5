@@ -122,11 +122,11 @@ class Contracts
     $player = $row['player'];
 ?>
         <tr>
-            <td style="text-align: center;"><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids) ?>
-            <td style="text-align: center;"><?= (int)$player->age ?></td>
-            <td style="text-align: center;"><?= (int)$player->yearsOfExperience ?></td>
-            <td style="text-align: center;"><?= (int)$player->birdYears ?></td>
+            <td><?= (int)$player->age ?></td>
+            <td><?= (int)$player->yearsOfExperience ?></td>
+            <td><?= (int)$player->birdYears ?></td>
             <td class="sep-team"></td>
             <td class="salary"><?= $row['con1'] ?></td>
             <td class="salary"><?= $row['con2'] ?></td>
@@ -135,15 +135,15 @@ class Contracts
             <td class="salary"><?= $row['con5'] ?></td>
             <td class="salary"><?= $row['con6'] ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= (int)$player->ratingTalent ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingSkill ?></td>
-            <td style="text-align: center;"><?= (int)$player->ratingIntangibles ?></td>
+            <td><?= (int)$player->ratingTalent ?></td>
+            <td><?= (int)$player->ratingSkill ?></td>
+            <td><?= (int)$player->ratingIntangibles ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= (int)$player->freeAgencyLoyalty ?></td>
-            <td style="text-align: center;"><?= (int)$player->freeAgencyPlayForWinner ?></td>
-            <td style="text-align: center;"><?= (int)$player->freeAgencyPlayingTime ?></td>
-            <td style="text-align: center;"><?= (int)$player->freeAgencySecurity ?></td>
-            <td style="text-align: center;"><?= (int)$player->freeAgencyTradition ?></td>
+            <td><?= (int)$player->freeAgencyLoyalty ?></td>
+            <td><?= (int)$player->freeAgencyPlayForWinner ?></td>
+            <td><?= (int)$player->freeAgencyPlayingTime ?></td>
+            <td><?= (int)$player->freeAgencySecurity ?></td>
+            <td><?= (int)$player->freeAgencyTradition ?></td>
         </tr>
 <?php endforeach; ?>
     </tbody>

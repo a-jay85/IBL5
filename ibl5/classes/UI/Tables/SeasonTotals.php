@@ -112,27 +112,27 @@ class SeasonTotals
 endif; ?>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', $starterPids) ?>
-            <td style="text-align: center;"><?= $playerStats->seasonGamesPlayed ?></td>
-            <td style="text-align: center;"><?= $playerStats->seasonGamesStarted ?></td>
-            <td style="text-align: center;"><?= $playerStats->seasonMinutes ?></td>
+            <td><?= $playerStats->seasonGamesPlayed ?></td>
+            <td><?= $playerStats->seasonGamesStarted ?></td>
+            <td><?= $playerStats->seasonMinutes ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= $playerStats->seasonFieldGoalsMade ?></td>
-            <td style="text-align: center;"><?= $playerStats->seasonFieldGoalsAttempted ?></td>
+            <td><?= $playerStats->seasonFieldGoalsMade ?></td>
+            <td><?= $playerStats->seasonFieldGoalsAttempted ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><?= $playerStats->seasonFreeThrowsMade ?></td>
-            <td style="text-align: center;"><?= $playerStats->seasonFreeThrowsAttempted ?></td>
+            <td><?= $playerStats->seasonFreeThrowsMade ?></td>
+            <td><?= $playerStats->seasonFreeThrowsAttempted ?></td>
             <td class="sep-weak"></td>
-            <td style="text-align: center;"><?= $playerStats->seasonThreePointersMade ?></td>
-            <td style="text-align: center;"><?= $playerStats->seasonThreePointersAttempted ?></td>
+            <td><?= $playerStats->seasonThreePointersMade ?></td>
+            <td><?= $playerStats->seasonThreePointersAttempted ?></td>
             <td class="sep-team"></td>
-            <td style="text-align: center;"><?= $playerStats->seasonOffensiveRebounds ?></td>
-            <td style="text-align: center;"><?= $playerStats->seasonTotalRebounds ?></td>
-            <td style="text-align: center;"><?= $playerStats->seasonAssists ?></td>
-            <td style="text-align: center;"><?= $playerStats->seasonSteals ?></td>
-            <td style="text-align: center;"><?= $playerStats->seasonTurnovers ?></td>
-            <td style="text-align: center;"><?= $playerStats->seasonBlocks ?></td>
-            <td style="text-align: center;"><?= $playerStats->seasonPersonalFouls ?></td>
-            <td style="text-align: center;"><?= $playerStats->seasonPoints ?></td>
+            <td><?= $playerStats->seasonOffensiveRebounds ?></td>
+            <td><?= $playerStats->seasonTotalRebounds ?></td>
+            <td><?= $playerStats->seasonAssists ?></td>
+            <td><?= $playerStats->seasonSteals ?></td>
+            <td><?= $playerStats->seasonTurnovers ?></td>
+            <td><?= $playerStats->seasonBlocks ?></td>
+            <td><?= $playerStats->seasonPersonalFouls ?></td>
+            <td><?= $playerStats->seasonPoints ?></td>
         </tr>
 <?php endforeach; ?>
     </tbody>

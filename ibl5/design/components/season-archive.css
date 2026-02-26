@@ -1,12 +1,3 @@
-/**
- * Season Archive Component Styles
- *
- * Navigation, section headings, roster flex layout, bracket styling,
- * and champion logo for the Season Archive module.
- *
- * Migrated from SeasonArchiveView::renderStyles()
- */
-
 @layer components {
 
 

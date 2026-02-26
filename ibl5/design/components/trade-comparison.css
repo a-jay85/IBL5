@@ -16,7 +16,6 @@
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-md);
-    overflow: hidden;
 }
 
 /* ==========================================================================

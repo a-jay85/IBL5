@@ -31,7 +31,7 @@ if (!isset($_POST['confirmed'])) {
                 margin-top: 20px;
             }
             .btn-run {
-                background: #28a745;
+                background: #dc3545;
                 color: white;
                 border: none;
                 padding: 10px 20px;

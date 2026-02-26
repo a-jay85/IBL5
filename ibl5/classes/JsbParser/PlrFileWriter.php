@@ -47,13 +47,7 @@ class PlrFileWriter implements PlrFileWriterInterface
     public const OFFSET_ACTIVE = 137;
     public const WIDTH_ACTIVE = 1;
 
-    // Injury
-    public const OFFSET_INJURY_DAYS_LEFT = 140;
-    public const WIDTH_INJURY_DAYS_LEFT = 4;
-
-    // Experience and bird rights
-    public const OFFSET_EXP = 286;
-    public const WIDTH_EXP = 2;
+    // Bird rights
     public const OFFSET_BIRD = 288;
     public const WIDTH_BIRD = 2;
 
@@ -95,8 +89,6 @@ class PlrFileWriter implements PlrFileWriterInterface
         'PFDepth' => [self::OFFSET_PF_DEPTH, self::WIDTH_DEPTH],
         'CDepth' => [self::OFFSET_C_DEPTH, self::WIDTH_DEPTH],
         'active' => [self::OFFSET_ACTIVE, self::WIDTH_ACTIVE],
-        'injuryDaysLeft' => [self::OFFSET_INJURY_DAYS_LEFT, self::WIDTH_INJURY_DAYS_LEFT],
-        'exp' => [self::OFFSET_EXP, self::WIDTH_EXP],
         'bird' => [self::OFFSET_BIRD, self::WIDTH_BIRD],
         'cy' => [self::OFFSET_CY, self::WIDTH_CY],
         'cyt' => [self::OFFSET_CYT, self::WIDTH_CYT],

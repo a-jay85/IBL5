@@ -239,28 +239,17 @@ class PlrFileWriterTest extends TestCase
         $this->assertSame('John Smith', PlrFileWriter::readPlayerName($record));
     }
 
-    public function testApplyChangesUpdatesExpAndBird(): void
+    public function testApplyChangesUpdatesBird(): void
     {
         $record = $this->buildSyntheticRecord();
 
         $modified = PlrFileWriter::applyChangesToRecord($record, [
-            'exp' => 10,
             'bird' => 4,
         ]);
 
-        $this->assertSame(10, PlrFileWriter::readField($modified, 'exp'));
         $this->assertSame(4, PlrFileWriter::readField($modified, 'bird'));
         // freeAgentSigningFlag unchanged — bird does not auto-derive it
         $this->assertSame(0, PlrFileWriter::readField($modified, 'freeAgentSigningFlag'));
-    }
-
-    public function testApplyChangesUpdatesInjuryDaysLeft(): void
-    {
-        $record = $this->buildSyntheticRecord();
-
-        $modified = PlrFileWriter::applyChangesToRecord($record, ['injuryDaysLeft' => 15]);
-
-        $this->assertSame(15, PlrFileWriter::readField($modified, 'injuryDaysLeft'));
     }
 
     public function testReadFileThrowsForMissingFile(): void

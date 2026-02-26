@@ -27,7 +27,6 @@ class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepo
                     COALESCE(dc_PFDepth, 0) AS dc_PFDepth,
                     COALESCE(dc_CDepth, 0) AS dc_CDepth,
                     COALESCE(dc_active, 1) AS dc_active,
-                    COALESCE(exp, 0) AS exp,
                     COALESCE(bird, 0) AS bird,
                     COALESCE(cy, 0) AS cy,
                     COALESCE(cyt, 0) AS cyt,
@@ -36,8 +35,7 @@ class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepo
                     COALESCE(cy3, 0) AS cy3,
                     COALESCE(cy4, 0) AS cy4,
                     COALESCE(cy5, 0) AS cy5,
-                    COALESCE(cy6, 0) AS cy6,
-                    COALESCE(injured, 0) AS injured
+                    COALESCE(cy6, 0) AS cy6
              FROM ibl_plr
              WHERE ordinal <= 1440 AND pid <> 0
              ORDER BY pid',
@@ -56,7 +54,6 @@ class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepo
                 'dc_PFDepth' => is_int($row['dc_PFDepth']) ? $row['dc_PFDepth'] : 0,
                 'dc_CDepth' => is_int($row['dc_CDepth']) ? $row['dc_CDepth'] : 0,
                 'dc_active' => is_int($row['dc_active']) ? $row['dc_active'] : 1,
-                'exp' => is_int($row['exp']) ? $row['exp'] : 0,
                 'bird' => is_int($row['bird']) ? $row['bird'] : 0,
                 'cy' => is_int($row['cy']) ? $row['cy'] : 0,
                 'cyt' => is_int($row['cyt']) ? $row['cyt'] : 0,
@@ -66,7 +63,6 @@ class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepo
                 'cy4' => is_int($row['cy4']) ? $row['cy4'] : 0,
                 'cy5' => is_int($row['cy5']) ? $row['cy5'] : 0,
                 'cy6' => is_int($row['cy6']) ? $row['cy6'] : 0,
-                'injured' => is_int($row['injured']) ? $row['injured'] : 0,
             ];
         }
 

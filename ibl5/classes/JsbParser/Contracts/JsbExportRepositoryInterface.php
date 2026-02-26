@@ -27,7 +27,6 @@ interface JsbExportRepositoryInterface
      *     dc_PFDepth: int,
      *     dc_CDepth: int,
      *     dc_active: int,
-     *     exp: int,
      *     bird: int,
      *     cy: int,
      *     cyt: int,
@@ -36,8 +35,7 @@ interface JsbExportRepositoryInterface
      *     cy3: int,
      *     cy4: int,
      *     cy5: int,
-     *     cy6: int,
-     *     injured: int
+     *     cy6: int
      * }> Keyed by pid
      */
     public function getAllPlayerChangeableFields(): array;

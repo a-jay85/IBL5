@@ -12,3 +12,13 @@ parameters:
         - phpstan-stubs/nuke-globals.stub.php
     phpVersion: 80300
     treatPhpDocTypesAsCertain: false
+
+services:
+    -
+        class: PHPStanRules\BanNumberFormatRule
+        tags:
+            - phpstan.rules.rule
+    -
+        class: PHPStanRules\RequireStrictTypesRule
+        tags:
+            - phpstan.rules.rule

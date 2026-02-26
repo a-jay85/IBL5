@@ -220,7 +220,7 @@ class StandingsView implements StandingsViewInterface
         <tr data-team-id="<?= $teamId; ?>">
             <?= TeamCellHelper::renderTeamCell($teamId, $team['team_name'], $team['color1'], $team['color2'], 'sticky-col', '', $teamName) ?>
             <td><?= $leagueRecord; ?></td>
-            <td><?= $pct; ?></td>
+            <td><?= \BasketballStats\StatsFormatter::formatWithDecimals((float)$pct, 3); ?></td>
             <td><?= $pythagoreanPct; ?></td>
             <td><?= $gamesBack; ?></td>
             <td><?= $magicNumber; ?></td>
@@ -234,8 +234,8 @@ class StandingsView implements StandingsViewInterface
             <td><?= $lastWin; ?>-<?= $lastLoss; ?></td>
             <td sorttable_customkey="<?= $streakSortKey; ?>"><?= $streakType; ?> <?= $streak; ?></td>
             <td><span class="ibl-stat-highlight"><?= $rating; ?></span></td>
-            <td><?= number_format((float)$sos, 3); ?></td>
-            <td><?= number_format((float)$remainingSos, 3); ?></td>
+            <td><?= \BasketballStats\StatsFormatter::formatWithDecimals((float)$sos, 3); ?></td>
+            <td><?= \BasketballStats\StatsFormatter::formatWithDecimals((float)$remainingSos, 3); ?></td>
         </tr>
         <?php
         return (string) ob_get_clean();

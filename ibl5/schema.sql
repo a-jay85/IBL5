@@ -456,7 +456,8 @@ DROP TABLE IF EXISTS `ibl_demands`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ibl_demands` (
-  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (PK, FK to ibl_plr.name)',
+  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (PK)',
+  `pid` int(11) NOT NULL DEFAULT 0 COMMENT 'Player ID (FK to ibl_plr.pid)',
   `dem1` int(11) NOT NULL DEFAULT 0 COMMENT 'FA year 1 day 1 demand',
   `dem2` int(11) NOT NULL DEFAULT 0 COMMENT 'FA year 2 day 1 demand',
   `dem3` int(11) NOT NULL DEFAULT 0 COMMENT 'FA year 3 day 1 demand',
@@ -466,7 +467,8 @@ CREATE TABLE `ibl_demands` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`name`),
-  CONSTRAINT `fk_demands_player` FOREIGN KEY (`name`) REFERENCES `ibl_plr` (`name`) ON DELETE CASCADE ON UPDATE CASCADE
+  KEY `idx_pid` (`pid`),
+  CONSTRAINT `fk_demands_pid` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1286,7 +1288,8 @@ CREATE TABLE `ibl_olympics_stats` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `year` int(11) NOT NULL DEFAULT 0 COMMENT 'Olympic tournament year',
   `pos` char(2) NOT NULL DEFAULT '' COMMENT 'Player position',
-  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (FK to ibl_plr)',
+  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name',
+  `pid` int(11) NOT NULL DEFAULT 0 COMMENT 'Player ID (FK to ibl_plr.pid)',
   `team` varchar(32) NOT NULL DEFAULT '' COMMENT 'National team represented',
   `games` int(11) NOT NULL DEFAULT 0 COMMENT 'Games played',
   `minutes` int(11) NOT NULL DEFAULT 0 COMMENT 'Total minutes played',
@@ -1304,8 +1307,8 @@ CREATE TABLE `ibl_olympics_stats` (
   `blk` int(11) NOT NULL DEFAULT 0 COMMENT 'Blocks',
   `pf` int(11) NOT NULL DEFAULT 0 COMMENT 'Personal fouls',
   PRIMARY KEY (`id`),
-  KEY `fk_olympics_stats_name` (`name`),
-  CONSTRAINT `fk_olympics_stats_name` FOREIGN KEY (`name`) REFERENCES `ibl_plr` (`name`) ON DELETE CASCADE ON UPDATE CASCADE
+  KEY `idx_pid` (`pid`),
+  CONSTRAINT `fk_olympics_stats_pid` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=97 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1648,6 +1651,7 @@ CREATE TABLE `ibl_plr` (
   KEY `idx_tid` (`tid`),
   KEY `idx_active` (`active`),
   KEY `idx_retired` (`retired`),
+  KEY `idx_retired_ordinal` (`retired`,`ordinal`),
   KEY `idx_tid_active` (`tid`,`active`),
   KEY `idx_pos` (`pos`),
   KEY `idx_draftyear` (`draftyear`),

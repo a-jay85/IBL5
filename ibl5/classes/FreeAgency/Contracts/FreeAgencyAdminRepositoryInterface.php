@@ -48,10 +48,10 @@ interface FreeAgencyAdminRepositoryInterface
     /**
      * Get player demand values from the demands table
      *
-     * @param string $playerName Player name to look up
+     * @param int $playerID Player ID to look up
      * @return DemandRow|null Demand row with dem1-dem6 fields, or null if not found
      */
-    public function getPlayerDemands(string $playerName): ?array;
+    public function getPlayerDemands(int $playerID): ?array;
 
     /**
      * Update a player's contract after signing

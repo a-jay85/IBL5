@@ -221,8 +221,8 @@ class PlayerPageController
 
         if ($pageView === PlayerPageType::OLYMPIC_TOTALS || $pageView === PlayerPageType::OLYMPIC_AVERAGES) {
             return $this->renderFlipCardView(
-                $viewFactory->createOlympicAveragesView()->renderAverages($playerName),
-                $viewFactory->createOlympicTotalsView()->renderTotals($playerName),
+                $viewFactory->createOlympicAveragesView()->renderAverages($playerID),
+                $viewFactory->createOlympicTotalsView()->renderTotals($playerID),
                 'Olympics',
                 $pageView === PlayerPageType::OLYMPIC_AVERAGES,
                 $colorScheme

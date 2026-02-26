@@ -40,10 +40,10 @@ class PlayerOlympicAveragesView implements PlayerOlympicAveragesViewInterface
     /**
      * @see PlayerOlympicAveragesViewInterface::renderAverages()
      */
-    public function renderAverages(string $playerName): string
+    public function renderAverages(int $playerID): string
     {
-        $olympicsStats = $this->repository->getOlympicsStats($playerName);
-        $careerAverages = $this->statsRepository->getOlympicsCareerAverages($playerName);
+        $olympicsStats = $this->repository->getOlympicsStats($playerID);
+        $careerAverages = $this->statsRepository->getOlympicsCareerAverages($playerID);
 
         ob_start();
         ?>

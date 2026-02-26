@@ -88,15 +88,15 @@ class FreeAgencyDemandRepository extends BaseMysqliRepository implements FreeAge
      *
      * @return PlayerDemandsRow
      */
-    public function getPlayerDemands(string $playerName): array
+    public function getPlayerDemands(int $playerID): array
     {
         /** @var array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int}|null $result */
         $result = $this->fetchOne(
             "SELECT dem1, dem2, dem3, dem4, dem5, dem6
              FROM ibl_demands
-             WHERE name = ?",
-            "s",
-            $playerName
+             WHERE pid = ?",
+            "i",
+            $playerID
         );
 
         if ($result === null) {

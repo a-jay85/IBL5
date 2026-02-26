@@ -255,3 +255,27 @@ ALTER TABLE `ibl_olympics_power`
   ADD COLUMN `remaining_sos` DECIMAL(4,3) NOT NULL DEFAULT 0.000 COMMENT 'Remaining strength of schedule' AFTER `sos`,
   ADD COLUMN `sos_rank` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'SOS league rank' AFTER `remaining_sos`,
   ADD COLUMN `remaining_sos_rank` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Remaining SOS league rank' AFTER `sos_rank`;
+
+
+-- ============================================================
+-- 1H. ibl_olympics_league_config: Create Olympics equivalent of ibl_league_config
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `ibl_olympics_league_config` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `season_ending_year` SMALLINT UNSIGNED NOT NULL COMMENT 'Season ending year',
+  `team_slot` TINYINT UNSIGNED NOT NULL COMMENT 'Team position in conference bracket',
+  `team_name` VARCHAR(32) NOT NULL COMMENT 'Team name (FK to ibl_olympics_team_info)',
+  `conference` VARCHAR(16) NOT NULL COMMENT 'Conference/group name',
+  `division` VARCHAR(16) NOT NULL COMMENT 'Division/pool name',
+  `playoff_qualifiers_per_conf` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `playoff_round1_format` VARCHAR(8) NOT NULL DEFAULT '',
+  `playoff_round2_format` VARCHAR(8) NOT NULL DEFAULT '',
+  `playoff_round3_format` VARCHAR(8) NOT NULL DEFAULT '',
+  `playoff_round4_format` VARCHAR(8) NOT NULL DEFAULT '',
+  `team_count` TINYINT UNSIGNED NOT NULL COMMENT 'Total teams in tournament',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_season_team` (`season_ending_year`, `team_slot`),
+  KEY `idx_season_year` (`season_ending_year`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

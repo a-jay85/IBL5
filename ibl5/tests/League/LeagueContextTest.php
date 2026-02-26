@@ -330,6 +330,7 @@ class LeagueContextTest extends TestCase
         $this->assertSame('ibl_olympics_standings', $this->leagueContext->getTableName('ibl_standings'));
         $this->assertSame('ibl_olympics_power', $this->leagueContext->getTableName('ibl_power'));
         $this->assertSame('ibl_olympics_team_info', $this->leagueContext->getTableName('ibl_team_info'));
+        $this->assertSame('ibl_olympics_league_config', $this->leagueContext->getTableName('ibl_league_config'));
     }
 
     public function testGetTableNameReturnsInputUnchangedForUnmappedTables(): void

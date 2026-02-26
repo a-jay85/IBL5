@@ -547,6 +547,7 @@ class StandingsUpdaterTest extends TestCase
                 return match ($table) {
                     'ibl_standings' => 'ibl_olympics_standings',
                     'ibl_schedule' => 'ibl_olympics_schedule',
+                    'ibl_league_config' => 'ibl_olympics_league_config',
                     default => $table,
                 };
             }
@@ -564,5 +565,42 @@ class StandingsUpdaterTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertNotEmpty($queries);
         $this->assertSame('TRUNCATE TABLE ibl_olympics_standings', $queries[0]);
+    }
+
+    public function testOlympicsContextFetchTeamMapQueriesOlympicsLeagueConfig(): void
+    {
+        $olympicsContext = $this->createStub(\League\LeagueContext::class);
+        $olympicsContext->method('getTableName')->willReturnCallback(
+            static function (string $table): string {
+                return match ($table) {
+                    'ibl_standings' => 'ibl_olympics_standings',
+                    'ibl_schedule' => 'ibl_olympics_schedule',
+                    'ibl_league_config' => 'ibl_olympics_league_config',
+                    default => $table,
+                };
+            }
+        );
+
+        // Use the real StandingsUpdater (not the testable subclass) to verify fetchTeamMap
+        $updater = new \Updater\StandingsUpdater($this->mockDb, $this->mockSeason, $olympicsContext);
+        $this->mockDb->setReturnTrue(true);
+        $this->mockDb->setMockData([]);
+
+        ob_start();
+        $updater->update();
+        ob_end_clean();
+
+        $queries = $this->mockDb->getExecutedQueries();
+
+        // fetchTeamMap should query ibl_olympics_league_config, not ibl_league_config
+        $leagueConfigQueries = array_filter($queries, static function (string $q): bool {
+            return stripos($q, 'league_config') !== false;
+        });
+        $this->assertNotEmpty($leagueConfigQueries);
+
+        foreach ($leagueConfigQueries as $q) {
+            $this->assertStringContainsString('ibl_olympics_league_config', $q);
+            $this->assertStringNotContainsString('FROM ibl_league_config', $q);
+        }
     }
 }

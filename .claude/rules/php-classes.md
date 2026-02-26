@@ -36,7 +36,7 @@ class MyRepository extends BaseMysqliRepository
 The `MySQL` class is deprecated and only exists for PHP-Nuke backward compatibility.
 
 ## View Rendering Pattern
-Use output buffering:
+Use output buffering with `HtmlSanitizer::e()` for XSS-safe output:
 ```php
 public function renderTable(array $data): string
 {
@@ -44,7 +44,7 @@ public function renderTable(array $data): string
     ?>
 <table>
     <?php foreach ($data as $row): ?>
-    <tr><td><?= \Utilities\HtmlSanitizer::safeHtmlOutput($row['name']) ?></td></tr>
+    <tr><td><?= \Utilities\HtmlSanitizer::e($row['name']) ?></td></tr>
     <?php endforeach; ?>
 </table>
     <?php
@@ -53,11 +53,12 @@ public function renderTable(array $data): string
 ```
 
 ## Statistics Formatting
-Use `BasketballStats\StatsFormatter`:
+Use `BasketballStats\StatsFormatter` — `number_format()` is banned by PHPStan:
 - `formatPercentage($made, $attempted)` - FG%, 3P% (3 decimals)
 - `formatPerGameAverage($total, $games)` - PPG, APG (1 decimal)
 - `formatPer36Stat($total, $minutes)` - Per-36 stats
 - `formatTotal($value)` - Totals with commas
+- `formatWithDecimals($value, $decimals)` - Custom decimal places
 - `safeDivide($num, $denom)` - Zero-division handling
 
 ## No Unused Methods

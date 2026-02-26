@@ -53,4 +53,15 @@ class HtmlSanitizer
         // Remaining types (resource, callable, etc.) cannot be meaningfully rendered
         return '';
     }
+
+    /**
+     * Short alias for safeHtmlOutput().
+     * Designed for use in View templates: <?= HtmlSanitizer::e($var) ?>
+     *
+     * @see self::safeHtmlOutput()
+     */
+    public static function e(mixed $value): string
+    {
+        return self::safeHtmlOutput($value);
+    }
 }

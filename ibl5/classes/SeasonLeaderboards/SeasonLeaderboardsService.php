@@ -151,7 +151,7 @@ class SeasonLeaderboardsService implements SeasonLeaderboardsServiceInterface
         $negatives = ($fga - $fgm) + ($fta - $ftm) + $tvr + $pf;
         $qa = ($positives - $negatives) / $games;
 
-        return number_format($qa, 1);
+        return \BasketballStats\StatsFormatter::formatWithDecimals($qa, 1);
     }
 
     /**

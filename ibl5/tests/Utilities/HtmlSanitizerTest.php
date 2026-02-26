@@ -173,7 +173,31 @@ class HtmlSanitizerTest extends TestCase
     public function testSafeHtmlOutputWithEmptyString(): void
     {
         $result = HtmlSanitizer::safeHtmlOutput("");
-        
+
         $this->assertEquals("", $result);
+    }
+
+    /**
+     * Test that e() is an alias for safeHtmlOutput()
+     */
+    public function testEMethodIsAliasForSafeHtmlOutput(): void
+    {
+        $testCases = [
+            "Jermaine O\\'Neal",
+            '<script>alert("xss")</script>',
+            42,
+            3.14,
+            null,
+            true,
+            '',
+        ];
+
+        foreach ($testCases as $value) {
+            $this->assertSame(
+                HtmlSanitizer::safeHtmlOutput($value),
+                HtmlSanitizer::e($value),
+                'e() must produce identical output to safeHtmlOutput() for value: ' . var_export($value, true)
+            );
+        }
     }
 }

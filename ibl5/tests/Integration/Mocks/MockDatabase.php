@@ -26,15 +26,42 @@ class MockDatabase extends \mysqli
     private bool $returnTrue = true;
     private array $executedQueries = [];
     private int $affectedRows = 0;
-    
+
+    /**
+     * Pattern-based query routing: maps SQL regex patterns to specific result sets.
+     * Checked BEFORE all other routing logic in sql_query().
+     * @var array<string, list<array<string, mixed>>>
+     */
+    private array $queryPatterns = [];
+
+    /**
+     * Register a query pattern with specific result rows.
+     * Patterns are checked in registration order BEFORE all other routing logic.
+     *
+     * @param string $pattern Regex pattern (without delimiters) matched case-insensitively against the SQL query
+     * @param list<array<string, mixed>> $rows The result rows to return when the pattern matches
+     */
+    public function onQuery(string $pattern, array $rows): void
+    {
+        $this->queryPatterns[$pattern] = $rows;
+    }
+
+    /**
+     * Clear all registered query patterns.
+     */
+    public function clearQueryPatterns(): void
+    {
+        $this->queryPatterns = [];
+    }
+
     public function sql_query(string $query): bool|object
     {
         // Track all executed queries for verification
         $this->executedQueries[] = $query;
-        
+
         // For queries that expect boolean return (INSERT, UPDATE, DELETE)
-        if (stripos($query, 'INSERT') === 0 || 
-            stripos($query, 'UPDATE') === 0 || 
+        if (stripos($query, 'INSERT') === 0 ||
+            stripos($query, 'UPDATE') === 0 ||
             stripos($query, 'DELETE') === 0) {
             // Set affected rows for UPDATE/DELETE operations (default to 1 for successful operations)
             if ($this->returnTrue) {
@@ -42,7 +69,14 @@ class MockDatabase extends \mysqli
             }
             return $this->returnTrue;
         }
-        
+
+        // Check registered query patterns first (highest priority)
+        foreach ($this->queryPatterns as $pattern => $rows) {
+            if (preg_match('/' . $pattern . '/i', $query) === 1) {
+                return new MockDatabaseResult($rows);
+            }
+        }
+
         // Special handling for PID existence checks (generateUniquePid)
         // Return empty result to indicate PID is available unless explicitly configured
         // Only match the specific "SELECT 1 FROM ibl_plr WHERE pid = X" pattern for existence checks

@@ -4,24 +4,24 @@ Auto-loads when editing `**/design/**/*.css` or `**/*View.php`.
 
 ## Layer Hierarchy
 
+Tailwind 4 owns the layer order — only these four layers exist:
+
 ```
-@layer theme, base, reset, legacy, components, overrides, utilities;
+@layer theme, base, components, utilities;
 ```
 
 | Layer | Priority | Contents | File(s) |
 |-------|----------|----------|---------|
 | `theme` | Lowest | Tailwind theme variables | Tailwind internal |
-| `base` | Low | Tailwind preflight/reset | Tailwind internal |
-| `reset` | ↑ | `box-sizing`, `html`/`body` base | `base.css` |
-| `legacy` | ↑ | PHP-Nuke element normalization, legacy classes, legacy layout | `base.css` |
-| `components` | Normal | All IBL component CSS + Tailwind component classes | `components/*.css`, `tokens/tokens.css` |
-| `overrides` | High | Mobile forced layouts, sticky wrapper fixes, card overrides | Bottom of `player-cards.css`, `tables.css`, `base.css` |
+| `base` | Low | Tailwind preflight/reset, CSS reset, legacy PHP-Nuke styles | Tailwind internal + `base.css` |
+| `components` | Normal | All IBL component CSS, Tailwind component classes, mobile overrides, card overrides | `components/*.css`, `tokens/tokens.css`, bottom of `base.css` |
 | `utilities` | Highest | Tailwind utility classes (`text-center`, `bg-navy-800`, etc.) | Tailwind internal |
 
 **Key rules:**
-- A selector in `components` *always* beats `legacy` regardless of specificity.
-- Use `@layer overrides` only when a component must override another component.
+- A selector in `components` *always* beats `base` regardless of specificity (layer ordering).
+- Within `components`, use higher specificity + later source order for overrides (e.g., `.player-stats-card table td` > `.ibl-data-table td`).
 - Tailwind utility classes (`@layer utilities`) always win over everything — this is correct.
+- **Never use custom layer names** (e.g., `reset`, `legacy`, `overrides`) — Tailwind 4 drops them from its layer order, causing them to implicitly land *after* `utilities`.
 
 ## Table Pattern Decision Tree
 
@@ -117,4 +117,4 @@ After `@layer` introduction, `!important` should only be used for:
 1. **User-agent override necessity** — e.g., iOS Safari auto-detection of phone numbers
 2. **JavaScript-set inline styles** that CSS must override
 
-All other specificity battles are resolved by layer ordering. If you need a component to beat another component, place the override in `@layer overrides`.
+All other specificity battles are resolved by layer ordering + specificity within a layer. If you need a component to beat another component, use higher specificity selectors and/or later source order within `@layer components`.

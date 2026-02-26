@@ -9,31 +9,23 @@
  *
  * Architecture:
  * 1. Google Fonts - external font loading
- * 2. CSS Layer Order - deterministic cascade (theme < base < reset < legacy < components < overrides < utilities)
- * 3. Tailwind CSS - utility-first framework (provides .text-*, .bg-*, .font-*, etc.)
- * 4. Design Tokens - CSS custom properties (colors, spacing, fonts)
- * 5. Base Styles - CSS reset (@layer reset) + legacy PHP-Nuke compatibility (@layer legacy)
- * 6. Components - reusable UI components (@layer components)
- * 7. Overrides - mobile forced layouts, sticky fixes, card table overrides (@layer overrides)
+ * 2. Tailwind CSS - utility-first framework (provides .text-*, .bg-*, .font-*, etc.)
+ * 3. Design Tokens - CSS custom properties (colors, spacing, fonts)
+ * 4. Base Styles - CSS reset + legacy PHP-Nuke compatibility (@layer base)
+ * 5. Components - reusable UI components + overrides (@layer components)
  *
- * Layer priority (lowest → highest): theme, base, reset, legacy, components, overrides, utilities
- * A rule in "components" always beats "legacy" regardless of selector specificity.
+ * Uses Tailwind 4's native layer order: theme < base < components < utilities
+ * CSS reset and legacy styles go in @layer base (below components).
+ * Component overrides go in @layer components (higher specificity + later source order).
  * See .claude/rules/css-architecture.md for full reference.
  */
 
 /* Google Fonts - must be at very top */
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap');
 
-/* CSS Layer Order - deterministic cascade priority, interleaved with Tailwind's layers.
-   Priority (lowest → highest): theme < base < reset < legacy < components < overrides < utilities
-   - Tailwind theme/base: foundational (lowest)
-   - reset/legacy: our CSS reset and PHP-Nuke compatibility
-   - components: all IBL component CSS + Tailwind component classes
-   - overrides: mobile forced layouts, sticky fixes, card overrides
-   - Tailwind utilities: highest (always wins, which is correct) */
-@layer theme, base, reset, legacy, components, overrides, utilities;
-
-/* Tailwind CSS 4 - provides all utility classes */
+/* Tailwind CSS 4 - provides all utility classes
+   Tailwind 4 owns the layer order: theme < base < components < utilities.
+   All custom CSS uses @layer base or @layer components — no custom layers. */
 @import 'tailwindcss';
 
 /* Tailwind Theme - registers custom values so the compiler generates utility classes

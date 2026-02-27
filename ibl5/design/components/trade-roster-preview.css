@@ -37,12 +37,15 @@
     align-items: center;
     justify-content: center;
     gap: var(--space-4);
-    background: linear-gradient(135deg, #111827 0%, #1a2234 100%);
+    background: linear-gradient(to right,
+        color-mix(in srgb, var(--preview-user-color, #111827) 15%, white),
+        color-mix(in srgb, var(--preview-partner-color, #1a2234) 15%, white));
     padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
 .trade-roster-preview__title {
-    color: white;
+    color: var(--gray-700, #374151);
     font-family: var(--font-display);
     font-weight: 700;
     font-size: 1.1rem;
@@ -166,7 +169,16 @@
     opacity: 0.45;
 }
 
-/* Hide per-team dropdowns injected by API responses (same as trade-comparison) */
+/* Table overrides — panel provides outer chrome, so strip the table's duplicate
+   border/shadow/radius.  Removes the gray line between thead and tbody. */
+.trade-roster-preview .ibl-data-table {
+    border: none;
+    box-shadow: none;
+    margin-bottom: 0;
+    border-radius: 0;
+}
+
+/* Hide per-team dropdowns injected by API responses */
 .trade-roster-preview .team-table-caption .ibl-view-dropdown {
     display: none;
 }

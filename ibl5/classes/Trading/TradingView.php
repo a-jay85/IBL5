@@ -123,7 +123,7 @@ class TradingView implements TradingViewInterface
                 </table>
             </div>
         </div>
-<?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam) ?>
+<?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam, $userColor1, $partnerColor1) ?>
 <?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2, $previousFormData) ?>
 <?= $this->renderCapTotals($pageData, $seasonEndingYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2) ?>
         <div style="text-align: center; padding: 1rem;">
@@ -146,6 +146,8 @@ $tradeConfig = [
     'seasonPhase' => $seasonPhase,
     'cashStartYear' => $cashStartYear,
     'cashEndYear' => $cashEndYear,
+    'userTeamColor1' => $userColor1,
+    'partnerTeamColor1' => $partnerColor1,
 ];
 ?>
 <script>window.IBL_TRADE_CONFIG = <?= json_encode($tradeConfig, JSON_HEX_TAG | JSON_THROW_ON_ERROR) ?>;</script>
@@ -462,17 +464,19 @@ $tradeConfig = [
     /**
      * Render the roster preview panel (hidden initially, shown via JS)
      */
-    private function renderRosterPreview(int $userTeamId, int $partnerTeamId, string $userTeam, string $partnerTeam): string
+    private function renderRosterPreview(int $userTeamId, int $partnerTeamId, string $userTeam, string $partnerTeam, string $userColor1, string $partnerColor1): string
     {
+        $safeUserColor = \UI\TableStyles::sanitizeColor($userColor1);
+        $safePartnerColor = \UI\TableStyles::sanitizeColor($partnerColor1);
         ob_start();
         ?>
-<div id="trade-roster-preview" class="trade-roster-preview" style="display: none;">
+<div id="trade-roster-preview" class="trade-roster-preview" style="display: none; --preview-user-color: #<?= $safeUserColor ?>; --preview-partner-color: #<?= $safePartnerColor ?>;">
     <div class="trade-roster-preview__header">
         <img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="trade-roster-preview__logo trade-roster-preview__logo--active" data-team-id="<?= $userTeamId ?>">
         <div class="trade-roster-preview__title">Roster Preview</div>
         <img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="trade-roster-preview__logo" data-team-id="<?= $partnerTeamId ?>">
     </div>
-    <div class="trade-roster-preview__tabs ibl-tabs" role="tablist">
+    <div class="trade-roster-preview__tabs ibl-tabs" role="tablist" style="--team-tab-bg-color: #<?= $safeUserColor ?>; --team-tab-active-color: #<?= $safeUserColor ?>">
         <button type="button" class="ibl-tab ibl-tab--active" data-display="ratings" role="tab">Ratings</button>
         <button type="button" class="ibl-tab" data-display="total_s" role="tab">Totals</button>
         <button type="button" class="ibl-tab" data-display="avg_s" role="tab">Averages</button>

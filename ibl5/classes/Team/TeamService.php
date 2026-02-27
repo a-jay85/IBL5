@@ -6,15 +6,28 @@ namespace Team;
 
 use Team\Contracts\TeamServiceInterface;
 use Team\Contracts\TeamRepositoryInterface;
-use UI\Components\TableViewDropdown;
-use UI\Components\TableViewSwitcher;
+use Team\Views\AwardsView;
+use Team\Views\BannersView;
+use Team\Views\CurrentSeasonView;
+use Team\Views\DraftPicksView;
+use Team\Views\FranchiseHistoryView;
+use Team\Views\SidebarView;
 
 /**
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
- * @phpstan-import-type TeamInfoRow from \Services\CommonMysqliRepository
  * @phpstan-import-type TeamPageData from Contracts\TeamServiceInterface
- * @phpstan-import-type StartersData from Contracts\TeamServiceInterface
  * @phpstan-import-type SidebarData from Contracts\TeamServiceInterface
+ * @phpstan-import-type CurrentSeasonData from Contracts\TeamServiceInterface
+ * @phpstan-import-type BannerData from Contracts\TeamServiceInterface
+ * @phpstan-import-type BannerItemData from Contracts\TeamServiceInterface
+ * @phpstan-import-type BannerGroupData from Contracts\TeamServiceInterface
+ * @phpstan-import-type PlayoffData from Contracts\TeamServiceInterface
+ * @phpstan-import-type PlayoffRoundData from Contracts\TeamServiceInterface
+ * @phpstan-import-type PlayoffResultItem from Contracts\TeamServiceInterface
+ * @phpstan-import-type WinLossHistoryData from Contracts\TeamServiceInterface
+ * @phpstan-import-type WinLossRecord from Contracts\TeamServiceInterface
+ * @phpstan-import-type DraftPickItemData from Contracts\TeamServiceInterface
+ * @phpstan-import-type FranchiseSeasonRow from Contracts\TeamRepositoryInterface
+ * @phpstan-import-type TeamInfoRow from \Services\CommonMysqliRepository
  *
  * @see TeamServiceInterface
  */
@@ -46,12 +59,17 @@ class TeamService implements TeamServiceInterface
 
         $insertyear = ($yr !== null && $yr !== '') ? "&yr=$yr" : "";
 
-        $tableOutput = $this->getTableOutput($teamID, $yr, $display, $split);
+        $tableService = new TeamTableService($this->db, $this->repository);
+        $tableOutput = $tableService->getTableOutput($teamID, $yr, $display, $split);
 
         $isActualTeam = ($teamID !== 0);
 
-        $teamModules = new TeamComponentsView($this->repository);
-        $draftPicksTable = $isActualTeam ? $teamModules->draftPicks($team) : "";
+        $draftPicksTable = '';
+        if ($isActualTeam) {
+            $draftPicksData = $this->prepareDraftPicksData($team);
+            $draftPicksView = new DraftPicksView();
+            $draftPicksTable = $draftPicksView->render($draftPicksData);
+        }
 
         $currentSeasonCard = "";
         $awardsCard = "";
@@ -85,174 +103,7 @@ class TeamService implements TeamServiceInterface
     }
 
     /**
-     * @see TeamServiceInterface::getTableOutput()
-     */
-    public function getTableOutput(int $teamID, ?string $yr, string $display, ?string $split = null): string
-    {
-        $season = new \Season($this->db);
-
-        $isFreeAgency = $season->isFreeAgencyPhase();
-
-        if ($teamID === 0) {
-            $result = $this->repository->getFreeAgents($isFreeAgency);
-        } elseif ($teamID === -1) {
-            $result = $this->repository->getEntireLeagueRoster();
-        } else {
-            if ($yr !== null && $yr !== '') {
-                $result = $this->repository->getHistoricalRoster($teamID, $yr);
-            } elseif ($isFreeAgency) {
-                $result = $this->repository->getFreeAgencyRoster($teamID);
-            } else {
-                $result = $this->repository->getRosterUnderContract($teamID);
-            }
-        }
-
-        $insertyear = ($yr !== null && $yr !== '') ? "&yr=$yr" : "";
-        $baseUrl = "modules.php?name=Team&op=team&teamID=$teamID" . $insertyear;
-        $teamData = $this->repository->getTeam($teamID);
-        $teamColor1 = is_string($teamData['color1'] ?? null) ? $teamData['color1'] : '000000';
-        $teamColor2 = is_string($teamData['color2'] ?? null) ? $teamData['color2'] : 'FFFFFF';
-
-        $team = \Team::initialize($this->db, $teamID);
-
-        /** @var list<int> $starterPids */
-        $starterPids = [];
-        if ($teamID > 0 && ($yr === null || $yr === '')) {
-            $starters = $this->extractStartersData($result);
-            foreach ($starters as $data) {
-                if ($data['pid'] !== null) {
-                    $starterPids[] = $data['pid'];
-                }
-            }
-        }
-
-        $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $starterPids, $split);
-
-        // Use dropdown for actual teams in current season; tabs for everything else
-        $useDropdown = $teamID > 0 && ($yr === null || $yr === '');
-
-        if ($useDropdown) {
-            $dropdownGroups = $this->buildDropdownGroups($season);
-            $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
-            $dropdown = new TableViewDropdown($dropdownGroups, $activeValue, $baseUrl, $teamColor1, $teamColor2);
-            return $dropdown->wrap($tableHtml);
-        }
-
-        $tabDefinitions = [
-            'ratings' => 'Ratings',
-            'total_s' => 'Season Totals',
-            'avg_s' => 'Season Averages',
-            'per36mins' => 'Per 36 Minutes',
-            'chunk' => 'Sim Averages',
-        ];
-
-        if (in_array($season->phase, ["Playoffs", "Draft", "Free Agency"], true)) {
-            $tabDefinitions['playoffs'] = 'Playoffs Averages';
-        }
-
-        $tabDefinitions['contracts'] = 'Contracts';
-
-        $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $teamColor1, $teamColor2);
-        return $switcher->wrap($tableHtml);
-    }
-
-    /**
-     * @see TeamServiceInterface::extractStartersData()
-     * @param list<array<string, mixed>> $roster
-     * @return StartersData
-     */
-    public function extractStartersData(array $roster): array
-    {
-        $starters = [
-            'PG' => ['name' => null, 'pid' => null],
-            'SG' => ['name' => null, 'pid' => null],
-            'SF' => ['name' => null, 'pid' => null],
-            'PF' => ['name' => null, 'pid' => null],
-            'C' => ['name' => null, 'pid' => null],
-        ];
-
-        $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
-
-        foreach ($roster as $player) {
-            foreach ($positions as $position) {
-                $depthField = $position . 'Depth';
-                $depthValue = $player[$depthField] ?? null;
-                $depthInt = is_int($depthValue) ? $depthValue : (is_string($depthValue) ? (int) $depthValue : 0);
-                if ($depthInt === 1) {
-                    $nameValue = $player['name'] ?? null;
-                    $pidValue = $player['pid'] ?? null;
-                    $starters[$position]['name'] = is_string($nameValue) ? $nameValue : null;
-                    $starters[$position]['pid'] = is_int($pidValue) ? $pidValue : null;
-                }
-            }
-        }
-
-        /** @var StartersData $starters */
-        return $starters;
-    }
-
-    /**
-     * @see TeamServiceInterface::getRosterAndStarters()
-     * @return array{roster: list<array<string, mixed>>, starterPids: list<int>}
-     */
-    public function getRosterAndStarters(int $teamID): array
-    {
-        $season = new \Season($this->db);
-        $isFreeAgency = $season->isFreeAgencyPhase();
-
-        if ($isFreeAgency) {
-            $result = $this->repository->getFreeAgencyRoster($teamID);
-        } else {
-            $result = $this->repository->getRosterUnderContract($teamID);
-        }
-
-        /** @var list<int> $starterPids */
-        $starterPids = [];
-        if ($teamID > 0) {
-            $starters = $this->extractStartersData($result);
-            foreach ($starters as $data) {
-                if ($data['pid'] !== null) {
-                    $starterPids[] = $data['pid'];
-                }
-            }
-        }
-
-        return ['roster' => $result, 'starterPids' => $starterPids];
-    }
-
-    /**
-     * @see TeamServiceInterface::renderTableForDisplay()
-     *
-     * @param list<PlayerRow>|list<array<string, mixed>> $result
-     * @param list<int> $starterPids
-     */
-    public function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, array $starterPids = [], ?string $split = null): string
-    {
-        $yrStr = $yr ?? '';
-        switch ($display) {
-            case 'total_s':
-                return \UI::seasonTotals($this->db, $result, $team, $yrStr, $starterPids);
-            case 'avg_s':
-                return \UI::seasonAverages($this->db, $result, $team, $yrStr, $starterPids);
-            case 'per36mins':
-                return \UI::per36Minutes($this->db, $result, $team, $yrStr, $starterPids);
-            case 'chunk':
-                return \UI::periodAverages($this->db, $team, $season, null, null, $starterPids);
-            case 'playoffs':
-                return \UI::periodAverages($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids);
-            case 'contracts':
-                return \UI::contracts($this->db, $result, $team, $season, $starterPids);
-            case 'split':
-                return $this->renderSplitStats($team, $season, $split ?? 'home', $starterPids);
-            default:
-                return \UI::ratings($this->db, $result, $team, $yrStr, $season, '', $starterPids);
-        }
-    }
-
-    /**
      * Render team information right sidebar
-     *
-     * Absorbed from TeamUIService::renderTeamInfoRight()
      *
      * @return SidebarData
      */
@@ -262,58 +113,42 @@ class TeamService implements TeamServiceInterface
         $color2 = \UI\TableStyles::sanitizeColor($team->color2);
         $teamColorStyle = "--team-color-primary: #$color1; --team-color-secondary: #$color2;";
 
-        $teamModules = new TeamComponentsView($this->repository);
-        $rafters = $teamModules->championshipBanners($team);
+        $sidebarView = new SidebarView();
+
+        // Banners
+        $bannerData = $this->prepareBannerData($team);
+        $bannersView = new BannersView();
+        $rafters = $bannersView->render($bannerData);
 
         // Current Season card
-        $currentSeason = $teamModules->currentSeason($team);
-        $currentSeasonCard = "<div class=\"team-card\" style=\"$teamColorStyle\">"
-            . '<div class="team-card__header"><h3 class="team-card__title">Current Season</h3></div>'
-            . "<div class=\"team-card__body\">$currentSeason</div>"
-            . '</div>';
+        $currentSeasonData = $this->prepareCurrentSeasonData($team);
+        $currentSeasonHtml = '';
+        if ($currentSeasonData !== null) {
+            $currentSeasonView = new CurrentSeasonView();
+            $currentSeasonHtml = $currentSeasonView->render($currentSeasonData);
+        }
+        $currentSeasonCard = $sidebarView->renderCurrentSeasonCard($currentSeasonHtml, $teamColorStyle);
 
         // Awards card — combines GM History and Team Accomplishments
-        $awardsCard = '';
-        $gmHistory = $teamModules->gmHistory($team);
-        $teamAccomplishments = $teamModules->teamAccomplishments($team);
-        if ($gmHistory !== '' || $teamAccomplishments !== '') {
-            $awardsCard = "<div class=\"team-card\" style=\"$teamColorStyle\">"
-                . '<div class="team-card__header"><h3 class="team-card__title">Awards</h3></div>';
-            if ($gmHistory !== '') {
-                $awardsCard .= "<div class=\"team-card__body\" style=\"padding-bottom: 0;\">"
-                    . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">GM History</strong>"
-                    . "</div><div class=\"team-card__body\">$gmHistory</div>";
-            }
-            if ($teamAccomplishments !== '') {
-                $awardsCard .= "<div class=\"team-card__body\" style=\"padding-bottom: 0; border-top: 1px solid var(--gray-100);\">"
-                    . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">Team Accomplishments</strong>"
-                    . "</div><div class=\"team-card__body\">$teamAccomplishments</div>";
-            }
-            $awardsCard .= '</div>';
-        }
+        $tenures = $this->repository->getGMTenures($team->teamID);
+        $gmAwards = $this->repository->getGMAwards($team->ownerName);
+        $teamAccomplishments = $this->repository->getTeamAccomplishments($team->name);
 
-        // Franchise History card — consolidates Regular Season, HEAT, and Playoffs
-        $regularSeason = $teamModules->resultsRegularSeason($team);
-        $heatHistory = $teamModules->resultsHEAT($team);
-        $playoffResults = $teamModules->resultsPlayoffs($team);
+        $awardsRenderer = new AwardsView();
+        $gmHistoryHtml = $awardsRenderer->renderGmHistory($tenures, $gmAwards);
+        $teamAccomplishmentsHtml = $awardsRenderer->renderTeamAccomplishments($teamAccomplishments);
+        $awardsCard = $sidebarView->renderAwardsCard($gmHistoryHtml, $teamAccomplishmentsHtml, $teamColorStyle);
 
-        $franchiseHistoryCard = "<div class=\"team-card\" style=\"$teamColorStyle\">"
-            . '<div class="team-card__header"><h3 class="team-card__title">Franchise History</h3></div>'
-            . '<div class="franchise-history-columns">'
-            . '<div class="franchise-history-column">'
-            . '<h4 class="franchise-history-column__title">H.E.A.T.</h4>'
-            . $heatHistory
-            . '</div>'
-            . '<div class="franchise-history-column">'
-            . '<h4 class="franchise-history-column__title">Regular Season</h4>'
-            . $regularSeason
-            . '</div>'
-            . '<div class="franchise-history-column">'
-            . '<h4 class="franchise-history-column__title">Playoffs</h4>'
-            . $playoffResults
-            . '</div>'
-            . '</div>'
-            . '</div>';
+        // Franchise History card
+        $regularSeasonData = $this->prepareWinLossHistoryData($team, 'regular');
+        $heatData = $this->prepareWinLossHistoryData($team, 'heat');
+        $playoffData = $this->preparePlayoffData($team);
+
+        $franchiseHistoryView = new FranchiseHistoryView();
+        $regularSeasonHtml = $franchiseHistoryView->renderRegularSeason($regularSeasonData);
+        $heatHtml = $franchiseHistoryView->renderHeat($heatData);
+        $playoffsHtml = $franchiseHistoryView->renderPlayoffs($playoffData);
+        $franchiseHistoryCard = $sidebarView->renderFranchiseHistoryCard($heatHtml, $regularSeasonHtml, $playoffsHtml, $teamColorStyle);
 
         return [
             'currentSeasonCard' => $currentSeasonCard,
@@ -324,103 +159,400 @@ class TeamService implements TeamServiceInterface
     }
 
     /**
-     * Render split stats table for a given split key
+     * Prepare current season data for the view.
      *
-     * @param list<int> $starterPids
+     * @return CurrentSeasonData|null
      */
-    private function renderSplitStats(\Team $team, \Season $season, string $splitKey, array $starterPids): string
+    private function prepareCurrentSeasonData(\Team $team): ?array
     {
-        $splitRepo = new SplitStatsRepository($this->db);
-        $teamID = $team->teamID;
-        $rows = $splitRepo->getSplitStats($teamID, $season->endingYear, $splitKey);
-        $splitLabel = $splitRepo->getSplitLabel($splitKey);
+        $powerData = $this->repository->getTeamPowerData($team->name);
+        if ($powerData === null) {
+            return null;
+        }
 
-        return \UI\Tables\SplitStats::render($rows, $team, $splitLabel, $starterPids);
+        $divisionStandings = $this->repository->getDivisionStandings($powerData['division']);
+        $divPos = 1;
+        foreach ($divisionStandings as $index => $standing) {
+            if ($standing['team_name'] === $team->name) {
+                $divPos = $index + 1;
+                break;
+            }
+        }
+
+        $conferenceStandings = $this->repository->getConferenceStandings($powerData['conference']);
+        $confPos = 1;
+        foreach ($conferenceStandings as $index => $standing) {
+            if ($standing['team_name'] === $team->name) {
+                $confPos = $index + 1;
+                break;
+            }
+        }
+
+        $franchiseSeasons = $this->repository->getFranchiseSeasons($team->teamID);
+        $fka = $this->buildFormerlyKnownAs($franchiseSeasons, $team->city, $team->name);
+
+        return [
+            'teamName' => $team->name,
+            'fka' => $fka,
+            'wins' => (int) $powerData['wins'],
+            'losses' => (int) $powerData['losses'],
+            'arena' => $team->arena,
+            'capacity' => $team->capacity,
+            'conference' => $powerData['conference'],
+            'conferencePosition' => $confPos,
+            'division' => $powerData['division'],
+            'divisionPosition' => $divPos,
+            'divisionGB' => (float) ($powerData['divGB'] ?? 0.0),
+            'homeRecord' => $powerData['homeRecord'],
+            'awayRecord' => $powerData['awayRecord'],
+            'lastWin' => $powerData['last_win'],
+            'lastLoss' => $powerData['last_loss'],
+        ];
     }
 
     /**
-     * Build the optgroup structure for the dropdown view selector
+     * Prepare banner data for the view.
      *
-     * @return array<string, array<string, string>>
+     * @return BannerData
      */
-    public function buildDropdownGroups(\Season $season): array
+    private function prepareBannerData(\Team $team): array
     {
-        $groups = [];
+        $banners = $this->repository->getChampionshipBanners($team->name);
 
-        // Views group
-        $views = [
-            'ratings' => 'Ratings',
-            'total_s' => 'Season Totals',
-            'avg_s' => 'Season Averages',
-            'per36mins' => 'Per 36 Minutes',
-            'chunk' => 'Sim Averages',
-        ];
+        /** @var list<BannerItemData> $champBanners */
+        $champBanners = [];
+        /** @var list<BannerItemData> $confBanners */
+        $confBanners = [];
+        /** @var list<BannerItemData> $divBanners */
+        $divBanners = [];
 
-        if (in_array($season->phase, ["Playoffs", "Draft", "Free Agency"], true)) {
-            $views['playoffs'] = 'Playoffs Averages';
+        $champText = "";
+        $confText = "";
+        $divText = "";
+
+        foreach ($banners as $banner) {
+            $year = $banner['year'];
+            $name = $banner['bannername'];
+            $type = $banner['bannertype'];
+
+            if ($type === 1) {
+                $champBanners[] = [
+                    'year' => $year,
+                    'name' => $name,
+                    'label' => 'IBL Champions',
+                    'bgImage' => './images/banners/banner1.gif',
+                ];
+                $champText = $this->appendBannerYear($champText, $year, $name, $team->name);
+            } elseif ($type === 2 || $type === 3) {
+                $confLabel = $type === 2 ? 'Eastern Conf. Champions' : 'Western Conf. Champions';
+                $confBanners[] = [
+                    'year' => $year,
+                    'name' => $name,
+                    'label' => $confLabel,
+                    'bgImage' => './images/banners/banner2.gif',
+                ];
+                $confText = $this->appendBannerYear($confText, $year, $name, $team->name);
+            } elseif ($type >= 4 && $type <= 7) {
+                $divLabel = match ($type) {
+                    4 => 'Atlantic Div. Champions',
+                    5 => 'Central Div. Champions',
+                    6 => 'Midwest Div. Champions',
+                    default => 'Pacific Div. Champions',
+                };
+                $divBanners[] = [
+                    'year' => $year,
+                    'name' => $name,
+                    'label' => $divLabel,
+                    'bgImage' => null,
+                ];
+                $divText = $this->appendBannerYear($divText, $year, $name, $team->name);
+            }
         }
 
-        $views['contracts'] = 'Contracts';
-        $groups['Views'] = $views;
+        return [
+            'teamName' => $team->name,
+            'color1' => $team->color1,
+            'color2' => $team->color2,
+            'championships' => ['banners' => $champBanners, 'textSummary' => $champText],
+            'conferenceTitles' => ['banners' => $confBanners, 'textSummary' => $confText],
+            'divisionTitles' => ['banners' => $divBanners, 'textSummary' => $divText],
+        ];
+    }
 
-        // Location
-        $groups['Location'] = [
-            'split:home' => 'Home',
-            'split:road' => 'Road',
+    /**
+     * Prepare playoff data for the view.
+     *
+     * @return PlayoffData
+     */
+    private function preparePlayoffData(\Team $team): array
+    {
+        $playoffResults = $this->repository->getPlayoffResults();
+        $teamName = $team->name;
+
+        $totalGameWins = 0;
+        $totalGameLosses = 0;
+
+        /** @var array<int, array{name: string, gameWins: int, gameLosses: int, seriesWins: int, seriesLosses: int, results: list<PlayoffResultItem>}> $roundsMap */
+        $roundsMap = [
+            1 => ['name' => 'First Round', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
+            2 => ['name' => 'Conference Semis', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
+            3 => ['name' => 'Conference Finals', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
+            4 => ['name' => 'IBL Finals', 'gameWins' => 0, 'gameLosses' => 0, 'seriesWins' => 0, 'seriesLosses' => 0, 'results' => []],
         ];
 
-        // Result
-        $groups['Result'] = [
-            'split:wins' => 'Wins',
-            'split:losses' => 'Losses',
+        foreach ($playoffResults as $playoff) {
+            $round = $playoff['round'];
+            $winner = $playoff['winner'];
+            $loser = $playoff['loser'];
+
+            if (!isset($roundsMap[$round])) {
+                continue;
+            }
+
+            $isWin = ($winner === $teamName);
+            $isLoss = ($loser === $teamName);
+
+            if (!$isWin && !$isLoss) {
+                continue;
+            }
+
+            $year = \Utilities\HtmlSanitizer::safeHtmlOutput((string) $playoff['year']);
+            $winnerSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($playoff['winner_name_that_year']);
+            $loserSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($playoff['loser_name_that_year']);
+            $winnerGames = $playoff['winner_games'];
+            $loserGames = $playoff['loser_games'];
+
+            /** @var PlayoffResultItem $resultItem */
+            $resultItem = [
+                'year' => $year,
+                'winner' => $winnerSafe,
+                'loser' => $loserSafe,
+                'winnerGames' => $winnerGames,
+                'loserGames' => $loserGames,
+                'isWin' => $isWin,
+            ];
+
+            $roundsMap[$round]['results'][] = $resultItem;
+
+            if ($isWin) {
+                $totalGameWins += $winnerGames;
+                $totalGameLosses += $loserGames;
+                $roundsMap[$round]['gameWins'] += $winnerGames;
+                $roundsMap[$round]['gameLosses'] += $loserGames;
+                $roundsMap[$round]['seriesWins']++;
+            } else {
+                $totalGameLosses += $winnerGames;
+                $totalGameWins += $loserGames;
+                $roundsMap[$round]['gameLosses'] += $winnerGames;
+                $roundsMap[$round]['gameWins'] += $loserGames;
+                $roundsMap[$round]['seriesLosses']++;
+            }
+        }
+
+        /** @var list<PlayoffRoundData> $rounds */
+        $rounds = [];
+        foreach ($roundsMap as $r) {
+            $rounds[] = [
+                'name' => $r['name'],
+                'gameWins' => $r['gameWins'],
+                'gameLosses' => $r['gameLosses'],
+                'seriesWins' => $r['seriesWins'],
+                'seriesLosses' => $r['seriesLosses'],
+                'results' => $r['results'],
+            ];
+        }
+
+        $totalSeriesWins = 0;
+        $totalSeriesLosses = 0;
+        foreach ($rounds as $r) {
+            $totalSeriesWins += $r['seriesWins'];
+            $totalSeriesLosses += $r['seriesLosses'];
+        }
+
+        return [
+            'rounds' => $rounds,
+            'totalGameWins' => $totalGameWins,
+            'totalGameLosses' => $totalGameLosses,
+            'totalSeriesWins' => $totalSeriesWins,
+            'totalSeriesLosses' => $totalSeriesLosses,
         ];
+    }
 
-        // Season Half
-        $groups['Season Half'] = [
-            'split:pre_allstar' => 'Pre All-Star',
-            'split:post_allstar' => 'Post All-Star',
+    /**
+     * Prepare win/loss history data for regular season or HEAT.
+     *
+     * @param string $type 'regular' or 'heat'
+     * @return WinLossHistoryData
+     */
+    private function prepareWinLossHistoryData(\Team $team, string $type): array
+    {
+        if ($type === 'heat') {
+            $history = $this->repository->getHEATHistory($team->name);
+            $urlYearOffset = 1;
+        } else {
+            $history = $this->repository->getRegularSeasonHistory($team->name);
+            $urlYearOffset = 0;
+        }
+
+        $totalWins = 0;
+        $totalLosses = 0;
+
+        // Find best record by win percentage
+        $bestPct = -1.0;
+        $bestWins = -1;
+        $bestIndex = -1;
+        foreach ($history as $index => $record) {
+            $w = (int) $record['wins'];
+            $l = (int) $record['losses'];
+            $total = $w + $l;
+            if ($total > 0) {
+                $pct = $w / $total;
+                if ($pct > $bestPct) {
+                    $bestPct = $pct;
+                    $bestWins = $w;
+                    $bestIndex = $index;
+                } elseif ($pct === $bestPct && $w > $bestWins) {
+                    $bestWins = $w;
+                    $bestIndex = $index;
+                }
+            }
+        }
+
+        /** @var list<WinLossRecord> $records */
+        $records = [];
+        foreach ($history as $index => $record) {
+            $yearwl = $record['year'];
+            $wins = (int) $record['wins'];
+            $losses = (int) $record['losses'];
+            $totalWins += $wins;
+            $totalLosses += $losses;
+
+            $name = \Utilities\HtmlSanitizer::safeHtmlOutput($record['namethatyear']);
+            if ($type === 'heat') {
+                $label = $yearwl . ' ' . $name;
+            } else {
+                $prevYear = $yearwl - 1;
+                $label = $prevYear . '-' . $yearwl . ' ' . $name;
+            }
+
+            $records[] = [
+                'year' => $yearwl,
+                'label' => $label,
+                'wins' => $wins,
+                'losses' => $losses,
+                'urlYear' => $yearwl + $urlYearOffset,
+                'isBest' => ($index === $bestIndex),
+            ];
+        }
+
+        return [
+            'records' => $records,
+            'totalWins' => $totalWins,
+            'totalLosses' => $totalLosses,
+            'teamID' => $team->teamID,
         ];
+    }
 
-        // By Month
-        $months = [
-            11 => 'November',
-            12 => 'December',
-            1 => 'January',
-            2 => 'February',
-            3 => 'March',
-            4 => 'April',
-            5 => 'May',
-        ];
-        $byMonth = [];
-        foreach ($months as $num => $name) {
-            $byMonth['split:month_' . $num] = $name;
+    /**
+     * Prepare draft picks data for the view.
+     *
+     * @return list<DraftPickItemData>
+     */
+    private function prepareDraftPicksData(\Team $team): array
+    {
+        $teamQueryRepo = new TeamQueryRepository($this->db);
+        $resultPicks = $teamQueryRepo->getDraftPicks($team->teamID);
+
+        $league = new \League($this->db);
+        $allTeamsResult = $league->getAllTeamsResult();
+
+        /** @var array<string, \Team> $teamsArray */
+        $teamsArray = [];
+        foreach ($allTeamsResult as $teamRow) {
+            /** @var TeamInfoRow $teamRow */
+            $teamRowName = $teamRow['team_name'];
+            $teamsArray[$teamRowName] = \Team::initialize($this->db, $teamRow);
         }
-        $groups['By Month'] = $byMonth;
 
-        // vs. Division
-        $vsDivision = [];
-        foreach (\League::DIVISION_NAMES as $division) {
-            $vsDivision['split:div_' . strtolower($division)] = 'vs. ' . $division;
+        /** @var list<DraftPickItemData> $draftPicks */
+        $draftPicks = [];
+
+        foreach ($resultPicks as $draftPickRow) {
+            $draftPick = new \Draft\DraftPick($draftPickRow);
+
+            $draftPicks[] = [
+                'originalTeamID' => $teamsArray[$draftPick->originalTeam]->teamID,
+                'originalTeamCity' => $teamsArray[$draftPick->originalTeam]->city,
+                'originalTeamName' => $draftPick->originalTeam,
+                'year' => (string) $draftPick->year,
+                'round' => $draftPick->round,
+                'notes' => $draftPick->notes,
+            ];
         }
-        $groups['vs. Division'] = $vsDivision;
 
-        // vs. Conference
-        $vsConference = [];
-        foreach (\League::CONFERENCE_NAMES as $conference) {
-            $vsConference['split:conf_' . strtolower($conference)] = 'vs. ' . $conference;
+        return $draftPicks;
+    }
+
+    /**
+     * Build a "formerly known as" string from franchise season history.
+     *
+     * @param list<FranchiseSeasonRow> $franchiseSeasons
+     */
+    private function buildFormerlyKnownAs(array $franchiseSeasons, string $currentCity, string $currentName): ?string
+    {
+        if ($franchiseSeasons === []) {
+            return null;
         }
-        $groups['vs. Conference'] = $vsConference;
 
-        // vs. Team
-        $allTeams = $this->repository->getAllTeams();
-        $vsTeam = [];
-        foreach ($allTeams as $teamRow) {
-            $tid = $teamRow['teamid'];
-            $teamName = $teamRow['team_name'];
-            $vsTeam['split:vs_' . $tid] = 'vs. ' . $teamName;
+        /** @var list<array{city: string, name: string, startYear: int, endYear: int}> $eras */
+        $eras = [];
+
+        foreach ($franchiseSeasons as $season) {
+            $city = $season['team_city'];
+            $name = $season['team_name'];
+            $lastIndex = count($eras) - 1;
+
+            if ($lastIndex >= 0 && $eras[$lastIndex]['city'] === $city && $eras[$lastIndex]['name'] === $name) {
+                $eras[$lastIndex] = [
+                    'city' => $eras[$lastIndex]['city'],
+                    'name' => $eras[$lastIndex]['name'],
+                    'startYear' => $eras[$lastIndex]['startYear'],
+                    'endYear' => $season['season_ending_year'],
+                ];
+            } else {
+                $eras[] = [
+                    'city' => $city,
+                    'name' => $name,
+                    'startYear' => $season['season_year'],
+                    'endYear' => $season['season_ending_year'],
+                ];
+            }
         }
-        $groups['vs. Team'] = $vsTeam;
 
-        return $groups;
+        $parts = [];
+        foreach ($eras as $era) {
+            if ($era['city'] === $currentCity && $era['name'] === $currentName) {
+                continue;
+            }
+            $parts[] = $era['city'] . ' ' . $era['name'] . ' (' . $era['startYear'] . '-' . $era['endYear'] . ')';
+        }
+
+        return $parts !== [] ? implode(', ', $parts) : null;
+    }
+
+    /**
+     * Append a banner year to the accumulating text, noting the franchise name if different.
+     */
+    private function appendBannerYear(string $text, int|string $year, string $bannerName, string $currentName): string
+    {
+        if ($text === '') {
+            $text = (string) $year;
+        } else {
+            $text .= ", $year";
+        }
+        if ($bannerName !== $currentName) {
+            $text .= " (as $bannerName)";
+        }
+        return $text;
     }
 }

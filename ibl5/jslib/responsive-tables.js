@@ -105,7 +105,10 @@
         if (table.dataset.hardcodedResponsive === "1") {
             // Still manage scroll indicators for hardcoded tables
             setupScrollIndicator(table);
-            setContainerWidth(table);
+            // Clear any inline width constraints — table fits, so let CSS
+            // handle sizing naturally (avoids sub-pixel scrollbar artifacts
+            // from setContainerWidth using integer-rounded clientWidth)
+            clearInlineWidths(table);
             return;
         }
 
@@ -116,8 +119,28 @@
             removeStickyColumns(table);
         }
 
+        // Clear inline widths from a previous makeResponsive call
+        clearInlineWidths(table);
+
         // Don't unwrap - leave the structure in place for future resizes
         // Just let the CSS handle it (no responsive-table = normal overflow:hidden)
+    }
+
+    /**
+     * Clear inline width/overflow styles set by setContainerWidth/constrainWrapper.
+     * Called when a table fits within the viewport so CSS handles natural sizing.
+     */
+    function clearInlineWidths(table) {
+        var container = table.closest(".table-scroll-container");
+        if (container) {
+            container.style.width = "";
+            container.style.maxWidth = "";
+        }
+        var wrapper = table.closest(".table-scroll-wrapper");
+        if (wrapper) {
+            wrapper.style.maxWidth = "";
+            wrapper.style.overflow = "";
+        }
     }
 
     /**

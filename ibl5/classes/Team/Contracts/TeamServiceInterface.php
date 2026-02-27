@@ -32,6 +32,37 @@ namespace Team\Contracts;
  * }
  * @phpstan-type StartersData array<string, array{name: string|null, pid: int|null}>
  * @phpstan-type SidebarData array{currentSeasonCard: string, awardsCard: string, franchiseHistoryCard: string, rafters: string}
+ *
+ * @phpstan-type CurrentSeasonData array{
+ *     teamName: string,
+ *     fka: ?string,
+ *     wins: int,
+ *     losses: int,
+ *     arena: string,
+ *     capacity: int,
+ *     conference: string,
+ *     conferencePosition: int,
+ *     division: string,
+ *     divisionPosition: int,
+ *     divisionGB: float,
+ *     homeRecord: string,
+ *     awayRecord: string,
+ *     lastWin: int,
+ *     lastLoss: int
+ * }
+ *
+ * @phpstan-type BannerItemData array{year: int|string, name: string, label: string, bgImage: ?string}
+ * @phpstan-type BannerGroupData array{banners: list<BannerItemData>, textSummary: string}
+ * @phpstan-type BannerData array{teamName: string, color1: string, color2: string, championships: BannerGroupData, conferenceTitles: BannerGroupData, divisionTitles: BannerGroupData}
+ *
+ * @phpstan-type PlayoffResultItem array{year: string, winner: string, loser: string, winnerGames: int, loserGames: int, isWin: bool}
+ * @phpstan-type PlayoffRoundData array{name: string, gameWins: int, gameLosses: int, seriesWins: int, seriesLosses: int, results: list<PlayoffResultItem>}
+ * @phpstan-type PlayoffData array{rounds: list<PlayoffRoundData>, totalGameWins: int, totalGameLosses: int, totalSeriesWins: int, totalSeriesLosses: int}
+ *
+ * @phpstan-type WinLossRecord array{year: int, label: string, wins: int, losses: int, urlYear: int, isBest: bool}
+ * @phpstan-type WinLossHistoryData array{records: list<WinLossRecord>, totalWins: int, totalLosses: int, teamID: int}
+ *
+ * @phpstan-type DraftPickItemData array{originalTeamID: int, originalTeamCity: string, originalTeamName: string, year: string, round: int|string, notes: ?string}
  */
 interface TeamServiceInterface
 {
@@ -50,67 +81,4 @@ interface TeamServiceInterface
      * @return TeamPageData
      */
     public function getTeamPageData(int $teamID, ?string $yr, string $display, string $userTeamName = '', ?string $split = null): array;
-
-    /**
-     * Extract starting lineup data from roster array
-     *
-     * Parses a roster array with depth chart information to identify the
-     * starting player (depth = 1) for each position.
-     *
-     * @param list<PlayerRow> $roster Array of player rows with depth chart fields
-     * @return StartersData Starters keyed by position
-     */
-    public function extractStartersData(array $roster): array;
-
-    /**
-     * Render the table output (tabs/dropdown + table HTML) for a given display mode
-     *
-     * Used by the API handler to return just the table portion of the team page
-     * without the full page layout (banner, sidebar, etc.).
-     *
-     * @param int $teamID Team ID (>0 = specific team, 0 = free agents, -1 = entire league)
-     * @param ?string $yr Historical year parameter (null if current season)
-     * @param string $display Active display tab (e.g., 'ratings', 'contracts', 'split')
-     * @param ?string $split Split stats key when display is 'split' (e.g. 'home', 'road')
-     * @return string Complete table HTML with tab/dropdown navigation
-     */
-    public function getTableOutput(int $teamID, ?string $yr, string $display, ?string $split = null): string;
-
-    /**
-     * Get roster data and starter PIDs for a team
-     *
-     * Encapsulates the roster-fetching + starterPids extraction logic so that
-     * other modules (e.g. DepthChartEntry) can reuse Team's roster data,
-     * including cash transaction placeholders and starter highlighting.
-     *
-     * @param int $teamID Team ID (>0 = specific team)
-     * @return array{roster: list<array<string, mixed>>, starterPids: list<int>}
-     */
-    public function getRosterAndStarters(int $teamID): array;
-
-    /**
-     * Render the appropriate table HTML based on display type
-     *
-     * @param string $display Display mode (ratings, total_s, avg_s, per36mins, chunk, playoffs, contracts, split)
-     * @param list<PlayerRow>|list<array<string, mixed>> $result Roster data
-     * @param \Team $team Team object
-     * @param ?string $yr Historical year (null for current)
-     * @param \Season $season Season object
-     * @param list<int> $starterPids Player IDs of starters for highlighting
-     * @param ?string $split Split stats key when display is 'split'
-     * @return string Table HTML
-     */
-    public function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, array $starterPids = [], ?string $split = null): string;
-
-    /**
-     * Build the optgroup structure for the dropdown view selector
-     *
-     * Returns grouped options for the TableViewDropdown component, including
-     * all standard views, split stat categories, and conditional playoffs.
-     * Used by both Team and DepthChartEntry modules.
-     *
-     * @param \Season $season Season object (used to determine playoff availability)
-     * @return array<string, array<string, string>> Groups keyed by label, each containing value => label pairs
-     */
-    public function buildDropdownGroups(\Season $season): array;
 }

@@ -31,33 +31,19 @@
     padding: var(--space-2) var(--space-4);
 }
 
-.trade-roster-preview__select {
-    background: rgba(255, 255, 255, 0.12);
+.trade-roster-preview__title {
     color: white;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: var(--radius-sm, 4px);
-    padding: var(--space-1, 4px) var(--space-3, 12px) var(--space-1, 4px) var(--space-2, 8px);
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 0.9rem;
+    font-size: 1.1rem;
+    text-align: center;
     letter-spacing: 0.025em;
-    cursor: pointer;
-    appearance: auto;
+    text-transform: uppercase;
 }
 
-.trade-roster-preview__select:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.trade-roster-preview__select:focus {
-    outline: 2px solid rgba(249, 115, 22, 0.6);
-    outline-offset: 1px;
-}
-
-.trade-roster-preview__select option,
-.trade-roster-preview__select optgroup {
-    background: #1a2234;
-    color: white;
+/* Tab bar sits between header and table content */
+.trade-roster-preview__tabs {
+    border-radius: 0;
 }
 
 .trade-roster-preview__logo {

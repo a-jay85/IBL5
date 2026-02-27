@@ -204,6 +204,76 @@ class UpdaterView
     }
 
     /**
+     * Render a list of messages as an expandable <details> log
+     *
+     * Separates file summary messages from error messages. File summaries
+     * are always visible; errors get their own expandable section.
+     * Uses ENT_SUBSTITUTE to safely render non-UTF-8 bytes from binary files.
+     *
+     * @param list<string> $messages Messages to display
+     * @param int $errorCount Number of errors reported by the result object
+     * @return string HTML expandable log (empty string if no messages)
+     */
+    public function renderMessageLog(array $messages, int $errorCount): string
+    {
+        if ($messages === [] && $errorCount === 0) {
+            return '';
+        }
+
+        // Separate file summaries from error messages
+        $summaries = [];
+        $errors = [];
+        foreach ($messages as $message) {
+            if (str_starts_with($message, 'ERROR: ')) {
+                $errors[] = $message;
+            } else {
+                $summaries[] = $message;
+            }
+        }
+
+        // ENT_SUBSTITUTE replaces invalid UTF-8 with U+FFFD instead of returning ''
+        $flags = ENT_QUOTES | ENT_HTML5 | ENT_SUBSTITUTE;
+
+        $html = '<div class="updater-log">';
+
+        // File summaries expandable
+        if ($summaries !== []) {
+            $summaryLabel = count($summaries) . ' file' . (count($summaries) !== 1 ? 's' : '') . ' processed';
+            $html .= '<details class="updater-details">'
+                . '<summary class="updater-details__summary">'
+                . HtmlSanitizer::safeHtmlOutput($summaryLabel) . '</summary>'
+                . '<div class="updater-details__content">';
+            foreach ($summaries as $msg) {
+                $html .= '<p>' . htmlspecialchars($msg, $flags, 'UTF-8') . '</p>';
+            }
+            $html .= '</div></details>';
+        }
+
+        // Errors expandable (separate, prominent section)
+        if ($errorCount > 0) {
+            $errorLabel = $errorCount . ' error' . ($errorCount !== 1 ? 's' : '');
+            $html .= '<details class="updater-details updater-details--errors">'
+                . '<summary class="updater-details__summary updater-details__summary--errors">'
+                . $errorLabel . '</summary>'
+                . '<div class="updater-details__content">';
+            if ($errors !== []) {
+                foreach ($errors as $msg) {
+                    $html .= '<p class="text-error">'
+                        . htmlspecialchars($msg, $flags, 'UTF-8') . '</p>';
+                }
+            } else {
+                $html .= '<p class="text-error">Error details were not captured. '
+                    . 'Check the PHP error log for more information.</p>';
+            }
+            $html .= '</div></details>';
+        }
+
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
      * Render the page closing: "Return to IBL" link and close tags
      *
      * @return string HTML page closing

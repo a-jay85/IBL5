@@ -121,6 +121,7 @@ class NavigationView
                     ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory'],
                     ['label' => 'Award History', 'url' => 'modules.php?name=AwardHistory'],
                     ['label' => 'Record Holders', 'url' => 'modules.php?name=RecordHolders'],
+                    ['label' => 'Franchise Record Book', 'url' => 'modules.php?name=FranchiseRecordBook'],
                     ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=AllStarAppearances'],
                     ['label' => 'Season Leaderboards', 'url' => 'modules.php?name=SeasonLeaderboards'],
                     ['label' => 'Career Leaderboards', 'url' => 'modules.php?name=CareerLeaderboards'],

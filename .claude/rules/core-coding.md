@@ -55,6 +55,7 @@ if (!$validator->validateX(...)) {
 | Retired players | `retired` is TINYINT — check `retired === 0` (int) |
 | Free agents | `tid` is INT — check `tid === 0` or empty username |
 | Team lookup | Some methods use `tid` (int), others use team name (string) |
+| Querying "all teams" | `ibl_team_info` contains special teams beyond the 28 real franchises: Rookies (40), Sophomores (41), All-Star Away (50), All-Star Home (51), and Free Agents (0). When querying all league teams (dropdowns, standings, rosters, record books, etc.), always use `WHERE teamid BETWEEN 1 AND League::MAX_REAL_TEAMID` — not just `WHERE teamid <> 0`. Only include teamid 0 (Free Agents/Waivers) or the All-Star/Rookie IDs when there is a specific reason to (e.g., free agency lists, All-Star voting). See `League::getAllTeamsResult()` for the canonical pattern. |
 | Null in queries | Build conditional SQL; `bind_param` has no NULL type |
 | Database booleans (INT cols) | `hasMLE === 1`, `hasLLE === 1` (native int) |
 | Database booleans (VARCHAR cols) | Check schema first — use `=== '1'` only for VARCHAR boolean columns |

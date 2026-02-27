@@ -335,6 +335,81 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     }
 
     /**
+     * @see JsbImportRepositoryInterface::upsertRcbAlltimeRecord()
+     */
+    public function upsertRcbAlltimeRecord(array $record): int
+    {
+        return $this->execute(
+            'INSERT INTO ibl_rcb_alltime_records
+                (scope, team_id, record_type, stat_category, ranking,
+                 player_name, car_block_id, pid, stat_value, stat_raw,
+                 team_of_record, season_year, career_total, source_file)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                player_name = VALUES(player_name),
+                car_block_id = VALUES(car_block_id),
+                pid = VALUES(pid),
+                stat_value = VALUES(stat_value),
+                stat_raw = VALUES(stat_raw),
+                team_of_record = VALUES(team_of_record),
+                season_year = VALUES(season_year),
+                career_total = VALUES(career_total),
+                source_file = VALUES(source_file)',
+            'sissisiidiiiis',
+            $record['scope'],
+            $record['team_id'],
+            $record['record_type'],
+            $record['stat_category'],
+            $record['ranking'],
+            $record['player_name'],
+            $record['car_block_id'],
+            $record['pid'],
+            $record['stat_value'],
+            $record['stat_raw'],
+            $record['team_of_record'],
+            $record['season_year'],
+            $record['career_total'],
+            $record['source_file']
+        );
+    }
+
+    /**
+     * @see JsbImportRepositoryInterface::upsertRcbSeasonRecord()
+     */
+    public function upsertRcbSeasonRecord(array $record): int
+    {
+        return $this->execute(
+            'INSERT INTO ibl_rcb_season_records
+                (season_year, scope, team_id, context, stat_category, ranking,
+                 player_name, player_position, car_block_id, pid,
+                 stat_value, record_season_year, source_file)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                player_name = VALUES(player_name),
+                player_position = VALUES(player_position),
+                car_block_id = VALUES(car_block_id),
+                pid = VALUES(pid),
+                stat_value = VALUES(stat_value),
+                record_season_year = VALUES(record_season_year),
+                source_file = VALUES(source_file)',
+            'isississiiiis',
+            $record['season_year'],
+            $record['scope'],
+            $record['team_id'],
+            $record['context'],
+            $record['stat_category'],
+            $record['ranking'],
+            $record['player_name'],
+            $record['player_position'],
+            $record['car_block_id'],
+            $record['pid'],
+            $record['stat_value'],
+            $record['record_season_year'],
+            $record['source_file']
+        );
+    }
+
+    /**
      * Look up a player name by pid.
      *
      * @param int $pid Player ID

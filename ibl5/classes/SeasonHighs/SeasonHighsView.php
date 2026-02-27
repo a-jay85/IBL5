@@ -15,6 +15,7 @@ use Utilities\HtmlSanitizer;
  *
  * @phpstan-import-type SeasonHighEntry from SeasonHighsServiceInterface
  * @phpstan-import-type SeasonHighsData from SeasonHighsServiceInterface
+ * @phpstan-import-type RcbSeasonHighEntry from SeasonHighsServiceInterface
  *
  * @see SeasonHighsViewInterface
  */
@@ -161,6 +162,107 @@ class SeasonHighsView implements SeasonHighsViewInterface
     <td class=\"value-cell\">{$value}</td>
 </tr>";
             }
+        }
+
+        $output .= '</tbody></table></div>';
+        return $output;
+    }
+
+    /**
+     * @see SeasonHighsViewInterface::renderHomeAwayHighs()
+     *
+     * @param array{home: array<string, list<RcbSeasonHighEntry>>, away: array<string, list<RcbSeasonHighEntry>>} $data
+     */
+    public function renderHomeAwayHighs(array $data): string
+    {
+        $output = '';
+
+        if ($this->hasRcbData($data['home'])) {
+            $output .= '<h2 class="ibl-table-title">Home Game Highs</h2>';
+            $output .= '<div class="ibl-grid ibl-grid--3col">';
+            $output .= $this->renderRcbStatTables($data['home']);
+            $output .= '</div>';
+        }
+
+        if ($this->hasRcbData($data['away'])) {
+            $output .= '<h2 class="ibl-table-title">Away Game Highs</h2>';
+            $output .= '<div class="ibl-grid ibl-grid--3col">';
+            $output .= $this->renderRcbStatTables($data['away']);
+            $output .= '</div>';
+        }
+
+        return $output;
+    }
+
+    /**
+     * Check if RCB data has any non-empty categories.
+     *
+     * @param array<string, list<RcbSeasonHighEntry>> $categories
+     */
+    private function hasRcbData(array $categories): bool
+    {
+        foreach ($categories as $records) {
+            if ($records !== []) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Render stat tables for RCB season records.
+     *
+     * @param array<string, list<RcbSeasonHighEntry>> $categories
+     */
+    private function renderRcbStatTables(array $categories): string
+    {
+        $output = '';
+        foreach ($categories as $category => $records) {
+            if ($records === []) {
+                continue;
+            }
+            $label = SeasonHighsService::getRcbStatLabel($category);
+            $output .= $this->renderRcbStatTable($label, $records);
+        }
+        return $output;
+    }
+
+    /**
+     * Render a single RCB stat table.
+     *
+     * @param string $statLabel Display label
+     * @param list<RcbSeasonHighEntry> $records
+     */
+    private function renderRcbStatTable(string $statLabel, array $records): string
+    {
+        /** @var string $safeName */
+        $safeName = HtmlSanitizer::safeHtmlOutput($statLabel);
+
+        $output = '<div class="stat-table-wrapper">
+        <table class="ibl-data-table stat-table">
+            <thead>
+                <tr><th colspan="4">' . $safeName . '</th></tr>
+            </thead>
+            <tbody>';
+
+        foreach ($records as $record) {
+            $rank = (int) $record['ranking'];
+            /** @var string $playerName */
+            $playerName = HtmlSanitizer::safeHtmlOutput($record['player_name']);
+            $value = (int) $record['stat_value'];
+            $seasonYear = (int) $record['record_season_year'];
+            $position = $record['player_position'] !== null && $record['player_position'] !== ''
+                ? $record['player_position'] . ' '
+                : '';
+            /** @var string $safePosition */
+            $safePosition = HtmlSanitizer::safeHtmlOutput($position);
+
+            $output .= "<tr>
+    <td class=\"rank-cell\">{$rank}</td>
+    <td class=\"name-cell\">{$safePosition}{$playerName}</td>
+    <td class=\"value-cell\">{$value}</td>
+    <td class=\"date-cell\">{$seasonYear}</td>
+</tr>";
         }
 
         $output .= '</tbody></table></div>';

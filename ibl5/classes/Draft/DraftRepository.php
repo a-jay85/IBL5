@@ -201,7 +201,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
      */
     public function getCurrentDraftPick(): ?array
     {
-        /** @var array{team: string, round: int, pick: int, player: string}|null $row */
+        /** @var array{team: string, tid: int, round: int, pick: int, player: string}|null $row */
         $row = $this->fetchOne(
             "SELECT * FROM ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1"
         );
@@ -209,6 +209,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
         if ($row !== null) {
             return [
                 'team' => $row['team'],
+                'tid' => $row['tid'],
                 'round' => $row['round'],
                 'pick' => $row['pick'],
             ];

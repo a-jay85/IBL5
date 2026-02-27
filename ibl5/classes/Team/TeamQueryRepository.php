@@ -66,16 +66,16 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
      *
      * @return list<DraftPickRow>
      */
-    public function getDraftPicks(string $teamName): array
+    public function getDraftPicks(int $teamId): array
     {
         /** @var list<DraftPickRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_draft_picks
-            WHERE ownerofpick = ?
+            WHERE owner_tid = ?
             ORDER BY year, round, teampick ASC",
-            "s",
-            $teamName
+            "i",
+            $teamId
         );
     }
 

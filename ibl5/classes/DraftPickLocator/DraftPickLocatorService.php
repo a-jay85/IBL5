@@ -49,7 +49,7 @@ class DraftPickLocatorService
                 'teamName' => $teamName,
                 'color1' => $team['color1'],
                 'color2' => $team['color2'],
-                'picks' => $allPicks[$teamName] ?? [],
+                'picks' => $allPicks[$team['teamid']] ?? [],
             ];
         }
 

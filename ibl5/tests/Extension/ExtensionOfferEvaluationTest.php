@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Extension;
+
 use PHPUnit\Framework\TestCase;
 use Extension\ExtensionOfferEvaluator;
 use Services\CommonContractValidator;

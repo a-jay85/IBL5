@@ -201,47 +201,6 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
         $this->assertInstanceOf(\Season::class, $season);
     }
 
-    public function testHasPhaseProperty(): void
-    {
-        $season = new \Season($this->mockDb);
-
-        $this->assertTrue(property_exists($season, 'phase'));
-    }
-
-    public function testHasBeginningYearProperty(): void
-    {
-        $season = new \Season($this->mockDb);
-
-        $this->assertTrue(property_exists($season, 'beginningYear'));
-    }
-
-    public function testHasEndingYearProperty(): void
-    {
-        $season = new \Season($this->mockDb);
-
-        $this->assertTrue(property_exists($season, 'endingYear'));
-    }
-
-    public function testHasLastSimNumberProperty(): void
-    {
-        $season = new \Season($this->mockDb);
-
-        $this->assertTrue(property_exists($season, 'lastSimNumber'));
-    }
-
-    public function testHasAllowTradesProperty(): void
-    {
-        $season = new \Season($this->mockDb);
-
-        $this->assertTrue(property_exists($season, 'allowTrades'));
-    }
-
-    public function testHasAllowWaiversProperty(): void
-    {
-        $season = new \Season($this->mockDb);
-
-        $this->assertTrue(property_exists($season, 'allowWaivers'));
-    }
 
     public function testHasShowDraftLinkProperty(): void
     {

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Tests\AwardHistory;
+
 use PHPUnit\Framework\TestCase;
 use AwardHistory\AwardHistoryValidator;
 

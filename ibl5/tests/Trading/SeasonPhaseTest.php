@@ -1,22 +1,27 @@
 <?php
 
-require_once __DIR__ . '/../bootstrap.php';
+declare(strict_types=1);
+
+namespace Tests\Trading;
+
+use PHPUnit\Framework\TestCase;
+use Trading\TradeValidator;
 
 /**
  * Test season phase specific behavior in trading
- * 
+ *
  * REFACTORED: Tests now focus on observable behaviors through public APIs
  * rather than using reflection to test internal state.
  */
-class SeasonPhaseTest extends PHPUnit\Framework\TestCase
+class SeasonPhaseTest extends TestCase
 {
-    private $mockDb;
-    private $validator;
+    private \MockDatabase $mockDb;
+    private TradeValidator $validator;
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
-        $this->validator = new Trading\TradeValidator($this->mockDb);
+        $this->mockDb = new \MockDatabase();
+        $this->validator = new TradeValidator($this->mockDb);
     }
 
     /**

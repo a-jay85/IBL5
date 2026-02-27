@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Draft;
+
 use PHPUnit\Framework\TestCase;
 use Draft\DraftValidator;
 

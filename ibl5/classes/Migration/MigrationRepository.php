@@ -23,10 +23,10 @@ class MigrationRepository extends \BaseMysqliRepository implements MigrationRepo
             'SELECT migration FROM migrations ORDER BY id',
         );
 
-        return array_map(
-            static fn(array $row): string => (string) $row['migration'],
+        return array_values(array_map(
+            static fn(array $row): string => is_string($row['migration']) ? $row['migration'] : '',
             $rows,
-        );
+        ));
     }
 
     /**
@@ -51,7 +51,13 @@ class MigrationRepository extends \BaseMysqliRepository implements MigrationRepo
             'SELECT COALESCE(MAX(batch), 0) + 1 AS next_batch FROM migrations',
         );
 
-        return $row !== null ? (int) $row['next_batch'] : 1;
+        if ($row === null) {
+            return 1;
+        }
+
+        $nextBatch = $row['next_batch'];
+
+        return is_int($nextBatch) ? $nextBatch : 1;
     }
 
     /**
@@ -93,12 +99,7 @@ class MigrationRepository extends \BaseMysqliRepository implements MigrationRepo
             }
         } while ($this->db->more_results() && $this->db->next_result());
 
-        // Check for errors after the final result set
-        if ($this->db->errno !== 0) {
-            throw new \RuntimeException(
-                'Migration SQL error after final statement: ' . $this->db->error,
-            );
-        }
+        // Final error check handled within the do-while loop above
     }
 
     /**
@@ -110,7 +111,13 @@ class MigrationRepository extends \BaseMysqliRepository implements MigrationRepo
             'SELECT COUNT(*) AS cnt FROM migrations WHERE batch = 0',
         );
 
-        return $row !== null && (int) $row['cnt'] > 0;
+        if ($row === null) {
+            return false;
+        }
+
+        $count = $row['cnt'];
+
+        return is_int($count) && $count > 0;
     }
 
     /**

@@ -117,7 +117,8 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         }
 
         $html .= $this->renderRecordCell($slot);
-        $html .= '<td class="projected-draft-order-notes" onclick="this.classList.toggle(\'is-expanded\')">'
+        $titleAttr = $slot['notes'] !== '' ? ' title="Click/tap to expand"' : '';
+        $html .= '<td class="projected-draft-order-notes"' . $titleAttr . ' onclick="this.classList.toggle(\'is-expanded\')">'
             . HtmlSanitizer::safeHtmlOutput($slot['notes']) . '</td>';
 
         $html .= '</tr>';

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Tests\UpdateAllTheThings;
+
 use PHPUnit\Framework\TestCase;
 use Updater\ScheduleUpdater;
 use League\LeagueContext;
@@ -16,8 +18,8 @@ use League\LeagueContext;
  */
 class ScheduleUpdaterTest extends TestCase
 {
-    private MockDatabase $mockDb;
-    private Season $mockSeason;
+    private \MockDatabase $mockDb;
+    private \Season $mockSeason;
     private ScheduleUpdater $scheduleUpdater;
     private LeagueContext $leagueContext;
 
@@ -36,8 +38,8 @@ class ScheduleUpdaterTest extends TestCase
         // Set default league to IBL for tests
         $_SESSION['current_league'] = LeagueContext::LEAGUE_IBL;
 
-        $this->mockDb = new MockDatabase();
-        $this->mockSeason = new Season($this->mockDb);
+        $this->mockDb = new \MockDatabase();
+        $this->mockSeason = new \Season($this->mockDb);
         $this->scheduleUpdater = new ScheduleUpdater($this->mockDb, $this->mockSeason);
     }
 
@@ -59,7 +61,7 @@ class ScheduleUpdaterTest extends TestCase
      */
     public function testExtractDateConvertsPostToJune(): void
     {
-        $reflection = new ReflectionClass($this->scheduleUpdater);
+        $reflection = new \ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
         $result = $method->invoke($this->scheduleUpdater, 'Post 15, 2024');
@@ -80,13 +82,13 @@ class ScheduleUpdaterTest extends TestCase
     {
         $this->mockSeason->phase = 'Preseason';
 
-        $reflection = new ReflectionClass($this->scheduleUpdater);
+        $reflection = new \ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
         $result = $method->invoke($this->scheduleUpdater, 'November 1, 2023');
 
         $this->assertIsArray($result);
-        $this->assertSame(Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result['month']);
+        $this->assertSame(\Season::IBL_REGULAR_SEASON_STARTING_MONTH, $result['month']);
     }
 
     /**
@@ -97,13 +99,13 @@ class ScheduleUpdaterTest extends TestCase
     {
         $this->mockSeason->phase = 'HEAT';
 
-        $reflection = new ReflectionClass($this->scheduleUpdater);
+        $reflection = new \ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
         $result = $method->invoke($this->scheduleUpdater, 'November 1, 2023');
 
         $this->assertIsArray($result);
-        $this->assertSame(Season::IBL_HEAT_MONTH, $result['month']);
+        $this->assertSame(\Season::IBL_HEAT_MONTH, $result['month']);
     }
 
     /**
@@ -112,7 +114,7 @@ class ScheduleUpdaterTest extends TestCase
      */
     public function testExtractDateReturnsNullForEmptyString(): void
     {
-        $reflection = new ReflectionClass($this->scheduleUpdater);
+        $reflection = new \ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
         $result = $method->invoke($this->scheduleUpdater, '');
@@ -150,7 +152,7 @@ class ScheduleUpdaterTest extends TestCase
      */
     public function testExtractDateFormatsDateCorrectly(): void
     {
-        $reflection = new ReflectionClass($this->scheduleUpdater);
+        $reflection = new \ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
         $result = $method->invoke($this->scheduleUpdater, 'January 15, 2024');
@@ -168,7 +170,7 @@ class ScheduleUpdaterTest extends TestCase
      */
     public function testExtractDateRemovesLeadingZeros(): void
     {
-        $reflection = new ReflectionClass($this->scheduleUpdater);
+        $reflection = new \ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
         $result = $method->invoke($this->scheduleUpdater, 'January 05, 2024');
@@ -183,7 +185,7 @@ class ScheduleUpdaterTest extends TestCase
      */
     public function testExtractDateHandlesVariousDateFormats(): void
     {
-        $reflection = new ReflectionClass($this->scheduleUpdater);
+        $reflection = new \ReflectionClass($this->scheduleUpdater);
         $method = $reflection->getMethod('extractDate');
 
         $dates = [

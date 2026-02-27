@@ -205,21 +205,4 @@ class CashTransactionHandlerTest extends TestCase
         $this->assertSame(1, $result);
     }
 
-    // ============================================
-    // METHOD EXISTENCE TESTS
-    // ============================================
-
-    public function testHasGenerateUniquePidMethod(): void
-    {
-        $handler = new CashTransactionHandler($this->mockDb);
-
-        $this->assertTrue(method_exists($handler, 'generateUniquePid'));
-    }
-
-    public function testHasCreateCashTransactionMethod(): void
-    {
-        $handler = new CashTransactionHandler($this->mockDb);
-
-        $this->assertTrue(method_exists($handler, 'createCashTransaction'));
-    }
 }

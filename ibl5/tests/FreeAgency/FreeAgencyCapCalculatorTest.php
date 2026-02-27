@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\FreeAgency;
+
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyCapCalculator;
@@ -25,7 +29,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
+        $this->mockDb = new \MockDatabase();
         $this->mockTeamQueryRepo = $this->createMock(TeamQueryRepositoryInterface::class);
         $mockTeam = $this->createMockTeam();
         $mockSeason = $this->createMock(\Season::class);
@@ -73,9 +77,9 @@ class FreeAgencyCapCalculatorTest extends TestCase
 
         // Assert - Should have full cap space and max roster spots
         $this->assertEquals(0, $result['totalSalaries'][0]);
-        $this->assertEquals(League::SOFT_CAP_MAX, $result['softCapSpace'][0]);
-        $this->assertEquals(League::HARD_CAP_MAX, $result['hardCapSpace'][0]);
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][0]);
+        $this->assertEquals(\League::SOFT_CAP_MAX, $result['softCapSpace'][0]);
+        $this->assertEquals(\League::HARD_CAP_MAX, $result['hardCapSpace'][0]);
+        $this->assertEquals(\Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][0]);
     }
 
     /**
@@ -110,10 +114,10 @@ class FreeAgencyCapCalculatorTest extends TestCase
         $this->assertEquals(850, $result['totalSalaries'][1]);
         $this->assertEquals(900, $result['totalSalaries'][2]);
 
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][0]);
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][1]);
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][2]);
-        $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][3]);
+        $this->assertEquals(\Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][0]);
+        $this->assertEquals(\Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][1]);
+        $this->assertEquals(\Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][2]);
+        $this->assertEquals(\Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][3]);
     }
 
     /**
@@ -194,7 +198,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
         $result = $this->calculator->calculateTeamCapMetrics(1);
 
         // Assert
-        $buffer = League::HARD_CAP_MAX - League::SOFT_CAP_MAX;
+        $buffer = \League::HARD_CAP_MAX - \League::SOFT_CAP_MAX;
 
         for ($i = 0; $i < 6; $i++) {
             $expectedHardCap = $result['softCapSpace'][$i] + $buffer;
@@ -214,7 +218,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
      */
     private function createMockTeam(): \Team
     {
-        $team = $this->createMock(Team::class);
+        $team = $this->createMock(\Team::class);
         $team->name = 'Test Team';
         $team->teamID = 1;
 

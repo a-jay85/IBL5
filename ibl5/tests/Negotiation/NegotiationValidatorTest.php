@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Negotiation;
+
 use PHPUnit\Framework\TestCase;
 use Negotiation\NegotiationValidator;
 use Player\Player;
@@ -19,7 +23,7 @@ class NegotiationValidatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
+        $this->mockDb = new \MockDatabase();
         $this->validator = new NegotiationValidator($this->mockDb);
     }
 

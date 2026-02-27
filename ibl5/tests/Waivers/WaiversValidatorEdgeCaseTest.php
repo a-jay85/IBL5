@@ -399,9 +399,7 @@ class WaiversValidatorEdgeCaseTest extends TestCase
     // DATA PROVIDER TESTS
     // ============================================
 
-    /**
-     * @dataProvider rosterSlotBoundaryProvider
-     */
+    /**     */
     #[DataProvider('rosterSlotBoundaryProvider')]
     public function testRosterSlotBoundaries(
         int $healthySlots,
@@ -435,9 +433,7 @@ class WaiversValidatorEdgeCaseTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider salaryBoundaryProvider
-     */
+    /**     */
     #[DataProvider('salaryBoundaryProvider')]
     public function testSalaryBoundaries(
         int $totalSalary,

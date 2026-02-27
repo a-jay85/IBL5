@@ -14,12 +14,12 @@ use Tests\Integration\Mocks\MockDatabase;
  */
 class BoxscoreProcessorTest extends TestCase
 {
-    private MockDatabase $mockDb;
+    private \MockDatabase $mockDb;
     private string|false $previousErrorLog = false;
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
+        $this->mockDb = new \MockDatabase();
         // Suppress error logs from Season constructor DB calls
         $this->previousErrorLog = ini_get('error_log') ?: '';
         ini_set('error_log', '/dev/null');

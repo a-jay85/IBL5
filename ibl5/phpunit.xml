@@ -208,6 +208,9 @@
         <testsuite name="Migration Module Tests">
             <directory>tests/Migration</directory>
         </testsuite>
+        <testsuite name="Navigation Module Tests">
+            <directory>tests/Navigation</directory>
+        </testsuite>
         <testsuite name="CSS Architecture Tests">
             <directory>tests/CSS</directory>
         </testsuite>

@@ -25,13 +25,14 @@ class NavigationView
     private ?array $teamsData;
     private string $seasonPhase;
     private string $allowWaivers;
+    private string $showDraftLink;
     private ?string $serverName;
     private ?string $requestUri;
 
     /**
      * @param array<string, array<string, list<array{teamid: int, team_name: string, team_city: string}>>>|null $teamsData
      */
-    public function __construct(bool $isLoggedIn, ?string $username, string $currentLeague, ?int $teamId = null, ?array $teamsData = null, string $seasonPhase = '', string $allowWaivers = '', ?string $serverName = null, ?string $requestUri = null)
+    public function __construct(bool $isLoggedIn, ?string $username, string $currentLeague, ?int $teamId = null, ?array $teamsData = null, string $seasonPhase = '', string $allowWaivers = '', string $showDraftLink = '', ?string $serverName = null, ?string $requestUri = null)
     {
         $this->isLoggedIn = $isLoggedIn;
         $this->username = $username;
@@ -40,6 +41,7 @@ class NavigationView
         $this->teamsData = $teamsData;
         $this->seasonPhase = $seasonPhase;
         $this->allowWaivers = $allowWaivers;
+        $this->showDraftLink = $showDraftLink;
         $this->serverName = $serverName;
         $this->requestUri = $requestUri;
     }
@@ -364,6 +366,8 @@ class NavigationView
 
             if ($this->seasonPhase === 'Draft') {
                 array_unshift($links, ['label' => 'Draft', 'url' => 'modules.php?name=Draft', 'badge' => 'LIVE']);
+            } elseif ($this->showDraftLink === 'On') {
+                array_unshift($links, ['label' => 'Draft', 'url' => 'modules.php?name=Draft']);
             }
 
             if ($this->seasonPhase === 'Free Agency') {

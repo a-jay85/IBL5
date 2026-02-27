@@ -59,7 +59,7 @@
     box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
     width: auto;
     max-width: 1440px;
-    margin: 0 auto;
+    margin: 0 auto var(--space-4);
 }
 
 /* Header row */
@@ -491,7 +491,6 @@
 /* Wrapper for scroll container - holds the fixed shadow */
 .table-scroll-wrapper {
     position: relative;
-    margin-bottom: 1rem;
 }
 
 /* On desktop, constrain tables to fit content and center (not full width on ultrawide) */

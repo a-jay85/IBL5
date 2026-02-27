@@ -24,8 +24,8 @@ class DraftOrderView implements DraftOrderViewInterface
         $html = '<div class="draft-order-container">';
         $html .= $this->renderTitle($seasonYear);
         $html .= $this->renderDescription();
-        $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1');
-        $html .= $this->renderRoundTable($draftOrder['round2'], 'Round 2');
+        $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1', showPlayoffDivider: true);
+        $html .= $this->renderRoundTable($draftOrder['round2'], 'Round 2', showPlayoffDivider: false);
         $html .= '</div>';
 
         return $html;
@@ -48,7 +48,7 @@ class DraftOrderView implements DraftOrderViewInterface
     /**
      * @param list<DraftSlot> $slots
      */
-    private function renderRoundTable(array $slots, string $roundLabel): string
+    private function renderRoundTable(array $slots, string $roundLabel, bool $showPlayoffDivider): string
     {
         $html = '<h3>' . HtmlSanitizer::safeHtmlOutput($roundLabel) . '</h3>';
         $html .= '<div class="table-container">';
@@ -62,7 +62,7 @@ class DraftOrderView implements DraftOrderViewInterface
         $html .= '<tbody>';
 
         foreach ($slots as $slot) {
-            if ($slot['pick'] === self::LOTTERY_PLAYOFF_BOUNDARY + 1) {
+            if ($showPlayoffDivider && $slot['pick'] === self::LOTTERY_PLAYOFF_BOUNDARY + 1) {
                 $html .= $this->renderSeparatorRow();
             }
             $html .= $this->renderPickRow($slot);

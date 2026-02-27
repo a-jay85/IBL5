@@ -96,13 +96,26 @@ class DraftOrderViewTest extends TestCase
         $this->assertStringContainsString('20-62', $result);
     }
 
-    public function testRenderShowsSeparatorRow(): void
+    public function testRenderShowsSeparatorRowInRound1(): void
     {
         $order = $this->sampleDraftOrderWithPlayoffSeparator();
         $result = $this->view->render($order, 2026);
 
         $this->assertStringContainsString('draft-order-separator', $result);
         $this->assertStringContainsString('Playoff Teams', $result);
+    }
+
+    public function testRenderDoesNotShowSeparatorInRound2(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026);
+
+        $round2Start = strpos($result, 'Round 2');
+        $this->assertNotFalse($round2Start);
+
+        $round2Html = substr($result, $round2Start);
+        $this->assertStringNotContainsString('draft-order-separator', $round2Html);
+        $this->assertStringNotContainsString('Playoff Teams', $round2Html);
     }
 
     public function testRenderEscapesHtmlEntities(): void

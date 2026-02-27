@@ -220,7 +220,7 @@ class DraftOrderViewTest extends TestCase
 
         $result = $this->view->render($order, 2026);
 
-        $this->assertMatchesRegularExpression('/background-color: #98002E;.*20-62.*<\/td><td>/s', $result);
+        $this->assertMatchesRegularExpression('/background-color: #98002E;.*20-62.*<\/td><td\b/s', $result);
     }
 
     public function testNoTooltipsInOutput(): void
@@ -257,6 +257,19 @@ class DraftOrderViewTest extends TestCase
         $result = $this->view->render($order, 2026);
 
         $this->assertStringContainsString('via 2025 trade', $result);
+    }
+
+    public function testNotesCellIsTruncatable(): void
+    {
+        $order = $this->emptyDraftOrder();
+        $order['round1'] = [
+            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 2, 'Celtics', '007A33', 'FFFFFF', true, 'via trade'),
+        ];
+
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringContainsString('draft-order-notes', $result);
+        $this->assertStringContainsString('is-expanded', $result);
     }
 
     public function testUsesDataTableClass(): void

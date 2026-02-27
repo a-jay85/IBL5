@@ -123,7 +123,8 @@ class DraftOrderView implements DraftOrderViewInterface
         }
 
         $html .= $this->renderRecordCell($slot);
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['notes']) . '</td>';
+        $html .= '<td class="draft-order-notes" onclick="this.classList.toggle(\'is-expanded\')">'
+            . HtmlSanitizer::safeHtmlOutput($slot['notes']) . '</td>';
 
         $html .= '</tr>';
         return $html;

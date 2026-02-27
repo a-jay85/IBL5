@@ -1756,6 +1756,20 @@ td.ibl-team-cell--colored {
     font-weight: 600;
 }
 
+.draft-order-notes {
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.draft-order-notes.is-expanded {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+
 /* Raise team cell above adjacent cells so tooltip renders on top */
 .draft-order-table td.ibl-team-cell--colored {
     position: relative;

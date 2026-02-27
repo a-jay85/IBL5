@@ -78,6 +78,7 @@
     padding: 0.75rem 0.2rem;
     text-align: center;
     white-space: nowrap;
+    border-bottom: 1px solid var(--gray-100);
 }
 
 /* Data cells */
@@ -86,6 +87,7 @@
     font-size: 1rem;
     padding: 0.25rem 0.2rem;
     text-align: center;
+    border-bottom: 1px solid var(--gray-100);
 }
 
 /* Row styling */
@@ -191,7 +193,7 @@
 
 /* Top border separating tfoot from tbody */
 .ibl-data-table tfoot tr:first-child td {
-    border-top: 2px solid var(--gray-200, #e5e7eb);
+    border-top: 1px solid var(--gray-200, #e5e7eb);
 }
 
 /* Legend/key row — subtle, de-emphasized */
@@ -1446,9 +1448,6 @@ td.ibl-team-cell--colored {
     margin: 0 auto var(--space-6);
 }
 
-.league-stats-table td {
-    border-bottom: 1px solid var(--gray-100);
-}
 
 /* .league-stats-user-row replaced by .user-team-row (user-team-highlighter.js) */
 

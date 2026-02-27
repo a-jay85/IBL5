@@ -305,107 +305,6 @@ class TradingViewTest extends TestCase
     }
 
     // ============================================
-    // COMPARISON PANEL TESTS
-    // ============================================
-
-    public function testRenderTradeOfferFormContainsComparisonPanel(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringContainsString('id="trade-comparison-panel"', $html);
-        $this->assertStringContainsString('trade-comparison', $html);
-        $this->assertStringContainsString('Player Comparison', $html);
-    }
-
-    public function testRenderTradeOfferFormContainsComparisonTeamSections(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringContainsString('data-side="user"', $html);
-        $this->assertStringContainsString('data-side="partner"', $html);
-        $this->assertStringContainsString('Lakers sends', $html);
-        $this->assertStringContainsString('Celtics sends', $html);
-    }
-
-    public function testRenderTradeOfferFormContainsTradeConfigJson(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringContainsString('window.IBL_TRADE_CONFIG', $html);
-        $this->assertStringContainsString('comparison-api', $html);
-        $this->assertStringContainsString('"hardCap":', $html);
-        $this->assertStringContainsString('"userPlayerContracts":', $html);
-        $this->assertStringContainsString('"partnerPlayerContracts":', $html);
-    }
-
-    public function testRenderTradeOfferFormLoadsComparisonJs(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringContainsString('trade-comparison.js', $html);
-    }
-
-    public function testRenderTradeOfferFormConfigContainsTeamIds(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringContainsString('"userTeamId":1', $html);
-        $this->assertStringContainsString('"partnerTeamId":2', $html);
-    }
-
-    public function testRenderTradeOfferFormContainsSharedDropdownWithOptgroups(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-        $pageData['comparisonDropdownGroups'] = [
-            'Views' => [
-                'ratings' => 'Ratings',
-                'total_s' => 'Season Totals',
-                'avg_s' => 'Season Averages',
-                'per36mins' => 'Per 36 Minutes',
-                'chunk' => 'Sim Averages',
-                'playoffs' => 'Playoff Averages',
-                'contracts' => 'Contracts',
-            ],
-            'Location' => [
-                'split:home' => 'Home',
-                'split:road' => 'Road',
-            ],
-        ];
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringContainsString('id="trade-comparison-display"', $html);
-        $this->assertStringContainsString('trade-comparison__shared-dropdown', $html);
-        $this->assertStringContainsString('<optgroup label="Views">', $html);
-        $this->assertStringContainsString('<optgroup label="Location">', $html);
-        $this->assertStringContainsString('value="ratings"', $html);
-        $this->assertStringContainsString('value="split:home"', $html);
-        $this->assertStringContainsString('value="split:road"', $html);
-        $this->assertStringContainsString(' selected', $html);
-    }
-
-    public function testRenderTradeOfferFormOmitsDropdownWhenGroupsEmpty(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-        $pageData['comparisonDropdownGroups'] = [];
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringNotContainsString('trade-comparison__shared-dropdown', $html);
-        $this->assertStringNotContainsString('id="trade-comparison-display"', $html);
-    }
-
-    // ============================================
     // ROSTER PREVIEW PANEL TESTS
     // ============================================
 
@@ -603,15 +502,6 @@ class TradingViewTest extends TestCase
             'userTeamColor2' => 'FDB927',
             'partnerTeamColor1' => '007A33',
             'partnerTeamColor2' => 'FFFFFF',
-            'userPlayerContracts' => [],
-            'partnerPlayerContracts' => [],
-            'comparisonDropdownGroups' => [
-                'Views' => [
-                    'ratings' => 'Ratings',
-                    'total_s' => 'Season Totals',
-                    'avg_s' => 'Season Averages',
-                ],
-            ],
             'result' => null,
             'error' => null,
         ];

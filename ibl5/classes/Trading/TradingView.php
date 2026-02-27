@@ -516,8 +516,6 @@ $tradeConfig = [
         <button type="button" class="ibl-tab" data-display="avg_s" role="tab">Averages</button>
         <button type="button" class="ibl-tab" data-display="per36mins" role="tab">Per 36</button>
         <button type="button" class="ibl-tab" data-display="contracts" role="tab">Contracts</button>
-        <button type="button" class="ibl-tab" data-display="chunk" role="tab">Chunk</button>
-        <button type="button" class="ibl-tab" data-display="playoffs" role="tab">Playoffs</button>
     </div>
     <div class="table-scroll-wrapper">
         <div class="table-scroll-container">

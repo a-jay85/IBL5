@@ -42,8 +42,6 @@ class DraftOrderView implements DraftOrderViewInterface
     {
         return '<p class="draft-order-description">'
             . 'If the draft were held today, this is the projected pick order based on current standings. '
-            . 'Non-playoff teams (picks 1-12) are ordered by worst record first. '
-            . 'Playoff teams (picks 13-28) are ordered by regular season record.'
             . '</p>';
     }
 

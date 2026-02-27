@@ -319,7 +319,7 @@
 **Impact:** Added 365 new tests across 40+ test files, bringing total from 1060→1425 tests (34% increase)
 
 **Test Coverage Additions:**
-- Core models: BoxscoreTest (28), DraftPickTest (9), GameTest (11), LeagueTest (15), SeasonTest (14), TeamTest (16)
+- Core models: BoxscoreProcessorTest + BoxscoreRepositoryTest (28), DraftPickTest (9), GameTest (11), LeagueTest (15), SeasonTest (14), TeamTest (16)
 - Contract rules: ContractRulesTest (42 CBA salary cap tests)
 - Module processors: FreeAgency (5), Negotiation (5), Extension (4), Trading (4)
 - Controllers: Waivers (4), DepthChart (3+5), RookieOption (3), Team (3), SeriesRecords (4)

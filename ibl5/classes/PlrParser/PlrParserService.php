@@ -39,7 +39,7 @@ class PlrParserService implements PlrParserServiceInterface
 
         // Pass 1: Calculate foul baseline
         $maxFoulRatio = $this->calculateFoulBaseline($filePath);
-        $result->addMessage('Foul baseline calculated (max ratio: ' . number_format($maxFoulRatio, 6) . ')');
+        $result->addMessage('Foul baseline calculated (max ratio: ' . \BasketballStats\StatsFormatter::formatWithDecimals($maxFoulRatio, 6) . ')');
 
         // Pass 2: Parse players and upsert
         $handle = fopen($filePath, 'rb');

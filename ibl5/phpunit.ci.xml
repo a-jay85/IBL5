@@ -123,6 +123,9 @@
         <testsuite name="Statistics Module Tests">
             <directory>tests/Statistics</directory>
         </testsuite>
+        <testsuite name="Migration Module Tests">
+            <directory>tests/Migration</directory>
+        </testsuite>
         <testsuite name="Integration Tests">
             <directory>tests/Integration</directory>
         </testsuite>

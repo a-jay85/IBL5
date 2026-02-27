@@ -84,16 +84,16 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
      *
      * @return list<FreeAgencyOfferRow>
      */
-    public function getFreeAgencyOffers(string $teamName): array
+    public function getFreeAgencyOffers(int $teamId): array
     {
         /** @var list<FreeAgencyOfferRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_fa_offers
-            WHERE team = ?
+            WHERE tid = ?
             ORDER BY name ASC",
-            "s",
-            $teamName
+            "i",
+            $teamId
         );
     }
 

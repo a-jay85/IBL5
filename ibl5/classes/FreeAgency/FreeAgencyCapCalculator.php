@@ -38,10 +38,10 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
      * 
      * @param array<int, array<string, mixed>> $rosterData Roster data from getRosterUnderContractOrderedByOrdinalResult()
      * @param array<int, array<string, mixed>> $offersData Offers data from getFreeAgencyOffersResult()
-     * @param string|null $excludeOfferPlayerName Player name to exclude from offer calculations
+     * @param int|null $excludeOfferPid Player ID to exclude from offer calculations
      * @return array<int, int> Total salaries for years 1-6
      */
-    private function calculateTotalSalaries(array $rosterData, array $offersData, ?string $excludeOfferPlayerName = null): array
+    private function calculateTotalSalaries(array $rosterData, array $offersData, ?int $excludeOfferPid = null): array
     {
         $totalSalaries = [0, 0, 0, 0, 0, 0];
 
@@ -62,10 +62,10 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
         // Add salaries from contract offers
         foreach ($offersData as $offerRow) {
             // Skip excluded player if specified
-            if ($excludeOfferPlayerName !== null && $offerRow['name'] === $excludeOfferPlayerName) {
+            if ($excludeOfferPid !== null && ($offerRow['pid'] ?? 0) === $excludeOfferPid) {
                 continue;
             }
-            
+
             for ($year = 0; $year < 6; $year++) {
                 $offerKey = 'offer' . ($year + 1);
                 /** @var int $offerValue */
@@ -79,13 +79,13 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
 
     /**
      * Calculate available roster spots for all contract years
-     * 
+     *
      * @param array<int, array<string, mixed>> $rosterData Roster data from getRosterUnderContractOrderedByOrdinalResult()
      * @param array<int, array<string, mixed>> $offersData Offers data from getFreeAgencyOffersResult()
-     * @param string|null $excludeOfferPlayerName Player name to exclude from offer calculations
+     * @param int|null $excludeOfferPid Player ID to exclude from offer calculations
      * @return array<int, int> Available roster spots for years 1-6 (indexed 0-5)
      */
-    private function calculateRosterSpots(array $rosterData, array $offersData, ?string $excludeOfferPlayerName = null): array
+    private function calculateRosterSpots(array $rosterData, array $offersData, ?int $excludeOfferPid = null): array
     {
         /** @var array<int, int> $rosterSpots */
         $rosterSpots = [
@@ -115,10 +115,10 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
         // Count contract offers
         foreach ($offersData as $offerRow) {
             // Skip excluded player if specified
-            if ($excludeOfferPlayerName !== null && $offerRow['name'] === $excludeOfferPlayerName) {
+            if ($excludeOfferPid !== null && ($offerRow['pid'] ?? 0) === $excludeOfferPid) {
                 continue;
             }
-            
+
             $this->decrementRosterSpotsForSalaries($rosterSpots, $offerRow);
         }
 
@@ -153,11 +153,11 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
     /**
      * @see FreeAgencyCapCalculatorInterface::calculateTeamCapMetrics()
      */
-    public function calculateTeamCapMetrics(?string $excludeOfferPlayerName = null): array
+    public function calculateTeamCapMetrics(?int $excludeOfferPid = null): array
     {
         // Fetch roster and offers data once, convert results to arrays
         $rosterResult = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($this->team->teamID);
-        $offersResult = $this->teamQueryRepo->getFreeAgencyOffers($this->team->name);
+        $offersResult = $this->teamQueryRepo->getFreeAgencyOffers($this->team->teamID);
         
         // Convert mysqli_result to arrays
         $rosterData = [];
@@ -170,8 +170,8 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
             $offersData[] = $row;
         }
         
-        $totalSalaries = $this->calculateTotalSalaries($rosterData, $offersData, $excludeOfferPlayerName);
-        $rosterSpots = $this->calculateRosterSpots($rosterData, $offersData, $excludeOfferPlayerName);
+        $totalSalaries = $this->calculateTotalSalaries($rosterData, $offersData, $excludeOfferPid);
+        $rosterSpots = $this->calculateRosterSpots($rosterData, $offersData, $excludeOfferPid);
         
         return [
             'totalSalaries' => $totalSalaries,

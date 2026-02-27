@@ -482,7 +482,8 @@ DROP TABLE IF EXISTS `ibl_draft`;
 CREATE TABLE `ibl_draft` (
   `draft_id` int(11) NOT NULL AUTO_INCREMENT,
   `year` smallint(5) unsigned NOT NULL DEFAULT 0 COMMENT 'Draft year',
-  `team` varchar(255) NOT NULL DEFAULT '' COMMENT 'Drafting team name (FK to ibl_team_info)',
+  `team` varchar(255) NOT NULL DEFAULT '' COMMENT 'Drafting team name',
+  `tid` int(11) NOT NULL DEFAULT 0 COMMENT 'Drafting team ID (FK to ibl_team_info.teamid)',
   `player` varchar(255) NOT NULL DEFAULT '' COMMENT 'Drafted player name',
   `round` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Draft round',
   `pick` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Pick number',
@@ -497,7 +498,8 @@ CREATE TABLE `ibl_draft` (
   KEY `idx_player` (`player`),
   KEY `idx_year_round` (`year`,`round`),
   KEY `idx_year_round_pick` (`year`,`round`,`pick`),
-  CONSTRAINT `fk_draft_team` FOREIGN KEY (`team`) REFERENCES `ibl_team_info` (`team_name`) ON UPDATE CASCADE,
+  KEY `fk_draft_tid` (`tid`),
+  CONSTRAINT `fk_draft_tid` FOREIGN KEY (`tid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `chk_draft_round` CHECK (`round` >= 0 and `round` <= 7),
   CONSTRAINT `chk_draft_pick` CHECK (`pick` >= 0 and `pick` <= 32)
 ) ENGINE=InnoDB AUTO_INCREMENT=57 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -556,8 +558,10 @@ DROP TABLE IF EXISTS `ibl_draft_picks`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ibl_draft_picks` (
   `pickid` int(11) NOT NULL AUTO_INCREMENT,
-  `ownerofpick` varchar(32) NOT NULL DEFAULT '' COMMENT 'Team currently owning pick (FK to ibl_team_info)',
-  `teampick` varchar(32) NOT NULL DEFAULT '' COMMENT 'Original team the pick belongs to (FK to ibl_team_info)',
+  `ownerofpick` varchar(32) NOT NULL DEFAULT '' COMMENT 'Team currently owning pick',
+  `owner_tid` int(11) NOT NULL DEFAULT 0 COMMENT 'Team ID currently owning pick (FK to ibl_team_info.teamid)',
+  `teampick` varchar(32) NOT NULL DEFAULT '' COMMENT 'Original team the pick belongs to',
+  `teampick_tid` int(11) NOT NULL DEFAULT 0 COMMENT 'Original team ID for the pick (FK to ibl_team_info.teamid)',
   `year` smallint(5) unsigned NOT NULL DEFAULT 0 COMMENT 'Draft year',
   `round` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Draft round',
   `notes` varchar(280) DEFAULT NULL COMMENT 'Trade/transaction notes',
@@ -567,9 +571,10 @@ CREATE TABLE `ibl_draft_picks` (
   KEY `idx_ownerofpick` (`ownerofpick`),
   KEY `idx_year` (`year`),
   KEY `idx_year_round` (`year`,`round`),
-  KEY `fk_draftpick_team` (`teampick`),
-  CONSTRAINT `fk_draftpick_owner` FOREIGN KEY (`ownerofpick`) REFERENCES `ibl_team_info` (`team_name`) ON UPDATE CASCADE,
-  CONSTRAINT `fk_draftpick_team` FOREIGN KEY (`teampick`) REFERENCES `ibl_team_info` (`team_name`) ON UPDATE CASCADE
+  KEY `idx_owner_tid_year` (`owner_tid`,`year`),
+  KEY `fk_draftpick_teampick_tid` (`teampick_tid`),
+  CONSTRAINT `fk_draftpick_owner_tid` FOREIGN KEY (`owner_tid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_draftpick_teampick_tid` FOREIGN KEY (`teampick_tid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=1359 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

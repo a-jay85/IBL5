@@ -18,6 +18,16 @@
     box-shadow: var(--shadow-md);
 }
 
+/* On desktop, constrain panel to table content width and center (matches .table-scroll-wrapper) */
+@media (min-width: 769px) {
+    .trade-roster-preview {
+        width: fit-content;
+        max-width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
 /* ==========================================================================
    Header — Logo / Title / Logo
    ========================================================================== */

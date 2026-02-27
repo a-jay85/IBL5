@@ -59,7 +59,7 @@
     box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
     width: auto;
     max-width: 1440px;
-    margin: 0 auto;
+    margin: 0 auto var(--space-4);
 }
 
 /* Header row */
@@ -491,7 +491,6 @@
 /* Wrapper for scroll container - holds the fixed shadow */
 .table-scroll-wrapper {
     position: relative;
-    margin-bottom: 1rem;
 }
 
 /* On desktop, constrain tables to fit content and center (not full width on ultrawide) */
@@ -739,6 +738,17 @@
     color: var(--navy-900, #0f172a);
     text-align: center;
     margin: 0 0 1rem 0;
+}
+
+/* Inline subheading — gray uppercase label for table headers and separator rows */
+.ibl-table-subheading th,
+.ibl-table-subheading td {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: var(--space-1) var(--space-2);
 }
 
 /* .ibl-table-header removed — use .ibl-card__header (cards.css) instead.
@@ -1644,15 +1654,6 @@ td.ibl-team-cell--colored {
 
 .record-table thead { background: var(--gray-100); }
 
-.record-table th {
-    color: var(--gray-600);
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: var(--space-1) var(--space-2);
-}
-
 .record-table td {
     text-align: center;
     vertical-align: middle;
@@ -1704,6 +1705,76 @@ td.ibl-team-cell--colored {
     margin: var(--space-4) var(--space-3) var(--space-2);
     padding-bottom: var(--space-1);
     border-bottom: 1px solid var(--gray-200);
+}
+
+/* ==========================================================================
+   Projected Draft Order Table (.projected-draft-order-table)
+   ========================================================================== */
+
+.projected-draft-order-description {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin-bottom: var(--space-4);
+}
+
+.projected-draft-order-separator td {
+    background-color: var(--gray-200, #e5e7eb);
+}
+
+.projected-draft-order-table .projected-draft-order-notes {
+    max-width: 550px;
+    padding-inline: 0.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.projected-draft-order-notes.is-expanded {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+/* On mobile, keep record text visible alongside logo (overrides global .ibl-team-cell__text hide) */
+@media (max-width: 768px) {
+    .projected-draft-order-table td:nth-child(3) .ibl-team-cell__text {
+        display: inline;
+    }
+
+    .projected-draft-order-table td:nth-child(3).ibl-team-cell--colored {
+        width: auto;
+        min-width: auto;
+        max-width: none;
+    }
+
+    .projected-draft-order-notes {
+        max-width: 136px;
+    }
+}
+
+/* Raise team cell above adjacent cells so tooltip renders on top */
+.projected-draft-order-table td.ibl-team-cell--colored {
+    position: relative;
+    z-index: 1;
+}
+
+/* Position tooltip to the right (default is left) — stays within table bounds */
+.projected-draft-order-table .ibl-tooltip::after {
+    right: auto;
+    left: 100%;
+    margin-right: 0;
+    margin-left: 8px;
+}
+
+.projected-draft-order-table .ibl-tooltip::before {
+    right: auto;
+    left: 100%;
+    margin-right: 0;
+    margin-left: -2px;
+    border-left-color: transparent;
+    border-right-color: var(--navy-900, #0f172a);
 }
 
 } /* end @layer components */

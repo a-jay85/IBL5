@@ -71,7 +71,7 @@ class TradingView implements TradingViewInterface
         <h2 class="ibl-title">Trading</h2>
         <div class="team-cards-row">
             <div class="trading-layout__card">
-                <table class="ibl-data-table trading-roster team-table" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>;">
+                <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $userTeamId ?>" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>;">
                     <colgroup>
                         <col style="width: 50px;">
                         <col style="width: 40px;">
@@ -98,7 +98,7 @@ class TradingView implements TradingViewInterface
             <div class="trading-layout__card">
                 <input type="hidden" name="switchCounter" value="<?= (int) $switchCounter ?>">
                 <input type="hidden" name="listeningTeam" value="<?= $partnerTeam ?>">
-                <table class="ibl-data-table trading-roster team-table" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>;">
+                <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $partnerTeamId ?>" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>;">
                     <colgroup>
                         <col style="width: 50px;">
                         <col style="width: 40px;">

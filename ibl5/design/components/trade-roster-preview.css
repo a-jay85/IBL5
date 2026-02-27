@@ -170,12 +170,51 @@
 }
 
 /* Table overrides — panel provides outer chrome, so strip the table's duplicate
-   border/shadow/radius.  Removes the gray line between thead and tbody. */
+   border/shadow/radius.  Removes the gray line between thead and tbody.
+   overflow: visible so cap-warning glow isn't clipped (no border-radius to protect). */
 .trade-roster-preview .ibl-data-table {
     border: none;
     box-shadow: none;
     margin-bottom: 0;
     border-radius: 0;
+    overflow: visible;
+}
+
+/* ==========================================================================
+   Cap Warning — over hard cap indicators on roster tables and preview tabs
+   ========================================================================== */
+
+/* Red glow on preview logo when team exceeds hard cap */
+.trade-roster-preview__logo.cap-warning-logo {
+    box-shadow: 0 0 14px 5px rgba(220, 38, 38, 0.65);
+    filter: grayscale(1) brightness(0.45) sepia(1) hue-rotate(-30deg) saturate(8);
+}
+
+/* Contracts tab: red text, light red background, red glow border */
+.trade-roster-preview__tabs .ibl-tab.cap-warning-tab {
+    color: var(--color-error-600, #dc2626);
+    font-weight: 700;
+    background-color: var(--color-error-50, #fef2f2);
+    box-shadow: 0 0 10px 3px rgba(220, 38, 38, 0.5);
+}
+
+/* Standalone cap totals table: allow outer glow to escape (no border-radius needed) */
+.trading-cap-totals {
+    overflow: visible;
+}
+
+/* Cap totals cell in standalone card: red background, text, outer glow */
+.trading-cap-totals td.cap-warning-cell {
+    background-color: var(--color-error-50, #fef2f2);
+    color: var(--color-error-600, #dc2626);
+    font-weight: 700;
+    box-shadow: 0 0 10px 3px rgba(220, 38, 38, 0.5);
+}
+
+/* Cap Totals row inside Contracts table (roster preview): red background + outer glow */
+.trade-roster-preview .ibl-data-table tfoot td.cap-exceeded {
+    background-color: var(--color-error-50, #fef2f2);
+    box-shadow: 0 0 10px 3px rgba(220, 38, 38, 0.5);
 }
 
 /* Hide per-team dropdowns injected by API responses */

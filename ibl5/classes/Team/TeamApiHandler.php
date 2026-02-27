@@ -23,13 +23,13 @@ class TeamApiHandler
     ];
 
     private \mysqli $db;
-    private TeamService $service;
+    private TeamTableService $tableService;
 
     public function __construct(\mysqli $db)
     {
         $this->db = $db;
         $repository = new TeamRepository($db);
-        $this->service = new TeamService($db, $repository);
+        $this->tableService = new TeamTableService($db, $repository);
     }
 
     public function handle(): void
@@ -68,7 +68,7 @@ class TeamApiHandler
             $display = 'ratings';
         }
 
-        $html = $this->service->getTableOutput($teamID, $yr, $display, $split);
+        $html = $this->tableService->getTableOutput($teamID, $yr, $display, $split);
 
         echo json_encode(['html' => $html], JSON_THROW_ON_ERROR);
     }

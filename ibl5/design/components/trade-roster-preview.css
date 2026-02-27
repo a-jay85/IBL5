@@ -180,6 +180,13 @@
     overflow: visible;
 }
 
+/* Clip table bottom at panel corner radius; top corners hidden by header/tabs.
+   Does not affect the header area, so logo glow remains unclipped. */
+.trade-roster-preview .table-scroll-wrapper {
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    overflow: hidden;
+}
+
 /* ==========================================================================
    Cap Warning — over hard cap indicators on roster tables and preview tabs
    ========================================================================== */
@@ -211,10 +218,13 @@
     box-shadow: 0 0 10px 3px rgba(220, 38, 38, 0.5);
 }
 
-/* Cap Totals row inside Contracts table (roster preview): red background + outer glow */
+/* Cap Totals row inside Contracts table (roster preview): red background + outer glow.
+   position/z-index elevate the glow above adjacent rows' backgrounds. */
 .trade-roster-preview .ibl-data-table tfoot td.cap-exceeded {
     background-color: var(--color-error-50, #fef2f2);
     box-shadow: 0 0 10px 3px rgba(220, 38, 38, 0.5);
+    position: relative;
+    z-index: 1;
 }
 
 /* Hide per-team dropdowns injected by API responses */

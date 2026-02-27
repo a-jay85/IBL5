@@ -1741,8 +1741,8 @@ td.ibl-team-cell--colored {
 }
 
 .draft-order-separator td {
-    background: var(--gradient-navy-header);
-    color: white;
+    background-color: var(--gray-200, #e5e7eb);
+    color: var(--gray-600, #4b5563);
     font-family: var(--font-display);
     font-weight: 600;
     font-size: 0.8rem;

@@ -96,16 +96,23 @@ class DraftOrderViewTest extends TestCase
         $this->assertStringContainsString('20-62', $result);
     }
 
-    public function testRenderShowsSeparatorRowInRound1(): void
+    public function testRenderShowsAllSeparatorRowsInRound1(): void
     {
         $order = $this->sampleDraftOrderWithPlayoffSeparator();
         $result = $this->view->render($order, 2026);
 
-        $this->assertStringContainsString('draft-order-separator', $result);
-        $this->assertStringContainsString('Playoff Teams', $result);
+        $round1Start = strpos($result, 'Round 1');
+        $round2Start = strpos($result, 'Round 2');
+        $this->assertNotFalse($round1Start);
+        $this->assertNotFalse($round2Start);
+
+        $round1Html = substr($result, $round1Start, $round2Start - $round1Start);
+        $this->assertStringContainsString('Playoff Teams', $round1Html);
+        $this->assertStringContainsString('Division Winners', $round1Html);
+        $this->assertStringContainsString('Conference Winners', $round1Html);
     }
 
-    public function testRenderDoesNotShowSeparatorInRound2(): void
+    public function testRenderDoesNotShowSeparatorsInRound2(): void
     {
         $order = $this->sampleDraftOrderWithPlayoffSeparator();
         $result = $this->view->render($order, 2026);
@@ -115,7 +122,6 @@ class DraftOrderViewTest extends TestCase
 
         $round2Html = substr($result, $round2Start);
         $this->assertStringNotContainsString('draft-order-separator', $round2Html);
-        $this->assertStringNotContainsString('Playoff Teams', $round2Html);
     }
 
     public function testRenderEscapesHtmlEntities(): void
@@ -293,7 +299,7 @@ class DraftOrderViewTest extends TestCase
     private function sampleDraftOrderWithPlayoffSeparator(): array
     {
         $slots = [];
-        for ($i = 1; $i <= 14; $i++) {
+        for ($i = 1; $i <= 28; $i++) {
             $slots[] = $this->makeSlot($i, $i, 'Team' . $i, 20 + $i, 62 - $i, '000000', 'FFFFFF', $i, 'Team' . $i, '000000', 'FFFFFF', false, '');
         }
 

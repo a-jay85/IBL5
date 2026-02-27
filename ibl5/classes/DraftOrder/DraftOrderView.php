@@ -17,6 +17,8 @@ use Utilities\HtmlSanitizer;
 class DraftOrderView implements DraftOrderViewInterface
 {
     private const LOTTERY_PLAYOFF_BOUNDARY = 12;
+    private const DIVISION_WINNERS_BOUNDARY = 24;
+    private const CONFERENCE_WINNERS_BOUNDARY = 26;
 
     /** @param DraftOrderResult $draftOrder */
     public function render(array $draftOrder, int $seasonYear): string
@@ -62,8 +64,11 @@ class DraftOrderView implements DraftOrderViewInterface
         $html .= '<tbody>';
 
         foreach ($slots as $slot) {
-            if ($showPlayoffDivider && $slot['pick'] === self::LOTTERY_PLAYOFF_BOUNDARY + 1) {
-                $html .= $this->renderSeparatorRow();
+            if ($showPlayoffDivider) {
+                $separator = $this->getSeparatorLabel($slot['pick']);
+                if ($separator !== null) {
+                    $html .= $this->renderSeparatorRow($separator);
+                }
             }
             $html .= $this->renderPickRow($slot);
         }
@@ -74,10 +79,20 @@ class DraftOrderView implements DraftOrderViewInterface
         return $html;
     }
 
-    private function renderSeparatorRow(): string
+    private function getSeparatorLabel(int $pick): ?string
+    {
+        return match ($pick) {
+            self::LOTTERY_PLAYOFF_BOUNDARY + 1 => 'Playoff Teams',
+            self::DIVISION_WINNERS_BOUNDARY + 1 => 'Division Winners',
+            self::CONFERENCE_WINNERS_BOUNDARY + 1 => 'Conference Winners',
+            default => null,
+        };
+    }
+
+    private function renderSeparatorRow(string $label): string
     {
         return '<tr class="draft-order-separator">'
-            . '<td colspan="4">Playoff Teams</td>'
+            . '<td colspan="4">' . HtmlSanitizer::e($label) . '</td>'
             . '</tr>';
     }
 

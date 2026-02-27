@@ -6,6 +6,7 @@ namespace DraftOrder;
 
 use DraftOrder\Contracts\DraftOrderServiceInterface;
 use DraftOrder\Contracts\DraftOrderViewInterface;
+use UI\Components\TooltipLabel;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
@@ -57,7 +58,6 @@ class DraftOrderView implements DraftOrderViewInterface
         $html .= '<th>Pick</th>';
         $html .= '<th>Team</th>';
         $html .= '<th>Record</th>';
-        $html .= '<th>Owner</th>';
         $html .= '<th>Notes</th>';
         $html .= '</tr></thead>';
         $html .= '<tbody>';
@@ -78,7 +78,7 @@ class DraftOrderView implements DraftOrderViewInterface
     private function renderSeparatorRow(): string
     {
         return '<tr class="draft-order-separator">'
-            . '<td colspan="5">Playoff Teams</td>'
+            . '<td colspan="4">Playoff Teams</td>'
             . '</tr>';
     }
 
@@ -90,26 +90,28 @@ class DraftOrderView implements DraftOrderViewInterface
 
         $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['pick']) . '</td>';
 
-        $html .= TeamCellHelper::renderTeamCell(
-            $slot['teamId'],
-            $slot['teamName'],
-            $slot['color1'],
-            $slot['color2'],
-        );
-
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['wins']) . '-' . HtmlSanitizer::safeHtmlOutput($slot['losses']) . '</td>';
-
         if ($slot['isTraded']) {
+            $nameHtml = TooltipLabel::render(
+                HtmlSanitizer::e($slot['ownerName']) . '*',
+                $slot['teamName'] . "'s pick",
+            );
             $html .= TeamCellHelper::renderTeamCell(
                 $slot['ownerId'],
                 $slot['ownerName'],
                 $slot['ownerColor1'],
                 $slot['ownerColor2'],
+                nameHtml: $nameHtml,
             );
         } else {
-            $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['ownerName']) . '</td>';
+            $html .= TeamCellHelper::renderTeamCell(
+                $slot['teamId'],
+                $slot['teamName'],
+                $slot['color1'],
+                $slot['color2'],
+            );
         }
 
+        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['wins']) . '-' . HtmlSanitizer::safeHtmlOutput($slot['losses']) . '</td>';
         $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['notes']) . '</td>';
 
         $html .= '</tr>';

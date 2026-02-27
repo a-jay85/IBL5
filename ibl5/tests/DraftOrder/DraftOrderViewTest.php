@@ -71,8 +71,14 @@ class DraftOrderViewTest extends TestCase
         $this->assertStringContainsString('Pick', $result);
         $this->assertStringContainsString('Team', $result);
         $this->assertStringContainsString('Record', $result);
-        $this->assertStringContainsString('Owner', $result);
         $this->assertStringContainsString('Notes', $result);
+    }
+
+    public function testRenderDoesNotContainOwnerColumnHeader(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026);
+
+        $this->assertStringNotContainsString('<th>Owner</th>', $result);
     }
 
     public function testRenderContainsDescription(): void
@@ -135,7 +141,7 @@ class DraftOrderViewTest extends TestCase
         $this->assertStringNotContainsString('draft-order-traded', $result);
     }
 
-    public function testTradedPickUsesTeamCellForOwner(): void
+    public function testTradedPickShowsOwnerInTeamColumnWithColors(): void
     {
         $order = $this->emptyDraftOrder();
         $order['round1'] = [
@@ -144,10 +150,47 @@ class DraftOrderViewTest extends TestCase
 
         $result = $this->view->render($order, 2026);
 
-        // TeamCellHelper renders with ibl-team-cell--colored class
         $this->assertStringContainsString('ibl-team-cell--colored', $result);
-        // Owner's team colors should appear
         $this->assertStringContainsString('007A33', $result);
+    }
+
+    public function testTradedPickShowsAsteriskOnOwnerName(): void
+    {
+        $order = $this->emptyDraftOrder();
+        $order['round1'] = [
+            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 2, 'Celtics', '007A33', 'FFFFFF', true, 'via trade'),
+        ];
+
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringContainsString('Celtics*', $result);
+    }
+
+    public function testTradedPickShowsTooltipWithOriginalTeam(): void
+    {
+        $order = $this->emptyDraftOrder();
+        $order['round1'] = [
+            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 2, 'Celtics', '007A33', 'FFFFFF', true, 'via trade'),
+        ];
+
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringContainsString('ibl-tooltip', $result);
+        $this->assertStringContainsString("Heat&apos;s pick", $result);
+        $this->assertStringContainsString('tabindex="0"', $result);
+    }
+
+    public function testOwnPickDoesNotShowAsteriskOrTooltip(): void
+    {
+        $order = $this->emptyDraftOrder();
+        $order['round1'] = [
+            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 1, 'Heat', '98002E', 'F9A01B', false, ''),
+        ];
+
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringNotContainsString('ibl-tooltip', $result);
+        $this->assertStringNotContainsString('*', $result);
     }
 
     public function testTradeNotesAreRendered(): void

@@ -89,13 +89,8 @@ class TradeRosterPreviewApiHandler
             /** @var list<int> $starterPids */
             $starterPids = $rosterData['starterPids'];
 
-            // Remove outgoing players
-            if ($removePids !== []) {
-                $roster = array_values(array_filter(
-                    $roster,
-                    static fn (array $row): bool => !in_array($row['pid'] ?? 0, $removePids, true)
-                ));
-            }
+            // Outgoing players stay in the roster — JS grays them out and
+            // moves them to the bottom. We only need to append incoming players.
 
             // Fetch and append incoming players
             if ($addPids !== []) {

@@ -157,9 +157,6 @@
             url += '&display=' + encodeURIComponent(currentDisplay);
         }
 
-        // Collect all trade-involved PIDs for highlighting
-        var tradePids = addPids.concat(removePids);
-
         fetch(url, { signal: abortController.signal })
             .then(function (response) {
                 if (!response.ok) {
@@ -200,8 +197,8 @@
                         window.IBL_refreshResponsiveTables();
                     }
 
-                    // Highlight trade-involved player rows
-                    highlightTradeRows(container, tradePids);
+                    // Classify and reorder trade-involved player rows
+                    classifyAndReorderTradeRows(container, addPids, removePids);
                 } else {
                     container.innerHTML = '<div class="trade-roster-preview__empty">No data available</div>';
                 }
@@ -214,28 +211,59 @@
     }
 
     /**
-     * Add .trade-involved-row class to rows containing trade-involved player links.
+     * Classify trade rows as incoming/outgoing, then reorder so that
+     * outgoing rows sink to the bottom and incoming rows sit below them.
      */
-    function highlightTradeRows(container, tradePids) {
-        if (tradePids.length === 0) {
+    function classifyAndReorderTradeRows(container, incomingPids, outgoingPids) {
+        if (incomingPids.length === 0 && outgoingPids.length === 0) {
             return;
         }
 
-        var rows = container.querySelectorAll('tr');
-        for (var r = 0; r < rows.length; r++) {
-            var links = rows[r].querySelectorAll('a[href*="pid="]');
-            for (var l = 0; l < links.length; l++) {
-                var href = links[l].getAttribute('href') || '';
-                var match = href.match(/pid=(\d+)/);
-                if (match) {
-                    var linkPid = parseInt(match[1], 10);
-                    if (tradePids.indexOf(linkPid) !== -1) {
-                        rows[r].classList.add('trade-involved-row');
-                        break;
-                    }
+        var tbodies = container.querySelectorAll('tbody');
+        for (var t = 0; t < tbodies.length; t++) {
+            var tbody = tbodies[t];
+            var rows = tbody.querySelectorAll('tr');
+            var outgoingRows = [];
+            var incomingRows = [];
+
+            for (var r = 0; r < rows.length; r++) {
+                var pid = getRowPid(rows[r]);
+                if (pid === null) {
+                    continue;
+                }
+
+                if (outgoingPids.indexOf(pid) !== -1) {
+                    rows[r].classList.add('trade-outgoing-row');
+                    outgoingRows.push(rows[r]);
+                } else if (incomingPids.indexOf(pid) !== -1) {
+                    rows[r].classList.add('trade-incoming-row');
+                    incomingRows.push(rows[r]);
                 }
             }
+
+            // Move outgoing rows to the bottom, then incoming rows below them
+            for (var o = 0; o < outgoingRows.length; o++) {
+                tbody.appendChild(outgoingRows[o]);
+            }
+            for (var i = 0; i < incomingRows.length; i++) {
+                tbody.appendChild(incomingRows[i]);
+            }
         }
+    }
+
+    /**
+     * Extract PID from a table row's player link (href containing pid=).
+     */
+    function getRowPid(row) {
+        var links = row.querySelectorAll('a[href*="pid="]');
+        for (var l = 0; l < links.length; l++) {
+            var href = links[l].getAttribute('href') || '';
+            var match = href.match(/pid=(\d+)/);
+            if (match) {
+                return parseInt(match[1], 10);
+            }
+        }
+        return null;
     }
 
     // ========================================================================

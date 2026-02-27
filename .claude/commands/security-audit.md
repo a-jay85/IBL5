@@ -27,15 +27,15 @@ gh pr view --json number,headRefOid,headRefName,baseRefName
 gh pr diff --name-only | grep '\.php$'
 ```
 
-### 2c. Get the PHP-only diff
+### 2c. Get the PHP-only diff and measure its size
 ```bash
-gh pr diff | awk '/^diff --git/{found=0} /^diff --git.*\.php/{found=1} found{print}'
+DIFF=$(gh pr diff | awk '/^diff --git/{found=0} /^diff --git.*\.php/{found=1} found{print}')
+DIFF_SIZE=$(echo "$DIFF" | wc -c)
+echo "Diff size: $DIFF_SIZE bytes"
+echo "$DIFF"
 ```
 
-### 2d. Measure the PHP diff size
-```bash
-gh pr diff | awk '/^diff --git/{found=0} /^diff --git.*\.php/{found=1} found{print}' | wc -c
-```
+Use `$DIFF` for all subsequent steps. Do NOT call `gh pr diff` again.
 
 **If the PHP diff is larger than 100,000 bytes:** Instead of the full diff, use the GitHub API to get per-file patches (excluding test files):
 ```bash
@@ -44,17 +44,31 @@ gh api "repos/a-jay85/IBL5/pulls/{N}/files" --paginate --jq '.[] | select(.filen
 
 Store all of these results — they will be passed as context to agents below.
 
-## Step 3: PR summary
+## Step 3: Pattern detection (parent context — determines which agents to launch)
 
-Use a **Haiku** agent. Pass it the PR metadata and PHP file list from Step 2. Ask it to return a 2-3 sentence summary of the change.
+Analyze the diff from Step 2c to determine which vulnerability categories are relevant. Run:
 
-## Step 4: Five parallel Sonnet agents
+```bash
+echo "SQL patterns:" && echo "$DIFF" | grep -c -E 'sql_query|prepare|fetchOne|fetchAll|query\(' || true
+echo "Superglobals:" && echo "$DIFF" | grep -c -E '\$_GET|\$_POST|\$_REQUEST|\$_COOKIE' || true
+echo "Output:" && echo "$DIFF" | grep -c -E 'echo |print |<\?=' || true
+echo "Forms:" && echo "$DIFF" | grep -c -E 'POST|PUT|DELETE|<form|action=' || true
+```
 
-Launch **5 parallel Sonnet agents**. Each agent receives the PHP diff from Step 2c and must return a list of findings with file, line number(s), and description. If the agent finds no issues, it returns an empty list.
+Record the counts. An agent is **relevant** if its category count > 0:
+- Agent 1 (SQL Injection): relevant if SQL patterns > 0
+- Agent 2 (XSS): relevant if Output > 0
+- Agent 3 (Input Validation): relevant if Superglobals > 0
+- Agent 4 (CSRF): relevant if Forms > 0
+- Agent 5 (Auth/Authz): **always relevant** (auth gaps can appear in any PHP change)
+
+## Step 4: Conditional parallel Sonnet agents
+
+Launch **only the relevant agents** identified in Step 3, in parallel. Each agent receives the PHP diff from Step 2c and must return a list of findings with file, line number(s), and description. If the agent finds no issues, it returns an empty list.
 
 **CRITICAL: No agent should call `gh pr diff`. The diff was already fetched in Step 2.**
 
-### Agent 1: SQL Injection
+### Agent 1: SQL Injection (only if SQL patterns > 0)
 Pass this agent the PHP diff from Step 2c.
 
 Task: Scan for SQL injection vulnerabilities.
@@ -70,7 +84,7 @@ Task: Scan for SQL injection vulnerabilities.
 - `$db->sql_query()` with fully hardcoded strings (no variables at all)
 - Integer-cast values: `(int)$var` used directly in SQL
 
-### Agent 2: XSS / Output Encoding
+### Agent 2: XSS / Output Encoding (only if Output > 0)
 Pass this agent the PHP diff from Step 2c.
 
 Task: Scan for cross-site scripting vulnerabilities.
@@ -88,7 +102,7 @@ Task: Scan for cross-site scripting vulnerabilities.
 - `echo` in CLI scripts (no web context)
 - Hardcoded string literals with no variables
 
-### Agent 3: Input Validation
+### Agent 3: Input Validation (only if Superglobals > 0)
 Pass this agent the PHP diff from Step 2c.
 
 Task: Scan for input validation gaps.
@@ -104,7 +118,7 @@ Task: Scan for input validation gaps.
 - Typed parameters in `strict_types=1` files (PHP enforces the type)
 - Integer type hints on function parameters receiving superglobal values
 
-### Agent 4: CSRF Protection
+### Agent 4: CSRF Protection (only if Forms > 0)
 Pass this agent the PHP diff from Step 2c.
 
 Task: Scan for missing CSRF protection on state-changing operations.
@@ -120,7 +134,7 @@ Task: Scan for missing CSRF protection on state-changing operations.
 - Code that calls `CsrfGuard::validateSubmittedToken()` or `CsrfGuard::validateToken()` before processing
 - Forms that include `CsrfGuard::generateToken()` output
 
-### Agent 5: Authentication & Authorization
+### Agent 5: Authentication & Authorization (always launch)
 Pass this agent the PHP diff from Step 2c AND the PHP file list from Step 2b.
 
 Task: Scan for authentication and authorization gaps.
@@ -139,23 +153,35 @@ Task: Scan for authentication and authorization gaps.
 
 ## Step 5: Confidence scoring
 
-For each finding from Step 4, launch a parallel **Haiku** agent that takes the PR summary, finding description, and the relevant code context. Each scoring agent returns a confidence score from 0-100 using this rubric:
+Collect all findings from Step 4 into a numbered list. Launch a **single Haiku agent** that receives all findings at once and returns a confidence score for each. Give the agent this prompt:
 
-- **0:** False positive — code is secure. Variable is validated upstream, parameter is type-hinted int in strict_types, string is hardcoded, API endpoint uses ApiKeyAuthenticator, etc.
-- **25:** Suspicious but likely mitigated. Variable is constrained elsewhere, or pattern is technically present but unexploitable in context.
-- **50:** Pattern present but exploitation requires specific conditions that may not apply.
-- **75:** Clearly present vulnerability with no visible mitigation in the diff.
-- **100:** Direct user input flows to SQL/HTML/file/state-change with zero sanitization or validation.
+> Score each finding 0-100 using the rubric below. You also receive the PR metadata and PHP file list for context.
+>
+> **Rubric:**
+> - **0:** False positive — code is secure. Variable is validated upstream, parameter is type-hinted int in strict_types, string is hardcoded, API endpoint uses ApiKeyAuthenticator, etc.
+> - **25:** Suspicious but likely mitigated. Variable is constrained elsewhere, or pattern is technically present but unexploitable in context.
+> - **50:** Pattern present but exploitation requires specific conditions that may not apply.
+> - **75:** Clearly present vulnerability with no visible mitigation in the diff.
+> - **100:** Direct user input flows to SQL/HTML/file/state-change with zero sanitization or validation.
+>
+> **IBL5-specific false positives to downgrade to 0-25:**
+> - Variables from `BaseMysqliRepository` methods (already parameterized)
+> - Test files (`tests/` directory — not production attack surface)
+> - Integers in `strict_types=1` files with typed parameters
+> - `echo` in CLI scripts (no web context)
+> - `$db->sql_query()` with fully hardcoded strings (no variables)
+> - `HtmlSanitizer` wrapping on a different line than the `echo` (still protected)
+> - API handlers that already use `ApiKeyAuthenticator` (CSRF exempt)
+> - Read-only GET handlers (CSRF exempt)
+>
+> Findings:
+> 1. [finding 1 description]
+> 2. [finding 2 description]
+> ...
+>
+> Return ONLY valid JSON: [{"n": 1, "score": 75}, {"n": 2, "score": 0}, ...]
 
-**IBL5-specific false positives to downgrade to 0-25:**
-- Variables from `BaseMysqliRepository` methods (already parameterized)
-- Test files (`tests/` directory — not production attack surface)
-- Integers in `strict_types=1` files with typed parameters
-- `echo` in CLI scripts (no web context)
-- `$db->sql_query()` with fully hardcoded strings (no variables)
-- `HtmlSanitizer` wrapping on a different line than the `echo` (still protected)
-- API handlers that already use `ApiKeyAuthenticator` (CSRF exempt)
-- Read-only GET handlers (CSRF exempt)
+Parse the JSON response and assign scores back to each finding.
 
 ## Step 6: Filter
 
@@ -163,7 +189,12 @@ Filter out any findings with a score less than **75**. If no findings meet this 
 
 ## Step 7: Re-check eligibility
 
-Use a **Haiku** agent to repeat the eligibility check from Step 1, to make sure the PR is still open and hasn't been merged while the audit was running.
+Run this command directly (no agent needed):
+```bash
+gh pr view --json state --jq '.state'
+```
+
+If the result is not `"OPEN"`, do not post a comment. Tell the user the PR is no longer open.
 
 ## Step 8: Post comment
 

@@ -97,9 +97,9 @@ export const load: PageServerLoad = async ({ params }) => {
 
 		console.log(`✅ Found ${players.length} total players for this game`);
 
-		// Separate players by team
-		const awayPlayers = players.filter((p: any) => p.isAwayPlayer === 1);
-		const homePlayers = players.filter((p: any) => p.isAwayPlayer === 0);
+		// Separate players by team (CASE returns BigInt from $queryRaw, so compare with Number())
+		const awayPlayers = players.filter((p: any) => Number(p.isAwayPlayer) === 1);
+		const homePlayers = players.filter((p: any) => Number(p.isAwayPlayer) === 0);
 
 		console.log(`👥 Away players: ${awayPlayers.length}, Home players: ${homePlayers.length}`);
 

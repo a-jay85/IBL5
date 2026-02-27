@@ -507,7 +507,7 @@ $tradeConfig = [
 <div id="trade-roster-preview" class="trade-roster-preview" style="display: none;">
     <div class="trade-roster-preview__header">
         <img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="trade-roster-preview__logo trade-roster-preview__logo--active" data-team-id="<?= $userTeamId ?>">
-        <div class="trade-roster-preview__title">Roster Preview</div>
+        <select class="ibl-view-select trade-roster-preview__select"><option value="ratings">Roster Preview</option></select>
         <img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="trade-roster-preview__logo" data-team-id="<?= $partnerTeamId ?>">
     </div>
     <div class="table-scroll-wrapper">

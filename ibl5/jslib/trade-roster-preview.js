@@ -36,6 +36,10 @@
     var currentDisplay = 'ratings';
     var debounceTimer = null;
     var abortController = null;
+    var headerSelectPopulated = false;
+
+    // Header dropdown (replaces static title)
+    var headerSelect = panel.querySelector('.trade-roster-preview__select');
 
     // ========================================================================
     // PID COLLECTION (same logic as trade-comparison.js)
@@ -78,6 +82,30 @@
         }
 
         return { user: userPids, partner: partnerPids };
+    }
+
+    // ========================================================================
+    // HEADER DROPDOWN POPULATION
+    // ========================================================================
+
+    /**
+     * Populate the header <select> from the API response's dropdown options.
+     * Only runs once — subsequent responses just restore the value.
+     */
+    function populateHeaderSelect(container) {
+        if (headerSelectPopulated || !headerSelect) {
+            return;
+        }
+
+        var responseSelect = container.querySelector('.ibl-view-select');
+        if (!responseSelect) {
+            return;
+        }
+
+        // Clone all optgroups and options into the header select
+        headerSelect.innerHTML = responseSelect.innerHTML;
+        headerSelect.value = currentDisplay;
+        headerSelectPopulated = true;
     }
 
     // ========================================================================
@@ -151,10 +179,12 @@
 
                     container.innerHTML = data.html;
 
-                    // Restore dropdown selection
-                    var dropdown = container.querySelector('.ibl-view-select');
-                    if (dropdown) {
-                        dropdown.value = currentDisplay;
+                    // Populate the header dropdown from response (first time only)
+                    populateHeaderSelect(container);
+
+                    // Restore header select value
+                    if (headerSelect) {
+                        headerSelect.value = currentDisplay;
                     }
 
                     // Re-initialize sorting
@@ -259,13 +289,13 @@
         });
     }
 
-    // Dropdown change within the preview panel (delegated — dropdown is injected by API)
-    panel.addEventListener('change', function (e) {
-        if (e.target && e.target.classList && e.target.classList.contains('ibl-view-select')) {
-            currentDisplay = e.target.value;
+    // Header dropdown change
+    if (headerSelect) {
+        headerSelect.addEventListener('change', function () {
+            currentDisplay = headerSelect.value;
             fetchRosterPreview();
-        }
-    });
+        });
+    }
 
     // Session-restored checkboxes on page load
     document.addEventListener('DOMContentLoaded', function () {

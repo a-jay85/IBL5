@@ -161,6 +161,15 @@
     color: var(--gray-400, #9ca3af);
 }
 
+.trade-roster-preview tr.trade-outgoing-row td {
+    color: var(--gray-400, #9ca3af);
+}
+
+.trade-roster-preview tr.trade-outgoing-row img {
+    filter: grayscale(100%);
+    opacity: 0.45;
+}
+
 /* Hide per-team dropdowns injected by API responses (same as trade-comparison) */
 .trade-roster-preview .team-table-caption .ibl-view-dropdown {
     display: none;

@@ -79,7 +79,9 @@
             <file>tests/LeagueTest.php</file>
             <file>tests/SeasonTest.php</file>
             <file>tests/TeamTest.php</file>
-            <file>tests/BoxscoreTest.php</file>
+        </testsuite>
+        <testsuite name="Boxscore Module Tests">
+            <directory>tests/Boxscore</directory>
         </testsuite>
         <testsuite name="SeriesRecords Module Tests">
             <directory>tests/SeriesRecords</directory>

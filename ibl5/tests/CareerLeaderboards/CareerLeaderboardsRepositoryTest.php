@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Tests\CareerLeaderboards;
+
 use PHPUnit\Framework\TestCase;
 use CareerLeaderboards\CareerLeaderboardsRepository;
 
@@ -9,7 +11,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
 {
     public function testGetTableTypeIdentifiesTotals(): void
     {
-        $mockDb = new MockDatabase();
+        $mockDb = new \MockDatabase();
         $repository = new CareerLeaderboardsRepository($mockDb);
 
         $this->assertEquals('totals', $repository->getTableType('ibl_hist'));
@@ -23,7 +25,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
 
     public function testGetTableTypeIdentifiesAverages(): void
     {
-        $mockDb = new MockDatabase();
+        $mockDb = new \MockDatabase();
         $repository = new CareerLeaderboardsRepository($mockDb);
 
         $this->assertEquals('averages', $repository->getTableType('ibl_season_career_avgs'));
@@ -35,7 +37,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
 
     public function testGetLeaderboardsRejectsInvalidTableName(): void
     {
-        $mockDb = new MockDatabase();
+        $mockDb = new \MockDatabase();
         $repository = new CareerLeaderboardsRepository($mockDb);
 
         $this->expectException(\InvalidArgumentException::class);
@@ -51,7 +53,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
 
     public function testGetLeaderboardsRejectsInvalidSortColumn(): void
     {
-        $mockDb = new MockDatabase();
+        $mockDb = new \MockDatabase();
         $repository = new CareerLeaderboardsRepository($mockDb);
 
         $this->expectException(\InvalidArgumentException::class);
@@ -68,7 +70,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
     public function testGetLeaderboardsAcceptsValidTableNames(): void
     {
         // Use the MockDatabase class
-        $mockDb = new MockDatabase();
+        $mockDb = new \MockDatabase();
         $mockDb->setMockData([
             ['pid' => 1, 'name' => 'Player 1', 'pts' => 100],
             ['pid' => 2, 'name' => 'Player 2', 'pts' => 95],
@@ -86,7 +88,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
 
     public function testGetLeaderboardsAcceptsValidSortColumns(): void
     {
-        $mockDb = new MockDatabase();
+        $mockDb = new \MockDatabase();
         $mockDb->setMockData([
             ['pid' => 1, 'name' => 'Player 1', 'ast' => 10],
             ['pid' => 2, 'name' => 'Player 2', 'ast' => 9],
@@ -107,7 +109,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
 
     public function testGetLeaderboardsBuildsCorrectQueryForHistTable(): void
     {
-        $mockDb = new MockDatabase();
+        $mockDb = new \MockDatabase();
         $mockDb->setMockData([
             ['pid' => 1, 'name' => 'Player 1', 'pts' => 100],
             ['pid' => 2, 'name' => 'Player 2', 'pts' => 95],
@@ -135,7 +137,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
 
     public function testGetLeaderboardsBuildsCorrectQueryForAveragesTable(): void
     {
-        $mockDb = new MockDatabase();
+        $mockDb = new \MockDatabase();
         $mockDb->setMockData([
             ['pid' => 1, 'name' => 'Player 1', 'ast' => 10.5],
             ['pid' => 2, 'name' => 'Player 2', 'ast' => 10.2],
@@ -169,7 +171,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
 
     public function testGetLeaderboardsHandlesUnlimitedRecords(): void
     {
-        $mockDb = new MockDatabase();
+        $mockDb = new \MockDatabase();
         $mockDb->setMockData([
             ['pid' => 1, 'name' => 'Player 1', 'pts' => 100],
             ['pid' => 2, 'name' => 'Player 2', 'pts' => 95],

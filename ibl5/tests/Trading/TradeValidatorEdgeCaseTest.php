@@ -437,9 +437,7 @@ class TradeValidatorEdgeCaseTest extends TestCase
     // DATA PROVIDER TESTS
     // ============================================
 
-    /**
-     * @dataProvider boundaryCapValuesProvider
-     */
+    /**     */
     #[DataProvider('boundaryCapValuesProvider')]
     public function testSalaryCapBoundaryConditions(
         int $userCap,

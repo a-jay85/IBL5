@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\SiteStatistics;
 
 use PHPUnit\Framework\TestCase;
@@ -37,12 +39,12 @@ class StatisticsRepositoryTest extends TestCase
             
             // Override prepare to handle both fetchAll and fetchOne patterns
             // For fetchOne, we need to track consumption across multiple prepare() calls
-            public function prepare(string $query): MockPreparedStatement
+            public function prepare(string $query): \MockPreparedStatement
             {
                 $sharedState = &$this->sharedState;
                 $results = $this->queryResults;
                 
-                $stmt = new class($this, $results, $sharedState) extends MockPreparedStatement {
+                $stmt = new class($this, $results, $sharedState) extends \MockPreparedStatement {
                     private array $results;
                     private array $sharedState;
                     
@@ -58,7 +60,7 @@ class StatisticsRepositoryTest extends TestCase
                         $currentIndex = $this->sharedState['fetchIndex'];
                         $this->sharedState['fetchIndex']++; // Consume the result for the next prepare() call
                         
-                        return new class($this->results, $currentIndex) extends MockDatabaseResult {
+                        return new class($this->results, $currentIndex) extends \MockDatabaseResult {
                             private int $localFetchIndex = 0;
                             private array $allResults;
                             private int $startIndex;

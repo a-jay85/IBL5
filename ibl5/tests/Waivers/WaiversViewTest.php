@@ -39,15 +39,6 @@ class WaiversViewTest extends TestCase
     }
 
     // ============================================
-    // METHOD EXISTENCE TESTS
-    // ============================================
-
-    public function testHasRenderWaiverFormMethod(): void
-    {
-        $this->assertTrue(method_exists($this->view, 'renderWaiverForm'));
-    }
-
-    // ============================================
     // RENDER WAIVER FORM TESTS
     // ============================================
 

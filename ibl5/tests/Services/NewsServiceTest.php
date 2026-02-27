@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Services;
+
 use PHPUnit\Framework\TestCase;
 use Services\NewsService;
 
@@ -13,7 +17,7 @@ class NewsServiceTest extends TestCase
     
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
+        $this->mockDb = new \MockDatabase();
         $this->newsService = new NewsService($this->mockDb);
     }
     

@@ -122,14 +122,4 @@ class TeamControllerTest extends TestCase
         $this->assertInstanceOf(TeamControllerInterface::class, $controller);
     }
 
-    // ============================================
-    // METHOD EXISTENCE TESTS
-    // ============================================
-
-    public function testHasDisplayTeamPageMethod(): void
-    {
-        $controller = new TeamController($this->mockDb);
-
-        $this->assertTrue(method_exists($controller, 'displayTeamPage'));
-    }
 }

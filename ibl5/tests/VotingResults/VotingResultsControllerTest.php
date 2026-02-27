@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../bootstrap.php';
+namespace Tests\VotingResults;
 
 use PHPUnit\Framework\TestCase;
 use Voting\VotingResultsController;
@@ -58,9 +58,9 @@ final class VotingResultsControllerTest extends TestCase
         $this->assertSame(1, $service->endOfYearCalls);
     }
 
-    private function createSeason(string $phase): Season
+    private function createSeason(string $phase): \Season
     {
-        $season = new Season(new MockDatabase());
+        $season = new \Season(new \MockDatabase());
         $season->phase = $phase;
 
         return $season;

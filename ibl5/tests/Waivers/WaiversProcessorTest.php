@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Waivers;
+
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Waivers\WaiversProcessor;
@@ -17,11 +21,11 @@ class WaiversProcessorTest extends TestCase
         $this->processor = new WaiversProcessor();
         
         // Create mock Season for regular season
-        $this->mockSeasonRegular = $this->createMock(Season::class);
+        $this->mockSeasonRegular = $this->createMock(\Season::class);
         $this->mockSeasonRegular->phase = 'Regular Season';
         
         // Create mock Season for free agency
-        $this->mockSeasonFreeAgency = $this->createMock(Season::class);
+        $this->mockSeasonFreeAgency = $this->createMock(\Season::class);
         $this->mockSeasonFreeAgency->phase = 'Free Agency';
     }
     

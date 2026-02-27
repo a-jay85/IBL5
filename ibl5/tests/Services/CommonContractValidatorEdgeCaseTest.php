@@ -542,9 +542,7 @@ class CommonContractValidatorEdgeCaseTest extends TestCase
     // DATA PROVIDER TESTS
     // ============================================
 
-    /**
-     * @dataProvider raisePercentageBoundaryProvider
-     */
+    /**     */
     #[DataProvider('raisePercentageBoundaryProvider')]
     public function testRaisePercentageBoundaries(
         int $year1,
@@ -570,9 +568,7 @@ class CommonContractValidatorEdgeCaseTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider yearsExperienceMaxProvider
-     */
+    /**     */
     #[DataProvider('yearsExperienceMaxProvider')]
     public function testMaxContractByExperience(int $yearsExperience): void
     {

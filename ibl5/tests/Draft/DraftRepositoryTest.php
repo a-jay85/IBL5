@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Draft;
+
 use PHPUnit\Framework\TestCase;
 use Draft\DraftRepository;
 
@@ -10,7 +14,7 @@ class DraftRepositoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
+        $this->mockDb = new \MockDatabase();
         $this->repository = new DraftRepository($this->mockDb);
     }
 

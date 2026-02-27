@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Team;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Team\Contracts\TeamServiceInterface;
 use Team\TeamService;
@@ -31,15 +32,6 @@ class TeamServiceBuildDropdownGroupsTest extends TestCase
 
         $repository = new \Team\TeamRepository($this->mockDb);
         $this->service = new TeamService($this->mockDb, $repository);
-    }
-
-    public function testImplementsBuildDropdownGroupsInInterface(): void
-    {
-        $this->assertInstanceOf(TeamServiceInterface::class, $this->service);
-        $this->assertTrue(
-            method_exists(TeamServiceInterface::class, 'buildDropdownGroups'),
-            'TeamServiceInterface must declare buildDropdownGroups()'
-        );
     }
 
     public function testReturnsExpectedGroupKeys(): void
@@ -85,7 +77,7 @@ class TeamServiceBuildDropdownGroupsTest extends TestCase
         $this->assertArrayNotHasKey('playoffs', $groups['Views']);
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('playoffPhaseProvider')]
+    #[DataProvider('playoffPhaseProvider')]
     public function testPlayoffsAveragesIncludedDuringPostSeason(string $phase): void
     {
         $season = $this->createSeasonStub($phase);

@@ -190,6 +190,29 @@ class UpdaterViewTest extends TestCase
         $this->assertStringContainsString('2 failed', $result);
     }
 
+    public function testRenderInlineHtmlWrapsContent(): void
+    {
+        $result = $this->view->renderInlineHtml('<div class="ibl-card">Content</div>');
+
+        $this->assertStringContainsString('updater-log', $result);
+        $this->assertStringContainsString('<div class="ibl-card">Content</div>', $result);
+    }
+
+    public function testRenderInlineHtmlReturnsEmptyForBlank(): void
+    {
+        $this->assertSame('', $this->view->renderInlineHtml(''));
+        $this->assertSame('', $this->view->renderInlineHtml('   '));
+    }
+
+    public function testRenderInlineHtmlPreservesTrustedHtml(): void
+    {
+        $html = '<div class="ibl-alert ibl-alert--success">.lge imported</div>';
+        $result = $this->view->renderInlineHtml($html);
+
+        $this->assertStringContainsString('.lge imported', $result);
+        $this->assertStringContainsString('ibl-alert--success', $result);
+    }
+
     public function testRenderPageCloseReturnsReturnLink(): void
     {
         $result = $this->view->renderPageClose();

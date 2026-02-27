@@ -148,6 +148,7 @@ class Contracts
 <?php endforeach; ?>
     </tbody>
     <tfoot>
+<?php $hardCapMax = \League::HARD_CAP_MAX; ?>
         <tr>
             <td></td>
             <td>Cap Totals</td>
@@ -155,12 +156,12 @@ class Contracts
             <td></td>
             <td></td>
             <td class="sep-team"></td>
-            <td class="salary"><?= $cap1 ?></td>
-            <td class="salary"><?= $cap2 ?></td>
-            <td class="salary"><?= $cap3 ?></td>
-            <td class="salary"><?= $cap4 ?></td>
-            <td class="salary"><?= $cap5 ?></td>
-            <td class="salary"><?= $cap6 ?></td>
+            <td class="salary<?= $cap1 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap1 ?></td>
+            <td class="salary<?= $cap2 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap2 ?></td>
+            <td class="salary<?= $cap3 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap3 ?></td>
+            <td class="salary<?= $cap4 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap4 ?></td>
+            <td class="salary<?= $cap5 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap5 ?></td>
+            <td class="salary<?= $cap6 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap6 ?></td>
             <td class="sep-team"></td>
             <td></td>
             <td></td>

@@ -198,6 +198,12 @@
     border-top: 1px solid var(--gray-200, #e5e7eb);
 }
 
+/* Cap exceeded — red highlight when salary totals exceed hard cap */
+.ibl-data-table tfoot td.cap-exceeded {
+    color: var(--color-error-600, #dc2626);
+    font-weight: 700;
+}
+
 /* ==========================================================================
    Team-Colored Table Modifier (.team-table)
 

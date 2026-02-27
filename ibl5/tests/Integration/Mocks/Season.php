@@ -68,6 +68,14 @@ class Season
     {
         return $this->phase;
     }
+
+    /**
+     * Check if current season phase is free agency (mock implementation)
+     */
+    public function isFreeAgencyPhase(): bool
+    {
+        return $this->phase === 'Free Agency';
+    }
     
     public function getSeasonEndingYear(): string
     {

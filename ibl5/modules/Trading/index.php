@@ -104,6 +104,16 @@ switch ($op) {
         }
         break;
 
+    case "roster-preview-api":
+        if (!is_user($user)) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['html' => ''], JSON_THROW_ON_ERROR);
+        } else {
+            $handler = new Trading\TradeRosterPreviewApiHandler($mysqli_db);
+            $handler->handle();
+        }
+        break;
+
     default:
         reviewtrade($user);
         break;

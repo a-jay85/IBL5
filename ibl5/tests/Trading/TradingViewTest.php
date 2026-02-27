@@ -406,6 +406,51 @@ class TradingViewTest extends TestCase
     }
 
     // ============================================
+    // ROSTER PREVIEW PANEL TESTS
+    // ============================================
+
+    public function testRenderTradeOfferFormContainsRosterPreviewPanel(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('id="trade-roster-preview"', $html);
+        $this->assertStringContainsString('trade-roster-preview', $html);
+        $this->assertStringContainsString('Roster Preview', $html);
+    }
+
+    public function testRenderTradeOfferFormContainsRosterPreviewLogos(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('trade-roster-preview__logo', $html);
+        $this->assertStringContainsString('data-team-id="1"', $html);
+        $this->assertStringContainsString('data-team-id="2"', $html);
+    }
+
+    public function testRenderTradeOfferFormConfigContainsRosterPreviewApiUrl(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('rosterPreviewApiBaseUrl', $html);
+        $this->assertStringContainsString('roster-preview-api', $html);
+    }
+
+    public function testRenderTradeOfferFormLoadsRosterPreviewJs(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('trade-roster-preview.js', $html);
+    }
+
+    // ============================================
     // RESULT BANNER TESTS
     // ============================================
 

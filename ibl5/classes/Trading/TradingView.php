@@ -157,6 +157,7 @@ if ($comparisonDropdownGroups !== []):
                 </div>
             </div>
         </div>
+<?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam) ?>
 <?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2, $previousFormData) ?>
 <?= $this->renderCapTotals($pageData, $seasonEndingYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2) ?>
         <div style="text-align: center; padding: 1rem;">
@@ -167,6 +168,7 @@ if ($comparisonDropdownGroups !== []):
 <?php
 $tradeConfig = [
     'apiBaseUrl' => 'modules.php?name=Trading&op=comparison-api',
+    'rosterPreviewApiBaseUrl' => 'modules.php?name=Trading&op=roster-preview-api',
     'userTeam' => $pageData['userTeam'],
     'partnerTeam' => $pageData['partnerTeam'],
     'userTeamId' => $userTeamId,
@@ -185,6 +187,7 @@ $tradeConfig = [
 ?>
 <script>window.IBL_TRADE_CONFIG = <?= json_encode($tradeConfig, JSON_HEX_TAG | JSON_THROW_ON_ERROR) ?>;</script>
 <script src="jslib/trade-comparison.js" defer></script>
+<script src="jslib/trade-roster-preview.js" defer></script>
 </form>
         <?php
         return (string) ob_get_clean();
@@ -487,6 +490,29 @@ $tradeConfig = [
 <?php endfor; ?>
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render the roster preview panel (hidden initially, shown via JS)
+     */
+    private function renderRosterPreview(int $userTeamId, int $partnerTeamId, string $userTeam, string $partnerTeam): string
+    {
+        ob_start();
+        ?>
+<div id="trade-roster-preview" class="trade-roster-preview" style="display: none;">
+    <div class="trade-roster-preview__header">
+        <img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="trade-roster-preview__logo trade-roster-preview__logo--active" data-team-id="<?= $userTeamId ?>">
+        <div class="trade-roster-preview__title">Roster Preview</div>
+        <img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="trade-roster-preview__logo" data-team-id="<?= $partnerTeamId ?>">
+    </div>
+    <div class="table-scroll-wrapper">
+        <div class="table-scroll-container">
+            <div class="trade-roster-preview__empty">Select players to preview roster changes</div>
         </div>
     </div>
 </div>

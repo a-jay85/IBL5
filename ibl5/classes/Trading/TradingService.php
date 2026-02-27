@@ -76,8 +76,8 @@ class TradingService implements TradingServiceInterface
 
         // Build shared comparison dropdown groups (all stat dimensions from team page)
         $teamRepository = new \Team\TeamRepository($mysqliDb);
-        $teamService = new \Team\TeamService($mysqliDb, $teamRepository);
-        $comparisonDropdownGroups = $teamService->buildDropdownGroups($season);
+        $teamTableService = new \Team\TeamTableService($mysqliDb, $teamRepository);
+        $comparisonDropdownGroups = $teamTableService->buildDropdownGroups($season);
 
         return [
             'userTeam' => $userTeam,

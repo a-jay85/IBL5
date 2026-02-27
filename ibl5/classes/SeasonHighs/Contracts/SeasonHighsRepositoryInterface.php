@@ -32,4 +32,13 @@ interface SeasonHighsRepositoryInterface
         string $endDate,
         int $limit = 15
     ): array;
+
+    /**
+     * Get RCB-sourced single-game records for a given context (home/away).
+     *
+     * @param int $seasonYear Season year
+     * @param string $context 'home' or 'away'
+     * @return list<array{stat_category: string, ranking: int, player_name: string, player_position: string|null, stat_value: int, record_season_year: int}>
+     */
+    public function getRcbSeasonHighs(int $seasonYear, string $context): array;
 }

@@ -72,6 +72,14 @@ class JsbImportService implements JsbImportServiceInterface
             $result->addMessage('ASW: ' . $aswResult->summary());
         }
 
+        // Process .rcb (Record Book)
+        $rcbPath = $basePath . '/IBL5.rcb';
+        if (file_exists($rcbPath)) {
+            $rcbResult = $this->processRcbFile($rcbPath, $seasonYear, 'current-season');
+            $result->merge($rcbResult);
+            $result->addMessage('RCB: ' . $rcbResult->summary());
+        }
+
         return $result;
     }
 
@@ -303,6 +311,72 @@ class JsbImportService implements JsbImportServiceInterface
             $rosters['three_point'],
             $result
         );
+
+        return $result;
+    }
+
+    /**
+     * @see JsbImportServiceInterface::processRcbFile()
+     */
+    public function processRcbFile(string $filePath, int $seasonYear, ?string $sourceLabel = null): JsbImportResult
+    {
+        $result = new JsbImportResult();
+
+        try {
+            $parsed = RcbFileParser::parseFile($filePath);
+        } catch (\RuntimeException $e) {
+            $result->addError('RCB parse failed: ' . $e->getMessage());
+            return $result;
+        }
+
+        // Import all-time records
+        foreach ($parsed['alltime'] as $record) {
+            try {
+                $affected = $this->repository->upsertRcbAlltimeRecord([
+                    'scope' => $record['scope'],
+                    'team_id' => $record['team_id'],
+                    'record_type' => $record['record_type'],
+                    'stat_category' => $record['stat_category'],
+                    'ranking' => $record['ranking'],
+                    'player_name' => $record['player_name'],
+                    'car_block_id' => $record['car_block_id'],
+                    'pid' => null,
+                    'stat_value' => $record['stat_value'],
+                    'stat_raw' => $record['stat_raw'],
+                    'team_of_record' => $record['team_of_record'],
+                    'season_year' => $record['season_year'],
+                    'career_total' => $record['career_total'],
+                    'source_file' => $sourceLabel,
+                ]);
+                $this->recordUpsertResult($affected, $result);
+            } catch (\RuntimeException $e) {
+                $result->addError('RCB alltime upsert failed for ' . $record['player_name'] . ': ' . $e->getMessage());
+            }
+        }
+
+        // Import current season records
+        foreach ($parsed['currentSeason'] as $record) {
+            try {
+                $affected = $this->repository->upsertRcbSeasonRecord([
+                    'season_year' => $seasonYear,
+                    'scope' => $record['scope'],
+                    'team_id' => $record['team_id'],
+                    'context' => $record['context'],
+                    'stat_category' => $record['stat_category'],
+                    'ranking' => $record['ranking'],
+                    'player_name' => $record['player_name'],
+                    'player_position' => $record['player_position'],
+                    'car_block_id' => $record['car_block_id'],
+                    'pid' => null,
+                    'stat_value' => $record['stat_value'],
+                    'record_season_year' => $record['season_year'],
+                    'source_file' => $sourceLabel,
+                ]);
+                $this->recordUpsertResult($affected, $result);
+            } catch (\RuntimeException $e) {
+                $result->addError('RCB season upsert failed for ' . $record['player_name'] . ': ' . $e->getMessage());
+            }
+        }
 
         return $result;
     }

@@ -225,5 +225,8 @@
         <testsuite name="PlrParser Module Tests">
             <directory>tests/PlrParser</directory>
         </testsuite>
+        <testsuite name="FranchiseRecordBook Module Tests">
+            <directory>tests/FranchiseRecordBook</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

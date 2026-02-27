@@ -26,6 +26,8 @@ namespace SeasonHighs\Contracts;
  *
  * @phpstan-type RcbSeasonHighEntry array{stat_category: string, ranking: int, player_name: string, player_position: string|null, stat_value: int, record_season_year: int}
  *
+ * @phpstan-type RcbDiscrepancy array{context: string, stat: string, boxValue: int, boxPlayer: string, rcbValue: int, rcbPlayer: string}
+ *
  * @phpstan-type SeasonHighsData array{
  *     playerHighs: array<string, list<SeasonHighEntry>>,
  *     teamHighs: array<string, list<SeasonHighEntry>>
@@ -42,9 +44,19 @@ interface SeasonHighsServiceInterface
     public function getSeasonHighsData(string $seasonPhase): array;
 
     /**
-     * Get RCB-sourced home/away single-game records.
+     * Get home/away single-game records from box scores.
      *
-     * @return array{home: array<string, list<RcbSeasonHighEntry>>, away: array<string, list<RcbSeasonHighEntry>>}
+     * @param string $seasonPhase Season phase for date range calculation
+     * @return array{home: array<string, list<SeasonHighEntry>>, away: array<string, list<SeasonHighEntry>>}
      */
-    public function getHomeAwayHighs(): array;
+    public function getHomeAwayHighs(string $seasonPhase): array;
+
+    /**
+     * Validate box score home/away data against RCB records.
+     *
+     * @param array{home: array<string, list<SeasonHighEntry>>, away: array<string, list<SeasonHighEntry>>} $homeAwayData
+     * @param int $seasonYear Beginning year of the season
+     * @return list<RcbDiscrepancy>
+     */
+    public function validateAgainstRcb(array $homeAwayData, int $seasonYear): array;
 }

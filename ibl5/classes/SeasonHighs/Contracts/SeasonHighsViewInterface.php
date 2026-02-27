@@ -10,7 +10,8 @@ namespace SeasonHighs\Contracts;
  * Provides method to render the season highs page.
  *
  * @phpstan-import-type SeasonHighsData from SeasonHighsServiceInterface
- * @phpstan-import-type RcbSeasonHighEntry from SeasonHighsServiceInterface
+ * @phpstan-import-type SeasonHighEntry from SeasonHighsServiceInterface
+ * @phpstan-import-type RcbDiscrepancy from SeasonHighsServiceInterface
  */
 interface SeasonHighsViewInterface
 {
@@ -24,10 +25,12 @@ interface SeasonHighsViewInterface
     public function render(string $seasonPhase, array $data): string;
 
     /**
-     * Render home/away season highs from RCB data.
+     * Render home/away season highs from box score data.
      *
-     * @param array{home: array<string, list<RcbSeasonHighEntry>>, away: array<string, list<RcbSeasonHighEntry>>} $data
+     * @param string $seasonPhase Current season phase
+     * @param array{home: array<string, list<SeasonHighEntry>>, away: array<string, list<SeasonHighEntry>>} $data
+     * @param list<RcbDiscrepancy> $discrepancies
      * @return string HTML output
      */
-    public function renderHomeAwayHighs(array $data): string;
+    public function renderHomeAwayHighs(string $seasonPhase, array $data, array $discrepancies): string;
 }

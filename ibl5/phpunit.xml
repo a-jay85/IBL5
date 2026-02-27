@@ -215,6 +215,7 @@
         </testsuite>
         <testsuite name="CSS Architecture Tests">
             <directory>tests/CSS</directory>
+        </testsuite>
         <testsuite name="Module Tests">
             <directory>tests/Module</directory>
         </testsuite>

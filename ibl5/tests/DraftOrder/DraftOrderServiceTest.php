@@ -94,6 +94,30 @@ class DraftOrderServiceTest extends TestCase
         $this->assertCount(16, $playoffPicks);
     }
 
+    public function testDivisionOnlyWinnersArePicks25And26(): void
+    {
+        $this->configureStubWithFullLeague();
+
+        $result = $this->service->calculateDraftOrder(2026);
+
+        // Division-only winners (not conference winners): Team22 (19w) and Team8 (61w)
+        // Worse record gets earlier pick
+        $this->assertSame('Team22', $result['round1'][24]['teamName']); // Pick 25
+        $this->assertSame('Team8', $result['round1'][25]['teamName']);  // Pick 26
+    }
+
+    public function testConferenceWinnersArePicks27And28(): void
+    {
+        $this->configureStubWithFullLeague();
+
+        $result = $this->service->calculateDraftOrder(2026);
+
+        // Conference winners: Team15 (40w) and Team1 (82w)
+        // Worse record gets earlier pick
+        $this->assertSame('Team15', $result['round1'][26]['teamName']); // Pick 27
+        $this->assertSame('Team1', $result['round1'][27]['teamName']);  // Pick 28
+    }
+
     public function testDivisionWinnersMakePlayoffs(): void
     {
         $standings = $this->buildStandingsWithWeakDivisionWinner();

@@ -39,35 +39,28 @@ class DraftOrderService implements DraftOrderServiceInterface
         $pointDiffs = $this->buildPointDifferentialMap($pointDiffRows);
 
         $teamsByConference = $this->groupByConference($standings);
-        $playoffTeamIds = [];
-        $nonPlayoffTeamIds = [];
+        $nonPlayoffTeams = [];
+        $wildCardTeams = [];
+        $divisionWinnerTeams = [];
+        $conferenceWinnerTeams = [];
 
         foreach (\League::CONFERENCE_NAMES as $conference) {
             $conferenceTeams = $teamsByConference[$conference] ?? [];
             $result = $this->determinePlayoffTeams($conferenceTeams, $h2h, $pointDiffs);
-            foreach ($result['playoff'] as $team) {
-                $playoffTeamIds[] = $team['tid'];
-            }
-            foreach ($result['nonPlayoff'] as $team) {
-                $nonPlayoffTeamIds[] = $team['tid'];
-            }
+            array_push($nonPlayoffTeams, ...$result['nonPlayoff']);
+            array_push($wildCardTeams, ...$result['wildCards']);
+            array_push($divisionWinnerTeams, ...$result['divisionWinners']);
+            $conferenceWinnerTeams[] = $result['conferenceWinner'];
         }
 
         $teamMap = $this->buildTeamMap($standings);
 
-        $nonPlayoffTeams = array_map(
-            static fn (int $tid): array => $teamMap[$tid],
-            $nonPlayoffTeamIds
-        );
-        $playoffTeams = array_map(
-            static fn (int $tid): array => $teamMap[$tid],
-            $playoffTeamIds
-        );
-
         $nonPlayoffSorted = $this->sortTeamsByRecord($nonPlayoffTeams, $h2h, $pointDiffs);
-        $playoffSorted = $this->sortTeamsByRecord($playoffTeams, $h2h, $pointDiffs);
+        $wildCardsSorted = $this->sortTeamsByRecord($wildCardTeams, $h2h, $pointDiffs);
+        $divisionWinnersSorted = $this->sortTeamsByRecord($divisionWinnerTeams, $h2h, $pointDiffs);
+        $conferenceWinnersSorted = $this->sortTeamsByRecord($conferenceWinnerTeams, $h2h, $pointDiffs);
 
-        $round1Order = array_merge($nonPlayoffSorted, $playoffSorted);
+        $round1Order = array_merge($nonPlayoffSorted, $wildCardsSorted, $divisionWinnersSorted, $conferenceWinnersSorted);
 
         $allTeamsSorted = $this->sortTeamsByRecord(array_values($teamMap), $h2h, $pointDiffs);
 
@@ -140,12 +133,12 @@ class DraftOrderService implements DraftOrderServiceInterface
     }
 
     /**
-     * Determine 8 playoff teams and 6 non-playoff teams for a conference.
+     * Determine playoff teams, division winners, conference winner, and non-playoff teams.
      *
      * @param list<StandingsRow> $conferenceTeams
      * @param array<int, array<int, int>> $h2h
      * @param array<int, float> $pointDiffs
-     * @return array{playoff: list<StandingsRow>, nonPlayoff: list<StandingsRow>}
+     * @return array{wildCards: list<StandingsRow>, divisionWinners: list<StandingsRow>, conferenceWinner: StandingsRow, nonPlayoff: list<StandingsRow>}
      */
     private function determinePlayoffTeams(array $conferenceTeams, array $h2h, array $pointDiffs): array
     {
@@ -171,10 +164,15 @@ class DraftOrderService implements DraftOrderServiceInterface
         $wildCards = array_slice($nonWinners, 0, 6);
         $nonPlayoff = array_slice($nonWinners, 6);
 
-        $playoff = array_merge($divisionWinners, $wildCards);
+        // Conference winner is the best division winner
+        usort($divisionWinners, fn (array $a, array $b): int => $this->compareTeamsForPlayoffSeeding($a, $b, $h2h, $pointDiffs));
+        $conferenceWinner = $divisionWinners[0];
+        $divisionOnlyWinners = array_slice($divisionWinners, 1);
 
         return [
-            'playoff' => array_values($playoff),
+            'wildCards' => array_values($wildCards),
+            'divisionWinners' => array_values($divisionOnlyWinners),
+            'conferenceWinner' => $conferenceWinner,
             'nonPlayoff' => array_values($nonPlayoff),
         ];
     }

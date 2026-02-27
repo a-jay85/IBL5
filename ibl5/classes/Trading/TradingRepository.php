@@ -245,12 +245,13 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     /**
      * @see TradingRepositoryInterface::updateDraftPickOwnerById()
      */
-    public function updateDraftPickOwnerById(int $pickId, string $newOwner): int
+    public function updateDraftPickOwnerById(int $pickId, string $newOwner, int $newOwnerId): int
     {
         return $this->execute(
-            "UPDATE ibl_draft_picks SET ownerofpick = ? WHERE pickid = ?",
-            "si",
+            "UPDATE ibl_draft_picks SET ownerofpick = ?, owner_tid = ? WHERE pickid = ?",
+            "sii",
             $newOwner,
+            $newOwnerId,
             $pickId
         );
     }
@@ -349,17 +350,16 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     /**
      * @see TradingRepositoryInterface::getTeamDraftPicksForTrading()
      */
-    public function getTeamDraftPicksForTrading(string $teamName): array
+    public function getTeamDraftPicksForTrading(int $teamId): array
     {
         /** @var list<TradingDraftPickRow> */
         return $this->fetchAll(
-            "SELECT dp.*, t.teamid AS teampick_id
+            "SELECT dp.*, dp.teampick_tid AS teampick_id
              FROM ibl_draft_picks dp
-             JOIN ibl_team_info t ON t.team_name = dp.teampick
-             WHERE dp.ownerofpick = ?
+             WHERE dp.owner_tid = ?
              ORDER BY dp.year, dp.round ASC",
-            "s",
-            $teamName
+            "i",
+            $teamId
         );
     }
 

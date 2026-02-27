@@ -311,7 +311,7 @@ class TeamComponentsView implements TeamComponentsViewInterface
         /** @var \mysqli $mysqli_db */
 
         $teamQueryRepo = new \Team\TeamQueryRepository($mysqli_db);
-        $resultPicks = $teamQueryRepo->getDraftPicks($team->name);
+        $resultPicks = $teamQueryRepo->getDraftPicks($team->teamID);
 
         $league = new \League($mysqli_db);
         $allTeamsResult = $league->getAllTeamsResult();

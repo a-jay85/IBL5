@@ -49,7 +49,6 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
     private function renderRoundTable(array $slots, string $roundLabel, bool $showPlayoffDivider): string
     {
         $html = '<h3 class="ibl-table-title">' . HtmlSanitizer::safeHtmlOutput($roundLabel) . '</h3>';
-        $html .= '<div class="table-container">';
         $html .= '<table class="ibl-data-table projected-draft-order-table">';
         $html .= '<thead><tr>';
         $html .= '<th>Pick</th>';
@@ -70,7 +69,6 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         }
 
         $html .= '</tbody></table>';
-        $html .= '</div>';
 
         return $html;
     }

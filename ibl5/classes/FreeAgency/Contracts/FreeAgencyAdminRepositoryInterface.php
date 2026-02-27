@@ -12,8 +12,9 @@ namespace FreeAgency\Contracts;
  *
  * @phpstan-type OfferRow array{
  *     name: string,
- *     team: string,
  *     pid: int,
+ *     team: string,
+ *     tid: int,
  *     offer1: int,
  *     offer2: int,
  *     offer3: int,

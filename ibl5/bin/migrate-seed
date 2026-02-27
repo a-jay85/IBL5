@@ -1,0 +1,48 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('This script must be run from the command line.');
+}
+
+set_time_limit(0);
+
+$_SERVER['DOCUMENT_ROOT'] = dirname(__DIR__, 2);
+require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/vendor/autoload.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/config.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/db/db.php';
+
+/** @var \mysqli $mysqli_db */
+
+echo "=== Migration Seed ===\n\n";
+
+$migrationsDir = dirname(__DIR__) . '/migrations';
+$repository = new \Migration\MigrationRepository($mysqli_db);
+$fileResolver = new \Migration\MigrationFileResolver($migrationsDir);
+
+// Step 1: Truncate the migrations table (clears stale Laravel-era rows)
+echo "Step 1: Truncating migrations table...\n";
+$repository->truncate();
+echo "  Done.\n\n";
+
+// Step 2: Record all existing migration files as batch 0 (pre-tracking sentinel)
+echo "Step 2: Recording existing migrations as batch 0...\n";
+$available = $fileResolver->getAvailableMigrations();
+
+if ($available === []) {
+    echo "  No migration files found in {$migrationsDir}\n";
+    exit(0);
+}
+
+$count = 0;
+foreach ($available as $filename) {
+    $repository->recordMigration($filename, 0);
+    $count++;
+    echo "  Recorded: {$filename}\n";
+}
+
+echo "\nSeeded {$count} migration(s) as batch 0.\n";
+echo "=== Seed complete ===\n";

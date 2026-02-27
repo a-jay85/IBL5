@@ -25,7 +25,7 @@ class TradingView implements TradingViewInterface
      */
     public function renderTradeOfferForm(array $pageData): string
     {
-        /** @var array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<TradingDraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<TradingDraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string, userPlayerContracts: array<int, list<int>>, partnerPlayerContracts: array<int, list<int>>, comparisonDropdownGroups: array<string, array<string, string>>, result?: string, error?: string} $pageData */
+        /** @var array{userTeam: string, userTeamId: int, partnerTeam: string, partnerTeamId: int, userPlayers: list<TradingPlayerRow>, userPicks: list<TradingDraftPickRow>, userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerPlayers: list<TradingPlayerRow>, partnerPicks: list<TradingDraftPickRow>, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonEndingYear: int, seasonPhase: string, cashStartYear: int, cashEndYear: int, userTeamColor1: string, userTeamColor2: string, partnerTeamColor1: string, partnerTeamColor2: string, result?: string, error?: string} $pageData */
 
         $userTeam = HtmlSanitizer::safeHtmlOutput($pageData['userTeam']);
         $userTeamId = $pageData['userTeamId'];
@@ -123,40 +123,6 @@ class TradingView implements TradingViewInterface
                 </table>
             </div>
         </div>
-        <div id="trade-comparison-panel" class="trade-comparison" style="display: none;">
-            <div class="trade-comparison__header">Player Comparison</div>
-<?php
-/** @var array<string, array<string, string>> $comparisonDropdownGroups */
-$comparisonDropdownGroups = $pageData['comparisonDropdownGroups'] ?? [];
-if ($comparisonDropdownGroups !== []):
-?>
-            <div class="trade-comparison__shared-dropdown">
-                <select id="trade-comparison-display" class="ibl-view-select">
-<?php foreach ($comparisonDropdownGroups as $groupLabel => $options): ?>
-                    <optgroup label="<?= HtmlSanitizer::safeHtmlOutput($groupLabel) ?>">
-<?php foreach ($options as $value => $label): ?>
-                        <option value="<?= HtmlSanitizer::safeHtmlOutput($value) ?>"<?= $value === 'ratings' ? ' selected' : '' ?>><?= HtmlSanitizer::safeHtmlOutput($label) ?></option>
-<?php endforeach; ?>
-                    </optgroup>
-<?php endforeach; ?>
-                </select>
-            </div>
-<?php endif; ?>
-            <div class="trade-comparison__grid">
-                <div class="trade-comparison__team" data-side="user">
-                    <div class="trade-comparison__team-name"><?= $userTeam ?> sends</div>
-                    <div class="table-scroll-wrapper"><div class="table-scroll-container">
-                        <div class="trade-comparison__empty">No players selected</div>
-                    </div></div>
-                </div>
-                <div class="trade-comparison__team" data-side="partner">
-                    <div class="trade-comparison__team-name"><?= $partnerTeam ?> sends</div>
-                    <div class="table-scroll-wrapper"><div class="table-scroll-container">
-                        <div class="trade-comparison__empty">No players selected</div>
-                    </div></div>
-                </div>
-            </div>
-        </div>
 <?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam) ?>
 <?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2, $previousFormData) ?>
 <?= $this->renderCapTotals($pageData, $seasonEndingYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2) ?>
@@ -167,15 +133,12 @@ if ($comparisonDropdownGroups !== []):
     </div>
 <?php
 $tradeConfig = [
-    'apiBaseUrl' => 'modules.php?name=Trading&op=comparison-api',
     'rosterPreviewApiBaseUrl' => 'modules.php?name=Trading&op=roster-preview-api',
     'userTeam' => $pageData['userTeam'],
     'partnerTeam' => $pageData['partnerTeam'],
     'userTeamId' => $userTeamId,
     'partnerTeamId' => $partnerTeamId,
     'switchCounter' => $switchCounter,
-    'userPlayerContracts' => $pageData['userPlayerContracts'],
-    'partnerPlayerContracts' => $pageData['partnerPlayerContracts'],
     'userFutureSalary' => $pageData['userFutureSalary']['player'],
     'partnerFutureSalary' => $pageData['partnerFutureSalary']['player'],
     'hardCap' => \League::HARD_CAP_MAX,
@@ -186,7 +149,6 @@ $tradeConfig = [
 ];
 ?>
 <script>window.IBL_TRADE_CONFIG = <?= json_encode($tradeConfig, JSON_HEX_TAG | JSON_THROW_ON_ERROR) ?>;</script>
-<script src="jslib/trade-comparison.js" defer></script>
 <script src="jslib/trade-roster-preview.js" defer></script>
 </form>
         <?php

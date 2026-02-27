@@ -94,16 +94,6 @@ switch ($op) {
         offertrade($user);
         break;
 
-    case "comparison-api":
-        if (!is_user($user)) {
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['html' => ''], JSON_THROW_ON_ERROR);
-        } else {
-            $handler = new Trading\TradeComparisonApiHandler($mysqli_db);
-            $handler->handle();
-        }
-        break;
-
     case "roster-preview-api":
         if (!is_user($user)) {
             header('Content-Type: application/json; charset=utf-8');

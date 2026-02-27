@@ -23,19 +23,17 @@ class DraftOrderView implements DraftOrderViewInterface
     /** @param DraftOrderResult $draftOrder */
     public function render(array $draftOrder, int $seasonYear): string
     {
-        $html = '<div class="draft-order-container">';
-        $html .= $this->renderTitle($seasonYear);
+        $html = $this->renderTitle($seasonYear);
         $html .= $this->renderDescription();
         $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1', showPlayoffDivider: true);
         $html .= $this->renderRoundTable($draftOrder['round2'], 'Round 2', showPlayoffDivider: false);
-        $html .= '</div>';
 
         return $html;
     }
 
     private function renderTitle(int $seasonYear): string
     {
-        return '<h2>' . HtmlSanitizer::safeHtmlOutput($seasonYear) . ' Projected Draft Order</h2>';
+        return '<h2 class="ibl-title">' . HtmlSanitizer::safeHtmlOutput($seasonYear) . ' Projected Draft Order</h2>';
     }
 
     private function renderDescription(): string

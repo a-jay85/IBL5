@@ -20,6 +20,7 @@ class Season
     public \DateTimeInterface|string $projectedNextSimEndDate;
     public string $allowTrades = 'Yes';
     public string $allowWaivers = 'Yes';
+    public string $showDraftLink = 'Off';
     public string $freeAgencyNotificationsState = 'Off';
 
     public ?string $lastRegularSeasonGameDate = null;

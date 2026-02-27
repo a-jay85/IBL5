@@ -21,6 +21,7 @@ declare(strict_types=1);
  * @property \DateTimeInterface $projectedNextSimEndDate Projected next sim end date
  * @property string $allowTrades Allow trades status
  * @property string $allowWaivers Allow waivers status
+ * @property string $showDraftLink Show Draft Link toggle status
  * @property string $freeAgencyNotificationsState Free agency notifications state
  */
 class Season
@@ -43,6 +44,7 @@ class Season
 
     public string $allowTrades;
     public string $allowWaivers;
+    public string $showDraftLink;
 
     public string $freeAgencyNotificationsState;
 
@@ -81,6 +83,7 @@ class Season
             'Current Season Ending Year',
             'Allow Trades',
             'Allow Waiver Moves',
+            'Show Draft Link',
             'Free Agency Notifications',
         ]);
 
@@ -105,6 +108,7 @@ class Season
 
         $this->allowTrades = $settings['Allow Trades'] ?? '';
         $this->allowWaivers = $settings['Allow Waiver Moves'] ?? '';
+        $this->showDraftLink = $settings['Show Draft Link'] ?? 'Off';
 
         $this->freeAgencyNotificationsState = $settings['Free Agency Notifications'] ?? '';
     }

@@ -7,9 +7,13 @@
     import { formatDate } from '$lib/utils/utils';
 
     const headers = [
-        'Pos', 'Name', 'min', 'fgm', 'fga', 'ftm', 'fta', 
+        'Pos', 'Name', 'min', 'fgm', 'fga', 'ftm', 'fta',
         '3pm', '3pa', 'pts', 'orb', 'reb', 'ast', 'stl', 'blk', 'tov', 'pf'
     ];
+
+    const sumStatKeys = [
+        'min', 'fgm', 'fga', 'ftm', 'fta', '3pm', '3pa', 'pts', 'orb', 'reb', 'ast', 'stl', 'blk', 'tov', 'pf'
+    ] as const;
 
     let { data }: { data: PageData } = $props();
 
@@ -87,6 +91,19 @@
         });
         
         return sortedPlayers;
+    });
+
+    const teamTotals = $derived.by(() => {
+        const totals: Record<string, number> = {};
+        for (const key of sumStatKeys) {
+            totals[key] = 0;
+        }
+        for (const player of filteredPlayers) {
+            for (const key of sumStatKeys) {
+                totals[key] += Number(player[key as keyof typeof player]) || 0;
+            }
+        }
+        return totals;
     });
 
     function handleTeamSelection(teamName: string) {
@@ -239,7 +256,13 @@
                     {/each}
                 </tbody>
                 <tfoot>
-                    <StatsHorizontal {headers} bind:sortColumn bind:sortDirection />
+                    <tr class="bg-base-200 font-bold border-t-2 border-base-300">
+                        <td class="px-2 py-1"></td>
+                        <td class="sticky left-0 z-20 bg-base-200 font-bold px-3 py-1 border-r border-base-300 shadow-lg min-w-32 max-w-32 text-sm">TOTALS</td>
+                        {#each sumStatKeys as key}
+                            <td class="px-2 py-1 text-center text-sm{key === 'pts' ? ' text-primary' : ''}">{teamTotals[key]}</td>
+                        {/each}
+                    </tr>
                 </tfoot>
             </table>
         </div>
@@ -248,7 +271,7 @@
 
 <style>
     /* Ensure sticky behavior works with hover states */
-    tr:hover .sticky {
+    tbody tr:hover .sticky {
         background-color: hsl(var(--b2)) !important;
     }
 </style>

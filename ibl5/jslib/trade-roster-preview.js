@@ -99,6 +99,119 @@
     }
 
     // ========================================================================
+    // CAP WARNING — over hard cap indicators
+    // ========================================================================
+
+    var contractsTab = null;
+    for (var ct = 0; ct < tabs.length; ct++) {
+        if (tabs[ct].getAttribute('data-display') === 'contracts') {
+            contractsTab = tabs[ct];
+            break;
+        }
+    }
+
+    /**
+     * Collect the total salary of checked players per side.
+     * Returns { userSalary: number, partnerSalary: number }
+     */
+    function getCheckedSalaries() {
+        var switchCounter = config.switchCounter;
+        var userSalary = 0;
+        var partnerSalary = 0;
+        var k = 0;
+
+        while (true) {
+            var checkbox = form.elements['check' + k];
+            if (!checkbox) {
+                break;
+            }
+
+            var typeField = form.elements['type' + k];
+            var isPlayer = typeField && typeField.value === '1';
+
+            if (isPlayer && checkbox.type === 'checkbox' && checkbox.checked) {
+                var contractField = form.elements['contract' + k];
+                var salary = contractField ? parseInt(contractField.value, 10) || 0 : 0;
+                if (k < switchCounter) {
+                    userSalary += salary;
+                } else {
+                    partnerSalary += salary;
+                }
+            }
+
+            k++;
+        }
+
+        return { userSalary: userSalary, partnerSalary: partnerSalary };
+    }
+
+    /**
+     * Get current-season cash exchange amounts from the form inputs.
+     * Returns { userSendsCash: number, partnerSendsCash: number }
+     */
+    function getCurrentSeasonCash() {
+        var yr = config.cashStartYear;
+        var userInput = form.elements['userSendsCash' + yr];
+        var partnerInput = form.elements['partnerSendsCash' + yr];
+        return {
+            userSendsCash: userInput ? parseInt(userInput.value, 10) || 0 : 0,
+            partnerSendsCash: partnerInput ? parseInt(partnerInput.value, 10) || 0 : 0,
+        };
+    }
+
+    /**
+     * Check if post-trade cap totals exceed the hard cap and toggle warnings.
+     */
+    function updateCapWarnings() {
+        var hardCap = config.hardCap;
+        var userBaseCap = config.userFutureSalary[0] || 0;
+        var partnerBaseCap = config.partnerFutureSalary[0] || 0;
+
+        var salaries = getCheckedSalaries();
+        var cash = getCurrentSeasonCash();
+
+        // Post-trade cap: base - outgoing salaries + incoming salaries +/- cash
+        var userPostCap = userBaseCap - salaries.userSalary + salaries.partnerSalary
+            + cash.partnerSendsCash - cash.userSendsCash;
+        var partnerPostCap = partnerBaseCap - salaries.partnerSalary + salaries.userSalary
+            + cash.userSendsCash - cash.partnerSendsCash;
+
+        var userOver = userPostCap > hardCap;
+        var partnerOver = partnerPostCap > hardCap;
+
+        // 1) Red glow on preview panel logos
+        var userLogo = panel.querySelector(
+            '.trade-roster-preview__logo[data-team-id="' + config.userTeamId + '"]');
+        var partnerLogo = panel.querySelector(
+            '.trade-roster-preview__logo[data-team-id="' + config.partnerTeamId + '"]');
+        if (userLogo) {
+            userLogo.classList.toggle('cap-warning-logo', userOver);
+        }
+        if (partnerLogo) {
+            partnerLogo.classList.toggle('cap-warning-logo', partnerOver);
+        }
+
+        // 2) Contracts tab — only red when the currently viewed team is over cap
+        var viewedTeamOverCap = currentTeamId === config.userTeamId
+            ? userOver : partnerOver;
+        if (contractsTab) {
+            contractsTab.classList.toggle('cap-warning-tab', viewedTeamOverCap);
+        }
+
+        // 3) Cap total cells — first row (current season) in each team's table
+        var userCapCell = form.querySelector(
+            '.trading-cap-totals[data-side="user"] tbody tr:first-child td');
+        var partnerCapCell = form.querySelector(
+            '.trading-cap-totals[data-side="partner"] tbody tr:first-child td');
+        if (userCapCell) {
+            userCapCell.classList.toggle('cap-warning-cell', userOver);
+        }
+        if (partnerCapCell) {
+            partnerCapCell.classList.toggle('cap-warning-cell', partnerOver);
+        }
+    }
+
+    // ========================================================================
     // FETCH AND RENDER
     // ========================================================================
 
@@ -292,7 +405,16 @@
     // Checkbox changes on the form
     form.addEventListener('change', function (e) {
         if (e.target.type === 'checkbox') {
+            updateCapWarnings();
             debouncedRefresh();
+        }
+    });
+
+    // Cash exchange input changes
+    form.addEventListener('input', function (e) {
+        if (e.target.name && (e.target.name.indexOf('userSendsCash') === 0
+            || e.target.name.indexOf('partnerSendsCash') === 0)) {
+            updateCapWarnings();
         }
     });
 
@@ -305,6 +427,7 @@
                 currentTeamId = teamId;
                 updateActiveLogoState();
                 updateTabBarColors();
+                updateCapWarnings();
                 fetchRosterPreview();
             }
         });
@@ -326,6 +449,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         var checked = getCheckedPids();
         if (checked.user.length > 0 || checked.partner.length > 0) {
+            updateCapWarnings();
             fetchRosterPreview();
         }
     });

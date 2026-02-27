@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { createEventDispatcher } from 'svelte';
 
     const dispatch = createEventDispatcher();
@@ -10,7 +10,7 @@
         minutes: 0
     });
 
-    function handleFormSubmit(event) {
+    function handleFormSubmit(event: SubmitEvent) {
         event.preventDefault();
         dispatch('addPlayer', { ...formData });
         resetForm();

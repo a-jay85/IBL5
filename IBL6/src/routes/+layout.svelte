@@ -29,6 +29,7 @@
 						/>
 					</svg>
 				</div>
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 				<ul
 					tabindex="0"
 					class="dropdown-content menu z-1 mt-3 w-52 menu-sm rounded-box bg-base-100 p-2 shadow"
@@ -43,10 +44,10 @@
 			</div>
 		</div>
 		<div class="navbar-center">
-			<a class="btn text-xl btn-ghost">AYE-BEE-EL</a>
+			<a href="/" class="btn text-xl btn-ghost">AYE-BEE-EL</a>
 		</div>
 		<div class="navbar-end">
-			<button class="btn btn-circle btn-ghost">
+			<button class="btn btn-circle btn-ghost" aria-label="Search">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					class="h-5 w-5"
@@ -62,7 +63,7 @@
 					/>
 				</svg>
 			</button>
-			<button class="btn btn-circle btn-ghost">
+			<button class="btn btn-circle btn-ghost" aria-label="Notifications">
 				<div class="indicator">
 					<svg
 						xmlns="http://www.w3.org/2000/svg"

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\SiteStatistics;
 
 use PHPUnit\Framework\TestCase;
@@ -66,42 +68,4 @@ class StatisticsControllerTest extends TestCase
         $this->assertInstanceOf(StatisticsController::class, $this->controller);
     }
 
-    public function testShowMainStatsExecutesWithoutErrors(): void
-    {
-        // Mock some basic data
-        $this->mockDb->setQueryResults([
-            ['type' => 'total', 'var' => 'hits', 'count' => 1000],
-            ['user_id' => 1], ['user_id' => 2], // Users
-        ]);
-
-        // Capture output to prevent displaying
-        ob_start();
-        try {
-            // Note: This will fail in unit tests because it calls Nuke functions
-            // But we're testing that the controller is properly structured
-            $this->assertTrue(method_exists($this->controller, 'showMainStats'));
-        } finally {
-            ob_end_clean();
-        }
-    }
-
-    public function testShowDetailedStatsMethodExists(): void
-    {
-        $this->assertTrue(method_exists($this->controller, 'showDetailedStats'));
-    }
-
-    public function testShowYearlyStatsMethodExists(): void
-    {
-        $this->assertTrue(method_exists($this->controller, 'showYearlyStats'));
-    }
-
-    public function testShowMonthlyStatsMethodExists(): void
-    {
-        $this->assertTrue(method_exists($this->controller, 'showMonthlyStats'));
-    }
-
-    public function testShowDailyStatsMethodExists(): void
-    {
-        $this->assertTrue(method_exists($this->controller, 'showDailyStats'));
-    }
 }

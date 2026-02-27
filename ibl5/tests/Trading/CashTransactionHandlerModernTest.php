@@ -1,6 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Trading;
+
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Modern unit tests for Trading\CashTransactionHandler class
@@ -19,8 +24,8 @@ class CashTransactionHandlerModernTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
-        $this->cashHandler = new Trading\CashTransactionHandler($this->mockDb);
+        $this->mockDb = new \MockDatabase();
+        $this->cashHandler = new \Trading\CashTransactionHandler($this->mockDb);
     }
 
     protected function tearDown(): void
@@ -47,10 +52,8 @@ class CashTransactionHandlerModernTest extends TestCase
     }
 
     /**
-     * @group contract-calculations
-     * @dataProvider contractYearScenarios
-     */
-    #[\PHPUnit\Framework\Attributes\DataProvider('contractYearScenarios')]
+     * @group contract-calculations     */
+        #[DataProvider('contractYearScenarios')]
     public function testCalculatesContractTotalYearsCorrectly($cashDistribution, $expectedYears, $description)
     {
         // Act

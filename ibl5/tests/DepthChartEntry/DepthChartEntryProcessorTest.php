@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\DepthChartEntry;
+
 use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntryProcessor;
 

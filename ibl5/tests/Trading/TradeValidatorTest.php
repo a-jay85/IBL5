@@ -1,6 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Trading;
+
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Comprehensive unit tests for Trading\TradeValidator class
@@ -20,7 +25,7 @@ class TradeValidatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockDb = new MockDatabase();
+        $this->mockDb = new \MockDatabase();
         
         // Set up mock mysqli for Trading repository
         $this->mockMysqli = new class($this->mockDb) {
@@ -34,11 +39,11 @@ class TradeValidatorTest extends TestCase
             }
             
             public function prepare($query) {
-                return new MockPreparedStatement($this->mockDb, $query);
+                return new \MockPreparedStatement($this->mockDb, $query);
             }
         };
         
-        $this->validator = new Trading\TradeValidator($this->mockDb, $this->mockMysqli);
+        $this->validator = new \Trading\TradeValidator($this->mockDb, $this->mockMysqli);
     }
 
     protected function tearDown(): void
@@ -68,10 +73,8 @@ class TradeValidatorTest extends TestCase
 
     /**
      * @group validation
-     * @group cash
-     * @dataProvider invalidCashAmountProvider
-     */
-    #[\PHPUnit\Framework\Attributes\DataProvider('invalidCashAmountProvider')]
+     * @group cash     */
+        #[DataProvider('invalidCashAmountProvider')]
     public function testRejectsCashAmountsBelowMinimum($userCash, $partnerCash, $expectedErrorText)
     {
         // Act
@@ -108,10 +111,8 @@ class TradeValidatorTest extends TestCase
 
     /**
      * @group validation
-     * @group salary-cap
-     * @dataProvider salaryCapViolationProvider
-     */
-    #[\PHPUnit\Framework\Attributes\DataProvider('salaryCapViolationProvider')]
+     * @group salary-cap     */
+        #[DataProvider('salaryCapViolationProvider')]
     public function testRejectsTradesExceedingSalaryCaps($tradeData, $expectedErrorCount)
     {
         // Act
@@ -160,10 +161,8 @@ class TradeValidatorTest extends TestCase
     }
 
     /**
-     * @group player-validation
-     * @dataProvider nonTradeablePlayerProvider
-     */
-    #[\PHPUnit\Framework\Attributes\DataProvider('nonTradeablePlayerProvider')]
+     * @group player-validation     */
+        #[DataProvider('nonTradeablePlayerProvider')]
     public function testPreventsTradingIneligiblePlayers($mockData, $expectedResult, $reason)
     {
         // Arrange

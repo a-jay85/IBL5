@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+namespace Tests\Trading;
+
 use PHPUnit\Framework\TestCase;
 
 class TradeApprovalTest extends TestCase
@@ -8,7 +12,7 @@ class TradeApprovalTest extends TestCase
     
     protected function setUp(): void
     {
-        $this->db = new MockDatabase();
+        $this->db = new \MockDatabase();
         
         // Set up mock data for team ID lookups, player data, and roster counts
         $this->db->setMockData([
@@ -33,7 +37,7 @@ class TradeApprovalTest extends TestCase
      */
     public function testApprovalAlwaysSetToListeningTeam()
     {
-        $tradeOffer = new Trading\TradeOffer($this->db);
+        $tradeOffer = new \Trading\TradeOffer($this->db);
         
         // Prepare trade data: Team A offers to Team B
         // Team A sends cash only (no players or picks)
@@ -88,7 +92,7 @@ class TradeApprovalTest extends TestCase
      */
     public function testCashFromListeningTeamHasCorrectApproval()
     {
-        $tradeOffer = new Trading\TradeOffer($this->db);
+        $tradeOffer = new \Trading\TradeOffer($this->db);
         
         // Team A offers cash to Team B
         // Team B sends cash back to Team A
@@ -137,7 +141,7 @@ class TradeApprovalTest extends TestCase
     public function testTradeWithOnlyPlayers()
     {
         $db = new QueryAwareMockDatabase();
-        $tradeOffer = new Trading\TradeOffer($db);
+        $tradeOffer = new \Trading\TradeOffer($db);
         
         // Team A sends Player 1 to Team B
         // Team B sends Player 2 back to Team A
@@ -179,7 +183,7 @@ class TradeApprovalTest extends TestCase
     public function testTradeWithPlayersAndCash()
     {
         $db = new QueryAwareMockDatabase();
-        $tradeOffer = new Trading\TradeOffer($db);
+        $tradeOffer = new \Trading\TradeOffer($db);
         
         // Team A sends Player 1 + cash to Team B
         // Team B sends Player 2 + cash back to Team A
@@ -228,7 +232,7 @@ class TradeApprovalTest extends TestCase
     public function testTradeWithOnlyDraftPicks()
     {
         $db = new QueryAwareMockDatabase();
-        $tradeOffer = new Trading\TradeOffer($db);
+        $tradeOffer = new \Trading\TradeOffer($db);
         
         // Team A sends 2025 1st round pick to Team B
         // Team B sends 2026 1st round pick back to Team A
@@ -267,7 +271,7 @@ class TradeApprovalTest extends TestCase
 /**
  * Enhanced MockDatabase that can return different data based on query type
  */
-class QueryAwareMockDatabase extends MockDatabase
+class QueryAwareMockDatabase extends \MockDatabase
 {
     public function sql_query(string $query): object|bool
     {
@@ -288,35 +292,35 @@ class QueryAwareMockDatabase extends MockDatabase
         
         // Return appropriate mock data based on query type
         if (stripos($query, 'LAST_INSERT_ID') !== false) {
-            return new MockDatabaseResult([['id' => 1001]]);
+            return new \MockDatabaseResult([['id' => 1001]]);
         }
         
         if (stripos($query, 'ibl_plr') !== false) {
             // Return roster count for COUNT queries
             if (stripos($query, 'COUNT(*)') !== false) {
-                return new MockDatabaseResult([['cnt' => 10]]);
+                return new \MockDatabaseResult([['cnt' => 10]]);
             }
             // Return player data
-            return new MockDatabaseResult([
+            return new \MockDatabaseResult([
                 ['name' => 'Test Player', 'pos' => 'PG']
             ]);
         }
         
         if (stripos($query, 'ibl_draft_picks') !== false) {
             // Return draft pick data
-            return new MockDatabaseResult([
+            return new \MockDatabaseResult([
                 ['teampick' => 'Test Team', 'year' => 2025, 'round' => 1, 'notes' => '']
             ]);
         }
         
         if (stripos($query, 'ibl_trade_cash') !== false) {
             // Return cash data
-            return new MockDatabaseResult([
+            return new \MockDatabaseResult([
                 ['cy1' => 100, 'cy2' => 200, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0]
             ]);
         }
         
         // Default: return empty result
-        return new MockDatabaseResult([]);
+        return new \MockDatabaseResult([]);
     }
 }

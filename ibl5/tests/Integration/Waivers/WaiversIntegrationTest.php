@@ -784,7 +784,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
      */
     private function createMockSeason(string $phase): Season
     {
-        $stubSeason = $this->createStub(Season::class);
+        $stubSeason = $this->createStub(\Season::class);
         $stubSeason->phase = $phase;
 
         return $stubSeason;

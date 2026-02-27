@@ -121,15 +121,5 @@ class SeriesRecordsControllerTest extends TestCase
         $this->assertInstanceOf(SeriesRecordsControllerInterface::class, $controller);
     }
 
-    // ============================================
-    // METHOD EXISTENCE TESTS
-    // ============================================
-
-    public function testHasDisplaySeriesRecordsMethod(): void
-    {
-        $controller = new SeriesRecordsController($this->mockDb);
-
-        $this->assertTrue(method_exists($controller, 'displaySeriesRecords'));
-    }
 
 }

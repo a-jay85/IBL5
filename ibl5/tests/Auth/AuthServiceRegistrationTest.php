@@ -42,25 +42,6 @@ class AuthServiceRegistrationTest extends TestCase
         self::assertInstanceOf(\Auth\Contracts\AuthServiceInterface::class, $this->authService);
     }
 
-    public function testRegisterMethodExists(): void
-    {
-        self::assertTrue(method_exists($this->authService, 'register'));
-    }
-
-    public function testConfirmEmailMethodExists(): void
-    {
-        self::assertTrue(method_exists($this->authService, 'confirmEmail'));
-    }
-
-    public function testForgotPasswordMethodExists(): void
-    {
-        self::assertTrue(method_exists($this->authService, 'forgotPassword'));
-    }
-
-    public function testResetPasswordMethodExists(): void
-    {
-        self::assertTrue(method_exists($this->authService, 'resetPassword'));
-    }
 
     public function testHashPasswordStillWorks(): void
     {

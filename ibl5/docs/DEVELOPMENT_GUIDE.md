@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 2892 tests • ~80% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 3033 tests • ~80% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -12,7 +12,7 @@
 
 ### 🚀 Post-Refactoring Phase
 
-1. **Test Coverage → 80%** - ✅ Goal achieved with 2892 tests (~80% coverage). Comprehensive edge case testing complete.
+1. **Test Coverage → 80%** - ✅ Goal achieved with 3033 tests (~80% coverage). Comprehensive edge case testing complete.
 
    **Priority Integration Tests:** ✅ All Complete
    - ~~Waivers, DepthChart, RookieOption, Schedule, Standings, Voting~~
@@ -319,7 +319,7 @@
 **Impact:** Added 365 new tests across 40+ test files, bringing total from 1060→1425 tests (34% increase)
 
 **Test Coverage Additions:**
-- Core models: BoxscoreTest (28), DraftPickTest (9), GameTest (11), LeagueTest (15), SeasonTest (14), TeamTest (16)
+- Core models: BoxscoreProcessorTest + BoxscoreRepositoryTest (28), DraftPickTest (9), GameTest (11), LeagueTest (15), SeasonTest (14), TeamTest (16)
 - Contract rules: ContractRulesTest (42 CBA salary cap tests)
 - Module processors: FreeAgency (5), Negotiation (5), Extension (4), Trading (4)
 - Controllers: Waivers (4), DepthChart (3+5), RookieOption (3), Team (3), SeriesRecords (4)

@@ -83,7 +83,12 @@ class ModuleAccessControl
         if (isset(self::PHASE_RESTRICTED_MODULES[$moduleName])) {
             $requiredPhase = self::PHASE_RESTRICTED_MODULES[$moduleName];
             if ($this->season->phase !== $requiredPhase) {
-                return false;
+                // Draft module can be made accessible outside Draft phase via "Show Draft Link" toggle
+                if ($moduleName === 'Draft' && $this->season->showDraftLink === 'On') {
+                    // Allow access — admin has explicitly enabled the Draft link
+                } else {
+                    return false;
+                }
             }
         }
 

@@ -110,7 +110,7 @@ class FreeAgencyRepositoryTest extends TestCase
         $repository = new FreeAgencyRepository($this->mockMysqliDb);
         $this->mockDb->setMockData([]);
 
-        $result = $repository->getExistingOffer('Test Team', 'Test Player');
+        $result = $repository->getExistingOffer(1, 1);
 
         $this->assertNull($result);
     }
@@ -122,7 +122,7 @@ class FreeAgencyRepositoryTest extends TestCase
             ['offer1' => 500, 'offer2' => 525, 'offer3' => 550, 'offer4' => 0, 'offer5' => 0, 'offer6' => 0]
         ]);
 
-        $result = $repository->getExistingOffer('Test Team', 'Test Player');
+        $result = $repository->getExistingOffer(1, 1);
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('offer1', $result);
@@ -138,7 +138,7 @@ class FreeAgencyRepositoryTest extends TestCase
         $repository = new FreeAgencyRepository($this->mockMysqliDb);
         
         // Track that the delete query was executed
-        $result = $repository->deleteOffer('Test Team', 'Test Player');
+        $result = $repository->deleteOffer(1, 1);
 
         // Should return affected rows (0 or more)
         $this->assertIsInt($result);

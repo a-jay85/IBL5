@@ -72,7 +72,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         }
 
         // Save the offer
-        $saveResult = $this->saveOffer($team->name, $player, $offerData);
+        $saveResult = $this->saveOffer($team, $player, $offerData);
 
         if (!$saveResult) {
             return [
@@ -111,11 +111,10 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
 
         // Reconstruct cap space data using provided team object
         $capCalculator = new FreeAgencyCapCalculator($this->mysqli_db, $team, $this->season);
-        $playerName = $player->name ?? '';
-        $capMetrics = $capCalculator->calculateTeamCapMetrics($playerName);
+        $capMetrics = $capCalculator->calculateTeamCapMetrics($player->playerID);
 
         // Get existing offer to calculate amended cap space
-        $existingOfferRow = $this->repository->getExistingOffer($team->name, $playerName);
+        $existingOfferRow = $this->repository->getExistingOffer($team->teamID, $player->playerID ?? 0);
         $existingOfferYear1 = $existingOfferRow !== null ? ($existingOfferRow['offer1'] ?? 0) : 0;
         /** @var array{softCapSpace: array<int, int>, hardCapSpace: array<int, int>, totalSalaries: array<int, int>, rosterSpots: array<int, int>} $capMetrics */
         $amendedCapSpaceYear1 = $capMetrics['softCapSpace'][0] + $existingOfferYear1;
@@ -183,13 +182,15 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     /**
      * Save a validated offer to the database
      *
-     * @param string $teamName Offering team
+     * @param \Team $team Offering team
      * @param \Player\Player $player Player object
      * @param array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int} $offerData Offer details
      * @return bool True if saved successfully
      */
-    private function saveOffer(string $teamName, \Player\Player $player, array $offerData): bool
+    private function saveOffer(\Team $team, \Player\Player $player, array $offerData): bool
     {
+        $teamName = $team->name;
+
         // Calculate perceived value
         $yearsInOffer = $this->calculateYearsInOffer($offerData);
         $offerAverage = $this->calculateOfferAverage($offerData, $yearsInOffer);
@@ -211,8 +212,9 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
 
         $playerName = $player->name ?? '';
 
-        // Save the offer using repository
         $saved = $this->repository->saveOffer([
+            'pid' => $player->playerID ?? 0,
+            'tid' => $team->teamID,
             'teamName' => $teamName,
             'playerName' => $playerName,
             'offer1' => $offerData['offer1'],
@@ -317,9 +319,10 @@ _**{$player->teamName}** GM <@!$playerTeamDiscordID> could not be reached for co
      */
     public function deleteOffers(string $teamName, int $playerID): array
     {
-        $player = \Player\Player::withPlayerID($this->mysqli_db, $playerID);
+        $commonRepo = new \Services\CommonMysqliRepository($this->mysqli_db);
+        $tid = $commonRepo->getTidFromTeamname($teamName) ?? 0;
 
-        $this->repository->deleteOffer($teamName, $player->name ?? '');
+        $this->repository->deleteOffer($tid, $playerID);
 
         return ['success' => true];
     }

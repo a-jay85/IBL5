@@ -162,7 +162,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
      */
     private function renderContractOffers(\Team $team, array $capMetrics): string
     {
-        $commonRepository = new \Services\CommonMysqliRepository($this->mysqli_db);
         $teamId = $team->teamID;
         $teamNameStr = htmlspecialchars($team->name);
         $color1 = htmlspecialchars($team->color1);
@@ -176,11 +175,10 @@ class FreeAgencyView implements FreeAgencyViewInterface
     <?= $this->renderTableHeader('Contract Offers', false, $team) ?>
     <tbody>
         <?php
-        $offersResult = $this->teamQueryRepo->getFreeAgencyOffers($team->name);
+        $offersResult = $this->teamQueryRepo->getFreeAgencyOffers($team->teamID);
         foreach ($offersResult as $offerRow): ?>
             <?php
-            $playerID = $commonRepository->getPlayerIDFromPlayerName($offerRow['name']);
-            $player = Player::withPlayerID($this->mysqli_db, $playerID ?? 0);
+            $player = Player::withPlayerID($this->mysqli_db, $offerRow['pid'] ?? 0);
             ?>
         <tr>
             <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Negotiate</a></td>

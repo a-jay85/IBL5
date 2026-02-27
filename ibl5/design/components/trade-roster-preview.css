@@ -110,28 +110,55 @@
 }
 
 /* ==========================================================================
-   Trade-Involved Player Row Highlight
-   Uses the accent (orange) palette for consistency with logo glow,
-   depth chart glow, and starter glow.
+   Trade-Involved Player Row Highlights
+   Incoming players (orange) — arriving from the other team.
+   Outgoing players (gray) — leaving this team in the trade.
    ========================================================================== */
 
-.trade-roster-preview tr.trade-involved-row:nth-child(odd),
-.trade-roster-preview tr.trade-involved-row:nth-child(even) {
+/* --- Incoming (orange accent) --- */
+
+.trade-roster-preview tr.trade-incoming-row:nth-child(odd),
+.trade-roster-preview tr.trade-incoming-row:nth-child(even) {
     background-color: var(--color-accent-100, #ffedd5);
 }
 
-.trade-roster-preview tr.trade-involved-row:nth-child(odd):hover,
-.trade-roster-preview tr.trade-involved-row:nth-child(even):hover {
+.trade-roster-preview tr.trade-incoming-row:nth-child(odd):hover,
+.trade-roster-preview tr.trade-incoming-row:nth-child(even):hover {
     background-color: var(--color-accent-200, #fed7aa);
 }
 
-/* Sticky-col variants for responsive tables */
-.trade-roster-preview tr.trade-involved-row td[class*="sticky-col"] {
+.trade-roster-preview tr.trade-incoming-row td[class*="sticky-col"] {
     background-color: var(--color-accent-100, #ffedd5);
 }
 
-.trade-roster-preview tr.trade-involved-row:hover td[class*="sticky-col"] {
+.trade-roster-preview tr.trade-incoming-row:hover td[class*="sticky-col"] {
     background-color: var(--color-accent-200, #fed7aa);
+}
+
+/* --- Outgoing (gray, desaturated) --- */
+
+.trade-roster-preview tr.trade-outgoing-row:nth-child(odd),
+.trade-roster-preview tr.trade-outgoing-row:nth-child(even) {
+    background-color: var(--gray-100, #f3f4f6);
+    color: var(--gray-400, #9ca3af);
+}
+
+.trade-roster-preview tr.trade-outgoing-row:nth-child(odd):hover,
+.trade-roster-preview tr.trade-outgoing-row:nth-child(even):hover {
+    background-color: var(--gray-200, #e5e7eb);
+}
+
+.trade-roster-preview tr.trade-outgoing-row td[class*="sticky-col"] {
+    background-color: var(--gray-100, #f3f4f6);
+    color: var(--gray-400, #9ca3af);
+}
+
+.trade-roster-preview tr.trade-outgoing-row:hover td[class*="sticky-col"] {
+    background-color: var(--gray-200, #e5e7eb);
+}
+
+.trade-roster-preview tr.trade-outgoing-row a {
+    color: var(--gray-400, #9ca3af);
 }
 
 /* Hide per-team dropdowns injected by API responses (same as trade-comparison) */

@@ -95,6 +95,13 @@ if (isset($_POST['query'])) {
                 $stmtPhase->bind_param("s", $phase);
                 $stmtPhase->execute();
                 $stmtPhase->close();
+
+                if ($phase === 'Preseason' || $phase === 'HEAT') {
+                    $stmtResetDraftLink = $mysqli_db->prepare("UPDATE ibl_settings SET value = 'Off' WHERE name = 'Show Draft Link'");
+                    $stmtResetDraftLink->execute();
+                    $stmtResetDraftLink->close();
+                }
+
                 $querySuccessful = true;
             }
             $successText = "Season Phase has been set to {$_POST['SeasonPhase']}.";
@@ -120,6 +127,17 @@ if (isset($_POST['query'])) {
                 $querySuccessful = true;
             }
             $successText = "Allow Waiver Moves Status has been set to {$_POST['Waivers']}.";
+            break;
+        case 'Set Show Draft Link Status':
+            if (isset($_POST['ShowDraftLink'])) {
+                $showDraftLink = $_POST['ShowDraftLink'];
+                $stmtDraftLink = $mysqli_db->prepare("UPDATE ibl_settings SET value = ? WHERE name = 'Show Draft Link'");
+                $stmtDraftLink->bind_param("s", $showDraftLink);
+                $stmtDraftLink->execute();
+                $stmtDraftLink->close();
+                $querySuccessful = true;
+            }
+            $successText = "Show Draft Link has been set to {$_POST['ShowDraftLink']}.";
             break;
         case 'Toggle Free Agency Notifications':
             if (isset($_POST['FANotifs'])) {
@@ -258,7 +276,12 @@ switch ($season->phase) {
                     <option value = \"Yes\"" . ($season->allowTrades == "Yes" ? " SELECTED" : "") . ">Yes</option>
                     <option value = \"No\"" . ($season->allowTrades == "No" ? " SELECTED" : "") . ">No</option>
                 </select>
-                <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>";
+                <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>
+                <select name=\"ShowDraftLink\">
+                    <option value = \"On\"" . ($season->showDraftLink == "On" ? " SELECTED" : "") . ">On</option>
+                    <option value = \"Off\"" . ($season->showDraftLink == "Off" ? " SELECTED" : "") . ">Off</option>
+                </select>
+                <INPUT type='submit' name='query' value='Set Show Draft Link Status'><p>";
         }
 
         break;
@@ -272,7 +295,12 @@ switch ($season->phase) {
                 <option value = \"Yes\"" . ($season->allowTrades == "Yes" ? " SELECTED" : "") . ">Yes</option>
                 <option value = \"No\"" . ($season->allowTrades == "No" ? " SELECTED" : "") . ">No</option>
             </select>
-            <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>";
+            <INPUT type='submit' name='query' value='Set Allow Trades Status'><p>
+            <select name=\"ShowDraftLink\">
+                <option value = \"On\"" . ($season->showDraftLink == "On" ? " SELECTED" : "") . ">On</option>
+                <option value = \"Off\"" . ($season->showDraftLink == "Off" ? " SELECTED" : "") . ">Off</option>
+            </select>
+            <INPUT type='submit' name='query' value='Set Show Draft Link Status'><p>";
         break;
     case 'Draft':
         echo "<select name=\"Waivers\">

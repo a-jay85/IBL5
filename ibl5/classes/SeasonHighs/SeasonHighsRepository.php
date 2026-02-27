@@ -30,13 +30,21 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         string $tableSuffix,
         string $startDate,
         string $endDate,
-        int $limit = 15
+        int $limit = 15,
+        ?string $locationFilter = null
     ): array {
         // Sanitize the stat name for use as column alias
         $safeStatName = preg_replace('/[^a-zA-Z0-9_]/', '', $statName);
         if ($safeStatName === null) {
             $safeStatName = $statName;
         }
+
+        // Build optional location filter (home/away) — column-to-column comparison, no extra bind params
+        $locationCondition = match ($locationFilter) {
+            'home' => ' AND bs.teamID = bs.homeTID',
+            'away' => ' AND bs.teamID = bs.visitorTID',
+            default => '',
+        };
 
         // For player stats (no suffix), JOIN with ibl_plr to get full names
         // The ibl_box_scores.name field is varchar(16) which truncates longer names
@@ -58,7 +66,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                     FROM ibl_box_scores_teams
                     GROUP BY Date, visitorTeamID, homeTeamID
                 ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
-                WHERE bs.`Date` BETWEEN ? AND ?
+                WHERE bs.`Date` BETWEEN ? AND ?{$locationCondition}
                 ORDER BY `{$safeStatName}` DESC, bs.`Date` ASC
                 LIMIT {$limit}";
         } else {

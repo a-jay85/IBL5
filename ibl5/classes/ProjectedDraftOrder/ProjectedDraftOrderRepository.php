@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace DraftOrder;
+namespace ProjectedDraftOrder;
 
-use DraftOrder\Contracts\DraftOrderRepositoryInterface;
+use ProjectedDraftOrder\Contracts\ProjectedDraftOrderRepositoryInterface;
 
 /**
- * @see DraftOrderRepositoryInterface
+ * @see ProjectedDraftOrderRepositoryInterface
  * @see \BaseMysqliRepository
  */
-class DraftOrderRepository extends \BaseMysqliRepository implements DraftOrderRepositoryInterface
+class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements ProjectedDraftOrderRepositoryInterface
 {
     /** @return list<array{tid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}> */
     public function getAllTeamsWithStandings(): array

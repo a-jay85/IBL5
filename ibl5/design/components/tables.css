@@ -1707,16 +1707,16 @@ td.ibl-team-cell--colored {
 }
 
 /* ==========================================================================
-   Projected Draft Order Table (.draft-order-table)
+   Projected Draft Order Table (.projected-draft-order-table)
    ========================================================================== */
 
-.draft-order-container {
+.projected-draft-order-container {
     max-width: 900px;
     margin: 0 auto;
     padding: var(--space-4) var(--space-3);
 }
 
-.draft-order-container h2 {
+.projected-draft-order-container h2 {
     font-family: var(--font-display);
     font-size: 1.75rem;
     font-weight: 700;
@@ -1724,7 +1724,7 @@ td.ibl-team-cell--colored {
     margin-bottom: var(--space-2);
 }
 
-.draft-order-container h3 {
+.projected-draft-order-container h3 {
     font-family: var(--font-display);
     font-size: 1.25rem;
     font-weight: 600;
@@ -1733,14 +1733,14 @@ td.ibl-team-cell--colored {
     margin-bottom: var(--space-2);
 }
 
-.draft-order-description {
+.projected-draft-order-description {
     color: var(--gray-600);
     font-size: 0.875rem;
     line-height: 1.5;
     margin-bottom: var(--space-4);
 }
 
-.draft-order-separator td {
+.projected-draft-order-separator td {
     background-color: var(--gray-200, #e5e7eb);
     color: var(--gray-600, #4b5563);
     font-family: var(--font-display);
@@ -1752,7 +1752,7 @@ td.ibl-team-cell--colored {
     padding: 0.35rem 0.5rem;
 }
 
-.draft-order-table .draft-order-notes {
+.projected-draft-order-table .projected-draft-order-notes {
     max-width: 550px;
     padding-inline: 0.5rem;
     white-space: nowrap;
@@ -1761,7 +1761,7 @@ td.ibl-team-cell--colored {
     cursor: pointer;
 }
 
-.draft-order-notes.is-expanded {
+.projected-draft-order-notes.is-expanded {
     white-space: normal;
     overflow: visible;
     text-overflow: clip;
@@ -1769,36 +1769,36 @@ td.ibl-team-cell--colored {
 
 /* On mobile, keep record text visible alongside logo (overrides global .ibl-team-cell__text hide) */
 @media (max-width: 768px) {
-    .draft-order-table td:nth-child(3) .ibl-team-cell__text {
+    .projected-draft-order-table td:nth-child(3) .ibl-team-cell__text {
         display: inline;
     }
 
-    .draft-order-table td:nth-child(3).ibl-team-cell--colored {
+    .projected-draft-order-table td:nth-child(3).ibl-team-cell--colored {
         width: auto;
         min-width: auto;
         max-width: none;
     }
 
-    .draft-order-notes {
+    .projected-draft-order-notes {
         max-width: 136px;
     }
 }
 
 /* Raise team cell above adjacent cells so tooltip renders on top */
-.draft-order-table td.ibl-team-cell--colored {
+.projected-draft-order-table td.ibl-team-cell--colored {
     position: relative;
     z-index: 1;
 }
 
 /* Position tooltip to the right (default is left) — stays within table bounds */
-.draft-order-table .ibl-tooltip::after {
+.projected-draft-order-table .ibl-tooltip::after {
     right: auto;
     left: 100%;
     margin-right: 0;
     margin-left: 8px;
 }
 
-.draft-order-table .ibl-tooltip::before {
+.projected-draft-order-table .ibl-tooltip::before {
     right: auto;
     left: 100%;
     margin-right: 0;

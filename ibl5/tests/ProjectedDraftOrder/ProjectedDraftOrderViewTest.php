@@ -2,27 +2,27 @@
 
 declare(strict_types=1);
 
-namespace Tests\DraftOrder;
+namespace Tests\ProjectedDraftOrder;
 
-use DraftOrder\Contracts\DraftOrderViewInterface;
-use DraftOrder\DraftOrderView;
+use ProjectedDraftOrder\Contracts\ProjectedDraftOrderViewInterface;
+use ProjectedDraftOrder\ProjectedDraftOrderView;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \DraftOrder\DraftOrderView
+ * @covers \ProjectedDraftOrder\ProjectedDraftOrderView
  */
-class DraftOrderViewTest extends TestCase
+class ProjectedDraftOrderViewTest extends TestCase
 {
-    private DraftOrderView $view;
+    private ProjectedDraftOrderView $view;
 
     protected function setUp(): void
     {
-        $this->view = new DraftOrderView();
+        $this->view = new ProjectedDraftOrderView();
     }
 
     public function testImplementsViewInterface(): void
     {
-        $this->assertInstanceOf(DraftOrderViewInterface::class, $this->view);
+        $this->assertInstanceOf(ProjectedDraftOrderViewInterface::class, $this->view);
     }
 
     public function testRenderReturnsString(): void
@@ -85,7 +85,7 @@ class DraftOrderViewTest extends TestCase
     {
         $result = $this->view->render($this->emptyDraftOrder(), 2026);
 
-        $this->assertStringContainsString('draft-order-description', $result);
+        $this->assertStringContainsString('projected-draft-order-description', $result);
         $this->assertStringContainsString('If the draft were held today', $result);
     }
 
@@ -122,7 +122,7 @@ class DraftOrderViewTest extends TestCase
         $this->assertNotFalse($round2Start);
 
         $round2Html = substr($result, $round2Start);
-        $this->assertStringNotContainsString('draft-order-separator', $round2Html);
+        $this->assertStringNotContainsString('projected-draft-order-separator', $round2Html);
     }
 
     public function testRenderEscapesHtmlEntities(): void
@@ -146,7 +146,7 @@ class DraftOrderViewTest extends TestCase
 
         $result = $this->view->render($order, 2026);
 
-        $this->assertStringContainsString('draft-order-traded', $result);
+        $this->assertStringContainsString('projected-draft-order-traded', $result);
     }
 
     public function testOwnPickDoesNotHaveTradedClass(): void
@@ -158,7 +158,7 @@ class DraftOrderViewTest extends TestCase
 
         $result = $this->view->render($order, 2026);
 
-        $this->assertStringNotContainsString('draft-order-traded', $result);
+        $this->assertStringNotContainsString('projected-draft-order-traded', $result);
     }
 
     public function testTradedPickShowsOwnerInTeamColumnWithColors(): void
@@ -268,7 +268,7 @@ class DraftOrderViewTest extends TestCase
 
         $result = $this->view->render($order, 2026);
 
-        $this->assertStringContainsString('draft-order-notes', $result);
+        $this->assertStringContainsString('projected-draft-order-notes', $result);
         $this->assertStringContainsString('is-expanded', $result);
     }
 
@@ -277,7 +277,7 @@ class DraftOrderViewTest extends TestCase
         $result = $this->view->render($this->sampleDraftOrder(), 2026);
 
         $this->assertStringContainsString('ibl-data-table', $result);
-        $this->assertStringContainsString('draft-order-table', $result);
+        $this->assertStringContainsString('projected-draft-order-table', $result);
     }
 
     // =========================================================================

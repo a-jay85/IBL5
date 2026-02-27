@@ -2,32 +2,32 @@
 
 declare(strict_types=1);
 
-namespace DraftOrder;
+namespace ProjectedDraftOrder;
 
-use DraftOrder\Contracts\DraftOrderRepositoryInterface;
-use DraftOrder\Contracts\DraftOrderServiceInterface;
+use ProjectedDraftOrder\Contracts\ProjectedDraftOrderRepositoryInterface;
+use ProjectedDraftOrder\Contracts\ProjectedDraftOrderServiceInterface;
 
 /**
  * Calculates projected draft order based on current standings.
  *
- * @phpstan-import-type StandingsRow from DraftOrderRepositoryInterface
- * @phpstan-import-type GameRow from DraftOrderRepositoryInterface
- * @phpstan-import-type PointDifferentialRow from DraftOrderRepositoryInterface
- * @phpstan-import-type PickOwnershipRow from DraftOrderRepositoryInterface
- * @phpstan-import-type DraftSlot from DraftOrderServiceInterface
- * @phpstan-import-type DraftOrderResult from DraftOrderServiceInterface
- * @see DraftOrderRepositoryInterface For data access
+ * @phpstan-import-type StandingsRow from ProjectedDraftOrderRepositoryInterface
+ * @phpstan-import-type GameRow from ProjectedDraftOrderRepositoryInterface
+ * @phpstan-import-type PointDifferentialRow from ProjectedDraftOrderRepositoryInterface
+ * @phpstan-import-type PickOwnershipRow from ProjectedDraftOrderRepositoryInterface
+ * @phpstan-import-type DraftSlot from ProjectedDraftOrderServiceInterface
+ * @phpstan-import-type ProjectedDraftOrderResult from ProjectedDraftOrderServiceInterface
+ * @see ProjectedDraftOrderRepositoryInterface For data access
  */
-class DraftOrderService implements DraftOrderServiceInterface
+class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
 {
-    private DraftOrderRepositoryInterface $repository;
+    private ProjectedDraftOrderRepositoryInterface $repository;
 
-    public function __construct(DraftOrderRepositoryInterface $repository)
+    public function __construct(ProjectedDraftOrderRepositoryInterface $repository)
     {
         $this->repository = $repository;
     }
 
-    /** @return DraftOrderResult */
+    /** @return ProjectedDraftOrderResult */
     public function calculateDraftOrder(int $seasonYear): array
     {
         $standings = $this->repository->getAllTeamsWithStandings();

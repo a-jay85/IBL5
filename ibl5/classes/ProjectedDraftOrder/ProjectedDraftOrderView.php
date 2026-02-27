@@ -2,25 +2,25 @@
 
 declare(strict_types=1);
 
-namespace DraftOrder;
+namespace ProjectedDraftOrder;
 
-use DraftOrder\Contracts\DraftOrderServiceInterface;
-use DraftOrder\Contracts\DraftOrderViewInterface;
+use ProjectedDraftOrder\Contracts\ProjectedDraftOrderServiceInterface;
+use ProjectedDraftOrder\Contracts\ProjectedDraftOrderViewInterface;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
- * @phpstan-import-type DraftSlot from DraftOrderServiceInterface
- * @phpstan-import-type DraftOrderResult from DraftOrderServiceInterface
- * @see DraftOrderViewInterface
+ * @phpstan-import-type DraftSlot from ProjectedDraftOrderServiceInterface
+ * @phpstan-import-type ProjectedDraftOrderResult from ProjectedDraftOrderServiceInterface
+ * @see ProjectedDraftOrderViewInterface
  */
-class DraftOrderView implements DraftOrderViewInterface
+class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
 {
     private const LOTTERY_PLAYOFF_BOUNDARY = 12;
     private const DIVISION_WINNERS_BOUNDARY = 24;
     private const CONFERENCE_WINNERS_BOUNDARY = 26;
 
-    /** @param DraftOrderResult $draftOrder */
+    /** @param ProjectedDraftOrderResult $draftOrder */
     public function render(array $draftOrder, int $seasonYear): string
     {
         $html = $this->renderTitle($seasonYear);
@@ -38,7 +38,7 @@ class DraftOrderView implements DraftOrderViewInterface
 
     private function renderDescription(): string
     {
-        return '<p class="draft-order-description">'
+        return '<p class="projected-draft-order-description">'
             . 'If the draft were held today, this is the projected pick order based on current standings. '
             . '</p>';
     }
@@ -48,9 +48,9 @@ class DraftOrderView implements DraftOrderViewInterface
      */
     private function renderRoundTable(array $slots, string $roundLabel, bool $showPlayoffDivider): string
     {
-        $html = '<h3>' . HtmlSanitizer::safeHtmlOutput($roundLabel) . '</h3>';
+        $html = '<h3 class="ibl-table-title">' . HtmlSanitizer::safeHtmlOutput($roundLabel) . '</h3>';
         $html .= '<div class="table-container">';
-        $html .= '<table class="ibl-data-table draft-order-table">';
+        $html .= '<table class="ibl-data-table projected-draft-order-table">';
         $html .= '<thead><tr>';
         $html .= '<th>Pick</th>';
         $html .= '<th>Team</th>';
@@ -88,7 +88,7 @@ class DraftOrderView implements DraftOrderViewInterface
 
     private function renderSeparatorRow(string $label): string
     {
-        return '<tr class="draft-order-separator">'
+        return '<tr class="projected-draft-order-separator">'
             . '<td colspan="4">' . HtmlSanitizer::e($label) . '</td>'
             . '</tr>';
     }
@@ -96,7 +96,7 @@ class DraftOrderView implements DraftOrderViewInterface
     /** @param DraftSlot $slot */
     private function renderPickRow(array $slot): string
     {
-        $rowClass = $slot['isTraded'] ? ' class="draft-order-traded"' : '';
+        $rowClass = $slot['isTraded'] ? ' class="projected-draft-order-traded"' : '';
         $html = '<tr' . $rowClass . '>';
 
         $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['pick']) . '</td>';
@@ -119,7 +119,7 @@ class DraftOrderView implements DraftOrderViewInterface
         }
 
         $html .= $this->renderRecordCell($slot);
-        $html .= '<td class="draft-order-notes" onclick="this.classList.toggle(\'is-expanded\')">'
+        $html .= '<td class="projected-draft-order-notes" onclick="this.classList.toggle(\'is-expanded\')">'
             . HtmlSanitizer::safeHtmlOutput($slot['notes']) . '</td>';
 
         $html .= '</tr>';

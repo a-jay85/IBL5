@@ -2,30 +2,30 @@
 
 declare(strict_types=1);
 
-namespace Tests\DraftOrder;
+namespace Tests\ProjectedDraftOrder;
 
-use DraftOrder\Contracts\DraftOrderRepositoryInterface;
-use DraftOrder\Contracts\DraftOrderServiceInterface;
-use DraftOrder\DraftOrderService;
+use ProjectedDraftOrder\Contracts\ProjectedDraftOrderRepositoryInterface;
+use ProjectedDraftOrder\Contracts\ProjectedDraftOrderServiceInterface;
+use ProjectedDraftOrder\ProjectedDraftOrderService;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \DraftOrder\DraftOrderService
+ * @covers \ProjectedDraftOrder\ProjectedDraftOrderService
  */
-class DraftOrderServiceTest extends TestCase
+class ProjectedDraftOrderServiceTest extends TestCase
 {
     private object $stubRepository;
-    private DraftOrderService $service;
+    private ProjectedDraftOrderService $service;
 
     protected function setUp(): void
     {
-        $this->stubRepository = $this->createStub(DraftOrderRepositoryInterface::class);
-        $this->service = new DraftOrderService($this->stubRepository);
+        $this->stubRepository = $this->createStub(ProjectedDraftOrderRepositoryInterface::class);
+        $this->service = new ProjectedDraftOrderService($this->stubRepository);
     }
 
     public function testImplementsServiceInterface(): void
     {
-        $this->assertInstanceOf(DraftOrderServiceInterface::class, $this->service);
+        $this->assertInstanceOf(ProjectedDraftOrderServiceInterface::class, $this->service);
     }
 
     public function testReturnsTwoRoundsWithCorrectKeys(): void

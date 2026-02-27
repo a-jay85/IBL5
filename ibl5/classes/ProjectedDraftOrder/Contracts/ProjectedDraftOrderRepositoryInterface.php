@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace DraftOrder\Contracts;
+namespace ProjectedDraftOrder\Contracts;
 
 /**
  * @phpstan-type StandingsRow array{tid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}
  * @phpstan-type GameRow array{Visitor: int, VScore: int, Home: int, HScore: int}
  * @phpstan-type PickOwnershipRow array{ownerofpick: string, teampick: string, round: int, notes: string|null}
  * @phpstan-type PointDifferentialRow array{tid: int, pointsFor: float, pointsAgainst: float}
- * @see \DraftOrder\DraftOrderRepository
+ * @see \ProjectedDraftOrder\ProjectedDraftOrderRepository
  */
-interface DraftOrderRepositoryInterface
+interface ProjectedDraftOrderRepositoryInterface
 {
     /**
      * Get all teams with standings and team info colors.

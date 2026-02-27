@@ -2,30 +2,30 @@
 
 declare(strict_types=1);
 
-namespace Tests\DraftOrder;
+namespace Tests\ProjectedDraftOrder;
 
-use DraftOrder\Contracts\DraftOrderRepositoryInterface;
-use DraftOrder\DraftOrderRepository;
+use ProjectedDraftOrder\Contracts\ProjectedDraftOrderRepositoryInterface;
+use ProjectedDraftOrder\ProjectedDraftOrderRepository;
 use PHPUnit\Framework\TestCase;
 use Tests\Integration\Mocks\MockDatabase;
 
 /**
- * @covers \DraftOrder\DraftOrderRepository
+ * @covers \ProjectedDraftOrder\ProjectedDraftOrderRepository
  */
-class DraftOrderRepositoryTest extends TestCase
+class ProjectedDraftOrderRepositoryTest extends TestCase
 {
     private MockDatabase $db;
-    private DraftOrderRepository $repository;
+    private ProjectedDraftOrderRepository $repository;
 
     protected function setUp(): void
     {
         $this->db = new MockDatabase();
-        $this->repository = new DraftOrderRepository($this->db);
+        $this->repository = new ProjectedDraftOrderRepository($this->db);
     }
 
     public function testImplementsRepositoryInterface(): void
     {
-        $this->assertInstanceOf(DraftOrderRepositoryInterface::class, $this->repository);
+        $this->assertInstanceOf(ProjectedDraftOrderRepositoryInterface::class, $this->repository);
     }
 
     public function testGetAllTeamsWithStandingsReturnsArray(): void

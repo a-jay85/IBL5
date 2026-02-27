@@ -741,6 +741,17 @@
     margin: 0 0 1rem 0;
 }
 
+/* Inline subheading — gray uppercase label for table headers and separator rows */
+.ibl-table-subheading th,
+.ibl-table-subheading td {
+    color: var(--gray-600);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: var(--space-1) var(--space-2);
+}
+
 /* .ibl-table-header removed — use .ibl-card__header (cards.css) instead.
    For accent variant, use .ibl-card__header--accent.
    For title, use .ibl-card__title. */
@@ -1644,15 +1655,6 @@ td.ibl-team-cell--colored {
 
 .record-table thead { background: var(--gray-100); }
 
-.record-table th {
-    color: var(--gray-600);
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: var(--space-1) var(--space-2);
-}
-
 .record-table td {
     text-align: center;
     vertical-align: middle;
@@ -1710,29 +1712,6 @@ td.ibl-team-cell--colored {
    Projected Draft Order Table (.projected-draft-order-table)
    ========================================================================== */
 
-.projected-draft-order-container {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: var(--space-4) var(--space-3);
-}
-
-.projected-draft-order-container h2 {
-    font-family: var(--font-display);
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--gray-900);
-    margin-bottom: var(--space-2);
-}
-
-.projected-draft-order-container h3 {
-    font-family: var(--font-display);
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--gray-700);
-    margin-top: var(--space-6);
-    margin-bottom: var(--space-2);
-}
-
 .projected-draft-order-description {
     color: var(--gray-600);
     font-size: 0.875rem;
@@ -1742,14 +1721,6 @@ td.ibl-team-cell--colored {
 
 .projected-draft-order-separator td {
     background-color: var(--gray-200, #e5e7eb);
-    color: var(--gray-600, #4b5563);
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    text-align: center;
-    padding: 0.35rem 0.5rem;
 }
 
 .projected-draft-order-table .projected-draft-order-notes {

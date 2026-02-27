@@ -86,7 +86,7 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
 
     private function renderSeparatorRow(string $label): string
     {
-        return '<tr class="projected-draft-order-separator">'
+        return '<tr class="projected-draft-order-separator ibl-table-subheading">'
             . '<td colspan="4">' . HtmlSanitizer::e($label) . '</td>'
             . '</tr>';
     }

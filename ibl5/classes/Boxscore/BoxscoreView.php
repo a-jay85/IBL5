@@ -166,7 +166,7 @@ class BoxscoreView
                 fd.append('renameTeamId', recordId);
                 fd.append('renameTeamName', name);
 
-                fetch('/ibl5/scripts/scoParser.php', { method: 'POST', body: fd })
+                fetch('/ibl5/scripts/allStarRename.php', { method: 'POST', body: fd })
                     .then(function (r) { return r.json(); })
                     .then(function (data) {
                         if (data.success) {

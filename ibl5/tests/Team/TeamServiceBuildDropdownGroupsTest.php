@@ -6,11 +6,11 @@ namespace Tests\Team;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Team\Contracts\TeamServiceInterface;
-use Team\TeamService;
+use Team\Contracts\TeamTableServiceInterface;
+use Team\TeamTableService;
 
 /**
- * Tests for TeamService::buildDropdownGroups()
+ * Tests for TeamTableService::buildDropdownGroups()
  *
  * Validates the dropdown group structure for the table view selector,
  * including conditional playoff availability.
@@ -18,7 +18,7 @@ use Team\TeamService;
 class TeamServiceBuildDropdownGroupsTest extends TestCase
 {
     private \MockDatabase $mockDb;
-    private TeamService $service;
+    private TeamTableService $service;
 
     protected function setUp(): void
     {
@@ -31,7 +31,12 @@ class TeamServiceBuildDropdownGroupsTest extends TestCase
         ]);
 
         $repository = new \Team\TeamRepository($this->mockDb);
-        $this->service = new TeamService($this->mockDb, $repository);
+        $this->service = new TeamTableService($this->mockDb, $repository);
+    }
+
+    public function testImplementsInterface(): void
+    {
+        $this->assertInstanceOf(TeamTableServiceInterface::class, $this->service);
     }
 
     public function testReturnsExpectedGroupKeys(): void

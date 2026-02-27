@@ -417,7 +417,10 @@ class TradingViewTest extends TestCase
 
         $this->assertStringContainsString('id="trade-roster-preview"', $html);
         $this->assertStringContainsString('trade-roster-preview', $html);
-        $this->assertStringContainsString('trade-roster-preview__select', $html);
+        $this->assertStringContainsString('Roster Preview', $html);
+        $this->assertStringContainsString('trade-roster-preview__tabs', $html);
+        $this->assertStringContainsString('data-display="ratings"', $html);
+        $this->assertStringContainsString('data-display="contracts"', $html);
     }
 
     public function testRenderTradeOfferFormContainsRosterPreviewLogos(): void

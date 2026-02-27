@@ -507,8 +507,17 @@ $tradeConfig = [
 <div id="trade-roster-preview" class="trade-roster-preview" style="display: none;">
     <div class="trade-roster-preview__header">
         <img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="trade-roster-preview__logo trade-roster-preview__logo--active" data-team-id="<?= $userTeamId ?>">
-        <select class="ibl-view-select trade-roster-preview__select"><option value="ratings">Roster Preview</option></select>
+        <div class="trade-roster-preview__title">Roster Preview</div>
         <img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="trade-roster-preview__logo" data-team-id="<?= $partnerTeamId ?>">
+    </div>
+    <div class="trade-roster-preview__tabs ibl-tabs" role="tablist">
+        <button class="ibl-tab ibl-tab--active" data-display="ratings" role="tab">Ratings</button>
+        <button class="ibl-tab" data-display="total_s" role="tab">Totals</button>
+        <button class="ibl-tab" data-display="avg_s" role="tab">Averages</button>
+        <button class="ibl-tab" data-display="per36mins" role="tab">Per 36</button>
+        <button class="ibl-tab" data-display="contracts" role="tab">Contracts</button>
+        <button class="ibl-tab" data-display="chunk" role="tab">Chunk</button>
+        <button class="ibl-tab" data-display="playoffs" role="tab">Playoffs</button>
     </div>
     <div class="table-scroll-wrapper">
         <div class="table-scroll-container">

@@ -36,10 +36,9 @@
     var currentDisplay = 'ratings';
     var debounceTimer = null;
     var abortController = null;
-    var headerSelectPopulated = false;
 
-    // Header dropdown (replaces static title)
-    var headerSelect = panel.querySelector('.trade-roster-preview__select');
+    // Tab elements
+    var tabs = panel.querySelectorAll('.trade-roster-preview__tabs .ibl-tab');
 
     // ========================================================================
     // PID COLLECTION (same logic as trade-comparison.js)
@@ -85,27 +84,17 @@
     }
 
     // ========================================================================
-    // HEADER DROPDOWN POPULATION
+    // TAB STATE
     // ========================================================================
 
-    /**
-     * Populate the header <select> from the API response's dropdown options.
-     * Only runs once — subsequent responses just restore the value.
-     */
-    function populateHeaderSelect(container) {
-        if (headerSelectPopulated || !headerSelect) {
-            return;
+    function updateActiveTab() {
+        for (var t = 0; t < tabs.length; t++) {
+            if (tabs[t].getAttribute('data-display') === currentDisplay) {
+                tabs[t].classList.add('ibl-tab--active');
+            } else {
+                tabs[t].classList.remove('ibl-tab--active');
+            }
         }
-
-        var responseSelect = container.querySelector('.ibl-view-select');
-        if (!responseSelect) {
-            return;
-        }
-
-        // Clone all optgroups and options into the header select
-        headerSelect.innerHTML = responseSelect.innerHTML;
-        headerSelect.value = currentDisplay;
-        headerSelectPopulated = true;
     }
 
     // ========================================================================
@@ -151,11 +140,7 @@
             + '&addPids=' + encodeURIComponent(addPids.join(','))
             + '&removePids=' + encodeURIComponent(removePids.join(','));
 
-        if (currentDisplay.indexOf('split:') === 0) {
-            url += '&display=split&split=' + encodeURIComponent(currentDisplay.substring(6));
-        } else {
-            url += '&display=' + encodeURIComponent(currentDisplay);
-        }
+        url += '&display=' + encodeURIComponent(currentDisplay);
 
         fetch(url, { signal: abortController.signal })
             .then(function (response) {
@@ -175,14 +160,6 @@
                     }
 
                     container.innerHTML = data.html;
-
-                    // Populate the header dropdown from response (first time only)
-                    populateHeaderSelect(container);
-
-                    // Restore header select value
-                    if (headerSelect) {
-                        headerSelect.value = currentDisplay;
-                    }
 
                     // Re-initialize sorting
                     if (typeof sorttable !== 'undefined') {
@@ -317,11 +294,15 @@
         });
     }
 
-    // Header dropdown change
-    if (headerSelect) {
-        headerSelect.addEventListener('change', function () {
-            currentDisplay = headerSelect.value;
-            fetchRosterPreview();
+    // Tab clicks
+    for (var t = 0; t < tabs.length; t++) {
+        tabs[t].addEventListener('click', function () {
+            var display = this.getAttribute('data-display');
+            if (display && display !== currentDisplay) {
+                currentDisplay = display;
+                updateActiveTab();
+                fetchRosterPreview();
+            }
         });
     }
 

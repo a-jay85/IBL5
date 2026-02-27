@@ -107,6 +107,7 @@ class DraftOrderViewTest extends TestCase
         $this->assertNotFalse($round2Start);
 
         $round1Html = substr($result, $round1Start, $round2Start - $round1Start);
+        $this->assertStringContainsString('Lottery Teams', $round1Html);
         $this->assertStringContainsString('Playoff Teams', $round1Html);
         $this->assertStringContainsString('Division Winners', $round1Html);
         $this->assertStringContainsString('Conference Winners', $round1Html);

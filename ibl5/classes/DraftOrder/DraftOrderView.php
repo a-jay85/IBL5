@@ -82,6 +82,7 @@ class DraftOrderView implements DraftOrderViewInterface
     private function getSeparatorLabel(int $pick): ?string
     {
         return match ($pick) {
+            1 => 'Lottery Teams',
             self::LOTTERY_PLAYOFF_BOUNDARY + 1 => 'Playoff Teams',
             self::DIVISION_WINNERS_BOUNDARY + 1 => 'Division Winners',
             self::CONFERENCE_WINNERS_BOUNDARY + 1 => 'Conference Winners',

@@ -11,6 +11,7 @@ nohup.out
 /phpmyadmin
 *.phar
 settings.local.json
+.claude/.workflow-pending
 
 config.json
 config.php

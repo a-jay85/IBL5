@@ -200,6 +200,59 @@ body:has(> .updater) {
     white-space: pre-wrap;
 }
 
+/* --- Expandable details within log --- */
+
+.updater-details {
+    margin: 0;
+}
+
+.updater-details__summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--gray-500, #6b7280);
+    user-select: none;
+    list-style: none;
+}
+
+.updater-details__summary::-webkit-details-marker {
+    display: none;
+}
+
+.updater-details__summary::before {
+    content: '\25b6';
+    display: inline-block;
+    font-size: 0.5625rem;
+    margin-right: var(--space-1, 0.25rem);
+    transition: transform 0.15s ease;
+}
+
+.updater-details[open] > .updater-details__summary::before {
+    transform: rotate(90deg);
+}
+
+.updater-details__content {
+    padding: var(--space-1, 0.25rem) 0 0 calc(0.5625rem + var(--space-1, 0.25rem));
+}
+
+.updater-details__content p {
+    margin: 0.125em 0;
+}
+
+/* --- Error variant --- */
+
+.updater-details__summary--errors {
+    color: var(--error-500, #ef4444);
+    font-weight: 600;
+}
+
+.updater-details--errors {
+    margin-top: var(--space-1, 0.25rem);
+}
+
+.updater-details__content .text-error {
+    color: var(--error-500, #ef4444);
+}
+
 /* ==========================================================================
    Summary
    ========================================================================== */

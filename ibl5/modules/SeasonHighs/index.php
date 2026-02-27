@@ -45,10 +45,12 @@ $view = new SeasonHighsView();
 
 // Get season highs data
 $data = $service->getSeasonHighsData($seasonPhase);
+$homeAwayData = $service->getHomeAwayHighs();
 
 // Render page
 PageLayout\PageLayout::header();
 
 echo $view->render($seasonPhase, $data);
+echo $view->renderHomeAwayHighs($homeAwayData);
 
 PageLayout\PageLayout::footer();

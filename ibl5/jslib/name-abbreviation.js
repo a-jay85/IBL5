@@ -48,6 +48,72 @@
         return initials + ' ' + lastName + suffix;
     }
 
+    /**
+     * Check whether showing the full name would cause the stat table to
+     * overflow its wrapper. Returns true if the name should be abbreviated.
+     *
+     * The table has `width: 100%` and `overflow: hidden`, so normal
+     * scrollWidth measurements are clamped. We temporarily set
+     * `width: auto` on the table and check wrapper.scrollWidth.
+     */
+    /**
+     * Measure the rendered pixel width of text using the same font as element.
+     * Creates a temporary off-screen DOM element for pixel-perfect accuracy.
+     */
+    function getTextWidth(text, element) {
+        const temp = document.createElement('span');
+        const s = window.getComputedStyle(element);
+        temp.style.fontFamily = s.fontFamily;
+        temp.style.fontSize = s.fontSize;
+        temp.style.fontWeight = s.fontWeight;
+        temp.style.fontStyle = s.fontStyle;
+        temp.style.letterSpacing = s.letterSpacing;
+        temp.style.whiteSpace = 'nowrap';
+        temp.style.position = 'absolute';
+        temp.style.visibility = 'hidden';
+        temp.style.left = '-9999px';
+        temp.textContent = text;
+        document.body.appendChild(temp);
+        const width = temp.getBoundingClientRect().width;
+        document.body.removeChild(temp);
+        return width;
+    }
+
+    function wouldOverflow(element, fullName) {
+        // element may be a Text node (from findTextNode) — resolve to Element
+        const el = element.nodeType === Node.TEXT_NODE ? element.parentElement : element;
+        if (!el) return false;
+
+        // For team name cells: the <a> has overflow:hidden and flex layout,
+        // so the span shrinks to fit and DOM measurements never show overflow.
+        // Compare the DOM-measured text width against the span's rendered width.
+        const cellLink = el.closest('.ibl-team-cell__name');
+        if (cellLink) {
+            const availableWidth = element.getBoundingClientRect().width;
+            const fullTextWidth = getTextWidth(fullName, element);
+            return fullTextWidth > availableWidth;
+        }
+
+        // For player names: temporarily let the table size naturally.
+        const table = el.closest('.stat-table');
+        if (!table) return false;
+        const wrapper = table.closest('.stat-table-wrapper');
+        if (!wrapper) return false;
+
+        const originalText = element.textContent;
+        element.textContent = fullName;
+        table.style.width = 'auto';
+        table.style.overflow = 'visible';
+
+        const overflows = table.offsetWidth > wrapper.clientWidth;
+
+        table.style.width = '';
+        table.style.overflow = '';
+        element.textContent = originalText;
+
+        return overflows;
+    }
+
     function processPlayerNames() {
         const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
 
@@ -57,41 +123,58 @@
             '.ibl-data-table a[href*="pid="]'
         );
 
+        // First pass: abbreviate names (stat tables always, others on mobile)
         nameLinks.forEach(link => {
-            // Find the text node containing the player name (skip img elements)
-            let textNode = null;
-            for (let i = 0; i < link.childNodes.length; i++) {
-                if (link.childNodes[i].nodeType === Node.TEXT_NODE && link.childNodes[i].textContent.trim()) {
-                    textNode = link.childNodes[i];
-                    break;
-                }
-            }
+            const textNode = findTextNode(link);
 
-            // Store original name on first encounter
             if (!link.dataset.fullName) {
                 link.dataset.fullName = textNode ? textNode.textContent.trim() : link.textContent.trim();
             }
 
-            // Always abbreviate in stat tables (compact grid layout), otherwise only on mobile
             const inStatTable = link.closest('.stat-table') !== null;
             const shouldAbbreviate = isMobile || inStatTable;
             const newName = shouldAbbreviate ? abbreviateName(link.dataset.fullName) : link.dataset.fullName;
 
-            if (textNode) {
-                // Preserve images/other elements, only update the text node
-                textNode.textContent = newName;
-            } else if (!link.querySelector('img')) {
-                // Only use textContent if there are no images to preserve
-                link.textContent = newName;
+            setLinkText(link, textNode, newName);
+        });
+
+        // Second pass: in stat tables, try restoring full names where they fit
+        nameLinks.forEach(link => {
+            if (link.closest('.stat-table') === null) return;
+            const nameEl = findTextNode(link) || link;
+            const fullName = link.dataset.fullName;
+            if (nameEl.textContent.trim() === fullName) return; // already full
+
+            if (!wouldOverflow(nameEl, fullName)) {
+                setLinkText(link, findTextNode(link), fullName);
             }
         });
+    }
+
+    /** Find the first non-empty text node child of a link. */
+    function findTextNode(link) {
+        for (let i = 0; i < link.childNodes.length; i++) {
+            if (link.childNodes[i].nodeType === Node.TEXT_NODE && link.childNodes[i].textContent.trim()) {
+                return link.childNodes[i];
+            }
+        }
+        return null;
+    }
+
+    /** Set text on a link, preserving img children when possible. */
+    function setLinkText(link, textNode, name) {
+        if (textNode) {
+            textNode.textContent = name;
+        } else if (!link.querySelector('img')) {
+            link.textContent = name;
+        }
     }
 
     function processTeamNames() {
         const spans = document.querySelectorAll('.stat-table .ibl-team-cell__text, .draft-pick-table .ibl-team-cell__text');
 
+        // First pass: abbreviate all long team names
         spans.forEach(span => {
-            // Store original name on first encounter
             if (!span.dataset.fullName) {
                 span.dataset.fullName = span.textContent.trim();
             }
@@ -107,6 +190,17 @@
             }
 
             span.textContent = display;
+        });
+
+        // Second pass: in stat tables, try restoring full names where they fit
+        spans.forEach(span => {
+            if (span.closest('.stat-table') === null) return;
+            const fullName = span.dataset.fullName;
+            if (span.textContent === fullName) return; // already full
+
+            if (!wouldOverflow(span, fullName)) {
+                span.textContent = fullName;
+            }
         });
     }
 

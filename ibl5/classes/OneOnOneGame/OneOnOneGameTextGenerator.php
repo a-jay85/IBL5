@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace OneOnOneGame;
 
-use Utilities\HtmlSanitizer;
-
 /**
  * OneOnOneGameTextGenerator - Generates play-by-play text for One-on-One games
  * 
@@ -196,9 +194,7 @@ class OneOnOneGameTextGenerator
      */
     public function getCoinFlipText(bool $isHeads, string $player1Name, string $player2Name): string
     {
-        $player1Name = HtmlSanitizer::safeHtmlOutput($player1Name);
-        $player2Name = HtmlSanitizer::safeHtmlOutput($player2Name);
-
+        // Names are already sanitized by the Engine before being passed here
         if ($isHeads) {
             return "The opening coin flip is heads, so {$player1Name} gets the ball to start.<br>";
         }
@@ -207,7 +203,7 @@ class OneOnOneGameTextGenerator
 
     /**
      * Generate score update text
-     * 
+     *
      * @param string $player1Name Name of player 1
      * @param int $player1Score Player 1's current score
      * @param string $player2Name Name of player 2
@@ -216,9 +212,7 @@ class OneOnOneGameTextGenerator
      */
     public function getScoreText(string $player1Name, int $player1Score, string $player2Name, int $player2Score): string
     {
-        $player1Name = HtmlSanitizer::safeHtmlOutput($player1Name);
-        $player2Name = HtmlSanitizer::safeHtmlOutput($player2Name);
-
+        // Names are already sanitized by the Engine before being passed here
         return '<strong style="font-weight: bold;">SCORE: ' . $player1Name . ' ' . $player1Score . ', ' . $player2Name . ' ' . $player2Score . '</strong><p>';
     }
 
@@ -227,9 +221,7 @@ class OneOnOneGameTextGenerator
      */
     public function getFoulText(string $defender, string $attacker): string
     {
-        $defender = HtmlSanitizer::safeHtmlOutput($defender);
-        $attacker = HtmlSanitizer::safeHtmlOutput($attacker);
-
+        // Names are already sanitized by the Engine before being passed here
         return "{$defender} fouls {$attacker}.<br>";
     }
 
@@ -238,9 +230,7 @@ class OneOnOneGameTextGenerator
      */
     public function getStealPlayText(string $defender, string $attacker): string
     {
-        $defender = HtmlSanitizer::safeHtmlOutput($defender);
-        $attacker = HtmlSanitizer::safeHtmlOutput($attacker);
-
+        // Names are already sanitized by the Engine before being passed here
         return "{$defender} " . $this->getStealText() . " {$attacker}.<br>";
     }
 
@@ -249,8 +239,7 @@ class OneOnOneGameTextGenerator
      */
     public function getReboundText(string $playerName, bool $isOffensive): string
     {
-        $playerName = HtmlSanitizer::safeHtmlOutput($playerName);
-
+        // Name is already sanitized by the Engine before being passed here
         if ($isOffensive) {
             return "{$playerName} gets the (offensive) rebound.<br>";
         }

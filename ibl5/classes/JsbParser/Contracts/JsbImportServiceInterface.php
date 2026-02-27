@@ -57,4 +57,14 @@ interface JsbImportServiceInterface
      * @return JsbImportResult Summary of import results
      */
     public function processAswFile(string $filePath, int $seasonYear): JsbImportResult;
+
+    /**
+     * Process an .rcb file and upsert records into ibl_rcb_alltime_records and ibl_rcb_season_records.
+     *
+     * @param string $filePath Path to the .rcb file
+     * @param int $seasonYear Season year for current season records
+     * @param string|null $sourceLabel Label for the source_file column
+     * @return JsbImportResult Summary of import results
+     */
+    public function processRcbFile(string $filePath, int $seasonYear, ?string $sourceLabel = null): JsbImportResult;
 }

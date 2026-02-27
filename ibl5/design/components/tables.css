@@ -1756,8 +1756,9 @@ td.ibl-team-cell--colored {
     font-weight: 600;
 }
 
-.draft-order-notes {
+.draft-order-table .draft-order-notes {
     max-width: 550px;
+    padding-inline: 0.5rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

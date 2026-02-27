@@ -34,15 +34,18 @@ export async function GET({ params }) {
 			team: teams[0],
 			timestamp: new Date().toISOString()
 		});
-	} catch (err) {
+	} catch (err: unknown) {
 		console.error('Failed to fetch team:', err);
+
+		const message = err instanceof Error ? err.message : 'Unknown error';
+		const status = err != null && typeof err === 'object' && 'status' in err ? (err as { status: number }).status : 500;
 
 		return json(
 			{
 				success: false,
-				error: err.message
+				error: message
 			},
-			{ status: err.status || 500 }
+			{ status }
 		);
 	}
 }

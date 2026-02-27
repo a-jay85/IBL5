@@ -144,4 +144,25 @@ final class OneOnOneGameTextGeneratorTest extends TestCase
         $this->assertStringContainsString('rebound', $text);
         $this->assertStringNotContainsString('offensive', $text);
     }
+
+    public function testNamesWithApostrophesAreNotDoubleEncoded(): void
+    {
+        $sanitizedName1 = "A&apos;Ja Wilson";
+        $sanitizedName2 = "Shaquille O&apos;Neal";
+
+        $coinFlip = $this->generator->getCoinFlipText(true, $sanitizedName1, $sanitizedName2);
+        $this->assertStringNotContainsString('&amp;', $coinFlip, 'Coin flip text double-encodes apostrophes');
+
+        $score = $this->generator->getScoreText($sanitizedName1, 10, $sanitizedName2, 8);
+        $this->assertStringNotContainsString('&amp;', $score, 'Score text double-encodes apostrophes');
+
+        $foul = $this->generator->getFoulText($sanitizedName1, $sanitizedName2);
+        $this->assertStringNotContainsString('&amp;', $foul, 'Foul text double-encodes apostrophes');
+
+        $steal = $this->generator->getStealPlayText($sanitizedName1, $sanitizedName2);
+        $this->assertStringNotContainsString('&amp;', $steal, 'Steal text double-encodes apostrophes');
+
+        $rebound = $this->generator->getReboundText($sanitizedName1, true);
+        $this->assertStringNotContainsString('&amp;', $rebound, 'Rebound text double-encodes apostrophes');
+    }
 }

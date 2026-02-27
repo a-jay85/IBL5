@@ -1752,10 +1752,6 @@ td.ibl-team-cell--colored {
     padding: 0.35rem 0.5rem;
 }
 
-.draft-order-traded td {
-    font-weight: 600;
-}
-
 .draft-order-table .draft-order-notes {
     max-width: 550px;
     padding-inline: 0.5rem;

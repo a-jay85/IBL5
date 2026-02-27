@@ -92,13 +92,15 @@ function themeheader()
 
     $seasonPhase = '';
     $allowWaivers = '';
+    $showDraftLink = '';
     if ($mysqli_db) {
         $season = new \Season($mysqli_db);
         $seasonPhase = $season->phase;
         $allowWaivers = $season->allowWaivers;
+        $showDraftLink = $season->showDraftLink;
     }
 
-    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId, $teamsData, $seasonPhase, $allowWaivers, $_SERVER['SERVER_NAME'] ?? null, $_SERVER['REQUEST_URI'] ?? null);
+    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId, $teamsData, $seasonPhase, $allowWaivers, $showDraftLink, $_SERVER['SERVER_NAME'] ?? null, $_SERVER['REQUEST_URI'] ?? null);
     echo $navView->render();
 
     echo "<body bgcolor=\"$bgcolor1\"" . ($teamId ? " data-user-team-id=\"$teamId\"" : '') . ">";

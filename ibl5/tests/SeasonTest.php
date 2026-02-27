@@ -243,6 +243,13 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
         $this->assertTrue(property_exists($season, 'allowWaivers'));
     }
 
+    public function testHasShowDraftLinkProperty(): void
+    {
+        $season = new \Season($this->mockDb);
+
+        $this->assertTrue(property_exists($season, 'showDraftLink'));
+    }
+
     // ============================================
     // RS-TO-PLAYOFFS GAP SKIP TESTS
     // ============================================

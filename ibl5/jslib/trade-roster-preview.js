@@ -38,6 +38,7 @@
     var abortController = null;
 
     // Tab elements
+    var tabBar = panel.querySelector('.trade-roster-preview__tabs');
     var tabs = panel.querySelectorAll('.trade-roster-preview__tabs .ibl-tab');
 
     // ========================================================================
@@ -259,6 +260,20 @@
         }
     }
 
+    /**
+     * Update tab bar colors to match the currently selected team.
+     */
+    function updateTabBarColors() {
+        if (!tabBar) {
+            return;
+        }
+        var color = currentTeamId === config.userTeamId
+            ? config.userTeamColor1
+            : config.partnerTeamColor1;
+        tabBar.style.setProperty('--team-tab-bg-color', '#' + color);
+        tabBar.style.setProperty('--team-tab-active-color', '#' + color);
+    }
+
     // ========================================================================
     // DEBOUNCE
     // ========================================================================
@@ -289,6 +304,7 @@
             if (teamId && teamId !== currentTeamId) {
                 currentTeamId = teamId;
                 updateActiveLogoState();
+                updateTabBarColors();
                 fetchRosterPreview();
             }
         });

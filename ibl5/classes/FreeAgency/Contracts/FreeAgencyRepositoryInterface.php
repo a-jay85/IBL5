@@ -13,27 +13,27 @@ namespace FreeAgency\Contracts;
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  *
  * @phpstan-type OfferRow array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}
- * @phpstan-type OfferData array{teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, modifier: int, random: int, perceivedValue: float, mle: int, lle: int, offerType: int}
+ * @phpstan-type OfferData array{pid: int, tid: int, teamName: string, playerName: string, offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, modifier: int, random: int, perceivedValue: float, mle: int, lle: int, offerType: int}
  */
 interface FreeAgencyRepositoryInterface
 {
     /**
      * Get an existing offer for a player from a team
      *
-     * @param string $teamName Team making the offer
-     * @param string $playerName Player receiving the offer
+     * @param int $tid Team ID making the offer
+     * @param int $pid Player ID receiving the offer
      * @return OfferRow|null Offer data with keys: offer1-6, or null if no offer exists
      */
-    public function getExistingOffer(string $teamName, string $playerName): ?array;
+    public function getExistingOffer(int $tid, int $pid): ?array;
 
     /**
      * Delete an offer from a team to a player
      *
-     * @param string $teamName Team making the offer
-     * @param string $playerName Player receiving the offer
+     * @param int $tid Team ID making the offer
+     * @param int $pid Player ID receiving the offer
      * @return int Number of rows deleted (0 or 1)
      */
-    public function deleteOffer(string $teamName, string $playerName): int;
+    public function deleteOffer(int $tid, int $pid): int;
 
     /**
      * Save a new offer to the database

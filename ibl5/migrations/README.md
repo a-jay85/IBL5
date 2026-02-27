@@ -6,6 +6,47 @@ This directory contains SQL migration scripts to improve the IBL5 database schem
 
 These migrations implement the recommendations from `DATABASE_SCHEMA_IMPROVEMENTS.md` in a phased approach to minimize risk and downtime.
 
+## Automated Migration Runner
+
+Migrations are applied automatically during deployment via `ibl5/bin/migrate`. The runner:
+
+1. Scans this directory for `.sql` and `.php` files
+2. Compares against the `migrations` tracking table
+3. Executes any pending migrations in order
+4. Records each successful migration with a batch number
+
+### Naming Convention for New Migrations
+
+Use timestamp-based filenames to avoid collisions:
+
+```
+YYYYMMDD_HHMMSS_description.sql
+```
+
+Example: `20260226_120000_add_league_season_table.sql`
+
+Historical migrations use numbered prefixes (`001_*`, `002_*`) or descriptive names (`add_*`, `fix-*`). These are fully supported but timestamp-based names are preferred for new migrations.
+
+### Sort Order
+
+The runner executes migrations in this deterministic order:
+1. **Numbered** (`001_*` through `999_*`) — natural sort
+2. **Non-numbered** (`add_*`, `fix-*`, `create_*`, `migrate_*`) — alphabetical
+3. **Timestamp-based** (`20260226_*`) — natural sort
+
+### CLI Usage
+
+```bash
+# Show pending migrations
+cd ibl5 && php bin/migrate --status
+
+# Run all pending migrations
+cd ibl5 && php bin/migrate
+
+# Seed tracking table with existing migrations (one-time bootstrap)
+cd ibl5 && php bin/migrate-seed
+```
+
 ## Migration Files
 
 ### 001_critical_improvements.sql (Phase 1) ✅ COMPLETED

@@ -146,7 +146,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
         // Arrange - Team is already set up in setUp()
 
         // Act
-        $result = $this->calculator->calculateTeamCapMetrics('Test Player');
+        $result = $this->calculator->calculateTeamCapMetrics(1);
 
         // Assert
         $this->assertArrayHasKey('totalSalaries', $result);
@@ -174,7 +174,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
         $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
 
         // Act
-        $result = $calculator->calculateTeamCapMetrics('Test Player');
+        $result = $calculator->calculateTeamCapMetrics(1);
 
         // Assert - Cap space should not include the excluded player's offer
         $this->assertIsInt($result['softCapSpace'][0]);
@@ -191,7 +191,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
         // Arrange - Team is already set up in setUp()
 
         // Act
-        $result = $this->calculator->calculateTeamCapMetrics('Test Player');
+        $result = $this->calculator->calculateTeamCapMetrics(1);
 
         // Assert
         $buffer = League::HARD_CAP_MAX - League::SOFT_CAP_MAX;

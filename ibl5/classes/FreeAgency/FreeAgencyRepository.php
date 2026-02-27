@@ -38,16 +38,16 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
      *
      * @return OfferRow|null
      */
-    public function getExistingOffer(string $teamName, string $playerName): ?array
+    public function getExistingOffer(int $tid, int $pid): ?array
     {
         /** @var OfferRow|null $result */
         $result = $this->fetchOne(
             "SELECT offer1, offer2, offer3, offer4, offer5, offer6
              FROM ibl_fa_offers
-             WHERE team = ? AND name = ?",
-            "ss",
-            $teamName,
-            $playerName
+             WHERE tid = ? AND pid = ?",
+            "ii",
+            $tid,
+            $pid
         );
 
         return $result;
@@ -56,13 +56,13 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
     /**
      * @see FreeAgencyRepositoryInterface::deleteOffer()
      */
-    public function deleteOffer(string $teamName, string $playerName): int
+    public function deleteOffer(int $tid, int $pid): int
     {
         return $this->execute(
-            "DELETE FROM ibl_fa_offers WHERE name = ? AND team = ? LIMIT 1",
-            "ss",
-            $playerName,
-            $teamName
+            "DELETE FROM ibl_fa_offers WHERE pid = ? AND tid = ? LIMIT 1",
+            "ii",
+            $pid,
+            $tid
         );
     }
 
@@ -74,17 +74,19 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
     public function saveOffer(array $offerData): bool
     {
         // First delete any existing offer
-        $this->deleteOffer($offerData['teamName'], $offerData['playerName']);
+        $this->deleteOffer($offerData['tid'], $offerData['pid']);
 
         // Insert the new offer
         $affected = $this->execute(
             "INSERT INTO ibl_fa_offers
-             (name, team, offer1, offer2, offer3, offer4, offer5, offer6,
+             (name, pid, team, tid, offer1, offer2, offer3, offer4, offer5, offer6,
               modifier, random, perceivedvalue, mle, lle, offer_type)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            "ssiiiiiiiidiii",
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "sisiiiiiiiiidiii",
             $offerData['playerName'],
+            $offerData['pid'],
             $offerData['teamName'],
+            $offerData['tid'],
             $offerData['offer1'],
             $offerData['offer2'],
             $offerData['offer3'],

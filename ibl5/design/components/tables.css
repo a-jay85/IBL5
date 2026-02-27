@@ -1851,4 +1851,39 @@ td.record-book-retired-cell {
     padding-left: calc(0.5rem + 24px + 0.5rem) !important;
 }
 
+/* ==========================================================================
+   Season Highs Discrepancy Panel
+
+   Shows mismatches between box score data and RCB (Record Book) data
+   for admin cross-validation purposes.
+   ========================================================================== */
+
+.season-highs-discrepancy-panel {
+    margin-top: var(--space-6, 1.5rem);
+    padding: var(--space-4, 1rem);
+    border: 1px solid var(--amber-300, #fcd34d);
+    border-radius: var(--radius-lg, 0.5rem);
+    background: var(--amber-50, #fffbeb);
+}
+
+.discrepancy-panel-title {
+    font-family: var(--font-display, 'Barlow Condensed', -apple-system, BlinkMacSystemFont, sans-serif);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--amber-800, #92400e);
+    margin-bottom: var(--space-3, 0.75rem);
+}
+
+.season-highs-discrepancy-panel .ibl-data-table {
+    font-size: 0.875rem;
+}
+
+.season-highs-discrepancy-panel .ibl-data-table thead {
+    background: var(--amber-600, #d97706);
+}
+
+.season-highs-discrepancy-panel .ibl-data-table td {
+    padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+}
+
 } /* end @layer components */

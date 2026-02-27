@@ -114,6 +114,75 @@ class SeasonHighsViewTest extends TestCase
         $this->assertStringContainsString('Season Highs', $html);
     }
 
+    // --- Home/Away Highs Tests ---
+
+    public function testRenderHomeAwayHighsShowsHomeSectionTitle(): void
+    {
+        $data = self::createHomeAwayData();
+        $html = $this->view->renderHomeAwayHighs('Regular Season', $data, []);
+
+        $this->assertStringContainsString("Players' Regular Season Home Highs", $html);
+    }
+
+    public function testRenderHomeAwayHighsShowsAwaySectionTitle(): void
+    {
+        $data = self::createHomeAwayData();
+        $html = $this->view->renderHomeAwayHighs('Regular Season', $data, []);
+
+        $this->assertStringContainsString("Players' Regular Season Away Highs", $html);
+    }
+
+    public function testRenderHomeAwayHighsShowsPlayerLink(): void
+    {
+        $data = [
+            'home' => ['POINTS' => [self::createHighEntry(['pid' => 99, 'name' => 'Home Star'])]],
+            'away' => [],
+        ];
+        $html = $this->view->renderHomeAwayHighs('Regular Season', $data, []);
+
+        $this->assertStringContainsString('pid=99', $html);
+        $this->assertStringContainsString('Home Star', $html);
+    }
+
+    public function testRenderHomeAwayHighsShowsDateLink(): void
+    {
+        $data = [
+            'home' => ['POINTS' => [self::createHighEntry(['gameOfThatDay' => 2])]],
+            'away' => [],
+        ];
+        $html = $this->view->renderHomeAwayHighs('Regular Season', $data, []);
+
+        $this->assertStringContainsString('2024-12-15-game-2/boxscore', $html);
+    }
+
+    public function testRenderHomeAwayHighsHidesDiscrepanciesWhenEmpty(): void
+    {
+        $data = self::createHomeAwayData();
+        $html = $this->view->renderHomeAwayHighs('Regular Season', $data, []);
+
+        $this->assertStringNotContainsString('discrepancy', strtolower($html));
+    }
+
+    public function testRenderHomeAwayHighsShowsDiscrepanciesWhenPresent(): void
+    {
+        $data = self::createHomeAwayData();
+        $discrepancies = [
+            [
+                'context' => 'home',
+                'stat' => 'POINTS',
+                'boxValue' => 40,
+                'boxPlayer' => 'Box Player',
+                'rcbValue' => 50,
+                'rcbPlayer' => 'RCB Player',
+            ],
+        ];
+        $html = $this->view->renderHomeAwayHighs('Regular Season', $data, $discrepancies);
+
+        $this->assertStringContainsString('Data Validation', $html);
+        $this->assertStringContainsString('Box Player: 40', $html);
+        $this->assertStringContainsString('RCB Player: 50', $html);
+    }
+
     /**
      * @return array{playerHighs: array<string, list<mixed>>, teamHighs: array<string, list<mixed>>}
      */
@@ -126,11 +195,22 @@ class SeasonHighsViewTest extends TestCase
     }
 
     /**
-     * @return array{name: string, date: string, value: int, pid?: int, tid?: int, teamname?: string, color1?: string, color2?: string, boxId?: int}
+     * @return array{home: array<string, list<mixed>>, away: array<string, list<mixed>>}
+     */
+    private static function createHomeAwayData(): array
+    {
+        return [
+            'home' => ['POINTS' => [self::createHighEntry()]],
+            'away' => ['POINTS' => [self::createHighEntry()]],
+        ];
+    }
+
+    /**
+     * @return array{name: string, date: string, value: int, pid?: int, tid?: int, teamname?: string, color1?: string, color2?: string, boxId?: int, gameOfThatDay?: int}
      */
     private static function createHighEntry(array $overrides = []): array
     {
-        /** @var array{name: string, date: string, value: int, pid?: int, tid?: int, teamname?: string, color1?: string, color2?: string, boxId?: int} */
+        /** @var array{name: string, date: string, value: int, pid?: int, tid?: int, teamname?: string, color1?: string, color2?: string, boxId?: int, gameOfThatDay?: int} */
         return array_merge([
             'name' => 'Test Player',
             'date' => '2024-12-15',

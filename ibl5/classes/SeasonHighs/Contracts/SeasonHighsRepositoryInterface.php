@@ -30,7 +30,8 @@ interface SeasonHighsRepositoryInterface
         string $tableSuffix,
         string $startDate,
         string $endDate,
-        int $limit = 15
+        int $limit = 15,
+        ?string $locationFilter = null
     ): array;
 
     /**

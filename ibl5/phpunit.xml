@@ -222,5 +222,8 @@
         <testsuite name="Season Module Tests">
             <directory>tests/Season</directory>
         </testsuite>
+        <testsuite name="PlrParser Module Tests">
+            <directory>tests/PlrParser</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

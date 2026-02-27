@@ -1,0 +1,121 @@
+/**
+ * Trade Roster Preview Panel
+ *
+ * Full-roster preview during trade construction. Shows what each team's
+ * roster would look like post-trade, with the same dropdown views as
+ * team pages (Ratings, Contracts, Splits, etc.).
+ */
+
+/* ==========================================================================
+   Panel Container
+   ========================================================================== */
+
+.trade-roster-preview {
+    margin-top: var(--space-4);
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+}
+
+/* ==========================================================================
+   Header — Logo / Title / Logo
+   ========================================================================== */
+
+.trade-roster-preview__header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-4);
+    background: linear-gradient(135deg, #111827 0%, #1a2234 100%);
+    padding: var(--space-2) var(--space-4);
+}
+
+.trade-roster-preview__title {
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-align: center;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+}
+
+.trade-roster-preview__logo {
+    height: 40px;
+    width: auto;
+    object-fit: contain;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.2s ease, box-shadow 0.2s ease;
+    border-radius: var(--radius-sm, 4px);
+}
+
+.trade-roster-preview__logo--active {
+    opacity: 1;
+    box-shadow: 0 0 12px 4px rgba(249, 115, 22, 0.6);
+}
+
+/* ==========================================================================
+   States: Empty / Loading
+   ========================================================================== */
+
+.trade-roster-preview__empty {
+    text-align: center;
+    padding: var(--space-6) var(--space-4);
+    color: var(--gray-400, #9ca3af);
+    font-style: italic;
+}
+
+.trade-roster-preview__loading {
+    text-align: center;
+    padding: var(--space-6) var(--space-4);
+    color: var(--gray-500, #6b7280);
+}
+
+.trade-roster-preview__loading::after {
+    content: '';
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    margin-left: var(--space-2);
+    border: 2px solid var(--gray-300, #d1d5db);
+    border-top-color: var(--gray-600, #4b5563);
+    border-radius: 50%;
+    animation: trade-roster-preview-spin 0.6s linear infinite;
+    vertical-align: middle;
+}
+
+@keyframes trade-roster-preview-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Trade-Involved Player Row Highlight
+   Uses the accent (orange) palette for consistency with logo glow,
+   depth chart glow, and starter glow.
+   ========================================================================== */
+
+.trade-roster-preview tr.trade-involved-row:nth-child(odd),
+.trade-roster-preview tr.trade-involved-row:nth-child(even) {
+    background-color: var(--color-accent-100, #ffedd5);
+}
+
+.trade-roster-preview tr.trade-involved-row:nth-child(odd):hover,
+.trade-roster-preview tr.trade-involved-row:nth-child(even):hover {
+    background-color: var(--color-accent-200, #fed7aa);
+}
+
+/* Sticky-col variants for responsive tables */
+.trade-roster-preview tr.trade-involved-row td[class*="sticky-col"] {
+    background-color: var(--color-accent-100, #ffedd5);
+}
+
+.trade-roster-preview tr.trade-involved-row:hover td[class*="sticky-col"] {
+    background-color: var(--color-accent-200, #fed7aa);
+}
+
+/* Hide per-team dropdowns injected by API responses (same as trade-comparison) */
+.trade-roster-preview .team-table-caption .ibl-view-dropdown {
+    display: none;
+}

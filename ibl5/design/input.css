@@ -73,6 +73,7 @@
 @import './components/strength-of-schedule.css';
 @import './components/team-splits.css';
 @import './components/trade-comparison.css';
+@import './components/trade-roster-preview.css';
 
 /* Site-wide layout wrapper (replaces legacy themeheader table) */
 @layer components {

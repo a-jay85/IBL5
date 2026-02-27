@@ -75,6 +75,24 @@ final class MigrationRepositoryTest extends TestCase
         $this->assertSame(4, $result);
     }
 
+    public function testHasSeededMigrationsReturnsTrueWhenBatchZeroExists(): void
+    {
+        $this->db->setMockData([['cnt' => 5]]);
+
+        $result = $this->repository->hasSeededMigrations();
+
+        $this->assertTrue($result);
+    }
+
+    public function testHasSeededMigrationsReturnsFalseWhenNoBatchZero(): void
+    {
+        $this->db->setMockData([['cnt' => 0]]);
+
+        $result = $this->repository->hasSeededMigrations();
+
+        $this->assertFalse($result);
+    }
+
     public function testTruncateExecutesQuery(): void
     {
         $this->repository->truncate();

@@ -102,6 +102,18 @@ class MigrationRepository extends \BaseMysqliRepository implements MigrationRepo
     }
 
     /**
+     * @see MigrationRepositoryInterface::hasSeededMigrations()
+     */
+    public function hasSeededMigrations(): bool
+    {
+        $row = $this->fetchOne(
+            'SELECT COUNT(*) AS cnt FROM migrations WHERE batch = 0',
+        );
+
+        return $row !== null && (int) $row['cnt'] > 0;
+    }
+
+    /**
      * @see MigrationRepositoryInterface::truncate()
      */
     public function truncate(): void

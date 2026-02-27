@@ -211,6 +211,9 @@ final class MigrationRunnerTest extends TestCase
                 }
             });
 
+        $stub->method('hasSeededMigrations')
+            ->willReturn(true);
+
         $stub->method('truncate')
             ->willReturnCallback(static function (): void {
                 // no-op

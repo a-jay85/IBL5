@@ -44,6 +44,14 @@ interface MigrationRepositoryInterface
     public function executeRawSql(string $sql): void;
 
     /**
+     * Check if the migrations table has been seeded (contains batch 0 rows).
+     *
+     * Used to detect whether migrate-seed has been run. Without seeding,
+     * the runner would attempt to re-execute all existing migrations.
+     */
+    public function hasSeededMigrations(): bool;
+
+    /**
      * Truncate the migrations table (for seeding).
      */
     public function truncate(): void;

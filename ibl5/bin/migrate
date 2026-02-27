@@ -47,6 +47,14 @@ try {
         exit(0);
     }
 
+    // Guard: if there are pending migrations but migrate-seed hasn't been run,
+    // skip execution to prevent re-running all existing migrations on first deploy.
+    if (!$repository->hasSeededMigrations()) {
+        echo "Migration tracking not seeded. Run 'php bin/migrate-seed' first.\n";
+        echo count($pending) . " pending migration(s) skipped.\n";
+        exit(0);
+    }
+
     echo count($pending) . " pending migration(s) to run...\n";
 
     $executed = $runner->runPending();

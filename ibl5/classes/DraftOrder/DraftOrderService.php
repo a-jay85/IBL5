@@ -67,12 +67,14 @@ class DraftOrderService implements DraftOrderServiceInterface
         $nonPlayoffSorted = $this->sortTeamsByRecord($nonPlayoffTeams, $h2h, $pointDiffs);
         $playoffSorted = $this->sortTeamsByRecord($playoffTeams, $h2h, $pointDiffs);
 
-        $baseOrder = array_merge($nonPlayoffSorted, $playoffSorted);
+        $round1Order = array_merge($nonPlayoffSorted, $playoffSorted);
+
+        $allTeamsSorted = $this->sortTeamsByRecord(array_values($teamMap), $h2h, $pointDiffs);
 
         $pickOwnership = $this->buildPickOwnershipMap($pickOwnershipRows);
 
-        $round1 = $this->buildRound($baseOrder, $pickOwnership, 1, $teamMap);
-        $round2 = $this->buildRound($baseOrder, $pickOwnership, 2, $teamMap);
+        $round1 = $this->buildRound($round1Order, $pickOwnership, 1, $teamMap);
+        $round2 = $this->buildRound($allTeamsSorted, $pickOwnership, 2, $teamMap);
 
         return ['round1' => $round1, 'round2' => $round2];
     }

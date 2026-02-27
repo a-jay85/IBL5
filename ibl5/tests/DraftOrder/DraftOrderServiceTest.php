@@ -237,7 +237,7 @@ class DraftOrderServiceTest extends TestCase
         }
     }
 
-    public function testRound2HasSameBaseOrderButDifferentOwnership(): void
+    public function testRound2HasDifferentOwnershipPerRound(): void
     {
         $this->configureStubWithFullLeague();
 
@@ -248,12 +248,33 @@ class DraftOrderServiceTest extends TestCase
 
         $result = $this->service->calculateDraftOrder(2026);
 
-        // Same base team order
-        $this->assertSame($result['round1'][0]['teamName'], $result['round2'][0]['teamName']);
-
-        // But different ownership per round
+        // Different ownership per round
         $this->assertSame('Team1', $result['round1'][0]['ownerName']);
         $this->assertSame('Team2', $result['round2'][0]['ownerName']);
+    }
+
+    public function testRound2IsOrderedStrictlyByRecord(): void
+    {
+        $standings = $this->buildStandingsWithWeakDivisionWinner();
+        $this->stubRepository->method('getAllTeamsWithStandings')->willReturn($standings);
+        $this->stubRepository->method('getPlayedGames')->willReturn([]);
+        $this->stubRepository->method('getPickOwnership')->willReturn([]);
+        $this->stubRepository->method('getPointDifferentials')->willReturn([]);
+
+        $result = $this->service->calculateDraftOrder(2026);
+
+        // In round 1, WeakDivWinner (30-52) is in the playoff section (picks 13-28)
+        $r1PlayoffNames = array_column(array_slice($result['round1'], 12), 'teamName');
+        $this->assertContains('WeakDivWinner', $r1PlayoffNames);
+
+        // In round 2, order is strictly by record — WeakDivWinner should be
+        // among the worse teams, not artificially pushed to playoff section
+        $r2Wins = array_column($result['round2'], 'wins');
+        // Verify wins are in ascending order (worst first)
+        for ($i = 0; $i < count($r2Wins) - 1; $i++) {
+            $this->assertLessThanOrEqual($r2Wins[$i + 1], $r2Wins[$i],
+                'Round 2 pick ' . ($i + 1) . ' (' . $r2Wins[$i] . ' wins) should not have more wins than pick ' . ($i + 2) . ' (' . $r2Wins[$i + 1] . ' wins)');
+        }
     }
 
     public function testDraftSlotContainsAllRequiredFields(): void

@@ -1770,6 +1770,19 @@ td.ibl-team-cell--colored {
     text-overflow: clip;
 }
 
+/* On mobile, keep record text visible alongside logo (overrides global .ibl-team-cell__text hide) */
+@media (max-width: 768px) {
+    .draft-order-table td:nth-child(3) .ibl-team-cell__text {
+        display: inline;
+    }
+
+    .draft-order-table td:nth-child(3).ibl-team-cell--colored {
+        width: auto;
+        min-width: auto;
+        max-width: none;
+    }
+}
+
 /* Raise team cell above adjacent cells so tooltip renders on top */
 .draft-order-table td.ibl-team-cell--colored {
     position: relative;

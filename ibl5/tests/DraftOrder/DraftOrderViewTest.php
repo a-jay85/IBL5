@@ -193,6 +193,43 @@ class DraftOrderViewTest extends TestCase
         $this->assertStringContainsString('tabindex="0"', $result);
     }
 
+    public function testTradedPickRecordCellUsesOriginalTeamColors(): void
+    {
+        $order = $this->emptyDraftOrder();
+        $order['round1'] = [
+            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 2, 'Celtics', '007A33', 'FFFFFF', true, 'via trade'),
+        ];
+
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringContainsString('98002E', $result);
+        $this->assertStringContainsString('20-62', $result);
+    }
+
+    public function testTradedPickRecordCellHasTooltip(): void
+    {
+        $order = $this->emptyDraftOrder();
+        $order['round1'] = [
+            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 2, 'Celtics', '007A33', 'FFFFFF', true, 'via trade'),
+        ];
+
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringContainsString("Heat&apos;s record", $result);
+    }
+
+    public function testTradedPickRecordCellHasOriginalTeamLogo(): void
+    {
+        $order = $this->emptyDraftOrder();
+        $order['round1'] = [
+            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 2, 'Celtics', '007A33', 'FFFFFF', true, 'via trade'),
+        ];
+
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringContainsString('new1.png', $result);
+    }
+
     public function testOwnPickDoesNotShowAsteriskOrTooltip(): void
     {
         $order = $this->emptyDraftOrder();

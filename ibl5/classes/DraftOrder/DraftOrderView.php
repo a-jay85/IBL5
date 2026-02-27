@@ -111,10 +111,34 @@ class DraftOrderView implements DraftOrderViewInterface
             );
         }
 
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['wins']) . '-' . HtmlSanitizer::safeHtmlOutput($slot['losses']) . '</td>';
+        $html .= $this->renderRecordCell($slot);
         $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['notes']) . '</td>';
 
         $html .= '</tr>';
         return $html;
+    }
+
+    /** @param DraftSlot $slot */
+    private function renderRecordCell(array $slot): string
+    {
+        $recordHtml = HtmlSanitizer::e($slot['wins']) . '-' . HtmlSanitizer::e($slot['losses']);
+
+        if (!$slot['isTraded']) {
+            return '<td>' . $recordHtml . '</td>';
+        }
+
+        $cell = TeamCellHelper::renderTeamCell(
+            $slot['teamId'],
+            $slot['teamName'],
+            $slot['color1'],
+            $slot['color2'],
+            nameHtml: $recordHtml,
+        );
+        $safeTooltip = HtmlSanitizer::e($slot['teamName'] . "'s record");
+        $tooltipOpen = '<span class="ibl-tooltip" title="' . $safeTooltip . '" tabindex="0">';
+        $cell = str_replace('><a ', '>' . $tooltipOpen . '<a ', $cell);
+        $cell = str_replace('</a></td>', '</a></span></td>', $cell);
+
+        return $cell;
     }
 }

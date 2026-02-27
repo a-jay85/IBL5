@@ -123,7 +123,7 @@ class TradingView implements TradingViewInterface
                 </table>
             </div>
         </div>
-<?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam) ?>
+<?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam, $userColor1, $partnerColor1) ?>
 <?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2, $previousFormData) ?>
 <?= $this->renderCapTotals($pageData, $seasonEndingYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2) ?>
 <?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam, $userColor1, $partnerColor1) ?>

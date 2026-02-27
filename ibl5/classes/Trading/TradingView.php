@@ -157,6 +157,7 @@ if ($comparisonDropdownGroups !== []):
                 </div>
             </div>
         </div>
+<?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam) ?>
 <?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2, $previousFormData) ?>
 <?= $this->renderCapTotals($pageData, $seasonEndingYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2) ?>
 <?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam, $userColor1, $partnerColor1) ?>
@@ -169,6 +170,7 @@ if ($comparisonDropdownGroups !== []):
 $tradeConfig = [
     'rosterPreviewApiBaseUrl' => 'modules.php?name=Trading&op=roster-preview-api',
     'apiBaseUrl' => 'modules.php?name=Trading&op=comparison-api',
+    'rosterPreviewApiBaseUrl' => 'modules.php?name=Trading&op=roster-preview-api',
     'userTeam' => $pageData['userTeam'],
     'partnerTeam' => $pageData['partnerTeam'],
     'userTeamId' => $userTeamId,
@@ -190,6 +192,7 @@ $tradeConfig = [
 <script>window.IBL_TRADE_CONFIG = <?= json_encode($tradeConfig, JSON_HEX_TAG | JSON_THROW_ON_ERROR) ?>;</script>
 <script src="jslib/trade-roster-preview.js" defer></script>
 <script src="jslib/trade-comparison.js" defer></script>
+<script src="jslib/trade-roster-preview.js" defer></script>
 </form>
         <?php
         return (string) ob_get_clean();

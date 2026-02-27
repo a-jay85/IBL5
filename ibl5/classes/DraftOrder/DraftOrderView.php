@@ -90,18 +90,13 @@ class DraftOrderView implements DraftOrderViewInterface
         $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['pick']) . '</td>';
 
         if ($slot['isTraded']) {
-            $cell = TeamCellHelper::renderTeamCell(
+            $html .= TeamCellHelper::renderTeamCell(
                 $slot['ownerId'],
                 $slot['ownerName'],
                 $slot['ownerColor1'],
                 $slot['ownerColor2'],
                 nameHtml: HtmlSanitizer::e($slot['ownerName']) . '*',
             );
-            $safeTooltip = HtmlSanitizer::e($slot['teamName'] . "'s pick");
-            $tooltipOpen = '<span class="ibl-tooltip" title="' . $safeTooltip . '" tabindex="0">';
-            $cell = str_replace('><a ', '>' . $tooltipOpen . '<a ', $cell);
-            $cell = str_replace('</a></td>', '</a></span></td>', $cell);
-            $html .= $cell;
         } else {
             $html .= TeamCellHelper::renderTeamCell(
                 $slot['teamId'],
@@ -123,10 +118,6 @@ class DraftOrderView implements DraftOrderViewInterface
     {
         $recordHtml = HtmlSanitizer::e($slot['wins']) . '-' . HtmlSanitizer::e($slot['losses']);
 
-        if (!$slot['isTraded']) {
-            return '<td>' . $recordHtml . '</td>';
-        }
-
         $cell = TeamCellHelper::renderTeamCell(
             $slot['teamId'],
             $slot['teamName'],
@@ -134,10 +125,6 @@ class DraftOrderView implements DraftOrderViewInterface
             $slot['color2'],
             nameHtml: $recordHtml,
         );
-        $safeTooltip = HtmlSanitizer::e($slot['teamName'] . "'s record");
-        $tooltipOpen = '<span class="ibl-tooltip" title="' . $safeTooltip . '" tabindex="0">';
-        $cell = str_replace('><a ', '>' . $tooltipOpen . '<a ', $cell);
-        $cell = str_replace('</a></td>', '</a></span></td>', $cell);
 
         return $cell;
     }

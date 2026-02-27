@@ -179,20 +179,6 @@ class DraftOrderViewTest extends TestCase
         $this->assertStringContainsString('Celtics*', $result);
     }
 
-    public function testTradedPickShowsTooltipWithOriginalTeam(): void
-    {
-        $order = $this->emptyDraftOrder();
-        $order['round1'] = [
-            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 2, 'Celtics', '007A33', 'FFFFFF', true, 'via trade'),
-        ];
-
-        $result = $this->view->render($order, 2026);
-
-        $this->assertStringContainsString('ibl-tooltip', $result);
-        $this->assertStringContainsString("Heat&apos;s pick", $result);
-        $this->assertStringContainsString('tabindex="0"', $result);
-    }
-
     public function testTradedPickRecordCellUsesOriginalTeamColors(): void
     {
         $order = $this->emptyDraftOrder();
@@ -206,31 +192,7 @@ class DraftOrderViewTest extends TestCase
         $this->assertStringContainsString('20-62', $result);
     }
 
-    public function testTradedPickRecordCellHasTooltip(): void
-    {
-        $order = $this->emptyDraftOrder();
-        $order['round1'] = [
-            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 2, 'Celtics', '007A33', 'FFFFFF', true, 'via trade'),
-        ];
-
-        $result = $this->view->render($order, 2026);
-
-        $this->assertStringContainsString("Heat&apos;s record", $result);
-    }
-
-    public function testTradedPickRecordCellHasOriginalTeamLogo(): void
-    {
-        $order = $this->emptyDraftOrder();
-        $order['round1'] = [
-            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 2, 'Celtics', '007A33', 'FFFFFF', true, 'via trade'),
-        ];
-
-        $result = $this->view->render($order, 2026);
-
-        $this->assertStringContainsString('new1.png', $result);
-    }
-
-    public function testOwnPickDoesNotShowAsteriskOrTooltip(): void
+    public function testRecordCellHasTeamLogo(): void
     {
         $order = $this->emptyDraftOrder();
         $order['round1'] = [
@@ -239,7 +201,42 @@ class DraftOrderViewTest extends TestCase
 
         $result = $this->view->render($order, 2026);
 
+        $this->assertMatchesRegularExpression('/<img[^>]+new1\.png.*20-62/', $result);
+    }
+
+    public function testOwnPickRecordCellUsesTeamColors(): void
+    {
+        $order = $this->emptyDraftOrder();
+        $order['round1'] = [
+            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 1, 'Heat', '98002E', 'F9A01B', false, ''),
+        ];
+
+        $result = $this->view->render($order, 2026);
+
+        $this->assertMatchesRegularExpression('/background-color: #98002E;.*20-62.*<\/td><td>/s', $result);
+    }
+
+    public function testNoTooltipsInOutput(): void
+    {
+        $order = $this->emptyDraftOrder();
+        $order['round1'] = [
+            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 2, 'Celtics', '007A33', 'FFFFFF', true, 'via trade'),
+        ];
+
+        $result = $this->view->render($order, 2026);
+
         $this->assertStringNotContainsString('ibl-tooltip', $result);
+    }
+
+    public function testOwnPickDoesNotShowAsterisk(): void
+    {
+        $order = $this->emptyDraftOrder();
+        $order['round1'] = [
+            $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 1, 'Heat', '98002E', 'F9A01B', false, ''),
+        ];
+
+        $result = $this->view->render($order, 2026);
+
         $this->assertStringNotContainsString('Heat*', $result);
     }
 

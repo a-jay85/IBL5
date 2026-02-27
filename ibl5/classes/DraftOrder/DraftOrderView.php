@@ -6,7 +6,6 @@ namespace DraftOrder;
 
 use DraftOrder\Contracts\DraftOrderServiceInterface;
 use DraftOrder\Contracts\DraftOrderViewInterface;
-use UI\Components\TooltipLabel;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
@@ -91,17 +90,18 @@ class DraftOrderView implements DraftOrderViewInterface
         $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['pick']) . '</td>';
 
         if ($slot['isTraded']) {
-            $nameHtml = TooltipLabel::render(
-                HtmlSanitizer::e($slot['ownerName']) . '*',
-                $slot['teamName'] . "'s pick",
-            );
-            $html .= TeamCellHelper::renderTeamCell(
+            $cell = TeamCellHelper::renderTeamCell(
                 $slot['ownerId'],
                 $slot['ownerName'],
                 $slot['ownerColor1'],
                 $slot['ownerColor2'],
-                nameHtml: $nameHtml,
+                nameHtml: HtmlSanitizer::e($slot['ownerName']) . '*',
             );
+            $safeTooltip = HtmlSanitizer::e($slot['teamName'] . "'s pick");
+            $tooltipOpen = '<span class="ibl-tooltip" title="' . $safeTooltip . '" tabindex="0">';
+            $cell = str_replace('><a ', '>' . $tooltipOpen . '<a ', $cell);
+            $cell = str_replace('</a></td>', '</a></span></td>', $cell);
+            $html .= $cell;
         } else {
             $html .= TeamCellHelper::renderTeamCell(
                 $slot['teamId'],

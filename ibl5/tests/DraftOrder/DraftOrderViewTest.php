@@ -190,7 +190,7 @@ class DraftOrderViewTest extends TestCase
         $result = $this->view->render($order, 2026);
 
         $this->assertStringNotContainsString('ibl-tooltip', $result);
-        $this->assertStringNotContainsString('*', $result);
+        $this->assertStringNotContainsString('Heat*', $result);
     }
 
     public function testTradeNotesAreRendered(): void

@@ -1756,4 +1756,27 @@ td.ibl-team-cell--colored {
     font-weight: 600;
 }
 
+/* Raise team cell above adjacent cells so tooltip renders on top */
+.draft-order-table td.ibl-team-cell--colored {
+    position: relative;
+    z-index: 1;
+}
+
+/* Position tooltip to the right (default is left) — stays within table bounds */
+.draft-order-table .ibl-tooltip::after {
+    right: auto;
+    left: 100%;
+    margin-right: 0;
+    margin-left: 8px;
+}
+
+.draft-order-table .ibl-tooltip::before {
+    right: auto;
+    left: 100%;
+    margin-right: 0;
+    margin-left: -2px;
+    border-left-color: transparent;
+    border-right-color: var(--navy-900, #0f172a);
+}
+
 } /* end @layer components */

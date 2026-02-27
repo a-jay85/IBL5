@@ -312,6 +312,9 @@ try {
     if ($log !== '') {
         echo $view->renderLog($log);
     }
+    if ($jsbResult->messages !== [] || $jsbResult->errors > 0) {
+        echo $view->renderMessageLog($jsbResult->messages, $jsbResult->errors);
+    }
     flush();
     $successCount++;
 

@@ -484,6 +484,36 @@ class RcbFileParserTest extends TestCase
         }
     }
 
+    public function testSingleSeasonEntryConvertsWindows1252ToUtf8(): void
+    {
+        // \x9A = š in Windows-1252
+        $entry = $this->buildAlltimeSingleSeasonEntry("Kre\x9Aimir Cosic", 100, 2500, 5, 2000);
+        $result = RcbFileParser::parseAlltimeSingleSeasonEntry($entry);
+
+        $this->assertNotNull($result);
+        $this->assertSame('Krešimir Cosic', $result['player_name']);
+    }
+
+    public function testCareerEntryConvertsWindows1252ToUtf8(): void
+    {
+        // \x9E = ž in Windows-1252
+        $entry = $this->buildAlltimeCareerEntry("Dra\x9Een Dalipagic", 200, 15000, 1800, 3);
+        $result = RcbFileParser::parseAlltimeCareerEntry($entry);
+
+        $this->assertNotNull($result);
+        $this->assertSame('Dražen Dalipagic', $result['player_name']);
+    }
+
+    public function testCurrentSeasonEntryConvertsWindows1252ToUtf8(): void
+    {
+        // \xF3 = ó in Windows-1252, \xE9 = é in Windows-1252
+        $entry = $this->buildCurrentSeasonEntry('PG', "Ram\xF3n Fern\xE1ndez", 300, 45, 2005);
+        $result = RcbFileParser::parseCurrentSeasonEntry($entry);
+
+        $this->assertNotNull($result);
+        $this->assertSame('Ramón Fernández', $result['player_name']);
+    }
+
     #[\PHPUnit\Framework\Attributes\DataProvider('percentageStatCategoryProvider')]
     public function testPercentageStatsUse10000Divisor(string $category): void
     {

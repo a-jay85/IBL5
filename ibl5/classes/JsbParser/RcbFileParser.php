@@ -86,6 +86,21 @@ class RcbFileParser implements RcbFileParserInterface
     private const PERCENTAGE_STATS = ['fg_pct', 'ft_pct', 'three_pct'];
 
     /**
+     * Convert a Windows-1252 (CP1252) encoded string to UTF-8.
+     *
+     * The .rcb file uses Windows-1252 encoding for player names with diacritical
+     * characters. This must be called after substr/trim extraction (not before),
+     * since converting the whole file would shift byte offsets and break
+     * fixed-width parsing.
+     */
+    private static function toUtf8(string $cp1252String): string
+    {
+        $result = mb_convert_encoding($cp1252String, 'UTF-8', 'Windows-1252');
+
+        return is_string($result) ? $result : $cp1252String;
+    }
+
+    /**
      * Mapping of current season entry index within a 16-entry block to [context, stat_category].
      *
      * @var array<int, array{0: string, 1: string}>
@@ -309,7 +324,7 @@ class RcbFileParser implements RcbFileParserInterface
             return null;
         }
 
-        $playerName = trim(substr($data, 0, 33));
+        $playerName = self::toUtf8(trim(substr($data, 0, 33)));
         if ($playerName === '' || $playerName === '0') {
             return null;
         }
@@ -346,7 +361,7 @@ class RcbFileParser implements RcbFileParserInterface
             return null;
         }
 
-        $playerName = trim(substr($data, 0, 33));
+        $playerName = self::toUtf8(trim(substr($data, 0, 33)));
         if ($playerName === '' || $playerName === '0') {
             return null;
         }
@@ -397,6 +412,8 @@ class RcbFileParser implements RcbFileParserInterface
             $position = substr($posAndName, 0, $spacePos);
             $playerName = trim(substr($posAndName, $spacePos + 1));
         }
+
+        $playerName = self::toUtf8($playerName);
 
         $carBlockId = (int) trim(substr($data, 33, 5));
         $statValue = (int) trim(substr($data, 38, 3));

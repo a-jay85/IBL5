@@ -103,6 +103,9 @@
         <testsuite name="DraftPickLocator Module Tests">
             <directory>tests/DraftPickLocator</directory>
         </testsuite>
+        <testsuite name="ProjectedDraftOrder Module Tests">
+            <directory>tests/ProjectedDraftOrder</directory>
+        </testsuite>
         <testsuite name="TeamSchedule Module Tests">
             <directory>tests/TeamSchedule</directory>
         </testsuite>

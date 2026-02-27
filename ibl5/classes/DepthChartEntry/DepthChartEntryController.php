@@ -9,9 +9,9 @@ use NextSim\NextSimService;
 use NextSim\NextSimView;
 use SavedDepthChart\SavedDepthChartService;
 use Standings\StandingsRepository;
-use Team\Contracts\TeamServiceInterface;
+use Team\Contracts\TeamTableServiceInterface;
 use Team\TeamRepository;
-use Team\TeamService;
+use Team\TeamTableService;
 use TeamSchedule\TeamScheduleRepository;
 use UI\Components\TableViewDropdown;
 
@@ -24,7 +24,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     private DepthChartEntryRepository $repository;
     private DepthChartEntryView $view;
     private \Services\CommonMysqliRepository $commonRepository;
-    private TeamServiceInterface $teamService;
+    private TeamTableServiceInterface $teamTableService;
 
     public function __construct(\mysqli $db)
     {
@@ -33,7 +33,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $this->view = new DepthChartEntryView();
         $this->commonRepository = new \Services\CommonMysqliRepository($db);
         $teamRepository = new TeamRepository($db);
-        $this->teamService = new TeamService($db, $teamRepository);
+        $this->teamTableService = new TeamTableService($db, $teamRepository);
     }
 
     /**
@@ -135,14 +135,14 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $team = \Team::initialize($this->db, $teamID);
 
         // Delegate roster + starters to TeamService (single source of truth)
-        $rosterData = $this->teamService->getRosterAndStarters($teamID);
+        $rosterData = $this->teamTableService->getRosterAndStarters($teamID);
 
-        $groups = $this->teamService->buildDropdownGroups($season);
+        $groups = $this->teamTableService->buildDropdownGroups($season);
 
         $activeValue = ($display === 'split' && $split !== null) ? 'split:' . $split : $display;
         $baseUrl = 'modules.php?name=DepthChartEntry';
         $dropdown = new TableViewDropdown($groups, $activeValue, $baseUrl, $team->color1, $team->color2);
-        $tableHtml = $this->teamService->renderTableForDisplay($display, $rosterData['roster'], $team, null, $season, $rosterData['starterPids'], $split);
+        $tableHtml = $this->teamTableService->renderTableForDisplay($display, $rosterData['roster'], $team, null, $season, $rosterData['starterPids'], $split);
 
         return $dropdown->wrap($tableHtml);
     }

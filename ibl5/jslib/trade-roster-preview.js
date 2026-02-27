@@ -191,14 +191,26 @@
             partnerLogo.classList.toggle('cap-warning-logo', partnerOver);
         }
 
-        // 2) Contracts tab — only red when the currently viewed team is over cap
+        // 2) Red glow + tint on roster checklist logo banners
+        var userBanner = form.querySelector(
+            '.trading-roster[data-team-id="' + config.userTeamId + '"] thead tr:first-child th');
+        var partnerBanner = form.querySelector(
+            '.trading-roster[data-team-id="' + config.partnerTeamId + '"] thead tr:first-child th');
+        if (userBanner) {
+            userBanner.classList.toggle('cap-warning-banner', userOver);
+        }
+        if (partnerBanner) {
+            partnerBanner.classList.toggle('cap-warning-banner', partnerOver);
+        }
+
+        // 3) Contracts tab — only red when the currently viewed team is over cap
         var viewedTeamOverCap = currentTeamId === config.userTeamId
             ? userOver : partnerOver;
         if (contractsTab) {
             contractsTab.classList.toggle('cap-warning-tab', viewedTeamOverCap);
         }
 
-        // 3) Cap total cells — first row (current season) in each team's table
+        // 4) Cap total cells — first row (current season) in each team's table
         var userCapCell = form.querySelector(
             '.trading-cap-totals[data-side="user"] tbody tr:first-child td');
         var partnerCapCell = form.querySelector(

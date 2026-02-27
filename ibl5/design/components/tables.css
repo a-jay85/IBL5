@@ -1781,6 +1781,10 @@ td.ibl-team-cell--colored {
         min-width: auto;
         max-width: none;
     }
+
+    .draft-order-notes {
+        max-width: 136px;
+    }
 }
 
 /* Raise team cell above adjacent cells so tooltip renders on top */

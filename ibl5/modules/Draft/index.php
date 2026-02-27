@@ -42,9 +42,11 @@ function userinfo($username)
     $draft_round = $currentPick['round'] ?? null;
     $draft_pick = $currentPick['pick'] ?? null;
 
+    $draft_tid = $currentPick['tid'] ?? 0;
+
     $pickOwner = null;
-    if ($draft_round !== null && $draft_team !== null) {
-        $pickOwner = $sharedRepository->getCurrentOwnerOfDraftPick($season->endingYear, $draft_round, $draft_team);
+    if ($draft_round !== null && $draft_tid !== 0) {
+        $pickOwner = $sharedRepository->getCurrentOwnerOfDraftPick($season->endingYear, $draft_round, $draft_tid);
     }
 
     // Get all draft class players

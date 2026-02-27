@@ -50,18 +50,18 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
      *
      * @param int $draftYear Draft year
      * @param int $draftRound Draft round number
-     * @param string $teamNameOfDraftPickOrigin Original team name for the draft pick
+     * @param int $teamIdOfDraftPickOrigin Team ID of the original team for the draft pick
      * @return string|null Team name of current draft pick owner, or null if not found
      */
-    public function getCurrentOwnerOfDraftPick(int $draftYear, int $draftRound, string $teamNameOfDraftPickOrigin): ?string
+    public function getCurrentOwnerOfDraftPick(int $draftYear, int $draftRound, int $teamIdOfDraftPickOrigin): ?string
     {
         /** @var array{ownerofpick: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT ownerofpick FROM ibl_draft_picks WHERE year = ? AND round = ? AND teampick = ? LIMIT 1",
-            "iis",
+            "SELECT ownerofpick FROM ibl_draft_picks WHERE year = ? AND round = ? AND teampick_tid = ? LIMIT 1",
+            "iii",
             $draftYear,
             $draftRound,
-            $teamNameOfDraftPickOrigin
+            $teamIdOfDraftPickOrigin
         );
 
         return $result !== null ? $result['ownerofpick'] : null;

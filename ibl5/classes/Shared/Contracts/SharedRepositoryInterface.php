@@ -30,10 +30,10 @@ interface SharedRepositoryInterface
      *
      * @param int $draftYear Draft year
      * @param int $draftRound Draft round number
-     * @param string $teamNameOfDraftPickOrigin Original team name for the draft pick
+     * @param int $teamIdOfDraftPickOrigin Team ID of the original team for the draft pick
      * @return string|null Team name of current draft pick owner, or null if not found
      */
-    public function getCurrentOwnerOfDraftPick(int $draftYear, int $draftRound, string $teamNameOfDraftPickOrigin): ?string;
+    public function getCurrentOwnerOfDraftPick(int $draftYear, int $draftRound, int $teamIdOfDraftPickOrigin): ?string;
 
     /**
      * Resets the contract extension counter for all teams

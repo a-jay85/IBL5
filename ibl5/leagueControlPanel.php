@@ -100,6 +100,10 @@ if (isset($_POST['query'])) {
                     $stmtResetDraftLink = $mysqli_db->prepare("UPDATE ibl_settings SET value = 'Off' WHERE name = 'Show Draft Link'");
                     $stmtResetDraftLink->execute();
                     $stmtResetDraftLink->close();
+
+                    $stmtDeactivateDraft = $mysqli_db->prepare("UPDATE nuke_modules SET active = 0 WHERE title = 'Draft'");
+                    $stmtDeactivateDraft->execute();
+                    $stmtDeactivateDraft->close();
                 }
 
                 $querySuccessful = true;
@@ -135,6 +139,13 @@ if (isset($_POST['query'])) {
                 $stmtDraftLink->bind_param("s", $showDraftLink);
                 $stmtDraftLink->execute();
                 $stmtDraftLink->close();
+
+                $moduleActive = $showDraftLink === 'On' ? 1 : 0;
+                $stmtModule = $mysqli_db->prepare("UPDATE nuke_modules SET active = ? WHERE title = 'Draft'");
+                $stmtModule->bind_param("i", $moduleActive);
+                $stmtModule->execute();
+                $stmtModule->close();
+
                 $querySuccessful = true;
             }
             $successText = "Show Draft Link has been set to {$_POST['ShowDraftLink']}.";

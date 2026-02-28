@@ -124,7 +124,6 @@ class TradingView implements TradingViewInterface
             </div>
         </div>
 <?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $previousFormData) ?>
-<?= $this->renderCapTotals($pageData, $seasonEndingYear, $userTeam, $partnerTeam) ?>
         <div style="text-align: center; padding: 1rem;">
             <input type="hidden" name="fieldsCounter" value="<?= (int) $k ?>">
             <button type="submit" class="ibl-btn ibl-btn--primary">Make Trade Offer</button>
@@ -376,45 +375,6 @@ class TradingView implements TradingViewInterface
         $html = (string) ob_get_clean();
 
         return ['html' => $html, 'nextK' => $k];
-    }
-
-    /**
-     * Render the cap totals section of the trade form
-     *
-     * @param array{userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonPhase: string} $pageData
-     */
-    private function renderCapTotals(array $pageData, int $seasonEndingYear, string $userTeam, string $partnerTeam): string
-    {
-        $userFutureSalary = $pageData['userFutureSalary'];
-        $partnerFutureSalary = $pageData['partnerFutureSalary'];
-        $seasonPhase = $pageData['seasonPhase'];
-
-        $displayEndingYear = $seasonEndingYear;
-        $seasonsToDisplay = 6;
-        $isOffseason = ($seasonPhase === 'Playoffs' || $seasonPhase === 'Draft' || $seasonPhase === 'Free Agency');
-        if ($isOffseason) {
-            $displayEndingYear++;
-            $seasonsToDisplay--;
-        }
-
-        ob_start();
-        ?>
-<table class="ibl-data-table trading-cap-totals" data-no-responsive style="width: 100%; margin-top: 1rem;">
-    <thead><tr><th colspan="2">Cap Totals</th></tr></thead>
-    <tbody>
-<?php for ($z = 0; $z < $seasonsToDisplay; $z++):
-    $yearLabel = ($displayEndingYear + $z - 1) . '-' . ($displayEndingYear + $z);
-    $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
-?>
-    <tr>
-        <td style="text-align: left;"><strong><?= $userTeam ?></strong> in <?= $yearLabelEscaped ?>: <?= $userFutureSalary['player'][$z] ?></td>
-        <td style="text-align: right;"><strong><?= $partnerTeam ?></strong> in <?= $yearLabelEscaped ?>: <?= $partnerFutureSalary['player'][$z] ?></td>
-    </tr>
-<?php endfor; ?>
-    </tbody>
-</table>
-        <?php
-        return (string) ob_get_clean();
     }
 
     /**

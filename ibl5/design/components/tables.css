@@ -1314,18 +1314,6 @@ td.ibl-team-cell--colored {
     word-break: break-word;
 }
 
-/* Cap totals table */
-.trading-cap-totals th {
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 0.5rem 0.75rem;
-    text-align: center;
-}
-
-.trading-cap-totals td {
-    padding: 0.5rem 0.75rem;
-}
-
 /* Cash exchange table */
 .trading-cash-exchange td {
     padding: 0.5rem 0.75rem;

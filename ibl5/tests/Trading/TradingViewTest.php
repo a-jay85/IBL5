@@ -80,15 +80,6 @@ class TradingViewTest extends TestCase
         $this->assertStringContainsString('R1', $html);
     }
 
-    public function testRenderTradeOfferFormContainsCapTotals(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringContainsString('Cap Totals', $html);
-    }
-
     public function testRenderTradeOfferFormContainsCashExchange(): void
     {
         $pageData = $this->createTradeOfferPageData();

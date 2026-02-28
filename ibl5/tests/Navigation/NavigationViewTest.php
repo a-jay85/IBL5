@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Navigation;
 
+use Navigation\NavigationConfig;
 use Navigation\NavigationView;
 use PHPUnit\Framework\TestCase;
 
@@ -18,7 +19,7 @@ class NavigationViewTest extends TestCase
     {
         $teamId = $loggedIn ? 1 : null;
 
-        $nav = new NavigationView(
+        $config = new NavigationConfig(
             isLoggedIn: $loggedIn,
             username: $loggedIn ? 'TestUser' : null,
             currentLeague: 'ibl',
@@ -30,6 +31,8 @@ class NavigationViewTest extends TestCase
             serverName: 'localhost',
             requestUri: '/ibl5/index.php',
         );
+
+        $nav = new NavigationView($config);
 
         return $nav->render();
     }
@@ -86,5 +89,36 @@ class NavigationViewTest extends TestCase
 
         // The My Team menu is not rendered for logged-out users, so no Draft link
         $this->assertStringNotContainsString(self::DRAFT_LINK_HREF, $html);
+    }
+
+    // --- Orchestration Tests ---
+
+    public function testRenderContainsDesktopAndMobileElements(): void
+    {
+        $html = $this->renderNav('Regular Season', 'Off');
+
+        // Desktop nav wrapper
+        $this->assertStringContainsString('hidden lg:flex', $html);
+        // Mobile nav panel
+        $this->assertStringContainsString('id="nav-mobile-menu"', $html);
+        // Mobile overlay
+        $this->assertStringContainsString('id="nav-overlay"', $html);
+    }
+
+    public function testRenderContainsLogo(): void
+    {
+        $html = $this->renderNav('Regular Season', 'Off');
+
+        $this->assertStringContainsString('href="index.php"', $html);
+        $this->assertStringContainsString('IBL', $html);
+        $this->assertStringContainsString('Sim League', $html);
+    }
+
+    public function testRenderContainsNavBarBackground(): void
+    {
+        $html = $this->renderNav('Regular Season', 'Off');
+
+        $this->assertStringContainsString('nav-bar-bg', $html);
+        $this->assertStringContainsString('nav-grain', $html);
     }
 }

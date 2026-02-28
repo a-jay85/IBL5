@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 3033 tests • ~80% coverage • Goal: 80%
+**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 3370 tests • ~80% coverage • Goal: 80%
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -30,6 +30,33 @@
 ---
 
 ## Recent Updates
+
+### Navigation: View Split into Controller/Service/View Architecture (Feb 27, 2026)
+
+**Impact:** Split 927-line monolithic NavigationView into 10 focused files following Repository/Service/View pattern, bringing total to 3370 tests
+
+**Changes:**
+- Extracted `NavigationConfig` DTO replacing 10 constructor parameters
+- Extracted `NavigationRepository` (extends BaseMysqliRepository) for DB queries
+- Extracted `NavigationMenuBuilder` for all conditional menu logic (no HTML)
+- Split rendering into `DesktopNavView`, `MobileNavView`, `LoginFormView`, `TeamsDropdownView`
+- NavigationView reduced to ~80-line orchestrator
+- Extracted 4 CSS classes from inline styles into `navigation.css`
+- Updated `theme.php` caller to use Repository + Config pattern
+
+**Test Coverage:**
+- NavigationMenuBuilderTest: 15 tests (menu structure, Draft/FA/Waivers conditionals, Olympics variant)
+- TeamsDropdownViewTest: 6 tests (conference headers, team links, user conference ordering)
+- DesktopNavViewTest: 5 tests (dropdowns, badges, external links, rawHtml, dev switch)
+- MobileNavViewTest: 4 tests (accordion, links, user greeting)
+- LoginFormViewTest: 4 tests (desktop/mobile sizing, CSRF, redirect)
+- NavigationRepositoryTest: 4 integration tests (resolveTeamId, getTeamsData)
+- NavigationConfigTest: 3 tests (construction, defaults, readonly)
+- NavigationViewTest: 9 tests (6 existing Draft link + 3 new orchestration tests)
+
+**Status:** All 3370 tests passing, PHPStan clean (0 errors)
+
+---
 
 ### StandingsUpdater: Database-Driven Computation (Feb 14, 2026)
 

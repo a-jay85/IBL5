@@ -186,10 +186,11 @@
         var cash = getCurrentSeasonCash();
 
         // Post-trade cap: base - outgoing salaries + incoming salaries +/- cash
+        // Sending cash = cap charge (positive), receiving cash = cap credit (negative)
         var userPostCap = userBaseCap - salaries.userSalary + salaries.partnerSalary
-            + cash.partnerSendsCash - cash.userSendsCash;
-        var partnerPostCap = partnerBaseCap - salaries.partnerSalary + salaries.userSalary
             + cash.userSendsCash - cash.partnerSendsCash;
+        var partnerPostCap = partnerBaseCap - salaries.partnerSalary + salaries.userSalary
+            + cash.partnerSendsCash - cash.userSendsCash;
 
         var userOver = userPostCap > hardCap;
         var partnerOver = partnerPostCap > hardCap;

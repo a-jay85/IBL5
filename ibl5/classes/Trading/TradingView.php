@@ -123,9 +123,7 @@ class TradingView implements TradingViewInterface
                 </table>
             </div>
         </div>
-<?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam, $userColor1, $partnerColor1) ?>
 <?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2, $previousFormData) ?>
-<?= $this->renderCapTotals($pageData, $seasonEndingYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2) ?>
 <?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam, $userColor1, $partnerColor1) ?>
         <div style="text-align: center; padding: 1rem;">
             <input type="hidden" name="fieldsCounter" value="<?= (int) $k ?>">
@@ -425,69 +423,6 @@ $tradeConfig = [
         $html = (string) ob_get_clean();
 
         return ['html' => $html, 'nextK' => $k];
-    }
-
-    /**
-     * Render the cap totals section of the trade form
-     *
-     * @param array<string, mixed> $pageData
-     */
-    private function renderCapTotals(array $pageData, int $seasonEndingYear, string $userTeam, string $partnerTeam, string $userColor1, string $userColor2, string $partnerColor1, string $partnerColor2): string
-    {
-        /** @var array{player: array<int, int>, hold: array<int, int>} $userFutureSalary */
-        $userFutureSalary = $pageData['userFutureSalary'];
-        /** @var array{player: array<int, int>, hold: array<int, int>} $partnerFutureSalary */
-        $partnerFutureSalary = $pageData['partnerFutureSalary'];
-        $cashStartYear = $pageData['cashStartYear'];
-
-        $displayEndingYear = $seasonEndingYear;
-        if ($cashStartYear === 2) {
-            $displayEndingYear++;
-        }
-        $seasonsToDisplay = 7 - $cashStartYear;
-
-        $safeUserColor = \UI\TableStyles::sanitizeColor($userColor1);
-        $safePartnerColor = \UI\TableStyles::sanitizeColor($partnerColor1);
-        ob_start();
-        ?>
-<div class="team-cards-row">
-    <div class="team-card" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>;">
-        <div class="team-card__header"><h3 class="team-card__title"><?= $userTeam ?> &mdash; Cap Totals</h3></div>
-        <div class="team-card__body--flush">
-            <table class="ibl-data-table trading-cap-totals" data-no-responsive data-side="user">
-                <tbody>
-<?php for ($z = 0; $z < $seasonsToDisplay; $z++):
-    $yearLabel = ($displayEndingYear + $z - 1) . '-' . ($displayEndingYear + $z);
-    $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
-?>
-                <tr>
-                    <td><?= $yearLabelEscaped ?>: <?= $userFutureSalary['player'][$z] ?></td>
-                </tr>
-<?php endfor; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    <div class="team-card" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>;">
-        <div class="team-card__header"><h3 class="team-card__title"><?= $partnerTeam ?> &mdash; Cap Totals</h3></div>
-        <div class="team-card__body--flush">
-            <table class="ibl-data-table trading-cap-totals" data-no-responsive data-side="partner">
-                <tbody>
-<?php for ($z = 0; $z < $seasonsToDisplay; $z++):
-    $yearLabel = ($displayEndingYear + $z - 1) . '-' . ($displayEndingYear + $z);
-    $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
-?>
-                <tr>
-                    <td><?= $yearLabelEscaped ?>: <?= $partnerFutureSalary['player'][$z] ?></td>
-                </tr>
-<?php endfor; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-        <?php
-        return (string) ob_get_clean();
     }
 
     /**

@@ -134,7 +134,7 @@ class Per36Minutes
     echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamID ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
 endif; ?>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', $starterPids) ?>
+            <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
             <td><?= $playerStats->seasonGamesPlayed ?></td>
             <td><?= $playerStats->seasonGamesStarted ?></td>
             <td><?= $row['stats_mpg'] ?></td>

@@ -65,7 +65,7 @@ interface PlayerImageHelperInterface
      * @param array<int> $starterPids Array of starter player IDs for highlighting
      * @return string Complete <td> HTML element
      */
-    public static function renderPlayerCell(int $playerID, string $displayName, array $starterPids = []): string;
+    public static function renderPlayerCell(int $playerID, string $displayName, array $starterPids = [], string $nameStatusClass = ''): string;
 
     /**
      * Render a flexible player name table cell with photo thumbnail

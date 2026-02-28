@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\UpdateAllTheThings;
 
 use PHPUnit\Framework\TestCase;
+use Updater\Contracts\UpdaterViewInterface;
 use Updater\UpdaterView;
 
 /**
@@ -20,6 +21,11 @@ class UpdaterViewTest extends TestCase
     protected function setUp(): void
     {
         $this->view = new UpdaterView();
+    }
+
+    public function testImplementsUpdaterViewInterface(): void
+    {
+        $this->assertInstanceOf(UpdaterViewInterface::class, $this->view);
     }
 
     public function testRenderPageOpenReturnsHtmlDoctype(): void

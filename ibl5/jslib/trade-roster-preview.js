@@ -331,6 +331,12 @@
 
                     // Classify and reorder trade-involved player rows
                     classifyAndReorderTradeRows(container, addPids, removePids);
+
+                    // Highlight cash rows with incoming style
+                    var cashRows = container.querySelectorAll('tr[data-cash-row]');
+                    for (var c = 0; c < cashRows.length; c++) {
+                        cashRows[c].classList.add('trade-incoming-row');
+                    }
                 } else {
                     container.innerHTML = '<div class="trade-roster-preview__empty">No data available</div>';
                 }

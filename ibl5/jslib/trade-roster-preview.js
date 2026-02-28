@@ -160,6 +160,21 @@
     }
 
     /**
+     * Check if any cash exchange inputs have a non-zero value.
+     */
+    function hasAnyCash() {
+        for (var yr = config.cashStartYear; yr <= config.cashEndYear; yr++) {
+            var uInput = form.elements['userSendsCash' + yr];
+            var pInput = form.elements['partnerSendsCash' + yr];
+            if ((uInput && parseInt(uInput.value, 10) > 0)
+                || (pInput && parseInt(pInput.value, 10) > 0)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Check if post-trade cap totals exceed the hard cap and toggle warnings.
      */
     function updateCapWarnings() {
@@ -234,13 +249,21 @@
         }
 
         var checked = getCheckedPids();
-        var anyChecked = checked.user.length > 0 || checked.partner.length > 0;
+        var anyPlayers = checked.user.length > 0 || checked.partner.length > 0;
+        var anyCash = hasAnyCash();
+        var anyContent = anyPlayers || anyCash;
 
-        panel.style.display = anyChecked ? '' : 'none';
+        panel.style.display = anyContent ? '' : 'none';
 
-        if (!anyChecked) {
+        if (!anyContent) {
             container.innerHTML = '<div class="trade-roster-preview__empty">Select players to preview roster changes</div>';
             return;
+        }
+
+        // Cash-only trade: auto-switch to contracts view
+        if (anyCash && !anyPlayers && currentDisplay !== 'contracts') {
+            currentDisplay = 'contracts';
+            updateActiveTab();
         }
 
         // Determine addPids and removePids based on which team is being viewed
@@ -489,10 +512,10 @@
         });
     }
 
-    // Session-restored checkboxes on page load
+    // Session-restored checkboxes or pre-filled cash on page load
     document.addEventListener('DOMContentLoaded', function () {
         var checked = getCheckedPids();
-        if (checked.user.length > 0 || checked.partner.length > 0) {
+        if (checked.user.length > 0 || checked.partner.length > 0 || hasAnyCash()) {
             updateCapWarnings();
             fetchRosterPreview();
         }

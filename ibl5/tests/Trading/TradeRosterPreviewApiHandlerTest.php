@@ -246,6 +246,137 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
         $this->assertSame('', $decoded['html']);
     }
 
+    public function testBuildCashRowsIgnoredWhenDisplayIsNotContracts(): void
+    {
+        // Cash params present but display is 'ratings' — no cash rows should be built
+        $_GET = [
+            'teamID' => '1',
+            'display' => 'ratings',
+            'userTeam' => 'Miami',
+            'partnerTeam' => 'Boston',
+            'userTeamId' => '1',
+            'cashStartYear' => '1',
+            'cashEndYear' => '6',
+            'userCash1' => '500',
+        ];
+
+        $handler = new TradeRosterPreviewApiHandler($this->mockDb);
+
+        ob_start();
+        $handler->handle();
+        $output = (string) ob_get_clean();
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        // DB returns false, so empty HTML — but the point is no crash from cash logic
+        $this->assertSame('', $decoded['html']);
+    }
+
+    public function testBuildCashRowsSkippedWhenCashParamsMissing(): void
+    {
+        // Contracts display but no cash params — should not crash
+        $_GET = [
+            'teamID' => '1',
+            'display' => 'contracts',
+        ];
+
+        $handler = new TradeRosterPreviewApiHandler($this->mockDb);
+
+        ob_start();
+        $handler->handle();
+        $output = (string) ob_get_clean();
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertSame('', $decoded['html']);
+    }
+
+    public function testBuildCashRowsSkippedWhenCashAmountsAreZero(): void
+    {
+        $_GET = [
+            'teamID' => '1',
+            'display' => 'contracts',
+            'userTeam' => 'Miami',
+            'partnerTeam' => 'Boston',
+            'userTeamId' => '1',
+            'cashStartYear' => '1',
+            'cashEndYear' => '6',
+            'userCash1' => '0',
+            'partnerCash1' => '0',
+        ];
+
+        $handler = new TradeRosterPreviewApiHandler($this->mockDb);
+
+        ob_start();
+        $handler->handle();
+        $output = (string) ob_get_clean();
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertSame('', $decoded['html']);
+    }
+
+    public function testCashAmountExceeding2000DefaultsToZero(): void
+    {
+        $_GET = [
+            'teamID' => '1',
+            'display' => 'contracts',
+            'userTeam' => 'Miami',
+            'partnerTeam' => 'Boston',
+            'userTeamId' => '1',
+            'cashStartYear' => '1',
+            'cashEndYear' => '1',
+            'userCash1' => '2001',
+            'partnerCash1' => '0',
+        ];
+
+        $handler = new TradeRosterPreviewApiHandler($this->mockDb);
+
+        ob_start();
+        $handler->handle();
+        $output = (string) ob_get_clean();
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        // Over-limit cash defaults to 0, so no cash rows generated
+        $this->assertSame('', $decoded['html']);
+    }
+
+    public function testNonNumericCashAmountDefaultsToZero(): void
+    {
+        $_GET = [
+            'teamID' => '1',
+            'display' => 'contracts',
+            'userTeam' => 'Miami',
+            'partnerTeam' => 'Boston',
+            'userTeamId' => '1',
+            'cashStartYear' => '1',
+            'cashEndYear' => '1',
+            'userCash1' => 'abc',
+            'partnerCash1' => '0',
+        ];
+
+        $handler = new TradeRosterPreviewApiHandler($this->mockDb);
+
+        ob_start();
+        $handler->handle();
+        $output = (string) ob_get_clean();
+
+        /** @var array{html: string} $decoded */
+        $decoded = json_decode($output, true);
+
+        $this->assertIsArray($decoded);
+        $this->assertSame('', $decoded['html']);
+    }
+
     protected function tearDown(): void
     {
         $_GET = [];

@@ -33,7 +33,7 @@ class Contracts
         }
 
         $cap1 = $cap2 = $cap3 = $cap4 = $cap5 = $cap6 = 0;
-        /** @var list<array{player: Player, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}> $playerRows */
+        /** @var list<array{player: Player, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int, isCashRow: bool}> $playerRows */
         $playerRows = [];
 
         foreach ($result as $plrRow) {
@@ -78,6 +78,7 @@ class Contracts
                 'con4' => $contracts[4],
                 'con5' => $contracts[5],
                 'con6' => $contracts[6],
+                'isCashRow' => (bool) ($plrRow['isCashRow'] ?? false),
             ];
 
             $cap1 += $contracts[1];
@@ -121,7 +122,7 @@ class Contracts
 <?php foreach ($playerRows as $row):
     $player = $row['player'];
 ?>
-        <tr>
+        <tr<?= $row['isCashRow'] ? ' data-cash-row' : '' ?>>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids) ?>
             <td><?= (int)$player->age ?></td>

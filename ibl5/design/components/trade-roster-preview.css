@@ -210,19 +210,6 @@
     box-shadow: 0 0 10px 3px rgba(220, 38, 38, 0.5);
 }
 
-/* Standalone cap totals table: allow outer glow to escape (no border-radius needed) */
-.trading-cap-totals {
-    overflow: visible;
-}
-
-/* Cap totals cell in standalone card: red background, text, outer glow */
-.trading-cap-totals td.cap-warning-cell {
-    background-color: var(--color-error-50, #fef2f2);
-    color: var(--color-error-600, #dc2626);
-    font-weight: 700;
-    box-shadow: 0 0 10px 3px rgba(220, 38, 38, 0.5);
-}
-
 /* Cap Totals row inside Contracts table (roster preview): red background + outer glow.
    position/z-index elevate the glow above adjacent rows' backgrounds. */
 .trade-roster-preview .ibl-data-table tfoot td.cap-exceeded {

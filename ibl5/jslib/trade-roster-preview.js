@@ -226,17 +226,6 @@
             contractsTab.classList.toggle('cap-warning-tab', viewedTeamOverCap);
         }
 
-        // 4) Cap total cells — first row (current season) in each team's table
-        var userCapCell = form.querySelector(
-            '.trading-cap-totals[data-side="user"] tbody tr:first-child td');
-        var partnerCapCell = form.querySelector(
-            '.trading-cap-totals[data-side="partner"] tbody tr:first-child td');
-        if (userCapCell) {
-            userCapCell.classList.toggle('cap-warning-cell', userOver);
-        }
-        if (partnerCapCell) {
-            partnerCapCell.classList.toggle('cap-warning-cell', partnerOver);
-        }
     }
 
     // ========================================================================

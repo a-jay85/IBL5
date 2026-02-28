@@ -77,9 +77,6 @@ set_exception_handler(function (\Throwable $exception) use ($view): void {
     flush();
 });
 
-$successCount = 0;
-$errorCount = 0;
-
 $basePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5';
 
 try {
@@ -117,221 +114,59 @@ try {
     echo $view->renderSectionClose();
     flush();
 
-    // --- Pipeline ---
-    echo $view->renderSectionOpen('Pipeline');
-    flush();
+    // --- Pipeline: register all steps and delegate to controller ---
+    $updaterService = new Updater\UpdaterService();
 
-    // --- Step 1: Import league config (.lge) ---
-    echo $view->renderStepStart('Importing league config (.lge)...');
-    flush();
+    $defaultLgePath = $basePath . '/IBL5.lge';
+    $defaultPlrPath = $basePath . '/IBL5.plr';
+    $defaultScoPath = $basePath . '/IBL5.sco';
 
     $lgeRepo = new LeagueConfig\LeagueConfigRepository($mysqli_db);
     $lgeService = new LeagueConfig\LeagueConfigService($lgeRepo);
     $lgeView = new LeagueConfig\LeagueConfigView();
-    $defaultLgePath = $basePath . '/IBL5.lge';
 
-    if ($lgeRepo->hasConfigForSeason($season->endingYear)) {
-        echo $view->renderStepComplete('League config', 'Already imported for ' . $season->endingYear);
-        $successCount++;
-    } elseif (!is_file($defaultLgePath)) {
-        echo $view->renderStepComplete('League config', 'No IBL5.lge file found (skipped)');
-        $successCount++;
-    } else {
-        $lgeResult = $lgeService->processLgeFile($defaultLgePath);
-        echo $view->renderInlineHtml($lgeView->renderParseResult($lgeResult));
+    $plrRepo = new PlrParser\PlrParserRepository($mysqli_db);
+    $plrService = new PlrParser\PlrParserService($plrRepo, $commonRepository, $season);
 
-        if ($lgeResult['success']) {
-            echo $view->renderStepComplete('League config imported');
-            $discrepancies = $lgeService->crossCheckWithFranchiseSeasons(
-                $lgeResult['season_ending_year'],
-            );
-            if ($discrepancies !== []) {
-                echo $view->renderInlineHtml($lgeView->renderCrossCheckResults($discrepancies));
-            }
-            $successCount++;
-        } else {
-            /** @var string $lgeError */
-            $lgeError = $lgeResult['error'] ?? 'Unknown error';
-            echo $view->renderStepError('League config import failed', $lgeError);
-            $errorCount++;
-        }
-    }
-    flush();
-
-    // --- Step 2: Parse player file (.plr) ---
-    echo $view->renderStepStart('Parsing player file (.plr)...');
-    flush();
-
-    $defaultPlrPath = $basePath . '/IBL5.plr';
-
-    if (!is_file($defaultPlrPath)) {
-        echo $view->renderStepComplete('Player file', 'No IBL5.plr file found (skipped)');
-    } else {
-        $plrRepo = new PlrParser\PlrParserRepository($mysqli_db);
-        $plrService = new PlrParser\PlrParserService($plrRepo, $commonRepository, $season);
-        $plrResult = $plrService->processPlrFile($defaultPlrPath);
-        echo $view->renderStepComplete('Player file parsed', $plrResult->summary());
-    }
-    flush();
-    $successCount++;
-
-    // --- Step 3: Update schedule ---
-    echo $view->renderStepStart('Updating schedule...');
-    flush();
-    ob_start();
-    $scheduleUpdater->update();
-    $log = (string) ob_get_clean();
-    echo $view->renderStepComplete('Schedule updated');
-    if ($log !== '') {
-        echo $view->renderLog($log);
-    }
-    flush();
-    $successCount++;
-
-    // --- Step 4: Update standings ---
-    echo $view->renderStepStart('Updating standings...');
-    flush();
-    ob_start();
-    $standingsUpdater->update();
-    $log = (string) ob_get_clean();
-    echo $view->renderStepComplete('Standings updated');
-    if ($log !== '') {
-        echo $view->renderLog($log);
-    }
-    flush();
-    $successCount++;
-
-    // --- Step 5: Update power rankings ---
-    echo $view->renderStepStart('Updating power rankings...');
-    flush();
-    ob_start();
-    $powerRankingsUpdater->update();
-    $log = (string) ob_get_clean();
-    echo $view->renderStepComplete('Power rankings updated');
-    if ($log !== '') {
-        echo $view->renderLog($log);
-    }
-    flush();
-    $successCount++;
-
-    // --- Step 6: Reset extension attempts ---
-    echo $view->renderStepStart('Resetting extension attempts...');
-    flush();
-    $sharedRepository->resetSimContractExtensionAttempts();
-    echo $view->renderStepComplete('Extension attempts reset');
-    flush();
-    $successCount++;
-
-    // --- Step 7: Extend active saved depth charts ---
-    echo $view->renderStepStart('Updating saved depth charts...');
-    flush();
-    $savedDcRepo = new SavedDepthChart\SavedDepthChartRepository($mysqli_db);
-    ob_start();
-    $savedDcCount = $savedDcRepo->extendActiveDepthCharts($season->lastSimEndDate, $season->lastSimNumber);
-    $log = (string) ob_get_clean();
-    echo $view->renderStepComplete('Saved depth charts updated', $savedDcCount . ' active DCs extended');
-    if ($log !== '') {
-        echo $view->renderLog($log);
-    }
-    flush();
-    $successCount++;
-
-    // --- Step 8: Process boxscores (.sco) ---
-    echo $view->renderStepStart('Processing boxscores (.sco)...');
-    flush();
-
-    $defaultScoPath = $basePath . '/IBL5.sco';
+    $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db);
+    $boxscoreRepo = new Boxscore\BoxscoreRepository($mysqli_db);
     $boxscoreView = new Boxscore\BoxscoreView();
 
-    if (!is_file($defaultScoPath)) {
-        echo $view->renderStepComplete('Boxscores', 'No IBL5.sco file found (skipped)');
-    } else {
-        $processor = new Boxscore\BoxscoreProcessor($mysqli_db);
-        $scoResult = $processor->processScoFile($defaultScoPath, 0, '');
-        echo $view->renderStepComplete('Boxscores processed');
-        echo $view->renderInlineHtml($boxscoreView->renderParseLog($scoResult));
-    }
-    flush();
-    $successCount++;
-
-    // --- Step 9: Process All-Star games (.sco) ---
-    echo $view->renderStepStart('Processing All-Star games...');
-    flush();
-
-    if (!is_file($defaultScoPath)) {
-        echo $view->renderStepComplete('All-Star games', 'No IBL5.sco file found (skipped)');
-    } else {
-        if (!isset($processor)) {
-            $processor = new Boxscore\BoxscoreProcessor($mysqli_db);
-        }
-        $allStarResult = $processor->processAllStarGames($defaultScoPath, 0);
-        echo $view->renderStepComplete('All-Star games processed');
-        echo $view->renderInlineHtml($boxscoreView->renderAllStarLog($allStarResult));
-
-        // Check for All-Star teams needing rename
-        $boxscoreRepo = new Boxscore\BoxscoreRepository($mysqli_db);
-        $pendingDefaults = $boxscoreRepo->findAllStarGamesWithDefaultNames();
-        if ($pendingDefaults !== []) {
-            $pendingRenames = [];
-            foreach ($pendingDefaults as $row) {
-                $date = $row['Date'];
-                $teamID = $row['name'] === Boxscore\BoxscoreProcessor::DEFAULT_AWAY_NAME
-                    ? 50
-                    : 51;
-                $teamLabel = $teamID === 50 ? 'Away (Visitor)' : 'Home';
-                $seasonYear = (int) substr($date, 0, 4);
-                $players = $boxscoreRepo->getPlayersForAllStarTeam($date, $teamID);
-
-                $pendingRenames[] = [
-                    'id' => $row['id'],
-                    'date' => $date,
-                    'name' => $row['name'],
-                    'seasonYear' => $seasonYear,
-                    'teamLabel' => $teamLabel,
-                    'players' => $players,
-                ];
-            }
-            echo $view->renderInlineHtml($boxscoreView->renderAllStarRenameUI($pendingRenames));
-        }
-    }
-    flush();
-    $successCount++;
-
-    // --- Step 10: Parse JSB engine files ---
-    echo $view->renderStepStart('Parsing JSB engine files...');
-    flush();
+    $savedDcRepo = new SavedDepthChart\SavedDepthChartRepository($mysqli_db);
 
     $jsbRepo = new JsbParser\JsbImportRepository($mysqli_db);
     $jsbResolver = new JsbParser\PlayerIdResolver($mysqli_db);
     $jsbService = new JsbParser\JsbImportService($jsbRepo, $jsbResolver);
 
-    ob_start();
-    $jsbResult = $jsbService->processCurrentSeason($basePath, $season);
-    $log = (string) ob_get_clean();
-    echo $view->renderStepComplete('JSB files parsed', $jsbResult->summary());
-    if ($log !== '') {
-        echo $view->renderLog($log);
-    }
-    if ($jsbResult->messages !== [] || $jsbResult->errors > 0) {
-        echo $view->renderMessageLog($jsbResult->messages, $jsbResult->errors);
-    }
-    flush();
-    $successCount++;
+    $updaterService->addStep(new Updater\Steps\ImportLeagueConfigStep(
+        $lgeRepo, $lgeService, $lgeView, $season->endingYear, $defaultLgePath,
+    ));
+    $updaterService->addStep(new Updater\Steps\ParsePlayerFileStep($plrService, $defaultPlrPath));
+    $updaterService->addStep(new Updater\Steps\UpdateScheduleStep($scheduleUpdater));
+    $updaterService->addStep(new Updater\Steps\UpdateStandingsStep($standingsUpdater));
+    $updaterService->addStep(new Updater\Steps\UpdatePowerRankingsStep($powerRankingsUpdater));
+    $updaterService->addStep(new Updater\Steps\ResetExtensionAttemptsStep($sharedRepository));
+    $updaterService->addStep(new Updater\Steps\ExtendDepthChartsStep(
+        $savedDcRepo, $season->lastSimEndDate, $season->lastSimNumber,
+    ));
+    $updaterService->addStep(new Updater\Steps\ProcessBoxscoresStep(
+        $boxscoreProcessor, $boxscoreView, $defaultScoPath,
+    ));
+    $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(
+        $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $defaultScoPath,
+    ));
+    $updaterService->addStep(new Updater\Steps\ParseJsbFilesStep($jsbService, $basePath, $season));
 
-    echo $view->renderSectionClose();
-    flush();
-
-    echo $view->renderSummary($successCount, $errorCount);
-    flush();
+    $controller = new Updater\UpdaterController($updaterService, $view);
+    $controller->run();
 
 } catch (\Exception $e) {
-    $errorCount++;
     $safeMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($e->getMessage());
     $safeTrace = \Utilities\HtmlSanitizer::safeHtmlOutput($e->getTraceAsString());
 
     echo $view->renderStepError('Exception', (string) $safeMessage);
     echo $view->renderLog('<pre>' . (string) $safeTrace . '</pre>');
-    echo $view->renderSummary($successCount, $errorCount);
+    echo $view->renderSummary(0, 1);
     flush();
 }
 

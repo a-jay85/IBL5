@@ -12,7 +12,7 @@ use Utilities\HtmlSanitizer;
  * Provides structured HTML rendering for the updateAllTheThings script,
  * with grouped sections and minimal visual accents.
  */
-class UpdaterView
+class UpdaterView implements Contracts\UpdaterViewInterface
 {
     /**
      * Render the page opening: doctype, head with fonts/stylesheet, body open, title

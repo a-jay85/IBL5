@@ -121,7 +121,7 @@ class TradeRosterPreviewApiHandler
                 }
             }
 
-            $tableHtml = $this->renderTable($display, $roster, $team, $season, $starterPids, $rosterPids, $split, $teamTableService);
+            $tableHtml = $this->renderTable($display, $roster, $team, $season, $starterPids, $rosterPids, $split, $teamTableService, $removePids);
 
             // Wrap with dropdown
             $dropdownGroups = $teamTableService->buildDropdownGroups($season);
@@ -486,10 +486,13 @@ class TradeRosterPreviewApiHandler
      * @param list<array<string, mixed>> $roster Modified roster
      * @param list<int> $starterPids Starter PIDs from original roster
      * @param list<int> $rosterPids All PIDs in the modified roster (for aggregate queries)
+     * @param list<int> $removePids Outgoing player PIDs to exclude from cap totals
      */
-    private function renderTable(string $display, array $roster, \Team $team, \Season $season, array $starterPids, array $rosterPids, ?string $split, TeamTableService $teamTableService): string
+    private function renderTable(string $display, array $roster, \Team $team, \Season $season, array $starterPids, array $rosterPids, ?string $split, TeamTableService $teamTableService, array $removePids = []): string
     {
         switch ($display) {
+            case 'contracts':
+                return \UI\Tables\Contracts::render($this->db, $roster, $team, $season, $starterPids, $removePids);
             case 'chunk':
                 return \UI::periodAverages($this->db, $team, $season, null, null, $starterPids, $rosterPids);
             case 'playoffs':

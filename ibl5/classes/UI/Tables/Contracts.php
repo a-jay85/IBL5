@@ -22,9 +22,10 @@ class Contracts
      * @param \Team $team Team object
      * @param \Season $season Season object
      * @param list<int> $starterPids Starter player IDs
+     * @param list<int> $excludeFromCapPids PIDs to exclude from cap total sums (e.g. outgoing trade players)
      * @return string HTML table
      */
-    public static function render($db, $result, $team, \Season $season, array $starterPids = []): string
+    public static function render(\mysqli $db, iterable $result, \Team $team, \Season $season, array $starterPids = [], array $excludeFromCapPids = []): string
     {
         $isFreeAgency = $season->isFreeAgencyPhase();
 
@@ -81,12 +82,15 @@ class Contracts
                 'isCashRow' => (bool) ($plrRow['isCashRow'] ?? false),
             ];
 
-            $cap1 += $contracts[1];
-            $cap2 += $contracts[2];
-            $cap3 += $contracts[3];
-            $cap4 += $contracts[4];
-            $cap5 += $contracts[5];
-            $cap6 += $contracts[6];
+            $pid = (int) ($plrRow['pid'] ?? 0);
+            if (!in_array($pid, $excludeFromCapPids, true)) {
+                $cap1 += $contracts[1];
+                $cap2 += $contracts[2];
+                $cap3 += $contracts[3];
+                $cap4 += $contracts[4];
+                $cap5 += $contracts[5];
+                $cap6 += $contracts[6];
+            }
         }
 
         ob_start();

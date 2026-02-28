@@ -56,20 +56,32 @@ ssh "${PROD_HOST}" << 'EOF'
   echo -e "\033[1;33m[Production] Staging sim files...\033[0m"
 
   # Stage the sim data files
-  git add --force ibl5/IBL5.plr || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.plr\033[0m"; exit 1; }
-  echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.plr\033[0m"
+  git add --force ibl5/IBL5.asw || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.asw\033[0m"; exit 1; }
+  echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.asw\033[0m"
 
-  git add --force ibl5/IBL5.sco || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.sco\033[0m"; exit 1; }
-  echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.sco\033[0m"
+  git add --force ibl5/IBL5.car || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.car\033[0m"; exit 1; }
+  echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.car\033[0m"
+
+  git add --force ibl5/IBL5.his || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.his\033[0m"; exit 1; }
+  echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.his\033[0m"
 
   git add --force ibl5/IBL5.lge || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.lge\033[0m"; exit 1; }
   echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.lge\033[0m"
 
+  git add --force ibl5/IBL5.plr || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.plr\033[0m"; exit 1; }
+  echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.plr\033[0m"
+
+  git add --force ibl5/IBL5.rcb || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.rcb\033[0m"; exit 1; }
+  echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.rcb\033[0m"
+
   git add --force ibl5/IBL5.sch || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.sch\033[0m"; exit 1; }
   echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.sch\033[0m"
 
-  git add --force ibl5/ibl/IBL/Standings.htm || { echo -e "\033[0;31m[Production] Error: Failed to stage Standings.htm\033[0m"; exit 1; }
-  echo -e "\033[0;32m[Production] ✓ Staged ibl5/ibl/IBL/Standings.htm\033[0m"
+  git add --force ibl5/IBL5.sco || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.sco\033[0m"; exit 1; }
+  echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.sco\033[0m"
+
+  git add --force ibl5/IBL5.trn || { echo -e "\033[0;31m[Production] Error: Failed to stage IBL5.trn\033[0m"; exit 1; }
+  echo -e "\033[0;32m[Production] ✓ Staged ibl5/IBL5.trn\033[0m"
 
   # Check if there are changes to commit
   echo -e "\033[1;33m[Production] Checking for changes to commit...\033[0m"

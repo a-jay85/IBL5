@@ -100,6 +100,14 @@ class TradeRosterPreviewApiHandler
                 }
             }
 
+            // Append synthetic cash rows when viewing contracts
+            if ($display === 'contracts') {
+                $cashRows = $this->buildCashRows($teamID);
+                foreach ($cashRows as $cashRow) {
+                    $roster[] = $cashRow;
+                }
+            }
+
             $team = \Team::initialize($this->db, $teamID);
             $season = new \Season($this->db);
 
@@ -238,6 +246,213 @@ class TradeRosterPreviewApiHandler
         $stmt->close();
 
         return $rows;
+    }
+
+    /**
+     * Build synthetic cash rows for the contracts view
+     *
+     * Creates in-memory player-format rows representing cash exchanges,
+     * mirroring the pattern used by CashTransactionHandler::createCashTransaction().
+     *
+     * @return list<array<string, mixed>> Synthetic cash player rows with isCashRow flag
+     */
+    private function buildCashRows(int $viewingTeamId): array
+    {
+        $userTeam = $this->validateStringParam('userTeam');
+        $partnerTeam = $this->validateStringParam('partnerTeam');
+        $userTeamId = $this->validateIntParam('userTeamId');
+        $cashStartYear = $this->validateIntParam('cashStartYear');
+        $cashEndYear = $this->validateIntParam('cashEndYear');
+
+        if ($userTeam === '' || $partnerTeam === '' || $cashStartYear === 0 || $cashEndYear === 0) {
+            return [];
+        }
+
+        $partnerTeamId = 0;
+        if ($viewingTeamId !== $userTeamId) {
+            $partnerTeamId = $viewingTeamId;
+        }
+
+        // Collect cash amounts per year
+        /** @var array<int, int> $userCash */
+        $userCash = [];
+        /** @var array<int, int> $partnerCash */
+        $partnerCash = [];
+        $hasUserCash = false;
+        $hasPartnerCash = false;
+
+        for ($yr = $cashStartYear; $yr <= $cashEndYear; $yr++) {
+            $uAmount = $this->validateCashAmount('userCash' . $yr);
+            $pAmount = $this->validateCashAmount('partnerCash' . $yr);
+            $userCash[$yr] = $uAmount;
+            $partnerCash[$yr] = $pAmount;
+            if ($uAmount > 0) {
+                $hasUserCash = true;
+            }
+            if ($pAmount > 0) {
+                $hasPartnerCash = true;
+            }
+        }
+
+        if (!$hasUserCash && !$hasPartnerCash) {
+            return [];
+        }
+
+        $rows = [];
+        $isViewingUserTeam = ($viewingTeamId === $userTeamId);
+
+        if ($isViewingUserTeam) {
+            // Viewing user's team
+            if ($hasUserCash) {
+                $rows[] = $this->makeCashRow(
+                    '| <strong>Cash to ' . $partnerTeam . '</strong>',
+                    $viewingTeamId,
+                    $userCash,
+                    $cashStartYear,
+                    $cashEndYear,
+                    false
+                );
+            }
+            if ($hasPartnerCash) {
+                $rows[] = $this->makeCashRow(
+                    '| <strong>Cash from ' . $partnerTeam . '</strong>',
+                    $viewingTeamId,
+                    $partnerCash,
+                    $cashStartYear,
+                    $cashEndYear,
+                    true
+                );
+            }
+        } else {
+            // Viewing partner's team
+            if ($hasPartnerCash) {
+                $rows[] = $this->makeCashRow(
+                    '| <strong>Cash to ' . $userTeam . '</strong>',
+                    $partnerTeamId,
+                    $partnerCash,
+                    $cashStartYear,
+                    $cashEndYear,
+                    false
+                );
+            }
+            if ($hasUserCash) {
+                $rows[] = $this->makeCashRow(
+                    '| <strong>Cash from ' . $userTeam . '</strong>',
+                    $partnerTeamId,
+                    $userCash,
+                    $cashStartYear,
+                    $cashEndYear,
+                    true
+                );
+            }
+        }
+
+        /** @var list<array<string, mixed>> $rows */
+        return $rows;
+    }
+
+    /**
+     * Create a single synthetic cash player row
+     *
+     * @param array<int, int> $amounts Cash amounts keyed by year index
+     * @return array<string, mixed>
+     */
+    private function makeCashRow(string $label, int $teamId, array $amounts, int $startYear, int $endYear, bool $negate): array
+    {
+        $cy1 = $cy2 = $cy3 = $cy4 = $cy5 = $cy6 = 0;
+        $totalYears = 0;
+
+        for ($yr = $startYear; $yr <= $endYear; $yr++) {
+            $amount = $amounts[$yr] ?? 0;
+            if ($negate) {
+                $amount = -$amount;
+            }
+            $cyIndex = $yr - $startYear + 1;
+            if ($cyIndex >= 1 && $cyIndex <= 6) {
+                match ($cyIndex) {
+                    1 => $cy1 = $amount,
+                    2 => $cy2 = $amount,
+                    3 => $cy3 = $amount,
+                    4 => $cy4 = $amount,
+                    5 => $cy5 = $amount,
+                    6 => $cy6 = $amount,
+                };
+                if ($amount !== 0 && $cyIndex > $totalYears) {
+                    $totalYears = $cyIndex;
+                }
+            }
+        }
+
+        if ($totalYears === 0) {
+            $totalYears = 1;
+        }
+
+        return [
+            'pid' => 0,
+            'name' => $label,
+            'ordinal' => 100000,
+            'tid' => $teamId,
+            'cy' => 1,
+            'cyt' => $totalYears,
+            'cy1' => $cy1,
+            'cy2' => $cy2,
+            'cy3' => $cy3,
+            'cy4' => $cy4,
+            'cy5' => $cy5,
+            'cy6' => $cy6,
+            'exp' => 1,
+            'retired' => 0,
+            'isCashRow' => true,
+            'pos' => '',
+            'age' => 0,
+            'bird_years' => 0,
+        ];
+    }
+
+    /**
+     * Validate a string query parameter
+     */
+    private function validateStringParam(string $paramName): string
+    {
+        if (!isset($_GET[$paramName]) || !is_string($_GET[$paramName])) {
+            return '';
+        }
+        $raw = trim($_GET[$paramName]);
+        return $raw !== '' ? $raw : '';
+    }
+
+    /**
+     * Validate an integer query parameter (positive)
+     */
+    private function validateIntParam(string $paramName): int
+    {
+        if (!isset($_GET[$paramName]) || !is_string($_GET[$paramName])) {
+            return 0;
+        }
+        $raw = $_GET[$paramName];
+        if (!ctype_digit($raw)) {
+            return 0;
+        }
+        return (int) $raw;
+    }
+
+    /**
+     * Validate a cash amount query parameter (0-2000)
+     */
+    private function validateCashAmount(string $paramName): int
+    {
+        if (!isset($_GET[$paramName]) || !is_string($_GET[$paramName])) {
+            return 0;
+        }
+        $raw = $_GET[$paramName];
+        if (!ctype_digit($raw)) {
+            return 0;
+        }
+        $amount = (int) $raw;
+        if ($amount > 2000) {
+            return 0;
+        }
+        return $amount;
     }
 
     /**

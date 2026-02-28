@@ -268,6 +268,22 @@
 
         url += '&display=' + encodeURIComponent(currentDisplay);
 
+        // Add cash params for contracts view
+        if (currentDisplay === 'contracts') {
+            url += '&userTeam=' + encodeURIComponent(config.userTeam)
+                 + '&partnerTeam=' + encodeURIComponent(config.partnerTeam)
+                 + '&userTeamId=' + encodeURIComponent(config.userTeamId)
+                 + '&cashStartYear=' + encodeURIComponent(config.cashStartYear)
+                 + '&cashEndYear=' + encodeURIComponent(config.cashEndYear);
+
+            for (var yr = config.cashStartYear; yr <= config.cashEndYear; yr++) {
+                var uInput = form.elements['userSendsCash' + yr];
+                var pInput = form.elements['partnerSendsCash' + yr];
+                url += '&userCash' + yr + '=' + (uInput ? parseInt(uInput.value, 10) || 0 : 0);
+                url += '&partnerCash' + yr + '=' + (pInput ? parseInt(pInput.value, 10) || 0 : 0);
+            }
+        }
+
         fetch(url, { signal: abortController.signal })
             .then(function (response) {
                 if (!response.ok) {
@@ -302,6 +318,12 @@
 
                     // Classify and reorder trade-involved player rows
                     classifyAndReorderTradeRows(container, addPids, removePids);
+
+                    // Highlight cash rows with incoming style
+                    var cashRows = container.querySelectorAll('tr[data-cash-row]');
+                    for (var c = 0; c < cashRows.length; c++) {
+                        cashRows[c].classList.add('trade-incoming-row');
+                    }
                 } else {
                     container.innerHTML = '<div class="trade-roster-preview__empty">No data available</div>';
                 }
@@ -427,6 +449,7 @@
         if (e.target.name && (e.target.name.indexOf('userSendsCash') === 0
             || e.target.name.indexOf('partnerSendsCash') === 0)) {
             updateCapWarnings();
+            debouncedRefresh();
         }
     });
 

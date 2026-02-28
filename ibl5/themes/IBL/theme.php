@@ -50,45 +50,24 @@ function themeheader()
     $isLoggedIn = is_user($user);
     $username = null;
     $teamId = null;
+    $teamsData = null;
 
     if ($isLoggedIn) {
         cookiedecode($user);
         $username = $cookie[1];
-        if ($mysqli_db && $username) {
-            $teamId = \Navigation\NavigationView::resolveTeamId($mysqli_db, $username);
+    }
+
+    if ($mysqli_db) {
+        $navRepo = new \Navigation\NavigationRepository($mysqli_db);
+
+        if ($isLoggedIn && $username !== null) {
+            $teamId = $navRepo->resolveTeamId($username);
         }
+
+        $teamsData = $navRepo->getTeamsData();
     }
 
     $currentLeague = $leagueContext->getCurrentLeague();
-
-    // Fetch teams organized by conference and division for navigation mega-menu
-    $teamsData = null;
-    if ($mysqli_db) {
-        $teamsData = [];
-        $stmt = $mysqli_db->prepare(
-            "SELECT ti.teamid, ti.team_name, ti.team_city, s.division, s.conference
-             FROM ibl_team_info ti
-             JOIN ibl_standings s ON ti.team_name = s.team_name
-             ORDER BY s.conference, s.division, ti.team_city"
-        );
-        if ($stmt) {
-            $stmt->execute();
-            $result = $stmt->get_result();
-            while ($row = $result->fetch_assoc()) {
-                $conf = $row['conference'];
-                $div = $row['division'];
-                $teamsData[$conf][$div][] = [
-                    'teamid' => (int)$row['teamid'],
-                    'team_name' => $row['team_name'],
-                    'team_city' => $row['team_city'],
-                ];
-            }
-            $stmt->close();
-        }
-        if (empty($teamsData)) {
-            $teamsData = null;
-        }
-    }
 
     $seasonPhase = '';
     $allowWaivers = '';
@@ -100,7 +79,20 @@ function themeheader()
         $showDraftLink = $season->showDraftLink;
     }
 
-    $navView = new \Navigation\NavigationView($isLoggedIn, $username, $currentLeague, $teamId, $teamsData, $seasonPhase, $allowWaivers, $showDraftLink, $_SERVER['SERVER_NAME'] ?? null, $_SERVER['REQUEST_URI'] ?? null);
+    $navConfig = new \Navigation\NavigationConfig(
+        isLoggedIn: $isLoggedIn,
+        username: $username,
+        currentLeague: $currentLeague,
+        teamId: $teamId,
+        teamsData: $teamsData,
+        seasonPhase: $seasonPhase,
+        allowWaivers: $allowWaivers,
+        showDraftLink: $showDraftLink,
+        serverName: $_SERVER['SERVER_NAME'] ?? null,
+        requestUri: $_SERVER['REQUEST_URI'] ?? null,
+    );
+
+    $navView = new \Navigation\NavigationView($navConfig);
     echo $navView->render();
 
     echo "<body bgcolor=\"$bgcolor1\"" . ($teamId ? " data-user-team-id=\"$teamId\"" : '') . ">";

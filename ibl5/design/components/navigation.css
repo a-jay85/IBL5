@@ -565,6 +565,37 @@ span.nav-dropdown-item a:hover {
 }
 
 /* ==========================================================================
+   Navigation Bar Extracted Styles
+   Replaces repeated inline styles with reusable classes.
+   ========================================================================== */
+
+/* Nav bar solid opaque navy background (replaces style="background: #1e293b;") */
+.nav-bar-bg {
+    background: #1e293b;
+}
+
+/* Team logo container in Teams dropdown (replaces style="width:27px;height:27px;flex-shrink:0") */
+.nav-team-logo-container {
+    width: 27px;
+    height: 27px;
+    flex-shrink: 0;
+}
+
+/* Team logo image in Teams dropdown (replaces style="max-height:27px;max-width:27px;width:auto;height:auto") */
+.nav-team-logo-img {
+    max-height: 27px;
+    max-width: 27px;
+    width: auto;
+    height: auto;
+}
+
+/* Dev switch link color (replaces style="color: #0EA5E9; contain: layout;") */
+.nav-dev-switch {
+    color: #0EA5E9;
+    contain: layout;
+}
+
+/* ==========================================================================
    Grain Texture Overlay (Nav Background Effect)
    ========================================================================== */
 

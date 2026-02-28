@@ -296,7 +296,7 @@ window.IBL_initNextSimHighlight();
         ?>
         <tr class="<?= $rowClass ?>" style="<?= $rowStyle ?>">
             <?= $gameInfoCell ?>
-            <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '') ?>
+            <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', [], $player->nameStatusClass) ?>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <td><?= (int)$player->age ?></td>
             <td class="sep-team"></td>

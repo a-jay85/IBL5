@@ -15,18 +15,23 @@ use Player\PlayerData;
 interface PlayerNameDecoratorInterface
 {
     /**
-     * Decorate a player name with status indicators
-     * 
-     * Adds special symbols to player names based on their status:
-     * - "(name)*" - Player is on waivers (ordinal > JSB::WAIVERS_ORDINAL)
-     * - "name^" - Player eligible for free agency at end of this season
-     *            (contractCurrentYear == contractTotalYears)
-     * - "name" - All other players
-     * 
-     * Returns the decorated name as a string ready for HTML display.
-     * 
+     * Return the player's raw name without any status indicators
+     *
      * @param PlayerData $playerData The player to decorate
-     * @return string Decorated player name with indicators
+     * @return string Player name
      */
     public function decoratePlayerName(PlayerData $playerData): string;
+
+    /**
+     * Get the CSS class for a player's contract status indicator
+     *
+     * Status classes drive ::after pseudo-element indicators via CSS:
+     * - "player-waived" — ordinal > JSB::WAIVERS_ORDINAL (shows * via CSS)
+     * - "player-expiring" — contractCurrentYear == contractTotalYears (shows ^ via CSS)
+     * - "" — no indicator
+     *
+     * @param PlayerData $playerData The player to check
+     * @return string CSS class name, or empty string
+     */
+    public function getNameStatusClass(PlayerData $playerData): string;
 }

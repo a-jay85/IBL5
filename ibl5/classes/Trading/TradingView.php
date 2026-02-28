@@ -69,9 +69,9 @@ class TradingView implements TradingViewInterface
     <input type="hidden" name="offeringTeam" value="<?= $userTeam ?>">
     <div class="trading-layout">
         <h2 class="ibl-title">Trading</h2>
-        <div class="trading-layout__rosters">
+        <div class="team-cards-row">
             <div class="trading-layout__card">
-                <table class="ibl-data-table trading-roster team-table" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>;">
+                <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $userTeamId ?>" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>;">
                     <colgroup>
                         <col style="width: 50px;">
                         <col style="width: 40px;">
@@ -83,7 +83,7 @@ class TradingView implements TradingViewInterface
                             <th colspan="4"><img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="team-logo-banner" style="margin-bottom: 0;"></th>
                         </tr>
                         <tr>
-                            <th>Select</th>
+                            <th></th>
                             <th>Pos</th>
                             <th>Name</th>
                             <th>Salary</th>
@@ -98,7 +98,7 @@ class TradingView implements TradingViewInterface
             <div class="trading-layout__card">
                 <input type="hidden" name="switchCounter" value="<?= (int) $switchCounter ?>">
                 <input type="hidden" name="listeningTeam" value="<?= $partnerTeam ?>">
-                <table class="ibl-data-table trading-roster team-table" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>;">
+                <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $partnerTeamId ?>" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>;">
                     <colgroup>
                         <col style="width: 50px;">
                         <col style="width: 40px;">
@@ -110,7 +110,7 @@ class TradingView implements TradingViewInterface
                             <th colspan="4"><img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="team-logo-banner" style="margin-bottom: 0;"></th>
                         </tr>
                         <tr>
-                            <th>Select</th>
+                            <th></th>
                             <th>Pos</th>
                             <th>Name</th>
                             <th>Salary</th>
@@ -123,13 +123,34 @@ class TradingView implements TradingViewInterface
                 </table>
             </div>
         </div>
-<?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $previousFormData) ?>
-<?= $this->renderCapTotals($pageData, $seasonEndingYear, $userTeam, $partnerTeam) ?>
+<?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2, $previousFormData) ?>
+<?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam, $userColor1, $partnerColor1) ?>
         <div style="text-align: center; padding: 1rem;">
             <input type="hidden" name="fieldsCounter" value="<?= (int) $k ?>">
             <button type="submit" class="ibl-btn ibl-btn--primary">Make Trade Offer</button>
         </div>
     </div>
+<?php
+$tradeConfig = [
+    'rosterPreviewApiBaseUrl' => 'modules.php?name=Trading&op=roster-preview-api',
+    'userTeam' => $pageData['userTeam'],
+    'partnerTeam' => $pageData['partnerTeam'],
+    'userTeamId' => $userTeamId,
+    'partnerTeamId' => $partnerTeamId,
+    'switchCounter' => $switchCounter,
+    'userFutureSalary' => $pageData['userFutureSalary']['player'],
+    'partnerFutureSalary' => $pageData['partnerFutureSalary']['player'],
+    'hardCap' => \League::HARD_CAP_MAX,
+    'seasonEndingYear' => $seasonEndingYear,
+    'seasonPhase' => $seasonPhase,
+    'cashStartYear' => $cashStartYear,
+    'cashEndYear' => $cashEndYear,
+    'userTeamColor1' => $userColor1,
+    'partnerTeamColor1' => $partnerColor1,
+];
+?>
+<script>window.IBL_TRADE_CONFIG = <?= json_encode($tradeConfig, JSON_HEX_TAG | JSON_THROW_ON_ERROR) ?>;</script>
+<script src="jslib/trade-roster-preview.js" defer></script>
 </form>
         <?php
         return (string) ob_get_clean();
@@ -379,40 +400,33 @@ class TradingView implements TradingViewInterface
     }
 
     /**
-     * Render the cap totals section of the trade form
-     *
-     * @param array{userFutureSalary: array{player: array<int, int>, hold: array<int, int>}, partnerFutureSalary: array{player: array<int, int>, hold: array<int, int>}, seasonPhase: string} $pageData
+     * Render the roster preview panel (hidden initially, shown via JS)
      */
-    private function renderCapTotals(array $pageData, int $seasonEndingYear, string $userTeam, string $partnerTeam): string
+    private function renderRosterPreview(int $userTeamId, int $partnerTeamId, string $userTeam, string $partnerTeam, string $userColor1, string $partnerColor1): string
     {
-        $userFutureSalary = $pageData['userFutureSalary'];
-        $partnerFutureSalary = $pageData['partnerFutureSalary'];
-        $seasonPhase = $pageData['seasonPhase'];
-
-        $displayEndingYear = $seasonEndingYear;
-        $seasonsToDisplay = 6;
-        $isOffseason = ($seasonPhase === 'Playoffs' || $seasonPhase === 'Draft' || $seasonPhase === 'Free Agency');
-        if ($isOffseason) {
-            $displayEndingYear++;
-            $seasonsToDisplay--;
-        }
-
+        $safeUserColor = \UI\TableStyles::sanitizeColor($userColor1);
+        $safePartnerColor = \UI\TableStyles::sanitizeColor($partnerColor1);
         ob_start();
         ?>
-<table class="ibl-data-table trading-cap-totals" data-no-responsive style="width: 100%; margin-top: 1rem;">
-    <thead><tr><th colspan="2">Cap Totals</th></tr></thead>
-    <tbody>
-<?php for ($z = 0; $z < $seasonsToDisplay; $z++):
-    $yearLabel = ($displayEndingYear + $z - 1) . '-' . ($displayEndingYear + $z);
-    $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
-?>
-    <tr>
-        <td style="text-align: left;"><strong><?= $userTeam ?></strong> in <?= $yearLabelEscaped ?>: <?= $userFutureSalary['player'][$z] ?></td>
-        <td style="text-align: right;"><strong><?= $partnerTeam ?></strong> in <?= $yearLabelEscaped ?>: <?= $partnerFutureSalary['player'][$z] ?></td>
-    </tr>
-<?php endfor; ?>
-    </tbody>
-</table>
+<div id="trade-roster-preview" class="trade-roster-preview" style="display: none; --preview-user-color: #<?= $safeUserColor ?>; --preview-partner-color: #<?= $safePartnerColor ?>;">
+    <div class="trade-roster-preview__header">
+        <img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="trade-roster-preview__logo trade-roster-preview__logo--active" data-team-id="<?= $userTeamId ?>">
+        <div class="trade-roster-preview__title">Roster Preview</div>
+        <img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="trade-roster-preview__logo" data-team-id="<?= $partnerTeamId ?>">
+    </div>
+    <div class="trade-roster-preview__tabs ibl-tabs" role="tablist" style="--team-tab-bg-color: #<?= $safeUserColor ?>; --team-tab-active-color: #<?= $safeUserColor ?>">
+        <button type="button" class="ibl-tab ibl-tab--active" data-display="ratings" role="tab">Ratings</button>
+        <button type="button" class="ibl-tab" data-display="total_s" role="tab">Totals</button>
+        <button type="button" class="ibl-tab" data-display="avg_s" role="tab">Averages</button>
+        <button type="button" class="ibl-tab" data-display="per36mins" role="tab">Per 36</button>
+        <button type="button" class="ibl-tab" data-display="contracts" role="tab">Contracts</button>
+    </div>
+    <div class="table-scroll-wrapper">
+        <div class="table-scroll-container">
+            <div class="trade-roster-preview__empty">Select players to preview roster changes</div>
+        </div>
+    </div>
+</div>
         <?php
         return (string) ob_get_clean();
     }
@@ -422,36 +436,54 @@ class TradingView implements TradingViewInterface
      *
      * @param array{checkedItems: array<string, true>, userSendsCash: array<int, int>, partnerSendsCash: array<int, int>}|null $previousFormData
      */
-    private function renderCashExchange(int $seasonEndingYear, string $seasonPhase, int $cashStartYear, int $cashEndYear, string $userTeam, string $partnerTeam, ?array $previousFormData = null): string
+    private function renderCashExchange(int $seasonEndingYear, string $seasonPhase, int $cashStartYear, int $cashEndYear, string $userTeam, string $partnerTeam, string $userColor1, string $userColor2, string $partnerColor1, string $partnerColor2, ?array $previousFormData = null): string
     {
         ob_start();
         ?>
-<table class="ibl-data-table trading-cash-exchange" data-no-responsive style="width: 100%; margin-top: 1rem;">
-    <thead><tr><th colspan="2">Cash Exchange</th></tr></thead>
-    <tbody>
+<div class="team-cards-row">
+    <div class="team-card" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>;">
+        <div class="team-card__header"><h3 class="team-card__title"><?= $userTeam ?> &mdash; Cash Exchange</h3></div>
+        <div class="team-card__body--flush">
+            <table class="ibl-data-table trading-cash-exchange" data-no-responsive data-side="user">
+                <tbody>
 <?php for ($i = $cashStartYear; $i <= $cashEndYear; $i++):
     $yearLabel = ($seasonEndingYear - 2 + $i) . '-' . ($seasonEndingYear - 1 + $i);
     $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
-?>
-    <?php
     $prevUserCash = $previousFormData['userSendsCash'][$i] ?? 0;
-    $prevPartnerCash = $previousFormData['partnerSendsCash'][$i] ?? 0;
-    ?>
-    <tr>
-        <td style="text-align: left;">
-            <strong><?= $userTeam ?></strong> send
-            <input type="number" name="userSendsCash<?= $i ?>" value="<?= $prevUserCash ?>" min="0" max="2000" style="width: 80px;">
-            for <?= $yearLabelEscaped ?>
-        </td>
-        <td style="text-align: right;">
-            <strong><?= $partnerTeam ?></strong> send
-            <input type="number" name="partnerSendsCash<?= $i ?>" value="<?= $prevPartnerCash ?>" min="0" max="2000" style="width: 80px;">
-            for <?= $yearLabelEscaped ?>
-        </td>
-    </tr>
+?>
+                <tr>
+                    <td>
+                        <input type="number" name="userSendsCash<?= $i ?>" value="<?= $prevUserCash ?>" min="0" max="2000">
+                        for <?= $yearLabelEscaped ?>
+                    </td>
+                </tr>
 <?php endfor; ?>
-    </tbody>
-</table>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="team-card" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>;">
+        <div class="team-card__header"><h3 class="team-card__title"><?= $partnerTeam ?> &mdash; Cash Exchange</h3></div>
+        <div class="team-card__body--flush">
+            <table class="ibl-data-table trading-cash-exchange" data-no-responsive data-side="partner">
+                <tbody>
+<?php for ($i = $cashStartYear; $i <= $cashEndYear; $i++):
+    $yearLabel = ($seasonEndingYear - 2 + $i) . '-' . ($seasonEndingYear - 1 + $i);
+    $yearLabelEscaped = HtmlSanitizer::safeHtmlOutput($yearLabel);
+    $prevPartnerCash = $previousFormData['partnerSendsCash'][$i] ?? 0;
+?>
+                <tr>
+                    <td>
+                        <input type="number" name="partnerSendsCash<?= $i ?>" value="<?= $prevPartnerCash ?>" min="0" max="2000">
+                        for <?= $yearLabelEscaped ?>
+                    </td>
+                </tr>
+<?php endfor; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
         <?php
         return (string) ob_get_clean();
     }

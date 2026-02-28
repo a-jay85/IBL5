@@ -216,6 +216,9 @@ class PlayerData
     /** @var string|null Decorated name with status indicators */
     public ?string $decoratedName = null;
 
+    /** @var string CSS class for player name status indicator (waived/expiring) */
+    public string $nameStatusClass = '';
+
     /**
      * Create a new PlayerData instance
      */

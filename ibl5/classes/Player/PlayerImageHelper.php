@@ -78,17 +78,18 @@ class PlayerImageHelper implements PlayerImageHelperInterface
     /**
      * @see PlayerImageHelperInterface::renderPlayerCell()
      */
-    public static function renderPlayerCell(int $playerID, string $displayName, array $starterPids = []): string
+    public static function renderPlayerCell(int $playerID, string $displayName, array $starterPids = [], string $nameStatusClass = ''): string
     {
         $starterClass = in_array($playerID, $starterPids, true) ? ' is-starter' : '';
         $thumbnail = str_contains($displayName, '|') ? '' : self::renderThumbnail($playerID);
         $abbreviated = self::abbreviateFirstName($displayName);
+        $statusClass = $nameStatusClass !== '' ? ' ' . $nameStatusClass : '';
 
         return '<td class="sticky-col ibl-player-cell' . $starterClass . '">'
             . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'
             . $thumbnail
-            . '<span class="ibl-player-cell__name ibl-player-cell__name--full">' . $displayName . '</span>'
-            . '<span class="ibl-player-cell__name ibl-player-cell__name--abbrev">' . $abbreviated . '</span>'
+            . '<span class="ibl-player-cell__name ibl-player-cell__name--full' . $statusClass . '">' . $displayName . '</span>'
+            . '<span class="ibl-player-cell__name ibl-player-cell__name--abbrev' . $statusClass . '">' . $abbreviated . '</span>'
             . '</a></td>';
     }
 

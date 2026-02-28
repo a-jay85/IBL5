@@ -80,15 +80,6 @@ class TradingViewTest extends TestCase
         $this->assertStringContainsString('R1', $html);
     }
 
-    public function testRenderTradeOfferFormContainsCapTotals(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringContainsString('Cap Totals', $html);
-    }
-
     public function testRenderTradeOfferFormContainsCashExchange(): void
     {
         $pageData = $this->createTradeOfferPageData();
@@ -128,8 +119,11 @@ class TradingViewTest extends TestCase
 
         $html = $this->view->renderTradeOfferForm($pageData);
 
-        $this->assertStringNotContainsString('<script>', $html);
+        // The XSS payload should be HTML-escaped in the page content
         $this->assertStringContainsString('&lt;script&gt;', $html);
+        // The unescaped XSS payload should NOT appear in user-visible areas
+        // (legitimate <script> tags for JS config are expected)
+        $this->assertStringNotContainsString('<script>alert', $html);
     }
 
     public function testRenderTradeOfferFormDisablesCheckboxForWaivedPlayers(): void
@@ -299,6 +293,54 @@ class TradingViewTest extends TestCase
         $html = $this->view->renderTradeReview($pageData);
 
         $this->assertStringNotContainsString('<script>', $html);
+    }
+
+    // ============================================
+    // ROSTER PREVIEW PANEL TESTS
+    // ============================================
+
+    public function testRenderTradeOfferFormContainsRosterPreviewPanel(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('id="trade-roster-preview"', $html);
+        $this->assertStringContainsString('trade-roster-preview', $html);
+        $this->assertStringContainsString('Roster Preview', $html);
+        $this->assertStringContainsString('trade-roster-preview__tabs', $html);
+        $this->assertStringContainsString('data-display="ratings"', $html);
+        $this->assertStringContainsString('data-display="contracts"', $html);
+    }
+
+    public function testRenderTradeOfferFormContainsRosterPreviewLogos(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('trade-roster-preview__logo', $html);
+        $this->assertStringContainsString('data-team-id="1"', $html);
+        $this->assertStringContainsString('data-team-id="2"', $html);
+    }
+
+    public function testRenderTradeOfferFormConfigContainsRosterPreviewApiUrl(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('rosterPreviewApiBaseUrl', $html);
+        $this->assertStringContainsString('roster-preview-api', $html);
+    }
+
+    public function testRenderTradeOfferFormLoadsRosterPreviewJs(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('trade-roster-preview.js', $html);
     }
 
     // ============================================

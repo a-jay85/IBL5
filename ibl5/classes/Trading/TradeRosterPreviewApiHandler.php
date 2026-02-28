@@ -268,6 +268,10 @@ class TradeRosterPreviewApiHandler
             return [];
         }
 
+        // Sanitize team names before embedding in HTML labels
+        $userTeam = \Utilities\HtmlSanitizer::safeHtmlOutput($userTeam);
+        $partnerTeam = \Utilities\HtmlSanitizer::safeHtmlOutput($partnerTeam);
+
         $partnerTeamId = 0;
         if ($viewingTeamId !== $userTeamId) {
             $partnerTeamId = $viewingTeamId;
@@ -388,24 +392,45 @@ class TradeRosterPreviewApiHandler
         }
 
         return [
+            // Basic fields
             'pid' => 0,
             'name' => $label,
+            'nickname' => '',
             'ordinal' => 100000,
             'tid' => $teamId,
+            'pos' => '',
+            'age' => null,
+            'color1' => null,
+            'color2' => null,
+            // Ratings (all zero, matching DB cash rows)
+            'r_fga' => 0, 'r_fgp' => 0, 'r_fta' => 0, 'r_ftp' => 0,
+            'r_tga' => 0, 'r_tgp' => 0, 'r_orb' => 0, 'r_drb' => 0,
+            'r_ast' => 0, 'r_stl' => 0, 'r_to' => 0, 'r_blk' => 0, 'r_foul' => 0,
+            'oo' => 0, 'od' => 0, 'do' => 0, 'dd' => 0,
+            'po' => 0, 'pd' => 0, 'to' => 0, 'td' => 0,
+            'Clutch' => null, 'Consistency' => null,
+            'talent' => 0, 'skill' => 0, 'intangibles' => 0,
+            // Free agency (null, matching DB cash rows)
+            'loyalty' => null, 'playingTime' => null, 'winner' => null,
+            'tradition' => null, 'security' => null,
+            // Contract fields
+            'exp' => 1,
+            'bird' => null,
             'cy' => 1,
             'cyt' => $totalYears,
-            'cy1' => $cy1,
-            'cy2' => $cy2,
-            'cy3' => $cy3,
-            'cy4' => $cy4,
-            'cy5' => $cy5,
-            'cy6' => $cy6,
-            'exp' => 1,
+            'cy1' => $cy1, 'cy2' => $cy2, 'cy3' => $cy3,
+            'cy4' => $cy4, 'cy5' => $cy5, 'cy6' => $cy6,
+            // Draft (zero/empty, matching DB cash rows)
+            'draftyear' => 0, 'draftround' => 0, 'draftpickno' => 0,
+            'draftedby' => '', 'draftedbycurrentname' => '', 'college' => '',
+            // Physical (zero, matching DB cash rows)
+            'htft' => 0, 'htin' => 0, 'wt' => 0,
+            // Status
+            'injured' => null,
             'retired' => 0,
+            'droptime' => 0,
+            // Cash row flag
             'isCashRow' => true,
-            'pos' => '',
-            'age' => 0,
-            'bird_years' => 0,
         ];
     }
 

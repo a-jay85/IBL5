@@ -318,12 +318,6 @@
 
                     // Classify and reorder trade-involved player rows
                     classifyAndReorderTradeRows(container, addPids, removePids);
-
-                    // Highlight cash rows with incoming style
-                    var cashRows = container.querySelectorAll('tr[data-cash-row]');
-                    for (var c = 0; c < cashRows.length; c++) {
-                        cashRows[c].classList.add('trade-incoming-row');
-                    }
                 } else {
                     container.innerHTML = '<div class="trade-roster-preview__empty">No data available</div>';
                 }
@@ -336,42 +330,57 @@
     }
 
     /**
-     * Classify trade rows as incoming/outgoing, then reorder so that
-     * outgoing rows sink to the bottom and incoming rows sit below them.
+     * Classify trade rows as incoming/outgoing/cash, then reorder:
+     *   1. Non-traded players (original order)
+     *   2. Existing cash rows already on team (data-cash-row without trade-incoming-row)
+     *   3. Outgoing players (trade-outgoing-row)
+     *   4. Incoming players (trade-incoming-row)
+     *   5. New cash rows from this trade (data-cash-row with trade-incoming-row)
      */
     function classifyAndReorderTradeRows(container, incomingPids, outgoingPids) {
-        if (incomingPids.length === 0 && outgoingPids.length === 0) {
-            return;
-        }
-
         var tbodies = container.querySelectorAll('tbody');
         for (var t = 0; t < tbodies.length; t++) {
             var tbody = tbodies[t];
             var rows = tbody.querySelectorAll('tr');
+            var existingCashRows = [];
             var outgoingRows = [];
             var incomingRows = [];
+            var newCashRows = [];
 
             for (var r = 0; r < rows.length; r++) {
+                var isCashRow = rows[r].hasAttribute('data-cash-row');
                 var pid = getRowPid(rows[r]);
-                if (pid === null) {
-                    continue;
-                }
 
-                if (outgoingPids.indexOf(pid) !== -1) {
+                if (isCashRow) {
+                    // New cash rows (appended by buildCashRows) have no pid link
+                    // Existing cash rows in the DB have a pid link (pid > 0)
+                    if (pid === null || pid === 0) {
+                        rows[r].classList.add('trade-incoming-row');
+                        newCashRows.push(rows[r]);
+                    } else {
+                        existingCashRows.push(rows[r]);
+                    }
+                } else if (pid !== null && outgoingPids.indexOf(pid) !== -1) {
                     rows[r].classList.add('trade-outgoing-row');
                     outgoingRows.push(rows[r]);
-                } else if (incomingPids.indexOf(pid) !== -1) {
+                } else if (pid !== null && incomingPids.indexOf(pid) !== -1) {
                     rows[r].classList.add('trade-incoming-row');
                     incomingRows.push(rows[r]);
                 }
             }
 
-            // Move outgoing rows to the bottom, then incoming rows below them
+            // Append in order: existing cash, outgoing, incoming, new cash
+            for (var ec = 0; ec < existingCashRows.length; ec++) {
+                tbody.appendChild(existingCashRows[ec]);
+            }
             for (var o = 0; o < outgoingRows.length; o++) {
                 tbody.appendChild(outgoingRows[o]);
             }
             for (var i = 0; i < incomingRows.length; i++) {
                 tbody.appendChild(incomingRows[i]);
+            }
+            for (var nc = 0; nc < newCashRows.length; nc++) {
+                tbody.appendChild(newCashRows[nc]);
             }
         }
     }

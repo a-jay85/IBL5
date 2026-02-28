@@ -967,6 +967,14 @@ td.ibl-team-cell--colored {
     color: var(--accent-500);
 }
 
+.ibl-player-cell__name.player-waived::after {
+    content: '*';
+}
+
+.ibl-player-cell__name.player-expiring::after {
+    content: '^';
+}
+
 .ibl-player-cell__team {
     font-size: 1rem;
     color: var(--gray-500);

@@ -271,54 +271,7 @@ class TradingViewTest extends TestCase
         // The unescaped XSS payload should NOT appear — legitimate <script> tags for JS config are expected
         $this->assertStringNotContainsString('<script>alert', $html);
         $this->assertStringNotContainsString('<script>xss', $html);
-    }
-
-    // ============================================
-    // ROSTER PREVIEW PANEL TESTS
-    // ============================================
-
-    public function testRenderTradeOfferFormContainsRosterPreviewPanel(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringContainsString('id="trade-roster-preview"', $html);
-        $this->assertStringContainsString('trade-roster-preview', $html);
-        $this->assertStringContainsString('Roster Preview', $html);
-        $this->assertStringContainsString('trade-roster-preview__tabs', $html);
-        $this->assertStringContainsString('data-display="ratings"', $html);
-        $this->assertStringContainsString('data-display="contracts"', $html);
-    }
-
-    public function testRenderTradeOfferFormContainsRosterPreviewLogos(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringContainsString('trade-roster-preview__logo', $html);
-        $this->assertStringContainsString('data-team-id="1"', $html);
-        $this->assertStringContainsString('data-team-id="2"', $html);
-    }
-
-    public function testRenderTradeOfferFormConfigContainsRosterPreviewApiUrl(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringContainsString('rosterPreviewApiBaseUrl', $html);
-        $this->assertStringContainsString('roster-preview-api', $html);
-    }
-
-    public function testRenderTradeOfferFormLoadsRosterPreviewJs(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringContainsString('trade-roster-preview.js', $html);
+<<<<<<< HEAD
     }
 
     // ============================================

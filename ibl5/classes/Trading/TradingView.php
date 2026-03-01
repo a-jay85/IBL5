@@ -163,12 +163,15 @@ $tradeConfig = [
      */
     public function renderTradeReview(array $pageData): string
     {
-        /** @var array{userTeam: string, userTeamId: int, tradeOffers: array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>}>, teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>, result?: string, error?: string} $pageData */
+        /** @var array{userTeam: string, userTeamId: int, tradeOffers: array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}}>, teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>, result?: string, error?: string} $pageData */
 
         $userTeam = HtmlSanitizer::safeHtmlOutput($pageData['userTeam']);
         $userTeamId = $pageData['userTeamId'];
         $tradeOffers = $pageData['tradeOffers'];
         $teams = $pageData['teams'];
+
+        /** @var array<int, array<string, mixed>> $reviewConfigs */
+        $reviewConfigs = [];
 
         ob_start();
         echo $this->renderResultBanner($pageData['result'] ?? null, $pageData['error'] ?? null);
@@ -183,8 +186,27 @@ $tradeConfig = [
 <?php if ($tradeOffers === []): ?>
             <p style="padding: 1rem; text-align: center;">No pending trade offers.</p>
 <?php else: ?>
-    <?php foreach ($tradeOffers as $offerId => $offer): ?>
-            <?= $this->renderTradeOfferCard((int) $offerId, $offer, $userTeam) ?>
+    <?php foreach ($tradeOffers as $offerId => $offer):
+        $preview = $offer['previewData'];
+        $reviewConfigs[(int) $offerId] = [
+            'rosterPreviewApiBaseUrl' => 'modules.php?name=Trading&op=roster-preview-api',
+            'fromTeam' => $offer['from'],
+            'toTeam' => $offer['to'],
+            'fromTeamId' => $preview['fromTeamId'],
+            'toTeamId' => $preview['toTeamId'],
+            'fromPids' => $preview['fromPids'],
+            'toPids' => $preview['toPids'],
+            'fromCash' => $preview['fromCash'],
+            'toCash' => $preview['toCash'],
+            'cashStartYear' => $preview['cashStartYear'],
+            'cashEndYear' => $preview['cashEndYear'],
+            'seasonEndingYear' => $preview['seasonEndingYear'],
+            'fromColor1' => $preview['fromColor1'],
+            'toColor1' => $preview['toColor1'],
+            'userTeamId' => $userTeamId,
+        ];
+    ?>
+            <?= $this->renderTradeOfferCard((int) $offerId, $offer, $userTeam, $userTeamId) ?>
     <?php endforeach; ?>
 <?php endif; ?>
         </td>
@@ -195,6 +217,10 @@ $tradeConfig = [
         </td>
     </tr>
 </table>
+<?php if ($reviewConfigs !== []): ?>
+<script>window.IBL_TRADE_REVIEW_CONFIGS = <?= json_encode($reviewConfigs, JSON_HEX_TAG | JSON_THROW_ON_ERROR) ?>;</script>
+<script src="jslib/trade-review-preview.js" defer></script>
+<?php endif; ?>
         <?php
         return (string) ob_get_clean();
     }
@@ -489,11 +515,11 @@ $tradeConfig = [
     }
 
     /**
-     * Render a single trade offer card with items and action buttons
+     * Render a single trade offer card with items, action buttons, and preview panel
      *
-     * @param array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>} $offer
+     * @param array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}} $offer
      */
-    private function renderTradeOfferCard(int $offerId, array $offer, string $userTeam): string
+    private function renderTradeOfferCard(int $offerId, array $offer, string $userTeam, int $userTeamId): string
     {
         $oppositeTeam = HtmlSanitizer::safeHtmlOutput($offer['oppositeTeam']);
 
@@ -532,6 +558,53 @@ $tradeConfig = [
         <?php endif; ?>
     <?php endif; ?>
 <?php endforeach; ?>
+    </div>
+    <div style="text-align: center; margin-top: 0.5rem;">
+        <button type="button" class="ibl-btn ibl-btn--neutral ibl-btn--sm" data-preview-offer="<?= $offerId ?>">Preview</button>
+    </div>
+</div>
+<?= $this->renderReviewRosterPreview($offerId, $offer['previewData'], $userTeamId) ?>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Render a roster preview panel for a trade review offer card
+     *
+     * @param array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int} $previewData
+     */
+    private function renderReviewRosterPreview(int $offerId, array $previewData, int $userTeamId): string
+    {
+        $fromTeamId = $previewData['fromTeamId'];
+        $toTeamId = $previewData['toTeamId'];
+
+        // Determine initial team: show the user's team first
+        $initialTeamId = ($userTeamId === $fromTeamId) ? $fromTeamId : $toTeamId;
+        $initialColor = ($initialTeamId === $fromTeamId)
+            ? \UI\TableStyles::sanitizeColor($previewData['fromColor1'])
+            : \UI\TableStyles::sanitizeColor($previewData['toColor1']);
+        $safeFromColor = \UI\TableStyles::sanitizeColor($previewData['fromColor1']);
+        $safeToColor = \UI\TableStyles::sanitizeColor($previewData['toColor1']);
+
+        ob_start();
+        ?>
+<div id="trade-review-preview-<?= $offerId ?>" class="trade-roster-preview" style="display: none; --preview-user-color: #<?= $safeFromColor ?>; --preview-partner-color: #<?= $safeToColor ?>;">
+    <div class="trade-roster-preview__header">
+        <img src="images/logo/<?= $fromTeamId ?>.jpg" alt="From Team" class="trade-roster-preview__logo<?= $initialTeamId === $fromTeamId ? ' trade-roster-preview__logo--active' : '' ?>" data-team-id="<?= $fromTeamId ?>">
+        <div class="trade-roster-preview__title">Roster Preview</div>
+        <img src="images/logo/<?= $toTeamId ?>.jpg" alt="To Team" class="trade-roster-preview__logo<?= $initialTeamId === $toTeamId ? ' trade-roster-preview__logo--active' : '' ?>" data-team-id="<?= $toTeamId ?>">
+    </div>
+    <div class="trade-roster-preview__tabs ibl-tabs" role="tablist" style="--team-tab-bg-color: #<?= $initialColor ?>; --team-tab-active-color: #<?= $initialColor ?>">
+        <button type="button" class="ibl-tab ibl-tab--active" data-display="ratings" role="tab">Ratings</button>
+        <button type="button" class="ibl-tab" data-display="total_s" role="tab">Totals</button>
+        <button type="button" class="ibl-tab" data-display="avg_s" role="tab">Averages</button>
+        <button type="button" class="ibl-tab" data-display="per36mins" role="tab">Per 36</button>
+        <button type="button" class="ibl-tab" data-display="contracts" role="tab">Contracts</button>
+    </div>
+    <div class="table-scroll-wrapper">
+        <div class="table-scroll-container">
+            <div class="trade-roster-preview__loading">Loading</div>
+        </div>
     </div>
 </div>
         <?php

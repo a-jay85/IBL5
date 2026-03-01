@@ -47,7 +47,8 @@ interface TradingServiceInterface
      * Assemble all data needed by the trade review page
      *
      * Returns pending trade offers with item details (players, picks, cash)
-     * needed by TradingView::renderTradeReview().
+     * and preview data (team IDs, colors, cash amounts) needed by
+     * TradingView::renderTradeReview().
      *
      * @param string $username Logged-in user's username
      * @return array{
@@ -59,7 +60,20 @@ interface TradingServiceInterface
      *         approval: string,
      *         oppositeTeam: string,
      *         hasHammer: bool,
-     *         items: array<array{description: string, notes: string|null}>
+     *         items: array<array{description: string, notes: string|null}>,
+     *         previewData: array{
+     *             fromPids: list<int>,
+     *             toPids: list<int>,
+     *             fromTeamId: int,
+     *             toTeamId: int,
+     *             fromColor1: string,
+     *             toColor1: string,
+     *             fromCash: array<int, int>,
+     *             toCash: array<int, int>,
+     *             cashStartYear: int,
+     *             cashEndYear: int,
+     *             seasonEndingYear: int
+     *         }
      *     }>,
      *     teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>
      * }

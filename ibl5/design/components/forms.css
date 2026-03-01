@@ -131,6 +131,16 @@
     border-color: var(--gray-400);
 }
 
+/* Neutral button (gray) */
+.ibl-btn--neutral {
+    background: var(--gray-500);
+    color: white;
+}
+
+.ibl-btn--neutral:hover:not(:disabled) {
+    background: var(--gray-600);
+}
+
 /* Button sizes */
 .ibl-btn--sm {
     font-size: 1rem;

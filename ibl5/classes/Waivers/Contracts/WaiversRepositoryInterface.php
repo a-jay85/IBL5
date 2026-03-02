@@ -56,7 +56,7 @@ interface WaiversRepositoryInterface
      * **Database Changes:**
      * - Sets `ordinal` = 800 (bench player status)
      * - Sets `bird` = 0 (resets Bird rights on waiver claim)
-     * - Sets `teamname` and `tid` to new team
+     * - Sets `tid` to new team
      * - Sets `droptime` = 0 (clears waiver status)
      * - If no existing contract: sets cy=0, cyt=1, cy1=salary, cy2-6=0
      * 

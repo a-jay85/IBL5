@@ -15,7 +15,7 @@ use Trading\Contracts\TradeExecutionRepositoryInterface;
  * each operation via prepared statements.
  *
  * @phpstan-type QueuedTradeRow array{id: int, operation_type: string, params: string, tradeline: string}
- * @phpstan-type PlayerTransferParams array{player_id: int, team_name: string, team_id: int}
+ * @phpstan-type PlayerTransferParams array{player_id: int, team_id: int}
  * @phpstan-type PickTransferParams array{pick_id: int, new_owner: string, new_owner_id?: int}
  */
 class TradeQueueProcessor

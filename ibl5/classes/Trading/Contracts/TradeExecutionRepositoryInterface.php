@@ -18,7 +18,7 @@ interface TradeExecutionRepositoryInterface
      * Stores structured data for safe execution via prepared statements.
      *
      * @param string $operationType Type of operation ('player_transfer' or 'pick_transfer')
-     * @param array<string, int|string> $params Operation parameters (e.g., player_id, team_name, team_id)
+     * @param array<string, int|string> $params Operation parameters (e.g., player_id, team_id)
      * @param string $tradeLine Trade description text
      * @return int Number of rows affected
      */

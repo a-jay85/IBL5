@@ -57,10 +57,9 @@ interface FreeAgencyAdminRepositoryInterface
     /**
      * Update a player's contract after signing
      *
-     * Sets cy=0, assigns contract year salaries, team name, contract years total, and team ID.
+     * Sets cy=0, assigns contract year salaries, contract years total, and team ID.
      *
      * @param int $pid Player ID
-     * @param string $teamName Team name to assign
      * @param int $tid Team ID to assign
      * @param int $offerYears Total contract years
      * @param int $offer1 Year 1 salary
@@ -73,7 +72,6 @@ interface FreeAgencyAdminRepositoryInterface
      */
     public function updatePlayerContract(
         int $pid,
-        string $teamName,
         int $tid,
         int $offerYears,
         int $offer1,

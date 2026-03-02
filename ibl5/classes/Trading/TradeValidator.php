@@ -89,13 +89,13 @@ class TradeValidator implements TradeValidatorInterface
      * @see TradeValidatorInterface::validateRosterLimits()
      */
     public function validateRosterLimits(
-        string $userTeamName,
-        string $partnerTeamName,
+        int $userTeamId,
+        int $partnerTeamId,
         int $userPlayersSent,
         int $partnerPlayersSent
     ): array {
-        $userCurrentRoster = $this->repository->getTeamPlayerCount($userTeamName);
-        $partnerCurrentRoster = $this->repository->getTeamPlayerCount($partnerTeamName);
+        $userCurrentRoster = $this->repository->getTeamPlayerCount($userTeamId);
+        $partnerCurrentRoster = $this->repository->getTeamPlayerCount($partnerTeamId);
 
         $userPostTradeRoster = $userCurrentRoster - $userPlayersSent + $partnerPlayersSent;
         $partnerPostTradeRoster = $partnerCurrentRoster - $partnerPlayersSent + $userPlayersSent;

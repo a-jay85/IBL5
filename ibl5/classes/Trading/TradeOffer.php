@@ -102,10 +102,13 @@ class TradeOffer implements TradeOfferInterface
             }
         }
 
-        // Validate roster limits
+        // Validate roster limits (resolve team IDs for the tid-based query)
+        $userTeamId = $this->commonRepository->getTidFromTeamname($tradeData['offeringTeam']) ?? 0;
+        $partnerTeamId = $this->commonRepository->getTidFromTeamname($tradeData['listeningTeam']) ?? 0;
+
         $rosterValidation = $this->validator->validateRosterLimits(
-            $tradeData['offeringTeam'],
-            $tradeData['listeningTeam'],
+            $userTeamId,
+            $partnerTeamId,
             $userPlayersSent,
             $partnerPlayersSent
         );

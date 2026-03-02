@@ -405,20 +405,17 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
     public function testGetPlayersOnTeamReturnsCorrectPlayers(): void
     {
         // Arrange
-        $teamName = 'Miami Cyclones';
         $teamId = 5;
         $mockPlayers = [
             TestDataFactory::createPlayer([
                 'pid' => 1,
                 'name' => 'Player One',
-                'teamname' => $teamName,
                 'tid' => $teamId,
                 'ordinal' => 10
             ]),
             TestDataFactory::createPlayer([
                 'pid' => 2,
                 'name' => 'Player Two',
-                'teamname' => $teamName,
                 'tid' => $teamId,
                 'ordinal' => 20
             ]),
@@ -426,14 +423,13 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData($mockPlayers);
 
         // Act
-        $result = $this->repository->getPlayersOnTeam($teamName, $teamId);
+        $result = $this->repository->getPlayersOnTeam($teamId);
 
         // Assert
         $this->assertCount(2, $result);
         $this->assertEquals('Player One', $result[0]['name']);
         $this->assertEquals('Player Two', $result[1]['name']);
         $this->assertQueryExecuted('SELECT * FROM ibl_plr');
-        $this->assertQueryExecuted("teamname = '$teamName'");
         $this->assertQueryExecuted("tid = $teamId");
     }
 

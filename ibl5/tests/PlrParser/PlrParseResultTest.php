@@ -21,9 +21,8 @@ class PlrParseResultTest extends TestCase
         $result = new PlrParseResult();
         $result->playersUpserted = 10;
         $result->historyRowsUpserted = 10;
-        $result->teamsAssigned = 28;
 
-        $this->assertSame('10 players upserted, 10 history rows upserted, 28 teams assigned', $result->summary());
+        $this->assertSame('10 players upserted, 10 history rows upserted', $result->summary());
     }
 
     public function testSummaryWithPartialCounters(): void

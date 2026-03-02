@@ -35,11 +35,10 @@ interface TradeExecutionRepositoryInterface
      * Execute a queued player transfer
      *
      * @param int $playerId Player ID
-     * @param string $teamName New team name
      * @param int $teamId New team ID
      * @return int Number of affected rows
      */
-    public function executeQueuedPlayerTransfer(int $playerId, string $teamName, int $teamId): int;
+    public function executeQueuedPlayerTransfer(int $playerId, int $teamId): int;
 
     /**
      * Execute a queued pick transfer

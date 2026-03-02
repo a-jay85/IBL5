@@ -111,8 +111,8 @@ class JsbImportService implements JsbImportServiceInterface
                     $teamId = 0;
                 }
 
-                // Resolve player ID
-                $pid = $this->resolver->resolve($histData['name'], $histData['team'], $histData['year']);
+                // Resolve player ID (pass teamId for tid-based ibl_plr lookup)
+                $pid = $this->resolver->resolve($histData['name'], $histData['team'], $histData['year'], $teamId);
                 if ($pid === null) {
                     $result->addSkipped();
                     continue;

@@ -55,22 +55,22 @@ declare(strict_types=1);
  *         );
  *     }
  *
- *     public function getPlayersByTeam(string $teamName, int $maxAge): array
+ *     public function getPlayersByTeam(int $teamId, int $maxAge): array
  *     {
  *         return $this->fetchAll(
- *             "SELECT * FROM ibl_plr WHERE teamname = ? AND age <= ?",
- *             "si",
- *             $teamName,
+ *             "SELECT * FROM ibl_plr WHERE tid = ? AND age <= ?",
+ *             "ii",
+ *             $teamId,
  *             $maxAge
  *         );
  *     }
  *
- *     public function updatePlayerTeam(int $pid, string $newTeam): int
+ *     public function updatePlayerTeam(int $pid, int $newTeamId): int
  *     {
  *         return $this->execute(
- *             "UPDATE ibl_plr SET teamname = ? WHERE pid = ?",
- *             "si",
- *             $newTeam,
+ *             "UPDATE ibl_plr SET tid = ? WHERE pid = ?",
+ *             "ii",
+ *             $newTeamId,
  *             $pid
  *         );
  *     }
@@ -238,7 +238,7 @@ abstract class BaseMysqliRepository
      * @throws \RuntimeException Error 1001/1002/1003 on failure (see executeQuery)
      *
      * @example
-     * $players = $this->fetchAll("SELECT * FROM ibl_plr WHERE teamname = ?", "s", "Lakers");
+     * $players = $this->fetchAll("SELECT * FROM ibl_plr WHERE tid = ?", "i", 1);
      * // Returns [['pid' => 1, 'name' => 'John', ...], ['pid' => 2, 'name' => 'Jane', ...]]
      */
     protected function fetchAll(string $query, string $types = '', mixed ...$params): array
@@ -279,7 +279,7 @@ abstract class BaseMysqliRepository
      * @throws \RuntimeException Error 1001/1002/1003 on failure (see executeQuery)
      *
      * @example
-     * $affected = $this->execute("UPDATE ibl_plr SET teamname = ? WHERE pid = ?", "si", "Lakers", 123);
+     * $affected = $this->execute("UPDATE ibl_plr SET tid = ? WHERE pid = ?", "ii", 1, 123);
      * // Returns 1 if player was updated, 0 if pid not found
      */
     protected function execute(string $query, string $types = '', mixed ...$params): int

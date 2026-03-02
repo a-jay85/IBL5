@@ -104,29 +104,24 @@ class TradeQueueProcessor
      */
     private function executePlayerTransfer(array $params): array
     {
-        if (!isset($params['player_id'], $params['team_name'], $params['team_id'])) {
+        if (!isset($params['player_id'], $params['team_id'])) {
             return ['success' => false, 'error' => 'Missing required player transfer params'];
         }
 
         $rawPlayerId = $params['player_id'];
-        $rawTeamName = $params['team_name'];
         $rawTeamId = $params['team_id'];
 
         if (!is_int($rawPlayerId) && !is_string($rawPlayerId)) {
             return ['success' => false, 'error' => 'Invalid player_id type'];
-        }
-        if (!is_string($rawTeamName)) {
-            return ['success' => false, 'error' => 'Invalid team_name type'];
         }
         if (!is_int($rawTeamId) && !is_string($rawTeamId)) {
             return ['success' => false, 'error' => 'Invalid team_id type'];
         }
 
         $playerId = (int) $rawPlayerId;
-        $teamName = $rawTeamName;
         $teamId = (int) $rawTeamId;
 
-        $affectedRows = $this->executionRepository->executeQueuedPlayerTransfer($playerId, $teamName, $teamId);
+        $affectedRows = $this->executionRepository->executeQueuedPlayerTransfer($playerId, $teamId);
 
         if ($affectedRows > 0) {
             return ['success' => true, 'error' => ''];

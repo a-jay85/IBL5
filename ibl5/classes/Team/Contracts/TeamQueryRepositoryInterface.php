@@ -61,7 +61,7 @@ interface TeamQueryRepositoryInterface
      * @param \Season|null $season Season object for free agency filtering
      * @return list<PlayerRow> Array of player rows
      */
-    public function getHealthyAndInjuredPlayersOrderedByName(string $teamName, int $teamId, ?\Season $season = null): array;
+    public function getHealthyAndInjuredPlayersOrderedByName(int $teamId, ?\Season $season = null): array;
 
     /**
      * Get healthy players ordered by name
@@ -69,7 +69,7 @@ interface TeamQueryRepositoryInterface
      * @param \Season|null $season Season object for free agency filtering
      * @return list<PlayerRow> Array of player rows
      */
-    public function getHealthyPlayersOrderedByName(string $teamName, int $teamId, ?\Season $season = null): array;
+    public function getHealthyPlayersOrderedByName(int $teamId, ?\Season $season = null): array;
 
     /**
      * Get player ID of last sim starter for a position
@@ -92,7 +92,7 @@ interface TeamQueryRepositoryInterface
      *
      * @return list<PlayerRow> Array of player rows
      */
-    public function getAllPlayersUnderContract(string $teamName): array;
+    public function getAllPlayersUnderContract(int $teamId): array;
 
     /**
      * Get players under contract by position
@@ -100,7 +100,7 @@ interface TeamQueryRepositoryInterface
      * @param string $position Position code (e.g., 'PG', 'SG', 'SF', 'PF', 'C')
      * @return list<PlayerRow> Array of player rows
      */
-    public function getPlayersUnderContractByPosition(string $teamName, string $position): array;
+    public function getPlayersUnderContractByPosition(int $teamId, string $position): array;
 
     /**
      * Get roster under contract ordered by name

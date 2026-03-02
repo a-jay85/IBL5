@@ -111,7 +111,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             }
 
             // Get roster players for snapshot (fresh from DB since they were just updated)
-            $rosterPlayers = $this->repository->getPlayersOnTeam($teamName, $tid);
+            $rosterPlayers = $this->repository->getPlayersOnTeam($tid);
 
             $loadedDcId = 0;
             $rawLoadedDcId = $postData['loaded_dc_id'] ?? '0';

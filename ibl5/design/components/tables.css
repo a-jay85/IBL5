@@ -1878,6 +1878,25 @@ td.record-book-retired-cell {
     font-size: 0.875rem;
 }
 
+/* ==========================================================================
+   Sorted Column Highlight (Season & Career Leaderboards)
+
+   Highlights the column corresponding to the active sort dimension.
+   Applied via .sorted-col class on <th> and <td> elements.
+   ========================================================================== */
+
+.ibl-data-table th.sorted-col {
+    background: var(--navy-600, #2d4a7a);
+}
+
+.ibl-data-table td.sorted-col {
+    background-color: var(--accent-100, #ffedd5);
+}
+
+.ibl-data-table tbody tr:hover td.sorted-col {
+    background-color: var(--accent-200, #fed7aa);
+}
+
 .season-highs-discrepancy-panel .ibl-data-table thead {
     background: var(--amber-600, #d97706);
 }

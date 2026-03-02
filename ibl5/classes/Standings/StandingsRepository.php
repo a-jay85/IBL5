@@ -82,6 +82,8 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             s.clinchedConference,
             s.clinchedDivision,
             s.clinchedPlayoffs,
+            s.clinchedLeague,
+            s.wins,
             (s.homeWins + s.homeLosses) AS homeGames,
             (s.awayWins + s.awayLosses) AS awayGames,
             t.color1,

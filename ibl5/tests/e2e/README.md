@@ -4,7 +4,7 @@ Browser-based end-to-end tests for IBL5. These automate functional verification 
 
 ## Prerequisites
 
-- **MAMP running** with IBL5 accessible at `http://localhost:8888/ibl5/`
+- **MAMP running** with IBL5 accessible at `http://localhost/ibl5/`
 - **Test user credentials** — a valid IBL account for authenticated tests
 - **CAPTCHA disabled** — login CAPTCHA must be off in your local `config.php` (`$gfx_chk = 0`)
 

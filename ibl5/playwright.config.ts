@@ -27,7 +27,7 @@ export default defineConfig({
   reporter: [['html', { open: 'never' }], ['list']],
 
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:8888/ibl5/',
+    baseURL: process.env.BASE_URL || 'http://localhost/ibl5/',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },

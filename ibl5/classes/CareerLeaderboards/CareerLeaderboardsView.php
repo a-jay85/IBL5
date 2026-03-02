@@ -16,10 +16,31 @@ use Player\PlayerImageHelper;
 class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
 {
     private CareerLeaderboardsService $service;
+    private string $activeSortColumn = '';
+
+    private const SORT_TO_COLUMN = [
+        'pts' => 'pts',     'games' => 'games',   'minutes' => 'minutes',
+        'fgm' => 'fgm',     'fga' => 'fga',       'fgpct' => 'fgp',
+        'ftm' => 'ftm',     'fta' => 'fta',       'ftpct' => 'ftp',
+        'tgm' => 'tgm',     'tga' => 'tga',       'tpct' => 'tgp',
+        'orb' => 'orb',     'reb' => 'reb',       'ast' => 'ast',
+        'stl' => 'stl',     'tvr' => 'tvr',       'blk' => 'blk',
+        'pf' => 'pf',
+    ];
 
     public function __construct(CareerLeaderboardsService $service)
     {
         $this->service = $service;
+    }
+
+    public function setSortColumn(string $sortColumn): void
+    {
+        $this->activeSortColumn = self::SORT_TO_COLUMN[$sortColumn] ?? '';
+    }
+
+    private function sortAttr(string $statKey): string
+    {
+        return $this->activeSortColumn === $statKey ? ' class="sorted-col"' : '';
     }
 
     /**
@@ -92,25 +113,25 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
         <tr>
             <th class="sticky-col-1">Rank</th>
             <th class="sticky-col-2">Name</th>
-            <th>Games</th>
-            <th>Minutes</th>
-            <th>FGM</th>
-            <th>FGA</th>
-            <th>FG%</th>
-            <th>FTM</th>
-            <th>FTA</th>
-            <th>FT%</th>
-            <th>3GM</th>
-            <th>3GA</th>
-            <th>3P%</th>
-            <th>ORB</th>
-            <th>REB</th>
-            <th>AST</th>
-            <th>STL</th>
-            <th>TVR</th>
-            <th>BLK</th>
-            <th>FOULS</th>
-            <th>PTS</th>
+            <th<?= $this->sortAttr('games') ?>>Games</th>
+            <th<?= $this->sortAttr('minutes') ?>>Minutes</th>
+            <th<?= $this->sortAttr('fgm') ?>>FGM</th>
+            <th<?= $this->sortAttr('fga') ?>>FGA</th>
+            <th<?= $this->sortAttr('fgp') ?>>FG%</th>
+            <th<?= $this->sortAttr('ftm') ?>>FTM</th>
+            <th<?= $this->sortAttr('fta') ?>>FTA</th>
+            <th<?= $this->sortAttr('ftp') ?>>FT%</th>
+            <th<?= $this->sortAttr('tgm') ?>>3GM</th>
+            <th<?= $this->sortAttr('tga') ?>>3GA</th>
+            <th<?= $this->sortAttr('tgp') ?>>3P%</th>
+            <th<?= $this->sortAttr('orb') ?>>ORB</th>
+            <th<?= $this->sortAttr('reb') ?>>REB</th>
+            <th<?= $this->sortAttr('ast') ?>>AST</th>
+            <th<?= $this->sortAttr('stl') ?>>STL</th>
+            <th<?= $this->sortAttr('tvr') ?>>TVR</th>
+            <th<?= $this->sortAttr('blk') ?>>BLK</th>
+            <th<?= $this->sortAttr('pf') ?>>FOULS</th>
+            <th<?= $this->sortAttr('pts') ?>>PTS</th>
         </tr>
     </thead>
     <tbody>
@@ -134,25 +155,25 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
 <tr>
     <td class="rank-cell sticky-col-1"><?= $rank ?></td>
     <?= $playerCell ?>
-    <td><?= htmlspecialchars((string) $stats['games']) ?></td>
-    <td><?= htmlspecialchars($stats['minutes']) ?></td>
-    <td><?= htmlspecialchars($stats['fgm']) ?></td>
-    <td><?= htmlspecialchars($stats['fga']) ?></td>
-    <td><?= htmlspecialchars($stats['fgp']) ?></td>
-    <td><?= htmlspecialchars($stats['ftm']) ?></td>
-    <td><?= htmlspecialchars($stats['fta']) ?></td>
-    <td><?= htmlspecialchars($stats['ftp']) ?></td>
-    <td><?= htmlspecialchars($stats['tgm']) ?></td>
-    <td><?= htmlspecialchars($stats['tga']) ?></td>
-    <td><?= htmlspecialchars($stats['tgp']) ?></td>
-    <td><?= htmlspecialchars($stats['orb']) ?></td>
-    <td><?= htmlspecialchars($stats['reb']) ?></td>
-    <td><?= htmlspecialchars($stats['ast']) ?></td>
-    <td><?= htmlspecialchars($stats['stl']) ?></td>
-    <td><?= htmlspecialchars($stats['tvr']) ?></td>
-    <td><?= htmlspecialchars($stats['blk']) ?></td>
-    <td><?= htmlspecialchars($stats['pf']) ?></td>
-    <td><?= htmlspecialchars($stats['pts']) ?></td>
+    <td<?= $this->sortAttr('games') ?>><?= htmlspecialchars((string) $stats['games']) ?></td>
+    <td<?= $this->sortAttr('minutes') ?>><?= htmlspecialchars($stats['minutes']) ?></td>
+    <td<?= $this->sortAttr('fgm') ?>><?= htmlspecialchars($stats['fgm']) ?></td>
+    <td<?= $this->sortAttr('fga') ?>><?= htmlspecialchars($stats['fga']) ?></td>
+    <td<?= $this->sortAttr('fgp') ?>><?= htmlspecialchars($stats['fgp']) ?></td>
+    <td<?= $this->sortAttr('ftm') ?>><?= htmlspecialchars($stats['ftm']) ?></td>
+    <td<?= $this->sortAttr('fta') ?>><?= htmlspecialchars($stats['fta']) ?></td>
+    <td<?= $this->sortAttr('ftp') ?>><?= htmlspecialchars($stats['ftp']) ?></td>
+    <td<?= $this->sortAttr('tgm') ?>><?= htmlspecialchars($stats['tgm']) ?></td>
+    <td<?= $this->sortAttr('tga') ?>><?= htmlspecialchars($stats['tga']) ?></td>
+    <td<?= $this->sortAttr('tgp') ?>><?= htmlspecialchars($stats['tgp']) ?></td>
+    <td<?= $this->sortAttr('orb') ?>><?= htmlspecialchars($stats['orb']) ?></td>
+    <td<?= $this->sortAttr('reb') ?>><?= htmlspecialchars($stats['reb']) ?></td>
+    <td<?= $this->sortAttr('ast') ?>><?= htmlspecialchars($stats['ast']) ?></td>
+    <td<?= $this->sortAttr('stl') ?>><?= htmlspecialchars($stats['stl']) ?></td>
+    <td<?= $this->sortAttr('tvr') ?>><?= htmlspecialchars($stats['tvr']) ?></td>
+    <td<?= $this->sortAttr('blk') ?>><?= htmlspecialchars($stats['blk']) ?></td>
+    <td<?= $this->sortAttr('pf') ?>><?= htmlspecialchars($stats['pf']) ?></td>
+    <td<?= $this->sortAttr('pts') ?>><?= htmlspecialchars($stats['pts']) ?></td>
 </tr>
         <?php
         return (string) ob_get_clean();

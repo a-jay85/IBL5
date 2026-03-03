@@ -188,7 +188,7 @@ class FreeAgencyRepositoryTest extends TestCase
             ['pid' => 2, 'name' => 'Player Two', 'teamname' => 'Boston', 'retired' => 0],
         ]);
 
-        $result = $repository->getAllPlayersExcludingTeam('Miami');
+        $result = $repository->getAllPlayersExcludingTeam(5);
 
         $this->assertIsArray($result);
         $this->assertCount(2, $result);
@@ -200,7 +200,7 @@ class FreeAgencyRepositoryTest extends TestCase
         $repository = new FreeAgencyRepository($this->mockMysqliDb);
         $this->mockDb->setMockData([]);
 
-        $result = $repository->getAllPlayersExcludingTeam('Miami');
+        $result = $repository->getAllPlayersExcludingTeam(5);
 
         $this->assertIsArray($result);
         $this->assertEmpty($result);

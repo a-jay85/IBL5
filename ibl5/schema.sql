@@ -1514,7 +1514,6 @@ CREATE TABLE `ibl_plr` (
   `age` tinyint(3) unsigned DEFAULT NULL COMMENT 'Player age in years',
   `peak` tinyint(3) unsigned DEFAULT NULL COMMENT 'Peak development age',
   `tid` int(11) NOT NULL DEFAULT 0 COMMENT 'Team ID (0 = free agent)',
-  `teamname` varchar(16) DEFAULT '' COMMENT 'Team name (denormalized from ibl_team_info)',
   `pos` enum('PG','SG','SF','PF','C','G','F','GF','') NOT NULL DEFAULT '' COMMENT 'Player position',
   `sta` tinyint(3) unsigned DEFAULT 0 COMMENT 'Stamina rating',
   `oo` tinyint(3) unsigned DEFAULT 0 COMMENT 'Outside offense rating',
@@ -1655,7 +1654,6 @@ CREATE TABLE `ibl_plr` (
   PRIMARY KEY (`pid`),
   UNIQUE KEY `uuid` (`uuid`),
   KEY `name` (`name`),
-  KEY `teamname` (`teamname`),
   KEY `idx_tid` (`tid`),
   KEY `idx_active` (`active`),
   KEY `idx_retired` (`retired`),
@@ -3755,7 +3753,7 @@ SET character_set_client = @saved_cs_client;
 /*!50001 SET collation_connection      = utf8mb4_general_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
 /*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY DEFINER */
-/*!50001 VIEW `vw_current_salary` AS select `ibl_plr`.`pid` AS `pid`,`ibl_plr`.`name` AS `name`,`ibl_plr`.`tid` AS `tid`,`ibl_plr`.`teamname` AS `teamname`,`ibl_plr`.`pos` AS `pos`,`ibl_plr`.`cy` AS `cy`,`ibl_plr`.`cyt` AS `cyt`,`ibl_plr`.`cy1` AS `cy1`,`ibl_plr`.`cy2` AS `cy2`,`ibl_plr`.`cy3` AS `cy3`,`ibl_plr`.`cy4` AS `cy4`,`ibl_plr`.`cy5` AS `cy5`,`ibl_plr`.`cy6` AS `cy6`,case `ibl_plr`.`cy` when 1 then `ibl_plr`.`cy1` when 2 then `ibl_plr`.`cy2` when 3 then `ibl_plr`.`cy3` when 4 then `ibl_plr`.`cy4` when 5 then `ibl_plr`.`cy5` when 6 then `ibl_plr`.`cy6` else 0 end AS `current_salary`,case `ibl_plr`.`cy` when 0 then `ibl_plr`.`cy1` when 1 then `ibl_plr`.`cy2` when 2 then `ibl_plr`.`cy3` when 3 then `ibl_plr`.`cy4` when 4 then `ibl_plr`.`cy5` when 5 then `ibl_plr`.`cy6` else 0 end AS `next_year_salary` from `ibl_plr` where `ibl_plr`.`retired` = 0 */;
+/*!50001 VIEW `vw_current_salary` AS select `p`.`pid` AS `pid`,`p`.`name` AS `name`,`p`.`tid` AS `tid`,`t`.`team_name` AS `teamname`,`p`.`pos` AS `pos`,`p`.`cy` AS `cy`,`p`.`cyt` AS `cyt`,`p`.`cy1` AS `cy1`,`p`.`cy2` AS `cy2`,`p`.`cy3` AS `cy3`,`p`.`cy4` AS `cy4`,`p`.`cy5` AS `cy5`,`p`.`cy6` AS `cy6`,case `p`.`cy` when 1 then `p`.`cy1` when 2 then `p`.`cy2` when 3 then `p`.`cy3` when 4 then `p`.`cy4` when 5 then `p`.`cy5` when 6 then `p`.`cy6` else 0 end AS `current_salary`,case `p`.`cy` when 0 then `p`.`cy1` when 1 then `p`.`cy2` when 2 then `p`.`cy3` when 3 then `p`.`cy4` when 4 then `p`.`cy5` when 5 then `p`.`cy6` else 0 end AS `next_year_salary` from (`ibl_plr` `p` left join `ibl_team_info` `t` on(`p`.`tid` = `t`.`teamid`)) where `p`.`retired` = 0 */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;

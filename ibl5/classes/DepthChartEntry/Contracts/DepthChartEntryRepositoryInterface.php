@@ -18,24 +18,22 @@ interface DepthChartEntryRepositoryInterface
 {
     /**
      * Get all active players on a team with depth chart data
-     * 
+     *
      * Returns database result set containing all players on the team who:
      * - Are not retired (retired = 0)
      * - Are on the active roster (ordinal <= WAIVERS_ORDINAL)
      * - Sorted by ordinal (draft order)
-     * 
-     * @param string $teamName Team name for lookup
+     *
      * @param int $teamID Team ID for database query
      * @return list<PlayerRow>
-     * 
+     *
      * **Important Behaviors:**
      * - Filters out retired players automatically
      * - Results include all depth chart fields (dc_PGDepth, dc_SGDepth, etc.)
      * - Ordered by player ordinal for consistent display
-     * - Uses DatabaseService::escapeString() for team name to prevent SQL injection
      * - Team ID is cast to int for safety
      */
-    public function getPlayersOnTeam(string $teamName, int $teamID);
+    public function getPlayersOnTeam(int $teamID);
 
     /**
      * Update a player's depth chart configuration across all positions

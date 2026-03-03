@@ -69,11 +69,10 @@ interface TradingRepositoryInterface
      * Update player's team after trade
      *
      * @param int $playerId Player ID
-     * @param string $newTeamName New team name
      * @param int $newTeamId New team ID
      * @return int Number of rows affected
      */
-    public function updatePlayerTeam(int $playerId, string $newTeamName, int $newTeamId): int;
+    public function updatePlayerTeam(int $playerId, int $newTeamId): int;
 
     /**
      * Update draft pick ownership after trade
@@ -247,10 +246,10 @@ interface TradingRepositoryInterface
      * Excludes retired players, cash placeholders (ordinal >= 100000),
      * and buyout/cash records whose names start with '|'.
      *
-     * @param string $teamName Team name
+     * @param int $teamId Team ID
      * @return int Number of active players on the team's roster
      */
-    public function getTeamPlayerCount(string $teamName): int;
+    public function getTeamPlayerCount(int $teamId): int;
 
     /**
      * Get all teams with city, name, colors and ID for trading UI

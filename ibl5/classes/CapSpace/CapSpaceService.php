@@ -82,7 +82,7 @@ class CapSpaceService
         ];
 
         // Get salary by position — fetch all players under contract once, partition by position
-        $allPlayers = $this->teamQueryRepo->getAllPlayersUnderContract($team->name);
+        $allPlayers = $this->teamQueryRepo->getAllPlayersUnderContract($team->teamID);
         /** @var array<string, list<PlayerRow>> $playersByPosition */
         $playersByPosition = [];
         foreach ($allPlayers as $playerRow) {

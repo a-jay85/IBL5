@@ -110,8 +110,6 @@ Classes autoload from `ibl5/classes/`. Never use `require_once`.
 
 ## Git & Commits
 
-**After committing:** Always suggest `/mergeAndPush` (not a bare `git push`). Only suggest it as a clickable inline prompt — do NOT mention it in your text messages.
-
 When committing, only include files relevant to the current task. Always review `git diff --staged` before committing. Never commit unrelated files.
 
 ### Commit Conventions

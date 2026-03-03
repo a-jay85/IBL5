@@ -17,6 +17,7 @@ const PHP_ERROR_PATTERNS = [
 async function isTradesClosed(page: Page): Promise<boolean> {
   const body = await page.locator('body').textContent();
   return (
+    body?.includes('trades are not allowed') ||
     body?.includes('Trading is closed') ||
     body?.includes('trades are closed') ||
     body?.includes('trading period') ||
@@ -97,13 +98,7 @@ test.describe('Trading flow', () => {
     await page.goto('modules.php?name=Trading');
 
     // Skip all trading tests if trades are currently closed
-    const body = await page.locator('body').textContent();
-    const tradesClosed =
-      body?.includes('Trading is closed') ||
-      body?.includes('trades are closed') ||
-      body?.includes('trading period');
-
-    if (tradesClosed) {
+    if (await isTradesClosed(page)) {
       test.skip(true, 'Trades are currently closed for the season');
     }
   });

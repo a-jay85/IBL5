@@ -1,11 +1,3 @@
-/**
- * IBL5 Existing Component Styles
- *
- * These are the existing component styles migrated from the original style.css.
- * They are organized here to work with the Tailwind build system while
- * preserving all the existing functionality.
- */
-
 @layer components {
 
 

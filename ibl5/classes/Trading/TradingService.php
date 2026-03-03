@@ -99,7 +99,7 @@ class TradingService implements TradingServiceInterface
     /**
      * @see TradingServiceInterface::getTradeReviewPageData()
      *
-     * @return array{userTeam: string, userTeamId: int, tradeOffers: array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>}>, teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>}
+     * @return array{userTeam: string, userTeamId: int, tradeOffers: array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}}>, teams: list<array{name: string, city: string, fullName: string, teamid: int, color1: string, color2: string}>}
      */
     public function getTradeReviewPageData(string $username): array
     {
@@ -116,6 +116,9 @@ class TradingService implements TradingServiceInterface
         // Get teams for the team selection sidebar
         $allTeams = $this->repository->getAllTeamsWithCity();
         $teams = $this->buildTeamList($allTeams);
+
+        // Enrich offers with preview data (team IDs, colors, cash)
+        $tradeOffers = $this->enrichOffersWithPreviewData($tradeOffers, $allTeams, $season);
 
         return [
             'userTeam' => $userTeam,
@@ -174,7 +177,7 @@ class TradingService implements TradingServiceInterface
      * @param list<TradeInfoRow> $allTradeRows Raw trade info rows
      * @param string $userTeam Current user's team name
      * @param int $seasonEndingYear Season ending year for cash season labels
-     * @return array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>}> Grouped trade offers with resolved item descriptions
+     * @return array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>}}> Grouped trade offers with resolved item descriptions
      */
     private function groupTradeOffers(array $allTradeRows, string $userTeam, int $seasonEndingYear): array
     {
@@ -201,6 +204,7 @@ class TradingService implements TradingServiceInterface
                     'oppositeTeam' => ($from === $userTeam) ? $to : $from,
                     'hasHammer' => ($approval === $userTeam || $approval === 'test'),
                     'items' => [],
+                    'previewData' => ['fromPids' => [], 'toPids' => []],
                 ];
             }
 
@@ -214,6 +218,15 @@ class TradingService implements TradingServiceInterface
                     $from,
                     $to
                 );
+
+                // Collect player PIDs for roster preview (classify by sending team)
+                if ($itemType === '1') {
+                    if ($from === $tradeOffers[$offerId]['from']) {
+                        $tradeOffers[$offerId]['previewData']['fromPids'][] = $itemId;
+                    } else {
+                        $tradeOffers[$offerId]['previewData']['toPids'][] = $itemId;
+                    }
+                }
             }
         }
 
@@ -353,6 +366,70 @@ class TradingService implements TradingServiceInterface
         return $phase === 'Playoffs'
             || $phase === 'Draft'
             || $phase === 'Free Agency';
+    }
+
+    /**
+     * Enrich trade offers with preview data (team IDs, colors, cash amounts)
+     *
+     * @param array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>}}> $tradeOffers
+     * @param list<TeamWithCityRow> $allTeams
+     * @return array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}}>
+     */
+    private function enrichOffersWithPreviewData(array $tradeOffers, array $allTeams, \Season $season): array
+    {
+        // Build team lookup map: team_name => {teamid, color1}
+        $teamLookup = [];
+        foreach ($allTeams as $row) {
+            $teamLookup[$row['team_name']] = [
+                'teamid' => $row['teamid'],
+                'color1' => $row['color1'],
+            ];
+        }
+
+        $cashStartYear = 1;
+        if ($this->isOffseasonPhase($season->phase)) {
+            $cashStartYear = 2;
+        }
+
+        /** @var array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}}> $enriched */
+        $enriched = [];
+
+        foreach ($tradeOffers as $offerId => $offer) {
+            $fromTeam = $offer['from'];
+            $toTeam = $offer['to'];
+
+            $fromTeamData = $teamLookup[$fromTeam] ?? ['teamid' => 0, 'color1' => '000000'];
+            $toTeamData = $teamLookup[$toTeam] ?? ['teamid' => 0, 'color1' => '000000'];
+
+            // Get cash amounts for each direction
+            $fromCashRow = $this->cashRepository->getCashTransactionByOffer($offerId, $fromTeam);
+            $toCashRow = $this->cashRepository->getCashTransactionByOffer($offerId, $toTeam);
+
+            $fromCash = [];
+            $toCash = [];
+            for ($y = 1; $y <= 6; $y++) {
+                $fromCash[$y] = ($fromCashRow !== null && $fromCashRow["cy{$y}"] !== null) ? $fromCashRow["cy{$y}"] : 0;
+                $toCash[$y] = ($toCashRow !== null && $toCashRow["cy{$y}"] !== null) ? $toCashRow["cy{$y}"] : 0;
+            }
+
+            $offer['previewData'] = [
+                'fromPids' => $offer['previewData']['fromPids'],
+                'toPids' => $offer['previewData']['toPids'],
+                'fromTeamId' => $fromTeamData['teamid'],
+                'toTeamId' => $toTeamData['teamid'],
+                'fromColor1' => $fromTeamData['color1'],
+                'toColor1' => $toTeamData['color1'],
+                'fromCash' => $fromCash,
+                'toCash' => $toCash,
+                'cashStartYear' => $cashStartYear,
+                'cashEndYear' => 6,
+                'seasonEndingYear' => $season->endingYear,
+            ];
+
+            $enriched[$offerId] = $offer;
+        }
+
+        return $enriched;
     }
 
     /**

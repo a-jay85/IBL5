@@ -1,16 +1,3 @@
-/**
- * IBL5 Table Components
- *
- * Consolidated table styles used across all data tables:
- * - StandingsView, LeagueStatsView, InjuriesView
- * - SeasonLeadersView, LeaderboardsView, DraftView
- * - ContractListView, SeasonHighsView, DraftHistoryView
- * - And all other data display tables
- *
- * Classes:
- * - .ibl-data-table: Primary data table (navy header, alternating rows)
- */
-
 @layer components {
 
 /* ==========================================================================
@@ -37,6 +24,7 @@
    - .sticky-scroll-wrapper: overflow: auto (provides the scroll viewport)
    - NEVER set overflow: hidden on elements containing position: sticky cells
    ========================================================================== */
+
 
 /* ==========================================================================
    Primary Data Table (.ibl-data-table)
@@ -208,6 +196,12 @@
 
 .ibl-data-table tfoot tr.tfoot-legend td {
     border-top: 1px solid var(--gray-200, #e5e7eb);
+}
+
+/* Cap exceeded — red highlight when salary totals exceed hard cap */
+.ibl-data-table tfoot td.cap-exceeded {
+    color: var(--color-error-600, #dc2626);
+    font-weight: 700;
 }
 
 /* ==========================================================================
@@ -973,6 +967,14 @@ td.ibl-team-cell--colored {
     color: var(--accent-500);
 }
 
+.ibl-player-cell__name.player-waived::after {
+    content: '*';
+}
+
+.ibl-player-cell__name.player-expiring::after {
+    content: '^';
+}
+
 .ibl-player-cell__team {
     font-size: 1rem;
     color: var(--gray-500);
@@ -1252,22 +1254,16 @@ td.ibl-team-cell--colored {
    - Trade offer review cards
    ========================================================================== */
 
-/* Trading layout — flex container replacing former layout table */
+/* Trading layout — page container */
 .trading-layout {
     text-align: center;
-    max-width: 960px;
     margin: 0 auto;
 }
 
-.trading-layout__rosters {
-    display: flex;
-    gap: var(--space-2);
-    justify-content: center;
-}
-
+/* Roster card flex sizing — wider than .team-cards-row > .team-card default */
 .trading-layout__card {
     flex: 1 1 0;
-    min-width: 0;
+    max-width: 450px;
 }
 
 /* Team selection table with logos */
@@ -1314,23 +1310,7 @@ td.ibl-team-cell--colored {
     word-break: break-word;
 }
 
-/* Cap totals table */
-.trading-cap-totals th {
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    padding: 0.5rem 0.75rem;
-    text-align: center;
-}
-
-.trading-cap-totals td {
-    padding: 0.5rem 0.75rem;
-}
-
-/* Cash exchange table */
-.trading-cash-exchange td {
-    padding: 0.5rem 0.75rem;
-}
-
+/* Cash exchange number input */
 .trading-cash-exchange input[type="number"] {
     width: 80px;
     padding: 0.25rem 0.5rem;

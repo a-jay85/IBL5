@@ -176,6 +176,66 @@ class TradingRepositoryTest extends TestCase
     }
 
     // ============================================
+    // GET TEAM PLAYERS FOR TRADING TESTS
+    // ============================================
+
+    public function testGetTeamPlayersForTradingReturnsPlayerRows(): void
+    {
+        $repository = new TradingRepository($this->mockMysqliDb);
+        $this->mockDb->setMockData([
+            ['pos' => 'PG', 'name' => 'Guard One', 'pid' => 1, 'ordinal' => 10, 'cy' => 2, 'cy1' => 500, 'cy2' => 525, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+            ['pos' => 'C', 'name' => 'Center Two', 'pid' => 2, 'ordinal' => 20, 'cy' => 1, 'cy1' => 800, 'cy2' => 0, 'cy3' => 0, 'cy4' => 0, 'cy5' => 0, 'cy6' => 0],
+        ]);
+
+        $result = $repository->getTeamPlayersForTrading(1);
+
+        $this->assertIsArray($result);
+        $this->assertCount(2, $result);
+        $this->assertSame('Guard One', $result[0]['name']);
+        $this->assertSame('PG', $result[0]['pos']);
+    }
+
+    public function testGetTeamPlayersForTradingReturnsEmptyArray(): void
+    {
+        $repository = new TradingRepository($this->mockMysqliDb);
+        $this->mockDb->setMockData([]);
+
+        $result = $repository->getTeamPlayersForTrading(99);
+
+        $this->assertIsArray($result);
+        $this->assertEmpty($result);
+    }
+
+    // ============================================
+    // GET TEAM DRAFT PICKS FOR TRADING TESTS
+    // ============================================
+
+    public function testGetTeamDraftPicksForTradingReturnsDraftPicks(): void
+    {
+        $repository = new TradingRepository($this->mockMysqliDb);
+        $this->mockDb->setMockData([
+            ['pickid' => 1, 'year' => 2026, 'round' => 1, 'pick' => 5, 'owner_tid' => 1, 'teampick_tid' => 3],
+            ['pickid' => 2, 'year' => 2026, 'round' => 2, 'pick' => 10, 'owner_tid' => 1, 'teampick_tid' => 1],
+        ]);
+
+        $result = $repository->getTeamDraftPicksForTrading(1);
+
+        $this->assertIsArray($result);
+        $this->assertCount(2, $result);
+    }
+
+    public function testGetTeamDraftPicksForTradingReturnsEmptyArray(): void
+    {
+        $repository = new TradingRepository($this->mockMysqliDb);
+        $this->mockDb->setMockData([]);
+
+        $result = $repository->getTeamDraftPicksForTrading(99);
+
+        $this->assertIsArray($result);
+        $this->assertEmpty($result);
+    }
+
+    // ============================================
     // MULTIPLE INSTANCES TEST
     // ============================================
 
@@ -183,7 +243,7 @@ class TradingRepositoryTest extends TestCase
     {
         $repo1 = new TradingRepository($this->mockMysqliDb);
         $repo2 = new TradingRepository($this->mockMysqliDb);
-        
+
         $this->assertInstanceOf(TradingRepository::class, $repo1);
         $this->assertInstanceOf(TradingRepository::class, $repo2);
         $this->assertNotSame($repo1, $repo2);

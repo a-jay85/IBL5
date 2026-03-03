@@ -145,6 +145,102 @@ class FreeAgencyRepositoryTest extends TestCase
     }
 
     // ============================================
+    // SAVE OFFER TESTS
+    // ============================================
+
+    public function testSaveOfferReturnsTrueOnSuccessfulInsert(): void
+    {
+        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+
+        $offerData = [
+            'tid' => 1,
+            'pid' => 100,
+            'playerName' => 'Test Player',
+            'teamName' => 'Miami',
+            'offer1' => 500,
+            'offer2' => 525,
+            'offer3' => 550,
+            'offer4' => 0,
+            'offer5' => 0,
+            'offer6' => 0,
+            'modifier' => 1,
+            'random' => 5,
+            'perceivedValue' => 1575.0,
+            'mle' => 0,
+            'lle' => 0,
+            'offerType' => 1,
+        ];
+
+        $result = $repository->saveOffer($offerData);
+
+        $this->assertTrue($result);
+    }
+
+    // ============================================
+    // GET ALL PLAYERS EXCLUDING TEAM TESTS
+    // ============================================
+
+    public function testGetAllPlayersExcludingTeamReturnsPlayerRows(): void
+    {
+        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $this->mockDb->setMockData([
+            ['pid' => 1, 'name' => 'Player One', 'teamname' => 'Chicago', 'retired' => 0],
+            ['pid' => 2, 'name' => 'Player Two', 'teamname' => 'Boston', 'retired' => 0],
+        ]);
+
+        $result = $repository->getAllPlayersExcludingTeam('Miami');
+
+        $this->assertIsArray($result);
+        $this->assertCount(2, $result);
+        $this->assertSame('Player One', $result[0]['name']);
+    }
+
+    public function testGetAllPlayersExcludingTeamReturnsEmptyArrayWhenNone(): void
+    {
+        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $this->mockDb->setMockData([]);
+
+        $result = $repository->getAllPlayersExcludingTeam('Miami');
+
+        $this->assertIsArray($result);
+        $this->assertEmpty($result);
+    }
+
+    // ============================================
+    // IS PLAYER ALREADY SIGNED TESTS
+    // ============================================
+
+    public function testIsPlayerAlreadySignedReturnsTrueWhenCyZeroAndCy1NonZero(): void
+    {
+        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $this->mockDb->onQuery('SELECT cy, cy1 FROM ibl_plr', [['cy' => 0, 'cy1' => 500]]);
+
+        $result = $repository->isPlayerAlreadySigned(100);
+
+        $this->assertTrue($result);
+    }
+
+    public function testIsPlayerAlreadySignedReturnsFalseWhenCy1IsZero(): void
+    {
+        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $this->mockDb->onQuery('SELECT cy, cy1 FROM ibl_plr', [['cy' => 0, 'cy1' => 0]]);
+
+        $result = $repository->isPlayerAlreadySigned(100);
+
+        $this->assertFalse($result);
+    }
+
+    public function testIsPlayerAlreadySignedReturnsFalseWhenPlayerNotFound(): void
+    {
+        $repository = new FreeAgencyRepository($this->mockMysqliDb);
+        $this->mockDb->onQuery('SELECT cy, cy1 FROM ibl_plr', []);
+
+        $result = $repository->isPlayerAlreadySigned(999);
+
+        $this->assertFalse($result);
+    }
+
+    // ============================================
     // MULTIPLE INSTANCES TEST
     // ============================================
 
@@ -152,7 +248,7 @@ class FreeAgencyRepositoryTest extends TestCase
     {
         $repo1 = new FreeAgencyRepository($this->mockMysqliDb);
         $repo2 = new FreeAgencyRepository($this->mockMysqliDb);
-        
+
         $this->assertInstanceOf(FreeAgencyRepository::class, $repo1);
         $this->assertInstanceOf(FreeAgencyRepository::class, $repo2);
         $this->assertNotSame($repo1, $repo2);

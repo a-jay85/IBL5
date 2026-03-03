@@ -670,6 +670,7 @@
     border: none;
     border-radius: 0;
     box-shadow: none;
+    max-width: none;
 }
 
 /* Sticky header row */
@@ -1515,10 +1516,10 @@ td.ibl-team-cell--colored {
 /* ==========================================================================
    Draft Pick Locator Table
 
-   Standalone table (NOT .ibl-data-table) for draft pick ownership grid.
+   Standalone table styled to match .ibl-data-table appearance, but uses
+   .draft-pick-table (not .ibl-data-table) to preserve sticky-scroll
+   compatibility on mobile.
    Source: class="draft-pick-table sticky-table"
-   Properties overridden by .sticky-table (border-radius, overflow,
-   box-shadow) have been removed.
    ========================================================================== */
 
 .draft-pick-locator-container {
@@ -1531,14 +1532,15 @@ td.ibl-team-cell--colored {
     margin: 0 auto;
 }
 
+/* Match ibl-data-table cell styling: bottom borders, centered text */
 .draft-pick-table th,
 .draft-pick-table td {
-    border: 1px solid var(--gray-200);
-    padding: 0.5rem;
+    border-bottom: 1px solid var(--gray-100);
     text-align: center;
     font-size: 0.875rem;
 }
 
+/* Match ibl-data-table header styling */
 .draft-pick-table th {
     background: var(--gradient-navy-header);
     color: white;
@@ -1546,21 +1548,45 @@ td.ibl-team-cell--colored {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
+    padding: 0.25rem 0.2rem;
+}
+
+/* Pick matrix cells: column borders, uniform sizing */
+.draft-pick-own,
+.draft-pick-traded {
+    padding: 4px;
+    width: 1px;
+    min-width: 37px;
+    border-right: 1px solid var(--gray-100);
 }
 
 .draft-pick-own {
     background-color: var(--gray-100);
 }
 
-.draft-pick-traded {
-    font-weight: 600;
+.draft-pick-own img {
+    filter: grayscale(100%);
+    opacity: 0.45;
+}
+
+.draft-pick-logo {
+    display: block;
+    margin: 0 auto;
+    object-fit: contain;
+}
+
+/* Alternating row colors (match ibl-data-table) */
+.draft-pick-table tbody tr:nth-child(even) {
+    background-color: var(--gray-50, #f9fafb);
+}
+
+.draft-pick-table tbody tr:hover {
+    background-color: var(--gray-100, #f3f4f6);
 }
 
 /* Draft Pick Locator: highlight cells containing user's team name in their row */
 .draft-pick-table tbody tr.user-team-row .draft-pick-own {
     background-color: var(--warning-100, #fef3c7);
-    font-style: italic;
-    color: var(--gray-500);
 }
 
 /* ==========================================================================

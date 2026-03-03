@@ -2,16 +2,16 @@
 
 ## Bun
 
-The PATH for bun (`~/.bun/bin`) may not be loaded in the shell. Before running `bun` commands, source the shell config first.
+Bun is available in all shells via `~/.zshenv`. No need to source shell configs before running `bun` or `bunx` commands.
 
 ## CSS Development (Tailwind 4)
 
 ```bash
 # DEVELOPMENT: Auto-rebuilds on save
-source ~/.zshrc && bun run css:watch
+bun run css:watch
 
 # LOCAL BUILDS: Rebuild CSS without minification (for commits)
-source ~/.zshrc && bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
+bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
 ```
 
 - **NEVER use `--minify` locally.** Minification is handled by GitHub Actions on merge/push.

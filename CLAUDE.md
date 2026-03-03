@@ -49,6 +49,24 @@ cd ibl5 && composer run analyse
 
 **Write PHPStan-clean code proactively.** The project runs level `max` with `phpstan-strict-rules` and `bleedingEdge`. See `php-classes.md` for the full list of PHPStan rules.
 
+### E2E Tests (Playwright)
+
+```bash
+# Run all E2E tests
+cd ibl5 && bun run test:e2e
+
+# Run with visible browser
+cd ibl5 && bun run test:e2e:headed
+
+# Run specific test file
+cd ibl5 && bunx playwright test tests/e2e/smoke/public-pages.spec.ts
+
+# Interactive UI mode
+cd ibl5 && bun run test:e2e:ui
+```
+
+**Prerequisites:** MAMP running, `.env.test` with credentials. E2E tests do NOT auto-run via PostToolUse hooks — run them manually. See `playwright-tests.md` for full rules.
+
 ## Architecture
 
 New features should follow the Repository-Service-View pattern. See `ibl5/scripts/scoParser.php` as the canonical refactored example.
@@ -154,6 +172,7 @@ Context-aware rules auto-load when relevant:
 **Path-Conditional** (`.claude/rules/`):
 - `php-classes.md` → editing `ibl5/classes/**/*.php`
 - `phpunit-tests.md` → editing `ibl5/tests/**/*.php`
+- `playwright-tests.md` → editing `ibl5/tests/e2e/**/*.ts`
 - `view-rendering.md` → editing `**/*View.php`
 - `database-access.md` → editing `**/*Repository.php`
 
@@ -176,3 +195,4 @@ Context-aware rules auto-load when relevant:
 | MAMP connection | `ibl5/docs/DEVELOPMENT_ENVIRONMENT.md` |
 | API patterns | `ibl5/docs/API_GUIDE.md` |
 | Interface examples | `classes/Player/Contracts/`, `classes/FreeAgency/Contracts/` |
+| E2E test patterns | `ibl5/tests/e2e/README.md` |

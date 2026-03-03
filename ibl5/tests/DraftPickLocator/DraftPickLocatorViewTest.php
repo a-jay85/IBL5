@@ -178,7 +178,7 @@ class DraftPickLocatorViewTest extends TestCase
         $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamID=1"', $result);
         // Traded pick links to owning team page
         $this->assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamID=2"', $result);
-        // Links should have no underline
-        $this->assertStringContainsString('text-decoration: none', $result);
+        // Pick cells show team logos
+        $this->assertStringContainsString('class="draft-pick-logo"', $result);
     }
 }

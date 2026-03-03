@@ -91,7 +91,7 @@ test.describe('Free Agency flow', () => {
 
     const href = await negotiateLink.getAttribute('href');
     await page.goto(href!);
-    await expect(page.locator('form[name="FAOffer"]')).toBeVisible();
+    await expect(page.locator('form[name="FAOffer"]').first()).toBeVisible();
   });
 
   test('offer year inputs are numeric', async ({ page }) => {
@@ -103,7 +103,7 @@ test.describe('Free Agency flow', () => {
     const href = await negotiateLink.getAttribute('href');
     await page.goto(href!);
 
-    const yearInput = page.locator('input[name="offeryear1"]');
+    const yearInput = page.locator('input[name="offeryear1"]').first();
     if (await yearInput.isVisible()) {
       const type = await yearInput.getAttribute('type');
       expect(type).toBe('number');

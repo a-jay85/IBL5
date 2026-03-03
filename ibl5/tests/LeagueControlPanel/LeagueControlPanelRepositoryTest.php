@@ -6,7 +6,6 @@ namespace Tests\LeagueControlPanel;
 
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use LeagueControlPanel\LeagueControlPanelRepository;
-use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -17,7 +16,6 @@ use PHPUnit\Framework\TestCase;
  * on PHPUnit mocks. Write behavior is tested through LeagueControlPanelProcessorTest
  * via the interface mock.
  */
-#[AllowMockObjectsWithoutExpectations]
 class LeagueControlPanelRepositoryTest extends TestCase
 {
     public function testImplementsInterface(): void
@@ -98,7 +96,7 @@ class LeagueControlPanelRepositoryTest extends TestCase
 
     private function createMockDatabase(): \mysqli
     {
-        return $this->createMock(\mysqli::class);
+        return $this->createStub(\mysqli::class);
     }
 
     /**
@@ -106,7 +104,7 @@ class LeagueControlPanelRepositoryTest extends TestCase
      */
     private function createMockDatabaseWithPreparedStatement(array|null $returnData): \mysqli
     {
-        $mockResult = $this->createMock(\mysqli_result::class);
+        $mockResult = $this->createStub(\mysqli_result::class);
 
         if ($returnData === null) {
             $mockResult->method('fetch_assoc')->willReturn(null);
@@ -118,15 +116,15 @@ class LeagueControlPanelRepositoryTest extends TestCase
             $mockResult->method('fetch_assoc')->willReturnOnConsecutiveCalls(...array_merge($returnData, [null]));
         }
 
-        $mockStmt = $this->createMock(\mysqli_stmt::class);
-        $mockStmt->method('bind_param')->willReturn(true);
-        $mockStmt->method('execute')->willReturn(true);
-        $mockStmt->method('get_result')->willReturn($mockResult);
-        $mockStmt->method('close')->willReturn(true);
+        $stubStmt = $this->createStub(\mysqli_stmt::class);
+        $stubStmt->method('bind_param')->willReturn(true);
+        $stubStmt->method('execute')->willReturn(true);
+        $stubStmt->method('get_result')->willReturn($mockResult);
+        $stubStmt->method('close')->willReturn(true);
 
-        $mockDb = $this->createMock(\mysqli::class);
-        $mockDb->method('prepare')->willReturn($mockStmt);
+        $stubDb = $this->createStub(\mysqli::class);
+        $stubDb->method('prepare')->willReturn($stubStmt);
 
-        return $mockDb;
+        return $stubDb;
     }
 }

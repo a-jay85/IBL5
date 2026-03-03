@@ -6,7 +6,6 @@ Browser-based end-to-end tests for IBL5. These automate functional verification 
 
 - **MAMP running** with IBL5 accessible at `http://localhost/ibl5/`
 - **Test user credentials** — a valid IBL account for authenticated tests
-- **CAPTCHA disabled** — login CAPTCHA must be off in your local `config.php` (`$gfx_chk = 0`)
 
 ## Setup
 
@@ -73,9 +72,6 @@ Tests that need authentication import from `./fixtures/auth.ts`. Tests for publi
 3. **Interactive flow test** — create a new `.spec.ts` in `flows/`
 
 ## Troubleshooting
-
-### CAPTCHA blocking login
-Set `$gfx_chk = 0` in your local `ibl5/config.php`. Login CAPTCHA only triggers when `$gfx_chk` is 2, 4, 5, or 7.
 
 ### Trading tests skipped
 Trading flow tests auto-skip when the season phase has trades closed. This is expected — they'll run when trading reopens.

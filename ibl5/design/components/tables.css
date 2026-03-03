@@ -1653,6 +1653,8 @@ td.ibl-team-cell--colored {
 .draft-pick-own,
 .draft-pick-traded {
     padding: 4px;
+    aspect-ratio: 1;
+    min-width: 37px;
 }
 
 .draft-pick-own {

@@ -271,7 +271,6 @@ class TradingViewTest extends TestCase
         // The unescaped XSS payload should NOT appear — legitimate <script> tags for JS config are expected
         $this->assertStringNotContainsString('<script>alert', $html);
         $this->assertStringNotContainsString('<script>xss', $html);
-<<<<<<< HEAD
     }
 
     // ============================================

@@ -41,5 +41,5 @@ ibl5/shellScripts/.env
 # Playwright
 playwright-report/
 test-results/
-playwright/.auth/
+**/playwright/.auth/
 ibl5/.env.test

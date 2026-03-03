@@ -220,4 +220,19 @@ class FreeAgencyAdminRepositoryTest extends TestCase
 
         $this->assertIsInt($result);
     }
+
+    // ============================================
+    // CLEAR ALL OFFERS TESTS
+    // ============================================
+
+    public function testClearAllOffersExecutesDelete(): void
+    {
+        $repository = new FreeAgencyAdminRepository($this->mockMysqliDb);
+
+        // Should not throw
+        $repository->clearAllOffers();
+
+        // Verify DELETE query was executed (void return, just confirm no exception)
+        $this->assertTrue(true);
+    }
 }

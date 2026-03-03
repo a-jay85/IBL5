@@ -135,7 +135,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
         $html = '<tr data-team-id="' . $teamId . '">';
         $html .= TeamCellHelper::renderTeamCell($teamId, $team['teamName'], $team['color1'], $team['color2'], 'sticky-col');
 
-        // Pick cells - color traded picks with owning team's colors
+        // Pick cells - show owning team's logo
         foreach ($team['picks'] as $pick) {
             $ownerOfPick = $pick['ownerofpick'];
             $isOwn = ($ownerOfPick === $team['teamName']);
@@ -146,8 +146,7 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
             } else {
                 if ($ownerInfo !== null) {
                     $bgColor = HtmlSanitizer::safeHtmlOutput($ownerInfo['color1']);
-                    $textColor = HtmlSanitizer::safeHtmlOutput($ownerInfo['color2']);
-                    $html .= '<td class="draft-pick-traded" style="background-color: #' . $bgColor . '; color: #' . $textColor . ';">';
+                    $html .= '<td class="draft-pick-traded" style="background-color: #' . $bgColor . ';">';
                 } else {
                     $html .= '<td class="draft-pick-traded">';
                 }
@@ -155,8 +154,9 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
 
             $escapedOwner = HtmlSanitizer::safeHtmlOutput($ownerOfPick);
             if ($ownerInfo !== null) {
-                $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $ownerInfo['teamId'] . '" style="color: inherit; text-decoration: none;">';
-                $html .= $escapedOwner . '</a>';
+                $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $ownerInfo['teamId'] . '" title="' . $escapedOwner . '">';
+                $html .= '<img src="images/logo/new' . $ownerInfo['teamId'] . '.png" alt="' . $escapedOwner . '" class="draft-pick-logo" width="20" height="20" loading="lazy">';
+                $html .= '</a>';
             } else {
                 $html .= $escapedOwner;
             }

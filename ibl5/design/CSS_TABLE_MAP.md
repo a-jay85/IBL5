@@ -14,7 +14,7 @@
 ├── .voting-results-table  (vote counts, max-width: 420px)
 ├── .voting-form-table  (ballot with checkboxes/radios)
 ├── .draft-table  (draft selection form)
-├── .draft-pick-table  (draft pick locator matrix)
+├── .draft-pick-table  (draft pick locator matrix, styled to match ibl-data-table)
 ├── .draft-history-table  (mobile column constraints)
 └── .injury-table  (card layout on mobile)
 ```
@@ -75,7 +75,7 @@ Affects ALL data tables site-wide:
 | `.injury-table` | InjuriesView |
 | `.league-stats-table` | TeamOffDefStatsView |
 | `.depth-chart-table` | DepthChartEntryView |
-| `.draft-pick-table` | DraftPickLocatorView |
+| `.draft-pick-table` | DraftPickLocatorView (styled to match `.ibl-data-table`, uses `.sticky-table`) |
 | `.contact-table` | GMContactListView |
 | `.voting-form-table` | Voting views |
 | `.trading-*` | Trading/TradingView |
@@ -157,6 +157,16 @@ These are used inside multiple table types.
 </div>
 ```
 
-## Key Gotcha
+## Key Gotchas
+
+### Sticky positioning and overflow
 
 Never set `overflow: hidden` on a table that uses `position: sticky` cells. The `.responsive-table` class is explicitly excluded from overflow clipping via `.ibl-data-table:not(.responsive-table)`.
+
+### `responsive-tables.js` and sticky-scroll tables
+
+`responsive-tables.js` auto-wraps overflowing `.ibl-data-table` elements in `.table-scroll-wrapper > .table-scroll-container` and sets inline `overflow: hidden` on the wrapper. This **breaks** `.sticky-table` tables that rely on `.sticky-scroll-wrapper` for both-axis scrolling.
+
+**Fix:** `responsive-tables.js` skips any table inside `.sticky-scroll-wrapper` (via `table.closest(".sticky-scroll-wrapper")`). All `.sticky-table` consumers **must** be wrapped in `.sticky-scroll-wrapper` to be protected.
+
+**Root cause:** The JS `constrainWrapper()` sets `wrapper.style.overflow = "hidden"` as an inline style, which overrides the CSS rule `.sticky-scroll-wrapper .table-scroll-wrapper { overflow: visible }`. Skipping these tables entirely avoids the conflict.

@@ -1445,22 +1445,6 @@ td.ibl-team-cell--colored {
 }
 
 /* ==========================================================================
-   All-Star Appearances Table
-
-   Overrides for .ibl-data-table on All-Star pages.
-   Source: class="sortable ibl-data-table allstar-table"
-   ========================================================================== */
-
-.allstar-table {
-    max-width: 500px;
-}
-
-.allstar-table td:last-child {
-    font-weight: 600;
-    color: var(--accent-600);
-}
-
-/* ==========================================================================
    Contact List Table
 
    Overrides for .ibl-data-table on the Contact List page.

@@ -44,7 +44,7 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable ibl-data-table allstar-table">
+        return '<table class="sortable ibl-data-table">
             <thead>
                 <tr>
                     <th>Player</th>
@@ -71,7 +71,7 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
 
             $output .= '<tr>'
                 . $playerCell
-                . "<td>{$count}</td>"
+                . "<td class=\"ibl-stat-highlight\">{$count}</td>"
                 . '</tr>';
         }
 

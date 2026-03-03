@@ -65,16 +65,6 @@ class YourAccountView
     }
 
     /**
-     * Render a key/code icon SVG for confirmation code fields.
-     */
-    private function keyIcon(): string
-    {
-        return '<svg class="auth-input__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
-            . '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>'
-            . '</svg>';
-    }
-
-    /**
      * Render a checkmark icon for success status.
      */
     private function checkIcon(): string
@@ -105,31 +95,11 @@ class YourAccountView
     }
 
     /**
-     * Render the CAPTCHA section for forms.
-     */
-    private function renderCaptchaSection(int $randomNum): string
-    {
-        return '<div class="ibl-form-group">'
-            . '<label class="ibl-label" for="auth-gfx-check">Security Code</label>'
-            . '<div style="margin-bottom: var(--space-2);">'
-            . '<img src="?gfx=gfx&amp;random_num=' . $randomNum . '" alt="Security Code" style="border: 1px solid var(--gray-300); border-radius: var(--radius-md);">'
-            . '</div>'
-            . '<div class="auth-input-wrapper">'
-            . $this->keyIcon()
-            . '<input type="text" name="gfx_check" id="auth-gfx-check" class="ibl-input auth-input--with-icon" size="7" maxlength="6" required placeholder="Enter security code">'
-            . '</div>'
-            . '<input type="hidden" name="random_num" value="' . $randomNum . '">'
-            . '</div>';
-    }
-
-    /**
      * Render the login page.
      *
      * @param string|null $error Error message to display, or null for no error
-     * @param int $randomNum Random number for CAPTCHA
-     * @param bool $showCaptcha Whether to show the CAPTCHA field
      */
-    public function renderLoginPage(?string $error, int $randomNum, bool $showCaptcha): string
+    public function renderLoginPage(?string $error): string
     {
         ob_start();
         ?>
@@ -164,10 +134,6 @@ class YourAccountView
                         <input type="password" name="user_password" id="login-password" class="ibl-input auth-input--with-icon" maxlength="20" required placeholder="Enter your password" autocomplete="current-password">
                     </div>
                 </div>
-
-                <?php if ($showCaptcha): ?>
-                    <?= $this->renderCaptchaSection($randomNum) ?>
-                <?php endif; ?>
 
                 <div class="ibl-form-group">
                     <label style="display: flex; align-items: center; gap: var(--space-2); cursor: pointer;">

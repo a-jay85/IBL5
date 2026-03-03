@@ -33,7 +33,7 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderLoginPageReturnsHtml(): void
     {
-        $result = $this->view->renderLoginPage(null, 123456, false);
+        $result = $this->view->renderLoginPage(null);
 
         $this->assertStringContainsString('auth-page', $result);
         $this->assertStringContainsString('auth-card', $result);
@@ -43,7 +43,7 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderLoginPageContainsFormFields(): void
     {
-        $result = $this->view->renderLoginPage(null, 123456, false);
+        $result = $this->view->renderLoginPage(null);
 
         $this->assertStringContainsString('name="username"', $result);
         $this->assertStringContainsString('name="user_password"', $result);
@@ -54,14 +54,14 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderLoginPageContainsCsrfToken(): void
     {
-        $result = $this->view->renderLoginPage(null, 123456, false);
+        $result = $this->view->renderLoginPage(null);
 
         $this->assertStringContainsString('name="_csrf_token"', $result);
     }
 
     public function testRenderLoginPageContainsRememberMeCheckbox(): void
     {
-        $result = $this->view->renderLoginPage(null, 123456, false);
+        $result = $this->view->renderLoginPage(null);
 
         $this->assertStringContainsString('name="remember_me"', $result);
         $this->assertStringContainsString('Remember me', $result);
@@ -69,7 +69,7 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderLoginPageShowsErrorWhenProvided(): void
     {
-        $result = $this->view->renderLoginPage('Login failed', 123456, false);
+        $result = $this->view->renderLoginPage('Login failed');
 
         $this->assertStringContainsString('ibl-alert--error', $result);
         $this->assertStringContainsString('Login failed', $result);
@@ -77,30 +77,14 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderLoginPageHidesErrorWhenNull(): void
     {
-        $result = $this->view->renderLoginPage(null, 123456, false);
+        $result = $this->view->renderLoginPage(null);
 
         $this->assertStringNotContainsString('ibl-alert--error', $result);
     }
 
-    public function testRenderLoginPageShowsCaptchaWhenEnabled(): void
-    {
-        $result = $this->view->renderLoginPage(null, 999, true);
-
-        $this->assertStringContainsString('name="gfx_check"', $result);
-        $this->assertStringContainsString('name="random_num" value="999"', $result);
-        $this->assertStringContainsString('Security Code', $result);
-    }
-
-    public function testRenderLoginPageHidesCaptchaWhenDisabled(): void
-    {
-        $result = $this->view->renderLoginPage(null, 999, false);
-
-        $this->assertStringNotContainsString('name="gfx_check"', $result);
-    }
-
     public function testRenderLoginPageContainsCrossNavLinks(): void
     {
-        $result = $this->view->renderLoginPage(null, 123456, false);
+        $result = $this->view->renderLoginPage(null);
 
         $this->assertStringContainsString('Forgot password?', $result);
         $this->assertStringContainsString('Create an account', $result);
@@ -110,7 +94,7 @@ class YourAccountViewTest extends TestCase
 
     public function testRenderLoginPageContainsLogo(): void
     {
-        $result = $this->view->renderLoginPage(null, 123456, false);
+        $result = $this->view->renderLoginPage(null);
 
         $this->assertStringContainsString('auth-logo', $result);
         $this->assertStringContainsString('auth-logo__icon', $result);

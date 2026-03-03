@@ -184,7 +184,8 @@ INSERT INTO ibl_plr (
   draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
   stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
   stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
-  stats_to, stats_blk, stats_pf
+  stats_to, stats_blk, stats_pf,
+  uuid
 ) VALUES (
   1, 'Test Player', 28, 28, 1, 'Metros', 'SG',
   80, 75, 70, 65, 60, 72, 68, 70, 65,
@@ -194,7 +195,8 @@ INSERT INTO ibl_plr (
   1, 5, 2021, 'Metros', 'Metros',
   40, 1200, 200, 450, 100, 120,
   60, 150, 40, 120, 180, 50,
-  80, 20, 90
+  80, 20, 90,
+  'plr-uuid-00000000-0000-000000000001'
 );
 
 -- ============================================================

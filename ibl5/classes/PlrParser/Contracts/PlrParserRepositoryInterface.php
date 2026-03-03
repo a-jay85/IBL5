@@ -25,18 +25,4 @@ interface PlrParserRepositoryInterface
      */
     public function upsertHistoricalStats(array $data): int;
 
-    /**
-     * Assign team names to players based on team ID mappings.
-     *
-     * @param list<array{teamid: int, team_name: string}> $teamData Team ID to name mappings
-     * @return int Number of teams assigned
-     */
-    public function assignTeamNames(array $teamData): int;
-
-    /**
-     * Get all real team data (ID and name).
-     *
-     * @return list<array{teamid: int, team_name: string}>
-     */
-    public function getAllTeamData(): array;
 }

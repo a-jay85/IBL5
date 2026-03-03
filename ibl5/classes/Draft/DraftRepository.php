@@ -137,18 +137,18 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
         // Insert new player into ibl_plr
         $affected = $this->execute(
             "INSERT INTO ibl_plr (
-                pid, name, age, tid, teamname, pos,
+                pid, name, age, tid, pos,
                 sta, oo, od, po, `to`, `do`, dd, pd, td,
                 talent, skill, intangibles,
                 active, bird, exp, cy, cyt
             ) VALUES (
-                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?,
                 1, 0, 0, 0, 0
             )",
-            "isiissiiiiiiiiiiii",
-            $pid, $name, $age, $teamId, $teamName, $pos,
+            "isiisiiiiiiiiiiii",
+            $pid, $name, $age, $teamId, $pos,
             $sta, $oo, $od, $po, $to, $do, $dd, $pd, $td,
             $talent, $skill, $intangibles
         );

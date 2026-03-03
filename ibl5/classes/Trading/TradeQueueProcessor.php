@@ -15,7 +15,7 @@ use Trading\Contracts\TradeExecutionRepositoryInterface;
  * each operation via prepared statements.
  *
  * @phpstan-type QueuedTradeRow array{id: int, operation_type: string, params: string, tradeline: string}
- * @phpstan-type PlayerTransferParams array{player_id: int, team_name: string, team_id: int}
+ * @phpstan-type PlayerTransferParams array{player_id: int, team_id: int}
  * @phpstan-type PickTransferParams array{pick_id: int, new_owner: string, new_owner_id?: int}
  */
 class TradeQueueProcessor
@@ -104,29 +104,24 @@ class TradeQueueProcessor
      */
     private function executePlayerTransfer(array $params): array
     {
-        if (!isset($params['player_id'], $params['team_name'], $params['team_id'])) {
+        if (!isset($params['player_id'], $params['team_id'])) {
             return ['success' => false, 'error' => 'Missing required player transfer params'];
         }
 
         $rawPlayerId = $params['player_id'];
-        $rawTeamName = $params['team_name'];
         $rawTeamId = $params['team_id'];
 
         if (!is_int($rawPlayerId) && !is_string($rawPlayerId)) {
             return ['success' => false, 'error' => 'Invalid player_id type'];
-        }
-        if (!is_string($rawTeamName)) {
-            return ['success' => false, 'error' => 'Invalid team_name type'];
         }
         if (!is_int($rawTeamId) && !is_string($rawTeamId)) {
             return ['success' => false, 'error' => 'Invalid team_id type'];
         }
 
         $playerId = (int) $rawPlayerId;
-        $teamName = $rawTeamName;
         $teamId = (int) $rawTeamId;
 
-        $affectedRows = $this->executionRepository->executeQueuedPlayerTransfer($playerId, $teamName, $teamId);
+        $affectedRows = $this->executionRepository->executeQueuedPlayerTransfer($playerId, $teamId);
 
         if ($affectedRows > 0) {
             return ['success' => true, 'error' => ''];

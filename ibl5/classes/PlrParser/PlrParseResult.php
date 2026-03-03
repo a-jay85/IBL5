@@ -11,7 +11,6 @@ class PlrParseResult
 {
     public int $playersUpserted = 0;
     public int $historyRowsUpserted = 0;
-    public int $teamsAssigned = 0;
 
     /** @var list<string> */
     public array $messages = [];
@@ -32,9 +31,6 @@ class PlrParseResult
         }
         if ($this->historyRowsUpserted > 0) {
             $parts[] = $this->historyRowsUpserted . ' history rows upserted';
-        }
-        if ($this->teamsAssigned > 0) {
-            $parts[] = $this->teamsAssigned . ' teams assigned';
         }
         if ($parts === []) {
             return 'No changes';

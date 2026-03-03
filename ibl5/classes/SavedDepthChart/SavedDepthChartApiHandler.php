@@ -105,7 +105,7 @@ class SavedDepthChartApiHandler
         $teamName = $commonRepo->getTeamnameFromTeamID($tid) ?? '';
 
         $depthChartRepo = new \DepthChartEntry\DepthChartEntryRepository($this->db);
-        $rosterPlayers = ($teamName !== '') ? $depthChartRepo->getPlayersOnTeam($teamName, $tid) : [];
+        $rosterPlayers = ($tid > 0) ? $depthChartRepo->getPlayersOnTeam($tid) : [];
         $currentRosterPids = array_map(
             static fn(array $p): int => $p['pid'],
             $rosterPlayers

@@ -256,7 +256,7 @@ class TradeValidatorTest extends TestCase
         // User: 13 - 1 + 2 = 14, Partner: 13 - 2 + 1 = 12
         $this->mockDb->setMockData([['cnt' => 13]]);
 
-        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 1, 2);
+        $result = $this->validator->validateRosterLimits(1, 2, 1, 2);
 
         $this->assertTrue($result['valid'], 'Both teams within roster limit should pass');
         $this->assertSame([], $result['errors']);
@@ -272,7 +272,7 @@ class TradeValidatorTest extends TestCase
         // User: 14 - 0 + 2 = 16 (exceeds 15), Partner: 14 - 2 + 0 = 12
         $this->mockDb->setMockData([['cnt' => 14]]);
 
-        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 0, 2);
+        $result = $this->validator->validateRosterLimits(1, 2, 0, 2);
 
         $this->assertFalse($result['valid']);
         $this->assertCount(1, $result['errors']);
@@ -290,7 +290,7 @@ class TradeValidatorTest extends TestCase
         // User: 14 - 2 + 0 = 12, Partner: 14 - 0 + 2 = 16 (exceeds 15)
         $this->mockDb->setMockData([['cnt' => 14]]);
 
-        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 2, 0);
+        $result = $this->validator->validateRosterLimits(1, 2, 2, 0);
 
         $this->assertFalse($result['valid']);
         $this->assertCount(1, $result['errors']);
@@ -327,7 +327,7 @@ class TradeValidatorTest extends TestCase
         // User: 16 - 0 + 1 = 17, Partner: 16 - 1 + 0 = 15 — no.
         // Both already over: both at 16, user sends 0, partner sends 0
         // User: 16, Partner: 16 — both exceed!
-        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 0, 0);
+        $result = $this->validator->validateRosterLimits(1, 2, 0, 0);
 
         $this->assertFalse($result['valid']);
         $this->assertCount(2, $result['errors']);
@@ -346,7 +346,7 @@ class TradeValidatorTest extends TestCase
         // Before the fix, buyout records inflated the count to 16, making this fail.
         $this->mockDb->setMockData([['cnt' => 15]]);
 
-        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 1, 1);
+        $result = $this->validator->validateRosterLimits(1, 2, 1, 1);
 
         $this->assertTrue($result['valid'], '1-for-1 swap at roster limit should be valid');
         $this->assertSame([], $result['errors']);
@@ -362,7 +362,7 @@ class TradeValidatorTest extends TestCase
         // User: 15 - 2 + 2 = 15, Partner: 15 - 2 + 2 = 15
         $this->mockDb->setMockData([['cnt' => 15]]);
 
-        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 2, 2);
+        $result = $this->validator->validateRosterLimits(1, 2, 2, 2);
 
         $this->assertTrue($result['valid'], 'Equal swap at roster limit should be valid');
         $this->assertSame([], $result['errors']);
@@ -378,7 +378,7 @@ class TradeValidatorTest extends TestCase
         // User: 14 - 0 + 1 = 15 (exactly at limit), Partner: 14 - 1 + 0 = 13
         $this->mockDb->setMockData([['cnt' => 14]]);
 
-        $result = $this->validator->validateRosterLimits('Team A', 'Team B', 0, 1);
+        $result = $this->validator->validateRosterLimits(1, 2, 0, 1);
 
         $this->assertTrue($result['valid'], 'Exactly at 15-player limit should be valid');
         $this->assertSame([], $result['errors']);

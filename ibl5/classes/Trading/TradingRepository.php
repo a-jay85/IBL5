@@ -114,12 +114,11 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     /**
      * @see TradingRepositoryInterface::updatePlayerTeam()
      */
-    public function updatePlayerTeam(int $playerId, string $newTeamName, int $newTeamId): int
+    public function updatePlayerTeam(int $playerId, int $newTeamId): int
     {
         return $this->execute(
-            "UPDATE ibl_plr SET teamname = ?, tid = ? WHERE pid = ?",
-            "sii",
-            $newTeamName,
+            "UPDATE ibl_plr SET tid = ? WHERE pid = ?",
+            "ii",
             $newTeamId,
             $playerId
         );
@@ -302,13 +301,13 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     /**
      * @see TradingRepositoryInterface::getTeamPlayerCount()
      */
-    public function getTeamPlayerCount(string $teamName): int
+    public function getTeamPlayerCount(int $teamId): int
     {
         /** @var array{cnt: int}|null $result */
         $result = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM ibl_plr WHERE teamname = ? AND retired = 0 AND ordinal <= 960 AND name NOT LIKE '|%'",
-            "s",
-            $teamName
+            "SELECT COUNT(*) AS cnt FROM ibl_plr WHERE tid = ? AND retired = 0 AND ordinal <= 960 AND name NOT LIKE '|%'",
+            "i",
+            $teamId
         );
         if ($result === null) {
             return 0;

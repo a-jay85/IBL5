@@ -58,12 +58,11 @@ class TradeExecutionRepository extends BaseMysqliRepository implements TradeExec
     /**
      * @see TradeExecutionRepositoryInterface::executeQueuedPlayerTransfer()
      */
-    public function executeQueuedPlayerTransfer(int $playerId, string $teamName, int $teamId): int
+    public function executeQueuedPlayerTransfer(int $playerId, int $teamId): int
     {
         return $this->execute(
-            "UPDATE ibl_plr SET teamname = ?, tid = ? WHERE pid = ?",
-            "sii",
-            $teamName,
+            "UPDATE ibl_plr SET tid = ? WHERE pid = ?",
+            "ii",
             $teamId,
             $playerId
         );

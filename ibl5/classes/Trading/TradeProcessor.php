@@ -232,10 +232,10 @@ class TradeProcessor implements TradeProcessorInterface
                     $playerData['name'] . " to the $listeningTeamName.<br>";
 
         // Update player team using repository
-        $affectedRows = $this->repository->updatePlayerTeam($itemId, $listeningTeamName, $listeningTeamId);
+        $affectedRows = $this->repository->updatePlayerTeam($itemId, $listeningTeamId);
 
         // Queue structured data for deferred execution during certain season phases
-        $this->queuePlayerTransfer($itemId, $listeningTeamName, $listeningTeamId, $tradeLine);
+        $this->queuePlayerTransfer($itemId, $listeningTeamId, $tradeLine);
 
         return [
             'success' => ($affectedRows > 0),
@@ -262,17 +262,15 @@ class TradeProcessor implements TradeProcessorInterface
      * Queue player transfer for later execution if in certain season phases
      *
      * @param int $playerId Player ID
-     * @param string $teamName New team name
      * @param int $teamId New team ID
      * @param string $tradeLine Trade description for tracking
      * @return void
      */
-    protected function queuePlayerTransfer(int $playerId, string $teamName, int $teamId, string $tradeLine): void
+    protected function queuePlayerTransfer(int $playerId, int $teamId, string $tradeLine): void
     {
         if ($this->shouldQueueTrades()) {
             $params = [
                 'player_id' => $playerId,
-                'team_name' => $teamName,
                 'team_id' => $teamId,
             ];
             $this->executionRepository->insertTradeQueue('player_transfer', $params, $tradeLine);

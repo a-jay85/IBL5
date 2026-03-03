@@ -106,13 +106,11 @@ class JsbImportService implements JsbImportServiceInterface
                 $histData = CarFileParser::convertToHistFormat($season);
 
                 // Resolve team ID
-                $teamId = $this->repository->resolveTeamIdByName($histData['team']);
-                if ($teamId === null) {
-                    $teamId = 0;
-                }
+                $resolvedTeamId = $this->repository->resolveTeamIdByName($histData['team']);
+                $teamId = $resolvedTeamId ?? 0;
 
-                // Resolve player ID
-                $pid = $this->resolver->resolve($histData['name'], $histData['team'], $histData['year']);
+                // Resolve player ID (pass resolvedTeamId for tid-based ibl_plr lookup; null skips Strategy 2)
+                $pid = $this->resolver->resolve($histData['name'], $histData['team'], $histData['year'], $resolvedTeamId);
                 if ($pid === null) {
                     $result->addSkipped();
                     continue;

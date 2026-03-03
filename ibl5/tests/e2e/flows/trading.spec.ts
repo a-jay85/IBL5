@@ -40,7 +40,10 @@ async function navigateToTradeForm(
 
   const firstTeamLink = page.locator('.trading-team-select a').first();
   await expect(firstTeamLink).toBeVisible();
-  await firstTeamLink.click();
+  // Use goto() with the href instead of click() — click() triggers navigation
+  // that can time out under MAMP concurrency with parallel workers.
+  const href = await firstTeamLink.getAttribute('href');
+  await page.goto(href!);
   await expect(page.locator('form[name="Trade_Offer"]')).toBeVisible();
 }
 

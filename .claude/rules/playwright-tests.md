@@ -225,6 +225,15 @@ test.skip(true, 'Skip until offseason');
 10. **Don't** import `Page` type from `../fixtures/auth` — it only exports `test` and `expect`. Import `Page` separately: `import type { Page } from '@playwright/test'`
 11. **Don't** use `link.click()` for page-to-page navigation — it triggers a Playwright-managed navigation wait that can time out when MAMP is under concurrent load from parallel workers. Instead, extract the href with `getAttribute('href')` and use `page.goto(href)`, which handles navigation more reliably
 
+## CI Workflow Notes
+
+The E2E tests run in GitHub Actions via `.github/workflows/e2e-tests.yml`. Key details:
+
+- **PHP built-in server** with `ibl5/router.php` replaces Apache. The router handles the single `api/v1/*` rewrite rule; returns `false` for everything else.
+- **Seed data** lives in `ibl5/tests/e2e/fixtures/ci-seed.sql`. When adding new E2E tests that require additional data (new tables, new rows), update this file.
+- **Bcrypt hashes contain `$` characters** that bash expands in unquoted heredocs (`<<EOF`). When writing CI steps that handle bcrypt hashes, use either: (a) single-quoted heredocs (`<<'EOF'`) with `getenv()` in PHP, or (b) pipe from PHP directly. Never store a bcrypt hash in a shell variable and use it in an unquoted heredoc.
+- **Secrets required:** `IBL_TEST_USER` and `IBL_TEST_PASS` must be configured as GitHub repository secrets.
+
 ## Completion Criteria
 
 Before considering an E2E test task complete:

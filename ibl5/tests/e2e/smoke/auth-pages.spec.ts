@@ -5,11 +5,20 @@ import { test, expect } from '../fixtures/auth';
 test.describe('Authenticated page smoke tests', () => {
   test('trading page loads', async ({ page }) => {
     await page.goto('modules.php?name=Trading');
+    const body = await page.locator('body').textContent();
+    if (body?.includes('trades are not allowed')) {
+      // When trades are closed the page renders a plain message, not the full UI
+      test.skip(true, 'Trades are currently closed for the season');
+    }
     await expect(page.locator('.ibl-title')).toContainText(/trading/i);
   });
 
   test('trading team select table is visible', async ({ page }) => {
     await page.goto('modules.php?name=Trading');
+    const body = await page.locator('body').textContent();
+    if (body?.includes('trades are not allowed')) {
+      test.skip(true, 'Trades are currently closed for the season');
+    }
     await expect(page.locator('.trading-team-select')).toBeVisible();
   });
 

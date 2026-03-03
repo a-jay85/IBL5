@@ -97,6 +97,23 @@ $repo = $this->createMock(RepositoryInterface::class);
 $repo->expects($this->once())->method('save')->with($entity);
 ```
 
+## Repository Write Methods Cannot Be Unit-Tested with Mocked mysqli
+
+`mysqli_stmt::$affected_rows` is a virtual/readonly property. PHPUnit mocks cannot write to it (`Cannot write read-only property`) or read it (`Property access is not allowed yet`). Since `BaseMysqliRepository::execute()` reads `$stmt->affected_rows` internally, **Repository write methods (update, insert, delete) cannot be tested through mocked `\mysqli`**.
+
+**Workaround:** Test write behavior through the **RepositoryInterface mock** in Processor or Service tests, where `expects($this->once())->method('save')` verifies the call was made. Only test Repository read methods (fetchOne, fetchAll) via mocked mysqli.
+
+```php
+// ❌ Cannot test Repository write methods with mocked mysqli
+$mockStmt->affected_rows = 1; // Fatal: Cannot write read-only property
+
+// ✅ Test write behavior via interface mock in ProcessorTest
+$mock = $this->createMock(RepositoryInterface::class);
+$mock->expects($this->once())->method('updateSetting')->with('Allow Trades', 'Yes');
+$processor = new Processor($mock);
+$processor->dispatch('set_allow_trades', ['Trades' => 'Yes']);
+```
+
 ## DON'T:
 - **NEVER** use `createMock()` when no `expects()` calls are configured — use `createStub()` instead
 - **NEVER** use `ReflectionClass` for private methods

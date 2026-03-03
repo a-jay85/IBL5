@@ -22,9 +22,10 @@ class Contracts
      * @param \Team $team Team object
      * @param \Season $season Season object
      * @param list<int> $starterPids Starter player IDs
+     * @param list<int> $excludeFromCapPids PIDs to exclude from cap total sums (e.g. outgoing trade players)
      * @return string HTML table
      */
-    public static function render($db, $result, $team, \Season $season, array $starterPids = []): string
+    public static function render(\mysqli $db, iterable $result, \Team $team, \Season $season, array $starterPids = [], array $excludeFromCapPids = []): string
     {
         $isFreeAgency = $season->isFreeAgencyPhase();
 
@@ -33,7 +34,7 @@ class Contracts
         }
 
         $cap1 = $cap2 = $cap3 = $cap4 = $cap5 = $cap6 = 0;
-        /** @var list<array{player: Player, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int}> $playerRows */
+        /** @var list<array{player: Player, con1: int, con2: int, con3: int, con4: int, con5: int, con6: int, isCashRow: bool}> $playerRows */
         $playerRows = [];
 
         foreach ($result as $plrRow) {
@@ -78,14 +79,18 @@ class Contracts
                 'con4' => $contracts[4],
                 'con5' => $contracts[5],
                 'con6' => $contracts[6],
+                'isCashRow' => (bool) ($plrRow['isCashRow'] ?? false),
             ];
 
-            $cap1 += $contracts[1];
-            $cap2 += $contracts[2];
-            $cap3 += $contracts[3];
-            $cap4 += $contracts[4];
-            $cap5 += $contracts[5];
-            $cap6 += $contracts[6];
+            $pid = (int) ($plrRow['pid'] ?? 0);
+            if (!in_array($pid, $excludeFromCapPids, true)) {
+                $cap1 += $contracts[1];
+                $cap2 += $contracts[2];
+                $cap3 += $contracts[3];
+                $cap4 += $contracts[4];
+                $cap5 += $contracts[5];
+                $cap6 += $contracts[6];
+            }
         }
 
         ob_start();
@@ -121,9 +126,9 @@ class Contracts
 <?php foreach ($playerRows as $row):
     $player = $row['player'];
 ?>
-        <tr>
+        <tr<?= $row['isCashRow'] ? ' data-cash-row' : '' ?>>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids) ?>
+            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
             <td><?= (int)$player->age ?></td>
             <td><?= (int)$player->yearsOfExperience ?></td>
             <td><?= (int)$player->birdYears ?></td>
@@ -148,6 +153,7 @@ class Contracts
 <?php endforeach; ?>
     </tbody>
     <tfoot>
+<?php $hardCapMax = \League::HARD_CAP_MAX; ?>
         <tr>
             <td></td>
             <td>Cap Totals</td>
@@ -155,12 +161,12 @@ class Contracts
             <td></td>
             <td></td>
             <td class="sep-team"></td>
-            <td class="salary"><?= $cap1 ?></td>
-            <td class="salary"><?= $cap2 ?></td>
-            <td class="salary"><?= $cap3 ?></td>
-            <td class="salary"><?= $cap4 ?></td>
-            <td class="salary"><?= $cap5 ?></td>
-            <td class="salary"><?= $cap6 ?></td>
+            <td class="salary<?= $cap1 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap1 ?></td>
+            <td class="salary<?= $cap2 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap2 ?></td>
+            <td class="salary<?= $cap3 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap3 ?></td>
+            <td class="salary<?= $cap4 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap4 ?></td>
+            <td class="salary<?= $cap5 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap5 ?></td>
+            <td class="salary<?= $cap6 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap6 ?></td>
             <td class="sep-team"></td>
             <td></td>
             <td></td>

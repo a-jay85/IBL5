@@ -12,19 +12,30 @@ use Player\Contracts\PlayerNameDecoratorInterface;
 class PlayerNameDecorator implements PlayerNameDecoratorInterface
 {
     /**
-     * Decorate a player name with status indicators
+     * @see PlayerNameDecoratorInterface::decoratePlayerName()
      */
     public function decoratePlayerName(PlayerData $playerData): string
     {
+        return (string) $playerData->name;
+    }
+
+    /**
+     * @see PlayerNameDecoratorInterface::getNameStatusClass()
+     */
+    public function getNameStatusClass(PlayerData $playerData): string
+    {
         if ($playerData->teamID === 0) {
-            $decoratedName = "$playerData->name";
-        } elseif ($playerData->ordinal > \JSB::WAIVERS_ORDINAL) {
-            $decoratedName = "($playerData->name)*";
-        } elseif ($playerData->contractCurrentYear === $playerData->contractTotalYears) { // eligible for Free Agency at the end of this season
-            $decoratedName = "$playerData->name^";
-        } else {
-            $decoratedName = "$playerData->name";
+            return '';
         }
-        return $decoratedName;
+
+        if ($playerData->ordinal > \JSB::WAIVERS_ORDINAL) {
+            return 'player-waived';
+        }
+
+        if ($playerData->contractCurrentYear === $playerData->contractTotalYears) {
+            return 'player-expiring';
+        }
+
+        return '';
     }
 }

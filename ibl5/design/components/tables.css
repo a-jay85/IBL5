@@ -66,6 +66,7 @@
     padding: 0.75rem 0.2rem;
     text-align: center;
     white-space: nowrap;
+    border-bottom: 1px solid var(--gray-100);
 }
 
 /* Data cells */
@@ -74,6 +75,7 @@
     font-size: 1rem;
     padding: 0.25rem 0.2rem;
     text-align: center;
+    border-bottom: 1px solid var(--gray-100);
 }
 
 /* Row styling */
@@ -179,7 +181,7 @@
 
 /* Top border separating tfoot from tbody */
 .ibl-data-table tfoot tr:first-child td {
-    border-top: 2px solid var(--gray-200, #e5e7eb);
+    border-top: 1px solid var(--gray-200, #e5e7eb);
 }
 
 /* Legend/key row — subtle, de-emphasized */
@@ -1427,9 +1429,6 @@ td.ibl-team-cell--colored {
     margin: 0 auto var(--space-6);
 }
 
-.league-stats-table td {
-    border-bottom: 1px solid var(--gray-100);
-}
 
 /* .league-stats-user-row replaced by .user-team-row (user-team-highlighter.js) */
 
@@ -1443,22 +1442,6 @@ td.ibl-team-cell--colored {
 .league-stats-team-cell a {
     font-weight: 600;
     text-decoration: none;
-}
-
-/* ==========================================================================
-   All-Star Appearances Table
-
-   Overrides for .ibl-data-table on All-Star pages.
-   Source: class="sortable ibl-data-table allstar-table"
-   ========================================================================== */
-
-.allstar-table {
-    max-width: 500px;
-}
-
-.allstar-table td:last-child {
-    font-weight: 600;
-    color: var(--accent-600);
 }
 
 /* ==========================================================================
@@ -1703,6 +1686,11 @@ td.ibl-team-cell--colored {
     background-color: var(--gray-200, #e5e7eb);
 }
 
+/* Vertical separator between Team and Record columns */
+.projected-draft-order-table tbody td:nth-child(3) {
+    border-left: 1px solid var(--gray-100);
+}
+
 .projected-draft-order-table .projected-draft-order-notes {
     max-width: 550px;
     padding-inline: 0.5rem;
@@ -1756,6 +1744,16 @@ td.ibl-team-cell--colored {
     margin-left: -2px;
     border-left-color: transparent;
     border-right-color: var(--navy-900, #0f172a);
+}
+
+/* ==========================================================================
+   Player Movement Table (.player-movement-table)
+   Module: PlayerMovement
+   ========================================================================== */
+
+/* Vertical separator between Old and New columns */
+.player-movement-table tbody td:nth-child(3) {
+    border-left: 1px solid var(--gray-100);
 }
 
 /* ==========================================================================

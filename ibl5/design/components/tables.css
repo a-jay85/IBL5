@@ -814,6 +814,18 @@
     border-right: 1px solid var(--gray-100);
 }
 
+/* Reset first/last-child extra padding — matrix columns need symmetric padding.
+   Specificity (0,2,1) beats .ibl-data-table th/td:first/last-child (0,1,1). */
+.sticky-table th:not(.sticky-corner):first-child,
+.sticky-table td:not(.sticky-col):first-child {
+    padding-left: 0.2rem;
+}
+
+.sticky-table th:last-child,
+.sticky-table td:last-child {
+    padding-right: 0.2rem;
+}
+
 /* Sticky first column */
 .sticky-table .sticky-col {
     position: sticky;
@@ -1650,10 +1662,13 @@ td.ibl-team-cell--colored {
    Only cell-level modifiers for own/traded picks live here.
    ========================================================================== */
 
-.draft-pick-own,
-.draft-pick-traded {
+/* Specificity (0,2,0) beats .ibl-data-table td:first/last-child (0,1,1) padding.
+   width: 1px tells auto table layout to use minimum column width; min-width prevents
+   going below 37px. This stops the last column from absorbing leftover table width. */
+.ibl-data-table .draft-pick-own,
+.ibl-data-table .draft-pick-traded {
     padding: 4px;
-    aspect-ratio: 1;
+    width: 1px;
     min-width: 37px;
 }
 

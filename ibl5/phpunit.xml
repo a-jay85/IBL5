@@ -228,5 +228,8 @@
         <testsuite name="FranchiseRecordBook Module Tests">
             <directory>tests/FranchiseRecordBook</directory>
         </testsuite>
+        <testsuite name="LeagueControlPanel Module Tests">
+            <directory>tests/LeagueControlPanel</directory>
+        </testsuite>
     </testsuites>
 </phpunit>

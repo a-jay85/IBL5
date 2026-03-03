@@ -1,0 +1,27 @@
+@layer components {
+  .league-switcher-admin {
+    background-color: #f0f0f0;
+    border: 2px solid #333;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+  }
+
+  .league-badge {
+    display: inline-block;
+    padding: 5px 15px;
+    border-radius: 3px;
+    font-weight: bold;
+    margin-right: 10px;
+  }
+
+  .league-badge-ibl {
+    background-color: #336699;
+    color: white;
+  }
+
+  .league-badge-olympics {
+    background-color: #d4af37;
+    color: black;
+  }
+}

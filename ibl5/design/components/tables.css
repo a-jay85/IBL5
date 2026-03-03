@@ -670,7 +670,7 @@
     border: none;
     border-radius: 0;
     box-shadow: none;
-    min-width: 100%;
+    max-width: none;
 }
 
 /* Sticky header row */
@@ -682,24 +682,6 @@
 
 .sticky-table thead th {
     background: var(--gradient-navy-header);
-}
-
-/* Column borders — matrix/grid tables need vertical dividers */
-.sticky-table th,
-.sticky-table td {
-    border-right: 1px solid var(--gray-100);
-}
-
-/* Reset first/last-child extra padding — matrix columns need symmetric padding.
-   Specificity (0,2,1) beats .ibl-data-table th/td:first/last-child (0,1,1). */
-.sticky-table th:not(.sticky-corner):first-child,
-.sticky-table td:not(.sticky-col):first-child {
-    padding-left: 0.2rem;
-}
-
-.sticky-table th:last-child,
-.sticky-table td:last-child {
-    padding-right: 0.2rem;
 }
 
 /* Sticky first column */
@@ -1534,18 +1516,48 @@ td.ibl-team-cell--colored {
 /* ==========================================================================
    Draft Pick Locator Table
 
-   Uses .ibl-data-table.sticky-table (Pattern 3) for the pick ownership grid.
-   Only cell-level modifiers for own/traded picks live here.
+   Standalone table styled to match .ibl-data-table appearance, but uses
+   .draft-pick-table (not .ibl-data-table) to preserve sticky-scroll
+   compatibility on mobile.
+   Source: class="draft-pick-table sticky-table"
    ========================================================================== */
 
-/* Specificity (0,2,0) beats .ibl-data-table td:first/last-child (0,1,1) padding.
-   width: 1px tells auto table layout to use minimum column width; min-width prevents
-   going below 37px. This stops the last column from absorbing leftover table width. */
-.ibl-data-table .draft-pick-own,
-.ibl-data-table .draft-pick-traded {
+.draft-pick-locator-container {
+    text-align: center;
+}
+
+.draft-pick-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 0 auto;
+}
+
+/* Match ibl-data-table cell styling: bottom borders, centered text */
+.draft-pick-table th,
+.draft-pick-table td {
+    border-bottom: 1px solid var(--gray-100);
+    text-align: center;
+    font-size: 0.875rem;
+}
+
+/* Match ibl-data-table header styling */
+.draft-pick-table th {
+    background: var(--gradient-navy-header);
+    color: white;
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.25rem 0.2rem;
+}
+
+/* Pick matrix cells: column borders, uniform sizing */
+.draft-pick-own,
+.draft-pick-traded {
     padding: 4px;
     width: 1px;
     min-width: 37px;
+    border-right: 1px solid var(--gray-100);
 }
 
 .draft-pick-own {
@@ -1563,8 +1575,17 @@ td.ibl-team-cell--colored {
     object-fit: contain;
 }
 
+/* Alternating row colors (match ibl-data-table) */
+.draft-pick-table tbody tr:nth-child(even) {
+    background-color: var(--gray-50, #f9fafb);
+}
+
+.draft-pick-table tbody tr:hover {
+    background-color: var(--gray-100, #f3f4f6);
+}
+
 /* Draft Pick Locator: highlight cells containing user's team name in their row */
-.sticky-table tbody tr.user-team-row .draft-pick-own {
+.draft-pick-table tbody tr.user-team-row .draft-pick-own {
     background-color: var(--warning-100, #fef3c7);
 }
 

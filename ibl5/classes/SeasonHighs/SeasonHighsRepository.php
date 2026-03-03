@@ -52,7 +52,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         // Also JOIN with ibl_schedule to get BoxID for linking to box scores
         // Also JOIN with ibl_team_info to get team colors for styled team cell
         if ($tableSuffix === '') {
-            $query = "SELECT p.`pid`, p.`name`, p.`tid`, p.`teamname`,
+            $query = "SELECT p.`pid`, p.`name`, p.`tid`, t.`team_name` AS `teamname`,
                 t.`team_city`, t.`color1`, t.`color2`,
                 bs.`Date` AS `date`, sch.`BoxID`,
                 COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,

@@ -6,20 +6,18 @@ paths: ibl5/tests/e2e/**/*.ts
 
 ## Commands
 
-All commands must be prefixed with `source ~/.zshrc &&` (bun PATH is not loaded by default in the shell).
-
 ```bash
 # Run all E2E tests
-source ~/.zshrc && cd ibl5 && bun run test:e2e
+cd ibl5 && bun run test:e2e
 
 # Run with visible browser
-source ~/.zshrc && cd ibl5 && bun run test:e2e:headed
+cd ibl5 && bun run test:e2e:headed
 
 # Run interactive UI mode
-source ~/.zshrc && cd ibl5 && bun run test:e2e:ui
+cd ibl5 && bun run test:e2e:ui
 
 # Run specific test file
-source ~/.zshrc && cd ibl5 && bunx playwright test tests/e2e/smoke/public-pages.spec.ts
+cd ibl5 && bunx playwright test tests/e2e/smoke/public-pages.spec.ts
 ```
 
 ## Prerequisites
@@ -219,15 +217,14 @@ test.skip(true, 'Skip until offseason');
 3. **Don't** use `.only` — it will fail in CI (`forbidOnly: true`)
 4. **Don't** use fragile structural selectors
 5. **Don't** mutate production data (create trades, submit forms) without cleanup
-6. **Don't** forget `source ~/.zshrc &&` when running bun/bunx commands
-7. **Don't** assume MAMP is running — tests will fail with connection errors if it's not
+6. **Don't** assume MAMP is running — tests will fail with connection errors if it's not
 8. **Don't** import from `@playwright/test` for authenticated tests — import from `../fixtures/auth`
 
 ## Completion Criteria
 
 Before considering an E2E test task complete:
 
-1. **Run the full E2E suite**: `source ~/.zshrc && cd ibl5 && bun run test:e2e`
+1. **Run the full E2E suite**: `cd ibl5 && bun run test:e2e`
 2. **Verify all tests pass** (season-phase skips are expected, not failures)
 3. **No `.only`** in any spec file
 4. **PHP error coverage** — every smoke file includes PHP error pattern checks

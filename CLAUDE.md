@@ -53,16 +53,16 @@ cd ibl5 && composer run analyse
 
 ```bash
 # Run all E2E tests
-source ~/.zshrc && cd ibl5 && bun run test:e2e
+cd ibl5 && bun run test:e2e
 
 # Run with visible browser
-source ~/.zshrc && cd ibl5 && bun run test:e2e:headed
+cd ibl5 && bun run test:e2e:headed
 
 # Run specific test file
-source ~/.zshrc && cd ibl5 && bunx playwright test tests/e2e/smoke/public-pages.spec.ts
+cd ibl5 && bunx playwright test tests/e2e/smoke/public-pages.spec.ts
 
 # Interactive UI mode
-source ~/.zshrc && cd ibl5 && bun run test:e2e:ui
+cd ibl5 && bun run test:e2e:ui
 ```
 
 **Prerequisites:** MAMP running, CAPTCHA disabled (`$gfx_chk = 0`), `.env.test` with credentials. E2E tests do NOT auto-run via PostToolUse hooks — run them manually. See `playwright-tests.md` for full rules.

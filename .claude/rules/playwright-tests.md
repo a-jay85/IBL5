@@ -223,6 +223,7 @@ test.skip(true, 'Skip until offseason');
 8. **Don't** use `toBeVisible()` or `toHaveText()` on locators that match multiple elements — Playwright strict mode throws. Use `.first()`, `.nth(n)`, or check `.count()` instead
 9. **Don't** use `boundingBox()` to verify CSS properties like `width: fit-content` — parent layout context affects the bounding box. Use `page.evaluate(() => getComputedStyle(el).property)` to check computed CSS values directly
 10. **Don't** import `Page` type from `../fixtures/auth` — it only exports `test` and `expect`. Import `Page` separately: `import type { Page } from '@playwright/test'`
+11. **Don't** use `link.click()` for page-to-page navigation — it triggers a Playwright-managed navigation wait that can time out when MAMP is under concurrent load from parallel workers. Instead, extract the href with `getAttribute('href')` and use `page.goto(href)`, which handles navigation more reliably
 
 ## Completion Criteria
 

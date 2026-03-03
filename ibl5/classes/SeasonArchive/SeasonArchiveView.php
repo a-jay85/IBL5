@@ -50,8 +50,8 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
             $html .= $this->renderStyles();
         }
         $html .= '<h2 class="ibl-title">IBL Season Archive</h2>';
-        $html .= '<table class="sortable ibl-data-table">';
-        $html .= '<thead><tr><th>Season</th><th>IBL Champion</th><th>HEAT Champion</th><th>MVP</th></tr></thead>';
+        $html .= '<table class="sortable ibl-data-table season-archive-index-table">';
+        $html .= '<thead><tr><th>Season</th><th>HEAT Champion</th><th>IBL Champion</th><th>MVP</th></tr></thead>';
         $html .= '<tbody>';
 
         foreach ($seasons as $season) {
@@ -61,8 +61,8 @@ class SeasonArchiveView implements SeasonArchiveViewInterface
 
             $html .= '<tr>';
             $html .= '<td><a href="modules.php?name=SeasonArchive&amp;year=' . $year . '">' . $label . '</a></td>';
-            $html .= self::renderTeamCell($season['iblChampion'], $teamColors, $year);
             $html .= self::renderTeamCell($season['heatChampion'], $teamColors, $year);
+            $html .= self::renderTeamCell($season['iblChampion'], $teamColors, $year);
             $html .= '<td>' . self::renderPlayerName($season['mvp'], $playerIds) . '</td>';
             $html .= '</tr>';
         }

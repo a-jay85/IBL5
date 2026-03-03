@@ -14,12 +14,14 @@ setup('authenticate', async ({ page }) => {
   }
 
   await page.goto('modules.php?name=YourAccount');
-  await page.locator('#login-username').fill(username);
-  await page.locator('#login-password').fill(password);
-  await page.locator('button[type="submit"]').click();
+  const loginForm = page.locator('form', { has: page.locator('#login-username') });
+  await loginForm.locator('#login-username').fill(username);
+  await loginForm.locator('#login-password').fill(password);
+  await loginForm.locator('button[type="submit"]').click();
 
-  // Wait for login to complete — nav should show "Logout"
-  await expect(page.getByText('Logout')).toBeVisible({ timeout: 10_000 });
+  // Wait for login redirect — successful login redirects away from YourAccount.
+  // "Logout" is inside a collapsed dropdown so we can't check for it directly.
+  await page.waitForURL((url) => !url.href.includes('name=YourAccount'), { timeout: 10_000 });
 
   await page.context().storageState({ path: authFile });
 });

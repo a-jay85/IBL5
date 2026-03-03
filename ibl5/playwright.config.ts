@@ -1,16 +1,21 @@
 import { defineConfig, devices } from '@playwright/test';
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
+
+const __configDir = dirname(fileURLToPath(import.meta.url));
 
 // Load .env.test if it exists (no external dependency needed)
 try {
-  const envFile = readFileSync(resolve(__dirname, '.env.test'), 'utf-8');
+  const envFile = readFileSync(resolve(__configDir, '.env.test'), 'utf-8');
   for (const line of envFile.split('\n')) {
     const trimmed = line.trim();
     if (trimmed && !trimmed.startsWith('#')) {
-      const [key, ...rest] = trimmed.split('=');
-      if (key && rest.length > 0) {
-        process.env[key.trim()] ??= rest.join('=').trim();
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex > 0) {
+        const key = trimmed.slice(0, eqIndex).trim();
+        const value = trimmed.slice(eqIndex + 1).trim();
+        process.env[key] ??= value;
       }
     }
   }

@@ -10,6 +10,9 @@
  * Tables that fit within the viewport retain rounded corners and standard styling.
  * Tables with hardcoded .responsive-table class (Standings, Draft, Leaderboards,
  * SeasonLeaders) are preserved and enhanced with scroll indicators.
+ *
+ * Tables inside .sticky-scroll-wrapper are skipped entirely — they use a separate
+ * both-axis scroll pattern (sticky header + sticky column) that this script would break.
  */
 (function () {
     "use strict";
@@ -30,6 +33,9 @@
      * Determine if a table overflows and apply/remove responsive features.
      */
     function processTable(table) {
+        // Skip tables inside sticky-scroll-wrapper — they handle their own scrolling
+        if (table.closest(".sticky-scroll-wrapper")) return;
+
         // Mark tables that already have hardcoded responsive-table class on first run
         if (table.dataset.responsiveInit === undefined) {
             table.dataset.responsiveInit = "1";

@@ -64,6 +64,8 @@ Need a data table?
 
 **Rule:** Never set `overflow: hidden` on any element containing `position: sticky` cells.
 
+**Rule:** All `.sticky-table` consumers must be inside `.sticky-scroll-wrapper`. The `responsive-tables.js` script skips tables inside `.sticky-scroll-wrapper` to avoid injecting conflicting scroll wrappers with inline `overflow: hidden`.
+
 ## Inline Style Policy
 
 ### Allowed inline styles

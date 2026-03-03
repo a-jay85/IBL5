@@ -255,7 +255,6 @@ $CensorReplace = filter($row['CensorReplace'], "nohtml");
 $copyright = filter($row['copyright']);
 $Version_Num = floatval($row['Version_Num']);
 $domain = str_replace("http://", "", $nukeurl);
-$gfx_chk = intval($row['gfx_chk']);
 $display_errors = filter($row['display_errors']);
 $nuke_editor = intval($row['nuke_editor']);
 $mtime = microtime();
@@ -1148,26 +1147,3 @@ function redir($content)
     return ($content);
 }
 
-if (isset($gfx)) {
-    switch ($gfx) {
-
-        case "gfx":
-            $datekey = date("F j");
-            $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $random_num . $datekey));
-            $code = substr($rcode, 2, 6);
-            $ThemeSel = get_theme();
-            if (file_exists("themes/" . $ThemeSel . "/images/code_bg.jpg")) {
-                $image = ImageCreateFromJPEG("themes/" . $ThemeSel . "/images/code_bg.jpg");
-            } else {
-                $image = ImageCreateFromJPEG("images/code_bg.jpg");
-            }
-            $text_color = ImageColorAllocate($image, 80, 80, 80);
-            Header("Content-type: image/jpeg");
-            ImageString($image, 5, 12, 2, $code, $text_color);
-            ImageJPEG($image, null, 75);
-            ImageDestroy($image);
-            die();
-            break;
-
-    }
-}

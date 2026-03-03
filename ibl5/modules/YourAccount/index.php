@@ -199,13 +199,9 @@ function redirectLoggedInUser()
 
 function main($user)
 {
-    global $stop, $module_name, $gfx_chk;
+    global $stop, $module_name;
     if (!is_user($user)) {
         PageLayout\PageLayout::header();
-        mt_srand((double) microtime() * 1000000);
-        $maxran = 1000000;
-        $random_num = mt_rand(0, $maxran);
-        $showCaptcha = extension_loaded("gd") && ($gfx_chk == 2 || $gfx_chk == 4 || $gfx_chk == 5 || $gfx_chk == 7);
 
         // Check for specific error from session (e.g., email not verified, throttled)
         $errorMessage = null;
@@ -217,11 +213,7 @@ function main($user)
         }
 
         $accountView = new \YourAccount\YourAccountView();
-        echo $accountView->renderLoginPage(
-            $errorMessage,
-            $random_num,
-            $showCaptcha
-        );
+        echo $accountView->renderLoginPage($errorMessage);
         PageLayout\PageLayout::footer();
     } elseif (is_user($user)) {
         cookiedecode($user);
@@ -383,7 +375,7 @@ function mail_password()
     PageLayout\PageLayout::footer();
 }
 
-function login($username, $user_password, $random_num, $gfx_check)
+function login($username, $user_password)
 {
     global $authService, $user_prefix, $db, $mysqli_db, $module_name, $pm_login, $prefix;
 
@@ -394,16 +386,6 @@ function login($username, $user_password, $random_num, $gfx_check)
     }
 
     $user_password = stripslashes($user_password);
-    include "config.php";
-
-    // CAPTCHA check
-    $datekey = date("F j");
-    $rcode = hexdec(md5($_SERVER['HTTP_USER_AGENT'] . $sitekey . $random_num . $datekey));
-    $code = substr($rcode, 2, 6);
-    if (extension_loaded("gd") and $code != $gfx_check and ($gfx_chk == 2 or $gfx_chk == 4 or $gfx_chk == 5 or $gfx_chk == 7)) {
-        Header("Location: modules.php?name=$module_name&stop=1");
-        die();
-    }
 
     // Store redirect from nav login form before auth (persists for retry on failure)
     $redirectQuery = $_POST['redirect_query'] ?? '';
@@ -481,7 +463,7 @@ switch ($op) {
         break;
 
     case "login":
-        login($username, $user_password, $random_num, $gfx_check);
+        login($username, $user_password);
         break;
 
     case "pass_lost":
@@ -490,10 +472,6 @@ switch ($op) {
 
     case "new_user":
         new_user();
-        break;
-
-    case "gfx":
-        gfx($random_num);
         break;
 
     case "activate":

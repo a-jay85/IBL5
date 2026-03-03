@@ -65,7 +65,7 @@ cd ibl5 && bunx playwright test tests/e2e/smoke/public-pages.spec.ts
 cd ibl5 && bun run test:e2e:ui
 ```
 
-**Prerequisites:** MAMP running, CAPTCHA disabled (`$gfx_chk = 0`), `.env.test` with credentials. E2E tests do NOT auto-run via PostToolUse hooks — run them manually. See `playwright-tests.md` for full rules.
+**Prerequisites:** MAMP running, `.env.test` with credentials. E2E tests do NOT auto-run via PostToolUse hooks — run them manually. See `playwright-tests.md` for full rules.
 
 ## Architecture
 

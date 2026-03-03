@@ -23,7 +23,6 @@ cd ibl5 && bunx playwright test tests/e2e/smoke/public-pages.spec.ts
 ## Prerequisites
 
 - **MAMP must be running** — E2E tests hit the real local server (`http://localhost/ibl5/`), unlike PHPUnit tests which use mocks
-- **CAPTCHA must be disabled** — `$gfx_chk = 0` in config, otherwise auth setup fails
 - **`.env.test` must exist** with valid credentials — copy from `.env.test.example`
 
 ## Test Categories

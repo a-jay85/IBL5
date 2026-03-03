@@ -16,67 +16,72 @@ $imagesPath = $leagueConfig['images_path'];
 $queryTopFiveInSeasonStatAverages = "SELECT *
     FROM (
         SELECT
-            pid,
-            tid,
-            name,
-            teamname,
-            ROUND((2 * `stats_fgm` + `stats_ftm` + `stats_3gm`) / `stats_gm`, 1) AS stat_value,
+            p.pid,
+            p.tid,
+            p.name,
+            t.team_name AS teamname,
+            ROUND((2 * p.stats_fgm + p.stats_ftm + p.stats_3gm) / p.stats_gm, 1) AS stat_value,
             'Points' AS stat_type,
-            ROW_NUMBER() OVER (ORDER BY (2 * `stats_fgm` + `stats_ftm` + `stats_3gm`) / `stats_gm` DESC) AS rn
-        FROM ibl_plr
-        WHERE retired = 0 AND stats_gm > 0 AND name NOT LIKE '%Buyouts%'
+            ROW_NUMBER() OVER (ORDER BY (2 * p.stats_fgm + p.stats_ftm + p.stats_3gm) / p.stats_gm DESC) AS rn
+        FROM ibl_plr p
+        INNER JOIN ibl_team_info t ON p.tid = t.teamid
+        WHERE p.retired = 0 AND p.stats_gm > 0 AND p.name NOT LIKE '%Buyouts%'
 
         UNION ALL
 
         SELECT
-            pid,
-            tid,
-            name,
-            teamname,
-            ROUND((`stats_orb` + `stats_drb`) / `stats_gm`, 1) AS stat_value,
+            p.pid,
+            p.tid,
+            p.name,
+            t.team_name AS teamname,
+            ROUND((p.stats_orb + p.stats_drb) / p.stats_gm, 1) AS stat_value,
             'Rebounds' AS stat_type,
-            ROW_NUMBER() OVER (ORDER BY (`stats_orb` + `stats_drb`) / `stats_gm` DESC) AS rn
-        FROM ibl_plr
-        WHERE retired = 0 AND stats_gm > 0 AND name NOT LIKE '%Buyouts%'
+            ROW_NUMBER() OVER (ORDER BY (p.stats_orb + p.stats_drb) / p.stats_gm DESC) AS rn
+        FROM ibl_plr p
+        INNER JOIN ibl_team_info t ON p.tid = t.teamid
+        WHERE p.retired = 0 AND p.stats_gm > 0 AND p.name NOT LIKE '%Buyouts%'
 
         UNION ALL
 
         SELECT
-            pid,
-            tid,
-            name,
-            teamname,
-            ROUND(`stats_ast` / `stats_gm`, 1) AS stat_value,
+            p.pid,
+            p.tid,
+            p.name,
+            t.team_name AS teamname,
+            ROUND(p.stats_ast / p.stats_gm, 1) AS stat_value,
             'Assists' AS stat_type,
-            ROW_NUMBER() OVER (ORDER BY `stats_ast` / `stats_gm` DESC) AS rn
-        FROM ibl_plr
-        WHERE retired = 0 AND stats_gm > 0 AND name NOT LIKE '%Buyouts%'
+            ROW_NUMBER() OVER (ORDER BY p.stats_ast / p.stats_gm DESC) AS rn
+        FROM ibl_plr p
+        INNER JOIN ibl_team_info t ON p.tid = t.teamid
+        WHERE p.retired = 0 AND p.stats_gm > 0 AND p.name NOT LIKE '%Buyouts%'
 
         UNION ALL
 
         SELECT
-            pid,
-            tid,
-            name,
-            teamname,
-            ROUND(`stats_stl` / `stats_gm`, 1) AS stat_value,
+            p.pid,
+            p.tid,
+            p.name,
+            t.team_name AS teamname,
+            ROUND(p.stats_stl / p.stats_gm, 1) AS stat_value,
             'Steals' AS stat_type,
-            ROW_NUMBER() OVER (ORDER BY `stats_stl` / `stats_gm` DESC) AS rn
-        FROM ibl_plr
-        WHERE retired = 0 AND stats_gm > 0 AND name NOT LIKE '%Buyouts%'
+            ROW_NUMBER() OVER (ORDER BY p.stats_stl / p.stats_gm DESC) AS rn
+        FROM ibl_plr p
+        INNER JOIN ibl_team_info t ON p.tid = t.teamid
+        WHERE p.retired = 0 AND p.stats_gm > 0 AND p.name NOT LIKE '%Buyouts%'
 
         UNION ALL
 
         SELECT
-            pid,
-            tid,
-            name,
-            teamname,
-            ROUND(`stats_blk` / `stats_gm`, 1) AS stat_value,
+            p.pid,
+            p.tid,
+            p.name,
+            t.team_name AS teamname,
+            ROUND(p.stats_blk / p.stats_gm, 1) AS stat_value,
             'Blocks' AS stat_type,
-            ROW_NUMBER() OVER (ORDER BY `stats_blk` / `stats_gm` DESC) AS rn
-        FROM ibl_plr
-        WHERE retired = 0 AND stats_gm > 0 AND name NOT LIKE '%Buyouts%'
+            ROW_NUMBER() OVER (ORDER BY p.stats_blk / p.stats_gm DESC) AS rn
+        FROM ibl_plr p
+        INNER JOIN ibl_team_info t ON p.tid = t.teamid
+        WHERE p.retired = 0 AND p.stats_gm > 0 AND p.name NOT LIKE '%Buyouts%'
     ) t
     WHERE rn <= 5
     ORDER BY FIELD(stat_type, 'Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'), rn;";

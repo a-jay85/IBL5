@@ -26,75 +26,80 @@ FROM (
     SELECT
         players.name,
         boxes.pid,
-        players.teamname,
+        t.team_name AS teamname,
         players.tid,
         CAST(FORMAT((2 * SUM(boxes.game2GM) + SUM(boxes.gameFTM) + 3 * SUM(boxes.game3GM)) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
         'Points' AS stat_type,
         ROW_NUMBER() OVER (ORDER BY (2 * SUM(boxes.game2GM) + SUM(boxes.gameFTM) + 3 * SUM(boxes.game3GM)) / COUNT(players.name) DESC) AS rn
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
+    INNER JOIN ibl_team_info t ON players.tid = t.teamid
     WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
-    GROUP BY players.name, boxes.pid, players.teamname, players.tid
+    GROUP BY players.name, boxes.pid, t.team_name, players.tid
 
     UNION ALL
 
     SELECT
         players.name,
         boxes.pid,
-        players.teamname,
+        t.team_name AS teamname,
         players.tid,
         CAST(FORMAT((SUM(boxes.gameORB) + SUM(boxes.gameDRB)) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
         'Rebounds' AS stat_type,
         ROW_NUMBER() OVER (ORDER BY (SUM(boxes.gameORB) + SUM(boxes.gameDRB)) / COUNT(players.name) DESC) AS rn
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
+    INNER JOIN ibl_team_info t ON players.tid = t.teamid
     WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
-    GROUP BY players.name, boxes.pid, players.teamname, players.tid
+    GROUP BY players.name, boxes.pid, t.team_name, players.tid
 
     UNION ALL
 
     SELECT
         players.name,
         boxes.pid,
-        players.teamname,
+        t.team_name AS teamname,
         players.tid,
         CAST(FORMAT(SUM(boxes.gameAST) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
         'Assists' AS stat_type,
         ROW_NUMBER() OVER (ORDER BY SUM(boxes.gameAST) / COUNT(players.name) DESC) AS rn
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
+    INNER JOIN ibl_team_info t ON players.tid = t.teamid
     WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
-    GROUP BY players.name, boxes.pid, players.teamname, players.tid
+    GROUP BY players.name, boxes.pid, t.team_name, players.tid
 
     UNION ALL
 
     SELECT
         players.name,
         boxes.pid,
-        players.teamname,
+        t.team_name AS teamname,
         players.tid,
         CAST(FORMAT(SUM(boxes.gameSTL) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
         'Steals' AS stat_type,
         ROW_NUMBER() OVER (ORDER BY SUM(boxes.gameSTL) / COUNT(players.name) DESC) AS rn
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
+    INNER JOIN ibl_team_info t ON players.tid = t.teamid
     WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
-    GROUP BY players.name, boxes.pid, players.teamname, players.tid
+    GROUP BY players.name, boxes.pid, t.team_name, players.tid
 
     UNION ALL
 
     SELECT
         players.name,
         boxes.pid,
-        players.teamname,
+        t.team_name AS teamname,
         players.tid,
         CAST(FORMAT(SUM(boxes.gameBLK) / COUNT(players.name), 1) AS DECIMAL(3,1)) AS stat_value,
         'Blocks' AS stat_type,
         ROW_NUMBER() OVER (ORDER BY SUM(boxes.gameBLK) / COUNT(players.name) DESC) AS rn
     FROM ibl_box_scores boxes
     INNER JOIN ibl_plr players USING(pid)
+    INNER JOIN ibl_team_info t ON players.tid = t.teamid
     WHERE boxes.Date BETWEEN '$lastSimStartDate' AND '$lastSimEndDate'
-    GROUP BY players.name, boxes.pid, players.teamname, players.tid
+    GROUP BY players.name, boxes.pid, t.team_name, players.tid
 ) t
 WHERE rn <= 5
 ORDER BY FIELD(stat_type, 'Points', 'Rebounds', 'Assists', 'Steals', 'Blocks'), rn;";

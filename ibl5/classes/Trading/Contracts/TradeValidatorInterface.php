@@ -77,15 +77,15 @@ interface TradeValidatorInterface
     /**
      * Validate that neither team exceeds the maximum roster size after the trade
      *
-     * @param string $userTeamName User's team name
-     * @param string $partnerTeamName Partner's team name
+     * @param int $userTeamId User's team ID
+     * @param int $partnerTeamId Partner's team ID
      * @param int $userPlayersSent Number of players user is sending
      * @param int $partnerPlayersSent Number of players partner is sending
      * @return array{valid: bool, errors: array<string>}
      */
     public function validateRosterLimits(
-        string $userTeamName,
-        string $partnerTeamName,
+        int $userTeamId,
+        int $partnerTeamId,
         int $userPlayersSent,
         int $partnerPlayersSent
     ): array;

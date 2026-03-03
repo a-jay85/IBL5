@@ -58,7 +58,6 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
      */
     public function updatePlayerContract(
         int $pid,
-        string $teamName,
         int $tid,
         int $offerYears,
         int $offer1,
@@ -77,20 +76,18 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
                  cy4 = ?,
                  cy5 = ?,
                  cy6 = ?,
-                 teamname = ?,
                  cyt = ?,
                  tid = ?,
                  fa_signing_flag = 1
              WHERE pid = ?
              LIMIT 1",
-            "iiiiiisiii",
+            "iiiiiiiii",
             $offer1,
             $offer2,
             $offer3,
             $offer4,
             $offer5,
             $offer6,
-            $teamName,
             $offerYears,
             $tid,
             $pid

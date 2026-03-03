@@ -293,8 +293,6 @@ class PlrParserServiceTest extends TestCase
         $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
         $mockRepo->expects($this->once())->method('upsertPlayer');
         $mockRepo->expects($this->once())->method('upsertHistoricalStats');
-        $mockRepo->method('getAllTeamData')->willReturn([]);
-        $mockRepo->method('assignTeamNames')->willReturn(0);
 
         $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
         $result = $service->processPlrFile($tmpFile);
@@ -311,8 +309,6 @@ class PlrParserServiceTest extends TestCase
         /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
         $mockRepo = $this->createMock(PlrParserRepositoryInterface::class);
         $mockRepo->expects($this->never())->method('upsertPlayer');
-        $mockRepo->method('getAllTeamData')->willReturn([]);
-        $mockRepo->method('assignTeamNames')->willReturn(0);
 
         $service = new PlrParserService($mockRepo, $this->stubCommonRepo, $this->stubSeason);
         $result = $service->processPlrFile($tmpFile);

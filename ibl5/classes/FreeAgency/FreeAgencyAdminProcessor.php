@@ -198,7 +198,6 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             // Update player contract
             $affected = $this->repository->updatePlayerContract(
                 $signing['playerId'],
-                $signing['teamName'],
                 $signing['teamId'],
                 $signing['offerYears'],
                 $signing['offers']['offer1'],

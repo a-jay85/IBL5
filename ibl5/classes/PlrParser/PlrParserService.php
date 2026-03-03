@@ -71,10 +71,6 @@ class PlrParserService implements PlrParserServiceInterface
 
         fclose($handle);
 
-        // Assign team names
-        $teamData = $this->repository->getAllTeamData();
-        $result->teamsAssigned = $this->repository->assignTeamNames($teamData);
-
         return $result;
     }
 

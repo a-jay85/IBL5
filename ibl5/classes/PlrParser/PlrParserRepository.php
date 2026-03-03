@@ -459,39 +459,4 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         );
     }
 
-    /**
-     * @see PlrParserRepositoryInterface::assignTeamNames()
-     *
-     * @param list<array{teamid: int, team_name: string}> $teamData
-     */
-    public function assignTeamNames(array $teamData): int
-    {
-        $assignedCount = 0;
-        foreach ($teamData as $teamRow) {
-            $affected = $this->execute(
-                "UPDATE ibl_plr SET teamname = ? WHERE tid = ?",
-                "si",
-                $teamRow['team_name'],
-                $teamRow['teamid'],
-            );
-            if ($affected > 0) {
-                $assignedCount++;
-            }
-        }
-        return $assignedCount;
-    }
-
-    /**
-     * @see PlrParserRepositoryInterface::getAllTeamData()
-     *
-     * @return list<array{teamid: int, team_name: string}>
-     */
-    public function getAllTeamData(): array
-    {
-        /** @var list<array{teamid: int, team_name: string}> $rows */
-        $rows = $this->fetchAll(
-            "SELECT teamid, team_name FROM ibl_team_info WHERE teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . " ORDER BY teamid ASC",
-        );
-        return $rows;
-    }
 }

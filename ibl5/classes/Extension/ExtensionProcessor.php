@@ -322,7 +322,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
             // Production: Use TeamQueryRepository to calculate
             if ($position !== null) {
                 // Get players under contract at this position
-                $posResult = $this->teamQueryRepo->getPlayersUnderContractByPosition($team->name, $position);
+                $posResult = $this->teamQueryRepo->getPlayersUnderContractByPosition($team->teamID, $position);
 
                 // Calculate total next season salaries
                 return $this->teamQueryRepo->getTotalNextSeasonSalaries($posResult);

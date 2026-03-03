@@ -53,10 +53,10 @@ interface FreeAgencyRepositoryInterface
      * Returns all non-retired players not on the specified team, ordered by ordinal.
      * Used for displaying "All Other Free Agents" in the free agency interface.
      *
-     * @param string $teamName Team to exclude
+     * @param int $teamId Team ID to exclude
      * @return list<PlayerRow> Array of player rows
      */
-    public function getAllPlayersExcludingTeam(string $teamName): array;
+    public function getAllPlayersExcludingTeam(int $teamId): array;
 
     /**
      * Check if a player has already been signed during this free agency period

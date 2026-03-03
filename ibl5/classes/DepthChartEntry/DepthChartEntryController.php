@@ -77,7 +77,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         $currentLiveLabel = $savedDcService->buildCurrentLiveLabel($teamID, $season);
         $this->view->renderSavedDepthChartDropdown($dropdownOptions, $currentLiveLabel);
 
-        $playersResult = $this->repository->getPlayersOnTeam($teamName, $teamID);
+        $playersResult = $this->repository->getPlayersOnTeam($teamID);
 
         // Collect current roster PIDs for JS config
         $currentRosterPids = array_map(

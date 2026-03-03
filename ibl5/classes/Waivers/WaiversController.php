@@ -246,8 +246,8 @@ class WaiversController implements WaiversControllerInterface
         $season = new \Season($this->db);
         $players = $this->getPlayersForAction($team, $action);
 
-        $openRosterSpots = 15 - count($this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->name, $team->teamID, $season));
-        $healthyOpenRosterSpots = 15 - count($this->teamQueryRepo->getHealthyPlayersOrderedByName($team->name, $team->teamID, $season));
+        $openRosterSpots = 15 - count($this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamID, $season));
+        $healthyOpenRosterSpots = 15 - count($this->teamQueryRepo->getHealthyPlayersOrderedByName($team->teamID, $season));
 
         $resultParam = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;
         $errorParam = isset($_GET['error']) && is_string($_GET['error']) ? $_GET['error'] : null;
@@ -267,7 +267,7 @@ class WaiversController implements WaiversControllerInterface
         $league = new \League($this->db);
 
         if ($action === 'waive') {
-            $tableResult = $this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->name, $team->teamID, $season);
+            $tableResult = $this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamID, $season);
             $styleTeam = $team;
         } elseif ($season->phase === 'Free Agency') {
             $tableResult = $league->getFreeAgentsResult($season);
@@ -323,7 +323,7 @@ class WaiversController implements WaiversControllerInterface
         $players = [];
 
         if ($action === 'waive') {
-            $result = $this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->name, $team->teamID);
+            $result = $this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamID);
         } elseif ($season->phase === 'Free Agency') {
             $result = $league->getFreeAgentsResult($season);
         } else {

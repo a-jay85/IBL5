@@ -122,14 +122,13 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
     {
         return $this->execute(
             "INSERT INTO `ibl_plr`
-                (`ordinal`, `pid`, `name`, `tid`, `teamname`, `exp`, `cy`, `cyt`, `cy1`, `cy2`, `cy3`, `cy4`, `cy5`, `cy6`, `retired`)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            "iisisissiiiiiii",
+                (`ordinal`, `pid`, `name`, `tid`, `exp`, `cy`, `cyt`, `cy1`, `cy2`, `cy3`, `cy4`, `cy5`, `cy6`, `retired`)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "iisiiiiiiiiiii",
             $data['ordinal'],
             $data['pid'],
             $data['name'],
             $data['tid'],
-            $data['teamname'],
             $data['exp'],
             $data['cy'],
             $data['cyt'],

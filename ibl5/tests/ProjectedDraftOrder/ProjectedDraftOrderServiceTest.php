@@ -382,6 +382,54 @@ class ProjectedDraftOrderServiceTest extends TestCase
         $this->assertSame('BB0001', $pick1['ownerColor2']);
     }
 
+    public function testThreeWayTieUsesAggregateH2H(): void
+    {
+        $standings = $this->buildThreeWayTiedStandings();
+        $games = [
+            // Team A (301) vs Team B (302): A wins 1, B wins 4
+            ['Visitor' => 301, 'VScore' => 100, 'Home' => 302, 'HScore' => 90],
+            ['Visitor' => 302, 'VScore' => 100, 'Home' => 301, 'HScore' => 90],
+            ['Visitor' => 302, 'VScore' => 100, 'Home' => 301, 'HScore' => 90],
+            ['Visitor' => 302, 'VScore' => 100, 'Home' => 301, 'HScore' => 90],
+            ['Visitor' => 302, 'VScore' => 100, 'Home' => 301, 'HScore' => 90],
+            // Team A (301) vs Team C (303): A wins 1, C wins 2
+            ['Visitor' => 301, 'VScore' => 100, 'Home' => 303, 'HScore' => 90],
+            ['Visitor' => 303, 'VScore' => 100, 'Home' => 301, 'HScore' => 90],
+            ['Visitor' => 303, 'VScore' => 100, 'Home' => 301, 'HScore' => 90],
+            // Team B (302) vs Team C (303): B wins 2, C wins 2
+            ['Visitor' => 302, 'VScore' => 100, 'Home' => 303, 'HScore' => 90],
+            ['Visitor' => 302, 'VScore' => 100, 'Home' => 303, 'HScore' => 90],
+            ['Visitor' => 303, 'VScore' => 100, 'Home' => 302, 'HScore' => 90],
+            ['Visitor' => 303, 'VScore' => 100, 'Home' => 302, 'HScore' => 90],
+        ];
+
+        // Aggregate H2H:
+        // Team A: 2W-6L (.250) → earliest pick
+        // Team C: 4W-3L (.571) → middle
+        // Team B: 6W-3L (.667) → latest pick
+
+        $this->stubRepository->method('getAllTeamsWithStandings')->willReturn($standings);
+        $this->stubRepository->method('getPlayedGames')->willReturn($games);
+        $this->stubRepository->method('getPickOwnership')->willReturn([]);
+        $this->stubRepository->method('getPointDifferentials')->willReturn([]);
+
+        $result = $this->service->calculateDraftOrder(2026);
+
+        $lotteryNames = array_column(array_slice($result['round1'], 0, 12), 'teamName');
+        $posA = array_search('TiedTeamA', $lotteryNames, true);
+        $posB = array_search('TiedTeamB', $lotteryNames, true);
+        $posC = array_search('TiedTeamC', $lotteryNames, true);
+
+        $this->assertNotFalse($posA);
+        $this->assertNotFalse($posB);
+        $this->assertNotFalse($posC);
+
+        // Worse aggregate H2H → earlier (better) draft pick
+        // Team A (.250) before Team C (.571) before Team B (.667)
+        $this->assertLessThan($posC, $posA, 'Team A (worst H2H) should pick before Team C');
+        $this->assertLessThan($posB, $posC, 'Team C should pick before Team B (best H2H)');
+    }
+
     // =========================================================================
     // Helper methods to build test fixtures
     // =========================================================================
@@ -656,6 +704,40 @@ class ProjectedDraftOrderServiceTest extends TestCase
             for ($i = 0; $i < 7; $i++) {
                 $wins = 50 - ($i * 5);
                 $teams[] = $this->makeStandingsRow($tid++, $div . 'Fill' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
+            }
+        }
+
+        return $teams;
+    }
+
+    /**
+     * Build 28-team standings with three tied non-playoff teams (25-57) in Eastern Atlantic.
+     *
+     * @return list<array{tid: int, team_name: string, wins: int, losses: int, pct: float, conference: string, division: string, confWins: int|null, confLosses: int|null, divWins: int|null, divLosses: int|null, clinchedDivision: int|null, color1: string, color2: string}>
+     */
+    private function buildThreeWayTiedStandings(): array
+    {
+        $teams = [];
+        $tid = 1;
+
+        // Eastern Atlantic: 4 strong playoff teams + 3 tied weak teams
+        for ($i = 0; $i < 4; $i++) {
+            $teams[] = $this->makeStandingsRow($tid++, 'EATop' . ($i + 1), 60 - ($i * 3), 22 + ($i * 3), 'Eastern', 'Atlantic');
+        }
+        $teams[] = $this->makeStandingsRow(301, 'TiedTeamA', 25, 57, 'Eastern', 'Atlantic');
+        $teams[] = $this->makeStandingsRow(302, 'TiedTeamB', 25, 57, 'Eastern', 'Atlantic');
+        $teams[] = $this->makeStandingsRow(303, 'TiedTeamC', 25, 57, 'Eastern', 'Atlantic');
+
+        // Eastern Central: 7 strong teams
+        for ($i = 0; $i < 7; $i++) {
+            $teams[] = $this->makeStandingsRow($tid++, 'ECTop' . ($i + 1), 55 - ($i * 3), 27 + ($i * 3), 'Eastern', 'Central');
+        }
+
+        // Western: 14 teams
+        foreach (['Midwest', 'Pacific'] as $div) {
+            for ($i = 0; $i < 7; $i++) {
+                $wins = 50 - ($i * 5);
+                $teams[] = $this->makeStandingsRow($tid++, $div . 'T' . ($i + 1), $wins, 82 - $wins, 'Western', $div);
             }
         }
 

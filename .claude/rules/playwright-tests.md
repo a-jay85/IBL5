@@ -24,6 +24,7 @@ cd ibl5 && bunx playwright test tests/e2e/smoke/public-pages.spec.ts
 
 - **MAMP must be running** — E2E tests hit the real local server (`http://localhost/ibl5/`), unlike PHPUnit tests which use mocks
 - **`.env.test` must exist** with valid credentials — copy from `.env.test.example`
+- **CSS must be rebuilt after branch switches** — `css:watch` may not detect source changes from `git checkout`. Run `bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css` if tests depend on CSS from another branch
 
 ## Test Categories
 
@@ -209,6 +210,7 @@ test.skip(true, 'Skip until offseason');
 5. Use stable CSS classes or accessible roles for locators
 6. Keep smoke tests fast — one assertion per test, no complex interactions
 7. Add new pages to the PHP error check loop when adding smoke tests
+8. Register `page.route()` mocks **before** `page.goto()` or any navigation — routes only intercept requests made after registration
 
 ## DON'T:
 1. **Don't** call login inside tests — use the auth fixture
@@ -217,7 +219,11 @@ test.skip(true, 'Skip until offseason');
 4. **Don't** use fragile structural selectors
 5. **Don't** mutate production data (create trades, submit forms) without cleanup
 6. **Don't** assume MAMP is running — tests will fail with connection errors if it's not
-8. **Don't** import from `@playwright/test` for authenticated tests — import from `../fixtures/auth`
+7. **Don't** import from `@playwright/test` for authenticated tests — import from `../fixtures/auth`
+8. **Don't** use `toBeVisible()` or `toHaveText()` on locators that match multiple elements — Playwright strict mode throws. Use `.first()`, `.nth(n)`, or check `.count()` instead
+9. **Don't** use `boundingBox()` to verify CSS properties like `width: fit-content` — parent layout context affects the bounding box. Use `page.evaluate(() => getComputedStyle(el).property)` to check computed CSS values directly
+10. **Don't** import `Page` type from `../fixtures/auth` — it only exports `test` and `expect`. Import `Page` separately: `import type { Page } from '@playwright/test'`
+11. **Don't** use `link.click()` for page-to-page navigation — it triggers a Playwright-managed navigation wait that can time out when MAMP is under concurrent load from parallel workers. Instead, extract the href with `getAttribute('href')` and use `page.goto(href)`, which handles navigation more reliably
 
 ## Completion Criteria
 

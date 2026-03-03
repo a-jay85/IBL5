@@ -97,4 +97,9 @@
     border-top: 2px solid var(--gray-300, #d1d5db);
 }
 
+/* Vertical separator between HEAT Champion and IBL Champion columns in index table */
+.season-archive-index-table tbody td:nth-child(3) {
+    border-left: 1px solid var(--gray-100);
+}
+
 } /* end @layer components */

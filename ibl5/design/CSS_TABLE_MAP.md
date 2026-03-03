@@ -11,7 +11,6 @@
 ├── .compare-players-table  (player comparison)
 ├── .depth-chart-table  (depth chart form)
 ├── .contact-table  (contact list, max-width: 800px)
-├── .allstar-table  (all-star history, max-width: 500px)
 ├── .voting-results-table  (vote counts, max-width: 420px)
 ├── .voting-form-table  (ballot with checkboxes/radios)
 ├── .draft-table  (draft selection form)

@@ -609,7 +609,8 @@ test.describe('Trade review page: offer cards and preview', () => {
     });
 
     // Card should be centered (auto margins) with a minimum width
-    expect(cardStyles.marginLeft).toBe(cardStyles.marginRight);
+    // Use approximate comparison — sub-pixel rendering can cause <1px differences
+    expect(Math.abs(parseFloat(cardStyles.marginLeft) - parseFloat(cardStyles.marginRight))).toBeLessThan(1);
     expect(parseFloat(cardStyles.minWidth)).toBeGreaterThanOrEqual(300);
   });
 });

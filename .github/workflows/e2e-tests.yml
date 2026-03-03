@@ -1,0 +1,72 @@
+# E2E Tests — CI Placeholder
+#
+# IBL5 uses PHP-Nuke which relies on $_SERVER['DOCUMENT_ROOT'] and Apache
+# mod_rewrite. The PHP built-in server doesn't support these, so CI needs
+# either Apache in Docker or a custom server wrapper.
+#
+# Uncomment and configure when CI infrastructure is ready.
+
+# name: E2E Tests
+#
+# on:
+#   pull_request:
+#     branches: [master]
+#
+# jobs:
+#   e2e:
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 15
+#
+#     services:
+#       mariadb:
+#         image: mariadb:10.6
+#         env:
+#           MARIADB_ROOT_PASSWORD: root
+#           MARIADB_DATABASE: ibl5
+#         ports:
+#           - 3306:3306
+#         options: >-
+#           --health-cmd="healthcheck.sh --connect --innodb_initialized"
+#           --health-interval=10s
+#           --health-timeout=5s
+#           --health-retries=3
+#
+#     steps:
+#       - uses: actions/checkout@v4
+#
+#       - name: Setup PHP
+#         uses: shivammathur/setup-php@v2
+#         with:
+#           php-version: '8.3'
+#           extensions: mysqli, gd
+#
+#       - name: Setup Bun
+#         uses: oven-sh/setup-bun@v2
+#
+#       - name: Install dependencies
+#         working-directory: ibl5
+#         run: bun install
+#
+#       - name: Install Playwright browsers
+#         working-directory: ibl5
+#         run: bunx playwright install chromium --with-deps
+#
+#       # TODO: Set up Apache/Docker container serving ibl5/
+#       # TODO: Import database schema and seed data
+#       # TODO: Configure ibl5/config.php for CI
+#
+#       - name: Run E2E tests
+#         working-directory: ibl5
+#         env:
+#           BASE_URL: http://localhost:80/ibl5/
+#           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
+#           IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
+#         run: bunx playwright test
+#
+#       - name: Upload test results
+#         if: always()
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: playwright-report
+#           path: ibl5/playwright-report/
+#           retention-days: 7

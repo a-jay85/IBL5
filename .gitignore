@@ -37,3 +37,9 @@ ibl5/shellScripts/.env
 !/ibl5/ibl-laravel/
 !/IBL6
 .htaccess
+
+# Playwright
+playwright-report/
+test-results/
+**/playwright/.auth/
+ibl5/.env.test

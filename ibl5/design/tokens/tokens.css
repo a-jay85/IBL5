@@ -1,19 +1,5 @@
-/**
- * IBL5 Design Tokens
- *
- * Color source of truth: @theme block in input.css
- * This file provides:
- *   1. Color aliases — bridge var(--navy-800) → var(--color-navy-800) for the
- *      850+ existing references in component CSS
- *   2. Non-color tokens — typography, spacing, radius, shadows, transitions, gradients
- *
- * New code should prefer Tailwind utility classes (e.g. bg-navy-800)
- * or the canonical --color-* variables (e.g. var(--color-navy-800)).
- *
- * Note: Google Fonts import is in input.css (must be at top of stylesheet)
- */
-
 @layer components {
+
 
 :root {
     /* ========================================================================

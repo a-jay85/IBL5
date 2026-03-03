@@ -1,31 +1,7 @@
-/**
- * IBL5 Design System - Main Entry Point
- *
- * This file imports all design system components and generates
- * the final compiled CSS for the site.
- *
- * Build: npm run css:build (or bun run css:build:bun)
- * Watch: npm run css:watch (or bun run css:watch:bun)
- *
- * Architecture:
- * 1. Google Fonts - external font loading
- * 2. Tailwind CSS - utility-first framework (provides .text-*, .bg-*, .font-*, etc.)
- * 3. Design Tokens - CSS custom properties (colors, spacing, fonts)
- * 4. Base Styles - CSS reset + legacy PHP-Nuke compatibility (@layer base)
- * 5. Components - reusable UI components + overrides (@layer components)
- *
- * Uses Tailwind 4's native layer order: theme < base < components < utilities
- * CSS reset and legacy styles go in @layer base (below components).
- * Component overrides go in @layer components (higher specificity + later source order).
- * See .claude/rules/css-architecture.md for full reference.
- */
-
 /* Google Fonts - must be at very top */
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap');
 
-/* Tailwind CSS 4 - provides all utility classes
-   Tailwind 4 owns the layer order: theme < base < components < utilities.
-   All custom CSS uses @layer base or @layer components — no custom layers. */
+
 @import 'tailwindcss';
 
 /* Tailwind Theme - registers custom values so the compiler generates utility classes
@@ -79,13 +55,8 @@
   --font-sans: 'Barlow', system-ui, sans-serif;
 }
 
-/* Design Tokens (CSS Custom Properties) */
 @import './tokens/tokens.css';
-
-/* Base Styles (CSS reset, legacy element normalization, PHP-Nuke classes) */
 @import './base.css';
-
-/* Component Styles */
 @import './components/existing-components.css';
 @import './components/tables.css';
 @import './components/cards.css';
@@ -101,6 +72,7 @@
 @import './components/auth.css';
 @import './components/strength-of-schedule.css';
 @import './components/team-splits.css';
+@import './components/trade-roster-preview.css';
 
 /* Site-wide layout wrapper (replaces legacy themeheader table) */
 @layer components {

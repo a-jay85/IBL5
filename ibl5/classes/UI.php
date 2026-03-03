@@ -134,10 +134,11 @@ class UI
      * @param string|null|\DateTime $startDate Start date for the period
      * @param string|null|\DateTime $endDate End date for the period
      * @param list<int> $starterPids Starter player IDs
+     * @param list<int> $pidFilter When non-empty, only include these player PIDs
      * @return string HTML table
      */
-    public static function periodAverages(\mysqli $db, $team, $season, $startDate = null, $endDate = null, array $starterPids = []): string
+    public static function periodAverages(\mysqli $db, $team, $season, $startDate = null, $endDate = null, array $starterPids = [], array $pidFilter = []): string
     {
-        return UI\Tables\PeriodAverages::render($db, $team, $season, $startDate, $endDate, $starterPids);
+        return UI\Tables\PeriodAverages::render($db, $team, $season, $startDate, $endDate, $starterPids, $pidFilter);
     }
 }

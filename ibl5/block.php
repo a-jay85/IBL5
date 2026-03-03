@@ -15,7 +15,7 @@ declare(strict_types=1);
  * - All user input sanitized
  */
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+require_once __DIR__ . '/mainfile.php';
 
 global $mysqli_db;
 

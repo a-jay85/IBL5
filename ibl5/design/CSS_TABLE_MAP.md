@@ -14,7 +14,7 @@
 ├── .voting-results-table  (vote counts, max-width: 420px)
 ├── .voting-form-table  (ballot with checkboxes/radios)
 ├── .draft-table  (draft selection form)
-├── .draft-pick-table  (draft pick locator matrix, styled to match ibl-data-table)
+├── (draft-pick-own/traded cell classes for pick locator)
 ├── .draft-history-table  (mobile column constraints)
 └── .injury-table  (card layout on mobile)
 ```
@@ -75,7 +75,7 @@ Affects ALL data tables site-wide:
 | `.injury-table` | InjuriesView |
 | `.league-stats-table` | TeamOffDefStatsView |
 | `.depth-chart-table` | DepthChartEntryView |
-| `.draft-pick-table` | DraftPickLocatorView (styled to match `.ibl-data-table`, uses `.sticky-table`) |
+| `.draft-pick-own` / `.draft-pick-traded` | DraftPickLocatorView (cell modifiers on `.ibl-data-table.sticky-table`) |
 | `.contact-table` | GMContactListView |
 | `.voting-form-table` | Voting views |
 | `.trading-*` | Trading/TradingView |

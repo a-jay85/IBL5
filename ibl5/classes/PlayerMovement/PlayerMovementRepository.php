@@ -30,7 +30,7 @@ class PlayerMovementRepository extends \BaseMysqliRepository implements PlayerMo
                 a.teamid AS old_teamid,
                 a.team AS old_team,
                 b.tid AS new_teamid,
-                b.teamname AS new_team,
+                new_info.team_name AS new_team,
                 old_hist.team_city AS old_city,
                 old_hist.color1 AS old_color1,
                 old_hist.color2 AS old_color2,
@@ -43,7 +43,7 @@ class PlayerMovementRepository extends \BaseMysqliRepository implements PlayerMo
             LEFT JOIN ibl_team_info new_info ON b.tid = new_info.teamid
             WHERE a.year = ?
             AND a.teamid != b.tid
-            ORDER BY b.teamname",
+            ORDER BY new_info.team_name",
             'i',
             $previousSeasonYear
         );

@@ -34,9 +34,10 @@ class PlayerIdResolver
      * @param string $name Player name from .car file
      * @param string $team Team name from .car file
      * @param int $year Season year
+     * @param int|null $teamId Resolved team ID (when available, enables tid-based ibl_plr lookup)
      * @return int|null Database pid, or null if not found
      */
-    public function resolve(string $name, string $team, int $year): ?int
+    public function resolve(string $name, string $team, int $year, ?int $teamId = null): ?int
     {
         $cacheKey = $name . '|' . $team . '|' . $year;
         if (array_key_exists($cacheKey, $this->cache)) {
@@ -50,11 +51,13 @@ class PlayerIdResolver
             return $pid;
         }
 
-        // Strategy 2: Exact match in ibl_plr by name + current team
-        $pid = $this->findInPlr($name, $team);
-        if ($pid !== null) {
-            $this->cache[$cacheKey] = $pid;
-            return $pid;
+        // Strategy 2: Exact match in ibl_plr by name + team ID
+        if ($teamId !== null) {
+            $pid = $this->findInPlr($name, $teamId);
+            if ($pid !== null) {
+                $this->cache[$cacheKey] = $pid;
+                return $pid;
+            }
         }
 
         // Strategy 3: Exact name match in ibl_hist without team constraint
@@ -98,18 +101,18 @@ class PlayerIdResolver
     }
 
     /**
-     * Find pid in ibl_plr by exact name + teamname.
+     * Find pid in ibl_plr by exact name + team ID.
      */
-    private function findInPlr(string $name, string $team): ?int
+    private function findInPlr(string $name, int $teamId): ?int
     {
         $stmt = $this->db->prepare(
-            'SELECT pid FROM ibl_plr WHERE name = ? AND teamname = ? LIMIT 1'
+            'SELECT pid FROM ibl_plr WHERE name = ? AND tid = ? LIMIT 1'
         );
         if ($stmt === false) {
             return null;
         }
 
-        $stmt->bind_param('ss', $name, $team);
+        $stmt->bind_param('si', $name, $teamId);
         $stmt->execute();
         $result = $stmt->get_result();
         /** @var array{pid: int}|null $row */

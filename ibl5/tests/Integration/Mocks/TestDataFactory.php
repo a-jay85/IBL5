@@ -26,7 +26,6 @@ class TestDataFactory
             'name' => 'Test Player',
             'firstname' => 'Test',
             'lastname' => 'Player',
-            'teamname' => 'Test Team',
             'tid' => 1,
             'position' => 'G',
             'pos' => 'G',

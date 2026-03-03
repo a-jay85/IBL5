@@ -99,9 +99,8 @@ class TradeIntegrationTest extends IntegrationTestCase
         $expectedText = "The Bulls send SF Michael Jordan to the Heat.";
         $this->assertStringContainsString($expectedText, $result['storytext']);
 
-        // Verify UPDATE query includes teamname and tid
+        // Verify UPDATE query sets tid
         $this->assertQueryExecuted('UPDATE ibl_plr');
-        $this->assertQueryExecuted('teamname');
         $this->assertQueryExecuted('tid');
     }
 
@@ -381,7 +380,7 @@ class TradeIntegrationTest extends IntegrationTestCase
         ]);
 
         // User team has 15 players, sends 0, receives 1 => 16 players (over 15 limit)
-        $result = $validator->validateRosterLimits('Lakers', 'Celtics', 0, 1);
+        $result = $validator->validateRosterLimits(1, 2, 0, 1);
 
         // Assert
         $this->assertFalse($result['valid'], 'Trade should be rejected when team exceeds 15-player roster limit');
@@ -418,8 +417,7 @@ class TradeIntegrationTest extends IntegrationTestCase
         $updateCount = $this->countQueriesMatching('UPDATE ibl_plr');
         $this->assertGreaterThanOrEqual(2, $updateCount, 'Should execute at least 2 UPDATE ibl_plr queries');
 
-        // Verify that the UPDATE queries set teamname and tid
-        $this->assertQueryExecuted('teamname');
+        // Verify that the UPDATE queries set tid
         $this->assertQueryExecuted('tid');
     }
 

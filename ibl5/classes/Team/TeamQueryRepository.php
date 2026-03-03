@@ -122,7 +122,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
      *
      * @return list<PlayerRow>
      */
-    public function getHealthyAndInjuredPlayersOrderedByName(string $teamName, int $teamId, ?\Season $season = null): array
+    public function getHealthyAndInjuredPlayersOrderedByName(int $teamId, ?\Season $season = null): array
     {
         $freeAgencyCondition = '';
         if ($season !== null && $season->phase === 'Free Agency') {
@@ -142,13 +142,11 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
-            WHERE teamname = ?
-              AND tid = ?
+            WHERE tid = ?
               AND retired = 0
               AND ordinal <= '" . \JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
             ORDER BY name ASC",
-            "si",
-            $teamName,
+            "i",
             $teamId
         );
     }
@@ -158,7 +156,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
      *
      * @return list<PlayerRow>
      */
-    public function getHealthyPlayersOrderedByName(string $teamName, int $teamId, ?\Season $season = null): array
+    public function getHealthyPlayersOrderedByName(int $teamId, ?\Season $season = null): array
     {
         $freeAgencyCondition = '';
         if ($season !== null && $season->phase === 'Free Agency') {
@@ -178,14 +176,12 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
-            WHERE teamname = ?
-              AND tid = ?
+            WHERE tid = ?
               AND retired = 0
               AND ordinal <= '" . \JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
               AND injured = '0'
             ORDER BY name ASC",
-            "si",
-            $teamName,
+            "i",
             $teamId
         );
     }
@@ -231,17 +227,17 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
      *
      * @return list<PlayerRow>
      */
-    public function getAllPlayersUnderContract(string $teamName): array
+    public function getAllPlayersUnderContract(int $teamId): array
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
-            WHERE teamname = ?
+            WHERE tid = ?
               AND cy1 != 0
               AND retired = 0",
-            "s",
-            $teamName
+            "i",
+            $teamId
         );
     }
 
@@ -250,18 +246,18 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
      *
      * @return list<PlayerRow>
      */
-    public function getPlayersUnderContractByPosition(string $teamName, string $position): array
+    public function getPlayersUnderContractByPosition(int $teamId, string $position): array
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
-            WHERE teamname = ?
+            WHERE tid = ?
               AND pos = ?
               AND cy1 != 0
               AND retired = 0",
-            "ss",
-            $teamName,
+            "is",
+            $teamId,
             $position
         );
     }

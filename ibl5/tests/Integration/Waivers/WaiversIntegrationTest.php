@@ -196,7 +196,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $this->assertQueryExecuted("ordinal` = '800'");
         $this->assertQueryExecuted('bird` = 0');
         $this->assertQueryExecuted('droptime` = 0');
-        $this->assertQueryExecuted("'Miami Cyclones'");
+        $this->assertQueryExecuted('tid` = 5');
         // Should NOT update contract fields when hasExistingContract = true
         $this->assertQueryNotExecuted('cy` = 0');
     }
@@ -228,7 +228,7 @@ class WaiversIntegrationTest extends IntegrationTestCase
         $this->assertQueryExecuted('cy` = 0');
         $this->assertQueryExecuted('cyt` = 1');
         $this->assertQueryExecuted("cy1` = 103");
-        $this->assertQueryExecuted("'Chicago Fire'");
+        $this->assertQueryExecuted('tid` = 8');
     }
 
     /**

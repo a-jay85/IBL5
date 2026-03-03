@@ -12,7 +12,7 @@ namespace Trading\Contracts;
  *
  * @phpstan-type TradeCashRow array{tradeOfferID: int, sendingTeam: string, receivingTeam: string, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
  * @phpstan-type CashTransactionData array{teamname: string, year1: int, year2: int, year3: int, year4: int, year5: int, year6: int, row: int}
- * @phpstan-type CashPlayerData array{ordinal: int, pid: int, name: string, tid: int, teamname: string, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, retired: int}
+ * @phpstan-type CashPlayerData array{ordinal: int, pid: int, name: string, tid: int, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, retired: int}
  * @phpstan-type TradingPlayerRow array{pos: string, name: string, pid: int, ordinal: ?int, cy: ?int, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
  */
 interface TradeCashRepositoryInterface
@@ -63,7 +63,7 @@ interface TradeCashRepositoryInterface
     /**
      * Insert a cash player record (positive or negative cash transaction)
      *
-     * @param CashPlayerData $data Associative array with keys: ordinal, pid, name, tid, teamname, exp, cy, cyt, cy1-cy6, retired
+     * @param CashPlayerData $data Associative array with keys: ordinal, pid, name, tid, exp, cy, cyt, cy1-cy6, retired
      * @return int Number of affected rows
      */
     public function insertCashPlayerRecord(array $data): int;

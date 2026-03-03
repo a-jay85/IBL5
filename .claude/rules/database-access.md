@@ -48,6 +48,11 @@ include 'db/db.php';
 
 **When to use `db-query`:** Use this script to explore the database schema, verify data after making changes, check record counts, and validate your work. This is the preferred method for Claude to query the local database since it's configured for auto-approval in the user's Claude Code settings.
 
+## MariaDB Strict Mode & Triggers
+
+- **NOT NULL columns without DEFAULT reject INSERTs before BEFORE INSERT triggers fire.** If a column is `NOT NULL` with no `DEFAULT`, MariaDB strict mode (enabled by default since 10.2) throws `Field 'x' doesn't have a default value` *before* any BEFORE INSERT trigger can auto-populate it. Always provide explicit values for NOT NULL columns in INSERT statements — don't rely on triggers to save you. Example: `ibl_plr.uuid` and `ibl_team_info.uuid` must be included in INSERTs even though BEFORE INSERT triggers exist.
+- **DEFINER clauses in schema.sql break CI imports.** The production `schema.sql` dump contains `DEFINER=\`iblhoops_chibul\`@\`71.145.211.164\`` on triggers and views. Strip them with `sed 's/DEFINER=\`[^\`]*\`@\`[^\`]*\`//g'` before importing into non-production databases.
+
 ## Multiple Claude Instances Protocol
 
 Other Claude instances may be working in this directory simultaneously.

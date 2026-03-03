@@ -78,6 +78,9 @@ When a static factory method like `PlayerStats::withPlayerID()` returns a new in
 ### Match PHPDoc array shapes to actual data sources
 When a method accepts or returns a color scheme, config, or structured array, the `@param`/`@return` PHPDoc must match the *actual* array shape produced by the source. For example, `TeamColorHelper::generateColorScheme()` returns `array{primary, secondary, gradient_start, gradient_mid, gradient_end, border, border_rgb, accent, text, text_muted}` — don't invent a different shape in consuming methods.
 
+### Don't use `@var` to narrow array shapes below the method's return type
+Adding `/** @var array{success: bool, error?: string} $result */` on a variable assigned from a method that returns more fields (e.g., also `teams_stored`, `messages`) causes PHPStan to reject the annotation as incompatible. Either use the full shape or omit the `@var` entirely and let PHPStan infer from the method signature.
+
 ### Avoid variable method calls (`$obj->$methodName()`)
 PHPStan cannot verify types through dynamic/variable method calls. This causes `method.dynamicName`, `method.nonObject`, and `argument.type` errors. Use explicit match expressions or pass pre-rendered results instead.
 

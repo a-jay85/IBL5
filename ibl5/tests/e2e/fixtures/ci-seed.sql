@@ -176,7 +176,7 @@ INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year
 -- ============================================================
 
 INSERT INTO ibl_plr (
-  pid, name, age, peak, tid, teamname, pos,
+  pid, name, age, peak, tid, pos,
   sta, oo, od, `do`, dd, po, pd, `to`, td,
   cy, cyt, cy1, cy2,
   retired, exp,
@@ -187,7 +187,7 @@ INSERT INTO ibl_plr (
   stats_to, stats_blk, stats_pf,
   uuid
 ) VALUES (
-  1, 'Test Player', 28, 28, 1, 'Metros', 'SG',
+  1, 'Test Player', 28, 28, 1, 'SG',
   80, 75, 70, 65, 60, 72, 68, 70, 65,
   2, 3, 1500, 1600,
   0, 5,

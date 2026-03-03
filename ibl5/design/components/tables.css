@@ -1702,6 +1702,11 @@ td.ibl-team-cell--colored {
     background-color: var(--gray-200, #e5e7eb);
 }
 
+/* Vertical separator between Team and Record columns */
+.projected-draft-order-table tbody td:nth-child(3) {
+    border-left: 1px solid var(--gray-100);
+}
+
 .projected-draft-order-table .projected-draft-order-notes {
     max-width: 550px;
     padding-inline: 0.5rem;

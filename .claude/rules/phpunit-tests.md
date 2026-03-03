@@ -101,7 +101,7 @@ $repo->expects($this->once())->method('save')->with($entity);
 - **NEVER** use `createMock()` when no `expects()` calls are configured — use `createStub()` instead
 - **NEVER** use `ReflectionClass` for private methods
 - **NEVER** use `markTestSkipped()` - delete instead
-- **NEVER** check SQL query structure (except security tests)
+- **NEVER** check full SQL query structure (column names, WHERE clauses, bind strings) — except security tests. For void write methods with no return value to assert on, you may use `assertQueryExecuted('table_name')` to verify the target table was hit, but don't match beyond the table name.
 
 ## Test Registration
 Register in `ibl5/phpunit.xml`:

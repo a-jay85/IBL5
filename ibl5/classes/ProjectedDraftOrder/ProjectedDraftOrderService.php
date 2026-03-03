@@ -200,6 +200,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
      * Sort teams by record for draft order (worst first).
      *
      * Tiebreaker loser gets the earlier (better) pick in both lottery and playoff contexts.
+     * Uses multi-way aggregate H2H for groups of 3+ teams with the same pct.
      *
      * @param list<StandingsRow> $teams
      * @param array<int, array<int, int>> $h2h
@@ -208,24 +209,97 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
      */
     private function sortTeamsByRecord(array $teams, array $h2h, array $pointDiffs): array
     {
-        usort($teams, function (array $a, array $b) use ($h2h, $pointDiffs): int {
-            // Ascending pct (worst first)
-            $pctDiff = $a['pct'] <=> $b['pct'];
-            if ($pctDiff !== 0) {
-                return $pctDiff;
-            }
+        // Step 1: Sort by pct ascending (worst first)
+        usort($teams, static fn (array $a, array $b): int => $a['pct'] <=> $b['pct']);
 
-            // applyTiebreakers returns negative if A wins (better team).
-            // For draft order: tiebreaker LOSER gets earlier pick.
-            // Negate so the winner sorts later (higher index = later pick).
-            return -$this->applyTiebreakers($a, $b, $h2h, $pointDiffs, 'better_wins');
-        });
-
-        return $teams;
+        // Step 2: Resolve tied groups using multi-way aggregate H2H
+        return $this->resolveTiedGroups($teams, $h2h, $pointDiffs);
     }
 
     /**
-     * Apply NBA tiebreakers between two teams.
+     * Walk the pct-sorted list, identify consecutive same-pct groups, and sort each.
+     *
+     * @param list<StandingsRow> $teams
+     * @param array<int, array<int, int>> $h2h
+     * @param array<int, float> $pointDiffs
+     * @return list<StandingsRow>
+     */
+    private function resolveTiedGroups(array $teams, array $h2h, array $pointDiffs): array
+    {
+        $result = [];
+        $i = 0;
+        $count = count($teams);
+
+        while ($i < $count) {
+            $groupStart = $i;
+            $currentPct = $teams[$i]['pct'];
+
+            // Find end of consecutive same-pct group
+            while ($i < $count && $teams[$i]['pct'] === $currentPct) {
+                $i++;
+            }
+
+            $group = array_slice($teams, $groupStart, $i - $groupStart);
+
+            if (count($group) > 1) {
+                $group = $this->sortTiedGroup($group, $h2h, $pointDiffs);
+            }
+
+            array_push($result, ...$group);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Sort a group of teams with the same pct using aggregate H2H then fallback tiebreakers.
+     *
+     * For draft order: worse aggregate H2H → earlier (better) pick.
+     *
+     * @param list<StandingsRow> $group
+     * @param array<int, array<int, int>> $h2h
+     * @param array<int, float> $pointDiffs
+     * @return list<StandingsRow>
+     */
+    private function sortTiedGroup(array $group, array $h2h, array $pointDiffs): array
+    {
+        $tids = array_map(static fn (array $t): int => $t['tid'], $group);
+
+        // Compute each team's aggregate H2H win pct against all other teams in the group
+        /** @var array<int, float> */
+        $aggregateH2HPct = [];
+        foreach ($group as $team) {
+            $totalWins = 0;
+            $totalLosses = 0;
+            foreach ($tids as $opponentTid) {
+                if ($opponentTid === $team['tid']) {
+                    continue;
+                }
+                $totalWins += $h2h[$team['tid']][$opponentTid] ?? 0;
+                $totalLosses += $h2h[$opponentTid][$team['tid']] ?? 0;
+            }
+            $aggregateH2HPct[$team['tid']] = $this->safeWinPct($totalWins, $totalLosses);
+        }
+
+        // Sort ascending by aggregate H2H pct (worse H2H → earlier draft pick)
+        // For sub-ties, fall through to non-H2H tiebreakers
+        usort($group, function (array $a, array $b) use ($aggregateH2HPct, $pointDiffs): int {
+            $h2hDiff = $aggregateH2HPct[$a['tid']] <=> $aggregateH2HPct[$b['tid']];
+            if ($h2hDiff !== 0) {
+                return $h2hDiff;
+            }
+
+            // Sub-tie: use non-H2H tiebreakers (negated for draft order)
+            return -$this->applyNonH2HTiebreakers($a, $b, $pointDiffs);
+        });
+
+        return $group;
+    }
+
+    /**
+     * Apply NBA tiebreakers between two teams (pairwise H2H + remaining tiebreakers).
+     *
+     * Used by playoff seeding. Draft order uses multi-way aggregate H2H instead.
      *
      * Returns negative if A wins the tiebreaker, positive if B wins.
      *
@@ -237,21 +311,34 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
      */
     private function applyTiebreakers(array $a, array $b, array $h2h, array $pointDiffs, string $direction): int
     {
-        // 1. Head-to-head record
+        // 1. Head-to-head record (pairwise)
         $aWinsVsB = $h2h[$a['tid']][$b['tid']] ?? 0;
         $bWinsVsA = $h2h[$b['tid']][$a['tid']] ?? 0;
         if ($aWinsVsB !== $bWinsVsA) {
-            return $direction === 'better_wins' ? ($bWinsVsA <=> $aWinsVsB) : ($aWinsVsB <=> $bWinsVsA);
+            return $bWinsVsA <=> $aWinsVsB;
         }
 
+        // 2-6. Non-H2H tiebreakers
+        return $this->applyNonH2HTiebreakers($a, $b, $pointDiffs);
+    }
+
+    /**
+     * Apply non-H2H tiebreakers: division winner, division record, conference record,
+     * point differential, alphabetical.
+     *
+     * Returns negative if A is the better team, positive if B is better.
+     *
+     * @param StandingsRow $a
+     * @param StandingsRow $b
+     * @param array<int, float> $pointDiffs
+     */
+    private function applyNonH2HTiebreakers(array $a, array $b, array $pointDiffs): int
+    {
         // 2. Division winner status
         $aDivWinner = ($a['clinchedDivision'] ?? 0) === 1;
         $bDivWinner = ($b['clinchedDivision'] ?? 0) === 1;
         if ($aDivWinner !== $bDivWinner) {
-            if ($direction === 'better_wins') {
-                return $aDivWinner ? -1 : 1;
-            }
-            return $bDivWinner ? -1 : 1;
+            return $aDivWinner ? -1 : 1;
         }
 
         // 3. Division record (same-division teams only)
@@ -260,7 +347,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
             $bDivPct = $this->safeWinPct($b['divWins'], $b['divLosses']);
             $divDiff = $bDivPct <=> $aDivPct;
             if ($divDiff !== 0) {
-                return $direction === 'better_wins' ? $divDiff : -$divDiff;
+                return $divDiff;
             }
         }
 
@@ -269,7 +356,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         $bConfPct = $this->safeWinPct($b['confWins'], $b['confLosses']);
         $confDiff = $bConfPct <=> $aConfPct;
         if ($confDiff !== 0) {
-            return $direction === 'better_wins' ? $confDiff : -$confDiff;
+            return $confDiff;
         }
 
         // 5. Point differential
@@ -277,7 +364,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         $bNetPts = $pointDiffs[$b['tid']] ?? 0.0;
         $ptsDiff = $bNetPts <=> $aNetPts;
         if ($ptsDiff !== 0) {
-            return $direction === 'better_wins' ? $ptsDiff : -$ptsDiff;
+            return $ptsDiff;
         }
 
         // Fallback: alphabetical by team name (for deterministic ordering)

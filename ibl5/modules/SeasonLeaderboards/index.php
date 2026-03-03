@@ -52,6 +52,9 @@ $leadersData = $repository->getSeasonLeaders($filters, $limit);
 $rows = $leadersData['result'];
 $numRows = $leadersData['count'];
 
+// Set active sort column for highlighting
+$view->setSortBy($filters['sortby']);
+
 // Render table header
 echo $view->renderTableHeader();
 

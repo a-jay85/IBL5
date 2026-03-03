@@ -442,6 +442,123 @@ class TradingServiceTest extends TestCase
     }
 
     // ============================================
+    // PREVIEW DATA ENRICHMENT TESTS
+    // ============================================
+
+    public function testGetTradeReviewPageDataCollectsPlayerPids(): void
+    {
+        $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
+
+        $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $mockCommon->method('getTidFromTeamname')->willReturn(1);
+        $mockRepo->method('getAllTradeOffers')->willReturn([
+            ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+            ['tradeofferid' => 1, 'itemid' => 200, 'itemtype' => '1', 'from' => 'Celtics', 'to' => 'Lakers', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+        ]);
+        $mockRepo->method('getPlayerById')
+            ->willReturn(['name' => 'Test Player', 'pos' => 'PG']);
+        $mockRepo->method('getAllTeamsWithCity')->willReturn([
+            ['teamid' => 1, 'team_name' => 'Lakers', 'team_city' => 'Los Angeles', 'color1' => '552583', 'color2' => 'FDB927'],
+            ['teamid' => 2, 'team_name' => 'Celtics', 'team_city' => 'Boston', 'color1' => '007A33', 'color2' => 'FFFFFF'],
+        ]);
+
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $result = $service->getTradeReviewPageData('testuser');
+
+        $preview = $result['tradeOffers'][1]['previewData'];
+        $this->assertSame([100], $preview['fromPids']);
+        $this->assertSame([200], $preview['toPids']);
+    }
+
+    public function testGetTradeReviewPageDataEnrichesTeamIds(): void
+    {
+        $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
+
+        $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $mockCommon->method('getTidFromTeamname')->willReturn(1);
+        $mockRepo->method('getAllTradeOffers')->willReturn([
+            ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+        ]);
+        $mockRepo->method('getPlayerById')
+            ->willReturn(['name' => 'Test Player', 'pos' => 'PG']);
+        $mockRepo->method('getAllTeamsWithCity')->willReturn([
+            ['teamid' => 1, 'team_name' => 'Lakers', 'team_city' => 'Los Angeles', 'color1' => '552583', 'color2' => 'FDB927'],
+            ['teamid' => 2, 'team_name' => 'Celtics', 'team_city' => 'Boston', 'color1' => '007A33', 'color2' => 'FFFFFF'],
+        ]);
+
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $result = $service->getTradeReviewPageData('testuser');
+
+        $preview = $result['tradeOffers'][1]['previewData'];
+        $this->assertSame(1, $preview['fromTeamId']);
+        $this->assertSame(2, $preview['toTeamId']);
+        $this->assertSame('552583', $preview['fromColor1']);
+        $this->assertSame('007A33', $preview['toColor1']);
+    }
+
+    public function testGetTradeReviewPageDataIncludesCashPreviewData(): void
+    {
+        $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
+
+        $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $mockCommon->method('getTidFromTeamname')->willReturn(1);
+        $mockRepo->method('getAllTradeOffers')->willReturn([
+            ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+        ]);
+        $mockRepo->method('getPlayerById')
+            ->willReturn(['name' => 'Test Player', 'pos' => 'PG']);
+        $mockRepo->method('getAllTeamsWithCity')->willReturn([
+            ['teamid' => 1, 'team_name' => 'Lakers', 'team_city' => 'Los Angeles', 'color1' => '552583', 'color2' => 'FDB927'],
+            ['teamid' => 2, 'team_name' => 'Celtics', 'team_city' => 'Boston', 'color1' => '007A33', 'color2' => 'FFFFFF'],
+        ]);
+        $mockCashRepo->method('getCashTransactionByOffer')->willReturnMap([
+            [1, 'Lakers', ['tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics', 'cy1' => 300, 'cy2' => null, 'cy3' => null, 'cy4' => null, 'cy5' => null, 'cy6' => null]],
+            [1, 'Celtics', null],
+        ]);
+
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $result = $service->getTradeReviewPageData('testuser');
+
+        $preview = $result['tradeOffers'][1]['previewData'];
+        $this->assertSame(300, $preview['fromCash'][1]);
+        $this->assertSame(0, $preview['fromCash'][2]);
+        $this->assertSame(0, $preview['toCash'][1]);
+    }
+
+    public function testGetTradeReviewPageDataPreviewDataIncludesSeasonInfo(): void
+    {
+        $mockRepo = $this->createStub(TradingRepositoryInterface::class);
+        $mockCashRepo = $this->createStub(TradeCashRepositoryInterface::class);
+        $mockCommon = $this->createStub(\Services\CommonMysqliRepository::class);
+
+        $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
+        $mockCommon->method('getTidFromTeamname')->willReturn(1);
+        $mockRepo->method('getAllTradeOffers')->willReturn([
+            ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+        ]);
+        $mockRepo->method('getPlayerById')
+            ->willReturn(['name' => 'Test Player', 'pos' => 'PG']);
+        $mockRepo->method('getAllTeamsWithCity')->willReturn([
+            ['teamid' => 1, 'team_name' => 'Lakers', 'team_city' => 'Los Angeles', 'color1' => '552583', 'color2' => 'FDB927'],
+        ]);
+
+        $service = new TradingService($mockRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $result = $service->getTradeReviewPageData('testuser');
+
+        $preview = $result['tradeOffers'][1]['previewData'];
+        $this->assertArrayHasKey('cashStartYear', $preview);
+        $this->assertArrayHasKey('cashEndYear', $preview);
+        $this->assertArrayHasKey('seasonEndingYear', $preview);
+        $this->assertSame(6, $preview['cashEndYear']);
+    }
+
+    // ============================================
     // HELPERS
     // ============================================
 

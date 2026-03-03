@@ -100,8 +100,10 @@ window.IBL_initNextSimHighlight=function(root){
         tbody.addEventListener("mouseover",function(e){
             var td=e.target.closest("td");
             if(!td)return;
-            var ci=td.cellIndex,bg=getHoverColor(td.parentElement);
+            var ci=td.cellIndex;
             clear();
+            if(ci<2)return;
+            var bg=getHoverColor(td.parentElement);
             tbody.querySelectorAll("tr").forEach(function(row){
                 var cell=row.cells[ci];
                 if(cell){cell.classList.add("next-sim-col-hover");cell.style.backgroundColor=bg;}
@@ -296,7 +298,7 @@ window.IBL_initNextSimHighlight();
         ?>
         <tr class="<?= $rowClass ?>" style="<?= $rowStyle ?>">
             <?= $gameInfoCell ?>
-            <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '') ?>
+            <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', [], $player->nameStatusClass) ?>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <td><?= (int)$player->age ?></td>
             <td class="sep-team"></td>

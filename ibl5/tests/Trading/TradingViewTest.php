@@ -80,15 +80,6 @@ class TradingViewTest extends TestCase
         $this->assertStringContainsString('R1', $html);
     }
 
-    public function testRenderTradeOfferFormContainsCapTotals(): void
-    {
-        $pageData = $this->createTradeOfferPageData();
-
-        $html = $this->view->renderTradeOfferForm($pageData);
-
-        $this->assertStringContainsString('Cap Totals', $html);
-    }
-
     public function testRenderTradeOfferFormContainsCashExchange(): void
     {
         $pageData = $this->createTradeOfferPageData();
@@ -128,8 +119,11 @@ class TradingViewTest extends TestCase
 
         $html = $this->view->renderTradeOfferForm($pageData);
 
-        $this->assertStringNotContainsString('<script>', $html);
+        // The XSS payload should be HTML-escaped in the page content
         $this->assertStringContainsString('&lt;script&gt;', $html);
+        // The unescaped XSS payload should NOT appear in user-visible areas
+        // (legitimate <script> tags for JS config are expected)
+        $this->assertStringNotContainsString('<script>alert', $html);
     }
 
     public function testRenderTradeOfferFormDisablesCheckboxForWaivedPlayers(): void
@@ -163,16 +157,11 @@ class TradingViewTest extends TestCase
     {
         $pageData = $this->createTradeReviewPageData();
         $pageData['tradeOffers'] = [
-            1 => [
-                'from' => 'Lakers',
-                'to' => 'Celtics',
-                'approval' => 'Celtics',
-                'oppositeTeam' => 'Celtics',
-                'hasHammer' => false,
+            1 => $this->createTradeOfferWithPreview([
                 'items' => [
                     ['type' => 'player', 'description' => 'The Lakers send PG LeBron James to the Celtics.', 'notes' => null, 'from' => 'Lakers', 'to' => 'Celtics'],
                 ],
-            ],
+            ]),
         ];
 
         $html = $this->view->renderTradeReview($pageData);
@@ -185,7 +174,7 @@ class TradingViewTest extends TestCase
     {
         $pageData = $this->createTradeReviewPageData();
         $pageData['tradeOffers'] = [
-            1 => [
+            1 => $this->createTradeOfferWithPreview([
                 'from' => 'Celtics',
                 'to' => 'Lakers',
                 'approval' => 'Lakers',
@@ -194,7 +183,7 @@ class TradingViewTest extends TestCase
                 'items' => [
                     ['type' => 'player', 'description' => 'Trade item.', 'notes' => null, 'from' => 'Celtics', 'to' => 'Lakers'],
                 ],
-            ],
+            ]),
         ];
 
         $html = $this->view->renderTradeReview($pageData);
@@ -207,16 +196,11 @@ class TradingViewTest extends TestCase
     {
         $pageData = $this->createTradeReviewPageData();
         $pageData['tradeOffers'] = [
-            1 => [
-                'from' => 'Lakers',
-                'to' => 'Celtics',
-                'approval' => 'Celtics',
-                'oppositeTeam' => 'Celtics',
-                'hasHammer' => false,
+            1 => $this->createTradeOfferWithPreview([
                 'items' => [
                     ['type' => 'player', 'description' => 'Trade item.', 'notes' => null, 'from' => 'Lakers', 'to' => 'Celtics'],
                 ],
-            ],
+            ]),
         ];
 
         $html = $this->view->renderTradeReview($pageData);
@@ -228,16 +212,11 @@ class TradingViewTest extends TestCase
     {
         $pageData = $this->createTradeReviewPageData();
         $pageData['tradeOffers'] = [
-            1 => [
-                'from' => 'Lakers',
-                'to' => 'Celtics',
-                'approval' => 'Celtics',
-                'oppositeTeam' => 'Celtics',
-                'hasHammer' => false,
+            1 => $this->createTradeOfferWithPreview([
                 'items' => [
                     ['type' => 'player', 'description' => 'Trade item.', 'notes' => null, 'from' => 'Lakers', 'to' => 'Celtics'],
                 ],
-            ],
+            ]),
         ];
 
         $html = $this->view->renderTradeReview($pageData);
@@ -250,16 +229,11 @@ class TradingViewTest extends TestCase
     {
         $pageData = $this->createTradeReviewPageData();
         $pageData['tradeOffers'] = [
-            1 => [
-                'from' => 'Lakers',
-                'to' => 'Celtics',
-                'approval' => 'Celtics',
-                'oppositeTeam' => 'Celtics',
-                'hasHammer' => false,
+            1 => $this->createTradeOfferWithPreview([
                 'items' => [
                     ['type' => 'pick', 'description' => 'The Lakers send pick to Celtics.', 'notes' => 'Top 5 protected', 'from' => 'Lakers', 'to' => 'Celtics'],
                 ],
-            ],
+            ]),
         ];
 
         $html = $this->view->renderTradeReview($pageData);
@@ -284,21 +258,67 @@ class TradingViewTest extends TestCase
     {
         $pageData = $this->createTradeReviewPageData();
         $pageData['tradeOffers'] = [
-            1 => [
-                'from' => 'Lakers',
-                'to' => 'Celtics',
-                'approval' => 'Celtics',
+            1 => $this->createTradeOfferWithPreview([
                 'oppositeTeam' => '<script>xss</script>',
-                'hasHammer' => false,
                 'items' => [
                     ['type' => 'player', 'description' => '<script>alert("xss")</script>', 'notes' => null, 'from' => 'Lakers', 'to' => 'Celtics'],
                 ],
-            ],
+            ]),
         ];
 
         $html = $this->view->renderTradeReview($pageData);
 
-        $this->assertStringNotContainsString('<script>', $html);
+        // The unescaped XSS payload should NOT appear — legitimate <script> tags for JS config are expected
+        $this->assertStringNotContainsString('<script>alert', $html);
+        $this->assertStringNotContainsString('<script>xss', $html);
+    }
+
+    // ============================================
+    // ROSTER PREVIEW PANEL TESTS
+    // ============================================
+
+    public function testRenderTradeOfferFormContainsRosterPreviewPanel(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('id="trade-roster-preview"', $html);
+        $this->assertStringContainsString('trade-roster-preview', $html);
+        $this->assertStringContainsString('Roster Preview', $html);
+        $this->assertStringContainsString('trade-roster-preview__tabs', $html);
+        $this->assertStringContainsString('data-display="ratings"', $html);
+        $this->assertStringContainsString('data-display="contracts"', $html);
+    }
+
+    public function testRenderTradeOfferFormContainsRosterPreviewLogos(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('trade-roster-preview__logo', $html);
+        $this->assertStringContainsString('data-team-id="1"', $html);
+        $this->assertStringContainsString('data-team-id="2"', $html);
+    }
+
+    public function testRenderTradeOfferFormConfigContainsRosterPreviewApiUrl(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('rosterPreviewApiBaseUrl', $html);
+        $this->assertStringContainsString('roster-preview-api', $html);
+    }
+
+    public function testRenderTradeOfferFormLoadsRosterPreviewJs(): void
+    {
+        $pageData = $this->createTradeOfferPageData();
+
+        $html = $this->view->renderTradeOfferForm($pageData);
+
+        $this->assertStringContainsString('trade-roster-preview.js', $html);
     }
 
     // ============================================
@@ -427,6 +447,131 @@ class TradingViewTest extends TestCase
     }
 
     // ============================================
+    // REVIEW PAGE PREVIEW TESTS
+    // ============================================
+
+    public function testRenderTradeReviewShowsPreviewButton(): void
+    {
+        $pageData = $this->createTradeReviewPageData();
+        $pageData['tradeOffers'] = [
+            1 => $this->createTradeOfferWithPreview(),
+        ];
+
+        $html = $this->view->renderTradeReview($pageData);
+
+        $this->assertStringContainsString('data-preview-offer="1"', $html);
+        $this->assertStringContainsString('ibl-btn--neutral', $html);
+        $this->assertStringContainsString('>Preview</button>', $html);
+    }
+
+    public function testRenderTradeReviewShowsPreviewPanel(): void
+    {
+        $pageData = $this->createTradeReviewPageData();
+        $pageData['tradeOffers'] = [
+            1 => $this->createTradeOfferWithPreview(),
+        ];
+
+        $html = $this->view->renderTradeReview($pageData);
+
+        $this->assertStringContainsString('id="trade-review-preview-1"', $html);
+        $this->assertStringContainsString('trade-roster-preview__logo', $html);
+        $this->assertStringContainsString('data-display="ratings"', $html);
+        $this->assertStringContainsString('data-display="contracts"', $html);
+        $this->assertStringContainsString('Roster Preview', $html);
+    }
+
+    public function testRenderTradeReviewLoadsPreviewJs(): void
+    {
+        $pageData = $this->createTradeReviewPageData();
+        $pageData['tradeOffers'] = [
+            1 => $this->createTradeOfferWithPreview(),
+        ];
+
+        $html = $this->view->renderTradeReview($pageData);
+
+        $this->assertStringContainsString('trade-review-preview.js', $html);
+    }
+
+    public function testRenderTradeReviewInjectsConfig(): void
+    {
+        $pageData = $this->createTradeReviewPageData();
+        $pageData['tradeOffers'] = [
+            1 => $this->createTradeOfferWithPreview(),
+        ];
+
+        $html = $this->view->renderTradeReview($pageData);
+
+        $this->assertStringContainsString('IBL_TRADE_REVIEW_CONFIGS', $html);
+        $this->assertStringContainsString('rosterPreviewApiBaseUrl', $html);
+        $this->assertStringContainsString('roster-preview-api', $html);
+    }
+
+    public function testRenderTradeReviewPreviewButtonBelowTradeItems(): void
+    {
+        $pageData = $this->createTradeReviewPageData();
+        $pageData['tradeOffers'] = [
+            1 => $this->createTradeOfferWithPreview([
+                'items' => [
+                    ['type' => 'player', 'description' => 'The Lakers send PG LeBron James to the Celtics.', 'notes' => null, 'from' => 'Lakers', 'to' => 'Celtics'],
+                ],
+            ]),
+        ];
+
+        $html = $this->view->renderTradeReview($pageData);
+
+        // Preview button should appear after trade-offer-items and before the panel
+        $itemsPos = strpos($html, 'trade-offer-items');
+        $buttonPos = strpos($html, 'data-preview-offer="1"');
+        $panelPos = strpos($html, 'trade-review-preview-1');
+
+        $this->assertNotFalse($itemsPos);
+        $this->assertNotFalse($buttonPos);
+        $this->assertNotFalse($panelPos);
+        $this->assertGreaterThan($itemsPos, $buttonPos);
+        $this->assertGreaterThan($buttonPos, $panelPos);
+    }
+
+    public function testRenderTradeReviewPreviewPanelUsesTeamLogos(): void
+    {
+        $pageData = $this->createTradeReviewPageData();
+        $pageData['tradeOffers'] = [
+            1 => $this->createTradeOfferWithPreview([
+                'previewData' => [
+                    'fromPids' => [100],
+                    'toPids' => [200],
+                    'fromTeamId' => 5,
+                    'toTeamId' => 10,
+                    'fromColor1' => '552583',
+                    'toColor1' => '007A33',
+                    'fromCash' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0],
+                    'toCash' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0],
+                    'cashStartYear' => 1,
+                    'cashEndYear' => 6,
+                    'seasonEndingYear' => 2025,
+                ],
+            ]),
+        ];
+
+        $html = $this->view->renderTradeReview($pageData);
+
+        $this->assertStringContainsString('data-team-id="5"', $html);
+        $this->assertStringContainsString('data-team-id="10"', $html);
+        $this->assertStringContainsString('images/logo/5.jpg', $html);
+        $this->assertStringContainsString('images/logo/10.jpg', $html);
+    }
+
+    public function testRenderTradeReviewNoScriptWhenNoOffers(): void
+    {
+        $pageData = $this->createTradeReviewPageData();
+        $pageData['tradeOffers'] = [];
+
+        $html = $this->view->renderTradeReview($pageData);
+
+        $this->assertStringNotContainsString('IBL_TRADE_REVIEW_CONFIGS', $html);
+        $this->assertStringNotContainsString('trade-review-preview.js', $html);
+    }
+
+    // ============================================
     // HELPERS
     // ============================================
 
@@ -466,5 +611,47 @@ class TradingViewTest extends TestCase
             'result' => null,
             'error' => null,
         ];
+    }
+
+    /**
+     * Create a trade offer array with previewData for review page tests.
+     *
+     * @param array<string, mixed> $overrides Fields to override
+     * @return array<string, mixed>
+     */
+    private function createTradeOfferWithPreview(array $overrides = []): array
+    {
+        $default = [
+            'from' => 'Lakers',
+            'to' => 'Celtics',
+            'approval' => 'Celtics',
+            'oppositeTeam' => 'Celtics',
+            'hasHammer' => false,
+            'items' => [
+                ['type' => 'player', 'description' => 'Trade item.', 'notes' => null, 'from' => 'Lakers', 'to' => 'Celtics'],
+            ],
+            'previewData' => [
+                'fromPids' => [100],
+                'toPids' => [200],
+                'fromTeamId' => 1,
+                'toTeamId' => 2,
+                'fromColor1' => '552583',
+                'toColor1' => '007A33',
+                'fromCash' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0],
+                'toCash' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0],
+                'cashStartYear' => 1,
+                'cashEndYear' => 6,
+                'seasonEndingYear' => 2025,
+            ],
+        ];
+
+        $merged = array_merge($default, $overrides);
+
+        // Deep-merge previewData if provided as override
+        if (isset($overrides['previewData'])) {
+            $merged['previewData'] = array_merge($default['previewData'], $overrides['previewData']);
+        }
+
+        return $merged;
     }
 }

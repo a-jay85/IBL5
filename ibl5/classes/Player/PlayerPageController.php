@@ -178,6 +178,15 @@ class PlayerPageController
         $playerName = $player->name ?? '';
 
         if ($pageView === PlayerPageType::OVERVIEW) {
+            if ($player->isRetired !== null && $player->isRetired !== 0) {
+                return $this->renderFlipCardView(
+                    $viewFactory->createRegularSeasonAveragesView()->renderAverages($playerID),
+                    $viewFactory->createRegularSeasonTotalsView()->renderTotals($playerID),
+                    'Regular Season',
+                    true,
+                    $colorScheme
+                );
+            }
             $view = $viewFactory->createOverviewView();
             return $view->renderOverview($playerID, $player, $playerStats, $season, $sharedRepository, $colorScheme);
         }
@@ -251,6 +260,15 @@ class PlayerPageController
         }
 
         // Default to overview
+        if ($player->isRetired !== null && $player->isRetired !== 0) {
+            return $this->renderFlipCardView(
+                $viewFactory->createRegularSeasonAveragesView()->renderAverages($playerID),
+                $viewFactory->createRegularSeasonTotalsView()->renderTotals($playerID),
+                'Regular Season',
+                true,
+                $colorScheme
+            );
+        }
         $view = $viewFactory->createOverviewView();
         return $view->renderOverview($playerID, $player, $playerStats, $season, $sharedRepository, $colorScheme);
     }

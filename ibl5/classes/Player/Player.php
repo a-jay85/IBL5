@@ -246,6 +246,9 @@ class Player implements PlayerInterface
     /** @var string|null Decorated name with status indicators */
     public ?string $decoratedName = null;
 
+    /** @var string CSS class for player name status indicator (waived/expiring) */
+    public string $nameStatusClass = '';
+
     /**
      * Create a new Player instance
      */
@@ -401,6 +404,7 @@ class Player implements PlayerInterface
         $this->timeDroppedOnWaivers = $this->playerData->timeDroppedOnWaivers;
 
         $this->decoratedName = $this->decoratePlayerName();
+        $this->nameStatusClass = $this->nameDecorator->getNameStatusClass($this->getPlayerData());
     }
 
     /**

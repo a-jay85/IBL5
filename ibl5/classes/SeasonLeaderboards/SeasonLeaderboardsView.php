@@ -20,10 +20,29 @@ use SeasonLeaderboards\Contracts\SeasonLeaderboardsViewInterface;
 class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
 {
     private SeasonLeaderboardsService $service;
+    private string $activeSortColumn = 'ppg';
+
+    private const SORT_TO_COLUMN = [
+        '1' => 'ppg',    '2' => 'rpg',    '3' => 'orbpg',  '4' => 'apg',
+        '5' => 'spg',    '6' => 'bpg',    '7' => 'tpg',    '8' => 'fpg',
+        '9' => 'qa',     '10' => 'fgmpg', '11' => 'fgapg', '12' => 'fgp',
+        '13' => 'ftmpg', '14' => 'ftapg', '15' => 'ftp',   '16' => 'tgmpg',
+        '17' => 'tgapg', '18' => 'tgp',   '19' => 'games', '20' => 'mpg',
+    ];
 
     public function __construct(SeasonLeaderboardsService $service)
     {
         $this->service = $service;
+    }
+
+    public function setSortBy(string $sortBy): void
+    {
+        $this->activeSortColumn = self::SORT_TO_COLUMN[$sortBy] ?? 'ppg';
+    }
+
+    private function sortAttr(string $statKey): string
+    {
+        return $this->activeSortColumn === $statKey ? ' class="sorted-col"' : '';
     }
 
     /**
@@ -144,26 +163,26 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
             <th>Year</th>
             <th class="sticky-col-2">Name</th>
             <th>Team</th>
-            <th>G</th>
-            <th>Min</th>
-            <th>fgm</th>
-            <th>fga</th>
-            <th>fg%</th>
-            <th>ftm</th>
-            <th>fta</th>
-            <th>ft%</th>
-            <th>tgm</th>
-            <th>tga</th>
-            <th>tg%</th>
-            <th>orb</th>
-            <th>reb</th>
-            <th>ast</th>
-            <th>stl</th>
-            <th>to</th>
-            <th>blk</th>
-            <th>pf</th>
-            <th>ppg</th>
-            <th>qa</th>
+            <th<?= $this->sortAttr('games') ?>>G</th>
+            <th<?= $this->sortAttr('mpg') ?>>Min</th>
+            <th<?= $this->sortAttr('fgmpg') ?>>fgm</th>
+            <th<?= $this->sortAttr('fgapg') ?>>fga</th>
+            <th<?= $this->sortAttr('fgp') ?>>fg%</th>
+            <th<?= $this->sortAttr('ftmpg') ?>>ftm</th>
+            <th<?= $this->sortAttr('ftapg') ?>>fta</th>
+            <th<?= $this->sortAttr('ftp') ?>>ft%</th>
+            <th<?= $this->sortAttr('tgmpg') ?>>tgm</th>
+            <th<?= $this->sortAttr('tgapg') ?>>tga</th>
+            <th<?= $this->sortAttr('tgp') ?>>tg%</th>
+            <th<?= $this->sortAttr('orbpg') ?>>orb</th>
+            <th<?= $this->sortAttr('rpg') ?>>reb</th>
+            <th<?= $this->sortAttr('apg') ?>>ast</th>
+            <th<?= $this->sortAttr('spg') ?>>stl</th>
+            <th<?= $this->sortAttr('tpg') ?>>to</th>
+            <th<?= $this->sortAttr('bpg') ?>>blk</th>
+            <th<?= $this->sortAttr('fpg') ?>>pf</th>
+            <th<?= $this->sortAttr('ppg') ?>>ppg</th>
+            <th<?= $this->sortAttr('qa') ?>>qa</th>
         </tr>
     </thead>
     <tbody>
@@ -189,26 +208,26 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     <td><?= $stats['year'] ?></td>
     <?= $playerCell ?>
     <?= $teamCell ?>
-    <td><?= $stats['games'] ?></td>
-    <td><?= $stats['mpg'] ?></td>
-    <td><?= $stats['fgmpg'] ?></td>
-    <td><?= $stats['fgapg'] ?></td>
-    <td><?= $stats['fgp'] ?></td>
-    <td><?= $stats['ftmpg'] ?></td>
-    <td><?= $stats['ftapg'] ?></td>
-    <td><?= $stats['ftp'] ?></td>
-    <td><?= $stats['tgmpg'] ?></td>
-    <td><?= $stats['tgapg'] ?></td>
-    <td><?= $stats['tgp'] ?></td>
-    <td><?= $stats['orbpg'] ?></td>
-    <td><?= $stats['rpg'] ?></td>
-    <td><?= $stats['apg'] ?></td>
-    <td><?= $stats['spg'] ?></td>
-    <td><?= $stats['tpg'] ?></td>
-    <td><?= $stats['bpg'] ?></td>
-    <td><?= $stats['fpg'] ?></td>
-    <td><?= $stats['ppg'] ?></td>
-    <td><?= $stats['qa'] ?></td>
+    <td<?= $this->sortAttr('games') ?>><?= $stats['games'] ?></td>
+    <td<?= $this->sortAttr('mpg') ?>><?= $stats['mpg'] ?></td>
+    <td<?= $this->sortAttr('fgmpg') ?>><?= $stats['fgmpg'] ?></td>
+    <td<?= $this->sortAttr('fgapg') ?>><?= $stats['fgapg'] ?></td>
+    <td<?= $this->sortAttr('fgp') ?>><?= $stats['fgp'] ?></td>
+    <td<?= $this->sortAttr('ftmpg') ?>><?= $stats['ftmpg'] ?></td>
+    <td<?= $this->sortAttr('ftapg') ?>><?= $stats['ftapg'] ?></td>
+    <td<?= $this->sortAttr('ftp') ?>><?= $stats['ftp'] ?></td>
+    <td<?= $this->sortAttr('tgmpg') ?>><?= $stats['tgmpg'] ?></td>
+    <td<?= $this->sortAttr('tgapg') ?>><?= $stats['tgapg'] ?></td>
+    <td<?= $this->sortAttr('tgp') ?>><?= $stats['tgp'] ?></td>
+    <td<?= $this->sortAttr('orbpg') ?>><?= $stats['orbpg'] ?></td>
+    <td<?= $this->sortAttr('rpg') ?>><?= $stats['rpg'] ?></td>
+    <td<?= $this->sortAttr('apg') ?>><?= $stats['apg'] ?></td>
+    <td<?= $this->sortAttr('spg') ?>><?= $stats['spg'] ?></td>
+    <td<?= $this->sortAttr('tpg') ?>><?= $stats['tpg'] ?></td>
+    <td<?= $this->sortAttr('bpg') ?>><?= $stats['bpg'] ?></td>
+    <td<?= $this->sortAttr('fpg') ?>><?= $stats['fpg'] ?></td>
+    <td<?= $this->sortAttr('ppg') ?>><?= $stats['ppg'] ?></td>
+    <td<?= $this->sortAttr('qa') ?>><?= $stats['qa'] ?></td>
 </tr>
         <?php
         return (string) ob_get_clean();

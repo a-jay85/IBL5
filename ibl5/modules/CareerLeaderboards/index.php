@@ -50,12 +50,15 @@ if ($filters['submitted'] != null) {
     if ($tableKey !== false && $sortColumn !== false) {
         // Get table type (totals or averages)
         $tableType = $repository->getTableType($tableKey);
-        
+
         // Get leaderboard data
         $activeOnly = (int)$filters['active'];
         $limit = is_numeric($filters['display']) && $filters['display'] > 0 ? (int)$filters['display'] : 0;
         $leadersData = $repository->getLeaderboards($tableKey, $sortColumn, $activeOnly, $limit);
-        
+
+        // Set active sort column for highlighting
+        $view->setSortColumn($sortColumn);
+
         // Render table header
         echo $view->renderTableHeader();
         

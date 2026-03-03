@@ -119,7 +119,7 @@ class Ratings
 <?php if ($moduleName === "LeagueStarters"):
     echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamID ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
 endif; ?>
-            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids) ?>
+            <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <td><?= (int)$player->age ?></td>
             <td class="sep-team"></td>

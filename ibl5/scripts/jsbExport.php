@@ -76,7 +76,7 @@ if (!isset($_POST['confirmed'])) {
     exit();
 }
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+require __DIR__ . '/../mainfile.php';
 
 use JsbParser\JsbExportRepository;
 use JsbParser\JsbExportService;
@@ -86,7 +86,7 @@ $repository = new JsbExportRepository($mysqli_db);
 $service = new JsbExportService($repository);
 $season = new Season($mysqli_db);
 
-$basePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5';
+$basePath = __DIR__ . '/..';
 $plrInput = $basePath . '/IBL5.plr';
 $plrOutput = $basePath . '/IBL5_export.plr';
 $trnOutput = $basePath . '/IBL5_export.trn';

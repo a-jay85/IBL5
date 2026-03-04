@@ -202,7 +202,8 @@ class FranchiseRecordBookView
             }
 
             if ($showTeamColumn) {
-                $html .= $this->renderTeamOfRecordCell($teamOfRecord, $recordType);
+                $isRetired = ($record['retired'] ?? 0) === 1;
+                $html .= $this->renderTeamOfRecordCell($teamOfRecord, $recordType, $isRetired);
             }
 
             $html .= '</tr>';
@@ -231,8 +232,12 @@ class FranchiseRecordBookView
     /**
      * Render a colored team cell with logo using TeamCellHelper.
      */
-    private function renderTeamOfRecordCell(int $teamId, string $recordType): string
+    private function renderTeamOfRecordCell(int $teamId, string $recordType, bool $isRetired = false): string
     {
+        if ($isRetired && $recordType === 'career') {
+            return '<td class="record-book-retired-cell">Retired</td>';
+        }
+
         if ($teamId <= 0 || !isset($this->teamLookup[$teamId])) {
             if ($recordType === 'career') {
                 return '<td class="record-book-retired-cell">Retired</td>';

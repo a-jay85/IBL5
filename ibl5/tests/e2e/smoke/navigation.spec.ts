@@ -1,18 +1,11 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
 
 // Public navigation tests — no authentication required.
 // The navigation bar renders on every page via themeheader().
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
-const PHP_ERROR_PATTERNS = [
-  'Fatal error',
-  'Warning:',
-  'Parse error',
-  'Uncaught',
-  'Stack trace:',
-];
 
 function desktopNav(page: Page) {
   return page.locator('.hidden.lg\\:flex').first();

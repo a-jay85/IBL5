@@ -24,7 +24,7 @@ test.describe('Public page smoke tests', () => {
     const body = await page.locator('body').textContent();
     if (isModuleInactive(body)) {
       await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
-      return;
+      test.skip(true, 'Module hidden during trivia mode');
     }
     // Player page uses a card layout — check for the player name heading
     await expect(page.locator('h2, h3').first()).toBeVisible();
@@ -40,7 +40,7 @@ test.describe('Public page smoke tests', () => {
     const body = await page.locator('body').textContent();
     if (isModuleInactive(body)) {
       await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
-      return;
+      test.skip(true, 'Module hidden during trivia mode');
     }
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
@@ -50,7 +50,7 @@ test.describe('Public page smoke tests', () => {
     const body = await page.locator('body').textContent();
     if (isModuleInactive(body)) {
       await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
-      return;
+      test.skip(true, 'Module hidden during trivia mode');
     }
     // Career leaderboards shows a form on initial load — verify the form is present
     await expect(page.getByRole('button', { name: /display/i })).toBeVisible();

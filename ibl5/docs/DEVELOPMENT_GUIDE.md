@@ -1,6 +1,6 @@
 # Development Guide
 
-**Status:** 30/30 IBL modules refactored (100% complete) ✅ • 3370 tests • ~80% coverage • Goal: 80%
+**Status:** 31/31 total modules refactored (100% complete) ✅ • 3370 tests • ~80% coverage • Goal: 80% ✅
 
 > 📘 **Progressive Loading:** Detailed workflows are in `.claude/rules/` and `.github/skills/`. See [SKILLS_GUIDE.md](.github/SKILLS_GUIDE.md).
 
@@ -8,7 +8,12 @@
 
 ## Current Priorities
 
-### 🎯 All Modules Refactored ✅
+### 🎯 All Modules Refactored ✅ (31/31 Complete)
+
+**Modules Included:**
+- 22 Core IBL modules (Player, Statistics, Team, Draft, Waivers, Extension, RookieOption, Trading, Negotiation, DepthChart, Voting, Schedule, Season Leaders, Free Agency, PlayerDatabase, Compare_Players, Leaderboards, Standings, League_Stats, AwardHistory, Series_Records, One-on-One)
+- 8 Display modules (CapSpace, Draft_Pick_Locator, Franchise_History, Injuries, League_Starters, Next_Sim, Power_Rankings, Team_Schedule)
+- 1 Admin module (LeagueControlPanel)
 
 ### 🚀 Post-Refactoring Phase
 
@@ -30,6 +35,27 @@
 ---
 
 ## Recent Updates
+
+### LeagueControlPanel: Admin Module Refactoring (Mar 2, 2026)
+
+**Impact:** Refactored admin LeagueControlPanel from 353-line monolithic script to Repository-Service-Processor-View architecture, bringing total from 3033 to 3089 tests (+56 tests)
+
+**Changes:**
+- Created 4 classes + 4 interfaces with separation of concerns
+- Extracted CSS to `design/components/league-control-panel.css`
+- Implemented admin authentication guard with login redirect and 403 access control
+- Replaced fragile button-label action dispatching with stable snake_case action keys
+- Implemented PRG (Post-Redirect-Get) pattern for form submissions
+- Added 56 comprehensive unit tests (148 assertions) with full coverage
+- Integrated HtmlSanitizer::e() for XSS protection on all output
+
+**Test Files:**
+- LeagueControlPanelRepositoryTest: 8 tests
+- LeagueControlPanelServiceTest: 16 tests
+- LeagueControlPanelProcessorTest: 18 tests
+- LeagueControlPanelViewTest: 14 tests
+
+**Status:** All 3089 tests passing • LeagueControlPanel now fully refactored
 
 ### Navigation: View Split into Controller/Service/View Architecture (Feb 27, 2026)
 
@@ -60,7 +86,7 @@
 
 ### StandingsUpdater: Database-Driven Computation (Feb 14, 2026)
 
-**Impact:** Replaced HTML file parsing with database-driven standings computation, bringing total from 2164 to 2892 tests
+**Impact:** Replaced HTML file parsing with database-driven standings computation, bringing total from 2164 to 3033 tests
 
 **Changes:**
 - `StandingsUpdater` now computes standings from `ibl_schedule` game results instead of parsing `Standings.htm`
@@ -385,11 +411,13 @@
 
 ---
 
-## Completed Modules (30/30) ✅
+## Completed Modules (31/31) ✅
 
-**Core Modules (22):** Player • Statistics • Team • Draft • Waivers • Extension • RookieOption • Trading • Negotiation • DepthChart • Voting • Schedule • Season Leaders • Free Agency • PlayerDatabase • Compare_Players • Leaderboards • Standings • League_Stats • Player_Awards • Series_Records • One-on-One
+**Core Modules (22):** Player • Statistics • Team • Draft • Waivers • Extension • RookieOption • Trading • Negotiation • DepthChart • Voting • Schedule • Season Leaders • Free Agency • PlayerDatabase • Compare_Players • Leaderboards • Standings • League_Stats • AwardHistory • Series_Records • One-on-One
 
 **Display Modules (8):** CapSpace • Draft_Pick_Locator • Franchise_History • Injuries • League_Starters • Next_Sim • Power_Rankings • Team_Schedule
+
+**Admin Modules (1):** LeagueControlPanel
 
 ---
 

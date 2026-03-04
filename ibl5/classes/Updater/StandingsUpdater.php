@@ -69,6 +69,8 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $this->updateMagicNumbers('Midwest');
         $this->updateMagicNumbers('Pacific');
 
+        $this->checkIfLeagueClinched();
+
         echo '<p>Magic numbers for all teams have been updated.<p>';
         echo '<p>The ibl_standings table has been updated.<p>';
     }
@@ -469,6 +471,55 @@ class StandingsUpdater extends \BaseMysqliRepository {
                 $winningestTeamName
             );
             echo "The {$winningestTeamName} have clinched the {$region} {$grouping}!";
+        }
+    }
+
+    private function checkIfLeagueClinched(): void {
+        echo '<p>Checking if any team has clinched the best league record...<br>';
+
+        $winningestTeam = $this->fetchOne(
+            "SELECT team_name, homeWins + awayWins AS wins
+            FROM ibl_standings
+            ORDER BY wins DESC
+            LIMIT 1",
+            ""
+        );
+
+        if ($winningestTeam === null) {
+            return;
+        }
+
+        /** @var string $winningestTeamName */
+        $winningestTeamName = $winningestTeam['team_name'];
+        /** @var int $winningestTeamWins */
+        $winningestTeamWins = $winningestTeam['wins'];
+
+        $leastLosingestTeam = $this->fetchOne(
+            "SELECT homeLosses + awayLosses AS losses
+            FROM ibl_standings
+            WHERE team_name <> ?
+            ORDER BY losses ASC
+            LIMIT 1",
+            "s",
+            $winningestTeamName
+        );
+
+        if ($leastLosingestTeam === null) {
+            return;
+        }
+
+        /** @var int $leastLosingestTeamLosses */
+        $leastLosingestTeamLosses = $leastLosingestTeam['losses'];
+
+        $magicNumber = 82 + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
+
+        if ($magicNumber <= 0) {
+            $this->execute(
+                "UPDATE ibl_standings SET clinchedLeague = 1 WHERE team_name = ?",
+                "s",
+                $winningestTeamName
+            );
+            echo "The {$winningestTeamName} have clinched the best record in the league!";
         }
     }
 

@@ -1,27 +1,63 @@
 @layer components {
   .league-switcher-admin {
-    background-color: #f0f0f0;
-    border: 2px solid #333;
-    padding: 15px;
-    margin-bottom: 20px;
-    border-radius: 5px;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    padding: var(--space-3) var(--space-4);
+    margin-bottom: var(--space-6);
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+
+  .league-switcher-admin label {
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-600);
   }
 
   .league-badge {
-    display: inline-block;
-    padding: 5px 15px;
-    border-radius: 3px;
-    font-weight: bold;
-    margin-right: 10px;
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-md);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 
   .league-badge-ibl {
-    background-color: #336699;
+    background: var(--navy-800);
     color: white;
   }
 
   .league-badge-olympics {
-    background-color: #d4af37;
-    color: black;
+    background: linear-gradient(135deg, #d4af37, #b8860b);
+    color: white;
+  }
+
+  .lcp-control-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-3);
+  }
+
+  .lcp-control-row .ibl-btn {
+    text-transform: none;
+  }
+
+  .lcp-note {
+    font-size: 0.8125rem;
+    color: var(--gray-400);
+    font-style: italic;
+    margin-top: var(--space-1);
   }
 }

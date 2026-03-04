@@ -177,9 +177,10 @@ test.describe('Career Leaderboards flow', () => {
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     const withoutRetireesCount = await page.locator('.ibl-data-table').first().locator('tbody tr').count();
 
-    // Counts should differ (or at least both be > 0)
+    // Both should have results, and counts should differ to confirm filter works
     expect(withRetireesCount).toBeGreaterThan(0);
     expect(withoutRetireesCount).toBeGreaterThan(0);
+    expect(withRetireesCount).not.toBe(withoutRetireesCount);
   });
 
   test('no PHP errors on career leaderboards', async ({ page }) => {

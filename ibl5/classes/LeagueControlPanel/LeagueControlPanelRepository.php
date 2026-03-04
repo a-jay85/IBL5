@@ -1,0 +1,275 @@
+<?php
+
+declare(strict_types=1);
+
+namespace LeagueControlPanel;
+
+use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
+
+/**
+ * @see LeagueControlPanelRepositoryInterface
+ */
+class LeagueControlPanelRepository extends \BaseMysqliRepository implements LeagueControlPanelRepositoryInterface
+{
+    /**
+     * @see LeagueControlPanelRepositoryInterface::getSetting()
+     */
+    public function getSetting(string $name): ?string
+    {
+        $row = $this->fetchOne(
+            "SELECT value FROM ibl_settings WHERE name = ?",
+            "s",
+            $name
+        );
+
+        if ($row === null) {
+            return null;
+        }
+
+        /** @var string */
+        return $row['value'];
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::getBulkSettings()
+     */
+    public function getBulkSettings(array $names): array
+    {
+        if ($names === []) {
+            return [];
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($names), '?'));
+        $types = str_repeat('s', count($names));
+
+        $rows = $this->fetchAll(
+            "SELECT name, value FROM ibl_settings WHERE name IN ($placeholders)",
+            $types,
+            ...$names
+        );
+
+        $settings = [];
+        foreach ($rows as $row) {
+            /** @var string $name */
+            $name = $row['name'];
+            /** @var string $value */
+            $value = $row['value'];
+            $settings[$name] = $value;
+        }
+
+        return $settings;
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::getSimLengthInDays()
+     */
+    public function getSimLengthInDays(): int
+    {
+        $value = $this->getSetting('Sim Length in Days');
+
+        return $value !== null ? (int) $value : 3;
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::updateSetting()
+     */
+    public function updateSetting(string $name, string $value): bool
+    {
+        $this->execute(
+            "UPDATE ibl_settings SET value = ? WHERE name = ?",
+            "ss",
+            $value,
+            $name
+        );
+
+        return true;
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::setSeasonPhase()
+     */
+    public function setSeasonPhase(string $phase): bool
+    {
+        $this->execute(
+            "UPDATE ibl_settings SET value = ? WHERE name = 'Current Season Phase'",
+            "s",
+            $phase
+        );
+
+        if ($phase === 'Preseason' || $phase === 'HEAT') {
+            $this->execute(
+                "UPDATE ibl_settings SET value = 'Off' WHERE name = 'Show Draft Link'"
+            );
+            $this->execute(
+                "UPDATE nuke_modules SET active = 0 WHERE title = 'Draft'"
+            );
+        }
+
+        return true;
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::setSimLengthInDays()
+     */
+    public function setSimLengthInDays(int $days): bool
+    {
+        $this->execute(
+            "UPDATE ibl_settings SET value = ? WHERE name = 'Sim Length in Days'",
+            "i",
+            $days
+        );
+
+        return true;
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::setShowDraftLink()
+     */
+    public function setShowDraftLink(string $value): bool
+    {
+        $this->execute(
+            "UPDATE ibl_settings SET value = ? WHERE name = 'Show Draft Link'",
+            "s",
+            $value
+        );
+
+        $moduleActive = $value === 'On' ? 1 : 0;
+        $this->execute(
+            "UPDATE nuke_modules SET active = ? WHERE title = 'Draft'",
+            "i",
+            $moduleActive
+        );
+
+        return true;
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::resetAllStarVoting()
+     */
+    public function resetAllStarVoting(): bool
+    {
+        $this->execute(
+            "UPDATE ibl_votes_ASG SET East_F1 = NULL, East_F2 = NULL, East_F3 = NULL, East_F4 = NULL,
+                West_F1 = NULL, West_F2 = NULL, West_F3 = NULL, West_F4 = NULL,
+                East_B1 = NULL, East_B2 = NULL, East_B3 = NULL, East_B4 = NULL,
+                West_B1 = NULL, West_B2 = NULL, West_B3 = NULL, West_B4 = NULL"
+        );
+
+        $this->execute(
+            "UPDATE ibl_settings SET value = 'Yes' WHERE name = 'ASG Voting'"
+        );
+
+        $this->execute(
+            "UPDATE ibl_team_info SET asg_vote = 'No Vote'"
+        );
+
+        return true;
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::resetEndOfYearVoting()
+     */
+    public function resetEndOfYearVoting(): bool
+    {
+        $this->execute(
+            "UPDATE ibl_votes_EOY SET MVP_1 = NULL, MVP_2 = NULL, MVP_3 = NULL,
+                Six_1 = NULL, Six_2 = NULL, Six_3 = NULL,
+                ROY_1 = NULL, ROY_2 = NULL, ROY_3 = NULL,
+                GM_1 = NULL, GM_2 = NULL, GM_3 = NULL"
+        );
+
+        $this->execute(
+            "UPDATE ibl_settings SET value = 'Yes' WHERE name = 'EOY Voting'"
+        );
+
+        $this->execute(
+            "UPDATE ibl_team_info SET eoy_vote = 'No Vote'"
+        );
+
+        return true;
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::setWaiversToFreeAgents()
+     */
+    public function setWaiversToFreeAgents(): bool
+    {
+        $this->execute(
+            "UPDATE ibl_plr SET teamname = 'Free Agents', bird = 0 WHERE retired <> 1 AND ordinal > " . \JSB::WAIVERS_ORDINAL
+        );
+
+        return true;
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::setFreeAgencyFactorsForPfw()
+     */
+    public function setFreeAgencyFactorsForPfw(): bool
+    {
+        $this->execute(
+            "UPDATE ibl_team_info info JOIN ibl_standings s ON s.tid = info.teamid SET Contract_Wins = s.wins, Contract_Losses = s.losses"
+        );
+
+        return true;
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::setAllowTrades()
+     */
+    public function setAllowTrades(string $value): bool
+    {
+        return $this->updateSetting('Allow Trades', $value);
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::setAllowWaivers()
+     */
+    public function setAllowWaivers(string $value): bool
+    {
+        return $this->updateSetting('Allow Waiver Moves', $value);
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::setFreeAgencyNotifications()
+     */
+    public function setFreeAgencyNotifications(string $value): bool
+    {
+        return $this->updateSetting('Free Agency Notifications', $value);
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::activateTriviaMode()
+     */
+    public function activateTriviaMode(): bool
+    {
+        return $this->updateSetting('Trivia Mode', 'On');
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::deactivateTriviaMode()
+     */
+    public function deactivateTriviaMode(): bool
+    {
+        return $this->updateSetting('Trivia Mode', 'Off');
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::resetAllContractExtensions()
+     */
+    public function resetAllContractExtensions(): bool
+    {
+        $this->execute("UPDATE ibl_team_info SET Used_Extension_This_Season = 0");
+
+        return true;
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::resetAllMlesAndLles()
+     */
+    public function resetAllMlesAndLles(): bool
+    {
+        $this->execute("UPDATE ibl_team_info SET HasMLE = 1, HasLLE = 1");
+
+        return true;
+    }
+}

@@ -15,23 +15,11 @@ use Utilities\SeasonPhaseHelper;
 class PowerRankingsUpdater extends \BaseMysqliRepository {
     private \Season $season;
     private TeamStatsCalculator $statsCalculator;
-    private ?LeagueContext $leagueContext;
 
     public function __construct(\mysqli $db, \Season $season, ?TeamStatsCalculator $statsCalculator = null, ?LeagueContext $leagueContext = null) {
-        parent::__construct($db);
+        parent::__construct($db, $leagueContext);
         $this->season = $season;
         $this->statsCalculator = $statsCalculator ?? new TeamStatsCalculator($db, $leagueContext);
-        $this->leagueContext = $leagueContext;
-    }
-
-    /**
-     * Resolve a table name through LeagueContext (if set), else return as-is
-     */
-    private function resolveTable(string $iblTableName): string
-    {
-        return $this->leagueContext !== null
-            ? $this->leagueContext->getTableName($iblTableName)
-            : $iblTableName;
     }
 
     public function update(): void {

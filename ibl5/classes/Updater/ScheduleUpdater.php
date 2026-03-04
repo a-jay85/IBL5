@@ -11,7 +11,6 @@ use Utilities\DateParser;
 
 class ScheduleUpdater extends \BaseMysqliRepository {
     private \Season $season;
-    private ?LeagueContext $leagueContext;
 
     /** @var array<int, string> Team ID to name lookup (for logging) */
     private array $teamIdToNameMap = [];
@@ -35,9 +34,8 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     ];
 
     public function __construct(\mysqli $db, \Season $season, ?LeagueContext $leagueContext = null) {
-        parent::__construct($db);
+        parent::__construct($db, $leagueContext);
         $this->season = $season;
-        $this->leagueContext = $leagueContext;
     }
 
     /**
@@ -70,16 +68,6 @@ class ScheduleUpdater extends \BaseMysqliRepository {
             $this->season->endingYear,
             $currentLeague
         );
-    }
-
-    /**
-     * Resolve a table name through LeagueContext (if set), else return as-is
-     */
-    private function resolveTable(string $iblTableName): string
-    {
-        return $this->leagueContext !== null
-            ? $this->leagueContext->getTableName($iblTableName)
-            : $iblTableName;
     }
 
     /**

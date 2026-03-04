@@ -164,9 +164,11 @@ class StandingsView implements StandingsViewInterface
     private function renderRows(array $standings): string
     {
         $html = '';
+        $bottomLocked = $this->getBottomLockedIndexes($standings);
 
-        foreach ($standings as $team) {
-            $html .= $this->renderTeamRow($team);
+        foreach ($standings as $index => $team) {
+            $isBottomLocked = isset($bottomLocked[$index]);
+            $html .= $this->renderTeamRow($team, $isBottomLocked);
         }
 
         return $html;
@@ -176,9 +178,10 @@ class StandingsView implements StandingsViewInterface
      * Render a single team row
      *
      * @param StandingsRow $team Team standings data
+     * @param bool $isBottomLocked Whether this team is mathematically locked at the bottom
      * @return string HTML for team row
      */
-    private function renderTeamRow(array $team): string
+    private function renderTeamRow(array $team, bool $isBottomLocked = false): string
     {
         $teamId = $team['tid'];
         $teamName = $this->formatTeamName($team);
@@ -215,9 +218,18 @@ class StandingsView implements StandingsViewInterface
         $homeGames = $team['homeGames'];
         $awayGames = $team['awayGames'];
 
+        // Build CSS class for row highlighting
+        $rowClass = '';
+        if ($isBottomLocked) {
+            $rowClass = 'bottom-locked';
+        } else {
+            $rowClass = $this->getClinchTierClass($team);
+        }
+        $classAttr = $rowClass !== '' ? ' class="' . $rowClass . '"' : '';
+
         ob_start();
         ?>
-        <tr data-team-id="<?= $teamId; ?>">
+        <tr data-team-id="<?= $teamId; ?>"<?= $classAttr; ?>>
             <?= TeamCellHelper::renderTeamCell($teamId, $team['team_name'], $team['color1'], $team['color2'], 'sticky-col', '', $teamName) ?>
             <td><?= $leagueRecord; ?></td>
             <td><?= \BasketballStats\StatsFormatter::formatWithDecimals((float)$pct, 3); ?></td>
@@ -244,12 +256,18 @@ class StandingsView implements StandingsViewInterface
     /**
      * Format team name with clinched indicator
      *
+     * Priority: W (league) > Z (conference) > Y (division) > X (playoffs)
+     *
      * @param StandingsRow $team Team standings data
      * @return string Formatted team name with clinched prefix if applicable
      */
     private function formatTeamName(array $team): string
     {
         $teamName = \Utilities\HtmlSanitizer::safeHtmlOutput($team['team_name']);
+
+        if ($team['clinchedLeague'] === 1) {
+            return '<span class="ibl-clinched-indicator">W</span>-' . $teamName;
+        }
 
         if ($team['clinchedConference'] === 1) {
             return '<span class="ibl-clinched-indicator">Z</span>-' . $teamName;
@@ -264,5 +282,105 @@ class StandingsView implements StandingsViewInterface
         }
 
         return $teamName;
+    }
+
+    /**
+     * Get the CSS class for a team's clinch tier
+     *
+     * @param StandingsRow $team Team standings data
+     * @return string CSS class name, or empty string if not clinched
+     */
+    private function getClinchTierClass(array $team): string
+    {
+        if ($team['clinchedLeague'] === 1) {
+            return 'clinch-league';
+        }
+
+        if ($team['clinchedConference'] === 1) {
+            return 'clinch-conference';
+        }
+
+        if ($team['clinchedDivision'] === 1) {
+            return 'clinch-division';
+        }
+
+        if ($team['clinchedPlayoffs'] === 1) {
+            return 'clinch-playoffs';
+        }
+
+        return '';
+    }
+
+    /**
+     * Determine which teams are eliminated (bottom-locked) in standings
+     *
+     * When the season is over (all gamesUnplayed = 0), any team without a clinch
+     * flag is eliminated. During the season, cascades from the bottom: a team is
+     * locked if even winning all remaining games can't catch the team above.
+     * The cascade stops at clinched teams or when a team can catch the one above.
+     *
+     * @param list<StandingsRow> $standings Standings data sorted by games back ASC
+     * @return array<int, true> Map of array indexes that are bottom-locked
+     */
+    private function getBottomLockedIndexes(array $standings): array
+    {
+        $count = count($standings);
+        /** @var array<int, true> $locked */
+        $locked = [];
+
+        if ($this->isSeasonOver($standings)) {
+            foreach ($standings as $index => $team) {
+                if (!$this->hasClinchStatus($team)) {
+                    $locked[$index] = true;
+                }
+            }
+
+            return $locked;
+        }
+
+        // During season: cascade from bottom, stop at clinched teams
+        for ($i = $count - 1; $i >= 1; $i--) {
+            if ($this->hasClinchStatus($standings[$i])) {
+                break;
+            }
+
+            $maxPossibleWins = $standings[$i]['wins'] + $standings[$i]['gamesUnplayed'];
+            if ($maxPossibleWins < $standings[$i - 1]['wins']) {
+                $locked[$i] = true;
+            } else {
+                break;
+            }
+        }
+
+        return $locked;
+    }
+
+    /**
+     * Check if the season is over (all teams have 0 games remaining)
+     *
+     * @param list<StandingsRow> $standings Standings data
+     */
+    private function isSeasonOver(array $standings): bool
+    {
+        foreach ($standings as $team) {
+            if ($team['gamesUnplayed'] > 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if a team has any clinch status (playoffs, division, conference, or league)
+     *
+     * @param StandingsRow $team Team standings data
+     */
+    private function hasClinchStatus(array $team): bool
+    {
+        return $team['clinchedLeague'] === 1
+            || $team['clinchedConference'] === 1
+            || $team['clinchedDivision'] === 1
+            || $team['clinchedPlayoffs'] === 1;
     }
 }

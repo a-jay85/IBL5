@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SeasonHighs;
 
+use League\LeagueContext;
 use SeasonHighs\Contracts\SeasonHighsRepositoryInterface;
 use SeasonHighs\Contracts\SeasonHighsServiceInterface;
 
@@ -19,6 +20,20 @@ use SeasonHighs\Contracts\SeasonHighsServiceInterface;
  */
 class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighsRepositoryInterface
 {
+    private string $boxScoresTable;
+    private string $boxScoresTeamsTable;
+    private string $teamInfoTable;
+    private string $scheduleTable;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->boxScoresTable = $this->resolveTable('ibl_box_scores');
+        $this->boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
+        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
+        $this->scheduleTable = $this->resolveTable('ibl_schedule');
+    }
+
     /**
      * @see SeasonHighsRepositoryInterface::getSeasonHighs()
      *
@@ -57,13 +72,13 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 bs.`Date` AS `date`, sch.`BoxID`,
                 COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,
                 {$statExpression} AS `{$safeStatName}`
-                FROM ibl_box_scores bs
+                FROM {$this->boxScoresTable} bs
                 JOIN ibl_plr p ON bs.pid = p.pid
-                LEFT JOIN ibl_team_info t ON p.tid = t.teamid
-                JOIN ibl_schedule sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
+                LEFT JOIN {$this->teamInfoTable} t ON p.tid = t.teamid
+                JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
                 LEFT JOIN (
                     SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
-                    FROM ibl_box_scores_teams
+                    FROM {$this->boxScoresTeamsTable}
                     GROUP BY Date, visitorTeamID, homeTeamID
                 ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
                 WHERE bs.`Date` BETWEEN ? AND ?{$locationCondition}
@@ -77,9 +92,9 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 bs.`name`, bs.`Date` AS `date`, sch.`BoxID`,
                 COALESCE(bs.`gameOfThatDay`, 0) AS gameOfThatDay,
                 {$statExpression} AS `{$safeStatName}`
-                FROM ibl_box_scores{$tableSuffix} bs
-                JOIN ibl_team_info t ON bs.name = t.team_name
-                JOIN ibl_schedule sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTeamID AND sch.Home = bs.homeTeamID
+                FROM {$this->boxScoresTeamsTable} bs
+                JOIN {$this->teamInfoTable} t ON bs.name = t.team_name
+                JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTeamID AND sch.Home = bs.homeTeamID
                 WHERE bs.`Date` BETWEEN ? AND ?
                 ORDER BY `{$safeStatName}` DESC, bs.`Date` ASC
                 LIMIT {$limit}";

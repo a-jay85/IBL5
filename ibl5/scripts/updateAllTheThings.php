@@ -43,6 +43,11 @@ if (!headers_sent()) {
 
 global $mysqli_db;
 
+// Determine league context from explicit URL parameter only (not cookie/session)
+$leagueParam = isset($_GET['league']) && is_string($_GET['league']) ? $_GET['league'] : null;
+$leagueContext = $leagueParam === 'olympics' ? new League\LeagueContext() : null;
+$isOlympics = $leagueContext !== null;
+
 $view = new Updater\UpdaterView();
 
 $stylesheetPath = '/ibl5/themes/IBL/style/style.css';
@@ -81,7 +86,8 @@ $basePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5';
 
 try {
     // --- Initialization ---
-    echo $view->renderSectionOpen('Initialization');
+    $leagueLabel = $isOlympics ? 'Olympics' : 'IBL';
+    echo $view->renderSectionOpen("Initialization ({$leagueLabel})");
     flush();
 
     echo $view->renderInitStatus('mainfile.php loaded');
@@ -99,15 +105,15 @@ try {
     echo $view->renderInitStatus('Season initialized');
     flush();
 
-    $scheduleUpdater = new Updater\ScheduleUpdater($mysqli_db, $season);
+    $scheduleUpdater = new Updater\ScheduleUpdater($mysqli_db, $season, $leagueContext);
     echo $view->renderInitStatus('ScheduleUpdater initialized');
     flush();
 
-    $standingsUpdater = new Updater\StandingsUpdater($mysqli_db, $season);
+    $standingsUpdater = new Updater\StandingsUpdater($mysqli_db, $season, $leagueContext);
     echo $view->renderInitStatus('StandingsUpdater initialized');
     flush();
 
-    $powerRankingsUpdater = new Updater\PowerRankingsUpdater($mysqli_db, $season);
+    $powerRankingsUpdater = new Updater\PowerRankingsUpdater($mysqli_db, $season, null, $leagueContext);
     echo $view->renderInitStatus('PowerRankingsUpdater initialized');
     flush();
 
@@ -121,7 +127,7 @@ try {
     $defaultPlrPath = $basePath . '/IBL5.plr';
     $defaultScoPath = $basePath . '/IBL5.sco';
 
-    $lgeRepo = new LeagueConfig\LeagueConfigRepository($mysqli_db);
+    $lgeRepo = new LeagueConfig\LeagueConfigRepository($mysqli_db, $leagueContext);
     $lgeService = new LeagueConfig\LeagueConfigService($lgeRepo);
     $lgeView = new LeagueConfig\LeagueConfigView();
 
@@ -129,7 +135,7 @@ try {
     $plrService = new PlrParser\PlrParserService($plrRepo, $commonRepository, $season);
 
     $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db);
-    $boxscoreRepo = new Boxscore\BoxscoreRepository($mysqli_db);
+    $boxscoreRepo = new Boxscore\BoxscoreRepository($mysqli_db, $leagueContext);
     $boxscoreView = new Boxscore\BoxscoreView();
 
     $savedDcRepo = new SavedDepthChart\SavedDepthChartRepository($mysqli_db);
@@ -141,20 +147,33 @@ try {
     $updaterService->addStep(new Updater\Steps\ImportLeagueConfigStep(
         $lgeRepo, $lgeService, $lgeView, $season->endingYear, $defaultLgePath,
     ));
-    $updaterService->addStep(new Updater\Steps\ParsePlayerFileStep($plrService, $defaultPlrPath));
+
+    // IBL-only steps: .plr file parsing, depth charts, extensions, All-Star games
+    if (!$isOlympics) {
+        $updaterService->addStep(new Updater\Steps\ParsePlayerFileStep($plrService, $defaultPlrPath));
+    }
+
     $updaterService->addStep(new Updater\Steps\UpdateScheduleStep($scheduleUpdater));
     $updaterService->addStep(new Updater\Steps\UpdateStandingsStep($standingsUpdater));
     $updaterService->addStep(new Updater\Steps\UpdatePowerRankingsStep($powerRankingsUpdater));
-    $updaterService->addStep(new Updater\Steps\ResetExtensionAttemptsStep($sharedRepository));
-    $updaterService->addStep(new Updater\Steps\ExtendDepthChartsStep(
-        $savedDcRepo, $season->lastSimEndDate, $season->lastSimNumber,
-    ));
+
+    if (!$isOlympics) {
+        $updaterService->addStep(new Updater\Steps\ResetExtensionAttemptsStep($sharedRepository));
+        $updaterService->addStep(new Updater\Steps\ExtendDepthChartsStep(
+            $savedDcRepo, $season->lastSimEndDate, $season->lastSimNumber,
+        ));
+    }
+
     $updaterService->addStep(new Updater\Steps\ProcessBoxscoresStep(
         $boxscoreProcessor, $boxscoreView, $defaultScoPath,
     ));
-    $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(
-        $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $defaultScoPath,
-    ));
+
+    if (!$isOlympics) {
+        $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(
+            $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $defaultScoPath,
+        ));
+    }
+
     $updaterService->addStep(new Updater\Steps\ParseJsbFilesStep($jsbService, $basePath, $season));
 
     $controller = new Updater\UpdaterController($updaterService, $view);

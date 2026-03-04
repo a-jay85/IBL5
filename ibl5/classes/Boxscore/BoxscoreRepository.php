@@ -18,7 +18,6 @@ use League\LeagueContext;
  */
 class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreRepositoryInterface
 {
-    private ?LeagueContext $leagueContext;
     private string $playerTable;
     private string $teamTable;
 
@@ -29,20 +28,9 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
      */
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
-        parent::__construct($db);
-        $this->leagueContext = $leagueContext;
+        parent::__construct($db, $leagueContext);
         $this->playerTable = $this->resolveTable('ibl_box_scores');
         $this->teamTable = $this->resolveTable('ibl_box_scores_teams');
-    }
-
-    /**
-     * Resolve a table name through LeagueContext (if set), else return as-is
-     */
-    private function resolveTable(string $iblTableName): string
-    {
-        return $this->leagueContext !== null
-            ? $this->leagueContext->getTableName($iblTableName)
-            : $iblTableName;
     }
 
     /**

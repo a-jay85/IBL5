@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LeagueSchedule;
 
+use League\LeagueContext;
 use LeagueSchedule\Contracts\LeagueScheduleRepositoryInterface;
 
 /**
@@ -15,6 +16,18 @@ use LeagueSchedule\Contracts\LeagueScheduleRepositoryInterface;
  */
 class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueScheduleRepositoryInterface
 {
+    private string $scheduleTable;
+    private string $boxScoresTeamsTable;
+    private string $standingsTable;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->scheduleTable = $this->resolveTable('ibl_schedule');
+        $this->boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
+        $this->standingsTable = $this->resolveTable('ibl_standings');
+    }
+
     /**
      * @see LeagueScheduleRepositoryInterface::getAllGamesWithBoxScoreInfo()
      *
@@ -24,10 +37,10 @@ class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueSc
     {
         $query = "SELECT s.SchedID, s.Date, s.Visitor, s.VScore, s.Home, s.HScore, s.BoxID,
                   bst.gameOfThatDay
-                  FROM ibl_schedule s
+                  FROM {$this->scheduleTable} s
                   LEFT JOIN (
                       SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
-                      FROM ibl_box_scores_teams
+                      FROM {$this->boxScoresTeamsTable}
                       GROUP BY Date, visitorTeamID, homeTeamID
                   ) bst ON bst.Date = s.Date AND bst.visitorTeamID = s.Visitor AND bst.homeTeamID = s.Home
                   ORDER BY s.Date ASC, s.SchedID ASC";
@@ -49,7 +62,7 @@ class LeagueScheduleRepository extends \BaseMysqliRepository implements LeagueSc
     public function getTeamRecords(): array
     {
         $rows = $this->fetchAll(
-            "SELECT tid, leagueRecord FROM ibl_standings ORDER BY tid ASC"
+            "SELECT tid, leagueRecord FROM {$this->standingsTable} ORDER BY tid ASC"
         );
 
         /** @var array<int, string> $records */

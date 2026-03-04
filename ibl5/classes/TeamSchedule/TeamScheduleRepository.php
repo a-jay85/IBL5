@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TeamSchedule;
 
+use League\LeagueContext;
 use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 
 /**
@@ -16,6 +17,16 @@ use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
  */
 class TeamScheduleRepository extends \BaseMysqliRepository implements TeamScheduleRepositoryInterface
 {
+    private string $scheduleTable;
+    private string $boxScoresTeamsTable;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->scheduleTable = $this->resolveTable('ibl_schedule');
+        $this->boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
+    }
+
     /**
      * @see TeamScheduleRepositoryInterface::getSchedule()
      *
@@ -26,10 +37,10 @@ class TeamScheduleRepository extends \BaseMysqliRepository implements TeamSchedu
         /** @var list<ScheduleRow> */
         return $this->fetchAll(
             "SELECT s.*, bst.gameOfThatDay
-            FROM ibl_schedule s
+            FROM {$this->scheduleTable} s
             LEFT JOIN (
                 SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
-                FROM ibl_box_scores_teams
+                FROM {$this->boxScoresTeamsTable}
                 GROUP BY Date, visitorTeamID, homeTeamID
             ) bst ON bst.Date = s.Date AND bst.visitorTeamID = s.Visitor AND bst.homeTeamID = s.Home
             WHERE s.Visitor = ? OR s.Home = ?
@@ -49,7 +60,7 @@ class TeamScheduleRepository extends \BaseMysqliRepository implements TeamSchedu
     {
         /** @var list<ProjectedGameRow> */
         return $this->fetchAll(
-            "SELECT * FROM `ibl_schedule`
+            "SELECT * FROM `{$this->scheduleTable}`
              WHERE (Visitor = ? OR Home = ?)
                AND Date BETWEEN ADDDATE(?, 1) AND ?
              ORDER BY Date ASC",

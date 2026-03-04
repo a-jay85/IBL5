@@ -312,10 +312,12 @@ class StandingsView implements StandingsViewInterface
     }
 
     /**
-     * Determine which teams are mathematically locked at the bottom of standings
+     * Determine which teams are eliminated (bottom-locked) in standings
      *
-     * A team is bottom-locked if even winning all remaining games can't catch the team above.
-     * Cascades from the bottom: once a team is NOT locked, no higher teams can be locked.
+     * When the season is over (all gamesUnplayed = 0), any team without a clinch
+     * flag is eliminated. During the season, cascades from the bottom: a team is
+     * locked if even winning all remaining games can't catch the team above.
+     * The cascade stops at clinched teams or when a team can catch the one above.
      *
      * @param list<StandingsRow> $standings Standings data sorted by games back ASC
      * @return array<int, true> Map of array indexes that are bottom-locked
@@ -326,7 +328,22 @@ class StandingsView implements StandingsViewInterface
         /** @var array<int, true> $locked */
         $locked = [];
 
+        if ($this->isSeasonOver($standings)) {
+            foreach ($standings as $index => $team) {
+                if (!$this->hasClinchStatus($team)) {
+                    $locked[$index] = true;
+                }
+            }
+
+            return $locked;
+        }
+
+        // During season: cascade from bottom, stop at clinched teams
         for ($i = $count - 1; $i >= 1; $i--) {
+            if ($this->hasClinchStatus($standings[$i])) {
+                break;
+            }
+
             $maxPossibleWins = $standings[$i]['wins'] + $standings[$i]['gamesUnplayed'];
             if ($maxPossibleWins < $standings[$i - 1]['wins']) {
                 $locked[$i] = true;
@@ -336,5 +353,34 @@ class StandingsView implements StandingsViewInterface
         }
 
         return $locked;
+    }
+
+    /**
+     * Check if the season is over (all teams have 0 games remaining)
+     *
+     * @param list<StandingsRow> $standings Standings data
+     */
+    private function isSeasonOver(array $standings): bool
+    {
+        foreach ($standings as $team) {
+            if ($team['gamesUnplayed'] > 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if a team has any clinch status (playoffs, division, conference, or league)
+     *
+     * @param StandingsRow $team Team standings data
+     */
+    private function hasClinchStatus(array $team): bool
+    {
+        return $team['clinchedLeague'] === 1
+            || $team['clinchedConference'] === 1
+            || $team['clinchedDivision'] === 1
+            || $team['clinchedPlayoffs'] === 1;
     }
 }

@@ -823,6 +823,7 @@
 /* Shadows — column edge, header bottom, corner combined */
 .sticky-table tbody td.sticky-col {
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+    border-right: 1px solid var(--gray-100);
 }
 
 .sticky-table thead tr th {
@@ -845,6 +846,11 @@
 
 .sticky-table tbody tr:hover td.sticky-col {
     background-color: var(--gray-100, #f3f4f6);
+}
+
+/* Prevent cell text wrapping on mobile (e.g. "12 - 5" in series records) */
+.sticky-table td {
+    white-space: nowrap;
 }
 
 /* ==========================================================================

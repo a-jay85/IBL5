@@ -19,20 +19,42 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         ob_start();
         ?>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IBLv5 Control Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=block" rel="stylesheet">
+    <link rel="stylesheet" href="/ibl5/themes/IBL/style/style.css">
 </head>
 <body>
-<?php echo $this->renderLeagueSwitcher($leagueConfig, $currentLeague); ?>
-<?php echo $this->renderFlashMessage($resultMessage, $resultSuccess); ?>
-<form action="leagueControlPanel.php" method="POST">
-<input type="hidden" name="current_phase" value="<?= HtmlSanitizer::e($panelData['phase']) ?>">
-<?php echo $this->renderSeasonPhaseControls($currentLeague, $panelData); ?>
-<a href="/ibl5/modules.php?name=SeasonHighs">Season Highs</a><p>
-<?php echo $this->renderPhaseControls($currentLeague, $panelData); ?>
-<?php echo $this->renderTriviaControls(); ?>
-</form>
+<div class="updater">
+    <h1 class="updater__title">League Control Panel</h1>
+
+    <?= $this->renderFlashMessage($resultMessage, $resultSuccess) ?>
+    <?= $this->renderLeagueSwitcher($leagueConfig, $currentLeague) ?>
+
+    <form action="leagueControlPanel.php" method="POST">
+        <input type="hidden" name="current_phase" value="<?= HtmlSanitizer::e($panelData['phase']) ?>">
+
+        <?= $this->renderSeasonPhaseControls($currentLeague, $panelData) ?>
+        <?= $this->renderPhaseControls($currentLeague, $panelData) ?>
+
+        <section class="updater-section">
+            <div class="updater-section__label">Quick Links</div>
+            <div class="lcp-control-row">
+                <a href="/ibl5/modules.php?name=SeasonHighs">Season Highs</a>
+            </div>
+        </section>
+
+        <?= $this->renderTriviaControls() ?>
+    </form>
+
+    <a href="/ibl5/index.php" class="updater__return" style="text-decoration: underline;">Return to IBL</a>
+</div>
 </body>
 </html>
         <?php
@@ -51,10 +73,10 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ob_start();
         ?>
 <div class="league-switcher-admin">
-    <strong>Current League:</strong>
+    <label>Current League:</label>
     <span class="league-badge <?= HtmlSanitizer::e($badgeClass) ?>"><?= HtmlSanitizer::e(strtoupper($leagueConfig['short_name'])) ?></span>
-    <span style="margin-left: 20px;">Switch to: </span>
-    <select onchange="window.location.href=this.value" style="padding: 5px; font-size: 14px;">
+    <label>Switch to:</label>
+    <select onchange="window.location.href=this.value" class="ibl-select" style="width: auto;">
         <option value="leagueControlPanel.php?league=ibl"<?= $iblSelected ?>>IBL</option>
         <option value="leagueControlPanel.php?league=olympics"<?= $olympicsSelected ?>>Olympics</option>
     </select>
@@ -74,7 +96,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ob_start();
         ?>
 <div class="<?= HtmlSanitizer::e($alertClass) ?>">
-    <b><?= HtmlSanitizer::e($message) ?></b>
+    <strong><?= HtmlSanitizer::e($message) ?></strong>
 </div>
         <?php
         return (string) ob_get_clean();
@@ -93,12 +115,17 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
 
         ob_start();
         ?>
-<select name="SeasonPhase">
-<?php foreach ($phases as $phase): ?>
-    <option value="<?= HtmlSanitizer::e($phase) ?>"<?= $panelData['phase'] === $phase ? ' selected' : '' ?>><?= HtmlSanitizer::e($phase) ?></option>
-<?php endforeach; ?>
-</select>
-<button type="submit" name="action" value="set_season_phase">Set Season Phase</button><p>
+<section class="updater-section">
+    <div class="updater-section__label">Season Phase</div>
+    <div class="lcp-control-row">
+        <select name="SeasonPhase" class="ibl-select" style="width: auto;">
+        <?php foreach ($phases as $phase): ?>
+            <option value="<?= HtmlSanitizer::e($phase) ?>"<?= $panelData['phase'] === $phase ? ' selected' : '' ?>><?= HtmlSanitizer::e($phase) ?></option>
+        <?php endforeach; ?>
+        </select>
+        <button type="submit" name="action" value="set_season_phase" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Season Phase</button>
+    </div>
+</section>
         <?php
         return (string) ob_get_clean();
     }
@@ -126,12 +153,23 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         ob_start();
         ?>
-<a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
-<br><b>(upload .asw .car .his .lge .plr .rcb .sch .sco .trn before running!)</b><p>
-<?= $this->renderWaiversSelect($panelData) ?>
-<button type="submit" name="action" value="set_waivers_to_free_agents">Set all players on waivers to Free Agents and reset their Bird years</button><p>
-<button type="submit" name="action" value="reset_contract_extensions">Reset All Contract Extensions</button><p>
-<button type="submit" name="action" value="reset_mles_lles">Reset All MLEs/LLEs</button><p>
+<section class="updater-section">
+    <div class="updater-section__label">Preseason Operations</div>
+    <div class="lcp-control-row">
+        <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
+    </div>
+    <div class="lcp-note">Upload .asw .car .his .lge .plr .rcb .sch .sco .trn before running</div>
+    <?= $this->renderWaiversSelect($panelData) ?>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="set_waivers_to_free_agents" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set all players on waivers to Free Agents and reset their Bird years</button>
+    </div>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="reset_contract_extensions" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset All Contract Extensions</button>
+    </div>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="reset_mles_lles" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset All MLEs/LLEs</button>
+    </div>
+</section>
         <?php
         return (string) ob_get_clean();
     }
@@ -140,8 +178,13 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         ob_start();
         ?>
-<a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
-<br><b>(upload .asw .car .his .lge .plr .rcb .sch .sco .trn before running!)</b><p>
+<section class="updater-section">
+    <div class="updater-section__label">HEAT Operations</div>
+    <div class="lcp-control-row">
+        <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
+    </div>
+    <div class="lcp-note">Upload .asw .car .his .lge .plr .rcb .sch .sco .trn before running</div>
+</section>
         <?php
         return (string) ob_get_clean();
     }
@@ -153,17 +196,28 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         ob_start();
         ?>
-<a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
-<br><b>(upload .asw .car .his .lge .plr .rcb .sch .sco .trn before running!)</b><p>
-<input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>">
-<button type="submit" name="action" value="set_sim_length">Set Sim Length in Days</button> <i>
-<br>(you HAVE to CLICK to set the days -- you unfortunately can't just hit Return/Enter)</i><p>
+<section class="updater-section">
+    <div class="updater-section__label">Regular Season Operations</div>
+    <div class="lcp-control-row">
+        <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
+    </div>
+    <div class="lcp-note">Upload .asw .car .his .lge .plr .rcb .sch .sco .trn before running</div>
+    <div class="lcp-control-row">
+        <input type="number" name="SimLengthInDays" min="1" max="180" size="3" value="<?= HtmlSanitizer::e((string) $panelData['simLengthInDays']) ?>" class="ibl-input ibl-input--sm" style="width: 5rem;">
+        <button type="submit" name="action" value="set_sim_length" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Sim Length in Days</button>
+    </div>
+    <div class="lcp-note">You must click the button — pressing Enter will not work</div>
 <?php if ($currentLeague === 'ibl'): ?>
-<button type="submit" name="action" value="reset_asg_voting">Reset All-Star Voting</button><p>
-<button type="submit" name="action" value="reset_eoy_voting">Reset End of the Year Voting</button><p>
-<?= $this->renderTradesSelect($panelData) ?>
-<?= $this->renderDraftLinkSelect($panelData) ?>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="reset_asg_voting" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset All-Star Voting</button>
+    </div>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="reset_eoy_voting" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset End of the Year Voting</button>
+    </div>
+    <?= $this->renderTradesSelect($panelData) ?>
+    <?= $this->renderDraftLinkSelect($panelData) ?>
 <?php endif; ?>
+</section>
         <?php
         return (string) ob_get_clean();
     }
@@ -175,11 +229,18 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         ob_start();
         ?>
-<a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
-<br><b>(upload .asw .car .his .lge .plr .rcb .sch .sco .trn before running!)</b><p>
-<button type="submit" name="action" value="reset_eoy_voting">Reset End of the Year Voting</button><p>
-<?= $this->renderTradesSelect($panelData) ?>
-<?= $this->renderDraftLinkSelect($panelData) ?>
+<section class="updater-section">
+    <div class="updater-section__label">Playoffs Operations</div>
+    <div class="lcp-control-row">
+        <a href="/ibl5/scripts/updateAllTheThings.php">Update All The Things</a>
+    </div>
+    <div class="lcp-note">Upload .asw .car .his .lge .plr .rcb .sch .sco .trn before running</div>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="reset_eoy_voting" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset End of the Year Voting</button>
+    </div>
+    <?= $this->renderTradesSelect($panelData) ?>
+    <?= $this->renderDraftLinkSelect($panelData) ?>
+</section>
         <?php
         return (string) ob_get_clean();
     }
@@ -189,7 +250,14 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
      */
     private function renderDraftControls(array $panelData): string
     {
-        return $this->renderWaiversSelect($panelData);
+        ob_start();
+        ?>
+<section class="updater-section">
+    <div class="updater-section__label">Draft Operations</div>
+    <?= $this->renderWaiversSelect($panelData) ?>
+</section>
+        <?php
+        return (string) ob_get_clean();
     }
 
     /**
@@ -199,13 +267,26 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         ob_start();
         ?>
-<button type="submit" name="action" value="reset_contract_extensions">Reset All Contract Extensions</button><p>
-<button type="submit" name="action" value="reset_mles_lles">Reset All MLEs/LLEs</button><p>
-<button type="submit" name="action" value="set_fa_factors_pfw">Set Free Agency factors for PFW</button><p>
-<a href="/ibl5/scripts/tradition.php">Set Free Agency factors for Tradition</a><p>
-<?= $this->renderFaNotificationsSelect($panelData) ?>
-<?= $this->renderWaiversSelect($panelData) ?>
-<button type="submit" name="action" value="set_waivers_to_free_agents">Set all players on waivers to Free Agents and reset their Bird years</button><p>
+<section class="updater-section">
+    <div class="updater-section__label">Free Agency Operations</div>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="reset_contract_extensions" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset All Contract Extensions</button>
+    </div>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="reset_mles_lles" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset All MLEs/LLEs</button>
+    </div>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="set_fa_factors_pfw" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Free Agency factors for PFW</button>
+    </div>
+    <div class="lcp-control-row">
+        <a href="/ibl5/scripts/tradition.php">Set Free Agency factors for Tradition</a>
+    </div>
+    <?= $this->renderFaNotificationsSelect($panelData) ?>
+    <?= $this->renderWaiversSelect($panelData) ?>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="set_waivers_to_free_agents" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set all players on waivers to Free Agents and reset their Bird years</button>
+    </div>
+</section>
         <?php
         return (string) ob_get_clean();
     }
@@ -217,11 +298,13 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         ob_start();
         ?>
-<select name="Waivers">
-    <option value="Yes"<?= $panelData['allowWaivers'] === 'Yes' ? ' selected' : '' ?>>Yes</option>
-    <option value="No"<?= $panelData['allowWaivers'] === 'No' ? ' selected' : '' ?>>No</option>
-</select>
-<button type="submit" name="action" value="set_allow_waivers">Set Allow Waiver Moves Status</button><p>
+<div class="lcp-control-row">
+    <select name="Waivers" class="ibl-select" style="width: auto;">
+        <option value="Yes"<?= $panelData['allowWaivers'] === 'Yes' ? ' selected' : '' ?>>Yes</option>
+        <option value="No"<?= $panelData['allowWaivers'] === 'No' ? ' selected' : '' ?>>No</option>
+    </select>
+    <button type="submit" name="action" value="set_allow_waivers" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Allow Waiver Moves Status</button>
+</div>
         <?php
         return (string) ob_get_clean();
     }
@@ -233,11 +316,13 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         ob_start();
         ?>
-<select name="Trades">
-    <option value="Yes"<?= $panelData['allowTrades'] === 'Yes' ? ' selected' : '' ?>>Yes</option>
-    <option value="No"<?= $panelData['allowTrades'] === 'No' ? ' selected' : '' ?>>No</option>
-</select>
-<button type="submit" name="action" value="set_allow_trades">Set Allow Trades Status</button><p>
+<div class="lcp-control-row">
+    <select name="Trades" class="ibl-select" style="width: auto;">
+        <option value="Yes"<?= $panelData['allowTrades'] === 'Yes' ? ' selected' : '' ?>>Yes</option>
+        <option value="No"<?= $panelData['allowTrades'] === 'No' ? ' selected' : '' ?>>No</option>
+    </select>
+    <button type="submit" name="action" value="set_allow_trades" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Allow Trades Status</button>
+</div>
         <?php
         return (string) ob_get_clean();
     }
@@ -249,11 +334,13 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         ob_start();
         ?>
-<select name="ShowDraftLink">
-    <option value="On"<?= $panelData['showDraftLink'] === 'On' ? ' selected' : '' ?>>On</option>
-    <option value="Off"<?= $panelData['showDraftLink'] === 'Off' ? ' selected' : '' ?>>Off</option>
-</select>
-<button type="submit" name="action" value="set_show_draft_link">Set Show Draft Link Status</button><p>
+<div class="lcp-control-row">
+    <select name="ShowDraftLink" class="ibl-select" style="width: auto;">
+        <option value="On"<?= $panelData['showDraftLink'] === 'On' ? ' selected' : '' ?>>On</option>
+        <option value="Off"<?= $panelData['showDraftLink'] === 'Off' ? ' selected' : '' ?>>Off</option>
+    </select>
+    <button type="submit" name="action" value="set_show_draft_link" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set Show Draft Link Status</button>
+</div>
         <?php
         return (string) ob_get_clean();
     }
@@ -265,11 +352,13 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         ob_start();
         ?>
-<select name="FANotifs">
-    <option value="On"<?= $panelData['freeAgencyNotifications'] === 'On' ? ' selected' : '' ?>>On</option>
-    <option value="Off"<?= $panelData['freeAgencyNotifications'] === 'Off' ? ' selected' : '' ?>>Off</option>
-</select>
-<button type="submit" name="action" value="toggle_fa_notifications">Toggle Free Agency Notifications</button><p>
+<div class="lcp-control-row">
+    <select name="FANotifs" class="ibl-select" style="width: auto;">
+        <option value="On"<?= $panelData['freeAgencyNotifications'] === 'On' ? ' selected' : '' ?>>On</option>
+        <option value="Off"<?= $panelData['freeAgencyNotifications'] === 'Off' ? ' selected' : '' ?>>Off</option>
+    </select>
+    <button type="submit" name="action" value="toggle_fa_notifications" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Toggle Free Agency Notifications</button>
+</div>
         <?php
         return (string) ob_get_clean();
     }
@@ -278,8 +367,15 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     {
         ob_start();
         ?>
-<button type="submit" name="action" value="activate_trivia">Deactivate Player and Season Leaders modules for Trivia</button><p>
-<button type="submit" name="action" value="deactivate_trivia">Activate Player and Season Leaders modules after Trivia</button><p>
+<section class="updater-section">
+    <div class="updater-section__label">Trivia Management</div>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="activate_trivia" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Deactivate Player and Season Leaders modules for Trivia</button>
+    </div>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="deactivate_trivia" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Activate Player and Season Leaders modules after Trivia</button>
+    </div>
+</section>
         <?php
         return (string) ob_get_clean();
     }

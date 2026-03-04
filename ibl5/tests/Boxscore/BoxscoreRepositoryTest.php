@@ -6,6 +6,7 @@ namespace Tests\Boxscore;
 
 use Boxscore\BoxscoreRepository;
 use Boxscore\Contracts\BoxscoreRepositoryInterface;
+use League\LeagueContext;
 use PHPUnit\Framework\TestCase;
 use Tests\Integration\Mocks\MockDatabase;
 
@@ -184,5 +185,61 @@ class BoxscoreRepositoryTest extends TestCase
         $this->assertCount(1, $queries);
         $this->assertStringContainsString('INSERT INTO ibl_box_scores', $queries[0]);
         $this->assertSame(1, $result);
+    }
+
+    public function testConstructorAcceptsNullLeagueContext(): void
+    {
+        $repo = new BoxscoreRepository($this->mockDb, null);
+        $this->assertInstanceOf(BoxscoreRepositoryInterface::class, $repo);
+    }
+
+    public function testOlympicsContextUsesOlympicsTables(): void
+    {
+        $leagueContext = $this->createStub(LeagueContext::class);
+        $leagueContext->method('getTableName')->willReturnCallback(
+            static function (string $table): string {
+                return match ($table) {
+                    'ibl_box_scores' => 'ibl_olympics_box_scores',
+                    'ibl_box_scores_teams' => 'ibl_olympics_box_scores_teams',
+                    default => $table,
+                };
+            }
+        );
+
+        $repo = new BoxscoreRepository($this->mockDb, $leagueContext);
+        $this->mockDb->setReturnTrue(true);
+
+        $repo->deletePreseasonBoxScores();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(2, $queries);
+        $this->assertStringContainsString('DELETE FROM ibl_olympics_box_scores', $queries[0]);
+        $this->assertStringContainsString('DELETE FROM ibl_olympics_box_scores_teams', $queries[1]);
+    }
+
+    public function testOlympicsContextInsertsIntoOlympicsTables(): void
+    {
+        $leagueContext = $this->createStub(LeagueContext::class);
+        $leagueContext->method('getTableName')->willReturnCallback(
+            static function (string $table): string {
+                return match ($table) {
+                    'ibl_box_scores' => 'ibl_olympics_box_scores',
+                    'ibl_box_scores_teams' => 'ibl_olympics_box_scores_teams',
+                    default => $table,
+                };
+            }
+        );
+
+        $repo = new BoxscoreRepository($this->mockDb, $leagueContext);
+        $this->mockDb->setReturnTrue(true);
+
+        $repo->insertTeamBoxscore(
+            '2025-01-15', 'TestTeam', 1, 1, 2, 15000, 18000,
+            10, 5, 8, 7, 25, 30, 20, 28, 0, 22, 27, 24, 30, 0,
+            40, 85, 20, 25, 10, 30, 12, 30, 25, 8, 15, 5, 20,
+        );
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertStringContainsString('INSERT INTO ibl_olympics_box_scores_teams', $queries[0]);
     }
 }

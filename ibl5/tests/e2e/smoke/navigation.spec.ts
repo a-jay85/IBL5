@@ -61,10 +61,10 @@ test.describe('Navigation bar smoke tests (public)', () => {
     await expect(page.locator('#nav-mobile-menu')).toBeAttached();
   });
 
-  test('desktop dropdown opens on hover and shows links', async ({ page }) => {
+  test('desktop dropdown opens on click and shows links', async ({ page }) => {
     await page.goto('/');
     const nav = desktopNav(page);
-    await nav.getByRole('button', { name: 'Season' }).hover();
+    await nav.getByRole('button', { name: 'Season' }).click();
 
     const standingsLink = nav.locator(
       '.nav-dropdown-item',
@@ -76,7 +76,7 @@ test.describe('Navigation bar smoke tests (public)', () => {
   test('league switcher is inside season dropdown', async ({ page }) => {
     await page.goto('/');
     const nav = desktopNav(page);
-    await nav.getByRole('button', { name: 'Season' }).hover();
+    await nav.getByRole('button', { name: 'Season' }).click();
 
     const leagueSelect = nav.locator('select').first();
     await expect(leagueSelect).toBeVisible({ timeout: 3000 });
@@ -85,7 +85,7 @@ test.describe('Navigation bar smoke tests (public)', () => {
 
   test('login form appears in login dropdown', async ({ page }) => {
     await page.goto('/');
-    await desktopNav(page).getByRole('button', { name: 'Login' }).hover();
+    await desktopNav(page).getByRole('button', { name: 'Login' }).click();
 
     await expect(page.locator('#nav-username')).toBeVisible({ timeout: 3000 });
     await expect(page.locator('#nav-password')).toBeVisible();

@@ -137,4 +137,37 @@ class BoxscoreProcessorTest extends TestCase
         $this->assertStringContainsString('Preseason', $lastMessage);
         $this->assertStringContainsString('not updated', $lastMessage);
     }
+
+    public function testConstructorAcceptsOptionalLeagueContext(): void
+    {
+        $this->mockDb->setReturnTrue(true);
+        $this->mockDb->setMockData([
+            ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
+            ['Sim' => 1, 'Start Date' => '2025-01-01', 'End Date' => '2025-01-07'],
+        ]);
+
+        $leagueContext = $this->createStub(\League\LeagueContext::class);
+        $processor = new BoxscoreProcessor($this->mockDb, null, null, $leagueContext);
+
+        $this->assertInstanceOf(BoxscoreProcessorInterface::class, $processor);
+    }
+
+    public function testOlympicsContextSkipsAllStarGames(): void
+    {
+        $this->mockDb->setReturnTrue(true);
+        $this->mockDb->setMockData([
+            ['name' => 'Current Season Phase', 'value' => 'Regular Season'],
+            ['Sim' => 1, 'Start Date' => '2025-01-01', 'End Date' => '2025-01-07'],
+        ]);
+
+        $olympicsContext = $this->createStub(\League\LeagueContext::class);
+        $olympicsContext->method('isOlympics')->willReturn(true);
+        $olympicsContext->method('getTableName')->willReturnArgument(0);
+
+        $processor = new BoxscoreProcessor($this->mockDb, null, null, $olympicsContext);
+        $result = $processor->processAllStarGames('/nonexistent/file.sco', 2025);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('Olympics context', $result['skipped']);
+    }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Boxscore;
 
 use Boxscore\Contracts\BoxscoreRepositoryInterface;
+use League\LeagueContext;
 
 /**
  * BoxscoreRepository - Data access layer for boxscore management
@@ -17,14 +18,31 @@ use Boxscore\Contracts\BoxscoreRepositoryInterface;
  */
 class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreRepositoryInterface
 {
+    private ?LeagueContext $leagueContext;
+    private string $playerTable;
+    private string $teamTable;
+
     /**
      * Constructor
      *
      * @param \mysqli $db Active mysqli connection
      */
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         parent::__construct($db);
+        $this->leagueContext = $leagueContext;
+        $this->playerTable = $this->resolveTable('ibl_box_scores');
+        $this->teamTable = $this->resolveTable('ibl_box_scores_teams');
+    }
+
+    /**
+     * Resolve a table name through LeagueContext (if set), else return as-is
+     */
+    private function resolveTable(string $iblTableName): string
+    {
+        return $this->leagueContext !== null
+            ? $this->leagueContext->getTableName($iblTableName)
+            : $iblTableName;
     }
 
     /**
@@ -77,7 +95,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     {
         // Delete player boxscores
         $this->execute(
-            "DELETE FROM ibl_box_scores WHERE Date BETWEEN ? AND ?",
+            "DELETE FROM {$this->playerTable} WHERE Date BETWEEN ? AND ?",
             "ss",
             $startDate,
             $endDate
@@ -85,7 +103,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
 
         // Delete team boxscores
         $this->execute(
-            "DELETE FROM ibl_box_scores_teams WHERE Date BETWEEN ? AND ?",
+            "DELETE FROM {$this->teamTable} WHERE Date BETWEEN ? AND ?",
             "ss",
             $startDate,
             $endDate
@@ -102,7 +120,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         return $this->fetchOne(
             "SELECT visitorQ1points, visitorQ2points, visitorQ3points, visitorQ4points, visitorOTpoints,
                     homeQ1points, homeQ2points, homeQ3points, homeQ4points, homeOTpoints
-             FROM ibl_box_scores_teams
+             FROM {$this->teamTable}
              WHERE Date = ? AND visitorTeamID = ? AND homeTeamID = ? AND gameOfThatDay = ?
              LIMIT 1",
             "siii",
@@ -119,7 +137,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     public function deleteTeamBoxscoresByGame(string $date, int $visitorTeamID, int $homeTeamID, int $gameOfThatDay): int
     {
         return $this->execute(
-            "DELETE FROM ibl_box_scores_teams
+            "DELETE FROM {$this->teamTable}
              WHERE Date = ? AND visitorTeamID = ? AND homeTeamID = ? AND gameOfThatDay = ?",
             "siii",
             $date,
@@ -135,7 +153,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     public function deletePlayerBoxscoresByGame(string $date, int $visitorTID, int $homeTID): int
     {
         return $this->execute(
-            "DELETE FROM ibl_box_scores
+            "DELETE FROM {$this->playerTable}
              WHERE Date = ? AND visitorTID = ? AND homeTID = ?",
             "sii",
             $date,
@@ -151,7 +169,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     {
         /** @var array{cnt: int}|null $row */
         $row = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM ibl_box_scores
+            "SELECT COUNT(*) AS cnt FROM {$this->playerTable}
              WHERE Date = ? AND visitorTID = ? AND homeTID = ? AND pid <> 0 AND teamID IS NULL
              LIMIT 1",
             "sii",
@@ -170,7 +188,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     {
         /** @var list<array{name: string}> $rows */
         $rows = $this->fetchAll(
-            "SELECT name FROM ibl_box_scores_teams
+            "SELECT name FROM {$this->teamTable}
              WHERE Date = ? AND visitorTeamID = 50 AND homeTeamID = 51
              ORDER BY id ASC
              LIMIT 2",
@@ -196,7 +214,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         /** @var list<array{id: int, Date: string, name: string, visitorTeamID: int, homeTeamID: int}> $rows */
         $rows = $this->fetchAll(
             "SELECT id, Date, name, visitorTeamID, homeTeamID
-             FROM ibl_box_scores_teams
+             FROM {$this->teamTable}
              WHERE name IN ('Team Away', 'Team Home')
                AND visitorTeamID = 50 AND homeTeamID = 51
              ORDER BY Date ASC, id ASC",
@@ -214,7 +232,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         /** @var list<array{name: string}> $rows */
         $rows = $this->fetchAll(
             "SELECT COALESCE(p.name, bs.name) AS name
-             FROM ibl_box_scores bs
+             FROM {$this->playerTable} bs
              LEFT JOIN ibl_plr p ON bs.pid = p.pid
              WHERE bs.Date = ? AND bs.visitorTID = 50 AND bs.homeTID = 51 AND bs.teamID = ?
              ORDER BY bs.id ASC",
@@ -237,7 +255,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     public function renameAllStarTeam(int $recordId, string $newName): int
     {
         return $this->execute(
-            "UPDATE ibl_box_scores_teams SET name = ? WHERE id = ?",
+            "UPDATE {$this->teamTable} SET name = ? WHERE id = ?",
             "si",
             $newName,
             $recordId
@@ -284,7 +302,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         int $personalFouls,
     ): int {
         return $this->execute(
-            \Boxscore::TEAMSTATEMENT_PREPARE,
+            \Boxscore::teamInsertSql($this->teamTable),
             "ssiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii",
             $date,
             $name,
@@ -358,7 +376,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         int $personalFouls,
     ): int {
         return $this->execute(
-            \Boxscore::PLAYERSTATEMENT_PREPARE,
+            \Boxscore::playerInsertSql($this->playerTable),
             "ssssiiiiiiiiiiiiiiiiiiiiiiiii",
             $date,
             $uuid,

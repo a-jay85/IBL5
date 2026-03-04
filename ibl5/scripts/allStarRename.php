@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+require __DIR__ . '/../mainfile.php';
 
 // SECURITY: Admin-only endpoint
 if (!function_exists('is_admin') || !is_admin($admin)) {

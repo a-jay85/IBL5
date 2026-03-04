@@ -1,7 +1,7 @@
 <?php
 
 try {
-    require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+    require __DIR__ . '/../../mainfile.php';
 } catch (Exception $e) {
     error_log("Failed to load mainfile.php: " . $e->getMessage());
     die("Error loading system files. Please contact the administrator.");

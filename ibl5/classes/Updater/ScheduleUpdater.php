@@ -111,9 +111,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $this->preloadTeamNameMap();
 
-        $documentRootRaw = $_SERVER['DOCUMENT_ROOT'] ?? '';
-        $documentRoot = is_string($documentRootRaw) ? $documentRootRaw : '';
-        $schFilePath = $documentRoot . '/ibl5/IBL5.sch';
+        $ibl5RootRaw = defined('IBL5_ROOT') ? IBL5_ROOT : null;
+        $ibl5Root = is_string($ibl5RootRaw) ? $ibl5RootRaw : '.';
+        $schFilePath = $ibl5Root . '/IBL5.sch';
 
         $games = SchFileParser::parseFile($schFilePath);
 

@@ -41,11 +41,12 @@ class PageLayout
         // Calculate the correct base path for resources
         $currentFileRaw = $_SERVER['SCRIPT_FILENAME'] ?? '';
         $currentFile = is_string($currentFileRaw) ? $currentFileRaw : '';
+
+        // Use IBL5_ROOT (set by mainfile.php) for reliable path calculation across worktrees
         $docRootRaw = $_SERVER['DOCUMENT_ROOT'] ?? '';
         $documentRoot = is_string($docRootRaw) ? $docRootRaw : '';
-
-        // Calculate how many directory levels deep we are from the application root
-        $iblRoot = $documentRoot . '/ibl5';
+        $ibl5RootRaw = defined('IBL5_ROOT') ? IBL5_ROOT : null;
+        $iblRoot = is_string($ibl5RootRaw) ? $ibl5RootRaw : $documentRoot . '/ibl5';
         $relativePath = '';
 
         // If we're in a subdirectory of ibl5, calculate the relative path back to root

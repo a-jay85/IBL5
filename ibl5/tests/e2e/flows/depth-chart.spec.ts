@@ -1,16 +1,9 @@
 import { test, expect } from '../fixtures/auth';
+import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
 
 // Depth Chart Entry — authenticated page.
 // The roster form may load asynchronously after the page header renders.
 // NOTE: Do NOT submit the form — that would mutate data.
-
-const PHP_ERROR_PATTERNS = [
-  'Fatal error',
-  'Warning:',
-  'Parse error',
-  'Uncaught',
-  'Stack trace:',
-];
 
 test.describe('Depth Chart Entry flow', () => {
   test.beforeEach(async ({ page }) => {

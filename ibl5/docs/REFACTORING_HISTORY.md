@@ -5,10 +5,51 @@ This document tracks the history of module refactoring efforts in the IBL5 codeb
 ## Overview
 
 **Current Status:** 30 of 30 IBL modules refactored (100% complete) ✅  
-**Test Coverage:** ~60% (target: 80%)  
+**Test Coverage:** ~80% (target: 80% ✅)  
 **Architecture Pattern:** Repository/Service/View with comprehensive testing
 
 ## Completed Refactorings
+
+### Navigation: View Split into Focused Components (February 2026)
+
+**Summary:** Split the 927-line monolithic `NavigationView` into 10 focused files following the project's Repository/Service/View pattern. Extracted business logic (menu structure, conditional links) from HTML rendering, and database access from static methods into a proper repository.
+
+**Key Changes:**
+- `NavigationConfig` DTO replaces 10 constructor parameters with a typed value object
+- `NavigationRepository` (extends `BaseMysqliRepository`) absorbs `resolveTeamId` static method and teams query from `theme.php`
+- `NavigationMenuBuilder` owns all conditional menu logic (Draft/FA/Waivers visibility, Olympics variant, GM Contact List)
+- Rendering split into `DesktopNavView`, `MobileNavView`, `LoginFormView`, `TeamsDropdownView`
+- `NavigationView` reduced to ~80-line orchestrator composing sub-views
+- 4 inline styles extracted to CSS classes in `navigation.css`
+
+**Files Created:**
+- `classes/Navigation/NavigationConfig.php` — Value object (DTO)
+- `classes/Navigation/NavigationRepository.php` — Database operations
+- `classes/Navigation/NavigationMenuBuilder.php` — Menu structure logic
+- `classes/Navigation/Contracts/NavigationRepositoryInterface.php`
+- `classes/Navigation/Contracts/NavigationMenuBuilderInterface.php`
+- `classes/Navigation/Views/DesktopNavView.php` — Desktop nav rendering
+- `classes/Navigation/Views/MobileNavView.php` — Mobile nav rendering
+- `classes/Navigation/Views/LoginFormView.php` — Shared login form
+- `classes/Navigation/Views/TeamsDropdownView.php` — Teams mega-menu
+
+**Files Modified:**
+- `classes/Navigation/NavigationView.php` — Reduced from 927 to ~80 lines
+- `themes/IBL/theme.php` — Uses NavigationRepository + NavigationConfig
+- `design/components/navigation.css` — 4 new extracted CSS classes
+
+**Test Coverage:**
+- NavigationMenuBuilderTest: 15 tests
+- TeamsDropdownViewTest: 6 tests
+- DesktopNavViewTest: 5 tests
+- MobileNavViewTest: 4 tests
+- LoginFormViewTest: 4 tests
+- NavigationRepositoryTest: 4 integration tests
+- NavigationConfigTest: 3 tests
+- NavigationViewTest: 9 tests (6 existing + 3 new)
+- **Total: 50 Navigation module tests**
+
+---
 
 ### StandingsUpdater: Database-Driven Standings Computation (February 2026)
 

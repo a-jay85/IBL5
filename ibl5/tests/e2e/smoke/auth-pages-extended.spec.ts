@@ -1,14 +1,7 @@
 import { test, expect } from '../fixtures/auth';
+import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
 
 // Authenticated page smoke tests — extended coverage.
-
-const PHP_ERROR_PATTERNS = [
-  'Fatal error',
-  'Warning:',
-  'Parse error',
-  'Uncaught',
-  'Stack trace:',
-];
 
 const AUTH_URLS = [
   'modules.php?name=FreeAgency',

@@ -1,16 +1,9 @@
 import { test, expect } from '../fixtures/auth';
 import type { Page } from '@playwright/test';
+import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
 
 // Free Agency — authenticated page.
 // NOTE: Do NOT submit offer forms — that would mutate data.
-
-const PHP_ERROR_PATTERNS = [
-  'Fatal error',
-  'Warning:',
-  'Parse error',
-  'Uncaught',
-  'Stack trace:',
-];
 
 async function shouldSkipFreeAgency(page: Page): Promise<string | null> {
   const body = await page.locator('body').textContent();

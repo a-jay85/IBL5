@@ -20,7 +20,7 @@ use Standings\Contracts\StandingsViewInterface;
 class StandingsViewTest extends TestCase
 {
     private StandingsViewInterface $view;
-    
+
     /** @var StandingsRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
     private StandingsRepositoryInterface $mockRepository;
 
@@ -28,6 +28,38 @@ class StandingsViewTest extends TestCase
     {
         $this->mockRepository = $this->createMock(StandingsRepositoryInterface::class);
         $this->view = new StandingsView($this->mockRepository, 2025);
+    }
+
+    /**
+     * Create a standard team data array for tests
+     *
+     * @param array<string, mixed> $overrides Fields to override
+     * @return array<string, mixed>
+     */
+    private function makeTeamData(array $overrides = []): array
+    {
+        return array_merge([
+            'tid' => 1,
+            'team_name' => 'Celtics',
+            'leagueRecord' => '5-3',
+            'pct' => '0.625',
+            'gamesBack' => '0.0',
+            'magicNumber' => 75,
+            'gamesUnplayed' => 74,
+            'confRecord' => '3-2',
+            'divRecord' => '1-1',
+            'homeRecord' => '3-1',
+            'awayRecord' => '2-2',
+            'homeGames' => 4,
+            'awayGames' => 4,
+            'clinchedConference' => 0,
+            'clinchedDivision' => 0,
+            'clinchedPlayoffs' => 0,
+            'clinchedLeague' => 0,
+            'wins' => 5,
+            'color1' => '000000',
+            'color2' => 'FFFFFF',
+        ], $overrides);
     }
 
     public function testRenderReturnsString(): void
@@ -85,28 +117,7 @@ class StandingsViewTest extends TestCase
 
     public function testRenderRegionDisplaysTeamData(): void
     {
-        $teamData = [
-            [
-                'tid' => 1,
-                'team_name' => 'Celtics',
-                'leagueRecord' => '5-3',
-                'pct' => '0.625',
-                'gamesBack' => '0.0',
-                'magicNumber' => 75,
-                'gamesUnplayed' => 74,
-                'confRecord' => '3-2',
-                'divRecord' => '1-1',
-                'homeRecord' => '3-1',
-                'awayRecord' => '2-2',
-                'homeGames' => 4,
-                'awayGames' => 4,
-                'clinchedConference' => 0,
-                'clinchedDivision' => 0,
-                'clinchedPlayoffs' => 0,
-                'color1' => '000000',
-                'color2' => 'FFFFFF',
-            ],
-        ];
+        $teamData = [$this->makeTeamData()];
 
         $this->mockRepository->method('getStandingsByRegion')
             ->willReturn($teamData);
@@ -125,28 +136,7 @@ class StandingsViewTest extends TestCase
 
     public function testRenderRegionIncludesPythagoreanColumn(): void
     {
-        $teamData = [
-            [
-                'tid' => 1,
-                'team_name' => 'Celtics',
-                'leagueRecord' => '5-3',
-                'pct' => '0.625',
-                'gamesBack' => '0.0',
-                'magicNumber' => 75,
-                'gamesUnplayed' => 74,
-                'confRecord' => '3-2',
-                'divRecord' => '1-1',
-                'homeRecord' => '3-1',
-                'awayRecord' => '2-2',
-                'homeGames' => 4,
-                'awayGames' => 4,
-                'clinchedConference' => 0,
-                'clinchedDivision' => 0,
-                'clinchedPlayoffs' => 0,
-                'color1' => '000000',
-                'color2' => 'FFFFFF',
-            ],
-        ];
+        $teamData = [$this->makeTeamData()];
 
         $this->mockRepository->method('getStandingsByRegion')
             ->willReturn($teamData);
@@ -164,28 +154,7 @@ class StandingsViewTest extends TestCase
 
     public function testRenderRegionHandlesMissingPythagoreanStats(): void
     {
-        $teamData = [
-            [
-                'tid' => 1,
-                'team_name' => 'Celtics',
-                'leagueRecord' => '5-3',
-                'pct' => '0.625',
-                'gamesBack' => '0.0',
-                'magicNumber' => 75,
-                'gamesUnplayed' => 74,
-                'confRecord' => '3-2',
-                'divRecord' => '1-1',
-                'homeRecord' => '3-1',
-                'awayRecord' => '2-2',
-                'homeGames' => 4,
-                'awayGames' => 4,
-                'clinchedConference' => 0,
-                'clinchedDivision' => 0,
-                'clinchedPlayoffs' => 0,
-                'color1' => '000000',
-                'color2' => 'FFFFFF',
-            ],
-        ];
+        $teamData = [$this->makeTeamData()];
 
         $this->mockRepository->method('getStandingsByRegion')
             ->willReturn($teamData);
@@ -203,12 +172,9 @@ class StandingsViewTest extends TestCase
     public function testRenderRegionDisplaysClinchedConferenceIndicator(): void
     {
         $teamData = [
-            [
-                'tid' => 1,
-                'team_name' => 'Celtics',
+            $this->makeTeamData([
                 'leagueRecord' => '50-10',
                 'pct' => '0.833',
-                'gamesBack' => '0.0',
                 'magicNumber' => 0,
                 'gamesUnplayed' => 22,
                 'confRecord' => '30-5',
@@ -218,11 +184,8 @@ class StandingsViewTest extends TestCase
                 'homeGames' => 31,
                 'awayGames' => 29,
                 'clinchedConference' => 1,
-                'clinchedDivision' => 0,
-                'clinchedPlayoffs' => 0,
-                'color1' => '000000',
-                'color2' => 'FFFFFF',
-            ],
+                'wins' => 50,
+            ]),
         ];
 
         $this->mockRepository->method('getStandingsByRegion')
@@ -240,12 +203,9 @@ class StandingsViewTest extends TestCase
     public function testRenderRegionDisplaysClinchedDivisionIndicator(): void
     {
         $teamData = [
-            [
-                'tid' => 1,
-                'team_name' => 'Celtics',
+            $this->makeTeamData([
                 'leagueRecord' => '45-15',
                 'pct' => '0.750',
-                'gamesBack' => '0.0',
                 'magicNumber' => 5,
                 'gamesUnplayed' => 22,
                 'confRecord' => '28-7',
@@ -254,12 +214,9 @@ class StandingsViewTest extends TestCase
                 'awayRecord' => '20-9',
                 'homeGames' => 31,
                 'awayGames' => 29,
-                'clinchedConference' => 0,
                 'clinchedDivision' => 1,
-                'clinchedPlayoffs' => 0,
-                'color1' => '000000',
-                'color2' => 'FFFFFF',
-            ],
+                'wins' => 45,
+            ]),
         ];
 
         $this->mockRepository->method('getStandingsByRegion')
@@ -277,9 +234,7 @@ class StandingsViewTest extends TestCase
     public function testRenderRegionDisplaysClinchedPlayoffsIndicator(): void
     {
         $teamData = [
-            [
-                'tid' => 1,
-                'team_name' => 'Celtics',
+            $this->makeTeamData([
                 'leagueRecord' => '40-20',
                 'pct' => '0.667',
                 'gamesBack' => '5.0',
@@ -291,12 +246,9 @@ class StandingsViewTest extends TestCase
                 'awayRecord' => '18-11',
                 'homeGames' => 31,
                 'awayGames' => 29,
-                'clinchedConference' => 0,
-                'clinchedDivision' => 0,
                 'clinchedPlayoffs' => 1,
-                'color1' => '000000',
-                'color2' => 'FFFFFF',
-            ],
+                'wins' => 40,
+            ]),
         ];
 
         $this->mockRepository->method('getStandingsByRegion')
@@ -313,28 +265,7 @@ class StandingsViewTest extends TestCase
 
     public function testRenderRegionHandlesMissingStreakData(): void
     {
-        $teamData = [
-            [
-                'tid' => 1,
-                'team_name' => 'Celtics',
-                'leagueRecord' => '5-3',
-                'pct' => '0.625',
-                'gamesBack' => '0.0',
-                'magicNumber' => 75,
-                'gamesUnplayed' => 74,
-                'confRecord' => '3-2',
-                'divRecord' => '1-1',
-                'homeRecord' => '3-1',
-                'awayRecord' => '2-2',
-                'homeGames' => 4,
-                'awayGames' => 4,
-                'clinchedConference' => 0,
-                'clinchedDivision' => 0,
-                'clinchedPlayoffs' => 0,
-                'color1' => '000000',
-                'color2' => 'FFFFFF',
-            ],
-        ];
+        $teamData = [$this->makeTeamData()];
 
         $this->mockRepository->method('getStandingsByRegion')
             ->willReturn($teamData);
@@ -351,28 +282,7 @@ class StandingsViewTest extends TestCase
 
     public function testRenderRegionDisplaysSosColumns(): void
     {
-        $teamData = [
-            [
-                'tid' => 1,
-                'team_name' => 'Celtics',
-                'leagueRecord' => '5-3',
-                'pct' => '0.625',
-                'gamesBack' => '0.0',
-                'magicNumber' => 75,
-                'gamesUnplayed' => 74,
-                'confRecord' => '3-2',
-                'divRecord' => '1-1',
-                'homeRecord' => '3-1',
-                'awayRecord' => '2-2',
-                'homeGames' => 4,
-                'awayGames' => 4,
-                'clinchedConference' => 0,
-                'clinchedDivision' => 0,
-                'clinchedPlayoffs' => 0,
-                'color1' => '000000',
-                'color2' => 'FFFFFF',
-            ],
-        ];
+        $teamData = [$this->makeTeamData()];
 
         $this->mockRepository->method('getStandingsByRegion')
             ->willReturn($teamData);
@@ -393,26 +303,7 @@ class StandingsViewTest extends TestCase
     public function testRenderRegionEscapesTeamName(): void
     {
         $teamData = [
-            [
-                'tid' => 1,
-                'team_name' => '<script>alert("xss")</script>',
-                'leagueRecord' => '5-3',
-                'pct' => '0.625',
-                'gamesBack' => '0.0',
-                'magicNumber' => 75,
-                'gamesUnplayed' => 74,
-                'confRecord' => '3-2',
-                'divRecord' => '1-1',
-                'homeRecord' => '3-1',
-                'awayRecord' => '2-2',
-                'homeGames' => 4,
-                'awayGames' => 4,
-                'clinchedConference' => 0,
-                'clinchedDivision' => 0,
-                'clinchedPlayoffs' => 0,
-                'color1' => '000000',
-                'color2' => 'FFFFFF',
-            ],
+            $this->makeTeamData(['team_name' => '<script>alert("xss")</script>']),
         ];
 
         $this->mockRepository->method('getStandingsByRegion')
@@ -426,5 +317,280 @@ class StandingsViewTest extends TestCase
 
         $this->assertStringNotContainsString('<script>alert("xss")</script>', $result);
         $this->assertStringContainsString('&lt;script&gt;', $result);
+    }
+
+    // ========== LEAGUE CLINCH (W) INDICATOR TESTS ==========
+
+    public function testRenderRegionDisplaysClinchedLeagueIndicator(): void
+    {
+        $teamData = [
+            $this->makeTeamData([
+                'leagueRecord' => '72-8',
+                'pct' => '0.900',
+                'wins' => 72,
+                'gamesUnplayed' => 2,
+                'clinchedLeague' => 1,
+                'clinchedConference' => 1,
+                'clinchedDivision' => 1,
+                'clinchedPlayoffs' => 1,
+            ]),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')
+            ->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')
+            ->willReturn([1 => ['last_win' => 9, 'last_loss' => 1, 'streak_type' => 'W', 'streak' => 10, 'ranking' => 1, 'sos' => 0.500, 'remaining_sos' => 0.500, 'sos_rank' => 1, 'remaining_sos_rank' => 1]]);
+        $this->mockRepository->method('getAllPythagoreanStats')
+            ->willReturn([1 => ['pointsScored' => 2000, 'pointsAllowed' => 1800]]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">W</span>-Celtics', $result);
+    }
+
+    public function testWIndicatorTakesPriorityOverAllOthers(): void
+    {
+        $teamData = [
+            $this->makeTeamData([
+                'wins' => 70,
+                'clinchedLeague' => 1,
+                'clinchedConference' => 1,
+                'clinchedDivision' => 1,
+                'clinchedPlayoffs' => 1,
+            ]),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')
+            ->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">W</span>-Celtics', $result);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">Z</span>', $result);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">Y</span>', $result);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">X</span>', $result);
+    }
+
+    // ========== CLINCH TIER CSS CLASS TESTS ==========
+
+    public function testClinchLeagueAppliesCorrectCssClass(): void
+    {
+        $teamData = [
+            $this->makeTeamData(['clinchedLeague' => 1, 'wins' => 70]),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        $this->assertStringContainsString('class="clinch-league"', $result);
+    }
+
+    public function testClinchConferenceAppliesCorrectCssClass(): void
+    {
+        $teamData = [
+            $this->makeTeamData(['clinchedConference' => 1, 'wins' => 50]),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        $this->assertStringContainsString('class="clinch-conference"', $result);
+    }
+
+    public function testClinchDivisionAppliesCorrectCssClass(): void
+    {
+        $teamData = [
+            $this->makeTeamData(['clinchedDivision' => 1, 'wins' => 45]),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        $this->assertStringContainsString('class="clinch-division"', $result);
+    }
+
+    public function testClinchPlayoffsAppliesCorrectCssClass(): void
+    {
+        $teamData = [
+            $this->makeTeamData(['clinchedPlayoffs' => 1, 'wins' => 40]),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        $this->assertStringContainsString('class="clinch-playoffs"', $result);
+    }
+
+    // ========== BOTTOM-LOCKED TESTS ==========
+
+    public function testBottomLockedClassAppliedWhenTeamCantCatchUp(): void
+    {
+        $teamData = [
+            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 50, 'gamesUnplayed' => 10, 'gamesBack' => '0.0']),
+            $this->makeTeamData(['tid' => 2, 'team_name' => 'Last', 'wins' => 30, 'gamesUnplayed' => 5, 'gamesBack' => '20.0']),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        // Last team: 30 wins + 5 games left = 35 max, can't catch 50. Should be bottom-locked.
+        $this->assertStringContainsString('class="bottom-locked"', $result);
+    }
+
+    public function testNoBottomLockWhenTeamCanStillCatchUp(): void
+    {
+        $teamData = [
+            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 40, 'gamesUnplayed' => 20, 'gamesBack' => '0.0']),
+            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 35, 'gamesUnplayed' => 20, 'gamesBack' => '5.0']),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        // Second team: 35 + 20 = 55 max, can catch 40. Not locked.
+        $this->assertStringNotContainsString('bottom-locked', $result);
+    }
+
+    public function testBottomLockCascadesFromBottom(): void
+    {
+        $teamData = [
+            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 60, 'gamesUnplayed' => 5, 'gamesBack' => '0.0']),
+            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 50, 'gamesUnplayed' => 5, 'gamesBack' => '10.0']),
+            $this->makeTeamData(['tid' => 3, 'team_name' => 'Third', 'wins' => 30, 'gamesUnplayed' => 5, 'gamesBack' => '30.0']),
+            $this->makeTeamData(['tid' => 4, 'team_name' => 'Fourth', 'wins' => 20, 'gamesUnplayed' => 5, 'gamesBack' => '40.0']),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        // Fourth: 20+5=25 < 30 (Third's wins) → locked
+        // Third: 30+5=35 < 50 (Second's wins) → locked
+        // Second: 50+5=55 < 60 (First's wins) → locked
+        // All three bottom teams should be locked
+        $this->assertSame(3, substr_count($result, 'class="bottom-locked"'));
+    }
+
+    public function testBottomLockStopsWhenTeamCanCatch(): void
+    {
+        $teamData = [
+            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 50, 'gamesUnplayed' => 10, 'gamesBack' => '0.0']),
+            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 45, 'gamesUnplayed' => 10, 'gamesBack' => '5.0']),
+            $this->makeTeamData(['tid' => 3, 'team_name' => 'Third', 'wins' => 20, 'gamesUnplayed' => 5, 'gamesBack' => '30.0']),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        // Third: 20+5=25 < 45 → locked
+        // Second: 45+10=55 >= 50 → NOT locked (breaks cascade)
+        // Only Third is locked
+        $this->assertSame(1, substr_count($result, 'class="bottom-locked"'));
+    }
+
+    // ========== SEASON-OVER ELIMINATION TESTS ==========
+
+    public function testSeasonOverUnclinkedTeamsAreBottomLocked(): void
+    {
+        $teamData = [
+            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 58, 'gamesUnplayed' => 0, 'gamesBack' => '0.0', 'clinchedPlayoffs' => 1]),
+            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 50, 'gamesUnplayed' => 0, 'gamesBack' => '8.0', 'clinchedPlayoffs' => 1]),
+            $this->makeTeamData(['tid' => 3, 'team_name' => 'Third', 'wins' => 36, 'gamesUnplayed' => 0, 'gamesBack' => '22.0']),
+            $this->makeTeamData(['tid' => 4, 'team_name' => 'Fourth', 'wins' => 20, 'gamesUnplayed' => 0, 'gamesBack' => '38.0']),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        // Season over: Third and Fourth have no clinch flag → bottom-locked
+        $this->assertSame(2, substr_count($result, 'class="bottom-locked"'));
+        // First and Second have clinch flags → clinch-playoffs
+        $this->assertSame(2, substr_count($result, 'class="clinch-playoffs"'));
+    }
+
+    public function testSeasonOverClinkedTeamsNeverBottomLocked(): void
+    {
+        $teamData = [
+            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 58, 'gamesUnplayed' => 0, 'gamesBack' => '0.0', 'clinchedDivision' => 1]),
+            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 55, 'gamesUnplayed' => 0, 'gamesBack' => '3.0', 'clinchedPlayoffs' => 1]),
+            $this->makeTeamData(['tid' => 3, 'team_name' => 'Third', 'wins' => 53, 'gamesUnplayed' => 0, 'gamesBack' => '5.0', 'clinchedPlayoffs' => 1]),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        // All clinched → none bottom-locked
+        $this->assertStringNotContainsString('bottom-locked', $result);
+    }
+
+    public function testSeasonOverTiedEliminatedTeamsAllBottomLocked(): void
+    {
+        $teamData = [
+            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 45, 'gamesUnplayed' => 0, 'gamesBack' => '0.0', 'clinchedPlayoffs' => 1]),
+            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 35, 'gamesUnplayed' => 0, 'gamesBack' => '10.0']),
+            $this->makeTeamData(['tid' => 3, 'team_name' => 'Third', 'wins' => 35, 'gamesUnplayed' => 0, 'gamesBack' => '10.0']),
+            $this->makeTeamData(['tid' => 4, 'team_name' => 'Fourth', 'wins' => 35, 'gamesUnplayed' => 0, 'gamesBack' => '10.0']),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        // All three tied teams without clinch flags → bottom-locked
+        $this->assertSame(3, substr_count($result, 'class="bottom-locked"'));
+    }
+
+    public function testMidSeasonCascadeStopsAtClinchedTeam(): void
+    {
+        $teamData = [
+            $this->makeTeamData(['tid' => 1, 'team_name' => 'First', 'wins' => 60, 'gamesUnplayed' => 5, 'gamesBack' => '0.0', 'clinchedPlayoffs' => 1]),
+            $this->makeTeamData(['tid' => 2, 'team_name' => 'Second', 'wins' => 50, 'gamesUnplayed' => 5, 'gamesBack' => '10.0', 'clinchedPlayoffs' => 1]),
+            $this->makeTeamData(['tid' => 3, 'team_name' => 'Third', 'wins' => 20, 'gamesUnplayed' => 5, 'gamesBack' => '40.0']),
+            $this->makeTeamData(['tid' => 4, 'team_name' => 'Fourth', 'wins' => 10, 'gamesUnplayed' => 5, 'gamesBack' => '50.0']),
+        ];
+
+        $this->mockRepository->method('getStandingsByRegion')->willReturn($teamData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->renderRegion('Eastern');
+
+        // Fourth: 10+5=15 < 20 → locked
+        // Third: 20+5=25 < 50 → locked
+        // Second: clinched → cascade stops
+        $this->assertSame(2, substr_count($result, 'class="bottom-locked"'));
     }
 }

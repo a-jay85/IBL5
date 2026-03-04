@@ -1,17 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
 
 // Public pages — no authentication required.
 // These use the base test (not the auth fixture) so they run without login.
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
-const PHP_ERROR_PATTERNS = [
-  'Fatal error',
-  'Warning:',
-  'Parse error',
-  'Uncaught',
-  'Stack trace:',
-];
 
 test.describe('Public page smoke tests', () => {
   test('homepage loads', async ({ page }) => {

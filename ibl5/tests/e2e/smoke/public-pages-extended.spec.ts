@@ -1,15 +1,8 @@
 import { test, expect } from '@playwright/test';
+import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
 
 // Public pages — no authentication required.
 test.use({ storageState: { cookies: [], origins: [] } });
-
-const PHP_ERROR_PATTERNS = [
-  'Fatal error',
-  'Warning:',
-  'Parse error',
-  'Uncaught',
-  'Stack trace:',
-];
 
 const EXTENDED_PUBLIC_URLS = [
   'modules.php?name=Schedule',

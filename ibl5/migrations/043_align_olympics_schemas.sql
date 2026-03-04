@@ -1,4 +1,4 @@
--- Migration 039: Align Olympics table schemas with IBL counterparts
+-- Migration 043: Align Olympics table schemas with IBL counterparts
 --
 -- Applies structural improvements from migrations 008, 009, and 016 to Olympics tables:
 -- - Add auto-increment PKs to box score tables

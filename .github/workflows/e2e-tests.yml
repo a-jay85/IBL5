@@ -68,7 +68,9 @@ jobs:
           $email = 'ci-test@example.com';
           $db = new mysqli('127.0.0.1', 'root', 'root', 'ibl5');
 
-          $stmt = $db->prepare("INSERT INTO auth_users (email, password, username, status, verified, resettable, roles_mask, registered, force_logout) VALUES (?, ?, ?, 0, 1, 1, 0, ?, 0)");
+          // roles_mask = 1 grants ADMIN role (Delight\Auth\Role::ADMIN)
+          // Required for admin page E2E tests (updateAllTheThings.php, block.php)
+          $stmt = $db->prepare("INSERT INTO auth_users (email, password, username, status, verified, resettable, roles_mask, registered, force_logout) VALUES (?, ?, ?, 0, 1, 1, 1, ?, 0)");
           $time = time();
           $stmt->bind_param('sssi', $email, $hash, $user, $time);
           $stmt->execute();

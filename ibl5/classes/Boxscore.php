@@ -64,7 +64,7 @@ class Boxscore
         gameBLK,
         gamePF
     )
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"; 
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 
     const TEAMSTATEMENT_PREPARE = "INSERT INTO ibl_box_scores_teams (
         Date,
@@ -103,6 +103,83 @@ class Boxscore
         gamePF
     )
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+
+    public static function playerInsertSql(string $table): string
+    {
+        return "INSERT INTO {$table} (
+        Date,
+        uuid,
+        name,
+        pos,
+        pid,
+        visitorTID,
+        homeTID,
+        gameOfThatDay,
+        attendance,
+        capacity,
+        visitorWins,
+        visitorLosses,
+        homeWins,
+        homeLosses,
+        teamID,
+        gameMIN,
+        game2GM,
+        game2GA,
+        gameFTM,
+        gameFTA,
+        game3GM,
+        game3GA,
+        gameORB,
+        gameDRB,
+        gameAST,
+        gameSTL,
+        gameTOV,
+        gameBLK,
+        gamePF
+    )
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+    }
+
+    public static function teamInsertSql(string $table): string
+    {
+        return "INSERT INTO {$table} (
+        Date,
+        name,
+        gameOfThatDay,
+        visitorTeamID,
+        homeTeamID,
+        attendance,
+        capacity,
+        visitorWins,
+        visitorLosses,
+        homeWins,
+        homeLosses,
+        visitorQ1points,
+        visitorQ2points,
+        visitorQ3points,
+        visitorQ4points,
+        visitorOTpoints,
+        homeQ1points,
+        homeQ2points,
+        homeQ3points,
+        homeQ4points,
+        homeOTpoints,
+        game2GM,
+        game2GA,
+        gameFTM,
+        gameFTA,
+        game3GM,
+        game3GA,
+        gameORB,
+        gameDRB,
+        gameAST,
+        gameSTL,
+        gameTOV,
+        gameBLK,
+        gamePF
+    )
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+    }
 
     protected function fillGameInfo(string $gameInfoLine, int $seasonEndingYear, string $seasonPhase): void
     {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\LeagueConfig;
 
+use League\LeagueContext;
 use LeagueConfig\Contracts\LeagueConfigRepositoryInterface;
 use LeagueConfig\LeagueConfigRepository;
 use Tests\Integration\IntegrationTestCase;
@@ -111,5 +112,20 @@ class LeagueConfigRepositoryTest extends IntegrationTestCase
         $result = $repository->getFranchiseTeamsBySeason(2027);
 
         $this->assertSame([], $result);
+    }
+
+    public function testOlympicsContextUsesOlympicsTable(): void
+    {
+        $_GET['league'] = 'olympics';
+        $leagueContext = new LeagueContext();
+
+        $this->mockDb->setMockData([['total' => 0]]);
+
+        $repository = new LeagueConfigRepository($this->mockDb, $leagueContext);
+        $repository->hasConfigForSeason(2007);
+
+        $this->assertQueryExecuted('ibl_olympics_league_config');
+
+        unset($_GET['league']);
     }
 }

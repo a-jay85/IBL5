@@ -30,11 +30,10 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
                     r.player_name, r.car_block_id,
                     COALESCE(r.pid, plr.pid) AS pid,
                     r.stat_value, r.stat_raw,
-                    r.team_of_record, r.season_year, r.career_total,
-                    plr.retired
+                    r.team_of_record, r.season_year, r.career_total
              FROM ibl_rcb_alltime_records r
              LEFT JOIN (
-               SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid, MAX(retired) AS retired
+               SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
                FROM ibl_plr GROUP BY clean_name
              ) plr ON plr.clean_name = r.player_name
              WHERE r.scope = 'team' AND r.team_id = ? AND r.record_type = 'single_season'
@@ -61,11 +60,10 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
                     r.player_name, r.car_block_id,
                     COALESCE(r.pid, plr.pid) AS pid,
                     r.stat_value, r.stat_raw,
-                    r.team_of_record, r.season_year, r.career_total,
-                    plr.retired
+                    r.team_of_record, r.season_year, r.career_total
              FROM ibl_rcb_alltime_records r
              LEFT JOIN (
-               SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid, MAX(retired) AS retired
+               SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
                FROM ibl_plr GROUP BY clean_name
              ) plr ON plr.clean_name = r.player_name
              WHERE r.scope = 'league' AND r.record_type = 'career'
@@ -91,11 +89,10 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
                     r.player_name, r.car_block_id,
                     COALESCE(r.pid, plr.pid) AS pid,
                     r.stat_value, r.stat_raw,
-                    r.team_of_record, r.season_year, r.career_total,
-                    plr.retired
+                    r.team_of_record, r.season_year, r.career_total
              FROM ibl_rcb_alltime_records r
              LEFT JOIN (
-               SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid, MAX(retired) AS retired
+               SELECT REPLACE(name, '''', '') AS clean_name, MAX(pid) AS pid
                FROM ibl_plr GROUP BY clean_name
              ) plr ON plr.clean_name = r.player_name
              WHERE r.scope = 'league' AND r.record_type = 'single_season'

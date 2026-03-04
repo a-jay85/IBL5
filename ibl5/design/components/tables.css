@@ -1677,6 +1677,7 @@ td.ibl-team-cell--colored {
 /* Team name cell padding (mirrors .ibl-data-table .ibl-team-cell--colored) */
 .draft-pick-table .ibl-team-cell--colored {
     padding-inline: 0.5rem;
+    border-right: 1px solid var(--gray-100);
 }
 
 /* Pick matrix cells: column borders, uniform square sizing */

@@ -63,24 +63,6 @@ INSERT INTO ibl_settings (name, value) VALUES
 INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES
   (689, '2026-03-01', '2026-03-07');
 
--- ibl_box_scores needs rows for Season date queries and career averages view.
--- Generated columns (game_type, season_year, calc_*) are computed automatically.
--- game_type=1 (regular season) when month is not 6 (playoffs), 10, or 0.
-INSERT INTO ibl_box_scores (
-  `Date`, pid, name, pos, visitorTID, homeTID, teamID,
-  gameMIN, game2GM, game2GA, gameFTM, gameFTA, game3GM, game3GA,
-  gameORB, gameDRB, gameAST, gameSTL, gameTOV, gameBLK, gamePF,
-  `uuid`
-) VALUES
-  ('2026-03-07', 1, 'Test Player', 'SG', 2, 1, 1,
-   32, 5, 10, 3, 4, 2, 5,
-   2, 4, 5, 1, 2, 1, 3,
-   '00000000-0000-0000-0000-000000000001'),
-  ('2026-03-07', 2, 'Test Player Two', 'PF', 2, 1, 1,
-   28, 4, 9, 2, 3, 1, 3,
-   3, 5, 3, 2, 1, 2, 2,
-   '00000000-0000-0000-0000-000000000002');
-
 -- ============================================================
 -- Teams (28 real franchises + Free Agents)
 -- Only columns required by the app; others use table defaults.
@@ -234,6 +216,28 @@ INSERT INTO ibl_plr (
    200, 600, 800, 2200, 1500, 400,
    900, 300, 1200,
    'plr-uuid-00000000-0000-000000000003');
+
+-- ============================================================
+-- Box scores (must be after players for FK constraint)
+-- ============================================================
+
+-- ibl_box_scores needs rows for Season date queries and career averages view.
+-- Generated columns (game_type, season_year, calc_*) are computed automatically.
+-- game_type=1 (regular season) when month is not 6 (playoffs), 10, or 0.
+INSERT INTO ibl_box_scores (
+  `Date`, pid, name, pos, visitorTID, homeTID, teamID,
+  gameMIN, game2GM, game2GA, gameFTM, gameFTA, game3GM, game3GA,
+  gameORB, gameDRB, gameAST, gameSTL, gameTOV, gameBLK, gamePF,
+  `uuid`
+) VALUES
+  ('2026-03-07', 1, 'Test Player', 'SG', 2, 1, 1,
+   32, 5, 10, 3, 4, 2, 5,
+   2, 4, 5, 1, 2, 1, 3,
+   '00000000-0000-0000-0000-000000000001'),
+  ('2026-03-07', 2, 'Test Player Two', 'PF', 2, 1, 1,
+   28, 4, 9, 2, 3, 1, 3,
+   3, 5, 3, 2, 1, 2, 2,
+   '00000000-0000-0000-0000-000000000002');
 
 -- ============================================================
 -- Player history (SeasonLeaderboards needs current-year stats)

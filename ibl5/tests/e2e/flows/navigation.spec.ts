@@ -33,7 +33,7 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
   test('my team dropdown opens and shows team links', async ({ page }) => {
     await page.goto('/');
     const nav = desktopNav(page);
-    await nav.getByRole('button', { name: 'My Team' }).hover();
+    await nav.getByRole('button', { name: 'My Team' }).click();
 
     const teamPageLink = nav.locator('.nav-dropdown-item', {
       hasText: 'Team Page',
@@ -45,9 +45,9 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
     await page.goto('/');
     const nav = desktopNav(page);
 
-    // Find the last dropdown button (account) and hover
+    // Find the last dropdown button (account) and click to pin open
     const accountBtn = nav.locator('.relative.group > button').last();
-    await accountBtn.hover();
+    await accountBtn.click();
 
     const logoutLink = nav.locator('.nav-dropdown-item', {
       hasText: 'Logout',
@@ -57,7 +57,7 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
 
   test('teams mega-menu shows team links', async ({ page }) => {
     await page.goto('/');
-    await desktopNav(page).getByRole('button', { name: 'Teams' }).hover();
+    await desktopNav(page).getByRole('button', { name: 'Teams' }).click();
 
     const teamLinks = page.locator('a[href*="teamID="]');
     await expect(teamLinks.first()).toBeVisible({ timeout: 3000 });
@@ -67,7 +67,7 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
   test('dropdown link navigates to correct page', async ({ page }) => {
     await page.goto('/');
     const nav = desktopNav(page);
-    await nav.getByRole('button', { name: 'Season' }).hover();
+    await nav.getByRole('button', { name: 'Season' }).click();
 
     const standingsLink = nav.locator('.nav-dropdown-item', {
       hasText: 'Standings',

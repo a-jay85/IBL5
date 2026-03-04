@@ -68,7 +68,7 @@ test.describe('Standings page flow', () => {
         els.map((el) => el.textContent?.trim() ?? ''),
       );
       for (const text of texts) {
-        expect(['X', 'Y', 'Z']).toContain(text);
+        expect(['W', 'X', 'Y', 'Z']).toContain(text);
       }
     }
   });

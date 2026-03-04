@@ -37,7 +37,7 @@ fi
 gh pr merge --squash --delete-branch || fail "gh pr merge"
 
 # 7a. Wait for GitHub to delete the origin branch
-sleep 2
+sleep 10
 
 # 8. mergeAndPush
 bash "$SCRIPT_DIR/mergeMasterToProdAndPush.sh"

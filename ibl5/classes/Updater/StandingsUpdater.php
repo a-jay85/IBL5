@@ -424,24 +424,36 @@ class StandingsUpdater extends \BaseMysqliRepository {
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
         echo "<p>Checking if the {$region} {$grouping} has been clinched...<br>";
 
-        $winningestTeam = $this->fetchOne(
-            "SELECT team_name, homeWins + awayWins AS wins
+        /** @var list<array{tid: int, team_name: string, wins: int}> $topTeams */
+        $topTeams = $this->fetchAll(
+            "SELECT tid, team_name, homeWins + awayWins AS wins
             FROM ibl_standings
             WHERE {$grouping} = ?
             ORDER BY wins DESC
-            LIMIT 1",
+            LIMIT 2",
             "s",
             $region
         );
 
-        if ($winningestTeam === null) {
+        if (count($topTeams) < 2) {
             return;
         }
 
+        $first = $topTeams[0];
+        $second = $topTeams[1];
+
+        // Head-to-head tiebreaker when tied in wins
+        if ($first['wins'] === $second['wins']) {
+            $winnerId = $this->getHeadToHeadWinner($first['tid'], $second['tid']);
+            if ($winnerId === $second['tid']) {
+                [$first, $second] = [$second, $first];
+            }
+        }
+
         /** @var string $winningestTeamName */
-        $winningestTeamName = $winningestTeam['team_name'];
+        $winningestTeamName = $first['team_name'];
         /** @var int $winningestTeamWins */
-        $winningestTeamWins = $winningestTeam['wins'];
+        $winningestTeamWins = $first['wins'];
 
         $leastLosingestTeam = $this->fetchOne(
             "SELECT homeLosses + awayLosses AS losses
@@ -464,6 +476,13 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
         $magicNumber = 82 + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
 
+        // When tied at the top and season is over, H2H winner has clinched
+        if ($magicNumber > 0 && $first['wins'] === $second['wins']) {
+            if ($this->isRegionSeasonOver($grouping, $region)) {
+                $magicNumber = 0;
+            }
+        }
+
         if ($magicNumber <= 0) {
             $this->execute(
                 "UPDATE ibl_standings SET clinched" . ucfirst($grouping) . " = 1 WHERE team_name = ?",
@@ -477,22 +496,34 @@ class StandingsUpdater extends \BaseMysqliRepository {
     private function checkIfLeagueClinched(): void {
         echo '<p>Checking if any team has clinched the best league record...<br>';
 
-        $winningestTeam = $this->fetchOne(
-            "SELECT team_name, homeWins + awayWins AS wins
+        /** @var list<array{tid: int, team_name: string, wins: int}> $topTeams */
+        $topTeams = $this->fetchAll(
+            "SELECT tid, team_name, homeWins + awayWins AS wins
             FROM ibl_standings
             ORDER BY wins DESC
-            LIMIT 1",
+            LIMIT 2",
             ""
         );
 
-        if ($winningestTeam === null) {
+        if (count($topTeams) < 2) {
             return;
         }
 
+        $first = $topTeams[0];
+        $second = $topTeams[1];
+
+        // Head-to-head tiebreaker when tied in wins
+        if ($first['wins'] === $second['wins']) {
+            $winnerId = $this->getHeadToHeadWinner($first['tid'], $second['tid']);
+            if ($winnerId === $second['tid']) {
+                [$first, $second] = [$second, $first];
+            }
+        }
+
         /** @var string $winningestTeamName */
-        $winningestTeamName = $winningestTeam['team_name'];
+        $winningestTeamName = $first['team_name'];
         /** @var int $winningestTeamWins */
-        $winningestTeamWins = $winningestTeam['wins'];
+        $winningestTeamWins = $first['wins'];
 
         $leastLosingestTeam = $this->fetchOne(
             "SELECT homeLosses + awayLosses AS losses
@@ -513,6 +544,13 @@ class StandingsUpdater extends \BaseMysqliRepository {
 
         $magicNumber = 82 + 1 - $winningestTeamWins - $leastLosingestTeamLosses;
 
+        // When tied at the top and season is over, H2H winner has clinched
+        if ($magicNumber > 0 && $first['wins'] === $second['wins']) {
+            if ($this->isRegionSeasonOver('', '')) {
+                $magicNumber = 0;
+            }
+        }
+
         if ($magicNumber <= 0) {
             $this->execute(
                 "UPDATE ibl_standings SET clinchedLeague = 1 WHERE team_name = ?",
@@ -521,6 +559,74 @@ class StandingsUpdater extends \BaseMysqliRepository {
             );
             echo "The {$winningestTeamName} have clinched the best record in the league!";
         }
+    }
+
+    /**
+     * Check if all teams in a region (or league-wide) have finished the season
+     *
+     * @param string $grouping Column name ('conference', 'division', or '' for league-wide)
+     * @param string $region Region value (e.g. 'Eastern', 'Atlantic', or '' for league-wide)
+     */
+    private function isRegionSeasonOver(string $grouping, string $region): bool {
+        if ($grouping !== '' && $region !== '') {
+            $result = $this->fetchOne(
+                "SELECT MAX(gamesUnplayed) AS maxLeft FROM ibl_standings WHERE {$grouping} = ?",
+                "s",
+                $region
+            );
+        } else {
+            $result = $this->fetchOne(
+                "SELECT MAX(gamesUnplayed) AS maxLeft FROM ibl_standings",
+                ""
+            );
+        }
+
+        return $result !== null && $result['maxLeft'] === 0;
+    }
+
+    /**
+     * Determine the head-to-head winner between two teams for the current season
+     *
+     * Counts wins from games played between the two teams. If the head-to-head
+     * record is also tied, defaults to tid1 (higher seed by database ordering).
+     *
+     * @param int $tid1 First team ID
+     * @param int $tid2 Second team ID
+     * @return int The tid of the team that won the head-to-head series
+     */
+    private function getHeadToHeadWinner(int $tid1, int $tid2): int {
+        $month = SeasonPhaseHelper::getMonthForPhase($this->season->phase);
+        $startDate = $this->season->beginningYear . "-{$month}-01";
+        $endDate = $this->season->endingYear . '-05-30';
+
+        $result = $this->fetchOne(
+            "SELECT
+                COUNT(*) AS total_games,
+                SUM(CASE
+                    WHEN (Visitor = ? AND VScore > HScore) OR (Home = ? AND HScore > VScore) THEN 1
+                    ELSE 0
+                END) AS team1_wins
+            FROM ibl_schedule
+            WHERE VScore > 0 AND HScore > 0
+            AND Date BETWEEN ? AND ?
+            AND ((Visitor = ? AND Home = ?) OR (Visitor = ? AND Home = ?))",
+            "iissiiii",
+            $tid1, $tid1,
+            $startDate, $endDate,
+            $tid1, $tid2, $tid2, $tid1
+        );
+
+        if ($result === null) {
+            return $tid1;
+        }
+
+        /** @var int $totalGames */
+        $totalGames = $result['total_games'];
+        /** @var int $team1Wins */
+        $team1Wins = $result['team1_wins'];
+        $team2Wins = $totalGames - $team1Wins;
+
+        return $team1Wins >= $team2Wins ? $tid1 : $tid2;
     }
 
     private function checkIfPlayoffsClinched(string $conference): void {

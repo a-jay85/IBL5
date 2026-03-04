@@ -193,8 +193,25 @@
     background-color: var(--gray-200, #e5e7eb);
 }
 
-.ibl-data-table tbody tr.bottom-locked td a {
+.ibl-data-table tbody tr.bottom-locked td,
+.ibl-data-table tbody tr.bottom-locked td a,
+.ibl-data-table tbody tr.bottom-locked td .ibl-stat-highlight,
+.ibl-data-table tbody tr.bottom-locked td .ibl-clinched-indicator {
     color: var(--gray-400, #9ca3af);
+}
+
+.ibl-data-table tbody tr.bottom-locked td.ibl-team-cell--colored {
+    filter: saturate(0.25) brightness(1.2);
+}
+
+.ibl-data-table tbody tr.bottom-locked td.ibl-team-cell--colored a {
+    color: inherit;
+    opacity: 0.55;
+}
+
+.ibl-data-table tbody tr.bottom-locked img {
+    filter: grayscale(100%);
+    opacity: 0.45;
 }
 
 /* Drafted/disabled row */

@@ -41,10 +41,10 @@ test.describe('Record Holders flow', () => {
     }
 
     // With sparse CI seed data, skip rather than fail if no cards have data.
-    // test.skip() throws internally, so no assertion needed after it.
     if (cardsWithRows === 0) {
       test.skip(true, 'No record data available (sparse CI seed)');
     }
+    expect(cardsWithRows).toBeGreaterThan(0);
   });
 
   test('player record rows contain player links', async ({ page }) => {

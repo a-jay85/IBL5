@@ -43,13 +43,16 @@ if (!headers_sent()) {
 
 global $mysqli_db;
 
-// Detect league context from URL parameter, session, or cookie
+// Detect league context from URL parameter ONLY (ignore session/cookie for admin scripts)
 $leagueContext = new League\LeagueContext();
 $leagueRaw = $_GET['league'] ?? null;
-if (is_string($leagueRaw) && ($leagueRaw === League\LeagueContext::LEAGUE_OLYMPICS || $leagueRaw === League\LeagueContext::LEAGUE_IBL)) {
+if (is_string($leagueRaw) && $leagueRaw === League\LeagueContext::LEAGUE_OLYMPICS) {
     $leagueContext->setLeague($leagueRaw);
+    $isOlympics = true;
+} else {
+    $leagueContext->setLeague(League\LeagueContext::LEAGUE_IBL);
+    $isOlympics = false;
 }
-$isOlympics = $leagueContext->isOlympics();
 $leagueLabel = $isOlympics ? 'Olympics' : 'IBL';
 
 $view = new Updater\UpdaterView();
@@ -135,7 +138,7 @@ try {
     echo $view->renderStepStart('Importing league config (.lge)...');
     flush();
 
-    $lgeRepo = new LeagueConfig\LeagueConfigRepository($mysqli_db);
+    $lgeRepo = new LeagueConfig\LeagueConfigRepository($mysqli_db, $leagueContext);
     $lgeService = new LeagueConfig\LeagueConfigService($lgeRepo);
     $lgeView = new LeagueConfig\LeagueConfigView();
     $defaultLgePath = $basePath . '/IBL5.lge';

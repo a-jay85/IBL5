@@ -44,4 +44,7 @@ if [ "$STASHED" -eq 1 ]; then
   git stash pop -q && echo "Restored stashed changes." || echo "WARNING: stash pop had conflicts -- resolve manually."
 fi
 
+# 10. Fetch all remotes and prune tracking branches
+git fetch --all --prune -q
+
 echo "Done."

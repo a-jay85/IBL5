@@ -67,14 +67,14 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
         for ($i = 0; $i < 6; $i++) {
             $year = $currentEndingYear + $i;
             $safeYear = HtmlSanitizer::safeHtmlOutput((string)$year);
-            $html .= '<th colspan="2">' . $safeYear . '</th>';
+            $html .= '<th colspan="2" class="draft-pick-year-sep">' . $safeYear . '</th>';
         }
         $html .= '</tr>';
 
         // Second header row - round labels
         $html .= '<tr>';
         for ($i = 0; $i < 6; $i++) {
-            $html .= '<th>R1</th><th>R2</th>';
+            $html .= '<th class="draft-pick-year-sep">R1</th><th>R2</th>';
         }
         $html .= '</tr>';
 
@@ -141,14 +141,16 @@ class DraftPickLocatorView implements DraftPickLocatorViewInterface
             $isOwn = ($ownerOfPick === $team['teamName']);
             $ownerInfo = $teamColorMap[$ownerOfPick] ?? null;
 
+            $yearSepClass = ($pick['round'] === 1) ? ' draft-pick-year-sep' : '';
+
             if ($isOwn) {
-                $html .= '<td class="draft-pick-own">';
+                $html .= '<td class="draft-pick-own' . $yearSepClass . '">';
             } else {
                 if ($ownerInfo !== null) {
                     $bgColor = HtmlSanitizer::safeHtmlOutput($ownerInfo['color1']);
-                    $html .= '<td class="draft-pick-traded" style="background-color: #' . $bgColor . ';">';
+                    $html .= '<td class="draft-pick-traded' . $yearSepClass . '" style="background-color: #' . $bgColor . ';">';
                 } else {
-                    $html .= '<td class="draft-pick-traded">';
+                    $html .= '<td class="draft-pick-traded' . $yearSepClass . '">';
                 }
             }
 

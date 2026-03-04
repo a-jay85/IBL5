@@ -1674,12 +1674,17 @@ td.ibl-team-cell--colored {
     padding: 0.25rem 0.2rem;
 }
 
-/* Pick matrix cells: column borders, uniform sizing */
+/* Team name cell padding (mirrors .ibl-data-table .ibl-team-cell--colored) */
+.draft-pick-table .ibl-team-cell--colored {
+    padding-inline: 0.5rem;
+}
+
+/* Pick matrix cells: column borders, uniform square sizing */
 .draft-pick-own,
 .draft-pick-traded {
     padding: 4px;
-    width: 1px;
-    min-width: 37px;
+    width: 37px;
+    height: 37px;
     border-right: 1px solid var(--gray-100);
 }
 

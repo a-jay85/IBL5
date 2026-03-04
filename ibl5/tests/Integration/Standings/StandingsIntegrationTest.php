@@ -773,6 +773,118 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $this->assertStringContainsString('table-scroll-container', $html);
     }
 
+    // ========== LEAGUE CLINCH (W) INDICATOR TESTS ==========
+
+    /**
+     * @group integration
+     * @group standings
+     * @group view
+     * @group clinched
+     */
+    public function testRenderRegionShowsClinchedLeagueIndicator(): void
+    {
+        // Arrange - Team that clinched league shows W
+        $standingsData = [
+            $this->createStandingsRow(1, 'Boston', 'Eastern', 'Atlantic', '72-8', 0.900, 0, 1, 1, 1, 1, 72),
+        ];
+        $this->mockDb->setMockData($standingsData);
+        $this->setupStreakAndPythagoreanData();
+
+        // Act
+        $html = $this->view->renderRegion('Eastern');
+
+        // Assert
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">W</span>-Boston', $html);
+    }
+
+    /**
+     * @group integration
+     * @group standings
+     * @group view
+     * @group clinched
+     */
+    public function testClinchedLeagueTakesPriorityOverConference(): void
+    {
+        // Arrange - Team with all flags set should show W, not Z
+        $standingsData = [
+            $this->createStandingsRow(1, 'Boston', 'Eastern', 'Atlantic', '72-8', 0.900, 0, 1, 1, 1, 1, 72),
+        ];
+        $this->mockDb->setMockData($standingsData);
+        $this->setupStreakAndPythagoreanData();
+
+        // Act
+        $html = $this->view->renderRegion('Eastern');
+
+        // Assert - Should show W, not Z, Y, or X
+        $this->assertStringContainsString('<span class="ibl-clinched-indicator">W</span>-Boston', $html);
+        $this->assertStringNotContainsString('<span class="ibl-clinched-indicator">Z</span>-Boston', $html);
+    }
+
+    // ========== CLINCH ROW HIGHLIGHT TESTS ==========
+
+    /**
+     * @group integration
+     * @group standings
+     * @group view
+     * @group clinched
+     */
+    public function testClinchLeagueRowHighlight(): void
+    {
+        $standingsData = [
+            $this->createStandingsRow(1, 'Boston', 'Eastern', 'Atlantic', '72-8', 0.900, 0, 0, 0, 0, 1, 72),
+        ];
+        $this->mockDb->setMockData($standingsData);
+        $this->setupStreakAndPythagoreanData();
+
+        $html = $this->view->renderRegion('Eastern');
+
+        $this->assertStringContainsString('class="clinch-league"', $html);
+    }
+
+    /**
+     * @group integration
+     * @group standings
+     * @group view
+     * @group clinched
+     */
+    public function testNoRowHighlightWhenNotClinched(): void
+    {
+        $standingsData = [
+            $this->createStandingsRow(1, 'Boston', 'Eastern', 'Atlantic', '40-40', 0.500, 20, 0, 0, 0, 0, 40),
+        ];
+        $this->mockDb->setMockData($standingsData);
+        $this->setupStreakAndPythagoreanData();
+
+        $html = $this->view->renderRegion('Eastern');
+
+        $this->assertStringNotContainsString('clinch-league', $html);
+        $this->assertStringNotContainsString('clinch-conference', $html);
+        $this->assertStringNotContainsString('clinch-division', $html);
+        $this->assertStringNotContainsString('clinch-playoffs', $html);
+    }
+
+    // ========== BOTTOM-LOCKED TESTS ==========
+
+    /**
+     * @group integration
+     * @group standings
+     * @group view
+     */
+    public function testBottomLockedRowHighlight(): void
+    {
+        $standingsData = [
+            $this->createStandingsRow(1, 'Boston', 'Eastern', 'Atlantic', '60-10', 0.857, 0, 0, 0, 0, 0, 60, 10),
+            $this->createStandingsRow(2, 'Miami', 'Eastern', 'Atlantic', '25-45', 0.357, 35, 0, 0, 0, 0, 25, 5),
+        ];
+        $this->mockDb->setMockData($standingsData);
+        $this->setupStreakAndPythagoreanData();
+
+        $html = $this->view->renderRegion('Eastern');
+
+        // Miami: 25 + 5 = 30 < 60 (Boston's wins) → locked
+        $this->assertStringContainsString('class="bottom-locked"', $html);
+    }
+
     // ========== COMPLETE WORKFLOW TESTS ==========
 
     /**
@@ -836,7 +948,10 @@ class StandingsIntegrationTest extends IntegrationTestCase
         float $gamesBack,
         int $clinchedConference = 0,
         int $clinchedDivision = 0,
-        int $clinchedPlayoffs = 0
+        int $clinchedPlayoffs = 0,
+        int $clinchedLeague = 0,
+        int $wins = 50,
+        int $gamesUnplayed = 12
     ): array {
         return [
             'tid' => $teamId,
@@ -852,13 +967,15 @@ class StandingsIntegrationTest extends IntegrationTestCase
             'divRecord' => '15-5',
             'homeRecord' => '30-5',
             'awayRecord' => '20-15',
-            'gamesUnplayed' => 12,
+            'gamesUnplayed' => $gamesUnplayed,
             'magicNumber' => $gamesBack > 0 ? 20 : 0,
             'confMagicNumber' => $gamesBack > 0 ? 20 : 0,
             'divMagicNumber' => $gamesBack > 0 ? 15 : 0,
             'clinchedConference' => $clinchedConference,
             'clinchedDivision' => $clinchedDivision,
             'clinchedPlayoffs' => $clinchedPlayoffs,
+            'clinchedLeague' => $clinchedLeague,
+            'wins' => $wins,
             'homeWins' => 30,
             'homeLosses' => 5,
             'awayWins' => 20,

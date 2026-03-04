@@ -82,6 +82,8 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             s.clinchedConference,
             s.clinchedDivision,
             s.clinchedPlayoffs,
+            s.clinchedLeague,
+            s.wins,
             (s.homeWins + s.homeLosses) AS homeGames,
             (s.awayWins + s.awayLosses) AS awayGames,
             t.color1,
@@ -89,7 +91,12 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             FROM ibl_standings s
             JOIN ibl_team_info t ON s.tid = t.teamid
             WHERE s.{$columns['grouping']} = ?
-            ORDER BY s.{$columns['gbColumn']} ASC";
+            ORDER BY s.{$columns['gbColumn']} ASC,
+                (COALESCE(s.clinchedLeague, 0) * 4
+                 + COALESCE(s.clinchedConference, 0) * 3
+                 + COALESCE(s.clinchedDivision, 0) * 2
+                 + COALESCE(s.clinchedPlayoffs, 0)) DESC,
+                s.wins DESC";
 
         /** @var list<StandingsRow> */
         return $this->fetchAll($query, "s", $region);

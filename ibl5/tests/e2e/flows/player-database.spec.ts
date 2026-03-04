@@ -1,16 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
 
 // Player Database — public page, no authentication required.
 // The results table only appears AFTER submitting a search.
 test.use({ storageState: { cookies: [], origins: [] } });
-
-const PHP_ERROR_PATTERNS = [
-  'Fatal error',
-  'Warning:',
-  'Parse error',
-  'Uncaught',
-  'Stack trace:',
-];
 
 test.describe('Player Database flow', () => {
   test.beforeEach(async ({ page }) => {

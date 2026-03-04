@@ -1,16 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
 
 // Team page — public, no authentication required.
 // Current-season teams use a dropdown (.ibl-view-select), not tabs.
 test.use({ storageState: { cookies: [], origins: [] } });
-
-const PHP_ERROR_PATTERNS = [
-  'Fatal error',
-  'Warning:',
-  'Parse error',
-  'Uncaught',
-  'Stack trace:',
-];
 
 test.describe('Team page flow', () => {
   test.beforeEach(async ({ page }) => {

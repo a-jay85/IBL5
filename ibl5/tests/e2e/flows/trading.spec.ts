@@ -1,17 +1,10 @@
 import { test, expect } from '../fixtures/auth';
 import type { Page } from '@playwright/test';
+import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
 
 // ---------------------------------------------------------------------------
 // Shared constants & helpers
 // ---------------------------------------------------------------------------
-
-const PHP_ERROR_PATTERNS = [
-  'Fatal error',
-  'Warning:',
-  'Parse error',
-  'Uncaught',
-  'Stack trace:',
-];
 
 /** Check whether the Trading module currently shows a "closed" message. */
 async function isTradesClosed(page: Page): Promise<boolean> {

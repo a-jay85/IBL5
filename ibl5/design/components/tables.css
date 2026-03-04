@@ -603,6 +603,13 @@
 /* Wrapper for scroll container - holds the fixed shadow */
 .table-scroll-wrapper {
     position: relative;
+    margin-bottom: var(--space-4);
+}
+
+/* Remove table's own bottom margin when inside wrapper so the scroll shadow
+   doesn't extend past the table's visible border. */
+.table-scroll-wrapper .ibl-data-table {
+    margin-bottom: 0;
 }
 
 /* On desktop, constrain tables to fit content and center (not full width on ultrawide) */

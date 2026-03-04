@@ -43,6 +43,7 @@ INSERT INTO nuke_modules (title, custom_title, active, view) VALUES
   ('CapSpace',          'CapSpace',          1, 0),
   ('Trading',           'Trading',           1, 0),
   ('DepthChartEntry',   'DepthChartEntry',   1, 0),
+  ('ComparePlayers',    'ComparePlayers',    1, 0),
   ('YourAccount',       'Your Account',      1, 0),
   ('News',              'News',              1, 0);
 
@@ -61,11 +62,6 @@ INSERT INTO ibl_settings (name, value) VALUES
 
 INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES
   (689, '2026-03-01', '2026-03-07');
-
--- ibl_box_scores needs at least one row for Season date queries.
--- Generated columns (game_type, season_year, calc_*) are computed automatically.
-INSERT INTO ibl_box_scores (`Date`, `uuid`) VALUES
-  ('2026-03-07', '00000000-0000-0000-0000-000000000001');
 
 -- ============================================================
 -- Teams (28 real franchises + Free Agents)
@@ -107,6 +103,8 @@ INSERT INTO ibl_team_info (teamid, team_city, team_name, color1, color2, uuid) V
 -- Standings (28 teams — FK to ibl_team_info)
 -- ============================================================
 
+-- Divisions must match League::DIVISION_NAMES = ['Atlantic', 'Central', 'Midwest', 'Pacific']
+-- 7 teams per division: Atlantic & Central (Eastern), Midwest & Pacific (Western)
 INSERT INTO ibl_standings (tid, team_name, pct, leagueRecord, wins, losses, conference, division) VALUES
   ( 1, 'Metros',       0.500, '20-20', 20, 20, 'Eastern',  'Atlantic'),
   ( 2, 'Stars',        0.500, '20-20', 20, 20, 'Western',  'Pacific'),
@@ -114,27 +112,27 @@ INSERT INTO ibl_standings (tid, team_name, pct, leagueRecord, wins, losses, conf
   ( 4, 'Diesels',      0.500, '20-20', 20, 20, 'Eastern',  'Central'),
   ( 5, 'Minutemen',    0.500, '20-20', 20, 20, 'Eastern',  'Atlantic'),
   ( 6, 'Rage',         0.500, '20-20', 20, 20, 'Eastern',  'Atlantic'),
-  ( 7, 'Tropics',      0.500, '20-20', 20, 20, 'Eastern',  'Southeast'),
-  ( 8, 'Monarchs',     0.500, '20-20', 20, 20, 'Eastern',  'Southeast'),
+  ( 7, 'Tropics',      0.500, '20-20', 20, 20, 'Eastern',  'Atlantic'),
+  ( 8, 'Monarchs',     0.500, '20-20', 20, 20, 'Eastern',  'Atlantic'),
   ( 9, 'Flames',       0.500, '20-20', 20, 20, 'Western',  'Pacific'),
-  (10, 'Spurs',        0.500, '20-20', 20, 20, 'Western',  'Southwest'),
-  (11, 'Pioneers',     0.500, '20-20', 20, 20, 'Western',  'Northwest'),
-  (12, 'Royals',       0.500, '20-20', 20, 20, 'Eastern',  'Southeast'),
-  (13, 'Apollos',      0.500, '20-20', 20, 20, 'Western',  'Southwest'),
-  (14, 'Phoenixes',    0.500, '20-20', 20, 20, 'Eastern',  'Southeast'),
-  (15, 'Blues',         0.500, '20-20', 20, 20, 'Western',  'Southwest'),
-  (16, 'Blizzard',     0.500, '20-20', 20, 20, 'Western',  'Northwest'),
+  (10, 'Spurs',        0.500, '20-20', 20, 20, 'Western',  'Midwest'),
+  (11, 'Pioneers',     0.500, '20-20', 20, 20, 'Western',  'Midwest'),
+  (12, 'Royals',       0.500, '20-20', 20, 20, 'Eastern',  'Central'),
+  (13, 'Apollos',      0.500, '20-20', 20, 20, 'Western',  'Midwest'),
+  (14, 'Phoenixes',    0.500, '20-20', 20, 20, 'Eastern',  'Central'),
+  (15, 'Blues',         0.500, '20-20', 20, 20, 'Western',  'Midwest'),
+  (16, 'Blizzard',     0.500, '20-20', 20, 20, 'Western',  'Pacific'),
   (17, 'Huskies',      0.500, '20-20', 20, 20, 'Eastern',  'Atlantic'),
   (18, 'Bucks',        0.500, '20-20', 20, 20, 'Eastern',  'Central'),
-  (19, 'Nuggets',      0.500, '20-20', 20, 20, 'Western',  'Northwest'),
+  (19, 'Nuggets',      0.500, '20-20', 20, 20, 'Western',  'Pacific'),
   (20, 'Pilots',       0.500, '20-20', 20, 20, 'Western',  'Pacific'),
-  (21, 'Mavericks',    0.500, '20-20', 20, 20, 'Western',  'Southwest'),
+  (21, 'Mavericks',    0.500, '20-20', 20, 20, 'Western',  'Midwest'),
   (22, 'Cavaliers',    0.500, '20-20', 20, 20, 'Eastern',  'Central'),
-  (23, 'Supersonics',  0.500, '20-20', 20, 20, 'Western',  'Northwest'),
+  (23, 'Supersonics',  0.500, '20-20', 20, 20, 'Western',  'Pacific'),
   (24, 'Nets',         0.500, '20-20', 20, 20, 'Eastern',  'Atlantic'),
-  (25, 'Generals',     0.500, '20-20', 20, 20, 'Eastern',  'Southeast'),
+  (25, 'Generals',     0.500, '20-20', 20, 20, 'Eastern',  'Central'),
   (26, 'Pacers',       0.500, '20-20', 20, 20, 'Eastern',  'Central'),
-  (27, 'Jazz',         0.500, '20-20', 20, 20, 'Western',  'Northwest'),
+  (27, 'Jazz',         0.500, '20-20', 20, 20, 'Western',  'Midwest'),
   (28, 'Thunder',      0.500, '20-20', 20, 20, 'Western',  'Pacific');
 
 -- ============================================================
@@ -172,11 +170,12 @@ INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year
   (28, 2025, 2026, 'Oklahoma City', 'Thunder');
 
 -- ============================================================
--- Players (pid=1 for Player page smoke test)
+-- Players (pid=1,2 active for Compare Players; pid=3 retired for retirees toggle)
+-- ordinal must be != 0 for players to appear in Compare Players datalist
 -- ============================================================
 
 INSERT INTO ibl_plr (
-  pid, name, age, peak, tid, pos,
+  pid, name, age, peak, tid, pos, ordinal,
   sta, oo, od, `do`, dd, po, pd, `to`, td,
   cy, cyt, cy1, cy2,
   retired, exp,
@@ -186,18 +185,59 @@ INSERT INTO ibl_plr (
   stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
   stats_to, stats_blk, stats_pf,
   uuid
-) VALUES (
-  1, 'Test Player', 28, 28, 1, 'SG',
-  80, 75, 70, 65, 60, 72, 68, 70, 65,
-  2, 3, 1500, 1600,
-  0, 5,
-  6, 4, 200, 'Test University',
-  1, 5, 2021, 'Metros', 'Metros',
-  40, 1200, 200, 450, 100, 120,
-  60, 150, 40, 120, 180, 50,
-  80, 20, 90,
-  'plr-uuid-00000000-0000-000000000001'
-);
+) VALUES
+  (1, 'Test Player', 28, 28, 1, 'SG', 1,
+   80, 75, 70, 65, 60, 72, 68, 70, 65,
+   2, 3, 1500, 1600,
+   0, 5,
+   6, 4, 200, 'Test University',
+   1, 5, 2021, 'Metros', 'Metros',
+   40, 1200, 200, 450, 100, 120,
+   60, 150, 40, 120, 180, 50,
+   80, 20, 90,
+   'plr-uuid-00000000-0000-000000000001'),
+  (2, 'Test Player Two', 26, 27, 1, 'PF', 2,
+   78, 72, 68, 63, 58, 70, 66, 68, 63,
+   1, 2, 1200, 0,
+   0, 3,
+   6, 8, 220, 'Test State',
+   1, 12, 2023, 'Metros', 'Metros',
+   38, 1100, 180, 400, 90, 110,
+   40, 120, 50, 130, 150, 45,
+   70, 25, 85,
+   'plr-uuid-00000000-0000-000000000002'),
+  (3, 'Retired Legend', 38, 30, 0, 'C', 0,
+   60, 80, 75, 70, 65, 75, 70, 72, 67,
+   0, 0, 0, 0,
+   1, 15,
+   7, 0, 250, 'Legend College',
+   1, 1, 2011, 'Stars', 'Stars',
+   500, 16000, 3000, 6500, 1500, 1800,
+   200, 600, 800, 2200, 1500, 400,
+   900, 300, 1200,
+   'plr-uuid-00000000-0000-000000000003');
+
+-- ============================================================
+-- Box scores (must be after players for FK constraint)
+-- ============================================================
+
+-- ibl_box_scores needs rows for Season date queries and career averages view.
+-- Generated columns (game_type, season_year, calc_*) are computed automatically.
+-- game_type=1 (regular season) when month is not 6 (playoffs), 10, or 0.
+INSERT INTO ibl_box_scores (
+  `Date`, pid, name, pos, visitorTID, homeTID, teamID,
+  gameMIN, game2GM, game2GA, gameFTM, gameFTA, game3GM, game3GA,
+  gameORB, gameDRB, gameAST, gameSTL, gameTOV, gameBLK, gamePF,
+  `uuid`
+) VALUES
+  ('2026-03-07', 1, 'Test Player', 'SG', 2, 1, 1,
+   32, 5, 10, 3, 4, 2, 5,
+   2, 4, 5, 1, 2, 1, 3,
+   '00000000-0000-0000-0000-000000000001'),
+  ('2026-03-07', 2, 'Test Player Two', 'PF', 2, 1, 1,
+   28, 4, 9, 2, 3, 1, 3,
+   3, 5, 3, 2, 1, 2, 2,
+   '00000000-0000-0000-0000-000000000002');
 
 -- ============================================================
 -- Player history (SeasonLeaderboards needs current-year stats)
@@ -207,11 +247,16 @@ INSERT INTO ibl_hist (
   pid, name, year, team, teamid,
   games, minutes, fgm, fga, ftm, fta, tgm, tga,
   orb, reb, ast, stl, blk, tvr, pf, pts, salary
-) VALUES (
-  1, 'Test Player', 2026, 'Metros', 1,
-  40, 1200, 200, 450, 100, 120, 60, 150,
-  40, 160, 180, 50, 20, 80, 90, 620, 1500
-);
+) VALUES
+  (1, 'Test Player', 2026, 'Metros', 1,
+   40, 1200, 200, 450, 100, 120, 60, 150,
+   40, 160, 180, 50, 20, 80, 90, 620, 1500),
+  (2, 'Test Player Two', 2026, 'Metros', 1,
+   38, 1100, 180, 400, 90, 110, 40, 120,
+   50, 180, 150, 45, 25, 70, 85, 530, 1200),
+  (3, 'Retired Legend', 2025, 'Stars', 2,
+   40, 1300, 250, 500, 150, 180, 30, 100,
+   80, 220, 100, 40, 50, 60, 100, 710, 2000);
 
 -- ============================================================
 -- Draft picks (DraftHistory page)

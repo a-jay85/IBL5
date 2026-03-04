@@ -13,7 +13,7 @@
 /************************************************************************/
 
 define('MODULE_FILE', true);
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+require_once __DIR__ . '/mainfile.php';
 
 if (isset($name) && $name == $_REQUEST['name']) {
     $name = trim($name);

@@ -9,9 +9,9 @@ declare(strict_types=1);
  * used in free agency calculations.
  */
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/vendor/autoload.php';
-include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/config.php';
-include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/db/db.php';
+require __DIR__ . '/../vendor/autoload.php';
+include __DIR__ . '/../config.php';
+include __DIR__ . '/../db/db.php';
 
 use Scripts\MaintenanceRepository;
 

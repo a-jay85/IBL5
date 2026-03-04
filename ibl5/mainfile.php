@@ -54,6 +54,11 @@ function include_secure($file_name)
     }
 }
 
+// Application root constant — reliable across worktrees and DOCUMENT_ROOT layouts
+if (!defined('IBL5_ROOT')) {
+    define('IBL5_ROOT', __DIR__);
+}
+
 // Check if this file isn't being accessed directly
 
 if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
@@ -81,6 +86,21 @@ if (isset($_SERVER['HTTP_USER_AGENT']) && strstr($_SERVER['HTTP_USER_AGENT'], 'c
 
 // Load Composer autoloader for IBL5 classes and third-party packages
 require_once __DIR__ . '/vendor/autoload.php';
+
+// In git worktrees, vendor/ is symlinked to the main repo. Composer resolves __DIR__
+// through the symlink, so it loads classes from the main repo instead of the worktree.
+// Prepend the worktree's classes/ directory so modified files are used at runtime.
+if (is_link(__DIR__ . '/vendor')) {
+    $worktreeClasses = realpath(__DIR__ . '/classes');
+    if ($worktreeClasses !== false) {
+        spl_autoload_register(static function (string $class) use ($worktreeClasses): void {
+            $file = $worktreeClasses . '/' . str_replace('\\', '/', $class) . '.php';
+            if (file_exists($file)) {
+                require $file;
+            }
+        }, true, true);
+    }
+}
 
 // SECURITY: Configure secure session cookie parameters before session_start()
 if (session_status() === PHP_SESSION_NONE) {

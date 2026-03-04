@@ -140,6 +140,80 @@
     background-color: var(--accent-200, #fed7aa);
 }
 
+/* Standings clinch tier rows — strongest to weakest orange */
+.ibl-data-table tbody tr.clinch-league:nth-child(odd),
+.ibl-data-table tbody tr.clinch-league:nth-child(even) {
+    background-color: var(--accent-200, #fed7aa);
+}
+
+.ibl-data-table tbody tr.clinch-league:nth-child(odd):hover,
+.ibl-data-table tbody tr.clinch-league:nth-child(even):hover {
+    background-color: var(--accent-300, #fdba74);
+}
+
+.ibl-data-table tbody tr.clinch-conference:nth-child(odd),
+.ibl-data-table tbody tr.clinch-conference:nth-child(even) {
+    background-color: color-mix(in srgb, var(--accent-200, #fed7aa) 60%, var(--accent-100, #ffedd5));
+}
+
+.ibl-data-table tbody tr.clinch-conference:nth-child(odd):hover,
+.ibl-data-table tbody tr.clinch-conference:nth-child(even):hover {
+    background-color: var(--accent-200, #fed7aa);
+}
+
+.ibl-data-table tbody tr.clinch-division:nth-child(odd),
+.ibl-data-table tbody tr.clinch-division:nth-child(even) {
+    background-color: var(--accent-100, #ffedd5);
+}
+
+.ibl-data-table tbody tr.clinch-division:nth-child(odd):hover,
+.ibl-data-table tbody tr.clinch-division:nth-child(even):hover {
+    background-color: var(--accent-200, #fed7aa);
+}
+
+.ibl-data-table tbody tr.clinch-playoffs:nth-child(odd),
+.ibl-data-table tbody tr.clinch-playoffs:nth-child(even) {
+    background-color: color-mix(in srgb, var(--accent-100, #ffedd5) 50%, white);
+}
+
+.ibl-data-table tbody tr.clinch-playoffs:nth-child(odd):hover,
+.ibl-data-table tbody tr.clinch-playoffs:nth-child(even):hover {
+    background-color: var(--accent-100, #ffedd5);
+}
+
+/* Bottom-locked row — team can't catch the team above */
+.ibl-data-table tbody tr.bottom-locked:nth-child(odd),
+.ibl-data-table tbody tr.bottom-locked:nth-child(even) {
+    background-color: var(--gray-100, #f3f4f6);
+    color: var(--gray-400, #9ca3af);
+}
+
+.ibl-data-table tbody tr.bottom-locked:nth-child(odd):hover,
+.ibl-data-table tbody tr.bottom-locked:nth-child(even):hover {
+    background-color: var(--gray-200, #e5e7eb);
+}
+
+.ibl-data-table tbody tr.bottom-locked td,
+.ibl-data-table tbody tr.bottom-locked td a,
+.ibl-data-table tbody tr.bottom-locked td .ibl-stat-highlight,
+.ibl-data-table tbody tr.bottom-locked td .ibl-clinched-indicator {
+    color: var(--gray-400, #9ca3af);
+}
+
+.ibl-data-table tbody tr.bottom-locked td.ibl-team-cell--colored {
+    filter: saturate(0.25) brightness(1.2);
+}
+
+.ibl-data-table tbody tr.bottom-locked td.ibl-team-cell--colored a {
+    color: inherit;
+    opacity: 0.55;
+}
+
+.ibl-data-table tbody tr.bottom-locked img {
+    filter: grayscale(100%);
+    opacity: 0.45;
+}
+
 /* Drafted/disabled row */
 .ibl-data-table tbody tr.drafted {
     opacity: 0.5;
@@ -416,6 +490,48 @@
         background-color: var(--warning-200, #fde68a);
     }
 
+    /* Clinch tier sticky backgrounds */
+    .responsive-table tbody tr.clinch-league td[class*="sticky-col"] {
+        background-color: var(--accent-200, #fed7aa);
+    }
+
+    .responsive-table tbody tr.clinch-league:hover td[class*="sticky-col"] {
+        background-color: var(--accent-300, #fdba74);
+    }
+
+    .responsive-table tbody tr.clinch-conference td[class*="sticky-col"] {
+        background-color: color-mix(in srgb, var(--accent-200, #fed7aa) 60%, var(--accent-100, #ffedd5));
+    }
+
+    .responsive-table tbody tr.clinch-conference:hover td[class*="sticky-col"] {
+        background-color: var(--accent-200, #fed7aa);
+    }
+
+    .responsive-table tbody tr.clinch-division td[class*="sticky-col"] {
+        background-color: var(--accent-100, #ffedd5);
+    }
+
+    .responsive-table tbody tr.clinch-division:hover td[class*="sticky-col"] {
+        background-color: var(--accent-200, #fed7aa);
+    }
+
+    .responsive-table tbody tr.clinch-playoffs td[class*="sticky-col"] {
+        background-color: color-mix(in srgb, var(--accent-100, #ffedd5) 50%, white);
+    }
+
+    .responsive-table tbody tr.clinch-playoffs:hover td[class*="sticky-col"] {
+        background-color: var(--accent-100, #ffedd5);
+    }
+
+    /* Bottom-locked row sticky backgrounds */
+    .responsive-table tbody tr.bottom-locked td[class*="sticky-col"] {
+        background-color: var(--gray-100, #f3f4f6);
+    }
+
+    .responsive-table tbody tr.bottom-locked:hover td[class*="sticky-col"] {
+        background-color: var(--gray-200, #e5e7eb);
+    }
+
     /* Tfoot sticky-col backgrounds (team-colored or accent fallback) */
     .responsive-table tfoot td[class*="sticky-col"] {
         background-color: var(--team-row-highlight-bg, var(--accent-100, #ffedd5));
@@ -487,6 +603,13 @@
 /* Wrapper for scroll container - holds the fixed shadow */
 .table-scroll-wrapper {
     position: relative;
+    margin-bottom: var(--space-4);
+}
+
+/* Remove table's own bottom margin when inside wrapper so the scroll shadow
+   doesn't extend past the table's visible border. */
+.table-scroll-wrapper .ibl-data-table {
+    margin-bottom: 0;
 }
 
 /* On desktop, constrain tables to fit content and center (not full width on ultrawide) */

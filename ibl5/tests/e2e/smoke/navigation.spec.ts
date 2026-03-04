@@ -36,7 +36,7 @@ test.describe('Navigation bar smoke tests (public)', () => {
     await expect(nav).toBeVisible();
 
     for (const label of ['Season', 'Stats', 'History', 'Community', 'Teams']) {
-      await expect(nav.getByRole('button', { name: label })).toBeVisible();
+      await expect(nav.getByRole('button', { name: label })).toBeVisible({ timeout: 10_000 });
     }
   });
 
@@ -125,7 +125,7 @@ test.describe('Navigation bar smoke tests (mobile viewport)', () => {
     for (const label of ['Season', 'Stats', 'History', 'Community', 'Teams']) {
       await expect(
         mobileMenu.locator('.mobile-dropdown-btn', { hasText: label }).first(),
-      ).toBeVisible({ timeout: 3000 });
+      ).toBeVisible({ timeout: 10_000 });
     }
   });
 

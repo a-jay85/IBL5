@@ -6,7 +6,7 @@ error_reporting(E_ALL);
 libxml_use_internal_errors(true);
 
 // Load mainfile first for authentication
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+require __DIR__ . '/../mainfile.php';
 
 // SECURITY: Admin-only script - check authentication before proceeding
 if (!function_exists('is_admin') || !is_admin()) {
@@ -45,9 +45,10 @@ global $mysqli_db;
 
 $view = new Updater\UpdaterView();
 
-$stylesheetPath = '/ibl5/themes/IBL/style/style.css';
+$stylesheetRelative = 'themes/IBL/style/style.css';
 /** @var int|false $stylesheetMtime */
-$stylesheetMtime = filemtime($_SERVER['DOCUMENT_ROOT'] . $stylesheetPath);
+$stylesheetMtime = filemtime(__DIR__ . '/../' . $stylesheetRelative);
+$stylesheetPath = '../' . $stylesheetRelative;
 $cacheBuster = $stylesheetMtime !== false ? '?v=' . $stylesheetMtime : '';
 
 echo $view->renderPageOpen($stylesheetPath . $cacheBuster);
@@ -80,7 +81,7 @@ set_exception_handler(function (\Throwable $exception) use ($view): void {
 $successCount = 0;
 $errorCount = 0;
 
-$basePath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5';
+$basePath = __DIR__ . '/..';
 
 try {
     // --- Initialization ---

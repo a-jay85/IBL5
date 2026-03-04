@@ -1,6 +1,6 @@
 <?php
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+require __DIR__ . '/../../mainfile.php';
 
 global $mysqli_db;
 

@@ -8,9 +8,9 @@ declare(strict_types=1);
  * Parses the .eng file from JSB simulation to read player energy values.
  */
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/vendor/autoload.php';
-include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/config.php';
-include $_SERVER['DOCUMENT_ROOT'] . '/ibl5/db/db.php';
+require __DIR__ . '/../vendor/autoload.php';
+include __DIR__ . '/../config.php';
+include __DIR__ . '/../db/db.php';
 
 use Scripts\MaintenanceRepository;
 
@@ -21,7 +21,7 @@ if ($leagueFileName === null) {
     die("Unable to find League File Name setting");
 }
 
-$engFilePath = $_SERVER['DOCUMENT_ROOT'] . "/ibl5/$leagueFileName.eng";
+$engFilePath = __DIR__ . "/../$leagueFileName.eng";
 if (!file_exists($engFilePath)) {
     die("Energy file not found: $engFilePath");
 }

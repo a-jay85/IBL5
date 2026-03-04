@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
+require __DIR__ . '/mainfile.php';
 $season = new Season($mysqli_db);
 
 $queryString = "";

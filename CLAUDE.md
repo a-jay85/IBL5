@@ -136,6 +136,10 @@ Commit body format — use `## Section` headers with bullet points:
 
 When debugging CSS layout issues, immediately check for inherited properties like `white-space: nowrap` that may override your fixes. Use browser DevTools-style reasoning: inspect computed styles, not just the element's own rules.
 
+## Workflow Continuity
+
+When executing a multi-phase workflow (e.g., post-plan-approval Phases 1-7), **never stop between phases**. Skill invocations (`/simplify`, `/commit-commands:commit-push-pr`, `/code-review`, `/security-audit`) are function calls within the workflow — when they return, immediately proceed to the next phase. Do not wait for user input after a skill completes.
+
 ## Mandatory Rules
 
 ### XSS Protection
@@ -167,6 +171,11 @@ After refactoring, compare output against iblhoops.net. Results must match exact
 ## Progressive Loading
 
 Context-aware rules auto-load when relevant:
+
+**Always Loaded** (`.claude/rules/`):
+- `workflow-continuity.md` → phase transition rules for multi-phase workflows
+- `core-coding.md` → key constants, common repository helpers, gotchas
+- `environment.md` → bun, CSS, IBLbot commands
 
 **Path-Conditional** (`.claude/rules/`):
 - `php-classes.md` → editing `ibl5/classes/**/*.php`

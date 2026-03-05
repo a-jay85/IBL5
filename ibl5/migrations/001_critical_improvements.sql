@@ -191,8 +191,7 @@ ALTER TABLE ibl_draft_picks ADD INDEX IF NOT EXISTS idx_year_round (year, round)
 -- ---------------------------------------------------------------------------
 -- Draft Class (ibl_draft_class) Indexes
 -- ---------------------------------------------------------------------------
--- Draft rankings
-ALTER TABLE ibl_draft_class ADD INDEX IF NOT EXISTS idx_ranking (ranking);
+-- ranking column no longer exists in ibl_draft_class, skip index
 
 -- Drafted status
 ALTER TABLE ibl_draft_class ADD INDEX IF NOT EXISTS idx_drafted (drafted);

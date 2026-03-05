@@ -11,8 +11,6 @@ use UI\TeamCellHelper;
 
 /**
  * SeasonTotals - Displays season totals statistics table
- *
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class SeasonTotals
 {
@@ -29,39 +27,7 @@ class SeasonTotals
      */
     public static function render(\mysqli $db, $result, \Team $team, string $yr, array $starterPids = [], string $moduleName = ""): string
     {
-        $playerRows = [];
-        foreach ($result as $plrRow) {
-            if ($yr === "") {
-                if ($plrRow instanceof Player) {
-                    $player = $plrRow;
-                    /** @var PlayerStats $playerStats */
-                    $playerStats = PlayerStats::withPlayerID($db, $player->playerID ?? 0);
-                } elseif (is_array($plrRow)) {
-                    /** @var PlayerRow $plrRow */
-                    $player = Player::withPlrRow($db, $plrRow);
-                    /** @var PlayerStats $playerStats */
-                    $playerStats = PlayerStats::withPlrRow($db, $plrRow);
-                } else {
-                    continue;
-                }
-
-                $playerName = $player->name ?? '';
-                $firstCharacterOfPlayerName = substr($playerName, 0, 1);
-                if ($firstCharacterOfPlayerName === '|') {
-                    continue;
-                }
-            } else {
-                /** @var array<string, mixed> $plrRow */
-                $player = Player::withHistoricalPlrRow($db, $plrRow);
-                /** @var PlayerStats $playerStats */
-                $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
-            }
-
-            $playerRows[] = [
-                'player' => $player,
-                'playerStats' => $playerStats,
-            ];
-        }
+        $playerRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
 
         $season = new \Season($db);
         $teamStats = \TeamStats::withTeamName($db, $team->name, $season->endingYear);

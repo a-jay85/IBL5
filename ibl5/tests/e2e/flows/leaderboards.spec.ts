@@ -1,21 +1,28 @@
 import { test, expect } from '@playwright/test';
 import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { isModuleInactive, MODULE_INACTIVE_TEXT } from '../helpers/trivia-mode';
 
 // Leaderboards — public, no authentication required.
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Season Leaderboards flow', () => {
+  let triviaMode = false;
+  let cachedBody: string | null = null;
+
   test.beforeEach(async ({ page }) => {
     await page.goto('modules.php?name=SeasonLeaderboards');
+    cachedBody = await page.locator('body').textContent();
+    triviaMode = isModuleInactive(cachedBody);
+  });
 
-    // Skip all tests if module is hidden (e.g. Trivia Mode is on)
-    const body = await page.locator('body').textContent();
-    if (body?.includes("Module isn't active")) {
-      test.skip(true, 'SeasonLeaderboards module is not active (Trivia Mode may be on)');
-    }
+  test('module shows inactive message when trivia mode is on', async ({ page }) => {
+    if (!triviaMode) test.skip(true, 'Trivia mode is off');
+    await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
   });
 
   test('page loads with filter form', async ({ page }) => {
+    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
+
     const form = page.locator('.ibl-filter-form');
     await expect(form).toBeVisible();
 
@@ -26,6 +33,8 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('default results table present', async ({ page }) => {
+    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
+
     const table = page.locator('.ibl-data-table');
     await expect(table.first()).toBeVisible();
     const rows = table.first().locator('tbody tr');
@@ -33,6 +42,8 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('table has sticky rank and name columns', async ({ page }) => {
+    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
+
     const table = page.locator('.ibl-data-table').first();
     await expect(table).toBeVisible();
 
@@ -41,6 +52,8 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('sorted column is highlighted', async ({ page }) => {
+    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
+
     const table = page.locator('.ibl-data-table').first();
     await expect(table).toBeVisible();
 
@@ -50,6 +63,8 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('changing sort category updates results', async ({ page }) => {
+    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
+
     // Get default sorted column text
     const table = page.locator('.ibl-data-table').first();
     await expect(table).toBeVisible();
@@ -67,6 +82,8 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('filtering by team shows only that team players', async ({ page }) => {
+    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
+
     // Pick the first non-"All" team option
     const teamSelect = page.locator('select[name="team"]');
     const options = teamSelect.locator('option');
@@ -94,6 +111,8 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('limit input controls row count', async ({ page }) => {
+    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
+
     await page.locator('input[name="limit"]').fill('5');
     await page.locator('.ibl-filter-form__submit').click();
 
@@ -104,10 +123,9 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('no PHP errors on season leaderboards', async ({ page }) => {
-    const body = await page.locator('body').textContent();
     for (const pattern of PHP_ERROR_PATTERNS) {
       expect(
-        body,
+        cachedBody,
         `PHP error "${pattern}" on Season Leaderboards page`,
       ).not.toContain(pattern);
     }
@@ -115,17 +133,23 @@ test.describe('Season Leaderboards flow', () => {
 });
 
 test.describe('Career Leaderboards flow', () => {
+  let triviaMode = false;
+  let cachedBody: string | null = null;
+
   test.beforeEach(async ({ page }) => {
     await page.goto('modules.php?name=CareerLeaderboards');
+    cachedBody = await page.locator('body').textContent();
+    triviaMode = isModuleInactive(cachedBody);
+  });
 
-    // Skip all tests if module is hidden (e.g. Trivia Mode is on)
-    const body = await page.locator('body').textContent();
-    if (body?.includes("Module isn't active")) {
-      test.skip(true, 'CareerLeaderboards module is not active (Trivia Mode may be on)');
-    }
+  test('module shows inactive message when trivia mode is on', async ({ page }) => {
+    if (!triviaMode) test.skip(true, 'Trivia mode is off');
+    await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
   });
 
   test('page loads with filter form', async ({ page }) => {
+    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
+
     const form = page.locator('.ibl-filter-form');
     await expect(form).toBeVisible();
 
@@ -136,6 +160,8 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('form submission shows results', async ({ page }) => {
+    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
+
     await page.locator('.ibl-filter-form__submit').click();
 
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
@@ -144,6 +170,8 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('table has sticky rank and name columns', async ({ page }) => {
+    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
+
     await page.locator('.ibl-filter-form__submit').click();
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
 
@@ -153,6 +181,8 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('sorted column is highlighted', async ({ page }) => {
+    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
+
     await page.locator('.ibl-filter-form__submit').click();
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
 
@@ -161,6 +191,8 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('changing board type works', async ({ page }) => {
+    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
+
     // Select a different board type option
     const boardTypeSelect = page.locator('select[name="boards_type"]');
     const options = boardTypeSelect.locator('option');
@@ -177,6 +209,8 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('include/exclude retirees toggle changes results', async ({ page }) => {
+    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
+
     // Submit with retirees included (default: active=0 means "Yes include")
     await page.locator('select[name="active"]').selectOption('0');
     await page.locator('.ibl-filter-form__submit').click();
@@ -196,24 +230,25 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('no PHP errors on career leaderboards', async ({ page }) => {
-    // Check initial page
-    let body = await page.locator('body').textContent();
+    // Check initial page (reuse cached body from beforeEach)
     for (const pattern of PHP_ERROR_PATTERNS) {
       expect(
-        body,
+        cachedBody,
         `PHP error "${pattern}" on Career Leaderboards form page`,
       ).not.toContain(pattern);
     }
 
-    // Check results page
-    await page.locator('.ibl-filter-form__submit').click();
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-    body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Career Leaderboards results page`,
-      ).not.toContain(pattern);
+    // Check results page (only if module is active)
+    if (!triviaMode) {
+      await page.locator('.ibl-filter-form__submit').click();
+      await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+      const body = await page.locator('body').textContent();
+      for (const pattern of PHP_ERROR_PATTERNS) {
+        expect(
+          body,
+          `PHP error "${pattern}" on Career Leaderboards results page`,
+        ).not.toContain(pattern);
+      }
     }
   });
 });

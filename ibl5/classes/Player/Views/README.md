@@ -19,7 +19,7 @@ use Player\Views\PlayerViewStyles;
 echo PlayerViewStyles::getStyles();
 
 // Then render views
-echo $viewFactory->createAwardsView()->renderAwardsList($player->name);
+echo $viewFactory->createAwardsAndNewsView()->renderAwardsList($player->name);
 ```
 
 ### Available CSS Classes
@@ -48,13 +48,21 @@ echo $viewFactory->createAwardsView()->renderAwardsList($player->name);
 ```
 PlayerPageService
     ├── PlayerRepository (mysqli-ready)
+    ├── PlayerStatsRepository
     └── PlayerViewFactory
-            ├── PlayerAwardsView
-            ├── PlayerGameLogView
-            ├── PlayerSeasonStatsView
-            ├── PlayerPlayoffStatsView
-            ├── PlayerHeatStatsView
-            └── PlayerOlympicsStatsView
+            ├── PlayerOverviewView
+            ├── PlayerAwardsAndNewsView
+            ├── PlayerSimStatsView
+            ├── PlayerRegularSeasonTotalsView
+            ├── PlayerRegularSeasonAveragesView
+            ├── PlayerPlayoffTotalsView
+            ├── PlayerPlayoffAveragesView
+            ├── PlayerHeatTotalsView
+            ├── PlayerHeatAveragesView
+            ├── PlayerOlympicTotalsView
+            ├── PlayerOlympicAveragesView
+            ├── PlayerRatingsAndSalaryView
+            └── PlayerOneOnOneView
 ```
 
 ## Basic Usage
@@ -80,14 +88,11 @@ $viewFactory = $playerService->getViewFactory();
 
 ### Using Individual Views
 
-#### Awards View
+#### Awards & News View
 
 ```php
 // Create view instance
-$awardsView = $viewFactory->createAwardsView();
-
-// Render All-Star activity table
-echo $awardsView->renderAllStarActivity($player->name);
+$awardsView = $viewFactory->createAwardsAndNewsView();
 
 // Render full awards list
 echo $awardsView->renderAwardsList($player->name);
@@ -105,7 +110,7 @@ echo "<tr><td><b>All Star Games:</b></td><td>$asg</td></tr>";
 **New Code (repository-based):**
 ```php
 // ✅ After - 1 line
-echo $viewFactory->createAwardsView()->renderAllStarActivity($player->name);
+echo $viewFactory->createAwardsAndNewsView()->renderAwardsList($player->name);
 ```
 
 #### Game Log View (Sim Stats)
@@ -123,63 +128,35 @@ echo $gameLogView->renderSimStats($playerID);
 - Proper HTML escaping
 - Clean separation of concerns
 
-#### Season Stats View
+#### Season Stats Views
 
 ```php
-// Create view instance
-$seasonStatsView = $viewFactory->createSeasonStatsView();
+// Season totals
+echo $viewFactory->createRegularSeasonTotalsView()->render($playerID);
 
-// Render season totals
-echo $seasonStatsView->renderSeasonTotals($playerID);
-
-// Render season averages
-echo $seasonStatsView->renderSeasonAverages($playerID);
+// Season averages
+echo $viewFactory->createRegularSeasonAveragesView()->render($playerID);
 ```
 
-**Old Code:**
+#### Playoff Stats Views
+
 ```php
-// ❌ Before - inline queries and rendering mixed together
-$result44 = $db->sql_query("SELECT * FROM ibl_hist WHERE pid=$playerID ORDER BY year ASC");
-while ($row44 = $db->sql_fetch_assoc($result44)) {
-    echo "<tr><td>" . $row44['team'] . "</td>";
-    // ... 50+ lines of output logic ...
-}
+echo $viewFactory->createPlayoffTotalsView()->render($player->name);
+echo $viewFactory->createPlayoffAveragesView()->render($player->name);
 ```
 
-**New Code:**
+#### Heat Stats Views
+
 ```php
-// ✅ After - clean separation
-echo $viewFactory->createSeasonStatsView()->renderSeasonTotals($playerID);
+echo $viewFactory->createHeatTotalsView()->render($player->name);
+echo $viewFactory->createHeatAveragesView()->render($player->name);
 ```
 
-#### Playoff Stats View
+#### Olympic Stats Views
 
 ```php
-$playoffStatsView = $viewFactory->createPlayoffStatsView();
-
-// Render playoff totals
-echo $playoffStatsView->renderPlayoffTotals($player->name);
-
-// Render playoff averages
-echo $playoffStatsView->renderPlayoffAverages($player->name);
-```
-
-#### Heat Stats View
-
-```php
-$heatStatsView = $viewFactory->createHeatStatsView();
-
-echo $heatStatsView->renderHeatTotals($player->name);
-echo $heatStatsView->renderHeatAverages($player->name);
-```
-
-#### Olympics Stats View
-
-```php
-$olympicsStatsView = $viewFactory->createOlympicsStatsView();
-
-echo $olympicsStatsView->renderOlympicsTotals($player->name);
-echo $olympicsStatsView->renderOlympicsAverages($player->name);
+echo $viewFactory->createOlympicTotalsView()->render($player->name);
+echo $viewFactory->createOlympicAveragesView()->render($player->name);
 ```
 
 ## Complete Example: Player Page
@@ -206,32 +183,27 @@ OpenTable();
 
 // === SIM STATS (spec == 10) ===
 if ($spec == 10) {
-    $gameLogView = $viewFactory->createGameLogView();
-    echo $gameLogView->renderSimStats($playerID);
+    echo $viewFactory->createSimStatsView()->render($playerID);
 }
 
 // === SEASON TOTALS (spec == 3) ===
 if ($spec == 3) {
-    $seasonStatsView = $viewFactory->createSeasonStatsView();
-    echo $seasonStatsView->renderSeasonTotals($playerID);
+    echo $viewFactory->createRegularSeasonTotalsView()->render($playerID);
 }
 
 // === SEASON AVERAGES (spec == 4) ===
 if ($spec == 4) {
-    $seasonStatsView = $viewFactory->createSeasonStatsView();
-    echo $seasonStatsView->renderSeasonAverages($playerID);
+    echo $viewFactory->createRegularSeasonAveragesView()->render($playerID);
 }
 
 // === PLAYOFF TOTALS (spec == 5) ===
 if ($spec == 5) {
-    $playoffStatsView = $viewFactory->createPlayoffStatsView();
-    echo $playoffStatsView->renderPlayoffTotals($player->name);
+    echo $viewFactory->createPlayoffTotalsView()->render($player->name);
 }
 
 // === AWARDS (spec == 20) ===
 if ($spec == 20) {
-    $awardsView = $viewFactory->createAwardsView();
-    echo $awardsView->renderAwardsList($player->name);
+    echo $viewFactory->createAwardsAndNewsView()->renderAwardsList($player->name);
 }
 
 CloseTable();

@@ -2,7 +2,7 @@
 -- IBL5 Database Schema Improvements - Phase 6: Add offer_type Column
 -- ============================================================================
 
-USE IBL;
+-- Database selected via CLI argument; no USE statement needed
 
 -- Add offer_type column to track the type of contract offer
 -- Values: 0=Custom, 1-6=MLE (years), 7=Lower-Level Exception, 8=Veteran's Minimum

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { isModuleInactive, MODULE_INACTIVE_TEXT } from '../helpers/trivia-mode';
 
 // Public pages — no authentication required.
 // These use the base test (not the auth fixture) so they run without login.
@@ -21,8 +22,9 @@ test.describe('Public page smoke tests', () => {
   test('player page loads', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1');
     const body = await page.locator('body').textContent();
-    if (body?.includes("Module isn't active")) {
-      test.skip(true, 'Player module is not active (Trivia Mode may be on)');
+    if (isModuleInactive(body)) {
+      await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
+      test.skip(true, 'Module hidden during trivia mode');
     }
     // Player page uses a card layout — check for the player name heading
     await expect(page.locator('h2, h3').first()).toBeVisible();
@@ -36,8 +38,9 @@ test.describe('Public page smoke tests', () => {
   test('season leaderboards loads', async ({ page }) => {
     await page.goto('modules.php?name=SeasonLeaderboards');
     const body = await page.locator('body').textContent();
-    if (body?.includes("Module isn't active")) {
-      test.skip(true, 'SeasonLeaderboards module is not active (Trivia Mode may be on)');
+    if (isModuleInactive(body)) {
+      await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
+      test.skip(true, 'Module hidden during trivia mode');
     }
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
@@ -45,8 +48,9 @@ test.describe('Public page smoke tests', () => {
   test('career leaderboards loads', async ({ page }) => {
     await page.goto('modules.php?name=CareerLeaderboards');
     const body = await page.locator('body').textContent();
-    if (body?.includes("Module isn't active")) {
-      test.skip(true, 'CareerLeaderboards module is not active (Trivia Mode may be on)');
+    if (isModuleInactive(body)) {
+      await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
+      test.skip(true, 'Module hidden during trivia mode');
     }
     // Career leaderboards shows a form on initial load — verify the form is present
     await expect(page.getByRole('button', { name: /display/i })).toBeVisible();

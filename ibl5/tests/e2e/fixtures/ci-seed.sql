@@ -276,7 +276,6 @@ INSERT INTO ibl_draft_picks (ownerofpick, owner_tid, teampick, teampick_tid, yea
   ('Stars',  2, 'Stars',  2, 2026, 1);
 
 -- ============================================================
-<<<<<<< HEAD
 -- Franchise Record Book tables (from migration 037)
 -- ============================================================
 

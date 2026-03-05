@@ -308,11 +308,8 @@ ALTER TABLE ibl_schedule
 --   MODIFY ranking TINYINT UNSIGNED DEFAULT NULL COMMENT 'Power ranking (1-30)';
 
 -- ---------------------------------------------------------------------------
--- Playoff Results
+-- Playoff Results: dropped by migration 035, skip
 -- ---------------------------------------------------------------------------
-ALTER TABLE ibl_playoff_results
-  MODIFY year SMALLINT UNSIGNED NOT NULL COMMENT 'Playoff year',
-  MODIFY round TINYINT UNSIGNED NOT NULL COMMENT 'Playoff round';
 
 -- ---------------------------------------------------------------------------
 -- Team History

@@ -21,8 +21,7 @@ ALTER TABLE `ibl_heat_stats` DROP KEY IF EXISTS `id`;
 -- ibl_olympics_stats: Drop redundant UNIQUE KEY on id (already PRIMARY KEY)
 ALTER TABLE `ibl_olympics_stats` DROP KEY IF EXISTS `id`;
 
--- ibl_plr_chunk: Drop duplicate pid index (pid_2 duplicates pid)
-ALTER TABLE `ibl_plr_chunk` DROP KEY IF EXISTS `pid_2`;
+-- ibl_plr_chunk: dropped by migration 035, skip
 
 -- ibl_draft: Convert draft_id from UNIQUE KEY to PRIMARY KEY
 -- (AUTO_INCREMENT column should be the PK, not just a unique key)
@@ -264,7 +263,4 @@ ALTER TABLE `ibl_schedule`
   ADD CONSTRAINT `fk_schedule_home` FOREIGN KEY (`Home`)
   REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE;
 
-ALTER TABLE `ibl_plr_chunk` DROP FOREIGN KEY IF EXISTS `fk_plr_chunk_player`;
-ALTER TABLE `ibl_plr_chunk`
-  ADD CONSTRAINT `fk_plr_chunk_player` FOREIGN KEY (`pid`)
-  REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE;
+-- ibl_plr_chunk: dropped by migration 035, skip FK

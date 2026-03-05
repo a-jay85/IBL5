@@ -332,11 +332,8 @@ ALTER TABLE `ibl_one_on_one` MODIFY COLUMN `lossscore` int NOT NULL DEFAULT '0' 
 ALTER TABLE `ibl_one_on_one` MODIFY COLUMN `owner` varchar(25) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'GM who submitted the matchup';
 
 -- =============================================================================
--- ibl_playoff_results
+-- ibl_playoff_results: dropped by migration 035, skip
 -- =============================================================================
-ALTER TABLE `ibl_playoff_results` MODIFY COLUMN `winner` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Series-winning team name';
-ALTER TABLE `ibl_playoff_results` MODIFY COLUMN `loser` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Series-losing team name';
-ALTER TABLE `ibl_playoff_results` MODIFY COLUMN `loser_games` int NOT NULL DEFAULT '0' COMMENT 'Games won by losing team in series';
 
 -- =============================================================================
 -- ibl_plr — Corrections to existing inaccurate comments
@@ -378,35 +375,8 @@ ALTER TABLE `ibl_plr` MODIFY COLUMN `college` varchar(40) COLLATE utf8mb4_unicod
 ALTER TABLE `ibl_plr` MODIFY COLUMN `droptime` int DEFAULT '0' COMMENT 'Unix timestamp when placed on waivers (0=not on waivers)';
 
 -- =============================================================================
--- ibl_plr_chunk
+-- ibl_plr_chunk: dropped by migration 035, skip
 -- =============================================================================
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `active` int NOT NULL DEFAULT '0' COMMENT 'On depth chart at chunk time';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `pid` int NOT NULL DEFAULT '0' COMMENT 'FK to ibl_plr.pid';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `ordinal` int NOT NULL COMMENT 'Roster sort order';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `name` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Player name (snapshot)';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `tid` int NOT NULL DEFAULT '0' COMMENT 'Team ID';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `teamname` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Team name (snapshot)';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `pos` varchar(4) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Primary position';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `altpos` varchar(4) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Alternate position';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_gs` int NOT NULL DEFAULT '0' COMMENT 'Games started in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_gm` int NOT NULL DEFAULT '0' COMMENT 'Games played in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_min` int NOT NULL DEFAULT '0' COMMENT 'Minutes played in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_fgm` int NOT NULL DEFAULT '0' COMMENT 'Field goals made in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_fga` int NOT NULL DEFAULT '0' COMMENT 'Field goals attempted in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_ftm` int NOT NULL DEFAULT '0' COMMENT 'Free throws made in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_fta` int NOT NULL DEFAULT '0' COMMENT 'Free throws attempted in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_3gm` int NOT NULL DEFAULT '0' COMMENT 'Three pointers made in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_3ga` int NOT NULL DEFAULT '0' COMMENT 'Three pointers attempted in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_orb` int NOT NULL DEFAULT '0' COMMENT 'Offensive rebounds in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_drb` int NOT NULL DEFAULT '0' COMMENT 'Defensive rebounds in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_ast` int NOT NULL DEFAULT '0' COMMENT 'Assists in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_stl` int NOT NULL DEFAULT '0' COMMENT 'Steals in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_to` int NOT NULL DEFAULT '0' COMMENT 'Turnovers in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_blk` int NOT NULL DEFAULT '0' COMMENT 'Blocks in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `stats_pf` int NOT NULL DEFAULT '0' COMMENT 'Personal fouls in chunk';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `chunk` int DEFAULT NULL COMMENT 'Sim chunk number';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `qa` decimal(11,2) NOT NULL DEFAULT '0.00' COMMENT 'Quality assessment score';
-ALTER TABLE `ibl_plr_chunk` MODIFY COLUMN `Season` int NOT NULL COMMENT 'Season year';
 
 -- =============================================================================
 -- ibl_power

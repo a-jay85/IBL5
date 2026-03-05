@@ -20,7 +20,7 @@
 
 -- Core Player Tables
 ALTER TABLE ibl_plr ENGINE=InnoDB;
-ALTER TABLE ibl_plr_chunk ENGINE=InnoDB;
+-- ibl_plr_chunk: dropped by migration 035, skip
 
 -- Historical Stats Tables
 ALTER TABLE ibl_hist ENGINE=InnoDB;
@@ -28,7 +28,7 @@ ALTER TABLE ibl_season_career_avgs ENGINE=InnoDB;
 ALTER TABLE ibl_playoff_career_avgs ENGINE=InnoDB;
 ALTER TABLE ibl_playoff_career_totals ENGINE=InnoDB;
 ALTER TABLE ibl_playoff_stats ENGINE=InnoDB;
-ALTER TABLE ibl_playoff_results ENGINE=InnoDB;
+-- ibl_playoff_results: dropped by migration 035, skip
 ALTER TABLE ibl_heat_career_avgs ENGINE=InnoDB;
 ALTER TABLE ibl_heat_career_totals ENGINE=InnoDB;
 ALTER TABLE ibl_heat_stats ENGINE=InnoDB;
@@ -39,7 +39,7 @@ ALTER TABLE ibl_olympics_stats ENGINE=InnoDB;
 
 -- Team Tables
 ALTER TABLE ibl_team_info ENGINE=InnoDB;
-ALTER TABLE ibl_team_history ENGINE=InnoDB;
+-- ibl_team_history: dropped by migration 030, skip
 ALTER TABLE ibl_team_win_loss ENGINE=InnoDB;
 ALTER TABLE ibl_team_offense_stats ENGINE=InnoDB;
 ALTER TABLE ibl_team_defense_stats ENGINE=InnoDB;
@@ -216,8 +216,7 @@ ALTER TABLE ibl_playoff_stats ADD INDEX IF NOT EXISTS idx_year (year);
 ALTER TABLE ibl_playoff_stats ADD INDEX IF NOT EXISTS idx_team (team);
 ALTER TABLE ibl_playoff_stats ADD INDEX IF NOT EXISTS idx_name (name);
 
-ALTER TABLE ibl_playoff_results ADD INDEX IF NOT EXISTS idx_year (year);
-ALTER TABLE ibl_playoff_results ADD INDEX IF NOT EXISTS idx_round (round);
+-- ibl_playoff_results: dropped by migration 035, skip indexes
 
 -- ---------------------------------------------------------------------------
 -- Team Stats Indexes

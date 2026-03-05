@@ -15,14 +15,16 @@ ALTER TABLE ibl_team_info
 
 -- ============================================================
 -- Step 2: Copy current operational data from ibl_team_history
--- (no-op if ibl_team_history doesn't exist or is already dropped)
+-- (skip if ibl_team_history already dropped — CI runs against post-migration schema.sql)
 -- ============================================================
-UPDATE ibl_team_info ti
-JOIN ibl_team_history th ON ti.teamid = th.teamid
-SET ti.depth = th.depth,
-    ti.sim_depth = th.sim_depth,
-    ti.asg_vote = th.asg_vote,
-    ti.eoy_vote = th.eoy_vote;
+SET @th_exists = (SELECT COUNT(*) FROM information_schema.tables
+  WHERE table_schema = DATABASE() AND table_name = 'ibl_team_history');
+SET @copy_sql = IF(@th_exists > 0,
+  'UPDATE ibl_team_info ti JOIN ibl_team_history th ON ti.teamid = th.teamid SET ti.depth = th.depth, ti.sim_depth = th.sim_depth, ti.asg_vote = th.asg_vote, ti.eoy_vote = th.eoy_vote',
+  'SELECT 1');
+PREPARE _stmt FROM @copy_sql;
+EXECUTE _stmt;
+DEALLOCATE PREPARE _stmt;
 
 -- ============================================================
 -- Step 3: Create vw_team_awards view

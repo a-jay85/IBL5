@@ -98,8 +98,8 @@ class MigrationFileResolver
             return 2;
         }
 
-        // Numbered: starts with 1-3 digits followed by underscore
-        if (preg_match('/^\d{1,3}_/', $filename) === 1) {
+        // Numbered: starts with 1-3 digits, optional sub-letter suffix, followed by underscore
+        if (preg_match('/^\d{1,3}[a-z]?_/', $filename) === 1) {
             return 0;
         }
 

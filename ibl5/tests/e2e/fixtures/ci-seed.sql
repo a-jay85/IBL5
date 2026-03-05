@@ -275,53 +275,7 @@ INSERT INTO ibl_draft_picks (ownerofpick, owner_tid, teampick, teampick_tid, yea
   ('Metros', 1, 'Metros', 1, 2026, 1),
   ('Stars',  2, 'Stars',  2, 2026, 1);
 
--- ============================================================
--- Franchise Record Book tables (from migration 037)
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS `ibl_rcb_alltime_records` (
-    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    `scope` ENUM('league', 'team') NOT NULL,
-    `team_id` TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    `record_type` ENUM('single_season', 'career') NOT NULL,
-    `stat_category` ENUM('ppg','pts','rpg','trb','apg','ast','spg','stl','bpg','blk','fg_pct','ft_pct','three_pct') NOT NULL,
-    `ranking` TINYINT UNSIGNED NOT NULL,
-    `player_name` VARCHAR(33) NOT NULL,
-    `car_block_id` SMALLINT UNSIGNED DEFAULT NULL,
-    `pid` INT DEFAULT NULL,
-    `stat_value` DECIMAL(10,4) NOT NULL,
-    `stat_raw` INT NOT NULL,
-    `team_of_record` TINYINT UNSIGNED DEFAULT NULL,
-    `season_year` SMALLINT UNSIGNED DEFAULT NULL,
-    `career_total` INT DEFAULT NULL,
-    `source_file` VARCHAR(128) DEFAULT NULL,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY `uq_record` (`scope`, `team_id`, `record_type`, `stat_category`, `ranking`),
-    KEY `idx_pid` (`pid`),
-    KEY `idx_team` (`team_id`),
-    KEY `idx_stat_type` (`stat_category`, `record_type`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `ibl_rcb_season_records` (
-    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    `season_year` SMALLINT UNSIGNED NOT NULL,
-    `scope` ENUM('league', 'team') NOT NULL,
-    `team_id` TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    `context` ENUM('home', 'away') NOT NULL,
-    `stat_category` ENUM('pts','reb','ast','stl','blk','two_gm','three_gm','ftm') NOT NULL,
-    `ranking` TINYINT UNSIGNED NOT NULL,
-    `player_name` VARCHAR(33) NOT NULL,
-    `player_position` VARCHAR(2) DEFAULT NULL,
-    `car_block_id` SMALLINT UNSIGNED DEFAULT NULL,
-    `pid` INT DEFAULT NULL,
-    `stat_value` SMALLINT UNSIGNED NOT NULL,
-    `record_season_year` SMALLINT UNSIGNED NOT NULL,
-    `source_file` VARCHAR(128) DEFAULT NULL,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY `uq_record` (`season_year`, `scope`, `team_id`, `context`, `stat_category`, `ranking`),
-    KEY `idx_pid` (`pid`),
-    KEY `idx_season` (`season_year`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Franchise Record Book data (tables created by migration 037c_create_rcb_tables.sql)
 
 -- League single-season records (scope=league, team_id=0)
 INSERT INTO ibl_rcb_alltime_records (scope, team_id, record_type, stat_category, ranking, player_name, pid, stat_value, stat_raw, team_of_record, season_year) VALUES

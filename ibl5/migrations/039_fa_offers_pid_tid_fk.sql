@@ -1,22 +1,21 @@
 -- Migration 039: Convert ibl_fa_offers FKs from name/team (VARCHAR) to pid/tid (INT)
---
--- Add pid column (FK to ibl_plr.pid) and tid column (FK to ibl_team_info.teamid)
--- Keep name/team columns for backward compat (reads)
 
 -- Add pid column
-ALTER TABLE ibl_fa_offers ADD COLUMN pid INT NOT NULL DEFAULT 0 AFTER name;
+ALTER TABLE ibl_fa_offers ADD COLUMN IF NOT EXISTS pid INT NOT NULL DEFAULT 0 AFTER name;
 UPDATE ibl_fa_offers f JOIN ibl_plr p ON f.name = p.name SET f.pid = p.pid;
-ALTER TABLE ibl_fa_offers DROP FOREIGN KEY fk_faoffer_player;
+ALTER TABLE ibl_fa_offers DROP FOREIGN KEY IF EXISTS fk_faoffer_player;
+ALTER TABLE ibl_fa_offers DROP FOREIGN KEY IF EXISTS fk_faoffer_pid;
 ALTER TABLE ibl_fa_offers ADD CONSTRAINT fk_faoffer_pid FOREIGN KEY (pid) REFERENCES ibl_plr(pid) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- Add tid column
-ALTER TABLE ibl_fa_offers ADD COLUMN tid INT NOT NULL DEFAULT 0 AFTER team;
+ALTER TABLE ibl_fa_offers ADD COLUMN IF NOT EXISTS tid INT NOT NULL DEFAULT 0 AFTER team;
 UPDATE ibl_fa_offers f JOIN ibl_team_info t ON f.team = t.team_name SET f.tid = t.teamid;
-ALTER TABLE ibl_fa_offers DROP FOREIGN KEY fk_faoffer_team;
+ALTER TABLE ibl_fa_offers DROP FOREIGN KEY IF EXISTS fk_faoffer_team;
+ALTER TABLE ibl_fa_offers DROP FOREIGN KEY IF EXISTS fk_faoffer_tid;
 ALTER TABLE ibl_fa_offers ADD CONSTRAINT fk_faoffer_tid FOREIGN KEY (tid) REFERENCES ibl_team_info(teamid) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- Add composite index for pid+tid lookups
-ALTER TABLE ibl_fa_offers ADD INDEX idx_tid_pid (tid, pid);
+ALTER TABLE ibl_fa_offers ADD INDEX IF NOT EXISTS idx_tid_pid (tid, pid);
 
 -- Update view to use new FK columns instead of string JOINs
 CREATE OR REPLACE VIEW vw_free_agency_offers AS

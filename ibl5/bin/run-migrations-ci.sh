@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Apply all idempotent SQL migrations in order for CI.
+# Usage: ./run-migrations-ci.sh <mysql-args>
+#
+# Only applies numbered .sql files (001_*, 002_*, 033b_*, etc.).
+# Matches the same pattern as MigrationFileResolver::getCategory() line 102.
+# Skips .php data migrations (need production data) and .md files.
+set -euo pipefail
+trap 'echo "ERROR: Failed applying migration: $(basename "${f:-unknown}")"; exit 1' ERR
+
+MIGRATIONS_DIR="$(cd "$(dirname "$0")/../migrations" && pwd)"
+numbered=()
+for f in "$MIGRATIONS_DIR"/*.sql; do
+    base=$(basename "$f")
+    if [[ "$base" =~ ^[0-9]{1,3}[a-z]?_ ]]; then
+        numbered+=("$f")
+    fi
+done
+# Lexicographic sort: 033_ < 033b_ < 034_ (sort -V gets this wrong)
+IFS=$'\n' numbered=($(printf '%s\n' "${numbered[@]}" | sort))
+
+echo "Applying ${#numbered[@]} migrations..."
+for f in "${numbered[@]}"; do
+    echo "  -> $(basename "$f")"
+    mysql "$@" < "$f"
+done
+echo "Done."

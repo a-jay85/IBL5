@@ -116,6 +116,43 @@ final class MigrationFileResolverTest extends TestCase
         ], $result);
     }
 
+    public function testSubLetterSuffixSortedAsNumberedCategory(): void
+    {
+        // Sub-lettered files (033b_) are categorized as numbered (category 0),
+        // not non-numbered (category 1). strnatcasecmp sorts 033b_ before 033_
+        // because natural sort orders letters before punctuation after numeric prefix.
+        touch($this->tempDir . '/033_add_trivia.sql');
+        touch($this->tempDir . '/033b_widen_password.sql');
+        touch($this->tempDir . '/034_add_comments.sql');
+
+        $resolver = new MigrationFileResolver($this->tempDir);
+        $result = $resolver->getAvailableMigrations();
+
+        $this->assertSame([
+            '033b_widen_password.sql',
+            '033_add_trivia.sql',
+            '034_add_comments.sql',
+        ], $result);
+    }
+
+    public function testMultipleSubLetterSuffixesSortCorrectly(): void
+    {
+        touch($this->tempDir . '/037_flag.sql');
+        touch($this->tempDir . '/037b_indexes.sql');
+        touch($this->tempDir . '/037c_tables.sql');
+        touch($this->tempDir . '/038_next.sql');
+
+        $resolver = new MigrationFileResolver($this->tempDir);
+        $result = $resolver->getAvailableMigrations();
+
+        $this->assertSame([
+            '037b_indexes.sql',
+            '037c_tables.sql',
+            '037_flag.sql',
+            '038_next.sql',
+        ], $result);
+    }
+
     public function testGetFullPathReturnsCorrectPath(): void
     {
         $resolver = new MigrationFileResolver($this->tempDir);

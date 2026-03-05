@@ -3,33 +3,31 @@
 --   1. Operational columns (depth, sim_depth, asg_vote, eoy_vote) moved to ibl_team_info
 --   2. vw_team_awards view (UNIONs all team awards from canonical sources)
 --   3. vw_franchise_summary view (computes all-time stats per team)
--- Continues the pattern from migrations 026-028 of replacing denormalized tables with views.
 
 -- ============================================================
 -- Step 1: Add operational columns to ibl_team_info
 -- ============================================================
 ALTER TABLE ibl_team_info
-  ADD COLUMN depth VARCHAR(100) NOT NULL DEFAULT '' AFTER chart,
-  ADD COLUMN sim_depth VARCHAR(100) NOT NULL DEFAULT 'No Depth Chart' AFTER depth,
-  ADD COLUMN asg_vote VARCHAR(100) NOT NULL DEFAULT 'No Vote' AFTER sim_depth,
-  ADD COLUMN eoy_vote VARCHAR(100) NOT NULL DEFAULT 'No Vote' AFTER asg_vote;
+  ADD COLUMN IF NOT EXISTS depth VARCHAR(100) NOT NULL DEFAULT '' AFTER chart,
+  ADD COLUMN IF NOT EXISTS sim_depth VARCHAR(100) NOT NULL DEFAULT 'No Depth Chart' AFTER depth,
+  ADD COLUMN IF NOT EXISTS asg_vote VARCHAR(100) NOT NULL DEFAULT 'No Vote' AFTER sim_depth,
+  ADD COLUMN IF NOT EXISTS eoy_vote VARCHAR(100) NOT NULL DEFAULT 'No Vote' AFTER asg_vote;
 
 -- ============================================================
 -- Step 2: Copy current operational data from ibl_team_history
+-- (skip if ibl_team_history already dropped — CI runs against post-migration schema.sql)
 -- ============================================================
-UPDATE ibl_team_info ti
-JOIN ibl_team_history th ON ti.teamid = th.teamid
-SET ti.depth = th.depth,
-    ti.sim_depth = th.sim_depth,
-    ti.asg_vote = th.asg_vote,
-    ti.eoy_vote = th.eoy_vote;
+SET @th_exists = (SELECT COUNT(*) FROM information_schema.tables
+  WHERE table_schema = DATABASE() AND table_name = 'ibl_team_history');
+SET @copy_sql = IF(@th_exists > 0,
+  'UPDATE ibl_team_info ti JOIN ibl_team_history th ON ti.teamid = th.teamid SET ti.depth = th.depth, ti.sim_depth = th.sim_depth, ti.asg_vote = th.asg_vote, ti.eoy_vote = th.eoy_vote',
+  'SELECT 1');
+PREPARE _stmt FROM @copy_sql;
+EXECUTE _stmt;
+DEALLOCATE PREPARE _stmt;
 
 -- ============================================================
 -- Step 3: Create vw_team_awards view
--- UNIONs all team awards from their canonical sources:
---   - Division Champions, Conference Champions, Draft Lottery Winners: from ibl_team_awards
---   - IBL Champions: derived from vw_playoff_series_results (max round per year)
---   - HEAT Champions: derived from ibl_box_scores_teams (championship game)
 -- ============================================================
 CREATE OR REPLACE VIEW vw_team_awards AS
 
@@ -71,7 +69,6 @@ FROM (
         END AS winner_tid
     FROM ibl_box_scores_teams bst
     JOIN (
-        -- Find the last date of each HEAT tournament year
         SELECT YEAR(Date) AS yr, MAX(Date) AS last_date
         FROM ibl_box_scores_teams
         WHERE game_type = 3
@@ -90,10 +87,6 @@ JOIN ibl_team_info ti ON ti.teamid = hc.winner_tid;
 
 -- ============================================================
 -- Step 4: Create vw_franchise_summary view
--- Computes all-time stats per team from existing views/tables:
---   - totwins/totloss/winpct from ibl_team_win_loss
---   - playoffs from vw_playoff_series_results (distinct years in round 1)
---   - Title counts from vw_team_awards
 -- ============================================================
 CREATE OR REPLACE VIEW vw_franchise_summary AS
 SELECT
@@ -138,7 +131,6 @@ WHERE ti.teamid BETWEEN 1 AND 30;
 
 -- ============================================================
 -- Step 5: Remove derived entries from ibl_team_awards
--- IBL Champions and HEAT Champions are now derived from game data
 -- ============================================================
 DELETE FROM ibl_team_awards WHERE Award IN (
     'IBL Champions',
@@ -148,4 +140,4 @@ DELETE FROM ibl_team_awards WHERE Award IN (
 -- ============================================================
 -- Step 6: Drop the denormalized table
 -- ============================================================
-DROP TABLE ibl_team_history;
+DROP TABLE IF EXISTS ibl_team_history;

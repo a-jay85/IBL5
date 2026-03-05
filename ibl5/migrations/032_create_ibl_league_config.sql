@@ -1,7 +1,7 @@
 -- Migration 032: Create ibl_league_config table
 -- Stores parsed Jump Shot Basketball .lge file data per season
 
-CREATE TABLE ibl_league_config (
+CREATE TABLE IF NOT EXISTS ibl_league_config (
   id INT NOT NULL AUTO_INCREMENT,
   season_ending_year SMALLINT UNSIGNED NOT NULL,
   team_slot TINYINT UNSIGNED NOT NULL,

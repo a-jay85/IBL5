@@ -66,11 +66,11 @@ ALTER TABLE ibl_plr
   MODIFY sta TINYINT UNSIGNED DEFAULT 0 COMMENT 'Stamina rating',
   MODIFY oo TINYINT UNSIGNED DEFAULT 0 COMMENT 'Outside offense rating',
   MODIFY od TINYINT UNSIGNED DEFAULT 0 COMMENT 'Outside defense rating',
-  MODIFY do TINYINT UNSIGNED DEFAULT 0 COMMENT 'Inside offense rating',
+  MODIFY `do` TINYINT UNSIGNED DEFAULT 0 COMMENT 'Inside offense rating',
   MODIFY dd TINYINT UNSIGNED DEFAULT 0 COMMENT 'Inside defense rating',
   MODIFY po TINYINT UNSIGNED DEFAULT 0 COMMENT 'Post offense rating',
   MODIFY pd TINYINT UNSIGNED DEFAULT 0 COMMENT 'Post defense rating',
-  MODIFY to TINYINT UNSIGNED DEFAULT 0 COMMENT 'Transition offense rating',
+  MODIFY `to` TINYINT UNSIGNED DEFAULT 0 COMMENT 'Transition offense rating',
   MODIFY td TINYINT UNSIGNED DEFAULT 0 COMMENT 'Transition defense rating',
   MODIFY talent TINYINT UNSIGNED DEFAULT 0 COMMENT 'Overall talent rating',
   MODIFY skill TINYINT UNSIGNED DEFAULT 0 COMMENT 'Skill rating',
@@ -271,7 +271,7 @@ ALTER TABLE ibl_draft_class
   MODIFY tvr TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Turnovers rating',
   MODIFY blk TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Blocks rating',
   MODIFY oo TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Off outside rating',
-  MODIFY do TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Off drive rating',
+  MODIFY `do` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Off drive rating',
   MODIFY po TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Off post rating',
   MODIFY `to` TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Off transition rating',
   MODIFY od TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Def outside rating',
@@ -291,10 +291,9 @@ ALTER TABLE ibl_draft_class
 -- ---------------------------------------------------------------------------
 -- Note: ibl_schedule does not have 'Day' or 'Neutral' columns
 -- Removed those columns from optimization
+-- Visitor and Home are INT with FK to ibl_team_info(teamid) — keep as INT (migration 009 enforces)
 ALTER TABLE ibl_schedule
   MODIFY Year SMALLINT UNSIGNED NOT NULL COMMENT 'Season year',
-  MODIFY Visitor SMALLINT UNSIGNED NOT NULL COMMENT 'Visiting team ID',
-  MODIFY Home SMALLINT UNSIGNED NOT NULL COMMENT 'Home team ID',
   MODIFY VScore TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Visitor score',
   MODIFY HScore TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Home score';
 
@@ -308,11 +307,8 @@ ALTER TABLE ibl_schedule
 --   MODIFY ranking TINYINT UNSIGNED DEFAULT NULL COMMENT 'Power ranking (1-30)';
 
 -- ---------------------------------------------------------------------------
--- Playoff Results
+-- Playoff Results: dropped by migration 035, skip
 -- ---------------------------------------------------------------------------
-ALTER TABLE ibl_playoff_results
-  MODIFY year SMALLINT UNSIGNED NOT NULL COMMENT 'Playoff year',
-  MODIFY round TINYINT UNSIGNED NOT NULL COMMENT 'Playoff round';
 
 -- ---------------------------------------------------------------------------
 -- Team History
@@ -382,40 +378,26 @@ ALTER TABLE ibl_draft_class
 -- ---------------------------------------------------------------------------
 -- Standings Constraints (ibl_standings)
 -- ---------------------------------------------------------------------------
--- Winning percentage must be between 0.000 and 1.000
+-- Drop + re-add pattern for CHECK constraints (idempotent)
 ALTER TABLE ibl_standings
-  ADD CONSTRAINT chk_standings_pct 
-  CHECK (pct IS NULL OR (pct >= 0.000 AND pct <= 1.000));
-
--- Games unplayed cannot be negative and should not exceed season length (82)
-ALTER TABLE ibl_standings
-  ADD CONSTRAINT chk_standings_games_unplayed 
-  CHECK (gamesUnplayed IS NULL OR (gamesUnplayed >= 0 AND gamesUnplayed <= 82));
-
--- Win/loss totals should be reasonable (max 82 for regular season)
-ALTER TABLE ibl_standings
-  ADD CONSTRAINT chk_standings_conf_wins 
-  CHECK (confWins IS NULL OR confWins <= 82);
+  DROP CONSTRAINT IF EXISTS chk_standings_pct,
+  DROP CONSTRAINT IF EXISTS chk_standings_games_unplayed,
+  DROP CONSTRAINT IF EXISTS chk_standings_conf_wins,
+  DROP CONSTRAINT IF EXISTS chk_standings_conf_losses,
+  DROP CONSTRAINT IF EXISTS chk_standings_home_wins,
+  DROP CONSTRAINT IF EXISTS chk_standings_home_losses,
+  DROP CONSTRAINT IF EXISTS chk_standings_away_wins,
+  DROP CONSTRAINT IF EXISTS chk_standings_away_losses;
 
 ALTER TABLE ibl_standings
-  ADD CONSTRAINT chk_standings_conf_losses 
-  CHECK (confLosses IS NULL OR confLosses <= 82);
-
-ALTER TABLE ibl_standings
-  ADD CONSTRAINT chk_standings_home_wins 
-  CHECK (homeWins IS NULL OR homeWins <= 41);
-
-ALTER TABLE ibl_standings
-  ADD CONSTRAINT chk_standings_home_losses 
-  CHECK (homeLosses IS NULL OR homeLosses <= 41);
-
-ALTER TABLE ibl_standings
-  ADD CONSTRAINT chk_standings_away_wins 
-  CHECK (awayWins IS NULL OR awayWins <= 41);
-
-ALTER TABLE ibl_standings
-  ADD CONSTRAINT chk_standings_away_losses 
-  CHECK (awayLosses IS NULL OR awayLosses <= 41);
+  ADD CONSTRAINT chk_standings_pct CHECK (pct IS NULL OR (pct >= 0.000 AND pct <= 1.000)),
+  ADD CONSTRAINT chk_standings_games_unplayed CHECK (gamesUnplayed IS NULL OR (gamesUnplayed >= 0 AND gamesUnplayed <= 82)),
+  ADD CONSTRAINT chk_standings_conf_wins CHECK (confWins IS NULL OR confWins <= 82),
+  ADD CONSTRAINT chk_standings_conf_losses CHECK (confLosses IS NULL OR confLosses <= 82),
+  ADD CONSTRAINT chk_standings_home_wins CHECK (homeWins IS NULL OR homeWins <= 41),
+  ADD CONSTRAINT chk_standings_home_losses CHECK (homeLosses IS NULL OR homeLosses <= 41),
+  ADD CONSTRAINT chk_standings_away_wins CHECK (awayWins IS NULL OR awayWins <= 41),
+  ADD CONSTRAINT chk_standings_away_losses CHECK (awayLosses IS NULL OR awayLosses <= 41);
 
 -- ---------------------------------------------------------------------------
 -- Player Ratings Constraints (ibl_plr)
@@ -439,8 +421,9 @@ ALTER TABLE ibl_standings
 -- Box Score Minutes Constraint
 -- ---------------------------------------------------------------------------
 -- Minutes in a game cannot exceed 48 (regulation) + ~15 overtimes (max realistic)
+ALTER TABLE ibl_box_scores DROP CONSTRAINT IF EXISTS chk_box_minutes;
 ALTER TABLE ibl_box_scores
-  ADD CONSTRAINT chk_box_minutes 
+  ADD CONSTRAINT chk_box_minutes
   CHECK (gameMIN IS NULL OR (gameMIN >= 0 AND gameMIN <= 70));
 
 -- ---------------------------------------------------------------------------
@@ -448,34 +431,25 @@ ALTER TABLE ibl_box_scores
 -- ---------------------------------------------------------------------------
 -- Team IDs must be between 1 and 32 (maximum teams in league)
 ALTER TABLE ibl_schedule
-  ADD CONSTRAINT chk_schedule_visitor_id 
-  CHECK (Visitor >= 1 AND Visitor <= 32);
+  DROP CONSTRAINT IF EXISTS chk_schedule_visitor_id,
+  DROP CONSTRAINT IF EXISTS chk_schedule_home_id,
+  DROP CONSTRAINT IF EXISTS chk_schedule_vscore,
+  DROP CONSTRAINT IF EXISTS chk_schedule_hscore;
 
+-- Visitor and Home have FK constraints — MariaDB 10.6 disallows CHECK on FK columns
 ALTER TABLE ibl_schedule
-  ADD CONSTRAINT chk_schedule_home_id 
-  CHECK (Home >= 1 AND Home <= 32);
-
--- Scores should be reasonable (0-200, accounting for rare high-scoring games)
-ALTER TABLE ibl_schedule
-  ADD CONSTRAINT chk_schedule_vscore 
-  CHECK (VScore >= 0 AND VScore <= 200);
-
-ALTER TABLE ibl_schedule
-  ADD CONSTRAINT chk_schedule_hscore 
-  CHECK (HScore >= 0 AND HScore <= 200);
+  ADD CONSTRAINT chk_schedule_vscore CHECK (VScore >= 0 AND VScore <= 200),
+  ADD CONSTRAINT chk_schedule_hscore CHECK (HScore >= 0 AND HScore <= 200);
 
 -- ---------------------------------------------------------------------------
 -- Draft Round and Pick Constraints
 -- ---------------------------------------------------------------------------
 -- Draft rounds typically 1-7
+ALTER TABLE ibl_draft DROP CONSTRAINT IF EXISTS chk_draft_round;
+ALTER TABLE ibl_draft DROP CONSTRAINT IF EXISTS chk_draft_pick;
 ALTER TABLE ibl_draft
-  ADD CONSTRAINT chk_draft_round 
-  CHECK (round >= 0 AND round <= 7);
-
--- Draft picks 1-30 per round
-ALTER TABLE ibl_draft
-  ADD CONSTRAINT chk_draft_pick 
-  CHECK (pick >= 0 AND pick <= 32);
+  ADD CONSTRAINT chk_draft_round CHECK (round >= 0 AND round <= 7),
+  ADD CONSTRAINT chk_draft_pick CHECK (pick >= 0 AND pick <= 32);
 
 -- Note: ibl_draft_picks.round is CHAR(1), not numeric - CHECK constraint won't work
 -- Commenting out these constraints as they reference non-existent or incompatible columns
@@ -493,8 +467,9 @@ ALTER TABLE ibl_draft
 -- Note: Column is 'ranking' not 'powerRanking'
 -- ranking is DECIMAL(6,1) in schema, so using decimal literals in constraint
 -- Power ranking should be 1-32 (maximum teams in league)
+ALTER TABLE ibl_power DROP CONSTRAINT IF EXISTS chk_power_ranking;
 ALTER TABLE ibl_power
-  ADD CONSTRAINT chk_power_ranking 
+  ADD CONSTRAINT chk_power_ranking
   CHECK (ranking IS NULL OR (ranking >= 0.0 AND ranking <= 100.0));
 
 -- ---------------------------------------------------------------------------
@@ -512,6 +487,16 @@ ALTER TABLE ibl_power
 -- ---------------------------------------------------------------------------
 -- Salary should not be larger than hard cap limits
 ALTER TABLE ibl_plr
+  DROP CONSTRAINT IF EXISTS chk_plr_cy,
+  DROP CONSTRAINT IF EXISTS chk_plr_cyt,
+  DROP CONSTRAINT IF EXISTS chk_plr_cy1,
+  DROP CONSTRAINT IF EXISTS chk_plr_cy2,
+  DROP CONSTRAINT IF EXISTS chk_plr_cy3,
+  DROP CONSTRAINT IF EXISTS chk_plr_cy4,
+  DROP CONSTRAINT IF EXISTS chk_plr_cy5,
+  DROP CONSTRAINT IF EXISTS chk_plr_cy6;
+
+ALTER TABLE ibl_plr
   ADD CONSTRAINT chk_plr_cy CHECK (cy >= 0 AND cy <= 6),
   ADD CONSTRAINT chk_plr_cyt CHECK (cyt >= 0 AND cyt <= 6),
   ADD CONSTRAINT chk_plr_cy1 CHECK (cy1 >= -7000 AND cy1 <= 7000),
@@ -520,14 +505,7 @@ ALTER TABLE ibl_plr
   ADD CONSTRAINT chk_plr_cy4 CHECK (cy4 >= -7000 AND cy4 <= 7000),
   ADD CONSTRAINT chk_plr_cy5 CHECK (cy5 >= -7000 AND cy5 <= 7000),
   ADD CONSTRAINT chk_plr_cy6 CHECK (cy6 >= -7000 AND cy6 <= 7000);
-
--- ---------------------------------------------------------------------------
--- Team ID Constraints
--- ---------------------------------------------------------------------------
--- Team IDs must be between 0 (free agent) and 32 (maximum teams in league)
-ALTER TABLE ibl_plr
-  ADD CONSTRAINT chk_plr_tid 
-  CHECK (tid >= 0 AND tid <= 32);
+-- tid has FK constraint fk_plr_team — MariaDB 10.6 disallows CHECK on FK columns
 
 -- ============================================================================
 -- PART 4: ADD NOT NULL CONSTRAINTS WHERE APPROPRIATE

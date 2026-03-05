@@ -94,32 +94,6 @@ test.describe('Trading flow', () => {
     expect(await checkboxes.count()).toBeGreaterThan(0);
   });
 
-  test('selecting players shows roster preview', async ({ page }) => {
-    const firstTeamLink = page.locator('.trading-team-select a').first();
-    await firstTeamLink.click();
-
-    await expect(page.locator('form[name="Trade_Offer"]')).toBeVisible();
-
-    // Preview should be hidden initially
-    const preview = page.locator('#trade-roster-preview');
-    await expect(preview).toBeHidden();
-
-    // Check one player from each roster table
-    const rosterTables = page.locator('.trading-roster');
-    for (let i = 0; i < 2; i++) {
-      const checkbox = rosterTables
-        .nth(i)
-        .locator('input[type="checkbox"]')
-        .first();
-      if (await checkbox.isVisible()) {
-        await checkbox.check();
-      }
-    }
-
-    // Preview should now be visible
-    await expect(preview).toBeVisible();
-  });
-
   test('trade review page loads', async ({ page }) => {
     await page.goto('modules.php?name=Trading&op=reviewtrade');
 
@@ -233,6 +207,27 @@ test.describe('Trade offer form: roster preview interactions', () => {
     await appState({ 'Allow Trades': 'Yes' });
     await navigateToTradeForm(page);
     await mockRosterPreviewApi(page);
+  });
+
+  test('selecting players shows roster preview', async ({ page }) => {
+    // Preview should be hidden initially
+    const preview = page.locator('#trade-roster-preview');
+    await expect(preview).toBeHidden();
+
+    // Check one player from each roster table
+    const rosterTables = page.locator('.trading-roster');
+    for (let i = 0; i < 2; i++) {
+      const checkbox = rosterTables
+        .nth(i)
+        .locator('input[type="checkbox"]')
+        .first();
+      if (await checkbox.isVisible()) {
+        await checkbox.check();
+      }
+    }
+
+    // Preview should now be visible
+    await expect(preview).toBeVisible();
   });
 
   test('preview hides when all players unchecked', async ({ page }) => {
@@ -382,6 +377,7 @@ test.describe('Trade offer form: cap warnings', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Allow Trades': 'Yes' });
     await navigateToTradeForm(page);
+    await mockRosterPreviewApi(page);
   });
 
   test('no cap warnings when no players selected', async ({ page }) => {

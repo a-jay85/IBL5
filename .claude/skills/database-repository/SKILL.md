@@ -153,4 +153,4 @@ $this->fetchOne(
 
 ## Templates
 
-See [templates/CustomRepository.php](./templates/CustomRepository.php) for starter template.
+See [templates/CustomRepository.php](${CLAUDE_SKILL_DIR}/templates/CustomRepository.php) for starter template.

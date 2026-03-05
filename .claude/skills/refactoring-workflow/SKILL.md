@@ -70,11 +70,11 @@ After refactoring, compare localhost against iblhoops.net:
 
 ## Templates
 
-See [templates/](./templates/) for starter files:
-- [ModuleInterface.php](./templates/ModuleInterface.php) - Interface template
-- [ModuleRepository.php](./templates/ModuleRepository.php) - Repository template
-- [ModuleService.php](./templates/ModuleService.php) - Service template
-- [ModuleView.php](./templates/ModuleView.php) - View template
+See [templates/](${CLAUDE_SKILL_DIR}/templates/) for starter files:
+- [ModuleInterface.php](${CLAUDE_SKILL_DIR}/templates/ModuleInterface.php) - Interface template
+- [ModuleRepository.php](${CLAUDE_SKILL_DIR}/templates/ModuleRepository.php) - Repository template
+- [ModuleService.php](${CLAUDE_SKILL_DIR}/templates/ModuleService.php) - Service template
+- [ModuleView.php](${CLAUDE_SKILL_DIR}/templates/ModuleView.php) - View template
 
 ## Reference Implementations
 

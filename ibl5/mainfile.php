@@ -199,7 +199,7 @@ foreach ($_REQUEST as $key => $value) {
 
 // Include the required files - Load appropriate config based on league selection
 $currentLeague = $_SESSION['current_league'] ?? $_COOKIE[\League\LeagueContext::COOKIE_NAME] ?? 'ibl';
-if ($currentLeague === 'olympics') {
+if ($currentLeague === 'olympics' && file_exists(__DIR__ . '/configOlympics.php')) {
     require_once __DIR__ . '/configOlympics.php';
 } else {
     require_once __DIR__ . '/config.php';

@@ -173,9 +173,8 @@ test.describe('Free Agency -- quick offer buttons', () => {
   test('submit veteran minimum offer', async ({ page }) => {
     // FA Forward pid=12 (exp=3, vet min=61)
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=12');
-    // Click the Veterans Exception button — label is in a child span, button in a sibling div
-    const vetRow = page.locator('div', { has: page.locator('span.ibl-label', { hasText: 'Veterans Exception:' }) });
-    const vetBtn = vetRow.locator('.ibl-btn--sm.ibl-btn--primary').first();
+    // Click the Veterans Exception button — use CSS :has(>) to target the direct parent div
+    const vetBtn = page.locator('div:has(> span.ibl-label:text("Veterans Exception:")) .ibl-btn--sm.ibl-btn--primary').first();
     await vetBtn.click();
     await page.waitForURL(/result=offer_success/);
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
@@ -184,8 +183,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
   test('submit MLE offer', async ({ page }) => {
     // FA Center pid=11 — team has HasMLE=1
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    const mleRow = page.locator('div', { has: page.locator('span.ibl-label', { hasText: 'Mid-Level Exception' }) });
-    const mleBtn = mleRow.locator('.ibl-btn--sm.ibl-btn--primary').first();
+    const mleBtn = page.locator('div:has(> span.ibl-label:text("Mid-Level Exception")) .ibl-btn--sm.ibl-btn--primary').first();
     await mleBtn.click();
     await page.waitForURL(/result=offer_success/);
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
@@ -201,8 +199,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
   test('submit LLE offer', async ({ page }) => {
     // FA Center pid=11 — team has HasLLE=1
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    const lleRow = page.locator('div', { has: page.locator('span.ibl-label', { hasText: 'Lower-Level Exception:' }) });
-    const lleBtn = lleRow.locator('.ibl-btn--sm.ibl-btn--primary').first();
+    const lleBtn = page.locator('div:has(> span.ibl-label:text("Lower-Level Exception:")) .ibl-btn--sm.ibl-btn--primary').first();
     await lleBtn.click();
     await page.waitForURL(/result=offer_success/);
     await expect(page.locator('.ibl-alert--success')).toBeVisible();

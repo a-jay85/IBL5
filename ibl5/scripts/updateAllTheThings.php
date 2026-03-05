@@ -8,9 +8,17 @@ libxml_use_internal_errors(true);
 // Load mainfile first for authentication
 require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
-// SECURITY: Admin-only script - check authentication before proceeding
-if (!function_exists('is_admin') || !is_admin()) {
-    header('HTTP/1.1 403 Forbidden');
+// SECURITY: Redirect logged-out users to login
+if (!function_exists('is_user') || !is_user($user ?? '')) {
+    $_SESSION['redirect_after_login_path'] = 'scripts/updateAllTheThings.php'
+        . (isset($_GET['league']) && $_GET['league'] === League\LeagueContext::LEAGUE_OLYMPICS ? '?league=olympics' : '');
+    header('Location: ../modules.php?name=YourAccount');
+    exit;
+}
+
+// SECURITY: Admin-only — logged-in non-admins get 403
+if (!is_admin()) {
+    http_response_code(403);
     die('Access denied. This script requires administrator privileges.');
 }
 

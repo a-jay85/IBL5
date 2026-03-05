@@ -26,22 +26,6 @@ if (isset($url) and is_admin()) {
     die();
 }
 
-if ($httpref == 1) {
-    if (isset($_SERVER['HTTP_REFERER'])) {
-        $referer = $_SERVER['HTTP_REFERER'];
-        $referer = check_html($referer, "nohtml");
-        if (stripos($referer, "nuke_") !== false && stripos($referer, "into") !== false && stripos($referer, "from") !== false) {
-            $referer = "";
-        }
-    }
-    if (!empty($referer) && !str_contains($referer, "unknown") && !str_contains($referer, "bookmark") && !str_contains($referer, $_SERVER['HTTP_HOST'])) {
-        $result = $db->sql_query("INSERT INTO " . $prefix . "_referer VALUES (NULL, '" . $referer . "')");
-    }
-    $numrows = $db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_referer"));
-    if ($numrows >= $httprefmax) {
-        $result2 = $db->sql_query("DELETE FROM " . $prefix . "_referer");
-    }
-}
 if (!isset($mop)) {$mop = "modload";}
 if (!isset($mod_file)) {$mod_file = "index";}
 $name = trim($name);

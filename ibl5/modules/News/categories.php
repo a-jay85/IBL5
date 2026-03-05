@@ -25,7 +25,7 @@ $cat = $catid;
 
 function theindex($catid)
 {
-    global $storyhome, $httpref, $httprefmax, $topicname, $topicimage, $topictext, $datetime, $user, $cookie, $nukeurl, $prefix, $multilingual, $currentlang, $db, $articlecomm, $module_name, $userinfo;
+    global $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $cookie, $nukeurl, $prefix, $multilingual, $currentlang, $db, $articlecomm, $module_name, $userinfo;
     if (is_user($user)) {getusrinfo($user);}
     if ($multilingual == 1) {
         $querylang = "AND (alanguage='$currentlang' OR alanguage='')"; /* the OR is needed to display stories who are posted to ALL languages */
@@ -82,17 +82,6 @@ function theindex($catid)
         $title1 = \Utilities\HtmlSanitizer::safeHtmlOutput($row2['title']);
         $title = "$title1: $title";
         themeindex($aid, $informant, $datetime, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
-    }
-    if ($httpref == 1) {
-        $referer = $_SERVER['HTTP_REFERER'];
-        if ($referer == "" or str_contains($referer, "unknown") or stripos($referer, $nukeurl) !== false) {
-        } else {
-            $db->sql_query("insert into " . $prefix . "_referer values (NULL, '$referer')");
-        }
-        $numrows = $db->sql_numrows($db->sql_query("select * from " . $prefix . "_referer"));
-        if ($numrows == $httprefmax) {
-            $db->sql_query("delete from " . $prefix . "_referer");
-        }
     }
     PageLayout\PageLayout::footer();
 }

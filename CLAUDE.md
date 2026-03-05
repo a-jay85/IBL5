@@ -91,6 +91,8 @@ Commit body: `<type>: <short summary>` then `## Section` headers with bullet poi
 
 When debugging CSS layout issues, immediately check for inherited properties like `white-space: nowrap` that may override your fixes. Use browser DevTools-style reasoning: inspect computed styles, not just the element's own rules.
 
+When modifying HTML output, selectors, or user-facing text in View classes, run `bun run test:e2e` before considering the task complete.
+
 ## Workflow Continuity
 
 Post-plan Phases 3-8 are consolidated into a single `/post-plan` skill invocation. After Phase 2 (Implementation), invoke `/post-plan` which handles simplify, commit/push/PR, code review, security audit, verification, CI monitoring, and retrospective internally.

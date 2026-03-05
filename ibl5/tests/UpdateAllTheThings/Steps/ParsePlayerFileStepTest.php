@@ -47,7 +47,6 @@ class ParsePlayerFileStepTest extends TestCase
         $plrResult = new PlrParseResult();
         $plrResult->playersUpserted = 150;
         $plrResult->historyRowsUpserted = 300;
-        $plrResult->teamsAssigned = 28;
 
         $this->stubService->method('processPlrFile')->willReturn($plrResult);
 

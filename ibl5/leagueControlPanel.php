@@ -6,7 +6,8 @@ require $_SERVER['DOCUMENT_ROOT'] . '/ibl5/mainfile.php';
 
 // Auth guard
 if (!is_user($user)) {
-    header('Location: modules.php?name=Your_Account');
+    $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php';
+    header('Location: modules.php?name=YourAccount');
     exit;
 }
 

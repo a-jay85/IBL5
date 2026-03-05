@@ -5,15 +5,13 @@ declare(strict_types=1);
 namespace UI\Tables;
 
 use BasketballStats\StatsFormatter;
+use Player\PlayerStats;
 use Player\Player;
 use Player\PlayerImageHelper;
-use Player\PlayerStats;
 use UI\TeamCellHelper;
 
 /**
  * Per36Minutes - Displays per-36-minute statistics table
- *
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class Per36Minutes
 {
@@ -30,39 +28,14 @@ class Per36Minutes
      */
     public static function render(\mysqli $db, $result, \Team $team, string $yr, array $starterPids = [], string $moduleName = ""): string
     {
+        $resolvedRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
+
+        /** @var list<array{player: Player, playerStats: PlayerStats, stats_fgm: string, stats_fga: string, stats_fgp: string, stats_ftm: string, stats_fta: string, stats_ftp: string, stats_tgm: string, stats_tga: string, stats_tgp: string, stats_mpg: string, stats_per36Min: string, stats_opg: string, stats_rpg: string, stats_apg: string, stats_spg: string, stats_tpg: string, stats_bpg: string, stats_fpg: string, stats_ppg: string}> $playerRows */
         $playerRows = [];
-        foreach ($result as $plrRow) {
-            if ($yr === "") {
-                if ($plrRow instanceof Player) {
-                    $player = $plrRow;
-                    /** @var PlayerStats $playerStats */
-                    $playerStats = PlayerStats::withPlayerID($db, $player->playerID ?? 0);
-                } elseif (is_array($plrRow)) {
-                    /** @var PlayerRow $plrRow */
-                    $player = Player::withPlrRow($db, $plrRow);
-                    /** @var PlayerStats $playerStats */
-                    $playerStats = PlayerStats::withPlrRow($db, $plrRow);
-                } else {
-                    continue;
-                }
-
-                $playerName = $player->name ?? '';
-                $firstCharacterOfPlayerName = substr($playerName, 0, 1);
-                if ($firstCharacterOfPlayerName === '|') {
-                    continue;
-                }
-            } else {
-                if (!is_array($plrRow)) {
-                    continue;
-                }
-                $player = Player::withHistoricalPlrRow($db, $plrRow);
-                /** @var PlayerStats $playerStats */
-                $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
-            }
-
+        foreach ($resolvedRows as $row) {
+            $playerStats = $row['playerStats'];
             $playerRows[] = [
-                'player' => $player,
-                'playerStats' => $playerStats,
+                ...$row,
                 'stats_fgm' => StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsMade, $playerStats->seasonMinutes),
                 'stats_fga' => StatsFormatter::formatPer36Stat($playerStats->seasonFieldGoalsAttempted, $playerStats->seasonMinutes),
                 'stats_fgp' => StatsFormatter::formatPercentage($playerStats->seasonFieldGoalsMade, $playerStats->seasonFieldGoalsAttempted),

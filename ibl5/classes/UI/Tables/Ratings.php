@@ -11,8 +11,6 @@ use UI\TeamCellHelper;
 
 /**
  * Ratings - Displays player ratings table
- *
- * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class Ratings
 {
@@ -29,41 +27,8 @@ class Ratings
      * @return string HTML table
      */
     public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = []): string
-    // TODO: simplify this by refactoring Player initialization logic out of this method
     {
-        $playerRows = [];
-        foreach ($data as $plrRow) {
-            if ($yr === "") {
-                if ($plrRow instanceof Player) {
-                    $player = $plrRow;
-                } elseif (is_array($plrRow)) {
-                    /** @var PlayerRow $plrRow */
-                    $player = Player::withPlrRow($db, $plrRow);
-                } else {
-                    continue;
-                }
-
-                $playerName = $player->name ?? '';
-                $firstCharacterOfPlayerName = substr($playerName, 0, 1);
-                if ($firstCharacterOfPlayerName === '|') {
-                    continue;
-                }
-            } else {
-                if (!is_array($plrRow)) {
-                    continue;
-                }
-                $player = Player::withHistoricalPlrRow($db, $plrRow);
-            }
-
-            $injuryReturnDate = $player->getInjuryReturnDate($season->lastSimEndDate);
-            $injuryDays = $player->daysRemainingForInjury;
-
-            $playerRows[] = [
-                'player' => $player,
-                'injuryDays' => $injuryDays,
-                'injuryReturnDate' => $injuryReturnDate,
-            ];
-        }
+        $players = PlayerRowTransformer::resolvePlayers($db, $data, $yr);
 
         ob_start();
         ?>
@@ -112,9 +77,7 @@ class Ratings
         </tr>
     </thead>
     <tbody>
-<?php foreach ($playerRows as $row):
-    $player = $row['player'];
-?>
+<?php foreach ($players as $player): ?>
         <tr<?php if ($moduleName === "LeagueStarters"): ?> data-team-id="<?= $player->teamID ?? 0 ?>"<?php endif; ?>>
 <?php if ($moduleName === "LeagueStarters"):
     echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamID ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
@@ -154,8 +117,8 @@ endif; ?>
             <td><?= (int)$player->ratingConsistency ?></td>
             <td class="sep-team"></td>
             <?php
-                $injDays = (int) $row['injuryDays'];
-                $injReturn = $row['injuryReturnDate'];
+                $injDays = (int) $player->daysRemainingForInjury;
+                $injReturn = $player->getInjuryReturnDate($season->lastSimEndDate);
             ?>
             <td><?= ($injDays > 0 && $injReturn !== '')
                 ? TooltipLabel::render((string) $injDays, 'Returns: ' . $injReturn)

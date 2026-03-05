@@ -16,7 +16,8 @@ for f in "$MIGRATIONS_DIR"/*.sql; do
         numbered+=("$f")
     fi
 done
-IFS=$'\n' numbered=($(printf '%s\n' "${numbered[@]}" | sort -V))
+# Lexicographic sort: 033_ < 033b_ < 034_ (sort -V gets this wrong)
+IFS=$'\n' numbered=($(printf '%s\n' "${numbered[@]}" | sort))
 
 echo "Applying ${#numbered[@]} migrations..."
 for f in "${numbered[@]}"; do

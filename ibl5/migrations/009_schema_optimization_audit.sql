@@ -15,8 +15,7 @@ ALTER TABLE `ibl_plr` DROP KEY IF EXISTS `idx_uuid`;
 -- ibl_team_info: Drop duplicate uuid index
 ALTER TABLE `ibl_team_info` DROP KEY IF EXISTS `idx_uuid`;
 
--- ibl_heat_stats: Drop redundant UNIQUE KEY on id (already PRIMARY KEY)
-ALTER TABLE `ibl_heat_stats` DROP KEY IF EXISTS `id`;
+-- ibl_heat_stats: now a view (migration 028), skip
 
 -- ibl_olympics_stats: Drop redundant UNIQUE KEY on id (already PRIMARY KEY)
 ALTER TABLE `ibl_olympics_stats` DROP KEY IF EXISTS `id`;
@@ -39,27 +38,14 @@ ALTER TABLE `ibl_banners`
   ADD COLUMN IF NOT EXISTS `id` int NOT NULL AUTO_INCREMENT FIRST,
   ADD PRIMARY KEY IF NOT EXISTS (`id`);
 
--- ibl_heat_career_avgs: Deduplicate before adding PK
-DELETE t1 FROM `ibl_heat_career_avgs` t1
-INNER JOIN `ibl_heat_career_avgs` t2
-  ON t1.pid = t2.pid
-  AND t1.games < t2.games;
-ALTER TABLE `ibl_heat_career_avgs` ADD PRIMARY KEY IF NOT EXISTS (`pid`);
-
--- ibl_heat_career_totals: Add PK on pid
-ALTER TABLE `ibl_heat_career_totals` ADD PRIMARY KEY IF NOT EXISTS (`pid`);
+-- ibl_heat_career_avgs/totals, ibl_playoff_career_totals, ibl_season_career_avgs:
+-- now views (migration 028), skip ADD PRIMARY KEY
 
 -- ibl_olympics_career_avgs: Add PK on pid
 ALTER TABLE `ibl_olympics_career_avgs` ADD PRIMARY KEY IF NOT EXISTS (`pid`);
 
 -- ibl_olympics_career_totals: Add PK on pid
 ALTER TABLE `ibl_olympics_career_totals` ADD PRIMARY KEY IF NOT EXISTS (`pid`);
-
--- ibl_playoff_career_totals: Add PK on pid
-ALTER TABLE `ibl_playoff_career_totals` ADD PRIMARY KEY IF NOT EXISTS (`pid`);
-
--- ibl_season_career_avgs: Add PK on pid
-ALTER TABLE `ibl_season_career_avgs` ADD PRIMARY KEY IF NOT EXISTS (`pid`);
 
 -- ibl_box_scores_teams: Add synthetic PK
 ALTER TABLE `ibl_box_scores_teams`
@@ -206,10 +192,7 @@ GROUP BY self, opponent;
 -- PART 6: Fix Column Types (Section 3)
 -- =====================================================================
 
-ALTER TABLE `ibl_team_win_loss`
-  MODIFY COLUMN `year` smallint unsigned NOT NULL DEFAULT 0,
-  MODIFY COLUMN `wins` smallint unsigned NOT NULL DEFAULT 0,
-  MODIFY COLUMN `losses` smallint unsigned NOT NULL DEFAULT 0;
+-- ibl_team_win_loss: now a view (migration 027), skip MODIFY
 
 ALTER TABLE `ibl_draft_picks`
   MODIFY COLUMN `year` smallint unsigned NOT NULL DEFAULT 0,

@@ -24,15 +24,8 @@ ALTER TABLE ibl_plr ENGINE=InnoDB;
 
 -- Historical Stats Tables
 ALTER TABLE ibl_hist ENGINE=InnoDB;
-ALTER TABLE ibl_season_career_avgs ENGINE=InnoDB;
-ALTER TABLE ibl_playoff_career_avgs ENGINE=InnoDB;
-ALTER TABLE ibl_playoff_career_totals ENGINE=InnoDB;
-ALTER TABLE ibl_playoff_stats ENGINE=InnoDB;
--- ibl_playoff_results: dropped by migration 035, skip
-ALTER TABLE ibl_heat_career_avgs ENGINE=InnoDB;
-ALTER TABLE ibl_heat_career_totals ENGINE=InnoDB;
-ALTER TABLE ibl_heat_stats ENGINE=InnoDB;
-ALTER TABLE ibl_heat_win_loss ENGINE=InnoDB;
+-- ibl_season_career_avgs, ibl_playoff_career_avgs/totals/stats, ibl_heat_career_avgs/totals,
+-- ibl_heat_stats, ibl_heat_win_loss: now views (migration 028), skip
 ALTER TABLE ibl_olympics_career_avgs ENGINE=InnoDB;
 ALTER TABLE ibl_olympics_career_totals ENGINE=InnoDB;
 ALTER TABLE ibl_olympics_stats ENGINE=InnoDB;
@@ -40,9 +33,7 @@ ALTER TABLE ibl_olympics_stats ENGINE=InnoDB;
 -- Team Tables
 ALTER TABLE ibl_team_info ENGINE=InnoDB;
 -- ibl_team_history: dropped by migration 030, skip
-ALTER TABLE ibl_team_win_loss ENGINE=InnoDB;
-ALTER TABLE ibl_team_offense_stats ENGINE=InnoDB;
-ALTER TABLE ibl_team_defense_stats ENGINE=InnoDB;
+-- ibl_team_win_loss, ibl_team_offense/defense_stats: now views (migration 027/028), skip
 ALTER TABLE ibl_team_awards ENGINE=InnoDB;
 
 -- Standings and Rankings
@@ -212,17 +203,14 @@ ALTER TABLE ibl_draft_class ADD INDEX IF NOT EXISTS idx_pos (pos);
 -- ---------------------------------------------------------------------------
 -- Playoff Stats Indexes
 -- ---------------------------------------------------------------------------
-ALTER TABLE ibl_playoff_stats ADD INDEX IF NOT EXISTS idx_year (year);
-ALTER TABLE ibl_playoff_stats ADD INDEX IF NOT EXISTS idx_team (team);
-ALTER TABLE ibl_playoff_stats ADD INDEX IF NOT EXISTS idx_name (name);
+-- ibl_playoff_stats: now a view (migration 028), skip indexes
 
 -- ibl_playoff_results: dropped by migration 035, skip indexes
 
 -- ---------------------------------------------------------------------------
 -- Team Stats Indexes
 -- ---------------------------------------------------------------------------
-ALTER TABLE ibl_team_offense_stats ADD INDEX IF NOT EXISTS idx_teamID (teamID);
-ALTER TABLE ibl_team_defense_stats ADD INDEX IF NOT EXISTS idx_teamID (teamID);
+-- ibl_team_offense/defense_stats: now views (migration 028), skip indexes
 
 -- ---------------------------------------------------------------------------
 -- Awards Indexes

@@ -94,21 +94,7 @@ ALTER TABLE ibl_box_scores_teams
 -- PART 3: STATISTICS FOREIGN KEYS
 -- ============================================================================
 
--- Playoff Stats
-ALTER TABLE ibl_playoff_stats DROP FOREIGN KEY IF EXISTS fk_playoff_stats_player;
-ALTER TABLE ibl_playoff_stats
-  ADD CONSTRAINT fk_playoff_stats_player
-  FOREIGN KEY (name) REFERENCES ibl_plr(name)
-  ON DELETE CASCADE
-  ON UPDATE CASCADE;
-
--- Heat Stats
-ALTER TABLE ibl_heat_stats DROP FOREIGN KEY IF EXISTS fk_heat_stats_name;
-ALTER TABLE ibl_heat_stats
-  ADD CONSTRAINT fk_heat_stats_name
-  FOREIGN KEY (name) REFERENCES ibl_plr(name)
-  ON DELETE CASCADE
-  ON UPDATE CASCADE;
+-- ibl_playoff_stats, ibl_heat_stats: now views (migration 028), skip FKs
 
 -- Olympics Stats
 ALTER TABLE ibl_olympics_stats DROP FOREIGN KEY IF EXISTS fk_olympics_stats_name;
@@ -118,21 +104,7 @@ ALTER TABLE ibl_olympics_stats
   ON DELETE CASCADE
   ON UPDATE CASCADE;
 
--- Team Offense Stats
-ALTER TABLE ibl_team_offense_stats DROP FOREIGN KEY IF EXISTS fk_team_offense_team;
-ALTER TABLE ibl_team_offense_stats
-  ADD CONSTRAINT fk_team_offense_team
-  FOREIGN KEY (teamID) REFERENCES ibl_team_info(teamid)
-  ON DELETE CASCADE
-  ON UPDATE CASCADE;
-
--- Team Defense Stats
-ALTER TABLE ibl_team_defense_stats DROP FOREIGN KEY IF EXISTS fk_team_defense_team;
-ALTER TABLE ibl_team_defense_stats
-  ADD CONSTRAINT fk_team_defense_team
-  FOREIGN KEY (teamID) REFERENCES ibl_team_info(teamid)
-  ON DELETE CASCADE
-  ON UPDATE CASCADE;
+-- ibl_team_offense_stats, ibl_team_defense_stats: now views (migration 028), skip FKs
 
 -- ============================================================================
 -- PART 4: DRAFT SYSTEM FOREIGN KEYS

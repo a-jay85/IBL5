@@ -3,4 +3,4 @@
 -- Current column: varchar(40) — only fits MD5 (32 hex chars)
 
 ALTER TABLE `nuke_users` MODIFY `user_password` VARCHAR(255) NOT NULL DEFAULT '';
-ALTER TABLE `nuke_users_temp` MODIFY `user_password` VARCHAR(255) NOT NULL DEFAULT '';
+-- nuke_users_temp: dropped by migration 035, skip

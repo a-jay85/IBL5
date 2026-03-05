@@ -2,7 +2,7 @@
 -- Tracks whether a team has clinched the best league-wide record (W indicator)
 
 ALTER TABLE ibl_standings
-ADD COLUMN clinchedLeague TINYINT(1) DEFAULT NULL AFTER clinchedPlayoffs;
+ADD COLUMN IF NOT EXISTS clinchedLeague TINYINT(1) DEFAULT NULL AFTER clinchedPlayoffs;
 
 -- Update vw_team_standings view to include the new column
 CREATE OR REPLACE SQL SECURITY INVOKER VIEW vw_team_standings AS

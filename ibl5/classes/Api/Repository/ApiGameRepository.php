@@ -5,9 +5,20 @@ declare(strict_types=1);
 namespace Api\Repository;
 
 use Api\Pagination\Paginator;
+use League\LeagueContext;
 
 class ApiGameRepository extends \BaseMysqliRepository
 {
+    private string $boxScoresTable;
+    private string $boxScoresTeamsTable;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->boxScoresTable = $this->resolveTable('ibl_box_scores');
+        $this->boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
+    }
+
     /**
      * Get paginated list of games from the schedule view.
      *
@@ -76,7 +87,7 @@ class ApiGameRepository extends \BaseMysqliRepository
     public function getBoxscoreTeams(int $visitorTeamId, int $homeTeamId, string $date): array
     {
         return $this->fetchAll(
-            'SELECT * FROM ibl_box_scores_teams WHERE visitorTeamID = ? AND homeTeamID = ? AND Date = ? ORDER BY id ASC',
+            "SELECT * FROM {$this->boxScoresTeamsTable} WHERE visitorTeamID = ? AND homeTeamID = ? AND Date = ? ORDER BY id ASC",
             'iis',
             $visitorTeamId,
             $homeTeamId,
@@ -92,11 +103,11 @@ class ApiGameRepository extends \BaseMysqliRepository
     public function getBoxscorePlayers(int $visitorTid, int $homeTid, string $date): array
     {
         return $this->fetchAll(
-            'SELECT b.*, COALESCE(p.name, b.name) AS name, p.uuid AS player_uuid, p.tid AS player_tid
-             FROM ibl_box_scores b
+            "SELECT b.*, COALESCE(p.name, b.name) AS name, p.uuid AS player_uuid, p.tid AS player_tid
+             FROM {$this->boxScoresTable} b
              LEFT JOIN ibl_plr p ON b.pid = p.pid
              WHERE b.Date = ? AND b.visitorTID = ? AND b.homeTID = ?
-             ORDER BY b.id ASC',
+             ORDER BY b.id ASC",
             'sii',
             $date,
             $visitorTid,

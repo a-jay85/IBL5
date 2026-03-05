@@ -165,6 +165,17 @@ class LeagueContext
     }
 
     /**
+     * Get the file prefix for JSB engine files in the current league.
+     *
+     * IBL files are named IBL5.lge, IBL5.plr, etc.
+     * Olympics files are named Olympics.lge, Olympics.plr, etc.
+     */
+    public function getFilePrefix(): string
+    {
+        return $this->isOlympics() ? 'Olympics' : 'IBL5';
+    }
+
+    /**
      * Resolve table name based on current league context
      *
      * For IBL context, returns the input table name unchanged.
@@ -185,6 +196,14 @@ class LeagueContext
             'ibl_power' => 'ibl_olympics_power',
             'ibl_team_info' => 'ibl_olympics_team_info',
             'ibl_league_config' => 'ibl_olympics_league_config',
+            'ibl_plr' => 'ibl_olympics_plr',
+            'ibl_hist' => 'ibl_olympics_hist',
+            'ibl_jsb_history' => 'ibl_olympics_jsb_history',
+            'ibl_jsb_transactions' => 'ibl_olympics_jsb_transactions',
+            'ibl_rcb_alltime_records' => 'ibl_olympics_rcb_alltime_records',
+            'ibl_rcb_season_records' => 'ibl_olympics_rcb_season_records',
+            'ibl_saved_depth_charts' => 'ibl_olympics_saved_depth_charts',
+            'ibl_saved_depth_chart_players' => 'ibl_olympics_saved_depth_chart_players',
             default => $iblTableName,
         };
     }

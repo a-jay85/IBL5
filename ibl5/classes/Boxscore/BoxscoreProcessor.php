@@ -73,6 +73,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $gamesUpdated = 0;
         $gamesSkipped = 0;
         $linesProcessed = 0;
+        $league = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'ibl';
 
         while (!feof($scoFile)) {
             $line = fgets($scoFile, 2001);
@@ -81,7 +82,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             }
 
             $gameInfoLine = substr($line, 0, 58);
-            $boxscoreGameInfo = \Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase);
+            $boxscoreGameInfo = \Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase, $league);
 
             $upsertAction = $this->processGameUpsert($boxscoreGameInfo);
 

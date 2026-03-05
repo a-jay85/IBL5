@@ -20,7 +20,7 @@ interface JsbImportServiceInterface
      * @param \Season $season Current season object for year resolution
      * @return JsbImportResult Summary of import results
      */
-    public function processCurrentSeason(string $basePath, \Season $season): JsbImportResult;
+    public function processCurrentSeason(string $basePath, \Season $season, string $filePrefix = 'IBL5'): JsbImportResult;
 
     /**
      * Process a .car file and upsert records into ibl_hist.

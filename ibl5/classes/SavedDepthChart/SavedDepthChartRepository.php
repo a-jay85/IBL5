@@ -15,6 +15,18 @@ use SavedDepthChart\Contracts\SavedDepthChartRepositoryInterface;
  */
 class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDepthChartRepositoryInterface
 {
+    private string $headerTable;
+    private string $playersTable;
+    private string $plrTable;
+
+    public function __construct(\mysqli $db, ?\League\LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->headerTable = $this->resolveTable('ibl_saved_depth_charts');
+        $this->playersTable = $this->resolveTable('ibl_saved_depth_chart_players');
+        $this->plrTable = $this->resolveTable('ibl_plr');
+    }
+
     /**
      * @see SavedDepthChartRepositoryInterface::createSavedDepthChart()
      */
@@ -29,7 +41,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     ): int {
         if ($name !== null) {
             $this->execute(
-                "INSERT INTO ibl_saved_depth_charts
+                "INSERT INTO {$this->headerTable}
                     (tid, username, name, phase, season_year, sim_start_date, sim_number_start, is_active)
                  VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
                 "isssissi",
@@ -43,7 +55,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
             );
         } else {
             $this->execute(
-                "INSERT INTO ibl_saved_depth_charts
+                "INSERT INTO {$this->headerTable}
                     (tid, username, phase, season_year, sim_start_date, sim_number_start, is_active)
                  VALUES (?, ?, ?, ?, ?, ?, 1)",
                 "issisi",
@@ -67,7 +79,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     {
         foreach ($playerSnapshots as $snapshot) {
             $this->execute(
-                "INSERT INTO ibl_saved_depth_chart_players
+                "INSERT INTO {$this->playersTable}
                     (depth_chart_id, pid, player_name, ordinal,
                      dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth,
                      dc_active, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh)
@@ -99,7 +111,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     public function deactivateForTeam(int $tid, string $simEndDate, int $simNumberEnd): void
     {
         $this->execute(
-            "UPDATE ibl_saved_depth_charts
+            "UPDATE {$this->headerTable}
              SET is_active = 0, sim_end_date = ?, sim_number_end = ?
              WHERE tid = ? AND is_active = 1",
             "sii",
@@ -115,7 +127,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     public function deactivateOthersForTeam(int $tid, int $excludeId, string $simEndDate, int $simNumberEnd): void
     {
         $this->execute(
-            "UPDATE ibl_saved_depth_charts
+            "UPDATE {$this->headerTable}
              SET is_active = 0, sim_end_date = ?, sim_number_end = ?
              WHERE tid = ? AND is_active = 1 AND id != ?",
             "siii",
@@ -134,7 +146,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     {
         /** @var list<SavedDepthChartRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_saved_depth_charts WHERE tid = ? ORDER BY created_at DESC",
+            "SELECT * FROM {$this->headerTable} WHERE tid = ? ORDER BY created_at DESC",
             "i",
             $tid
         );
@@ -148,7 +160,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     {
         /** @var SavedDepthChartRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_saved_depth_charts WHERE id = ? AND tid = ? LIMIT 1",
+            "SELECT * FROM {$this->headerTable} WHERE id = ? AND tid = ? LIMIT 1",
             "ii",
             $id,
             $tid
@@ -163,7 +175,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     {
         /** @var list<SavedDepthChartPlayerRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_saved_depth_chart_players WHERE depth_chart_id = ? ORDER BY ordinal ASC",
+            "SELECT * FROM {$this->playersTable} WHERE depth_chart_id = ? ORDER BY ordinal ASC",
             "i",
             $depthChartId
         );
@@ -175,7 +187,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     public function updateName(int $id, int $tid, string $newName): bool
     {
         $affected = $this->execute(
-            "UPDATE ibl_saved_depth_charts SET name = ? WHERE id = ? AND tid = ?",
+            "UPDATE {$this->headerTable} SET name = ? WHERE id = ? AND tid = ?",
             "sii",
             $newName,
             $id,
@@ -191,7 +203,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     public function updateDepthChartPlayers(int $depthChartId, array $playerSnapshots): void
     {
         $this->execute(
-            "DELETE FROM ibl_saved_depth_chart_players WHERE depth_chart_id = ?",
+            "DELETE FROM {$this->playersTable} WHERE depth_chart_id = ?",
             "i",
             $depthChartId
         );
@@ -205,7 +217,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     public function extendActiveDepthCharts(string $newEndDate, int $newSimNumber): int
     {
         return $this->execute(
-            "UPDATE ibl_saved_depth_charts SET sim_end_date = ?, sim_number_end = ? WHERE is_active = 1",
+            "UPDATE {$this->headerTable} SET sim_end_date = ?, sim_number_end = ? WHERE is_active = 1",
             "si",
             $newEndDate,
             $newSimNumber
@@ -218,7 +230,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     public function reactivate(int $id, int $tid): bool
     {
         $affected = $this->execute(
-            "UPDATE ibl_saved_depth_charts SET is_active = 1 WHERE id = ? AND tid = ?",
+            "UPDATE {$this->headerTable} SET is_active = 1 WHERE id = ? AND tid = ?",
             "ii",
             $id,
             $tid
@@ -234,7 +246,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     {
         /** @var SavedDepthChartRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_saved_depth_charts WHERE tid = ? ORDER BY created_at DESC LIMIT 1",
+            "SELECT * FROM {$this->headerTable} WHERE tid = ? ORDER BY created_at DESC LIMIT 1",
             "i",
             $tid
         );
@@ -250,7 +262,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
         return $this->fetchAll(
             "SELECT pid, name, ordinal, dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth,
                     dc_active, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh
-             FROM ibl_plr
+             FROM {$this->plrTable}
              WHERE tid = ? AND retired = '0' AND ordinal <= ?
              ORDER BY ordinal ASC",
             "ii",
@@ -267,7 +279,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
     {
         /** @var SavedDepthChartRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_saved_depth_charts WHERE tid = ? AND is_active = 1 ORDER BY updated_at DESC LIMIT 1",
+            "SELECT * FROM {$this->headerTable} WHERE tid = ? AND is_active = 1 ORDER BY updated_at DESC LIMIT 1",
             "i",
             $tid
         );

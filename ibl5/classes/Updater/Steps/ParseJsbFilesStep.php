@@ -19,6 +19,7 @@ class ParseJsbFilesStep implements PipelineStepInterface
         private readonly JsbImportService $service,
         private readonly string $basePath,
         private readonly \Season $season,
+        private readonly string $filePrefix = 'IBL5',
     ) {
     }
 
@@ -30,7 +31,7 @@ class ParseJsbFilesStep implements PipelineStepInterface
     public function execute(): StepResult
     {
         ob_start();
-        $jsbResult = $this->service->processCurrentSeason($this->basePath, $this->season);
+        $jsbResult = $this->service->processCurrentSeason($this->basePath, $this->season, $this->filePrefix);
         $log = (string) ob_get_clean();
 
         return StepResult::success(

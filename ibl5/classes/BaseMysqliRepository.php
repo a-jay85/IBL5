@@ -87,12 +87,19 @@ abstract class BaseMysqliRepository
     protected \mysqli $db;
 
     /**
+     * Optional league context for multi-league table resolution.
+     * When set, resolveTable() maps IBL table names to their league-specific equivalents.
+     */
+    protected ?\League\LeagueContext $leagueContext;
+
+    /**
      * Constructor with connection validation
      *
      * @param \mysqli $db Active mysqli connection
+     * @param \League\LeagueContext|null $leagueContext Optional league context for table resolution
      * @throws \RuntimeException If connection is invalid or closed (error code 1002)
      */
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?\League\LeagueContext $leagueContext = null)
     {
         if ($db->connect_errno !== 0) {
             $this->logError('Connection error in constructor', $db->connect_error ?? 'Unknown error');
@@ -102,6 +109,20 @@ abstract class BaseMysqliRepository
             );
         }
         $this->db = $db;
+        $this->leagueContext = $leagueContext;
+    }
+
+    /**
+     * Resolve a table name through LeagueContext (if set), else return as-is.
+     *
+     * @param string $iblTableName The IBL table name (e.g., 'ibl_standings')
+     * @return string The resolved table name (e.g., 'ibl_olympics_standings' if Olympics)
+     */
+    protected function resolveTable(string $iblTableName): string
+    {
+        return $this->leagueContext !== null
+            ? $this->leagueContext->getTableName($iblTableName)
+            : $iblTableName;
     }
 
     /**

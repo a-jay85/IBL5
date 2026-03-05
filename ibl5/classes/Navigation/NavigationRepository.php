@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Navigation;
 
+use League\LeagueContext;
 use Navigation\Contracts\NavigationRepositoryInterface;
 
 /**
@@ -13,13 +14,23 @@ use Navigation\Contracts\NavigationRepositoryInterface;
  */
 class NavigationRepository extends \BaseMysqliRepository implements NavigationRepositoryInterface
 {
+    private string $teamInfoTable;
+    private string $standingsTable;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
+        $this->standingsTable = $this->resolveTable('ibl_standings');
+    }
+
     /** @see NavigationRepositoryInterface::resolveTeamId() */
     public function resolveTeamId(string $username): ?int
     {
         $row = $this->fetchOne(
             "SELECT ti.teamid
              FROM nuke_users nu
-             JOIN ibl_team_info ti ON ti.team_name = nu.user_ibl_team
+             JOIN {$this->teamInfoTable} ti ON ti.team_name = nu.user_ibl_team
              WHERE nu.username = ?
              LIMIT 1",
             's',
@@ -42,8 +53,8 @@ class NavigationRepository extends \BaseMysqliRepository implements NavigationRe
     {
         $rows = $this->fetchAll(
             "SELECT ti.teamid, ti.team_name, ti.team_city, s.division, s.conference
-             FROM ibl_team_info ti
-             JOIN ibl_standings s ON ti.team_name = s.team_name
+             FROM {$this->teamInfoTable} ti
+             JOIN {$this->standingsTable} s ON ti.team_name = s.team_name
              ORDER BY s.conference, s.division, ti.team_city",
             ''
         );

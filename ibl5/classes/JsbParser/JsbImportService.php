@@ -35,13 +35,13 @@ class JsbImportService implements JsbImportServiceInterface
     /**
      * @see JsbImportServiceInterface::processCurrentSeason()
      */
-    public function processCurrentSeason(string $basePath, \Season $season): JsbImportResult
+    public function processCurrentSeason(string $basePath, \Season $season, string $filePrefix = 'IBL5'): JsbImportResult
     {
         $result = new JsbImportResult();
         $seasonYear = $season->beginningYear;
 
         // Process .trn first (trade data helps with player ID resolution)
-        $trnPath = $basePath . '/IBL5.trn';
+        $trnPath = $basePath . '/' . $filePrefix . '.trn';
         if (file_exists($trnPath)) {
             $trnResult = $this->processTrnFile($trnPath, 'current-season');
             $result->merge($trnResult);
@@ -49,7 +49,7 @@ class JsbImportService implements JsbImportServiceInterface
         }
 
         // Process .car (uses trade data for mid-season splits)
-        $carPath = $basePath . '/IBL5.car';
+        $carPath = $basePath . '/' . $filePrefix . '.car';
         if (file_exists($carPath)) {
             $carResult = $this->processCarFile($carPath, $seasonYear);
             $result->merge($carResult);
@@ -57,7 +57,7 @@ class JsbImportService implements JsbImportServiceInterface
         }
 
         // Process .his
-        $hisPath = $basePath . '/IBL5.his';
+        $hisPath = $basePath . '/' . $filePrefix . '.his';
         if (file_exists($hisPath)) {
             $hisResult = $this->processHisFile($hisPath, 'current-season');
             $result->merge($hisResult);
@@ -65,7 +65,7 @@ class JsbImportService implements JsbImportServiceInterface
         }
 
         // Process .asw
-        $aswPath = $basePath . '/IBL5.asw';
+        $aswPath = $basePath . '/' . $filePrefix . '.asw';
         if (file_exists($aswPath)) {
             $aswResult = $this->processAswFile($aswPath, $seasonYear);
             $result->merge($aswResult);
@@ -73,7 +73,7 @@ class JsbImportService implements JsbImportServiceInterface
         }
 
         // Process .rcb (Record Book)
-        $rcbPath = $basePath . '/IBL5.rcb';
+        $rcbPath = $basePath . '/' . $filePrefix . '.rcb';
         if (file_exists($rcbPath)) {
             $rcbResult = $this->processRcbFile($rcbPath, $seasonYear, 'current-season');
             $result->merge($rcbResult);

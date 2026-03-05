@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SeasonLeaderboards;
 
+use League\LeagueContext;
 use SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface;
 
 /**
@@ -16,9 +17,12 @@ use SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface;
  */
 class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements SeasonLeaderboardsRepositoryInterface
 {
-    public function __construct(\mysqli $db)
+    private string $teamInfoTable;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
-        parent::__construct($db);
+        parent::__construct($db, $leagueContext);
+        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
     }
 
     /**
@@ -60,7 +64,7 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
         // NOTE: $sortBy is validated in getSortColumn() against a strict whitelist
         $query = "SELECT h.*, t.team_city, t.color1, t.color2
             FROM ibl_hist h
-            LEFT JOIN ibl_team_info t ON h.teamid = t.teamid
+            LEFT JOIN {$this->teamInfoTable} t ON h.teamid = t.teamid
             WHERE $whereClause ORDER BY $sortBy DESC"
             . ($limit > 0 ? " LIMIT $limit" : "");
 
@@ -82,7 +86,7 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
     {
         /** @var list<TeamRow> $rows */
         $rows = $this->fetchAll(
-            "SELECT teamid AS TeamID, team_name AS Team FROM ibl_team_info WHERE teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . " ORDER BY teamid ASC"
+            "SELECT teamid AS TeamID, team_name AS Team FROM {$this->teamInfoTable} WHERE teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . " ORDER BY teamid ASC"
         );
         return $rows;
     }

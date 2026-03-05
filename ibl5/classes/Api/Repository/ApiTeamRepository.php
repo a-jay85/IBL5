@@ -5,9 +5,20 @@ declare(strict_types=1);
 namespace Api\Repository;
 
 use Api\Pagination\Paginator;
+use League\LeagueContext;
 
 class ApiTeamRepository extends \BaseMysqliRepository
 {
+    private string $teamInfoTable;
+    private string $standingsTable;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
+        $this->standingsTable = $this->resolveTable('ibl_standings');
+    }
+
     /**
      * Get paginated list of teams.
      *
@@ -21,8 +32,8 @@ class ApiTeamRepository extends \BaseMysqliRepository
             "SELECT t.teamid, t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,
                     s.conference, s.division,
                     nu.discordID
-             FROM ibl_team_info t
-             LEFT JOIN ibl_standings s ON t.teamid = s.tid
+             FROM {$this->teamInfoTable} t
+             LEFT JOIN {$this->standingsTable} s ON t.teamid = s.tid
              LEFT JOIN nuke_users nu ON nu.user_ibl_team = t.team_name
              WHERE t.teamid BETWEEN 1 AND ?
              ORDER BY {$orderBy}
@@ -41,7 +52,7 @@ class ApiTeamRepository extends \BaseMysqliRepository
     {
         /** @var array{total: int}|null $row */
         $row = $this->fetchOne(
-            'SELECT COUNT(*) AS total FROM ibl_team_info WHERE teamid BETWEEN 1 AND ?',
+            "SELECT COUNT(*) AS total FROM {$this->teamInfoTable} WHERE teamid BETWEEN 1 AND ?",
             'i',
             \League::MAX_REAL_TEAMID
         );
@@ -71,8 +82,8 @@ class ApiTeamRepository extends \BaseMysqliRepository
                     s.awayWins AS away_wins,
                     s.awayLosses AS away_losses,
                     s.gamesUnplayed AS games_remaining
-             FROM ibl_team_info t
-             LEFT JOIN ibl_standings s ON t.teamid = s.tid
+             FROM {$this->teamInfoTable} t
+             LEFT JOIN {$this->standingsTable} s ON t.teamid = s.tid
              LEFT JOIN nuke_users nu ON nu.user_ibl_team = t.team_name
              WHERE t.uuid = ?",
             's',

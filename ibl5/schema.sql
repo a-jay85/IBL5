@@ -36,7 +36,7 @@ CREATE TABLE `auth_users` (
   `force_logout` mediumint(8) unsigned NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=790 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=795 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -78,7 +78,7 @@ CREATE TABLE `auth_users_audit_log` (
   KEY `event_at` (`event_at`),
   KEY `user_id_event_at` (`user_id`,`event_at`),
   KEY `user_id_event_type_event_at` (`user_id`,`event_type`,`event_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=101 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=204 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -99,7 +99,7 @@ CREATE TABLE `auth_users_confirmations` (
   UNIQUE KEY `selector` (`selector`),
   KEY `email_expires` (`email`,`expires`),
   KEY `user_id` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -158,7 +158,7 @@ CREATE TABLE `auth_users_resets` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `selector` (`selector`),
   KEY `user_expires` (`user`,`expires`)
-) ENGINE=InnoDB AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -227,6 +227,69 @@ CREATE TABLE `failed_jobs` (
   UNIQUE KEY `failed_jobs_uuid_unique` (`uuid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Temporary table structure for view `ibl_allstar_career_avgs`
+--
+
+DROP TABLE IF EXISTS `ibl_allstar_career_avgs`;
+/*!50001 DROP VIEW IF EXISTS `ibl_allstar_career_avgs`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `ibl_allstar_career_avgs` AS SELECT 
+ 1 AS `pid`,
+ 1 AS `name`,
+ 1 AS `games`,
+ 1 AS `minutes`,
+ 1 AS `fgm`,
+ 1 AS `fga`,
+ 1 AS `fgpct`,
+ 1 AS `ftm`,
+ 1 AS `fta`,
+ 1 AS `ftpct`,
+ 1 AS `tgm`,
+ 1 AS `tga`,
+ 1 AS `tpct`,
+ 1 AS `orb`,
+ 1 AS `reb`,
+ 1 AS `ast`,
+ 1 AS `stl`,
+ 1 AS `tvr`,
+ 1 AS `blk`,
+ 1 AS `pf`,
+ 1 AS `pts`,
+ 1 AS `retired`*/;
+SET character_set_client = @saved_cs_client;
+
+--
+-- Temporary table structure for view `ibl_allstar_career_totals`
+--
+
+DROP TABLE IF EXISTS `ibl_allstar_career_totals`;
+/*!50001 DROP VIEW IF EXISTS `ibl_allstar_career_totals`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `ibl_allstar_career_totals` AS SELECT 
+ 1 AS `pid`,
+ 1 AS `name`,
+ 1 AS `games`,
+ 1 AS `minutes`,
+ 1 AS `fgm`,
+ 1 AS `fga`,
+ 1 AS `ftm`,
+ 1 AS `fta`,
+ 1 AS `tgm`,
+ 1 AS `tga`,
+ 1 AS `orb`,
+ 1 AS `reb`,
+ 1 AS `ast`,
+ 1 AS `stl`,
+ 1 AS `tvr`,
+ 1 AS `blk`,
+ 1 AS `pf`,
+ 1 AS `pts`,
+ 1 AS `retired`*/;
+SET character_set_client = @saved_cs_client;
 
 --
 -- Table structure for table `ibl_api_keys`
@@ -372,7 +435,7 @@ CREATE TABLE `ibl_box_scores` (
   CONSTRAINT `fk_boxscore_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscore_visitor` FOREIGN KEY (`visitorTID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `chk_box_minutes` CHECK (`gameMIN` is null or `gameMIN` >= 0 and `gameMIN` <= 70)
-) ENGINE=InnoDB AUTO_INCREMENT=585922 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=588121 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -445,7 +508,7 @@ CREATE TABLE `ibl_box_scores_teams` (
   KEY `idx_date_visitor_home_gotd` (`Date`,`visitorTeamID`,`homeTeamID`,`gameOfThatDay`),
   CONSTRAINT `fk_boxscoreteam_home` FOREIGN KEY (`homeTeamID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscoreteam_visitor` FOREIGN KEY (`visitorTeamID`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=49902 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=50092 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -456,8 +519,8 @@ DROP TABLE IF EXISTS `ibl_demands`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ibl_demands` (
-  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (PK)',
-  `pid` int(11) NOT NULL DEFAULT 0 COMMENT 'Player ID (FK to ibl_plr.pid)',
+  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (PK, FK to ibl_plr.name)',
+  `pid` int(11) NOT NULL DEFAULT 0,
   `dem1` int(11) NOT NULL DEFAULT 0 COMMENT 'FA year 1 day 1 demand',
   `dem2` int(11) NOT NULL DEFAULT 0 COMMENT 'FA year 2 day 1 demand',
   `dem3` int(11) NOT NULL DEFAULT 0 COMMENT 'FA year 3 day 1 demand',
@@ -467,8 +530,7 @@ CREATE TABLE `ibl_demands` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`name`),
-  KEY `idx_pid` (`pid`),
-  CONSTRAINT `fk_demands_pid` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE
+  KEY `idx_pid` (`pid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -482,8 +544,8 @@ DROP TABLE IF EXISTS `ibl_draft`;
 CREATE TABLE `ibl_draft` (
   `draft_id` int(11) NOT NULL AUTO_INCREMENT,
   `year` smallint(5) unsigned NOT NULL DEFAULT 0 COMMENT 'Draft year',
-  `team` varchar(255) NOT NULL DEFAULT '' COMMENT 'Drafting team name',
-  `tid` int(11) NOT NULL DEFAULT 0 COMMENT 'Drafting team ID (FK to ibl_team_info.teamid)',
+  `team` varchar(255) NOT NULL DEFAULT '' COMMENT 'Drafting team name (FK to ibl_team_info)',
+  `tid` int(11) NOT NULL DEFAULT 0,
   `player` varchar(255) NOT NULL DEFAULT '' COMMENT 'Drafted player name',
   `round` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Draft round',
   `pick` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Pick number',
@@ -546,7 +608,7 @@ CREATE TABLE `ibl_draft_class` (
   PRIMARY KEY (`id`),
   KEY `idx_drafted` (`drafted`),
   KEY `idx_pos` (`pos`)
-) ENGINE=InnoDB AUTO_INCREMENT=66 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=67 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -558,10 +620,10 @@ DROP TABLE IF EXISTS `ibl_draft_picks`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ibl_draft_picks` (
   `pickid` int(11) NOT NULL AUTO_INCREMENT,
-  `ownerofpick` varchar(32) NOT NULL DEFAULT '' COMMENT 'Team currently owning pick',
-  `owner_tid` int(11) NOT NULL DEFAULT 0 COMMENT 'Team ID currently owning pick (FK to ibl_team_info.teamid)',
-  `teampick` varchar(32) NOT NULL DEFAULT '' COMMENT 'Original team the pick belongs to',
-  `teampick_tid` int(11) NOT NULL DEFAULT 0 COMMENT 'Original team ID for the pick (FK to ibl_team_info.teamid)',
+  `ownerofpick` varchar(32) NOT NULL DEFAULT '' COMMENT 'Team currently owning pick (FK to ibl_team_info)',
+  `owner_tid` int(11) NOT NULL DEFAULT 0,
+  `teampick` varchar(32) NOT NULL DEFAULT '' COMMENT 'Original team the pick belongs to (FK to ibl_team_info)',
+  `teampick_tid` int(11) NOT NULL DEFAULT 0,
   `year` smallint(5) unsigned NOT NULL DEFAULT 0 COMMENT 'Draft year',
   `round` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Draft round',
   `notes` varchar(280) DEFAULT NULL COMMENT 'Trade/transaction notes',
@@ -571,8 +633,9 @@ CREATE TABLE `ibl_draft_picks` (
   KEY `idx_ownerofpick` (`ownerofpick`),
   KEY `idx_year` (`year`),
   KEY `idx_year_round` (`year`,`round`),
-  KEY `idx_owner_tid_year` (`owner_tid`,`year`),
+  KEY `fk_draftpick_team` (`teampick`),
   KEY `fk_draftpick_teampick_tid` (`teampick_tid`),
+  KEY `idx_owner_tid_year` (`owner_tid`,`year`),
   CONSTRAINT `fk_draftpick_owner_tid` FOREIGN KEY (`owner_tid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_draftpick_teampick_tid` FOREIGN KEY (`teampick_tid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=1359 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -586,10 +649,10 @@ DROP TABLE IF EXISTS `ibl_fa_offers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ibl_fa_offers` (
-  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (kept for backward compat reads)',
-  `pid` int(11) NOT NULL DEFAULT 0 COMMENT 'Player ID (FK to ibl_plr.pid)',
-  `team` varchar(32) NOT NULL DEFAULT '' COMMENT 'Offering team name (kept for backward compat reads)',
-  `tid` int(11) NOT NULL DEFAULT 0 COMMENT 'Team ID (FK to ibl_team_info.teamid)',
+  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (FK to ibl_plr.name)',
+  `pid` int(11) NOT NULL DEFAULT 0,
+  `team` varchar(32) NOT NULL DEFAULT '' COMMENT 'Offering team name (FK to ibl_team_info)',
+  `tid` int(11) NOT NULL DEFAULT 0,
   `offer1` int(11) NOT NULL DEFAULT 0 COMMENT 'Salary offer year 1 (thousands)',
   `offer2` int(11) NOT NULL DEFAULT 0 COMMENT 'Salary offer year 2 (thousands)',
   `offer3` int(11) NOT NULL DEFAULT 0 COMMENT 'Salary offer year 3 (thousands)',
@@ -609,6 +672,7 @@ CREATE TABLE `ibl_fa_offers` (
   KEY `idx_name` (`name`),
   KEY `idx_team` (`team`),
   KEY `idx_offer_type` (`offer_type`),
+  KEY `fk_faoffer_pid` (`pid`),
   KEY `idx_tid_pid` (`tid`,`pid`),
   CONSTRAINT `fk_faoffer_pid` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_faoffer_tid` FOREIGN KEY (`tid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE
@@ -868,7 +932,7 @@ CREATE TABLE `ibl_hist` (
   KEY `idx_pid_year_team` (`pid`,`year`,`team`),
   CONSTRAINT `fk_hist_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_hist_team` FOREIGN KEY (`teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=19217 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=23816 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -889,7 +953,7 @@ CREATE TABLE `ibl_jsb_allstar_rosters` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_season_event_slot` (`season_year`,`event_type`,`roster_slot`),
   KEY `idx_pid` (`pid`)
-) ENGINE=InnoDB AUTO_INCREMENT=601 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=961 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -911,7 +975,7 @@ CREATE TABLE `ibl_jsb_allstar_scores` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_season_contest_round_slot` (`season_year`,`contest_type`,`round`,`participant_slot`),
   KEY `idx_pid` (`pid`)
-) ENGINE=InnoDB AUTO_INCREMENT=251 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=401 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -939,7 +1003,7 @@ CREATE TABLE `ibl_jsb_history` (
   KEY `idx_teamid` (`teamid`),
   KEY `idx_season` (`season_year`),
   KEY `idx_champion` (`won_championship`)
-) ENGINE=InnoDB AUTO_INCREMENT=4841 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7745 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -972,7 +1036,7 @@ CREATE TABLE `ibl_jsb_transactions` (
   KEY `idx_type` (`transaction_type`),
   KEY `idx_pid` (`pid`),
   KEY `idx_trade_group` (`trade_group_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2011 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3483 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1010,12 +1074,21 @@ DROP TABLE IF EXISTS `ibl_olympics_box_scores`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ibl_olympics_box_scores` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `Date` date NOT NULL COMMENT 'Game date',
   `name` varchar(16) DEFAULT '' COMMENT 'Player name',
   `pos` varchar(2) DEFAULT '' COMMENT 'Position played',
   `pid` int(11) DEFAULT NULL COMMENT 'Player ID (references ibl_plr)',
   `visitorTID` int(11) DEFAULT NULL COMMENT 'Visiting team ID',
   `homeTID` int(11) DEFAULT NULL COMMENT 'Home team ID',
+  `gameOfThatDay` int(11) DEFAULT NULL COMMENT 'Game number for that date',
+  `attendance` int(11) DEFAULT NULL COMMENT 'Game attendance',
+  `capacity` int(11) DEFAULT NULL COMMENT 'Arena capacity',
+  `visitorWins` int(11) DEFAULT NULL COMMENT 'Visitor team wins before game',
+  `visitorLosses` int(11) DEFAULT NULL COMMENT 'Visitor team losses before game',
+  `homeWins` int(11) DEFAULT NULL COMMENT 'Home team wins before game',
+  `homeLosses` int(11) DEFAULT NULL COMMENT 'Home team losses before game',
+  `teamID` int(11) DEFAULT NULL COMMENT 'Player team ID (visitor or home)',
   `gameMIN` tinyint(3) unsigned DEFAULT NULL COMMENT 'Minutes played',
   `game2GM` tinyint(3) unsigned DEFAULT NULL COMMENT 'Field goals made',
   `game2GA` tinyint(3) unsigned DEFAULT NULL COMMENT 'Field goals attempted',
@@ -1030,17 +1103,32 @@ CREATE TABLE `ibl_olympics_box_scores` (
   `gameTOV` tinyint(3) unsigned DEFAULT NULL COMMENT 'Turnovers',
   `gameBLK` tinyint(3) unsigned DEFAULT NULL COMMENT 'Blocks',
   `gamePF` tinyint(3) unsigned DEFAULT NULL COMMENT 'Personal fouls',
+  `game_type` tinyint(3) unsigned GENERATED ALWAYS AS (case when month(`Date`) = 6 then 2 when month(`Date`) = 10 then 3 when month(`Date`) = 0 then 0 else 1 end) STORED,
+  `season_year` smallint(5) unsigned GENERATED ALWAYS AS (case when year(`Date`) = 0 then 0 when month(`Date`) >= 10 then year(`Date`) + 1 else year(`Date`) end) STORED,
+  `calc_points` smallint(5) unsigned GENERATED ALWAYS AS (`game2GM` * 2 + `gameFTM` + `game3GM` * 3) STORED,
+  `calc_rebounds` tinyint(3) unsigned GENERATED ALWAYS AS (`gameORB` + `gameDRB`) STORED,
+  `calc_fg_made` tinyint(3) unsigned GENERATED ALWAYS AS (`game2GM` + `game3GM`) STORED,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `uuid` char(36) NOT NULL COMMENT 'Public API identifier',
+  PRIMARY KEY (`id`),
   UNIQUE KEY `uuid` (`uuid`),
-  UNIQUE KEY `idx_uuid` (`uuid`),
   KEY `idx_date` (`Date`),
   KEY `idx_pid` (`pid`),
   KEY `idx_visitor_tid` (`visitorTID`),
   KEY `idx_home_tid` (`homeTID`),
   KEY `idx_date_pid` (`Date`,`pid`),
   KEY `idx_date_home_visitor` (`Date`,`homeTID`,`visitorTID`),
+  KEY `idx_gt_points` (`game_type`,`calc_points`),
+  KEY `idx_gt_rebounds` (`game_type`,`calc_rebounds`),
+  KEY `idx_gt_fg_made` (`game_type`,`calc_fg_made`),
+  KEY `idx_gt_ast` (`game_type`,`gameAST`),
+  KEY `idx_gt_stl` (`game_type`,`gameSTL`),
+  KEY `idx_gt_blk` (`game_type`,`gameBLK`),
+  KEY `idx_gt_tov` (`game_type`,`gameTOV`),
+  KEY `idx_gt_ftm` (`game_type`,`gameFTM`),
+  KEY `idx_gt_3gm` (`game_type`,`game3GM`),
+  KEY `idx_team_id` (`teamID`),
   CONSTRAINT `fk_olympics_boxscore_home` FOREIGN KEY (`homeTID`) REFERENCES `ibl_olympics_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_olympics_boxscore_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_olympics_boxscore_visitor` FOREIGN KEY (`visitorTID`) REFERENCES `ibl_olympics_team_info` (`teamid`) ON UPDATE CASCADE,
@@ -1056,6 +1144,7 @@ DROP TABLE IF EXISTS `ibl_olympics_box_scores_teams`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ibl_olympics_box_scores_teams` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `Date` date NOT NULL COMMENT 'Game date',
   `name` varchar(16) DEFAULT '' COMMENT 'Arena/venue name',
   `gameOfThatDay` int(11) DEFAULT NULL COMMENT 'Game number for that date',
@@ -1091,11 +1180,25 @@ CREATE TABLE `ibl_olympics_box_scores_teams` (
   `gameTOV` int(11) DEFAULT NULL COMMENT 'Turnovers',
   `gameBLK` int(11) DEFAULT NULL COMMENT 'Blocks',
   `gamePF` int(11) DEFAULT NULL COMMENT 'Personal fouls',
+  `game_type` tinyint(3) unsigned GENERATED ALWAYS AS (case when month(`Date`) = 6 then 2 when month(`Date`) = 10 then 3 when month(`Date`) = 0 then 0 else 1 end) STORED,
+  `calc_points` smallint(5) unsigned GENERATED ALWAYS AS (`game2GM` * 2 + `gameFTM` + `game3GM` * 3) STORED,
+  `calc_rebounds` smallint(5) unsigned GENERATED ALWAYS AS (`gameORB` + `gameDRB`) STORED,
+  `calc_fg_made` smallint(5) unsigned GENERATED ALWAYS AS (`game2GM` + `game3GM`) STORED,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
   KEY `idx_date` (`Date`),
   KEY `idx_visitor_team` (`visitorTeamID`),
   KEY `idx_home_team` (`homeTeamID`),
+  KEY `idx_gt_points` (`game_type`,`calc_points`),
+  KEY `idx_gt_rebounds` (`game_type`,`calc_rebounds`),
+  KEY `idx_gt_fg_made` (`game_type`,`calc_fg_made`),
+  KEY `idx_gt_ast` (`game_type`,`gameAST`),
+  KEY `idx_gt_stl` (`game_type`,`gameSTL`),
+  KEY `idx_gt_blk` (`game_type`,`gameBLK`),
+  KEY `idx_gt_tov` (`game_type`,`gameTOV`),
+  KEY `idx_gt_ftm` (`game_type`,`gameFTM`),
+  KEY `idx_gt_3gm` (`game_type`,`game3GM`),
   CONSTRAINT `fk_olympics_boxscoreteam_home` FOREIGN KEY (`homeTeamID`) REFERENCES `ibl_olympics_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_olympics_boxscoreteam_visitor` FOREIGN KEY (`visitorTeamID`) REFERENCES `ibl_olympics_team_info` (`teamid`) ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Team-level statistics for Olympics games';
@@ -1167,6 +1270,33 @@ CREATE TABLE `ibl_olympics_career_totals` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `ibl_olympics_league_config`
+--
+
+DROP TABLE IF EXISTS `ibl_olympics_league_config`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `ibl_olympics_league_config` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `season_ending_year` smallint(5) unsigned NOT NULL COMMENT 'Season ending year',
+  `team_slot` tinyint(3) unsigned NOT NULL COMMENT 'Team position in conference bracket',
+  `team_name` varchar(32) NOT NULL COMMENT 'Team name (FK to ibl_olympics_team_info)',
+  `conference` varchar(16) NOT NULL COMMENT 'Conference/group name',
+  `division` varchar(16) NOT NULL COMMENT 'Division/pool name',
+  `playoff_qualifiers_per_conf` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `playoff_round1_format` varchar(8) NOT NULL DEFAULT '',
+  `playoff_round2_format` varchar(8) NOT NULL DEFAULT '',
+  `playoff_round3_format` varchar(8) NOT NULL DEFAULT '',
+  `playoff_round4_format` varchar(8) NOT NULL DEFAULT '',
+  `team_count` tinyint(3) unsigned NOT NULL COMMENT 'Total teams in tournament',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_season_team` (`season_ending_year`,`team_slot`),
+  KEY `idx_season_year` (`season_ending_year`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `ibl_olympics_power`
 --
 
@@ -1174,29 +1304,19 @@ DROP TABLE IF EXISTS `ibl_olympics_power`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `ibl_olympics_power` (
-  `TeamID` smallint(6) NOT NULL DEFAULT 0 COMMENT 'Team ID (FK to ibl_olympics_team_info)',
-  `Team` varchar(20) NOT NULL DEFAULT '' COMMENT 'Team name (PK)',
-  `Division` varchar(20) NOT NULL DEFAULT '' COMMENT 'Division/group name',
-  `Conference` varchar(20) NOT NULL DEFAULT '' COMMENT 'Conference name',
+  `TeamID` int(11) NOT NULL DEFAULT 0 COMMENT 'Team ID (PK, FK to ibl_olympics_team_info)',
   `ranking` decimal(6,1) NOT NULL DEFAULT 0.0 COMMENT 'Power ranking score (0.0-100.0)',
-  `win` smallint(6) NOT NULL DEFAULT 0 COMMENT 'Overall wins',
-  `loss` smallint(6) NOT NULL DEFAULT 0 COMMENT 'Overall losses',
-  `gb` decimal(6,1) NOT NULL DEFAULT 0.0 COMMENT 'Games behind leader',
-  `conf_win` int(11) NOT NULL COMMENT 'Conference wins',
-  `conf_loss` int(11) NOT NULL COMMENT 'Conference losses',
-  `div_win` int(11) NOT NULL COMMENT 'Division wins',
-  `div_loss` int(11) NOT NULL COMMENT 'Division losses',
-  `home_win` int(11) NOT NULL COMMENT 'Home wins',
-  `home_loss` int(11) NOT NULL COMMENT 'Home losses',
-  `road_win` int(11) NOT NULL COMMENT 'Road wins',
-  `road_loss` int(11) NOT NULL COMMENT 'Road losses',
   `last_win` int(11) NOT NULL COMMENT 'Last 10 games wins',
   `last_loss` int(11) NOT NULL COMMENT 'Last 10 games losses',
   `streak_type` varchar(1) NOT NULL DEFAULT '' COMMENT 'W=winning, L=losing',
   `streak` int(11) NOT NULL COMMENT 'Current streak length',
+  `sos` decimal(4,3) NOT NULL DEFAULT 0.000 COMMENT 'Strength of schedule',
+  `remaining_sos` decimal(4,3) NOT NULL DEFAULT 0.000 COMMENT 'Remaining strength of schedule',
+  `sos_rank` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'SOS league rank',
+  `remaining_sos_rank` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Remaining SOS league rank',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`Team`),
+  PRIMARY KEY (`TeamID`),
   CONSTRAINT `ibl_olympics_power_chk_1` CHECK (`ranking` is null or `ranking` >= 0.0 and `ranking` <= 100.0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1212,9 +1332,9 @@ CREATE TABLE `ibl_olympics_schedule` (
   `Year` smallint(5) unsigned NOT NULL COMMENT 'Tournament year',
   `BoxID` int(11) NOT NULL DEFAULT 0 COMMENT 'Box score identifier',
   `Date` date NOT NULL COMMENT 'Game date',
-  `Visitor` smallint(5) unsigned NOT NULL COMMENT 'Visiting team ID',
+  `Visitor` int(11) NOT NULL COMMENT 'Visiting team ID',
   `VScore` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Visitor score',
-  `Home` smallint(5) unsigned NOT NULL COMMENT 'Home team ID',
+  `Home` int(11) NOT NULL COMMENT 'Home team ID',
   `HScore` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Home score',
   `round` varchar(32) DEFAULT NULL COMMENT 'Tournament round (Group A, Quarterfinal, Semifinal, Gold Medal, Bronze Medal)',
   `SchedID` int(11) NOT NULL AUTO_INCREMENT,
@@ -1223,7 +1343,6 @@ CREATE TABLE `ibl_olympics_schedule` (
   `uuid` char(36) NOT NULL COMMENT 'Public API identifier',
   PRIMARY KEY (`SchedID`),
   UNIQUE KEY `uuid` (`uuid`),
-  UNIQUE KEY `idx_uuid` (`uuid`),
   KEY `BoxID` (`BoxID`),
   KEY `idx_year` (`Year`),
   KEY `idx_date` (`Date`),
@@ -1231,9 +1350,71 @@ CREATE TABLE `ibl_olympics_schedule` (
   KEY `idx_home` (`Home`),
   KEY `idx_round` (`round`),
   KEY `idx_year_date` (`Year`,`Date`),
+  CONSTRAINT `fk_olympics_schedule_home` FOREIGN KEY (`Home`) REFERENCES `ibl_olympics_team_info` (`teamid`) ON UPDATE CASCADE,
+  CONSTRAINT `fk_olympics_schedule_visitor` FOREIGN KEY (`Visitor`) REFERENCES `ibl_olympics_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `chk_olympics_schedule_hscore` CHECK (`HScore` >= 0 and `HScore` <= 200),
   CONSTRAINT `chk_olympics_schedule_vscore` CHECK (`VScore` >= 0 and `VScore` <= 200)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Olympics game schedule with tournament round tracking';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `ibl_olympics_saved_depth_charts`
+--
+
+DROP TABLE IF EXISTS `ibl_olympics_saved_depth_charts`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `ibl_olympics_saved_depth_charts` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `tid` int(11) NOT NULL COMMENT 'Team ID (FK to ibl_olympics_team_info)',
+  `username` varchar(25) NOT NULL COMMENT 'GM username who saved',
+  `name` varchar(100) DEFAULT NULL COMMENT 'User-assigned label',
+  `phase` varchar(30) NOT NULL COMMENT 'Season phase at save time',
+  `season_year` smallint(5) unsigned NOT NULL COMMENT 'Season ending year',
+  `sim_start_date` date NOT NULL COMMENT 'Next sim start date when saved',
+  `sim_end_date` date DEFAULT NULL COMMENT 'Extended as sims run',
+  `sim_number_start` int(10) unsigned NOT NULL COMMENT 'Sim number when chart was saved',
+  `sim_number_end` int(10) unsigned DEFAULT NULL COMMENT 'Latest sim number chart was active',
+  `is_active` tinyint(3) unsigned NOT NULL DEFAULT 1 COMMENT '1=currently active depth chart',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_tid_active` (`tid`,`is_active`),
+  KEY `idx_tid_created` (`tid`,`created_at` DESC),
+  KEY `idx_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `ibl_olympics_saved_depth_chart_players`
+--
+
+DROP TABLE IF EXISTS `ibl_olympics_saved_depth_chart_players`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `ibl_olympics_saved_depth_chart_players` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `depth_chart_id` int(10) unsigned NOT NULL COMMENT 'FK to ibl_olympics_saved_depth_charts.id',
+  `pid` int(11) NOT NULL COMMENT 'Player ID at save time',
+  `player_name` varchar(64) NOT NULL COMMENT 'Snapshot for historical display',
+  `ordinal` int(11) NOT NULL DEFAULT 0 COMMENT 'Roster sort order at save time',
+  `dc_PGDepth` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Point guard depth setting',
+  `dc_SGDepth` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Shooting guard depth setting',
+  `dc_SFDepth` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Small forward depth setting',
+  `dc_PFDepth` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Power forward depth setting',
+  `dc_CDepth` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Center depth setting',
+  `dc_active` tinyint(3) unsigned NOT NULL DEFAULT 1 COMMENT 'Active flag at save time',
+  `dc_minutes` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Minutes setting at save time',
+  `dc_of` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Offensive focus at save time',
+  `dc_df` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Defensive focus at save time',
+  `dc_oi` tinyint(4) NOT NULL DEFAULT 0 COMMENT 'Offensive importance at save time',
+  `dc_di` tinyint(4) NOT NULL DEFAULT 0 COMMENT 'Defensive importance at save time',
+  `dc_bh` tinyint(4) NOT NULL DEFAULT 0 COMMENT 'Ball handling at save time',
+  PRIMARY KEY (`id`),
+  KEY `idx_depth_chart_id` (`depth_chart_id`),
+  KEY `idx_pid` (`pid`),
+  CONSTRAINT `fk_olympics_saved_dc_header` FOREIGN KEY (`depth_chart_id`) REFERENCES `ibl_olympics_saved_depth_charts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1248,7 +1429,9 @@ CREATE TABLE `ibl_olympics_standings` (
   `team_name` varchar(16) NOT NULL DEFAULT '' COMMENT 'Team name (denormalized)',
   `pct` float(4,3) unsigned DEFAULT NULL COMMENT 'Win percentage',
   `leagueRecord` varchar(5) DEFAULT '' COMMENT 'Overall W-L record',
-  `conference` enum('Eastern','Western','') DEFAULT '' COMMENT 'Conference (if used)',
+  `wins` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Total wins',
+  `losses` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Total losses',
+  `conference` varchar(32) DEFAULT '' COMMENT 'Conference affiliation or Olympics group name',
   `confRecord` varchar(5) NOT NULL DEFAULT '' COMMENT 'Conference record',
   `confGB` decimal(3,1) DEFAULT NULL COMMENT 'Conference games back',
   `division` varchar(16) DEFAULT '' COMMENT 'Division (if used)',
@@ -1270,6 +1453,7 @@ CREATE TABLE `ibl_olympics_standings` (
   `clinchedConference` tinyint(1) DEFAULT NULL COMMENT 'Clinched conference flag',
   `clinchedDivision` tinyint(1) DEFAULT NULL COMMENT 'Clinched division flag',
   `clinchedPlayoffs` tinyint(1) DEFAULT NULL COMMENT 'Clinched playoffs flag',
+  `clinchedLeague` tinyint(1) DEFAULT NULL COMMENT '1=clinched league best record',
   `group_name` varchar(32) DEFAULT NULL COMMENT 'Olympics group (A, B, C, etc.)',
   `medal` enum('gold','silver','bronze') DEFAULT NULL COMMENT 'Final tournament medal',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -1281,7 +1465,14 @@ CREATE TABLE `ibl_olympics_standings` (
   KEY `idx_group` (`group_name`),
   KEY `idx_medal` (`medal`),
   CONSTRAINT `fk_olympics_standings_team` FOREIGN KEY (`tid`) REFERENCES `ibl_olympics_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `chk_olympics_standings_pct` CHECK (`pct` is null or `pct` >= 0.000 and `pct` <= 1.000)
+  CONSTRAINT `chk_olympics_standings_pct` CHECK (`pct` is null or `pct` >= 0.000 and `pct` <= 1.000),
+  CONSTRAINT `chk_olympics_standings_games_unplayed` CHECK (`gamesUnplayed` is null or `gamesUnplayed` >= 0),
+  CONSTRAINT `chk_olympics_standings_conf_wins` CHECK (`confWins` is null or `confWins` >= 0),
+  CONSTRAINT `chk_olympics_standings_conf_losses` CHECK (`confLosses` is null or `confLosses` >= 0),
+  CONSTRAINT `chk_olympics_standings_home_wins` CHECK (`homeWins` is null or `homeWins` >= 0),
+  CONSTRAINT `chk_olympics_standings_home_losses` CHECK (`homeLosses` is null or `homeLosses` >= 0),
+  CONSTRAINT `chk_olympics_standings_away_wins` CHECK (`awayWins` is null or `awayWins` >= 0),
+  CONSTRAINT `chk_olympics_standings_away_losses` CHECK (`awayLosses` is null or `awayLosses` >= 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Olympics tournament standings and medal tracking';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1296,8 +1487,8 @@ CREATE TABLE `ibl_olympics_stats` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `year` int(11) NOT NULL DEFAULT 0 COMMENT 'Olympic tournament year',
   `pos` char(2) NOT NULL DEFAULT '' COMMENT 'Player position',
-  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name',
-  `pid` int(11) NOT NULL DEFAULT 0 COMMENT 'Player ID (FK to ibl_plr.pid)',
+  `name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Player name (FK to ibl_plr)',
+  `pid` int(11) NOT NULL DEFAULT 0,
   `team` varchar(32) NOT NULL DEFAULT '' COMMENT 'National team represented',
   `games` int(11) NOT NULL DEFAULT 0 COMMENT 'Games played',
   `minutes` int(11) NOT NULL DEFAULT 0 COMMENT 'Total minutes played',
@@ -1314,8 +1505,13 @@ CREATE TABLE `ibl_olympics_stats` (
   `tvr` int(11) NOT NULL DEFAULT 0 COMMENT 'Turnovers',
   `blk` int(11) NOT NULL DEFAULT 0 COMMENT 'Blocks',
   `pf` int(11) NOT NULL DEFAULT 0 COMMENT 'Personal fouls',
+  `pts` int(11) GENERATED ALWAYS AS (`fgm` * 2 + `ftm` + `tgm`) STORED COMMENT 'Calculated total points',
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
+  KEY `fk_olympics_stats_name` (`name`),
   KEY `idx_pid` (`pid`),
+  KEY `idx_pid_year` (`pid`,`year`),
+  KEY `idx_year` (`year`),
   CONSTRAINT `fk_olympics_stats_pid` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=97 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1334,25 +1530,20 @@ CREATE TABLE `ibl_olympics_team_info` (
   `color1` varchar(6) NOT NULL DEFAULT '' COMMENT 'Primary team color (hex)',
   `color2` varchar(6) NOT NULL DEFAULT '' COMMENT 'Secondary team color (hex)',
   `arena` varchar(255) NOT NULL DEFAULT '' COMMENT 'Home arena/venue',
+  `capacity` int(11) NOT NULL DEFAULT 0 COMMENT 'Arena capacity',
   `owner_name` varchar(32) NOT NULL DEFAULT '' COMMENT 'Team owner username',
   `owner_email` varchar(48) NOT NULL DEFAULT '' COMMENT 'Owner email address',
   `discordID` bigint(20) unsigned DEFAULT NULL COMMENT 'Discord user ID',
-  `skype` varchar(16) NOT NULL DEFAULT '' COMMENT 'Skype username (legacy)',
-  `aim` varchar(48) NOT NULL DEFAULT '' COMMENT 'AIM username (legacy)',
-  `msn` varchar(48) NOT NULL DEFAULT '' COMMENT 'MSN username (legacy)',
-  `formerly_known_as` varchar(255) DEFAULT NULL COMMENT 'Previous team names',
   `Contract_Wins` int(11) NOT NULL DEFAULT 0 COMMENT 'Contract performance tracking',
   `Contract_Losses` int(11) NOT NULL DEFAULT 0 COMMENT 'Contract performance tracking',
   `Contract_AvgW` int(11) NOT NULL DEFAULT 0 COMMENT 'Average wins per contract',
   `Contract_AvgL` int(11) NOT NULL DEFAULT 0 COMMENT 'Average losses per contract',
-  `Contract_Coach` decimal(3,2) NOT NULL DEFAULT 0.00 COMMENT 'Coach rating',
   `chart` char(2) NOT NULL DEFAULT '' COMMENT 'Depth chart identifier',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `uuid` char(36) DEFAULT uuid(),
+  `uuid` char(36) NOT NULL DEFAULT uuid() COMMENT 'Public API identifier',
   PRIMARY KEY (`teamid`),
   UNIQUE KEY `uuid` (`uuid`),
-  UNIQUE KEY `idx_uuid` (`uuid`),
   KEY `team_name` (`team_name`),
   KEY `idx_owner_email` (`owner_email`),
   KEY `idx_discordID` (`discordID`)
@@ -1657,7 +1848,6 @@ CREATE TABLE `ibl_plr` (
   KEY `idx_tid` (`tid`),
   KEY `idx_active` (`active`),
   KEY `idx_retired` (`retired`),
-  KEY `idx_retired_ordinal` (`retired`,`ordinal`),
   KEY `idx_tid_active` (`tid`,`active`),
   KEY `idx_pos` (`pos`),
   KEY `idx_draftyear` (`draftyear`),
@@ -1720,6 +1910,98 @@ CREATE TABLE `ibl_power` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `ibl_rcb_alltime_records`
+--
+
+DROP TABLE IF EXISTS `ibl_rcb_alltime_records`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `ibl_rcb_alltime_records` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `scope` enum('league','team') NOT NULL,
+  `team_id` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT '0 for league scope; JSB team ID 1-28 for team scope',
+  `record_type` enum('single_season','career') NOT NULL,
+  `stat_category` enum('ppg','pts','rpg','trb','apg','ast','spg','stl','bpg','blk','fg_pct','ft_pct','three_pct') NOT NULL,
+  `ranking` tinyint(3) unsigned NOT NULL COMMENT 'Ranking position 1-50',
+  `player_name` varchar(33) NOT NULL COMMENT 'Player name from .rcb file (right-justified, trimmed)',
+  `car_block_id` smallint(5) unsigned DEFAULT NULL COMMENT 'Block ID from .car file for player cross-reference',
+  `pid` int(11) DEFAULT NULL COMMENT 'Resolved FK to ibl_plr.pid',
+  `stat_value` decimal(10,4) NOT NULL COMMENT 'Decoded value: per-game avg or percentage',
+  `stat_raw` int(11) NOT NULL COMMENT 'Raw encoded value from .rcb file',
+  `team_of_record` tinyint(3) unsigned DEFAULT NULL COMMENT 'JSB team ID when record was set',
+  `season_year` smallint(5) unsigned DEFAULT NULL COMMENT 'Season year (single_season records only)',
+  `career_total` int(11) DEFAULT NULL COMMENT 'Career counting total (career records only)',
+  `source_file` varchar(128) DEFAULT NULL COMMENT 'Source file label for auditing',
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_record` (`scope`,`team_id`,`record_type`,`stat_category`,`ranking`),
+  KEY `idx_pid` (`pid`),
+  KEY `idx_team` (`team_id`),
+  KEY `idx_stat_type` (`stat_category`,`record_type`)
+) ENGINE=InnoDB AUTO_INCREMENT=10236 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `ibl_rcb_season_records`
+--
+
+DROP TABLE IF EXISTS `ibl_rcb_season_records`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `ibl_rcb_season_records` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `season_year` smallint(5) unsigned NOT NULL COMMENT 'IBL season year this data belongs to',
+  `scope` enum('league','team') NOT NULL,
+  `team_id` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT '0 for league scope; JSB team ID 1-28 for team scope',
+  `context` enum('home','away') NOT NULL,
+  `stat_category` enum('pts','reb','ast','stl','blk','two_gm','three_gm','ftm') NOT NULL,
+  `ranking` tinyint(3) unsigned NOT NULL COMMENT 'Ranking position 1-10',
+  `player_name` varchar(33) NOT NULL COMMENT 'Player name from .rcb file',
+  `player_position` varchar(2) DEFAULT NULL COMMENT 'Position code (PG, SG, SF, PF, C)',
+  `car_block_id` smallint(5) unsigned DEFAULT NULL COMMENT 'Block ID from .car file',
+  `pid` int(11) DEFAULT NULL COMMENT 'Resolved FK to ibl_plr.pid',
+  `stat_value` smallint(5) unsigned NOT NULL COMMENT 'Single-game stat count',
+  `record_season_year` smallint(5) unsigned NOT NULL COMMENT 'Season year when the record performance occurred',
+  `source_file` varchar(128) DEFAULT NULL COMMENT 'Source file label for auditing',
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_record` (`season_year`,`scope`,`team_id`,`context`,`stat_category`,`ranking`),
+  KEY `idx_pid` (`pid`),
+  KEY `idx_season` (`season_year`)
+) ENGINE=InnoDB AUTO_INCREMENT=23201 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Temporary table structure for view `ibl_rookie_career_totals`
+--
+
+DROP TABLE IF EXISTS `ibl_rookie_career_totals`;
+/*!50001 DROP VIEW IF EXISTS `ibl_rookie_career_totals`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `ibl_rookie_career_totals` AS SELECT 
+ 1 AS `pid`,
+ 1 AS `name`,
+ 1 AS `games`,
+ 1 AS `minutes`,
+ 1 AS `fgm`,
+ 1 AS `fga`,
+ 1 AS `ftm`,
+ 1 AS `fta`,
+ 1 AS `tgm`,
+ 1 AS `tga`,
+ 1 AS `orb`,
+ 1 AS `reb`,
+ 1 AS `ast`,
+ 1 AS `stl`,
+ 1 AS `tvr`,
+ 1 AS `blk`,
+ 1 AS `pf`,
+ 1 AS `pts`,
+ 1 AS `retired`*/;
+SET character_set_client = @saved_cs_client;
+
+--
 -- Table structure for table `ibl_saved_depth_chart_players`
 --
 
@@ -1748,7 +2030,7 @@ CREATE TABLE `ibl_saved_depth_chart_players` (
   KEY `idx_depth_chart_id` (`depth_chart_id`),
   KEY `idx_pid` (`pid`),
   CONSTRAINT `fk_saved_dc_header` FOREIGN KEY (`depth_chart_id`) REFERENCES `ibl_saved_depth_charts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=718 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=867 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1776,7 +2058,7 @@ CREATE TABLE `ibl_saved_depth_charts` (
   KEY `idx_tid_active` (`tid`,`is_active`),
   KEY `idx_tid_created` (`tid`,`created_at` DESC),
   KEY `idx_active` (`is_active`)
-) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1906,8 +2188,38 @@ CREATE TABLE `ibl_sim_dates` (
   `Start Date` date DEFAULT NULL COMMENT 'First date in sim range',
   `End Date` date DEFAULT NULL COMMENT 'Last date in sim range',
   PRIMARY KEY (`Sim`)
-) ENGINE=InnoDB AUTO_INCREMENT=690 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=692 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Temporary table structure for view `ibl_sophomore_career_totals`
+--
+
+DROP TABLE IF EXISTS `ibl_sophomore_career_totals`;
+/*!50001 DROP VIEW IF EXISTS `ibl_sophomore_career_totals`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+/*!50001 CREATE VIEW `ibl_sophomore_career_totals` AS SELECT 
+ 1 AS `pid`,
+ 1 AS `name`,
+ 1 AS `games`,
+ 1 AS `minutes`,
+ 1 AS `fgm`,
+ 1 AS `fga`,
+ 1 AS `ftm`,
+ 1 AS `fta`,
+ 1 AS `tgm`,
+ 1 AS `tga`,
+ 1 AS `orb`,
+ 1 AS `reb`,
+ 1 AS `ast`,
+ 1 AS `stl`,
+ 1 AS `tvr`,
+ 1 AS `blk`,
+ 1 AS `pf`,
+ 1 AS `pts`,
+ 1 AS `retired`*/;
+SET character_set_client = @saved_cs_client;
 
 --
 -- Table structure for table `ibl_standings`
@@ -1945,7 +2257,7 @@ CREATE TABLE `ibl_standings` (
   `clinchedConference` tinyint(1) DEFAULT NULL COMMENT '1=clinched conference seed',
   `clinchedDivision` tinyint(1) DEFAULT NULL COMMENT '1=clinched division title',
   `clinchedPlayoffs` tinyint(1) DEFAULT NULL COMMENT '1=clinched playoff berth',
-  `clinchedLeague` tinyint(1) DEFAULT NULL COMMENT '1=clinched best league record',
+  `clinchedLeague` tinyint(1) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`tid`),
@@ -2327,7 +2639,7 @@ CREATE TABLE `migrations` (
   `migration` varchar(255) NOT NULL,
   `batch` int(11) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2829,7 +3141,7 @@ CREATE TABLE `nuke_referer` (
   `rid` int(11) NOT NULL AUTO_INCREMENT,
   `url` varchar(100) NOT NULL DEFAULT '',
   PRIMARY KEY (`rid`)
-) ENGINE=MyISAM AUTO_INCREMENT=40467 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=40505 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -3498,6 +3810,7 @@ SET character_set_client = utf8;
  1 AS `clinched_conference`,
  1 AS `clinched_division`,
  1 AS `clinched_playoffs`,
+ 1 AS `clinched_league`,
  1 AS `conference_magic_number`,
  1 AS `division_magic_number`,
  1 AS `created_at`,
@@ -3524,6 +3837,42 @@ SET character_set_client = @saved_cs_client;
 --
 -- Dumping routines for database 'iblhoops_ibl5'
 --
+
+--
+-- Final view structure for view `ibl_allstar_career_avgs`
+--
+
+/*!50001 DROP VIEW IF EXISTS `ibl_allstar_career_avgs`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY DEFINER */
+/*!50001 VIEW `ibl_allstar_career_avgs` AS select `bs`.`pid` AS `pid`,`p`.`name` AS `name`,cast(count(0) as signed) AS `games`,round(avg(`bs`.`gameMIN`),2) AS `minutes`,round(avg(`bs`.`calc_fg_made`),2) AS `fgm`,round(avg(`bs`.`game2GA` + `bs`.`game3GA`),2) AS `fga`,case when sum(`bs`.`game2GA` + `bs`.`game3GA`) > 0 then round(sum(`bs`.`calc_fg_made`) / sum(`bs`.`game2GA` + `bs`.`game3GA`),3) else 0.000 end AS `fgpct`,round(avg(`bs`.`gameFTM`),2) AS `ftm`,round(avg(`bs`.`gameFTA`),2) AS `fta`,case when sum(`bs`.`gameFTA`) > 0 then round(sum(`bs`.`gameFTM`) / sum(`bs`.`gameFTA`),3) else 0.000 end AS `ftpct`,round(avg(`bs`.`game3GM`),2) AS `tgm`,round(avg(`bs`.`game3GA`),2) AS `tga`,case when sum(`bs`.`game3GA`) > 0 then round(sum(`bs`.`game3GM`) / sum(`bs`.`game3GA`),3) else 0.000 end AS `tpct`,round(avg(`bs`.`gameORB`),2) AS `orb`,round(avg(`bs`.`calc_rebounds`),2) AS `reb`,round(avg(`bs`.`gameAST`),2) AS `ast`,round(avg(`bs`.`gameSTL`),2) AS `stl`,round(avg(`bs`.`gameTOV`),2) AS `tvr`,round(avg(`bs`.`gameBLK`),2) AS `blk`,round(avg(`bs`.`gamePF`),2) AS `pf`,round(avg(`bs`.`calc_points`),2) AS `pts`,`p`.`retired` AS `retired` from (`ibl_box_scores` `bs` join `ibl_plr` `p` on(`bs`.`pid` = `p`.`pid`)) where `bs`.`teamID` in (50,51) group by `bs`.`pid`,`p`.`name`,`p`.`retired` */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `ibl_allstar_career_totals`
+--
+
+/*!50001 DROP VIEW IF EXISTS `ibl_allstar_career_totals`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY DEFINER */
+/*!50001 VIEW `ibl_allstar_career_totals` AS select `bs`.`pid` AS `pid`,`p`.`name` AS `name`,cast(count(0) as signed) AS `games`,cast(sum(`bs`.`gameMIN`) as signed) AS `minutes`,cast(sum(`bs`.`calc_fg_made`) as signed) AS `fgm`,cast(sum(`bs`.`game2GA` + `bs`.`game3GA`) as signed) AS `fga`,cast(sum(`bs`.`gameFTM`) as signed) AS `ftm`,cast(sum(`bs`.`gameFTA`) as signed) AS `fta`,cast(sum(`bs`.`game3GM`) as signed) AS `tgm`,cast(sum(`bs`.`game3GA`) as signed) AS `tga`,cast(sum(`bs`.`gameORB`) as signed) AS `orb`,cast(sum(`bs`.`calc_rebounds`) as signed) AS `reb`,cast(sum(`bs`.`gameAST`) as signed) AS `ast`,cast(sum(`bs`.`gameSTL`) as signed) AS `stl`,cast(sum(`bs`.`gameTOV`) as signed) AS `tvr`,cast(sum(`bs`.`gameBLK`) as signed) AS `blk`,cast(sum(`bs`.`gamePF`) as signed) AS `pf`,cast(sum(`bs`.`calc_points`) as signed) AS `pts`,`p`.`retired` AS `retired` from (`ibl_box_scores` `bs` join `ibl_plr` `p` on(`bs`.`pid` = `p`.`pid`)) where `bs`.`teamID` in (50,51) group by `bs`.`pid`,`p`.`name`,`p`.`retired` */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
 
 --
 -- Final view structure for view `ibl_heat_career_avgs`
@@ -3652,6 +4001,24 @@ SET character_set_client = @saved_cs_client;
 /*!50001 SET collation_connection      = @saved_col_connection */;
 
 --
+-- Final view structure for view `ibl_rookie_career_totals`
+--
+
+/*!50001 DROP VIEW IF EXISTS `ibl_rookie_career_totals`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY DEFINER */
+/*!50001 VIEW `ibl_rookie_career_totals` AS select `bs`.`pid` AS `pid`,`p`.`name` AS `name`,cast(count(0) as signed) AS `games`,cast(sum(`bs`.`gameMIN`) as signed) AS `minutes`,cast(sum(`bs`.`calc_fg_made`) as signed) AS `fgm`,cast(sum(`bs`.`game2GA` + `bs`.`game3GA`) as signed) AS `fga`,cast(sum(`bs`.`gameFTM`) as signed) AS `ftm`,cast(sum(`bs`.`gameFTA`) as signed) AS `fta`,cast(sum(`bs`.`game3GM`) as signed) AS `tgm`,cast(sum(`bs`.`game3GA`) as signed) AS `tga`,cast(sum(`bs`.`gameORB`) as signed) AS `orb`,cast(sum(`bs`.`calc_rebounds`) as signed) AS `reb`,cast(sum(`bs`.`gameAST`) as signed) AS `ast`,cast(sum(`bs`.`gameSTL`) as signed) AS `stl`,cast(sum(`bs`.`gameTOV`) as signed) AS `tvr`,cast(sum(`bs`.`gameBLK`) as signed) AS `blk`,cast(sum(`bs`.`gamePF`) as signed) AS `pf`,cast(sum(`bs`.`calc_points`) as signed) AS `pts`,`p`.`retired` AS `retired` from (`ibl_box_scores` `bs` join `ibl_plr` `p` on(`bs`.`pid` = `p`.`pid`)) where `bs`.`teamID` = 40 group by `bs`.`pid`,`p`.`name`,`p`.`retired` */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
 -- Final view structure for view `ibl_season_career_avgs`
 --
 
@@ -3665,6 +4032,24 @@ SET character_set_client = @saved_cs_client;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
 /*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY DEFINER */
 /*!50001 VIEW `ibl_season_career_avgs` AS select `bs`.`pid` AS `pid`,`p`.`name` AS `name`,cast(count(0) as signed) AS `games`,round(avg(`bs`.`gameMIN`),2) AS `minutes`,round(avg(`bs`.`calc_fg_made`),2) AS `fgm`,round(avg(`bs`.`game2GA` + `bs`.`game3GA`),2) AS `fga`,case when sum(`bs`.`game2GA` + `bs`.`game3GA`) > 0 then round(sum(`bs`.`calc_fg_made`) / sum(`bs`.`game2GA` + `bs`.`game3GA`),3) else 0.000 end AS `fgpct`,round(avg(`bs`.`gameFTM`),2) AS `ftm`,round(avg(`bs`.`gameFTA`),2) AS `fta`,case when sum(`bs`.`gameFTA`) > 0 then round(sum(`bs`.`gameFTM`) / sum(`bs`.`gameFTA`),3) else 0.000 end AS `ftpct`,round(avg(`bs`.`game3GM`),2) AS `tgm`,round(avg(`bs`.`game3GA`),2) AS `tga`,case when sum(`bs`.`game3GA`) > 0 then round(sum(`bs`.`game3GM`) / sum(`bs`.`game3GA`),3) else 0.000 end AS `tpct`,round(avg(`bs`.`gameORB`),2) AS `orb`,round(avg(`bs`.`calc_rebounds`),2) AS `reb`,round(avg(`bs`.`gameAST`),2) AS `ast`,round(avg(`bs`.`gameSTL`),2) AS `stl`,round(avg(`bs`.`gameTOV`),2) AS `tvr`,round(avg(`bs`.`gameBLK`),2) AS `blk`,round(avg(`bs`.`gamePF`),2) AS `pf`,round(avg(`bs`.`calc_points`),2) AS `pts`,`p`.`retired` AS `retired` from (`ibl_box_scores` `bs` join `ibl_plr` `p` on(`bs`.`pid` = `p`.`pid`)) where `bs`.`game_type` = 1 group by `bs`.`pid`,`p`.`name`,`p`.`retired` */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `ibl_sophomore_career_totals`
+--
+
+/*!50001 DROP VIEW IF EXISTS `ibl_sophomore_career_totals`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY DEFINER */
+/*!50001 VIEW `ibl_sophomore_career_totals` AS select `bs`.`pid` AS `pid`,`p`.`name` AS `name`,cast(count(0) as signed) AS `games`,cast(sum(`bs`.`gameMIN`) as signed) AS `minutes`,cast(sum(`bs`.`calc_fg_made`) as signed) AS `fgm`,cast(sum(`bs`.`game2GA` + `bs`.`game3GA`) as signed) AS `fga`,cast(sum(`bs`.`gameFTM`) as signed) AS `ftm`,cast(sum(`bs`.`gameFTA`) as signed) AS `fta`,cast(sum(`bs`.`game3GM`) as signed) AS `tgm`,cast(sum(`bs`.`game3GA`) as signed) AS `tga`,cast(sum(`bs`.`gameORB`) as signed) AS `orb`,cast(sum(`bs`.`calc_rebounds`) as signed) AS `reb`,cast(sum(`bs`.`gameAST`) as signed) AS `ast`,cast(sum(`bs`.`gameSTL`) as signed) AS `stl`,cast(sum(`bs`.`gameTOV`) as signed) AS `tvr`,cast(sum(`bs`.`gameBLK`) as signed) AS `blk`,cast(sum(`bs`.`gamePF`) as signed) AS `pf`,cast(sum(`bs`.`calc_points`) as signed) AS `pts`,`p`.`retired` AS `retired` from (`ibl_box_scores` `bs` join `ibl_plr` `p` on(`bs`.`pid` = `p`.`pid`)) where `bs`.`teamID` = 41 group by `bs`.`pid`,`p`.`name`,`p`.`retired` */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
@@ -3753,7 +4138,7 @@ SET character_set_client = @saved_cs_client;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_general_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY DEFINER */
+/*!50013 DEFINER=`iblhoops_chibul`@`localhost` SQL SECURITY DEFINER */
 /*!50001 VIEW `vw_current_salary` AS select `p`.`pid` AS `pid`,`p`.`name` AS `name`,`p`.`tid` AS `tid`,`t`.`team_name` AS `teamname`,`p`.`pos` AS `pos`,`p`.`cy` AS `cy`,`p`.`cyt` AS `cyt`,`p`.`cy1` AS `cy1`,`p`.`cy2` AS `cy2`,`p`.`cy3` AS `cy3`,`p`.`cy4` AS `cy4`,`p`.`cy5` AS `cy5`,`p`.`cy6` AS `cy6`,case `p`.`cy` when 1 then `p`.`cy1` when 2 then `p`.`cy2` when 3 then `p`.`cy3` when 4 then `p`.`cy4` when 5 then `p`.`cy5` when 6 then `p`.`cy6` else 0 end AS `current_salary`,case `p`.`cy` when 0 then `p`.`cy1` when 1 then `p`.`cy2` when 2 then `p`.`cy3` when 3 then `p`.`cy4` when 4 then `p`.`cy5` when 5 then `p`.`cy6` else 0 end AS `next_year_salary` from (`ibl_plr` `p` left join `ibl_team_info` `t` on(`p`.`tid` = `t`.`teamid`)) where `p`.`retired` = 0 */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
@@ -3789,7 +4174,7 @@ SET character_set_client = @saved_cs_client;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_general_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY INVOKER */
+/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY DEFINER */
 /*!50001 VIEW `vw_free_agency_offers` AS select `fa`.`primary_key` AS `offer_id`,`p`.`uuid` AS `player_uuid`,`p`.`pid` AS `pid`,`p`.`name` AS `player_name`,`p`.`pos` AS `position`,`p`.`age` AS `age`,`t`.`uuid` AS `team_uuid`,`t`.`teamid` AS `teamid`,`t`.`team_city` AS `team_city`,`t`.`team_name` AS `team_name`,concat(`t`.`team_city`,' ',`t`.`team_name`) AS `full_team_name`,`fa`.`offer1` AS `year1_amount`,`fa`.`offer2` AS `year2_amount`,`fa`.`offer3` AS `year3_amount`,`fa`.`offer4` AS `year4_amount`,`fa`.`offer5` AS `year5_amount`,`fa`.`offer6` AS `year6_amount`,`fa`.`offer1` + `fa`.`offer2` + `fa`.`offer3` + `fa`.`offer4` + `fa`.`offer5` + `fa`.`offer6` AS `total_contract_value`,`fa`.`modifier` AS `modifier`,`fa`.`random` AS `random`,`fa`.`perceivedvalue` AS `perceived_value`,`fa`.`MLE` AS `is_mle`,`fa`.`LLE` AS `is_lle`,`fa`.`created_at` AS `created_at`,`fa`.`updated_at` AS `updated_at` from ((`ibl_fa_offers` `fa` join `ibl_plr` `p` on(`fa`.`pid` = `p`.`pid`)) join `ibl_team_info` `t` on(`fa`.`tid` = `t`.`teamid`)) */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
@@ -3915,7 +4300,7 @@ SET character_set_client = @saved_cs_client;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_general_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY INVOKER */
+/*!50013 DEFINER=`iblhoops_chibul`@`localhost` SQL SECURITY INVOKER */
 /*!50001 VIEW `vw_team_standings` AS select `t`.`uuid` AS `team_uuid`,`t`.`teamid` AS `teamid`,`t`.`team_city` AS `team_city`,`t`.`team_name` AS `team_name`,concat(`t`.`team_city`,' ',`t`.`team_name`) AS `full_team_name`,`t`.`owner_name` AS `owner_name`,`s`.`leagueRecord` AS `league_record`,`s`.`pct` AS `win_percentage`,`s`.`conference` AS `conference`,`s`.`confRecord` AS `conference_record`,`s`.`confGB` AS `conference_games_back`,`s`.`division` AS `division`,`s`.`divRecord` AS `division_record`,`s`.`divGB` AS `division_games_back`,`s`.`homeWins` AS `home_wins`,`s`.`homeLosses` AS `home_losses`,`s`.`awayWins` AS `away_wins`,`s`.`awayLosses` AS `away_losses`,concat(`s`.`homeWins`,'-',`s`.`homeLosses`) AS `home_record`,concat(`s`.`awayWins`,'-',`s`.`awayLosses`) AS `away_record`,`s`.`gamesUnplayed` AS `games_remaining`,`s`.`confWins` AS `conference_wins`,`s`.`confLosses` AS `conference_losses`,`s`.`divWins` AS `division_wins`,`s`.`divLosses` AS `division_losses`,`s`.`clinchedConference` AS `clinched_conference`,`s`.`clinchedDivision` AS `clinched_division`,`s`.`clinchedPlayoffs` AS `clinched_playoffs`,`s`.`clinchedLeague` AS `clinched_league`,`s`.`confMagicNumber` AS `conference_magic_number`,`s`.`divMagicNumber` AS `division_magic_number`,`s`.`created_at` AS `created_at`,`s`.`updated_at` AS `updated_at` from (`ibl_team_info` `t` join `ibl_standings` `s` on(`t`.`teamid` = `s`.`tid`)) */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
@@ -3948,4 +4333,4 @@ SET character_set_client = @saved_cs_client;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-02-25  1:23:26
+-- Dump completed on 2026-03-04 20:59:20

@@ -57,6 +57,10 @@ class LeagueContextTableResolutionTest extends TestCase
         $this->assertSame('ibl_olympics_jsb_transactions', $context->getTableName('ibl_jsb_transactions'));
         $this->assertSame('ibl_olympics_rcb_alltime_records', $context->getTableName('ibl_rcb_alltime_records'));
         $this->assertSame('ibl_olympics_rcb_season_records', $context->getTableName('ibl_rcb_season_records'));
+
+        // Saved depth chart tables
+        $this->assertSame('ibl_olympics_saved_depth_charts', $context->getTableName('ibl_saved_depth_charts'));
+        $this->assertSame('ibl_olympics_saved_depth_chart_players', $context->getTableName('ibl_saved_depth_chart_players'));
     }
 
     public function testGetTableNameReturnsUnmappedTablesUnchanged(): void

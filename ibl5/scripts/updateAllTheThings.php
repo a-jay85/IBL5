@@ -45,8 +45,11 @@ global $mysqli_db;
 
 // Determine league context from explicit URL parameter only (not cookie/session)
 $leagueParam = isset($_GET['league']) && is_string($_GET['league']) ? $_GET['league'] : null;
-$leagueContext = $leagueParam === 'olympics' ? new League\LeagueContext() : null;
+$leagueContext = $leagueParam === League\LeagueContext::LEAGUE_OLYMPICS ? new League\LeagueContext() : null;
 $isOlympics = $leagueContext !== null;
+if ($leagueContext !== null) {
+    $leagueContext->setLeague(League\LeagueContext::LEAGUE_OLYMPICS);
+}
 
 $view = new Updater\UpdaterView();
 
@@ -97,19 +100,11 @@ try {
     echo $view->renderInitStatus('CommonRepository initialized');
     flush();
 
-    $sharedRepository = new Shared\SharedRepository($mysqli_db);
-    echo $view->renderInitStatus('Shared repository initialized');
-    flush();
-
     $season = new \Season($mysqli_db);
 
-    // Olympics league context setup
-    $leagueContext = null;
-    $getLeague = $_GET['league'] ?? null;
-    if (is_string($getLeague) && strtolower($getLeague) === 'olympics') {
-        $leagueContext = new \League\LeagueContext();
-        $leagueContext->setLeague('olympics');
-    }
+    $sharedRepository = new Shared\SharedRepository($mysqli_db, $leagueContext);
+    echo $view->renderInitStatus('Shared repository initialized');
+    flush();
 
     // Season year override for historical imports (e.g., Olympics 2003)
     $seasonYearOverride = isset($_GET['season_year']) && is_string($_GET['season_year'])
@@ -154,11 +149,11 @@ try {
     $plrRepo = new PlrParser\PlrParserRepository($mysqli_db, $leagueContext);
     $plrService = new PlrParser\PlrParserService($plrRepo, $commonRepository, $season);
 
-    $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db, null, null, $leagueContext);
+    $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db, null, $season, $leagueContext);
     $boxscoreRepo = new Boxscore\BoxscoreRepository($mysqli_db, $leagueContext);
     $boxscoreView = new Boxscore\BoxscoreView();
 
-    $savedDcRepo = new SavedDepthChart\SavedDepthChartRepository($mysqli_db);
+    $savedDcRepo = new SavedDepthChart\SavedDepthChartRepository($mysqli_db, $leagueContext);
 
     $jsbRepo = new JsbParser\JsbImportRepository($mysqli_db, $leagueContext);
     $jsbResolver = new JsbParser\PlayerIdResolver($mysqli_db, $leagueContext);
@@ -168,26 +163,25 @@ try {
         $lgeRepo, $lgeService, $lgeView, $season->endingYear, $defaultLgePath,
     ));
 
-    // IBL-only steps: .plr file parsing, depth charts, extensions, All-Star games
-    if (!$isOlympics) {
-        $updaterService->addStep(new Updater\Steps\ParsePlayerFileStep($plrService, $defaultPlrPath));
-    }
+    $updaterService->addStep(new Updater\Steps\ParsePlayerFileStep($plrService, $defaultPlrPath));
 
     $updaterService->addStep(new Updater\Steps\UpdateScheduleStep($scheduleUpdater));
     $updaterService->addStep(new Updater\Steps\UpdateStandingsStep($standingsUpdater));
     $updaterService->addStep(new Updater\Steps\UpdatePowerRankingsStep($powerRankingsUpdater));
 
+    // IBL-only: contract extensions don't exist in Olympics (ibl_olympics_team_info lacks Used_Extension_This_Chunk)
     if (!$isOlympics) {
         $updaterService->addStep(new Updater\Steps\ResetExtensionAttemptsStep($sharedRepository));
-        $updaterService->addStep(new Updater\Steps\ExtendDepthChartsStep(
-            $savedDcRepo, $season->lastSimEndDate, $season->lastSimNumber,
-        ));
     }
+    $updaterService->addStep(new Updater\Steps\ExtendDepthChartsStep(
+        $savedDcRepo, $season->lastSimEndDate, $season->lastSimNumber,
+    ));
 
     $updaterService->addStep(new Updater\Steps\ProcessBoxscoresStep(
         $boxscoreProcessor, $boxscoreView, $defaultScoPath,
     ));
 
+    // IBL-only: All-Star games don't exist in Olympics
     if (!$isOlympics) {
         $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(
             $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $defaultScoPath,

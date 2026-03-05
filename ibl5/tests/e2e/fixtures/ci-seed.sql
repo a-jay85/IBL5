@@ -369,6 +369,32 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic) VA
   (14, 'admin', 'Test Player Two changes position from SF to PF',      '2026-03-02 11:00:00', 'Position change details',    '', 1);
 
 -- ============================================================
+-- Olympics seed data (minimal for E2E smoke tests)
+-- ============================================================
+
+INSERT INTO ibl_olympics_team_info (teamid, team_city, team_name, color1, color2, uuid) VALUES
+  (1, 'USA',    'Eagles',  '002868', 'BF0A30', 'oly-team-uuid-01'),
+  (2, 'Canada', 'Maple',   'FF0000', 'FFFFFF', 'oly-team-uuid-02'),
+  (3, 'Spain',  'Bulls',   'AA151B', 'F1BF00', 'oly-team-uuid-03'),
+  (4, 'France', 'Coqs',    '002395', 'ED2939', 'oly-team-uuid-04');
+
+INSERT INTO ibl_olympics_standings (tid, team_name, pct, leagueRecord, wins, losses, conference, division) VALUES
+  (1, 'Eagles', 0.750, '3-1', 3, 1, 'Group A', ''),
+  (2, 'Maple',  0.500, '2-2', 2, 2, 'Group A', ''),
+  (3, 'Bulls',  0.500, '2-2', 2, 2, 'Group B', ''),
+  (4, 'Coqs',   0.250, '1-3', 1, 3, 'Group B', '');
+
+INSERT INTO ibl_olympics_schedule (SchedID, Date, Year, Visitor, VScore, Home, HScore, BoxID, uuid) VALUES
+  (1, '2026-07-01', 2026, 1, 95, 2, 88, 1, 'oly-sched-uuid-01'),
+  (2, '2026-07-01', 2026, 3, 82, 4, 79, 2, 'oly-sched-uuid-02');
+
+INSERT INTO ibl_olympics_league_config (season_ending_year, team_slot, team_name, conference, division, team_count) VALUES
+  (2026, 1, 'Eagles', 'Group A', '', 4),
+  (2026, 2, 'Maple',  'Group A', '', 4),
+  (2026, 3, 'Bulls',  'Group B', '', 4),
+  (2026, 4, 'Coqs',   'Group B', '', 4);
+
+-- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the
 -- workflow via PHP bcrypt hash at runtime — not seeded here.
 -- ============================================================

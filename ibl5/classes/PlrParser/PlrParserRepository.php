@@ -4,15 +4,27 @@ declare(strict_types=1);
 
 namespace PlrParser;
 
+use League\LeagueContext;
 use PlrParser\Contracts\PlrParserRepositoryInterface;
 
 /**
  * Repository for PLR file database operations using prepared statements.
  *
  * Handles upserts into ibl_plr and ibl_hist tables.
+ * League-aware: resolves table names through LeagueContext when provided.
  */
 class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepositoryInterface
 {
+    private string $plrTable;
+    private string $histTable;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->plrTable = $this->resolveTable('ibl_plr');
+        $this->histTable = $this->resolveTable('ibl_hist');
+    }
+
     /**
      * @see PlrParserRepositoryInterface::upsertPlayer()
      *
@@ -20,7 +32,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
      */
     public function upsertPlayer(array $data): int
     {
-        $query = "INSERT INTO ibl_plr
+        $query = "INSERT INTO {$this->plrTable}
             (`ordinal`, `name`, `age`, `pid`, `tid`, `peak`, `pos`,
              `oo`, `od`, `do`, `dd`, `po`, `pd`, `to`, `td`,
              `Clutch`, `Consistency`,
@@ -345,7 +357,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
      */
     public function upsertHistoricalStats(array $data): int
     {
-        $query = "INSERT INTO ibl_hist
+        $query = "INSERT INTO {$this->histTable}
             (`pid`, `name`, `year`, `team`, `teamid`,
              `games`, `minutes`, `fgm`, `fga`, `ftm`, `fta`, `tgm`, `tga`,
              `orb`, `reb`, `ast`, `stl`, `blk`, `tvr`, `pf`, `pts`,

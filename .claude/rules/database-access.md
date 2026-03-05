@@ -1,5 +1,11 @@
 ---
-paths: "**/*Repository.php"
+paths:
+  - "**/*Repository.php"
+  - "**/schema.sql"
+  - "**/migrations/**"
+  - "**/db/**"
+  - "**/seed*.php"
+  - "**/seed*.sql"
 ---
 
 # Database Access Reference

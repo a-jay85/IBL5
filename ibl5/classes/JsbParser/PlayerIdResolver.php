@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace JsbParser;
 
+use League\LeagueContext;
+
 /**
  * Resolves player names from .car files to database PIDs.
  *
@@ -12,10 +14,14 @@ namespace JsbParser;
  * 2. Exact name match in ibl_hist for the same year + team
  * 3. Exact name match in ibl_plr without team constraint (for traded players)
  * 4. Fuzzy name match (Levenshtein ≤ 2) for encoding differences
+ *
+ * League-aware: resolves table names through LeagueContext when provided.
  */
 class PlayerIdResolver
 {
     private \mysqli $db;
+    private string $plrTable;
+    private string $histTable;
 
     /**
      * Cache of resolved name+team+year → pid.
@@ -23,9 +29,18 @@ class PlayerIdResolver
      */
     private array $cache = [];
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
         $this->db = $db;
+        $this->plrTable = self::resolveTable($leagueContext, 'ibl_plr');
+        $this->histTable = self::resolveTable($leagueContext, 'ibl_hist');
+    }
+
+    private static function resolveTable(?LeagueContext $leagueContext, string $iblTableName): string
+    {
+        return $leagueContext !== null
+            ? $leagueContext->getTableName($iblTableName)
+            : $iblTableName;
     }
 
     /**
@@ -84,7 +99,7 @@ class PlayerIdResolver
     private function findInHist(string $name, string $team, int $year): ?int
     {
         $stmt = $this->db->prepare(
-            'SELECT pid FROM ibl_hist WHERE name = ? AND team = ? AND year = ? LIMIT 1'
+            "SELECT pid FROM {$this->histTable} WHERE name = ? AND team = ? AND year = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;
@@ -106,7 +121,7 @@ class PlayerIdResolver
     private function findInPlr(string $name, int $teamId): ?int
     {
         $stmt = $this->db->prepare(
-            'SELECT pid FROM ibl_plr WHERE name = ? AND tid = ? LIMIT 1'
+            "SELECT pid FROM {$this->plrTable} WHERE name = ? AND tid = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;
@@ -128,7 +143,7 @@ class PlayerIdResolver
     private function findInHistByNameOnly(string $name, int $year): ?int
     {
         $stmt = $this->db->prepare(
-            'SELECT pid FROM ibl_hist WHERE name = ? AND year = ? LIMIT 1'
+            "SELECT pid FROM {$this->histTable} WHERE name = ? AND year = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;
@@ -150,7 +165,7 @@ class PlayerIdResolver
     private function findInPlrByNameOnly(string $name): ?int
     {
         $stmt = $this->db->prepare(
-            'SELECT pid FROM ibl_plr WHERE name = ? LIMIT 1'
+            "SELECT pid FROM {$this->plrTable} WHERE name = ? LIMIT 1"
         );
         if ($stmt === false) {
             return null;

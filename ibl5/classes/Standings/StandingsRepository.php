@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Standings;
 
+use League\LeagueContext;
 use Standings\Contracts\StandingsRepositoryInterface;
 
 /**
@@ -21,14 +22,16 @@ use Standings\Contracts\StandingsRepositoryInterface;
  */
 class StandingsRepository extends \BaseMysqliRepository implements StandingsRepositoryInterface
 {
-    /**
-     * Constructor
-     *
-     * @param \mysqli $db Active mysqli connection
-     */
-    public function __construct(\mysqli $db)
+    private string $standingsTable;
+    private string $powerTable;
+    private string $teamInfoTable;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
-        parent::__construct($db);
+        parent::__construct($db, $leagueContext);
+        $this->standingsTable = $this->resolveTable('ibl_standings');
+        $this->powerTable = $this->resolveTable('ibl_power');
+        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
     }
 
     /**
@@ -88,8 +91,8 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             (s.awayWins + s.awayLosses) AS awayGames,
             t.color1,
             t.color2
-            FROM ibl_standings s
-            JOIN ibl_team_info t ON s.tid = t.teamid
+            FROM {$this->standingsTable} s
+            JOIN {$this->teamInfoTable} t ON s.tid = t.teamid
             WHERE s.{$columns['grouping']} = ?
             ORDER BY s.{$columns['gbColumn']} ASC,
                 (COALESCE(s.clinchedLeague, 0) * 4
@@ -111,7 +114,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     {
         /** @var StreakRow|null */
         return $this->fetchOne(
-            "SELECT last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM ibl_power WHERE TeamID = ?",
+            "SELECT last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM {$this->powerTable} WHERE TeamID = ?",
             "i",
             $teamId
         );
@@ -153,7 +156,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
     {
         /** @var list<array{TeamID: int, last_win: int, last_loss: int, streak_type: string, streak: int, ranking: int, sos: float|string, remaining_sos: float|string, sos_rank: int, remaining_sos_rank: int}> $rows */
         $rows = $this->fetchAll(
-            "SELECT TeamID, last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM ibl_power",
+            "SELECT TeamID, last_win, last_loss, streak_type, streak, ranking, sos, remaining_sos, sos_rank, remaining_sos_rank FROM {$this->powerTable}",
             ""
         );
 

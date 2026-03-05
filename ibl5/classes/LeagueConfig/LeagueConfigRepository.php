@@ -18,10 +18,8 @@ class LeagueConfigRepository extends \BaseMysqliRepository implements LeagueConf
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
-        parent::__construct($db);
-        $this->table = $leagueContext !== null
-            ? $leagueContext->getTableName('ibl_league_config')
-            : 'ibl_league_config';
+        parent::__construct($db, $leagueContext);
+        $this->table = $this->resolveTable('ibl_league_config');
     }
 
     /**

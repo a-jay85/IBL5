@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Season;
 
+use League\LeagueContext;
 use Season\Contracts\SeasonQueryRepositoryInterface;
 
 /**
@@ -15,6 +16,16 @@ use Season\Contracts\SeasonQueryRepositoryInterface;
  */
 class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQueryRepositoryInterface
 {
+    private string $boxScoresTable;
+    private string $scheduleTable;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->boxScoresTable = $this->resolveTable('ibl_box_scores');
+        $this->scheduleTable = $this->resolveTable('ibl_schedule');
+    }
+
     /**
      * Bulk-fetch multiple settings in a single query
      *
@@ -85,7 +96,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{Date: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT Date FROM ibl_box_scores ORDER BY Date ASC LIMIT 1"
+            "SELECT Date FROM {$this->boxScoresTable} ORDER BY Date ASC LIMIT 1"
         );
 
         return $result['Date'] ?? '';
@@ -100,7 +111,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
     {
         /** @var array{Date: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT Date FROM ibl_box_scores ORDER BY Date DESC LIMIT 1"
+            "SELECT Date FROM {$this->boxScoresTable} ORDER BY Date DESC LIMIT 1"
         );
 
         return $result['Date'] ?? '';
@@ -161,7 +172,7 @@ class SeasonQueryRepository extends \BaseMysqliRepository implements SeasonQuery
 
         /** @var array{max_date: string|null}|null $result */
         $result = $this->fetchOne(
-            "SELECT MAX(Date) AS max_date FROM ibl_schedule WHERE Date < ?",
+            "SELECT MAX(Date) AS max_date FROM {$this->scheduleTable} WHERE Date < ?",
             "s",
             $playoffsStart
         );

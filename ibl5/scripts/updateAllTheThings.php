@@ -102,8 +102,28 @@ try {
     flush();
 
     $season = new \Season($mysqli_db);
+
+    // Olympics league context setup
+    $leagueContext = null;
+    $getLeague = $_GET['league'] ?? null;
+    if (is_string($getLeague) && strtolower($getLeague) === 'olympics') {
+        $leagueContext = new \League\LeagueContext();
+        $leagueContext->setLeague('olympics');
+    }
+
+    // Season year override for historical imports (e.g., Olympics 2003)
+    $seasonYearOverride = isset($_GET['season_year']) && is_string($_GET['season_year'])
+        ? (int) $_GET['season_year'] : null;
+    if ($seasonYearOverride !== null && $seasonYearOverride > 1900 && $seasonYearOverride < 2100) {
+        $season->endingYear = $seasonYearOverride;
+        $season->beginningYear = $seasonYearOverride - 1;
+    }
+
     echo $view->renderInitStatus('Season initialized');
     flush();
+
+    $filePrefix = $leagueContext !== null ? $leagueContext->getFilePrefix() : 'IBL5';
+
 
     $scheduleUpdater = new Updater\ScheduleUpdater($mysqli_db, $season, $leagueContext);
     echo $view->renderInitStatus('ScheduleUpdater initialized');
@@ -123,25 +143,25 @@ try {
     // --- Pipeline: register all steps and delegate to controller ---
     $updaterService = new Updater\UpdaterService();
 
-    $defaultLgePath = $basePath . '/IBL5.lge';
-    $defaultPlrPath = $basePath . '/IBL5.plr';
-    $defaultScoPath = $basePath . '/IBL5.sco';
+    $defaultLgePath = $basePath . '/' . $filePrefix . '.lge';
+    $defaultPlrPath = $basePath . '/' . $filePrefix . '.plr';
+    $defaultScoPath = $basePath . '/' . $filePrefix . '.sco';
 
     $lgeRepo = new LeagueConfig\LeagueConfigRepository($mysqli_db, $leagueContext);
     $lgeService = new LeagueConfig\LeagueConfigService($lgeRepo);
     $lgeView = new LeagueConfig\LeagueConfigView();
 
-    $plrRepo = new PlrParser\PlrParserRepository($mysqli_db);
+    $plrRepo = new PlrParser\PlrParserRepository($mysqli_db, $leagueContext);
     $plrService = new PlrParser\PlrParserService($plrRepo, $commonRepository, $season);
 
-    $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db);
+    $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db, null, null, $leagueContext);
     $boxscoreRepo = new Boxscore\BoxscoreRepository($mysqli_db, $leagueContext);
     $boxscoreView = new Boxscore\BoxscoreView();
 
     $savedDcRepo = new SavedDepthChart\SavedDepthChartRepository($mysqli_db);
 
-    $jsbRepo = new JsbParser\JsbImportRepository($mysqli_db);
-    $jsbResolver = new JsbParser\PlayerIdResolver($mysqli_db);
+    $jsbRepo = new JsbParser\JsbImportRepository($mysqli_db, $leagueContext);
+    $jsbResolver = new JsbParser\PlayerIdResolver($mysqli_db, $leagueContext);
     $jsbService = new JsbParser\JsbImportService($jsbRepo, $jsbResolver);
 
     $updaterService->addStep(new Updater\Steps\ImportLeagueConfigStep(
@@ -174,7 +194,7 @@ try {
         ));
     }
 
-    $updaterService->addStep(new Updater\Steps\ParseJsbFilesStep($jsbService, $basePath, $season));
+    $updaterService->addStep(new Updater\Steps\ParseJsbFilesStep($jsbService, $basePath, $season, $filePrefix));
 
     $controller = new Updater\UpdaterController($updaterService, $view);
     $controller->run();

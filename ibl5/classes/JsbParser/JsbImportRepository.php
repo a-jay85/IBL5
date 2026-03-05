@@ -5,15 +5,37 @@ declare(strict_types=1);
 namespace JsbParser;
 
 use JsbParser\Contracts\JsbImportRepositoryInterface;
+use League\LeagueContext;
 
 /**
  * Repository for database operations related to JSB file imports.
  *
  * Handles upserts into ibl_hist, ibl_jsb_transactions, ibl_jsb_history,
  * ibl_jsb_allstar_rosters, and ibl_jsb_allstar_scores tables.
+ * League-aware: resolves table names through LeagueContext when provided.
  */
 class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepositoryInterface
 {
+    private string $histTable;
+    private string $jsbHistoryTable;
+    private string $jsbTransactionsTable;
+    private string $rcbAlltimeTable;
+    private string $rcbSeasonTable;
+    private string $plrTable;
+    private string $teamInfoTable;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->histTable = $this->resolveTable('ibl_hist');
+        $this->jsbHistoryTable = $this->resolveTable('ibl_jsb_history');
+        $this->jsbTransactionsTable = $this->resolveTable('ibl_jsb_transactions');
+        $this->rcbAlltimeTable = $this->resolveTable('ibl_rcb_alltime_records');
+        $this->rcbSeasonTable = $this->resolveTable('ibl_rcb_season_records');
+        $this->plrTable = $this->resolveTable('ibl_plr');
+        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
+    }
+
     /**
      * JSB team ID → team name mapping for historical team names.
      *
@@ -81,7 +103,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertHistRecord(array $record): int
     {
         return $this->execute(
-            'INSERT INTO ibl_hist
+            "INSERT INTO {$this->histTable}
                 (pid, name, year, team, teamid, games, minutes, fgm, fga, ftm, fta, tgm, tga, orb, reb, ast, stl, blk, tvr, pf, pts)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
@@ -102,7 +124,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
                 blk = VALUES(blk),
                 tvr = VALUES(tvr),
                 pf = VALUES(pf),
-                pts = VALUES(pts)',
+                pts = VALUES(pts)",
             'isisiiiiiiiiiiiiiiiii',
             $record['pid'],
             $record['name'],
@@ -134,7 +156,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertTransaction(array $record): int
     {
         return $this->execute(
-            'INSERT INTO ibl_jsb_transactions
+            "INSERT INTO {$this->jsbTransactionsTable}
                 (season_year, transaction_month, transaction_day, transaction_type,
                  pid, player_name, from_teamid, to_teamid,
                  injury_games_missed, injury_description, trade_group_id,
@@ -147,7 +169,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
                 trade_group_id = VALUES(trade_group_id),
                 is_draft_pick = VALUES(is_draft_pick),
                 draft_pick_year = VALUES(draft_pick_year),
-                source_file = VALUES(source_file)',
+                source_file = VALUES(source_file)",
             'iiiiisiiisiiis',
             $record['season_year'],
             $record['transaction_month'],
@@ -172,7 +194,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertHistoryRecord(array $record): int
     {
         return $this->execute(
-            'INSERT INTO ibl_jsb_history
+            "INSERT INTO {$this->jsbHistoryTable}
                 (season_year, team_name, teamid, wins, losses, made_playoffs,
                  playoff_result, playoff_round_reached, won_championship, source_file)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -184,7 +206,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
                 playoff_result = VALUES(playoff_result),
                 playoff_round_reached = VALUES(playoff_round_reached),
                 won_championship = VALUES(won_championship),
-                source_file = VALUES(source_file)',
+                source_file = VALUES(source_file)",
             'isiiiissss',
             $record['season_year'],
             $record['team_name'],
@@ -266,7 +288,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
 
         // Try direct lookup first
         $row = $this->fetchOne(
-            'SELECT teamid FROM ibl_team_info WHERE team_name = ? LIMIT 1',
+            "SELECT teamid FROM {$this->teamInfoTable} WHERE team_name = ? LIMIT 1",
             's',
             $teamName
         );
@@ -282,7 +304,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
         if (isset(self::TEAM_NAME_ALIASES[$teamName])) {
             $aliasName = self::TEAM_NAME_ALIASES[$teamName];
             $row = $this->fetchOne(
-                'SELECT teamid FROM ibl_team_info WHERE team_name = ? LIMIT 1',
+                "SELECT teamid FROM {$this->teamInfoTable} WHERE team_name = ? LIMIT 1",
                 's',
                 $aliasName
             );
@@ -295,9 +317,9 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
             }
         }
 
-        // Try looking in ibl_hist for historical team names
+        // Try looking in hist table for historical team names
         $row = $this->fetchOne(
-            'SELECT teamid FROM ibl_hist WHERE team = ? AND teamid > 0 LIMIT 1',
+            "SELECT teamid FROM {$this->histTable} WHERE team = ? AND teamid > 0 LIMIT 1",
             's',
             $teamName
         );
@@ -321,7 +343,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function fetchMaxTradeGroupId(): int
     {
         $row = $this->fetchOne(
-            'SELECT COALESCE(MAX(trade_group_id), 0) AS max_id FROM ibl_jsb_transactions',
+            "SELECT COALESCE(MAX(trade_group_id), 0) AS max_id FROM {$this->jsbTransactionsTable}",
             ''
         );
 
@@ -340,7 +362,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertRcbAlltimeRecord(array $record): int
     {
         return $this->execute(
-            'INSERT INTO ibl_rcb_alltime_records
+            "INSERT INTO {$this->rcbAlltimeTable}
                 (scope, team_id, record_type, stat_category, ranking,
                  player_name, car_block_id, pid, stat_value, stat_raw,
                  team_of_record, season_year, career_total, source_file)
@@ -354,7 +376,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
                 team_of_record = VALUES(team_of_record),
                 season_year = VALUES(season_year),
                 career_total = VALUES(career_total),
-                source_file = VALUES(source_file)',
+                source_file = VALUES(source_file)",
             'sissisiidiiiis',
             $record['scope'],
             $record['team_id'],
@@ -379,7 +401,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function upsertRcbSeasonRecord(array $record): int
     {
         return $this->execute(
-            'INSERT INTO ibl_rcb_season_records
+            "INSERT INTO {$this->rcbSeasonTable}
                 (season_year, scope, team_id, context, stat_category, ranking,
                  player_name, player_position, car_block_id, pid,
                  stat_value, record_season_year, source_file)
@@ -391,7 +413,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
                 pid = VALUES(pid),
                 stat_value = VALUES(stat_value),
                 record_season_year = VALUES(record_season_year),
-                source_file = VALUES(source_file)',
+                source_file = VALUES(source_file)",
             'isississiiiis',
             $record['season_year'],
             $record['scope'],
@@ -418,7 +440,7 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     public function getPlayerName(int $pid): ?string
     {
         $row = $this->fetchOne(
-            'SELECT name FROM ibl_plr WHERE pid = ? LIMIT 1',
+            "SELECT name FROM {$this->plrTable} WHERE pid = ? LIMIT 1",
             'i',
             $pid
         );

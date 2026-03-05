@@ -123,7 +123,8 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $ibl5RootRaw = defined('IBL5_ROOT') ? IBL5_ROOT : null;
         $ibl5Root = is_string($ibl5RootRaw) ? $ibl5RootRaw : '.';
-        $schFilePath = $ibl5Root . '/IBL5.sch';
+        $filePrefix = $this->leagueContext !== null ? $this->leagueContext->getFilePrefix() : 'IBL5';
+        $schFilePath = $ibl5Root . '/' . $filePrefix . '.sch';
 
         $games = SchFileParser::parseFile($schFilePath);
 

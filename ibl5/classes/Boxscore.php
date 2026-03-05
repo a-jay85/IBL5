@@ -181,7 +181,7 @@ class Boxscore
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
     }
 
-    protected function fillGameInfo(string $gameInfoLine, int $seasonEndingYear, string $seasonPhase): void
+    protected function fillGameInfo(string $gameInfoLine, int $seasonEndingYear, string $seasonPhase, string $league = 'ibl'): void
     {
         $this->gameYear = $seasonEndingYear;
         $this->gameMonth = sprintf("%02u", intval(substr($gameInfoLine, 0, 2)) + 10); // sprintf() prepends 0 if the result isn't in double-digits
@@ -206,25 +206,31 @@ class Boxscore
         $this->homeQ4points = substr($gameInfoLine, 52, 3);
         $this->homeOTpoints = substr($gameInfoLine, 55, 3);
 
-        $seasonStartingYear = $seasonEndingYear - 1;
-        if ((int)$this->gameMonth > 12 && (int)$this->gameMonth !== JSB::PLAYOFF_MONTH) {
-            $this->gameMonth = sprintf("%02u", (int)$this->gameMonth - 12);
-        } elseif ((int)$this->gameMonth === JSB::PLAYOFF_MONTH) {
-            $this->gameMonth = sprintf("%02u", (int)$this->gameMonth - 16); // This hacks the Playoffs to be in "June"
-        } elseif ((int)$this->gameMonth > 10) {
-            $this->gameYear = $seasonStartingYear;
-            if ($seasonPhase === "HEAT") {
-                $this->gameMonth = (string) Season::IBL_HEAT_MONTH;
+        // Olympics: all games occur in August of the ending year
+        if (strtolower($league) === 'olympics') {
+            $this->gameMonth = sprintf("%02u", Season::IBL_OLYMPICS_MONTH);
+            $this->gameYear = $seasonEndingYear;
+        } else {
+            $seasonStartingYear = $seasonEndingYear - 1;
+            if ((int)$this->gameMonth > 12 && (int)$this->gameMonth !== JSB::PLAYOFF_MONTH) {
+                $this->gameMonth = sprintf("%02u", (int)$this->gameMonth - 12);
+            } elseif ((int)$this->gameMonth === JSB::PLAYOFF_MONTH) {
+                $this->gameMonth = sprintf("%02u", (int)$this->gameMonth - 16); // This hacks the Playoffs to be in "June"
+            } elseif ((int)$this->gameMonth > 10) {
+                $this->gameYear = $seasonStartingYear;
+                if ($seasonPhase === "HEAT") {
+                    $this->gameMonth = (string) Season::IBL_HEAT_MONTH;
+                }
             }
         }
 
         $this->gameDate = $this->gameYear . '-' . $this->gameMonth . '-' . $this->gameDay;
     }
 
-    public static function withGameInfoLine(string $gameInfoLine, int $seasonEndingYear, string $seasonPhase): self
+    public static function withGameInfoLine(string $gameInfoLine, int $seasonEndingYear, string $seasonPhase, string $league = 'ibl'): self
     {
         $instance = new self();
-        $instance->fillGameInfo($gameInfoLine, $seasonEndingYear, $seasonPhase);
+        $instance->fillGameInfo($gameInfoLine, $seasonEndingYear, $seasonPhase, $league);
         return $instance;
     }
 

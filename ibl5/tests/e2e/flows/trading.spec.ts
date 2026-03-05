@@ -7,27 +7,17 @@ import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
 // ---------------------------------------------------------------------------
 
 /**
- * Navigate to the trade offer form.
- * @param partner - Optional partner team name. If omitted, picks the first available.
+ * Navigate to the trade offer form by picking the first available partner.
  */
-async function navigateToTradeForm(
-  page: Page,
-  partner?: string,
-): Promise<void> {
-  if (partner) {
-    await page.goto(
-      `modules.php?name=Trading&op=offertrade&partner=${encodeURIComponent(partner)}`,
-    );
-  } else {
-    await page.goto('modules.php?name=Trading');
+async function navigateToTradeForm(page: Page): Promise<void> {
+  await page.goto('modules.php?name=Trading');
 
-    const firstTeamLink = page.locator('.trading-team-select a').first();
-    await expect(firstTeamLink).toBeVisible();
-    // Use goto() with the href instead of click() — click() triggers navigation
-    // that can time out under MAMP concurrency with parallel workers.
-    const href = await firstTeamLink.getAttribute('href');
-    await page.goto(href!);
-  }
+  const firstTeamLink = page.locator('.trading-team-select a').first();
+  await expect(firstTeamLink).toBeVisible();
+  // Use goto() with the href instead of click() — click() triggers navigation
+  // that can time out under MAMP concurrency with parallel workers.
+  const href = await firstTeamLink.getAttribute('href');
+  await page.goto(href!);
   await expect(page.locator('form[name="Trade_Offer"]')).toBeVisible();
 }
 
@@ -216,7 +206,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Allow Trades': 'Yes' });
     await mockRosterPreviewApi(page);
-    await navigateToTradeForm(page, 'Stars');
+    await navigateToTradeForm(page);
   });
 
   test('selecting players shows roster preview', async ({ page }) => {
@@ -392,7 +382,7 @@ test.describe('Trade offer form: cap warnings', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Allow Trades': 'Yes' });
     await mockRosterPreviewApi(page);
-    await navigateToTradeForm(page, 'Stars');
+    await navigateToTradeForm(page);
   });
 
   test('no cap warnings when no players selected', async ({ page }) => {

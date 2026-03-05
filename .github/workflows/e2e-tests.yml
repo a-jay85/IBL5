@@ -131,6 +131,14 @@ jobs:
           echo "Server failed to start"
           exit 1
 
+      - name: Debug Olympics pages
+        run: |
+          echo "=== Olympics Standings ==="
+          curl -sS http://localhost:8080/ibl5/modules.php?name=Standings\&league=olympics 2>&1 | head -50
+          echo ""
+          echo "=== Response code ==="
+          curl -sS -o /dev/null -w "%{http_code}" http://localhost:8080/ibl5/modules.php?name=Standings\&league=olympics
+
       - name: Run E2E tests
         working-directory: ibl5
         env:

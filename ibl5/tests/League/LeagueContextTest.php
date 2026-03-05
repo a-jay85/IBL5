@@ -341,8 +341,6 @@ class LeagueContextTest extends TestCase
     {
         $_SESSION['current_league'] = 'olympics';
 
-        $this->assertSame('ibl_plr', $this->leagueContext->getTableName('ibl_plr'));
-        $this->assertSame('ibl_hist', $this->leagueContext->getTableName('ibl_hist'));
         $this->assertSame('some_other_table', $this->leagueContext->getTableName('some_other_table'));
     }
 
@@ -351,5 +349,48 @@ class LeagueContextTest extends TestCase
         // No league set — defaults to IBL
         $this->assertSame('ibl_schedule', $this->leagueContext->getTableName('ibl_schedule'));
         $this->assertSame('ibl_power', $this->leagueContext->getTableName('ibl_power'));
+    }
+
+    public function testGetTableNameReturnsOlympicsJsbTableMappings(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+
+        $this->assertSame('ibl_olympics_plr', $this->leagueContext->getTableName('ibl_plr'));
+        $this->assertSame('ibl_olympics_hist', $this->leagueContext->getTableName('ibl_hist'));
+        $this->assertSame('ibl_olympics_jsb_history', $this->leagueContext->getTableName('ibl_jsb_history'));
+        $this->assertSame('ibl_olympics_jsb_transactions', $this->leagueContext->getTableName('ibl_jsb_transactions'));
+        $this->assertSame('ibl_olympics_rcb_alltime_records', $this->leagueContext->getTableName('ibl_rcb_alltime_records'));
+        $this->assertSame('ibl_olympics_rcb_season_records', $this->leagueContext->getTableName('ibl_rcb_season_records'));
+    }
+
+    public function testGetTableNameReturnsIblJsbTableNamesForIblContext(): void
+    {
+        $_SESSION['current_league'] = 'ibl';
+
+        $this->assertSame('ibl_plr', $this->leagueContext->getTableName('ibl_plr'));
+        $this->assertSame('ibl_hist', $this->leagueContext->getTableName('ibl_hist'));
+        $this->assertSame('ibl_jsb_history', $this->leagueContext->getTableName('ibl_jsb_history'));
+        $this->assertSame('ibl_jsb_transactions', $this->leagueContext->getTableName('ibl_jsb_transactions'));
+        $this->assertSame('ibl_rcb_alltime_records', $this->leagueContext->getTableName('ibl_rcb_alltime_records'));
+        $this->assertSame('ibl_rcb_season_records', $this->leagueContext->getTableName('ibl_rcb_season_records'));
+    }
+
+    // ---- getFilePrefix() tests ----
+
+    public function testGetFilePrefixReturnsIbl5ForIblContext(): void
+    {
+        $_SESSION['current_league'] = 'ibl';
+        $this->assertSame('IBL5', $this->leagueContext->getFilePrefix());
+    }
+
+    public function testGetFilePrefixReturnsOlympicsForOlympicsContext(): void
+    {
+        $_SESSION['current_league'] = 'olympics';
+        $this->assertSame('Olympics', $this->leagueContext->getFilePrefix());
+    }
+
+    public function testGetFilePrefixReturnsIbl5ByDefault(): void
+    {
+        $this->assertSame('IBL5', $this->leagueContext->getFilePrefix());
     }
 }

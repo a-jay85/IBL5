@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RecordHolders;
 
+use League\LeagueContext;
 use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
 
 /**
@@ -46,6 +47,20 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
     /** @var array<int, string> Team ID → team name lookup cache */
     private array $teamNameCache = [];
 
+    private string $boxScoresTable;
+    private string $boxScoresTeamsTable;
+    private string $scheduleTable;
+    private string $teamInfoTable;
+
+    public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->boxScoresTable = $this->resolveTable('ibl_box_scores');
+        $this->boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
+        $this->scheduleTable = $this->resolveTable('ibl_schedule');
+        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
+    }
+
     /**
      * @see RecordHoldersRepositoryInterface::getTopPlayerSingleGame()
      *
@@ -64,17 +79,17 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 CASE WHEN h.teamid = bs.visitorTID THEN bs.homeTID ELSE bs.visitorTID END AS oppTid,
                 opp.team_name AS opp_team_name,
                 {$statExpression} AS value
-            FROM ibl_box_scores bs
+            FROM {$this->boxScoresTable} bs
             JOIN ibl_plr p ON p.pid = bs.pid
             JOIN ibl_hist h ON h.pid = bs.pid AND h.year = ({$this->seasonYearExpression()})
-            LEFT JOIN ibl_schedule sch ON sch.Date = bs.Date
+            LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
                 AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
             LEFT JOIN (
                 SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
-                FROM ibl_box_scores_teams
+                FROM {$this->boxScoresTeamsTable}
                 GROUP BY Date, visitorTeamID, homeTeamID
             ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
-            LEFT JOIN ibl_team_info opp ON opp.teamid = CASE
+            LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
                 WHEN h.teamid = bs.visitorTID THEN bs.homeTID
                 ELSE bs.visitorTID END
             WHERE {$dateFilter}
@@ -176,17 +191,17 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 bs.gameAST AS assists,
                 bs.gameSTL AS steals,
                 bs.gameBLK AS blocks
-            FROM ibl_box_scores bs
+            FROM {$this->boxScoresTable} bs
             JOIN ibl_plr p ON p.pid = bs.pid
             JOIN ibl_hist h ON h.pid = bs.pid AND h.year = ({$this->seasonYearExpression()})
-            LEFT JOIN ibl_schedule sch ON sch.Date = bs.Date
+            LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
                 AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
             LEFT JOIN (
                 SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
-                FROM ibl_box_scores_teams
+                FROM {$this->boxScoresTeamsTable}
                 GROUP BY Date, visitorTeamID, homeTeamID
             ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
-            LEFT JOIN ibl_team_info opp ON opp.teamid = CASE
+            LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
                 WHEN h.teamid = bs.visitorTID THEN bs.homeTID
                 ELSE bs.visitorTID END
             WHERE (
@@ -276,11 +291,11 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 CASE WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID ELSE bs.visitorTeamID END AS oppTid,
                 opp.team_name AS opp_team_name,
                 {$statExpression} AS value
-            FROM ibl_box_scores_teams bs
-            JOIN ibl_team_info t ON t.team_name = bs.name
-            LEFT JOIN ibl_schedule sch ON sch.Date = bs.Date
+            FROM {$this->boxScoresTeamsTable} bs
+            JOIN {$this->teamInfoTable} t ON t.team_name = bs.name
+            LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
                 AND sch.Visitor = bs.visitorTeamID AND sch.Home = bs.homeTeamID
-            LEFT JOIN ibl_team_info opp ON opp.teamid = CASE
+            LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
                 WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID
                 ELSE bs.visitorTeamID END
             WHERE {$dateFilter}
@@ -340,11 +355,11 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 CASE WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID ELSE bs.visitorTeamID END AS oppTid,
                 opp.team_name AS opp_team_name,
                 {$expression} AS value
-            FROM ibl_box_scores_teams bs
-            JOIN ibl_team_info t ON t.team_name = bs.name
-            LEFT JOIN ibl_schedule sch ON sch.Date = bs.Date
+            FROM {$this->boxScoresTeamsTable} bs
+            JOIN {$this->teamInfoTable} t ON t.team_name = bs.name
+            LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
                 AND sch.Visitor = bs.visitorTeamID AND sch.Home = bs.homeTeamID
-            LEFT JOIN ibl_team_info opp ON opp.teamid = CASE
+            LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
                 WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID
                 ELSE bs.visitorTeamID END
             WHERE bs.visitorTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
@@ -408,13 +423,13 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     AND bs.homeTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
                 GROUP BY bs.Date, bs.visitorTeamID, bs.homeTeamID
             ) sub
-            JOIN ibl_team_info winner_t ON winner_t.teamid = sub.winner_id
-            JOIN ibl_team_info loser_t ON loser_t.teamid = sub.loser_id
-            LEFT JOIN ibl_schedule sch ON sch.Date = sub.Date
+            JOIN {$this->teamInfoTable} winner_t ON winner_t.teamid = sub.winner_id
+            JOIN {$this->teamInfoTable} loser_t ON loser_t.teamid = sub.loser_id
+            LEFT JOIN {$this->scheduleTable} sch ON sch.Date = sub.Date
                 AND sch.Visitor = sub.visitorTeamID AND sch.Home = sub.homeTeamID
             LEFT JOIN (
                 SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
-                FROM ibl_box_scores_teams
+                FROM {$this->boxScoresTeamsTable}
                 GROUP BY Date, visitorTeamID, homeTeamID
             ) bst ON bst.Date = sub.Date AND bst.visitorTeamID = sub.visitorTeamID AND bst.homeTeamID = sub.homeTeamID
             ORDER BY sub.margin DESC, sub.Date ASC
@@ -456,7 +471,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 twl.wins,
                 twl.losses
             FROM ibl_team_win_loss twl
-            JOIN ibl_team_info ti ON ti.team_name = twl.currentname
+            JOIN {$this->teamInfoTable} ti ON ti.team_name = twl.currentname
             WHERE ti.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
                 AND (twl.wins + twl.losses) > 0
             ORDER BY (twl.wins / (twl.wins + twl.losses)) {$safeOrder},
@@ -522,7 +537,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
     {
         if ($this->teamNameCache === []) {
             /** @var list<array{teamid: int, team_name: string}> $rows */
-            $rows = $this->fetchAll("SELECT teamid, team_name FROM ibl_team_info WHERE teamid BETWEEN 1 AND ?", 'i', \League::MAX_REAL_TEAMID);
+            $rows = $this->fetchAll("SELECT teamid, team_name FROM {$this->teamInfoTable} WHERE teamid BETWEEN 1 AND ?", 'i', \League::MAX_REAL_TEAMID);
             foreach ($rows as $row) {
                 $this->teamNameCache[$row['teamid']] = $row['team_name'];
             }
@@ -718,7 +733,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 COUNT(DISTINCT pr.year) AS count,
                 GROUP_CONCAT(DISTINCT pr.year ORDER BY pr.year ASC SEPARATOR ', ') AS years
             FROM vw_playoff_series_results pr
-            JOIN ibl_team_info t ON t.teamid = pr.winner_tid OR t.teamid = pr.loser_tid
+            JOIN {$this->teamInfoTable} t ON t.teamid = pr.winner_tid OR t.teamid = pr.loser_tid
             WHERE t.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             GROUP BY t.team_name
             ORDER BY count DESC, t.team_name ASC
@@ -778,17 +793,17 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     CASE WHEN h.teamid = bs.visitorTID THEN bs.homeTID ELSE bs.visitorTID END AS oppTid,
                     opp.team_name AS opp_team_name,
                     {$expression} AS value
-                FROM ibl_box_scores bs
+                FROM {$this->boxScoresTable} bs
                 JOIN ibl_plr p ON p.pid = bs.pid
                 JOIN ibl_hist h ON h.pid = bs.pid AND h.year = ({$this->seasonYearExpression()})
-                LEFT JOIN ibl_schedule sch ON sch.Date = bs.Date
+                LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
                     AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
                 LEFT JOIN (
                     SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
-                    FROM ibl_box_scores_teams
+                    FROM {$this->boxScoresTeamsTable}
                     GROUP BY Date, visitorTeamID, homeTeamID
                 ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
-                LEFT JOIN ibl_team_info opp ON opp.teamid = CASE
+                LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
                     WHEN h.teamid = bs.visitorTID THEN bs.homeTID
                     ELSE bs.visitorTID END
                 WHERE {$dateFilter}
@@ -853,11 +868,11 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     CASE WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID ELSE bs.visitorTeamID END AS oppTid,
                     opp.team_name AS opp_team_name,
                     {$config['expression']} AS value
-                FROM ibl_box_scores_teams bs
-                JOIN ibl_team_info t ON t.team_name = bs.name
-                LEFT JOIN ibl_schedule sch ON sch.Date = bs.Date
+                FROM {$this->boxScoresTeamsTable} bs
+                JOIN {$this->teamInfoTable} t ON t.team_name = bs.name
+                LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
                     AND sch.Visitor = bs.visitorTeamID AND sch.Home = bs.homeTeamID
-                LEFT JOIN ibl_team_info opp ON opp.teamid = CASE
+                LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
                     WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID
                     ELSE bs.visitorTeamID END
                 WHERE {$dateFilter}
@@ -1067,7 +1082,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
 
         /** @var list<array{Date: string}> $rows */
         $rows = $this->fetchAll(
-            "SELECT DISTINCT Date FROM ibl_box_scores WHERE Date > ? AND Date <= ? ORDER BY Date ASC",
+            "SELECT DISTINCT Date FROM {$this->boxScoresTable} WHERE Date > ? AND Date <= ? ORDER BY Date ASC",
             'ss',
             $floor,
             $simEnd

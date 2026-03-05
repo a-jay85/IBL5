@@ -25,9 +25,15 @@ ALTER TABLE `ibl_olympics_stats` DROP KEY IF EXISTS `id`;
 -- ibl_draft: Convert draft_id from UNIQUE KEY to PRIMARY KEY
 -- (AUTO_INCREMENT column should be the PK, not just a unique key)
 ALTER TABLE `ibl_draft` DROP KEY IF EXISTS `draft_id`;
--- Only add PK if not already present (MODIFY keeps existing PK)
--- If PK already exists on draft_id this is a no-op via the MODIFY
-ALTER TABLE `ibl_draft` MODIFY COLUMN `draft_id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY;
+-- Only add PK if draft_id is not already the PK (production schema already has it)
+SET @has_pk = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ibl_draft' AND CONSTRAINT_TYPE = 'PRIMARY KEY');
+SET @pk_sql = IF(@has_pk = 0,
+  'ALTER TABLE `ibl_draft` MODIFY COLUMN `draft_id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY',
+  'SELECT 1');
+PREPARE _stmt FROM @pk_sql;
+EXECUTE _stmt;
+DEALLOCATE PREPARE _stmt;
 
 -- =====================================================================
 -- PART 2: Add Missing Primary Keys (Section 1.2)

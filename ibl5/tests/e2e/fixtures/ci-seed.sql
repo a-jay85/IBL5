@@ -388,11 +388,11 @@ INSERT INTO ibl_olympics_schedule (SchedID, Date, Year, Visitor, VScore, Home, H
   (1, '2026-07-01', 2026, 1, 95, 2, 88, 1, 'oly-sched-uuid-01'),
   (2, '2026-07-01', 2026, 3, 82, 4, 79, 2, 'oly-sched-uuid-02');
 
-INSERT INTO ibl_olympics_league_config (season_ending_year, team_slot, team_name, conference, division) VALUES
-  (2026, 1, 'Eagles', 'Group A', ''),
-  (2026, 2, 'Maple',  'Group A', ''),
-  (2026, 3, 'Bulls',  'Group B', ''),
-  (2026, 4, 'Coqs',   'Group B', '');
+INSERT INTO ibl_olympics_league_config (season_ending_year, team_slot, team_name, conference, division, team_count) VALUES
+  (2026, 1, 'Eagles', 'Group A', '', 4),
+  (2026, 2, 'Maple',  'Group A', '', 4),
+  (2026, 3, 'Bulls',  'Group B', '', 4),
+  (2026, 4, 'Coqs',   'Group B', '', 4);
 
 -- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the

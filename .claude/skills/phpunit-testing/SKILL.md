@@ -257,7 +257,7 @@ Add **only** to `ibl5/phpunit.xml` (not CI/CD):
 
 ## Templates
 
-See [templates/BaseTestCase.php](./templates/BaseTestCase.php) for starter template.
+See [templates/BaseTestCase.php](${CLAUDE_SKILL_DIR}/templates/BaseTestCase.php) for starter template.
 
 ## Reference Test Suites
 

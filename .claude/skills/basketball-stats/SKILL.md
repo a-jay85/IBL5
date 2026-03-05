@@ -114,6 +114,6 @@ $min = StatsSanitizer::sanitizeMinutes($value);        // Ensures non-negative f
 
 ## Examples
 
-See [examples/](./examples/) for more patterns:
-- [percentage-formatting.php](./examples/percentage-formatting.php)
-- [per-game-averages.php](./examples/per-game-averages.php)
+See [examples/](${CLAUDE_SKILL_DIR}/examples/) for more patterns:
+- [percentage-formatting.php](${CLAUDE_SKILL_DIR}/examples/percentage-formatting.php)
+- [per-game-averages.php](${CLAUDE_SKILL_DIR}/examples/per-game-averages.php)

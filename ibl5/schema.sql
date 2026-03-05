@@ -2886,12 +2886,6 @@ CREATE TABLE `nuke_groups_points` (
 DROP TABLE IF EXISTS `nuke_headlines`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_headlines` (
-  `hid` int(11) NOT NULL AUTO_INCREMENT,
-  `sitename` varchar(30) NOT NULL DEFAULT '',
-  `headlinesurl` varchar(200) NOT NULL DEFAULT '',
-  PRIMARY KEY (`hid`)
-) ENGINE=MyISAM AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2901,13 +2895,6 @@ CREATE TABLE `nuke_headlines` (
 DROP TABLE IF EXISTS `nuke_links_categories`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_links_categories` (
-  `cid` int(11) NOT NULL AUTO_INCREMENT,
-  `title` varchar(50) NOT NULL DEFAULT '',
-  `cdescription` mediumtext NOT NULL,
-  `parentid` int(11) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`cid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2917,25 +2904,6 @@ CREATE TABLE `nuke_links_categories` (
 DROP TABLE IF EXISTS `nuke_links_links`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_links_links` (
-  `lid` int(11) NOT NULL AUTO_INCREMENT,
-  `cid` int(11) NOT NULL DEFAULT 0,
-  `sid` int(11) NOT NULL DEFAULT 0,
-  `title` varchar(100) NOT NULL DEFAULT '',
-  `url` varchar(100) NOT NULL DEFAULT '',
-  `description` mediumtext NOT NULL,
-  `date` datetime DEFAULT NULL,
-  `name` varchar(100) NOT NULL DEFAULT '',
-  `email` varchar(100) NOT NULL DEFAULT '',
-  `hits` int(11) NOT NULL DEFAULT 0,
-  `submitter` varchar(60) NOT NULL DEFAULT '',
-  `linkratingsummary` double(6,4) NOT NULL DEFAULT 0.0000,
-  `totalvotes` int(11) NOT NULL DEFAULT 0,
-  `totalcomments` int(11) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`lid`),
-  KEY `cid` (`cid`),
-  KEY `sid` (`sid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2945,18 +2913,6 @@ CREATE TABLE `nuke_links_links` (
 DROP TABLE IF EXISTS `nuke_links_modrequest`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_links_modrequest` (
-  `requestid` int(11) NOT NULL AUTO_INCREMENT,
-  `lid` int(11) NOT NULL DEFAULT 0,
-  `cid` int(11) NOT NULL DEFAULT 0,
-  `sid` int(11) NOT NULL DEFAULT 0,
-  `title` varchar(100) NOT NULL DEFAULT '',
-  `url` varchar(100) NOT NULL DEFAULT '',
-  `description` mediumtext NOT NULL,
-  `modifysubmitter` varchar(60) NOT NULL DEFAULT '',
-  `brokenlink` int(11) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`requestid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2966,20 +2922,6 @@ CREATE TABLE `nuke_links_modrequest` (
 DROP TABLE IF EXISTS `nuke_links_newlink`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_links_newlink` (
-  `lid` int(11) NOT NULL AUTO_INCREMENT,
-  `cid` int(11) NOT NULL DEFAULT 0,
-  `sid` int(11) NOT NULL DEFAULT 0,
-  `title` varchar(100) NOT NULL DEFAULT '',
-  `url` varchar(100) NOT NULL DEFAULT '',
-  `description` mediumtext NOT NULL,
-  `name` varchar(100) NOT NULL DEFAULT '',
-  `email` varchar(100) NOT NULL DEFAULT '',
-  `submitter` varchar(60) NOT NULL DEFAULT '',
-  PRIMARY KEY (`lid`),
-  KEY `cid` (`cid`),
-  KEY `sid` (`sid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -2989,9 +2931,6 @@ CREATE TABLE `nuke_links_newlink` (
 DROP TABLE IF EXISTS `nuke_main`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_main` (
-  `main_module` varchar(255) NOT NULL DEFAULT ''
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -3114,20 +3053,6 @@ CREATE TABLE `nuke_poll_desc` (
 DROP TABLE IF EXISTS `nuke_queue`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_queue` (
-  `qid` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
-  `uid` mediumint(9) NOT NULL DEFAULT 0,
-  `uname` varchar(40) NOT NULL DEFAULT '',
-  `subject` varchar(100) NOT NULL DEFAULT '',
-  `story` mediumtext DEFAULT NULL,
-  `storyext` mediumtext NOT NULL,
-  `timestamp` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `topic` varchar(20) NOT NULL DEFAULT '',
-  `alanguage` varchar(30) NOT NULL DEFAULT '',
-  PRIMARY KEY (`qid`),
-  KEY `uid` (`uid`),
-  KEY `uname` (`uname`)
-) ENGINE=MyISAM AUTO_INCREMENT=80 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -3151,14 +3076,6 @@ CREATE TABLE `nuke_referer` (
 DROP TABLE IF EXISTS `nuke_related`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_related` (
-  `rid` int(11) NOT NULL AUTO_INCREMENT,
-  `tid` int(11) NOT NULL DEFAULT 0,
-  `name` varchar(30) NOT NULL DEFAULT '',
-  `url` varchar(200) NOT NULL DEFAULT '',
-  PRIMARY KEY (`rid`),
-  KEY `tid` (`tid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

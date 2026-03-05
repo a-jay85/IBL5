@@ -40,7 +40,7 @@ jobs:
         run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
       
       - name: Cache Composer dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-composer-${{ hashFiles('ibl5/composer.lock') }}
@@ -48,7 +48,7 @@ jobs:
             ${{ runner.os }}-composer-
       
       - name: Cache vendor directory
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: vendor-cache
         with:
           path: ibl5/vendor

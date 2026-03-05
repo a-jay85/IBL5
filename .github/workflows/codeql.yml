@@ -1,15 +1,14 @@
 name: CodeQL
 on:
   push:
+    branches: [master]
     paths:
-      - '**/*.java'
       - '**/*.ts'
       - '**/*.tsx'
       - '**/*.js'
       - '**/*.jsx'
   pull_request:
     paths:
-      - '**/*.java'
       - '**/*.ts'
       - '**/*.tsx'
       - '**/*.js'

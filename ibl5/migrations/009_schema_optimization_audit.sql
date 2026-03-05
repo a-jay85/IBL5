@@ -45,25 +45,22 @@ DELETE t1 FROM `ibl_heat_career_avgs` t1
 INNER JOIN `ibl_heat_career_avgs` t2
   ON t1.pid = t2.pid
   AND t1.games < t2.games;
--- ADD PRIMARY KEY is not idempotent in MariaDB, but if it already exists
--- this will error. Use a conditional approach via IGNORE:
--- If PK already exists, this is harmless (MariaDB 10.6 ignores duplicate PK add)
-ALTER IGNORE TABLE `ibl_heat_career_avgs` ADD PRIMARY KEY (`pid`);
+ALTER TABLE `ibl_heat_career_avgs` ADD PRIMARY KEY IF NOT EXISTS (`pid`);
 
 -- ibl_heat_career_totals: Add PK on pid
-ALTER IGNORE TABLE `ibl_heat_career_totals` ADD PRIMARY KEY (`pid`);
+ALTER TABLE `ibl_heat_career_totals` ADD PRIMARY KEY IF NOT EXISTS (`pid`);
 
 -- ibl_olympics_career_avgs: Add PK on pid
-ALTER IGNORE TABLE `ibl_olympics_career_avgs` ADD PRIMARY KEY (`pid`);
+ALTER TABLE `ibl_olympics_career_avgs` ADD PRIMARY KEY IF NOT EXISTS (`pid`);
 
 -- ibl_olympics_career_totals: Add PK on pid
-ALTER IGNORE TABLE `ibl_olympics_career_totals` ADD PRIMARY KEY (`pid`);
+ALTER TABLE `ibl_olympics_career_totals` ADD PRIMARY KEY IF NOT EXISTS (`pid`);
 
 -- ibl_playoff_career_totals: Add PK on pid
-ALTER IGNORE TABLE `ibl_playoff_career_totals` ADD PRIMARY KEY (`pid`);
+ALTER TABLE `ibl_playoff_career_totals` ADD PRIMARY KEY IF NOT EXISTS (`pid`);
 
 -- ibl_season_career_avgs: Add PK on pid
-ALTER IGNORE TABLE `ibl_season_career_avgs` ADD PRIMARY KEY (`pid`);
+ALTER TABLE `ibl_season_career_avgs` ADD PRIMARY KEY IF NOT EXISTS (`pid`);
 
 -- ibl_box_scores_teams: Add synthetic PK
 ALTER TABLE `ibl_box_scores_teams`

@@ -36,6 +36,8 @@ ALTER TABLE ibl_power
   DROP COLUMN IF EXISTS Team;
 
 -- TeamID becomes the PK (if not already)
--- MODIFY to ensure correct type, then set as PK if needed
 ALTER TABLE ibl_power
   MODIFY COLUMN TeamID INT NOT NULL DEFAULT 0;
+
+ALTER TABLE ibl_power
+  ADD PRIMARY KEY IF NOT EXISTS (TeamID);

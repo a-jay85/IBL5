@@ -227,6 +227,9 @@ ALTER TABLE `ibl_olympics_power`
 ALTER TABLE `ibl_olympics_power`
   MODIFY COLUMN `TeamID` INT NOT NULL DEFAULT 0 COMMENT 'Team ID (PK, FK to ibl_olympics_team_info)';
 
+ALTER TABLE `ibl_olympics_power`
+  ADD PRIMARY KEY IF NOT EXISTS (`TeamID`);
+
 -- Add SOS columns
 ALTER TABLE `ibl_olympics_power`
   ADD COLUMN IF NOT EXISTS `sos` DECIMAL(4,3) NOT NULL DEFAULT 0.000 COMMENT 'Strength of schedule' AFTER `streak`,

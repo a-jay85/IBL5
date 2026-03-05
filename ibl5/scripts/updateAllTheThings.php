@@ -169,7 +169,10 @@ try {
     $updaterService->addStep(new Updater\Steps\UpdateStandingsStep($standingsUpdater));
     $updaterService->addStep(new Updater\Steps\UpdatePowerRankingsStep($powerRankingsUpdater));
 
-    $updaterService->addStep(new Updater\Steps\ResetExtensionAttemptsStep($sharedRepository));
+    // IBL-only: contract extensions don't exist in Olympics (ibl_olympics_team_info lacks Used_Extension_This_Chunk)
+    if (!$isOlympics) {
+        $updaterService->addStep(new Updater\Steps\ResetExtensionAttemptsStep($sharedRepository));
+    }
     $updaterService->addStep(new Updater\Steps\ExtendDepthChartsStep(
         $savedDcRepo, $season->lastSimEndDate, $season->lastSimNumber,
     ));

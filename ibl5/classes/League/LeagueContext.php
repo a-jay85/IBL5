@@ -202,6 +202,8 @@ class LeagueContext
             'ibl_jsb_transactions' => 'ibl_olympics_jsb_transactions',
             'ibl_rcb_alltime_records' => 'ibl_olympics_rcb_alltime_records',
             'ibl_rcb_season_records' => 'ibl_olympics_rcb_season_records',
+            'ibl_saved_depth_charts' => 'ibl_olympics_saved_depth_charts',
+            'ibl_saved_depth_chart_players' => 'ibl_olympics_saved_depth_chart_players',
             default => $iblTableName,
         };
     }

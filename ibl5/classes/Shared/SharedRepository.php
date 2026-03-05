@@ -20,6 +20,14 @@ use Shared\Contracts\SharedRepositoryInterface;
  */
 class SharedRepository extends \BaseMysqliRepository implements SharedRepositoryInterface
 {
+    private string $teamInfoTable;
+
+    public function __construct(\mysqli $db, ?\League\LeagueContext $leagueContext = null)
+    {
+        parent::__construct($db, $leagueContext);
+        $this->teamInfoTable = $this->resolveTable('ibl_team_info');
+    }
+
     /**
      * Gets the number of a specific award won by a team
      *
@@ -80,7 +88,7 @@ class SharedRepository extends \BaseMysqliRepository implements SharedRepository
     {
         try {
             $this->execute(
-                "UPDATE ibl_team_info SET Used_Extension_This_Chunk = 0",
+                "UPDATE {$this->teamInfoTable} SET Used_Extension_This_Chunk = 0",
                 ""
             );
         } catch (\Exception $e) {

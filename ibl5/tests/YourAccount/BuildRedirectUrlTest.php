@@ -19,7 +19,7 @@ class BuildRedirectUrlTest extends TestCase
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
-        unset($_SESSION['redirect_after_login']);
+        unset($_SESSION['redirect_after_login'], $_SESSION['redirect_after_login_path']);
 
         // Ensure the function is available (defined in includes/buildRedirectUrl.php)
         if (!function_exists('buildRedirectUrl')) {
@@ -29,7 +29,7 @@ class BuildRedirectUrlTest extends TestCase
 
     protected function tearDown(): void
     {
-        unset($_SESSION['redirect_after_login']);
+        unset($_SESSION['redirect_after_login'], $_SESSION['redirect_after_login_path']);
     }
 
     public function testReturnsNullWhenSessionNotSet(): void
@@ -147,5 +147,52 @@ class BuildRedirectUrlTest extends TestCase
         $result = buildRedirectUrl();
 
         $this->assertSame('modules.php?name=Module123', $result);
+    }
+
+    public function testReturnsStandalonePagePath(): void
+    {
+        $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php';
+
+        $result = buildRedirectUrl();
+
+        $this->assertSame('leagueControlPanel.php', $result);
+    }
+
+    public function testReturnsStandalonePagePathWithQueryString(): void
+    {
+        $_SESSION['redirect_after_login_path'] = 'scripts/updateAllTheThings.php?league=olympics';
+
+        $result = buildRedirectUrl();
+
+        $this->assertSame('scripts/updateAllTheThings.php?league=olympics', $result);
+    }
+
+    public function testRejectsNonWhitelistedStandalonePath(): void
+    {
+        $_SESSION['redirect_after_login_path'] = 'malicious.php';
+
+        $result = buildRedirectUrl();
+
+        $this->assertNull($result);
+    }
+
+    public function testClearsStandalonePathSessionAfterUse(): void
+    {
+        $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php';
+
+        buildRedirectUrl();
+
+        $this->assertArrayNotHasKey('redirect_after_login_path', $_SESSION);
+    }
+
+    public function testStandalonePathTakesPriorityOverModuleRedirect(): void
+    {
+        $_SESSION['redirect_after_login_path'] = 'leagueControlPanel.php';
+        $_SESSION['redirect_after_login'] = 'name=Trading';
+
+        $result = buildRedirectUrl();
+
+        $this->assertSame('leagueControlPanel.php', $result);
+        $this->assertArrayHasKey('redirect_after_login', $_SESSION);
     }
 }

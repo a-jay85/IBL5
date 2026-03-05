@@ -98,31 +98,32 @@ ALTER TABLE `ibl_box_scores`
 -- PART 5: Create Optimization Views (Section 2)
 -- =====================================================================
 
--- 5.1: vw_current_salary
+-- 5.1: vw_current_salary (teamname via JOIN since column dropped by migration 041)
 CREATE OR REPLACE VIEW `vw_current_salary` AS
 SELECT
-  pid, name, tid, teamname, pos, cy, cyt,
-  cy1, cy2, cy3, cy4, cy5, cy6,
-  CASE cy
-    WHEN 1 THEN cy1
-    WHEN 2 THEN cy2
-    WHEN 3 THEN cy3
-    WHEN 4 THEN cy4
-    WHEN 5 THEN cy5
-    WHEN 6 THEN cy6
+  p.pid, p.name, p.tid, t.team_name AS teamname, p.pos, p.cy, p.cyt,
+  p.cy1, p.cy2, p.cy3, p.cy4, p.cy5, p.cy6,
+  CASE p.cy
+    WHEN 1 THEN p.cy1
+    WHEN 2 THEN p.cy2
+    WHEN 3 THEN p.cy3
+    WHEN 4 THEN p.cy4
+    WHEN 5 THEN p.cy5
+    WHEN 6 THEN p.cy6
     ELSE 0
   END AS current_salary,
-  CASE cy
-    WHEN 0 THEN cy1
-    WHEN 1 THEN cy2
-    WHEN 2 THEN cy3
-    WHEN 3 THEN cy4
-    WHEN 4 THEN cy5
-    WHEN 5 THEN cy6
+  CASE p.cy
+    WHEN 0 THEN p.cy1
+    WHEN 1 THEN p.cy2
+    WHEN 2 THEN p.cy3
+    WHEN 3 THEN p.cy4
+    WHEN 4 THEN p.cy5
+    WHEN 5 THEN p.cy6
     ELSE 0
   END AS next_year_salary
-FROM ibl_plr
-WHERE retired = 0;
+FROM ibl_plr p
+LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+WHERE p.retired = 0;
 
 -- 5.2: vw_team_total_score
 CREATE OR REPLACE VIEW `vw_team_total_score` AS

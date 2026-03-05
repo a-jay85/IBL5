@@ -272,21 +272,8 @@ ALTER TABLE `ibl_olympics_career_totals` MODIFY COLUMN `retired` int NOT NULL DE
 -- ibl_olympics_power
 -- =============================================================================
 ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `TeamID` smallint NOT NULL DEFAULT '0' COMMENT 'Team ID (FK to ibl_olympics_team_info)';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `Team` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Team name (PK)';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `Division` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Division/group name';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `Conference` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Conference name';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `ranking` decimal(6,1) NOT NULL DEFAULT '0.0' COMMENT 'Power ranking score (0.0-100.0)';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `win` smallint NOT NULL DEFAULT '0' COMMENT 'Overall wins';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `loss` smallint NOT NULL DEFAULT '0' COMMENT 'Overall losses';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `gb` decimal(6,1) NOT NULL DEFAULT '0.0' COMMENT 'Games behind leader';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `conf_win` int NOT NULL COMMENT 'Conference wins';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `conf_loss` int NOT NULL COMMENT 'Conference losses';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `div_win` int NOT NULL COMMENT 'Division wins';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `div_loss` int NOT NULL COMMENT 'Division losses';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `home_win` int NOT NULL COMMENT 'Home wins';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `home_loss` int NOT NULL COMMENT 'Home losses';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `road_win` int NOT NULL COMMENT 'Road wins';
-ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `road_loss` int NOT NULL COMMENT 'Road losses';
+-- Team, Division, Conference, win, loss, gb, conf_win/loss, div_win/loss,
+-- home_win/loss, road_win/loss: dropped by migration 043, skip
 ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `last_win` int NOT NULL COMMENT 'Last 10 games wins';
 ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `last_loss` int NOT NULL COMMENT 'Last 10 games losses';
 ALTER TABLE `ibl_olympics_power` MODIFY COLUMN `streak_type` varchar(1) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'W=winning, L=losing';
@@ -348,7 +335,7 @@ ALTER TABLE `ibl_plr` MODIFY COLUMN `ordinal` int DEFAULT '0' COMMENT 'Roster so
 ALTER TABLE `ibl_plr` MODIFY COLUMN `nickname` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT 'Player nickname';
 ALTER TABLE `ibl_plr` MODIFY COLUMN `age` tinyint unsigned DEFAULT NULL COMMENT 'Player age in years';
 ALTER TABLE `ibl_plr` MODIFY COLUMN `peak` tinyint unsigned DEFAULT NULL COMMENT 'Peak development age';
-ALTER TABLE `ibl_plr` MODIFY COLUMN `teamname` varchar(16) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT 'Team name (denormalized from ibl_team_info)';
+-- teamname: dropped by migration 041, skip
 ALTER TABLE `ibl_plr` MODIFY COLUMN `Clutch` tinyint DEFAULT NULL COMMENT 'Clutch performance rating';
 ALTER TABLE `ibl_plr` MODIFY COLUMN `Consistency` tinyint DEFAULT NULL COMMENT 'Consistency rating';
 ALTER TABLE `ibl_plr` MODIFY COLUMN `active` tinyint(1) DEFAULT NULL COMMENT 'On depth chart (1=yes, NOT retired status)';
@@ -484,7 +471,7 @@ ALTER TABLE `ibl_team_info` MODIFY COLUMN `Contract_Wins` int NOT NULL DEFAULT '
 ALTER TABLE `ibl_team_info` MODIFY COLUMN `Contract_Losses` int NOT NULL DEFAULT '0' COMMENT 'Losses from last season for FA Play for Winner weight';
 ALTER TABLE `ibl_team_info` MODIFY COLUMN `Contract_AvgW` int NOT NULL DEFAULT '0' COMMENT 'Avg wins from last five seasons for FA Tradition weight';
 ALTER TABLE `ibl_team_info` MODIFY COLUMN `Contract_AvgL` int NOT NULL DEFAULT '0' COMMENT 'Avg losses from last five seasons for FA Tradition weight';
-ALTER TABLE `ibl_team_info` MODIFY COLUMN `Contract_Coach` decimal(3,2) NOT NULL DEFAULT '0.00' COMMENT 'Playoff record for FA Coach weight (currently unused)';
+-- Contract_Coach: dropped by migration 035, skip
 ALTER TABLE `ibl_team_info` MODIFY COLUMN `Used_Extension_This_Chunk` int NOT NULL DEFAULT '0' COMMENT '1=used extension in current sim chunk';
 ALTER TABLE `ibl_team_info` MODIFY COLUMN `Used_Extension_This_Season` int DEFAULT '0' COMMENT '1=used extension this season';
 ALTER TABLE `ibl_team_info` MODIFY COLUMN `HasMLE` int NOT NULL DEFAULT '0' COMMENT '1=Mid-Level Exception already used';

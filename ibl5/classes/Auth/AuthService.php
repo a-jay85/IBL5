@@ -136,7 +136,7 @@ class AuthService implements AuthServiceInterface
         if (password_verify($password, $storedHash)) {
             // Re-hash if cost parameters have changed
             if (password_needs_rehash($storedHash, PASSWORD_BCRYPT, ['cost' => self::BCRYPT_COST])) {
-                $this->upgradeHash($row['username'], $password);
+                $this->syncPasswordToNukeUsers($row['username'], $password);
             }
             $this->startSession($row['user_id'], $row['username']);
             return true;
@@ -144,7 +144,7 @@ class AuthService implements AuthServiceInterface
 
         // 2b. MD5 transitional fallback — upgrade hash on success
         if ($storedHash !== '' && md5($password) === $storedHash) {
-            $this->upgradeHash($row['username'], $password);
+            $this->syncPasswordToNukeUsers($row['username'], $password);
             $this->startSession($row['user_id'], $row['username']);
             return true;
         }
@@ -335,31 +335,20 @@ class AuthService implements AuthServiceInterface
             $userId = $this->getAuth()->registerWithUniqueUsername($email, $password, $username, $emailCallback);
             return $userId;
         } catch (InvalidEmailException) {
-            $this->lastError = 'The email address is invalid.';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('The email address is invalid.');
         } catch (InvalidPasswordException) {
-            $this->lastError = 'The password is invalid. Please choose a stronger password.';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('The password is invalid. Please choose a stronger password.');
         } catch (UserAlreadyExistsException) {
-            $this->lastError = 'A user with this email address already exists.';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('A user with this email address already exists.');
         } catch (DuplicateUsernameException) {
-            $this->lastError = 'This username is already taken. Please choose another.';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('This username is already taken. Please choose another.');
         } catch (TooManyRequestsException) {
-            $this->lastError = 'Too many requests. Please try again later.';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('Too many requests. Please try again later.');
         } catch (AuthError $e) {
-            $this->lastError = 'An unexpected error occurred during registration.';
-            throw new \RuntimeException($this->lastError, 0, $e);
+            $this->fail('An unexpected error occurred during registration.', $e);
         }
     }
 
-    /**
-     * @see AuthServiceInterface::confirmEmail()
-     *
-     * @return array<int|string, string>
-     */
     /**
      * Confirm a user's email and sign them in via delight-auth.
      *
@@ -383,20 +372,15 @@ class AuthService implements AuthServiceInterface
 
             return ['username' => $authUsername ?? 'User'];
         } catch (InvalidSelectorTokenPairException) {
-            $this->lastError = 'mismatch';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('mismatch');
         } catch (TokenExpiredException) {
-            $this->lastError = 'expired';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('expired');
         } catch (UserAlreadyExistsException) {
-            $this->lastError = 'mismatch';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('mismatch');
         } catch (TooManyRequestsException) {
-            $this->lastError = 'expired';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('expired');
         } catch (AuthError $e) {
-            $this->lastError = 'expired';
-            throw new \RuntimeException($this->lastError, 0, $e);
+            $this->fail('expired', $e);
         }
     }
 
@@ -437,29 +421,36 @@ class AuthService implements AuthServiceInterface
                 $stmt->close();
             }
         } catch (InvalidSelectorTokenPairException) {
-            $this->lastError = 'This password reset link is invalid. Please request a new one.';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('This password reset link is invalid. Please request a new one.');
         } catch (TokenExpiredException) {
-            $this->lastError = 'This password reset link has expired. Please request a new one.';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('This password reset link has expired. Please request a new one.');
         } catch (ResetDisabledException) {
-            $this->lastError = 'Password reset is disabled for this account.';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('Password reset is disabled for this account.');
         } catch (InvalidPasswordException) {
-            $this->lastError = 'The new password is invalid. Please choose a stronger password.';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('The new password is invalid. Please choose a stronger password.');
         } catch (TooManyRequestsException) {
-            $this->lastError = 'Too many requests. Please try again later.';
-            throw new \RuntimeException($this->lastError);
+            $this->fail('Too many requests. Please try again later.');
         } catch (AuthError $e) {
-            $this->lastError = 'An error occurred while resetting your password.';
-            throw new \RuntimeException($this->lastError, 0, $e);
+            $this->fail('An error occurred while resetting your password.', $e);
         }
     }
 
     public function getLastError(): ?string
     {
         return $this->lastError;
+    }
+
+    /**
+     * Set the last error message and throw a RuntimeException.
+     *
+     * Consolidates the repeated catch pattern: set lastError, then re-throw.
+     *
+     * @throws \RuntimeException Always
+     */
+    private function fail(string $message, ?\Throwable $previous = null): never
+    {
+        $this->lastError = $message;
+        throw new \RuntimeException($message, 0, $previous);
     }
 
     /**
@@ -501,10 +492,9 @@ class AuthService implements AuthServiceInterface
     }
 
     /**
-     * Sync the password hash to nuke_users after a successful delight-auth login.
+     * Update the bcrypt hash in nuke_users for a given user.
      *
-     * This allows future logins to succeed via the faster nuke_users bcrypt path
-     * without needing a delight-auth round-trip.
+     * Used for both MD5-to-bcrypt upgrades and delight-auth sync.
      */
     private function syncPasswordToNukeUsers(string $username, string $plaintext): void
     {
@@ -541,18 +531,4 @@ class AuthService implements AuthServiceInterface
         return $row !== null ? $row['user_id'] : null;
     }
 
-    /**
-     * Upgrade a user's password hash from MD5 to bcrypt
-     */
-    private function upgradeHash(string $username, string $plaintext): void
-    {
-        $newHash = $this->hashPassword($plaintext);
-        $stmt = $this->db->prepare('UPDATE nuke_users SET user_password = ? WHERE username = ?');
-        if ($stmt === false) {
-            return;
-        }
-        $stmt->bind_param('ss', $newHash, $username);
-        $stmt->execute();
-        $stmt->close();
-    }
 }

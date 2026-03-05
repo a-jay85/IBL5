@@ -116,7 +116,7 @@ jobs:
 
       - name: Start PHP server
         run: |
-          php -S 0.0.0.0:8080 -t $GITHUB_WORKSPACE $GITHUB_WORKSPACE/ibl5/router.php &
+          E2E_TESTING=1 php -S 0.0.0.0:8080 -t $GITHUB_WORKSPACE $GITHUB_WORKSPACE/ibl5/router.php &
           echo "PHP server PID: $!"
 
       - name: Wait for server

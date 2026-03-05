@@ -7,7 +7,3 @@
  */
 
 export const MODULE_INACTIVE_TEXT = "Module isn't active";
-
-export function isModuleInactive(body: string | null): boolean {
-  return body?.includes(MODULE_INACTIVE_TEXT) ?? false;
-}

@@ -61,10 +61,13 @@ INSERT INTO nuke_modules (title, custom_title, active, view) VALUES
 INSERT INTO ibl_settings (name, value) VALUES
   ('Current Season Phase',        'Free Agency'),
   ('Current Season Ending Year',  '2026'),
-  ('Allow Trades',                'Off'),
-  ('Allow Waiver Moves',          'Off'),
+  ('Allow Trades',                'No'),
+  ('Allow Waiver Moves',          'No'),
   ('Show Draft Link',             'Off'),
   ('Free Agency Notifications',   'Off'),
+  ('Trivia Mode',                 'Off'),
+  ('ASG Voting',                  'No'),
+  ('EOY Voting',                  'No'),
   ('League Sim Length',            '7');
 
 INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES

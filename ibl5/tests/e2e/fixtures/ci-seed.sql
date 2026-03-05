@@ -45,7 +45,16 @@ INSERT INTO nuke_modules (title, custom_title, active, view) VALUES
   ('DepthChartEntry',   'DepthChartEntry',   1, 0),
   ('ComparePlayers',    'ComparePlayers',    1, 0),
   ('YourAccount',       'Your Account',      1, 0),
-  ('News',              'News',              1, 0);
+  ('News',              'News',              1, 0),
+  ('FreeAgency',          'FreeAgency',          1, 0),
+  ('AwardHistory',        'AwardHistory',        1, 0),
+  ('FranchiseRecordBook', 'FranchiseRecordBook', 1, 0),
+  ('RecordHolders',       'RecordHolders',       1, 0),
+  ('TransactionHistory',  'TransactionHistory',  1, 0),
+  ('Search',              'Search',              1, 0),
+  ('FranchiseHistory',    'FranchiseHistory',    1, 0),
+  ('TeamStats',           'TeamStats',           1, 0),
+  ('PlayerDatabase',      'PlayerDatabase',      1, 0);
 
 -- ============================================================
 -- IBL season bootstrap
@@ -265,6 +274,99 @@ INSERT INTO ibl_hist (
 INSERT INTO ibl_draft_picks (ownerofpick, owner_tid, teampick, teampick_tid, year, round) VALUES
   ('Metros', 1, 'Metros', 1, 2026, 1),
   ('Stars',  2, 'Stars',  2, 2026, 1);
+
+-- ============================================================
+-- Franchise Record Book tables (from migration 037)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `ibl_rcb_alltime_records` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `scope` ENUM('league', 'team') NOT NULL,
+    `team_id` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    `record_type` ENUM('single_season', 'career') NOT NULL,
+    `stat_category` ENUM('ppg','pts','rpg','trb','apg','ast','spg','stl','bpg','blk','fg_pct','ft_pct','three_pct') NOT NULL,
+    `ranking` TINYINT UNSIGNED NOT NULL,
+    `player_name` VARCHAR(33) NOT NULL,
+    `car_block_id` SMALLINT UNSIGNED DEFAULT NULL,
+    `pid` INT DEFAULT NULL,
+    `stat_value` DECIMAL(10,4) NOT NULL,
+    `stat_raw` INT NOT NULL,
+    `team_of_record` TINYINT UNSIGNED DEFAULT NULL,
+    `season_year` SMALLINT UNSIGNED DEFAULT NULL,
+    `career_total` INT DEFAULT NULL,
+    `source_file` VARCHAR(128) DEFAULT NULL,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uq_record` (`scope`, `team_id`, `record_type`, `stat_category`, `ranking`),
+    KEY `idx_pid` (`pid`),
+    KEY `idx_team` (`team_id`),
+    KEY `idx_stat_type` (`stat_category`, `record_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `ibl_rcb_season_records` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `season_year` SMALLINT UNSIGNED NOT NULL,
+    `scope` ENUM('league', 'team') NOT NULL,
+    `team_id` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    `context` ENUM('home', 'away') NOT NULL,
+    `stat_category` ENUM('pts','reb','ast','stl','blk','two_gm','three_gm','ftm') NOT NULL,
+    `ranking` TINYINT UNSIGNED NOT NULL,
+    `player_name` VARCHAR(33) NOT NULL,
+    `player_position` VARCHAR(2) DEFAULT NULL,
+    `car_block_id` SMALLINT UNSIGNED DEFAULT NULL,
+    `pid` INT DEFAULT NULL,
+    `stat_value` SMALLINT UNSIGNED NOT NULL,
+    `record_season_year` SMALLINT UNSIGNED NOT NULL,
+    `source_file` VARCHAR(128) DEFAULT NULL,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uq_record` (`season_year`, `scope`, `team_id`, `context`, `stat_category`, `ranking`),
+    KEY `idx_pid` (`pid`),
+    KEY `idx_season` (`season_year`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- League single-season records (scope=league, team_id=0)
+INSERT INTO ibl_rcb_alltime_records (scope, team_id, record_type, stat_category, ranking, player_name, pid, stat_value, stat_raw, team_of_record, season_year) VALUES
+  ('league', 0, 'single_season', 'ppg', 1, 'Test Player',     1, 15.5000, 155, 1, 2026),
+  ('league', 0, 'single_season', 'ppg', 2, 'Test Player Two', 2, 13.9474, 139, 1, 2026),
+  ('league', 0, 'single_season', 'rpg', 1, 'Test Player Two', 2, 4.7368,  47,  1, 2026),
+  ('league', 0, 'single_season', 'rpg', 2, 'Test Player',     1, 4.0000,  40,  1, 2026),
+  ('league', 0, 'single_season', 'apg', 1, 'Test Player',     1, 4.5000,  45,  1, 2026),
+  ('league', 0, 'single_season', 'apg', 2, 'Test Player Two', 2, 3.9474,  39,  1, 2026);
+
+-- Team single-season records for team_id=1 (Metros)
+INSERT INTO ibl_rcb_alltime_records (scope, team_id, record_type, stat_category, ranking, player_name, pid, stat_value, stat_raw, team_of_record, season_year) VALUES
+  ('team', 1, 'single_season', 'ppg', 1, 'Test Player',     1, 15.5000, 155, 1, 2026),
+  ('team', 1, 'single_season', 'ppg', 2, 'Test Player Two', 2, 13.9474, 139, 1, 2026),
+  ('team', 1, 'single_season', 'rpg', 1, 'Test Player Two', 2, 4.7368,  47,  1, 2026),
+  ('team', 1, 'single_season', 'rpg', 2, 'Test Player',     1, 4.0000,  40,  1, 2026),
+  ('team', 1, 'single_season', 'apg', 1, 'Test Player',     1, 4.5000,  45,  1, 2026),
+  ('team', 1, 'single_season', 'apg', 2, 'Test Player Two', 2, 3.9474,  39,  1, 2026);
+
+-- ============================================================
+-- Award History (ibl_awards — searched by AwardHistory module)
+-- Award names must contain 'MVP' for test search, and player
+-- names must match ibl_plr.name for pid JOIN.
+-- ============================================================
+
+INSERT INTO ibl_awards (year, Award, name) VALUES
+  (2026, 'Regular Season MVP',           'Test Player'),
+  (2026, 'Defensive Player of the Year', 'Test Player Two'),
+  (2025, 'Regular Season MVP',           'Test Player'),
+  (2025, 'Rookie of the Year',           'Test Player Two'),
+  (2026, 'Most Improved Player',         'Test Player');
+
+-- ============================================================
+-- Transaction History (nuke_stories — filtered by catid)
+-- Category IDs: 1=Waiver Pool, 2=Trades, 3=Extensions,
+--               8=Free Agency, 10=Rookie Extension, 14=Position Changes
+-- ============================================================
+
+INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic) VALUES
+  (1,  'admin', 'Metros waive Test Bench Player',                       '2026-03-01 12:00:00', 'Waiver transaction details', '', 1),
+  (2,  'admin', 'Metros trade Test Player Two to Stars for draft pick', '2026-02-15 10:00:00', 'Trade details',              '', 1),
+  (2,  'admin', 'Stars trade Draft Pick to Cougars for Cash',           '2026-02-10 09:00:00', 'Trade details',              '', 1),
+  (3,  'admin', 'Test Player extends with Metros for 3 years',         '2026-01-20 14:00:00', 'Extension details',          '', 1),
+  (8,  'admin', 'Metros sign Free Agent Guard',                        '2025-12-01 08:00:00', 'Free agency signing',        '', 1),
+  (14, 'admin', 'Test Player Two changes position from SF to PF',      '2026-03-02 11:00:00', 'Position change details',    '', 1);
 
 -- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the

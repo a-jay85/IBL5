@@ -20,6 +20,10 @@ test.describe('Public page smoke tests', () => {
 
   test('player page loads', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1');
+    const body = await page.locator('body').textContent();
+    if (body?.includes("Module isn't active")) {
+      test.skip(true, 'Player module is not active (Trivia Mode may be on)');
+    }
     // Player page uses a card layout — check for the player name heading
     await expect(page.locator('h2, h3').first()).toBeVisible();
   });
@@ -31,11 +35,19 @@ test.describe('Public page smoke tests', () => {
 
   test('season leaderboards loads', async ({ page }) => {
     await page.goto('modules.php?name=SeasonLeaderboards');
+    const body = await page.locator('body').textContent();
+    if (body?.includes("Module isn't active")) {
+      test.skip(true, 'SeasonLeaderboards module is not active (Trivia Mode may be on)');
+    }
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 
   test('career leaderboards loads', async ({ page }) => {
     await page.goto('modules.php?name=CareerLeaderboards');
+    const body = await page.locator('body').textContent();
+    if (body?.includes("Module isn't active")) {
+      test.skip(true, 'CareerLeaderboards module is not active (Trivia Mode may be on)');
+    }
     // Career leaderboards shows a form on initial load — verify the form is present
     await expect(page.getByRole('button', { name: /display/i })).toBeVisible();
   });

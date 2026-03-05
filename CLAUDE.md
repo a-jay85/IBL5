@@ -105,7 +105,7 @@ Classes autoload from `ibl5/classes/`. Never use `require_once`.
 - **Schema is reference-only:** `schema.sql` is a snapshot of production's database schema. Never edit it directly to make schema changes. Instead, create migration files. `schema.sql` will not be reimported into production.
 - Use `$mysqli_db` (modern MySQLi) over legacy `$db`
 - 51 InnoDB tables with foreign keys, 84 legacy MyISAM tables, 23 database views
-- **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on `$mysqli_db` (in `db/db.php`). INT columns return PHP `int`, FLOAT columns return PHP `float`, VARCHAR/TEXT columns return PHP `string`. Compare with native types accordingly (e.g., `=== 0` for INT columns, `=== '0'` for VARCHAR columns). The legacy `$db` connection does NOT have native types.
+- **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on `$mysqli_db`. See `core-coding.md` for type comparison rules. The legacy `$db` connection does NOT have native types.
 - **MAMP connection & db-query script:** See `database-access.md` for local connection details and the auto-approved `./bin/db-query` wrapper.
 - **CLI MySQL access:** Always use MAMP's mysql client (`/Applications/MAMP/Library/bin/mysql80/bin/mysql --socket=/Applications/MAMP/tmp/mysql/mysql.sock -u root -p'root'`), NOT Homebrew's `mysql`. Homebrew MySQL has authentication plugin incompatibility with MAMP's server. For quick queries, prefer the `./bin/db-query "SQL"` wrapper.
 

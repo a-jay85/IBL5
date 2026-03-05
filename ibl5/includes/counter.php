@@ -72,7 +72,6 @@ if (str_contains($_SERVER["HTTP_USER_AGENT"], "Win")) {
 /* Save on the databases the obtained values */
 
 $db->sql_query("UPDATE " . $prefix . "_counter SET count=count+1 WHERE (type='total' AND var='hits') OR (var='$browser' AND type='browser') OR (var='$os' AND type='os')");
-update_points(13);
 
 /* Start Detailed Statistics */
 

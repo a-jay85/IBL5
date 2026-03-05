@@ -31,7 +31,6 @@ function theindex($new_topic = "0")
         $querylang = "";
     }
     PageLayout\PageLayout::header();
-    automated_news();
     if (isset($userinfo['storynum']) and $user_news == 1) {
         $storynum = $userinfo['storynum'];
     } else {

@@ -384,9 +384,9 @@ INSERT INTO ibl_olympics_standings (tid, team_name, pct, leagueRecord, wins, los
   (3, 'Bulls',  0.500, '2-2', 2, 2, 'Group B', ''),
   (4, 'Coqs',   0.250, '1-3', 1, 3, 'Group B', '');
 
-INSERT INTO ibl_olympics_schedule (SchedID, Date, Visitor, VScore, Home, HScore, BoxID) VALUES
-  (1, '2026-07-01', 1, 95, 2, 88, 1),
-  (2, '2026-07-01', 3, 82, 4, 79, 2);
+INSERT INTO ibl_olympics_schedule (SchedID, Date, Year, Visitor, VScore, Home, HScore, BoxID) VALUES
+  (1, '2026-07-01', 2026, 1, 95, 2, 88, 1),
+  (2, '2026-07-01', 2026, 3, 82, 4, 79, 2);
 
 INSERT INTO ibl_olympics_league_config (season_ending_year, team_slot, team_name, conference, division) VALUES
   (2026, 1, 'Eagles', 'Group A', ''),

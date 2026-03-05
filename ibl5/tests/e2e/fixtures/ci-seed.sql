@@ -68,7 +68,8 @@ INSERT INTO ibl_settings (name, value) VALUES
   ('Trivia Mode',                 'Off'),
   ('ASG Voting',                  'No'),
   ('EOY Voting',                  'No'),
-  ('League Sim Length',            '7');
+  ('League Sim Length',            '7')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
 
 INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES
   (689, '2026-03-01', '2026-03-07');

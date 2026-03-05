@@ -3179,9 +3179,6 @@ CREATE TABLE `nuke_config` (
   `notify_from` varchar(255) NOT NULL DEFAULT '',
   `moderate` tinyint(1) NOT NULL DEFAULT 0,
   `admingraphic` tinyint(1) NOT NULL DEFAULT 1,
-  `httpref` tinyint(1) NOT NULL DEFAULT 1,
-  `httprefmax` int(11) NOT NULL DEFAULT 1000,
-  `httprefmode` tinyint(1) NOT NULL DEFAULT 1,
   `CensorMode` tinyint(1) NOT NULL DEFAULT 3,
   `CensorReplace` varchar(10) NOT NULL DEFAULT '',
   `copyright` text NOT NULL,
@@ -3298,20 +3295,6 @@ CREATE TABLE `nuke_poll_desc` (
   `comments` int(11) DEFAULT 0,
   PRIMARY KEY (`pollID`)
 ) ENGINE=MyISAM AUTO_INCREMENT=53 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_referer`
---
-
-DROP TABLE IF EXISTS `nuke_referer`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_referer` (
-  `rid` int(11) NOT NULL AUTO_INCREMENT,
-  `url` varchar(100) NOT NULL DEFAULT '',
-  PRIMARY KEY (`rid`)
-) ENGINE=MyISAM AUTO_INCREMENT=40508 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

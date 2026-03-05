@@ -14,7 +14,7 @@ INSERT INTO nuke_config (
   ultramode, banners, backend_title, backend_language, language, locale,
   multilingual, useflags, notify, notify_email, notify_subject,
   notify_message, notify_from, moderate, admingraphic,
-  httpref, httprefmax, httprefmode, CensorMode, CensorReplace,
+  CensorMode, CensorReplace,
   copyright, Version_Num, gfx_chk, nuke_editor, display_errors
 ) VALUES (
   'IBL5', 'http://localhost:8080/ibl5/', '', 'Internet Basketball League', '2026-01-01',
@@ -26,7 +26,7 @@ INSERT INTO nuke_config (
   0, 0, '', 'en', 'english', 'en_US',
   0, 0, 0, '', '',
   '', '', 0, 1,
-  0, 1000, 1, 0, '',
+  0, '',
   '', '5.11', 0, 0, 0
 );
 

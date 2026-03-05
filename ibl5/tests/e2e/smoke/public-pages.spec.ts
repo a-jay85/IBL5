@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
-import { isModuleInactive, MODULE_INACTIVE_TEXT } from '../helpers/trivia-mode';
+import { setState, type Settings } from '../helpers/test-state';
 
 // Public pages — no authentication required.
 // These use the base test (not the auth fixture) so they run without login.
@@ -8,6 +8,18 @@ import { isModuleInactive, MODULE_INACTIVE_TEXT } from '../helpers/trivia-mode';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Public page smoke tests', () => {
+  // Ensure trivia mode is off so modules render normally
+  let restoreSettings: Settings;
+
+  test.beforeEach(async ({ request }) => {
+    const result = await setState(request, { 'Trivia Mode': 'Off' });
+    restoreSettings = result.previous;
+  });
+
+  test.afterEach(async ({ request }) => {
+    await setState(request, restoreSettings);
+  });
+
   test('homepage loads', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle(/IBL/i);
@@ -21,12 +33,6 @@ test.describe('Public page smoke tests', () => {
 
   test('player page loads', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1');
-    const body = await page.locator('body').textContent();
-    if (isModuleInactive(body)) {
-      await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
-      test.skip(true, 'Module hidden during trivia mode');
-    }
-    // Player page uses a card layout — check for the player name heading
     await expect(page.locator('h2, h3').first()).toBeVisible();
   });
 
@@ -37,22 +43,11 @@ test.describe('Public page smoke tests', () => {
 
   test('season leaderboards loads', async ({ page }) => {
     await page.goto('modules.php?name=SeasonLeaderboards');
-    const body = await page.locator('body').textContent();
-    if (isModuleInactive(body)) {
-      await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
-      test.skip(true, 'Module hidden during trivia mode');
-    }
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 
   test('career leaderboards loads', async ({ page }) => {
     await page.goto('modules.php?name=CareerLeaderboards');
-    const body = await page.locator('body').textContent();
-    if (isModuleInactive(body)) {
-      await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
-      test.skip(true, 'Module hidden during trivia mode');
-    }
-    // Career leaderboards shows a form on initial load — verify the form is present
     await expect(page.getByRole('button', { name: /display/i })).toBeVisible();
   });
 
@@ -63,8 +58,7 @@ test.describe('Public page smoke tests', () => {
 
   test('cap space loads', async ({ page }) => {
     await page.goto('modules.php?name=CapSpace');
-    // The CapSpace module renders a large sticky-table. Under some local
-    // database states the view may produce no content — skip if so.
+    // Data-dependent skip: the view may produce no content depending on DB state
     const table = page.locator('.ibl-data-table, .sticky-table, table').first();
     const visible = await table.isVisible({ timeout: 10_000 }).catch(() => false);
     if (!visible) {

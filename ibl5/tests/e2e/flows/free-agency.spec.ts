@@ -1,49 +1,18 @@
 import { test, expect } from '../fixtures/auth';
-import type { Page } from '@playwright/test';
 import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
 
 // Free Agency — authenticated page.
 // NOTE: Do NOT submit offer forms — that would mutate data.
 
-async function shouldSkipFreeAgency(page: Page): Promise<string | null> {
-  const body = await page.locator('body').textContent();
-  if (!body) return 'Free agency page returned empty content';
-
-  const lower = body.toLowerCase();
-  if (
-    lower.includes('free agency is closed') ||
-    lower.includes('free agency is not open') ||
-    (lower.includes('free agency') && lower.includes('closed'))
-  ) {
-    return 'Free agency is currently closed';
-  }
-
-  // Between season phases, the page may show only the nav bar with no
-  // module content. Check if any data tables or team tables exist.
-  const hasContent = await page
-    .locator('.ibl-data-table, .team-table, table')
-    .first()
-    .isVisible()
-    .catch(() => false);
-  if (!hasContent) {
-    return 'Free agency has no content in current season phase';
-  }
-
-  return null;
-}
-
 test.describe('Free Agency flow', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Free Agency' });
     await page.goto('modules.php?name=FreeAgency');
     // Under parallel MAMP load, the page may render blank — retry once
-    let body = await page.locator('body').innerText();
+    const body = await page.locator('body').innerText();
     if (body.trim().length < 20) {
       await page.waitForTimeout(500);
       await page.goto('modules.php?name=FreeAgency');
-    }
-    const skipReason = await shouldSkipFreeAgency(page);
-    if (skipReason) {
-      test.skip(true, skipReason);
     }
   });
 

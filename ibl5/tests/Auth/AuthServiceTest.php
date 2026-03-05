@@ -130,6 +130,7 @@ class AuthServiceTest extends TestCase
     {
         $_SESSION['auth_user_id'] = 42;
         $_SESSION['auth_username'] = 'testuser';
+        $_SESSION['auth_roles'] = 1; // ADMIN role cached from login
 
         self::assertTrue($this->authService->isAuthenticated());
 
@@ -138,6 +139,7 @@ class AuthServiceTest extends TestCase
         self::assertFalse($this->authService->isAuthenticated());
         self::assertArrayNotHasKey('auth_user_id', $_SESSION);
         self::assertArrayNotHasKey('auth_username', $_SESSION);
+        self::assertArrayNotHasKey('auth_roles', $_SESSION);
     }
 
     public function testGetUserInfoReturnsNullWhenNotAuthenticated(): void

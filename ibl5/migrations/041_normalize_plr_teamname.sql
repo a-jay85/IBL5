@@ -1,7 +1,4 @@
 -- Migration 041: Normalize ibl_plr from teamname to tid
---
--- Phase A: Update vw_current_salary to JOIN for team name (backward-compatible)
--- Phase B: Drop the denormalized teamname column (run after PHP deploy)
 
 -- ============================================================================
 -- PHASE A: Update view (safe, backward-compatible)
@@ -25,5 +22,5 @@ WHERE p.retired = 0;
 -- PHASE B: Drop column (run after PHP deploy confirms no teamname writes)
 -- ============================================================================
 
-DROP INDEX teamname ON ibl_plr;
-ALTER TABLE ibl_plr DROP COLUMN teamname;
+DROP INDEX IF EXISTS teamname ON ibl_plr;
+ALTER TABLE ibl_plr DROP COLUMN IF EXISTS teamname;

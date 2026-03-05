@@ -53,6 +53,11 @@ jobs:
           sed 's/DEFINER=`[^`]*`@`[^`]*`//g' ibl5/schema.sql \
             | mysql -h 127.0.0.1 -u root -proot ibl5
 
+      - name: Apply migrations
+        run: |
+          chmod +x ibl5/bin/run-migrations-ci.sh
+          ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
+
       - name: Import seed data
         run: mysql -h 127.0.0.1 -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
 

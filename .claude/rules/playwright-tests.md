@@ -84,23 +84,45 @@ test.describe('Module auth smoke tests', () => {
 });
 ```
 
-### Flow test with season-phase-aware skipping
+### Flow test with state control
 ```typescript
 import { test, expect } from '../fixtures/auth';
 
 test.describe('Module flow', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ appState, page }) => {
+    // Set the state this test needs — automatically restored after each test
+    await appState({ 'Allow Trades': 'Yes' });
     await page.goto('modules.php?name=Module');
-
-    // Skip if season phase doesn't support this feature
-    const body = await page.locator('body').textContent();
-    const featureClosed = body?.includes('is closed') || body?.includes('period');
-    if (featureClosed) {
-      test.skip(true, 'Feature is closed for the current season phase');
-    }
   });
 
   test('interaction works', async ({ page }) => {
+    // Test steps...
+  });
+});
+```
+
+### Public test with manual state control
+```typescript
+import { test, expect } from '@playwright/test';
+import { setState, type Settings } from '../helpers/test-state';
+
+test.use({ storageState: { cookies: [], origins: [] } });
+test.describe.configure({ mode: 'serial' });
+
+test.describe('Public module flow', () => {
+  let restoreSettings: Settings;
+
+  test.beforeEach(async ({ request, page }) => {
+    const result = await setState(request, { 'Trivia Mode': 'Off' });
+    restoreSettings = result.previous;
+    await page.goto('modules.php?name=Module');
+  });
+
+  test.afterEach(async ({ request }) => {
+    await setState(request, restoreSettings);
+  });
+
+  test('page loads', async ({ page }) => {
     // Test steps...
   });
 });
@@ -186,27 +208,42 @@ expect(await page.locator('input[type="checkbox"]').count()).toBeGreaterThan(0);
 expect(body, `PHP error on ${url}`).not.toContain('Fatal error');
 ```
 
-## Season-Phase-Aware Skipping
+## State Control for Season-Phase-Dependent Tests
 
-Some features are only available during certain season phases (e.g., trading, free agency, draft). **Never hardcode skips** — detect the phase at runtime from page content:
+Tests that depend on application state (season phase, trading open/closed, trivia mode, etc.) should **set the state they need** rather than detecting and skipping. This uses the `test-state.php` endpoint (gated by `E2E_TESTING=1`).
 
+**Authenticated tests** — use the `appState` fixture from `../fixtures/auth`:
 ```typescript
-// CORRECT — runtime detection
-const body = await page.locator('body').textContent();
-const tradesClosed = body?.includes('Trading is closed') || body?.includes('trades are closed');
-if (tradesClosed) {
-  test.skip(true, 'Trades are currently closed for the season');
-}
-
-// WRONG — hardcoded skip
-test.skip(true, 'Skip until offseason');
+// appState sets settings and auto-restores after each test
+test.beforeEach(async ({ appState, page }) => {
+  await appState({ 'Current Season Phase': 'Free Agency' });
+  await page.goto('modules.php?name=FreeAgency');
+});
 ```
+
+**Public tests** — use `setState` directly with manual restore:
+```typescript
+import { setState, type Settings } from '../helpers/test-state';
+
+let restoreSettings: Settings;
+test.beforeEach(async ({ request }) => {
+  const result = await setState(request, { 'Trivia Mode': 'Off' });
+  restoreSettings = result.previous;
+});
+test.afterEach(async ({ request }) => {
+  await setState(request, restoreSettings);
+});
+```
+
+**Allowlisted settings:** `Current Season Phase`, `Allow Trades`, `Allow Waiver Moves`, `Show Draft Link`, `Trivia Mode`, `ASG Voting`, `EOY Voting`, `Free Agency Notifications`.
+
+**Serial mode:** When multiple `describe` blocks in the same file set the same setting to different values, use `test.describe.configure({ mode: 'serial' })` at the file level to prevent interleaving.
 
 ## DO:
 1. Check for PHP errors on every page you visit in smoke tests
 2. Use the auth fixture for authenticated tests
 3. Use `storageState: { cookies: [], origins: [] }` for public tests
-4. Detect season phase at runtime and skip dynamically
+4. Use `appState` fixture (authenticated) or `setState` helper (public) to set required state
 5. Use stable CSS classes or accessible roles for locators
 6. Keep smoke tests fast — one assertion per test, no complex interactions
 7. Add new pages to the PHP error check loop when adding smoke tests
@@ -214,7 +251,7 @@ test.skip(true, 'Skip until offseason');
 
 ## DON'T:
 1. **Don't** call login inside tests — use the auth fixture
-2. **Don't** hardcode `test.skip()` — use runtime phase detection
+2. **Don't** skip tests due to season phase — use `appState` or `setState` to set the state you need
 3. **Don't** use `.only` — it will fail in CI (`forbidOnly: true`)
 4. **Don't** use fragile structural selectors
 5. **Don't** mutate production data (create trades, submit forms) without cleanup

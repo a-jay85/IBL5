@@ -1,28 +1,41 @@
 import { test, expect } from '@playwright/test';
 import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
-import { isModuleInactive, MODULE_INACTIVE_TEXT } from '../helpers/trivia-mode';
+import { MODULE_INACTIVE_TEXT } from '../helpers/trivia-mode';
+import { setState, type Settings } from '../helpers/test-state';
+import type { APIRequestContext } from '@playwright/test';
 
 // Leaderboards — public, no authentication required.
+// Serial: trivia-on and trivia-off blocks set the same setting (Trivia Mode).
+test.describe.configure({ mode: 'serial' });
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test.describe('Season Leaderboards flow', () => {
-  let triviaMode = false;
-  let cachedBody: string | null = null;
+/**
+ * Set trivia mode and return a cleanup function.
+ * For public tests that don't have the appState fixture.
+ */
+async function setTriviaMode(
+  request: APIRequestContext,
+  mode: 'On' | 'Off',
+): Promise<Settings> {
+  const result = await setState(request, { 'Trivia Mode': mode });
+  return result.previous;
+}
 
-  test.beforeEach(async ({ page }) => {
+// ---- Season Leaderboards: trivia off (normal) ----
+
+test.describe('Season Leaderboards flow', () => {
+  let restoreSettings: Settings;
+
+  test.beforeEach(async ({ request, page }) => {
+    restoreSettings = await setTriviaMode(request, 'Off');
     await page.goto('modules.php?name=SeasonLeaderboards');
-    cachedBody = await page.locator('body').textContent();
-    triviaMode = isModuleInactive(cachedBody);
   });
 
-  test('module shows inactive message when trivia mode is on', async ({ page }) => {
-    if (!triviaMode) test.skip(true, 'Trivia mode is off');
-    await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
+  test.afterEach(async ({ request }) => {
+    await setState(request, restoreSettings);
   });
 
   test('page loads with filter form', async ({ page }) => {
-    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
-
     const form = page.locator('.ibl-filter-form');
     await expect(form).toBeVisible();
 
@@ -33,8 +46,6 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('default results table present', async ({ page }) => {
-    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
-
     const table = page.locator('.ibl-data-table');
     await expect(table.first()).toBeVisible();
     const rows = table.first().locator('tbody tr');
@@ -42,8 +53,6 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('table has sticky rank and name columns', async ({ page }) => {
-    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
-
     const table = page.locator('.ibl-data-table').first();
     await expect(table).toBeVisible();
 
@@ -52,29 +61,21 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('sorted column is highlighted', async ({ page }) => {
-    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
-
     const table = page.locator('.ibl-data-table').first();
     await expect(table).toBeVisible();
 
-    // Default sort is PPG — should have sorted-col class
     const sortedCol = table.locator('th.sorted-col');
     expect(await sortedCol.count()).toBeGreaterThanOrEqual(1);
   });
 
   test('changing sort category updates results', async ({ page }) => {
-    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
-
-    // Get default sorted column text
     const table = page.locator('.ibl-data-table').first();
     await expect(table).toBeVisible();
     const defaultSortedText = await table.locator('th.sorted-col').first().textContent();
 
-    // Change sort to REB (value 2) and submit
     await page.locator('select[name="sortby"]').selectOption('2');
     await page.locator('.ibl-filter-form__submit').click();
 
-    // Wait for page reload
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
 
     const newSortedText = await page.locator('.ibl-data-table').first().locator('th.sorted-col').first().textContent();
@@ -82,14 +83,10 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('filtering by team shows only that team players', async ({ page }) => {
-    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
-
-    // Pick the first non-"All" team option
     const teamSelect = page.locator('select[name="team"]');
     const options = teamSelect.locator('option');
     const optionCount = await options.count();
 
-    // Skip "All" (index 0), pick the first real team
     if (optionCount > 1) {
       const teamValue = await options.nth(1).getAttribute('value');
       await teamSelect.selectOption(teamValue!);
@@ -102,7 +99,6 @@ test.describe('Season Leaderboards flow', () => {
         els.map((el) => el.getAttribute('data-team-id')),
       );
       if (teamIds.length > 0) {
-        // All rows should have the same team ID
         for (const id of teamIds) {
           expect(id).toBe(teamIds[0]);
         }
@@ -111,8 +107,6 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('limit input controls row count', async ({ page }) => {
-    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
-
     await page.locator('input[name="limit"]').fill('5');
     await page.locator('.ibl-filter-form__submit').click();
 
@@ -123,33 +117,50 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('no PHP errors on season leaderboards', async ({ page }) => {
+    const body = await page.locator('body').textContent();
     for (const pattern of PHP_ERROR_PATTERNS) {
       expect(
-        cachedBody,
+        body,
         `PHP error "${pattern}" on Season Leaderboards page`,
       ).not.toContain(pattern);
     }
   });
 });
 
-test.describe('Career Leaderboards flow', () => {
-  let triviaMode = false;
-  let cachedBody: string | null = null;
+// ---- Season Leaderboards: trivia on ----
 
-  test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=CareerLeaderboards');
-    cachedBody = await page.locator('body').textContent();
-    triviaMode = isModuleInactive(cachedBody);
+test.describe('Season Leaderboards: trivia mode', () => {
+  let restoreSettings: Settings;
+
+  test.beforeEach(async ({ request, page }) => {
+    restoreSettings = await setTriviaMode(request, 'On');
+    await page.goto('modules.php?name=SeasonLeaderboards');
+  });
+
+  test.afterEach(async ({ request }) => {
+    await setState(request, restoreSettings);
   });
 
   test('module shows inactive message when trivia mode is on', async ({ page }) => {
-    if (!triviaMode) test.skip(true, 'Trivia mode is off');
     await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
+  });
+});
+
+// ---- Career Leaderboards: trivia off (normal) ----
+
+test.describe('Career Leaderboards flow', () => {
+  let restoreSettings: Settings;
+
+  test.beforeEach(async ({ request, page }) => {
+    restoreSettings = await setTriviaMode(request, 'Off');
+    await page.goto('modules.php?name=CareerLeaderboards');
+  });
+
+  test.afterEach(async ({ request }) => {
+    await setState(request, restoreSettings);
   });
 
   test('page loads with filter form', async ({ page }) => {
-    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
-
     const form = page.locator('.ibl-filter-form');
     await expect(form).toBeVisible();
 
@@ -160,8 +171,6 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('form submission shows results', async ({ page }) => {
-    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
-
     await page.locator('.ibl-filter-form__submit').click();
 
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
@@ -170,8 +179,6 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('table has sticky rank and name columns', async ({ page }) => {
-    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
-
     await page.locator('.ibl-filter-form__submit').click();
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
 
@@ -181,8 +188,6 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('sorted column is highlighted', async ({ page }) => {
-    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
-
     await page.locator('.ibl-filter-form__submit').click();
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
 
@@ -191,9 +196,6 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('changing board type works', async ({ page }) => {
-    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
-
-    // Select a different board type option
     const boardTypeSelect = page.locator('select[name="boards_type"]');
     const options = boardTypeSelect.locator('option');
     const optionCount = await options.count();
@@ -209,46 +211,57 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('include/exclude retirees toggle changes results', async ({ page }) => {
-    if (triviaMode) test.skip(true, 'Module hidden during trivia mode');
-
-    // Submit with retirees included (default: active=0 means "Yes include")
     await page.locator('select[name="active"]').selectOption('0');
     await page.locator('.ibl-filter-form__submit').click();
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     const withRetireesCount = await page.locator('.ibl-data-table').first().locator('tbody tr').count();
 
-    // Submit with retirees excluded (active=1 means "No")
     await page.locator('select[name="active"]').selectOption('1');
     await page.locator('.ibl-filter-form__submit').click();
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     const withoutRetireesCount = await page.locator('.ibl-data-table').first().locator('tbody tr').count();
 
-    // Both should have results, and counts should differ to confirm filter works
     expect(withRetireesCount).toBeGreaterThan(0);
     expect(withoutRetireesCount).toBeGreaterThan(0);
     expect(withRetireesCount).not.toBe(withoutRetireesCount);
   });
 
   test('no PHP errors on career leaderboards', async ({ page }) => {
-    // Check initial page (reuse cached body from beforeEach)
+    const body = await page.locator('body').textContent();
     for (const pattern of PHP_ERROR_PATTERNS) {
       expect(
-        cachedBody,
+        body,
         `PHP error "${pattern}" on Career Leaderboards form page`,
       ).not.toContain(pattern);
     }
 
-    // Check results page (only if module is active)
-    if (!triviaMode) {
-      await page.locator('.ibl-filter-form__submit').click();
-      await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-      const body = await page.locator('body').textContent();
-      for (const pattern of PHP_ERROR_PATTERNS) {
-        expect(
-          body,
-          `PHP error "${pattern}" on Career Leaderboards results page`,
-        ).not.toContain(pattern);
-      }
+    await page.locator('.ibl-filter-form__submit').click();
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    const resultsBody = await page.locator('body').textContent();
+    for (const pattern of PHP_ERROR_PATTERNS) {
+      expect(
+        resultsBody,
+        `PHP error "${pattern}" on Career Leaderboards results page`,
+      ).not.toContain(pattern);
     }
+  });
+});
+
+// ---- Career Leaderboards: trivia on ----
+
+test.describe('Career Leaderboards: trivia mode', () => {
+  let restoreSettings: Settings;
+
+  test.beforeEach(async ({ request, page }) => {
+    restoreSettings = await setTriviaMode(request, 'On');
+    await page.goto('modules.php?name=CareerLeaderboards');
+  });
+
+  test.afterEach(async ({ request }) => {
+    await setState(request, restoreSettings);
+  });
+
+  test('module shows inactive message when trivia mode is on', async ({ page }) => {
+    await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
   });
 });

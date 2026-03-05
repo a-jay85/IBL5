@@ -6,31 +6,11 @@ import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
 // Shared constants & helpers
 // ---------------------------------------------------------------------------
 
-/** Check whether the Trading module currently shows a "closed" message. */
-async function isTradesClosed(page: Page): Promise<boolean> {
-  const body = await page.locator('body').textContent();
-  return (
-    body?.includes('trades are not allowed') ||
-    body?.includes('Trading is closed') ||
-    body?.includes('trades are closed') ||
-    body?.includes('trading period') ||
-    false
-  );
-}
-
 /**
  * Navigate to the trade offer form by picking the first available partner.
- * Automatically skips the calling test if trades are closed.
  */
-async function navigateToTradeForm(
-  page: Page,
-  testInfo: typeof test,
-): Promise<void> {
+async function navigateToTradeForm(page: Page): Promise<void> {
   await page.goto('modules.php?name=Trading');
-
-  if (await isTradesClosed(page)) {
-    testInfo.skip(true, 'Trades are currently closed for the season');
-  }
 
   const firstTeamLink = page.locator('.trading-team-select a').first();
   await expect(firstTeamLink).toBeVisible();
@@ -87,13 +67,9 @@ async function mockRosterPreviewApi(page: Page): Promise<void> {
 // ===========================================================================
 
 test.describe('Trading flow', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Allow Trades': 'Yes' });
     await page.goto('modules.php?name=Trading');
-
-    // Skip all trading tests if trades are currently closed
-    if (await isTradesClosed(page)) {
-      test.skip(true, 'Trades are currently closed for the season');
-    }
   });
 
   test('navigate to trade form via team select', async ({ page }) => {
@@ -118,32 +94,6 @@ test.describe('Trading flow', () => {
     expect(await checkboxes.count()).toBeGreaterThan(0);
   });
 
-  test('selecting players shows roster preview', async ({ page }) => {
-    const firstTeamLink = page.locator('.trading-team-select a').first();
-    await firstTeamLink.click();
-
-    await expect(page.locator('form[name="Trade_Offer"]')).toBeVisible();
-
-    // Preview should be hidden initially
-    const preview = page.locator('#trade-roster-preview');
-    await expect(preview).toBeHidden();
-
-    // Check one player from each roster table
-    const rosterTables = page.locator('.trading-roster');
-    for (let i = 0; i < 2; i++) {
-      const checkbox = rosterTables
-        .nth(i)
-        .locator('input[type="checkbox"]')
-        .first();
-      if (await checkbox.isVisible()) {
-        await checkbox.check();
-      }
-    }
-
-    // Preview should now be visible
-    await expect(preview).toBeVisible();
-  });
-
   test('trade review page loads', async ({ page }) => {
     await page.goto('modules.php?name=Trading&op=reviewtrade');
 
@@ -164,8 +114,9 @@ test.describe('Trading flow', () => {
 // ===========================================================================
 
 test.describe('Trade offer form structure', () => {
-  test.beforeEach(async ({ page }) => {
-    await navigateToTradeForm(page, test);
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Allow Trades': 'Yes' });
+    await navigateToTradeForm(page);
   });
 
   test('roster tables have team-colored styling and logo banners', async ({
@@ -252,12 +203,36 @@ test.describe('Trade offer form structure', () => {
 // ===========================================================================
 
 test.describe('Trade offer form: roster preview interactions', () => {
-  test.beforeEach(async ({ page }) => {
-    await navigateToTradeForm(page, test);
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Allow Trades': 'Yes' });
     await mockRosterPreviewApi(page);
+    await navigateToTradeForm(page);
+  });
+
+  test('selecting players shows roster preview', async ({ page }) => {
+
+    // Preview should be hidden initially
+    const preview = page.locator('#trade-roster-preview');
+    await expect(preview).toBeHidden();
+
+    // Check one player from each roster table
+    const rosterTables = page.locator('.trading-roster');
+    for (let i = 0; i < 2; i++) {
+      const checkbox = rosterTables
+        .nth(i)
+        .locator('input[type="checkbox"]')
+        .first();
+      if (await checkbox.isVisible()) {
+        await checkbox.check();
+      }
+    }
+
+    // Preview should now be visible
+    await expect(preview).toBeVisible();
   });
 
   test('preview hides when all players unchecked', async ({ page }) => {
+
     const preview = page.locator('#trade-roster-preview');
     const checkbox = page
       .locator('.trading-roster input[type="checkbox"]')
@@ -293,6 +268,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
   });
 
   test('clicking logo switches viewed team', async ({ page }) => {
+
     const preview = page.locator('#trade-roster-preview');
     const logos = preview.locator('.trade-roster-preview__logo');
 
@@ -321,6 +297,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
   });
 
   test('clicking tab switches display and refetches', async ({ page }) => {
+
     const preview = page.locator('#trade-roster-preview');
 
     // Check a player to show preview
@@ -342,6 +319,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
   test('incoming and outgoing rows are classified after fetch', async ({
     page,
   }) => {
+
     const preview = page.locator('#trade-roster-preview');
 
     // Check one player from each roster
@@ -401,8 +379,10 @@ test.describe('Trade offer form: roster preview interactions', () => {
 // ===========================================================================
 
 test.describe('Trade offer form: cap warnings', () => {
-  test.beforeEach(async ({ page }) => {
-    await navigateToTradeForm(page, test);
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Allow Trades': 'Yes' });
+    await mockRosterPreviewApi(page);
+    await navigateToTradeForm(page);
   });
 
   test('no cap warnings when no players selected', async ({ page }) => {
@@ -416,6 +396,7 @@ test.describe('Trade offer form: cap warnings', () => {
   test('cap warning classes appear when post-trade cap exceeds hard cap', async ({
     page,
   }) => {
+
     // Inflate the user team's future salary so any incoming player pushes over the cap
     await page.evaluate(() => {
       const cfg = (window as Record<string, unknown>)
@@ -465,11 +446,8 @@ test.describe('Trade offer form: cap warnings', () => {
 // ===========================================================================
 
 test.describe('Trade review page: offer cards and preview', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=Trading');
-    if (await isTradesClosed(page)) {
-      test.skip(true, 'Trades are currently closed for the season');
-    }
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Allow Trades': 'Yes' });
     await page.goto('modules.php?name=Trading&op=reviewtrade');
   });
 
@@ -613,12 +591,9 @@ test.describe('Trade review page: offer cards and preview', () => {
 // ===========================================================================
 
 test.describe('Trading pages: no PHP errors', () => {
-  test('no PHP errors on trade form', async ({ page }) => {
+  test('no PHP errors on trade form', async ({ appState, page }) => {
+    await appState({ 'Allow Trades': 'Yes' });
     await page.goto('modules.php?name=Trading');
-
-    if (await isTradesClosed(page)) {
-      test.skip(true, 'Trades are currently closed for the season');
-    }
 
     const firstTeamLink = page.locator('.trading-team-select a').first();
     await firstTeamLink.click();
@@ -630,13 +605,8 @@ test.describe('Trading pages: no PHP errors', () => {
     }
   });
 
-  test('no PHP errors on trade review page', async ({ page }) => {
-    await page.goto('modules.php?name=Trading');
-
-    if (await isTradesClosed(page)) {
-      test.skip(true, 'Trades are currently closed for the season');
-    }
-
+  test('no PHP errors on trade review page', async ({ appState, page }) => {
+    await appState({ 'Allow Trades': 'Yes' });
     await page.goto('modules.php?name=Trading&op=reviewtrade');
 
     const body = await page.locator('body').textContent();

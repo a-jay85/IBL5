@@ -6,7 +6,7 @@
 # Matches the same pattern as MigrationFileResolver::getCategory() line 102.
 # Skips .php data migrations (need production data) and .md files.
 set -euo pipefail
-trap 'echo "ERROR: Failed applying migration: $(basename "${f:-unknown})""; exit 1' ERR
+trap 'echo "ERROR: Failed applying migration: $(basename "${f:-unknown}")"; exit 1' ERR
 
 MIGRATIONS_DIR="$(cd "$(dirname "$0")/../migrations" && pwd)"
 numbered=()

@@ -13,6 +13,22 @@ declare(strict_types=1);
  */
 function buildRedirectUrl(): ?string
 {
+    // Check for standalone page redirect (admin pages outside modules.php)
+    if (isset($_SESSION['redirect_after_login_path']) && is_string($_SESSION['redirect_after_login_path']) && $_SESSION['redirect_after_login_path'] !== '') {
+        $storedPath = $_SESSION['redirect_after_login_path'];
+        unset($_SESSION['redirect_after_login_path']);
+
+        $allowedPaths = [
+            'leagueControlPanel.php',
+            'scripts/updateAllTheThings.php',
+        ];
+
+        $pathOnly = strtok($storedPath, '?');
+        if (is_string($pathOnly) && in_array($pathOnly, $allowedPaths, true)) {
+            return $storedPath;
+        }
+    }
+
     if (!isset($_SESSION['redirect_after_login']) || !is_string($_SESSION['redirect_after_login']) || $_SESSION['redirect_after_login'] === '') {
         return null;
     }

@@ -299,6 +299,7 @@ class AuthService implements AuthServiceInterface
         unset(
             $_SESSION[self::SESSION_USER_ID],
             $_SESSION[self::SESSION_USERNAME],
+            $_SESSION['auth_roles'],
         );
         $this->cachedUserInfo = null;
     }

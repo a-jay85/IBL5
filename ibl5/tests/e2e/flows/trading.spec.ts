@@ -210,6 +210,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
   });
 
   test('selecting players shows roster preview', async ({ page }) => {
+
     // Preview should be hidden initially
     const preview = page.locator('#trade-roster-preview');
     await expect(preview).toBeHidden();
@@ -231,6 +232,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
   });
 
   test('preview hides when all players unchecked', async ({ page }) => {
+
     const preview = page.locator('#trade-roster-preview');
     const checkbox = page
       .locator('.trading-roster input[type="checkbox"]')
@@ -266,6 +268,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
   });
 
   test('clicking logo switches viewed team', async ({ page }) => {
+
     const preview = page.locator('#trade-roster-preview');
     const logos = preview.locator('.trade-roster-preview__logo');
 
@@ -294,6 +297,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
   });
 
   test('clicking tab switches display and refetches', async ({ page }) => {
+
     const preview = page.locator('#trade-roster-preview');
 
     // Check a player to show preview
@@ -315,6 +319,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
   test('incoming and outgoing rows are classified after fetch', async ({
     page,
   }) => {
+
     const preview = page.locator('#trade-roster-preview');
 
     // Check one player from each roster
@@ -391,6 +396,7 @@ test.describe('Trade offer form: cap warnings', () => {
   test('cap warning classes appear when post-trade cap exceeds hard cap', async ({
     page,
   }) => {
+
     // Inflate the user team's future salary so any incoming player pushes over the cap
     await page.evaluate(() => {
       const cfg = (window as Record<string, unknown>)

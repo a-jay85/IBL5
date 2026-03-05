@@ -181,7 +181,10 @@ INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year
   (28, 2025, 2026, 'Oklahoma City', 'Thunder');
 
 -- ============================================================
--- Players (pid=1,2 active for Compare Players; pid=3 retired for retirees toggle)
+-- Players
+--   pid=1,2: active on Metros (tid=1) for Compare Players + trading
+--   pid=3:   retired for retirees toggle
+--   pid=4,5: active on Stars (tid=2) for trading partner roster
 -- ordinal must be != 0 for players to appear in Compare Players datalist
 -- ============================================================
 
@@ -226,7 +229,27 @@ INSERT INTO ibl_plr (
    500, 16000, 3000, 6500, 1500, 1800,
    200, 600, 800, 2200, 1500, 400,
    900, 300, 1200,
-   'plr-uuid-00000000-0000-000000000003');
+   'plr-uuid-00000000-0000-000000000003'),
+  (4, 'Stars Guard', 25, 27, 2, 'PG', 1,
+   82, 78, 72, 66, 62, 74, 70, 72, 67,
+   2, 3, 1800, 1900,
+   0, 4,
+   6, 2, 190, 'Stars Academy',
+   1, 8, 2022, 'Stars', 'Stars',
+   40, 1250, 210, 460, 110, 130,
+   65, 160, 35, 110, 200, 55,
+   75, 15, 80,
+   'plr-uuid-00000000-0000-000000000004'),
+  (5, 'Stars Forward', 27, 28, 2, 'SF', 2,
+   79, 74, 69, 64, 59, 71, 67, 69, 64,
+   1, 2, 1400, 0,
+   0, 6,
+   6, 7, 215, 'Stars College',
+   2, 3, 2020, 'Stars', 'Stars',
+   40, 1150, 190, 420, 95, 115,
+   45, 130, 45, 140, 160, 48,
+   65, 22, 88,
+   'plr-uuid-00000000-0000-000000000005');
 
 -- ============================================================
 -- Box scores (must be after players for FK constraint)
@@ -267,7 +290,13 @@ INSERT INTO ibl_hist (
    50, 180, 150, 45, 25, 70, 85, 530, 1200),
   (3, 'Retired Legend', 2025, 'Stars', 2,
    40, 1300, 250, 500, 150, 180, 30, 100,
-   80, 220, 100, 40, 50, 60, 100, 710, 2000);
+   80, 220, 100, 40, 50, 60, 100, 710, 2000),
+  (4, 'Stars Guard', 2026, 'Stars', 2,
+   40, 1250, 210, 460, 110, 130, 65, 160,
+   35, 145, 200, 55, 15, 75, 80, 660, 1800),
+  (5, 'Stars Forward', 2026, 'Stars', 2,
+   40, 1150, 190, 420, 95, 115, 45, 130,
+   45, 185, 160, 48, 22, 65, 88, 565, 1400);
 
 -- ============================================================
 -- Draft picks (DraftHistory page)

@@ -61,11 +61,15 @@ INSERT INTO nuke_modules (title, custom_title, active, view) VALUES
 INSERT INTO ibl_settings (name, value) VALUES
   ('Current Season Phase',        'Free Agency'),
   ('Current Season Ending Year',  '2026'),
-  ('Allow Trades',                'Off'),
-  ('Allow Waiver Moves',          'Off'),
+  ('Allow Trades',                'No'),
+  ('Allow Waiver Moves',          'No'),
   ('Show Draft Link',             'Off'),
   ('Free Agency Notifications',   'Off'),
-  ('League Sim Length',            '7');
+  ('Trivia Mode',                 'Off'),
+  ('ASG Voting',                  'No'),
+  ('EOY Voting',                  'No'),
+  ('League Sim Length',            '7')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
 
 INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES
   (689, '2026-03-01', '2026-03-07');
@@ -177,7 +181,11 @@ INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year
   (28, 2025, 2026, 'Oklahoma City', 'Thunder');
 
 -- ============================================================
--- Players (pid=1,2 active for Compare Players; pid=3 retired for retirees toggle)
+-- Players
+--   pid=1,2: active on Metros (tid=1) for Compare Players + trading
+--   pid=3:   retired for retirees toggle
+--   pid=4,5: active on Stars (tid=2) for additional trading partner
+--   pid=6,7: active on Phoenixes (tid=14, Atlanta) — first partner alphabetically by city
 -- ordinal must be != 0 for players to appear in Compare Players datalist
 -- ============================================================
 
@@ -195,7 +203,7 @@ INSERT INTO ibl_plr (
 ) VALUES
   (1, 'Test Player', 28, 28, 1, 'SG', 1,
    80, 75, 70, 65, 60, 72, 68, 70, 65,
-   2, 3, 1500, 1600,
+   1, 3, 1500, 1600,
    0, 5,
    6, 4, 200, 'Test University',
    1, 5, 2021, 'Metros', 'Metros',
@@ -205,7 +213,7 @@ INSERT INTO ibl_plr (
    'plr-uuid-00000000-0000-000000000001'),
   (2, 'Test Player Two', 26, 27, 1, 'PF', 2,
    78, 72, 68, 63, 58, 70, 66, 68, 63,
-   1, 2, 1200, 0,
+   1, 2, 1200, 1300,
    0, 3,
    6, 8, 220, 'Test State',
    1, 12, 2023, 'Metros', 'Metros',
@@ -222,7 +230,47 @@ INSERT INTO ibl_plr (
    500, 16000, 3000, 6500, 1500, 1800,
    200, 600, 800, 2200, 1500, 400,
    900, 300, 1200,
-   'plr-uuid-00000000-0000-000000000003');
+   'plr-uuid-00000000-0000-000000000003'),
+  (4, 'Stars Guard', 25, 27, 2, 'PG', 1,
+   82, 78, 72, 66, 62, 74, 70, 72, 67,
+   1, 3, 1800, 1900,
+   0, 4,
+   6, 2, 190, 'Stars Academy',
+   1, 8, 2022, 'Stars', 'Stars',
+   40, 1250, 210, 460, 110, 130,
+   65, 160, 35, 110, 200, 55,
+   75, 15, 80,
+   'plr-uuid-00000000-0000-000000000004'),
+  (5, 'Stars Forward', 27, 28, 2, 'SF', 2,
+   79, 74, 69, 64, 59, 71, 67, 69, 64,
+   1, 2, 1400, 1500,
+   0, 6,
+   6, 7, 215, 'Stars College',
+   2, 3, 2020, 'Stars', 'Stars',
+   40, 1150, 190, 420, 95, 115,
+   45, 130, 45, 140, 160, 48,
+   65, 22, 88,
+   'plr-uuid-00000000-0000-000000000005'),
+  (6, 'Phoenixes Guard', 26, 28, 14, 'PG', 1,
+   81, 76, 71, 65, 61, 73, 69, 71, 66,
+   1, 3, 1700, 1800,
+   0, 5,
+   6, 1, 185, 'Phoenixes Academy',
+   1, 10, 2021, 'Phoenixes', 'Phoenixes',
+   40, 1200, 200, 440, 105, 125,
+   55, 145, 38, 115, 190, 52,
+   72, 18, 82,
+   'plr-uuid-00000000-0000-000000000006'),
+  (7, 'Phoenixes Center', 29, 29, 14, 'C', 2,
+   83, 80, 74, 68, 64, 76, 72, 74, 69,
+   1, 2, 1300, 1400,
+   0, 7,
+   6, 11, 240, 'Phoenixes College',
+   1, 6, 2019, 'Phoenixes', 'Phoenixes',
+   40, 1300, 220, 480, 115, 135,
+   20, 60, 60, 160, 100, 40,
+   60, 35, 95,
+   'plr-uuid-00000000-0000-000000000007');
 
 -- ============================================================
 -- Box scores (must be after players for FK constraint)
@@ -263,7 +311,19 @@ INSERT INTO ibl_hist (
    50, 180, 150, 45, 25, 70, 85, 530, 1200),
   (3, 'Retired Legend', 2025, 'Stars', 2,
    40, 1300, 250, 500, 150, 180, 30, 100,
-   80, 220, 100, 40, 50, 60, 100, 710, 2000);
+   80, 220, 100, 40, 50, 60, 100, 710, 2000),
+  (4, 'Stars Guard', 2026, 'Stars', 2,
+   40, 1250, 210, 460, 110, 130, 65, 160,
+   35, 145, 200, 55, 15, 75, 80, 660, 1800),
+  (5, 'Stars Forward', 2026, 'Stars', 2,
+   40, 1150, 190, 420, 95, 115, 45, 130,
+   45, 185, 160, 48, 22, 65, 88, 565, 1400),
+  (6, 'Phoenixes Guard', 2026, 'Phoenixes', 14,
+   40, 1200, 200, 440, 105, 125, 55, 145,
+   38, 153, 190, 52, 18, 72, 82, 615, 1700),
+  (7, 'Phoenixes Center', 2026, 'Phoenixes', 14,
+   40, 1300, 220, 480, 115, 135, 20, 60,
+   60, 220, 100, 40, 35, 60, 95, 610, 1300);
 
 -- ============================================================
 -- Draft picks (DraftHistory page)

@@ -146,13 +146,7 @@ ALTER TABLE ibl_standings
   ON DELETE CASCADE
   ON UPDATE CASCADE;
 
--- Power Rankings to Team
-ALTER TABLE ibl_power DROP FOREIGN KEY IF EXISTS fk_power_team;
-ALTER TABLE ibl_power
-  ADD CONSTRAINT fk_power_team
-  FOREIGN KEY (Team) REFERENCES ibl_team_info(team_name)
-  ON DELETE CASCADE
-  ON UPDATE CASCADE;
+-- ibl_power.Team column dropped by migration 049 (re-keyed to TeamID), skip FK
 
 -- ============================================================================
 -- PART 6: FREE AGENCY AND TRADING FOREIGN KEYS

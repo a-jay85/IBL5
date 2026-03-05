@@ -352,30 +352,6 @@ function is_user($user)
     return $userSave = $authService->isAuthenticated() ? 1 : 0;
 }
 
-function update_points($id)
-{
-    global $user_prefix, $prefix, $db, $user;
-    if (is_user($user)) {
-        if (!is_array($user)) {
-            $cookie = cookiedecode($user);
-            $username = trim($cookie[1]);
-        } else {
-            $username = trim($user[1]);
-        }
-        $username = substr(htmlspecialchars(str_replace("\'", "'", trim($username))), 0, 25);
-        $username = rtrim($username, "\\");
-        $username = str_replace("'", "\'", $username);
-        if ($db->sql_numrows($db->sql_query("SELECT * FROM " . $prefix . "_groups")) > 0) {
-            $id = intval($id);
-            $result = $db->sql_query("SELECT points FROM " . $prefix . "_groups_points WHERE id='$id'");
-            list($points) = $db->sql_fetchrow($result);
-            $db->sql_freeresult($result);
-            $rpoints = intval($points);
-            $db->sql_query("UPDATE " . $user_prefix . "_users SET points=points+" . $rpoints . " WHERE username='$username'");
-        }
-    }
-}
-
 function title($text)
 {
     OpenTable();
@@ -464,7 +440,7 @@ function blocks($side)
         $action = substr($action, 0, 1);
         $now = time();
         $sub = intval($row['subscription']);
-        if ($sub == 0 or ($sub == 1 and !paid())) {
+        if ($sub == 0 or $sub == 1) {
             if ($expire != 0 and $expire <= $now) {
                 if ($action == "d") {
                     $db->sql_query("UPDATE " . $prefix . "_blocks SET active='0', expire='0' WHERE bid='$bid'");
@@ -488,83 +464,6 @@ function blocks($side)
         }
     }
     $db->sql_freeresult($result);
-}
-
-function message_box()
-{
-    global $bgcolor1, $bgcolor2, $user, $cookie, $textcolor2, $prefix, $multilingual, $currentlang, $db;
-    if ($multilingual == 1) {
-        $querylang = "AND (mlanguage='$currentlang' OR mlanguage='')";
-    } else {
-        $querylang = "";
-    }
-    $result = $db->sql_query("SELECT mid, title, content, date, expire, view FROM " . $prefix . "_message WHERE active='1' $querylang");
-    if ($numrows = $db->sql_numrows($result) == 0) {
-        return;
-    } else {
-        while ($row = $db->sql_fetchrow($result)) {
-            $mid = intval($row['mid']);
-            $title = filter($row['title'], "nohtml");
-            if ($row['content'] != NULL) {
-                $content = filter($row['content']);
-            } else {
-                $content = $row['content'];
-            }
-            $mdate = $row['date'];
-            $expire = intval($row['expire']);
-            $view = intval($row['view']);
-            if (!empty($title) && !empty($content)) {
-                if ($expire == 0) {
-                    $remain = _UNLIMITED;
-                } else {
-                    $etime = (($mdate + $expire) - time()) / 3600;
-                    $etime = (int) $etime;
-                    if ($etime < 1) {
-                        $remain = _EXPIRELESSHOUR;
-                    } else {
-                        $remain = "" . _EXPIREIN . " $etime " . _HOURS . "";
-                    }
-                }
-                if ($view == 5 and paid()) {
-                    OpenTable();
-                    echo "<center><font class=\"option\" color=\"$textcolor2\"><b>$title</b></font></center><br>\n"
-                        . "<font class=\"content\">$content</font>";
-                    CloseTable();
-                    echo "<br>";
-                } elseif ($view == 4 and is_admin()) {
-                    OpenTable();
-                    echo "<center><font class=\"option\" color=\"$textcolor2\"><b>$title</b></font></center><br>\n"
-                        . "<font class=\"content\">$content</font>";
-                    CloseTable();
-                    echo "<br>";
-                } elseif ($view == 3 and is_user($user) || is_admin()) {
-                    OpenTable();
-                    echo "<center><font class=\"option\" color=\"$textcolor2\"><b>$title</b></font></center><br>\n"
-                        . "<font class=\"content\">$content</font>";
-                    CloseTable();
-                    echo "<br>";
-                } elseif ($view == 2 and !is_user($user) || is_admin()) {
-                    OpenTable();
-                    echo "<center><font class=\"option\" color=\"$textcolor2\"><b>$title</b></font></center><br>\n"
-                        . "<font class=\"content\">$content</font>";
-                    CloseTable();
-                    echo "<br>";
-                } elseif ($view == 1) {
-                    OpenTable();
-                    echo "<center><font class=\"option\" color=\"$textcolor2\"><b>$title</b></font></center><br>\n"
-                        . "<font class=\"content\">$content</font>";
-                    CloseTable();
-                    echo "<br>";
-                }
-                if ($expire != 0) {
-                    $past = time() - $expire;
-                    if ($mdate < $past) {
-                        $db->sql_query("UPDATE " . $prefix . "_message SET active='0' WHERE mid='$mid'");
-                    }
-                }
-            }
-        }
-    }
 }
 
 function online()
@@ -983,68 +882,6 @@ function headlines($bid, $cenbox = 0)
     themecenterbox($title, $content);
 }
 
-function automated_news()
-{
-    global $prefix, $multilingual, $currentlang, $db;
-    if ($multilingual == 1) {
-        $querylang = "WHERE (alanguage='$currentlang' OR alanguage='')";
-    } else {
-        $querylang = "";
-    }
-    $today = getdate();
-    $day = $today['mday'];
-    if ($day < 10) {
-        $day = "0$day";
-    }
-    $month = $today['mon'];
-    if ($month < 10) {
-        $month = "0$month";
-    }
-    $year = $today['year'];
-    $hour = $today['hours'];
-    $min = $today['minutes'];
-    $sec = "00";
-    $result = $db->sql_query("SELECT anid, time FROM " . $prefix . "_autonews $querylang");
-    while ($row = $db->sql_fetchrow($result)) {
-        $anid = intval($row['anid']);
-        $time = $row['time'];
-        preg_match('/([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})/', $time, $date);
-        if (($date[1] <= $year) and ($date[2] <= $month) and ($date[3] <= $day)) {
-            if (($date[4] < $hour) and ($date[5] >= $min) or ($date[4] <= $hour) and ($date[5] <= $min)) {
-                $result2 = $db->sql_query("SELECT * FROM " . $prefix . "_autonews WHERE anid='$anid'");
-                while ($row2 = $db->sql_fetchrow($result2)) {
-                    $num = $db->sql_numrows($db->sql_query("SELECT sid FROM " . $prefix . "_stories WHERE title='$row2[title]'"));
-                    if ($num == 0) {
-                        $title = $row2['title'];
-                        $hometext = filter($row2['hometext']);
-                        $bodytext = filter($row2['bodytext']);
-                        $notes = filter($row2['notes']);
-                        $catid2 = intval($row2['catid']);
-                        $aid2 = filter($row2['aid'], "nohtml");
-                        $time2 = $row2['time'];
-                        $topic2 = intval($row2['topic']);
-                        $informant2 = filter($row2['informant'], "nohtml");
-                        $ihome2 = intval($row2['ihome']);
-                        $alanguage2 = $row2['alanguage'];
-                        $acomm2 = intval($row2['acomm']);
-                        $associated2 = $row2['associated'];
-                        // Prepare and filter variables to be saved
-                        $hometext = filter($hometext, "", 1);
-                        $bodytext = filter($bodytext, "", 1);
-                        $notes = filter($notes, "", 1);
-                        $aid2 = filter($aid2, "nohtml", 1);
-                        $informant2 = filter($informant2, "nohtml", 1);
-                        $db->sql_query("DELETE FROM " . $prefix . "_autonews WHERE anid='$anid'");
-                        $db->sql_query("INSERT INTO " . $prefix . "_stories (catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, ihome, alanguage, acomm, haspoll, pollID, associated) VALUES ('$catid2', '$aid2', '$title', '$time2', '$hometext', '$bodytext', '0', '0', '$topic2', '$informant2', '$notes', '$ihome2', '$alanguage2', '$acomm2', '0', '0', '$associated2')");
-                    }
-                }
-                $db->sql_freeresult($result2);
-            }
-        }
-    }
-    $db->sql_freeresult($result);
-}
-
 function get_theme()
 {
     global $user, $userinfo, $Default_Theme, $name, $op;
@@ -1080,43 +917,6 @@ function validate_mail($email)
         die();
     } else {
         return $email;
-    }
-}
-
-function paid()
-{
-    static $result = null;
-    if ($result !== null) {
-        return $result;
-    }
-    global $db, $user, $cookie, $adminmail, $sitename, $nukeurl, $subscription_url, $user_prefix, $prefix;
-    if (is_user($user)) {
-        if (!empty($subscription_url)) {
-            $renew = "" . _SUBRENEW . " $subscription_url";
-        } else {
-            $renew = "";
-        }
-        cookiedecode($user);
-        $sql = "SELECT * FROM " . $prefix . "_subscriptions WHERE userid='$cookie[0]'";
-        $result = $db->sql_query($sql);
-        $numrows = $db->sql_numrows($result);
-        $row = $db->sql_fetchrow($result);
-        if ($numrows == 0) {
-            return $result = 0;
-        } elseif ($numrows != 0) {
-            $time = time();
-            if ($row['subscription_expire'] <= $time) {
-                $db->sql_query("DELETE FROM " . $prefix . "_subscriptions WHERE userid='$cookie[0]' AND id='" . intval($row['id']) . "'");
-                $from = "$sitename <$adminmail>";
-                $subject = "$sitename: " . _SUBEXPIRED . "";
-                $body = "" . _HELLO . " $cookie[1]:\n\n" . _SUBSCRIPTIONAT . " $sitename " . _HASEXPIRED . "\n$renew\n\n" . _HOPESERVED . "\n\n$sitename " . _TEAM . "\n$nukeurl";
-                $row = $db->sql_fetchrow($db->sql_query("SELECT user_email FROM " . $user_prefix . "_users WHERE id='$cookie[0]' AND nickname='$cookie[1]' AND password='$cookie[2]'"));
-                mail($row['user_email'], $subject, $body, "From: $from\nX-Mailer: PHP/" . phpversion());
-            }
-            return $result = 1;
-        }
-    } else {
-        return $result = 0;
     }
 }
 

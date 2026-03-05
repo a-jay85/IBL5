@@ -2678,32 +2678,6 @@ CREATE TABLE `nuke_authors` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `nuke_autonews`
---
-
-DROP TABLE IF EXISTS `nuke_autonews`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_autonews` (
-  `anid` int(11) NOT NULL AUTO_INCREMENT,
-  `catid` int(11) NOT NULL DEFAULT 0,
-  `aid` varchar(30) NOT NULL DEFAULT '',
-  `title` varchar(80) NOT NULL DEFAULT '',
-  `time` varchar(19) NOT NULL DEFAULT '',
-  `hometext` mediumtext NOT NULL,
-  `bodytext` mediumtext NOT NULL,
-  `topic` int(11) NOT NULL DEFAULT 1,
-  `informant` varchar(20) NOT NULL DEFAULT '',
-  `notes` mediumtext NOT NULL,
-  `ihome` int(11) NOT NULL DEFAULT 0,
-  `alanguage` varchar(30) NOT NULL DEFAULT '',
-  `acomm` int(11) NOT NULL DEFAULT 0,
-  `associated` mediumtext NOT NULL,
-  PRIMARY KEY (`anid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `nuke_banned_ip`
 --
 
@@ -2850,36 +2824,6 @@ CREATE TABLE `nuke_counter` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `nuke_groups`
---
-
-DROP TABLE IF EXISTS `nuke_groups`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_groups` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL DEFAULT '',
-  `description` mediumtext NOT NULL,
-  `points` int(11) NOT NULL DEFAULT 0,
-  KEY `id` (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_groups_points`
---
-
-DROP TABLE IF EXISTS `nuke_groups_points`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_groups_points` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `points` int(11) NOT NULL DEFAULT 0,
-  KEY `id` (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `nuke_headlines`
 --
 
@@ -2931,26 +2875,6 @@ DROP TABLE IF EXISTS `nuke_links_newlink`;
 DROP TABLE IF EXISTS `nuke_main`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_message`
---
-
-DROP TABLE IF EXISTS `nuke_message`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_message` (
-  `mid` int(11) NOT NULL AUTO_INCREMENT,
-  `title` varchar(100) NOT NULL DEFAULT '',
-  `content` mediumtext NOT NULL,
-  `date` varchar(14) NOT NULL DEFAULT '',
-  `expire` int(11) NOT NULL DEFAULT 0,
-  `active` int(11) NOT NULL DEFAULT 1,
-  `view` int(11) NOT NULL DEFAULT 1,
-  `mlanguage` varchar(30) NOT NULL DEFAULT '',
-  PRIMARY KEY (`mid`)
-) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -3202,21 +3126,6 @@ CREATE TABLE `nuke_stories_cat` (
   `counter` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`catid`)
 ) ENGINE=MyISAM AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Table structure for table `nuke_subscriptions`
---
-
-DROP TABLE IF EXISTS `nuke_subscriptions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `nuke_subscriptions` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `userid` int(11) DEFAULT 0,
-  `subscription_expire` varchar(50) NOT NULL DEFAULT '',
-  KEY `id` (`id`,`userid`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

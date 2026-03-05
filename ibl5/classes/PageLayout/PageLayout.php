@@ -21,7 +21,6 @@ class PageLayout
             echo '<div class="ibl-alert ibl-alert--success">' . $flashMessage . '</div>';
         }
         if (defined('HOME_FILE')) {
-            message_box();
             blocks("Center");
         }
     }

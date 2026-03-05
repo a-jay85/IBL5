@@ -22,7 +22,6 @@ get_lang($module_name);
 define('INDEX_FILE', true);
 $categories = 1;
 $cat = $catid;
-automated_news();
 
 function theindex($catid)
 {

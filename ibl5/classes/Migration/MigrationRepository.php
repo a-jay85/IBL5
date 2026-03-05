@@ -71,7 +71,7 @@ class MigrationRepository extends \BaseMysqliRepository implements MigrationRepo
      */
     public function executeRawSql(string $sql): void
     {
-        $sql = trim($sql);
+        $sql = $this->preprocessDelimiters(trim($sql));
 
         if ($sql === '') {
             return;
@@ -100,6 +100,45 @@ class MigrationRepository extends \BaseMysqliRepository implements MigrationRepo
         } while ($this->db->more_results() && $this->db->next_result());
 
         // Final error check handled within the do-while loop above
+    }
+
+    /**
+     * Strip DELIMITER directives from SQL and replace custom delimiters with semicolons.
+     *
+     * DELIMITER is a mysql client command, not valid SQL. multi_query() cannot process it.
+     * This method converts custom delimiter blocks back to standard semicolon-terminated SQL
+     * that multi_query() (and the MySQL server parser) can handle natively. The server parser
+     * understands BEGIN...END compound statements, so semicolons inside trigger/procedure
+     * bodies are handled correctly.
+     */
+    private function preprocessDelimiters(string $sql): string
+    {
+        $lines = explode("\n", $sql);
+        $result = [];
+        $currentDelimiter = ';';
+
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+
+            // Match DELIMITER directive (e.g., "DELIMITER //", "DELIMITER $$", "DELIMITER ;")
+            if (preg_match('/^DELIMITER\s+(\S+)\s*$/i', $trimmed, $matches) === 1) {
+                $currentDelimiter = $matches[1];
+                continue; // Strip the DELIMITER line itself
+            }
+
+            // If using a custom delimiter, check if this line ends with it
+            if ($currentDelimiter !== ';' && str_ends_with($trimmed, $currentDelimiter)) {
+                // Replace the custom delimiter at the end with a semicolon
+                $pos = strrpos($line, $currentDelimiter);
+                if ($pos !== false) {
+                    $line = substr($line, 0, $pos) . ';';
+                }
+            }
+
+            $result[] = $line;
+        }
+
+        return implode("\n", $result);
     }
 
     /**

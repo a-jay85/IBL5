@@ -291,10 +291,9 @@ ALTER TABLE ibl_draft_class
 -- ---------------------------------------------------------------------------
 -- Note: ibl_schedule does not have 'Day' or 'Neutral' columns
 -- Removed those columns from optimization
+-- Visitor and Home are INT with FK to ibl_team_info(teamid) — keep as INT (migration 009 enforces)
 ALTER TABLE ibl_schedule
   MODIFY Year SMALLINT UNSIGNED NOT NULL COMMENT 'Season year',
-  MODIFY Visitor SMALLINT UNSIGNED NOT NULL COMMENT 'Visiting team ID',
-  MODIFY Home SMALLINT UNSIGNED NOT NULL COMMENT 'Home team ID',
   MODIFY VScore TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Visitor score',
   MODIFY HScore TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Home score';
 

@@ -1,8 +1,8 @@
-The role of this file is to describe common mistakes and confusion points that agents might encounter as they work in this project. If you ever encounter something in the project that surprises you, please alert the developer working with you and indicate that this is the case in the AgentMD file to help prevent future agents from having the same issue.
-
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+**Context budget rule:** This file and all always-loaded rules/memory files consume ~5K tokens every conversation. When adding content, prefer pointers to conditional files over inline detail. Move reference material (command variants, setup scripts, lookup tables) to path-conditional rules or `memory/` topic files, keeping only error-prevention rules and frequently-needed patterns here.
 
 ## Project Overview
 
@@ -11,30 +11,14 @@ IBL5 is an Internet Basketball League fantasy basketball site powered by Jump Sh
 ## Commands
 
 ```bash
-# Run all tests
+# Run all tests (always use these flags)
 cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary
 
-# Run single test file
-cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary tests/Player/PlayerRepositoryTest.php
-
-# Run single test method
-cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary --filter testMethodName
-
-# Run specific test suite
-cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary --testsuite "Player Module Tests"
-
-# Show ALL issues (deprecations, warnings, notices, risky tests, etc.)
-cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary --display-all-issues
-
-# Use specific config (e.g., CI config without local-only tests)
-cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary -c phpunit.ci.xml
+# Quick pass/fail check (append | tail -n 3)
+cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary | tail -n 3
 ```
 
-**PHPUnit output rule:** Always use `--no-progress --no-output --testdox-summary`. Only read output below `Summary of tests with errors, failures, or issues:` — this shows `OK (X tests, X assertions)` when passing, or only the failures/errors. Ignore everything above that line to save tokens.
-
-**Token-saving tip:** When merely checking if tests pass (not debugging failures), append `| tail -n 3` to commands to output only the final summary. Example: `cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary | tail -n 3`
-
-**Note:** PHPUnit 13.x has no `-v`/`--verbose`. Use `--display-all-issues` instead. See `phpunit-tests.md` for full testing rules and completion criteria.
+**PHPUnit output rule:** Always use `--no-progress --no-output --testdox-summary`. Only read output below `Summary of tests with errors, failures, or issues:`. Add `--filter`, `--testsuite`, `--display-all-issues`, or `-c phpunit.ci.xml` as needed. See `phpunit-tests.md` for full rules.
 
 ### Static Analysis (PHPStan)
 
@@ -52,38 +36,17 @@ cd ibl5 && composer run analyse
 ### E2E Tests (Playwright)
 
 ```bash
-# Run all E2E tests
 cd ibl5 && bun run test:e2e
-
-# Run with visible browser
-cd ibl5 && bun run test:e2e:headed
-
-# Run specific test file
-cd ibl5 && bunx playwright test tests/e2e/smoke/public-pages.spec.ts
-
-# Interactive UI mode
-cd ibl5 && bun run test:e2e:ui
 ```
 
-**Prerequisites:** MAMP running, `.env.test` with credentials. E2E tests do NOT auto-run via PostToolUse hooks — run them manually. See `playwright-tests.md` for full rules.
+E2E tests do NOT auto-run via hooks — run manually. Requires MAMP + `.env.test`. See `playwright-tests.md` for full rules and command variants.
 
 ## Architecture
 
 New features should follow the Repository-Service-View pattern. See `ibl5/scripts/scoParser.php` as the canonical refactored example.
 
 ### Interface-Driven Modules
-All 30 modules follow Repository/Service/View pattern with interfaces in `Contracts/` subdirectories:
-```
-ibl5/classes/
-├── Player/
-│   ├── Contracts/           # Interfaces (PlayerRepositoryInterface, etc.)
-│   ├── PlayerRepository.php # Database operations
-│   ├── PlayerService.php    # Business logic
-│   └── PlayerView.php       # HTML rendering
-├── FreeAgency/
-├── Trading/
-└── ... (30 modules total)
-```
+All 30 modules in `ibl5/classes/` follow Repository/Service/View pattern with interfaces in `Contracts/` subdirectories. See `php-classes.md` for structure details.
 
 ### Legacy (Non-IBL) Modules
 - **SiteStatistics:** A legacy PHP-Nuke module for tracking site visitor/page-view statistics. It is **not** basketball- or IBL-related and should be deprioritized against core IBL modules during refactoring or feature work.
@@ -115,15 +78,7 @@ When committing, only include files relevant to the current task. Always review 
 
 ### Commit Conventions
 
-Commit body format — use `## Section` headers with bullet points:
-```
-<type>: <short summary>
-
-## Section Header
-
-- Detail 1
-- Detail 2
-```
+Commit body: `<type>: <short summary>` then `## Section` headers with bullet points.
 
 ## PHP / Database Gotchas
 
@@ -138,7 +93,7 @@ When debugging CSS layout issues, immediately check for inherited properties lik
 
 ## Workflow Continuity
 
-When executing a multi-phase workflow (e.g., post-plan-approval Phases 1-7), **never stop between phases**. Skill invocations (`/simplify`, `/commit-commands:commit-push-pr`, `/code-review`, `/security-audit`) are function calls within the workflow — when they return, immediately proceed to the next phase. Do not wait for user input after a skill completes.
+When executing a multi-phase workflow (e.g., post-plan-approval Phases 1-8), **never stop between phases**. Skill invocations (`/simplify`, `/commit-commands:commit-push-pr`, `/code-review`, `/security-audit`) are function calls within the workflow — when they return, immediately proceed to the next phase. Do not wait for user input after a skill completes.
 
 ## Mandatory Rules
 
@@ -184,23 +139,4 @@ Context-aware rules auto-load when relevant:
 - `view-rendering.md` → editing `**/*View.php`
 - `database-access.md` → editing `**/*Repository.php`
 
-**Task-Discovery** (`.claude/skills/`):
-- `refactoring-workflow/` - Module refactoring with templates
-- `security-audit/` - XSS/SQL injection patterns
-- `phpunit-testing/` - Test patterns and mocking
-- `basketball-stats/` - StatsFormatter usage
-- `contract-rules/` - CBA salary cap rules
-- `database-repository/` - BaseMysqliRepository patterns
-- `documentation-updates/` - Doc update workflow
-
-## Key References
-
-| Resource | Location |
-|----------|----------|
-| Schema | `ibl5/schema.sql` |
-| Development status | `ibl5/docs/DEVELOPMENT_GUIDE.md` |
-| Database guide | `ibl5/docs/DATABASE_GUIDE.md` |
-| MAMP connection | `ibl5/docs/DEVELOPMENT_ENVIRONMENT.md` |
-| API patterns | `ibl5/docs/API_GUIDE.md` |
-| Interface examples | `classes/Player/Contracts/`, `classes/FreeAgency/Contracts/` |
-| E2E test patterns | `ibl5/tests/e2e/README.md` |
+**Task-Discovery** (`.claude/skills/`): Discovered automatically when relevant skills are invoked. Includes refactoring-workflow, security-audit, phpunit-testing, basketball-stats, contract-rules, database-repository, documentation-updates.

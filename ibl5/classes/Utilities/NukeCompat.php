@@ -112,14 +112,6 @@ class NukeCompat
     }
 
     /**
-     * Display the message box.
-     */
-    public function messageBox(): void
-    {
-        message_box();
-    }
-
-    /**
      * Track online users.
      */
     public function online(): void

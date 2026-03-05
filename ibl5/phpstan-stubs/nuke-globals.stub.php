@@ -80,9 +80,6 @@ function include_secure(string $file): void {}
 function blocks(string $position): void {}
 
 /** @return void */
-function message_box(): void {}
-
-/** @return void */
 function online(): void {}
 
 /** @return void */

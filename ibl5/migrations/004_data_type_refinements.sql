@@ -436,9 +436,8 @@ ALTER TABLE ibl_schedule
   DROP CONSTRAINT IF EXISTS chk_schedule_vscore,
   DROP CONSTRAINT IF EXISTS chk_schedule_hscore;
 
+-- Visitor and Home have FK constraints — MariaDB 10.6 disallows CHECK on FK columns
 ALTER TABLE ibl_schedule
-  ADD CONSTRAINT chk_schedule_visitor_id CHECK (Visitor >= 1 AND Visitor <= 32),
-  ADD CONSTRAINT chk_schedule_home_id CHECK (Home >= 1 AND Home <= 32),
   ADD CONSTRAINT chk_schedule_vscore CHECK (VScore >= 0 AND VScore <= 200),
   ADD CONSTRAINT chk_schedule_hscore CHECK (HScore >= 0 AND HScore <= 200);
 
@@ -495,8 +494,7 @@ ALTER TABLE ibl_plr
   DROP CONSTRAINT IF EXISTS chk_plr_cy3,
   DROP CONSTRAINT IF EXISTS chk_plr_cy4,
   DROP CONSTRAINT IF EXISTS chk_plr_cy5,
-  DROP CONSTRAINT IF EXISTS chk_plr_cy6,
-  DROP CONSTRAINT IF EXISTS chk_plr_tid;
+  DROP CONSTRAINT IF EXISTS chk_plr_cy6;
 
 ALTER TABLE ibl_plr
   ADD CONSTRAINT chk_plr_cy CHECK (cy >= 0 AND cy <= 6),
@@ -506,8 +504,8 @@ ALTER TABLE ibl_plr
   ADD CONSTRAINT chk_plr_cy3 CHECK (cy3 >= -7000 AND cy3 <= 7000),
   ADD CONSTRAINT chk_plr_cy4 CHECK (cy4 >= -7000 AND cy4 <= 7000),
   ADD CONSTRAINT chk_plr_cy5 CHECK (cy5 >= -7000 AND cy5 <= 7000),
-  ADD CONSTRAINT chk_plr_cy6 CHECK (cy6 >= -7000 AND cy6 <= 7000),
-  ADD CONSTRAINT chk_plr_tid CHECK (tid >= 0 AND tid <= 32);
+  ADD CONSTRAINT chk_plr_cy6 CHECK (cy6 >= -7000 AND cy6 <= 7000);
+-- tid has FK constraint fk_plr_team — MariaDB 10.6 disallows CHECK on FK columns
 
 -- ============================================================================
 -- PART 4: ADD NOT NULL CONSTRAINTS WHERE APPROPRIATE

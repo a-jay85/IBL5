@@ -93,7 +93,7 @@ When debugging CSS layout issues, immediately check for inherited properties lik
 
 ## Workflow Continuity
 
-When executing a multi-phase workflow (e.g., post-plan-approval Phases 1-8), **never stop between phases**. Skill invocations (`/simplify`, `/commit-commands:commit-push-pr`, `/code-review`, `/security-audit`) are function calls within the workflow — when they return, immediately proceed to the next phase. Do not wait for user input after a skill completes.
+Post-plan Phases 3-8 are consolidated into a single `/post-plan` skill invocation. After Phase 2 (Implementation), invoke `/post-plan` which handles simplify, commit/push/PR, code review, security audit, verification, CI monitoring, and retrospective internally.
 
 ## Mandatory Rules
 
@@ -128,7 +128,7 @@ After refactoring, compare output against iblhoops.net. Results must match exact
 Context-aware rules auto-load when relevant:
 
 **Always Loaded** (`.claude/rules/`):
-- `workflow-continuity.md` → phase transition rules for multi-phase workflows
+- `workflow-continuity.md` → `/post-plan` orchestrator rules for post-plan workflow
 - `core-coding.md` → key constants, common repository helpers, gotchas
 - `environment.md` → bun, CSS, IBLbot commands
 

@@ -7,6 +7,12 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test.describe('Season Leaderboards flow', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('modules.php?name=SeasonLeaderboards');
+
+    // Skip all tests if module is hidden (e.g. Trivia Mode is on)
+    const body = await page.locator('body').textContent();
+    if (body?.includes("Module isn't active")) {
+      test.skip(true, 'SeasonLeaderboards module is not active (Trivia Mode may be on)');
+    }
   });
 
   test('page loads with filter form', async ({ page }) => {
@@ -111,6 +117,12 @@ test.describe('Season Leaderboards flow', () => {
 test.describe('Career Leaderboards flow', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('modules.php?name=CareerLeaderboards');
+
+    // Skip all tests if module is hidden (e.g. Trivia Mode is on)
+    const body = await page.locator('body').textContent();
+    if (body?.includes("Module isn't active")) {
+      test.skip(true, 'CareerLeaderboards module is not active (Trivia Mode may be on)');
+    }
   });
 
   test('page loads with filter form', async ({ page }) => {

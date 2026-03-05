@@ -1,13 +1,7 @@
 -- Migration 035: Drop dead tables and columns
--- 26 tables with zero PHP references + 1 dead column
---
--- Every table was cross-referenced against all PHP code:
---   - Literal table name references in classes/
---   - $prefix . "_tablename" references in mainfile.php, admin/, modules/, includes/
--- Only tables with ZERO references across all code are dropped.
 
 -- Drop dead column
-ALTER TABLE ibl_team_info DROP COLUMN Contract_Coach;
+ALTER TABLE ibl_team_info DROP COLUMN IF EXISTS Contract_Coach;
 
 -- Drop dead IBL tables
 DROP TABLE IF EXISTS ibl_playoff_results;

@@ -3,7 +3,7 @@
 
 -- Add clinchedLeague (present in ibl_standings, missing from Olympics)
 ALTER TABLE ibl_olympics_standings
-  ADD COLUMN clinchedLeague TINYINT(1) DEFAULT NULL
+  ADD COLUMN IF NOT EXISTS clinchedLeague TINYINT(1) DEFAULT NULL
   COMMENT '1=clinched league best record' AFTER clinchedPlayoffs;
 
 -- Change conference from ENUM to VARCHAR on both tables for Olympics group support

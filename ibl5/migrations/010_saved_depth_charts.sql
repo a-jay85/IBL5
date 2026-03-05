@@ -1,10 +1,7 @@
 -- Migration: Add saved depth charts tables
 -- Purpose: Persistent depth chart snapshots for recall, tracking, and analytics
---
--- Player ratings are NOT snapshotted here. For analysis, join with ibl_hist
--- on pid + season_year to get position ratings and JSB skill ratings.
 
-CREATE TABLE `ibl_saved_depth_charts` (
+CREATE TABLE IF NOT EXISTS `ibl_saved_depth_charts` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `tid` INT NOT NULL,
   `username` VARCHAR(25) NOT NULL,
@@ -24,13 +21,12 @@ CREATE TABLE `ibl_saved_depth_charts` (
   KEY `idx_active` (`is_active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `ibl_saved_depth_chart_players` (
+CREATE TABLE IF NOT EXISTS `ibl_saved_depth_chart_players` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `depth_chart_id` INT UNSIGNED NOT NULL,
   `pid` INT NOT NULL,
   `player_name` VARCHAR(64) NOT NULL COMMENT 'Snapshot for historical display',
   `ordinal` INT NOT NULL DEFAULT 0,
-  -- Depth chart settings (the independent variables for analysis)
   `dc_PGDepth` TINYINT UNSIGNED NOT NULL DEFAULT 0,
   `dc_SGDepth` TINYINT UNSIGNED NOT NULL DEFAULT 0,
   `dc_SFDepth` TINYINT UNSIGNED NOT NULL DEFAULT 0,

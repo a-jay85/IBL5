@@ -17,8 +17,7 @@ global $prefix, $db;
 $modpath = '';
 define('MODULE_FILE', true);
 $_SERVER['PHP_SELF'] = "modules.php";
-$row = $db->sql_fetchrow($db->sql_query("SELECT main_module from " . $prefix . "_main"));
-$name = $row['main_module'];
+$name = 'News';
 define('HOME_FILE', true);
 
 if (isset($url) and is_admin()) {

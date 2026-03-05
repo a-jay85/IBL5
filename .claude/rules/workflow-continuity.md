@@ -1,14 +1,7 @@
 # Workflow Continuity Rule
 
-When executing the post-plan-approval workflow (Phases 1-8), skill completions are NOT stopping points. After ANY skill invocation returns output, IMMEDIATELY proceed to the next phase in the same response.
+Phases 3-8 of the post-plan workflow are consolidated into a single `/post-plan` skill. This eliminates inter-skill stopping points — all phases execute within one skill invocation.
 
-| Skill completed | Next action |
-|----------------|-------------|
-| `/simplify` | Phase 4: `/commit-commands:commit-push-pr` |
-| `/commit-commands:commit-push-pr` | Phase 5: `/code-review:code-review` + `/security-audit` |
-| `/code-review:code-review` | Continue to `/security-audit` or Phase 6 |
-| `/security-audit` | Phase 6: Full test suite + PHPStan |
-| Phase 6 verification | Phase 7: CI monitoring |
-| Phase 7 CI pass | Phase 8: Retrospective (update memory/docs if needed) |
-
-Never wait for user input between phases. Treat skill completion like a function return — the caller continues executing.
+- After Phase 2 (Implementation), invoke `/post-plan` and let it run to completion.
+- Do NOT invoke `/simplify`, `/commit-commands:commit-push-pr`, `/code-review:code-review`, or `/security-audit` separately during the post-plan workflow. `/post-plan` handles all of them internally using direct tool calls (Bash, Agent, Read, Edit).
+- Those individual skills remain available for standalone use outside the workflow.

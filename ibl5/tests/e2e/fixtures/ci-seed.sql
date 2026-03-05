@@ -30,8 +30,6 @@ INSERT INTO nuke_config (
   '', '5.11', 0, 0, 0
 );
 
-INSERT INTO nuke_main (main_module) VALUES ('News');
-
 -- Modules referenced by E2E tests (is_active() checks)
 INSERT INTO nuke_modules (title, custom_title, active, view) VALUES
   ('Standings',         'Standings',         1, 0),

@@ -32,7 +32,7 @@ jobs:
         coverage: none
 
     - name: Cache vendor directory
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ibl5/vendor
         key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}

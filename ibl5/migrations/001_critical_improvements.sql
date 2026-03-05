@@ -56,7 +56,7 @@ ALTER TABLE ibl_demands ENGINE=InnoDB;
 
 -- Trade System
 ALTER TABLE ibl_trade_info ENGINE=InnoDB;
-ALTER TABLE ibl_trade_autocounter ENGINE=InnoDB;
+-- ibl_trade_autocounter: dropped by migration 029, skip
 
 -- Awards and Settings
 ALTER TABLE ibl_awards ENGINE=InnoDB;

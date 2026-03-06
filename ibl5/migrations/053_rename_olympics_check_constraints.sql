@@ -12,7 +12,15 @@ ALTER TABLE ibl_olympics_plr
   DROP CONSTRAINT IF EXISTS chk_plr_cy3,
   DROP CONSTRAINT IF EXISTS chk_plr_cy4,
   DROP CONSTRAINT IF EXISTS chk_plr_cy5,
-  DROP CONSTRAINT IF EXISTS chk_plr_cy6;
+  DROP CONSTRAINT IF EXISTS chk_plr_cy6,
+  DROP CONSTRAINT IF EXISTS chk_olym_plr_cy,
+  DROP CONSTRAINT IF EXISTS chk_olym_plr_cyt,
+  DROP CONSTRAINT IF EXISTS chk_olym_plr_cy1,
+  DROP CONSTRAINT IF EXISTS chk_olym_plr_cy2,
+  DROP CONSTRAINT IF EXISTS chk_olym_plr_cy3,
+  DROP CONSTRAINT IF EXISTS chk_olym_plr_cy4,
+  DROP CONSTRAINT IF EXISTS chk_olym_plr_cy5,
+  DROP CONSTRAINT IF EXISTS chk_olym_plr_cy6;
 
 ALTER TABLE ibl_olympics_plr
   ADD CONSTRAINT chk_olym_plr_cy  CHECK (cy  >= 0 AND cy  <= 6),

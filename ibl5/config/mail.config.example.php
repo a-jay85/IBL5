@@ -13,6 +13,16 @@
  *   'log'  - Write emails to error_log (safe for local development)
  */
 
+// Docker development with Mailpit (http://localhost:8025):
+// 'transport' => 'smtp',
+// 'smtp' => [
+//     'host' => 'mailpit',
+//     'port' => 1025,
+//     'encryption' => '',
+//     'username' => '',
+//     'password' => '',
+// ],
+
 return [
     // Transport method: 'smtp', 'mail', or 'log'
     'transport' => 'log',

@@ -1922,6 +1922,25 @@ td.ibl-team-cell--colored {
 }
 
 /* Draft Order Drag-and-Drop (admin) */
+.draft-pick-cell {
+    position: relative;
+}
+
+.draft-drag-handle {
+    position: absolute;
+    left: 0.25rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-400, #9ca3af);
+    font-size: 1rem;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.draft-draggable:hover .draft-drag-handle {
+    color: var(--gray-600, #4b5563);
+}
+
 .draft-draggable {
     cursor: grab;
     user-select: none;

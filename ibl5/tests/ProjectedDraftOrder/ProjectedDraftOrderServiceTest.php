@@ -452,7 +452,7 @@ class ProjectedDraftOrderServiceTest extends TestCase
 
         $savedPicks = [];
         for ($i = 1; $i <= 28; $i++) {
-            $savedPicks[] = ['pick' => $i, 'team' => 'Team' . $i, 'tid' => $i];
+            $savedPicks[] = ['pick' => $i, 'team' => 'Team' . $i, 'tid' => $i, 'player' => ''];
         }
         $this->stubRepository->method('getFinalDraftOrder')->willReturn($savedPicks);
 

@@ -140,6 +140,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
                 'isTraded' => $isTraded,
                 'notes' => $notes,
                 'movement' => $movement,
+                'player' => $savedPick['player'],
             ];
         }
 
@@ -567,6 +568,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
                 'isTraded' => $isTraded,
                 'notes' => $notes,
                 'movement' => 0,
+                'player' => '',
             ];
         }
 

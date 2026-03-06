@@ -54,9 +54,9 @@ interface ProjectedDraftOrderRepositoryInterface
     public function saveFinalDraftOrder(int $year, array $picks): void;
 
     /**
-     * Fetch saved round-1 draft order from ibl_draft for a given year (unfilled slots).
+     * Fetch saved round-1 draft order from ibl_draft for a given year.
      *
-     * @return list<array{pick: int, team: string, tid: int}>
+     * @return list<array{pick: int, team: string, tid: int, player: string}>
      */
     public function getFinalDraftOrder(int $year): array;
 

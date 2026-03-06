@@ -126,13 +126,13 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
         }
     }
 
-    /** @return list<array{pick: int, team: string, tid: int}> */
+    /** @return list<array{pick: int, team: string, tid: int, player: string}> */
     public function getFinalDraftOrder(int $year): array
     {
-        /** @var list<array{pick: int, team: string, tid: int}> */
+        /** @var list<array{pick: int, team: string, tid: int, player: string}> */
         return $this->fetchAll(
-            "SELECT pick, team, tid FROM ibl_draft
-             WHERE year = ? AND round = 1 AND player = ''
+            "SELECT pick, team, tid, player FROM ibl_draft
+             WHERE year = ? AND round = 1
              ORDER BY pick",
             "i",
             $year,

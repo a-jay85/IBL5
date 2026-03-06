@@ -55,6 +55,7 @@
                 cloneCells[i].style.padding = cs.padding;
                 cloneCells[i].style.height = cs.height;
                 cloneCells[i].style.textAlign = cs.textAlign;
+                cloneCells[i].style.position = cs.position;
                 cloneCells[i].style.overflow = 'visible';
             });
 
@@ -73,7 +74,8 @@
             requestAnimationFrame(function () {
                 placeholder = document.createElement('tr');
                 placeholder.className = 'draft-drag-placeholder';
-                placeholder.innerHTML = '<td colspan="4">&nbsp;</td>';
+                var colCount = table.querySelectorAll('thead th').length;
+                placeholder.innerHTML = '<td colspan="' + colCount + '">&nbsp;</td>';
                 placeholder.addEventListener('dragover', function (ev) {
                     ev.preventDefault();
                     ev.dataTransfer.dropEffect = 'move';
@@ -128,8 +130,13 @@
         var currentRows = table.querySelectorAll('tr[draggable="true"]');
         currentRows.forEach(function (row, index) {
             var pickCell = row.querySelector('td:first-child');
-            if (pickCell) {
-                pickCell.textContent = String(index + 1);
+            if (!pickCell) return;
+            // Update only the text node after the drag handle span
+            var textNode = pickCell.lastChild;
+            if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                textNode.textContent = String(index + 1);
+            } else {
+                pickCell.appendChild(document.createTextNode(String(index + 1)));
             }
         });
     }

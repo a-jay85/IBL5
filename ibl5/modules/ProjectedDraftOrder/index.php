@@ -34,7 +34,7 @@ $draftOrder = $isFinalized
 
 PageLayout\PageLayout::header();
 echo $view->render($draftOrder, $season->endingYear, $isAdmin, $isFinalized, $isDraftStarted);
-if ($isAdmin && !$isFinalized) {
+if ($isAdmin && !$isDraftStarted) {
     echo '<script src="jslib/draft-order-drag.js"></script>';
 }
 PageLayout\PageLayout::footer();

@@ -71,4 +71,83 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
             $seasonYear
         );
     }
+
+    public function isDraftOrderFinalized(): bool
+    {
+        $row = $this->fetchOne(
+            "SELECT value FROM ibl_settings WHERE name = 'Draft Order Finalized'",
+        );
+
+        return $row !== null && $row['value'] === 'Yes';
+    }
+
+    /**
+     * @param list<array{round: int, pick: int, team: string, tid: int}> $picks
+     */
+    public function saveFinalDraftOrder(int $year, array $picks): void
+    {
+        $this->db->begin_transaction();
+        try {
+            // Delete all draft rows from previous years (out of date)
+            $this->execute(
+                "DELETE FROM ibl_draft WHERE year < ?",
+                "i",
+                $year,
+            );
+
+            // Delete unfilled slots for this year (both rounds) before inserting new ones
+            $this->execute(
+                "DELETE FROM ibl_draft WHERE year = ? AND player = ''",
+                "i",
+                $year,
+            );
+
+            foreach ($picks as $pick) {
+                $this->execute(
+                    "INSERT INTO ibl_draft (year, round, pick, team, tid, player, uuid)
+                     VALUES (?, ?, ?, ?, ?, '', UUID())",
+                    "iiisi",
+                    $year,
+                    $pick['round'],
+                    $pick['pick'],
+                    $pick['team'],
+                    $pick['tid'],
+                );
+            }
+
+            $this->execute(
+                "UPDATE ibl_settings SET value = 'Yes' WHERE name = 'Draft Order Finalized'",
+            );
+
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
+    }
+
+    /** @return list<array{pick: int, team: string, tid: int, player: string}> */
+    public function getFinalDraftOrder(int $year): array
+    {
+        /** @var list<array{pick: int, team: string, tid: int, player: string}> */
+        return $this->fetchAll(
+            "SELECT pick, team, tid, player FROM ibl_draft
+             WHERE year = ? AND round = 1
+             ORDER BY pick",
+            "i",
+            $year,
+        );
+    }
+
+    /** @see ProjectedDraftOrderRepositoryInterface::isDraftStarted() */
+    public function isDraftStarted(int $year): bool
+    {
+        $row = $this->fetchOne(
+            "SELECT 1 FROM ibl_draft WHERE year = ? AND player != '' LIMIT 1",
+            "i",
+            $year,
+        );
+
+        return $row !== null;
+    }
 }

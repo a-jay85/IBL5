@@ -72,11 +72,15 @@ function themeheader()
     $seasonPhase = '';
     $allowWaivers = '';
     $showDraftLink = '';
+    $isDraftOrderFinalized = false;
     if ($mysqli_db) {
         $season = new \Season($mysqli_db);
         $seasonPhase = $season->phase;
         $allowWaivers = $season->allowWaivers;
         $showDraftLink = $season->showDraftLink;
+
+        $draftOrderRepo = new \ProjectedDraftOrder\ProjectedDraftOrderRepository($mysqli_db);
+        $isDraftOrderFinalized = $draftOrderRepo->isDraftOrderFinalized();
     }
 
     $navConfig = new \Navigation\NavigationConfig(
@@ -90,6 +94,7 @@ function themeheader()
         showDraftLink: $showDraftLink,
         serverName: $_SERVER['SERVER_NAME'] ?? null,
         requestUri: $_SERVER['REQUEST_URI'] ?? null,
+        isDraftOrderFinalized: $isDraftOrderFinalized,
     );
 
     $navView = new \Navigation\NavigationView($navConfig);

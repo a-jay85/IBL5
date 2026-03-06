@@ -20,6 +20,8 @@ use ProjectedDraftOrder\Contracts\ProjectedDraftOrderServiceInterface;
  */
 class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
 {
+    private const LOTTERY_SIZE = 12;
+
     private ProjectedDraftOrderRepositoryInterface $repository;
 
     public function __construct(ProjectedDraftOrderRepositoryInterface $repository)
@@ -70,6 +72,128 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         $round2 = $this->buildRound($allTeamsSorted, $pickOwnership, 2, $teamMap);
 
         return ['round1' => $round1, 'round2' => $round2];
+    }
+
+    /** @return ProjectedDraftOrderResult */
+    public function getFinalOrProjectedDraftOrder(int $seasonYear): array
+    {
+        if (!$this->repository->isDraftOrderFinalized()) {
+            return $this->calculateDraftOrder($seasonYear);
+        }
+
+        $savedPicks = $this->repository->getFinalDraftOrder($seasonYear);
+        if ($savedPicks === []) {
+            return $this->calculateDraftOrder($seasonYear);
+        }
+
+        $projected = $this->calculateDraftOrder($seasonYear);
+        $standings = $this->repository->getAllTeamsWithStandings();
+        $teamMap = $this->buildTeamMap($standings);
+        $pickOwnershipRows = $this->repository->getPickOwnership($seasonYear);
+        $pickOwnership = $this->buildPickOwnershipMap($pickOwnershipRows);
+
+        $nameToIdMap = [];
+        foreach ($teamMap as $tid => $team) {
+            $nameToIdMap[$team['team_name']] = $tid;
+        }
+
+        // Build projected pick map: teamId => projected pick number (lottery only)
+        $projectedPickByTeam = [];
+        foreach ($projected['round1'] as $slot) {
+            if ($slot['pick'] <= self::LOTTERY_SIZE) {
+                $projectedPickByTeam[$slot['teamId']] = $slot['pick'];
+            }
+        }
+
+        // Build round-1 from saved picks, enriching with standings and ownership data
+        $round1 = [];
+        foreach ($savedPicks as $savedPick) {
+            $team = $teamMap[$savedPick['tid']] ?? null;
+            if ($team === null) {
+                continue;
+            }
+
+            $teamName = $savedPick['team'];
+            $ownership = $pickOwnership[$teamName][1] ?? null;
+            $ownerName = $ownership !== null ? $ownership['ownerName'] : $teamName;
+            $notes = $ownership !== null ? $ownership['notes'] : '';
+            $isTraded = $ownerName !== $teamName;
+            $ownerId = $nameToIdMap[$ownerName] ?? $savedPick['tid'];
+            $ownerTeam = $teamMap[$ownerId] ?? $team;
+
+            // Movement: positive = moved up, negative = moved down (lottery only)
+            $projectedPick = $projectedPickByTeam[$savedPick['tid']] ?? $savedPick['pick'];
+            $movement = $projectedPick - $savedPick['pick'];
+
+            $round1[] = [
+                'pick' => $savedPick['pick'],
+                'teamId' => $savedPick['tid'],
+                'teamName' => $teamName,
+                'wins' => $team['wins'],
+                'losses' => $team['losses'],
+                'color1' => $team['color1'],
+                'color2' => $team['color2'],
+                'ownerId' => $ownerId,
+                'ownerName' => $ownerName,
+                'ownerColor1' => $ownerTeam['color1'],
+                'ownerColor2' => $ownerTeam['color2'],
+                'isTraded' => $isTraded,
+                'notes' => $notes,
+                'movement' => $movement,
+                'player' => $savedPick['player'],
+            ];
+        }
+
+        return ['round1' => $round1, 'round2' => $projected['round2']];
+    }
+
+    /** @param list<int> $lotteryTeamIds */
+    public function saveLotteryOrder(int $seasonYear, array $lotteryTeamIds): void
+    {
+        $projected = $this->calculateDraftOrder($seasonYear);
+        $standings = $this->repository->getAllTeamsWithStandings();
+        $teamMap = $this->buildTeamMap($standings);
+
+        /** @var list<array{round: int, pick: int, team: string, tid: int}> $picks */
+        $picks = [];
+
+        // Round 1: Picks 1-12 from the reordered lottery
+        foreach ($lotteryTeamIds as $index => $tid) {
+            $team = $teamMap[$tid] ?? null;
+            if ($team === null) {
+                throw new \InvalidArgumentException('Invalid team ID: ' . $tid);
+            }
+            $picks[] = [
+                'round' => 1,
+                'pick' => $index + 1,
+                'team' => $team['team_name'],
+                'tid' => $tid,
+            ];
+        }
+
+        // Round 1: Picks 13-28 from projected order
+        foreach ($projected['round1'] as $slot) {
+            if ($slot['pick'] >= 13) {
+                $picks[] = [
+                    'round' => 1,
+                    'pick' => $slot['pick'],
+                    'team' => $slot['teamName'],
+                    'tid' => $slot['teamId'],
+                ];
+            }
+        }
+
+        // Round 2: All 28 picks from projected order
+        foreach ($projected['round2'] as $slot) {
+            $picks[] = [
+                'round' => 2,
+                'pick' => $slot['pick'],
+                'team' => $slot['teamName'],
+                'tid' => $slot['teamId'],
+            ];
+        }
+
+        $this->repository->saveFinalDraftOrder($seasonYear, $picks);
     }
 
     /**
@@ -443,6 +567,8 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
                 'ownerColor2' => $ownerTeam['color2'],
                 'isTraded' => $isTraded,
                 'notes' => $notes,
+                'movement' => 0,
+                'player' => '',
             ];
         }
 

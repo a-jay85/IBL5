@@ -281,20 +281,235 @@ class ProjectedDraftOrderViewTest extends TestCase
     }
 
     // =========================================================================
+    // Finalization & Admin Drag-and-Drop Tests
+    // =========================================================================
+
+    public function testRenderShowsDraftOrderTitleWhenFinalized(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, false, true);
+
+        $this->assertStringContainsString('Draft Order', $result);
+        $this->assertStringNotContainsString('Projected Draft Order', $result);
+    }
+
+    public function testDescriptionHiddenWhenFinalized(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, false, true);
+
+        $this->assertStringNotContainsString('projected-draft-order-description', $result);
+    }
+
+    public function testAdminAlertShownWhenNotFinalized(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, false);
+
+        $this->assertStringContainsString('ibl-alert--info', $result);
+        $this->assertStringContainsString('Drag the lottery teams', $result);
+    }
+
+    public function testAdminAlertHiddenWhenFinalized(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, true);
+
+        $this->assertStringNotContainsString('ibl-alert--info', $result);
+    }
+
+    public function testAdminAlertHiddenForNonAdmin(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, false, false);
+
+        $this->assertStringNotContainsString('ibl-alert--info', $result);
+    }
+
+    public function testWarningShownWhenFinalizedButDraftNotStarted(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, true, false);
+
+        $this->assertStringContainsString('ibl-alert--warning', $result);
+        $this->assertStringContainsString('can still adjust', $result);
+    }
+
+    public function testWarningHiddenWhenDraftStarted(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, true, true);
+
+        $this->assertStringNotContainsString('ibl-alert--warning', $result);
+    }
+
+    public function testWarningHiddenForNonAdmin(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, false, true, false);
+
+        $this->assertStringNotContainsString('ibl-alert--warning', $result);
+    }
+
+    public function testSaveButtonRenderedForAdmin(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, false);
+
+        $this->assertStringContainsString('draft-order-save-btn', $result);
+    }
+
+    public function testSaveButtonNotRenderedForNonAdmin(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, false, false);
+
+        $this->assertStringNotContainsString('draft-order-save-btn', $result);
+    }
+
+    public function testDraggableAttributesOnLotteryRowsForAdmin(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, true, false);
+
+        $this->assertStringContainsString('draggable="true"', $result);
+        $this->assertStringContainsString('data-team-id=', $result);
+    }
+
+    public function testDragHandleShownOnDraggableRows(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, true, false);
+
+        $this->assertStringContainsString('draft-drag-handle', $result);
+        $this->assertStringContainsString('draft-pick-cell', $result);
+    }
+
+    public function testDragHandleNotShownWhenNotDraggable(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, false, false);
+
+        $this->assertStringNotContainsString('draft-drag-handle', $result);
+        $this->assertStringNotContainsString('draft-pick-cell', $result);
+    }
+
+    public function testNoDraggableAttributesForNonAdmin(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, false, false);
+
+        $this->assertStringNotContainsString('draggable="true"', $result);
+    }
+
+    public function testDraggableWhenFinalizedButDraftNotStarted(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, true, true, false);
+
+        $this->assertStringContainsString('draggable="true"', $result);
+        $this->assertStringContainsString('draft-draggable', $result);
+    }
+
+    public function testNoDraggableAttributesWhenDraftStarted(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, true, true, true);
+
+        $this->assertStringNotContainsString('draggable="true"', $result);
+        $this->assertStringNotContainsString('draft-draggable', $result);
+    }
+
+    public function testSaveButtonNotRenderedWhenDraftStarted(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, true, true);
+
+        $this->assertStringNotContainsString('draft-order-save-btn', $result);
+    }
+
+    public function testNonLotteryRowsNotDraggableForAdmin(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, true, false);
+
+        // Count draggable rows — should be exactly 12 (picks 1-12)
+        $draggableCount = substr_count($result, 'draggable="true"');
+        $this->assertSame(12, $draggableCount);
+    }
+
+    public function testMovedUpRowGetsGreenHighlight(): void
+    {
+        $order = [
+            'round1' => [
+                $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 1, 'Heat', '98002E', 'F9A01B', false, '', movement: 2),
+            ],
+            'round2' => [],
+        ];
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringContainsString('draft-moved-up', $result);
+    }
+
+    public function testMovedDownRowGetsRedHighlight(): void
+    {
+        $order = [
+            'round1' => [
+                $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 1, 'Heat', '98002E', 'F9A01B', false, '', movement: -3),
+            ],
+            'round2' => [],
+        ];
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringContainsString('draft-moved-down', $result);
+    }
+
+    public function testNoMovementNoHighlight(): void
+    {
+        $order = [
+            'round1' => [
+                $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 1, 'Heat', '98002E', 'F9A01B', false, '', movement: 0),
+            ],
+            'round2' => [],
+        ];
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringNotContainsString('draft-moved-up', $result);
+        $this->assertStringNotContainsString('draft-moved-down', $result);
+    }
+
+    public function testRound1TableHasId(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, false);
+
+        $this->assertStringContainsString('id="draft-order-round1"', $result);
+    }
+
+    public function testPlayerColumnShownWhenDraftStarted(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, false, true, true);
+
+        $this->assertStringContainsString('<th>Player</th>', $result);
+    }
+
+    public function testPlayerColumnHiddenWhenDraftNotStarted(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, false, true, false);
+
+        $this->assertStringNotContainsString('<th>Player</th>', $result);
+    }
+
+    public function testPlayerNameRenderedWhenFinalized(): void
+    {
+        $order = [
+            'round1' => [
+                $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 1, 'Heat', '98002E', 'F9A01B', false, '', player: 'LeBron James'),
+            ],
+            'round2' => [],
+        ];
+        $result = $this->view->render($order, 2026, false, true, true);
+
+        $this->assertStringContainsString('LeBron James', $result);
+    }
+
+    // =========================================================================
     // Helper methods
     // =========================================================================
 
-    /**
-     * @return array{round1: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string}>, round2: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string}>}
-     */
     private function emptyDraftOrder(): array
     {
         return ['round1' => [], 'round2' => []];
     }
 
-    /**
-     * @return array{round1: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string}>, round2: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string}>}
-     */
     private function sampleDraftOrder(): array
     {
         return [
@@ -307,9 +522,6 @@ class ProjectedDraftOrderViewTest extends TestCase
         ];
     }
 
-    /**
-     * @return array{round1: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string}>, round2: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string}>}
-     */
     private function sampleDraftOrderWithPlayoffSeparator(): array
     {
         $slots = [];
@@ -321,7 +533,7 @@ class ProjectedDraftOrderViewTest extends TestCase
     }
 
     /**
-     * @return array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string}
+     * @return array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int, player: string}
      */
     private function makeSlot(
         int $pick,
@@ -337,6 +549,8 @@ class ProjectedDraftOrderViewTest extends TestCase
         string $ownerColor2,
         bool $isTraded,
         string $notes,
+        int $movement = 0,
+        string $player = '',
     ): array {
         return [
             'pick' => $pick,
@@ -352,6 +566,8 @@ class ProjectedDraftOrderViewTest extends TestCase
             'ownerColor2' => $ownerColor2,
             'isTraded' => $isTraded,
             'notes' => $notes,
+            'movement' => $movement,
+            'player' => $player,
         ];
     }
 }

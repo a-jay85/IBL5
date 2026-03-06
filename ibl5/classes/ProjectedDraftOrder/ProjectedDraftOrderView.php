@@ -21,19 +21,33 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
     private const CONFERENCE_WINNERS_BOUNDARY = 26;
 
     /** @param ProjectedDraftOrderResult $draftOrder */
-    public function render(array $draftOrder, int $seasonYear): string
+    public function render(array $draftOrder, int $seasonYear, bool $isAdmin = false, bool $isFinalized = false, bool $isDraftStarted = false): string
     {
-        $html = $this->renderTitle($seasonYear);
-        $html .= $this->renderDescription();
-        $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1', showPlayoffDivider: true);
-        $html .= $this->renderRoundTable($draftOrder['round2'], 'Round 2', showPlayoffDivider: false);
+        $html = $this->renderTitle($seasonYear, $isFinalized);
+        if (!$isFinalized) {
+            $html .= $this->renderDescription();
+        }
+        if ($isAdmin && !$isFinalized) {
+            $html .= '<div class="ibl-alert ibl-alert--info">Admin-only message:<br>Drag the lottery teams (picks 1–12) into their final draft order, then click Save.</div>';
+        }
+        if ($isAdmin && $isFinalized && !$isDraftStarted) {
+            $html .= '<div class="ibl-alert ibl-alert--warning">Admin-only message:<br>You can still adjust the lottery order until a player has been drafted.</div>';
+        }
+        $isDraggable = $isAdmin && !$isDraftStarted;
+        if ($isDraggable) {
+            $html .= '<button type="button" id="draft-order-save-btn" class="ibl-btn ibl-btn--danger" style="display: none; margin-bottom: 1rem;">Save Draft Order</button>';
+        }
+        $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1', showPlayoffDivider: true, isAdmin: $isDraggable, showPlayer: $isDraftStarted);
+        $html .= $this->renderRoundTable($draftOrder['round2'], 'Round 2', showPlayoffDivider: false, isAdmin: false, showPlayer: $isDraftStarted);
 
         return $html;
     }
 
-    private function renderTitle(int $seasonYear): string
+    private function renderTitle(int $seasonYear, bool $isFinalized): string
     {
-        return '<h2 class="ibl-title">' . HtmlSanitizer::safeHtmlOutput($seasonYear) . ' Projected Draft Order</h2>';
+        $label = $isFinalized ? 'Draft Order' : 'Projected Draft Order';
+
+        return '<h2 class="ibl-title">' . HtmlSanitizer::e($seasonYear) . ' ' . $label . '</h2>';
     }
 
     private function renderDescription(): string
@@ -46,15 +60,20 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
     /**
      * @param list<DraftSlot> $slots
      */
-    private function renderRoundTable(array $slots, string $roundLabel, bool $showPlayoffDivider): string
+    private function renderRoundTable(array $slots, string $roundLabel, bool $showPlayoffDivider, bool $isAdmin, bool $showPlayer): string
     {
-        $html = '<h3 class="ibl-table-title">' . HtmlSanitizer::safeHtmlOutput($roundLabel) . '</h3>';
-        $html .= '<table class="ibl-data-table projected-draft-order-table">';
+        $colspan = $showPlayer ? '5' : '4';
+        $tableId = $roundLabel === 'Round 1' ? ' id="draft-order-round1"' : '';
+        $html = '<h3 class="ibl-table-title">' . HtmlSanitizer::e($roundLabel) . '</h3>';
+        $html .= '<table class="ibl-data-table projected-draft-order-table"' . $tableId . '>';
         $html .= '<thead><tr>';
         $html .= '<th>Pick</th>';
         $html .= '<th>Team</th>';
         $html .= '<th>Record</th>';
         $html .= '<th>Notes</th>';
+        if ($showPlayer) {
+            $html .= '<th>Player</th>';
+        }
         $html .= '</tr></thead>';
         $html .= '<tbody>';
 
@@ -62,10 +81,11 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
             if ($showPlayoffDivider) {
                 $separator = $this->getSeparatorLabel($slot['pick']);
                 if ($separator !== null) {
-                    $html .= $this->renderSeparatorRow($separator);
+                    $html .= $this->renderSeparatorRow($separator, $colspan);
                 }
             }
-            $html .= $this->renderPickRow($slot);
+            $isLottery = $slot['pick'] <= self::LOTTERY_PLAYOFF_BOUNDARY;
+            $html .= $this->renderPickRow($slot, $isAdmin && $isLottery, $showPlayer);
         }
 
         $html .= '</tbody></table>';
@@ -84,20 +104,36 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         };
     }
 
-    private function renderSeparatorRow(string $label): string
+    private function renderSeparatorRow(string $label, string $colspan = '4'): string
     {
         return '<tr class="projected-draft-order-separator ibl-table-subheading">'
-            . '<td colspan="4">' . HtmlSanitizer::e($label) . '</td>'
+            . '<td colspan="' . $colspan . '">' . HtmlSanitizer::e($label) . '</td>'
             . '</tr>';
     }
 
     /** @param DraftSlot $slot */
-    private function renderPickRow(array $slot): string
+    private function renderPickRow(array $slot, bool $isDraggable, bool $showPlayer): string
     {
-        $rowClass = $slot['isTraded'] ? ' class="projected-draft-order-traded"' : '';
-        $html = '<tr' . $rowClass . '>';
+        $classes = [];
+        if ($slot['isTraded']) {
+            $classes[] = 'projected-draft-order-traded';
+        }
+        if ($slot['movement'] > 0) {
+            $classes[] = 'draft-moved-up';
+        } elseif ($slot['movement'] < 0) {
+            $classes[] = 'draft-moved-down';
+        }
+        if ($isDraggable) {
+            $classes[] = 'draft-draggable';
+        }
+        $classAttr = $classes !== [] ? ' class="' . implode(' ', $classes) . '"' : '';
+        $dragAttr = $isDraggable ? ' draggable="true" data-team-id="' . HtmlSanitizer::e($slot['teamId']) . '"' : '';
+        $html = '<tr' . $classAttr . $dragAttr . '>';
 
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['pick']) . '</td>';
+        $pickHtml = $isDraggable
+            ? '<td class="draft-pick-cell"><span class="draft-drag-handle">⠿</span>' . HtmlSanitizer::e($slot['pick']) . '</td>'
+            : '<td>' . HtmlSanitizer::e($slot['pick']) . '</td>';
+        $html .= $pickHtml;
 
         if ($slot['isTraded']) {
             $html .= TeamCellHelper::renderTeamCell(
@@ -120,6 +156,10 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         $titleAttr = $slot['notes'] !== '' ? ' title="Click/tap to expand"' : '';
         $html .= '<td class="projected-draft-order-notes"' . $titleAttr . ' onclick="this.classList.toggle(\'is-expanded\')">'
             . HtmlSanitizer::safeHtmlOutput($slot['notes']) . '</td>';
+
+        if ($showPlayer) {
+            $html .= '<td>' . HtmlSanitizer::e($slot['player']) . '</td>';
+        }
 
         $html .= '</tr>';
         return $html;

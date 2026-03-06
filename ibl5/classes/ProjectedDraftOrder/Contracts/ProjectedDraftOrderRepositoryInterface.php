@@ -40,4 +40,28 @@ interface ProjectedDraftOrderRepositoryInterface
      * @return list<PointDifferentialRow>
      */
     public function getPointDifferentials(int $seasonYear): array;
+
+    /**
+     * Check if the draft order has been finalized via ibl_settings.
+     */
+    public function isDraftOrderFinalized(): bool;
+
+    /**
+     * Save the final draft order (both rounds) to ibl_draft and mark as finalized.
+     *
+     * @param list<array{round: int, pick: int, team: string, tid: int}> $picks
+     */
+    public function saveFinalDraftOrder(int $year, array $picks): void;
+
+    /**
+     * Fetch saved round-1 draft order from ibl_draft for a given year.
+     *
+     * @return list<array{pick: int, team: string, tid: int, player: string}>
+     */
+    public function getFinalDraftOrder(int $year): array;
+
+    /**
+     * Check if any player has been drafted for the given year.
+     */
+    public function isDraftStarted(int $year): bool;
 }

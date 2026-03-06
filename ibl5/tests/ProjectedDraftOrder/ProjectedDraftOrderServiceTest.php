@@ -431,6 +431,106 @@ class ProjectedDraftOrderServiceTest extends TestCase
     }
 
     // =========================================================================
+    // Finalization Tests
+    // =========================================================================
+
+    public function testGetFinalOrProjectedReturnsProjectedWhenNotFinalized(): void
+    {
+        $this->configureStubWithFullLeague();
+        $this->stubRepository->method('isDraftOrderFinalized')->willReturn(false);
+
+        $result = $this->service->getFinalOrProjectedDraftOrder(2026);
+
+        $this->assertArrayHasKey('round1', $result);
+        $this->assertCount(28, $result['round1']);
+    }
+
+    public function testGetFinalOrProjectedReturnsSavedOrderWhenFinalized(): void
+    {
+        $this->configureStubWithFullLeague();
+        $this->stubRepository->method('isDraftOrderFinalized')->willReturn(true);
+
+        $savedPicks = [];
+        for ($i = 1; $i <= 28; $i++) {
+            $savedPicks[] = ['pick' => $i, 'team' => 'Team' . $i, 'tid' => $i, 'player' => ''];
+        }
+        $this->stubRepository->method('getFinalDraftOrder')->willReturn($savedPicks);
+
+        $result = $this->service->getFinalOrProjectedDraftOrder(2026);
+
+        $this->assertSame(1, $result['round1'][0]['pick']);
+        $this->assertSame('Team1', $result['round1'][0]['teamName']);
+    }
+
+    public function testGetFinalOrProjectedFallsBackWhenNoSavedPicks(): void
+    {
+        $this->configureStubWithFullLeague();
+        $this->stubRepository->method('isDraftOrderFinalized')->willReturn(true);
+        $this->stubRepository->method('getFinalDraftOrder')->willReturn([]);
+
+        $result = $this->service->getFinalOrProjectedDraftOrder(2026);
+
+        // Falls back to projected
+        $this->assertCount(28, $result['round1']);
+    }
+
+    public function testSaveLotteryOrderDelegatesToRepository(): void
+    {
+        $standings = $this->buildFullLeagueStandings();
+        /** @var ProjectedDraftOrderRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(ProjectedDraftOrderRepositoryInterface::class);
+        $mockRepo->method('getAllTeamsWithStandings')->willReturn($standings);
+        $mockRepo->method('getPlayedGames')->willReturn([]);
+        $mockRepo->method('getPickOwnership')->willReturn([]);
+        $mockRepo->method('getPointDifferentials')->willReturn([]);
+
+        // Get the projected order to know which teams are in lottery
+        $tempService = new ProjectedDraftOrderService($mockRepo);
+        $projected = $tempService->calculateDraftOrder(2026);
+        $lotteryTids = [];
+        for ($i = 0; $i < 12; $i++) {
+            $lotteryTids[] = $projected['round1'][$i]['teamId'];
+        }
+
+        // Reverse the lottery order
+        $reversedLottery = array_reverse($lotteryTids);
+
+        $mockRepo->expects($this->once())
+            ->method('saveFinalDraftOrder')
+            ->with(
+                2026,
+                $this->callback(static function (array $picks) use ($reversedLottery): bool {
+                    // 28 round-1 + 28 round-2 = 56 total
+                    if (count($picks) !== 56) {
+                        return false;
+                    }
+                    // First pick should be round 1, last original lottery team
+                    if ($picks[0]['round'] !== 1 || $picks[0]['tid'] !== $reversedLottery[0] || $picks[0]['pick'] !== 1) {
+                        return false;
+                    }
+                    // Pick 13 should be round 1 from projected order (unchanged)
+                    if ($picks[12]['round'] !== 1 || $picks[12]['pick'] !== 13) {
+                        return false;
+                    }
+                    // Pick index 28 should be round 2, pick 1
+                    return $picks[28]['round'] === 2 && $picks[28]['pick'] === 1;
+                }),
+            );
+
+        $service = new ProjectedDraftOrderService($mockRepo);
+        $service->saveLotteryOrder(2026, $reversedLottery);
+    }
+
+    public function testSaveLotteryOrderThrowsOnInvalidTeamId(): void
+    {
+        $this->configureStubWithFullLeague();
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service->saveLotteryOrder(2026, [999, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    }
+
+    // =========================================================================
     // Helper methods to build test fixtures
     // =========================================================================
 

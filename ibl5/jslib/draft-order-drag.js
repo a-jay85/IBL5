@@ -54,6 +54,7 @@
                 cloneCells[i].style.width = cell.offsetWidth + 'px';
                 cloneCells[i].style.padding = cs.padding;
                 cloneCells[i].style.height = cs.height;
+                cloneCells[i].style.textAlign = cs.textAlign;
                 cloneCells[i].style.overflow = 'visible';
             });
 

@@ -1852,6 +1852,11 @@ td.ibl-team-cell--colored {
     background-color: var(--gray-200, #e5e7eb);
 }
 
+.projected-draft-order-lottery-results td {
+    background-color: var(--accent-500, #f97316);
+    color: var(--navy-900, #0a0f1a);
+}
+
 /* Vertical separator between Team and Record columns */
 .projected-draft-order-table tbody td:nth-child(3) {
     border-left: 1px solid var(--gray-100);

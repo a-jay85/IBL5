@@ -17,6 +17,8 @@
     var draggedRow = null;
     var lastTarget = null;
     var rowHeight = 0;
+    var rowMidpoints = []; // original Y midpoints of each draggable row
+    var rowsArray = Array.from(draggableRows);
     var tbody = table.querySelector('tbody');
 
     draggableRows.forEach(function (row) {
@@ -24,6 +26,12 @@
             draggedRow = row;
             lastTarget = null;
             rowHeight = row.offsetHeight;
+
+            // Snapshot the original midpoints before any transforms
+            rowMidpoints = rowsArray.map(function (r) {
+                var rect = r.getBoundingClientRect();
+                return rect.top + rect.height / 2;
+            });
 
             // Create a custom drag image from the row to suppress Chrome's link preview
             var clone = row.cloneNode(true);
@@ -58,7 +66,7 @@
 
             // Clean up the off-screen clone after drag starts
             requestAnimationFrame(function () {
-                document.body.removeChild(wrapTable);
+                if (wrapTable.parentNode) document.body.removeChild(wrapTable);
             });
 
             row.classList.add('draft-dragging');
@@ -72,22 +80,20 @@
             draggedRow = null;
             lastTarget = null;
         });
-
-        row.addEventListener('dragover', function (e) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            if (!draggedRow || row === draggedRow || !row.hasAttribute('draggable')) return;
-
-            lastTarget = row;
-            applyDisplacement(row);
-        });
     });
 
-    // Listen for drop on the entire tbody so it fires even when the cursor
-    // is over the (collapsed-looking) dragged row or a separator row
+    // Use tbody-level dragover to determine target by cursor Y position.
+    // This avoids hit-test confusion from translateY transforms.
     tbody.addEventListener('dragover', function (e) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        if (!draggedRow) return;
+
+        var target = findTargetByY(e.clientY);
+        if (target && target !== draggedRow) {
+            lastTarget = target;
+            applyDisplacement(target);
+        }
     });
 
     tbody.addEventListener('drop', function (e) {
@@ -109,12 +115,25 @@
         checkForChanges();
     });
 
-    function applyDisplacement(targetRow) {
-        var rows = Array.from(table.querySelectorAll('tr[draggable="true"]'));
-        var draggedIdx = rows.indexOf(draggedRow);
-        var targetIdx = rows.indexOf(targetRow);
+    function findTargetByY(clientY) {
+        // Find the draggable row whose original midpoint is closest to the cursor
+        var closest = null;
+        var closestDist = Infinity;
+        for (var i = 0; i < rowsArray.length; i++) {
+            var dist = Math.abs(clientY - rowMidpoints[i]);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = rowsArray[i];
+            }
+        }
+        return closest;
+    }
 
-        rows.forEach(function (r, i) {
+    function applyDisplacement(targetRow) {
+        var draggedIdx = rowsArray.indexOf(draggedRow);
+        var targetIdx = rowsArray.indexOf(targetRow);
+
+        rowsArray.forEach(function (r, i) {
             r.classList.remove('draft-drag-placeholder');
             if (r === draggedRow) {
                 r.style.transform = '';
@@ -141,8 +160,7 @@
     }
 
     function clearDisplacement() {
-        var rows = table.querySelectorAll('tr[draggable="true"]');
-        rows.forEach(function (r) {
+        rowsArray.forEach(function (r) {
             r.style.transform = '';
             r.classList.remove('draft-drag-placeholder');
         });

@@ -638,6 +638,22 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic) VA
   (1, 'admin', 'The Blizzard waive the backup guard',      '2026-02-10 10:00:00', 'The roster move was expected',     '', 1);
 
 -- ============================================================
+-- Saved depth chart configs (for depth-chart-changes.spec.ts)
+-- ============================================================
+
+INSERT INTO ibl_saved_depth_charts (id, tid, username, name, phase, season_year, sim_start_date, sim_number_start, is_active) VALUES
+  (1, 1, 'A-Jay', 'Offensive Config', 'Free Agency', 2026, '2026-03-01', 689, 0),
+  (2, 1, 'A-Jay', 'Defensive Config', 'Free Agency', 2026, '2026-03-01', 689, 0)
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+INSERT INTO ibl_saved_depth_chart_players (depth_chart_id, pid, player_name, ordinal, dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth, dc_active, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh) VALUES
+  (1, 1, 'Test Player One', 1, 1, 0, 0, 0, 0, 1, 30, 5, 5, 3, 3, 5),
+  (1, 2, 'Test Player Two', 2, 0, 1, 0, 0, 0, 1, 28, 4, 6, 2, 4, 3),
+  (2, 1, 'Test Player One', 1, 0, 0, 0, 1, 0, 1, 32, 3, 7, 2, 5, 4),
+  (2, 2, 'Test Player Two', 2, 1, 0, 0, 0, 0, 1, 26, 6, 4, 4, 2, 6)
+ON DUPLICATE KEY UPDATE player_name = VALUES(player_name);
+
+-- ============================================================
 -- Schedule games for NextSim (Metros games in sim 689 window)
 -- ============================================================
 

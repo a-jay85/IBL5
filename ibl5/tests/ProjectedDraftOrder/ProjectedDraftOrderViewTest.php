@@ -108,6 +108,7 @@ class ProjectedDraftOrderViewTest extends TestCase
 
         $round1Html = substr($result, $round1Start, $round2Start - $round1Start);
         $this->assertStringContainsString('Lottery Teams', $round1Html);
+        $this->assertStringNotContainsString('Lottery Results', $round1Html);
         $this->assertStringContainsString('Playoff Teams', $round1Html);
         $this->assertStringContainsString('Division Winners', $round1Html);
         $this->assertStringContainsString('Conference Winners', $round1Html);
@@ -465,6 +466,30 @@ class ProjectedDraftOrderViewTest extends TestCase
 
         $this->assertStringNotContainsString('draft-moved-up', $result);
         $this->assertStringNotContainsString('draft-moved-down', $result);
+    }
+
+    public function testLotteryResultsLabelWhenFinalized(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, false, true);
+
+        $round1Start = strpos($result, 'Round 1');
+        $round2Start = strpos($result, 'Round 2');
+        $this->assertNotFalse($round1Start);
+        $this->assertNotFalse($round2Start);
+
+        $round1Html = substr($result, $round1Start, $round2Start - $round1Start);
+        $this->assertStringContainsString('Lottery Results', $round1Html);
+        $this->assertStringNotContainsString('Lottery Teams', $round1Html);
+        $this->assertStringContainsString('projected-draft-order-lottery-results', $round1Html);
+    }
+
+    public function testLotteryResultsClassNotPresentWhenNotFinalized(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, false, false);
+
+        $this->assertStringNotContainsString('projected-draft-order-lottery-results', $result);
     }
 
     public function testRound1TableHasId(): void

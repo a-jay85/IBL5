@@ -137,12 +137,7 @@ test.describe('Depth Chart change detection', () => {
   }) => {
     const dropdown = page.locator('#saved-dc-select');
     const options = dropdown.locator('option');
-    const optionCount = await options.count();
-
-    // Need at least 2 options (default + saved config)
-    if (optionCount < 2) {
-      test.skip(true, 'No saved depth chart configs to test');
-    }
+    expect(await options.count()).toBeGreaterThanOrEqual(2);
 
     // Mock the AJAX endpoint
     await page.route(

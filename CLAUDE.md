@@ -70,6 +70,7 @@ Classes autoload from `ibl5/classes/`. Never use `require_once`.
 - 51 InnoDB tables with foreign keys, 84 legacy MyISAM tables, 23 database views
 - **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on `$mysqli_db`. See `core-coding.md` for type comparison rules. The legacy `$db` connection does NOT have native types.
 - **Docker MariaDB:** Start the database with `docker compose up -d` from the repo root. See `database-access.md` for connection details and the auto-approved `./bin/db-query` wrapper.
+- **Docker PHP-Apache:** `docker compose up -d` also starts a PHP 8.4 Apache container serving the site at `http://localhost/ibl5/`. The `DB_HOST` env var is set to `mariadb` in the container; `config.php` uses `getenv('DB_HOST') ?: '127.0.0.1'` so it works both inside Docker and on the host. See `ibl5/docs/DOCKER_SETUP.md` for full details.
 - **CLI MariaDB access:** `mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5`. For quick queries, prefer the `./bin/db-query "SQL"` wrapper.
 
 ## Git & Commits

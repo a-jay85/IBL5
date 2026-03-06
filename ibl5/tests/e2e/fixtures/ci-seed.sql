@@ -55,7 +55,22 @@ INSERT INTO nuke_modules (title, custom_title, active, view) VALUES
   ('PlayerDatabase',      'PlayerDatabase',      1, 0),
   ('NextSim',             'NextSim',             1, 0),
   ('ProjectedDraftOrder', 'ProjectedDraftOrder', 1, 0),
-  ('Schedule',            'Schedule',            1, 0);
+  ('Schedule',            'Schedule',            1, 0),
+  ('Waivers',             'Waivers',             1, 0),
+  ('Voting',              'Voting',              1, 0),
+  ('GMContactList',       'GMContactList',       1, 0),
+  ('Injuries',            'Injuries',            1, 0),
+  ('ActivityTracker',     'ActivityTracker',     1, 0),
+  ('LeagueStarters',      'LeagueStarters',      1, 0),
+  ('SeriesRecords',       'SeriesRecords',       1, 0),
+  ('SeasonHighs',         'SeasonHighs',         1, 0),
+  ('PlayerMovement',      'PlayerMovement',      1, 0),
+  ('ContractList',        'ContractList',        1, 0),
+  ('DraftPickLocator',    'DraftPickLocator',    1, 0),
+  ('FreeAgencyPreview',   'FreeAgencyPreview',   1, 0),
+  ('Draft',               'Draft',               1, 0),
+  ('TeamOffDefStats',     'TeamOffDefStats',     1, 0),
+  ('Transaction',         'Transaction',         1, 0);
 
 -- ============================================================
 -- IBL season bootstrap
@@ -71,7 +86,7 @@ INSERT INTO ibl_settings (name, value) VALUES
   ('Trivia Mode',                 'Off'),
   ('ASG Voting',                  'No'),
   ('EOY Voting',                  'No'),
-  ('League Sim Length',            '7')
+  ('Sim Length in Days',            '7')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
 
 INSERT INTO ibl_sim_dates (`Sim`, `Start Date`, `End Date`) VALUES
@@ -348,6 +363,113 @@ INSERT INTO ibl_hist (
 
 -- Team MLE/LLE flags: Metros have both exceptions available
 UPDATE ibl_team_info SET HasMLE = 1, HasLLE = 1 WHERE teamid = 1;
+
+-- ============================================================
+-- Additional players for depth chart starters
+-- Metros need PG, SF, C starters (pid=1 is SG, pid=2 is PF)
+-- Cougars (tid=3) need players for NextSim opposing starters
+-- ============================================================
+
+INSERT INTO ibl_plr (
+  pid, name, age, peak, tid, pos, ordinal,
+  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  cy, cyt, cy1, cy2,
+  retired, exp,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_to, stats_blk, stats_pf,
+  uuid
+) VALUES
+  (20, 'Metros PG', 27, 28, 1, 'PG', 3,
+   80, 76, 70, 66, 60, 72, 68, 70, 65,
+   1, 2, 500, 550,
+   0, 4,
+   6, 1, 185, 'PG University',
+   1, 7, 2022, 'Metros', 'Metros',
+   40, 1200, 200, 450, 100, 120,
+   60, 150, 30, 100, 200, 55,
+   75, 10, 80,
+   'plr-uuid-00000000-0000-000000000020'),
+  (21, 'Metros SF', 26, 27, 1, 'SF', 4,
+   78, 74, 68, 64, 58, 70, 66, 68, 63,
+   1, 2, 400, 440,
+   0, 3,
+   6, 6, 205, 'SF University',
+   1, 15, 2023, 'Metros', 'Metros',
+   38, 1100, 180, 400, 90, 110,
+   40, 120, 35, 120, 140, 45,
+   65, 20, 85,
+   'plr-uuid-00000000-0000-000000000021'),
+  (22, 'Metros Center', 29, 29, 1, 'C', 5,
+   82, 78, 72, 68, 64, 76, 72, 74, 69,
+   1, 2, 600, 660,
+   0, 6,
+   7, 0, 245, 'Center University',
+   1, 3, 2020, 'Metros', 'Metros',
+   40, 1300, 220, 480, 115, 135,
+   20, 60, 60, 160, 100, 40,
+   60, 35, 95,
+   'plr-uuid-00000000-0000-000000000022'),
+  (23, 'Cougars Guard', 26, 27, 3, 'PG', 1,
+   79, 74, 69, 64, 59, 71, 67, 69, 64,
+   1, 2, 1300, 1400,
+   0, 4,
+   6, 2, 190, 'Cougars Academy',
+   1, 11, 2022, 'Cougars', 'Cougars',
+   40, 1200, 195, 440, 100, 120,
+   55, 140, 35, 110, 185, 50,
+   70, 15, 80,
+   'plr-uuid-00000000-0000-000000000023'),
+  (24, 'Cougars Forward', 28, 28, 3, 'SF', 2,
+   81, 76, 71, 66, 62, 73, 69, 71, 66,
+   1, 3, 1500, 1600,
+   0, 5,
+   6, 7, 215, 'Cougars College',
+   1, 9, 2021, 'Cougars', 'Cougars',
+   40, 1250, 210, 460, 105, 125,
+   45, 130, 45, 140, 160, 48,
+   65, 22, 88,
+   'plr-uuid-00000000-0000-000000000024');
+
+-- ============================================================
+-- Depth chart starters (NextSim needs dc_*Depth=1 and *Depth=1)
+-- ============================================================
+
+-- Metros (tid=1): 5 distinct starters
+UPDATE ibl_plr SET dc_PGDepth = 1, PGDepth = 1 WHERE pid = 20;
+UPDATE ibl_plr SET dc_SGDepth = 1, SGDepth = 1 WHERE pid = 1;
+UPDATE ibl_plr SET dc_SFDepth = 1, SFDepth = 1 WHERE pid = 21;
+UPDATE ibl_plr SET dc_PFDepth = 1, PFDepth = 1 WHERE pid = 2;
+UPDATE ibl_plr SET dc_CDepth  = 1, CDepth  = 1 WHERE pid = 22;
+
+-- Stars (tid=2): pid=4 covers PG/SG/PF, pid=5 covers SF/C
+UPDATE ibl_plr SET dc_PGDepth = 1, PGDepth = 1, dc_SGDepth = 1, SGDepth = 1, dc_PFDepth = 1, PFDepth = 1 WHERE pid = 4;
+UPDATE ibl_plr SET dc_SFDepth = 1, SFDepth = 1, dc_CDepth = 1, CDepth = 1 WHERE pid = 5;
+
+-- Cougars (tid=3): pid=23 covers PG/SG/PF, pid=24 covers SF/C
+UPDATE ibl_plr SET dc_PGDepth = 1, PGDepth = 1, dc_SGDepth = 1, SGDepth = 1, dc_PFDepth = 1, PFDepth = 1 WHERE pid = 23;
+UPDATE ibl_plr SET dc_SFDepth = 1, SFDepth = 1, dc_CDepth = 1, CDepth = 1 WHERE pid = 24;
+
+-- Phoenixes (tid=14): pid=6 covers PG/SG/SF, pid=7 covers PF/C
+UPDATE ibl_plr SET dc_PGDepth = 1, PGDepth = 1, dc_SGDepth = 1, SGDepth = 1, dc_SFDepth = 1, SFDepth = 1 WHERE pid = 6;
+UPDATE ibl_plr SET dc_PFDepth = 1, PFDepth = 1, dc_CDepth = 1, CDepth = 1 WHERE pid = 7;
+
+-- ============================================================
+-- Saved depth chart configs (for depth-chart-changes test)
+-- Need at least 1 saved config so #saved-dc-select has >= 2 options
+-- ============================================================
+
+INSERT INTO ibl_saved_depth_charts (id, tid, username, name, phase, season_year, sim_start_date, sim_number_start, is_active) VALUES
+  (1, 1, 'A-Jay', 'Offensive Config', 'Free Agency', 2026, '2026-03-01', 689, 0),
+  (2, 1, 'A-Jay', 'Defensive Config', 'Free Agency', 2026, '2026-03-01', 689, 0);
+
+INSERT INTO ibl_saved_depth_chart_players (depth_chart_id, pid, player_name, ordinal, dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth, dc_active, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh) VALUES
+  (1, 1, 'Test Player', 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0),
+  (1, 2, 'Test Player Two', 2, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0),
+  (2, 1, 'Test Player', 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0),
+  (2, 2, 'Test Player Two', 2, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0);
 
 -- ============================================================
 -- Box scores (must be after players for FK constraint)

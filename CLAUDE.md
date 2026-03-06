@@ -69,8 +69,8 @@ Classes autoload from `ibl5/classes/`. Never use `require_once`.
 - Use `$mysqli_db` (modern MySQLi) over legacy `$db`
 - 51 InnoDB tables with foreign keys, 84 legacy MyISAM tables, 23 database views
 - **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on `$mysqli_db`. See `core-coding.md` for type comparison rules. The legacy `$db` connection does NOT have native types.
-- **MAMP connection & db-query script:** See `database-access.md` for local connection details and the auto-approved `./bin/db-query` wrapper.
-- **CLI MySQL access:** Always use MAMP's mysql client (`/Applications/MAMP/Library/bin/mysql80/bin/mysql --socket=/Applications/MAMP/tmp/mysql/mysql.sock -u root -p'root'`), NOT Homebrew's `mysql`. Homebrew MySQL has authentication plugin incompatibility with MAMP's server. For quick queries, prefer the `./bin/db-query "SQL"` wrapper.
+- **Docker MariaDB:** Start the database with `docker compose up -d` from the repo root. See `database-access.md` for connection details and the auto-approved `./bin/db-query` wrapper.
+- **CLI MariaDB access:** `mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5`. For quick queries, prefer the `./bin/db-query "SQL"` wrapper.
 
 ## Git & Commits
 

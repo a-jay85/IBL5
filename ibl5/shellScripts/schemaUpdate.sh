@@ -17,15 +17,7 @@ source "${ENV_FILE}"
 # Output schema file location
 SCHEMA_FILE="../schema.sql"
 
-# Use MAMP's MySQL binaries if available (compatible with older auth plugins)
-MAMP_MYSQL_BIN="/Applications/MAMP/Library/bin/mysql57/bin"
-if [ -f "${MAMP_MYSQL_BIN}/mysqldump" ]; then
-  MYSQLDUMP_CMD="${MAMP_MYSQL_BIN}/mysqldump"
-  echo "Using MAMP MySQL 5.7 binaries"
-else
-  MYSQLDUMP_CMD="mysqldump"
-  echo "Using system MySQL binaries"
-fi
+MYSQLDUMP_CMD="mariadb-dump"
 
 # ============================================
 # Script execution - No need to modify below
@@ -58,7 +50,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo "✓ Schema export completed successfully!"
+echo "Schema export completed successfully!"
 echo "  Output file: ${SCHEMA_FILE}"
 echo "  File size: $(du -h "${SCHEMA_FILE}" | cut -f1)"
 echo ""
@@ -69,9 +61,9 @@ git add "${SCHEMA_FILE}"
 git commit -m "chore: update schema.sql"
 
 if [ $? -eq 0 ]; then
-  echo "✓ Schema changes committed successfully!"
+  echo "Schema changes committed successfully!"
 else
-  echo "⚠ Warning: Git commit failed or no changes to commit"
+  echo "Warning: Git commit failed or no changes to commit"
 fi
 
 echo ""

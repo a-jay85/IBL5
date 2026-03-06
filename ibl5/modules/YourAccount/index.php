@@ -28,7 +28,7 @@ function userCheck($username, $user_email)
 {
     $username = filter($username, "nohtml", 1);
     $user_email = filter($user_email, "nohtml", 1);
-    global $stop, $user_prefix, $db;
+    global $stop, $user_prefix, $db, $mysqli_db;
     if ((!$user_email) || (empty($user_email)) || (filter_var($user_email, FILTER_VALIDATE_EMAIL) === false)) {
         $stop = _ERRORINVEMAIL;
     }
@@ -53,11 +53,21 @@ function userCheck($username, $user_email)
         $stop = _NICKNOSPACES;
     }
 
-    if (\DatabaseConnection::fetchValue("SELECT COUNT(*) FROM nuke_users WHERE username = ?", [$username]) > 0) {
+    $stmt = $mysqli_db->prepare("SELECT COUNT(*) FROM nuke_users WHERE username = ?");
+    $stmt->bind_param('s', $username);
+    $stmt->execute();
+    $usernameCount = $stmt->get_result()->fetch_row()[0];
+    $stmt->close();
+    if ($usernameCount > 0) {
         $stop = _NICKTAKEN;
     }
 
-    if (\DatabaseConnection::fetchValue("SELECT COUNT(*) FROM nuke_users WHERE user_email = ?", [$user_email]) > 0) {
+    $stmt = $mysqli_db->prepare("SELECT COUNT(*) FROM nuke_users WHERE user_email = ?");
+    $stmt->bind_param('s', $user_email);
+    $stmt->execute();
+    $emailCount = $stmt->get_result()->fetch_row()[0];
+    $stmt->close();
+    if ($emailCount > 0) {
         $stop = _EMAILREGISTERED;
     }
 

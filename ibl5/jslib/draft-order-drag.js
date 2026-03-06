@@ -15,38 +15,16 @@
     });
 
     var draggedRow = null;
-    var lastTarget = null;
-    var rowHeight = 0;
-    var rowMidpoints = []; // original Y midpoints of each draggable row
-    var rowsArray = Array.from(draggableRows);
-    var tbody = table.querySelector('tbody');
+    var placeholder = null;
 
     draggableRows.forEach(function (row) {
         row.addEventListener('dragstart', function (e) {
             draggedRow = row;
-            lastTarget = null;
-            rowHeight = row.offsetHeight;
-
-            // Snapshot the original midpoints before any transforms
-            rowMidpoints = rowsArray.map(function (r) {
-                var rect = r.getBoundingClientRect();
-                return rect.top + rect.height / 2;
-            });
 
             // Create a custom drag image from the row to suppress Chrome's link preview
             var clone = row.cloneNode(true);
-            clone.style.width = row.offsetWidth + 'px';
-            clone.style.backgroundColor = '#fff';
-            clone.style.opacity = '0.9';
-            clone.style.position = 'absolute';
-            clone.style.top = '-9999px';
-            clone.style.left = '-9999px';
-            clone.style.display = 'table-row';
-
-            // Wrap in a table so the row renders properly
             var wrapTable = document.createElement('table');
-            wrapTable.style.borderCollapse = 'collapse';
-            wrapTable.style.width = row.offsetWidth + 'px';
+            wrapTable.style.cssText = 'border-collapse:collapse;width:' + row.offsetWidth + 'px;position:absolute;top:-9999px;left:-9999px;';
             var wrapBody = document.createElement('tbody');
             wrapBody.appendChild(clone);
             wrapTable.appendChild(wrapBody);
@@ -63,108 +41,70 @@
             document.body.appendChild(wrapTable);
             var rect = row.getBoundingClientRect();
             e.dataTransfer.setDragImage(wrapTable, e.clientX - rect.left, e.clientY - rect.top);
-
-            // Clean up the off-screen clone after drag starts
             requestAnimationFrame(function () {
-                if (wrapTable.parentNode) document.body.removeChild(wrapTable);
+                if (wrapTable.parentNode) wrapTable.parentNode.removeChild(wrapTable);
             });
 
-            row.classList.add('draft-dragging');
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', '');
+
+            // Replace the dragged row with a placeholder after a tick
+            // (browser needs the row in the DOM during dragstart)
+            requestAnimationFrame(function () {
+                placeholder = document.createElement('tr');
+                placeholder.className = 'draft-drag-placeholder';
+                placeholder.innerHTML = '<td colspan="4">&nbsp;</td>';
+                row.parentNode.insertBefore(placeholder, row);
+                row.classList.add('draft-dragging');
+            });
         });
 
         row.addEventListener('dragend', function () {
+            // Remove placeholder if it exists and put the row back
+            if (placeholder && placeholder.parentNode) {
+                placeholder.parentNode.insertBefore(row, placeholder);
+                placeholder.parentNode.removeChild(placeholder);
+            }
             row.classList.remove('draft-dragging');
-            clearDisplacement();
+            placeholder = null;
             draggedRow = null;
-            lastTarget = null;
+            renumberPicks();
+            checkForChanges();
         });
-    });
 
-    // Use tbody-level dragover to determine target by cursor Y position.
-    // This avoids hit-test confusion from translateY transforms.
-    tbody.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        if (!draggedRow) return;
+        row.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (!draggedRow || !placeholder || row === draggedRow || row === placeholder) return;
+            if (!row.hasAttribute('draggable')) return;
 
-        var target = findTargetByY(e.clientY);
-        if (target && target !== draggedRow) {
-            lastTarget = target;
-            applyDisplacement(target);
-        }
-    });
+            // Move the placeholder to the target position
+            var tbody = row.parentNode;
+            var allChildren = Array.from(tbody.children);
+            var placeholderIdx = allChildren.indexOf(placeholder);
+            var targetIdx = allChildren.indexOf(row);
 
-    tbody.addEventListener('drop', function (e) {
-        e.preventDefault();
-        clearDisplacement();
-        if (!draggedRow || !lastTarget || lastTarget === draggedRow) return;
-
-        var allRows = Array.from(tbody.children);
-        var draggedIdx = allRows.indexOf(draggedRow);
-        var targetIdx = allRows.indexOf(lastTarget);
-
-        if (draggedIdx < targetIdx) {
-            tbody.insertBefore(draggedRow, lastTarget.nextSibling);
-        } else {
-            tbody.insertBefore(draggedRow, lastTarget);
-        }
-
-        renumberPicks();
-        checkForChanges();
-    });
-
-    function findTargetByY(clientY) {
-        // Find the draggable row whose original midpoint is closest to the cursor
-        var closest = null;
-        var closestDist = Infinity;
-        for (var i = 0; i < rowsArray.length; i++) {
-            var dist = Math.abs(clientY - rowMidpoints[i]);
-            if (dist < closestDist) {
-                closestDist = dist;
-                closest = rowsArray[i];
-            }
-        }
-        return closest;
-    }
-
-    function applyDisplacement(targetRow) {
-        var draggedIdx = rowsArray.indexOf(draggedRow);
-        var targetIdx = rowsArray.indexOf(targetRow);
-
-        rowsArray.forEach(function (r, i) {
-            r.classList.remove('draft-drag-placeholder');
-            if (r === draggedRow) {
-                r.style.transform = '';
-                return;
-            }
-            if (draggedIdx < targetIdx) {
-                // Dragging down: rows between dragged and target shift up
-                if (i > draggedIdx && i <= targetIdx) {
-                    r.style.transform = 'translateY(-' + rowHeight + 'px)';
-                } else {
-                    r.style.transform = '';
-                }
+            if (placeholderIdx < targetIdx) {
+                tbody.insertBefore(placeholder, row.nextSibling);
             } else {
-                // Dragging up: rows between target and dragged shift down
-                if (i >= targetIdx && i < draggedIdx) {
-                    r.style.transform = 'translateY(' + rowHeight + 'px)';
-                } else {
-                    r.style.transform = '';
-                }
+                tbody.insertBefore(placeholder, row);
             }
         });
 
-        targetRow.classList.add('draft-drag-placeholder');
-    }
+        row.addEventListener('drop', function (e) {
+            e.preventDefault();
+            if (!draggedRow || !placeholder) return;
 
-    function clearDisplacement() {
-        rowsArray.forEach(function (r) {
-            r.style.transform = '';
-            r.classList.remove('draft-drag-placeholder');
+            // Insert the dragged row where the placeholder is
+            placeholder.parentNode.insertBefore(draggedRow, placeholder);
+            placeholder.parentNode.removeChild(placeholder);
+            draggedRow.classList.remove('draft-dragging');
+            placeholder = null;
+            draggedRow = null;
+            renumberPicks();
+            checkForChanges();
         });
-    }
+    });
 
     function renumberPicks() {
         var currentRows = table.querySelectorAll('tr[draggable="true"]');

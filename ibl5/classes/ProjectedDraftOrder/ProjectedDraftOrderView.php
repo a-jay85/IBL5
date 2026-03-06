@@ -113,6 +113,11 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         if ($slot['isTraded']) {
             $classes[] = 'projected-draft-order-traded';
         }
+        if ($slot['movement'] > 0) {
+            $classes[] = 'draft-moved-up';
+        } elseif ($slot['movement'] < 0) {
+            $classes[] = 'draft-moved-down';
+        }
         if ($isDraggable) {
             $classes[] = 'draft-draggable';
         }

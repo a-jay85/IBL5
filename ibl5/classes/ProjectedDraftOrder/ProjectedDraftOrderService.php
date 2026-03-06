@@ -20,6 +20,8 @@ use ProjectedDraftOrder\Contracts\ProjectedDraftOrderServiceInterface;
  */
 class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
 {
+    private const LOTTERY_SIZE = 12;
+
     private ProjectedDraftOrderRepositoryInterface $repository;
 
     public function __construct(ProjectedDraftOrderRepositoryInterface $repository)
@@ -95,6 +97,14 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
             $nameToIdMap[$team['team_name']] = $tid;
         }
 
+        // Build projected pick map: teamId => projected pick number (lottery only)
+        $projectedPickByTeam = [];
+        foreach ($projected['round1'] as $slot) {
+            if ($slot['pick'] <= self::LOTTERY_SIZE) {
+                $projectedPickByTeam[$slot['teamId']] = $slot['pick'];
+            }
+        }
+
         // Build round-1 from saved picks, enriching with standings and ownership data
         $round1 = [];
         foreach ($savedPicks as $savedPick) {
@@ -111,6 +121,10 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
             $ownerId = $nameToIdMap[$ownerName] ?? $savedPick['tid'];
             $ownerTeam = $teamMap[$ownerId] ?? $team;
 
+            // Movement: positive = moved up, negative = moved down (lottery only)
+            $projectedPick = $projectedPickByTeam[$savedPick['tid']] ?? $savedPick['pick'];
+            $movement = $projectedPick - $savedPick['pick'];
+
             $round1[] = [
                 'pick' => $savedPick['pick'],
                 'teamId' => $savedPick['tid'],
@@ -125,6 +139,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
                 'ownerColor2' => $ownerTeam['color2'],
                 'isTraded' => $isTraded,
                 'notes' => $notes,
+                'movement' => $movement,
             ];
         }
 
@@ -551,6 +566,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
                 'ownerColor2' => $ownerTeam['color2'],
                 'isTraded' => $isTraded,
                 'notes' => $notes,
+                'movement' => 0,
             ];
         }
 

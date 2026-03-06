@@ -34,7 +34,7 @@ include 'db/db.php';
 
 **Command Line Access:**
 ```bash
-mariadb -h 127.0.0.1 -u root -proot iblhoops_ibl5
+mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5
 ```
 
 ## Claude Code Database Queries (Auto-Approved)

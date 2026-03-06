@@ -46,7 +46,7 @@ echo -e "${BLUE}  Draft Test Data Setup${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-if ! $MYSQL_CMD -h 127.0.0.1 -u "${DB_USER}" -p"${LOCAL_PASSWORD}" -e "SELECT 1" > /dev/null 2>&1; then
+if ! $MYSQL_CMD -h 127.0.0.1 --skip-ssl -u "${DB_USER}" -p"${LOCAL_PASSWORD}" -e "SELECT 1" > /dev/null 2>&1; then
     echo -e "${RED}ERROR: Cannot connect to MariaDB at 127.0.0.1${NC}"
     echo -e "${RED}Is Docker MariaDB running? Try: docker compose up -d${NC}"
     exit 1
@@ -60,7 +60,7 @@ echo ""
 # ============================================
 run_sql() {
     MYSQL_PWD="${LOCAL_PASSWORD}" "${MYSQL_CMD}" \
-        -h 127.0.0.1 \
+        -h 127.0.0.1 --skip-ssl \
         --user="${DB_USER}" \
         "${DB_NAME}" \
         --batch --skip-column-names \

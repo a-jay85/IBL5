@@ -13,7 +13,7 @@ REPO_ROOT="$(cd "$IBL5_DIR/.." && pwd)"
 CONFIG_DIR="$(cd "$(dirname "$(readlink "$IBL5_DIR/config.php" || echo "$IBL5_DIR/config.php")")" && pwd)"
 
 MYSQL="mariadb"
-MYSQL_ARGS="-h 127.0.0.1 -u root -proot"
+MYSQL_ARGS="-h 127.0.0.1 --skip-ssl -u root -proot"
 DB_NAME="ibl5_e2e_test"
 PORT=8081
 PHP_PID=""

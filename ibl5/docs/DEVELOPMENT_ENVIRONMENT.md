@@ -122,13 +122,13 @@ docker compose up -d
 
 # Verify it's running
 docker compose ps
-mariadb -h 127.0.0.1 -u root -proot -e "SELECT VERSION();"
+mariadb -h 127.0.0.1 --skip-ssl -u root -proot -e "SELECT VERSION();"
 ```
 
 ### Command Line Verification
 
 ```bash
-mariadb -h 127.0.0.1 \
+mariadb -h 127.0.0.1 --skip-ssl \
   -u root -proot \
   -D iblhoops_ibl5 \
   -e "SELECT COUNT(*) as table_count FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'iblhoops_ibl5';"

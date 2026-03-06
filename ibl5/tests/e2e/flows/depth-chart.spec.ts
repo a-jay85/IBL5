@@ -34,7 +34,7 @@ test.describe('Depth Chart Entry flow', () => {
 
     await expect(
       page.locator('.depth-chart-table').first(),
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible();
 
     // Player rows should have data-pid attributes
     const playerRows = page.locator('.depth-chart-table tr[data-pid]');
@@ -44,7 +44,7 @@ test.describe('Depth Chart Entry flow', () => {
   test('position selects have options', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
     // Wait for form to load
-    if (!(await form.isVisible({ timeout: 10000 }).catch(() => false))) return;
+    if (!(await form.isVisible().catch(() => false))) return;
 
     const posSelect = page.locator('select[name^="pg"]').first();
     if (await posSelect.isVisible()) {
@@ -55,7 +55,7 @@ test.describe('Depth Chart Entry flow', () => {
 
   test('active selects have valid values', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
-    if (!(await form.isVisible({ timeout: 10000 }).catch(() => false))) return;
+    if (!(await form.isVisible().catch(() => false))) return;
 
     const activeSelects = page.locator('select[name^="active"]');
     const count = await activeSelects.count();
@@ -70,7 +70,7 @@ test.describe('Depth Chart Entry flow', () => {
 
   test('reset button prompts confirmation', async ({ page }) => {
     const resetBtn = page.locator('.depth-chart-reset-btn');
-    if (!(await resetBtn.isVisible({ timeout: 10000 }).catch(() => false)))
+    if (!(await resetBtn.isVisible().catch(() => false)))
       return;
 
     let dialogFired = false;
@@ -85,7 +85,7 @@ test.describe('Depth Chart Entry flow', () => {
 
   test('submit button present when form loaded', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
-    if (!(await form.isVisible({ timeout: 10000 }).catch(() => false))) return;
+    if (!(await form.isVisible().catch(() => false))) return;
 
     await expect(page.locator('.depth-chart-submit-btn')).toBeVisible();
   });

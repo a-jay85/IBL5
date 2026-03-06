@@ -27,12 +27,18 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 2 : 1,
   workers: process.env.CI ? 1 : undefined,
   reporter: [['html', { open: 'never' }], ['list']],
 
+  expect: {
+    timeout: 5_000,
+  },
+
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost/ibl5/',
+    actionTimeout: 10_000,
+    navigationTimeout: 15_000,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },

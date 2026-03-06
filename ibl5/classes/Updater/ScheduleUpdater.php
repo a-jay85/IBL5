@@ -7,6 +7,7 @@ namespace Updater;
 use League\LeagueContext;
 use Utilities\UuidGenerator;
 use Utilities\SchFileParser;
+use Utilities\ScheduleHtmParser;
 use Utilities\DateParser;
 
 class ScheduleUpdater extends \BaseMysqliRepository {
@@ -14,6 +15,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
     /** @var array<int, string> Team ID to name lookup (for logging) */
     private array $teamIdToNameMap = [];
+
+    /** @var array<string, int> Team name to ID lookup (for Schedule.htm parsing) */
+    private array $teamNameToIdMap = [];
 
     private const UNPLAYED_BOX_ID = 100000;
 
@@ -86,6 +90,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         foreach ($rows as $row) {
             $this->teamIdToNameMap[$row['teamid']] = $row['team_name'];
+            $this->teamNameToIdMap[$row['team_name']] = $row['teamid'];
         }
     }
 
@@ -110,57 +115,69 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     }
 
     /**
-     * Insert playoff schedule entries from box scores.
+     * Insert playoff schedule entries from Schedule.htm.
      *
-     * Playoff games are NOT stored in the .sch file — they only exist in the
-     * box score data (ibl_box_scores_teams). This method queries for June games
-     * and creates corresponding ibl_schedule entries.
+     * Playoff games are NOT stored in the .sch file — they exist only in
+     * JSB's Schedule.htm HTML export. This parses both played games (with
+     * scores) and upcoming/unplayed games (no scores yet).
      *
      * @return string Log of inserted playoff games
      */
-    private function insertPlayoffGamesFromBoxScores(string $scheduleTable): string
+    private function insertPlayoffGamesFromScheduleHtm(string $scheduleTable): string
     {
-        $boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
-        $teamInfoTable = $this->resolveTable('ibl_team_info');
+        $ibl5RootRaw = defined('IBL5_ROOT') ? IBL5_ROOT : null;
+        $ibl5Root = is_string($ibl5RootRaw) ? $ibl5RootRaw : '.';
+        $leagueDir = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'IBL';
+        $scheduleHtmPath = $ibl5Root . '/ibl/' . $leagueDir . '/Schedule.htm';
 
-        /** @var list<array{Date: string, visitorTeamID: int, homeTeamID: int, vScore: int, hScore: int}> $playoffGames */
-        $playoffGames = $this->fetchAll(
-            "SELECT bst.Date, bst.visitorTeamID, bst.homeTeamID,
-                    SUM(CASE WHEN bst.name = v.team_name THEN bst.calc_points ELSE 0 END) AS vScore,
-                    SUM(CASE WHEN bst.name = h.team_name THEN bst.calc_points ELSE 0 END) AS hScore
-             FROM {$boxScoresTeamsTable} bst
-             JOIN {$teamInfoTable} v ON v.teamid = bst.visitorTeamID
-             JOIN {$teamInfoTable} h ON h.teamid = bst.homeTeamID
-             WHERE bst.Date LIKE CONCAT(?, '-06-%')
-             GROUP BY bst.Date, bst.visitorTeamID, bst.homeTeamID
-             ORDER BY bst.Date ASC, bst.visitorTeamID ASC",
-            'i',
-            $this->season->endingYear
-        );
+        if (!file_exists($scheduleHtmPath)) {
+            return "Schedule.htm not found at {$scheduleHtmPath} — skipping playoff games<br>";
+        }
+
+        $html = file_get_contents($scheduleHtmPath);
+        if ($html === false) {
+            return "Failed to read Schedule.htm — skipping playoff games<br>";
+        }
+
+        $playoffGames = ScheduleHtmParser::parsePlayoffGames($html);
 
         $log = '';
-        $year = $this->season->endingYear;
 
         foreach ($playoffGames as $game) {
+            $fullDate = $this->extractDate($game['date_label']);
+            if ($fullDate === null) {
+                continue;
+            }
+
+            $visitorTID = $this->teamNameToIdMap[$game['visitor']] ?? null;
+            $homeTID = $this->teamNameToIdMap[$game['home']] ?? null;
+
+            if ($visitorTID === null || $homeTID === null) {
+                $log .= "Unknown team in playoff game: {$game['visitor']} @ {$game['home']}<br>";
+                continue;
+            }
+
+            $boxId = $game['played'] && $game['box_id'] !== null
+                ? $game['box_id']
+                : self::UNPLAYED_BOX_ID;
+
             $uuid = UuidGenerator::generateUuid();
-            $visitorName = $this->getTeamNameById($game['visitorTeamID']);
-            $homeName = $this->getTeamNameById($game['homeTeamID']);
 
             $this->execute(
                 "INSERT INTO {$scheduleTable} (
                     Year, BoxID, Date, Visitor, Vscore, Home, Hscore, uuid
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 "iisiiiis",
-                $year,
-                self::UNPLAYED_BOX_ID,
-                $game['Date'],
-                $game['visitorTeamID'],
-                $game['vScore'],
-                $game['homeTeamID'],
-                $game['hScore'],
+                $fullDate['year'],
+                $boxId,
+                $fullDate['date'],
+                $visitorTID,
+                $game['visitor_score'],
+                $homeTID,
+                $game['home_score'],
                 $uuid
             );
-            $log .= "Inserted playoff game: {$visitorName} @ {$homeName} on {$game['Date']}<br>";
+            $log .= "Inserted playoff game: {$game['visitor']} @ {$game['home']} on {$fullDate['date']}<br>";
         }
 
         return $log;
@@ -267,7 +284,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
             }
         }
 
-        $log .= $this->insertPlayoffGamesFromBoxScores($scheduleTable);
+        $log .= $this->insertPlayoffGamesFromScheduleHtm($scheduleTable);
 
         \UI::displayDebugOutput($log, "{$scheduleTable} SQL Queries");
 

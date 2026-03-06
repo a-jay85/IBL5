@@ -231,6 +231,12 @@ class Season
                         $projectedNextSimEndDate,
                         new \DateInterval('P' . $gapDays . 'D')
                     );
+                } elseif ($lastSimEndDateObj >= $gapStartDate && $lastSimEndDateObj < $this->playoffsStartDate) {
+                    $remainingGapDays = (int) $lastSimEndDateObj->diff($this->playoffsStartDate)->days;
+                    $projectedNextSimEndDate = date_add(
+                        $projectedNextSimEndDate,
+                        new \DateInterval('P' . $remainingGapDays . 'D')
+                    );
                 }
             }
         }

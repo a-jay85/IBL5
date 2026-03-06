@@ -10,14 +10,18 @@ paths:
 
 # Database Access Reference
 
-## Local MAMP Database Connection
+## Local Docker MariaDB Connection
 
 **Connection Details:**
-- Host: `localhost` or `127.0.0.1`
+- Host: `127.0.0.1`
 - Port: `3306`
 - Database: `iblhoops_ibl5`
-- Socket: `/Applications/MAMP/tmp/mysql/mysql.sock`
 - Credentials: See `ibl5/config.php` (`$dbuname`, `$dbpass`)
+
+**Start the database:**
+```bash
+docker compose up -d   # from repo root
+```
 
 **PHP Connection (app standard):**
 ```php
@@ -30,14 +34,8 @@ include 'db/db.php';
 
 **Command Line Access:**
 ```bash
-# IMPORTANT: Use MAMP's mysql client, NOT Homebrew mysql
-/Applications/MAMP/Library/bin/mysql80/bin/mysql \
-  --socket=/Applications/MAMP/tmp/mysql/mysql.sock \
-  -u root -p'root' \
-  iblhoops_ibl5
+mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5
 ```
-
-**Why MAMP's client?** Homebrew's mysql client has authentication plugin incompatibility with MAMP's MySQL 8.0 server. Always use `/Applications/MAMP/Library/bin/mysql80/bin/mysql`.
 
 ## Claude Code Database Queries (Auto-Approved)
 

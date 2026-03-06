@@ -21,4 +21,18 @@ interface ProjectedDraftOrderServiceInterface
      * @return ProjectedDraftOrderResult
      */
     public function calculateDraftOrder(int $seasonYear): array;
+
+    /**
+     * Get the final draft order if finalized, otherwise the projected order.
+     *
+     * @return ProjectedDraftOrderResult
+     */
+    public function getFinalOrProjectedDraftOrder(int $seasonYear): array;
+
+    /**
+     * Save the lottery order (picks 1-12) and append projected picks 13-28.
+     *
+     * @param list<int> $lotteryTeamIds Ordered list of 12 team IDs for picks 1-12
+     */
+    public function saveLotteryOrder(int $seasonYear, array $lotteryTeamIds): void;
 }

@@ -21,19 +21,26 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
     private const CONFERENCE_WINNERS_BOUNDARY = 26;
 
     /** @param ProjectedDraftOrderResult $draftOrder */
-    public function render(array $draftOrder, int $seasonYear): string
+    public function render(array $draftOrder, int $seasonYear, bool $isAdmin = false, bool $isFinalized = false): string
     {
-        $html = $this->renderTitle($seasonYear);
-        $html .= $this->renderDescription();
-        $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1', showPlayoffDivider: true);
-        $html .= $this->renderRoundTable($draftOrder['round2'], 'Round 2', showPlayoffDivider: false);
+        $html = $this->renderTitle($seasonYear, $isFinalized);
+        if (!$isFinalized) {
+            $html .= $this->renderDescription();
+        }
+        if ($isAdmin) {
+            $html .= '<button type="button" id="draft-order-save-btn" class="ibl-btn ibl-btn--danger" style="display: none;">Save Draft Order</button>';
+        }
+        $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1', showPlayoffDivider: true, isAdmin: $isAdmin);
+        $html .= $this->renderRoundTable($draftOrder['round2'], 'Round 2', showPlayoffDivider: false, isAdmin: false);
 
         return $html;
     }
 
-    private function renderTitle(int $seasonYear): string
+    private function renderTitle(int $seasonYear, bool $isFinalized): string
     {
-        return '<h2 class="ibl-title">' . HtmlSanitizer::safeHtmlOutput($seasonYear) . ' Projected Draft Order</h2>';
+        $label = $isFinalized ? 'Draft Order' : 'Projected Draft Order';
+
+        return '<h2 class="ibl-title">' . HtmlSanitizer::e($seasonYear) . ' ' . $label . '</h2>';
     }
 
     private function renderDescription(): string
@@ -46,10 +53,11 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
     /**
      * @param list<DraftSlot> $slots
      */
-    private function renderRoundTable(array $slots, string $roundLabel, bool $showPlayoffDivider): string
+    private function renderRoundTable(array $slots, string $roundLabel, bool $showPlayoffDivider, bool $isAdmin): string
     {
-        $html = '<h3 class="ibl-table-title">' . HtmlSanitizer::safeHtmlOutput($roundLabel) . '</h3>';
-        $html .= '<table class="ibl-data-table projected-draft-order-table">';
+        $tableId = $roundLabel === 'Round 1' ? ' id="draft-order-round1"' : '';
+        $html = '<h3 class="ibl-table-title">' . HtmlSanitizer::e($roundLabel) . '</h3>';
+        $html .= '<table class="ibl-data-table projected-draft-order-table"' . $tableId . '>';
         $html .= '<thead><tr>';
         $html .= '<th>Pick</th>';
         $html .= '<th>Team</th>';
@@ -65,7 +73,8 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
                     $html .= $this->renderSeparatorRow($separator);
                 }
             }
-            $html .= $this->renderPickRow($slot);
+            $isLottery = $slot['pick'] <= self::LOTTERY_PLAYOFF_BOUNDARY;
+            $html .= $this->renderPickRow($slot, $isAdmin && $isLottery);
         }
 
         $html .= '</tbody></table>';
@@ -92,12 +101,23 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
     }
 
     /** @param DraftSlot $slot */
-    private function renderPickRow(array $slot): string
+    private function renderPickRow(array $slot, bool $isDraggable = false): string
     {
-        $rowClass = $slot['isTraded'] ? ' class="projected-draft-order-traded"' : '';
-        $html = '<tr' . $rowClass . '>';
+        $classes = [];
+        if ($slot['isTraded']) {
+            $classes[] = 'projected-draft-order-traded';
+        }
+        if ($isDraggable) {
+            $classes[] = 'draft-draggable';
+        }
+        $classAttr = $classes !== [] ? ' class="' . implode(' ', $classes) . '"' : '';
+        $dragAttr = $isDraggable ? ' draggable="true" data-team-id="' . HtmlSanitizer::e($slot['teamId']) . '"' : '';
+        $html = '<tr' . $classAttr . $dragAttr . '>';
 
-        $html .= '<td>' . HtmlSanitizer::safeHtmlOutput($slot['pick']) . '</td>';
+        $pickContent = $isDraggable
+            ? '<span class="draft-drag-handle">&#x2630;</span> ' . HtmlSanitizer::e($slot['pick'])
+            : HtmlSanitizer::e($slot['pick']);
+        $html .= '<td>' . $pickContent . '</td>';
 
         if ($slot['isTraded']) {
             $html .= TeamCellHelper::renderTeamCell(

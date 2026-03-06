@@ -31,6 +31,7 @@ final class NavigationConfig
         public readonly string $showDraftLink = '',
         public readonly ?string $serverName = null,
         public readonly ?string $requestUri = null,
+        public readonly bool $isDraftOrderFinalized = false,
     ) {
         $this->teamsData = $teamsData;
     }

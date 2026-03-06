@@ -281,6 +281,75 @@ class ProjectedDraftOrderViewTest extends TestCase
     }
 
     // =========================================================================
+    // Finalization & Admin Drag-and-Drop Tests
+    // =========================================================================
+
+    public function testRenderShowsDraftOrderTitleWhenFinalized(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, false, true);
+
+        $this->assertStringContainsString('Draft Order', $result);
+        $this->assertStringNotContainsString('Projected Draft Order', $result);
+    }
+
+    public function testDescriptionHiddenWhenFinalized(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, false, true);
+
+        $this->assertStringNotContainsString('projected-draft-order-description', $result);
+    }
+
+    public function testSaveButtonRenderedForAdmin(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, false);
+
+        $this->assertStringContainsString('draft-order-save-btn', $result);
+    }
+
+    public function testSaveButtonNotRenderedForNonAdmin(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, false, false);
+
+        $this->assertStringNotContainsString('draft-order-save-btn', $result);
+    }
+
+    public function testDraggableAttributesOnLotteryRowsForAdmin(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, true, false);
+
+        $this->assertStringContainsString('draggable="true"', $result);
+        $this->assertStringContainsString('data-team-id=', $result);
+        $this->assertStringContainsString('draft-drag-handle', $result);
+    }
+
+    public function testNoDraggableAttributesForNonAdmin(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, false, false);
+
+        $this->assertStringNotContainsString('draggable="true"', $result);
+        $this->assertStringNotContainsString('draft-drag-handle', $result);
+    }
+
+    public function testNonLotteryRowsNotDraggableForAdmin(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, true, false);
+
+        // Count draggable rows — should be exactly 12 (picks 1-12)
+        $draggableCount = substr_count($result, 'draggable="true"');
+        $this->assertSame(12, $draggableCount);
+    }
+
+    public function testRound1TableHasId(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, false);
+
+        $this->assertStringContainsString('id="draft-order-round1"', $result);
+    }
+
+    // =========================================================================
     // Helper methods
     // =========================================================================
 

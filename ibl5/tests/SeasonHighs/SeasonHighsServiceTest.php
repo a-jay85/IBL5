@@ -108,6 +108,36 @@ class SeasonHighsServiceTest extends TestCase
         $service->getSeasonHighsData('Playoffs');
     }
 
+    public function testSeasonHighsHandlesEntriesWithoutBoxId(): void
+    {
+        $repo = $this->createStub(SeasonHighsRepositoryInterface::class);
+        $repo->method('getSeasonHighs')
+            ->willReturn([
+                [
+                    'name' => 'Test Player',
+                    'date' => '2025-06-15',
+                    'value' => 45,
+                    'pid' => 1,
+                    'tid' => 5,
+                    'teamname' => 'Test Team',
+                    'team_city' => 'Test City',
+                    'color1' => 'FFFFFF',
+                    'color2' => '000000',
+                    'gameOfThatDay' => 0,
+                ],
+            ]);
+        $season = $this->createStubSeason(2024, 2025);
+        $service = new SeasonHighsService($repo, $season);
+
+        $result = $service->getSeasonHighsData('Playoffs');
+
+        // Verify entries without boxId (from LEFT JOIN) are still returned
+        $pointsHighs = $result['playerHighs']['POINTS'];
+        $this->assertCount(1, $pointsHighs);
+        $this->assertArrayNotHasKey('boxId', $pointsHighs[0]);
+        $this->assertSame('Test Player', $pointsHighs[0]['name']);
+    }
+
     // --- Home/Away Highs Tests ---
 
     public function testGetHomeAwayHighsReturnsHomeAndAwayKeys(): void

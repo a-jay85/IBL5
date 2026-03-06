@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Updater;
 
+use League\LeagueContext;
 use PHPUnit\Framework\TestCase;
 use Tests\Integration\Mocks\MockDatabase;
-use Utilities\SchFileParser;
 
 /**
  * @covers \Updater\ScheduleUpdater
@@ -20,81 +20,60 @@ class ScheduleUpdaterTest extends TestCase
         $this->mockDb = new MockDatabase();
     }
 
-    /**
-     * Create a testable ScheduleUpdater subclass that exposes protected methods.
-     */
-    private function createUpdater(): TestableScheduleUpdater
+    private function createUpdater(string $phase = 'Regular Season', int $endingYear = 2025): TestableScheduleUpdater
     {
         $season = $this->createStub(\Season::class);
-        $season->endingYear = 2025;
-        $season->phase = 'Regular Season';
+        $season->endingYear = $endingYear;
+        $season->beginningYear = $endingYear - 1;
+        $season->phase = $phase;
 
-        return new TestableScheduleUpdater($this->mockDb, $season);
+        $leagueContext = $this->createStub(LeagueContext::class);
+        $leagueContext->method('getCurrentLeague')->willReturn('IBL');
+
+        return new TestableScheduleUpdater($this->mockDb, $season, $leagueContext);
     }
 
-    public function testGetPlayoffMatchupsReturnsTeamPairings(): void
+    public function testExtractDateReturnsNullForEmptyString(): void
     {
         $updater = $this->createUpdater();
 
-        $this->mockDb->onQuery('ibl_box_scores_teams', [
-            ['visitorTeamID' => 6, 'homeTeamID' => 17],
-            ['visitorTeamID' => 9, 'homeTeamID' => 22],
-            ['visitorTeamID' => 17, 'homeTeamID' => 6],
-        ]);
-
-        $matchups = $updater->exposedGetPlayoffMatchups();
-
-        $this->assertTrue(isset($matchups['6-17']));
-        $this->assertTrue(isset($matchups['9-22']));
-        $this->assertTrue(isset($matchups['17-6']));
-        $this->assertFalse(isset($matchups['1-2']));
+        $this->assertNull($updater->exposedExtractDate(''));
     }
 
-    public function testGetPlayoffMatchupsReturnsEmptyWhenNoJuneGames(): void
+    public function testExtractDateParsesNovemberDate(): void
     {
         $updater = $this->createUpdater();
 
-        $this->mockDb->onQuery('ibl_box_scores_teams', []);
+        $result = $updater->exposedExtractDate('November 5, 2000');
 
-        $matchups = $updater->exposedGetPlayoffMatchups();
-
-        $this->assertSame([], $matchups);
+        $this->assertNotNull($result);
+        $this->assertSame(11, $result['month']);
+        $this->assertSame(5, $result['day']);
+        $this->assertSame(2024, $result['year']);
     }
 
-    public function testRegularSeasonGamesKeepAprilDates(): void
+    public function testExtractDateParsesAprilDate(): void
     {
         $updater = $this->createUpdater();
 
-        $result = $updater->exposedBuildDateString(4, 5, null);
+        $result = $updater->exposedExtractDate('April 10, 2000');
 
-        $this->assertSame('April 5, 2000', $result);
+        $this->assertNotNull($result);
+        $this->assertSame(4, $result['month']);
+        $this->assertSame(10, $result['day']);
+        $this->assertSame(2025, $result['year']);
     }
 
-    public function testPlayoffGamesGetJuneMonthOverride(): void
+    public function testExtractDateParsesJuneDate(): void
     {
         $updater = $this->createUpdater();
 
-        $result = $updater->exposedBuildDateString(4, 15, \Season::IBL_PLAYOFF_MONTH);
+        $result = $updater->exposedExtractDate('June 15, 2000');
 
-        $this->assertSame('June 15, 2000', $result);
-    }
-
-    public function testMonthOverridePreservesDay(): void
-    {
-        $updater = $this->createUpdater();
-
-        $result = $updater->exposedBuildDateString(4, 22, \Season::IBL_PLAYOFF_MONTH);
-
-        $this->assertSame('June 22, 2000', $result);
-    }
-
-    public function testBuildDateStringWithoutOverrideUsesOriginalMonth(): void
-    {
-        $updater = $this->createUpdater();
-
-        $result = $updater->exposedBuildDateString(11, 15, null);
-
-        $this->assertSame('November 15, 2000', $result);
+        $this->assertNotNull($result);
+        $this->assertSame(6, $result['month']);
+        $this->assertSame(15, $result['day']);
+        $this->assertSame(2025, $result['year']);
     }
 }
 
@@ -104,15 +83,10 @@ class ScheduleUpdaterTest extends TestCase
 class TestableScheduleUpdater extends \Updater\ScheduleUpdater
 {
     /**
-     * @return array<string, true>
+     * @return array{date: string, year: int, month: int, day: int}|null
      */
-    public function exposedGetPlayoffMatchups(): array
+    public function exposedExtractDate(string $rawDate): ?array
     {
-        return $this->getPlayoffMatchups();
-    }
-
-    public function exposedBuildDateString(int $month, int $day, ?int $monthOverride = null): string
-    {
-        return $this->buildDateString($month, $day, $monthOverride);
+        return $this->extractDate($rawDate);
     }
 }

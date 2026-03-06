@@ -93,15 +93,10 @@ class ScheduleUpdater extends \BaseMysqliRepository {
      * Build a date string from month and day for DateParser consumption.
      *
      * Example: buildDateString(11, 2) → "November 2, 2000"
-     *
-     * @param int $month Calendar month number (1-12)
-     * @param int $day Day of month
-     * @param int|null $monthOverride Override the month (e.g., for playoff games that need June dates)
      */
-    protected function buildDateString(int $month, int $day, ?int $monthOverride = null): string
+    private function buildDateString(int $month, int $day): string
     {
-        $effectiveMonth = $monthOverride ?? $month;
-        $monthName = self::MONTH_NAMES[$effectiveMonth];
+        $monthName = self::MONTH_NAMES[$month];
 
         return "{$monthName} {$day}, 2000";
     }
@@ -115,34 +110,60 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     }
 
     /**
-     * Build a lookup set of playoff team pairings from box scores.
+     * Insert playoff schedule entries from box scores.
      *
-     * Month offset 6 in the .sch file contains both final regular season games
-     * and playoff games mixed on the same days. We identify playoff games by
-     * matching their team pairings against June box scores (which have correct dates).
+     * Playoff games are NOT stored in the .sch file — they only exist in the
+     * box score data (ibl_box_scores_teams). This method queries for June games
+     * and creates corresponding ibl_schedule entries.
      *
-     * @return array<string, true> Set of "visitorTID-homeTID" keys for playoff matchups
+     * @return string Log of inserted playoff games
      */
-    protected function getPlayoffMatchups(): array
+    private function insertPlayoffGamesFromBoxScores(string $scheduleTable): string
     {
         $boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
+        $teamInfoTable = $this->resolveTable('ibl_team_info');
 
-        /** @var list<array{visitorTeamID: int, homeTeamID: int}> $rows */
-        $rows = $this->fetchAll(
-            "SELECT DISTINCT visitorTeamID, homeTeamID
-             FROM {$boxScoresTeamsTable}
-             WHERE Date LIKE CONCAT(?, '-06-%')",
+        /** @var list<array{Date: string, visitorTeamID: int, homeTeamID: int, vScore: int, hScore: int}> $playoffGames */
+        $playoffGames = $this->fetchAll(
+            "SELECT bst.Date, bst.visitorTeamID, bst.homeTeamID,
+                    SUM(CASE WHEN bst.name = v.team_name THEN bst.calc_points ELSE 0 END) AS vScore,
+                    SUM(CASE WHEN bst.name = h.team_name THEN bst.calc_points ELSE 0 END) AS hScore
+             FROM {$boxScoresTeamsTable} bst
+             JOIN {$teamInfoTable} v ON v.teamid = bst.visitorTeamID
+             JOIN {$teamInfoTable} h ON h.teamid = bst.homeTeamID
+             WHERE bst.Date LIKE CONCAT(?, '-06-%')
+             GROUP BY bst.Date, bst.visitorTeamID, bst.homeTeamID
+             ORDER BY bst.Date ASC, bst.visitorTeamID ASC",
             'i',
             $this->season->endingYear
         );
 
-        /** @var array<string, true> $matchups */
-        $matchups = [];
-        foreach ($rows as $row) {
-            $matchups[$row['visitorTeamID'] . '-' . $row['homeTeamID']] = true;
+        $log = '';
+        $year = $this->season->endingYear;
+
+        foreach ($playoffGames as $game) {
+            $uuid = UuidGenerator::generateUuid();
+            $visitorName = $this->getTeamNameById($game['visitorTeamID']);
+            $homeName = $this->getTeamNameById($game['homeTeamID']);
+
+            $this->execute(
+                "INSERT INTO {$scheduleTable} (
+                    Year, BoxID, Date, Visitor, Vscore, Home, Hscore, uuid
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "iisiiiis",
+                $year,
+                self::UNPLAYED_BOX_ID,
+                $game['Date'],
+                $game['visitorTeamID'],
+                $game['vScore'],
+                $game['homeTeamID'],
+                $game['hScore'],
+                $uuid
+            );
+            $log .= "Inserted playoff game: {$visitorName} @ {$homeName} on {$game['Date']}<br>";
         }
 
-        return $matchups;
+        return $log;
     }
 
     public function update(): void {
@@ -164,51 +185,30 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $games = SchFileParser::parseFile($schFilePath);
 
-        $playoffMatchups = $this->getPlayoffMatchups();
-
         $currentDateSlot = -1;
-        /** @var array{month: int, day: int}|null $currentMonthDay */
-        $currentMonthDay = null;
-
-        /** @var array<string, array{date: string|null, year: int|null, month: int|null}> $dateCache */
-        $dateCache = [];
+        $date = null;
+        $year = null;
+        /** @var int|null $month */
+        $month = null;
 
         foreach ($games as $game) {
-            // Cache the month/day lookup when we move to a new date slot
+            // Compute date when we move to a new date slot
             if ($game['date_slot'] !== $currentDateSlot) {
                 $currentDateSlot = $game['date_slot'];
-                $currentMonthDay = SchFileParser::dateSlotToMonthDay($game['date_slot']);
-            }
+                $monthDay = SchFileParser::dateSlotToMonthDay($game['date_slot']);
 
-            if ($currentMonthDay === null) {
-                continue;
-            }
-
-            // Determine if this specific game is a playoff game (per-game, not per-day)
-            $monthOverride = null;
-            $monthOffset = intdiv($game['date_slot'], SchFileParser::DAYS_PER_MONTH);
-            if ($monthOffset === 6 && $playoffMatchups !== []) {
-                $pairKey = $game['visitor'] . '-' . $game['home'];
-                if (isset($playoffMatchups[$pairKey])) {
-                    $monthOverride = \Season::IBL_PLAYOFF_MONTH;
+                if ($monthDay !== null) {
+                    $dateString = $this->buildDateString($monthDay['month'], $monthDay['day']);
+                    $fullDate = $this->extractDate($dateString);
+                    $date = $fullDate['date'] ?? null;
+                    $year = $fullDate['year'] ?? null;
+                    $month = $fullDate['month'] ?? null;
+                } else {
+                    $date = null;
+                    $year = null;
+                    $month = null;
                 }
             }
-
-            // Build and cache the date string for this month/day/override combination
-            $cacheKey = $currentMonthDay['month'] . '-' . $currentMonthDay['day'] . '-' . ($monthOverride ?? 0);
-            if (!isset($dateCache[$cacheKey])) {
-                $dateString = $this->buildDateString($currentMonthDay['month'], $currentMonthDay['day'], $monthOverride);
-                $fullDate = $this->extractDate($dateString);
-                $dateCache[$cacheKey] = [
-                    'date' => $fullDate['date'] ?? null,
-                    'year' => $fullDate['year'] ?? null,
-                    'month' => $fullDate['month'] ?? null,
-                ];
-            }
-
-            $date = $dateCache[$cacheKey]['date'];
-            $year = $dateCache[$cacheKey]['year'];
-            $month = $dateCache[$cacheKey]['month'];
 
             if ($date === null || $year === null) {
                 continue;
@@ -266,6 +266,8 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 throw new \RuntimeException($errorMessage, 1002);
             }
         }
+
+        $log .= $this->insertPlayoffGamesFromBoxScores($scheduleTable);
 
         \UI::displayDebugOutput($log, "{$scheduleTable} SQL Queries");
 

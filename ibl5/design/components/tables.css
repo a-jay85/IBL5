@@ -1916,6 +1916,7 @@ td.ibl-team-cell--colored {
 .draft-draggable {
     cursor: grab;
     user-select: none;
+    transition: transform 0.15s ease;
 }
 
 .draft-draggable a {
@@ -1928,11 +1929,12 @@ td.ibl-team-cell--colored {
 }
 
 .draft-dragging {
-    opacity: 0.4;
+    opacity: 0.3;
 }
 
-.draft-drag-over td {
-    border-top: 2px solid var(--accent-500, #ef4444);
+.draft-drag-placeholder td {
+    background-color: var(--gray-100, #f3f4f6);
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.08);
 }
 
 /* ==========================================================================

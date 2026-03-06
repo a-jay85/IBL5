@@ -394,7 +394,8 @@ function login($username, $user_password)
     }
 
     // Authenticate via AuthService (handles bcrypt + MD5 transitional upgrade)
-    if ($authService->attempt($username, $user_password)) {
+    $rememberMe = isset($_POST['remember_me']) && $_POST['remember_me'] === '1';
+    if ($authService->attempt($username, $user_password, $rememberMe)) {
         $uname = $_SERVER['REMOTE_ADDR'];
 
         // Clean up guest session for this IP

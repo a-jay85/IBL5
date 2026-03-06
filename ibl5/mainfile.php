@@ -214,6 +214,9 @@ require_once __DIR__ . "/db/db.php";
 // Initialize session-based AuthService for user authentication
 $authService = new \Auth\AuthService($mysqli_db);
 
+// Attempt to restore session from "remember me" cookie for returning users
+$authService->tryRememberMe();
+
 // Populate legacy $user global so modules.php and other code that calls
 // base64_decode($user) continues to work during the migration period.
 $user = '';

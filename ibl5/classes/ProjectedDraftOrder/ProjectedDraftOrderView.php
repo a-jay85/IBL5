@@ -37,8 +37,8 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         if ($isDraggable) {
             $html .= '<button type="button" id="draft-order-save-btn" class="ibl-btn ibl-btn--danger" style="display: none; margin-bottom: 1rem;">Save Draft Order</button>';
         }
-        $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1', showPlayoffDivider: true, isAdmin: $isDraggable, showPlayer: $isDraftStarted);
-        $html .= $this->renderRoundTable($draftOrder['round2'], 'Round 2', showPlayoffDivider: false, isAdmin: false, showPlayer: $isDraftStarted);
+        $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1', showPlayoffDivider: true, isAdmin: $isDraggable, showPlayer: $isDraftStarted, isFinalized: $isFinalized);
+        $html .= $this->renderRoundTable($draftOrder['round2'], 'Round 2', showPlayoffDivider: false, isAdmin: false, showPlayer: $isDraftStarted, isFinalized: $isFinalized);
 
         return $html;
     }
@@ -60,7 +60,7 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
     /**
      * @param list<DraftSlot> $slots
      */
-    private function renderRoundTable(array $slots, string $roundLabel, bool $showPlayoffDivider, bool $isAdmin, bool $showPlayer): string
+    private function renderRoundTable(array $slots, string $roundLabel, bool $showPlayoffDivider, bool $isAdmin, bool $showPlayer, bool $isFinalized = false): string
     {
         $colspan = $showPlayer ? '5' : '4';
         $tableId = $roundLabel === 'Round 1' ? ' id="draft-order-round1"' : '';
@@ -79,9 +79,10 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
 
         foreach ($slots as $slot) {
             if ($showPlayoffDivider) {
-                $separator = $this->getSeparatorLabel($slot['pick']);
+                $separator = $this->getSeparatorLabel($slot['pick'], $isFinalized);
                 if ($separator !== null) {
-                    $html .= $this->renderSeparatorRow($separator, $colspan);
+                    $isLotteryResults = $slot['pick'] === 1 && $isFinalized;
+                    $html .= $this->renderSeparatorRow($separator, $colspan, $isLotteryResults);
                 }
             }
             $isLottery = $slot['pick'] <= self::LOTTERY_PLAYOFF_BOUNDARY;
@@ -93,10 +94,10 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         return $html;
     }
 
-    private function getSeparatorLabel(int $pick): ?string
+    private function getSeparatorLabel(int $pick, bool $isFinalized = false): ?string
     {
         return match ($pick) {
-            1 => 'Lottery Teams',
+            1 => $isFinalized ? 'Lottery Results' : 'Lottery Teams',
             self::LOTTERY_PLAYOFF_BOUNDARY + 1 => 'Playoff Teams',
             self::DIVISION_WINNERS_BOUNDARY + 1 => 'Division Winners',
             self::CONFERENCE_WINNERS_BOUNDARY + 1 => 'Conference Winners',
@@ -104,9 +105,14 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         };
     }
 
-    private function renderSeparatorRow(string $label, string $colspan = '4'): string
+    private function renderSeparatorRow(string $label, string $colspan = '4', bool $isLotteryResults = false): string
     {
-        return '<tr class="projected-draft-order-separator ibl-table-subheading">'
+        $classes = 'projected-draft-order-separator ibl-table-subheading';
+        if ($isLotteryResults) {
+            $classes .= ' projected-draft-order-lottery-results';
+        }
+
+        return '<tr class="' . $classes . '">'
             . '<td colspan="' . $colspan . '">' . HtmlSanitizer::e($label) . '</td>'
             . '</tr>';
     }

@@ -42,16 +42,10 @@ test.describe('Extended authenticated page smoke tests', () => {
 
   test('next sim page loads', async ({ page }) => {
     await page.goto('modules.php?name=NextSim');
-    // NextSim may have no content if no games are scheduled — data-dependent skip
-    const hasContent = await page
-      .locator('.ibl-title, .ibl-data-table, table, h2, h3')
-      .first()
-      .isVisible()
-      .catch(() => false);
-    if (!hasContent) {
-      test.skip(true, 'NextSim page has no content (no scheduled games)');
-    }
     await expect(page.getByText('Sign In')).not.toBeVisible();
+    await expect(
+      page.locator('.ibl-title, .ibl-data-table, table, h2, h3').first(),
+    ).toBeVisible();
   });
 
   test('gm contact list loads', async ({ page }) => {

@@ -23,111 +23,114 @@ const EXTENDED_PUBLIC_URLS = [
 
 /**
  * Navigate and verify the page actually rendered content.
- * Under parallel MAMP load, some pages return blank HTML. Retries up to
- * 2 times with increasing wait. Skips the test if page is still blank.
+ * Under parallel load, PHP's built-in server can return blank HTML.
+ * Retries up to 4 times with increasing back-off before failing.
  */
-async function gotoOrSkip(
+async function gotoWithRetry(
   page: import('@playwright/test').Page,
   url: string,
-  testRef: typeof test,
 ): Promise<void> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await page.waitForTimeout(attempt * 500);
-    await page.goto(url);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (attempt > 0) await page.waitForTimeout(attempt * 1000);
+    try {
+      await page.goto(url, { timeout: 15_000 });
+    } catch {
+      continue;
+    }
     const body = await page.locator('body').innerText();
     if (body.trim().length >= 20) return;
   }
-  testRef.skip(true, `Page returned blank content after retries: ${url}`);
+  throw new Error(`Page returned blank content after 5 attempts: ${url}`);
 }
 
 test.describe('Extended public page smoke tests', () => {
   test('schedule loads', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=Schedule', test);
+    await gotoWithRetry(page,'modules.php?name=Schedule');
     await expect(
       page.locator('.schedule-container, .ibl-data-table, table').first(),
     ).toBeVisible();
   });
 
   test('injuries page loads', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=Injuries', test);
+    await gotoWithRetry(page,'modules.php?name=Injuries');
     await expect(page.locator('.ibl-title, h2, h3').first()).toBeVisible();
   });
 
   test('player database loads with form', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=PlayerDatabase', test);
+    await gotoWithRetry(page,'modules.php?name=PlayerDatabase');
     await expect(page.locator('form[name="Search"]')).toBeVisible();
   });
 
   test('projected draft order loads', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=ProjectedDraftOrder', test);
+    await gotoWithRetry(page,'modules.php?name=ProjectedDraftOrder');
     await expect(
       page.locator('.ibl-title, .ibl-data-table, table').first(),
     ).toBeVisible();
   });
 
   test('draft pick locator loads', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=DraftPickLocator', test);
+    await gotoWithRetry(page,'modules.php?name=DraftPickLocator');
     await expect(page.locator('.ibl-title, table').first()).toBeVisible();
   });
 
   test('free agency preview loads', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=FreeAgencyPreview', test);
+    await gotoWithRetry(page,'modules.php?name=FreeAgencyPreview');
     await expect(
       page.locator('.ibl-data-table, table, .ibl-title').first(),
     ).toBeVisible();
   });
 
   test('contract list loads', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=ContractList', test);
+    await gotoWithRetry(page,'modules.php?name=ContractList');
     await expect(
       page.locator('.ibl-data-table, table, .ibl-title').first(),
     ).toBeVisible();
   });
 
   test('player movement loads', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=PlayerMovement', test);
+    await gotoWithRetry(page,'modules.php?name=PlayerMovement');
     await expect(
       page.locator('.ibl-title, .ibl-data-table, table, h2, h3').first(),
     ).toBeVisible();
   });
 
   test('league starters loads', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=LeagueStarters', test);
+    await gotoWithRetry(page,'modules.php?name=LeagueStarters');
     await expect(
       page.locator('.ibl-data-table, table').first(),
     ).toBeVisible();
   });
 
   test('compare players loads with form', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=ComparePlayers', test);
+    await gotoWithRetry(page,'modules.php?name=ComparePlayers');
     await expect(
       page.locator('input[name="Player1"], input[name="player1"]').first(),
     ).toBeVisible();
   });
 
   test('season highs loads', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=SeasonHighs', test);
+    await gotoWithRetry(page,'modules.php?name=SeasonHighs');
     await expect(
       page.locator('.ibl-data-table, table, .ibl-title').first(),
     ).toBeVisible();
   });
 
   test('series records loads', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=SeriesRecords', test);
+    await gotoWithRetry(page,'modules.php?name=SeriesRecords');
     await expect(
       page.locator('.ibl-data-table, table, .ibl-title').first(),
     ).toBeVisible();
   });
 
   test('franchise history loads', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=FranchiseHistory', test);
+    await gotoWithRetry(page,'modules.php?name=FranchiseHistory');
     await expect(
       page.locator('.ibl-data-table, table, .ibl-title').first(),
     ).toBeVisible();
   });
 
   test('activity tracker loads', async ({ page }) => {
-    await gotoOrSkip(page, 'modules.php?name=ActivityTracker', test);
+    await gotoWithRetry(page,'modules.php?name=ActivityTracker');
     await expect(
       page.locator('.ibl-data-table, table, .ibl-title').first(),
     ).toBeVisible();

@@ -28,15 +28,16 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
             $html .= $this->renderDescription();
         }
         if ($isAdmin && !$isFinalized) {
-            $html .= '<div class="ibl-alert ibl-alert--info">Drag the lottery teams (picks 1–12) into their final draft order, then click Save.</div>';
+            $html .= '<div class="ibl-alert ibl-alert--info">Admin-only message: Drag the lottery teams (picks 1–12) into their final draft order, then click Save.</div>';
         }
         if ($isAdmin && $isFinalized && !$isDraftStarted) {
-            $html .= '<div class="ibl-alert ibl-alert--warning">The lottery order can still be changed until a player has been drafted.</div>';
+            $html .= '<div class="ibl-alert ibl-alert--warning">Admin-only message: You can still adjust the lottery order until a player has been drafted.</div>';
         }
-        if ($isAdmin) {
+        $isDraggable = $isAdmin && !$isFinalized;
+        if ($isDraggable) {
             $html .= '<button type="button" id="draft-order-save-btn" class="ibl-btn ibl-btn--danger" style="display: none; margin-bottom: 1rem;">Save Draft Order</button>';
         }
-        $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1', showPlayoffDivider: true, isAdmin: $isAdmin);
+        $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1', showPlayoffDivider: true, isAdmin: $isDraggable);
         $html .= $this->renderRoundTable($draftOrder['round2'], 'Round 2', showPlayoffDivider: false, isAdmin: false);
 
         return $html;

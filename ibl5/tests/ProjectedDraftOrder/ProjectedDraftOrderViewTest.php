@@ -326,7 +326,7 @@ class ProjectedDraftOrderViewTest extends TestCase
         $result = $this->view->render($this->sampleDraftOrder(), 2026, true, true, false);
 
         $this->assertStringContainsString('ibl-alert--warning', $result);
-        $this->assertStringContainsString('can still be changed', $result);
+        $this->assertStringContainsString('can still adjust', $result);
     }
 
     public function testWarningHiddenWhenDraftStarted(): void
@@ -372,6 +372,22 @@ class ProjectedDraftOrderViewTest extends TestCase
         $result = $this->view->render($order, 2026, false, false);
 
         $this->assertStringNotContainsString('draggable="true"', $result);
+    }
+
+    public function testNoDraggableAttributesWhenFinalized(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, true, true);
+
+        $this->assertStringNotContainsString('draggable="true"', $result);
+        $this->assertStringNotContainsString('draft-draggable', $result);
+    }
+
+    public function testSaveButtonNotRenderedWhenFinalized(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, true);
+
+        $this->assertStringNotContainsString('draft-order-save-btn', $result);
     }
 
     public function testNonLotteryRowsNotDraggableForAdmin(): void

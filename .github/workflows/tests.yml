@@ -55,3 +55,34 @@ jobs:
           --testdox \
           --no-coverage \
           --colors=always
+
+  phpstan:
+    name: PHPStan Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.4'
+        extensions: mbstring, intl, mysqli
+        coverage: none
+
+    - name: Cache vendor directory
+      uses: actions/cache@v5
+      with:
+        path: ibl5/vendor
+        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-vendor-
+
+    - name: Install dependencies
+      working-directory: ibl5
+      run: composer install --no-progress --no-interaction
+
+    - name: Run PHPStan
+      working-directory: ibl5
+      run: composer run analyse

@@ -43,4 +43,4 @@ playwright-report/
 test-results/
 **/playwright/.auth/
 ibl5/.env.test
-docker-compose.yml
+docker-compose.override.yml

@@ -88,9 +88,15 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
     {
         $this->db->begin_transaction();
         try {
-            // Delete unfilled slots from previous years and current year round 1
+            // Delete all draft rows from previous years (out of date) and
+            // unfilled round-1 slots for the current year
             $this->execute(
-                "DELETE FROM ibl_draft WHERE player = '' AND year <= ?",
+                "DELETE FROM ibl_draft WHERE year < ?",
+                "i",
+                $year,
+            );
+            $this->execute(
+                "DELETE FROM ibl_draft WHERE year = ? AND round = 1 AND player = ''",
                 "i",
                 $year,
             );

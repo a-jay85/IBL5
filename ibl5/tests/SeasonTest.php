@@ -295,4 +295,28 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
         // May 28 + 7 = June 4
         $this->assertSame('2025-06-04', $result->format('Y-m-d'));
     }
+
+    public function testGapSkipWhenLastSimInsideGap(): void
+    {
+        $season = $this->createGapSkipSeason(7, '2025-05-15');
+
+        // lastSimEndDate = May 20, which is inside the gap (May 16 to June 1)
+        $result = $season->getProjectedNextSimEndDate('2025-05-20');
+
+        // May 20 + 7 = May 27, then skip remaining gap days (May 20 to June 1 = 12 days)
+        // May 27 + 12 = June 8
+        $this->assertSame('2025-06-08', $result->format('Y-m-d'));
+    }
+
+    public function testGapSkipWhenLastSimAtGapEnd(): void
+    {
+        $season = $this->createGapSkipSeason(7, '2025-05-15');
+
+        // lastSimEndDate = May 31, which is at the end of the gap
+        $result = $season->getProjectedNextSimEndDate('2025-05-31');
+
+        // May 31 + 7 = June 7, then skip remaining gap days (May 31 to June 1 = 1 day)
+        // June 7 + 1 = June 8
+        $this->assertSame('2025-06-08', $result->format('Y-m-d'));
+    }
 }

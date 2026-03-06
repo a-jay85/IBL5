@@ -7,6 +7,7 @@ namespace Updater;
 use League\LeagueContext;
 use Utilities\UuidGenerator;
 use Utilities\SchFileParser;
+use Utilities\ScheduleHtmParser;
 use Utilities\DateParser;
 
 class ScheduleUpdater extends \BaseMysqliRepository {
@@ -14,6 +15,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
     /** @var array<int, string> Team ID to name lookup (for logging) */
     private array $teamIdToNameMap = [];
+
+    /** @var array<string, int> Team name to ID lookup (for Schedule.htm parsing) */
+    private array $teamNameToIdMap = [];
 
     private const UNPLAYED_BOX_ID = 100000;
 
@@ -86,6 +90,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         foreach ($rows as $row) {
             $this->teamIdToNameMap[$row['teamid']] = $row['team_name'];
+            $this->teamNameToIdMap[$row['team_name']] = $row['teamid'];
         }
     }
 
@@ -107,6 +112,75 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     private function getTeamNameById(int $teamId): string
     {
         return $this->teamIdToNameMap[$teamId] ?? "Team #{$teamId}";
+    }
+
+    /**
+     * Insert playoff schedule entries from Schedule.htm.
+     *
+     * Playoff games are NOT stored in the .sch file — they exist only in
+     * JSB's Schedule.htm HTML export. This parses both played games (with
+     * scores) and upcoming/unplayed games (no scores yet).
+     *
+     * @return string Log of inserted playoff games
+     */
+    private function insertPlayoffGamesFromScheduleHtm(string $scheduleTable): string
+    {
+        $ibl5RootRaw = defined('IBL5_ROOT') ? IBL5_ROOT : null;
+        $ibl5Root = is_string($ibl5RootRaw) ? $ibl5RootRaw : '.';
+        $leagueDir = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'IBL';
+        $scheduleHtmPath = $ibl5Root . '/ibl/' . $leagueDir . '/Schedule.htm';
+
+        if (!file_exists($scheduleHtmPath)) {
+            return "Schedule.htm not found at {$scheduleHtmPath} — skipping playoff games<br>";
+        }
+
+        $html = file_get_contents($scheduleHtmPath);
+        if ($html === false) {
+            return "Failed to read Schedule.htm — skipping playoff games<br>";
+        }
+
+        $playoffGames = ScheduleHtmParser::parsePlayoffGames($html);
+
+        $log = '';
+
+        foreach ($playoffGames as $game) {
+            $fullDate = $this->extractDate($game['date_label']);
+            if ($fullDate === null) {
+                continue;
+            }
+
+            $visitorTID = $this->teamNameToIdMap[$game['visitor']] ?? null;
+            $homeTID = $this->teamNameToIdMap[$game['home']] ?? null;
+
+            if ($visitorTID === null || $homeTID === null) {
+                $log .= "Unknown team in playoff game: {$game['visitor']} @ {$game['home']}<br>";
+                continue;
+            }
+
+            $boxId = $game['played'] && $game['box_id'] !== null
+                ? $game['box_id']
+                : self::UNPLAYED_BOX_ID;
+
+            $uuid = UuidGenerator::generateUuid();
+
+            $this->execute(
+                "INSERT INTO {$scheduleTable} (
+                    Year, BoxID, Date, Visitor, Vscore, Home, Hscore, uuid
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "iisiiiis",
+                $fullDate['year'],
+                $boxId,
+                $fullDate['date'],
+                $visitorTID,
+                $game['visitor_score'],
+                $homeTID,
+                $game['home_score'],
+                $uuid
+            );
+            $log .= "Inserted playoff game: {$game['visitor']} @ {$game['home']} on {$fullDate['date']}<br>";
+        }
+
+        return $log;
     }
 
     public function update(): void {
@@ -209,6 +283,8 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 throw new \RuntimeException($errorMessage, 1002);
             }
         }
+
+        $log .= $this->insertPlayoffGamesFromScheduleHtm($scheduleTable);
 
         \UI::displayDebugOutput($log, "{$scheduleTable} SQL Queries");
 

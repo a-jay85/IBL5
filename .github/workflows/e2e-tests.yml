@@ -35,18 +35,53 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
+      # --- Dependency Caching ---
+      - name: Cache vendor directory
+        uses: actions/cache@v5
+        with:
+          path: ibl5/vendor
+          key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-vendor-
+
+      - name: Cache node_modules
+        uses: actions/cache@v5
+        with:
+          path: ibl5/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
       - name: Install JS dependencies
         working-directory: ibl5
         run: bun install
 
+      - name: Get Playwright version
+        id: playwright-version
+        working-directory: ibl5
+        run: echo "version=$(bunx playwright --version)" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         working-directory: ibl5
         run: bunx playwright install chromium --with-deps
+
+      - name: Install Playwright system deps
+        run: bunx playwright install-deps chromium
+        working-directory: ibl5
 
       - name: Install Composer dependencies
         working-directory: ibl5
         run: composer install --no-interaction --no-progress --prefer-dist
 
+      # --- Database Setup ---
       - name: Import database schema
         run: |
           # Strip DEFINER clauses that reference the production user
@@ -88,6 +123,7 @@ jobs:
           echo "Test user created: $user\n";
           PHPSCRIPT
 
+      # --- App Setup ---
       - name: Create config.php
         working-directory: ibl5
         run: |
@@ -131,6 +167,7 @@ jobs:
           echo "Server failed to start"
           exit 1
 
+      # --- Run Tests ---
       - name: Run E2E tests
         working-directory: ibl5
         env:

@@ -1928,16 +1928,7 @@ td.ibl-team-cell--colored {
 }
 
 .draft-dragging {
-    opacity: 0;
-    height: 0;
-    overflow: hidden;
-}
-
-.draft-dragging td {
-    padding: 0;
-    border: 0;
-    line-height: 0;
-    font-size: 0;
+    display: none;
 }
 
 .draft-drag-placeholder td {

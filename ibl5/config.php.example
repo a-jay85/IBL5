@@ -38,7 +38,7 @@ if (stristr(htmlentities($_SERVER['PHP_SELF']), "config.php")) {
 #                    email if set.
 ######################################################################
 
-$dbhost = "localhost";
+$dbhost = getenv('DB_HOST') ?: 'localhost';
 $dbuname = "iblhoops_";
 $dbpass = "password";
 $dbname = "iblhoops_";

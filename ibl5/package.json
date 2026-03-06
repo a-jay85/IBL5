@@ -9,7 +9,10 @@
     "test:e2e": "bunx playwright test",
     "test:e2e:headed": "bunx playwright test --headed",
     "test:e2e:ui": "bunx playwright test --ui",
-    "test:e2e:isolated": "./bin/e2e-local.sh"
+    "test:e2e:isolated": "./bin/e2e-local.sh",
+    "docker:up": "cd .. && docker compose up -d",
+    "docker:down": "cd .. && docker compose down",
+    "docker:logs": "cd .. && docker compose logs -f php"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",

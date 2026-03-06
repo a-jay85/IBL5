@@ -273,6 +273,80 @@ INSERT INTO ibl_plr (
    'plr-uuid-00000000-0000-000000000007');
 
 -- ============================================================
+-- Free agent players (pid=10,11,12) for Free Agency E2E tests
+-- Formula: draftYear + exp + cyt - cy = 2026 (season ending year)
+-- With cy=0, cyt=0: draftYear + exp = 2026
+-- ============================================================
+
+INSERT INTO ibl_plr (
+  pid, name, age, peak, tid, pos, ordinal,
+  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  cy, cyt, cy1, cy2,
+  retired, exp, bird,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_to, stats_blk, stats_pf,
+  uuid
+) VALUES
+  (10, 'FA Guard', 26, 28, 1, 'SG', 3,
+   80, 75, 70, 65, 60, 72, 68, 70, 65,
+   0, 0, 0, 0,
+   0, 5, 4,
+   6, 3, 195, 'Guard Academy',
+   1, 15, 2021, 'Metros', 'Metros',
+   40, 1200, 200, 450, 100, 120,
+   60, 150, 40, 120, 180, 50,
+   80, 20, 90,
+   'plr-uuid-00000000-0000-000000000010'),
+  (11, 'FA Center', 30, 29, 0, 'C', 0,
+   78, 72, 68, 63, 58, 70, 66, 68, 63,
+   0, 0, 0, 0,
+   0, 8, 0,
+   7, 0, 250, 'Center College',
+   1, 20, 2018, 'Stars', 'Stars',
+   38, 1100, 180, 400, 90, 110,
+   40, 120, 50, 130, 150, 45,
+   70, 25, 85,
+   'plr-uuid-00000000-0000-000000000011'),
+  (12, 'FA Forward', 25, 27, 2, 'SF', 3,
+   79, 74, 69, 64, 59, 71, 67, 69, 64,
+   0, 0, 0, 0,
+   0, 3, 2,
+   6, 6, 210, 'Forward University',
+   2, 5, 2023, 'Stars', 'Stars',
+   40, 1150, 190, 420, 95, 115,
+   45, 130, 45, 140, 160, 48,
+   65, 22, 88,
+   'plr-uuid-00000000-0000-000000000012');
+
+-- Free agent demands
+INSERT INTO ibl_demands (name, pid, dem1, dem2, dem3, dem4, dem5, dem6) VALUES
+  ('FA Guard',   10, 800, 880, 960, 1040, 0, 0),
+  ('FA Center',  11, 500, 550, 600, 0, 0, 0),
+  ('FA Forward', 12, 400, 440, 480, 520, 560, 600);
+
+-- Free agent player history (needed for SeasonLeaderboards)
+INSERT INTO ibl_hist (
+  pid, name, year, team, teamid,
+  games, minutes, fgm, fga, ftm, fta, tgm, tga,
+  orb, reb, ast, stl, blk, tvr, pf, pts, salary
+) VALUES
+  (10, 'FA Guard', 2026, 'Metros', 1,
+   40, 1200, 200, 450, 100, 120, 60, 150,
+   40, 160, 180, 50, 20, 80, 90, 620, 0),
+  (11, 'FA Center', 2026, 'Stars', 2,
+   38, 1100, 180, 400, 90, 110, 40, 120,
+   50, 180, 150, 45, 25, 70, 85, 530, 0),
+  (12, 'FA Forward', 2026, 'Stars', 2,
+   40, 1150, 190, 420, 95, 115, 45, 130,
+   45, 185, 160, 48, 22, 65, 88, 565, 0);
+
+-- Team MLE/LLE flags: Metros have both exceptions available
+UPDATE ibl_team_info SET HasMLE = 1, HasLLE = 1 WHERE teamid = 1;
+
+-- ============================================================
 -- Box scores (must be after players for FK constraint)
 -- ============================================================
 

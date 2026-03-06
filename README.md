@@ -5,7 +5,7 @@ A fantasy basketball league website powered by the Jump Shot Basketball simulati
 ## Tech Stack
 
 - **Backend:** PHP 8.3, MariaDB 10.6
-- **Local Dev:** MAMP (macOS)
+- **Local Dev:** MAMP (Apache/PHP) + Docker MariaDB 10.6
 - **Testing:** PHPUnit 12, PHPStan (level max + strict-rules + bleedingEdge)
 - **CI/CD:** GitHub Actions
 - **Frontend:** Tailwind CSS 4, vanilla JS
@@ -19,9 +19,8 @@ git clone https://github.com/your-org/IBL5.git && cd IBL5
 # 2. Install dependencies
 cd ibl5 && composer install
 
-# 3. Configure database (MAMP must be running)
-cp classes/DatabaseConnection.php.template classes/DatabaseConnection.php
-# Edit DatabaseConnection.php with your MAMP credentials from config.php
+# 3. Start Docker MariaDB
+cd .. && docker compose up -d && cd ibl5
 
 # 4. Run tests
 vendor/bin/phpunit
@@ -96,7 +95,7 @@ All project documentation lives in [`ibl5/docs/`](ibl5/docs/README.md):
 | [API_GUIDE.md](ibl5/docs/API_GUIDE.md) | REST API design (planned) |
 | [REFACTORING_HISTORY.md](ibl5/docs/REFACTORING_HISTORY.md) | Complete module refactoring timeline |
 | [STRATEGIC_PRIORITIES.md](ibl5/docs/STRATEGIC_PRIORITIES.md) | Post-refactoring roadmap |
-| [DEVELOPMENT_ENVIRONMENT.md](ibl5/docs/DEVELOPMENT_ENVIRONMENT.md) | MAMP setup, dependency caching |
+| [DEVELOPMENT_ENVIRONMENT.md](ibl5/docs/DEVELOPMENT_ENVIRONMENT.md) | Docker MariaDB setup, dependency caching |
 
 For AI agents, see [CLAUDE.md](CLAUDE.md).
 

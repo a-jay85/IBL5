@@ -1,17 +1,17 @@
 # IBL5 Development Environment Setup
 
-**Purpose:** Environment setup, dependency caching, and database connection for Copilot Agent.  
+**Purpose:** Environment setup, dependency caching, and database connection for Copilot Agent.
 **When to reference:** Initial setup, troubleshooting dependencies, database connection issues.
 
 ---
 
-## ⚠️ CRITICAL: Check for Cached Dependencies FIRST
+## Check for Cached Dependencies FIRST
 
 **Before running `composer install` or any PHPUnit commands:**
 
 ```bash
 # Check if vendor directory exists
-ls -la ibl5/vendor/bin/phpunit 2>/dev/null && echo "✅ PHPUnit cached - use directly"
+ls -la ibl5/vendor/bin/phpunit 2>/dev/null && echo "PHPUnit cached - use directly"
 ```
 
 **If vendor exists**, use PHPUnit directly WITHOUT running composer install:
@@ -49,13 +49,6 @@ The `.github/workflows/cache-dependencies.yml` and `.github/workflows/tests.yml`
 4. Only if both caches miss does Composer download from repositories
 5. Downloaded packages are cached for future runs
 
-**Benefits:**
-- ✅ Cache-first priority avoids network timeouts
-- ✅ No network calls when cache available
-- ✅ Fast test execution
-- ✅ Consistent PHP version (8.3)
-- ✅ Automatic cache refresh on dependency changes
-
 ---
 
 ## Testing from Command Line
@@ -63,10 +56,10 @@ The `.github/workflows/cache-dependencies.yml` and `.github/workflows/tests.yml`
 ```bash
 # Step 1: Check if dependencies are already cached
 if [ -f "ibl5/vendor/bin/phpunit" ]; then
-    echo "✅ Dependencies cached, running tests directly"
+    echo "Dependencies cached, running tests directly"
     cd ibl5 && vendor/bin/phpunit
 else
-    echo "⚠️ No cached dependencies, running bootstrap script"
+    echo "No cached dependencies, running bootstrap script"
     bash bootstrap-phpunit.sh
     cd ibl5 && vendor/bin/phpunit
 fi
@@ -100,8 +93,7 @@ vendor/bin/phpcs --version                 # Should show PHP_CodeSniffer version
 | `Composer install fails` | Check `.github/workflows/cache-dependencies.yml` workflow logs |
 | `Tests fail to run` | Verify cache-dependencies workflow completed successfully |
 | `Cache outdated` | Manually trigger "Cache PHP Dependencies" workflow |
-| `Authentication plugin error` | You're using Homebrew's mysql client — use MAMP's: `/Applications/MAMP/Library/bin/mysql80/bin/mysql` |
-| `Can't connect via socket` | Check socket exists: `/Applications/MAMP/tmp/mysql/mysql.sock`. Ensure MAMP is running. |
+| `Can't connect to database` | Check Docker MariaDB is running: `docker compose ps`. Start with `docker compose up -d` |
 
 ---
 
@@ -114,51 +106,38 @@ vendor/bin/phpcs --version                 # Should show PHP_CodeSniffer version
 
 ---
 
-## Local Database Connection (MAMP)
+## Local Database (Docker MariaDB)
 
 ### Connection Details
-- **Host:** `localhost`
-- **Port:** `3306` (MAMP default)
+- **Host:** `127.0.0.1`
+- **Port:** `3306`
 - **Database Name:** `iblhoops_ibl5`
-- **Socket:** `/Applications/MAMP/tmp/mysql/mysql.sock`
 - **Credentials Location:** See `ibl5/config.php` (in `.gitignore`)
+
+### Starting the Database
+
+```bash
+# From repo root
+docker compose up -d
+
+# Verify it's running
+docker compose ps
+mariadb -h 127.0.0.1 --skip-ssl -u root -proot -e "SELECT VERSION();"
+```
 
 ### Command Line Verification
 
 ```bash
-/Applications/MAMP/Library/bin/mysql80/bin/mysql \
-  -h localhost \
-  -u <username_from_config.php> \
-  -p'<password_from_config.php>' \
+mariadb -h 127.0.0.1 --skip-ssl \
+  -u root -proot \
   -D iblhoops_ibl5 \
   -e "SELECT COUNT(*) as table_count FROM information_schema.TABLES WHERE TABLE_SCHEMA = 'iblhoops_ibl5';"
 ```
 
-### Homebrew MySQL Client Incompatibility
+### Data Safety
 
-**Do NOT use** the Homebrew-installed `mysql` command:
-```bash
-# WRONG - Will fail with authentication plugin error
-mysql -h 127.0.0.1 -u root -p'root' iblhoops_ibl5
-```
-
-**Always use** MAMP's bundled mysql client:
-```bash
-# CORRECT - Use MAMP's mysql client with socket
-/Applications/MAMP/Library/bin/mysql80/bin/mysql \
-  --socket=/Applications/MAMP/tmp/mysql/mysql.sock \
-  -u root -p'root' \
-  iblhoops_ibl5
-```
-
-**Why?** Homebrew's MySQL 9.x client expects plugins that MAMP's MySQL 8.0 server doesn't provide. The PHP mysqli extension works fine because it uses a different connection method.
-
-### Why the Socket Path Matters
-
-- **Command-line MySQL client:** Uses port 3306 directly
-- **PHP mysqli:** Requires explicit socket path to connect locally
-- **MAMP Socket Location:** `/Applications/MAMP/tmp/mysql/mysql.sock`
-- **DatabaseConnection class:** Automatically handles this
+- `docker compose down` preserves database data (named volume persists)
+- `docker compose down -v` **destroys all data** (removes the volume)
 
 ### Security Notes
 

@@ -4,7 +4,7 @@ Browser-based end-to-end tests for IBL5. These automate functional verification 
 
 ## Prerequisites
 
-- **MAMP running** with IBL5 accessible at `http://localhost/ibl5/`
+- **Docker MariaDB running** (`docker compose up -d` from repo root) and **MAMP running** (for Apache) with IBL5 accessible at `http://localhost/ibl5/`
 - **Test user credentials** — a valid IBL account for authenticated tests
 
 ## Setup

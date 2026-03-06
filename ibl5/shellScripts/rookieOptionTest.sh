@@ -32,8 +32,7 @@ NC='\033[0m' # No Color
 # ============================================
 # Configuration
 # ============================================
-MYSQL_BIN="/Applications/MAMP/Library/bin/mysql80/bin/mysql"
-MYSQL_SOCKET="/Applications/MAMP/tmp/mysql/mysql.sock"
+MYSQL_CMD="mariadb"
 DB_USER="${LOCAL_USER}"
 DB_NAME="${LOCAL_DATABASE}"
 
@@ -50,28 +49,21 @@ echo -e "${BLUE}  Rookie Option Test Data Setup${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-if [ ! -f "${MYSQL_BIN}" ]; then
-    echo -e "${RED}ERROR: MAMP MySQL binary not found at ${MYSQL_BIN}${NC}"
-    echo -e "${RED}This script is for local development only.${NC}"
+if ! $MYSQL_CMD -h 127.0.0.1 --skip-ssl -u "${DB_USER}" -p"${LOCAL_PASSWORD}" -e "SELECT 1" > /dev/null 2>&1; then
+    echo -e "${RED}ERROR: Cannot connect to MariaDB at 127.0.0.1${NC}"
+    echo -e "${RED}Is Docker MariaDB running? Try: docker compose up -d${NC}"
     exit 1
 fi
 
-if [ ! -S "${MYSQL_SOCKET}" ]; then
-    echo -e "${RED}ERROR: MAMP MySQL socket not found at ${MYSQL_SOCKET}${NC}"
-    echo -e "${RED}Is MAMP running?${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}✓${NC} MAMP MySQL binary found"
-echo -e "${GREEN}✓${NC} MAMP MySQL socket found"
+echo -e "${GREEN}✓${NC} MariaDB connection verified"
 echo ""
 
 # ============================================
 # Helper Function
 # ============================================
 run_sql() {
-    MYSQL_PWD="${LOCAL_PASSWORD}" "${MYSQL_BIN}" \
-        --socket="${MYSQL_SOCKET}" \
+    MYSQL_PWD="${LOCAL_PASSWORD}" "${MYSQL_CMD}" \
+        -h 127.0.0.1 --skip-ssl \
         --user="${DB_USER}" \
         "${DB_NAME}" \
         --batch --skip-column-names \

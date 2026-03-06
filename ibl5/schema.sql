@@ -59,7 +59,7 @@ CREATE TABLE `auth_users_audit_log` (
   KEY `event_at` (`event_at`),
   KEY `user_id_event_at` (`user_id`,`event_at`),
   KEY `user_id_event_type_event_at` (`user_id`,`event_type`,`event_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=245 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=251 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `auth_users_confirmations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -2075,7 +2075,7 @@ CREATE TABLE `ibl_saved_depth_chart_players` (
   KEY `idx_depth_chart_id` (`depth_chart_id`),
   KEY `idx_pid` (`pid`),
   CONSTRAINT `fk_saved_dc_header` FOREIGN KEY (`depth_chart_id`) REFERENCES `ibl_saved_depth_charts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=984 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1063 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_saved_depth_charts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -2098,7 +2098,7 @@ CREATE TABLE `ibl_saved_depth_charts` (
   KEY `idx_tid_active` (`tid`,`is_active`),
   KEY `idx_tid_created` (`tid`,`created_at` DESC),
   KEY `idx_active` (`is_active`)
-) ENGINE=InnoDB AUTO_INCREMENT=56 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_schedule`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

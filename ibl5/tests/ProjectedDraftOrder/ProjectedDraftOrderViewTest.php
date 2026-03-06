@@ -299,6 +299,28 @@ class ProjectedDraftOrderViewTest extends TestCase
         $this->assertStringNotContainsString('projected-draft-order-description', $result);
     }
 
+    public function testAdminAlertShownWhenNotFinalized(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, false);
+
+        $this->assertStringContainsString('ibl-alert--info', $result);
+        $this->assertStringContainsString('Drag the lottery teams', $result);
+    }
+
+    public function testAdminAlertHiddenWhenFinalized(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, true);
+
+        $this->assertStringNotContainsString('ibl-alert--info', $result);
+    }
+
+    public function testAdminAlertHiddenForNonAdmin(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, false, false);
+
+        $this->assertStringNotContainsString('ibl-alert--info', $result);
+    }
+
     public function testSaveButtonRenderedForAdmin(): void
     {
         $result = $this->view->render($this->sampleDraftOrder(), 2026, true, false);

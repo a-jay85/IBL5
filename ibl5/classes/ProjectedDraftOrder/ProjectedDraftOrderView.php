@@ -27,6 +27,9 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         if (!$isFinalized) {
             $html .= $this->renderDescription();
         }
+        if ($isAdmin && !$isFinalized) {
+            $html .= '<div class="ibl-alert ibl-alert--info">Drag the lottery teams (picks 1–12) into their final draft order, then click Save.</div>';
+        }
         if ($isAdmin) {
             $html .= '<button type="button" id="draft-order-save-btn" class="ibl-btn ibl-btn--danger" style="display: none;">Save Draft Order</button>';
         }

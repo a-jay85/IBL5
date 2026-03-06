@@ -114,10 +114,7 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         $dragAttr = $isDraggable ? ' draggable="true" data-team-id="' . HtmlSanitizer::e($slot['teamId']) . '"' : '';
         $html = '<tr' . $classAttr . $dragAttr . '>';
 
-        $pickContent = $isDraggable
-            ? '<span class="draft-drag-handle">&#x2630;</span> ' . HtmlSanitizer::e($slot['pick'])
-            : HtmlSanitizer::e($slot['pick']);
-        $html .= '<td>' . $pickContent . '</td>';
+        $html .= '<td>' . HtmlSanitizer::e($slot['pick']) . '</td>';
 
         if ($slot['isTraded']) {
             $html .= TeamCellHelper::renderTeamCell(

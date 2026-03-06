@@ -320,7 +320,6 @@ class ProjectedDraftOrderViewTest extends TestCase
 
         $this->assertStringContainsString('draggable="true"', $result);
         $this->assertStringContainsString('data-team-id=', $result);
-        $this->assertStringContainsString('draft-drag-handle', $result);
     }
 
     public function testNoDraggableAttributesForNonAdmin(): void
@@ -329,7 +328,6 @@ class ProjectedDraftOrderViewTest extends TestCase
         $result = $this->view->render($order, 2026, false, false);
 
         $this->assertStringNotContainsString('draggable="true"', $result);
-        $this->assertStringNotContainsString('draft-drag-handle', $result);
     }
 
     public function testNonLotteryRowsNotDraggableForAdmin(): void

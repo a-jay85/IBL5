@@ -76,9 +76,7 @@
         currentRows.forEach(function (row, index) {
             var pickCell = row.querySelector('td:first-child');
             if (pickCell) {
-                var handle = pickCell.querySelector('.draft-drag-handle');
-                var handleHtml = handle ? handle.outerHTML + ' ' : '';
-                pickCell.innerHTML = handleHtml + (index + 1);
+                pickCell.textContent = String(index + 1);
             }
         });
     }

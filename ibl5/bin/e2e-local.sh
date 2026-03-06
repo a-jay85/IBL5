@@ -139,9 +139,11 @@ sed -i '' '/IBL_E2E_CONFIG/d' "$CONFIG_DIR/config.e2e.php"
 echo "==> Starting PHP server on port $PORT..."
 E2E_TESTING=1 PHP_CLI_SERVER_WORKERS=8 php \
     -d "auto_prepend_file=$SCRIPT_DIR/e2e-prepend.php" \
+    -d "log_errors=1" \
+    -d "error_log=/tmp/e2e-php-errors.log" \
     -S "0.0.0.0:$PORT" \
     -t "$REPO_ROOT" \
-    "$IBL5_DIR/router.php" 2>/dev/null &
+    "$IBL5_DIR/router.php" 2>/tmp/e2e-php-server.log &
 PHP_PID=$!
 
 for i in $(seq 1 15); do

@@ -33,6 +33,11 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
     public function calculateDraftOrder(int $seasonYear): array
     {
         $standings = $this->repository->getAllTeamsWithStandings();
+
+        if ($standings === []) {
+            return ['round1' => [], 'round2' => []];
+        }
+
         $games = $this->repository->getPlayedGames($seasonYear);
         $pickOwnershipRows = $this->repository->getPickOwnership($seasonYear);
         $pointDiffRows = $this->repository->getPointDifferentials($seasonYear);
@@ -52,7 +57,9 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
             array_push($nonPlayoffTeams, ...$result['nonPlayoff']);
             array_push($wildCardTeams, ...$result['wildCards']);
             array_push($divisionWinnerTeams, ...$result['divisionWinners']);
-            $conferenceWinnerTeams[] = $result['conferenceWinner'];
+            if ($result['conferenceWinner'] !== null) {
+                $conferenceWinnerTeams[] = $result['conferenceWinner'];
+            }
         }
 
         $teamMap = $this->buildTeamMap($standings);
@@ -262,10 +269,14 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
      * @param list<StandingsRow> $conferenceTeams
      * @param array<int, array<int, int>> $h2h
      * @param array<int, float> $pointDiffs
-     * @return array{wildCards: list<StandingsRow>, divisionWinners: list<StandingsRow>, conferenceWinner: StandingsRow, nonPlayoff: list<StandingsRow>}
+     * @return array{wildCards: list<StandingsRow>, divisionWinners: list<StandingsRow>, conferenceWinner: StandingsRow|null, nonPlayoff: list<StandingsRow>}
      */
     private function determinePlayoffTeams(array $conferenceTeams, array $h2h, array $pointDiffs): array
     {
+        if ($conferenceTeams === []) {
+            return ['wildCards' => [], 'divisionWinners' => [], 'conferenceWinner' => null, 'nonPlayoff' => []];
+        }
+
         $byDivision = [];
         foreach ($conferenceTeams as $team) {
             $byDivision[$team['division']][] = $team;

@@ -34,6 +34,7 @@ use Delight\Auth\UserAlreadyExistsException;
 class AuthService implements AuthServiceInterface
 {
     private const BCRYPT_COST = 12;
+    private const REMEMBER_DURATION_SECONDS = 7776000; // 90 days
 
     private const SESSION_USER_ID = 'auth_user_id';
     private const SESSION_USERNAME = 'auth_username';
@@ -64,13 +65,14 @@ class AuthService implements AuthServiceInterface
         return $this->auth;
     }
 
-    public function attempt(string $username, string $password): bool
+    public function attempt(string $username, string $password, bool $rememberMe = false): bool
     {
         $this->lastError = null;
+        $rememberDuration = $rememberMe ? self::REMEMBER_DURATION_SECONDS : null;
 
         // 1. Try delight-auth first (handles users registered via the new flow)
         try {
-            $this->getAuth()->loginWithUsername($username, $password);
+            $this->getAuth()->loginWithUsername($username, $password, $rememberDuration);
 
             // Delight-auth login succeeded — look up nuke_users row for session
             $nukeUserId = $this->getNukeUserId($username);
@@ -294,8 +296,52 @@ class AuthService implements AuthServiceInterface
         ];
     }
 
+    public function tryRememberMe(): bool
+    {
+        // Already authenticated — nothing to do
+        if ($this->isAuthenticated()) {
+            return false;
+        }
+
+        try {
+            $auth = $this->getAuth();
+        } catch (\Throwable) {
+            return false;
+        }
+
+        // Delight-auth's constructor calls processRememberDirective(), which
+        // checks for a remember cookie and auto-logs the user in if valid.
+        if (!$auth->isLoggedIn()) {
+            return false;
+        }
+
+        // Delight-auth restored the session — mirror it into our own session keys
+        $username = $auth->getUsername();
+        if ($username === null) {
+            return false;
+        }
+
+        $nukeUserId = $this->getNukeUserId($username);
+        if ($nukeUserId === null) {
+            return false;
+        }
+
+        $this->startSession($nukeUserId, $username);
+        return true;
+    }
+
     public function logout(): void
     {
+        // Clear delight-auth remember cookie and session
+        try {
+            $auth = $this->getAuth();
+            if ($auth->isLoggedIn()) {
+                $auth->logOut();
+            }
+        } catch (\Throwable) {
+            // Delight-auth not available — continue with local cleanup
+        }
+
         unset(
             $_SESSION[self::SESSION_USER_ID],
             $_SESSION[self::SESSION_USERNAME],

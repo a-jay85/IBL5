@@ -38,7 +38,7 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
     const teamPageLink = nav.locator('.nav-dropdown-item', {
       hasText: 'Team Page',
     }).first();
-    await expect(teamPageLink).toBeVisible({ timeout: 3000 });
+    await expect(teamPageLink).toBeVisible();
   });
 
   test('account dropdown shows logout link', async ({ page }) => {
@@ -52,7 +52,7 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
     const logoutLink = nav.locator('.nav-dropdown-item', {
       hasText: 'Logout',
     }).first();
-    await expect(logoutLink).toBeVisible({ timeout: 3000 });
+    await expect(logoutLink).toBeVisible();
   });
 
   test('teams mega-menu shows team links', async ({ page }) => {
@@ -60,7 +60,7 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
     await desktopNav(page).getByRole('button', { name: 'Teams' }).click();
 
     const teamLinks = page.locator('a[href*="teamID="]');
-    await expect(teamLinks.first()).toBeVisible({ timeout: 3000 });
+    await expect(teamLinks.first()).toBeVisible();
     expect(await teamLinks.count()).toBeGreaterThan(0);
   });
 
@@ -72,7 +72,7 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
     const standingsLink = nav.locator('.nav-dropdown-item', {
       hasText: 'Standings',
     }).first();
-    await expect(standingsLink).toBeVisible({ timeout: 3000 });
+    await expect(standingsLink).toBeVisible();
 
     const href = await standingsLink.getAttribute('href');
     await page.goto(href!);
@@ -90,7 +90,7 @@ test.describe('Navigation bar (authenticated, mobile viewport)', () => {
 
     await expect(
       mobileMenu.locator('text=Welcome back'),
-    ).toBeVisible({ timeout: 3000 });
+    ).toBeVisible();
   });
 
   test('my team section appears in mobile panel', async ({ page }) => {
@@ -99,7 +99,7 @@ test.describe('Navigation bar (authenticated, mobile viewport)', () => {
 
     await expect(
       mobileMenu.locator('.mobile-dropdown-btn', { hasText: 'My Team' }).first(),
-    ).toBeVisible({ timeout: 3000 });
+    ).toBeVisible();
   });
 
   test('account section shows Account instead of Login', async ({ page }) => {
@@ -108,7 +108,7 @@ test.describe('Navigation bar (authenticated, mobile viewport)', () => {
 
     await expect(
       mobileMenu.locator('.mobile-dropdown-btn', { hasText: 'Account' }).first(),
-    ).toBeVisible({ timeout: 3000 });
+    ).toBeVisible();
 
     await expect(
       mobileMenu.locator('.mobile-dropdown-btn', { hasText: 'Login' }),
@@ -126,7 +126,7 @@ test.describe('Navigation bar (authenticated, mobile viewport)', () => {
     const teamPageLink = mobileMenu.locator('.mobile-dropdown-link', {
       hasText: 'Team Page',
     }).first();
-    await expect(teamPageLink).toBeVisible({ timeout: 3000 });
+    await expect(teamPageLink).toBeVisible();
   });
 
   test('mobile link navigates to correct page', async ({ page }) => {
@@ -140,7 +140,7 @@ test.describe('Navigation bar (authenticated, mobile viewport)', () => {
     const standingsLink = mobileMenu.locator('.mobile-dropdown-link', {
       hasText: 'Standings',
     }).first();
-    await expect(standingsLink).toBeVisible({ timeout: 3000 });
+    await expect(standingsLink).toBeVisible();
 
     const href = await standingsLink.getAttribute('href');
     await page.goto(href!);

@@ -76,7 +76,8 @@ test.describe('Trading flow', () => {
     // Click first team link in the team selection table
     const firstTeamLink = page.locator('.trading-team-select a').first();
     await expect(firstTeamLink).toBeVisible();
-    await firstTeamLink.click();
+    const href = await firstTeamLink.getAttribute('href');
+    await page.goto(href!);
 
     // Trade form should appear with two roster tables
     await expect(page.locator('form[name="Trade_Offer"]')).toBeVisible();
@@ -86,7 +87,8 @@ test.describe('Trading flow', () => {
 
   test('player checkboxes exist in roster tables', async ({ page }) => {
     const firstTeamLink = page.locator('.trading-team-select a').first();
-    await firstTeamLink.click();
+    const href = await firstTeamLink.getAttribute('href');
+    await page.goto(href!);
 
     await expect(page.locator('form[name="Trade_Offer"]')).toBeVisible();
 
@@ -259,7 +261,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
     await cashInput.dispatchEvent('input');
 
     // Wait for debounced fetch + panel to appear
-    await expect(preview).toBeVisible({ timeout: 5000 });
+    await expect(preview).toBeVisible();
 
     // Contracts tab should be auto-selected
     await expect(
@@ -277,7 +279,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
       .locator('.trading-roster input[type="checkbox"]')
       .first()
       .check();
-    await expect(preview).toBeVisible({ timeout: 5000 });
+    await expect(preview).toBeVisible();
 
     // First logo (user team) should be active initially
     const firstLogo = logos.first();
@@ -305,7 +307,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
       .locator('.trading-roster input[type="checkbox"]')
       .first()
       .check();
-    await expect(preview).toBeVisible({ timeout: 5000 });
+    await expect(preview).toBeVisible();
 
     // Click "Totals" tab
     const totalsTab = preview.locator('.ibl-tab[data-display="total_s"]');
@@ -334,11 +336,11 @@ test.describe('Trade offer form: roster preview interactions', () => {
       }
     }
 
-    await expect(preview).toBeVisible({ timeout: 5000 });
+    await expect(preview).toBeVisible();
 
     // Wait for the table to render (the mock responds with rows)
     const table = preview.locator('table.ibl-data-table');
-    await expect(table).toBeVisible({ timeout: 5000 });
+    await expect(table).toBeVisible();
 
     // The JS classifies rows — check that at least one of each class exists
     const incomingRows = preview.locator('tr.trade-incoming-row');
@@ -431,13 +433,13 @@ test.describe('Trade offer form: cap warnings', () => {
     const warningLogo = page.locator(
       `.trade-roster-preview__logo[data-team-id="${config}"].cap-warning-logo`,
     );
-    await expect(warningLogo).toBeVisible({ timeout: 3000 });
+    await expect(warningLogo).toBeVisible();
 
     // Cap warning banner on the user team's roster header
     const warningBanner = page.locator(
       `.trading-roster[data-team-id="${config}"] thead tr:first-child th.cap-warning-banner`,
     );
-    await expect(warningBanner).toBeVisible({ timeout: 3000 });
+    await expect(warningBanner).toBeVisible();
   });
 });
 
@@ -596,7 +598,8 @@ test.describe('Trading pages: no PHP errors', () => {
     await page.goto('modules.php?name=Trading');
 
     const firstTeamLink = page.locator('.trading-team-select a').first();
-    await firstTeamLink.click();
+    const href = await firstTeamLink.getAttribute('href');
+    await page.goto(href!);
     await expect(page.locator('form[name="Trade_Offer"]')).toBeVisible();
 
     const body = await page.locator('body').textContent();

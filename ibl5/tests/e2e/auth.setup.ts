@@ -21,7 +21,7 @@ setup('authenticate', async ({ page }) => {
 
   // Wait for login redirect — successful login redirects away from YourAccount.
   // "Logout" is inside a collapsed dropdown so we can't check for it directly.
-  await page.waitForURL((url) => !url.href.includes('name=YourAccount'), { timeout: 10_000 });
+  await page.waitForURL((url) => !url.href.includes('name=YourAccount'));
 
   await page.context().storageState({ path: authFile });
 });

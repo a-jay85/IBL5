@@ -37,7 +37,7 @@ test.describe('Navigation bar smoke tests (public)', () => {
 
     // Static menu buttons (always present regardless of DB state)
     for (const label of ['Season', 'Stats', 'History', 'Community']) {
-      await expect(nav.getByRole('button', { name: label })).toBeVisible({ timeout: 10_000 });
+      await expect(nav.getByRole('button', { name: label })).toBeVisible();
     }
 
     // Teams is database-driven (JOIN ibl_team_info + ibl_standings).
@@ -78,7 +78,7 @@ test.describe('Navigation bar smoke tests (public)', () => {
       '.nav-dropdown-item',
       { hasText: 'Standings' },
     ).first();
-    await expect(standingsLink).toBeVisible({ timeout: 3000 });
+    await expect(standingsLink).toBeVisible();
   });
 
   test('league switcher is inside season dropdown', async ({ page }) => {
@@ -87,7 +87,7 @@ test.describe('Navigation bar smoke tests (public)', () => {
     await nav.getByRole('button', { name: 'Season' }).click();
 
     const leagueSelect = nav.locator('select').first();
-    await expect(leagueSelect).toBeVisible({ timeout: 3000 });
+    await expect(leagueSelect).toBeVisible();
     await expect(leagueSelect.locator('option')).toHaveCount(2);
   });
 
@@ -95,7 +95,7 @@ test.describe('Navigation bar smoke tests (public)', () => {
     await page.goto('/');
     await desktopNav(page).getByRole('button', { name: 'Login' }).click();
 
-    await expect(page.locator('#nav-username')).toBeVisible({ timeout: 3000 });
+    await expect(page.locator('#nav-username')).toBeVisible();
     await expect(page.locator('#nav-password')).toBeVisible();
   });
 
@@ -134,7 +134,7 @@ test.describe('Navigation bar smoke tests (mobile viewport)', () => {
     for (const label of ['Season', 'Stats', 'History', 'Community']) {
       await expect(
         mobileMenu.locator('.mobile-dropdown-btn', { hasText: label }).first(),
-      ).toBeVisible({ timeout: 10_000 });
+      ).toBeVisible();
     }
 
     // Teams is database-driven — conditionally check
@@ -155,7 +155,7 @@ test.describe('Navigation bar smoke tests (mobile viewport)', () => {
     const standingsLink = mobileMenu.locator('.mobile-dropdown-link', {
       hasText: 'Standings',
     }).first();
-    await expect(standingsLink).toBeVisible({ timeout: 3000 });
+    await expect(standingsLink).toBeVisible();
   });
 
   test('login section appears for unauthenticated mobile users', async ({ page }) => {
@@ -164,6 +164,6 @@ test.describe('Navigation bar smoke tests (mobile viewport)', () => {
 
     await expect(
       mobileMenu.locator('.mobile-dropdown-btn', { hasText: 'Login' }).first(),
-    ).toBeVisible({ timeout: 3000 });
+    ).toBeVisible();
   });
 });

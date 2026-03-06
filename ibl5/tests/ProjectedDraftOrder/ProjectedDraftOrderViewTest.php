@@ -321,6 +321,28 @@ class ProjectedDraftOrderViewTest extends TestCase
         $this->assertStringNotContainsString('ibl-alert--info', $result);
     }
 
+    public function testWarningShownWhenFinalizedButDraftNotStarted(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, true, false);
+
+        $this->assertStringContainsString('ibl-alert--warning', $result);
+        $this->assertStringContainsString('can still be changed', $result);
+    }
+
+    public function testWarningHiddenWhenDraftStarted(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, true, true, true);
+
+        $this->assertStringNotContainsString('ibl-alert--warning', $result);
+    }
+
+    public function testWarningHiddenForNonAdmin(): void
+    {
+        $result = $this->view->render($this->sampleDraftOrder(), 2026, false, true, false);
+
+        $this->assertStringNotContainsString('ibl-alert--warning', $result);
+    }
+
     public function testSaveButtonRenderedForAdmin(): void
     {
         $result = $this->view->render($this->sampleDraftOrder(), 2026, true, false);

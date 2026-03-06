@@ -16,5 +16,5 @@ interface ProjectedDraftOrderViewInterface
      *
      * @param ProjectedDraftOrderResult $draftOrder
      */
-    public function render(array $draftOrder, int $seasonYear, bool $isAdmin = false, bool $isFinalized = false): string;
+    public function render(array $draftOrder, int $seasonYear, bool $isAdmin = false, bool $isFinalized = false, bool $isDraftStarted = false): string;
 }

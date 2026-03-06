@@ -24,6 +24,7 @@ $view = new ProjectedDraftOrderView();
 $authService = new AuthService($mysqli_db);
 $isAdmin = $authService->isAdmin();
 $isFinalized = $repository->isDraftOrderFinalized();
+$isDraftStarted = $isFinalized && $repository->isDraftStarted($season->endingYear);
 
 $pagetitle = $isFinalized ? '- Draft Order' : '- Projected Draft Order';
 
@@ -32,7 +33,7 @@ $draftOrder = $isFinalized
     : $service->calculateDraftOrder($season->endingYear);
 
 PageLayout\PageLayout::header();
-echo $view->render($draftOrder, $season->endingYear, $isAdmin, $isFinalized);
+echo $view->render($draftOrder, $season->endingYear, $isAdmin, $isFinalized, $isDraftStarted);
 if ($isAdmin) {
     echo '<script src="jslib/draft-order-drag.js"></script>';
 }

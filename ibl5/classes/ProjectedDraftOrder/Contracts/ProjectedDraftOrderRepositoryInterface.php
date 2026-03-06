@@ -59,4 +59,9 @@ interface ProjectedDraftOrderRepositoryInterface
      * @return list<array{pick: int, team: string, tid: int}>
      */
     public function getFinalDraftOrder(int $year): array;
+
+    /**
+     * Check if any player has been drafted for the given year.
+     */
+    public function isDraftStarted(int $year): bool;
 }

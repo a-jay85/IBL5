@@ -21,7 +21,7 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
     private const CONFERENCE_WINNERS_BOUNDARY = 26;
 
     /** @param ProjectedDraftOrderResult $draftOrder */
-    public function render(array $draftOrder, int $seasonYear, bool $isAdmin = false, bool $isFinalized = false): string
+    public function render(array $draftOrder, int $seasonYear, bool $isAdmin = false, bool $isFinalized = false, bool $isDraftStarted = false): string
     {
         $html = $this->renderTitle($seasonYear, $isFinalized);
         if (!$isFinalized) {
@@ -29,6 +29,9 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         }
         if ($isAdmin && !$isFinalized) {
             $html .= '<div class="ibl-alert ibl-alert--info">Drag the lottery teams (picks 1–12) into their final draft order, then click Save.</div>';
+        }
+        if ($isAdmin && $isFinalized && !$isDraftStarted) {
+            $html .= '<div class="ibl-alert ibl-alert--warning">The lottery order can still be changed until a player has been drafted.</div>';
         }
         if ($isAdmin) {
             $html .= '<button type="button" id="draft-order-save-btn" class="ibl-btn ibl-btn--danger" style="display: none;">Save Draft Order</button>';

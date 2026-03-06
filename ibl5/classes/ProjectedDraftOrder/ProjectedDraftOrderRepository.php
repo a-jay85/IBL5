@@ -138,4 +138,16 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
             $year,
         );
     }
+
+    /** @see ProjectedDraftOrderRepositoryInterface::isDraftStarted() */
+    public function isDraftStarted(int $year): bool
+    {
+        $row = $this->fetchOne(
+            "SELECT 1 FROM ibl_draft WHERE year = ? AND player != '' LIMIT 1",
+            "i",
+            $year,
+        );
+
+        return $row !== null;
+    }
 }

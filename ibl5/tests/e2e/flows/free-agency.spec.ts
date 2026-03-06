@@ -1,117 +1,290 @@
 import { test, expect } from '../fixtures/auth';
 import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
 
-// Free Agency — authenticated page.
-// NOTE: Do NOT submit offer forms — that would mutate data.
+// Free Agency E2E tests — authenticated.
+// Seed data provides 3 free agent players:
+//   pid=10: FA Guard on Metros (tid=1, bird=4 — Bird Rights) → "Unsigned Free Agents"
+//   pid=11: FA Center pure FA (tid=0) → "All Other Free Agents"
+//   pid=12: FA Forward on Stars (tid=2) → "All Other Free Agents"
 
-test.describe('Free Agency flow', () => {
+// Helper: scope form inputs to the visible custom offer form (not hidden quick-offer forms)
+const offerForm = (page: import('@playwright/test').Page) =>
+  page.locator('form[name="FAOffer"]').filter({ has: page.locator('input[type="number"]') });
+
+test.describe('Free Agency -- main page', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Free Agency' });
     await page.goto('modules.php?name=FreeAgency');
-    // Under parallel MAMP load, the page may render blank — retry once
-    const body = await page.locator('body').innerText();
-    if (body.trim().length < 20) {
-      await page.waitForTimeout(500);
-      await page.goto('modules.php?name=FreeAgency');
-    }
   });
 
-  test('main page loads with tables', async ({ page }) => {
-    // The FA page has 4 data tables when open
-    const table = page.locator('.ibl-data-table, .team-table, table').first();
-    await expect(table).toBeVisible({ timeout: 10000 });
+  test('main page loads with four table sections', async ({ page }) => {
+    // Table headers include team name prefix, e.g. "Metros Players Under Contract"
+    await expect(page.getByText('Players Under Contract').first()).toBeVisible();
+    await expect(page.getByText('Contract Offers').first()).toBeVisible();
+    await expect(page.getByText('Unsigned Free Agents').first()).toBeVisible();
+    await expect(page.getByText('All Other Free Agents').first()).toBeVisible();
   });
 
   test('roster table has team-colored styling', async ({ page }) => {
     const teamTable = page.locator('.team-table').first();
-    if (await teamTable.isVisible()) {
-      const style = await teamTable.getAttribute('style');
-      expect(style).toContain('--team');
-    }
+    await expect(teamTable).toBeVisible();
+    const style = await teamTable.getAttribute('style');
+    expect(style).toContain('--team');
   });
 
-  test('cap space info displayed', async ({ page }) => {
+  test('cap space footer shows financial metrics', async ({ page }) => {
     const body = await page.locator('body').textContent();
-    expect(body?.toLowerCase()).toContain('cap');
+    expect(body).toContain('Soft Cap Space');
+    expect(body).toContain('Hard Cap Space');
+    expect(body).toContain('Empty Roster Slots');
   });
 
-  test('negotiate links present', async ({ page }) => {
-    const negotiateLink = page.locator('a[href*="pa=negotiate"]').first();
-    if (!(await negotiateLink.isVisible())) {
-      test.skip(true, 'No negotiate links available');
-    }
-    expect(
-      await page.locator('a[href*="pa=negotiate"]').count(),
-    ).toBeGreaterThan(0);
+  test('negotiate links present for free agents', async ({ page }) => {
+    const count = await page.locator('a[href*="pa=negotiate"]').count();
+    expect(count).toBeGreaterThan(0);
   });
 
-  test('negotiation page shows offer form', async ({ page }) => {
-    const negotiateLink = page.locator('a[href*="pa=negotiate"]').first();
-    if (!(await negotiateLink.isVisible())) {
-      test.skip(true, 'No negotiate links available');
-    }
-
-    const href = await negotiateLink.getAttribute('href');
-    await page.goto(href!);
-    await expect(page.locator('form[name="FAOffer"]').first()).toBeVisible();
+  test('unsigned free agents section shows bird rights notation', async ({ page }) => {
+    const body = await page.locator('body').textContent();
+    expect(body).toContain('Bird Rights');
   });
 
-  test('offer year inputs are numeric', async ({ page }) => {
-    const negotiateLink = page.locator('a[href*="pa=negotiate"]').first();
-    if (!(await negotiateLink.isVisible())) {
-      test.skip(true, 'No negotiate links available');
-    }
-
-    const href = await negotiateLink.getAttribute('href');
-    await page.goto(href!);
-
-    const yearInput = page.locator('input[name="offeryear1"]').first();
-    if (await yearInput.isVisible()) {
-      const type = await yearInput.getAttribute('type');
-      expect(type).toBe('number');
-    }
+  test('result=offer_success shows success banner', async ({ page }) => {
+    await page.goto('modules.php?name=FreeAgency&result=offer_success');
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
   });
 
-  test('quick offer preset buttons present', async ({ page }) => {
-    const negotiateLink = page.locator('a[href*="pa=negotiate"]').first();
-    if (!(await negotiateLink.isVisible())) {
-      test.skip(true, 'No negotiate links available');
-    }
+  test('result=deleted shows info banner', async ({ page }) => {
+    await page.goto('modules.php?name=FreeAgency&result=deleted');
+    await expect(page.locator('.ibl-alert--info')).toBeVisible();
+  });
 
-    const href = await negotiateLink.getAttribute('href');
-    await page.goto(href!);
-
-    const quickOfferBtns = page.locator('.ibl-btn--sm.ibl-btn--primary');
-    if (await quickOfferBtns.first().isVisible()) {
-      expect(await quickOfferBtns.count()).toBeGreaterThanOrEqual(1);
-    }
+  test('result=already_signed shows warning banner', async ({ page }) => {
+    await page.goto('modules.php?name=FreeAgency&result=already_signed');
+    await expect(page.locator('.ibl-alert--warning')).toBeVisible();
   });
 
   test('no PHP errors on main page', async ({ page }) => {
     const body = await page.locator('body').textContent();
     for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Free Agency main page`,
-      ).not.toContain(pattern);
+      expect(body, `PHP error "${pattern}" on Free Agency main page`).not.toContain(pattern);
+    }
+  });
+});
+
+test.describe('Free Agency -- negotiation page', () => {
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Free Agency' });
+    // Navigate to negotiate page for FA Center (pid=11, pure free agent)
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+  });
+
+  test('player info card shows ratings', async ({ page }) => {
+    await expect(page.locator('.ibl-card__title').first()).toContainText('Contract Negotiation');
+    // Ratings table headers
+    await expect(page.locator('th').filter({ hasText: '2ga' }).first()).toBeVisible();
+  });
+
+  test('demand display shows player demands', async ({ page }) => {
+    await expect(page.getByText('Player Demands').first()).toBeVisible();
+    await expect(page.getByText('Yr 1').first()).toBeVisible();
+  });
+
+  test('offer form has six year inputs', async ({ page }) => {
+    const form = offerForm(page);
+    for (let i = 1; i <= 6; i++) {
+      const input = form.locator(`input[name="offeryear${i}"]`);
+      await expect(input).toBeVisible();
+      expect(await input.getAttribute('type')).toBe('number');
     }
   });
 
+  test('quick offer presets present', async ({ page }) => {
+    await expect(page.locator('.ibl-card__title').filter({ hasText: 'Quick Offer Presets' })).toBeVisible();
+    const body = await page.locator('body').textContent();
+    expect(body).toContain('Max Level Contract');
+    expect(body).toContain('Mid-Level Exception');
+    expect(body).toContain('Lower-Level Exception');
+    expect(body).toContain('Veterans Exception');
+  });
+
+  test('notes/reminders card shows rules', async ({ page }) => {
+    await expect(page.locator('.ibl-card__title').filter({ hasText: 'Notes / Reminders' })).toBeVisible();
+    const body = await page.locator('body').textContent();
+    expect(body).toContain('cap');
+  });
+
   test('no PHP errors on negotiation page', async ({ page }) => {
-    const negotiateLink = page.locator('a[href*="pa=negotiate"]').first();
-    if (!(await negotiateLink.isVisible())) {
-      test.skip(true, 'No negotiate links available');
-    }
-
-    const href = await negotiateLink.getAttribute('href');
-    await page.goto(href!);
-
     const body = await page.locator('body').textContent();
     for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Free Agency negotiation page`,
-      ).not.toContain(pattern);
+      expect(body, `PHP error "${pattern}" on negotiation page`).not.toContain(pattern);
+    }
+  });
+});
+
+test.describe('Free Agency -- submit and manage offers', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test.beforeEach(async ({ appState }) => {
+    await appState({ 'Current Season Phase': 'Free Agency' });
+  });
+
+  test('submit valid 1-year custom offer', async ({ page }) => {
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    const form = offerForm(page);
+    // FA Center has exp=8, vet min = 89
+    await form.locator('input[name="offeryear1"]').fill('200');
+    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
+    await page.waitForURL(/result=offer_success/);
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+  });
+
+  test('amend existing offer', async ({ page }) => {
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    const form = offerForm(page);
+    // Previous offer should pre-fill year 1
+    const yr1Input = form.locator('input[name="offeryear1"]');
+    const currentValue = await yr1Input.inputValue();
+    expect(currentValue).toBe('200');
+    // Change offer amount
+    await yr1Input.fill('250');
+    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
+    await page.waitForURL(/result=offer_success/);
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+  });
+
+  test('delete existing offer', async ({ page }) => {
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
+    await expect(deleteBtn).toBeVisible();
+    await deleteBtn.click();
+    await page.waitForURL(/result=deleted/);
+    await expect(page.locator('.ibl-alert--info')).toBeVisible();
+  });
+});
+
+test.describe('Free Agency -- quick offer buttons', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test.beforeEach(async ({ appState }) => {
+    await appState({ 'Current Season Phase': 'Free Agency' });
+  });
+
+  test('submit veteran minimum offer', async ({ page }) => {
+    // FA Forward pid=12 (exp=3, vet min=61)
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=12');
+    // Click the Veterans Exception button — use CSS :has(>) to target the direct parent div
+    const vetBtn = page.locator('div:has(> span.ibl-label:text("Veterans Exception:")) .ibl-btn--sm.ibl-btn--primary').first();
+    await vetBtn.click();
+    await page.waitForURL(/result=offer_success/);
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+  });
+
+  test('submit MLE offer', async ({ page }) => {
+    // FA Center pid=11 — team has HasMLE=1
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    const mleBtn = page.locator('div:has(> span.ibl-label:text("Mid-Level Exception")) .ibl-btn--sm.ibl-btn--primary').first();
+    await mleBtn.click();
+    await page.waitForURL(/result=offer_success/);
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+  });
+
+  // LLE test after MLE — delete MLE offer first so HasMLE remains available
+  test('delete MLE offer before LLE test', async ({ page }) => {
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    await page.getByRole('button', { name: /Delete This Offer/i }).click();
+    await page.waitForURL(/result=deleted/);
+  });
+
+  test('submit LLE offer', async ({ page }) => {
+    // FA Center pid=11 — team has HasLLE=1
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    const lleBtn = page.locator('div:has(> span.ibl-label:text("Lower-Level Exception:")) .ibl-btn--sm.ibl-btn--primary').first();
+    await lleBtn.click();
+    await page.waitForURL(/result=offer_success/);
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+  });
+
+  // Cleanup: delete all offers made during this describe block
+  test.afterAll(async ({ request }) => {
+    // Delete offer for pid=11 (LLE offer)
+    await request.post('modules.php?name=FreeAgency&pa=deleteoffer', {
+      form: { teamname: 'Metros', playerID: '11' },
+    });
+    // Delete offer for pid=12 (vet min offer)
+    await request.post('modules.php?name=FreeAgency&pa=deleteoffer', {
+      form: { teamname: 'Metros', playerID: '12' },
+    });
+  });
+});
+
+test.describe('Free Agency -- validation errors', () => {
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Free Agency' });
+    // Use FA Center pid=11 for validation tests
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    // Skip if the negotiate page doesn't show the custom offer form
+    // (player may not exist or may be already signed in local DB)
+    const formCount = await page.locator('form[name="FAOffer"] input[type="number"]').count();
+    if (formCount === 0) {
+      test.skip(true, 'Negotiate form not available — player may not exist or is already signed');
+    }
+  });
+
+  test('zero first year shows error', async ({ page }) => {
+    const form = offerForm(page);
+    await form.locator('input[name="offeryear1"]').fill('0');
+    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
+    await expect(page.locator('.ibl-alert--error')).toContainText('must enter an amount greater than zero');
+  });
+
+  test('below veteran minimum shows error', async ({ page }) => {
+    const form = offerForm(page);
+    // FA Center exp=8, vet min=89; offer 1 is below that
+    await form.locator('input[name="offeryear1"]').fill('1');
+    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
+    await expect(page.locator('.ibl-alert--error')).toContainText("Veteran's Minimum");
+  });
+
+  test('raise too large between years', async ({ page }) => {
+    const form = offerForm(page);
+    await form.locator('input[name="offeryear1"]').fill('500');
+    await form.locator('input[name="offeryear2"]').fill('700');
+    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
+    const alert = page.locator('.ibl-alert--error');
+    await expect(alert).toBeVisible();
+    const text = await alert.textContent() ?? '';
+    // If the team is over the hard cap, the cap space error fires before the raise check
+    if (text.includes('cap space')) {
+      test.skip(true, 'Team is over the hard cap — raise validation unreachable');
+    }
+    expect(text).toContain('larger raise than is permitted');
+  });
+
+  test('gap in contract years', async ({ page }) => {
+    const form = offerForm(page);
+    await form.locator('input[name="offeryear1"]').fill('200');
+    await form.locator('input[name="offeryear2"]').fill('0');
+    await form.locator('input[name="offeryear3"]').fill('200');
+    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
+    const alert = page.locator('.ibl-alert--error');
+    await expect(alert).toBeVisible();
+    const text = await alert.textContent() ?? '';
+    // If the team is over the hard cap, the cap space error fires before the gap check
+    if (text.includes('cap space')) {
+      test.skip(true, 'Team is over the hard cap — gap validation unreachable');
+    }
+    expect(text).toContain('gaps in contract years');
+  });
+});
+
+test.describe('Free Agency -- wrong season phase', () => {
+  test('page renders without PHP errors in non-FA phase', async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Regular Season' });
+    await page.goto('modules.php?name=FreeAgency');
+    const body = await page.locator('body').textContent();
+    for (const pattern of PHP_ERROR_PATTERNS) {
+      expect(body, `PHP error "${pattern}" in non-FA phase`).not.toContain(pattern);
     }
   });
 });

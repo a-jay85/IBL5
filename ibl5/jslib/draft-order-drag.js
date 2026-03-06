@@ -54,6 +54,21 @@
                 placeholder = document.createElement('tr');
                 placeholder.className = 'draft-drag-placeholder';
                 placeholder.innerHTML = '<td colspan="4">&nbsp;</td>';
+                placeholder.addEventListener('dragover', function (ev) {
+                    ev.preventDefault();
+                    ev.dataTransfer.dropEffect = 'move';
+                });
+                placeholder.addEventListener('drop', function (ev) {
+                    ev.preventDefault();
+                    if (!draggedRow || !placeholder) return;
+                    placeholder.parentNode.insertBefore(draggedRow, placeholder);
+                    placeholder.parentNode.removeChild(placeholder);
+                    draggedRow.classList.remove('draft-dragging');
+                    placeholder = null;
+                    draggedRow = null;
+                    renumberPicks();
+                    checkForChanges();
+                });
                 row.parentNode.insertBefore(placeholder, row);
                 row.classList.add('draft-dragging');
             });

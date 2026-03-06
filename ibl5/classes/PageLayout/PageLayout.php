@@ -69,7 +69,8 @@ class PageLayout
         echo "<script src=\"{$relativePath}jslib/user-team-highlighter.js\"></script>";
 
         // Meta tags (inlined from includes/meta.php)
-        $charset = defined('_CHARSET') ? (string) \_CHARSET : 'UTF-8';
+        $charsetValue = defined('_CHARSET') ? \_CHARSET : null;
+        $charset = is_string($charsetValue) ? $charsetValue : 'UTF-8';
         echo "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset={$charset}\">\n";
         echo "<meta id=\"viewport-meta\" name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
         echo "<script>(function(){try{if(localStorage.getItem('ibl_desktop_view')==='1'){document.getElementById('viewport-meta').setAttribute('content','width=1440');document.documentElement.classList.add('desktop-view-active');}}catch(e){}})()</script>\n";

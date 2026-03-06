@@ -1914,11 +1914,11 @@ td.ibl-team-cell--colored {
 
 /* Draft Order Movement Highlights */
 .draft-moved-up td {
-    background-color: var(--success-50, #f0fdf4);
+    background-color: var(--success-100, #dcfce7);
 }
 
 .draft-moved-down td {
-    background-color: var(--error-50, #fef2f2);
+    background-color: var(--error-100, #fee2e2);
 }
 
 /* Draft Order Drag-and-Drop (admin) */

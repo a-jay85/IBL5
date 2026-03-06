@@ -20,9 +20,20 @@ interface AuthServiceInterface
      *
      * @param string $username The username to authenticate
      * @param string $password The plaintext password
+     * @param bool $rememberMe Whether to set a persistent "remember me" cookie
      * @return bool True if authentication succeeded
      */
-    public function attempt(string $username, string $password): bool;
+    public function attempt(string $username, string $password, bool $rememberMe = false): bool;
+
+    /**
+     * Attempt to restore a session from a "remember me" cookie
+     *
+     * Should be called early on every page load (before checking isAuthenticated)
+     * to auto-login users who have a valid persistent token.
+     *
+     * @return bool True if a session was restored from a remember cookie
+     */
+    public function tryRememberMe(): bool;
 
     /**
      * Check if the current session is authenticated

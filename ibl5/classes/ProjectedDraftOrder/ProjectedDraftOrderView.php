@@ -34,7 +34,7 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
             $html .= '<div class="ibl-alert ibl-alert--warning">The lottery order can still be changed until a player has been drafted.</div>';
         }
         if ($isAdmin) {
-            $html .= '<button type="button" id="draft-order-save-btn" class="ibl-btn ibl-btn--danger" style="display: none;">Save Draft Order</button>';
+            $html .= '<button type="button" id="draft-order-save-btn" class="ibl-btn ibl-btn--danger" style="display: none; margin-bottom: 1rem;">Save Draft Order</button>';
         }
         $html .= $this->renderRoundTable($draftOrder['round1'], 'Round 1', showPlayoffDivider: true, isAdmin: $isAdmin);
         $html .= $this->renderRoundTable($draftOrder['round2'], 'Round 2', showPlayoffDivider: false, isAdmin: false);

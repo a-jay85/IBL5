@@ -31,33 +31,40 @@ fi
 E2E_GUARD="if (defined('IBL_E2E_CONFIG')) { require __DIR__ . '/config.e2e.php'; return; }"
 
 inject_config_guard() {
-    if ! grep -q 'IBL_E2E_CONFIG' "$CONFIG_DIR/config.php" 2>/dev/null; then
-        # Insert guard after the direct-access redirect block (line 6: closing brace)
-        sed -i '' '6 a\
+    local config
+    for config in "$CONFIG_DIR/config.php" "$CONFIG_DIR/configOlympics.php"; do
+        [[ -f "$config" ]] || continue
+        if ! grep -q 'IBL_E2E_CONFIG' "$config" 2>/dev/null; then
+            sed -i '' '6 a\
 '"$E2E_GUARD"'
-' "$CONFIG_DIR/config.php"
-        echo "==> Injected E2E config guard into config.php"
-    else
-        echo "==> E2E config guard already present in config.php"
-    fi
+' "$config"
+            echo "==> Injected E2E config guard into $(basename "$config")"
+        fi
+    done
 }
 
 remove_config_guard() {
-    if grep -q 'IBL_E2E_CONFIG' "$CONFIG_DIR/config.php" 2>/dev/null; then
-        sed -i '' '/IBL_E2E_CONFIG/d' "$CONFIG_DIR/config.php"
-        echo "Removed E2E config guard from config.php"
-    fi
+    local config
+    for config in "$CONFIG_DIR/config.php" "$CONFIG_DIR/configOlympics.php"; do
+        [[ -f "$config" ]] || continue
+        if grep -q 'IBL_E2E_CONFIG' "$config" 2>/dev/null; then
+            sed -i '' '/IBL_E2E_CONFIG/d' "$config"
+            echo "Removed E2E config guard from $(basename "$config")"
+        fi
+    done
 }
 
 cleanup() {
+    set +e  # Disable errexit — cleanup must run to completion
     echo ""
     echo "==> Cleaning up..."
     # Kill PHP server and all forked workers (PHP_CLI_SERVER_WORKERS creates child processes)
     local pids
-    pids=$(lsof -ti:"$PORT" 2>/dev/null) && kill $pids 2>/dev/null || true
+    pids=$(lsof -ti:"$PORT" 2>/dev/null)
+    [[ -n "$pids" ]] && kill $pids 2>/dev/null
     [[ -f "$CONFIG_DIR/config.e2e.php" ]] && rm -f "$CONFIG_DIR/config.e2e.php"
     remove_config_guard
-    $MYSQL $MYSQL_ARGS -e "DROP DATABASE IF EXISTS $DB_NAME;" 2>/dev/null || true
+    $MYSQL $MYSQL_ARGS -e "DROP DATABASE IF EXISTS $DB_NAME;" 2>/dev/null
     echo "Done."
 }
 trap cleanup EXIT
@@ -148,4 +155,7 @@ done
 
 # --- Run tests ---
 echo "==> Running E2E tests..."
+set +e  # Don't exit on test failure — let cleanup run
 cd "$IBL5_DIR" && BASE_URL="http://localhost:$PORT/ibl5/" bunx playwright test "$@"
+TEST_EXIT=$?
+exit $TEST_EXIT

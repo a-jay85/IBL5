@@ -17,6 +17,22 @@
     var draggedRow = null;
     var placeholder = null;
 
+    // Hidden stash keeps the dragged row in the DOM (so dragend fires)
+    // but out of the visible table
+    var stash = document.createElement('div');
+    stash.style.cssText = 'position:absolute;top:-9999px;left:-9999px;overflow:hidden;height:0;';
+    document.body.appendChild(stash);
+
+    function finishDrop() {
+        if (!draggedRow || !placeholder || !placeholder.parentNode) return;
+        placeholder.parentNode.insertBefore(draggedRow, placeholder);
+        placeholder.parentNode.removeChild(placeholder);
+        placeholder = null;
+        draggedRow = null;
+        renumberPicks();
+        checkForChanges();
+    }
+
     draggableRows.forEach(function (row) {
         row.addEventListener('dragstart', function (e) {
             draggedRow = row;
@@ -29,7 +45,6 @@
             wrapBody.appendChild(clone);
             wrapTable.appendChild(wrapBody);
 
-            // Copy cell widths so columns align
             var origCells = row.querySelectorAll('td');
             var cloneCells = clone.querySelectorAll('td');
             origCells.forEach(function (cell, i) {
@@ -48,8 +63,8 @@
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', '');
 
-            // Replace the dragged row with a placeholder after a tick
-            // (browser needs the row in the DOM during dragstart)
+            // After the browser captures the drag image, replace the row with a placeholder
+            // and move the row to the off-screen stash
             requestAnimationFrame(function () {
                 placeholder = document.createElement('tr');
                 placeholder.className = 'draft-drag-placeholder';
@@ -60,27 +75,19 @@
                 });
                 placeholder.addEventListener('drop', function (ev) {
                     ev.preventDefault();
-                    if (!draggedRow || !placeholder) return;
-                    placeholder.parentNode.insertBefore(draggedRow, placeholder);
-                    placeholder.parentNode.removeChild(placeholder);
-                    draggedRow.classList.remove('draft-dragging');
-                    placeholder = null;
-                    draggedRow = null;
-                    renumberPicks();
-                    checkForChanges();
+                    finishDrop();
                 });
                 row.parentNode.insertBefore(placeholder, row);
-                row.classList.add('draft-dragging');
+                stash.appendChild(row);
             });
         });
 
         row.addEventListener('dragend', function () {
-            // Remove placeholder if it exists and put the row back
+            // If drop didn't handle it (e.g. cancelled), put the row back
             if (placeholder && placeholder.parentNode) {
                 placeholder.parentNode.insertBefore(row, placeholder);
                 placeholder.parentNode.removeChild(placeholder);
             }
-            row.classList.remove('draft-dragging');
             placeholder = null;
             draggedRow = null;
             renumberPicks();
@@ -108,16 +115,7 @@
 
         row.addEventListener('drop', function (e) {
             e.preventDefault();
-            if (!draggedRow || !placeholder) return;
-
-            // Insert the dragged row where the placeholder is
-            placeholder.parentNode.insertBefore(draggedRow, placeholder);
-            placeholder.parentNode.removeChild(placeholder);
-            draggedRow.classList.remove('draft-dragging');
-            placeholder = null;
-            draggedRow = null;
-            renumberPicks();
-            checkForChanges();
+            finishDrop();
         });
     });
 

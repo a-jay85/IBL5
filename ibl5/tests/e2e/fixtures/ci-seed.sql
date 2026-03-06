@@ -52,7 +52,10 @@ INSERT INTO nuke_modules (title, custom_title, active, view) VALUES
   ('Search',              'Search',              1, 0),
   ('FranchiseHistory',    'FranchiseHistory',    1, 0),
   ('TeamStats',           'TeamStats',           1, 0),
-  ('PlayerDatabase',      'PlayerDatabase',      1, 0);
+  ('PlayerDatabase',      'PlayerDatabase',      1, 0),
+  ('NextSim',             'NextSim',             1, 0),
+  ('ProjectedDraftOrder', 'ProjectedDraftOrder', 1, 0),
+  ('Schedule',            'Schedule',            1, 0);
 
 -- ============================================================
 -- IBL season bootstrap
@@ -479,6 +482,47 @@ INSERT INTO ibl_olympics_league_config (season_ending_year, team_slot, team_name
   (2026, 2, 'Maple',  'Group A', '', 4),
   (2026, 3, 'Bulls',  'Group B', '', 4),
   (2026, 4, 'Coqs',   'Group B', '', 4);
+
+-- ============================================================
+-- Trade offers (for Trading review E2E tests)
+-- Test user is on Metros (tid=1). Offers must involve Metros.
+-- ============================================================
+
+INSERT INTO ibl_trade_offers (id) VALUES (1), (2);
+
+INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, `from`, `to`, approval) VALUES
+  -- Offer 1: Stars Guard (pid=4) from Stars to Metros, player (pid=2) from Metros to Stars
+  (1, 4, '1', 'Stars', 'Metros', 'Metros'),
+  (1, 2, '1', 'Metros', 'Stars', 'Metros'),
+  -- Offer 2: Phoenixes Guard (pid=6) from Phoenixes to Metros, draft pick from Metros to Phoenixes
+  (2, 6, '1', 'Phoenixes', 'Metros', 'Metros'),
+  (2, 1, '0', 'Metros', 'Phoenixes', 'Metros');
+
+-- ============================================================
+-- Stories for search pagination (need >10 results for "the")
+-- ============================================================
+
+INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic) VALUES
+  (1, 'admin', 'The Cougars waive backup center',          '2026-02-20 10:00:00', 'The team needed the roster spot', '', 1),
+  (1, 'admin', 'The Diesels claim forward off waivers',    '2026-02-19 10:00:00', 'The pickup bolsters the bench',   '', 1),
+  (2, 'admin', 'The Minutemen complete trade with Tropics', '2026-02-18 10:00:00', 'The deal sends three players',    '', 1),
+  (2, 'admin', 'The Monarchs acquire the number one pick', '2026-02-17 10:00:00', 'The draft pick was the centerpiece', '', 1),
+  (3, 'admin', 'The Flames extend their star player',      '2026-02-16 10:00:00', 'The extension is for three years', '', 1),
+  (8, 'admin', 'The Spurs sign free agent guard',          '2026-02-15 10:00:00', 'The signing fills the starting role', '', 1),
+  (1, 'admin', 'The Pioneers waive the veteran forward',   '2026-02-14 10:00:00', 'The move clears cap space',       '', 1),
+  (2, 'admin', 'The Royals trade for the young center',    '2026-02-13 10:00:00', 'The rebuild continues',           '', 1),
+  (3, 'admin', 'The Apollos extend the franchise player',  '2026-02-12 10:00:00', 'The max deal locks them in',      '', 1),
+  (8, 'admin', 'The Blues sign the top free agent',        '2026-02-11 10:00:00', 'The biggest signing of the period', '', 1),
+  (1, 'admin', 'The Blizzard waive the backup guard',      '2026-02-10 10:00:00', 'The roster move was expected',     '', 1);
+
+-- ============================================================
+-- Schedule games for NextSim (Metros games in sim 689 window)
+-- ============================================================
+
+INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid) VALUES
+  (2026, '2026-03-08', 1, 2,  0, 0, 0, 'sched-uuid-0001'),
+  (2026, '2026-03-10', 3, 1,  0, 0, 0, 'sched-uuid-0002'),
+  (2026, '2026-03-12', 1, 14, 0, 0, 0, 'sched-uuid-0003');
 
 -- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the

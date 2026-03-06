@@ -45,12 +45,16 @@
             wrapBody.appendChild(clone);
             wrapTable.appendChild(wrapBody);
 
+            // Copy computed styles per cell so padding, height, and overflow match
             var origCells = row.querySelectorAll('td');
             var cloneCells = clone.querySelectorAll('td');
             origCells.forEach(function (cell, i) {
-                if (cloneCells[i]) {
-                    cloneCells[i].style.width = cell.offsetWidth + 'px';
-                }
+                if (!cloneCells[i]) return;
+                var cs = window.getComputedStyle(cell);
+                cloneCells[i].style.width = cell.offsetWidth + 'px';
+                cloneCells[i].style.padding = cs.padding;
+                cloneCells[i].style.height = cs.height;
+                cloneCells[i].style.overflow = 'visible';
             });
 
             document.body.appendChild(wrapTable);

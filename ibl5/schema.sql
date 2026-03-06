@@ -59,7 +59,7 @@ CREATE TABLE `auth_users_audit_log` (
   KEY `event_at` (`event_at`),
   KEY `user_id_event_at` (`user_id`,`event_at`),
   KEY `user_id_event_type_event_at` (`user_id`,`event_type`,`event_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=252 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=255 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `auth_users_confirmations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -763,7 +763,7 @@ CREATE TABLE `ibl_hist` (
   KEY `idx_pid_year_team` (`pid`,`year`,`team`),
   CONSTRAINT `fk_hist_player` FOREIGN KEY (`pid`) REFERENCES `ibl_plr` (`pid`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_hist_team` FOREIGN KEY (`teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=24473 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=25130 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_jsb_allstar_rosters`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -779,7 +779,7 @@ CREATE TABLE `ibl_jsb_allstar_rosters` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_season_event_slot` (`season_year`,`event_type`,`roster_slot`),
   KEY `idx_pid` (`pid`)
-) ENGINE=InnoDB AUTO_INCREMENT=1021 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1081 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_jsb_allstar_scores`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -796,7 +796,7 @@ CREATE TABLE `ibl_jsb_allstar_scores` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_season_contest_round_slot` (`season_year`,`contest_type`,`round`,`participant_slot`),
   KEY `idx_pid` (`pid`)
-) ENGINE=InnoDB AUTO_INCREMENT=426 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=451 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_jsb_history`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -819,7 +819,7 @@ CREATE TABLE `ibl_jsb_history` (
   KEY `idx_teamid` (`teamid`),
   KEY `idx_season` (`season_year`),
   KEY `idx_champion` (`won_championship`)
-) ENGINE=InnoDB AUTO_INCREMENT=8229 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8713 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_jsb_transactions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -847,7 +847,7 @@ CREATE TABLE `ibl_jsb_transactions` (
   KEY `idx_type` (`transaction_type`),
   KEY `idx_pid` (`pid`),
   KEY `idx_trade_group` (`trade_group_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=3737 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=3991 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_league_config`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -1998,7 +1998,7 @@ CREATE TABLE `ibl_rcb_alltime_records` (
   KEY `idx_pid` (`pid`),
   KEY `idx_team` (`team_id`),
   KEY `idx_stat_type` (`stat_category`,`record_type`)
-) ENGINE=InnoDB AUTO_INCREMENT=12283 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=14330 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_rcb_season_records`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -2023,7 +2023,7 @@ CREATE TABLE `ibl_rcb_season_records` (
   UNIQUE KEY `uq_record` (`season_year`,`scope`,`team_id`,`context`,`stat_category`,`ranking`),
   KEY `idx_pid` (`pid`),
   KEY `idx_season` (`season_year`)
-) ENGINE=InnoDB AUTO_INCREMENT=27841 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=32481 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_rookie_career_totals`;
 /*!50001 DROP VIEW IF EXISTS `ibl_rookie_career_totals`*/;
@@ -2128,7 +2128,7 @@ CREATE TABLE `ibl_schedule` (
   CONSTRAINT `fk_schedule_visitor` FOREIGN KEY (`Visitor`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `chk_schedule_vscore` CHECK (`VScore` >= 0 and `VScore` <= 200),
   CONSTRAINT `chk_schedule_hscore` CHECK (`HScore` >= 0 and `HScore` <= 200)
-) ENGINE=InnoDB AUTO_INCREMENT=1149 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1205 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_season_career_avgs`;
 /*!50001 DROP VIEW IF EXISTS `ibl_season_career_avgs`*/;

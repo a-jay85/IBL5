@@ -18,6 +18,7 @@ class NavigationMenuBuilderTest extends TestCase
         string $seasonPhase = 'Regular Season',
         string $allowWaivers = 'No',
         string $showDraftLink = 'Off',
+        bool $isDraftOrderFinalized = false,
     ): NavigationConfig {
         return new NavigationConfig(
             isLoggedIn: $isLoggedIn,
@@ -27,6 +28,7 @@ class NavigationMenuBuilderTest extends TestCase
             seasonPhase: $seasonPhase,
             allowWaivers: $allowWaivers,
             showDraftLink: $showDraftLink,
+            isDraftOrderFinalized: $isDraftOrderFinalized,
         );
     }
 
@@ -197,6 +199,46 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertContains('Depth Chart Entry', $labels);
         $this->assertContains('Activity Tracker', $labels);
         $this->assertNotContains('Trading', $labels);
+    }
+
+    // --- Draft Order Finalization Tests ---
+
+    public function testProjectedDraftOrderLabelWhenNotFinalized(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(isDraftOrderFinalized: false));
+        $menus = $builder->getMenuStructure();
+
+        $seasonLinks = $menus['Season']['links'];
+        $draftOrderLink = null;
+        foreach ($seasonLinks as $link) {
+            if (str_contains($link['url'] ?? '', 'ProjectedDraftOrder')) {
+                $draftOrderLink = $link;
+                break;
+            }
+        }
+
+        $this->assertNotNull($draftOrderLink);
+        $this->assertSame('Projected Draft Order', $draftOrderLink['label']);
+        $this->assertArrayNotHasKey('badge', $draftOrderLink);
+    }
+
+    public function testDraftOrderLabelWithFinalBadgeWhenFinalized(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig(isDraftOrderFinalized: true));
+        $menus = $builder->getMenuStructure();
+
+        $seasonLinks = $menus['Season']['links'];
+        $draftOrderLink = null;
+        foreach ($seasonLinks as $link) {
+            if (str_contains($link['url'] ?? '', 'ProjectedDraftOrder')) {
+                $draftOrderLink = $link;
+                break;
+            }
+        }
+
+        $this->assertNotNull($draftOrderLink);
+        $this->assertSame('Draft Order', $draftOrderLink['label']);
+        $this->assertSame('FINAL', $draftOrderLink['badge'] ?? null);
     }
 
     // --- Account Menu Tests ---

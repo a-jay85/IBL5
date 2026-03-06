@@ -17,17 +17,8 @@ source "${ENV_FILE}"
 # Dump file location
 DUMP_FILE="./database_dump_$(date +%Y%m%d_%H%M%S).sql"
 
-# Use MAMP's MySQL binaries if available (compatible with older auth plugins)
-MAMP_MYSQL_BIN="/Applications/MAMP/Library/bin/mysql57/bin"
-if [ -f "${MAMP_MYSQL_BIN}/mysqldump" ]; then
-  MYSQLDUMP_CMD="${MAMP_MYSQL_BIN}/mysqldump"
-  MYSQL_CMD="${MAMP_MYSQL_BIN}/mysql"
-  echo "Using MAMP MySQL 5.7 binaries"
-else
-  MYSQLDUMP_CMD="mysqldump"
-  MYSQL_CMD="mysql"
-  echo "Using system MySQL binaries"
-fi
+MYSQLDUMP_CMD="mariadb-dump"
+MYSQL_CMD="mariadb"
 
 # ============================================
 # Script execution - No need to modify below
@@ -56,7 +47,7 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo "✓ Export completed successfully: ${DUMP_FILE}"
+echo "Export completed successfully: ${DUMP_FILE}"
 echo "  File size: $(du -h "${DUMP_FILE}" | cut -f1)"
 
 # Step 1.5: Remove DEFINER clauses to make schema portable
@@ -72,15 +63,7 @@ sed -i '' "s/ DEFINER=[^ ]*/ /g" "${DUMP_FILE}"
 # Clean up any double spaces left behind
 sed -i '' "s/  */ /g" "${DUMP_FILE}"
 
-echo "✓ DEFINER clauses removed successfully"
-
-# Step 1.6: Remove DEFAULT uuid() expressions (MariaDB 10.2+ syntax unsupported by MySQL 5.7)
-echo ""
-echo "Step 1.6: Removing DEFAULT uuid() expressions for MySQL 5.7 compatibility..."
-
-sed -i '' "s/ DEFAULT uuid()/ DEFAULT NULL/g" "${DUMP_FILE}"
-
-echo "✓ DEFAULT uuid() expressions replaced with DEFAULT NULL"
+echo "DEFINER clauses removed successfully"
 
 # Step 2: Import to local database
 echo ""
@@ -100,11 +83,11 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo "✓ Import completed successfully!"
+echo "Import completed successfully!"
 
 # Remove dump file after successful import
 rm "${DUMP_FILE}"
-echo "✓ Dump file deleted"
+echo "Dump file deleted"
 
 echo ""
 echo "================================================"

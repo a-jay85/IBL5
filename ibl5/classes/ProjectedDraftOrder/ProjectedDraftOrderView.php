@@ -28,10 +28,10 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
             $html .= $this->renderDescription();
         }
         if ($isAdmin && !$isFinalized) {
-            $html .= '<div class="ibl-alert ibl-alert--info">Admin-only message: Drag the lottery teams (picks 1–12) into their final draft order, then click Save.</div>';
+            $html .= '<div class="ibl-alert ibl-alert--info">Admin-only message:<br>Drag the lottery teams (picks 1–12) into their final draft order, then click Save.</div>';
         }
         if ($isAdmin && $isFinalized && !$isDraftStarted) {
-            $html .= '<div class="ibl-alert ibl-alert--warning">Admin-only message: You can still adjust the lottery order until a player has been drafted.</div>';
+            $html .= '<div class="ibl-alert ibl-alert--warning">Admin-only message:<br>You can still adjust the lottery order until a player has been drafted.</div>';
         }
         $isDraggable = $isAdmin && !$isFinalized;
         if ($isDraggable) {

@@ -87,28 +87,44 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         $projected = $this->calculateDraftOrder($seasonYear);
         $standings = $this->repository->getAllTeamsWithStandings();
         $teamMap = $this->buildTeamMap($standings);
+        $pickOwnershipRows = $this->repository->getPickOwnership($seasonYear);
+        $pickOwnership = $this->buildPickOwnershipMap($pickOwnershipRows);
 
-        // Build round-1 from saved picks, enriching with standings data
+        $nameToIdMap = [];
+        foreach ($teamMap as $tid => $team) {
+            $nameToIdMap[$team['team_name']] = $tid;
+        }
+
+        // Build round-1 from saved picks, enriching with standings and ownership data
         $round1 = [];
         foreach ($savedPicks as $savedPick) {
             $team = $teamMap[$savedPick['tid']] ?? null;
             if ($team === null) {
                 continue;
             }
+
+            $teamName = $savedPick['team'];
+            $ownership = $pickOwnership[$teamName][1] ?? null;
+            $ownerName = $ownership !== null ? $ownership['ownerName'] : $teamName;
+            $notes = $ownership !== null ? $ownership['notes'] : '';
+            $isTraded = $ownerName !== $teamName;
+            $ownerId = $nameToIdMap[$ownerName] ?? $savedPick['tid'];
+            $ownerTeam = $teamMap[$ownerId] ?? $team;
+
             $round1[] = [
                 'pick' => $savedPick['pick'],
                 'teamId' => $savedPick['tid'],
-                'teamName' => $savedPick['team'],
+                'teamName' => $teamName,
                 'wins' => $team['wins'],
                 'losses' => $team['losses'],
                 'color1' => $team['color1'],
                 'color2' => $team['color2'],
-                'ownerId' => $savedPick['tid'],
-                'ownerName' => $savedPick['team'],
-                'ownerColor1' => $team['color1'],
-                'ownerColor2' => $team['color2'],
-                'isTraded' => false,
-                'notes' => '',
+                'ownerId' => $ownerId,
+                'ownerName' => $ownerName,
+                'ownerColor1' => $ownerTeam['color1'],
+                'ownerColor2' => $ownerTeam['color2'],
+                'isTraded' => $isTraded,
+                'notes' => $notes,
             ];
         }
 

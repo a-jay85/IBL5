@@ -12,11 +12,18 @@ REPO_ROOT="$(cd "$IBL5_DIR/.." && pwd)"
 # Resolve config.php's real directory (follows symlinks to main repo)
 CONFIG_DIR="$(cd "$(dirname "$(readlink "$IBL5_DIR/config.php" || echo "$IBL5_DIR/config.php")")" && pwd)"
 
-MYSQL="/Applications/MAMP/Library/bin/mysql80/bin/mysql"
-MYSQL_ARGS="--socket=/Applications/MAMP/tmp/mysql/mysql.sock -u root -proot"
+MYSQL="mariadb"
+MYSQL_ARGS="-h 127.0.0.1 --skip-ssl -u root -proot"
 DB_NAME="ibl5_e2e_test"
 PORT=8081
 PHP_PID=""
+
+# Pre-flight: verify MariaDB is reachable
+if ! $MYSQL $MYSQL_ARGS -e "SELECT 1" > /dev/null 2>&1; then
+    echo "ERROR: Cannot connect to MariaDB at 127.0.0.1:3306."
+    echo "Is Docker MariaDB running? Try: docker compose up -d"
+    exit 1
+fi
 
 # Load .env.test credentials
 eval "$(grep -E '^(IBL_TEST_USER|IBL_TEST_PASS)=' "$IBL5_DIR/.env.test")"
@@ -77,21 +84,9 @@ echo "==> Creating database $DB_NAME..."
 $MYSQL $MYSQL_ARGS -e "DROP DATABASE IF EXISTS $DB_NAME; CREATE DATABASE $DB_NAME;"
 
 echo "==> Importing schema.sql..."
-# Patches for MySQL 8.0 compatibility (schema.sql is generated from MariaDB 10.6):
-# - Strip DEFINER clauses from views/triggers
-# - Strip DEFAULT uuid() (MariaDB expression defaults)
-# - Rename duplicate CHECK constraint names (MySQL 8.0 has schema-scoped constraints)
-sed -e 's/DEFINER=`[^`]*`@`[^`]*`//g' \
-    -e 's/ DEFAULT uuid()//g' \
+# Strip DEFINER clauses (schema.sql references production user)
+sed 's/DEFINER=`[^`]*`@`[^`]*`//g' \
     "$IBL5_DIR/schema.sql" \
-    | awk '
-      /CREATE TABLE `ibl_olympics_plr`/ { in_olympics=1 }
-      /ENGINE=InnoDB/ && in_olympics { in_olympics=0 }
-      in_olympics && /CONSTRAINT `chk_plr_/ {
-        gsub(/`chk_plr_/, "`chk_olympics_plr_")
-      }
-      { print }
-    ' \
     | $MYSQL $MYSQL_ARGS "$DB_NAME"
 
 # Migrations are skipped: schema.sql is auto-synced from production after each
@@ -107,8 +102,7 @@ IBL_TEST_USER="$IBL_TEST_USER" IBL_TEST_PASS="$IBL_TEST_PASS" php <<'PHPSCRIPT'
 $hash = password_hash(getenv('IBL_TEST_PASS'), PASSWORD_BCRYPT);
 $user = getenv('IBL_TEST_USER');
 $email = 'e2e-local@example.com';
-$db = new mysqli('localhost', 'root', 'root', 'ibl5_e2e_test', 0,
-    '/Applications/MAMP/tmp/mysql/mysql.sock');
+$db = new mysqli('127.0.0.1', 'root', 'root', 'ibl5_e2e_test', 3306);
 
 $stmt = $db->prepare("INSERT INTO auth_users (email, password, username, status, verified, resettable, roles_mask, registered, force_logout) VALUES (?, ?, ?, 0, 1, 1, 1, ?, 0)");
 $t = time();

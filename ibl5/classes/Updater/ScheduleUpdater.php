@@ -93,10 +93,15 @@ class ScheduleUpdater extends \BaseMysqliRepository {
      * Build a date string from month and day for DateParser consumption.
      *
      * Example: buildDateString(11, 2) → "November 2, 2000"
+     *
+     * @param int $month Calendar month number (1-12)
+     * @param int $day Day of month
+     * @param int|null $monthOverride Override the month (e.g., for playoff games that need June dates)
      */
-    private function buildDateString(int $month, int $day): string
+    protected function buildDateString(int $month, int $day, ?int $monthOverride = null): string
     {
-        $monthName = self::MONTH_NAMES[$month];
+        $effectiveMonth = $monthOverride ?? $month;
+        $monthName = self::MONTH_NAMES[$effectiveMonth];
 
         return "{$monthName} {$day}, 2000";
     }
@@ -107,6 +112,108 @@ class ScheduleUpdater extends \BaseMysqliRepository {
     private function getTeamNameById(int $teamId): string
     {
         return $this->teamIdToNameMap[$teamId] ?? "Team #{$teamId}";
+    }
+
+    /**
+     * Detect the first day within month offset 6 (April) that belongs to playoffs.
+     *
+     * Month offset 6 in the .sch file contains both the final regular season games
+     * and playoff games. This method finds the boundary day — everything at or after
+     * this day gets June dates instead of April dates.
+     *
+     * Strategy:
+     * 1. Primary: Find the first empty-day gap in offset 6 (RS days are populated, playoff
+     *    slots start empty until playoffs begin, creating a gap).
+     * 2. Fallback (all played): Query ibl_box_scores for June games to identify which
+     *    offset 6 days are playoffs.
+     * 3. Final fallback: Query ibl_sim_dates for the last RS sim end date.
+     *
+     * @param list<array{date_slot: int, game_index: int, visitor: int, home: int, visitor_score: int, home_score: int, played: bool}> $games
+     * @return int|null The first playoff day (1-based) within offset 6, or null if no boundary found
+     */
+    protected function detectPlayoffBoundaryDay(array $games): ?int
+    {
+        $offset6Start = 6 * SchFileParser::DAYS_PER_MONTH;
+        $offset6End = $offset6Start + SchFileParser::DAYS_PER_MONTH - 1;
+
+        // Collect days that have games in offset 6
+        /** @var array<int, bool> $daysWithGames Maps day (1-based) to whether it has games */
+        $daysWithGames = [];
+        foreach ($games as $game) {
+            if ($game['date_slot'] >= $offset6Start && $game['date_slot'] <= $offset6End) {
+                $dayZeroBased = $game['date_slot'] - $offset6Start;
+                $day = $dayZeroBased + 1;
+                $daysWithGames[$day] = true;
+            }
+        }
+
+        if ($daysWithGames === []) {
+            return null;
+        }
+
+        ksort($daysWithGames);
+        $populatedDays = array_keys($daysWithGames);
+
+        // Primary: Find the first gap (empty day) between populated days.
+        // RS days are contiguous; playoff days start after a gap.
+        $lastDay = $populatedDays[0];
+        for ($i = 1; $i < count($populatedDays); $i++) {
+            $currentDay = $populatedDays[$i];
+            // Check if there's a gap of empty days between consecutive populated days
+            // But skip day gaps caused by invalid dates (e.g., April 31 doesn't exist)
+            if ($currentDay > $lastDay + 1) {
+                // Verify the gap isn't just from invalid dates (April only has 30 days)
+                $gapHasValidDates = false;
+                for ($d = $lastDay + 1; $d < $currentDay; $d++) {
+                    if (checkdate(4, $d, 2000)) {
+                        $gapHasValidDates = true;
+                        break;
+                    }
+                }
+                if ($gapHasValidDates) {
+                    return $currentDay;
+                }
+            }
+            $lastDay = $currentDay;
+        }
+
+        // Fallback: All offset 6 days are populated (no gap). Query box scores for June games.
+        $boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
+
+        /** @var list<array{day_num: int}> $juneGameDays */
+        $juneGameDays = $this->fetchAll(
+            "SELECT DISTINCT DAY(bst.Date) AS day_num
+             FROM {$boxScoresTeamsTable} bst
+             WHERE bst.Date LIKE CONCAT(?, '-06-%')
+             ORDER BY day_num ASC",
+            'i',
+            $this->season->endingYear
+        );
+
+        if ($juneGameDays !== []) {
+            // The first June box score day corresponds to the first playoff day in offset 6.
+            // Map: box scores have correct June dates, offset 6 games with the same matchups
+            // are the playoff games.
+            $firstJuneDay = $juneGameDays[0]['day_num'];
+            return (int) $firstJuneDay;
+        }
+
+        // Final fallback: Query ibl_sim_dates for the last RS sim end date
+        /** @var array{max_end: string|null}|null $simRow */
+        $simRow = $this->fetchOne(
+            "SELECT MAX(End_Date) AS max_end FROM ibl_sim_dates
+             WHERE YEAR(End_Date) = ? AND MONTH(End_Date) <= 5",
+            'i',
+            $this->season->endingYear
+        );
+
+        if ($simRow !== null && $simRow['max_end'] !== null) {
+            $lastRsDate = new \DateTime($simRow['max_end']);
+            $lastRsDay = (int) $lastRsDate->format('j');
+            return $lastRsDay + 1;
+        }
+
+        return null;
     }
 
     public function update(): void {
@@ -128,6 +235,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $games = SchFileParser::parseFile($schFilePath);
 
+        $playoffBoundaryDay = $this->detectPlayoffBoundaryDay($games);
+        $offset6Start = 6 * SchFileParser::DAYS_PER_MONTH;
+
         $currentDateSlot = -1;
         $date = null;
         $year = null;
@@ -141,7 +251,17 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 $monthDay = SchFileParser::dateSlotToMonthDay($game['date_slot']);
 
                 if ($monthDay !== null) {
-                    $dateString = $this->buildDateString($monthDay['month'], $monthDay['day']);
+                    // Detect if this game is in offset 6 and past the playoff boundary
+                    $monthOverride = null;
+                    $monthOffset = intdiv($game['date_slot'], SchFileParser::DAYS_PER_MONTH);
+                    if ($monthOffset === 6 && $playoffBoundaryDay !== null) {
+                        $dayInOffset = $game['date_slot'] - $offset6Start + 1;
+                        if ($dayInOffset >= $playoffBoundaryDay) {
+                            $monthOverride = \Season::IBL_PLAYOFF_MONTH;
+                        }
+                    }
+
+                    $dateString = $this->buildDateString($monthDay['month'], $monthDay['day'], $monthOverride);
                     $fullDate = $this->extractDate($dateString);
                     $date = $fullDate['date'] ?? null;
                     $year = $fullDate['year'] ?? null;

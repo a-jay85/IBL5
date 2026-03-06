@@ -24,6 +24,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
     private string $boxScoresTeamsTable;
     private string $teamInfoTable;
     private string $scheduleTable;
+    private string $playerTable;
 
     public function __construct(\mysqli $db, ?LeagueContext $leagueContext = null)
     {
@@ -32,6 +33,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         $this->boxScoresTeamsTable = $this->resolveTable('ibl_box_scores_teams');
         $this->teamInfoTable = $this->resolveTable('ibl_team_info');
         $this->scheduleTable = $this->resolveTable('ibl_schedule');
+        $this->playerTable = $this->resolveTable('ibl_plr');
     }
 
     /**
@@ -73,9 +75,9 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,
                 {$statExpression} AS `{$safeStatName}`
                 FROM {$this->boxScoresTable} bs
-                JOIN ibl_plr p ON bs.pid = p.pid
+                JOIN {$this->playerTable} p ON bs.pid = p.pid
                 LEFT JOIN {$this->teamInfoTable} t ON p.tid = t.teamid
-                JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
+                LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
                 LEFT JOIN (
                     SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
                     FROM {$this->boxScoresTeamsTable}
@@ -94,7 +96,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
                 {$statExpression} AS `{$safeStatName}`
                 FROM {$this->boxScoresTeamsTable} bs
                 JOIN {$this->teamInfoTable} t ON bs.name = t.team_name
-                JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTeamID AND sch.Home = bs.homeTeamID
+                LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date AND sch.Visitor = bs.visitorTeamID AND sch.Home = bs.homeTeamID
                 WHERE bs.`Date` BETWEEN ? AND ?
                 ORDER BY `{$safeStatName}` DESC, bs.`Date` ASC
                 LIMIT {$limit}";

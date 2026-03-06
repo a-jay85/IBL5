@@ -60,7 +60,7 @@ test.describe('Public page smoke tests', () => {
     await page.goto('modules.php?name=CapSpace');
     // Data-dependent skip: the view may produce no content depending on DB state
     const table = page.locator('.ibl-data-table, .sticky-table, table').first();
-    const visible = await table.isVisible({ timeout: 10_000 }).catch(() => false);
+    const visible = await table.isVisible().catch(() => false);
     if (!visible) {
       test.skip(true, 'Cap Space rendered no table content (local DB state)');
     }

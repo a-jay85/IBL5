@@ -15,11 +15,14 @@
     });
 
     var draggedRow = null;
+    var lastTarget = null;
     var rowHeight = 0;
+    var tbody = table.querySelector('tbody');
 
     draggableRows.forEach(function (row) {
         row.addEventListener('dragstart', function (e) {
             draggedRow = row;
+            lastTarget = null;
             rowHeight = row.offsetHeight;
 
             // Create a custom drag image from the row to suppress Chrome's link preview
@@ -67,6 +70,7 @@
             row.classList.remove('draft-dragging');
             clearDisplacement();
             draggedRow = null;
+            lastTarget = null;
         });
 
         row.addEventListener('dragover', function (e) {
@@ -74,39 +78,35 @@
             e.dataTransfer.dropEffect = 'move';
             if (!draggedRow || row === draggedRow || !row.hasAttribute('draggable')) return;
 
+            lastTarget = row;
             applyDisplacement(row);
-        });
-
-        row.addEventListener('drop', function (e) {
-            e.preventDefault();
-            clearDisplacement();
-            if (!draggedRow || row === draggedRow || !row.hasAttribute('draggable')) return;
-
-            // Move the dragged row before or after the target
-            var tbody = row.parentNode;
-            var allRows = Array.from(tbody.children);
-            var draggedIdx = allRows.indexOf(draggedRow);
-            var targetIdx = allRows.indexOf(row);
-
-            if (draggedIdx < targetIdx) {
-                tbody.insertBefore(draggedRow, row.nextSibling);
-            } else {
-                tbody.insertBefore(draggedRow, row);
-            }
-
-            renumberPicks();
-            checkForChanges();
         });
     });
 
-    // Also handle dragover on separator rows (non-draggable) to keep displacement visible
-    var allTbodyRows = table.querySelectorAll('tbody tr');
-    allTbodyRows.forEach(function (row) {
-        if (row.hasAttribute('draggable')) return; // already handled
-        row.addEventListener('dragover', function (e) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-        });
+    // Listen for drop on the entire tbody so it fires even when the cursor
+    // is over the (collapsed-looking) dragged row or a separator row
+    tbody.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    });
+
+    tbody.addEventListener('drop', function (e) {
+        e.preventDefault();
+        clearDisplacement();
+        if (!draggedRow || !lastTarget || lastTarget === draggedRow) return;
+
+        var allRows = Array.from(tbody.children);
+        var draggedIdx = allRows.indexOf(draggedRow);
+        var targetIdx = allRows.indexOf(lastTarget);
+
+        if (draggedIdx < targetIdx) {
+            tbody.insertBefore(draggedRow, lastTarget.nextSibling);
+        } else {
+            tbody.insertBefore(draggedRow, lastTarget);
+        }
+
+        renumberPicks();
+        checkForChanges();
     });
 
     function applyDisplacement(targetRow) {

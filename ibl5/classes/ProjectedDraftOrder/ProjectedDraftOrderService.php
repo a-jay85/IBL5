@@ -122,31 +122,43 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         $standings = $this->repository->getAllTeamsWithStandings();
         $teamMap = $this->buildTeamMap($standings);
 
-        /** @var list<array{pick: int, team: string, tid: int}> $picks */
+        /** @var list<array{round: int, pick: int, team: string, tid: int}> $picks */
         $picks = [];
 
-        // Picks 1-12 from the reordered lottery
+        // Round 1: Picks 1-12 from the reordered lottery
         foreach ($lotteryTeamIds as $index => $tid) {
             $team = $teamMap[$tid] ?? null;
             if ($team === null) {
                 throw new \InvalidArgumentException('Invalid team ID: ' . $tid);
             }
             $picks[] = [
+                'round' => 1,
                 'pick' => $index + 1,
                 'team' => $team['team_name'],
                 'tid' => $tid,
             ];
         }
 
-        // Picks 13-28 from projected order
+        // Round 1: Picks 13-28 from projected order
         foreach ($projected['round1'] as $slot) {
             if ($slot['pick'] >= 13) {
                 $picks[] = [
+                    'round' => 1,
                     'pick' => $slot['pick'],
                     'team' => $slot['teamName'],
                     'tid' => $slot['teamId'],
                 ];
             }
+        }
+
+        // Round 2: All 28 picks from projected order
+        foreach ($projected['round2'] as $slot) {
+            $picks[] = [
+                'round' => 2,
+                'pick' => $slot['pick'],
+                'team' => $slot['teamName'],
+                'tid' => $slot['teamId'],
+            ];
         }
 
         $this->repository->saveFinalDraftOrder($seasonYear, $picks);

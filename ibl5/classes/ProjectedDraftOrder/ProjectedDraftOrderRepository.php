@@ -82,21 +82,22 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
     }
 
     /**
-     * @param list<array{pick: int, team: string, tid: int}> $picks
+     * @param list<array{round: int, pick: int, team: string, tid: int}> $picks
      */
     public function saveFinalDraftOrder(int $year, array $picks): void
     {
         $this->db->begin_transaction();
         try {
-            // Delete all draft rows from previous years (out of date) and
-            // unfilled round-1 slots for the current year
+            // Delete all draft rows from previous years (out of date)
             $this->execute(
                 "DELETE FROM ibl_draft WHERE year < ?",
                 "i",
                 $year,
             );
+
+            // Delete unfilled slots for this year (both rounds) before inserting new ones
             $this->execute(
-                "DELETE FROM ibl_draft WHERE year = ? AND round = 1 AND player = ''",
+                "DELETE FROM ibl_draft WHERE year = ? AND player = ''",
                 "i",
                 $year,
             );
@@ -104,9 +105,10 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
             foreach ($picks as $pick) {
                 $this->execute(
                     "INSERT INTO ibl_draft (year, round, pick, team, tid, player, uuid)
-                     VALUES (?, 1, ?, ?, ?, '', UUID())",
-                    "iisi",
+                     VALUES (?, ?, ?, ?, ?, '', UUID())",
+                    "iiisi",
                     $year,
+                    $pick['round'],
                     $pick['pick'],
                     $pick['team'],
                     $pick['tid'],

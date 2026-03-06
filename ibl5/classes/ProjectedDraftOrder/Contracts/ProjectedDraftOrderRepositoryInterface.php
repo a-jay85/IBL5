@@ -47,9 +47,9 @@ interface ProjectedDraftOrderRepositoryInterface
     public function isDraftOrderFinalized(): bool;
 
     /**
-     * Save the final round-1 draft order to ibl_draft and mark as finalized.
+     * Save the final draft order (both rounds) to ibl_draft and mark as finalized.
      *
-     * @param list<array{pick: int, team: string, tid: int}> $picks
+     * @param list<array{round: int, pick: int, team: string, tid: int}> $picks
      */
     public function saveFinalDraftOrder(int $year, array $picks): void;
 

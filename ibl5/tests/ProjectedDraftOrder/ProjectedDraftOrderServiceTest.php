@@ -500,15 +500,20 @@ class ProjectedDraftOrderServiceTest extends TestCase
             ->with(
                 2026,
                 $this->callback(static function (array $picks) use ($reversedLottery): bool {
-                    if (count($picks) !== 28) {
+                    // 28 round-1 + 28 round-2 = 56 total
+                    if (count($picks) !== 56) {
                         return false;
                     }
-                    // First pick should be last original lottery team
-                    if ($picks[0]['tid'] !== $reversedLottery[0] || $picks[0]['pick'] !== 1) {
+                    // First pick should be round 1, last original lottery team
+                    if ($picks[0]['round'] !== 1 || $picks[0]['tid'] !== $reversedLottery[0] || $picks[0]['pick'] !== 1) {
                         return false;
                     }
-                    // Pick 13 should be from projected order (unchanged)
-                    return $picks[12]['pick'] === 13;
+                    // Pick 13 should be round 1 from projected order (unchanged)
+                    if ($picks[12]['round'] !== 1 || $picks[12]['pick'] !== 13) {
+                        return false;
+                    }
+                    // Pick index 28 should be round 2, pick 1
+                    return $picks[28]['round'] === 2 && $picks[28]['pick'] === 1;
                 }),
             );
 

@@ -91,13 +91,14 @@ class League extends BaseMysqliRepository
             $positions = self::ALL_STAR_BACKCOURT_POSITIONS;
         }
 
-        $query = "SELECT *
-        FROM ibl_plr
-        WHERE pos IN ($positions)
-          AND tid IN ('" . $this->formatTidsForSqlQuery($conferenceTids) . "')
-          AND retired != 1
-          AND stats_gm > '14'
-        ORDER BY name";
+        $query = "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
+        FROM ibl_plr p
+        JOIN ibl_team_info t ON p.tid = t.teamid
+        WHERE p.pos IN ($positions)
+          AND p.tid IN ('" . $this->formatTidsForSqlQuery($conferenceTids) . "')
+          AND p.retired != 1
+          AND p.stats_gm > '14'
+        ORDER BY p.name";
 
         return $this->fetchAll($query);
     }
@@ -165,12 +166,13 @@ class League extends BaseMysqliRepository
     public function getMVPCandidatesResult(): array
     {
         return $this->fetchAll(
-            "SELECT *
-            FROM ibl_plr
-            WHERE retired != 1
-              AND stats_gm >= '41'
-              AND stats_min / stats_gm >= '30'
-            ORDER BY name"
+            "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
+            FROM ibl_plr p
+            JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.retired != 1
+              AND p.stats_gm >= '41'
+              AND p.stats_min / p.stats_gm >= '30'
+            ORDER BY p.name"
         );
     }
 
@@ -182,13 +184,14 @@ class League extends BaseMysqliRepository
     public function getSixthPersonOfTheYearCandidatesResult(): array
     {
         return $this->fetchAll(
-            "SELECT *
-            FROM ibl_plr
-            WHERE retired != 1
-              AND stats_min / stats_gm >= 15
-              AND stats_gs / stats_gm <= '.5'
-              AND stats_gm >= '41'
-            ORDER BY name"
+            "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
+            FROM ibl_plr p
+            JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.retired != 1
+              AND p.stats_min / p.stats_gm >= 15
+              AND p.stats_gs / p.stats_gm <= '.5'
+              AND p.stats_gm >= '41'
+            ORDER BY p.name"
         );
     }
 
@@ -200,12 +203,13 @@ class League extends BaseMysqliRepository
     public function getRookieOfTheYearCandidatesResult(): array
     {
         return $this->fetchAll(
-            "SELECT *
-            FROM ibl_plr
-            WHERE retired != 1
-              AND exp = '1'
-              AND stats_gm >= '41'
-            ORDER BY name"
+            "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
+            FROM ibl_plr p
+            JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.retired != 1
+              AND p.exp = '1'
+              AND p.stats_gm >= '41'
+            ORDER BY p.name"
         );
     }
 

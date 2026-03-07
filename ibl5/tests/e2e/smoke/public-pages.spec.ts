@@ -67,6 +67,7 @@ test.describe('Public page smoke tests', () => {
       'modules.php?name=CapSpace',
       'modules.php?name=Player&pa=showpage&pid=1',
       'modules.php?name=Team&op=team&teamID=1',
+      'modules.php?name=Topics',
     ];
 
     for (const url of urls) {

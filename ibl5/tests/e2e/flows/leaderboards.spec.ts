@@ -1,38 +1,16 @@
-import { test, expect } from '@playwright/test';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
-import { MODULE_INACTIVE_TEXT } from '../helpers/trivia-mode';
-import { setState, type Settings } from '../helpers/test-state';
-import type { APIRequestContext } from '@playwright/test';
+import { test, expect } from '../fixtures/public';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Leaderboards — public, no authentication required.
 // Serial: trivia-on and trivia-off blocks set the same setting (Trivia Mode).
 test.describe.configure({ mode: 'serial' });
-test.use({ storageState: { cookies: [], origins: [] } });
-
-/**
- * Set trivia mode and return a cleanup function.
- * For public tests that don't have the appState fixture.
- */
-async function setTriviaMode(
-  request: APIRequestContext,
-  mode: 'On' | 'Off',
-): Promise<Settings> {
-  const result = await setState(request, { 'Trivia Mode': mode });
-  return result.previous;
-}
 
 // ---- Season Leaderboards: trivia off (normal) ----
 
 test.describe('Season Leaderboards flow', () => {
-  let restoreSettings: Settings;
-
-  test.beforeEach(async ({ request, page }) => {
-    restoreSettings = await setTriviaMode(request, 'Off');
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Trivia Mode': 'Off' });
     await page.goto('modules.php?name=SeasonLeaderboards');
-  });
-
-  test.afterEach(async ({ request }) => {
-    await setState(request, restoreSettings);
   });
 
   test('page loads with filter form', async ({ page }) => {
@@ -117,47 +95,29 @@ test.describe('Season Leaderboards flow', () => {
   });
 
   test('no PHP errors on season leaderboards', async ({ page }) => {
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Season Leaderboards page`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Season Leaderboards page');
   });
 });
 
 // ---- Season Leaderboards: trivia on ----
 
 test.describe('Season Leaderboards: trivia mode', () => {
-  let restoreSettings: Settings;
-
-  test.beforeEach(async ({ request, page }) => {
-    restoreSettings = await setTriviaMode(request, 'On');
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Trivia Mode': 'On' });
     await page.goto('modules.php?name=SeasonLeaderboards');
   });
 
-  test.afterEach(async ({ request }) => {
-    await setState(request, restoreSettings);
-  });
-
   test('module shows inactive message when trivia mode is on', async ({ page }) => {
-    await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
+    await expect(page.getByText("Module isn't active")).toBeVisible();
   });
 });
 
 // ---- Career Leaderboards: trivia off (normal) ----
 
 test.describe('Career Leaderboards flow', () => {
-  let restoreSettings: Settings;
-
-  test.beforeEach(async ({ request, page }) => {
-    restoreSettings = await setTriviaMode(request, 'Off');
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Trivia Mode': 'Off' });
     await page.goto('modules.php?name=CareerLeaderboards');
-  });
-
-  test.afterEach(async ({ request }) => {
-    await setState(request, restoreSettings);
   });
 
   test('page loads with filter form', async ({ page }) => {
@@ -227,41 +187,23 @@ test.describe('Career Leaderboards flow', () => {
   });
 
   test('no PHP errors on career leaderboards', async ({ page }) => {
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Career Leaderboards form page`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Career Leaderboards form page');
 
     await page.locator('.ibl-filter-form__submit').click();
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-    const resultsBody = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        resultsBody,
-        `PHP error "${pattern}" on Career Leaderboards results page`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Career Leaderboards results page');
   });
 });
 
 // ---- Career Leaderboards: trivia on ----
 
 test.describe('Career Leaderboards: trivia mode', () => {
-  let restoreSettings: Settings;
-
-  test.beforeEach(async ({ request, page }) => {
-    restoreSettings = await setTriviaMode(request, 'On');
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Trivia Mode': 'On' });
     await page.goto('modules.php?name=CareerLeaderboards');
   });
 
-  test.afterEach(async ({ request }) => {
-    await setState(request, restoreSettings);
-  });
-
   test('module shows inactive message when trivia mode is on', async ({ page }) => {
-    await expect(page.getByText(MODULE_INACTIVE_TEXT)).toBeVisible();
+    await expect(page.getByText("Module isn't active")).toBeVisible();
   });
 });

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Team page — public, no authentication required.
 // Current-season teams use a dropdown (.ibl-view-select), not tabs.
@@ -62,13 +62,7 @@ test.describe('Team page flow', () => {
     const teamIDs = [1, 5, 10, 15];
     for (const teamID of teamIDs) {
       await page.goto(`modules.php?name=Team&op=team&teamID=${teamID}`);
-      const body = await page.locator('body').textContent();
-      for (const pattern of PHP_ERROR_PATTERNS) {
-        expect(
-          body,
-          `PHP error "${pattern}" on team ${teamID}`,
-        ).not.toContain(pattern);
-      }
+      await assertNoPhpErrors(page, `on team ${teamID}`);
     }
   });
 });

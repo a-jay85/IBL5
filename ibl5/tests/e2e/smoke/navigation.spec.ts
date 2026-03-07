@@ -1,20 +1,11 @@
 import { test, expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
+import { desktopNav, openMobileMenu } from '../helpers/navigation';
 
 // Public navigation tests — no authentication required.
 // The navigation bar renders on every page via themeheader().
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
-function desktopNav(page: Page) {
-  return page.locator('.hidden.lg\\:flex').first();
-}
-
-async function openMobileMenu(page: Page) {
-  await page.locator('#nav-hamburger').click();
-  return page.locator('#nav-mobile-menu');
-}
 
 test.describe('Navigation bar smoke tests (public)', () => {
   test('nav bar is visible on homepage', async ({ page }) => {
@@ -101,10 +92,7 @@ test.describe('Navigation bar smoke tests (public)', () => {
 
   test('no PHP errors on homepage', async ({ page }) => {
     await page.goto('index.php');
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body, `PHP error "${pattern}" found`).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page);
   });
 });
 

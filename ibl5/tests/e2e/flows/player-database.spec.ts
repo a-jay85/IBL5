@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Player Database — public page, no authentication required.
 // The results table only appears AFTER submitting a search.
@@ -77,11 +77,6 @@ test.describe('Player Database flow', () => {
     await page.locator('input[name="search_name"]').fill('test');
     await page.locator('.ibl-filter-form__submit').click();
 
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body, `PHP error "${pattern}" after search`).not.toContain(
-        pattern,
-      );
-    }
+    await assertNoPhpErrors(page, 'after search');
   });
 });

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Award History — public page, no authentication required.
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -73,10 +73,7 @@ test.describe('Award History flow', () => {
     await page.locator('#aw_name').fill('zzzznonexistent999');
     await page.locator('.ibl-filter-form').locator('button[type="submit"], input[type="submit"]').first().click();
 
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page);
   });
 
   test('result rows contain player links', async ({ page }) => {
@@ -106,23 +103,11 @@ test.describe('Award History flow', () => {
 
   test('no PHP errors on form and results pages', async ({ page }) => {
     // Check form page
-    let body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Award History form page`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Award History form page');
 
     // Check results page
     await page.locator('.ibl-filter-form').locator('button[type="submit"], input[type="submit"]').first().click();
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-    body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Award History results page`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Award History results page');
   });
 });

@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/auth';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Depth Chart Entry — authenticated page.
 // The roster form may load asynchronously after the page header renders.
@@ -91,11 +91,6 @@ test.describe('Depth Chart Entry flow', () => {
   });
 
   test('no PHP errors', async ({ page }) => {
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body, `PHP error "${pattern}" on Depth Chart Entry`).not.toContain(
-        pattern,
-      );
-    }
+    await assertNoPhpErrors(page, 'on Depth Chart Entry');
   });
 });

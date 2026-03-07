@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/auth';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Authenticated page smoke tests — extended coverage.
 
@@ -63,12 +63,7 @@ test.describe('Extended authenticated page smoke tests', () => {
     });
     for (const url of AUTH_URLS) {
       await page.goto(url);
-      const body = await page.locator('body').textContent();
-      for (const pattern of PHP_ERROR_PATTERNS) {
-        expect(body, `PHP error "${pattern}" found on ${url}`).not.toContain(
-          pattern,
-        );
-      }
+      await assertNoPhpErrors(page, `on ${url}`);
     }
   });
 });

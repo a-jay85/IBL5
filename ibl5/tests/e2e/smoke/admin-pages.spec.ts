@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/auth';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Admin-only page smoke tests — require roles_mask = 1 (ADMIN) on the test user.
 // If the authenticated user is not an admin, tests skip gracefully.
@@ -65,11 +65,7 @@ test.describe('Admin page smoke tests', () => {
         test.skip(true, 'Test user does not have admin privileges');
       }
 
-      for (const pattern of PHP_ERROR_PATTERNS) {
-        expect(body, `PHP error "${pattern}" found on ${url}`).not.toContain(
-          pattern,
-        );
-      }
+      await assertNoPhpErrors(page, `on ${url}`);
     }
   });
 });

@@ -853,6 +853,46 @@
     white-space: nowrap;
 }
 
+/* Page-sticky modifier — on desktop, the wrapper has no max-height so
+   vertical scroll happens on the page (not inside the wrapper). A JS
+   module (sticky-page-header.js) clones the thead into a fixed overlay
+   when it scrolls past the nav, synced with the wrapper's horizontal scroll.
+   Usage: <div class="sticky-scroll-wrapper page-sticky"> */
+@media (min-width: 1024px) {
+    .sticky-scroll-wrapper.page-sticky {
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    /* Rounded corners on the table's corner cells since the wrapper no longer clips */
+    .page-sticky .sticky-table thead th:first-child {
+        border-top-left-radius: var(--radius-lg, 0.5rem);
+    }
+
+    .page-sticky .sticky-table thead th:last-child {
+        border-top-right-radius: var(--radius-lg, 0.5rem);
+    }
+
+    .page-sticky .sticky-table tbody tr:last-child td:first-child {
+        border-bottom-left-radius: var(--radius-lg, 0.5rem);
+    }
+
+    .page-sticky .sticky-table tbody tr:last-child td:last-child {
+        border-bottom-right-radius: var(--radius-lg, 0.5rem);
+    }
+}
+
+.page-sticky-header-clone {
+    position: fixed;
+    top: 72px;
+    z-index: 40;
+    overflow-x: hidden;
+    overflow-y: visible;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.15));
+}
+
 /* ==========================================================================
    Pattern 4: Page-Level Sticky Header (.sticky-header)
 

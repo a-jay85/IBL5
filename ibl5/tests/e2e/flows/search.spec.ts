@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import {
+  assertSearchFormPresent,
+  assertFilterDropdownsPresent,
+  assertSearchTypeRadiosPresent,
+} from '../helpers/search-form-assertions';
 
 // Search — public page, no authentication required.
 // Uses POST-based search form with filter dropdowns.
@@ -14,27 +19,17 @@ test.describe('Search flow', () => {
     const searchPage = page.locator('.search-page');
     await expect(searchPage).toBeVisible();
 
-    const searchInput = page.locator('input[name="query"]');
-    await expect(searchInput).toBeVisible();
+    await assertSearchFormPresent(page);
   });
 
   test('filter selects present', async ({ page }) => {
-    const selects = page.locator('.search-form__select');
-    // Should have topic, category, author, days dropdowns
-    expect(await selects.count()).toBeGreaterThanOrEqual(3);
+    await assertFilterDropdownsPresent(page);
   });
 
   test('type radio buttons present with stories as default', async ({
     page,
   }) => {
-    const radios = page.locator('input[name="type"]');
-    expect(await radios.count()).toBeGreaterThanOrEqual(2);
-
-    // Stories should be checked by default
-    const storiesRadio = page.locator(
-      'input[name="type"][value="stories"]',
-    );
-    await expect(storiesRadio).toBeChecked();
+    await assertSearchTypeRadiosPresent(page);
   });
 
   test('searching for common term returns results or empty state', async ({ page }) => {

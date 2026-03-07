@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Search — public page, no authentication required.
 // Uses POST-based search form with filter dropdowns.
@@ -44,12 +44,8 @@ test.describe('Search flow', () => {
     // POST form may navigate — wait for search page to re-render
     await page.waitForLoadState('domcontentloaded');
 
-    const body = await page.locator('body').textContent();
-
     // Should either have results or a "no matches" message — no PHP errors
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page);
 
     // Check for result cards, empty state, or the search form re-rendered
     const results = page.locator('.search-result');
@@ -70,10 +66,7 @@ test.describe('Search flow', () => {
 
     await page.waitForLoadState('domcontentloaded');
 
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page);
 
     // User results use compact cards, or we get empty state, or search page
     const results = page.locator('.search-result');
@@ -103,9 +96,7 @@ test.describe('Search flow', () => {
     expect(hasError).toBe(true);
 
     // No PHP errors
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page);
   });
 
   test('many-result search shows pagination', async ({ page }) => {
@@ -113,10 +104,7 @@ test.describe('Search flow', () => {
     await page.locator('input[name="query"]').fill('the');
     await page.locator('.ibl-search__btn').click();
 
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page);
 
     // Check for pagination links
     const pagination = page.locator('.search-pagination');
@@ -148,10 +136,7 @@ test.describe('Search flow', () => {
     await page.goto(href!);
 
     // Should load the next page without errors
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page);
 
     // Should have results on the offset page
     const results = page.locator('.search-result');
@@ -159,12 +144,6 @@ test.describe('Search flow', () => {
   });
 
   test('no PHP errors on form page', async ({ page }) => {
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Search form page`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Search form page');
   });
 });

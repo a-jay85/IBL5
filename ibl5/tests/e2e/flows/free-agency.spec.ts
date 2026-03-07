@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/auth';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Free Agency E2E tests — authenticated.
 // Seed data provides 3 free agent players:
@@ -65,10 +65,7 @@ test.describe('Free Agency -- main page', () => {
   });
 
   test('no PHP errors on main page', async ({ page }) => {
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body, `PHP error "${pattern}" on Free Agency main page`).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Free Agency main page');
   });
 });
 
@@ -115,10 +112,7 @@ test.describe('Free Agency -- negotiation page', () => {
   });
 
   test('no PHP errors on negotiation page', async ({ page }) => {
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body, `PHP error "${pattern}" on negotiation page`).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on negotiation page');
   });
 });
 
@@ -282,9 +276,6 @@ test.describe('Free Agency -- wrong season phase', () => {
   test('page renders without PHP errors in non-FA phase', async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Regular Season' });
     await page.goto('modules.php?name=FreeAgency');
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body, `PHP error "${pattern}" in non-FA phase`).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'in non-FA phase');
   });
 });

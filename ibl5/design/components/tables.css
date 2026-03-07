@@ -520,12 +520,12 @@
 
     /* User team highlight sticky backgrounds */
     .responsive-table tbody tr.user-team-row td[class*="sticky-col"],
-    .sticky-table tbody tr.user-team-row td.sticky-col {
+    .sticky-table tbody tr.user-team-row td[class*="sticky-col"] {
         background-color: var(--warning-100, #fef3c7);
     }
 
     .responsive-table tbody tr.user-team-row:hover td[class*="sticky-col"],
-    .sticky-table tbody tr.user-team-row:hover td.sticky-col {
+    .sticky-table tbody tr.user-team-row:hover td[class*="sticky-col"] {
         background-color: var(--warning-200, #fde68a);
     }
 
@@ -853,6 +853,13 @@
     z-index: 5;
 }
 
+/* Second sticky column (e.g. Draft table: radio + name) */
+.sticky-table .sticky-col-2 {
+    position: sticky;
+    left: 36px;
+    z-index: 5;
+}
+
 /* Corner cell — intersection of sticky header and sticky column */
 .sticky-table .sticky-corner {
     z-index: 15;
@@ -861,6 +868,11 @@
 
 /* Shadows — column edge, header bottom, corner combined */
 .sticky-table tbody td.sticky-col {
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+    border-right: 1px solid var(--gray-100);
+}
+
+.sticky-table tbody td.sticky-col-2 {
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
     border-right: 1px solid var(--gray-100);
 }
@@ -874,16 +886,21 @@
 }
 
 /* Sticky-col body cell backgrounds — required so content behind
-   the sticky column doesn't bleed through on scroll */
-.sticky-table tbody tr:nth-child(odd) td.sticky-col {
+   the sticky columns doesn't bleed through on scroll */
+.sticky-table tbody tr:nth-child(odd) td[class*="sticky-col"] {
     background-color: white;
 }
 
-.sticky-table tbody tr:nth-child(even) td.sticky-col {
+.sticky-table tbody tr:nth-child(even) td[class*="sticky-col"] {
     background-color: var(--gray-50, #f9fafb);
 }
 
-.sticky-table tbody tr:hover td.sticky-col {
+.sticky-table tbody tr:hover td[class*="sticky-col"] {
+    background-color: var(--gray-100, #f3f4f6);
+}
+
+/* Drafted row sticky backgrounds */
+.sticky-table tbody tr.drafted td[class*="sticky-col"] {
     background-color: var(--gray-100, #f3f4f6);
 }
 
@@ -930,6 +947,7 @@
     overflow-y: visible;
     pointer-events: none;
     filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.15));
+    border-radius: var(--radius-lg, 0.5rem) var(--radius-lg, 0.5rem) 0 0;
 }
 
 /* ==========================================================================

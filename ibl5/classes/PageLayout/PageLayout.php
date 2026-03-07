@@ -61,12 +61,16 @@ class PageLayout
         echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">';
         echo '<html xmlns="http://www.w3.org/1999/xhtml">';
         echo "<head>\n";
+        if ($relativePath !== '') {
+            echo "<base href=\"{$relativePath}\">\n";
+        }
         echo "<title>$sitename $pagetitle</title>\n";
         echo '<meta name="google-site-verification" content="3y3xJYDHSYUitn7cbfFfI6C2BiK_q66dtRfykpzHW5w" />';
         echo "<script src=\"{$relativePath}jslib/sorttable.js\"></script>";
         echo "<script src=\"{$relativePath}jslib/responsive-tables.js\"></script>";
         echo "<script src=\"{$relativePath}jslib/name-abbreviation.js\"></script>";
         echo "<script src=\"{$relativePath}jslib/user-team-highlighter.js\"></script>";
+        echo "<script src=\"{$relativePath}jslib/sticky-page-header.js\"></script>";
 
         // Meta tags (inlined from includes/meta.php)
         $charsetValue = defined('_CHARSET') ? \_CHARSET : null;

@@ -17,12 +17,51 @@
               → Table: .ibl-data-table.sticky-table
               → Columns: .sticky-col + .sticky-corner (header intersection)
 
+   Pattern 3a: .sticky-scroll-wrapper.page-sticky > .sticky-scroll-container
+              → Same as Pattern 3 but header sticks to VIEWPORT on desktop
+              → On desktop: JS (sticky-page-header.js) clones thead into a
+                fixed overlay synced with horizontal scroll. CSS strips wrapper
+                border/radius/shadow; corner cells get border-radius instead.
+              → On mobile: unchanged — wrapper scrolls, CSS sticky works.
+              → IMPORTANT: Pure CSS cannot do page-level sticky inside a
+                horizontal scroll container (overflow:auto on any axis makes
+                the element a scroll container, capturing position:sticky).
+                JavaScript is required for this pattern.
+
+   Pattern 4: <table class="ibl-data-table sticky-header">
+              → Page-level sticky thead (no horizontal scroll needed)
+              → Sets overflow:visible on table (breaks out of ibl-data-table's
+                overflow:hidden), position:sticky + top:72px on th cells.
+              → Corner th cells get border-radius + box-shadow in
+                var(--page-bg) to mask rows scrolling behind rounded corners.
+              → --page-bg is set on <body> by theme.php from $bgcolor1.
+
    OVERFLOW RULES:
    - .ibl-data-table: overflow: hidden (for border-radius clipping)
+   - .ibl-data-table.sticky-header: overflow: visible (required for sticky)
    - .responsive-table (mobile): overflow: visible (required for position: sticky)
    - .sticky-table: overflow: visible (same reason)
    - .sticky-scroll-wrapper: overflow: auto (provides the scroll viewport)
    - NEVER set overflow: hidden on elements containing position: sticky cells
+
+   STICKY HEADER GOTCHAS:
+   - The fixed nav is 72px tall. All sticky top values must be 72px, not 0.
+   - base.css sets `table { overflow-x: auto }` which creates a scroll
+     container and breaks sticky. Override with overflow:visible on the table.
+   - overflow:auto on ANY axis makes the element a scroll container per CSS
+     spec. Even overflow-x:auto + overflow-y:visible → both become auto.
+     This is why Pattern 3a needs JS instead of pure CSS.
+   - overflow-y:clip does NOT get promoted, but the element is still a scroll
+     container if the other axis is auto/scroll. Sticky is captured per-element,
+     not per-axis.
+   - Rounded corners require overflow:hidden to clip, which breaks sticky.
+     Solution: set overflow:visible and apply border-radius to individual
+     corner cells (first/last th, last-row first/last td).
+   - For Pattern 4, corner th cells need box-shadow in var(--page-bg) to
+     mask body rows scrolling behind the rounded corners.
+   - css:watch may not rebuild after editing tables.css. Always verify with:
+     grep -c "your-new-class" themes/IBL/style/style.css
+     If 0, manually run: bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
    ========================================================================== */
 
 

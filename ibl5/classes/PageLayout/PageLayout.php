@@ -61,12 +61,16 @@ class PageLayout
         echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">';
         echo '<html xmlns="http://www.w3.org/1999/xhtml">';
         echo "<head>\n";
+        if ($relativePath !== '') {
+            echo "<base href=\"{$relativePath}\">\n";
+        }
         echo "<title>$sitename $pagetitle</title>\n";
         echo '<meta name="google-site-verification" content="3y3xJYDHSYUitn7cbfFfI6C2BiK_q66dtRfykpzHW5w" />';
-        echo "<script src=\"{$relativePath}jslib/sorttable.js\"></script>";
-        echo "<script src=\"{$relativePath}jslib/responsive-tables.js\"></script>";
-        echo "<script src=\"{$relativePath}jslib/name-abbreviation.js\"></script>";
-        echo "<script src=\"{$relativePath}jslib/user-team-highlighter.js\"></script>";
+        echo "<script src=\"jslib/sorttable.js\"></script>";
+        echo "<script src=\"jslib/responsive-tables.js\"></script>";
+        echo "<script src=\"jslib/name-abbreviation.js\"></script>";
+        echo "<script src=\"jslib/user-team-highlighter.js\"></script>";
+        echo "<script src=\"jslib/sticky-page-header.js\"></script>";
 
         // Meta tags (inlined from includes/meta.php)
         $charsetValue = defined('_CHARSET') ? \_CHARSET : null;
@@ -98,7 +102,7 @@ class PageLayout
         }
 
         if (file_exists("themes/$ThemeSel/images/favicon.ico")) {
-            echo "<link REL=\"shortcut icon\" HREF=\"{$relativePath}themes/$ThemeSel/images/favicon.ico\" TYPE=\"image/x-icon\">\n";
+            echo "<link REL=\"shortcut icon\" HREF=\"themes/$ThemeSel/images/favicon.ico\" TYPE=\"image/x-icon\">\n";
         }
         // Google Fonts (inlined from includes/custom_files/custom_head.php)
         echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
@@ -151,7 +155,7 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
 </script>';
 
         // Navigation JavaScript for mobile menu toggle
-        echo '<script src="' . $relativePath . 'jslib/navigation.js" defer></script>';
+        echo '<script src="jslib/navigation.js" defer></script>';
 
         // FOUT prevention inline styles
         echo '<style>
@@ -167,7 +171,7 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
         // CSS stylesheet — loaded once (fixes duplicate CSS loading bug)
         $cssPath = "themes/$ThemeSel/style/style.css";
         $cssVersion = file_exists($cssPath) ? filemtime($cssPath) : '';
-        echo "<LINK REL=\"StyleSheet\" HREF=\"{$relativePath}{$cssPath}?v={$cssVersion}\" TYPE=\"text/css\">\n";
+        echo "<LINK REL=\"StyleSheet\" HREF=\"{$cssPath}?v={$cssVersion}\" TYPE=\"text/css\">\n";
 
         echo "\n\n\n</head>\n\n";
         themeheader();

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run E2E tests locally with isolated CI-like database.
+# Run E2E tests locally with isolated CI-like database via Docker Apache.
 # Usage: ./bin/e2e-local.sh [playwright-args...]
 #   e.g. ./bin/e2e-local.sh --headed
 #        ./bin/e2e-local.sh --grep "trading"
@@ -7,7 +7,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 IBL5_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_ROOT="$(cd "$IBL5_DIR/.." && pwd)"
 
 # Resolve config.php's real directory (follows symlinks to main repo)
 CONFIG_DIR="$(cd "$(dirname "$(readlink "$IBL5_DIR/config.php" || echo "$IBL5_DIR/config.php")")" && pwd)"
@@ -15,8 +14,13 @@ CONFIG_DIR="$(cd "$(dirname "$(readlink "$IBL5_DIR/config.php" || echo "$IBL5_DI
 MYSQL="mariadb"
 MYSQL_ARGS="-h 127.0.0.1 --skip-ssl -u root -proot"
 DB_NAME="ibl5_e2e_test"
-PORT=8081
-PHP_PID=""
+
+# Pre-flight: verify Docker Apache is running
+if ! curl -sf "http://localhost/ibl5/" > /dev/null 2>&1; then
+    echo "ERROR: Docker Apache is not responding at http://localhost/ibl5/"
+    echo "Start it with: docker compose up -d"
+    exit 1
+fi
 
 # Pre-flight: verify MariaDB is reachable
 if ! $MYSQL $MYSQL_ARGS -e "SELECT 1" > /dev/null 2>&1; then
@@ -29,19 +33,13 @@ fi
 eval "$(grep -E '^(IBL_TEST_USER|IBL_TEST_PASS)=' "$IBL5_DIR/.env.test")"
 export IBL_TEST_USER IBL_TEST_PASS
 
-# Fail fast if port is already in use
-if lsof -ti:"$PORT" > /dev/null 2>&1; then
-    echo "ERROR: Port $PORT is already in use. Kill the process or choose a different port."
-    exit 1
-fi
-
-E2E_GUARD="if (defined('IBL_E2E_CONFIG')) { require __DIR__ . '/config.e2e.php'; return; }"
+E2E_GUARD='if (file_exists(__DIR__ . "/.e2e-active")) { require __DIR__ . "/config.e2e.php"; return; }'
 
 inject_config_guard() {
     local config
     for config in "$CONFIG_DIR/config.php" "$CONFIG_DIR/configOlympics.php"; do
         [[ -f "$config" ]] || continue
-        if ! grep -q 'IBL_E2E_CONFIG' "$config" 2>/dev/null; then
+        if ! grep -q '.e2e-active' "$config" 2>/dev/null; then
             sed -i '' '6 a\
 '"$E2E_GUARD"'
 ' "$config"
@@ -54,8 +52,8 @@ remove_config_guard() {
     local config
     for config in "$CONFIG_DIR/config.php" "$CONFIG_DIR/configOlympics.php"; do
         [[ -f "$config" ]] || continue
-        if grep -q 'IBL_E2E_CONFIG' "$config" 2>/dev/null; then
-            sed -i '' '/IBL_E2E_CONFIG/d' "$config"
+        if grep -q '.e2e-active' "$config" 2>/dev/null; then
+            sed -i '' '/.e2e-active/d' "$config"
             echo "Removed E2E config guard from $(basename "$config")"
         fi
     done
@@ -65,10 +63,7 @@ cleanup() {
     set +e  # Disable errexit — cleanup must run to completion
     echo ""
     echo "==> Cleaning up..."
-    # Kill PHP server and all forked workers (PHP_CLI_SERVER_WORKERS creates child processes)
-    local pids
-    pids=$(lsof -ti:"$PORT" 2>/dev/null)
-    [[ -n "$pids" ]] && kill $pids 2>/dev/null
+    rm -f "$CONFIG_DIR/.e2e-active"
     [[ -f "$CONFIG_DIR/config.e2e.php" ]] && rm -f "$CONFIG_DIR/config.e2e.php"
     remove_config_guard
     $MYSQL $MYSQL_ARGS -e "DROP DATABASE IF EXISTS $DB_NAME;" 2>/dev/null
@@ -117,9 +112,10 @@ echo "Test user created: $user\n";
 PHPSCRIPT
 
 # --- Generate test config ---
+# Use 'mariadb' as dbhost since Apache runs inside Docker and resolves via Docker DNS
 echo "==> Generating config.e2e.php..."
 sed -E \
-    -e "s/^\\\$dbhost = .*/\\\$dbhost = '127.0.0.1';/" \
+    -e "s/^\\\$dbhost = .*/\\\$dbhost = 'mariadb';/" \
     -e "s/^\\\$dbuname = .*/\\\$dbuname = 'root';/" \
     -e "s/^\\\$dbpass = .*/\\\$dbpass = 'root';/" \
     -e "s/^\\\$dbname = .*/\\\$dbname = '$DB_NAME';/" \
@@ -127,31 +123,15 @@ sed -E \
     "$CONFIG_DIR/config.php" > "$CONFIG_DIR/config.e2e.php"
 
 # Remove the E2E guard from the generated file (avoid infinite recursion)
-sed -i '' '/IBL_E2E_CONFIG/d' "$CONFIG_DIR/config.e2e.php"
+sed -i '' '/.e2e-active/d' "$CONFIG_DIR/config.e2e.php"
 
-# --- Start server ---
-echo "==> Starting PHP server on port $PORT..."
-E2E_TESTING=1 PHP_CLI_SERVER_WORKERS=8 php \
-    -d "auto_prepend_file=$SCRIPT_DIR/e2e-prepend.php" \
-    -d "log_errors=1" \
-    -d "error_log=/tmp/e2e-php-errors.log" \
-    -S "0.0.0.0:$PORT" \
-    -t "$REPO_ROOT" \
-    "$IBL5_DIR/router.php" 2>/tmp/e2e-php-server.log &
-PHP_PID=$!
-
-for i in $(seq 1 15); do
-    if curl -sf "http://localhost:$PORT/ibl5/" > /dev/null 2>&1; then
-        echo "==> Server ready (${i}s)"
-        break
-    fi
-    [[ $i -eq 15 ]] && { echo "Server failed to start"; exit 1; }
-    sleep 1
-done
+# --- Activate E2E config ---
+echo "==> Activating E2E config (touching .e2e-active)..."
+touch "$CONFIG_DIR/.e2e-active"
 
 # --- Run tests ---
-echo "==> Running E2E tests..."
+echo "==> Running E2E tests against Docker Apache..."
 set +e  # Don't exit on test failure — let cleanup run
-cd "$IBL5_DIR" && BASE_URL="http://localhost:$PORT/ibl5/" bunx playwright test "$@"
+cd "$IBL5_DIR" && bunx playwright test "$@"
 TEST_EXIT=$?
 exit $TEST_EXIT

@@ -58,6 +58,16 @@ Tools that run on the **host** (not inside Docker):
 
 Code edits on the host are immediately reflected in the container (bind mount: `./ibl5 -> /var/www/html/ibl5`).
 
+## OPcache
+
+The Docker PHP container has OPcache enabled with `validate_timestamps=1` and `revalidate_freq=0`. This means PHP checks file modification times on every request, so code edits are visible immediately — no cache clearing needed. OPcache eliminates redundant parsing/compilation, making PHP requests 2-4x faster.
+
+To verify OPcache is loaded:
+
+```bash
+docker compose exec php php -m | grep OPcache
+```
+
 ## Email Testing with Mailpit
 
 To capture outgoing emails in Mailpit, update `ibl5/config/mail.config.php`:

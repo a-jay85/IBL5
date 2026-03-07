@@ -1,8 +1,11 @@
---- Migration 055: Fix vw_team_awards awarding IBL Champions prematurely
---- The IBL Champions UNION selected the winner of MAX(round) per year,
---- so during incomplete playoffs (e.g. only round 1 finished), all
---- first-round winners were listed as IBL Champions.
---- Fix: require round = 4 (the Finals) instead of MAX(round).
+-- Migration 055: Fix vw_team_awards awarding IBL Champions during incomplete playoffs
+--
+-- Bug: The "IBL Champions" union selects winners from the max round each year.
+-- When playoffs are in progress (e.g., only round 1 complete), all first-round
+-- winners are incorrectly listed as IBL Champions.
+--
+-- Fix: Add a condition requiring the max round to have exactly 1 series,
+-- which only happens when the Finals (round 4) have been played.
 
 CREATE OR REPLACE VIEW vw_team_awards AS
 
@@ -12,14 +15,29 @@ FROM ibl_team_awards
 
 UNION ALL
 
--- IBL Champions: winner of the Finals (round 4) each playoff year
+-- IBL Champions: winner of the final round each playoff year
+-- Only when the max round has exactly 1 series (= the Finals are complete)
 SELECT
     psr.year,
     psr.winner AS name,
     'IBL Champions' AS Award,
     0 AS ID
 FROM vw_playoff_series_results psr
-WHERE psr.round = 4
+WHERE psr.round = (
+    SELECT MAX(psr2.round)
+    FROM vw_playoff_series_results psr2
+    WHERE psr2.year = psr.year
+)
+AND (
+    SELECT COUNT(*)
+    FROM vw_playoff_series_results psr3
+    WHERE psr3.year = psr.year
+      AND psr3.round = (
+          SELECT MAX(psr4.round)
+          FROM vw_playoff_series_results psr4
+          WHERE psr4.year = psr.year
+      )
+) = 1
 
 UNION ALL
 

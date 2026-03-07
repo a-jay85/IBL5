@@ -63,12 +63,13 @@ class DraftView implements DraftViewInterface
      */
     public function renderPlayerTable(array $players, string $teamLogo, ?string $pickOwner): string
     {
-        $html = '<div class="table-scroll-container">
-        <table class="sortable ibl-data-table draft-table responsive-table">
+        $html = '<div class="sticky-scroll-wrapper page-sticky">
+        <div class="sticky-scroll-container">
+        <table class="sortable ibl-data-table draft-table sticky-table">
             <thead>
                 <tr>
-                    <th class="sticky-col">Draft</th>
-                    <th class="sticky-col-2">Name</th>
+                    <th class="sticky-col sticky-corner">Draft</th>
+                    <th class="sticky-col-2 sticky-corner">Name</th>
                     <th>Pos</th>
                     <th>Team</th>
                     <th>Age</th>
@@ -150,7 +151,7 @@ class DraftView implements DraftViewInterface
             </tr>';
         }
 
-        $html .= '</tbody></table></div>'; // Close table and scroll container
+        $html .= '</tbody></table></div></div>'; // Close table, scroll container, and wrapper
 
         return $html;
     }

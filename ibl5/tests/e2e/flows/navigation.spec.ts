@@ -14,14 +14,14 @@ async function openMobileMenu(page: Page) {
 
 test.describe('Navigation bar (authenticated, desktop)', () => {
   test('my team menu is visible for logged-in users', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('index.php');
     await expect(
       desktopNav(page).getByRole('button', { name: 'My Team' }),
     ).toBeVisible();
   });
 
   test('account button shows username instead of login', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('index.php');
     const nav = desktopNav(page);
 
     // "Login" button should NOT be present when authenticated
@@ -31,7 +31,7 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
   });
 
   test('my team dropdown opens and shows team links', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('index.php');
     const nav = desktopNav(page);
     await nav.getByRole('button', { name: 'My Team' }).click();
 
@@ -42,7 +42,7 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
   });
 
   test('account dropdown shows logout link', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('index.php');
     const nav = desktopNav(page);
 
     // Find the last dropdown button (account) and click to pin open
@@ -56,7 +56,7 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
   });
 
   test('teams mega-menu shows team links', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('index.php');
     await desktopNav(page).getByRole('button', { name: 'Teams' }).click();
 
     const teamLinks = page.locator('a[href*="teamID="]');
@@ -65,7 +65,7 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
   });
 
   test('dropdown link navigates to correct page', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('index.php');
     const nav = desktopNav(page);
     await nav.getByRole('button', { name: 'Season' }).click();
 
@@ -85,7 +85,7 @@ test.describe('Navigation bar (authenticated, mobile viewport)', () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
   test('welcome greeting shows in mobile panel', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('index.php');
     const mobileMenu = await openMobileMenu(page);
 
     await expect(
@@ -94,7 +94,7 @@ test.describe('Navigation bar (authenticated, mobile viewport)', () => {
   });
 
   test('my team section appears in mobile panel', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('index.php');
     const mobileMenu = await openMobileMenu(page);
 
     await expect(
@@ -103,7 +103,7 @@ test.describe('Navigation bar (authenticated, mobile viewport)', () => {
   });
 
   test('account section shows Account instead of Login', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('index.php');
     const mobileMenu = await openMobileMenu(page);
 
     await expect(
@@ -116,7 +116,7 @@ test.describe('Navigation bar (authenticated, mobile viewport)', () => {
   });
 
   test('mobile team section expands to show team links', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('index.php');
     const mobileMenu = await openMobileMenu(page);
 
     await mobileMenu.locator('.mobile-dropdown-btn', {
@@ -130,7 +130,7 @@ test.describe('Navigation bar (authenticated, mobile viewport)', () => {
   });
 
   test('mobile link navigates to correct page', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('index.php');
     const mobileMenu = await openMobileMenu(page);
 
     await mobileMenu.locator('.mobile-dropdown-btn', {

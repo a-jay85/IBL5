@@ -8,6 +8,13 @@ namespace Topics\Contracts;
  * Interface for the Topics view.
  *
  * Defines methods for rendering the topics listing page.
+ *
+ * @phpstan-type SearchFilterData array{
+ *     topics: list<array{topicId: int, topicText: string}>,
+ *     categories: list<array{catId: int, title: string}>,
+ *     authors: list<string>,
+ *     articleComm: bool
+ * }
  */
 interface TopicsViewInterface
 {
@@ -29,7 +36,8 @@ interface TopicsViewInterface
      *     }>
      * }> $topics Array of topic data with articles
      * @param string $themePath Path prefix for topic images
+     * @param SearchFilterData $searchFilters Search filter data for the form
      * @return string Rendered HTML
      */
-    public function render(array $topics, string $themePath): string;
+    public function render(array $topics, string $themePath, array $searchFilters): string;
 }

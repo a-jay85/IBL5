@@ -29,6 +29,42 @@ if (!defined('_MORE')) {
 if (!defined('_NONEWSYET')) {
     define('_NONEWSYET', 'No news yet');
 }
+if (!defined('_ALLTOPICS')) {
+    define('_ALLTOPICS', 'All Topics');
+}
+if (!defined('_ARTICLES')) {
+    define('_ARTICLES', 'All Categories');
+}
+if (!defined('_ALLAUTHORS')) {
+    define('_ALLAUTHORS', 'All Authors');
+}
+if (!defined('_ALL')) {
+    define('_ALL', 'Any Date');
+}
+if (!defined('_WEEK')) {
+    define('_WEEK', 'Week');
+}
+if (!defined('_WEEKS')) {
+    define('_WEEKS', 'Weeks');
+}
+if (!defined('_MONTH')) {
+    define('_MONTH', 'Month');
+}
+if (!defined('_MONTHS')) {
+    define('_MONTHS', 'Months');
+}
+if (!defined('_SEARCHON')) {
+    define('_SEARCHON', 'Search on:');
+}
+if (!defined('_SSTORIES')) {
+    define('_SSTORIES', 'Stories');
+}
+if (!defined('_SCOMMENTS')) {
+    define('_SCOMMENTS', 'Comments');
+}
+if (!defined('_SUSERS')) {
+    define('_SUSERS', 'Users');
+}
 
 /**
  * View class for rendering the Topics listing page.
@@ -37,6 +73,7 @@ if (!defined('_NONEWSYET')) {
  * article count, total reads, and a list of recent articles.
  *
  * @phpstan-type TopicData array{topicId: int, topicName: string, topicImage: string, topicText: string, storyCount: int, totalReads: int, recentArticles: array<int, array{sid: int, title: string, catId: int, catTitle: string}>}
+ * @phpstan-import-type SearchFilterData from Contracts\TopicsViewInterface
  *
  * @see TopicsViewInterface
  */
@@ -46,15 +83,16 @@ class TopicsView implements TopicsViewInterface
      * @see TopicsViewInterface::render()
      *
      * @param array<int, TopicData> $topics
+     * @param SearchFilterData $searchFilters
      */
-    public function render(array $topics, string $themePath): string
+    public function render(array $topics, string $themePath, array $searchFilters): string
     {
         if ($topics === []) {
             return $this->renderEmptyState();
         }
 
         $output = $this->renderPageHeader();
-        $output .= $this->renderSearchForm();
+        $output .= $this->renderSearchForm($searchFilters);
         $output .= $this->renderTopicsGrid($topics, $themePath);
 
         return $output;
@@ -74,19 +112,167 @@ class TopicsView implements TopicsViewInterface
     }
 
     /**
-     * Render the search form.
+     * Render the full search form with filter dropdowns and type radio buttons.
+     *
+     * @param SearchFilterData $searchFilters
      */
-    private function renderSearchForm(): string
+    private function renderSearchForm(array $searchFilters): string
     {
-        $search = HtmlSanitizer::safeHtmlOutput(_SEARCH);
+        $output = '<form action="modules.php?name=Search" method="post" class="topics-search search-form">';
 
-        return '<form action="modules.php?name=Search" method="post" class="topics-search">
-        <div class="ibl-search">
-            <svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" name="query" class="ibl-search__input" placeholder="Search articles...">
-            <button type="submit" class="ibl-search__btn">' . $search . '</button>
-        </div>
-    </form>';
+        // Search input row
+        $output .= '<div class="search-form__input-row">';
+        $output .= '<div class="ibl-search search-form__search-bar">';
+        $output .= '<svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+        $output .= '<input type="text" name="query" class="ibl-search__input" placeholder="Search articles...">';
+        $safeSearch = HtmlSanitizer::safeHtmlOutput(_SEARCH);
+        $output .= '<button type="submit" class="ibl-search__btn">' . $safeSearch . '</button>';
+        $output .= '</div></div>';
+
+        // Filter row
+        $output .= '<div class="search-form__filters">';
+        $output .= $this->renderTopicSelect($searchFilters['topics']);
+        $output .= $this->renderCategorySelect($searchFilters['categories']);
+        $output .= $this->renderAuthorSelect($searchFilters['authors']);
+        $output .= $this->renderDaysSelect();
+        $output .= '</div>';
+
+        // Search type radio buttons
+        $output .= '<div class="search-form__types">';
+        $safeSearchOn = HtmlSanitizer::safeHtmlOutput(_SEARCHON);
+        $output .= '<span class="search-form__types-label">' . $safeSearchOn . '</span>';
+        /** @var string $storiesLabel */
+        $storiesLabel = _SSTORIES;
+        $output .= $this->renderTypeRadio('stories', $storiesLabel, 'stories');
+
+        if ($searchFilters['articleComm']) {
+            /** @var string $commentsLabel */
+            $commentsLabel = _SCOMMENTS;
+            $output .= $this->renderTypeRadio('comments', $commentsLabel, 'stories');
+        }
+
+        /** @var string $usersLabel */
+        $usersLabel = _SUSERS;
+        $output .= $this->renderTypeRadio('users', $usersLabel, 'stories');
+        $output .= '</div>';
+
+        $output .= '</form>';
+
+        return $output;
+    }
+
+    /**
+     * Render the topic filter dropdown.
+     *
+     * @param list<array{topicId: int, topicText: string}> $topics
+     */
+    private function renderTopicSelect(array $topics): string
+    {
+        $output = '<select name="topic" class="search-form__select">';
+        $safeAllTopics = HtmlSanitizer::safeHtmlOutput(_ALLTOPICS);
+        $output .= '<option value="">' . $safeAllTopics . '</option>';
+
+        foreach ($topics as $topic) {
+            $topicId = $topic['topicId'];
+            $topicText = HtmlSanitizer::safeHtmlOutput($topic['topicText']);
+            $output .= '<option value="' . $topicId . '">' . $topicText . '</option>';
+        }
+
+        $output .= '</select>';
+        return $output;
+    }
+
+    /**
+     * Render the category filter dropdown.
+     *
+     * @param list<array{catId: int, title: string}> $categories
+     */
+    private function renderCategorySelect(array $categories): string
+    {
+        $output = '<select name="category" class="search-form__select">';
+        $safeArticles = HtmlSanitizer::safeHtmlOutput(_ARTICLES);
+        $output .= '<option value="0">' . $safeArticles . '</option>';
+
+        foreach ($categories as $cat) {
+            $catId = $cat['catId'];
+            $title = HtmlSanitizer::safeHtmlOutput($cat['title']);
+            $output .= '<option value="' . $catId . '">' . $title . '</option>';
+        }
+
+        $output .= '</select>';
+        return $output;
+    }
+
+    /**
+     * Render the author filter dropdown.
+     *
+     * @param list<string> $authors
+     */
+    private function renderAuthorSelect(array $authors): string
+    {
+        $output = '<select name="author" class="search-form__select">';
+        $safeAllAuthors = HtmlSanitizer::safeHtmlOutput(_ALLAUTHORS);
+        $output .= '<option value="">' . $safeAllAuthors . '</option>';
+
+        foreach ($authors as $authorName) {
+            $safe = HtmlSanitizer::safeHtmlOutput($authorName);
+            $output .= '<option value="' . $safe . '">' . $safe . '</option>';
+        }
+
+        $output .= '</select>';
+        return $output;
+    }
+
+    /**
+     * Render the date range filter dropdown.
+     */
+    private function renderDaysSelect(): string
+    {
+        /** @var string $allLabel */
+        $allLabel = _ALL;
+        /** @var string $weekLabel */
+        $weekLabel = _WEEK;
+        /** @var string $weeksLabel */
+        $weeksLabel = _WEEKS;
+        /** @var string $monthLabel */
+        $monthLabel = _MONTH;
+        /** @var string $monthsLabel */
+        $monthsLabel = _MONTHS;
+
+        /** @var array<int, string> $options */
+        $options = [
+            0 => $allLabel,
+            7 => '1 ' . $weekLabel,
+            14 => '2 ' . $weeksLabel,
+            30 => '1 ' . $monthLabel,
+            60 => '2 ' . $monthsLabel,
+            90 => '3 ' . $monthsLabel,
+        ];
+
+        $output = '<select name="days" class="search-form__select">';
+
+        foreach ($options as $value => $label) {
+            $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
+            $output .= '<option value="' . $value . '">' . $safeLabel . '</option>';
+        }
+
+        $output .= '</select>';
+        return $output;
+    }
+
+    /**
+     * Render a search type radio button.
+     */
+    private function renderTypeRadio(string $value, string $label, string $selectedType): string
+    {
+        $checked = ($value === $selectedType) ? ' checked' : '';
+        $id = 'search-type-' . $value;
+
+        $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
+        return '<label class="search-form__type" for="' . $id . '">
+            <input type="radio" name="type" value="' . $value . '" id="' . $id . '"' . $checked . '>
+            <span class="search-form__type-label">' . $safeLabel . '</span>
+        </label>';
     }
 
     /**

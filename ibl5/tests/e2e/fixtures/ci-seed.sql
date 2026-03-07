@@ -70,7 +70,8 @@ INSERT INTO nuke_modules (title, custom_title, active, view) VALUES
   ('FreeAgencyPreview',   'FreeAgencyPreview',   1, 0),
   ('Draft',               'Draft',               1, 0),
   ('TeamOffDefStats',     'TeamOffDefStats',     1, 0),
-  ('Transaction',         'Transaction',         1, 0);
+  ('Transaction',         'Transaction',         1, 0),
+  ('Topics',              'Topics',              1, 0);
 
 -- ============================================================
 -- IBL season bootstrap
@@ -661,6 +662,32 @@ INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid
   (2026, '2026-03-08', 1, 2,  0, 0, 0, 'sched-uuid-0001'),
   (2026, '2026-03-10', 3, 1,  0, 0, 0, 'sched-uuid-0002'),
   (2026, '2026-03-12', 1, 14, 0, 0, 0, 'sched-uuid-0003');
+
+-- ============================================================
+-- Topics (nuke_topics) for Topics module E2E tests
+-- PK is `id`, topicid is an auto-increment index
+-- ============================================================
+
+INSERT INTO nuke_topics (topicid, topicname, topicimage, topictext, counter, id) VALUES
+  (1, 'IBL',      'IBL.gif',      'IBL News',      10, 1),
+  (2, 'Trades',   'trades.gif',   'Trade News',     5, 2),
+  (3, 'Draft',    'draft.gif',    'Draft Coverage',  3, 3);
+
+-- Stories linked to topics (for topic card article lists)
+INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic) VALUES
+  (0, 'admin', 'Metros win season opener',             '2026-03-05 10:00:00', 'Great start to the season', '', 1),
+  (0, 'admin', 'Stars acquire top free agent',          '2026-03-04 10:00:00', 'Big move for the Stars',    '', 1),
+  (0, 'admin', 'Blockbuster trade shakes up the league', '2026-03-03 10:00:00', 'Three-team deal completed',  '', 2);
+
+-- Categories for search filter dropdown
+INSERT INTO nuke_stories_cat (catid, title) VALUES
+  (15, 'General')
+ON DUPLICATE KEY UPDATE title = VALUES(title);
+
+-- Authors for search filter dropdown (admin already used in stories above)
+INSERT INTO nuke_authors (aid, name) VALUES
+  ('admin', 'Admin')
+ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 -- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the

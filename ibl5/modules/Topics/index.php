@@ -18,6 +18,7 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
+use Search\SearchRepository;
 use Topics\TopicsRepository;
 use Topics\TopicsView;
 
@@ -26,7 +27,7 @@ get_lang($module_name);
 
 $pagetitle = "- " . _ACTIVETOPICS;
 
-global $mysqli_db, $prefix, $tipath;
+global $mysqli_db, $prefix, $user_prefix, $tipath, $articlecomm;
 
 $ThemeSel = get_theme();
 
@@ -37,12 +38,21 @@ $themePath = (is_dir("themes/{$ThemeSel}/images/topics/"))
 
 // Initialize services
 $service = new TopicsRepository($mysqli_db, $prefix);
+$searchRepo = new SearchRepository($mysqli_db, $prefix, $user_prefix);
 $view = new TopicsView();
 
 // Get topics data
 $topics = $service->getTopicsWithArticles();
 
+// Get search filter data
+$searchFilters = [
+    'topics' => $searchRepo->getTopics(),
+    'categories' => $searchRepo->getCategories(),
+    'authors' => $searchRepo->getAuthors(),
+    'articleComm' => (bool) ($articlecomm ?? false),
+];
+
 // Render page
 PageLayout\PageLayout::header();
-echo $view->render($topics, $themePath);
+echo $view->render($topics, $themePath, $searchFilters);
 PageLayout\PageLayout::footer();

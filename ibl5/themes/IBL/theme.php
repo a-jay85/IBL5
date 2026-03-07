@@ -100,7 +100,7 @@ function themeheader()
     $navView = new \Navigation\NavigationView($navConfig);
     echo $navView->render();
 
-    echo "<body bgcolor=\"$bgcolor1\"" . ($teamId ? " data-user-team-id=\"$teamId\"" : '') . ">";
+    echo "<body bgcolor=\"$bgcolor1\" style=\"--page-bg: $bgcolor1;\"" . ($teamId ? " data-user-team-id=\"$teamId\"" : '') . ">";
     echo "<div class=\"site-content\">\n";
 }
 

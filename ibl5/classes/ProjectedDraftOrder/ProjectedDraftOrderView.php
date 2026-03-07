@@ -65,7 +65,7 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         $colspan = $showPlayer ? '5' : '4';
         $tableId = $roundLabel === 'Round 1' ? ' id="draft-order-round1"' : '';
         $html = '<h3 class="ibl-table-title">' . HtmlSanitizer::e($roundLabel) . '</h3>';
-        $html .= '<table class="ibl-data-table projected-draft-order-table"' . $tableId . '>';
+        $html .= '<table class="ibl-data-table projected-draft-order-table sticky-header"' . $tableId . '>';
         $html .= '<thead><tr>';
         $html .= '<th>Pick</th>';
         $html .= '<th>Team</th>';

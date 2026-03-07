@@ -854,6 +854,55 @@
 }
 
 /* ==========================================================================
+   Pattern 4: Page-Level Sticky Header (.sticky-header)
+
+   Modifier for .ibl-data-table that makes thead stick to the viewport top
+   as the user scrolls the page. Unlike .sticky-table (which uses a scroll
+   wrapper), this works with the page's own scroll.
+
+   Usage: <table class="ibl-data-table sticky-header">
+   ========================================================================== */
+
+.ibl-data-table.sticky-header {
+    overflow: visible;
+    border-radius: var(--radius-lg, 0.5rem);
+}
+
+.sticky-header thead th {
+    position: sticky;
+    top: 72px; /* Below fixed nav (72px tall) */
+    z-index: 10;
+    background: var(--gradient-navy-header);
+}
+
+/* Rounded top corners on first/last header cells.
+   box-shadow in the page bg color masks content scrolling behind the corners.
+   --page-bg is set on <body> via inline style from PHP (see theme.php). */
+.sticky-header thead th:first-child {
+    border-top-left-radius: var(--radius-lg, 0.5rem);
+    box-shadow: -4px -4px 0 4px var(--page-bg, #eeeeee);
+}
+
+.sticky-header thead th:last-child {
+    border-top-right-radius: var(--radius-lg, 0.5rem);
+    box-shadow: 4px -4px 0 4px var(--page-bg, #eeeeee);
+}
+
+/* Rounded bottom corners on last row's first/last cells */
+.sticky-header tbody tr:last-child td:first-child {
+    border-bottom-left-radius: var(--radius-lg, 0.5rem);
+}
+
+.sticky-header tbody tr:last-child td:last-child {
+    border-bottom-right-radius: var(--radius-lg, 0.5rem);
+}
+
+/* Shadow on the last header cell's bottom border to hint at content beneath */
+.sticky-header thead {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* ==========================================================================
    Table Title (placed above table)
    ========================================================================== */
 

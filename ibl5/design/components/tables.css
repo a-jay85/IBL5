@@ -2250,4 +2250,56 @@ td.record-book-retired-cell {
     padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
 }
 
+/* ==========================================================================
+   Free Agency Tables (.fa-table)
+
+   Overrides for .ibl-data-table on the Free Agency page.
+   Wide tables with many rating columns need max-width: none and
+   border-based separators instead of empty separator cells.
+   ========================================================================== */
+
+.fa-table {
+    max-width: none;
+}
+
+/* Right-border separators — applied to the last cell before a column group boundary.
+   Coexists with the empty-cell .sep-team/.sep-weak pattern used by other modules. */
+.team-table th.sep-r-team,
+.team-table td.sep-r-team {
+    border-right: 2px solid var(--team-sep-color);
+}
+
+.team-table th.sep-r-weak,
+.team-table td.sep-r-weak {
+    border-right: 2px solid var(--gray-200, #e5e7eb);
+}
+
+/* Team cell border in FA tables */
+.fa-table td.ibl-team-cell--colored {
+    border-right: 2px solid var(--team-sep-color);
+    min-width: 120px;
+}
+
+/* Cap space footer */
+.cap-footer-row {
+    background-color: #cc0000;
+}
+.cap-footer-row:hover {
+    background-color: #cc0000;
+}
+.cap-footer-label {
+    text-align: right;
+    color: white;
+    font-weight: 700;
+}
+.cap-footer-spacer {
+    background-color: var(--page-bg, #eeeeee);
+}
+
+/* Team-table + sticky-table combo: use team header colors */
+.team-table.sticky-table thead th {
+    background: var(--team-header-bg);
+    color: var(--team-color-secondary);
+}
+
 } /* end @layer components */

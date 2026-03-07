@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Franchise Record Book — public page, no authentication required.
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -92,24 +92,12 @@ test.describe('Franchise Record Book flow', () => {
   test('no PHP errors on league-wide view', async ({ page }) => {
     await page.goto('modules.php?name=FranchiseRecordBook');
 
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on league-wide Record Book`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on league-wide Record Book');
   });
 
   test('no PHP errors on team view', async ({ page }) => {
     await page.goto('modules.php?name=FranchiseRecordBook&teamid=1');
 
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on team Record Book`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on team Record Book');
   });
 });

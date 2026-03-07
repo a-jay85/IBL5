@@ -1,23 +1,13 @@
-import { test, expect } from '@playwright/test';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
-import { setState, type Settings } from '../helpers/test-state';
+import { test, expect } from '../fixtures/public';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Public pages — no authentication required.
-// These use the base test (not the auth fixture) so they run without login.
-
-test.use({ storageState: { cookies: [], origins: [] } });
+// Uses the public fixture with appState for automatic state restore.
 
 test.describe('Public page smoke tests', () => {
   // Ensure trivia mode is off so modules render normally
-  let restoreSettings: Settings;
-
-  test.beforeEach(async ({ request }) => {
-    const result = await setState(request, { 'Trivia Mode': 'Off' });
-    restoreSettings = result.previous;
-  });
-
-  test.afterEach(async ({ request }) => {
-    await setState(request, restoreSettings);
+  test.beforeEach(async ({ appState }) => {
+    await appState({ 'Trivia Mode': 'Off' });
   });
 
   test('homepage loads', async ({ page }) => {
@@ -81,10 +71,7 @@ test.describe('Public page smoke tests', () => {
 
     for (const url of urls) {
       await page.goto(url);
-      const body = await page.locator('body').textContent();
-      for (const pattern of PHP_ERROR_PATTERNS) {
-        expect(body, `PHP error "${pattern}" found on ${url}`).not.toContain(pattern);
-      }
+      await assertNoPhpErrors(page, `on ${url}`);
     }
   });
 });

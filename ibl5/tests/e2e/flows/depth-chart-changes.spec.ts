@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/auth';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Depth Chart Changes — tests the JS change-detection (depth-chart-changes.js).
 // Extends depth-chart.spec.ts with glow/dirty indicator tests.
@@ -161,20 +161,11 @@ test.describe('Depth Chart change detection', () => {
       await page.waitForTimeout(500);
 
       // Page should still be functional (no errors)
-      const body = await page.locator('body').textContent();
-      for (const pattern of PHP_ERROR_PATTERNS) {
-        expect(body).not.toContain(pattern);
-      }
+      await assertNoPhpErrors(page);
     }
   });
 
   test('no PHP errors', async ({ page }) => {
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Depth Chart Entry`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Depth Chart Entry');
   });
 });

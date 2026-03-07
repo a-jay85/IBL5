@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Compare Players — public, no authentication required.
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -87,23 +87,11 @@ test.describe('Compare Players flow', () => {
 
   test('no PHP errors on compare players pages', async ({ page }) => {
     // Check form page
-    let body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Compare Players form page`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Compare Players form page');
 
     // Check results page with valid players
     await submitComparison(page);
 
-    body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Compare Players results page`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Compare Players results page');
   });
 });

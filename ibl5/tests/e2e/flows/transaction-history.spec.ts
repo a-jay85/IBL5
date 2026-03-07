@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Transaction History — public page, no authentication required.
 // NOTE: The form hidden field uses name=Transaction_History but the module
@@ -91,32 +91,17 @@ test.describe('Transaction History flow', () => {
       await page.goto(`${BASE}&year=${yearValue}&month=1&cat=6`);
 
       // Should show either table or empty state — no PHP errors either way
-      const body = await page.locator('body').textContent();
-      for (const pattern of PHP_ERROR_PATTERNS) {
-        expect(body).not.toContain(pattern);
-      }
+      await assertNoPhpErrors(page);
     }
   });
 
   test('no PHP errors on load and after filtering', async ({ page }) => {
     // Check initial page
-    let body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Transaction History page`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Transaction History page');
 
     // Filter and check again
     await page.goto(`${BASE}&cat=2`);
 
-    body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on filtered Transaction History page`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on filtered Transaction History page');
   });
 });

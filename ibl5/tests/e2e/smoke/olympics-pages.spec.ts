@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Olympics public pages — verify league-context table resolution works.
 // These pages append ?league=olympics to switch to Olympics context.
@@ -35,10 +35,7 @@ test.describe('Olympics page smoke tests', () => {
   test('no PHP errors on Olympics pages', async ({ page }) => {
     for (const url of OLYMPICS_URLS) {
       await page.goto(url);
-      const body = await page.locator('body').textContent();
-      for (const pattern of PHP_ERROR_PATTERNS) {
-        expect(body, `PHP error "${pattern}" found on ${url}`).not.toContain(pattern);
-      }
+      await assertNoPhpErrors(page, `on ${url}`);
     }
   });
 });

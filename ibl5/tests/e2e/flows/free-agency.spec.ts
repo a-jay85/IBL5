@@ -33,6 +33,26 @@ test.describe('Free Agency -- main page', () => {
     expect(style).toContain('--team');
   });
 
+  test('tables use proper scroll wrappers instead of inline styles', async ({ page }) => {
+    // Tables 1-3 use .table-scroll-wrapper
+    const scrollWrappers = await page.locator('.table-scroll-wrapper').count();
+    expect(scrollWrappers).toBeGreaterThanOrEqual(3);
+    // No inline overflow-x: auto wrapper divs
+    const inlineScrollDivs = await page.locator('div[style*="overflow-x: auto"]').count();
+    expect(inlineScrollDivs).toBe(0);
+  });
+
+  test('All Other Free Agents uses sticky scroll wrapper', async ({ page }) => {
+    const stickyWrapper = page.locator('.sticky-scroll-wrapper.page-sticky');
+    await expect(stickyWrapper).toBeVisible();
+  });
+
+  test('no empty separator cells in FA tables', async ({ page }) => {
+    const emptySepTeam = await page.locator('.fa-table td.sep-team').count();
+    const emptySepWeak = await page.locator('.fa-table td.sep-weak').count();
+    expect(emptySepTeam + emptySepWeak).toBe(0);
+  });
+
   test('cap space footer shows financial metrics', async ({ page }) => {
     const body = await page.locator('body').textContent();
     expect(body).toContain('Soft Cap Space');

@@ -44,11 +44,11 @@ class FreeAgencyView implements FreeAgencyViewInterface
         ?>
 <h2 class="ibl-title">Free Agency</h2>
 <img src="images/logo/<?= $team->teamID ?>.jpg" alt="Team Logo" class="team-logo-banner">
-<div style="margin-top: 1.5rem;"></div>
+<div class="mt-6"></div>
 <?= $this->renderPlayersUnderContract($team, $season, $capMetrics) ?>
-<div style="margin-top: 1.5rem;"></div>
+<div class="mt-6"></div>
 <?= $this->renderContractOffers($team, $capMetrics) ?>
-<div style="margin-top: 1.5rem;"></div>
+<div class="mt-6"></div>
 <?= $this->renderTeamFreeAgents($team, $season, $capMetrics) ?>
 <?= $this->renderOtherFreeAgents($team, $season, $allOtherPlayers) ?>
         <?php
@@ -96,8 +96,9 @@ class FreeAgencyView implements FreeAgencyViewInterface
     {
         ob_start();
         ?>
-<div style="overflow-x: auto; width: 0; min-width: 100%;">
-<table class="ibl-data-table team-table sortable" style="max-width: none; <?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
+<div class="table-scroll-wrapper">
+<div class="table-scroll-container">
+<table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <?= $this->renderColgroups(false) ?>
     <?= $this->renderTableHeader('Players Under Contract', false, $team, false) ?>
     <tbody>
@@ -134,13 +135,14 @@ class FreeAgencyView implements FreeAgencyViewInterface
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="30" style="text-align: right;"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary</em></strong></td>
+            <td colspan="33" class="cap-footer-label"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary</em></strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
                 <td><strong><em><?= $salary ?></em></strong></td>
             <?php endforeach; ?>
         </tr>
     </tfoot>
 </table>
+</div>
 </div>
         <?php
         return (string) ob_get_clean();
@@ -157,8 +159,9 @@ class FreeAgencyView implements FreeAgencyViewInterface
     {
         ob_start();
         ?>
-<div style="overflow-x: auto; width: 0; min-width: 100%;">
-<table class="ibl-data-table team-table sortable" style="max-width: none; <?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
+<div class="table-scroll-wrapper">
+<div class="table-scroll-container">
+<table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <?= $this->renderColgroups(false) ?>
     <?= $this->renderTableHeader('Contract Offers', false, $team, false) ?>
     <tbody>
@@ -186,7 +189,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="30" style="text-align: right;"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary Plus Contract Offers</em></strong></td>
+            <td colspan="33" class="cap-footer-label"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary Plus Contract Offers</em></strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
                 <td><strong><em><?= $salary ?></em></strong></td>
             <?php endforeach; ?>
@@ -194,6 +197,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <?= $this->renderCapSpaceFooter($team, $capMetrics) ?>
     </tfoot>
 </table>
+</div>
 </div>
         <?php
         return (string) ob_get_clean();
@@ -211,8 +215,9 @@ class FreeAgencyView implements FreeAgencyViewInterface
     {
         ob_start();
         ?>
-<div style="overflow-x: auto; width: 0; min-width: 100%;">
-<table class="ibl-data-table team-table sortable" style="max-width: none; <?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
+<div class="table-scroll-wrapper">
+<div class="table-scroll-container">
+<table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <?= $this->renderColgroups(false) ?>
     <?= $this->renderTableHeader('Unsigned Free Agents', true, $team, false) ?>
     <tbody>
@@ -251,6 +256,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     </tbody>
 </table>
 </div>
+</div>
         <?php
         return (string) ob_get_clean();
     }
@@ -267,8 +273,9 @@ class FreeAgencyView implements FreeAgencyViewInterface
     {
         ob_start();
         ?>
-<div style="overflow-x: auto; width: 0; min-width: 100%;">
-<table class="ibl-data-table team-table sortable" style="max-width: none; <?= \UI\TableStyles::inlineVars('666666', 'ffffff') ?>">
+<div class="sticky-scroll-wrapper page-sticky">
+<div class="sticky-scroll-container">
+<table class="ibl-data-table team-table fa-table sticky-table sortable" style="<?= \UI\TableStyles::inlineVars('666666', 'ffffff') ?>">
     <?= $this->renderColgroups() ?>
     <?= $this->renderTableHeader('All Other Free Agents', false, $team) ?>
     <tbody>
@@ -284,7 +291,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
             <?= $this->renderTeamCell($player) ?>
-            <td class="sep-team"></td>
             <td><?= $player->age ?? 0 ?></td>
             <?= $this->renderPlayerRatings($player) ?>
             <?= $this->renderPlayerDemands($demands) ?>
@@ -294,6 +300,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <?php endforeach; ?>
     </tbody>
 </table>
+</div>
 </div>
         <?php
         return (string) ob_get_clean();
@@ -308,12 +315,12 @@ class FreeAgencyView implements FreeAgencyViewInterface
     {
         ob_start();
         if ($showTeamColumn) {
-            ?><colgroup span="4"></colgroup><colgroup span="1"></colgroup><?php
+            ?><colgroup span="4"></colgroup><?php // Options, Pos, Player, Team
         } else {
-            ?><colgroup span="3"></colgroup><?php
+            ?><colgroup span="3"></colgroup><?php // Options, Pos, Player
         }
-        ?><colgroup span="1"></colgroup><colgroup span="6"></colgroup><colgroup span="7"></colgroup><colgroup span="4"></colgroup><colgroup span="4"></colgroup><colgroup span="3"></colgroup><colgroup span="6"></colgroup><colgroup span="5"></colgroup>
-        <?php
+        ?><colgroup span="7"></colgroup><colgroup span="7"></colgroup><colgroup span="8"></colgroup><colgroup span="3"></colgroup><colgroup span="6"></colgroup><colgroup span="5"></colgroup>
+        <?php // Age,2ga,2g%,fta,ft%,3ga,3g% | orb,drb,ast,stl,tvr,blk,foul | oo,do,po,to,od,dd,pd,td | T,S,I | Yr1-6 | Loy,PFW,PT,Sec,Trd
         return (string) ob_get_clean();
     }
 
@@ -333,11 +340,13 @@ class FreeAgencyView implements FreeAgencyViewInterface
             $fullTitle = $teamName . ' ' . $title;
         }
 
+        $colspan = $showTeamColumn ? 40 : 39;
+
         ob_start();
         ?>
     <thead>
         <tr>
-            <th colspan="41">
+            <th colspan="<?= $colspan ?>">
                 <?= $fullTitle ?>
                 <?php if ($showBirdRightsNote): ?>
                     <br><small>(Note: * and <em>italicized</em> indicates player has Bird Rights)</small>
@@ -349,41 +358,33 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <th>Pos</th>
             <th>Player</th>
             <?php if ($showTeamColumn): ?>
-            <th>Team</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">Team</th>
             <?php endif; ?>
             <th>Age</th>
             <th>2ga</th>
-            <th>2g%</th>
-            <th class="sep-weak"></th>
+            <th class="sep-r-weak">2g%</th>
             <th>fta</th>
-            <th>ft%</th>
-            <th class="sep-weak"></th>
+            <th class="sep-r-weak">ft%</th>
             <th>3ga</th>
-            <th>3g%</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">3g%</th>
             <th>orb</th>
             <th>drb</th>
             <th>ast</th>
             <th>stl</th>
             <th>tvr</th>
             <th>blk</th>
-            <th>foul</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">foul</th>
             <th>oo</th>
             <th>do</th>
             <th>po</th>
-            <th>to</th>
-            <th class="sep-weak"></th>
+            <th class="sep-r-weak">to</th>
             <th>od</th>
             <th>dd</th>
             <th>pd</th>
-            <th>td</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">td</th>
             <th>T</th>
             <th>S</th>
-            <th>I</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">I</th>
             <th>Yr1</th>
             <th>Yr2</th>
             <th>Yr3</th>
@@ -436,36 +437,29 @@ class FreeAgencyView implements FreeAgencyViewInterface
         ob_start();
         ?>
 <td><?= $player->ratingFieldGoalAttempts ?? 0 ?></td>
-<td><?= $player->ratingFieldGoalPercentage ?? 0 ?></td>
-<td class="sep-weak"></td>
+<td class="sep-r-weak"><?= $player->ratingFieldGoalPercentage ?? 0 ?></td>
 <td><?= $player->ratingFreeThrowAttempts ?? 0 ?></td>
-<td><?= $player->ratingFreeThrowPercentage ?? 0 ?></td>
-<td class="sep-weak"></td>
+<td class="sep-r-weak"><?= $player->ratingFreeThrowPercentage ?? 0 ?></td>
 <td><?= $player->ratingThreePointAttempts ?? 0 ?></td>
-<td><?= $player->ratingThreePointPercentage ?? 0 ?></td>
-<td class="sep-team"></td>
+<td class="sep-r-team"><?= $player->ratingThreePointPercentage ?? 0 ?></td>
 <td><?= $player->ratingOffensiveRebounds ?? 0 ?></td>
 <td><?= $player->ratingDefensiveRebounds ?? 0 ?></td>
 <td><?= $player->ratingAssists ?? 0 ?></td>
 <td><?= $player->ratingSteals ?? 0 ?></td>
 <td><?= $player->ratingTurnovers ?? 0 ?></td>
 <td><?= $player->ratingBlocks ?? 0 ?></td>
-<td><?= $player->ratingFouls ?? 0 ?></td>
-<td class="sep-team"></td>
+<td class="sep-r-team"><?= $player->ratingFouls ?? 0 ?></td>
 <td><?= $player->ratingOutsideOffense ?? 0 ?></td>
 <td><?= $player->ratingDriveOffense ?? 0 ?></td>
 <td><?= $player->ratingPostOffense ?? 0 ?></td>
-<td><?= $player->ratingTransitionOffense ?? 0 ?></td>
-<td class="sep-weak"></td>
+<td class="sep-r-weak"><?= $player->ratingTransitionOffense ?? 0 ?></td>
 <td><?= $player->ratingOutsideDefense ?? 0 ?></td>
 <td><?= $player->ratingDriveDefense ?? 0 ?></td>
 <td><?= $player->ratingPostDefense ?? 0 ?></td>
-<td><?= $player->ratingTransitionDefense ?? 0 ?></td>
-<td class="sep-team"></td>
+<td class="sep-r-team"><?= $player->ratingTransitionDefense ?? 0 ?></td>
 <td><?= $player->ratingTalent ?? 0 ?></td>
 <td><?= $player->ratingSkill ?? 0 ?></td>
-<td><?= $player->ratingIntangibles ?? 0 ?></td>
-<td class="sep-team"></td>
+<td class="sep-r-team"><?= $player->ratingIntangibles ?? 0 ?></td>
         <?php
         return (string) ob_get_clean();
     }
@@ -528,27 +522,27 @@ class FreeAgencyView implements FreeAgencyViewInterface
 
         ob_start();
         ?>
-<tr style="background-color: #cc0000;">
-    <td style="text-align: right; color: white;"><strong>MLE:</strong></td>
+<tr class="cap-footer-row">
+    <td class="cap-footer-label"><strong>MLE:</strong></td>
     <td><?= $MLEicon ?></td>
-    <td colspan="28" style="background-color: #eeeeee;"></td>
-    <td colspan="8" style="text-align: right; color: white;"><strong>Soft Cap Space</strong></td>
+    <td colspan="21" class="cap-footer-spacer"></td>
+    <td colspan="10" class="cap-footer-label"><strong>Soft Cap Space</strong></td>
     <?php foreach ($capMetrics['softCapSpace'] as $capSpace): ?>
         <td><?= $capSpace ?></td>
     <?php endforeach; ?>
 </tr>
-<tr style="background-color: #cc0000;">
-    <td style="text-align: right; color: white;"><strong>LLE:</strong></td>
+<tr class="cap-footer-row">
+    <td class="cap-footer-label"><strong>LLE:</strong></td>
     <td><?= $LLEicon ?></td>
-    <td colspan="28" style="background-color: #eeeeee;"></td>
-    <td colspan="8" style="text-align: right; color: white;"><strong>Hard Cap Space</strong></td>
+    <td colspan="21" class="cap-footer-spacer"></td>
+    <td colspan="10" class="cap-footer-label"><strong>Hard Cap Space</strong></td>
     <?php foreach ($capMetrics['hardCapSpace'] as $capSpace): ?>
         <td><?= $capSpace ?></td>
     <?php endforeach; ?>
 </tr>
-<tr style="background-color: #cc0000;">
-    <td colspan="30" style="background-color: #eeeeee;"></td>
-    <td colspan="8" style="text-align: right; color: white;"><strong>Empty Roster Slots</strong></td>
+<tr class="cap-footer-row">
+    <td colspan="22" class="cap-footer-spacer"></td>
+    <td colspan="11" class="cap-footer-label"><strong>Empty Roster Slots</strong></td>
     <?php foreach ($capMetrics['rosterSpots'] as $spots): ?>
         <td><?= $spots ?></td>
     <?php endforeach; ?>

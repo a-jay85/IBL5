@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import type { Page } from '@playwright/test';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // ---------------------------------------------------------------------------
 // Shared constants & helpers
@@ -602,19 +602,13 @@ test.describe('Trading pages: no PHP errors', () => {
     await page.goto(href!);
     await expect(page.locator('form[name="Trade_Offer"]')).toBeVisible();
 
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page);
   });
 
   test('no PHP errors on trade review page', async ({ appState, page }) => {
     await appState({ 'Allow Trades': 'Yes' });
     await page.goto('modules.php?name=Trading&op=reviewtrade');
 
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(body).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page);
   });
 });

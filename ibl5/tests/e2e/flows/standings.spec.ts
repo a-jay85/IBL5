@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Standings — public, no authentication required.
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -121,12 +121,6 @@ test.describe('Standings page flow', () => {
   });
 
   test('no PHP errors on standings page', async ({ page }) => {
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Standings page`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Standings page');
   });
 });

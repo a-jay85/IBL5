@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/auth';
-import { PHP_ERROR_PATTERNS } from '../helpers/php-errors';
+import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Waivers — authenticated page with explicit state control.
 // NOTE: NEVER submit a waiver claim — read-only assertions only.
@@ -13,13 +13,7 @@ test.describe('Waivers flow: closed', () => {
   });
 
   test('page loads without PHP errors', async ({ page }) => {
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Waivers page`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Waivers page');
   });
 
   test('shows closed message with no form elements', async ({ page }) => {
@@ -55,12 +49,6 @@ test.describe('Waivers flow: open', () => {
   });
 
   test('page loads without PHP errors', async ({ page }) => {
-    const body = await page.locator('body').textContent();
-    for (const pattern of PHP_ERROR_PATTERNS) {
-      expect(
-        body,
-        `PHP error "${pattern}" on Waivers page (open)`,
-      ).not.toContain(pattern);
-    }
+    await assertNoPhpErrors(page, 'on Waivers page (open)');
   });
 });

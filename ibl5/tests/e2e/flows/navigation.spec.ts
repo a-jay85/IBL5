@@ -1,16 +1,7 @@
 import { test, expect } from '../fixtures/auth';
-import type { Page } from '@playwright/test';
+import { desktopNav, openMobileMenu } from '../helpers/navigation';
 
 // Authenticated navigation flow tests — verify logged-in user experience.
-
-function desktopNav(page: Page) {
-  return page.locator('.hidden.lg\\:flex').first();
-}
-
-async function openMobileMenu(page: Page) {
-  await page.locator('#nav-hamburger').click();
-  return page.locator('#nav-mobile-menu');
-}
 
 test.describe('Navigation bar (authenticated, desktop)', () => {
   test('my team menu is visible for logged-in users', async ({ page }) => {

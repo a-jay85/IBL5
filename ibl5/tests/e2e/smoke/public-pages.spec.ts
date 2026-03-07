@@ -21,7 +21,7 @@ test.describe('Public page smoke tests', () => {
   });
 
   test('homepage loads', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('index.php');
     await expect(page).toHaveTitle(/IBL/i);
   });
 
@@ -69,7 +69,7 @@ test.describe('Public page smoke tests', () => {
 
   test('no PHP errors on key public pages', async ({ page }) => {
     const urls = [
-      '/',
+      'index.php',
       'modules.php?name=Standings',
       'modules.php?name=SeasonLeaderboards',
       'modules.php?name=CareerLeaderboards',

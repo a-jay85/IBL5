@@ -94,17 +94,12 @@ class FreeAgencyView implements FreeAgencyViewInterface
      */
     private function renderPlayersUnderContract(\Team $team, \Season $season, array $capMetrics): string
     {
-        $teamId = $team->teamID;
-        $teamNameStr = htmlspecialchars($team->name);
-        $color1 = htmlspecialchars($team->color1);
-        $color2 = htmlspecialchars($team->color2);
-
         ob_start();
         ?>
 <div style="overflow-x: auto; width: 0; min-width: 100%;">
 <table class="ibl-data-table team-table sortable" style="max-width: none; <?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
-    <?= $this->renderColgroups() ?>
-    <?= $this->renderTableHeader('Players Under Contract', false, $team) ?>
+    <?= $this->renderColgroups(false) ?>
+    <?= $this->renderTableHeader('Players Under Contract', false, $team, false) ?>
     <tbody>
         <?php
         $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamID);
@@ -127,8 +122,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
             </td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $playerName) ?>
-            <?= TeamCellHelper::renderTeamCell($teamId, $team->name, $team->color1, $team->color2) ?>
-            <td class="sep-team"></td>
             <td><?= $player->age ?? 0 ?></td>
             <?= $this->renderPlayerRatings($player) ?>
             <?php foreach ($futureSalaries as $salary): ?>
@@ -162,17 +155,12 @@ class FreeAgencyView implements FreeAgencyViewInterface
      */
     private function renderContractOffers(\Team $team, array $capMetrics): string
     {
-        $teamId = $team->teamID;
-        $teamNameStr = htmlspecialchars($team->name);
-        $color1 = htmlspecialchars($team->color1);
-        $color2 = htmlspecialchars($team->color2);
-
         ob_start();
         ?>
 <div style="overflow-x: auto; width: 0; min-width: 100%;">
 <table class="ibl-data-table team-table sortable" style="max-width: none; <?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
-    <?= $this->renderColgroups() ?>
-    <?= $this->renderTableHeader('Contract Offers', false, $team) ?>
+    <?= $this->renderColgroups(false) ?>
+    <?= $this->renderTableHeader('Contract Offers', false, $team, false) ?>
     <tbody>
         <?php
         $offersResult = $this->teamQueryRepo->getFreeAgencyOffers($team->teamID);
@@ -184,8 +172,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Negotiate</a></td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
-            <?= TeamCellHelper::renderTeamCell($teamId, $team->name, $team->color1, $team->color2) ?>
-            <td class="sep-team"></td>
             <td><?= $player->age ?? 0 ?></td>
             <?= $this->renderPlayerRatings($player) ?>
             <td><?= $offerRow['offer1'] ?></td>
@@ -223,17 +209,12 @@ class FreeAgencyView implements FreeAgencyViewInterface
      */
     private function renderTeamFreeAgents(\Team $team, \Season $season, array $capMetrics): string
     {
-        $teamId = $team->teamID;
-        $teamNameStr = htmlspecialchars($team->name);
-        $color1 = htmlspecialchars($team->color1);
-        $color2 = htmlspecialchars($team->color2);
-
         ob_start();
         ?>
 <div style="overflow-x: auto; width: 0; min-width: 100%;">
 <table class="ibl-data-table team-table sortable" style="max-width: none; <?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
-    <?= $this->renderColgroups() ?>
-    <?= $this->renderTableHeader('Unsigned Free Agents', true, $team) ?>
+    <?= $this->renderColgroups(false) ?>
+    <?= $this->renderTableHeader('Unsigned Free Agents', true, $team, false) ?>
     <tbody>
         <?php
         $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamID);
@@ -260,8 +241,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
                     <?= htmlspecialchars($resolved['name']) ?>
                 <?php endif; ?>
             </a></td>
-            <?= TeamCellHelper::renderTeamCell($teamId, $team->name, $team->color1, $team->color2) ?>
-            <td class="sep-team"></td>
             <td><?= $player->age ?? 0 ?></td>
             <?= $this->renderPlayerRatings($player) ?>
             <?= $this->renderPlayerDemands($demands) ?>
@@ -325,11 +304,15 @@ class FreeAgencyView implements FreeAgencyViewInterface
      *
      * @return string HTML colgroup elements
      */
-    private function renderColgroups(): string
+    private function renderColgroups(bool $showTeamColumn = true): string
     {
         ob_start();
-        ?>
-<colgroup span="4"></colgroup><colgroup span="1"></colgroup><colgroup span="1"></colgroup><colgroup span="6"></colgroup><colgroup span="7"></colgroup><colgroup span="4"></colgroup><colgroup span="4"></colgroup><colgroup span="3"></colgroup><colgroup span="6"></colgroup><colgroup span="5"></colgroup>
+        if ($showTeamColumn) {
+            ?><colgroup span="4"></colgroup><colgroup span="1"></colgroup><?php
+        } else {
+            ?><colgroup span="3"></colgroup><?php
+        }
+        ?><colgroup span="1"></colgroup><colgroup span="6"></colgroup><colgroup span="7"></colgroup><colgroup span="4"></colgroup><colgroup span="4"></colgroup><colgroup span="3"></colgroup><colgroup span="6"></colgroup><colgroup span="5"></colgroup>
         <?php
         return (string) ob_get_clean();
     }
@@ -342,7 +325,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
      * @param \Team $team Team object for name display
      * @return string HTML table header
      */
-    private function renderTableHeader(string $title, bool $showBirdRightsNote, \Team $team): string
+    private function renderTableHeader(string $title, bool $showBirdRightsNote, \Team $team, bool $showTeamColumn = true): string
     {
         $teamName = htmlspecialchars($team->name);
         $fullTitle = $title;
@@ -365,8 +348,10 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <th>Options</th>
             <th>Pos</th>
             <th>Player</th>
+            <?php if ($showTeamColumn): ?>
             <th>Team</th>
             <th class="sep-team"></th>
+            <?php endif; ?>
             <th>Age</th>
             <th>2ga</th>
             <th>2g%</th>

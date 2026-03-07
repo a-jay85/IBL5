@@ -59,7 +59,7 @@ CREATE TABLE `auth_users_audit_log` (
   KEY `event_at` (`event_at`),
   KEY `user_id_event_at` (`user_id`,`event_at`),
   KEY `user_id_event_type_event_at` (`user_id`,`event_type`,`event_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=256 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=268 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `auth_users_confirmations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -105,7 +105,7 @@ CREATE TABLE `auth_users_remembered` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `selector` (`selector`),
   KEY `user` (`user`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `auth_users_resets`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -455,7 +455,7 @@ CREATE TABLE `ibl_draft` (
   CONSTRAINT `fk_draft_tid` FOREIGN KEY (`tid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `chk_draft_round` CHECK (`round` >= 0 and `round` <= 7),
   CONSTRAINT `chk_draft_pick` CHECK (`pick` >= 0 and `pick` <= 32)
-) ENGINE=InnoDB AUTO_INCREMENT=57 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=169 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_draft_class`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -2075,7 +2075,7 @@ CREATE TABLE `ibl_saved_depth_chart_players` (
   KEY `idx_depth_chart_id` (`depth_chart_id`),
   KEY `idx_pid` (`pid`),
   CONSTRAINT `fk_saved_dc_header` FOREIGN KEY (`depth_chart_id`) REFERENCES `ibl_saved_depth_charts` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=1063 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1153 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_saved_depth_charts`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -2098,7 +2098,7 @@ CREATE TABLE `ibl_saved_depth_charts` (
   KEY `idx_tid_active` (`tid`,`is_active`),
   KEY `idx_tid_created` (`tid`,`created_at` DESC),
   KEY `idx_active` (`is_active`)
-) ENGINE=InnoDB AUTO_INCREMENT=59 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=61 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_schedule`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -2579,7 +2579,7 @@ CREATE TABLE `migrations` (
   `migration` varchar(255) NOT NULL,
   `batch` int(11) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=64 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=65 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `nuke_antiflood`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -3660,8 +3660,8 @@ SET character_set_client = @saved_cs_client;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_general_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`iblhoops_chibul`@`71.145.211.164` SQL SECURITY DEFINER */
-/*!50001 VIEW `vw_team_awards` AS select `ibl_team_awards`.`year` AS `year`,`ibl_team_awards`.`name` AS `name`,`ibl_team_awards`.`Award` AS `Award`,`ibl_team_awards`.`ID` AS `ID` from `ibl_team_awards` union all select `psr`.`year` AS `year`,`psr`.`winner` AS `name`,'IBL Champions' AS `Award`,0 AS `ID` from `vw_playoff_series_results` `psr` where `psr`.`round` = (select max(`psr2`.`round`) from `vw_playoff_series_results` `psr2` where `psr2`.`year` = `psr`.`year`) union all select `hc`.`year` AS `year`,`ti`.`team_name` AS `name`,'IBL HEAT Champions' AS `Award`,0 AS `ID` from ((select year(`bst`.`Date`) AS `year`,case when `bst`.`homeQ1points` + `bst`.`homeQ2points` + `bst`.`homeQ3points` + `bst`.`homeQ4points` + coalesce(`bst`.`homeOTpoints`,0) > `bst`.`visitorQ1points` + `bst`.`visitorQ2points` + `bst`.`visitorQ3points` + `bst`.`visitorQ4points` + coalesce(`bst`.`visitorOTpoints`,0) then `bst`.`homeTeamID` else `bst`.`visitorTeamID` end AS `winner_tid` from (`ibl_box_scores_teams` `bst` join (select year(`ibl_box_scores_teams`.`Date`) AS `yr`,max(`ibl_box_scores_teams`.`Date`) AS `last_date` from `ibl_box_scores_teams` where `ibl_box_scores_teams`.`game_type` = 3 group by year(`ibl_box_scores_teams`.`Date`)) `ld` on(`bst`.`Date` = `ld`.`last_date` and year(`bst`.`Date`) = `ld`.`yr`)) where `bst`.`game_type` = 3 and `bst`.`gameOfThatDay` = (select min(`bst2`.`gameOfThatDay`) from `ibl_box_scores_teams` `bst2` where `bst2`.`Date` = `ld`.`last_date` and `bst2`.`game_type` = 3) group by year(`bst`.`Date`)) `hc` join `ibl_team_info` `ti` on(`ti`.`teamid` = `hc`.`winner_tid`)) */;
+/*!50013 DEFINER=`iblhoops_chibul`@`localhost` SQL SECURITY DEFINER */
+/*!50001 VIEW `vw_team_awards` AS select `ibl_team_awards`.`year` AS `year`,`ibl_team_awards`.`name` AS `name`,`ibl_team_awards`.`Award` AS `Award`,`ibl_team_awards`.`ID` AS `ID` from `ibl_team_awards` union all select `psr`.`year` AS `year`,`psr`.`winner` AS `name`,'IBL Champions' AS `Award`,0 AS `ID` from `vw_playoff_series_results` `psr` where `psr`.`round` = (select max(`psr2`.`round`) from `vw_playoff_series_results` `psr2` where `psr2`.`year` = `psr`.`year`) and (select count(0) from `vw_playoff_series_results` `psr3` where `psr3`.`year` = `psr`.`year` and `psr3`.`round` = (select max(`psr4`.`round`) from `vw_playoff_series_results` `psr4` where `psr4`.`year` = `psr`.`year`)) = 1 union all select `hc`.`year` AS `year`,`ti`.`team_name` AS `name`,'IBL HEAT Champions' AS `Award`,0 AS `ID` from ((select year(`bst`.`Date`) AS `year`,case when `bst`.`homeQ1points` + `bst`.`homeQ2points` + `bst`.`homeQ3points` + `bst`.`homeQ4points` + coalesce(`bst`.`homeOTpoints`,0) > `bst`.`visitorQ1points` + `bst`.`visitorQ2points` + `bst`.`visitorQ3points` + `bst`.`visitorQ4points` + coalesce(`bst`.`visitorOTpoints`,0) then `bst`.`homeTeamID` else `bst`.`visitorTeamID` end AS `winner_tid` from (`ibl_box_scores_teams` `bst` join (select year(`ibl_box_scores_teams`.`Date`) AS `yr`,max(`ibl_box_scores_teams`.`Date`) AS `last_date` from `ibl_box_scores_teams` where `ibl_box_scores_teams`.`game_type` = 3 group by year(`ibl_box_scores_teams`.`Date`)) `ld` on(`bst`.`Date` = `ld`.`last_date` and year(`bst`.`Date`) = `ld`.`yr`)) where `bst`.`game_type` = 3 and `bst`.`gameOfThatDay` = (select min(`bst2`.`gameOfThatDay`) from `ibl_box_scores_teams` `bst2` where `bst2`.`Date` = `ld`.`last_date` and `bst2`.`game_type` = 3) group by year(`bst`.`Date`)) `hc` join `ibl_team_info` `ti` on(`ti`.`teamid` = `hc`.`winner_tid`)) */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;

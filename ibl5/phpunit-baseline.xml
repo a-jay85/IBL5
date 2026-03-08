@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<files version="1">
+ <file path="vendor/delight-im/auth/src/Auth.php">
+  <line number="231" hash="dfa72a36de2c84e4df360ff9351f240032d832db">
+   <issue><![CDATA[Delight\Auth\Auth::register(): Implicitly marking parameter $callback as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="274" hash="0051a4b3b4b204aa80458dab7e55157cb53b5b88">
+   <issue><![CDATA[Delight\Auth\Auth::registerWithUniqueUsername(): Implicitly marking parameter $callback as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="302" hash="46df202df303ce98bef19e519c6d6d6f15b7eed4">
+   <issue><![CDATA[Delight\Auth\Auth::login(): Implicitly marking parameter $onBeforeSuccess as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="328" hash="d6cd66f5f509f2ebdee4bfc19a6bac047897c3b7">
+   <issue><![CDATA[Delight\Auth\Auth::loginWithUsername(): Implicitly marking parameter $onBeforeSuccess as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+  <line number="1306" hash="fe20a2537dda9be06f69f1d25e88916af452ad16">
+   <issue><![CDATA[Delight\Auth\Auth::authenticateUserInternal(): Implicitly marking parameter $onBeforeSuccess as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+ </file>
+ <file path="vendor/delight-im/auth/src/UserManager.php">
+  <line number="131" hash="6ccad7f119c81ee60eb314de1283bee93b1accf6">
+   <issue><![CDATA[Delight\Auth\UserManager::createUserInternal(): Implicitly marking parameter $callback as nullable is deprecated, the explicit nullable type must be used instead]]></issue>
+  </line>
+ </file>
+</files>

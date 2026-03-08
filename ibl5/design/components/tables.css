@@ -842,6 +842,7 @@
     position: sticky;
     top: 0;
     z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .sticky-table thead th {
@@ -879,9 +880,8 @@
     border-right: 1px solid var(--gray-100);
 }
 
-.sticky-table thead tr th {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
+/* Header bottom shadow is on thead (above), not individual th cells,
+   to avoid overlapping shadows creating darker lines between columns. */
 
 .sticky-table thead .sticky-corner {
     box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
@@ -2311,9 +2311,13 @@ td.record-book-retired-cell {
 
 /* Right-border separators — applied to the last cell before a column group boundary.
    Coexists with the empty-cell .sep-team/.sep-weak pattern used by other modules. */
-.team-table th.sep-r-team,
 .team-table td.sep-r-team {
     border-right: 2px solid var(--team-sep-color);
+}
+
+/* In thead, the sep border must contrast against the dark header background */
+.team-table th.sep-r-team {
+    border-right: 2px solid rgba(255, 255, 255, 0.3);
 }
 
 .team-table th.sep-r-weak,

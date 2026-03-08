@@ -2310,11 +2310,20 @@ td.record-book-retired-cell {
     border-right: 2px solid var(--gray-200, #e5e7eb);
 }
 
-/* Team cell border in FA tables — width forces the column wider in auto-layout */
+/* FA tables: logo-only team cell (same treatment as mobile globally) */
+.fa-table .ibl-team-cell__text {
+    display: none;
+}
+
 .fa-table td.ibl-team-cell--colored {
     border-right: 2px solid var(--team-sep-color);
-    width: 120px;
-    min-width: 120px;
+    text-align: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.fa-table .ibl-team-cell--colored .ibl-team-cell__name {
+    justify-content: center;
 }
 
 /* Separator between Yr6 and Loy (6th from last td = last salary cell) */

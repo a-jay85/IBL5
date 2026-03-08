@@ -381,6 +381,56 @@
     text-align: right;
 }
 
+/* Contract hint cells — show salary zeros with dotted underline; reveal action link on hover/tap.
+   The link lives in the first hint cell and spans all 5 via width: 500% + overflow: visible. */
+.contract-hint-cell {
+    position: relative;
+    overflow: visible;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-decoration-color: var(--gray-400, #9ca3af);
+    text-underline-offset: 2px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.contract-hint-link {
+    display: none;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 10;
+    background-color: var(--team-row-hover-bg, var(--gray-100, #f3f4f6));
+    color: var(--accent-700, #c2410c);
+    text-decoration: underline;
+    font-weight: 600;
+    white-space: nowrap;
+    align-items: center;
+    justify-content: center;
+    /* width set by contract-hint.js */
+}
+
+/* Desktop: reveal link and hide zeros on hover */
+@media (hover: hover) {
+    tr:has(.contract-hint-cell):hover .contract-hint-link {
+        display: flex;
+    }
+    tr:has(.contract-hint-cell):hover .contract-hint-cell {
+        color: transparent;
+        text-decoration: none;
+    }
+}
+
+/* Mobile: reveal link and hide zeros on focus/tap */
+.contract-hint-cell:focus-within .contract-hint-link {
+    display: flex;
+}
+.contract-hint-cell:focus-within {
+    color: transparent;
+    text-decoration: none;
+}
+
 /* Team-colored tfoot */
 .team-table tfoot tr {
     background-color: var(--team-row-highlight-bg);
@@ -2332,15 +2382,9 @@ td.record-book-retired-cell {
 }
 
 /* Cap space footer */
-.cap-footer-row {
-    background-color: #cc0000;
-}
-.cap-footer-row:hover {
-    background-color: #cc0000;
-}
 .ibl-data-table td.cap-footer-label {
     text-align: right;
-    font-weight: 700;
+    font-weight: 400;
 }
 .cap-footer-spacer {
     background-color: var(--team-row-highlight-bg, #e5e7eb);

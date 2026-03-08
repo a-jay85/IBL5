@@ -109,7 +109,7 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
         $affectedRowsPositive = $this->cashRepository->insertCashPlayerRecord([
             'ordinal' => 100000,
             'pid' => $itemId,
-            'name' => "| <B>Cash to $listeningTeamName</B>",
+            'name' => "| Cash to $listeningTeamName",
             'tid' => $offeringTeamId,
             'exp' => $contractCurrentYear,
             'cy' => $contractCurrentYear,
@@ -130,7 +130,7 @@ class CashTransactionHandler implements CashTransactionHandlerInterface
         $affectedRowsNegative = $this->cashRepository->insertCashPlayerRecord([
             'ordinal' => 100000,
             'pid' => $itemId,
-            'name' => "| <B>Cash from $offeringTeamName</B>",
+            'name' => "| Cash from $offeringTeamName",
             'tid' => $listeningTeamId,
             'exp' => $contractCurrentYear,
             'cy' => $contractCurrentYear,

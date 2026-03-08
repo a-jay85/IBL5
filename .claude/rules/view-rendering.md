@@ -4,6 +4,12 @@ paths: "**/*View.php"
 
 # View Rendering Rules
 
+## Canonical View Examples
+Reference these before building new Views:
+- `FreeAgency/FreeAgencyView.php` — complex tables with sticky columns, team colors, footer rows
+- `PlayerInfo/PlayerInfoView.php` — cards, stats grids, tabbed layouts
+- `ScoParser/ScoParserView.php` — custom component with dedicated CSS
+
 ## XSS Protection (MANDATORY)
 ALL dynamic content must use `HtmlSanitizer::e()` (short alias) or `HtmlSanitizer::safeHtmlOutput()`:
 

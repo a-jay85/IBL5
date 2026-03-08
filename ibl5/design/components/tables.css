@@ -394,7 +394,8 @@
     -webkit-tap-highlight-color: transparent;
 }
 
-.ibl-data-table .contract-hint-link {
+.ibl-data-table .contract-hint-link,
+.ibl-data-table .contract-hint-link:visited {
     display: none;
     position: absolute;
     top: 0;

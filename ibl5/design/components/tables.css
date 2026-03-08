@@ -722,13 +722,6 @@
         /* Width set by JavaScript for iOS compatibility */
     }
 
-    /* Remove border-radius and padding on mobile for edge-to-edge tables */
-    .standings-table-container {
-        border-radius: 0;
-        padding: 0;
-        margin: 0;
-    }
-
     .table-scroll-wrapper {
         padding: 0;
         margin-left: 0;
@@ -1069,10 +1062,6 @@
     letter-spacing: 0.05em;
     padding: var(--space-1) var(--space-2);
 }
-
-/* .ibl-table-header removed — use .ibl-card__header (cards.css) instead.
-   For accent variant, use .ibl-card__header--accent.
-   For title, use .ibl-card__title. */
 
 /* ==========================================================================
    Table Row Variants
@@ -1542,8 +1531,6 @@ td.ibl-team-cell--colored {
     color: var(--gray-500);
 }
 
-/* .voting-submit-btn removed — use .ibl-btn .ibl-btn--primary .ibl-btn--lg instead */
-
 /* Mobile adjustments for voting form - keep full table display */
 @media (max-width: 768px) {
     .voting-category {
@@ -1752,20 +1739,6 @@ td.ibl-team-cell--colored {
     margin: 0 auto var(--space-6);
 }
 
-
-/* .league-stats-user-row replaced by .user-team-row (user-team-highlighter.js) */
-
-/* Specificity (0,2,0) beats .ibl-data-table td (0,1,1) for text-align override */
-.ibl-data-table .league-stats-team-cell {
-    text-align: left;
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-sm);
-}
-
-.league-stats-team-cell a {
-    font-weight: 600;
-    text-decoration: none;
-}
 
 /* ==========================================================================
    Contact List Table

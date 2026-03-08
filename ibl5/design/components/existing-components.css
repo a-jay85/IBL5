@@ -270,10 +270,6 @@
     color: var(--accent-500);
 }
 
-.leaders-tabbed__runner-team {
-    display: none;
-}
-
 .leaders-tabbed__runner-value {
     font-family: var(--font-display);
     font-size: 1rem;
@@ -476,8 +472,6 @@
 .ibl-title:first-child {
     margin-top: 0;
 }
-
-/* .ibl-title--large, .ibl-title--centered, .ibl-section-title removed — unused */
 
 /* ==========================================================================
    Responsive Grid Layouts
@@ -1038,8 +1032,6 @@ a.schedule-jump-btn:hover {
     text-align: center;
     margin-top: 1rem;
 }
-
-/* .draft-submit-btn removed — use .ibl-btn .ibl-btn--primary .ibl-btn--lg instead */
 
 /* Draft Pick Locator table overrides moved to tables.css */
 

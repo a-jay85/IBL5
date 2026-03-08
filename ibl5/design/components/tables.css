@@ -2345,6 +2345,20 @@ td.record-book-retired-cell {
     vertical-align: middle;
 }
 
+/* Fill thead cells with a solid background to eliminate subpixel gradient seams.
+   With border-collapse: separate, transparent th cells expose hairline gaps where
+   the thead gradient bleeds through on retina displays.  A solid fill covers them.
+   sep-r-team / sep-r-weak classes add explicit borders on cells that need them. */
+.contracts-table thead th {
+    background-color: var(--team-color-primary);
+}
+
+.contracts-table th,
+.contracts-table td {
+    border-left: 0;
+    border-right: 0;
+}
+
 /* Right-border separators — applied to the last cell before a column group boundary.
    Coexists with the empty-cell .sep-team/.sep-weak pattern used by other modules. */
 .team-table td.sep-r-team {

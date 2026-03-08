@@ -128,14 +128,14 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <td class="col-salary"><?= $futureSalaries[0] ?></td>
             <?php if ($hasRookieOption): ?>
                 <?php $actionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . ($player->playerID ?? 0) . '&amp;from=fa'; $actionLabel = 'Rookie Option'; ?>
-                <td class="col-salary contract-hint-cell"><?= $futureSalaries[1] ?><a href="<?= $actionUrl ?>" class="contract-hint-link"><?= $actionLabel ?></a></td>
+                <td class="col-salary contract-hint-cell"><?= $futureSalaries[1] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
                 <td class="col-salary contract-hint-cell"><?= $futureSalaries[2] ?></td>
                 <td class="col-salary contract-hint-cell"><?= $futureSalaries[3] ?></td>
                 <td class="col-salary contract-hint-cell"><?= $futureSalaries[4] ?></td>
                 <td class="col-salary contract-hint-cell"><?= $futureSalaries[5] ?></td>
             <?php elseif ($hasExtension): ?>
                 <?php $actionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . ($player->playerID ?? 0); $actionLabel = 'Contract Extension'; ?>
-                <td class="col-salary contract-hint-cell"><?= $futureSalaries[1] ?><a href="<?= $actionUrl ?>" class="contract-hint-link"><?= $actionLabel ?></a></td>
+                <td class="col-salary contract-hint-cell"><?= $futureSalaries[1] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
                 <td class="col-salary contract-hint-cell"><?= $futureSalaries[2] ?></td>
                 <td class="col-salary contract-hint-cell"><?= $futureSalaries[3] ?></td>
                 <td class="col-salary contract-hint-cell"><?= $futureSalaries[4] ?></td>

@@ -142,14 +142,14 @@ class Contracts
             <td class="col-salary"><?= $row['con1'] ?></td>
             <?php if ($hasRookieOption): ?>
             <?php $actionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . (int)$player->playerID . '&amp;from=team'; $actionLabel = 'Rookie Option'; ?>
-            <td class="col-salary contract-hint-cell"><?= $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link"><?= $actionLabel ?></a></td>
+            <td class="col-salary contract-hint-cell"><?= $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
             <td class="col-salary contract-hint-cell"><?= $row['con3'] ?></td>
             <td class="col-salary contract-hint-cell"><?= $row['con4'] ?></td>
             <td class="col-salary contract-hint-cell"><?= $row['con5'] ?></td>
             <td class="col-salary contract-hint-cell"><?= $row['con6'] ?></td>
             <?php elseif ($hasExtension): ?>
             <?php $actionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . (int)$player->playerID; $actionLabel = 'Contract Extension'; ?>
-            <td class="col-salary contract-hint-cell"><?= $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link"><?= $actionLabel ?></a></td>
+            <td class="col-salary contract-hint-cell"><?= $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
             <td class="col-salary contract-hint-cell"><?= $row['con3'] ?></td>
             <td class="col-salary contract-hint-cell"><?= $row['con4'] ?></td>
             <td class="col-salary contract-hint-cell"><?= $row['con5'] ?></td>

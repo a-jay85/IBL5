@@ -394,7 +394,7 @@
     -webkit-tap-highlight-color: transparent;
 }
 
-.contract-hint-link {
+.ibl-data-table .contract-hint-link {
     display: none;
     position: absolute;
     top: 0;
@@ -403,7 +403,7 @@
     z-index: 10;
     background-color: var(--team-row-hover-bg, var(--gray-100, #f3f4f6));
     color: var(--accent-700, #c2410c);
-    text-decoration: underline;
+    text-decoration-line: underline;
     font-weight: 600;
     white-space: nowrap;
     align-items: center;

@@ -14,10 +14,11 @@
             var cells = cell.parentElement.querySelectorAll('.contract-hint-cell');
             if (cells.length === 0) continue;
 
-            var first = cells[0];
-            var last = cells[cells.length - 1];
-            var width = last.offsetLeft + last.offsetWidth - first.offsetLeft;
-            link.style.width = width + 'px';
+            var firstRect = cells[0].getBoundingClientRect();
+            var lastCell = cells[cells.length - 1];
+            var lastRect = lastCell.getBoundingClientRect();
+            var borderRight = parseFloat(window.getComputedStyle(lastCell).borderRightWidth) || 0;
+            link.style.width = (lastRect.right - firstRect.left - borderRight) + 'px';
         }
     }
 

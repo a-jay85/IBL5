@@ -556,24 +556,26 @@ class FreeAgencyView implements FreeAgencyViewInterface
         ob_start();
         ?>
 <tr class="cap-footer-row">
-    <td class="cap-footer-label"><strong>MLE:</strong></td>
-    <td><?= $MLEicon ?></td>
-    <td colspan="16" class="cap-footer-spacer"></td>
+    <td colspan="18" class="cap-footer-spacer"></td>
     <td colspan="10" class="cap-footer-label"><strong>Soft Cap Space</strong></td>
     <?php foreach ($capMetrics['softCapSpace'] as $capSpace): ?>
         <td class="col-salary"><?= $capSpace ?></td>
     <?php endforeach; ?>
-    <td colspan="5" class="cap-footer-spacer"></td>
+    <td class="cap-footer-spacer"></td>
+    <td colspan="2" class="cap-footer-label"><strong>MLE:</strong></td>
+    <td><?= $MLEicon ?></td>
+    <td class="cap-footer-spacer"></td>
 </tr>
 <tr class="cap-footer-row">
-    <td class="cap-footer-label"><strong>LLE:</strong></td>
-    <td><?= $LLEicon ?></td>
-    <td colspan="16" class="cap-footer-spacer"></td>
+    <td colspan="18" class="cap-footer-spacer"></td>
     <td colspan="10" class="cap-footer-label"><strong>Hard Cap Space</strong></td>
     <?php foreach ($capMetrics['hardCapSpace'] as $capSpace): ?>
         <td class="col-salary"><?= $capSpace ?></td>
     <?php endforeach; ?>
-    <td colspan="5" class="cap-footer-spacer"></td>
+    <td class="cap-footer-spacer"></td>
+    <td colspan="2" class="cap-footer-label"><strong>LLE:</strong></td>
+    <td><?= $LLEicon ?></td>
+    <td class="cap-footer-spacer"></td>
 </tr>
 <tr class="cap-footer-row">
     <td colspan="18" class="cap-footer-spacer"></td>

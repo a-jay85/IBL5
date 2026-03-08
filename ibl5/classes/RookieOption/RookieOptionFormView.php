@@ -66,20 +66,13 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
     <strong style="font-weight: bold;">Warning:</strong><br>By exercising this option, you cannot use an in-season contract extension on this player next season. They will become a free agent after the option year.
 </div>
 
-<div class="ibl-card">
-    <div class="ibl-card__header">
-        <h2 class="ibl-card__title">Exercise Option</h2>
-    </div>
-    <div class="ibl-card__body" style="text-align: center;">
-        <form name="RookieExtend" method="post" action="modules.php?name=Player&amp;pa=processrookieoption">
-            <input type="hidden" name="teamname" value="<?= $teamNameEscaped ?>">
-            <input type="hidden" name="playerID" value="<?= $playerID ?>">
-            <input type="hidden" name="rookieOptionValue" value="<?= $rookieOptionValue ?>">
-            <input type="hidden" name="from" value="<?= $fromEscaped ?>">
-            <button type="submit" class="ibl-btn ibl-btn--danger">Exercise Rookie Option</button>
-        </form>
-    </div>
-</div>
+<form name="RookieExtend" method="post" action="modules.php?name=Player&amp;pa=processrookieoption" style="text-align: center;">
+    <input type="hidden" name="teamname" value="<?= $teamNameEscaped ?>">
+    <input type="hidden" name="playerID" value="<?= $playerID ?>">
+    <input type="hidden" name="rookieOptionValue" value="<?= $rookieOptionValue ?>">
+    <input type="hidden" name="from" value="<?= $fromEscaped ?>">
+    <button type="submit" class="ibl-btn ibl-btn--danger">Exercise Rookie Option</button>
+</form>
 
 </div>
         <?php

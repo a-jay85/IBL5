@@ -387,14 +387,14 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <th>tvr</th>
             <th>blk</th>
             <th class="sep-r-team">foul</th>
-            <th>oo</th>
-            <th>do</th>
-            <th>po</th>
-            <th>to</th>
-            <th>od</th>
-            <th>dd</th>
-            <th>pd</th>
-            <th class="sep-r-team">td</th>
+            <th class="col-odrt">oo</th>
+            <th class="col-odrt">do</th>
+            <th class="col-odrt">po</th>
+            <th class="col-odrt">to</th>
+            <th class="col-odrt">od</th>
+            <th class="col-odrt">dd</th>
+            <th class="col-odrt">pd</th>
+            <th class="col-odrt sep-r-team">td</th>
             <th>T</th>
             <th>S</th>
             <th class="sep-r-team">I</th>
@@ -468,14 +468,14 @@ class FreeAgencyView implements FreeAgencyViewInterface
 <td><?= $player->ratingTurnovers ?? 0 ?></td>
 <td><?= $player->ratingBlocks ?? 0 ?></td>
 <td class="sep-r-team"><?= $player->ratingFouls ?? 0 ?></td>
-<td><?= $player->ratingOutsideOffense ?? 0 ?></td>
-<td><?= $player->ratingDriveOffense ?? 0 ?></td>
-<td><?= $player->ratingPostOffense ?? 0 ?></td>
-<td class="sep-r-weak"><?= $player->ratingTransitionOffense ?? 0 ?></td>
-<td><?= $player->ratingOutsideDefense ?? 0 ?></td>
-<td><?= $player->ratingDriveDefense ?? 0 ?></td>
-<td><?= $player->ratingPostDefense ?? 0 ?></td>
-<td class="sep-r-team"><?= $player->ratingTransitionDefense ?? 0 ?></td>
+<td class="col-odrt"><?= $player->ratingOutsideOffense ?? 0 ?></td>
+<td class="col-odrt"><?= $player->ratingDriveOffense ?? 0 ?></td>
+<td class="col-odrt"><?= $player->ratingPostOffense ?? 0 ?></td>
+<td class="col-odrt sep-r-weak"><?= $player->ratingTransitionOffense ?? 0 ?></td>
+<td class="col-odrt"><?= $player->ratingOutsideDefense ?? 0 ?></td>
+<td class="col-odrt"><?= $player->ratingDriveDefense ?? 0 ?></td>
+<td class="col-odrt"><?= $player->ratingPostDefense ?? 0 ?></td>
+<td class="col-odrt sep-r-team"><?= $player->ratingTransitionDefense ?? 0 ?></td>
 <td><?= $player->ratingTalent ?? 0 ?></td>
 <td><?= $player->ratingSkill ?? 0 ?></td>
 <td class="sep-r-team"><?= $player->ratingIntangibles ?? 0 ?></td>

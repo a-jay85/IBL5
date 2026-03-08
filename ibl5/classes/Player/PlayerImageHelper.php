@@ -80,10 +80,20 @@ class PlayerImageHelper implements PlayerImageHelperInterface
      */
     public static function renderPlayerCell(int $playerID, string $displayName, array $starterPids = [], string $nameStatusClass = ''): string
     {
+        $hasPipe = str_contains($displayName, '|');
         $starterClass = in_array($playerID, $starterPids, true) ? ' is-starter' : '';
-        $thumbnail = str_contains($displayName, '|') ? '' : self::renderThumbnail($playerID);
-        $abbreviated = self::abbreviateFirstName($displayName);
         $statusClass = $nameStatusClass !== '' ? ' ' . $nameStatusClass : '';
+
+        // Cash rows (pipe-delimited names) get a single span — no thumbnail or abbreviation
+        if ($hasPipe) {
+            $cleanName = \Utilities\HtmlSanitizer::e(str_replace('|', '', strip_tags($displayName)));
+            return '<td class="sticky-col ibl-player-cell' . $starterClass . '">'
+                . '<span class="ibl-player-cell__name' . $statusClass . '">' . $cleanName . '</span>'
+                . '</td>';
+        }
+
+        $thumbnail = self::renderThumbnail($playerID);
+        $abbreviated = self::abbreviateFirstName($displayName);
 
         return '<td class="sticky-col ibl-player-cell' . $starterClass . '">'
             . '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'

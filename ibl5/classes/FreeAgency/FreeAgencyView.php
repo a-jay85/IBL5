@@ -115,7 +115,11 @@ class FreeAgencyView implements FreeAgencyViewInterface
                     $playerName .= "*";
                 }
             ?>
-        <?php $hasRookieOption = $player->canRookieOption($season->phase); ?>
+        <?php
+        $hasRookieOption = $player->canRookieOption($season->phase);
+        $isExtensionPhase = in_array($season->phase, ['Preseason', 'Regular Season', 'Playoffs'], true);
+        $hasExtension = !$hasRookieOption && $isExtensionPhase && $player->canRenegotiateContract();
+        ?>
         <tr>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $playerName) ?>
@@ -123,7 +127,19 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <?= $this->renderPlayerRatings($player) ?>
             <td class="col-salary"><?= $futureSalaries[0] ?></td>
             <?php if ($hasRookieOption): ?>
-                <td class="col-salary" colspan="5" style="text-align: center;"><a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= $player->playerID ?? 0 ?>&amp;from=fa" style="text-decoration: underline;">Rookie Option</a></td>
+                <?php $actionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . ($player->playerID ?? 0) . '&amp;from=fa'; $actionLabel = 'Rookie Option'; ?>
+                <td class="col-salary contract-hint-cell"><?= $futureSalaries[1] ?><a href="<?= $actionUrl ?>" class="contract-hint-link"><?= $actionLabel ?></a></td>
+                <td class="col-salary contract-hint-cell"><?= $futureSalaries[2] ?></td>
+                <td class="col-salary contract-hint-cell"><?= $futureSalaries[3] ?></td>
+                <td class="col-salary contract-hint-cell"><?= $futureSalaries[4] ?></td>
+                <td class="col-salary contract-hint-cell"><?= $futureSalaries[5] ?></td>
+            <?php elseif ($hasExtension): ?>
+                <?php $actionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . ($player->playerID ?? 0); $actionLabel = 'Contract Extension'; ?>
+                <td class="col-salary contract-hint-cell"><?= $futureSalaries[1] ?><a href="<?= $actionUrl ?>" class="contract-hint-link"><?= $actionLabel ?></a></td>
+                <td class="col-salary contract-hint-cell"><?= $futureSalaries[2] ?></td>
+                <td class="col-salary contract-hint-cell"><?= $futureSalaries[3] ?></td>
+                <td class="col-salary contract-hint-cell"><?= $futureSalaries[4] ?></td>
+                <td class="col-salary contract-hint-cell"><?= $futureSalaries[5] ?></td>
             <?php else: ?>
                 <td class="col-salary"><?= $futureSalaries[1] ?></td>
                 <td class="col-salary"><?= $futureSalaries[2] ?></td>
@@ -139,9 +155,9 @@ class FreeAgencyView implements FreeAgencyViewInterface
     <tfoot>
         <tr>
             <td colspan="17" class="cap-footer-spacer"></td>
-            <td colspan="10" style="text-align: right;"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary</em></strong></td>
+            <td colspan="10" style="text-align: right;"><strong><?= htmlspecialchars($team->name) ?> Total Salary</strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
-                <td class="col-salary"><strong><em><?= $salary ?></em></strong></td>
+                <td class="col-salary"><strong><?= $salary ?></strong></td>
             <?php endforeach; ?>
             <td colspan="5" class="cap-footer-spacer"></td>
         </tr>
@@ -195,9 +211,9 @@ class FreeAgencyView implements FreeAgencyViewInterface
     <tfoot>
         <tr>
             <td colspan="18" class="cap-footer-spacer"></td>
-            <td colspan="10" style="text-align: right;"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary Plus Contract Offers</em></strong></td>
+            <td colspan="10" style="text-align: right;"><strong><?= htmlspecialchars($team->name) ?> Total Salary Plus Contract Offers</strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
-                <td class="col-salary"><strong><em><?= $salary ?></em></strong></td>
+                <td class="col-salary"><strong><?= $salary ?></strong></td>
             <?php endforeach; ?>
             <td colspan="5" class="cap-footer-spacer"></td>
         </tr>
@@ -345,11 +361,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
      */
     private function renderTableHeader(string $title, bool $showBirdRightsNote, \Team $team, bool $showTeamColumn = true, bool $showOptionsColumn = true, ?\Season $season = null): string
     {
-        $teamName = htmlspecialchars($team->name);
         $fullTitle = $title;
-        if ($title !== 'All Other Free Agents') {
-            $fullTitle = $teamName . ' ' . $title;
-        }
 
         $colspan = 38 + ($showTeamColumn ? 1 : 0) + ($showOptionsColumn ? 1 : 0);
 
@@ -557,7 +569,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         ?>
 <tr class="cap-footer-row">
     <td colspan="18" class="cap-footer-spacer"></td>
-    <td colspan="10" class="cap-footer-label"><strong>Soft Cap Space</strong></td>
+    <td colspan="10" class="cap-footer-label">Soft Cap Space</td>
     <?php foreach ($capMetrics['softCapSpace'] as $capSpace): ?>
         <td class="col-salary"><?= $capSpace ?></td>
     <?php endforeach; ?>
@@ -568,7 +580,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
 </tr>
 <tr class="cap-footer-row">
     <td colspan="18" class="cap-footer-spacer"></td>
-    <td colspan="10" class="cap-footer-label"><strong>Hard Cap Space</strong></td>
+    <td colspan="10" class="cap-footer-label">Hard Cap Space</td>
     <?php foreach ($capMetrics['hardCapSpace'] as $capSpace): ?>
         <td class="col-salary"><?= $capSpace ?></td>
     <?php endforeach; ?>
@@ -579,7 +591,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
 </tr>
 <tr class="cap-footer-row">
     <td colspan="18" class="cap-footer-spacer"></td>
-    <td colspan="10" class="cap-footer-label"><strong>Empty Roster Slots</strong></td>
+    <td colspan="10" class="cap-footer-label">Empty Roster Slots</td>
     <?php foreach ($capMetrics['rosterSpots'] as $spots): ?>
         <td class="col-salary"><?= $spots ?></td>
     <?php endforeach; ?>

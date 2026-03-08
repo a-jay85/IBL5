@@ -71,6 +71,7 @@ class PageLayout
         echo "<script src=\"jslib/name-abbreviation.js\"></script>";
         echo "<script src=\"jslib/user-team-highlighter.js\"></script>";
         echo "<script src=\"jslib/sticky-page-header.js\"></script>";
+        echo "<script src=\"jslib/contract-hint.js\"></script>";
 
         // Meta tags (inlined from includes/meta.php)
         $charsetValue = defined('_CHARSET') ? \_CHARSET : null;

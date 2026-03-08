@@ -28,6 +28,7 @@ class Contracts
     public static function render(\mysqli $db, iterable $result, \Team $team, \Season $season, array $starterPids = [], array $excludeFromCapPids = []): string
     {
         $isFreeAgency = $season->isFreeAgencyPhase();
+        $isExtensionPhase = in_array($season->phase, ['Preseason', 'Regular Season', 'Playoffs'], true);
 
         if ($isFreeAgency) {
             $season->endingYear++;
@@ -126,7 +127,11 @@ class Contracts
 <?php foreach ($playerRows as $row):
     $player = $row['player'];
 ?>
-        <?php $hasRookieOption = !$row['isCashRow'] && $player->canRookieOption($season->phase); ?>
+        <?php
+        $isCashPlayer = $row['isCashRow'] || str_contains($player->name ?? '', '|');
+        $hasRookieOption = !$isCashPlayer && $player->canRookieOption($season->phase);
+        $hasExtension = !$isCashPlayer && !$hasRookieOption && $isExtensionPhase && $player->canRenegotiateContract();
+        ?>
         <tr<?= $row['isCashRow'] ? ' data-cash-row' : '' ?>>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
@@ -136,7 +141,19 @@ class Contracts
             <td class="sep-team"></td>
             <td class="col-salary"><?= $row['con1'] ?></td>
             <?php if ($hasRookieOption): ?>
-            <td class="col-salary" colspan="5" style="text-align: center;"><a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= (int)$player->playerID ?>&amp;from=team" style="text-decoration: underline;">Rookie Option</a></td>
+            <?php $actionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . (int)$player->playerID . '&amp;from=team'; $actionLabel = 'Rookie Option'; ?>
+            <td class="col-salary contract-hint-cell"><?= $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link"><?= $actionLabel ?></a></td>
+            <td class="col-salary contract-hint-cell"><?= $row['con3'] ?></td>
+            <td class="col-salary contract-hint-cell"><?= $row['con4'] ?></td>
+            <td class="col-salary contract-hint-cell"><?= $row['con5'] ?></td>
+            <td class="col-salary contract-hint-cell"><?= $row['con6'] ?></td>
+            <?php elseif ($hasExtension): ?>
+            <?php $actionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . (int)$player->playerID; $actionLabel = 'Contract Extension'; ?>
+            <td class="col-salary contract-hint-cell"><?= $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link"><?= $actionLabel ?></a></td>
+            <td class="col-salary contract-hint-cell"><?= $row['con3'] ?></td>
+            <td class="col-salary contract-hint-cell"><?= $row['con4'] ?></td>
+            <td class="col-salary contract-hint-cell"><?= $row['con5'] ?></td>
+            <td class="col-salary contract-hint-cell"><?= $row['con6'] ?></td>
             <?php else: ?>
             <td class="col-salary"><?= $row['con2'] ?></td>
             <td class="col-salary"><?= $row['con3'] ?></td>

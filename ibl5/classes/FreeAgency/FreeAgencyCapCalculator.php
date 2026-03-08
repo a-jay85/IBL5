@@ -105,7 +105,7 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
             if (!$player->isPlayerFreeAgent($this->season)) {
                 // Exclude players whose name starts with '|'
                 $firstChar = substr($player->name ?? '', 0, 1);
-                if ($player->teamName === $this->team->name && $firstChar !== '|') {
+                if ($firstChar !== '|') {
                     $futureSalaries = $player->getFutureSalaries();
                     $this->decrementRosterSpotsForSalaries($rosterSpots, $futureSalaries);
                 }

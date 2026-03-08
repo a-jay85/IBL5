@@ -394,7 +394,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <th>Yr3</th>
             <th>Yr4</th>
             <th>Yr5</th>
-            <th>Yr6</th>
+            <th class="sep-r-team">Yr6</th>
             <th>Loy</th>
             <th>PFW</th>
             <th>PT</th>

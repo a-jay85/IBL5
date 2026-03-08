@@ -1248,7 +1248,7 @@ td.ibl-team-cell--colored {
 }
 
 .ibl-player-cell a {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 6px;
 }

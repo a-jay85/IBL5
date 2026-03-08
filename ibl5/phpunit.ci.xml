@@ -138,4 +138,9 @@
             <directory>tests/FranchiseRecordBook</directory>
         </testsuite>
     </testsuites>
+    <source baseline="phpunit-baseline.xml">
+        <include>
+            <directory>classes</directory>
+        </include>
+    </source>
 </phpunit>

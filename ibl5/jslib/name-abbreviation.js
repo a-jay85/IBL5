@@ -11,6 +11,8 @@
     'use strict';
 
     const MOBILE_BREAKPOINT = 768;
+    /** Tables where names are always abbreviated (then selectively restored if they fit) */
+    const COMPACT_TABLE_SELECTOR = '.stat-table, .fa-table';
 
     /** Long team names mapped to shorter display forms */
     const TEAM_ABBREVIATIONS = {
@@ -95,9 +97,11 @@
         }
 
         // For player names: temporarily let the table size naturally.
-        const table = el.closest('.stat-table');
+        const table = el.closest(COMPACT_TABLE_SELECTOR);
         if (!table) return false;
-        const wrapper = table.closest('.stat-table-wrapper');
+        const wrapper = table.closest('.stat-table-wrapper')
+            || table.closest('.sticky-scroll-wrapper')
+            || table.closest('.table-scroll-wrapper');
         if (!wrapper) return false;
 
         const originalText = element.textContent;
@@ -131,16 +135,16 @@
                 link.dataset.fullName = textNode ? textNode.textContent.trim() : link.textContent.trim();
             }
 
-            const inStatTable = link.closest('.stat-table') !== null;
-            const shouldAbbreviate = isMobile || inStatTable;
+            const inCompactTable = link.closest(COMPACT_TABLE_SELECTOR) !== null;
+            const shouldAbbreviate = isMobile || inCompactTable;
             const newName = shouldAbbreviate ? abbreviateName(link.dataset.fullName) : link.dataset.fullName;
 
             setLinkText(link, textNode, newName);
         });
 
-        // Second pass: in stat tables, try restoring full names where they fit
+        // Second pass: in compact tables, try restoring full names where they fit
         nameLinks.forEach(link => {
-            if (link.closest('.stat-table') === null) return;
+            if (link.closest(COMPACT_TABLE_SELECTOR) === null) return;
             const nameEl = findTextNode(link) || link;
             const fullName = link.dataset.fullName;
             if (nameEl.textContent.trim() === fullName) return; // already full

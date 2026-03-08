@@ -375,9 +375,9 @@
     padding: 0;
 }
 
-/* Salary column left alignment */
-.team-table th.salary,
-.team-table td.salary {
+/* Salary year columns — left-aligned (shared between Contracts and Free Agency) */
+.team-table th.col-salary,
+.team-table td.col-salary {
     text-align: left;
 }
 
@@ -2282,6 +2282,17 @@ td.record-book-retired-cell {
     max-width: none;
 }
 
+/* Shrink all columns to content in FA and Contracts tables.
+   width: 1px prevents auto-layout from distributing extra space;
+   white-space: nowrap ensures content still forces the minimum needed width. */
+.fa-table th,
+.fa-table td,
+.contracts-table th,
+.contracts-table td {
+    width: 1px;
+    white-space: nowrap;
+}
+
 /* Right-border separators — applied to the last cell before a column group boundary.
    Coexists with the empty-cell .sep-team/.sep-weak pattern used by other modules. */
 .team-table td.sep-r-team {
@@ -2303,12 +2314,6 @@ td.record-book-retired-cell {
     border-right: 2px solid var(--team-sep-color);
     width: 120px;
     min-width: 120px;
-}
-
-/* Offensive/defensive rating columns (oo,do,po,to,od,dd,pd,td) — uniform width */
-.fa-table th.col-odrt,
-.fa-table td.col-odrt {
-    width: 22px;
 }
 
 /* Separator between Yr6 and Loy (6th from last td = last salary cell) */

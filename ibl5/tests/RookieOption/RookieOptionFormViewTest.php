@@ -81,7 +81,7 @@ class RookieOptionFormViewTest extends TestCase
         $this->assertStringContainsString('ibl-card__header', $output);
         $this->assertStringContainsString('ibl-card__title', $output);
         $this->assertStringContainsString('ibl-card__body', $output);
-        $this->assertStringContainsString('ibl-btn ibl-btn--primary', $output);
+        $this->assertStringContainsString('ibl-btn ibl-btn--danger', $output);
     }
 
     /**
@@ -209,13 +209,13 @@ class RookieOptionFormViewTest extends TestCase
     /**
      * Test form uses flex layout for player image
      */
-    public function testRenderFormUsesFlexLayout(): void
+    public function testRenderFormUsesCenteredLayout(): void
     {
         $mockPlayer = $this->createPlayerMock();
 
         $output = $this->view->renderForm($mockPlayer, 'Test Team', 500);
 
-        $this->assertStringContainsString('display: flex', $output);
+        $this->assertStringContainsString('text-align: center', $output);
         $this->assertStringContainsString('border-radius: 0.375rem', $output);
     }
 

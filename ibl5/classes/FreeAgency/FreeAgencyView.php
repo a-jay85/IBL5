@@ -99,8 +99,8 @@ class FreeAgencyView implements FreeAgencyViewInterface
 <div class="table-scroll-wrapper">
 <div class="table-scroll-container">
 <table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
-    <?= $this->renderColgroups(false) ?>
-    <?= $this->renderTableHeader('Players Under Contract', false, $team, false) ?>
+    <?= $this->renderColgroups(false, false) ?>
+    <?= $this->renderTableHeader('Players Under Contract', false, $team, false, false) ?>
     <tbody>
         <?php
         $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamID);
@@ -115,19 +115,22 @@ class FreeAgencyView implements FreeAgencyViewInterface
                     $playerName .= "*";
                 }
             ?>
+        <?php $hasRookieOption = $player->canRookieOption($season->phase); ?>
         <tr>
-            <td>
-                <?php if ($player->canRookieOption($season->phase)): ?>
-                    <a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= $player->playerID ?? 0 ?>&amp;from=fa">Rookie Option</a>
-                <?php endif; ?>
-            </td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $playerName) ?>
             <td><?= $player->age ?? 0 ?></td>
             <?= $this->renderPlayerRatings($player) ?>
-            <?php foreach ($futureSalaries as $salary): ?>
-                <td><?= $salary ?></td>
-            <?php endforeach; ?>
+            <td><?= $futureSalaries[0] ?></td>
+            <?php if ($hasRookieOption): ?>
+                <td colspan="5" style="text-align: left;"><a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= $player->playerID ?? 0 ?>&amp;from=fa">Rookie Option</a></td>
+            <?php else: ?>
+                <td><?= $futureSalaries[1] ?></td>
+                <td><?= $futureSalaries[2] ?></td>
+                <td><?= $futureSalaries[3] ?></td>
+                <td><?= $futureSalaries[4] ?></td>
+                <td><?= $futureSalaries[5] ?></td>
+            <?php endif; ?>
             <?= $this->renderPlayerPreferences($player) ?>
         </tr>
             <?php endif; ?>
@@ -135,7 +138,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="18" class="cap-footer-spacer"></td>
+            <td colspan="17" class="cap-footer-spacer"></td>
             <td colspan="10" style="text-align: right;"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary</em></strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
                 <td><strong><em><?= $salary ?></em></strong></td>
@@ -315,13 +318,17 @@ class FreeAgencyView implements FreeAgencyViewInterface
      *
      * @return string HTML colgroup elements
      */
-    private function renderColgroups(bool $showTeamColumn = true): string
+    private function renderColgroups(bool $showTeamColumn = true, bool $showOptionsColumn = true): string
     {
         ob_start();
-        if ($showTeamColumn) {
+        if ($showTeamColumn && $showOptionsColumn) {
             ?><colgroup span="4"></colgroup><?php // Options, Pos, Player, Team
-        } else {
+        } elseif ($showTeamColumn) {
+            ?><colgroup span="3"></colgroup><?php // Pos, Player, Team
+        } elseif ($showOptionsColumn) {
             ?><colgroup span="3"></colgroup><?php // Options, Pos, Player
+        } else {
+            ?><colgroup span="2"></colgroup><?php // Pos, Player
         }
         ?><colgroup span="7"></colgroup><colgroup span="7"></colgroup><colgroup span="8"></colgroup><colgroup span="3"></colgroup><colgroup span="6"></colgroup><colgroup span="5"></colgroup>
         <?php // Age,2ga,2g%,fta,ft%,3ga,3g% | orb,drb,ast,stl,tvr,blk,foul | oo,do,po,to,od,dd,pd,td | T,S,I | Yr1-6 | Loy,PFW,PT,Sec,Trd
@@ -336,7 +343,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
      * @param \Team $team Team object for name display
      * @return string HTML table header
      */
-    private function renderTableHeader(string $title, bool $showBirdRightsNote, \Team $team, bool $showTeamColumn = true): string
+    private function renderTableHeader(string $title, bool $showBirdRightsNote, \Team $team, bool $showTeamColumn = true, bool $showOptionsColumn = true): string
     {
         $teamName = htmlspecialchars($team->name);
         $fullTitle = $title;
@@ -344,7 +351,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             $fullTitle = $teamName . ' ' . $title;
         }
 
-        $colspan = $showTeamColumn ? 40 : 39;
+        $colspan = 38 + ($showTeamColumn ? 1 : 0) + ($showOptionsColumn ? 1 : 0);
 
         ob_start();
         ?>
@@ -358,7 +365,9 @@ class FreeAgencyView implements FreeAgencyViewInterface
             </th>
         </tr>
         <tr>
+            <?php if ($showOptionsColumn): ?>
             <th>Options</th>
+            <?php endif; ?>
             <th>Pos</th>
             <th>Player</th>
             <?php if ($showTeamColumn): ?>

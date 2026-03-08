@@ -126,6 +126,7 @@ class Contracts
 <?php foreach ($playerRows as $row):
     $player = $row['player'];
 ?>
+        <?php $hasRookieOption = !$row['isCashRow'] && $player->canRookieOption($season->phase); ?>
         <tr<?= $row['isCashRow'] ? ' data-cash-row' : '' ?>>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
@@ -134,11 +135,15 @@ class Contracts
             <td><?= (int)$player->birdYears ?></td>
             <td class="sep-team"></td>
             <td class="salary"><?= $row['con1'] ?></td>
+            <?php if ($hasRookieOption): ?>
+            <td class="salary" colspan="5" style="text-align: left;"><a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= (int)$player->playerID ?>&amp;from=team">Rookie Option</a></td>
+            <?php else: ?>
             <td class="salary"><?= $row['con2'] ?></td>
             <td class="salary"><?= $row['con3'] ?></td>
             <td class="salary"><?= $row['con4'] ?></td>
             <td class="salary"><?= $row['con5'] ?></td>
             <td class="salary"><?= $row['con6'] ?></td>
+            <?php endif; ?>
             <td class="sep-team"></td>
             <td><?= (int)$player->ratingTalent ?></td>
             <td><?= (int)$player->ratingSkill ?></td>

@@ -424,10 +424,10 @@
 }
 
 /* Mobile: reveal link and hide zeros on focus/tap */
-.contract-hint-cell:focus-within .contract-hint-link {
+tr:has(.contract-hint-cell):focus-within .contract-hint-link {
     display: flex;
 }
-.contract-hint-cell:focus-within {
+tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     color: transparent;
     text-decoration: none;
 }

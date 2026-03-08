@@ -440,7 +440,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         $teamId = $player->teamID ?? 0;
 
         if ($teamId === 0) {
-            return '<td>Free Agent</td>';
+            return '<td>FA</td>';
         }
 
         $teamName = $player->teamName ?? '';

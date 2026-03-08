@@ -95,7 +95,7 @@ class Contracts
 
         ob_start();
         ?>
-<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
+<table class="ibl-data-table team-table responsive-table contracts-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
             <th>Pos</th>
@@ -104,12 +104,12 @@ class Contracts
             <th>Exp</th>
             <th>Bird</th>
             <th class="sep-team"></th>
-            <th class="salary"><?= substr((string) ($season->endingYear - 1), -2) ?>-<?= substr((string) $season->endingYear, -2) ?></th>
-            <th class="salary"><?= substr((string) $season->endingYear, -2) ?>-<?= substr((string) ($season->endingYear + 1), -2) ?></th>
-            <th class="salary"><?= substr((string) ($season->endingYear + 1), -2) ?>-<?= substr((string) ($season->endingYear + 2), -2) ?></th>
-            <th class="salary"><?= substr((string) ($season->endingYear + 2), -2) ?>-<?= substr((string) ($season->endingYear + 3), -2) ?></th>
-            <th class="salary"><?= substr((string) ($season->endingYear + 3), -2) ?>-<?= substr((string) ($season->endingYear + 4), -2) ?></th>
-            <th class="salary"><?= substr((string) ($season->endingYear + 4), -2) ?>-<?= substr((string) ($season->endingYear + 5), -2) ?></th>
+            <th class="col-salary"><?= substr((string) ($season->endingYear - 1), -2) ?>-<?= substr((string) $season->endingYear, -2) ?></th>
+            <th class="col-salary"><?= substr((string) $season->endingYear, -2) ?>-<?= substr((string) ($season->endingYear + 1), -2) ?></th>
+            <th class="col-salary"><?= substr((string) ($season->endingYear + 1), -2) ?>-<?= substr((string) ($season->endingYear + 2), -2) ?></th>
+            <th class="col-salary"><?= substr((string) ($season->endingYear + 2), -2) ?>-<?= substr((string) ($season->endingYear + 3), -2) ?></th>
+            <th class="col-salary"><?= substr((string) ($season->endingYear + 3), -2) ?>-<?= substr((string) ($season->endingYear + 4), -2) ?></th>
+            <th class="col-salary"><?= substr((string) ($season->endingYear + 4), -2) ?>-<?= substr((string) ($season->endingYear + 5), -2) ?></th>
             <th class="sep-team"></th>
             <th>Tal</th>
             <th>Skl</th>
@@ -134,15 +134,15 @@ class Contracts
             <td><?= (int)$player->yearsOfExperience ?></td>
             <td><?= (int)$player->birdYears ?></td>
             <td class="sep-team"></td>
-            <td class="salary"><?= $row['con1'] ?></td>
+            <td class="col-salary"><?= $row['con1'] ?></td>
             <?php if ($hasRookieOption): ?>
-            <td class="salary" colspan="5" style="text-align: left;"><a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= (int)$player->playerID ?>&amp;from=team">Rookie Option</a></td>
+            <td class="col-salary" colspan="5" style="text-align: left;"><a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= (int)$player->playerID ?>&amp;from=team">Rookie Option</a></td>
             <?php else: ?>
-            <td class="salary"><?= $row['con2'] ?></td>
-            <td class="salary"><?= $row['con3'] ?></td>
-            <td class="salary"><?= $row['con4'] ?></td>
-            <td class="salary"><?= $row['con5'] ?></td>
-            <td class="salary"><?= $row['con6'] ?></td>
+            <td class="col-salary"><?= $row['con2'] ?></td>
+            <td class="col-salary"><?= $row['con3'] ?></td>
+            <td class="col-salary"><?= $row['con4'] ?></td>
+            <td class="col-salary"><?= $row['con5'] ?></td>
+            <td class="col-salary"><?= $row['con6'] ?></td>
             <?php endif; ?>
             <td class="sep-team"></td>
             <td><?= (int)$player->ratingTalent ?></td>
@@ -166,12 +166,12 @@ class Contracts
             <td></td>
             <td></td>
             <td class="sep-team"></td>
-            <td class="salary<?= $cap1 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap1 ?></td>
-            <td class="salary<?= $cap2 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap2 ?></td>
-            <td class="salary<?= $cap3 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap3 ?></td>
-            <td class="salary<?= $cap4 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap4 ?></td>
-            <td class="salary<?= $cap5 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap5 ?></td>
-            <td class="salary<?= $cap6 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap6 ?></td>
+            <td class="col-salary<?= $cap1 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap1 ?></td>
+            <td class="col-salary<?= $cap2 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap2 ?></td>
+            <td class="col-salary<?= $cap3 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap3 ?></td>
+            <td class="col-salary<?= $cap4 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap4 ?></td>
+            <td class="col-salary<?= $cap5 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap5 ?></td>
+            <td class="col-salary<?= $cap6 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap6 ?></td>
             <td class="sep-team"></td>
             <td></td>
             <td></td>

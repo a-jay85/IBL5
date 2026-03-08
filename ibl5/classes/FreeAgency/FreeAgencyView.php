@@ -47,7 +47,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
 <div class="mt-6"></div>
 <?= $this->renderPlayersUnderContract($team, $season, $capMetrics) ?>
 <div class="mt-6"></div>
-<?= $this->renderContractOffers($team, $capMetrics) ?>
+<?= $this->renderContractOffers($team, $season, $capMetrics) ?>
 <div class="mt-6"></div>
 <?= $this->renderTeamFreeAgents($team, $season, $capMetrics) ?>
 <?= $this->renderOtherFreeAgents($team, $season, $allOtherPlayers) ?>
@@ -100,7 +100,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
 <div class="table-scroll-container">
 <table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <?= $this->renderColgroups(false, false) ?>
-    <?= $this->renderTableHeader('Players Under Contract', false, $team, false, false) ?>
+    <?= $this->renderTableHeader('Players Under Contract', false, $team, false, false, $season) ?>
     <tbody>
         <?php
         $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamID);
@@ -121,15 +121,15 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $playerName) ?>
             <td><?= $player->age ?? 0 ?></td>
             <?= $this->renderPlayerRatings($player) ?>
-            <td><?= $futureSalaries[0] ?></td>
+            <td class="col-salary"><?= $futureSalaries[0] ?></td>
             <?php if ($hasRookieOption): ?>
-                <td colspan="5" style="text-align: left;"><a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= $player->playerID ?? 0 ?>&amp;from=fa">Rookie Option</a></td>
+                <td class="col-salary" colspan="5" style="text-align: left;"><a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= $player->playerID ?? 0 ?>&amp;from=fa">Rookie Option</a></td>
             <?php else: ?>
-                <td><?= $futureSalaries[1] ?></td>
-                <td><?= $futureSalaries[2] ?></td>
-                <td><?= $futureSalaries[3] ?></td>
-                <td><?= $futureSalaries[4] ?></td>
-                <td><?= $futureSalaries[5] ?></td>
+                <td class="col-salary"><?= $futureSalaries[1] ?></td>
+                <td class="col-salary"><?= $futureSalaries[2] ?></td>
+                <td class="col-salary"><?= $futureSalaries[3] ?></td>
+                <td class="col-salary"><?= $futureSalaries[4] ?></td>
+                <td class="col-salary"><?= $futureSalaries[5] ?></td>
             <?php endif; ?>
             <?= $this->renderPlayerPreferences($player) ?>
         </tr>
@@ -141,7 +141,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <td colspan="17" class="cap-footer-spacer"></td>
             <td colspan="10" style="text-align: right;"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary</em></strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
-                <td><strong><em><?= $salary ?></em></strong></td>
+                <td class="col-salary"><strong><em><?= $salary ?></em></strong></td>
             <?php endforeach; ?>
             <td colspan="5" class="cap-footer-spacer"></td>
         </tr>
@@ -160,7 +160,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
      * @param CapMetrics $capMetrics Cap metrics from service
      * @return string HTML table
      */
-    private function renderContractOffers(\Team $team, array $capMetrics): string
+    private function renderContractOffers(\Team $team, \Season $season, array $capMetrics): string
     {
         ob_start();
         ?>
@@ -168,7 +168,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
 <div class="table-scroll-container">
 <table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <?= $this->renderColgroups(false) ?>
-    <?= $this->renderTableHeader('Contract Offers', false, $team, false) ?>
+    <?= $this->renderTableHeader('Contract Offers', false, $team, false, true, $season) ?>
     <tbody>
         <?php
         $offersResult = $this->teamQueryRepo->getFreeAgencyOffers($team->teamID);
@@ -182,12 +182,12 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
             <td><?= $player->age ?? 0 ?></td>
             <?= $this->renderPlayerRatings($player) ?>
-            <td><?= $offerRow['offer1'] ?></td>
-            <td><?= $offerRow['offer2'] ?></td>
-            <td><?= $offerRow['offer3'] ?></td>
-            <td><?= $offerRow['offer4'] ?></td>
-            <td><?= $offerRow['offer5'] ?></td>
-            <td><?= $offerRow['offer6'] ?></td>
+            <td class="col-salary"><?= $offerRow['offer1'] ?></td>
+            <td class="col-salary"><?= $offerRow['offer2'] ?></td>
+            <td class="col-salary"><?= $offerRow['offer3'] ?></td>
+            <td class="col-salary"><?= $offerRow['offer4'] ?></td>
+            <td class="col-salary"><?= $offerRow['offer5'] ?></td>
+            <td class="col-salary"><?= $offerRow['offer6'] ?></td>
             <?= $this->renderPlayerPreferences($player) ?>
         </tr>
         <?php endforeach; ?>
@@ -197,7 +197,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <td colspan="18" class="cap-footer-spacer"></td>
             <td colspan="10" style="text-align: right;"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary Plus Contract Offers</em></strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
-                <td><strong><em><?= $salary ?></em></strong></td>
+                <td class="col-salary"><strong><em><?= $salary ?></em></strong></td>
             <?php endforeach; ?>
             <td colspan="5" class="cap-footer-spacer"></td>
         </tr>
@@ -226,7 +226,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
 <div class="table-scroll-container">
 <table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <?= $this->renderColgroups(false) ?>
-    <?= $this->renderTableHeader('Unsigned Free Agents', true, $team, false) ?>
+    <?= $this->renderTableHeader('Unsigned Free Agents', true, $team, false, true, $season) ?>
     <tbody>
         <?php
         $rosterRows = $this->teamQueryRepo->getRosterUnderContractOrderedByOrdinal($team->teamID);
@@ -284,7 +284,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
 <div class="sticky-scroll-container">
 <table class="ibl-data-table team-table fa-table sticky-table sortable" style="<?= \UI\TableStyles::inlineVars('666666', 'ffffff') ?>">
     <?= $this->renderColgroups() ?>
-    <?= $this->renderTableHeader('All Other Free Agents', false, $team) ?>
+    <?= $this->renderTableHeader('All Other Free Agents', false, $team, true, true, $season) ?>
     <tbody>
         <?php
         foreach ($allOtherPlayers as $playerRow):
@@ -343,7 +343,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
      * @param \Team $team Team object for name display
      * @return string HTML table header
      */
-    private function renderTableHeader(string $title, bool $showBirdRightsNote, \Team $team, bool $showTeamColumn = true, bool $showOptionsColumn = true): string
+    private function renderTableHeader(string $title, bool $showBirdRightsNote, \Team $team, bool $showTeamColumn = true, bool $showOptionsColumn = true, ?\Season $season = null): string
     {
         $teamName = htmlspecialchars($team->name);
         $fullTitle = $title;
@@ -352,6 +352,20 @@ class FreeAgencyView implements FreeAgencyViewInterface
         }
 
         $colspan = 38 + ($showTeamColumn ? 1 : 0) + ($showOptionsColumn ? 1 : 0);
+
+        // Season year headers (same format as Contracts table)
+        $yearHeaders = [];
+        if ($season !== null) {
+            $baseYear = $season->endingYear;
+            if ($season->isFreeAgencyPhase()) {
+                $baseYear++;
+            }
+            for ($i = 0; $i < 6; $i++) {
+                $yearHeaders[] = substr((string) ($baseYear - 1 + $i), -2) . '-' . substr((string) ($baseYear + $i), -2);
+            }
+        } else {
+            $yearHeaders = ['Yr1', 'Yr2', 'Yr3', 'Yr4', 'Yr5', 'Yr6'];
+        }
 
         ob_start();
         ?>
@@ -387,23 +401,23 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <th>tvr</th>
             <th>blk</th>
             <th class="sep-r-team">foul</th>
-            <th class="col-odrt">oo</th>
-            <th class="col-odrt">do</th>
-            <th class="col-odrt">po</th>
-            <th class="col-odrt">to</th>
-            <th class="col-odrt">od</th>
-            <th class="col-odrt">dd</th>
-            <th class="col-odrt">pd</th>
-            <th class="col-odrt sep-r-team">td</th>
+            <th>oo</th>
+            <th>do</th>
+            <th>po</th>
+            <th>to</th>
+            <th>od</th>
+            <th>dd</th>
+            <th>pd</th>
+            <th class="sep-r-team">td</th>
             <th>T</th>
             <th>S</th>
             <th class="sep-r-team">I</th>
-            <th>Yr1</th>
-            <th>Yr2</th>
-            <th>Yr3</th>
-            <th>Yr4</th>
-            <th>Yr5</th>
-            <th class="sep-r-team">Yr6</th>
+            <th class="col-salary"><?= $yearHeaders[0] ?></th>
+            <th class="col-salary"><?= $yearHeaders[1] ?></th>
+            <th class="col-salary"><?= $yearHeaders[2] ?></th>
+            <th class="col-salary"><?= $yearHeaders[3] ?></th>
+            <th class="col-salary"><?= $yearHeaders[4] ?></th>
+            <th class="col-salary sep-r-team"><?= $yearHeaders[5] ?></th>
             <th>Loy</th>
             <th>PFW</th>
             <th>PT</th>
@@ -468,14 +482,14 @@ class FreeAgencyView implements FreeAgencyViewInterface
 <td><?= $player->ratingTurnovers ?? 0 ?></td>
 <td><?= $player->ratingBlocks ?? 0 ?></td>
 <td class="sep-r-team"><?= $player->ratingFouls ?? 0 ?></td>
-<td class="col-odrt"><?= $player->ratingOutsideOffense ?? 0 ?></td>
-<td class="col-odrt"><?= $player->ratingDriveOffense ?? 0 ?></td>
-<td class="col-odrt"><?= $player->ratingPostOffense ?? 0 ?></td>
-<td class="col-odrt sep-r-weak"><?= $player->ratingTransitionOffense ?? 0 ?></td>
-<td class="col-odrt"><?= $player->ratingOutsideDefense ?? 0 ?></td>
-<td class="col-odrt"><?= $player->ratingDriveDefense ?? 0 ?></td>
-<td class="col-odrt"><?= $player->ratingPostDefense ?? 0 ?></td>
-<td class="col-odrt sep-r-team"><?= $player->ratingTransitionDefense ?? 0 ?></td>
+<td><?= $player->ratingOutsideOffense ?? 0 ?></td>
+<td><?= $player->ratingDriveOffense ?? 0 ?></td>
+<td><?= $player->ratingPostOffense ?? 0 ?></td>
+<td class="sep-r-weak"><?= $player->ratingTransitionOffense ?? 0 ?></td>
+<td><?= $player->ratingOutsideDefense ?? 0 ?></td>
+<td><?= $player->ratingDriveDefense ?? 0 ?></td>
+<td><?= $player->ratingPostDefense ?? 0 ?></td>
+<td class="sep-r-team"><?= $player->ratingTransitionDefense ?? 0 ?></td>
 <td><?= $player->ratingTalent ?? 0 ?></td>
 <td><?= $player->ratingSkill ?? 0 ?></td>
 <td class="sep-r-team"><?= $player->ratingIntangibles ?? 0 ?></td>
@@ -518,12 +532,12 @@ class FreeAgencyView implements FreeAgencyViewInterface
         $dem6 = $demands['dem6'] ?? 0;
 
         ob_start();
-        echo '<td>' . ($dem1 !== 0 ? $dem1 : '') . '</td>';
-        echo '<td>' . ($dem2 !== 0 ? $dem2 : '') . '</td>';
-        echo '<td>' . ($dem3 !== 0 ? $dem3 : '') . '</td>';
-        echo '<td>' . ($dem4 !== 0 ? $dem4 : '') . '</td>';
-        echo '<td>' . ($dem5 !== 0 ? $dem5 : '') . '</td>';
-        echo '<td>' . ($dem6 !== 0 ? $dem6 : '') . '</td>';
+        echo '<td class="col-salary">' . ($dem1 !== 0 ? $dem1 : '') . '</td>';
+        echo '<td class="col-salary">' . ($dem2 !== 0 ? $dem2 : '') . '</td>';
+        echo '<td class="col-salary">' . ($dem3 !== 0 ? $dem3 : '') . '</td>';
+        echo '<td class="col-salary">' . ($dem4 !== 0 ? $dem4 : '') . '</td>';
+        echo '<td class="col-salary">' . ($dem5 !== 0 ? $dem5 : '') . '</td>';
+        echo '<td class="col-salary">' . ($dem6 !== 0 ? $dem6 : '') . '</td>';
         return (string) ob_get_clean();
     }
 
@@ -547,7 +561,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     <td colspan="16" class="cap-footer-spacer"></td>
     <td colspan="10" class="cap-footer-label"><strong>Soft Cap Space</strong></td>
     <?php foreach ($capMetrics['softCapSpace'] as $capSpace): ?>
-        <td><?= $capSpace ?></td>
+        <td class="col-salary"><?= $capSpace ?></td>
     <?php endforeach; ?>
     <td colspan="5" class="cap-footer-spacer"></td>
 </tr>
@@ -557,7 +571,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     <td colspan="16" class="cap-footer-spacer"></td>
     <td colspan="10" class="cap-footer-label"><strong>Hard Cap Space</strong></td>
     <?php foreach ($capMetrics['hardCapSpace'] as $capSpace): ?>
-        <td><?= $capSpace ?></td>
+        <td class="col-salary"><?= $capSpace ?></td>
     <?php endforeach; ?>
     <td colspan="5" class="cap-footer-spacer"></td>
 </tr>
@@ -565,7 +579,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     <td colspan="18" class="cap-footer-spacer"></td>
     <td colspan="10" class="cap-footer-label"><strong>Empty Roster Slots</strong></td>
     <?php foreach ($capMetrics['rosterSpots'] as $spots): ?>
-        <td><?= $spots ?></td>
+        <td class="col-salary"><?= $spots ?></td>
     <?php endforeach; ?>
     <td colspan="5" class="cap-footer-spacer"></td>
 </tr>

@@ -2291,6 +2291,7 @@ td.record-book-retired-cell {
 .contracts-table td {
     width: 1px;
     white-space: nowrap;
+    vertical-align: middle;
 }
 
 /* Right-border separators — applied to the last cell before a column group boundary.

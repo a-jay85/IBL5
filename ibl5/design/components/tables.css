@@ -921,15 +921,21 @@
         box-shadow: none;
     }
 
-    /* Rounded corners on the table's corner cells since the wrapper no longer clips */
-    .page-sticky .sticky-table thead th:first-child {
+    /* Flat background on column headers row — gradient only on title row */
+    .page-sticky .sticky-table thead tr:last-child th {
+        background: var(--team-color-primary, var(--navy-800, #1e293b));
+    }
+
+    /* Rounded corners on title row only — column header row gets corners via JS clone */
+    .page-sticky .sticky-table thead tr:first-child th:first-child {
         border-top-left-radius: var(--radius-lg, 0.5rem);
     }
 
-    .page-sticky .sticky-table thead th:last-child {
+    .page-sticky .sticky-table thead tr:first-child th:last-child {
         border-top-right-radius: var(--radius-lg, 0.5rem);
     }
 
+    /* Rounded corners on body bottom cells since the wrapper no longer clips */
     .page-sticky .sticky-table tbody tr:last-child td:first-child {
         border-bottom-left-radius: var(--radius-lg, 0.5rem);
     }
@@ -943,11 +949,50 @@
     position: fixed;
     top: 72px;
     z-index: 40;
-    overflow-x: hidden;
-    overflow-y: visible;
     pointer-events: none;
     filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.15));
     border-radius: var(--radius-lg, 0.5rem) var(--radius-lg, 0.5rem) 0 0;
+}
+
+/* Inner wrapper clips the table horizontally */
+.page-sticky-header-clone-inner {
+    overflow: hidden;
+}
+
+/* Corner masks — painted ON TOP of the header via pseudo-elements.
+   Radial gradient: transparent quarter-circle (shows header), page-bg fill (masks corner). */
+.page-sticky-header-clone::before,
+.page-sticky-header-clone::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    width: var(--radius-lg, 0.5rem);
+    height: var(--radius-lg, 0.5rem);
+    z-index: 1;
+    pointer-events: none;
+}
+
+.page-sticky-header-clone::before {
+    left: 0;
+    background: radial-gradient(circle at 100% 100%, transparent 0, transparent var(--radius-lg, 0.5rem), var(--page-bg, #eeeeee) var(--radius-lg, 0.5rem));
+}
+
+.page-sticky-header-clone::after {
+    right: 0;
+    background: radial-gradient(circle at 0% 100%, transparent 0, transparent var(--radius-lg, 0.5rem), var(--page-bg, #eeeeee) var(--radius-lg, 0.5rem));
+}
+
+/* Remove table border (causes line artifact at top edge) */
+.page-sticky-header-clone table {
+    border: none;
+}
+
+/* Flat background — needs high specificity to override .team-table.sticky-table thead th */
+.page-sticky-header-clone .team-table.sticky-table thead th,
+.page-sticky-header-clone .sticky-table thead th,
+.page-sticky-header-clone th {
+    background: var(--team-color-primary, var(--navy-800, #1e293b));
+    box-shadow: none;
 }
 
 /* ==========================================================================
@@ -2274,10 +2319,16 @@ td.record-book-retired-cell {
     border-right: 2px solid var(--gray-200, #e5e7eb);
 }
 
-/* Team cell border in FA tables */
+/* Team cell border in FA tables — width forces the column wider in auto-layout */
 .fa-table td.ibl-team-cell--colored {
     border-right: 2px solid var(--team-sep-color);
+    width: 120px;
     min-width: 120px;
+}
+
+/* Separator between Yr6 and Loy (6th from last td = last salary cell) */
+.fa-table tbody td:nth-last-child(6) {
+    border-right: 2px solid var(--team-sep-color);
 }
 
 /* Cap space footer */

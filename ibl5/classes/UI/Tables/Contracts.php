@@ -136,7 +136,7 @@ class Contracts
             <td class="sep-team"></td>
             <td class="col-salary"><?= $row['con1'] ?></td>
             <?php if ($hasRookieOption): ?>
-            <td class="col-salary" colspan="5" style="text-align: left;"><a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= (int)$player->playerID ?>&amp;from=team">Rookie Option</a></td>
+            <td class="col-salary" colspan="5" style="text-align: center;"><a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= (int)$player->playerID ?>&amp;from=team">Rookie Option</a></td>
             <?php else: ?>
             <td class="col-salary"><?= $row['con2'] ?></td>
             <td class="col-salary"><?= $row['con3'] ?></td>

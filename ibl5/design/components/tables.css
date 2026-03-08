@@ -375,10 +375,10 @@
     padding: 0;
 }
 
-/* Salary year columns — left-aligned (shared between Contracts and Free Agency) */
+/* Salary year columns — right-aligned (shared between Contracts and Free Agency) */
 .team-table th.col-salary,
 .team-table td.col-salary {
-    text-align: left;
+    text-align: right;
 }
 
 /* Team-colored tfoot */

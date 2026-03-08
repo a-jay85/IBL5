@@ -135,11 +135,12 @@ class FreeAgencyView implements FreeAgencyViewInterface
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="28" class="cap-footer-label"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary</em></strong></td>
+            <td colspan="18" class="cap-footer-spacer"></td>
+            <td colspan="10" style="text-align: right;"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary</em></strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
                 <td><strong><em><?= $salary ?></em></strong></td>
             <?php endforeach; ?>
-            <td colspan="5"></td>
+            <td colspan="5" class="cap-footer-spacer"></td>
         </tr>
     </tfoot>
 </table>
@@ -190,11 +191,12 @@ class FreeAgencyView implements FreeAgencyViewInterface
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="28" class="cap-footer-label"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary Plus Contract Offers</em></strong></td>
+            <td colspan="18" class="cap-footer-spacer"></td>
+            <td colspan="10" style="text-align: right;"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary Plus Contract Offers</em></strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
                 <td><strong><em><?= $salary ?></em></strong></td>
             <?php endforeach; ?>
-            <td colspan="5"></td>
+            <td colspan="5" class="cap-footer-spacer"></td>
         </tr>
         <?= $this->renderCapSpaceFooter($team, $capMetrics) ?>
     </tfoot>

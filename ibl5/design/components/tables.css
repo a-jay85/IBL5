@@ -2338,13 +2338,12 @@ td.record-book-retired-cell {
 .cap-footer-row:hover {
     background-color: #cc0000;
 }
-.cap-footer-label {
+.ibl-data-table td.cap-footer-label {
     text-align: right;
-    color: white;
     font-weight: 700;
 }
 .cap-footer-spacer {
-    background-color: var(--page-bg, #eeeeee);
+    background-color: var(--team-row-highlight-bg, #e5e7eb);
 }
 
 /* Team-table + sticky-table combo: use team header colors */

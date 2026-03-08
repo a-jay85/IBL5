@@ -211,9 +211,9 @@ class DesktopNavView
         ob_start();
         ?>
         <div class="px-4 py-3 border-t border-white/10 bg-black/20">
-            <label class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>
+            <label for="desktop-league-select" class="block text-base font-semibold tracking-widest uppercase text-gray-500 mb-2">League</label>
             <div class="relative">
-                <select onchange="window.location.href=this.value" class="w-full appearance-none bg-white/10 text-white text-sm font-medium border border-white/20 rounded-lg px-3 py-2 pr-8 cursor-pointer hover:bg-white/15 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition-all">
+                <select id="desktop-league-select" name="league" onchange="window.location.href=this.value" class="w-full appearance-none bg-white/10 text-white text-sm font-medium border border-white/20 rounded-lg px-3 py-2 pr-8 cursor-pointer hover:bg-white/15 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500 transition-all">
                     <option value="index.php?league=ibl"<?= $iblSelected ?> class="bg-navy-800 text-white">IBL</option>
                     <option value="index.php?league=olympics"<?= $olympicsSelected ?> class="bg-navy-800 text-white">Olympics</option>
                 </select>

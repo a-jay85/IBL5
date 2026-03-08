@@ -402,7 +402,7 @@
     bottom: 0;
     left: 0;
     z-index: 10;
-    background-color: var(--team-row-hover-bg, var(--gray-100, #f3f4f6));
+    background-color: inherit;
     color: var(--accent-700, #c2410c);
     text-decoration-line: underline;
     font-weight: 600;

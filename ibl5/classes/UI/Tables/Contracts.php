@@ -103,19 +103,16 @@ class Contracts
             <th class="sticky-col">Player</th>
             <th>Age</th>
             <th>Exp</th>
-            <th>Bird</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">Bird</th>
             <th class="col-salary"><?= substr((string) ($season->endingYear - 1), -2) ?>-<?= substr((string) $season->endingYear, -2) ?></th>
             <th class="col-salary"><?= substr((string) $season->endingYear, -2) ?>-<?= substr((string) ($season->endingYear + 1), -2) ?></th>
             <th class="col-salary"><?= substr((string) ($season->endingYear + 1), -2) ?>-<?= substr((string) ($season->endingYear + 2), -2) ?></th>
             <th class="col-salary"><?= substr((string) ($season->endingYear + 2), -2) ?>-<?= substr((string) ($season->endingYear + 3), -2) ?></th>
             <th class="col-salary"><?= substr((string) ($season->endingYear + 3), -2) ?>-<?= substr((string) ($season->endingYear + 4), -2) ?></th>
-            <th class="col-salary"><?= substr((string) ($season->endingYear + 4), -2) ?>-<?= substr((string) ($season->endingYear + 5), -2) ?></th>
-            <th class="sep-team"></th>
+            <th class="col-salary sep-r-team"><?= substr((string) ($season->endingYear + 4), -2) ?>-<?= substr((string) ($season->endingYear + 5), -2) ?></th>
             <th>Tal</th>
             <th>Skl</th>
-            <th>Int</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">Int</th>
             <th>Loy</th>
             <th>PFW</th>
             <th>PT</th>
@@ -137,8 +134,7 @@ class Contracts
             <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
             <td><?= (int)$player->age ?></td>
             <td><?= (int)$player->yearsOfExperience ?></td>
-            <td><?= (int)$player->birdYears ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= (int)$player->birdYears ?></td>
             <td class="col-salary"><?= $row['con1'] ?></td>
             <?php if ($hasRookieOption): ?>
             <?php $actionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . (int)$player->playerID . '&amp;from=team'; $actionLabel = 'Rookie Option'; ?>
@@ -146,26 +142,24 @@ class Contracts
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con3'] ?></td>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con4'] ?></td>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con5'] ?></td>
-            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con6'] ?></td>
+            <td class="col-salary contract-hint-cell sep-r-team" tabindex="0"><?= $row['con6'] ?></td>
             <?php elseif ($hasExtension): ?>
             <?php $actionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . (int)$player->playerID; $actionLabel = 'Contract Extension'; ?>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con3'] ?></td>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con4'] ?></td>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con5'] ?></td>
-            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con6'] ?></td>
+            <td class="col-salary contract-hint-cell sep-r-team" tabindex="0"><?= $row['con6'] ?></td>
             <?php else: ?>
             <td class="col-salary"><?= $row['con2'] ?></td>
             <td class="col-salary"><?= $row['con3'] ?></td>
             <td class="col-salary"><?= $row['con4'] ?></td>
             <td class="col-salary"><?= $row['con5'] ?></td>
-            <td class="col-salary"><?= $row['con6'] ?></td>
+            <td class="col-salary sep-r-team"><?= $row['con6'] ?></td>
             <?php endif; ?>
-            <td class="sep-team"></td>
             <td><?= (int)$player->ratingTalent ?></td>
             <td><?= (int)$player->ratingSkill ?></td>
-            <td><?= (int)$player->ratingIntangibles ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= (int)$player->ratingIntangibles ?></td>
             <td><?= (int)$player->freeAgencyLoyalty ?></td>
             <td><?= (int)$player->freeAgencyPlayForWinner ?></td>
             <td><?= (int)$player->freeAgencyPlayingTime ?></td>
@@ -181,19 +175,16 @@ class Contracts
             <td>Cap Totals</td>
             <td></td>
             <td></td>
-            <td></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"></td>
             <td class="col-salary<?= $cap1 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap1 ?></td>
             <td class="col-salary<?= $cap2 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap2 ?></td>
             <td class="col-salary<?= $cap3 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap3 ?></td>
             <td class="col-salary<?= $cap4 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap4 ?></td>
             <td class="col-salary<?= $cap5 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap5 ?></td>
-            <td class="col-salary<?= $cap6 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap6 ?></td>
-            <td class="sep-team"></td>
+            <td class="col-salary sep-r-team<?= $cap6 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap6 ?></td>
             <td></td>
             <td></td>
-            <td></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"></td>
             <td></td>
             <td></td>
             <td></td>
@@ -201,7 +192,7 @@ class Contracts
             <td></td>
         </tr>
         <tr class="tfoot-legend">
-            <td colspan="22" style="text-align: left;">
+            <td colspan="19" style="text-align: left;">
                 Key: &nbsp; <i>(Waived)*</i> &nbsp; Becomes Free Agent^
             </td>
         </tr>

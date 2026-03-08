@@ -33,6 +33,27 @@ Replace deprecated tags:
 | `<center>` | `<div style="text-align: center;">` |
 | `border=1` | `style="border: 1px solid #000; border-collapse: collapse;"` |
 
+## View Class Structure
+
+All View classes use output buffering with `ob_start()` / `ob_get_clean()`:
+
+```php
+public function renderSection(array $data): string
+{
+    ob_start();
+    ?>
+    <div class="existing-component-class">
+        <h2><?= HtmlSanitizer::e($data['title']) ?></h2>
+    </div>
+    <?php
+    return (string) ob_get_clean();
+}
+```
+
+Delegate to UI helpers instead of building markup inline:
+- `UI\TableStyles` — team-colored styling (row backgrounds, hover effects, CSS custom properties)
+- `UI\TeamCellHelper` — team name cells with consistent formatting
+
 ## CSS Centralization
 When inline styles repeat 2+ times, extract to a CSS file in `ibl5/design/components/`. Never write `<style>` blocks in PHP view files — all CSS must be centralized. For dynamic team colors, use CSS custom properties set via inline `style` attributes on container elements, with the corresponding rules in centralized CSS files.
 

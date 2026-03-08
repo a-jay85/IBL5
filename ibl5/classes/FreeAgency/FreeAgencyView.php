@@ -123,7 +123,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <?= $this->renderPlayerRatings($player) ?>
             <td class="col-salary"><?= $futureSalaries[0] ?></td>
             <?php if ($hasRookieOption): ?>
-                <td class="col-salary" colspan="5" style="text-align: center;"><a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= $player->playerID ?? 0 ?>&amp;from=fa">Rookie Option</a></td>
+                <td class="col-salary" colspan="5" style="text-align: center;"><a href="modules.php?name=Player&amp;pa=rookieoption&amp;pid=<?= $player->playerID ?? 0 ?>&amp;from=fa" style="text-decoration: underline;">Rookie Option</a></td>
             <?php else: ?>
                 <td class="col-salary"><?= $futureSalaries[1] ?></td>
                 <td class="col-salary"><?= $futureSalaries[2] ?></td>

@@ -120,8 +120,8 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
 <div style="display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap;">
     <?php for ($i = 1; $i <= 6; $i++): ?>
     <div style="text-align: center;">
-        <label class="ibl-label" style="font-size: 0.75rem; display: block;">Yr <?= $i ?></label>
-        <input type="number" class="ibl-input ibl-input--sm" style="width: 4.5rem;" name="offeryear<?= $i ?>" value="<?= $prefills["offer{$i}"] !== 0 ? $prefills["offer{$i}"] : '' ?>" min="0" max="9999">
+        <label for="offeryear<?= $i ?>" class="ibl-label" style="font-size: 0.75rem; display: block;">Yr <?= $i ?></label>
+        <input type="number" id="offeryear<?= $i ?>" class="ibl-input ibl-input--sm" style="width: 4.5rem;" name="offeryear<?= $i ?>" value="<?= $prefills["offer{$i}"] !== 0 ? $prefills["offer{$i}"] : '' ?>" min="0" max="9999">
     </div>
     <?php endfor; ?>
 </div>

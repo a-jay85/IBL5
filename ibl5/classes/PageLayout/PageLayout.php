@@ -58,8 +58,8 @@ class PageLayout
             }
         }
 
-        echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">';
-        echo '<html xmlns="http://www.w3.org/1999/xhtml">';
+        echo '<!DOCTYPE html>';
+        echo '<html lang="en">';
         echo "<head>\n";
         if ($relativePath !== '') {
             echo "<base href=\"{$relativePath}\">\n";

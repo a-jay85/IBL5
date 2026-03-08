@@ -177,7 +177,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             $player = Player::withPlayerID($this->mysqli_db, $offerRow['pid'] ?? 0);
             ?>
         <tr>
-            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Negotiate</a></td>
+            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Offer</a></td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
             <td><?= $player->age ?? 0 ?></td>
@@ -240,7 +240,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         <tr>
             <td>
                 <?php if ($capMetrics['rosterSpots'][0] > 0): ?>
-                    <a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Negotiate</a>
+                    <a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Offer</a>
                 <?php endif; ?>
             </td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
@@ -294,7 +294,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
                 $demands = $player->getFreeAgencyDemands();
         ?>
         <tr>
-            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Negotiate</a></td>
+            <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Offer</a></td>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
             <?= $this->renderTeamCell($player) ?>
@@ -380,7 +380,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         </tr>
         <tr>
             <?php if ($showOptionsColumn): ?>
-            <th>Options</th>
+            <th></th>
             <?php endif; ?>
             <th>Pos</th>
             <th>Player</th>

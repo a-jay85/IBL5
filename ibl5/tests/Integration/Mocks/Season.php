@@ -76,6 +76,20 @@ class Season
     {
         return $this->phase === 'Free Agency';
     }
+
+    /**
+     * Check if trades are currently allowed (mock implementation)
+     *
+     * @see \Season::areTradesAllowed()
+     */
+    public function areTradesAllowed(): bool
+    {
+        if ($this->phase === 'Draft' || $this->phase === 'Free Agency') {
+            return true;
+        }
+
+        return $this->allowTrades === 'Yes';
+    }
     
     public function getSeasonEndingYear(): string
     {

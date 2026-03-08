@@ -2332,6 +2332,14 @@ td.record-book-retired-cell {
     min-width: 120px;
 }
 
+/* Offensive/defensive rating columns (oo,do,po,to,od,dd,pd,td) — uniform width */
+.fa-table th.col-odrt,
+.fa-table td.col-odrt {
+    width: 22px;
+    max-width: 22px;
+    box-sizing: border-box;
+}
+
 /* Separator between Yr6 and Loy (6th from last td = last salary cell) */
 .fa-table tbody td:nth-last-child(6) {
     border-right: 2px solid var(--team-sep-color);

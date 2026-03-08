@@ -112,7 +112,7 @@
 .ibl-data-table td {
     color: var(--gray-800, #1f2937);
     font-size: 1rem;
-    padding: 0.25rem 0.2rem;
+    padding: 0.25rem 0.1rem;
     text-align: center;
     border-bottom: 1px solid var(--gray-100);
 }

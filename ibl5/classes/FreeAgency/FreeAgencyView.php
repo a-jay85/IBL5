@@ -135,10 +135,11 @@ class FreeAgencyView implements FreeAgencyViewInterface
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="33" class="cap-footer-label"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary</em></strong></td>
+            <td colspan="28" class="cap-footer-label"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary</em></strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
                 <td><strong><em><?= $salary ?></em></strong></td>
             <?php endforeach; ?>
+            <td colspan="5"></td>
         </tr>
     </tfoot>
 </table>
@@ -189,10 +190,11 @@ class FreeAgencyView implements FreeAgencyViewInterface
     </tbody>
     <tfoot>
         <tr>
-            <td colspan="33" class="cap-footer-label"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary Plus Contract Offers</em></strong></td>
+            <td colspan="28" class="cap-footer-label"><strong><em><?= htmlspecialchars($team->name) ?> Total Salary Plus Contract Offers</em></strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
                 <td><strong><em><?= $salary ?></em></strong></td>
             <?php endforeach; ?>
+            <td colspan="5"></td>
         </tr>
         <?= $this->renderCapSpaceFooter($team, $capMetrics) ?>
     </tfoot>
@@ -362,9 +364,9 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <?php endif; ?>
             <th>Age</th>
             <th>2ga</th>
-            <th class="sep-r-weak">2g%</th>
+            <th>2g%</th>
             <th>fta</th>
-            <th class="sep-r-weak">ft%</th>
+            <th>ft%</th>
             <th>3ga</th>
             <th class="sep-r-team">3g%</th>
             <th>orb</th>
@@ -377,7 +379,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             <th>oo</th>
             <th>do</th>
             <th>po</th>
-            <th class="sep-r-weak">to</th>
+            <th>to</th>
             <th>od</th>
             <th>dd</th>
             <th>pd</th>
@@ -416,11 +418,17 @@ class FreeAgencyView implements FreeAgencyViewInterface
             return '<td>Free Agent</td>';
         }
 
+        $teamName = $player->teamName ?? '';
+        if ($teamName === '') {
+            $commonRepo = new \Services\CommonMysqliRepository($this->mysqli_db);
+            $teamName = $commonRepo->getTeamnameFromTeamID($teamId) ?? '';
+        }
+
         $teamColors = \Player\Views\TeamColorHelper::getTeamColors($this->mysqli_db, $teamId);
 
         return TeamCellHelper::renderTeamCellOrFreeAgent(
             $teamId,
-            $player->teamName ?? '',
+            $teamName,
             $teamColors['color1'] ?? 'D4AF37',
             $teamColors['color2'] ?? '1e3a5f',
         );
@@ -525,27 +533,30 @@ class FreeAgencyView implements FreeAgencyViewInterface
 <tr class="cap-footer-row">
     <td class="cap-footer-label"><strong>MLE:</strong></td>
     <td><?= $MLEicon ?></td>
-    <td colspan="21" class="cap-footer-spacer"></td>
+    <td colspan="16" class="cap-footer-spacer"></td>
     <td colspan="10" class="cap-footer-label"><strong>Soft Cap Space</strong></td>
     <?php foreach ($capMetrics['softCapSpace'] as $capSpace): ?>
         <td><?= $capSpace ?></td>
     <?php endforeach; ?>
+    <td colspan="5" class="cap-footer-spacer"></td>
 </tr>
 <tr class="cap-footer-row">
     <td class="cap-footer-label"><strong>LLE:</strong></td>
     <td><?= $LLEicon ?></td>
-    <td colspan="21" class="cap-footer-spacer"></td>
+    <td colspan="16" class="cap-footer-spacer"></td>
     <td colspan="10" class="cap-footer-label"><strong>Hard Cap Space</strong></td>
     <?php foreach ($capMetrics['hardCapSpace'] as $capSpace): ?>
         <td><?= $capSpace ?></td>
     <?php endforeach; ?>
+    <td colspan="5" class="cap-footer-spacer"></td>
 </tr>
 <tr class="cap-footer-row">
-    <td colspan="22" class="cap-footer-spacer"></td>
-    <td colspan="11" class="cap-footer-label"><strong>Empty Roster Slots</strong></td>
+    <td colspan="18" class="cap-footer-spacer"></td>
+    <td colspan="10" class="cap-footer-label"><strong>Empty Roster Slots</strong></td>
     <?php foreach ($capMetrics['rosterSpots'] as $spots): ?>
         <td><?= $spots ?></td>
     <?php endforeach; ?>
+    <td colspan="5" class="cap-footer-spacer"></td>
 </tr>
         <?php
         return (string) ob_get_clean();

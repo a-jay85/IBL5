@@ -47,7 +47,10 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     {
         /** @var PlayerRow|null $plrRow */
         $plrRow = $this->fetchOne(
-            "SELECT * FROM ibl_plr WHERE pid = ? LIMIT 1",
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
+             FROM ibl_plr p
+             LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+             WHERE p.pid = ? LIMIT 1",
             "i",
             $playerID
         );

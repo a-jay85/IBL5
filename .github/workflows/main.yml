@@ -69,7 +69,7 @@ jobs:
             mysqldump --host="$REMOTE_HOST" --port="$REMOTE_PORT" --user="$REMOTE_USER" \
               --password="$REMOTE_PASSWORD" --no-data --routines --triggers \
               --skip-comments "$REMOTE_DATABASE"
-          ' > ibl5/schema.sql
+          ' | sed 's/ AUTO_INCREMENT=[0-9]*//' > ibl5/schema.sql
 
           if git diff --quiet ibl5/schema.sql; then
             echo "No schema changes"

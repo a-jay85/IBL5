@@ -42,7 +42,7 @@ class TeamView implements TeamViewInterface
             $cardsRowHtml = "<div class=\"team-cards-row\">$currentSeasonCard$draftPicksHtml$awardsCard</div>";
             $draftPicksHtml = ""; // already inside cards row
         }
-        $franchiseHtml = $isActualTeam ? "<div style=\"max-width: 1115px; margin: 0 auto;\">$franchiseHistoryCard</div>" : "";
+        $franchiseHtml = $isActualTeam ? "<div class=\"franchise-history-wrapper\">$franchiseHistoryCard</div>" : "";
         $raftersHtml = $isActualTeam ? "<div class=\"team-page-rafters\">$rafters</div>" : "";
 
         $yrSafe = \Utilities\HtmlSanitizer::safeHtmlOutput($yr ?? '');
@@ -53,7 +53,7 @@ class TeamView implements TeamViewInterface
 
         $bannerHtml = $isActualTeam
             ? $this->renderTeamBanner($teamID, $team, $imagesPath, $userTeamName, $isOwnTeam)
-            : "<div style=\"text-align: center; margin-bottom: 1rem;\"><img src=\"./{$imagesPath}logo/{$teamID}.jpg\" style=\"display: block; margin: 0 auto;\"></div>";
+            : "<div class=\"team-logo-fallback\"><img src=\"./{$imagesPath}logo/{$teamID}.jpg\"></div>";
 
         ob_start();
         ?>
@@ -146,8 +146,8 @@ class TeamView implements TeamViewInterface
 <div class="team-banner-row" style="--team-tab-bg-color: #<?= $color1 ?>; --team-tab-active-color: #<?= $color2 ?>;">
     <?= $tradeButton ?>
     <a href="modules.php?name=Schedule&amp;teamID=<?= $teamID ?>" class="team-action-link">Schedule</a>
-    <div class="team-banner-logo" style="text-align: center;">
-        <img src="./<?= $imagesPath ?>logo/<?= $teamID ?>.jpg" style="display: block; margin: 0 18px;">
+    <div class="team-banner-logo">
+        <img src="./<?= $imagesPath ?>logo/<?= $teamID ?>.jpg">
     </div>
     <a href="modules.php?name=DraftHistory&amp;teamID=<?= $teamID ?>" class="team-action-link">Draft History</a>
     <?= $discordButton ?>

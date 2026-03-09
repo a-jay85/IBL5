@@ -60,8 +60,8 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
         <h2 class="ibl-card__title"><?= $playerPos ?> <?= $playerName ?> - Contract Extension</h2>
     </div>
     <div class="ibl-card__body">
-        <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
-            <img src="<?= PlayerImageHelper::getImageUrl($player->playerID) ?>" alt="<?= $playerName ?>" style="max-width: 120px; border-radius: 0.375rem;">
+        <div class="negotiate-player-info">
+            <img src="<?= PlayerImageHelper::getImageUrl($player->playerID) ?>" alt="<?= $playerName ?>" class="negotiate-player-img">
             <?= self::renderPlayerRatings($player) ?>
         </div>
     </div>
@@ -73,19 +73,19 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
         <h2 class="ibl-card__title">Contract Offer</h2>
     </div>
     <div class="ibl-card__body">
-        <div class="ibl-alert ibl-alert--warning" style="margin-bottom: 1rem;">If you offer the max and I refuse, it means I am opting for Free Agency at the end of the season.</div>
+        <div class="ibl-alert ibl-alert--warning negotiate-field-group">If you offer the max and I refuse, it means I am opting for Free Agency at the end of the season.</div>
 
-        <div style="margin-bottom: 1rem;">
+        <div class="negotiate-field-group">
             <span class="ibl-label">Player Demands:</span>
-            <div style="margin-top: 0.25rem;">
+            <div class="negotiate-field-group__content">
                 <?= self::buildDemandDisplay($demands) ?>
             </div>
         </div>
 
         <form name="ExtensionOffer" method="post" action="modules/Player/extension.php">
-            <div style="margin-bottom: 1rem;">
+            <div class="negotiate-field-group">
                 <span class="ibl-label">Your Offer:</span>
-                <div style="margin-top: 0.25rem;">
+                <div class="negotiate-field-group__content">
                     <?php if (!$demandsExceedMax): ?>
                         <?= self::renderEditableOfferFields($demands) ?>
                     <?php else: ?>
@@ -112,7 +112,7 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
         <h2 class="ibl-card__title">Notes / Reminders</h2>
     </div>
     <div class="ibl-card__body">
-        <ul style="margin: 0; padding-left: 1.25rem; line-height: 1.75;">
+        <ul class="negotiate-notes">
             <li>You have <strong><?= $capSpace ?></strong> in cap space available; the amount you offer in year 1 cannot exceed this.</li>
             <li>Based on years of service, the maximum amount you can offer in year 1 is <strong><?= $maxYearOneSalary ?></strong>.</li>
             <li>Enter "0" for years you do not want to offer a contract.</li>
@@ -143,12 +143,12 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
 
         ob_start();
         ?>
-<div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+<div class="negotiate-salary-row">
     <?php foreach ($yearKeys as $index => $key): ?>
         <?php if ($demands[$key] !== 0): ?>
-        <div style="text-align: center;">
-            <div class="ibl-label" style="font-size: 0.75rem;">Yr <?= $index + 1 ?></div>
-            <div style="font-weight: 600;"><?= (int) $demands[$key] ?></div>
+        <div class="negotiate-salary-cell">
+            <div class="ibl-label ibl-label--sm">Yr <?= $index + 1 ?></div>
+            <div class="negotiate-salary-cell__value"><?= (int) $demands[$key] ?></div>
         </div>
         <?php endif; ?>
     <?php endforeach; ?>
@@ -167,11 +167,11 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
     {
         ob_start();
         ?>
-<div style="display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap;">
+<div class="negotiate-salary-row negotiate-salary-row--inputs">
     <?php for ($i = 1; $i <= 5; $i++): ?>
-    <div style="text-align: center;">
-        <label for="offerYear<?= $i ?>" class="ibl-label" style="font-size: 0.75rem; display: block;">Yr <?= $i ?></label>
-        <input type="number" id="offerYear<?= $i ?>" class="ibl-input ibl-input--sm" style="width: 4.5rem;" name="offerYear<?= $i ?>" value="<?= (int) $demands['year' . $i] ?>" min="0" max="9999">
+    <div class="negotiate-salary-cell">
+        <label for="offerYear<?= $i ?>" class="ibl-label ibl-label--sm">Yr <?= $i ?></label>
+        <input type="number" id="offerYear<?= $i ?>" class="ibl-input ibl-input--sm negotiate-salary-input" name="offerYear<?= $i ?>" value="<?= (int) $demands['year' . $i] ?>" min="0" max="9999">
     </div>
     <?php endfor; ?>
 </div>
@@ -197,11 +197,11 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
 
         ob_start();
         ?>
-<div style="display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap;">
+<div class="negotiate-salary-row negotiate-salary-row--inputs">
     <?php for ($i = 0; $i < 5; $i++): ?>
-    <div style="text-align: center;">
-        <label for="offerYear<?= $i + 1 ?>" class="ibl-label" style="font-size: 0.75rem; display: block;">Yr <?= $i + 1 ?></label>
-        <input type="number" id="offerYear<?= $i + 1 ?>" class="ibl-input ibl-input--sm" style="width: 4.5rem;" name="offerYear<?= $i + 1 ?>" value="<?= $maxValues[$i] ?>" min="0" max="9999">
+    <div class="negotiate-salary-cell">
+        <label for="offerYear<?= $i + 1 ?>" class="ibl-label ibl-label--sm">Yr <?= $i + 1 ?></label>
+        <input type="number" id="offerYear<?= $i + 1 ?>" class="ibl-input ibl-input--sm negotiate-salary-input" name="offerYear<?= $i + 1 ?>" value="<?= $maxValues[$i] ?>" min="0" max="9999">
     </div>
     <?php endfor; ?>
 </div>
@@ -236,7 +236,7 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
     {
         ob_start();
         ?>
-<table class="ibl-data-table" style="font-size: 0.875rem;">
+<table class="ibl-data-table negotiate-ratings">
     <thead>
         <tr>
             <th>2ga</th>

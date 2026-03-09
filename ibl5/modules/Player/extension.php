@@ -46,11 +46,11 @@ $commonRepo = new \Services\CommonMysqliRepository($mysqli_db);
 $tid = $commonRepo->getTidFromTeamname($teamName);
 
 if ($tid === null) {
-    header('Location: index.php');
+    header('Location: ../../index.php');
     exit;
 }
 
-$redirectBase = 'modules.php?name=Team&op=team&teamID=' . $tid . '&display=contracts';
+$redirectBase = '../../modules.php?name=Team&op=team&teamID=' . $tid . '&display=contracts';
 
 if (!$result['success']) {
     $redirectUrl = $redirectBase . '&result=extension_error&msg=' . rawurlencode($result['error']);

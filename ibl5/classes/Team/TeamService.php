@@ -99,6 +99,8 @@ class TeamService implements TeamServiceInterface
             'rafters' => $rafters,
             'userTeamName' => $userTeamName,
             'isOwnTeam' => ($userTeamName !== '' && $userTeamName === $team->name),
+            'extensionResult' => null,
+            'extensionMsg' => null,
         ];
     }
 

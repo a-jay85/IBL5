@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Team;
 
 use Team\Contracts\TeamViewInterface;
+use Utilities\HtmlSanitizer;
 
 /**
  * @phpstan-import-type TeamPageData from Contracts\TeamServiceInterface
@@ -32,6 +33,8 @@ class TeamView implements TeamViewInterface
         $rafters = $pageData['rafters'];
         $userTeamName = $pageData['userTeamName'];
         $isOwnTeam = $pageData['isOwnTeam'];
+        $extensionResult = $pageData['extensionResult'];
+        $extensionMsg = $pageData['extensionMsg'];
 
         $draftPicksHtml = $isActualTeam ? $this->renderDraftPicksSection($team, $draftPicksTable) : "";
         $cardsRowHtml = "";
@@ -59,6 +62,7 @@ class TeamView implements TeamViewInterface
         <div class="team-stats-block">
             <?= $yearHeading ?>
             <?= $bannerHtml ?>
+            <?= $this->renderExtensionResultBanner($extensionResult, $extensionMsg) ?>
             <div class="table-scroll-wrapper">
                 <div class="table-scroll-container">
                     <?= $tableOutput ?>
@@ -73,6 +77,41 @@ class TeamView implements TeamViewInterface
 </div>
         <?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * Render a flash message banner for extension results (PRG pattern)
+     */
+    private function renderExtensionResultBanner(?string $result, ?string $msg): string
+    {
+        if ($result === null) {
+            return '';
+        }
+
+        $msgSafe = HtmlSanitizer::e($msg ?? '');
+
+        if ($result === 'extension_error') {
+            return '<div class="ibl-alert ibl-alert--error">'
+                . $msgSafe
+                . ' Your extension attempt was not legal and will not be recorded.'
+                . '</div>';
+        }
+
+        if ($result === 'extension_accepted') {
+            return '<div class="ibl-alert ibl-alert--success">'
+                . '<strong>Player response:</strong> ' . $msgSafe
+                . '<br>Note from the commissioner\'s office: You have used up your successful extension for this season and may not make any more extension attempts.'
+                . '</div>';
+        }
+
+        if ($result === 'extension_rejected') {
+            return '<div class="ibl-alert ibl-alert--info">'
+                . '<strong>Player response:</strong> ' . $msgSafe
+                . '<br>Note from the commissioner\'s office: You will be able to make another attempt next sim as you have not yet used up your successful extension for this season.'
+                . '</div>';
+        }
+
+        return '';
     }
 
     /**

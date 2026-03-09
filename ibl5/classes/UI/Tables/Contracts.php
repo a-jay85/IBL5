@@ -131,15 +131,29 @@ class Contracts
             <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
             <td><?= (int)$player->age ?></td>
             <td><?= (int)$player->yearsOfExperience ?></td>
-            <td><?= (int)$player->birdYears ?></td>
-            <td class="sep-team"></td>
-            <td class="salary"><?= $row['con1'] ?></td>
-            <td class="salary"><?= $row['con2'] ?></td>
-            <td class="salary"><?= $row['con3'] ?></td>
-            <td class="salary"><?= $row['con4'] ?></td>
-            <td class="salary"><?= $row['con5'] ?></td>
-            <td class="salary"><?= $row['con6'] ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= (int)$player->birdYears ?></td>
+            <td class="col-salary"><?= $row['con1'] ?></td>
+            <?php if ($hasRookieOption): ?>
+            <?php $actionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . (int)$player->playerID . '&amp;from=team'; $actionLabel = 'Rookie Option'; ?>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con2'] === 0 ? '0*' : $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con3'] ?></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con4'] ?></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con5'] ?></td>
+            <td class="col-salary contract-hint-cell sep-r-team" tabindex="0"><?= $row['con6'] ?></td>
+            <?php elseif ($hasExtension): ?>
+            <?php $actionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . (int)$player->playerID; $actionLabel = 'Contract Extension'; ?>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con2'] === 0 ? '0*' : $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con3'] === 0 ? '0*' : $row['con3'] ?></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con4'] === 0 ? '0*' : $row['con4'] ?></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con5'] === 0 ? '0*' : $row['con5'] ?></td>
+            <td class="col-salary contract-hint-cell sep-r-team" tabindex="0"><?= $row['con6'] === 0 ? '0*' : $row['con6'] ?></td>
+            <?php else: ?>
+            <td class="col-salary"><?= $row['con2'] ?></td>
+            <td class="col-salary"><?= $row['con3'] ?></td>
+            <td class="col-salary"><?= $row['con4'] ?></td>
+            <td class="col-salary"><?= $row['con5'] ?></td>
+            <td class="col-salary sep-r-team"><?= $row['con6'] ?></td>
+            <?php endif; ?>
             <td><?= (int)$player->ratingTalent ?></td>
             <td><?= (int)$player->ratingSkill ?></td>
             <td><?= (int)$player->ratingIntangibles ?></td>
@@ -179,8 +193,8 @@ class Contracts
             <td></td>
         </tr>
         <tr class="tfoot-legend">
-            <td colspan="22" style="text-align: left;">
-                Key: &nbsp; <i>(Waived)*</i> &nbsp; Becomes Free Agent^
+            <td colspan="19" style="text-align: left;">
+                Key: &nbsp; <i>(Waived)*</i> &nbsp; Becomes Free Agent^ &nbsp; Eligible for Rookie Option/Extension 0*
             </td>
         </tr>
     </tfoot>

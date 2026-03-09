@@ -42,9 +42,9 @@ class Ratings
             <th>Pos</th>
             <th class="sep-r-team">Age</th>
             <th>2ga</th>
-            <th class="sep-r-weak">2g%</th>
+            <th>2g%</th>
             <th>fta</th>
-            <th class="sep-r-weak">ft%</th>
+            <th>ft%</th>
             <th>3ga</th>
             <th class="sep-r-team">3g%</th>
             <th>orb</th>
@@ -57,7 +57,7 @@ class Ratings
             <th>oo</th>
             <th>do</th>
             <th>po</th>
-            <th class="sep-r-weak">to</th>
+            <th>to</th>
             <th>od</th>
             <th>dd</th>
             <th>pd</th>

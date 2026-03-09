@@ -47,10 +47,10 @@ class SeasonAverages
             <th class="sep-r-team">min</th>
             <th>fgm</th>
             <th>fga</th>
-            <th class="sep-r-weak">fgp</th>
+            <th>fgp</th>
             <th>ftm</th>
             <th>fta</th>
-            <th class="sep-r-weak">ftp</th>
+            <th>ftp</th>
             <th>3gm</th>
             <th>3ga</th>
             <th class="sep-r-team">3gp</th>

@@ -46,9 +46,9 @@ class SeasonTotals
             <th>gs</th>
             <th class="sep-r-team">min</th>
             <th>fgm</th>
-            <th class="sep-r-weak">fga</th>
+            <th>fga</th>
             <th>ftm</th>
-            <th class="sep-r-weak">fta</th>
+            <th>fta</th>
             <th>3gm</th>
             <th class="sep-r-team">3ga</th>
             <th>orb</th>

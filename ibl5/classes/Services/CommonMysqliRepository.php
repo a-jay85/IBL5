@@ -20,7 +20,7 @@ namespace Services;
  * - Common data retrieval patterns
  *
  * @phpstan-type UserRow array{user_id: int, username: string, user_email: string, user_ibl_team: string, name: string, date_started: string, discordID: ?int, user_password: string, user_level: int, user_active: ?int, ...}
- * @phpstan-type TeamInfoRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, owner_name: string, owner_email: string, discordID: ?int, Used_Extension_This_Chunk: int, Used_Extension_This_Season: ?int, HasMLE: int, HasLLE: int, ...}
+ * @phpstan-type TeamInfoRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, owner_name: string, owner_email: string, gm_username: ?string, discordID: ?int, Used_Extension_This_Chunk: int, Used_Extension_This_Season: ?int, HasMLE: int, HasLLE: int, ...}
  * @phpstan-type PlayerRow array{pid: int, name: string, nickname: ?string, age: ?int, tid: int, teamname: ?string, pos: string, sta: ?int, exp: ?int, bird: ?int, cy: ?int, cyt: ?int, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int, ordinal: ?int, active: ?int, injured: ?int, retired: ?int, droptime: ?int, stats_gs: ?int, stats_gm: ?int, stats_min: ?int, stats_fgm: ?int, stats_fga: ?int, stats_ftm: ?int, stats_fta: ?int, stats_3gm: ?int, stats_3ga: ?int, stats_orb: ?int, stats_drb: ?int, stats_ast: ?int, stats_stl: ?int, stats_to: ?int, stats_blk: ?int, stats_pf: ?int, sh_pts: ?int, sh_reb: ?int, sh_ast: ?int, sh_stl: ?int, sh_blk: ?int, s_dd: ?int, s_td: ?int, sp_pts: ?int, sp_reb: ?int, sp_ast: ?int, sp_stl: ?int, sp_blk: ?int, ch_pts: ?int, ch_reb: ?int, ch_ast: ?int, ch_stl: ?int, ch_blk: ?int, c_dd: ?int, c_td: ?int, cp_pts: ?int, cp_reb: ?int, cp_ast: ?int, cp_stl: ?int, cp_blk: ?int, car_gm: ?int, car_min: ?int, car_fgm: ?int, car_fga: ?int, car_ftm: ?int, car_fta: ?int, car_tgm: ?int, car_tga: ?int, car_orb: ?int, car_drb: ?int, car_reb: ?int, car_ast: ?int, car_stl: ?int, car_to: ?int, car_blk: ?int, car_pf: ?int, r_fga: ?int, r_fgp: ?int, r_fta: ?int, r_ftp: ?int, r_tga: ?int, r_tgp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_to: ?int, r_blk: ?int, r_foul: ?int, oo: ?int, od: ?int, do: ?int, dd: ?int, po: ?int, pd: ?int, to: ?int, td: ?int, Clutch: ?int, Consistency: ?int, talent: ?int, skill: ?int, intangibles: ?int, loyalty: ?int, playingTime: ?int, winner: ?int, tradition: ?int, security: ?int, draftround: ?int, draftedby: ?string, draftedbycurrentname: ?string, draftyear: ?int, draftpickno: ?int, htft: ?int, htin: ?int, wt: ?int, college: ?string, dc_PGDepth: ?int, dc_SGDepth: ?int, dc_SFDepth: ?int, dc_PFDepth: ?int, dc_CDepth: ?int, dc_active: ?int, dc_minutes: ?int, dc_of: ?int, dc_df: ?int, dc_oi: ?int, dc_di: ?int, dc_bh: ?int, ...}
  */
 class CommonMysqliRepository extends \BaseMysqliRepository
@@ -52,15 +52,33 @@ class CommonMysqliRepository extends \BaseMysqliRepository
         if ($username === null || $username === '') {
             return "Free Agents";
         }
-        
-        /** @var array{user_ibl_team: string}|null $result */
+
+        /** @var array{team_name: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT user_ibl_team FROM nuke_users WHERE username = ? LIMIT 1",
+            "SELECT team_name FROM ibl_team_info WHERE gm_username = ? LIMIT 1",
             "s",
             $username
         );
 
-        return $result !== null ? $result['user_ibl_team'] : null;
+        return $result !== null ? $result['team_name'] : null;
+    }
+
+    /**
+     * Gets the GM username associated with a team name
+     *
+     * @param string $teamName Team name to look up
+     * @return string|null GM username or null if not found
+     */
+    public function getUsernameFromTeamname(string $teamName): ?string
+    {
+        /** @var array{gm_username: ?string}|null $result */
+        $result = $this->fetchOne(
+            "SELECT gm_username FROM ibl_team_info WHERE team_name = ? LIMIT 1",
+            "s",
+            $teamName
+        );
+
+        return $result !== null ? $result['gm_username'] : null;
     }
 
     /**

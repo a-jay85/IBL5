@@ -13,15 +13,15 @@ paths: ibl5/schema.sql
 | Games | `ibl_schedule`, `ibl_box_scores`, `ibl_box_scores_teams` |
 | Contracts | `ibl_fa_offers`, `ibl_trade_*` tables |
 | Draft | `ibl_draft`, `ibl_draft_picks` |
-| Users | `nuke_users` (`username`, `user_ibl_team`) |
+| Users | `nuke_users` (`username`), `ibl_team_info` (`gm_username` — user-to-team mapping) |
 
 ## Quick Table Reference
 
 | Purpose | Table | Key Fields |
 |---------|-------|------------|
 | Players | `ibl_plr` | `pid`, `tid`, `name`, `cy`, `cy1-cy6` |
-| Teams | `ibl_team_info` | `teamid`, `team_name` |
-| Users | `nuke_users` | `username`, `user_ibl_team` |
+| Teams | `ibl_team_info` | `teamid`, `team_name`, `gm_username` |
+| Users | `nuke_users` | `username` (legacy — `user_ibl_team` being phased out) |
 | History | `ibl_hist` | Historical player stats |
 | Schedule | `ibl_schedule` | Game schedule |
 

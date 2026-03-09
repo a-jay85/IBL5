@@ -105,9 +105,9 @@ class DiscordIntegrationTest extends IntegrationTestCase
         $queries = $this->mockDb->getExecutedQueries();
         // MockPreparedStatement calls sql_query in both execute() and get_result()
         $this->assertGreaterThanOrEqual(1, count($queries));
-        $this->assertStringContainsString('nuke_users', $queries[0]);
+        $this->assertStringContainsString('ibl_team_info', $queries[0]);
         $this->assertStringContainsString('discordID', $queries[0]);
-        $this->assertStringContainsString('user_ibl_team', $queries[0]);
+        $this->assertStringContainsString('team_name', $queries[0]);
     }
 
     /**

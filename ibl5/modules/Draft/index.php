@@ -24,15 +24,9 @@ function userinfo($username)
     $view = new DraftView();
     $sharedRepository = new \Shared\SharedRepository($mysqli_db);
 
-    $stmt = $mysqli_db->prepare("SELECT * FROM " . $user_prefix . "_users WHERE username = ?");
-    $stmt->bind_param('s', $username);
-    $stmt->execute();
-    $result2 = $stmt->get_result();
-    $userinfo = $result2->fetch_assoc();
-
     PageLayout\PageLayout::header();
 
-    $teamlogo = $userinfo['user_ibl_team'];
+    $teamlogo = $commonRepository->getTeamnameFromUsername($username) ?? '';
     $tid = $commonRepository->getTidFromTeamname($teamlogo);
 
     // Get current draft pick information

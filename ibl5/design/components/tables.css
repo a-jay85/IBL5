@@ -381,6 +381,64 @@
     text-align: left;
 }
 
+/* Salary year columns — right-aligned (shared between Contracts and Free Agency) */
+.team-table th.col-salary,
+.team-table td.col-salary {
+    text-align: right;
+}
+
+/* Contract hint cells — show salary zeros with dotted underline; reveal action link on hover/tap.
+   The link lives in the first hint cell and spans all 5 via width: 500% + overflow: visible. */
+.contract-hint-cell {
+    position: relative;
+    overflow: visible;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-decoration-color: var(--gray-400, #9ca3af);
+    text-underline-offset: 2px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ibl-data-table .contract-hint-link,
+.ibl-data-table .contract-hint-link:visited {
+    display: none;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 0;
+    background-color: inherit;
+    color: var(--accent-700, #c2410c);
+    text-decoration-line: underline;
+    font-weight: 600;
+    white-space: nowrap;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    /* width set by contract-hint.js */
+}
+
+/* Desktop: reveal link and hide zeros on hover */
+@media (hover: hover) {
+    tr:has(.contract-hint-cell):hover .contract-hint-link {
+        display: flex;
+    }
+    tr:has(.contract-hint-cell):hover .contract-hint-cell {
+        color: transparent;
+        text-decoration: none;
+    }
+}
+
+/* Mobile: reveal link and hide zeros on focus/tap */
+tr:has(.contract-hint-cell):focus-within .contract-hint-link {
+    display: flex;
+}
+tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
+    color: transparent;
+    text-decoration: none;
+}
+
 /* Team-colored tfoot */
 .team-table tfoot tr {
     background-color: var(--team-row-highlight-bg);

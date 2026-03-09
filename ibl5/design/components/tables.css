@@ -2427,7 +2427,7 @@ td.record-book-retired-cell {
 /* Right-border separators — applied to the last cell before a column group boundary.
    Coexists with the empty-cell .sep-team/.sep-weak pattern used by other modules. */
 .team-table td.sep-r-team {
-    border-right: 2px solid var(--team-sep-color);
+    border-right: 2px solid color-mix(in srgb, var(--team-color-primary) 30%, var(--gray-300, #d1d5db));
 }
 
 /* In thead, the sep border must contrast against the dark header background */

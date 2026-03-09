@@ -44,20 +44,16 @@ class SeasonAverages
             <th class="sticky-col">Player</th>
             <th>g</th>
             <th>gs</th>
-            <th>min</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">min</th>
             <th>fgm</th>
             <th>fga</th>
             <th>fgp</th>
-            <th class="sep-team"></th>
             <th>ftm</th>
             <th>fta</th>
             <th>ftp</th>
-            <th class="sep-team"></th>
             <th>3gm</th>
             <th>3ga</th>
-            <th>3gp</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">3gp</th>
             <th>orb</th>
             <th>reb</th>
             <th>ast</th>
@@ -83,20 +79,16 @@ endif; ?>
             <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
             <td><?= $playerStats->seasonGamesPlayed ?></td>
             <td><?= $playerStats->seasonGamesStarted ?></td>
-            <td><?= $playerStats->seasonMinutesPerGame ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= $playerStats->seasonMinutesPerGame ?></td>
             <td><?= $playerStats->seasonFieldGoalsMadePerGame ?></td>
             <td><?= $playerStats->seasonFieldGoalsAttemptedPerGame ?></td>
-            <td><?= $playerStats->seasonFieldGoalPercentage ?></td>
-            <td class="sep-weak"></td>
+            <td class="sep-r-weak"><?= $playerStats->seasonFieldGoalPercentage ?></td>
             <td><?= $playerStats->seasonFreeThrowsMadePerGame ?></td>
             <td><?= $playerStats->seasonFreeThrowsAttemptedPerGame ?></td>
-            <td><?= $playerStats->seasonFreeThrowPercentage ?></td>
-            <td class="sep-weak"></td>
+            <td class="sep-r-weak"><?= $playerStats->seasonFreeThrowPercentage ?></td>
             <td><?= $playerStats->seasonThreePointersMadePerGame ?></td>
             <td><?= $playerStats->seasonThreePointersAttemptedPerGame ?></td>
-            <td><?= $playerStats->seasonThreePointPercentage ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= $playerStats->seasonThreePointPercentage ?></td>
             <td><?= $playerStats->seasonOffensiveReboundsPerGame ?></td>
             <td><?= $playerStats->seasonTotalReboundsPerGame ?></td>
             <td><?= $playerStats->seasonAssistsPerGame ?></td>
@@ -116,20 +108,16 @@ endif; ?>
             <td colspan="<?= $labelColspan ?>"><?= htmlspecialchars($team->name) ?> Offense</td>
             <td><?= $teamStats->seasonOffenseGamesPlayed ?></td>
             <td><?= $teamStats->seasonOffenseGamesPlayed ?></td>
-            <td></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"></td>
             <td><?= $teamStats->seasonOffenseFieldGoalsMadePerGame ?></td>
             <td><?= $teamStats->seasonOffenseFieldGoalsAttemptedPerGame ?></td>
-            <td><?= $teamStats->seasonOffenseFieldGoalPercentage ?></td>
-            <td class="sep-weak"></td>
+            <td class="sep-r-weak"><?= $teamStats->seasonOffenseFieldGoalPercentage ?></td>
             <td><?= $teamStats->seasonOffenseFreeThrowsMadePerGame ?></td>
             <td><?= $teamStats->seasonOffenseFreeThrowsAttemptedPerGame ?></td>
-            <td><?= $teamStats->seasonOffenseFreeThrowPercentage ?></td>
-            <td class="sep-weak"></td>
+            <td class="sep-r-weak"><?= $teamStats->seasonOffenseFreeThrowPercentage ?></td>
             <td><?= $teamStats->seasonOffenseThreePointersMadePerGame ?></td>
             <td><?= $teamStats->seasonOffenseThreePointersAttemptedPerGame ?></td>
-            <td><?= $teamStats->seasonOffenseThreePointPercentage ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= $teamStats->seasonOffenseThreePointPercentage ?></td>
             <td><?= $teamStats->seasonOffenseOffensiveReboundsPerGame ?></td>
             <td><?= $teamStats->seasonOffenseTotalReboundsPerGame ?></td>
             <td><?= $teamStats->seasonOffenseAssistsPerGame ?></td>
@@ -143,20 +131,16 @@ endif; ?>
             <td colspan="<?= $labelColspan ?>"><?= htmlspecialchars($team->name) ?> Defense</td>
             <td><?= $teamStats->seasonDefenseGamesPlayed ?></td>
             <td><?= $teamStats->seasonDefenseGamesPlayed ?></td>
-            <td></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"></td>
             <td><?= $teamStats->seasonDefenseFieldGoalsMadePerGame ?></td>
             <td><?= $teamStats->seasonDefenseFieldGoalsAttemptedPerGame ?></td>
-            <td><?= $teamStats->seasonDefenseFieldGoalPercentage ?></td>
-            <td class="sep-weak"></td>
+            <td class="sep-r-weak"><?= $teamStats->seasonDefenseFieldGoalPercentage ?></td>
             <td><?= $teamStats->seasonDefenseFreeThrowsMadePerGame ?></td>
             <td><?= $teamStats->seasonDefenseFreeThrowsAttemptedPerGame ?></td>
-            <td><?= $teamStats->seasonDefenseFreeThrowPercentage ?></td>
-            <td class="sep-weak"></td>
+            <td class="sep-r-weak"><?= $teamStats->seasonDefenseFreeThrowPercentage ?></td>
             <td><?= $teamStats->seasonDefenseThreePointersMadePerGame ?></td>
             <td><?= $teamStats->seasonDefenseThreePointersAttemptedPerGame ?></td>
-            <td><?= $teamStats->seasonDefenseThreePointPercentage ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= $teamStats->seasonDefenseThreePointPercentage ?></td>
             <td><?= $teamStats->seasonDefenseOffensiveReboundsPerGame ?></td>
             <td><?= $teamStats->seasonDefenseTotalReboundsPerGame ?></td>
             <td><?= $teamStats->seasonDefenseAssistsPerGame ?></td>

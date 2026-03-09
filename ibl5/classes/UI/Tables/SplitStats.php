@@ -66,20 +66,16 @@ class SplitStats
             <th>Pos</th>
             <th class="sticky-col">Player</th>
             <th>g</th>
-            <th>min</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">min</th>
             <th>fgm</th>
             <th>fga</th>
             <th>fgp</th>
-            <th class="sep-team"></th>
             <th>ftm</th>
             <th>fta</th>
             <th>ftp</th>
-            <th class="sep-team"></th>
             <th>3gm</th>
             <th>3ga</th>
-            <th>3gp</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">3gp</th>
             <th>orb</th>
             <th>reb</th>
             <th>ast</th>
@@ -92,27 +88,23 @@ class SplitStats
     </thead>
     <tbody>
 <?php if ($playerRows === []): ?>
-        <tr><td colspan="25" style="padding: 2rem; color: var(--gray-500);">No games found for <strong><?= $safeSplitLabel ?></strong> split.</td></tr>
+        <tr><td colspan="21" style="padding: 2rem; color: var(--gray-500);">No games found for <strong><?= $safeSplitLabel ?></strong> split.</td></tr>
 <?php endif; ?>
 <?php foreach ($playerRows as $row): ?>
         <tr>
             <td><?= htmlspecialchars($row['pos']) ?></td>
             <?= PlayerImageHelper::renderPlayerCell($row['pid'], $row['name'], $starterPids) ?>
             <td><?= $row['games'] ?></td>
-            <td><?= $row['min'] ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= $row['min'] ?></td>
             <td><?= $row['fgm'] ?></td>
             <td><?= $row['fga'] ?></td>
-            <td><?= $row['fgp'] ?></td>
-            <td class="sep-weak"></td>
+            <td class="sep-r-weak"><?= $row['fgp'] ?></td>
             <td><?= $row['ftm'] ?></td>
             <td><?= $row['fta'] ?></td>
-            <td><?= $row['ftp'] ?></td>
-            <td class="sep-weak"></td>
+            <td class="sep-r-weak"><?= $row['ftp'] ?></td>
             <td><?= $row['tgm'] ?></td>
             <td><?= $row['tga'] ?></td>
-            <td><?= $row['tgp'] ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= $row['tgp'] ?></td>
             <td><?= $row['orb'] ?></td>
             <td><?= $row['reb'] ?></td>
             <td><?= $row['ast'] ?></td>

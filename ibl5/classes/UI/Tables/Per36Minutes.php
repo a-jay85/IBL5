@@ -71,20 +71,16 @@ class Per36Minutes
             <th>g</th>
             <th>gs</th>
             <th>mpg</th>
-            <th>36min</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">36min</th>
             <th>fgm</th>
             <th>fga</th>
             <th>fgp</th>
-            <th class="sep-team"></th>
             <th>ftm</th>
             <th>fta</th>
             <th>ftp</th>
-            <th class="sep-team"></th>
             <th>3gm</th>
             <th>3ga</th>
-            <th>3gp</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">3gp</th>
             <th>orb</th>
             <th>reb</th>
             <th>ast</th>
@@ -111,20 +107,16 @@ endif; ?>
             <td><?= $playerStats->seasonGamesPlayed ?></td>
             <td><?= $playerStats->seasonGamesStarted ?></td>
             <td><?= $row['stats_mpg'] ?></td>
-            <td><?= $row['stats_per36Min'] ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= $row['stats_per36Min'] ?></td>
             <td><?= $row['stats_fgm'] ?></td>
             <td><?= $row['stats_fga'] ?></td>
-            <td><?= $row['stats_fgp'] ?></td>
-            <td class="sep-weak"></td>
+            <td class="sep-r-weak"><?= $row['stats_fgp'] ?></td>
             <td><?= $row['stats_ftm'] ?></td>
             <td><?= $row['stats_fta'] ?></td>
-            <td><?= $row['stats_ftp'] ?></td>
-            <td class="sep-weak"></td>
+            <td class="sep-r-weak"><?= $row['stats_ftp'] ?></td>
             <td><?= $row['stats_tgm'] ?></td>
             <td><?= $row['stats_tga'] ?></td>
-            <td><?= $row['stats_tgp'] ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= $row['stats_tgp'] ?></td>
             <td><?= $row['stats_opg'] ?></td>
             <td><?= $row['stats_rpg'] ?></td>
             <td><?= $row['stats_apg'] ?></td>

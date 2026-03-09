@@ -125,6 +125,8 @@ class Contracts
     <tbody>
 <?php foreach ($playerRows as $row):
     $player = $row['player'];
+    $hasRookieOption = $player->canRookieOption($season->phase);
+    $hasExtension = !$hasRookieOption && $player->canRenegotiateContract();
 ?>
         <tr<?= $row['isCashRow'] ? ' data-cash-row' : '' ?>>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>

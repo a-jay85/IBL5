@@ -120,4 +120,34 @@ final class ContainerTest extends TestCase
 
         self::assertSame(3306, $this->container->get('port'));
     }
+
+    public function testFactoryReturningNullIsCached(): void
+    {
+        $callCount = 0;
+
+        $this->container->set('nullable-factory', static function () use (&$callCount): mixed {
+            $callCount++;
+            return null;
+        });
+
+        $this->container->get('nullable-factory');
+        $this->container->get('nullable-factory');
+
+        self::assertSame(1, $callCount);
+    }
+
+    public function testFactoryReturningFalseIsCached(): void
+    {
+        $callCount = 0;
+
+        $this->container->set('false-factory', static function () use (&$callCount): bool {
+            $callCount++;
+            return false;
+        });
+
+        $this->container->get('false-factory');
+        $this->container->get('false-factory');
+
+        self::assertSame(1, $callCount);
+    }
 }

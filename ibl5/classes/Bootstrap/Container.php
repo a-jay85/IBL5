@@ -32,8 +32,9 @@ class Container implements ContainerInterface
             throw new \RuntimeException("Container entry not found: {$id}");
         }
 
-        // Return cached factory result if already resolved
-        if (isset($this->resolved[$id])) {
+        // Return cached factory result if already resolved (array_key_exists
+        // handles null/false returns correctly, unlike isset)
+        if (array_key_exists($id, $this->resolved)) {
             return $this->resolved[$id];
         }
 

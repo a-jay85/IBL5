@@ -89,16 +89,20 @@ Need a data table?
 
 ## Inline Style Policy
 
-### Allowed inline styles
+### The ONLY allowed inline styles
 - **CSS custom properties** on containers: `style="--team-color-primary: #1a2e5a;"` (dynamic values from PHP)
 - **Row-level dynamic styles**: `style="--team-row-hover-bg: ..."` (computed per-team)
-- **Truly one-off layout**: `colspan`, unique padding on empty-state messages
 
-### Redundant — use CSS classes instead
-- `text-align: center` on `<td>` in `.ibl-data-table` (already set by `tables.css`)
-- `font-family` on any element (set by `base.css` and component CSS)
-- `font-size` on elements already styled by component classes
-- `color` on links inside `.ibl-data-table` (set by `tables.css`)
+All other visual styling (layout, typography, colors, spacing) **must** use CSS classes defined in `design/components/`. If no suitable class exists, create one — do not use an inline `style` attribute.
+
+### Common card modifier classes (use these, don't reinvent via inline styles)
+| Class | Purpose |
+|-------|---------|
+| `.team-card__body--flush` | Zero padding |
+| `.team-card__body--tight` | No bottom padding |
+| `.team-card__body--bordered` | Top border separator |
+| `.team-card__section-label` | Uppercase sub-heading in cards |
+| `.team-card__footer--bold` | Bold totals row |
 
 ## `white-space: nowrap` Locations
 
@@ -141,3 +145,14 @@ After `@layer` introduction, `!important` should only be used for:
 2. **JavaScript-set inline styles** that CSS must override
 
 All other specificity battles are resolved by layer ordering + specificity within a layer. If you need a component to beat another component, use higher specificity selectors and/or later source order within `@layer components`.
+
+## Frontend Anti-Patterns
+
+Before writing any CSS or HTML, read the relevant component CSS in `ibl5/design/components/` and check if a utility class already exists.
+
+Avoid these common AI tendencies that conflict with this project's design system:
+1. **Custom fonts or font stacks** — system fonts only, set in `base.css`
+2. **Generic/trendy aesthetics** — no grain overlays, glassmorphism, gradient borders, or decorative elements foreign to the design system
+3. **New table markup patterns** — always use `.ibl-data-table` and its variants (see decision tree above)
+4. **Creating wrapper divs** when Tailwind utilities on existing elements suffice
+5. **Inventing CSS from scratch** — read existing component files first; the pattern you need likely already exists

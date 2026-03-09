@@ -69,25 +69,21 @@ interface NegotiationViewHelperInterface
      * Displays an error message with HTML escaping for safety.
      *
      * @param string $error Error message to display
-     * @return string HTML paragraph with escaped error message
+     * @return string HTML alert div with escaped error message
      *
      * **Behaviors:**
-     * - Wraps message in <p> tags
-     * - Escapes message using HtmlSanitizer::safeHtmlOutput()
+     * - Wraps message in .ibl-alert.ibl-alert--error div
+     * - Escapes message using HtmlSanitizer::e()
      */
     public static function renderError(string $error): string;
 
     /**
      * Render page header
      *
-     * Displays the player's position and name as a header.
+     * Displays the page title as a styled heading.
      *
      * @param Player $player The player object
-     * @return string HTML header with format: "<b>POS Name</b> - Contract Demands:<br>"
-     *
-     * **Behaviors:**
-     * - Escapes player name and position for HTML safety
-     * - Uses bold formatting
+     * @return string HTML h2 heading with .ibl-title class
      */
     public static function renderHeader(Player $player): string;
 }

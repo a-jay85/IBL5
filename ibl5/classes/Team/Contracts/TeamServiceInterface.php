@@ -28,7 +28,9 @@ namespace Team\Contracts;
  *     franchiseHistoryCard: string,
  *     rafters: string,
  *     userTeamName: string,
- *     isOwnTeam: bool
+ *     isOwnTeam: bool,
+ *     extensionResult: ?string,
+ *     extensionMsg: ?string
  * }
  * @phpstan-type StartersData array<string, array{name: string|null, pid: int|null}>
  * @phpstan-type SidebarData array{currentSeasonCard: string, awardsCard: string, franchiseHistoryCard: string, rafters: string}

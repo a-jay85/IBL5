@@ -55,10 +55,10 @@ class FranchiseHistoryView
             $gamePct = StatsFormatter::formatPercentage($round['gameWins'], $round['gameWins'] + $round['gameLosses']);
             $seriesPct = StatsFormatter::formatPercentage($round['seriesWins'], $round['seriesWins'] + $round['seriesLosses']);
 
-            $output .= "<div class=\"team-card__body\" style=\"padding-bottom: 0;\">"
-                . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">$roundName</strong>"
+            $output .= "<div class=\"team-card__body team-card__body--tight\">"
+                . "<strong class=\"team-card__section-label\">$roundName</strong>"
                 . '</div>'
-                . '<ul class="team-history-list" style="padding: 0 var(--space-4);">';
+                . '<ul class="team-history-list team-history-list--padded">';
 
             foreach ($round['results'] as $result) {
                 $year = $result['year'];
@@ -78,7 +78,7 @@ class FranchiseHistoryView
         $pwlpct = StatsFormatter::formatPercentage($data['totalGameWins'], $data['totalGameWins'] + $data['totalGameLosses']);
         $swlpct = StatsFormatter::formatPercentage($data['totalSeriesWins'], $data['totalSeriesWins'] + $data['totalSeriesLosses']);
 
-        $output .= "<div class=\"team-card__footer\" style=\"font-weight: 700;\">Post-Season: {$data['totalGameWins']}-{$data['totalGameLosses']} ($pwlpct) &middot; Series: {$data['totalSeriesWins']}-{$data['totalSeriesLosses']} ($swlpct)</div>";
+        $output .= "<div class=\"team-card__footer team-card__footer--bold\">Post-Season: {$data['totalGameWins']}-{$data['totalGameLosses']} ($pwlpct) &middot; Series: {$data['totalSeriesWins']}-{$data['totalSeriesLosses']} ($swlpct)</div>";
 
         return $output;
     }

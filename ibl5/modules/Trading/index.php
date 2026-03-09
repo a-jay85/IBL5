@@ -61,7 +61,7 @@ function reviewtrade($user)
     if (!is_user($user)) {
         loginbox();
     } else {
-        if ($season->allowTrades === 'Yes') {
+        if ($season->areTradesAllowed()) {
             global $cookie;
             cookiedecode($user);
             tradereview(strval($cookie[1] ?? ''));

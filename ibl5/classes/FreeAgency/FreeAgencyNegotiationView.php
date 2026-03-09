@@ -67,8 +67,8 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
         <h2 class="ibl-card__title"><?= htmlspecialchars($player->position ?? '') ?> <?= htmlspecialchars($player->name ?? '') ?> - Contract Negotiation</h2>
     </div>
     <div class="ibl-card__body">
-        <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
-            <img src="<?= htmlspecialchars(PlayerImageHelper::getImageUrl($player->playerID)) ?>" alt="<?= htmlspecialchars($player->name ?? '') ?>" style="max-width: 120px; border-radius: 0.375rem;">
+        <div class="offer-player-info">
+            <img src="<?= htmlspecialchars(PlayerImageHelper::getImageUrl($player->playerID)) ?>" alt="<?= htmlspecialchars($player->name ?? '') ?>" class="offer-player-img">
             <?= $this->formComponents->renderPlayerRatings() ?>
         </div>
     </div>
@@ -80,17 +80,17 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
         <h2 class="ibl-card__title">Contract Offer</h2>
     </div>
     <div class="ibl-card__body">
-        <div style="margin-bottom: 1rem;">
+        <div class="ibl-field-group">
             <span class="ibl-label">Player Demands (base, before team modifiers):</span>
-            <div style="margin-top: 0.25rem;">
+            <div class="ibl-field-group__content">
                 <?= $this->formComponents->renderDemandDisplay($demands) ?>
             </div>
         </div>
 
         <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer">
-            <div style="margin-bottom: 1rem;">
+            <div class="ibl-field-group">
                 <span class="ibl-label">Your Custom Offer:</span>
-                <div style="margin-top: 0.25rem;">
+                <div class="ibl-field-group__content">
                     <?= $this->formComponents->renderOfferInputs($existingOffer) ?>
                 </div>
             </div>
@@ -119,11 +119,11 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
 
 <?php // Delete Offer (conditional) ?>
 <?php if ($hasExistingOffer): ?>
-<div style="margin-top: 1rem;">
+<div class="offer-delete-section">
     <form method="post" action="modules.php?name=FreeAgency&pa=deleteoffer">
         <input type="hidden" name="teamname" value="<?= htmlspecialchars($team->name) ?>">
         <input type="hidden" name="playerID" value="<?= (int) $player->playerID ?>">
-        <button type="submit" class="ibl-btn" style="background-color: #dc2626; color: white; border: none;">Delete This Offer</button>
+        <button type="submit" class="ibl-btn ibl-btn--danger">Delete This Offer</button>
     </form>
 </div>
 <?php endif; ?>
@@ -201,7 +201,7 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
         <h2 class="ibl-card__title">Notes / Reminders</h2>
     </div>
     <div class="ibl-card__body">
-        <ul style="margin: 0; padding-left: 1.25rem; line-height: 1.75;">
+        <ul class="ibl-notes">
             <li>The maximum contract permitted for this player (based on years of service) starts at <?= $maxContract ?> in Year 1.</li>
             <li>You have <strong><?= $amendedCapSpace ?></strong> in <strong>soft cap</strong> space available; the amount you offer in year 1 cannot exceed this unless you are using one of the exceptions.</li>
             <?php for ($year = 1; $year < 6; $year++): ?>

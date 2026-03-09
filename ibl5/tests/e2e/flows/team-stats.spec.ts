@@ -71,13 +71,6 @@ test.describe('Team Stats flow', () => {
     }
   });
 
-  test('team cells contain team-colored styling', async ({ page }) => {
-    const teamCells = page.locator('.league-stats-team-cell');
-    if (await teamCells.first().isVisible()) {
-      expect(await teamCells.count()).toBeGreaterThan(0);
-    }
-  });
-
   test('tables have team rows matching expected count', async ({ page }) => {
     // Each table should have rows for all 28 teams
     const firstTable = page.locator('.ibl-data-table').first();

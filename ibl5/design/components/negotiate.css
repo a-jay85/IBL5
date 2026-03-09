@@ -1,0 +1,66 @@
+/* ==========================================================================
+   Offer Forms — Contract Extension & Free Agency Negotiate Pages
+   ========================================================================== */
+
+/* Player info row — photo + ratings side by side */
+.offer-player-info {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.offer-player-img {
+    max-width: 120px;
+    border-radius: 0.375rem;
+}
+
+/* Ratings table — compact font for the 21-column layout */
+.offer-ratings {
+    font-size: 0.875rem;
+}
+
+/* Salary row — flex layout for year columns (demands and offer inputs) */
+.offer-salary-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.offer-salary-row--inputs {
+    align-items: flex-end;
+}
+
+/* Individual year cell */
+.offer-salary-cell {
+    text-align: center;
+}
+
+.offer-salary-cell__value {
+    font-weight: 600;
+}
+
+/* Narrow number input for salary year fields */
+.offer-salary-input {
+    width: 4.5rem;
+}
+
+/* Quick offer button row — label + row of buttons */
+.offer-button-row {
+    margin-bottom: 0.75rem;
+}
+
+.offer-button-row__buttons {
+    display: flex;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 0.25rem;
+}
+
+/* Delete offer section */
+.offer-delete-section {
+    margin-top: 1rem;
+}

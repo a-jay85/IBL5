@@ -188,6 +188,11 @@
                         if (typeof window.IBL_refreshResponsiveTables === 'function') {
                             window.IBL_refreshResponsiveTables();
                         }
+
+                        // Re-size contract hint links for the new content
+                        if (typeof window.IBL_sizeContractHintLinks === 'function') {
+                            window.IBL_sizeContractHintLinks();
+                        }
                     }
                 })
                 .catch(function (err) {

@@ -93,7 +93,10 @@ class PlayerPageController
         $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? 'Free Agents';
         $userTeam = \Team::initialize($this->mysqliDb, $userTeamName);
 
-        $html .= $this->renderActionButtons($pageService, $player, $playerID, $userTeam, $season);
+        $actionButtons = $this->renderActionButtons($pageService, $player, $playerID, $userTeam, $season);
+        if ($actionButtons !== '') {
+            $html .= '<tr><td colspan="2"><div class="player-action-buttons">' . $actionButtons . '</div></td></tr>';
+        }
 
         // Navigation menu
         $html .= PlayerMenuView::render($playerID, $pageView, $colorScheme);

@@ -123,6 +123,8 @@ class Contracts
     <tbody>
 <?php foreach ($playerRows as $row):
     $player = $row['player'];
+    $hasRookieOption = $player->canRookieOption($season->phase);
+    $hasExtension = !$hasRookieOption && $player->canRenegotiateContract();
 ?>
         <?php
         $isCashPlayer = $row['isCashRow'] || str_contains($player->name ?? '', '|');

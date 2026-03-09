@@ -33,11 +33,38 @@ use Utilities\StandingsGrouper;
  * @phpstan-type TeamMapping array{conference: string, division: string, teamName: string}
  */
 class StandingsUpdater extends \BaseMysqliRepository {
+    /** @var array<string, string> */
+    private const REGION_AWARD_MAP = [
+        'Atlantic' => 'Atlantic Division Champions',
+        'Central'  => 'Central Division Champions',
+        'Midwest'  => 'Midwest Division Champions',
+        'Pacific'  => 'Pacific Division Champions',
+        'Eastern'  => 'Eastern Conference Champions',
+        'Western'  => 'Western Conference Champions',
+    ];
+
     private \Season $season;
 
     public function __construct(\mysqli $db, \Season $season, ?LeagueContext $leagueContext = null) {
         parent::__construct($db, $leagueContext);
         $this->season = $season;
+    }
+
+    private function upsertTeamAward(string $teamName, string $awardName): void
+    {
+        if ($this->leagueContext !== null) {
+            return;
+        }
+
+        $this->execute(
+            "INSERT INTO ibl_team_awards (year, name, Award)
+             VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE name = VALUES(name)",
+            "iss",
+            $this->season->endingYear,
+            $teamName,
+            $awardName
+        );
     }
 
     protected function extractWins(string $record): int {
@@ -501,6 +528,11 @@ class StandingsUpdater extends \BaseMysqliRepository {
                 $winningestTeamName
             );
             echo "The {$winningestTeamName} have clinched the {$region} {$grouping}!";
+
+            $awardName = self::REGION_AWARD_MAP[$region] ?? null;
+            if ($awardName !== null) {
+                $this->upsertTeamAward($winningestTeamName, $awardName);
+            }
         }
     }
 

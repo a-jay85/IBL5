@@ -90,6 +90,7 @@ class StandingsUpdaterTest extends TestCase
 
     protected function tearDown(): void
     {
+        $this->mockDb->clearQueryPatterns();
         unset($this->updater, $this->mockDb, $this->mockSeason);
     }
 
@@ -524,6 +525,122 @@ class StandingsUpdaterTest extends TestCase
             }
         }
         return null;
+    }
+
+    public function testClinchDivisionUpsertsTeamAward(): void
+    {
+        $this->mockDb->setReturnTrue(true);
+        $clinchData = [
+            ['tid' => 1, 'team_name' => 'Celtics', 'homeWins' => 40, 'homeLosses' => 1, 'awayWins' => 40, 'awayLosses' => 1, 'wins' => 80],
+            ['tid' => 2, 'team_name' => 'Heat', 'homeWins' => 1, 'homeLosses' => 40, 'awayWins' => 1, 'awayLosses' => 40, 'wins' => 2],
+        ];
+        // Route clinch-check queries ([\s\S] matches across newlines unlike .)
+        $this->mockDb->onQuery('ORDER BY wins DESC', $clinchData);
+        $this->mockDb->onQuery('ORDER BY losses ASC', [['losses' => 80]]);
+        $this->mockDb->onQuery('ORDER BY losses DESC', [['losses' => 80]]);
+        $this->mockDb->onQuery('ORDER BY pct DESC', $clinchData);
+        $this->mockDb->onQuery('gamesUnplayed', [['maxLeft' => 0]]);
+        $this->updater->setTestTeamMap($this->defaultTeamMap);
+        $this->updater->setTestGames([]);
+
+        ob_start();
+        $this->updater->update();
+        ob_end_clean();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $awardQueries = array_filter($queries, static function (string $q): bool {
+            return stripos($q, 'ibl_team_awards') !== false;
+        });
+
+        $this->assertNotEmpty($awardQueries, 'Expected at least one ibl_team_awards upsert query');
+    }
+
+    public function testClinchConferenceUpsertsTeamAward(): void
+    {
+        $this->mockDb->setReturnTrue(true);
+        $clinchData = [
+            ['tid' => 1, 'team_name' => 'Celtics', 'homeWins' => 40, 'homeLosses' => 1, 'awayWins' => 40, 'awayLosses' => 1, 'wins' => 80],
+            ['tid' => 2, 'team_name' => 'Heat', 'homeWins' => 1, 'homeLosses' => 40, 'awayWins' => 1, 'awayLosses' => 40, 'wins' => 2],
+        ];
+        $this->mockDb->onQuery('ORDER BY wins DESC', $clinchData);
+        $this->mockDb->onQuery('ORDER BY losses ASC', [['losses' => 80]]);
+        $this->mockDb->onQuery('ORDER BY losses DESC', [['losses' => 80]]);
+        $this->mockDb->onQuery('ORDER BY pct DESC', $clinchData);
+        $this->mockDb->onQuery('gamesUnplayed', [['maxLeft' => 0]]);
+        $this->updater->setTestTeamMap($this->defaultTeamMap);
+        $this->updater->setTestGames([]);
+
+        ob_start();
+        $this->updater->update();
+        ob_end_clean();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $awardQueries = array_values(array_filter($queries, static function (string $q): bool {
+            return stripos($q, 'ibl_team_awards') !== false;
+        }));
+
+        $conferenceAwardFound = false;
+        foreach ($awardQueries as $q) {
+            if (stripos($q, 'Conference Champions') !== false) {
+                $conferenceAwardFound = true;
+                break;
+            }
+        }
+
+        $this->assertTrue($conferenceAwardFound, 'Expected a Conference Champions award upsert');
+    }
+
+    public function testOlympicsSkipsTeamAwardUpsert(): void
+    {
+        $olympicsContext = $this->createStub(\League\LeagueContext::class);
+        $olympicsContext->method('getTableName')->willReturnCallback(
+            static function (string $table): string {
+                return match ($table) {
+                    'ibl_standings' => 'ibl_olympics_standings',
+                    'ibl_schedule' => 'ibl_olympics_schedule',
+                    'ibl_league_config' => 'ibl_olympics_league_config',
+                    default => $table,
+                };
+            }
+        );
+
+        $updater = new TestableStandingsUpdater($this->mockDb, $this->mockSeason, $olympicsContext);
+        $updater->setTestTeamMap($this->defaultTeamMap);
+        $updater->setTestGames([]);
+        $this->mockDb->setReturnTrue(true);
+        $clinchData = [
+            ['tid' => 1, 'team_name' => 'Celtics', 'homeWins' => 40, 'homeLosses' => 1, 'awayWins' => 40, 'awayLosses' => 1, 'wins' => 80],
+            ['tid' => 2, 'team_name' => 'Heat', 'homeWins' => 1, 'homeLosses' => 40, 'awayWins' => 1, 'awayLosses' => 40, 'wins' => 2],
+        ];
+        $this->mockDb->onQuery('ORDER BY wins DESC', $clinchData);
+        $this->mockDb->onQuery('ORDER BY losses ASC', [['losses' => 80]]);
+        $this->mockDb->onQuery('ORDER BY losses DESC', [['losses' => 80]]);
+        $this->mockDb->onQuery('ORDER BY pct DESC', $clinchData);
+        $this->mockDb->onQuery('gamesUnplayed', [['maxLeft' => 0]]);
+
+        ob_start();
+        $updater->update();
+        ob_end_clean();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $awardQueries = array_filter($queries, static function (string $q): bool {
+            return stripos($q, 'ibl_team_awards') !== false;
+        });
+
+        $this->assertEmpty($awardQueries, 'Olympics context should not upsert team awards');
+    }
+
+    public function testRegionAwardMapCoversAllSixRegions(): void
+    {
+        $reflection = new ReflectionClass(StandingsUpdater::class);
+        $constant = $reflection->getConstant('REGION_AWARD_MAP');
+        $this->assertIsArray($constant);
+        $this->assertCount(6, $constant);
+
+        $expectedRegions = ['Atlantic', 'Central', 'Midwest', 'Pacific', 'Eastern', 'Western'];
+        foreach ($expectedRegions as $region) {
+            $this->assertArrayHasKey($region, $constant, "REGION_AWARD_MAP missing region: {$region}");
+        }
     }
 
     public function testConstructorAcceptsOptionalLeagueContext(): void

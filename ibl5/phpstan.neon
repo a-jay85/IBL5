@@ -8,6 +8,7 @@ parameters:
         - classes
     excludePaths:
         - classes/SiteStatistics
+        - classes/Bootstrap/LegacyFunctions.php
     bootstrapFiles:
         - phpstan-stubs/nuke-globals.stub.php
     phpVersion: 80300

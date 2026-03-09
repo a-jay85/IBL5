@@ -33,10 +33,22 @@
       clone.className = 'page-sticky-header-clone';
       clone.setAttribute('aria-hidden', 'true');
 
+      var inner = document.createElement('div');
+      inner.className = 'page-sticky-header-clone-inner';
+
       cloneTable = document.createElement('table');
       cloneTable.className = table.className;
-      cloneTable.appendChild(thead.cloneNode(true));
-      clone.appendChild(cloneTable);
+      var css = table.style.cssText || '';
+      cloneTable.style.cssText = css + '; border: none;';
+      var clonedThead = thead.cloneNode(true);
+      // Hide title/colspan rows — only show column headers (last row)
+      var rows = clonedThead.querySelectorAll('tr');
+      for (var r = 0; r < rows.length - 1; r++) {
+        rows[r].style.display = 'none';
+      }
+      cloneTable.appendChild(clonedThead);
+      inner.appendChild(cloneTable);
+      clone.appendChild(inner);
 
       document.body.appendChild(clone);
       syncWidths();
@@ -53,8 +65,11 @@
 
     function syncWidths() {
       if (!cloneTable) return;
-      var origCells = thead.querySelectorAll('th');
-      var cloneCells = cloneTable.querySelectorAll('th');
+      var lastOrigRow = thead.querySelector('tr:last-child');
+      var lastCloneRow = cloneTable.querySelector('thead tr:last-child');
+      if (!lastOrigRow || !lastCloneRow) return;
+      var origCells = lastOrigRow.querySelectorAll('th');
+      var cloneCells = lastCloneRow.querySelectorAll('th');
       for (var i = 0; i < origCells.length; i++) {
         if (cloneCells[i]) {
           var w = origCells[i].getBoundingClientRect().width + 'px';

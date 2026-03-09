@@ -65,6 +65,10 @@
     margin-bottom: var(--space-2);
 }
 
+.ibl-label--sm {
+    font-size: 0.75rem;
+}
+
 .ibl-label--required::after {
     content: ' *';
     color: #dc2626;
@@ -141,6 +145,21 @@
     background: var(--gray-600);
 }
 
+/* Danger button (destructive actions) */
+.ibl-btn--danger {
+    background-color: var(--error-600);
+    color: white;
+}
+
+.ibl-btn--danger:hover:not(:disabled) {
+    background-color: var(--error-500);
+}
+
+/* Inline form — flows inline with surrounding content */
+.ibl-form--inline {
+    display: inline;
+}
+
 /* Button sizes */
 .ibl-btn--sm {
     font-size: 1rem;
@@ -160,6 +179,15 @@
 /* ==========================================================================
    Form Groups
    ========================================================================== */
+
+/* Field group — label + content block with bottom spacing */
+.ibl-field-group {
+    margin-bottom: 1rem;
+}
+
+.ibl-field-group__content {
+    margin-top: 0.25rem;
+}
 
 .ibl-form-group {
     margin-bottom: var(--space-4);
@@ -181,32 +209,6 @@
     font-size: 1rem;
     color: #dc2626;
     margin-top: var(--space-1);
-}
-
-/* ==========================================================================
-   Checkbox & Radio
-   ========================================================================== */
-
-.ibl-checkbox,
-.ibl-radio {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    cursor: pointer;
-}
-
-.ibl-checkbox input,
-.ibl-radio input {
-    width: 16px;
-    height: 16px;
-    accent-color: var(--accent-500);
-    cursor: pointer;
-}
-
-.ibl-checkbox__label,
-.ibl-radio__label {
-    font-size: 1.125rem;
-    color: var(--gray-700);
 }
 
 /* ==========================================================================

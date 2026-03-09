@@ -147,7 +147,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
      */
     private function resolveUsernameForTeam(string $teamName): string
     {
-        $query = "SELECT username FROM nuke_users WHERE user_ibl_team = ? LIMIT 1";
+        $query = "SELECT gm_username FROM ibl_team_info WHERE team_name = ? LIMIT 1";
         $stmt = $this->db->prepare($query);
         if ($stmt === false) {
             return '';
@@ -162,11 +162,11 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
         $row = $result->fetch_assoc();
         $stmt->close();
 
-        if (!is_array($row) || !isset($row['username'])) {
+        if (!is_array($row) || !isset($row['gm_username'])) {
             return '';
         }
 
-        return (string) $row['username'];
+        return (string) $row['gm_username'];
     }
 
     /**

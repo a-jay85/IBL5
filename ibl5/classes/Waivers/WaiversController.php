@@ -241,7 +241,8 @@ class WaiversController implements WaiversControllerInterface
 
         \PageLayout\PageLayout::header();
 
-        $team = \Team::initialize($this->db, $userInfo['user_ibl_team']);
+        $teamName = $this->commonRepository->getTeamnameFromUsername((string) ($userInfo['username'] ?? '')) ?? '';
+        $team = \Team::initialize($this->db, $teamName);
 
         $season = new \Season($this->db);
         $players = $this->getPlayersForAction($team, $action);

@@ -26,16 +26,11 @@ function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
     global $user, $prefix, $user_prefix, $mysqli_db;
     $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
 
-    $stmt = $mysqli_db->prepare("SELECT * FROM " . $user_prefix . "_users WHERE username = ?");
-    $stmt->bind_param('s', $username);
-    $stmt->execute();
-    $result2 = $stmt->get_result();
-    $userinfo = $result2->fetch_assoc() ?? [];
     if (!$bypass) {
         cookiedecode($user);
     }
 
-    $teamlogo = $userinfo['user_ibl_team'] ?? '';
+    $teamlogo = $commonRepository->getTeamnameFromUsername($username) ?? '';
     $tid = $commonRepository->getTidFromTeamname($teamlogo);
 
     PageLayout\PageLayout::header();

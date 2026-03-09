@@ -28,10 +28,9 @@ class NavigationRepository extends \BaseMysqliRepository implements NavigationRe
     public function resolveTeamId(string $username): ?int
     {
         $row = $this->fetchOne(
-            "SELECT ti.teamid
-             FROM nuke_users nu
-             JOIN {$this->teamInfoTable} ti ON ti.team_name = nu.user_ibl_team
-             WHERE nu.username = ?
+            "SELECT teamid
+             FROM {$this->teamInfoTable}
+             WHERE gm_username = ?
              LIMIT 1",
             's',
             $username

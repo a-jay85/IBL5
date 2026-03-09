@@ -33,16 +33,7 @@ function userinfo(string $username): void
     $season = new \Season($mysqli_db);
     $league = new \League($mysqli_db);
 
-    $userRow = $commonRepository->getUserByUsername($username);
-
-    if ($userRow === null) {
-        PageLayout\PageLayout::header();
-        echo '<div class="ibl-alert ibl-alert--error">User not found.</div>';
-        PageLayout\PageLayout::footer();
-        return;
-    }
-
-    $voterTeamName = (string)($userRow['user_ibl_team'] ?? '');
+    $voterTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
     $tid = $commonRepository->getTidFromTeamname($voterTeamName) ?? 0;
 
     $formAction = ($season->phase === 'Regular Season')

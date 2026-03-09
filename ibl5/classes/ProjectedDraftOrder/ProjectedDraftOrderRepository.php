@@ -150,4 +150,17 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
 
         return $row !== null;
     }
+
+    /** @see ProjectedDraftOrderRepositoryInterface::upsertLotteryWinnerAward() */
+    public function upsertLotteryWinnerAward(int $year, string $teamName): void
+    {
+        $this->execute(
+            "INSERT INTO ibl_team_awards (year, name, Award)
+             VALUES (?, ?, 'IBL Draft Lottery Winners')
+             ON DUPLICATE KEY UPDATE name = VALUES(name)",
+            "is",
+            $year,
+            $teamName,
+        );
+    }
 }

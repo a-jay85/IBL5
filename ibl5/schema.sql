@@ -59,7 +59,7 @@ CREATE TABLE `auth_users_audit_log` (
   KEY `event_at` (`event_at`),
   KEY `user_id_event_at` (`user_id`,`event_at`),
   KEY `user_id_event_type_event_at` (`user_id`,`event_type`,`event_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=338 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=339 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `auth_users_confirmations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -2336,6 +2336,7 @@ CREATE TABLE `ibl_team_info` (
   `capacity` int(11) NOT NULL DEFAULT 0 COMMENT 'Arena seating capacity',
   `owner_name` varchar(32) NOT NULL DEFAULT '' COMMENT 'GM display name',
   `owner_email` varchar(48) NOT NULL DEFAULT '' COMMENT 'GM email address',
+  `gm_username` varchar(25) DEFAULT NULL,
   `discordID` bigint(20) unsigned DEFAULT NULL COMMENT 'GM Discord user ID',
   `Contract_Wins` int(11) NOT NULL DEFAULT 0 COMMENT 'Wins from last season for FA Play for Winner weight',
   `Contract_Losses` int(11) NOT NULL DEFAULT 0 COMMENT 'Losses from last season for FA Play for Winner weight',
@@ -2357,7 +2358,8 @@ CREATE TABLE `ibl_team_info` (
   UNIQUE KEY `uuid` (`uuid`),
   KEY `team_name` (`team_name`),
   KEY `idx_owner_email` (`owner_email`),
-  KEY `idx_discordID` (`discordID`)
+  KEY `idx_discordID` (`discordID`),
+  KEY `idx_gm_username` (`gm_username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
@@ -2580,7 +2582,7 @@ CREATE TABLE `migrations` (
   `migration` varchar(255) NOT NULL,
   `batch` int(11) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=66 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=67 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `nuke_antiflood`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -2872,7 +2874,7 @@ CREATE TABLE `nuke_stories` (
   KEY `catid` (`catid`),
   KEY `counter` (`counter`),
   KEY `topic` (`topic`)
-) ENGINE=MyISAM AUTO_INCREMENT=4270 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=4271 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `nuke_stories_cat`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -2981,7 +2983,7 @@ CREATE TABLE `nuke_users` (
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = '' */ ;
 DELIMITER ;;
-/*!50003 CREATE*/ /*!50017 DEFINER=`iblhoops_chibul`@`71.145.211.164`*/ /*!50003 TRIGGER trg_gm_tenure_track
+/*!50003 CREATE*/ /*!50017 DEFINER=`iblhoops_chibul`@`localhost`*/ /*!50003 TRIGGER trg_gm_tenure_track
 AFTER UPDATE ON nuke_users
 FOR EACH ROW
 BEGIN
@@ -2993,6 +2995,25 @@ BEGIN
   DECLARE v_new_franchise INT;
 
   IF OLD.user_ibl_team <> NEW.user_ibl_team THEN
+
+    -- ===== Dual-write: sync ibl_team_info.gm_username =====
+
+    -- Clear gm_username on old team
+    IF OLD.user_ibl_team <> '' THEN
+      UPDATE ibl_team_info
+         SET gm_username = NULL
+       WHERE team_name = OLD.user_ibl_team
+         AND gm_username = OLD.username;
+    END IF;
+
+    -- Set gm_username on new team
+    IF NEW.user_ibl_team <> '' THEN
+      UPDATE ibl_team_info
+         SET gm_username = NEW.username
+       WHERE team_name = NEW.user_ibl_team;
+    END IF;
+
+    -- ===== GM tenure tracking (existing logic) =====
 
     -- Read current season context
     SELECT CAST(value AS UNSIGNED) INTO v_ending_year

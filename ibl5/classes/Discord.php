@@ -87,7 +87,7 @@ class Discord
     public function getDiscordIDFromTeamname(string $teamname): string
     {
         $stmt = $this->db->prepare(
-            "SELECT discordID FROM nuke_users WHERE user_ibl_team = ? LIMIT 1"
+            "SELECT discordID FROM ibl_team_info WHERE team_name = ? LIMIT 1"
         );
         if ($stmt === false) {
             throw new \Exception('Prepare failed: ' . $this->db->error);

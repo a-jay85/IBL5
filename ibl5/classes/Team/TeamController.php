@@ -88,12 +88,12 @@ class TeamController implements TeamControllerInterface
         $userTeamName = '';
         global $user;
         if (is_user($user)) {
-            $userInfo = getusrinfo($user);
-            if (is_array($userInfo)) {
-                $rawTeam = $userInfo['user_ibl_team'] ?? '';
-                if (is_string($rawTeam) && $rawTeam !== '') {
-                    $userTeamName = $rawTeam;
-                }
+            /** @var array<int, string> $cookie */
+            global $cookie;
+            $username = (string) ($cookie[1] ?? '');
+            if ($username !== '') {
+                $commonRepo = new \Services\CommonMysqliRepository($this->db);
+                $userTeamName = $commonRepo->getTeamnameFromUsername($username) ?? '';
             }
         }
 

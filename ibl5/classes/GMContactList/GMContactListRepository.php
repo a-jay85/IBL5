@@ -22,9 +22,8 @@ class GMContactListRepository extends \BaseMysqliRepository implements GMContact
     public function getAllTeamContacts(): array
     {
         $query = "SELECT ti.teamid, ti.team_city, ti.team_name, ti.color1, ti.color2,
-                         ti.owner_name, nu.discordID
+                         ti.owner_name, ti.discordID
             FROM ibl_team_info ti
-            LEFT JOIN nuke_users nu ON nu.user_ibl_team = ti.team_name
             WHERE ti.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
             ORDER BY ti.team_city ASC";
 

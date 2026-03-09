@@ -28,4 +28,7 @@
         sizeLinks();
     }
     window.addEventListener('resize', sizeLinks);
+
+    // Expose for re-invocation after AJAX content swaps (e.g. ajax-tabs.js)
+    window.IBL_sizeContractHintLinks = sizeLinks;
 })();

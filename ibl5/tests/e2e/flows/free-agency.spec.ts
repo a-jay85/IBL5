@@ -290,12 +290,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const maxBtn = page.locator('div:has(> span.ibl-label:text("Max Level Contract")) .ibl-btn--sm.ibl-btn--primary').first();
     await maxBtn.click();
-    // Max contract with offerType=0 may fail with soft cap error if team is over cap
-    await page.waitForURL(/result=offer_success|error=/);
-    const url = page.url();
-    if (url.includes('error=')) {
-      test.skip(true, 'Max contract exceeds team cap space — skipping');
-    }
+    await page.waitForURL(/result=offer_success/);
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
   });
 
@@ -361,12 +356,7 @@ test.describe('Free Agency -- validation errors', () => {
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
     const alert = page.locator('.ibl-alert--error');
     await expect(alert).toBeVisible();
-    const text = await alert.textContent() ?? '';
-    // Hard cap or soft cap error may fire first depending on team's cap space
-    if (text.includes('cap space')) {
-      test.skip(true, 'Cap space error fired before max contract check — skipping');
-    }
-    expect(text).toContain('maximum allowed');
+    await expect(alert).toContainText('maximum allowed');
   });
 
   test('raise too large between years', async ({ page }) => {

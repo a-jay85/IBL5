@@ -413,22 +413,28 @@
     /* width set by contract-hint.js */
 }
 
-/* Desktop: reveal link and hide zeros on hover */
+/* Desktop: reveal link and hide zeros when hovering over hint cells */
 @media (hover: hover) {
-    tr:has(.contract-hint-cell):hover .contract-hint-link {
+    tr:has(.contract-hint-cell:hover) .contract-hint-link {
         display: flex;
     }
-    tr:has(.contract-hint-cell):hover .contract-hint-cell {
+    tr:has(.contract-hint-cell:hover) .contract-hint-cell:has(.contract-hint-link) {
+        z-index: 1;
+    }
+    tr:has(.contract-hint-cell:hover) .contract-hint-cell {
         color: transparent;
         text-decoration: none;
     }
 }
 
 /* Mobile: reveal link and hide zeros on focus/tap */
-tr:has(.contract-hint-cell):focus-within .contract-hint-link {
+tr:has(.contract-hint-cell:focus) .contract-hint-link {
     display: flex;
 }
-tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
+tr:has(.contract-hint-cell:focus) .contract-hint-cell:has(.contract-hint-link) {
+    z-index: 1;
+}
+tr:has(.contract-hint-cell:focus) .contract-hint-cell {
     color: transparent;
     text-decoration: none;
 }

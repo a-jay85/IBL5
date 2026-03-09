@@ -122,9 +122,10 @@ class NegotiationViewHelperTest extends TestCase
         // Act
         $html = NegotiationViewHelper::renderNegotiationForm($player, $demands, $capSpace, $maxYearOneSalary);
 
-        // Assert
-        $this->assertStringNotContainsString('<img', $html);
+        // Assert — the injected tag's angle brackets are escaped, preventing injection
         $this->assertStringContainsString('&lt;img', $html);
+        // No unescaped <img tag with an onerror handler (legitimate player photo <img> is fine)
+        $this->assertStringNotContainsString('<img src=x onerror', $html);
     }
 
     /**
@@ -185,7 +186,7 @@ class NegotiationViewHelperTest extends TestCase
 
         // Assert
         $this->assertStringContainsString('value="1063"', $html); // Max year 1
-        $this->assertStringContainsString('type="text"', $html); // Text not number when showing max
+        $this->assertStringContainsString('type="number"', $html); // Number inputs for max salary fields
     }
 
     /**
@@ -260,7 +261,7 @@ class NegotiationViewHelperTest extends TestCase
         $html = NegotiationViewHelper::renderError($errorMessage);
 
         // Assert
-        $this->assertStringContainsString('<p>', $html);
+        $this->assertStringContainsString('ibl-alert ibl-alert--error', $html);
         $this->assertStringContainsString('This is a test error', $html);
     }
 
@@ -297,27 +298,25 @@ class NegotiationViewHelperTest extends TestCase
         $html = NegotiationViewHelper::renderHeader($player);
 
         // Assert
-        $this->assertStringContainsString('<b>PG Test Player</b>', $html);
-        $this->assertStringContainsString('Contract Demands', $html);
+        $this->assertStringContainsString('ibl-title', $html);
+        $this->assertStringContainsString('Contract Extension', $html);
     }
 
     /**
      * @group view
      * @group header-rendering
-     * @group security
      */
-    public function testEscapesPlayerNameInHeader()
+    public function testHeaderReturnsStaticTitle()
     {
         // Arrange
         $player = $this->createMockPlayer();
-        $player->name = "O'Neal";
-        $player->position = "C";
 
         // Act
         $html = NegotiationViewHelper::renderHeader($player);
 
-        // Assert
-        $this->assertStringContainsString('O&apos;Neal', $html);
+        // Assert — header is a static title, player name is in the card
+        $this->assertStringContainsString('<h2', $html);
+        $this->assertStringContainsString('Contract Extension', $html);
     }
 
     /**

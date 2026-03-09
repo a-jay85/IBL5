@@ -197,13 +197,9 @@ foreach ($_REQUEST as $key => $value) {
 
 // Auth is now session-based via AuthService — legacy admin/user cookies are ignored
 
-// Include the required files - Load appropriate config based on league selection
-$currentLeague = $_SESSION['current_league'] ?? $_COOKIE[\League\LeagueContext::COOKIE_NAME] ?? 'ibl';
-if ($currentLeague === 'olympics' && file_exists(__DIR__ . '/configOlympics.php')) {
-    require_once __DIR__ . '/configOlympics.php';
-} else {
-    require_once __DIR__ . '/config.php';
-}
+// Include the required files - single config for all leagues
+// Olympics uses the same database with different table names (handled by LeagueContext)
+require_once __DIR__ . '/config.php';
 
 if (!$dbname) {
     die("<br><br><center><img src=images/logo.gif><br><br><b>There seems that PHP-Nuke isn't installed yet.<br>(The values in config.php file are the default ones)<br><br>You can proceed with the <a href='./install/index.php'>web installation</a> now.</center></b>");

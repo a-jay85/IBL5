@@ -270,10 +270,6 @@
     color: var(--accent-500);
 }
 
-.leaders-tabbed__runner-team {
-    display: none;
-}
-
 .leaders-tabbed__runner-value {
     font-family: var(--font-display);
     font-size: 1rem;
@@ -477,8 +473,6 @@
     margin-top: 0;
 }
 
-/* .ibl-title--large, .ibl-title--centered, .ibl-section-title removed — unused */
-
 /* ==========================================================================
    Responsive Grid Layouts
    ========================================================================== */
@@ -545,6 +539,23 @@
 
 .team-page-rafters {
     margin-top: var(--space-4);
+}
+
+/* Non-team (e.g. free agents) logo fallback — centered logo without banner row */
+.team-logo-fallback {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.team-logo-fallback img {
+    display: block;
+    margin: 0 auto;
+}
+
+/* Franchise history card wrapper — constrains width and centers */
+.franchise-history-wrapper {
+    max-width: 1115px;
+    margin: 0 auto;
 }
 
 /* ==========================================================================
@@ -1038,8 +1049,6 @@ a.schedule-jump-btn:hover {
     text-align: center;
     margin-top: 1rem;
 }
-
-/* .draft-submit-btn removed — use .ibl-btn .ibl-btn--primary .ibl-btn--lg instead */
 
 /* Draft Pick Locator table overrides moved to tables.css */
 

@@ -88,6 +88,16 @@
 }
 
 /* ==========================================================================
+   Notes List — bulleted list inside card bodies
+   ========================================================================== */
+
+.ibl-notes {
+    margin: 0;
+    padding-left: 1.25rem;
+    line-height: 1.75;
+}
+
+/* ==========================================================================
    Empty State
    ========================================================================== */
 
@@ -200,6 +210,27 @@
     padding: 0;
 }
 
+/* Tight body — keeps horizontal padding but removes bottom padding so adjacent
+   list/content sits flush against the label. */
+.team-card__body--tight {
+    padding-bottom: 0;
+}
+
+/* Bordered body — adds top border for sub-sections within the same card */
+.team-card__body--bordered {
+    border-top: 1px solid var(--gray-100);
+}
+
+/* Section label — uppercase subtitle used inside card bodies to separate
+   groups (e.g. playoff rounds, GM History, Team Accomplishments). */
+.team-card__section-label {
+    font-weight: 700;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-500);
+}
+
 /* Neutralize .ibl-data-table chrome when embedded inside a card flush body —
    the card itself provides border, shadow, and border-radius. */
 .team-card__body--flush > .ibl-data-table {
@@ -267,6 +298,12 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Padded history list — used for playoff rounds where the list sits inside
+   a card body rather than a franchise-history-column */
+.team-history-list--padded {
+    padding: 0 var(--space-4);
+}
+
 /* Totals footer inside team-card */
 .team-card__footer {
     padding: var(--space-2) var(--space-4);
@@ -275,6 +312,11 @@
     font-size: 0.9375rem;
     font-weight: 600;
     color: var(--gray-700);
+}
+
+/* Bold footer — totals row with extra emphasis */
+.team-card__footer--bold {
+    font-weight: 700;
 }
 
 /* Awards list — compact year + award pairs */

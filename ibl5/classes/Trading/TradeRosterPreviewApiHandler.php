@@ -309,7 +309,7 @@ class TradeRosterPreviewApiHandler
             // Viewing user's team
             if ($hasUserCash) {
                 $rows[] = $this->makeCashRow(
-                    '| <strong>Cash to ' . $partnerTeam . '</strong>',
+                    '| Cash to ' . $partnerTeam,
                     $viewingTeamId,
                     $userCash,
                     $cashStartYear,
@@ -319,7 +319,7 @@ class TradeRosterPreviewApiHandler
             }
             if ($hasPartnerCash) {
                 $rows[] = $this->makeCashRow(
-                    '| <strong>Cash from ' . $partnerTeam . '</strong>',
+                    '| Cash from ' . $partnerTeam,
                     $viewingTeamId,
                     $partnerCash,
                     $cashStartYear,
@@ -331,7 +331,7 @@ class TradeRosterPreviewApiHandler
             // Viewing partner's team
             if ($hasPartnerCash) {
                 $rows[] = $this->makeCashRow(
-                    '| <strong>Cash to ' . $userTeam . '</strong>',
+                    '| Cash to ' . $userTeam,
                     $partnerTeamId,
                     $partnerCash,
                     $cashStartYear,
@@ -341,7 +341,7 @@ class TradeRosterPreviewApiHandler
             }
             if ($hasUserCash) {
                 $rows[] = $this->makeCashRow(
-                    '| <strong>Cash from ' . $userTeam . '</strong>',
+                    '| Cash from ' . $userTeam,
                     $partnerTeamId,
                     $userCash,
                     $cashStartYear,

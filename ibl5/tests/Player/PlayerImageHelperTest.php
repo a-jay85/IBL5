@@ -219,10 +219,12 @@ class PlayerImageHelperTest extends TestCase
      */
     public function testRenderPlayerCellSkipsThumbnailForPipePrefixedName(): void
     {
-        $result = PlayerImageHelper::renderPlayerCell(0, '|Cash');
+        $result = PlayerImageHelper::renderPlayerCell(0, '| Cash from Team');
 
         $this->assertStringNotContainsString('<img', $result);
-        $this->assertStringContainsString('|Cash', $result);
+        $this->assertStringNotContainsString('<a href', $result);
+        $this->assertStringContainsString('Cash from Team', $result);
+        $this->assertStringNotContainsString('|', $result);
     }
 
     /**
@@ -230,10 +232,12 @@ class PlayerImageHelperTest extends TestCase
      */
     public function testRenderPlayerCellSkipsThumbnailForWaivedPipePrefixedName(): void
     {
-        $result = PlayerImageHelper::renderPlayerCell(0, '(|Cash)*');
+        $result = PlayerImageHelper::renderPlayerCell(0, '(| Cash to Team)*');
 
         $this->assertStringNotContainsString('<img', $result);
-        $this->assertStringContainsString('(|Cash)*', $result);
+        $this->assertStringNotContainsString('<a href', $result);
+        $this->assertStringContainsString('( Cash to Team)*', $result);
+        $this->assertStringNotContainsString('|', $result);
     }
 
     /**

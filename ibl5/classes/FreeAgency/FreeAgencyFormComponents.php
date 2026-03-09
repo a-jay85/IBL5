@@ -33,7 +33,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     {
         ob_start();
         ?>
-<table class="ibl-data-table" style="font-size: 0.875rem;">
+<table class="ibl-data-table offer-ratings">
     <thead>
         <tr>
             <th>2ga</th>
@@ -96,12 +96,12 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     {
         ob_start();
         ?>
-<div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+<div class="offer-salary-row">
     <?php for ($i = 1; $i <= 6; $i++): ?>
         <?php if ($demands["dem{$i}"] !== 0): ?>
-        <div style="text-align: center;">
-            <div class="ibl-label" style="font-size: 0.75rem;">Yr <?= $i ?></div>
-            <div style="font-weight: 600;"><?= $demands["dem{$i}"] ?></div>
+        <div class="offer-salary-cell">
+            <div class="ibl-label ibl-label--sm">Yr <?= $i ?></div>
+            <div class="offer-salary-cell__value"><?= $demands["dem{$i}"] ?></div>
         </div>
         <?php endif; ?>
     <?php endfor; ?>
@@ -117,11 +117,11 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     {
         ob_start();
         ?>
-<div style="display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap;">
+<div class="offer-salary-row offer-salary-row--inputs">
     <?php for ($i = 1; $i <= 6; $i++): ?>
-    <div style="text-align: center;">
-        <label class="ibl-label" style="font-size: 0.75rem; display: block;">Yr <?= $i ?></label>
-        <input type="number" class="ibl-input ibl-input--sm" style="width: 4.5rem;" name="offeryear<?= $i ?>" value="<?= $prefills["offer{$i}"] !== 0 ? $prefills["offer{$i}"] : '' ?>" min="0" max="9999">
+    <div class="offer-salary-cell">
+        <label for="offeryear<?= $i ?>" class="ibl-label ibl-label--sm">Yr <?= $i ?></label>
+        <input type="number" id="offeryear<?= $i ?>" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear<?= $i ?>" value="<?= $prefills["offer{$i}"] !== 0 ? $prefills["offer{$i}"] : '' ?>" min="0" max="9999">
     </div>
     <?php endfor; ?>
 </div>
@@ -143,7 +143,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     {
         ob_start();
         ?>
-<form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" style="display: inline;">
+<form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
     <?= $this->renderHiddenFields($offers, $offerType) ?>
     <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary"><?= (int) $offers[$finalYear - 1] ?></button>
 </form>
@@ -296,9 +296,9 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
     {
         ob_start();
         ?>
-<div style="margin-bottom: 0.75rem;">
+<div class="offer-button-row">
     <span class="ibl-label"><?= htmlspecialchars($label) ?></span>
-    <div style="display: flex; gap: 0.375rem; flex-wrap: wrap; margin-top: 0.25rem;">
+    <div class="offer-button-row__buttons">
         <?php foreach ($contractOfferConfigs as $config): ?>
             <?php
             $offerType = isset($config['offerType']) ? (int) $config['offerType'] : 0;

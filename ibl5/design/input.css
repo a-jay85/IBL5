@@ -74,6 +74,7 @@
 @import './components/team-splits.css';
 @import './components/trade-roster-preview.css';
 @import './components/league-control-panel.css';
+@import './components/negotiate.css';
 
 /* Site-wide layout wrapper (replaces legacy themeheader table) */
 @layer components {

@@ -102,7 +102,7 @@
     text-transform: uppercase;
     letter-spacing: 0.03em;
     line-height: 1.25rem;
-    padding: 0.75rem 0.2rem;
+    padding: 0.75rem 0.1rem;
     text-align: center;
     white-space: nowrap;
     border-bottom: 1px solid var(--gray-100);
@@ -112,7 +112,7 @@
 .ibl-data-table td {
     color: var(--gray-800, #1f2937);
     font-size: 1rem;
-    padding: 0.25rem 0.2rem;
+    padding: 0.25rem 0.1rem;
     text-align: center;
     border-bottom: 1px solid var(--gray-100);
 }
@@ -375,10 +375,126 @@
     padding: 0;
 }
 
-/* Salary column left alignment */
-.team-table th.salary,
-.team-table td.salary {
-    text-align: left;
+/* Salary year columns — right-aligned (shared between Contracts and Free Agency) */
+.team-table th.col-salary,
+.team-table td.col-salary {
+    text-align: right;
+}
+
+/* Contract hint cells — show salary zeros with dotted underline; reveal action link on hover/tap.
+   The link lives in the first hint cell and spans all 5 via width: 500% + overflow: visible. */
+.contract-hint-cell {
+    position: relative;
+    overflow: visible;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-decoration-color: var(--gray-400, #9ca3af);
+    text-underline-offset: 2px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ibl-data-table .contract-hint-link,
+.ibl-data-table .contract-hint-link:visited {
+    display: none;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 0;
+    background-color: inherit;
+    color: var(--accent-700, #c2410c);
+    text-decoration-line: underline;
+    font-weight: 600;
+    white-space: nowrap;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    /* width set by contract-hint.js */
+}
+
+/* Desktop: reveal link and hide zeros when hovering over hint cells */
+@media (hover: hover) {
+    tr:has(.contract-hint-cell:hover) .contract-hint-link {
+        display: flex;
+    }
+    tr:has(.contract-hint-cell:hover) .contract-hint-cell:has(.contract-hint-link) {
+        z-index: 1;
+    }
+    tr:has(.contract-hint-cell:hover) .contract-hint-cell {
+        color: transparent;
+        text-decoration: none;
+    }
+}
+
+/* Mobile: reveal link and hide zeros on focus/tap */
+tr:has(.contract-hint-cell:focus) .contract-hint-link {
+    display: flex;
+}
+tr:has(.contract-hint-cell:focus) .contract-hint-cell:has(.contract-hint-link) {
+    z-index: 1;
+}
+tr:has(.contract-hint-cell:focus) .contract-hint-cell {
+    color: transparent;
+    text-decoration: none;
+}
+
+/* Salary year columns — right-aligned (shared between Contracts and Free Agency) */
+.team-table th.col-salary,
+.team-table td.col-salary {
+    text-align: right;
+}
+
+/* Contract hint cells — show salary zeros with dotted underline; reveal action link on hover/tap.
+   The link lives in the first hint cell and spans all 5 via width: 500% + overflow: visible. */
+.contract-hint-cell {
+    position: relative;
+    overflow: visible;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-decoration-color: var(--gray-400, #9ca3af);
+    text-underline-offset: 2px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ibl-data-table .contract-hint-link,
+.ibl-data-table .contract-hint-link:visited {
+    display: none;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 0;
+    background-color: inherit;
+    color: var(--accent-700, #c2410c);
+    text-decoration-line: underline;
+    font-weight: 600;
+    white-space: nowrap;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    /* width set by contract-hint.js */
+}
+
+/* Desktop: reveal link and hide zeros on hover */
+@media (hover: hover) {
+    tr:has(.contract-hint-cell):hover .contract-hint-link {
+        display: flex;
+    }
+    tr:has(.contract-hint-cell):hover .contract-hint-cell {
+        color: transparent;
+        text-decoration: none;
+    }
+}
+
+/* Mobile: reveal link and hide zeros on focus/tap */
+tr:has(.contract-hint-cell):focus-within .contract-hint-link {
+    display: flex;
+}
+tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
+    color: transparent;
+    text-decoration: none;
 }
 
 /* Team-colored tfoot */
@@ -690,6 +806,7 @@
     -webkit-overflow-scrolling: touch;
     max-width: 100%;
     width: 100%;
+    border-radius: var(--radius-lg, 0.5rem);
 }
 
 /* Center section titles on mobile */
@@ -721,13 +838,6 @@
         /* Width set by JavaScript for iOS compatibility */
     }
 
-    /* Remove border-radius and padding on mobile for edge-to-edge tables */
-    .standings-table-container {
-        border-radius: 0;
-        padding: 0;
-        margin: 0;
-    }
-
     .table-scroll-wrapper {
         padding: 0;
         margin-left: 0;
@@ -752,6 +862,7 @@
     pointer-events: none;
     opacity: 1;
     transition: opacity 0.3s ease;
+    border-radius: 0 var(--radius-lg, 0.5rem) var(--radius-lg, 0.5rem) 0;
     z-index: 2;
 }
 
@@ -840,6 +951,7 @@
     position: sticky;
     top: 0;
     z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .sticky-table thead th {
@@ -877,9 +989,8 @@
     border-right: 1px solid var(--gray-100);
 }
 
-.sticky-table thead tr th {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
+/* Header bottom shadow is on thead (above), not individual th cells,
+   to avoid overlapping shadows creating darker lines between columns. */
 
 .sticky-table thead .sticky-corner {
     box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
@@ -921,15 +1032,21 @@
         box-shadow: none;
     }
 
-    /* Rounded corners on the table's corner cells since the wrapper no longer clips */
-    .page-sticky .sticky-table thead th:first-child {
+    /* Flat background on column headers row — gradient only on title row */
+    .page-sticky .sticky-table thead tr:last-child th {
+        background: var(--team-color-primary, var(--navy-800, #1e293b));
+    }
+
+    /* Rounded corners on title row only — column header row gets corners via JS clone */
+    .page-sticky .sticky-table thead tr:first-child th:first-child {
         border-top-left-radius: var(--radius-lg, 0.5rem);
     }
 
-    .page-sticky .sticky-table thead th:last-child {
+    .page-sticky .sticky-table thead tr:first-child th:last-child {
         border-top-right-radius: var(--radius-lg, 0.5rem);
     }
 
+    /* Rounded corners on body bottom cells since the wrapper no longer clips */
     .page-sticky .sticky-table tbody tr:last-child td:first-child {
         border-bottom-left-radius: var(--radius-lg, 0.5rem);
     }
@@ -943,11 +1060,50 @@
     position: fixed;
     top: 72px;
     z-index: 40;
-    overflow-x: hidden;
-    overflow-y: visible;
     pointer-events: none;
     filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.15));
     border-radius: var(--radius-lg, 0.5rem) var(--radius-lg, 0.5rem) 0 0;
+}
+
+/* Inner wrapper clips the table horizontally */
+.page-sticky-header-clone-inner {
+    overflow: hidden;
+}
+
+/* Corner masks — painted ON TOP of the header via pseudo-elements.
+   Radial gradient: transparent quarter-circle (shows header), page-bg fill (masks corner). */
+.page-sticky-header-clone::before,
+.page-sticky-header-clone::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    width: var(--radius-lg, 0.5rem);
+    height: var(--radius-lg, 0.5rem);
+    z-index: 1;
+    pointer-events: none;
+}
+
+.page-sticky-header-clone::before {
+    left: 0;
+    background: radial-gradient(circle at 100% 100%, transparent 0, transparent var(--radius-lg, 0.5rem), var(--page-bg, #eeeeee) var(--radius-lg, 0.5rem));
+}
+
+.page-sticky-header-clone::after {
+    right: 0;
+    background: radial-gradient(circle at 0% 100%, transparent 0, transparent var(--radius-lg, 0.5rem), var(--page-bg, #eeeeee) var(--radius-lg, 0.5rem));
+}
+
+/* Remove table border (causes line artifact at top edge) */
+.page-sticky-header-clone table {
+    border: none;
+}
+
+/* Flat background — needs high specificity to override .team-table.sticky-table thead th */
+.page-sticky-header-clone .team-table.sticky-table thead th,
+.page-sticky-header-clone .sticky-table thead th,
+.page-sticky-header-clone th {
+    background: var(--team-color-primary, var(--navy-800, #1e293b));
+    box-shadow: none;
 }
 
 /* ==========================================================================
@@ -1022,10 +1178,6 @@
     letter-spacing: 0.05em;
     padding: var(--space-1) var(--space-2);
 }
-
-/* .ibl-table-header removed — use .ibl-card__header (cards.css) instead.
-   For accent variant, use .ibl-card__header--accent.
-   For title, use .ibl-card__title. */
 
 /* ==========================================================================
    Table Row Variants
@@ -1212,7 +1364,7 @@ td.ibl-team-cell--colored {
 }
 
 .ibl-player-cell a {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 6px;
 }
@@ -1495,8 +1647,6 @@ td.ibl-team-cell--colored {
     color: var(--gray-500);
 }
 
-/* .voting-submit-btn removed — use .ibl-btn .ibl-btn--primary .ibl-btn--lg instead */
-
 /* Mobile adjustments for voting form - keep full table display */
 @media (max-width: 768px) {
     .voting-category {
@@ -1705,20 +1855,6 @@ td.ibl-team-cell--colored {
     margin: 0 auto var(--space-6);
 }
 
-
-/* .league-stats-user-row replaced by .user-team-row (user-team-highlighter.js) */
-
-/* Specificity (0,2,0) beats .ibl-data-table td (0,1,1) for text-align override */
-.ibl-data-table .league-stats-team-cell {
-    text-align: left;
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-sm);
-}
-
-.league-stats-team-cell a {
-    font-weight: 600;
-    text-decoration: none;
-}
 
 /* ==========================================================================
    Contact List Table
@@ -2248,6 +2384,96 @@ td.record-book-retired-cell {
 
 .season-highs-discrepancy-panel .ibl-data-table td {
     padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+}
+
+/* ==========================================================================
+   Free Agency Tables (.fa-table)
+
+   Overrides for .ibl-data-table on the Free Agency page.
+   Wide tables with many rating columns need max-width: none and
+   border-based separators instead of empty separator cells.
+   ========================================================================== */
+
+.fa-table {
+    max-width: none;
+}
+
+/* Shrink all columns to content in FA and Contracts tables.
+   width: 1px prevents auto-layout from distributing extra space;
+   white-space: nowrap ensures content still forces the minimum needed width. */
+.fa-table th,
+.fa-table td,
+.contracts-table th,
+.contracts-table td {
+    width: 1px;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* Fill thead cells with a solid background to eliminate subpixel gradient seams.
+   With border-collapse: separate, transparent th cells expose hairline gaps where
+   the thead gradient bleeds through on retina displays.  A solid fill covers them.
+   sep-r-team / sep-r-weak classes add explicit borders on cells that need them. */
+.contracts-table thead th {
+    background-color: var(--team-color-primary);
+}
+
+.contracts-table th,
+.contracts-table td {
+    border-left: 0;
+    border-right: 0;
+}
+
+/* Right-border separators — applied to the last cell before a column group boundary.
+   Coexists with the empty-cell .sep-team/.sep-weak pattern used by other modules. */
+.team-table td.sep-r-team {
+    border-right: 2px solid var(--team-sep-color);
+}
+
+/* In thead, the sep border must contrast against the dark header background */
+.team-table th.sep-r-team {
+    border-right: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.team-table th.sep-r-weak,
+.team-table td.sep-r-weak {
+    border-right: 2px solid var(--gray-200, #e5e7eb);
+}
+
+/* FA tables: logo-only team cell (same treatment as mobile globally) */
+.fa-table .ibl-team-cell__text {
+    display: none;
+}
+
+.fa-table td.ibl-team-cell--colored {
+    border-right: 2px solid var(--team-sep-color);
+    text-align: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.fa-table .ibl-team-cell--colored .ibl-team-cell__name {
+    justify-content: center;
+}
+
+/* Separator between Yr6 and Loy (6th from last td = last salary cell) */
+.fa-table tbody td:nth-last-child(6) {
+    border-right: 2px solid var(--team-sep-color);
+}
+
+/* Cap space footer */
+.ibl-data-table td.cap-footer-label {
+    text-align: right;
+    font-weight: 400;
+}
+.cap-footer-spacer {
+    background-color: var(--team-row-highlight-bg, #e5e7eb);
+}
+
+/* Team-table + sticky-table combo: use team header colors */
+.team-table.sticky-table thead th {
+    background: var(--team-header-bg);
+    color: var(--team-color-secondary);
 }
 
 } /* end @layer components */

@@ -146,10 +146,10 @@ class Contracts
             <?php elseif ($hasExtension): ?>
             <?php $actionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . (int)$player->playerID; $actionLabel = 'Contract Extension'; ?>
             <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con2'] === 0 ? '0*' : $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
-            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con3'] === 0 ? '0*' : $row['con3'] ?></td>
-            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con4'] === 0 ? '0*' : $row['con4'] ?></td>
-            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con5'] === 0 ? '0*' : $row['con5'] ?></td>
-            <td class="col-salary contract-hint-cell sep-r-team" tabindex="0"><?= $row['con6'] === 0 ? '0*' : $row['con6'] ?></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con3'] ?></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con4'] ?></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con5'] ?></td>
+            <td class="col-salary contract-hint-cell sep-r-team" tabindex="0"><?= $row['con6'] ?></td>
             <?php else: ?>
             <td class="col-salary"><?= $row['con2'] ?></td>
             <td class="col-salary"><?= $row['con3'] ?></td>
@@ -193,7 +193,7 @@ class Contracts
         </tr>
         <tr class="tfoot-legend">
             <td colspan="19" style="text-align: left;">
-                Key: &nbsp; <i>(Waived)*</i> &nbsp; Becomes Free Agent^ &nbsp; Eligible for Rookie Option/Extension 0*
+                Key: &nbsp; <i>(Waived)*</i> &nbsp; Becomes Free Agent^ &nbsp; Eligible for Rookie Option/Extension 0* (hover/tap to reveal link)
             </td>
         </tr>
     </tfoot>

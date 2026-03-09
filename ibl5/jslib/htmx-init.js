@@ -18,10 +18,16 @@
         }
     }
 
-    // Run on initial page load
-    disableBoostOnForms(document);
+    // Run on initial page load (script is in <head>, so DOM isn't ready yet)
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () {
+            disableBoostOnForms(document);
+        });
+    } else {
+        disableBoostOnForms(document);
+    }
 
-    document.body.addEventListener('htmx:afterSwap', function () {
+    document.addEventListener('htmx:afterSwap', function () {
         // Disable boost on any new forms in the swapped content
         disableBoostOnForms(document);
         // Re-run sorttable on new .sortable tables

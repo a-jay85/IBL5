@@ -89,16 +89,20 @@ Need a data table?
 
 ## Inline Style Policy
 
-### Allowed inline styles
+### The ONLY allowed inline styles
 - **CSS custom properties** on containers: `style="--team-color-primary: #1a2e5a;"` (dynamic values from PHP)
 - **Row-level dynamic styles**: `style="--team-row-hover-bg: ..."` (computed per-team)
-- **Truly one-off layout**: `colspan`, unique padding on empty-state messages
 
-### Redundant — use CSS classes instead
-- `text-align: center` on `<td>` in `.ibl-data-table` (already set by `tables.css`)
-- `font-family` on any element (set by `base.css` and component CSS)
-- `font-size` on elements already styled by component classes
-- `color` on links inside `.ibl-data-table` (set by `tables.css`)
+All other visual styling (layout, typography, colors, spacing) **must** use CSS classes defined in `design/components/`. If no suitable class exists, create one — do not use an inline `style` attribute.
+
+### Common card modifier classes (use these, don't reinvent via inline styles)
+| Class | Purpose |
+|-------|---------|
+| `.team-card__body--flush` | Zero padding |
+| `.team-card__body--tight` | No bottom padding |
+| `.team-card__body--bordered` | Top border separator |
+| `.team-card__section-label` | Uppercase sub-heading in cards |
+| `.team-card__footer--bold` | Bold totals row |
 
 ## `white-space: nowrap` Locations
 

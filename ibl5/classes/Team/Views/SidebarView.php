@@ -36,14 +36,14 @@ class SidebarView
             . '<div class="team-card__header"><h3 class="team-card__title">Awards</h3></div>';
 
         if ($gmHistoryHtml !== '') {
-            $output .= "<div class=\"team-card__body\" style=\"padding-bottom: 0;\">"
-                . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">GM History</strong>"
+            $output .= "<div class=\"team-card__body team-card__body--tight\">"
+                . "<strong class=\"team-card__section-label\">GM History</strong>"
                 . "</div><div class=\"team-card__body\">$gmHistoryHtml</div>";
         }
 
         if ($teamAccomplishmentsHtml !== '') {
-            $output .= "<div class=\"team-card__body\" style=\"padding-bottom: 0; border-top: 1px solid var(--gray-100);\">"
-                . "<strong style=\"font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500);\">Team Accomplishments</strong>"
+            $output .= "<div class=\"team-card__body team-card__body--tight team-card__body--bordered\">"
+                . "<strong class=\"team-card__section-label\">Team Accomplishments</strong>"
                 . "</div><div class=\"team-card__body\">$teamAccomplishmentsHtml</div>";
         }
 

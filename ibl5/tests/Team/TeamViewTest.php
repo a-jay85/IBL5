@@ -50,6 +50,8 @@ class TeamViewTest extends TestCase
             'rafters' => '<div>banners</div>',
             'userTeamName' => '',
             'isOwnTeam' => false,
+            'extensionResult' => null,
+            'extensionMsg' => null,
         ], $overrides);
     }
 
@@ -257,5 +259,68 @@ class TeamViewTest extends TestCase
         $output = $this->view->render($this->createPageData());
 
         $this->assertStringContainsString('team-banner-logo', $output);
+    }
+
+    // ============================================
+    // EXTENSION FLASH MESSAGE TESTS
+    // ============================================
+
+    public function testRenderShowsExtensionAcceptedBanner(): void
+    {
+        $output = $this->view->render($this->createPageData([
+            'extensionResult' => 'extension_accepted',
+            'extensionMsg' => 'I accept your offer!',
+        ]));
+
+        $this->assertStringContainsString('ibl-alert--success', $output);
+        $this->assertStringContainsString('I accept your offer!', $output);
+        $this->assertStringContainsString('used up your successful extension', $output);
+    }
+
+    public function testRenderShowsExtensionRejectedBanner(): void
+    {
+        $output = $this->view->render($this->createPageData([
+            'extensionResult' => 'extension_rejected',
+            'extensionMsg' => 'No thanks, I want more money.',
+        ]));
+
+        $this->assertStringContainsString('ibl-alert--info', $output);
+        $this->assertStringContainsString('No thanks, I want more money.', $output);
+        $this->assertStringContainsString('another attempt next sim', $output);
+    }
+
+    public function testRenderShowsExtensionErrorBanner(): void
+    {
+        $output = $this->view->render($this->createPageData([
+            'extensionResult' => 'extension_error',
+            'extensionMsg' => 'Offer exceeds salary cap.',
+        ]));
+
+        $this->assertStringContainsString('ibl-alert--error', $output);
+        $this->assertStringContainsString('Offer exceeds salary cap.', $output);
+        $this->assertStringContainsString('will not be recorded', $output);
+    }
+
+    public function testRenderNoFlashWhenNoExtensionResult(): void
+    {
+        $output = $this->view->render($this->createPageData([
+            'extensionResult' => null,
+            'extensionMsg' => null,
+        ]));
+
+        $this->assertStringNotContainsString('ibl-alert--success', $output);
+        $this->assertStringNotContainsString('ibl-alert--info', $output);
+        $this->assertStringNotContainsString('ibl-alert--error', $output);
+    }
+
+    public function testRenderEscapesExtensionMessageContent(): void
+    {
+        $output = $this->view->render($this->createPageData([
+            'extensionResult' => 'extension_accepted',
+            'extensionMsg' => '<script>alert("xss")</script>',
+        ]));
+
+        $this->assertStringNotContainsString('<script>', $output);
+        $this->assertStringContainsString('&lt;script&gt;', $output);
     }
 }

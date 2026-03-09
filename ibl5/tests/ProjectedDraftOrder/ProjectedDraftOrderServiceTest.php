@@ -521,6 +521,81 @@ class ProjectedDraftOrderServiceTest extends TestCase
         $service->saveLotteryOrder(2026, $reversedLottery);
     }
 
+    public function testSaveLotteryOrderUpsertsLotteryWinnerAward(): void
+    {
+        $standings = $this->buildFullLeagueStandings();
+        /** @var ProjectedDraftOrderRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(ProjectedDraftOrderRepositoryInterface::class);
+        $mockRepo->method('getAllTeamsWithStandings')->willReturn($standings);
+        $mockRepo->method('getPlayedGames')->willReturn([]);
+        $mockRepo->method('getPickOwnership')->willReturn([]);
+        $mockRepo->method('getPointDifferentials')->willReturn([]);
+        // Get the projected order to know which teams are in lottery
+        $tempService = new ProjectedDraftOrderService($mockRepo);
+        $projected = $tempService->calculateDraftOrder(2026);
+        $lotteryTids = [];
+        for ($i = 0; $i < 12; $i++) {
+            $lotteryTids[] = $projected['round1'][$i]['teamId'];
+        }
+
+        // Since no pick ownership override, the original team name is the winner
+        $firstTeamTid = $lotteryTids[0];
+        $firstTeamRow = null;
+        foreach ($standings as $row) {
+            if ($row['tid'] === $firstTeamTid) {
+                $firstTeamRow = $row;
+                break;
+            }
+        }
+        $this->assertNotNull($firstTeamRow);
+
+        $mockRepo->expects($this->once())
+            ->method('upsertLotteryWinnerAward')
+            ->with(2026, $firstTeamRow['team_name']);
+
+        $service = new ProjectedDraftOrderService($mockRepo);
+        $service->saveLotteryOrder(2026, $lotteryTids);
+    }
+
+    public function testSaveLotteryOrderUpsertsLotteryWinnerWithTradedPick(): void
+    {
+        $standings = $this->buildFullLeagueStandings();
+        /** @var ProjectedDraftOrderRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject $mockRepo */
+        $mockRepo = $this->createMock(ProjectedDraftOrderRepositoryInterface::class);
+        $mockRepo->method('getAllTeamsWithStandings')->willReturn($standings);
+        $mockRepo->method('getPlayedGames')->willReturn([]);
+        $mockRepo->method('getPointDifferentials')->willReturn([]);
+        // Get the projected order to know which teams are in lottery
+        $tempService = new ProjectedDraftOrderService($mockRepo);
+        $projected = $tempService->calculateDraftOrder(2026);
+        $lotteryTids = [];
+        for ($i = 0; $i < 12; $i++) {
+            $lotteryTids[] = $projected['round1'][$i]['teamId'];
+        }
+
+        $firstTeamTid = $lotteryTids[0];
+        $firstTeamName = '';
+        foreach ($standings as $row) {
+            if ($row['tid'] === $firstTeamTid) {
+                $firstTeamName = $row['team_name'];
+                break;
+            }
+        }
+
+        // First team's pick is traded to Team1
+        $mockRepo->method('getPickOwnership')->willReturn([
+            ['ownerofpick' => 'Team1', 'teampick' => $firstTeamName, 'round' => 1, 'notes' => 'via trade'],
+        ]);
+
+        // The award should go to Team1 (the owner), not the original team
+        $mockRepo->expects($this->once())
+            ->method('upsertLotteryWinnerAward')
+            ->with(2026, 'Team1');
+
+        $service = new ProjectedDraftOrderService($mockRepo);
+        $service->saveLotteryOrder(2026, $lotteryTids);
+    }
+
     public function testSaveLotteryOrderThrowsOnInvalidTeamId(): void
     {
         $this->configureStubWithFullLeague();

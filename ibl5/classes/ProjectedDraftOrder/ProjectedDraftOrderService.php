@@ -201,6 +201,14 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         }
 
         $this->repository->saveFinalDraftOrder($seasonYear, $picks);
+
+        // Upsert the Draft Lottery Winner award for the team that owns pick #1
+        $firstTeamName = $teamMap[$lotteryTeamIds[0]]['team_name'] ?? '';
+        $pickOwnershipRows = $this->repository->getPickOwnership($seasonYear);
+        $pickOwnership = $this->buildPickOwnershipMap($pickOwnershipRows);
+        $ownership = $pickOwnership[$firstTeamName][1] ?? null;
+        $ownerName = $ownership !== null ? $ownership['ownerName'] : $firstTeamName;
+        $this->repository->upsertLotteryWinnerAward($seasonYear, $ownerName);
     }
 
     /**

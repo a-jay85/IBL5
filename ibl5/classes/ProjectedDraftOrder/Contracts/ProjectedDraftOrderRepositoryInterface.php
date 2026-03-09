@@ -64,4 +64,9 @@ interface ProjectedDraftOrderRepositoryInterface
      * Check if any player has been drafted for the given year.
      */
     public function isDraftStarted(int $year): bool;
+
+    /**
+     * Upsert the IBL Draft Lottery Winners award for the team that owns the #1 pick.
+     */
+    public function upsertLotteryWinnerAward(int $year, string $teamName): void;
 }

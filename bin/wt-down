@@ -1,0 +1,98 @@
+#!/bin/bash
+# Stop a worktree Docker environment.
+# Usage: bin/wt-down <worktree-name> [--volumes]
+#        bin/wt-down --all [--volumes]
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+WORKTREE_NAME=""
+REMOVE_VOLUMES=false
+ALL=false
+
+# Parse arguments
+for arg in "$@"; do
+    case "$arg" in
+        --volumes) REMOVE_VOLUMES=true ;;
+        --all) ALL=true ;;
+        -*) echo "Unknown option: $arg" >&2; exit 1 ;;
+        *) WORKTREE_NAME="$arg" ;;
+    esac
+done
+
+teardown_worktree() {
+    local wt_path="$1"
+    local wt_name
+    wt_name=$(basename "$wt_path")
+    local compose_file="$wt_path/docker-compose.yml"
+
+    if [ ! -f "$compose_file" ]; then
+        return
+    fi
+
+    # Extract project name from compose file (slug is in container names)
+    local slug
+    slug=$(grep 'container_name: ibl5-php-' "$compose_file" | sed 's/.*ibl5-php-//' | tr -d ' ')
+
+    if [ -z "$slug" ]; then
+        echo "Warning: Could not determine slug for $wt_name, skipping"
+        return
+    fi
+
+    echo "Stopping environment: $slug (worktree: $wt_name)..."
+    if [ "$REMOVE_VOLUMES" = true ]; then
+        docker compose -f "$compose_file" -p "ibl5-$slug" down -v
+    else
+        docker compose -f "$compose_file" -p "ibl5-$slug" down
+    fi
+
+    rm -f "$compose_file"
+    echo "  Done."
+}
+
+if [ "$ALL" = true ]; then
+    WORKTREES_DIR="$REPO_ROOT/worktrees"
+    if [ ! -d "$WORKTREES_DIR" ]; then
+        echo "No worktrees directory found."
+        exit 0
+    fi
+
+    found=false
+    for wt in "$WORKTREES_DIR"/*/; do
+        [ -d "$wt" ] || continue
+        if [ -f "$wt/docker-compose.yml" ]; then
+            found=true
+            teardown_worktree "$wt"
+        fi
+    done
+
+    if [ "$found" = false ]; then
+        echo "No running worktree environments found."
+    fi
+    exit 0
+fi
+
+if [ -z "$WORKTREE_NAME" ]; then
+    echo "Usage: bin/wt-down <worktree-name> [--volumes]" >&2
+    echo "       bin/wt-down --all [--volumes]" >&2
+    echo "" >&2
+    echo "Options:" >&2
+    echo "  --volumes  Also remove the database volume" >&2
+    echo "  --all      Tear down all worktree environments" >&2
+    exit 1
+fi
+
+WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
+if [ ! -d "$WORKTREE_PATH" ]; then
+    echo "Error: Worktree not found at $WORKTREE_PATH" >&2
+    exit 1
+fi
+
+COMPOSE_FILE="$WORKTREE_PATH/docker-compose.yml"
+if [ ! -f "$COMPOSE_FILE" ]; then
+    echo "No Docker environment found for worktree '$WORKTREE_NAME'."
+    echo "(No docker-compose.yml in $WORKTREE_PATH)"
+    exit 0
+fi
+
+teardown_worktree "$WORKTREE_PATH"

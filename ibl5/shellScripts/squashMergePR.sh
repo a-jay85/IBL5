@@ -20,34 +20,39 @@ if ! git diff --quiet HEAD 2>/dev/null || ! git diff --cached --quiet HEAD 2>/de
   echo "Stashed uncommitted changes."
 fi
 
-# 4. Push unpushed commits
-git push -q 2>/dev/null || true
-
-# 5. Fetch
+# 4. Fetch
 git fetch origin -q
 
-# 6. Rebase if not at tip of master
+# 5. Rebase if not at tip of master
 if ! git merge-base --is-ancestor origin/master HEAD; then
   git rebase origin/master -q || fail "Rebase conflicts -- resolve manually"
-  git push --force-with-lease -q || fail "Force push after rebase"
   echo "Rebased onto master."
 fi
 
-# 7. Squash merge + cleanup
+# 6. Push all local commits (including any rebase result)
+git push --force-with-lease -q || fail "Push to origin failed -- local commits may not be on remote"
+
+# 7. Verify local and remote branch tips match before merging
+LOCAL_SHA=$(git rev-parse HEAD)
+REMOTE_SHA=$(git rev-parse "origin/$BRANCH")
+[[ "$LOCAL_SHA" == "$REMOTE_SHA" ]] || fail "Local ($LOCAL_SHA) and remote ($REMOTE_SHA) out of sync"
+
+# 8. Squash merge + cleanup
 gh pr merge --squash --delete-branch || fail "gh pr merge"
 
-# 7a. Wait for GitHub to delete the origin branch
+# 8a. Wait for GitHub to delete the origin branch
 sleep 10
 
-# 8. mergeAndPush
+# 9. mergeAndPush
 bash "$SCRIPT_DIR/mergeMasterToProdAndPush.sh"
 
-# 9. Restore stash
+# 10. Restore stash (we're now on master after mergeMasterToProdAndPush)
 if [ "$STASHED" -eq 1 ]; then
+  echo "NOTE: Stashed changes from '$BRANCH' will be restored onto master (branch was deleted)."
   git stash pop -q && echo "Restored stashed changes." || echo "WARNING: stash pop had conflicts -- resolve manually."
 fi
 
-# 10. Fetch all remotes and prune tracking branches
+# 11. Fetch all remotes and prune tracking branches
 git fetch --all --prune -q
 
 echo "Done."

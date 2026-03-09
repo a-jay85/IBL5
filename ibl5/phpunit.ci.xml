@@ -137,6 +137,9 @@
         <testsuite name="FranchiseRecordBook Module Tests">
             <directory>tests/FranchiseRecordBook</directory>
         </testsuite>
+        <testsuite name="Unit Tests">
+            <directory>tests/Unit</directory>
+        </testsuite>
     </testsuites>
     <source baseline="phpunit-baseline.xml">
         <include>

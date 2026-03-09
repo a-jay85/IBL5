@@ -228,6 +228,8 @@
         resizeTimer = setTimeout(processAll, 150);
     }
 
+    window.IBL_refreshNameAbbreviations = processAll;
+
     document.addEventListener('DOMContentLoaded', processAll);
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleResize);

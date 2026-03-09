@@ -4,10 +4,17 @@ declare(strict_types=1);
 
 namespace PageLayout;
 
+use Utilities\HtmxHelper;
+
 class PageLayout
 {
     public static function header(): void
     {
+        if (HtmxHelper::isBoostedRequest()) {
+            self::renderBoostedHeader();
+            return;
+        }
+
         online();
         self::renderHead();
         include "includes/counter.php";
@@ -22,6 +29,26 @@ class PageLayout
         }
         if (defined('HOME_FILE')) {
             blocks("Center");
+        }
+    }
+
+    private static function renderBoostedHeader(): void
+    {
+        /** @var string $sitename */
+        global $sitename;
+        /** @var string $pagetitle */
+        global $pagetitle;
+
+        echo '<title>' . \Utilities\HtmlSanitizer::e($sitename . ' ' . $pagetitle) . '</title>';
+
+        if (
+            isset($_SESSION['flash_success'])
+            && is_string($_SESSION['flash_success'])
+            && $_SESSION['flash_success'] !== ''
+        ) {
+            $flashMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_success']);
+            unset($_SESSION['flash_success']);
+            echo '<div class="ibl-alert ibl-alert--success">' . $flashMessage . '</div>';
         }
     }
 
@@ -66,12 +93,14 @@ class PageLayout
         }
         echo "<title>$sitename $pagetitle</title>\n";
         echo '<meta name="google-site-verification" content="3y3xJYDHSYUitn7cbfFfI6C2BiK_q66dtRfykpzHW5w" />';
+        echo "<script src=\"jslib/htmx.min.js\"></script>";
         echo "<script src=\"jslib/sorttable.js\"></script>";
         echo "<script src=\"jslib/responsive-tables.js\"></script>";
         echo "<script src=\"jslib/name-abbreviation.js\"></script>";
         echo "<script src=\"jslib/user-team-highlighter.js\"></script>";
         echo "<script src=\"jslib/sticky-page-header.js\"></script>";
         echo "<script src=\"jslib/contract-hint.js\"></script>";
+        echo "<script src=\"jslib/htmx-init.js\"></script>";
 
         // Meta tags (inlined from includes/meta.php)
         $charsetValue = defined('_CHARSET') ? \_CHARSET : null;
@@ -178,8 +207,12 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
         themeheader();
     }
 
-    public static function footer(): never
+    public static function footer(): void
     {
+        if (HtmxHelper::isBoostedRequest()) {
+            return;
+        }
+
         if (defined('HOME_FILE')) {
             blocks("Down");
         }

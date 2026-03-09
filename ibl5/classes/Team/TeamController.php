@@ -104,6 +104,7 @@ class TeamController implements TeamControllerInterface
         } catch (\RuntimeException $e) {
             echo '<div class="ibl-alert ibl-alert--error">Team not found.</div>';
             \PageLayout\PageLayout::footer();
+            return;
         }
 
         echo $this->view->render($pageData);

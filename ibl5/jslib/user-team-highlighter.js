@@ -12,7 +12,7 @@
 (function () {
     'use strict';
 
-    document.addEventListener('DOMContentLoaded', function () {
+    function highlightUserTeam() {
         var userTeamId = document.body.getAttribute('data-user-team-id');
         if (!userTeamId) {
             return;
@@ -47,5 +47,9 @@
                 games[g].classList.add('user-team-game');
             }
         }
-    });
+    }
+
+    window.IBL_refreshUserTeamHighlighter = highlightUserTeam;
+
+    document.addEventListener('DOMContentLoaded', highlightUserTeam);
 })();

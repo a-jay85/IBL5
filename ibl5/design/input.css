@@ -75,6 +75,7 @@
 @import './components/trade-roster-preview.css';
 @import './components/league-control-panel.css';
 @import './components/negotiate.css';
+@import './components/htmx.css';
 
 /* Site-wide layout wrapper (replaces legacy themeheader table) */
 @layer components {

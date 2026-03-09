@@ -1,0 +1,6 @@
+@layer components {
+    #site-content.htmx-request {
+        opacity: 0.7;
+        transition: opacity 200ms;
+    }
+}

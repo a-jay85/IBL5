@@ -28,6 +28,7 @@ class Contracts
     public static function render(\mysqli $db, iterable $result, \Team $team, \Season $season, array $starterPids = [], array $excludeFromCapPids = []): string
     {
         $isFreeAgency = $season->isFreeAgencyPhase();
+        $isExtensionPhase = in_array($season->phase, ['Preseason', 'Regular Season', 'Playoffs'], true);
 
         if ($isFreeAgency) {
             $season->endingYear++;
@@ -95,26 +96,23 @@ class Contracts
 
         ob_start();
         ?>
-<table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
+<table class="ibl-data-table team-table responsive-table contracts-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <thead>
         <tr>
             <th>Pos</th>
             <th class="sticky-col">Player</th>
             <th>Age</th>
             <th>Exp</th>
-            <th>Bird</th>
-            <th class="sep-team"></th>
-            <th class="salary"><?= substr((string) ($season->endingYear - 1), -2) ?>-<?= substr((string) $season->endingYear, -2) ?></th>
-            <th class="salary"><?= substr((string) $season->endingYear, -2) ?>-<?= substr((string) ($season->endingYear + 1), -2) ?></th>
-            <th class="salary"><?= substr((string) ($season->endingYear + 1), -2) ?>-<?= substr((string) ($season->endingYear + 2), -2) ?></th>
-            <th class="salary"><?= substr((string) ($season->endingYear + 2), -2) ?>-<?= substr((string) ($season->endingYear + 3), -2) ?></th>
-            <th class="salary"><?= substr((string) ($season->endingYear + 3), -2) ?>-<?= substr((string) ($season->endingYear + 4), -2) ?></th>
-            <th class="salary"><?= substr((string) ($season->endingYear + 4), -2) ?>-<?= substr((string) ($season->endingYear + 5), -2) ?></th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">Bird</th>
+            <th class="col-salary"><?= substr((string) ($season->endingYear - 1), -2) ?>-<?= substr((string) $season->endingYear, -2) ?></th>
+            <th class="col-salary"><?= substr((string) $season->endingYear, -2) ?>-<?= substr((string) ($season->endingYear + 1), -2) ?></th>
+            <th class="col-salary"><?= substr((string) ($season->endingYear + 1), -2) ?>-<?= substr((string) ($season->endingYear + 2), -2) ?></th>
+            <th class="col-salary"><?= substr((string) ($season->endingYear + 2), -2) ?>-<?= substr((string) ($season->endingYear + 3), -2) ?></th>
+            <th class="col-salary"><?= substr((string) ($season->endingYear + 3), -2) ?>-<?= substr((string) ($season->endingYear + 4), -2) ?></th>
+            <th class="col-salary sep-r-team"><?= substr((string) ($season->endingYear + 4), -2) ?>-<?= substr((string) ($season->endingYear + 5), -2) ?></th>
             <th>Tal</th>
             <th>Skl</th>
-            <th>Int</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">Int</th>
             <th>Loy</th>
             <th>PFW</th>
             <th>PT</th>
@@ -125,25 +123,45 @@ class Contracts
     <tbody>
 <?php foreach ($playerRows as $row):
     $player = $row['player'];
+    $hasRookieOption = $player->canRookieOption($season->phase);
+    $hasExtension = !$hasRookieOption && $player->canRenegotiateContract();
 ?>
+        <?php
+        $isCashPlayer = $row['isCashRow'] || str_contains($player->name ?? '', '|');
+        $hasRookieOption = !$isCashPlayer && $player->canRookieOption($season->phase);
+        $hasExtension = !$isCashPlayer && !$hasRookieOption && $isExtensionPhase && $player->canRenegotiateContract();
+        ?>
         <tr<?= $row['isCashRow'] ? ' data-cash-row' : '' ?>>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
             <td><?= (int)$player->age ?></td>
             <td><?= (int)$player->yearsOfExperience ?></td>
-            <td><?= (int)$player->birdYears ?></td>
-            <td class="sep-team"></td>
-            <td class="salary"><?= $row['con1'] ?></td>
-            <td class="salary"><?= $row['con2'] ?></td>
-            <td class="salary"><?= $row['con3'] ?></td>
-            <td class="salary"><?= $row['con4'] ?></td>
-            <td class="salary"><?= $row['con5'] ?></td>
-            <td class="salary"><?= $row['con6'] ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= (int)$player->birdYears ?></td>
+            <td class="col-salary"><?= $row['con1'] ?></td>
+            <?php if ($hasRookieOption): ?>
+            <?php $actionUrl = 'modules.php?name=Player&amp;pa=rookieoption&amp;pid=' . (int)$player->playerID . '&amp;from=team'; $actionLabel = 'Rookie Option'; ?>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con2'] === 0 ? '0*' : $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con3'] ?></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con4'] ?></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con5'] ?></td>
+            <td class="col-salary contract-hint-cell sep-r-team" tabindex="0"><?= $row['con6'] ?></td>
+            <?php elseif ($hasExtension): ?>
+            <?php $actionUrl = 'modules.php?name=Player&amp;pa=negotiate&amp;pid=' . (int)$player->playerID; $actionLabel = 'Contract Extension'; ?>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con2'] === 0 ? '0*' : $row['con2'] ?><a href="<?= $actionUrl ?>" class="contract-hint-link" data-no-abbreviate><?= $actionLabel ?></a></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con3'] ?></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con4'] ?></td>
+            <td class="col-salary contract-hint-cell" tabindex="0"><?= $row['con5'] ?></td>
+            <td class="col-salary contract-hint-cell sep-r-team" tabindex="0"><?= $row['con6'] ?></td>
+            <?php else: ?>
+            <td class="col-salary"><?= $row['con2'] ?></td>
+            <td class="col-salary"><?= $row['con3'] ?></td>
+            <td class="col-salary"><?= $row['con4'] ?></td>
+            <td class="col-salary"><?= $row['con5'] ?></td>
+            <td class="col-salary sep-r-team"><?= $row['con6'] ?></td>
+            <?php endif; ?>
             <td><?= (int)$player->ratingTalent ?></td>
             <td><?= (int)$player->ratingSkill ?></td>
-            <td><?= (int)$player->ratingIntangibles ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= (int)$player->ratingIntangibles ?></td>
             <td><?= (int)$player->freeAgencyLoyalty ?></td>
             <td><?= (int)$player->freeAgencyPlayForWinner ?></td>
             <td><?= (int)$player->freeAgencyPlayingTime ?></td>
@@ -159,19 +177,16 @@ class Contracts
             <td>Cap Totals</td>
             <td></td>
             <td></td>
-            <td></td>
-            <td class="sep-team"></td>
-            <td class="salary<?= $cap1 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap1 ?></td>
-            <td class="salary<?= $cap2 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap2 ?></td>
-            <td class="salary<?= $cap3 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap3 ?></td>
-            <td class="salary<?= $cap4 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap4 ?></td>
-            <td class="salary<?= $cap5 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap5 ?></td>
-            <td class="salary<?= $cap6 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap6 ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"></td>
+            <td class="col-salary<?= $cap1 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap1 ?></td>
+            <td class="col-salary<?= $cap2 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap2 ?></td>
+            <td class="col-salary<?= $cap3 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap3 ?></td>
+            <td class="col-salary<?= $cap4 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap4 ?></td>
+            <td class="col-salary<?= $cap5 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap5 ?></td>
+            <td class="col-salary sep-r-team<?= $cap6 > $hardCapMax ? ' cap-exceeded' : '' ?>"><?= $cap6 ?></td>
             <td></td>
             <td></td>
-            <td></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"></td>
             <td></td>
             <td></td>
             <td></td>
@@ -179,8 +194,8 @@ class Contracts
             <td></td>
         </tr>
         <tr class="tfoot-legend">
-            <td colspan="22" style="text-align: left;">
-                Key: &nbsp; <i>(Waived)*</i> &nbsp; Becomes Free Agent^
+            <td colspan="19" style="text-align: left;">
+                Key: &nbsp; <i>(Waived)*</i> &nbsp; Becomes Free Agent^ &nbsp; Eligible for Rookie Option/Extension 0* (hover/tap to reveal link)
             </td>
         </tr>
     </tfoot>

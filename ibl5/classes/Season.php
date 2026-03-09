@@ -150,6 +150,21 @@ class Season
     }
 
     /**
+     * Check if trades are currently allowed.
+     *
+     * Trades are allowed when the "Allow Trades" setting is "Yes",
+     * OR when the season phase is Draft or Free Agency (regardless of the setting).
+     */
+    public function areTradesAllowed(): bool
+    {
+        if ($this->phase === 'Draft' || $this->phase === 'Free Agency') {
+            return true;
+        }
+
+        return $this->allowTrades === 'Yes';
+    }
+
+    /**
      * Get first box score date
      *
      * Delegates to SeasonQueryRepository.

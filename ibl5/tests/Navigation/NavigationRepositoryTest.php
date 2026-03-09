@@ -24,7 +24,7 @@ class NavigationRepositoryTest extends IntegrationTestCase
         $result = $this->repository->resolveTeamId('TestUser');
 
         $this->assertSame(5, $result);
-        $this->assertQueryExecuted('nuke_users');
+        $this->assertQueryExecuted('ibl_team_info');
     }
 
     public function testResolveTeamIdReturnsNullForInvalidUser(): void

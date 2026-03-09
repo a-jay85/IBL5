@@ -31,10 +31,9 @@ class ApiTeamRepository extends \BaseMysqliRepository
         return $this->fetchAll(
             "SELECT t.teamid, t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,
                     s.conference, s.division,
-                    nu.discordID
+                    t.discordID
              FROM {$this->teamInfoTable} t
              LEFT JOIN {$this->standingsTable} s ON t.teamid = s.tid
-             LEFT JOIN nuke_users nu ON nu.user_ibl_team = t.team_name
              WHERE t.teamid BETWEEN 1 AND ?
              ORDER BY {$orderBy}
              LIMIT ? OFFSET ?",
@@ -70,7 +69,7 @@ class ApiTeamRepository extends \BaseMysqliRepository
         return $this->fetchOne(
             "SELECT t.teamid, t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,
                     s.conference, s.division,
-                    nu.discordID,
+                    t.discordID,
                     s.leagueRecord AS league_record,
                     s.pct AS win_percentage,
                     s.confRecord AS conference_record,
@@ -84,7 +83,6 @@ class ApiTeamRepository extends \BaseMysqliRepository
                     s.gamesUnplayed AS games_remaining
              FROM {$this->teamInfoTable} t
              LEFT JOIN {$this->standingsTable} s ON t.teamid = s.tid
-             LEFT JOIN nuke_users nu ON nu.user_ibl_team = t.team_name
              WHERE t.uuid = ?",
             's',
             $uuid

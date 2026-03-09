@@ -120,6 +120,10 @@ jobs:
           $stmt->bind_param('sss', $user, $email, $hash);
           $stmt->execute();
 
+          $stmt = $db->prepare("UPDATE ibl_team_info SET gm_username = ? WHERE team_name = 'Metros'");
+          $stmt->bind_param('s', $user);
+          $stmt->execute();
+
           $db->close();
           echo "Test user created: $user\n";
           PHPSCRIPT

@@ -33,7 +33,6 @@ class Ratings
         ob_start();
         ?>
 <table class="ibl-data-table team-table responsive-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
-<colgroup span="2"></colgroup><colgroup span="2"></colgroup><colgroup span="6"></colgroup><colgroup span="6"></colgroup><colgroup span="4"></colgroup><colgroup span="4"></colgroup><colgroup span="1"></colgroup>
     <thead>
         <tr>
 <?php if ($moduleName === "LeagueStarters"): ?>
@@ -41,38 +40,30 @@ class Ratings
 <?php endif; ?>
             <th class="sticky-col">Player</th>
             <th>Pos</th>
-            <th>Age</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">Age</th>
             <th>2ga</th>
             <th>2g%</th>
-            <th class="sep-team"></th>
             <th>fta</th>
             <th>ft%</th>
-            <th class="sep-team"></th>
             <th>3ga</th>
-            <th>3g%</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">3g%</th>
             <th>orb</th>
             <th>drb</th>
             <th>ast</th>
             <th>stl</th>
             <th>tvr</th>
             <th>blk</th>
-            <th>foul</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">foul</th>
             <th>oo</th>
             <th>do</th>
             <th>po</th>
             <th>to</th>
-            <th class="sep-team"></th>
             <th>od</th>
             <th>dd</th>
             <th>pd</th>
-            <th>td</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">td</th>
             <th>Clu</th>
-            <th>Con</th>
-            <th class="sep-team"></th>
+            <th class="sep-r-team">Con</th>
             <th>Days Injured</th>
         </tr>
     </thead>
@@ -84,38 +75,30 @@ class Ratings
 endif; ?>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
             <td><?= htmlspecialchars($player->position ?? '') ?></td>
-            <td><?= (int)$player->age ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= (int)$player->age ?></td>
             <td><?= (int)$player->ratingFieldGoalAttempts ?></td>
-            <td><?= (int)$player->ratingFieldGoalPercentage ?></td>
-            <td class="sep-weak"></td>
+            <td class="sep-r-weak"><?= (int)$player->ratingFieldGoalPercentage ?></td>
             <td><?= (int)$player->ratingFreeThrowAttempts ?></td>
-            <td><?= (int)$player->ratingFreeThrowPercentage ?></td>
-            <td class="sep-weak"></td>
+            <td class="sep-r-weak"><?= (int)$player->ratingFreeThrowPercentage ?></td>
             <td><?= (int)$player->ratingThreePointAttempts ?></td>
-            <td><?= (int)$player->ratingThreePointPercentage ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= (int)$player->ratingThreePointPercentage ?></td>
             <td><?= (int)$player->ratingOffensiveRebounds ?></td>
             <td><?= (int)$player->ratingDefensiveRebounds ?></td>
             <td><?= (int)$player->ratingAssists ?></td>
             <td><?= (int)$player->ratingSteals ?></td>
             <td><?= (int)$player->ratingTurnovers ?></td>
             <td><?= (int)$player->ratingBlocks ?></td>
-            <td><?= (int)$player->ratingFouls ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= (int)$player->ratingFouls ?></td>
             <td><?= (int)$player->ratingOutsideOffense ?></td>
             <td><?= (int)$player->ratingDriveOffense ?></td>
             <td><?= (int)$player->ratingPostOffense ?></td>
-            <td><?= (int)$player->ratingTransitionOffense ?></td>
-            <td class="sep-weak"></td>
+            <td class="sep-r-weak"><?= (int)$player->ratingTransitionOffense ?></td>
             <td><?= (int)$player->ratingOutsideDefense ?></td>
             <td><?= (int)$player->ratingDriveDefense ?></td>
             <td><?= (int)$player->ratingPostDefense ?></td>
-            <td><?= (int)$player->ratingTransitionDefense ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= (int)$player->ratingTransitionDefense ?></td>
             <td><?= (int)$player->ratingClutch ?></td>
-            <td><?= (int)$player->ratingConsistency ?></td>
-            <td class="sep-team"></td>
+            <td class="sep-r-team"><?= (int)$player->ratingConsistency ?></td>
             <?php
                 $injDays = (int) $player->daysRemainingForInjury;
                 $injReturn = $player->getInjuryReturnDate($season->lastSimEndDate);

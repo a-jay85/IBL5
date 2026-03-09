@@ -210,6 +210,7 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
     public static function footer(): void
     {
         if (HtmxHelper::isBoostedRequest()) {
+            ob_end_flush();
             return;
         }
 

@@ -143,7 +143,10 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     {
         /** @var PlayerRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_plr WHERE pid = ?",
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.pid = ?",
             "i",
             $playerID
         );
@@ -177,7 +180,10 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     {
         /** @var PlayerRow|null */
         return $this->fetchOne(
-            "SELECT * FROM ibl_plr WHERE name = ?",
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.name = ?",
             "s",
             $playerName
         );

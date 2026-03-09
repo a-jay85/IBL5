@@ -31,11 +31,12 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT *
-            FROM ibl_plr
-            WHERE tid = ?
-              AND name LIKE '%Buyout%'
-            ORDER BY name ASC",
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.tid = ?
+              AND p.name LIKE '%Buyout%'
+            ORDER BY p.name ASC",
             "i",
             $teamId
         );
@@ -50,12 +51,13 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT *
-            FROM ibl_plr
-            WHERE draftedby LIKE ?
-            ORDER BY draftyear DESC,
-                     draftround,
-                     draftpickno ASC",
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.draftedby LIKE ?
+            ORDER BY p.draftyear DESC,
+                     p.draftround,
+                     p.draftpickno ASC",
             "s",
             $teamName
         );
@@ -106,12 +108,13 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT *
-            FROM ibl_plr
-            WHERE tid = ?
-              AND retired = 0
-              AND cyt != cy
-            ORDER BY name ASC",
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.tid = ?
+              AND p.retired = 0
+              AND p.cyt != p.cy
+            ORDER BY p.name ASC",
             "i",
             $teamId
         );
@@ -128,24 +131,25 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         if ($season !== null && $season->phase === 'Free Agency') {
             // During Free Agency, only count players who have a salary for next year
             $freeAgencyCondition = " AND (
-                (cy = 0 AND cy1 > 0) OR
-                (cy = 0 AND cy2 > 0) OR
-                (cy = 1 AND cy2 > 0) OR
-                (cy = 2 AND cy3 > 0) OR
-                (cy = 3 AND cy4 > 0) OR
-                (cy = 4 AND cy5 > 0) OR
-                (cy = 5 AND cy6 > 0)
+                (p.cy = 0 AND p.cy1 > 0) OR
+                (p.cy = 0 AND p.cy2 > 0) OR
+                (p.cy = 1 AND p.cy2 > 0) OR
+                (p.cy = 2 AND p.cy3 > 0) OR
+                (p.cy = 3 AND p.cy4 > 0) OR
+                (p.cy = 4 AND p.cy5 > 0) OR
+                (p.cy = 5 AND p.cy6 > 0)
             )";
         }
 
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT *
-            FROM ibl_plr
-            WHERE tid = ?
-              AND retired = 0
-              AND ordinal <= '" . \JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
-            ORDER BY name ASC",
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.tid = ?
+              AND p.retired = 0
+              AND p.ordinal <= '" . \JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
+            ORDER BY p.name ASC",
             "i",
             $teamId
         );
@@ -162,25 +166,26 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         if ($season !== null && $season->phase === 'Free Agency') {
             // During Free Agency, only count players who have a salary for next year
             $freeAgencyCondition = " AND (
-                (cy = 0 AND cy1 > 0) OR
-                (cy = 0 AND cy2 > 0) OR
-                (cy = 1 AND cy2 > 0) OR
-                (cy = 2 AND cy3 > 0) OR
-                (cy = 3 AND cy4 > 0) OR
-                (cy = 4 AND cy5 > 0) OR
-                (cy = 5 AND cy6 > 0)
+                (p.cy = 0 AND p.cy1 > 0) OR
+                (p.cy = 0 AND p.cy2 > 0) OR
+                (p.cy = 1 AND p.cy2 > 0) OR
+                (p.cy = 2 AND p.cy3 > 0) OR
+                (p.cy = 3 AND p.cy4 > 0) OR
+                (p.cy = 4 AND p.cy5 > 0) OR
+                (p.cy = 5 AND p.cy6 > 0)
             )";
         }
 
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT *
-            FROM ibl_plr
-            WHERE tid = ?
-              AND retired = 0
-              AND ordinal <= '" . \JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
-              AND injured = '0'
-            ORDER BY name ASC",
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.tid = ?
+              AND p.retired = 0
+              AND p.ordinal <= '" . \JSB::WAIVERS_ORDINAL . "'" . $freeAgencyCondition . "
+              AND p.injured = '0'
+            ORDER BY p.name ASC",
             "i",
             $teamId
         );
@@ -231,11 +236,12 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT *
-            FROM ibl_plr
-            WHERE tid = ?
-              AND cy1 != 0
-              AND retired = 0",
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.tid = ?
+              AND p.cy1 != 0
+              AND p.retired = 0",
             "i",
             $teamId
         );
@@ -250,12 +256,13 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT *
-            FROM ibl_plr
-            WHERE tid = ?
-              AND pos = ?
-              AND cy1 != 0
-              AND retired = 0",
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.tid = ?
+              AND p.pos = ?
+              AND p.cy1 != 0
+              AND p.retired = 0",
             "is",
             $teamId,
             $position
@@ -271,11 +278,12 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT *
-            FROM ibl_plr
-            WHERE tid = ?
-              AND retired = 0
-            ORDER BY name ASC",
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.tid = ?
+              AND p.retired = 0
+            ORDER BY p.name ASC",
             "i",
             $teamId
         );
@@ -290,11 +298,12 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT *
-            FROM ibl_plr
-            WHERE tid = ?
-              AND retired = 0
-            ORDER BY ordinal ASC",
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
+            FROM ibl_plr p
+            LEFT JOIN ibl_team_info t ON p.tid = t.teamid
+            WHERE p.tid = ?
+              AND p.retired = 0
+            ORDER BY p.ordinal ASC",
             "i",
             $teamId
         );

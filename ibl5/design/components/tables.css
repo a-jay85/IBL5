@@ -409,6 +409,7 @@
     white-space: nowrap;
     align-items: center;
     justify-content: center;
+    text-align: center;
     /* width set by contract-hint.js */
 }
 

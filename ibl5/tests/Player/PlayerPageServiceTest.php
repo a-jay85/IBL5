@@ -77,8 +77,8 @@ class PlayerPageServiceTest extends TestCase
 
     public function testCanShowRenegotiationButtonReturnsFalseWhenNotOwnerOfPlayer()
     {
-        $player = $this->createMockPlayer(false, true, 'Other Team');
-        $userTeam = $this->createMockTeam('Test Team', 0);
+        $player = $this->createMockPlayer(false, true, 99);
+        $userTeam = $this->createMockTeam('Test Team', 0, 1);
         $season = $this->createMockSeason('Regular Season');
 
         $result = $this->service->canShowRenegotiationButton($player, $userTeam, $season);
@@ -128,9 +128,9 @@ class PlayerPageServiceTest extends TestCase
 
     public function testCanShowRookieOptionButtonReturnsTrueWhenAllConditionsMet()
     {
-        $player = $this->createMockPlayer(false, true, 'Test Team', true);
-        
-        $userTeam = $this->createMockTeam('Test Team', 0);
+        $player = $this->createMockPlayer(false, true, 1, true);
+
+        $userTeam = $this->createMockTeam('Test Team', 0, 1);
         $season = $this->createMockSeason('Regular Season');
 
         $result = $this->service->canShowRookieOptionButton($player, $userTeam, $season);
@@ -140,9 +140,9 @@ class PlayerPageServiceTest extends TestCase
 
     public function testCanShowRookieOptionButtonReturnsFalseWhenTeamIsFreeAgents()
     {
-        $player = $this->createMockPlayer(false, true, 'Test Team', true);
-        
-        $userTeam = $this->createMockTeam('Free Agents', 0);
+        $player = $this->createMockPlayer(false, true, 1, true);
+
+        $userTeam = $this->createMockTeam('Free Agents', 0, 0);
         $season = $this->createMockSeason('Regular Season');
 
         $result = $this->service->canShowRookieOptionButton($player, $userTeam, $season);
@@ -152,9 +152,9 @@ class PlayerPageServiceTest extends TestCase
 
     public function testCanShowRookieOptionButtonReturnsFalseWhenCannotRookieOption()
     {
-        $player = $this->createMockPlayer(false, true, 'Test Team', false);
-        
-        $userTeam = $this->createMockTeam('Test Team', 0);
+        $player = $this->createMockPlayer(false, true, 1, false);
+
+        $userTeam = $this->createMockTeam('Test Team', 0, 1);
         $season = $this->createMockSeason('Regular Season');
 
         $result = $this->service->canShowRookieOptionButton($player, $userTeam, $season);
@@ -164,9 +164,9 @@ class PlayerPageServiceTest extends TestCase
 
     public function testCanShowRookieOptionButtonReturnsFalseWhenNotOwnerOfPlayer()
     {
-        $player = $this->createMockPlayer(false, true, 'Other Team', true);
-        
-        $userTeam = $this->createMockTeam('Test Team', 0);
+        $player = $this->createMockPlayer(false, true, 99, true);
+
+        $userTeam = $this->createMockTeam('Test Team', 0, 1);
         $season = $this->createMockSeason('Regular Season');
 
         $result = $this->service->canShowRookieOptionButton($player, $userTeam, $season);
@@ -179,7 +179,7 @@ class PlayerPageServiceTest extends TestCase
     private function createMockPlayer(
         bool $wasRookieOptioned,
         bool $canRenegotiate,
-        string $teamName = 'Test Team',
+        int $teamID = 1,
         bool $canRookieOpt = false
     ): Player {
         // Use createStub since we're only configuring return values, not verifying expectations
@@ -188,15 +188,16 @@ class PlayerPageServiceTest extends TestCase
         $stub->method('wasRookieOptioned')->willReturn($wasRookieOptioned);
         $stub->method('canRenegotiateContract')->willReturn($canRenegotiate);
         $stub->method('canRookieOption')->willReturn($canRookieOpt);
-        $stub->teamName = $teamName;
+        $stub->teamID = $teamID;
 
         return $stub;
     }
 
-    private function createMockTeam(string $name, int $hasUsedExtension): object
+    private function createMockTeam(string $name, int $hasUsedExtension, int $teamID = 1): object
     {
         $team = new \stdClass();
         $team->name = $name;
+        $team->teamID = $teamID;
         $team->hasUsedExtensionThisSeason = $hasUsedExtension;
         return $team;
     }

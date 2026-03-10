@@ -19,7 +19,7 @@ printf "%-25s %-20s %-35s %s\n" "--------" "----" "---" "------"
 
 for wt in "$WORKTREES_DIR"/*/; do
     [ -d "$wt" ] || continue
-    compose_file="$wt/docker-compose.yml"
+    compose_file="$wt/docker-compose.worktree.yml"
     [ -f "$compose_file" ] || continue
 
     wt_name=$(basename "$wt")

@@ -74,9 +74,21 @@ jobs:
         working-directory: ibl5
         run: bunx playwright install chromium --with-deps
 
+      - name: Restore Playwright system deps from cache
+        uses: actions/cache/restore@v5
+        id: apt-cache
+        with:
+          path: ~/playwright-apt-cache
+          key: ${{ runner.os }}-playwright-apt-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright system deps
-        run: bunx playwright install-deps chromium
         working-directory: ibl5
+        run: |
+          if [ -d ~/playwright-apt-cache ] && ls ~/playwright-apt-cache/*.deb 1>/dev/null 2>&1; then
+            echo "Installing $(ls ~/playwright-apt-cache/*.deb | wc -l) cached .deb files"
+            sudo cp ~/playwright-apt-cache/*.deb /var/cache/apt/archives/
+          fi
+          bunx playwright install-deps chromium
 
       - name: Install Composer dependencies
         working-directory: ibl5

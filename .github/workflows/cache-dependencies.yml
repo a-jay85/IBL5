@@ -109,6 +109,23 @@ jobs:
         working-directory: ibl5
         run: bunx playwright install chromium --with-deps
 
+      # --- Playwright System Dependencies (apt packages) ---
+      - name: Cache Playwright system deps (apt archives)
+        uses: actions/cache@v5
+        id: apt-cache
+        with:
+          path: ~/playwright-apt-cache
+          key: ${{ runner.os }}-playwright-apt-${{ steps.playwright-version.outputs.version }}
+
+      - name: Save apt archives from Playwright install
+        if: steps.apt-cache.outputs.cache-hit != 'true'
+        run: |
+          # The --with-deps step above already downloaded and installed system packages.
+          # Save the .deb files so e2e-tests can restore them from cache.
+          mkdir -p ~/playwright-apt-cache
+          cp /var/cache/apt/archives/*.deb ~/playwright-apt-cache/ 2>/dev/null || true
+          echo "Cached $(ls ~/playwright-apt-cache/*.deb 2>/dev/null | wc -l) .deb files"
+
       # --- Summary ---
       - name: Cache summary
         run: |
@@ -138,3 +155,11 @@ jobs:
           fi
           echo "- Version: ${{ steps.playwright-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "- Key: \`${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Playwright System Deps (apt)" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.apt-cache.outputs.cache-hit }}" == "true" ]; then
+            echo "- Apt cache: already up-to-date" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Apt cache: updated" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- Key: \`${{ runner.os }}-playwright-apt-${{ steps.playwright-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY

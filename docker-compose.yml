@@ -1,4 +1,25 @@
 services:
+  traefik:
+    image: traefik:v3.6
+    container_name: ibl5-traefik
+    restart: unless-stopped
+    environment:
+      DOCKER_API_VERSION: "1.44"
+    command:
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=ibl5-proxy
+      - --entrypoints.web.address=:80
+    ports:
+      - "80:80"
+      - "8081:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - ibl5-proxy
+
   mariadb:
     image: mariadb:10.6
     container_name: ibl5-mariadb
@@ -12,19 +33,27 @@ services:
       MARIADB_PASSWORD: "whereWTFhappens19!"
     volumes:
       - ibl5-mariadb-data:/var/lib/mysql
+    networks:
+      - default
+      - ibl5-proxy
 
   php:
     build: .
     container_name: ibl5-php
     restart: unless-stopped
-    ports:
-      - "80:80"
     environment:
       DB_HOST: mariadb
     volumes:
       - ./ibl5:/var/www/html/ibl5
     depends_on:
       - mariadb
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.main.rule=Host(`main.localhost`)
+      - traefik.http.services.main.loadbalancer.server.port=80
+    networks:
+      - default
+      - ibl5-proxy
 
   mailpit:
     image: axllent/mailpit:latest
@@ -39,11 +68,18 @@ services:
     container_name: ibl5-adminer
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8082:8080"
     environment:
       ADMINER_DEFAULT_SERVER: mariadb
     depends_on:
       - mariadb
+    networks:
+      - default
+      - ibl5-proxy
 
 volumes:
   ibl5-mariadb-data:
+
+networks:
+  ibl5-proxy:
+    external: true

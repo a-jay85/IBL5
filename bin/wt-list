@@ -1,0 +1,51 @@
+#!/bin/bash
+# List all running worktree Docker environments.
+# Usage: bin/wt-list
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+WORKTREES_DIR="$REPO_ROOT/worktrees"
+
+if [ ! -d "$WORKTREES_DIR" ]; then
+    echo "No worktrees directory found."
+    exit 0
+fi
+
+found=false
+
+printf "%-25s %-20s %-35s %s\n" "WORKTREE" "SLUG" "URL" "STATUS"
+printf "%-25s %-20s %-35s %s\n" "--------" "----" "---" "------"
+
+for wt in "$WORKTREES_DIR"/*/; do
+    [ -d "$wt" ] || continue
+    compose_file="$wt/docker-compose.yml"
+    [ -f "$compose_file" ] || continue
+
+    wt_name=$(basename "$wt")
+    slug=$(grep 'container_name: ibl5-php-' "$compose_file" 2>/dev/null | sed 's/.*ibl5-php-//' | tr -d ' ' || true)
+    [ -z "$slug" ] && continue
+
+    found=true
+
+    # Check container status
+    php_status=$(docker inspect --format='{{.State.Status}}' "ibl5-php-$slug" 2>/dev/null || echo "not found")
+    db_status=$(docker inspect --format='{{.State.Status}}' "ibl5-db-$slug" 2>/dev/null || echo "not found")
+
+    if [ "$php_status" = "running" ] && [ "$db_status" = "running" ]; then
+        status="running"
+    elif [ "$php_status" = "not found" ] && [ "$db_status" = "not found" ]; then
+        status="stopped"
+    else
+        status="php=$php_status db=$db_status"
+    fi
+
+    url="http://$slug.localhost/ibl5/"
+    printf "%-25s %-20s %-35s %s\n" "$wt_name" "$slug" "$url" "$status"
+done
+
+if [ "$found" = false ]; then
+    echo "No worktree Docker environments found."
+    echo ""
+    echo "Start one with: bin/wt-up <worktree-name>"
+fi

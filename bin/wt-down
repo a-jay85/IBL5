@@ -1,0 +1,145 @@
+#!/bin/bash
+# Stop a worktree Docker environment.
+# Usage: bin/wt-down <worktree-name> [--volumes]
+#        bin/wt-down --all [--volumes]
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+WORKTREE_NAME=""
+REMOVE_VOLUMES=false
+ALL=false
+
+# Parse arguments
+for arg in "$@"; do
+    case "$arg" in
+        --volumes) REMOVE_VOLUMES=true ;;
+        --all) ALL=true ;;
+        -*) echo "Unknown option: $arg" >&2; exit 1 ;;
+        *) WORKTREE_NAME="$arg" ;;
+    esac
+done
+
+teardown_worktree() {
+    local wt_path="$1"
+    local wt_name
+    wt_name=$(basename "$wt_path")
+    local compose_file="$wt_path/docker-compose.yml"
+
+    if [ ! -f "$compose_file" ]; then
+        return
+    fi
+
+    # Extract project name from compose file (slug is in container names)
+    local slug
+    slug=$(grep 'container_name: ibl5-php-' "$compose_file" | sed 's/.*ibl5-php-//' | tr -d ' ' || true)
+
+    if [ -z "$slug" ]; then
+        echo "Warning: Could not determine slug for $wt_name, skipping"
+        return
+    fi
+
+    # Detect the actual project name from the running container (may differ from convention)
+    local project
+    project=$(docker inspect "ibl5-php-$slug" --format '{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || echo "ibl5-$slug")
+    [ -z "$project" ] && project="ibl5-$slug"
+
+    echo "Stopping environment: $slug (worktree: $wt_name, project: $project)..."
+    if [ "$REMOVE_VOLUMES" = true ]; then
+        docker compose -f "$compose_file" -p "$project" down -v
+    else
+        docker compose -f "$compose_file" -p "$project" down
+    fi
+
+    rm -f "$compose_file"
+    echo "  Done."
+}
+
+if [ "$ALL" = true ]; then
+    WORKTREES_DIR="$REPO_ROOT/worktrees"
+    if [ ! -d "$WORKTREES_DIR" ]; then
+        echo "No worktrees directory found."
+        exit 0
+    fi
+
+    found=false
+    for wt in "$WORKTREES_DIR"/*/; do
+        [ -d "$wt" ] || continue
+        if [ -f "$wt/docker-compose.yml" ]; then
+            found=true
+            teardown_worktree "$wt"
+        fi
+    done
+
+    if [ "$found" = false ]; then
+        echo "No running worktree environments found."
+    fi
+    exit 0
+fi
+
+if [ -z "$WORKTREE_NAME" ]; then
+    echo "Usage: bin/wt-down <worktree-name> [--volumes]" >&2
+    echo "       bin/wt-down --all [--volumes]" >&2
+    echo "" >&2
+    echo "Options:" >&2
+    echo "  --volumes  Also remove the database volume" >&2
+    echo "  --all      Tear down all worktree environments" >&2
+    exit 1
+fi
+
+WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
+
+# If the worktree directory is gone (already removed), try to find and stop
+# orphaned containers by name pattern (slug = worktree name or pr-NNN).
+if [ ! -d "$WORKTREE_PATH" ]; then
+    echo "Worktree directory not found at $WORKTREE_PATH"
+    echo "Searching for orphaned Docker containers..."
+
+    # Try the worktree name as slug, and also check for pr-* slugs
+    found_orphan=false
+    for slug in "$WORKTREE_NAME" $(docker ps -a --format '{{.Names}}' | grep -o 'ibl5-php-pr-[0-9]*' | sed 's/ibl5-php-//' || true); do
+        php_container="ibl5-php-$slug"
+        db_container="ibl5-db-$slug"
+        if docker inspect "$php_container" &>/dev/null || docker inspect "$db_container" &>/dev/null; then
+            found_orphan=true
+            echo "Found orphaned containers for slug: $slug"
+            # Get project name from container label
+            project=$(docker inspect "$php_container" --format '{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || echo "ibl5-$slug")
+            [ -z "$project" ] && project="ibl5-$slug"
+            # Stop containers (no compose file, so use docker rm directly)
+            for c in "$php_container" "$db_container"; do
+                if docker inspect "$c" &>/dev/null; then
+                    echo "  Stopping $c..."
+                    docker stop "$c" 2>/dev/null || true
+                    docker rm "$c" 2>/dev/null || true
+                fi
+            done
+            # Remove volume if requested
+            if [ "$REMOVE_VOLUMES" = true ]; then
+                for vol in $(docker volume ls --format '{{.Name}}' | grep "$slug" || true); do
+                    echo "  Removing volume: $vol"
+                    docker volume rm "$vol" 2>/dev/null || true
+                done
+            fi
+            # Remove network
+            for net in $(docker network ls --format '{{.Name}}' | grep "$project" || true); do
+                docker network rm "$net" 2>/dev/null || true
+            done
+            echo "  Done."
+        fi
+    done
+
+    if [ "$found_orphan" = false ]; then
+        echo "No orphaned containers found for '$WORKTREE_NAME'."
+    fi
+    exit 0
+fi
+
+COMPOSE_FILE="$WORKTREE_PATH/docker-compose.yml"
+if [ ! -f "$COMPOSE_FILE" ]; then
+    echo "No Docker environment found for worktree '$WORKTREE_NAME'."
+    echo "(No docker-compose.yml in $WORKTREE_PATH)"
+    exit 0
+fi
+
+teardown_worktree "$WORKTREE_PATH"

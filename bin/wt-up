@@ -70,8 +70,18 @@ if ! docker ps --format '{{.Names}}' | grep -q '^ibl5-traefik$'; then
 fi
 
 # Build CSS for the worktree
+STYLE_CSS="$WORKTREE_PATH/ibl5/themes/IBL/style/style.css"
+# Replace symlink with real file so Docker can mount the worktree cleanly
+if [ -L "$STYLE_CSS" ]; then
+    rm "$STYLE_CSS"
+fi
 echo "Building CSS for worktree..."
 (cd "$WORKTREE_PATH/ibl5" && bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css 2>/dev/null) || true
+# Fallback: copy from main repo if build failed or produced empty file
+if [ ! -s "$STYLE_CSS" ]; then
+    echo "CSS build failed or empty — copying from main repo..."
+    cp "$REPO_ROOT/ibl5/themes/IBL/style/style.css" "$STYLE_CSS" 2>/dev/null || true
+fi
 
 # Generate compose file from template
 COMPOSE_FILE="$WORKTREE_PATH/docker-compose.yml"

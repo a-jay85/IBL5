@@ -1,8 +1,10 @@
 services:
   traefik:
-    image: traefik:v3.3
+    image: traefik:v3.6
     container_name: ibl5-traefik
     restart: unless-stopped
+    environment:
+      DOCKER_API_VERSION: "1.44"
     command:
       - --api.dashboard=true
       - --api.insecure=true

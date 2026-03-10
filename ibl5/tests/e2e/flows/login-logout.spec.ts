@@ -1,8 +1,10 @@
 import { test, expect } from '../fixtures/public';
-import { test as authTest, expect as authExpect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
-// Login/Logout flow — uses public (unauthenticated) fixture for login tests.
+// Login/Logout flow — uses public (unauthenticated) fixture throughout.
+// IMPORTANT: Do NOT use the auth fixture here. The logout test destroys the
+// server-side session, which would poison all parallel tests sharing the
+// same stored auth state.
 
 test.describe('Login page', () => {
   test('login page renders with form elements', async ({ page }) => {
@@ -113,23 +115,43 @@ test.describe('Login required redirect', () => {
 });
 
 // ============================================================
-// Logout — uses authenticated fixture
+// Logout — uses public fixture with manual login/logout cycle.
+// Does NOT use the auth fixture to avoid destroying the shared
+// server-side session used by parallel tests.
 // ============================================================
 
-authTest.describe('Logout flow', () => {
-  authTest('logout clears session and shows login option', async ({
-    page,
-  }) => {
-    // Start authenticated — verify we can access a protected page
+test.describe('Logout flow', () => {
+  test('logout clears session and shows login option', async ({ page }) => {
+    const username = process.env.IBL_TEST_USER;
+    const password = process.env.IBL_TEST_PASS;
+
+    if (!username || !password) {
+      test.skip(true, 'Missing IBL_TEST_USER or IBL_TEST_PASS');
+    }
+
+    // Log in manually with a fresh session
+    await page.goto('modules.php?name=YourAccount');
+    const loginForm = page.locator('form', {
+      has: page.locator('#login-username'),
+    });
+    await loginForm.locator('#login-username').fill(username!);
+    await loginForm.locator('#login-password').fill(password!);
+    await loginForm.locator('button[type="submit"]').click();
+
+    await page.waitForURL(
+      (url) => !url.href.includes('name=YourAccount'),
+      { timeout: 10000 },
+    );
+
+    // Verify we're logged in — can access a protected page
     await page.goto('modules.php?name=DepthChartEntry');
-    authExpect(page.url()).not.toContain('YourAccount');
+    expect(page.url()).not.toContain('YourAccount');
 
     // Perform logout
     await page.goto('modules.php?name=YourAccount&op=logout');
     await page.waitForLoadState('domcontentloaded');
 
-    // After logout, should be redirected to homepage or see login option
-    // Try accessing a protected page — should get login prompt
+    // After logout, try accessing a protected page — should get login prompt
     await page.goto('modules.php?name=DepthChartEntry');
 
     const body = await page.locator('body').textContent();
@@ -137,6 +159,6 @@ authTest.describe('Logout flow', () => {
       body?.match(/sign in|log in|login/i) ||
       page.url().includes('YourAccount');
 
-    authExpect(hasLoginPrompt).toBeTruthy();
+    expect(hasLoginPrompt).toBeTruthy();
   });
 });

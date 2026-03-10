@@ -23,7 +23,7 @@ for wt in "$WORKTREES_DIR"/*/; do
     [ -f "$compose_file" ] || continue
 
     wt_name=$(basename "$wt")
-    slug=$(grep 'container_name: ibl5-php-' "$compose_file" 2>/dev/null | sed 's/.*ibl5-php-//' | tr -d ' ')
+    slug=$(grep 'container_name: ibl5-php-' "$compose_file" 2>/dev/null | sed 's/.*ibl5-php-//' | tr -d ' ' || true)
     [ -z "$slug" ] && continue
 
     found=true

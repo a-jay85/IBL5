@@ -2,6 +2,8 @@ import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Draft flow — authenticated tests with state control.
+// Serial: describe blocks share ibl_settings state and must not run in parallel.
+test.describe.configure({ mode: 'serial' });
 
 test.describe('Draft board: renders', () => {
   test.beforeEach(async ({ appState, page }) => {
@@ -66,9 +68,7 @@ test.describe('Draft board: renders', () => {
   });
 });
 
-// Serial: draft selection test mutates state (marks player as drafted).
 test.describe('Draft selection: submission', () => {
-  test.describe.configure({ mode: 'serial' });
   test('successful draft selection', async ({ appState, page }) => {
     await appState({
       'Current Season Phase': 'Draft',
@@ -91,10 +91,11 @@ test.describe('Draft selection: submission', () => {
     const submitBtn = page.locator('button, input[type="submit"]').filter({
       hasText: /draft player/i,
     });
-    await submitBtn.first().click();
-
-    // Wait for navigation — form posts to draft_selection.php
-    await page.waitForLoadState('domcontentloaded');
+    // Submit — wait for navigation to draft_selection.php
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+      submitBtn.first().click(),
+    ]);
 
     // The response page should contain draft-related content.
     // Success: "With pick #N ... select PlayerName!"
@@ -123,14 +124,16 @@ test.describe('Draft selection: submission', () => {
     }
 
     // Submit via JS to bypass client-side validation
-    await page.evaluate(() => {
-      const f = document.querySelector(
-        'form[name="draft_form"]',
-      ) as HTMLFormElement;
-      if (f) f.submit();
-    });
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+      page.evaluate(() => {
+        const f = document.querySelector(
+          'form[name="draft_form"]',
+        ) as HTMLFormElement;
+        if (f) f.submit();
+      }),
+    ]);
 
-    await page.waitForLoadState('domcontentloaded');
     const html = await page.content();
     expect(html).toMatch(/didn.t select|select a player|oops/i);
   });

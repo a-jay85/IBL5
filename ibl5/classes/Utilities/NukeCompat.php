@@ -28,7 +28,7 @@ class NukeCompat
      */
     public function isUser(mixed $cookie): bool
     {
-        return is_user($cookie);
+        return (bool) is_user($cookie);
     }
 
     /**
@@ -39,7 +39,7 @@ class NukeCompat
      */
     public function cookieDecode(mixed $cookie): array
     {
-        return cookiedecode($cookie);
+        return cookiedecode($cookie) ?? [];
     }
 
     /**
@@ -60,7 +60,7 @@ class NukeCompat
      */
     public function isAdmin(mixed $admin = null): bool
     {
-        return is_admin($admin);
+        return (bool) is_admin($admin);
     }
 
     /**

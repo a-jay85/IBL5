@@ -6,6 +6,7 @@ namespace RecordHolders;
 
 use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
 use RecordHolders\Contracts\RecordHoldersServiceInterface;
+use Utilities\IblSeasonDateHelper;
 
 /**
  * RecordHoldersService - Business logic for all-time IBL record holders.
@@ -189,7 +190,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         $formatted = [];
         foreach ($dbRecords as $record) {
             $teamAbbr = $this->getTeamAbbreviation($record['tid']);
-            $seasonYear = $this->dateToSeasonEndingYear($record['date']);
+            $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($record['date']);
             $formatted[] = [
                 'pid' => $record['pid'],
                 'name' => $record['name'],
@@ -219,8 +220,8 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         $formatted = [];
 
         foreach ($dbRecords as $record) {
-            $gameType = $this->getGameTypeFromDate($record['date']);
-            $seasonYear = $this->dateToSeasonEndingYear($record['date']);
+            $gameType = IblSeasonDateHelper::getGameTypeFromDate($record['date']);
+            $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($record['date']);
             $teamAbbr = $this->getTeamAbbreviation($record['tid']);
 
             // Build multi-line amount string
@@ -403,7 +404,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         /** @var list<FormattedTeamGameRecord> $formatted */
         $formatted = [];
         foreach ($dbRecords as $record) {
-            $seasonYear = $this->dateToSeasonEndingYear($record['date']);
+            $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($record['date']);
             $formatted[] = [
                 'teamAbbr' => $this->getTeamAbbreviation($record['tid']),
                 'teamTid' => $record['tid'],
@@ -430,7 +431,7 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         /** @var list<FormattedTeamGameRecord> $formatted */
         $formatted = [];
         foreach ($dbRecords as $record) {
-            $seasonYear = $this->dateToSeasonEndingYear($record['date']);
+            $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($record['date']);
             $formatted[] = [
                 'teamAbbr' => $this->getTeamAbbreviation($record['winner_tid']),
                 'teamTid' => $record['winner_tid'],
@@ -740,38 +741,4 @@ class RecordHoldersService implements RecordHoldersServiceInterface
         return $beginYear . '-' . $endYearShort;
     }
 
-    /**
-     * Convert a date to its IBL season ending year.
-     */
-    private function dateToSeasonEndingYear(string $date): int
-    {
-        $timestamp = strtotime($date);
-        if ($timestamp === false) {
-            return 0;
-        }
-        $month = (int) date('n', $timestamp);
-        $year = (int) date('Y', $timestamp);
-
-        return $month >= 10 ? $year + 1 : $year;
-    }
-
-    /**
-     * Determine the game type from a date.
-     */
-    private function getGameTypeFromDate(string $date): string
-    {
-        $timestamp = strtotime($date);
-        if ($timestamp === false) {
-            return 'regularSeason';
-        }
-        $month = (int) date('n', $timestamp);
-
-        if ($month === 10) {
-            return 'heat';
-        }
-        if ($month === 6) {
-            return 'playoffs';
-        }
-        return 'regularSeason';
-    }
 }

@@ -24,36 +24,6 @@ final class RecordHoldersRepositoryTest extends IntegrationTestCase
         parent::tearDown();
     }
 
-    public function testGetTopPlayerSingleGameQueriesBoxScores(): void
-    {
-        $this->mockDb->setMockData([]);
-
-        $this->repository->getTopPlayerSingleGame(
-            '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)',
-            'MONTH(bs.Date) IN (11, 12, 1, 2, 3, 4, 5)'
-        );
-
-        $this->assertQueryExecuted('ibl_box_scores');
-        $this->assertQueryExecuted('ibl_plr');
-        $this->assertQueryExecuted('ibl_hist');
-    }
-
-    public function testGetTopSeasonAverageQueriesHistoryTable(): void
-    {
-        $this->mockDb->setMockData([]);
-
-        $this->repository->getTopSeasonAverage('pts', 'games', 50);
-
-        $this->assertQueryExecuted('ibl_hist');
-    }
-
-    public function testGetTopSeasonAverageRejectsInvalidColumnName(): void
-    {
-        $result = $this->repository->getTopSeasonAverage('pts; DROP TABLE', 'games', 50);
-
-        $this->assertSame([], $result);
-    }
-
     public function testGetQuadrupleDoublesQueriesForFourCategories(): void
     {
         $this->mockDb->setMockData([]);
@@ -72,31 +42,6 @@ final class RecordHoldersRepositoryTest extends IntegrationTestCase
 
         $this->assertQueryExecuted('ibl_awards');
         $this->assertQueryExecuted('Conference All-Star');
-    }
-
-    public function testGetTopTeamSingleGameQueriesTeamBoxScores(): void
-    {
-        $this->mockDb->setMockData([]);
-
-        $this->repository->getTopTeamSingleGame(
-            '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)',
-            'MONTH(bs.Date) IN (11, 12, 1, 2, 3, 4, 5)'
-        );
-
-        $this->assertQueryExecuted('ibl_box_scores_teams');
-    }
-
-    public function testGetTopTeamSingleGameAcceptsAscOrder(): void
-    {
-        $this->mockDb->setMockData([]);
-
-        $this->repository->getTopTeamSingleGame(
-            '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)',
-            '1=1',
-            'ASC'
-        );
-
-        $this->assertQueryExecuted('ASC');
     }
 
     public function testGetTopTeamHalfScoreQueriesQuarterPoints(): void
@@ -135,35 +80,6 @@ final class RecordHoldersRepositoryTest extends IntegrationTestCase
 
         $this->assertQueryExecuted('vw_team_awards');
         $this->assertQueryExecuted('Division');
-    }
-
-    public function testGetTopPlayerSingleGameReturnsFormattedRecords(): void
-    {
-        $this->mockDb->setMockData([
-            [
-                'pid' => 927,
-                'name' => 'Bob Pettit',
-                'tid' => 14,
-                'team_name' => 'Timberwolves',
-                'date' => '1996-01-16',
-                'BoxID' => 0,
-                'gameOfThatDay' => 0,
-                'oppTid' => 20,
-                'opp_team_name' => 'Grizzlies',
-                'value' => 80,
-            ],
-        ]);
-
-        $result = $this->repository->getTopPlayerSingleGame(
-            '(bs.game2GM * 2 + bs.gameFTM + bs.game3GM * 3)',
-            'MONTH(bs.Date) IN (11, 12, 1, 2, 3, 4, 5)'
-        );
-
-        $this->assertCount(1, $result);
-        $this->assertSame(927, $result[0]['pid']);
-        $this->assertSame('Bob Pettit', $result[0]['name']);
-        $this->assertSame(14, $result[0]['tid']);
-        $this->assertSame(80, $result[0]['value']);
     }
 
     public function testGetMostAllStarAppearancesReturnsFormattedRecords(): void

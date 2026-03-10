@@ -125,25 +125,6 @@ namespace RecordHolders\Contracts;
 interface RecordHoldersRepositoryInterface
 {
     /**
-     * Get the top player single-game record for a stat.
-     *
-     * @param string $statExpression SQL expression for the stat
-     * @param string $dateFilter SQL WHERE clause for date filtering
-     * @return list<PlayerSingleGameRecord>
-     */
-    public function getTopPlayerSingleGame(string $statExpression, string $dateFilter): array;
-
-    /**
-     * Get the top player full-season average for a stat.
-     *
-     * @param string $statColumn Column name in ibl_hist for the stat
-     * @param string $gamesColumn Column name for games played
-     * @param int $minGames Minimum games required
-     * @return list<PlayerSeasonRecord>
-     */
-    public function getTopSeasonAverage(string $statColumn, string $gamesColumn, int $minGames = 50): array;
-
-    /**
      * Get all quadruple doubles in IBL history.
      *
      * @return list<QuadrupleDoubleRecord>
@@ -156,16 +137,6 @@ interface RecordHoldersRepositoryInterface
      * @return list<AllStarRecord>
      */
     public function getMostAllStarAppearances(): array;
-
-    /**
-     * Get the top team single-game record for a stat.
-     *
-     * @param string $statExpression SQL expression for the stat
-     * @param string $dateFilter SQL WHERE clause for date filtering
-     * @param string $order Sort direction ('DESC' or 'ASC')
-     * @return list<TeamSingleGameRecord>
-     */
-    public function getTopTeamSingleGame(string $statExpression, string $dateFilter, string $order = 'DESC'): array;
 
     /**
      * Get the top team half scoring record.

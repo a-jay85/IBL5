@@ -33,17 +33,16 @@ $repo->getTeamDiscordID(string $teamName): ?int
 
 ## Validation Return Patterns
 
-**Standard pattern** (CommonValidator, TradeValidator):
+**Standard pattern** (CommonValidator, NegotiationValidator, RookieOptionValidator):
+```php
+ValidationResult::success()              // ->isValid() === true
+ValidationResult::failure('Message')     // ->isValid() === false, ->getError() === 'Message'
+```
+
+**Legacy array pattern** (TradeValidator, ExtensionValidator):
 ```php
 ['valid' => true, 'error' => null]        // Success
 ['valid' => false, 'error' => 'Message']  // Failure
-```
-
-**Validator class pattern** (DraftValidator, WaiversValidator):
-```php
-if (!$validator->validateX(...)) {
-    $errors = $validator->getErrors();  // Returns array of error strings
-}
 ```
 
 ## Common Gotchas
@@ -58,8 +57,6 @@ if (!$validator->validateX(...)) {
 | Querying "all teams" | `ibl_team_info` contains special teams beyond the 28 real franchises: Rookies (40), Sophomores (41), All-Star Away (50), All-Star Home (51), and Free Agents (0). When querying all league teams (dropdowns, standings, rosters, record books, etc.), always use `WHERE teamid BETWEEN 1 AND League::MAX_REAL_TEAMID` — not just `WHERE teamid <> 0`. Only include teamid 0 (Free Agents/Waivers) or the All-Star/Rookie IDs when there is a specific reason to (e.g., free agency lists, All-Star voting). See `League::getAllTeamsResult()` for the canonical pattern. |
 | Null in queries | Build conditional SQL; `bind_param` has no NULL type |
 | Database booleans (INT cols) | `hasMLE === 1`, `hasLLE === 1` (native int) |
-| Database booleans (VARCHAR cols) | Check schema first — use `=== '1'` only for VARCHAR boolean columns |
-| Trade itemtype | `itemtype` is VARCHAR — compare with `=== '0'`, `=== '1'`, `=== 'cash'` |
+| Trade itemtype | Use `TradeItemType` enum — `TradeItemType::Player`, `TradeItemType::DraftPick`, `TradeItemType::Cash` |
 | Division guards | Use `=== 0` or `=== 0.0`, not `== 0` |
 | Sticky columns + overflow | Never set `overflow: hidden` on a table that uses `position: sticky` cells — it breaks sticky. Use `.ibl-data-table:not(.responsive-table)` for overflow clipping so `.responsive-table` tables (which have sticky columns) are excluded |
-| PHP-Nuke functions | For new code, use `Utilities\NukeCompat` adapter (injectable, mockable) instead of calling global functions directly. Legacy stubs are in `phpstan-stubs/nuke-globals.stub.php` — add new stubs if calling globals directly |

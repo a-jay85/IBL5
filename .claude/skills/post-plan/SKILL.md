@@ -28,7 +28,6 @@ Fix any issues found directly in the worktree files before proceeding.
 3. Create a commit with conventional format: `<type>: <short summary>` followed by `## Section` headers with bullet points
 4. Push the branch: `git push -u origin <branch-name>`
 5. Create a PR: `gh pr create --fill` (or with explicit `--title` and `--body`)
-6. Start Docker environment: `bin/wt-up <worktree-name> --pr --prod` (from repo root — creates isolated environment with production data at `http://pr-NNN.localhost/ibl5/`)
 
 **Stacked PRs:** If the current branch was created from another feature branch (not `master`), set `--base <parent-branch>` so the PR targets the parent branch instead of master.
 
@@ -163,14 +162,25 @@ Or if no issues: `No security issues found. Scanned for SQL injection, XSS, inpu
 
 ## Phase 6: Final Verification
 
-Run the full test suite and static analysis:
+Run three verification tracks concurrently using **two parallel Sonnet agents**:
 
+**Agent 1 — PHPUnit + PHPStan:**
 ```bash
 cd <worktree>/ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary | tail -n 3
 cd <worktree>/ibl5 && composer run analyse
 ```
 
-If either fails, fix the issues in the worktree, commit, and push the fix. Then re-run verification.
+**Agent 2 — E2E tests (Playwright):**
+```bash
+# From the repo root (not the worktree):
+bin/wt-down <worktree-name> --volumes   # tear down if already running
+bin/wt-up <worktree-name> --seed        # start with CI seed data for E2E
+bin/e2e-wt.sh <worktree-name>           # run Playwright against worktree
+```
+
+After both agents complete:
+- If either fails, fix the issues in the worktree, commit, and push the fix. Then re-run the failing verification.
+- Once all pass, restart Docker with production data for preview: `bin/wt-down <worktree-name> --volumes && bin/wt-up <worktree-name> --pr --prod` (from repo root).
 
 Leave the worktree as-is and stay on the feature branch.
 

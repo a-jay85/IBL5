@@ -22,6 +22,9 @@ git push origin production -q 2>/dev/null || fail "push production"
 
 git checkout master -q
 
+# Wait for GitHub to reflect recent changes
+sleep 10
+
 # Fetch all remotes and prune tracking branches
 git fetch --all --prune -q
 

@@ -45,7 +45,7 @@ test.describe('NextSim flow', () => {
 
     const sections = page.locator('.next-sim-position-section');
     // 5 positions: PG, SG, SF, PF, C
-    expect(await sections.count()).toBe(5);
+    await expect(sections).toHaveCount(5);
   });
 
   test('position tables have headers', async ({ page }) => {
@@ -71,7 +71,7 @@ test.describe('NextSim flow', () => {
     }
 
     const userRow = page.locator('.next-sim-row--user');
-    expect(await userRow.count()).toBeGreaterThanOrEqual(1);
+    await expect(userRow.first()).toBeVisible();
   });
 
   test('opponent starters listed with team colors', async ({ page }) => {
@@ -80,7 +80,7 @@ test.describe('NextSim flow', () => {
     }
 
     const opponentRows = page.locator('.next-sim-row--opponent');
-    expect(await opponentRows.count()).toBeGreaterThanOrEqual(1);
+    await expect(opponentRows.first()).toBeVisible();
 
     // Opponent rows should have team color CSS variables
     const firstOpponent = opponentRows.first();

@@ -21,7 +21,7 @@ test.describe('Depth Chart submission', () => {
 
     // Position selects should be pre-populated with current assignments
     const pgSelects = page.locator('select[name^="pg"]');
-    expect(await pgSelects.count()).toBeGreaterThan(0);
+    await expect(pgSelects.first()).toBeVisible();
 
     // At least one should have a non-zero value (starter)
     let hasStarter = false;
@@ -111,14 +111,13 @@ test.describe('Depth Chart submission', () => {
     // Select the second option (first saved config)
     await dropdown.selectOption({ index: 1 });
 
-    // Wait for AJAX load
-    await page.waitForTimeout(1000);
-
-    // The hidden loaded_dc_id should update
+    // Wait for AJAX to update the hidden field
     const loadedId = page.locator('#loaded_dc_id, input[name="loaded_dc_id"]');
     if ((await loadedId.count()) > 0) {
-      const val = await loadedId.first().inputValue();
-      expect(val).not.toBe('0');
+      await expect(async () => {
+        const val = await loadedId.first().inputValue();
+        expect(val).not.toBe('0');
+      }).toPass({ timeout: 5000 });
     }
   });
 

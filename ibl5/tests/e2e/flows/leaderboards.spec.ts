@@ -27,15 +27,15 @@ test.describe('Season Leaderboards flow', () => {
     const table = page.locator('.ibl-data-table');
     await expect(table.first()).toBeVisible();
     const rows = table.first().locator('tbody tr');
-    expect(await rows.count()).toBeGreaterThan(0);
+    await expect(rows.first()).toBeVisible();
   });
 
   test('table has sticky rank and name columns', async ({ page }) => {
     const table = page.locator('.ibl-data-table').first();
     await expect(table).toBeVisible();
 
-    expect(await table.locator('.sticky-col-1').count()).toBeGreaterThan(0);
-    expect(await table.locator('.sticky-col-2').count()).toBeGreaterThan(0);
+    await expect(table.locator('.sticky-col-1').first()).toBeVisible();
+    await expect(table.locator('.sticky-col-2').first()).toBeVisible();
   });
 
   test('sorted column is highlighted', async ({ page }) => {
@@ -43,7 +43,7 @@ test.describe('Season Leaderboards flow', () => {
     await expect(table).toBeVisible();
 
     const sortedCol = table.locator('th.sorted-col');
-    expect(await sortedCol.count()).toBeGreaterThanOrEqual(1);
+    await expect(sortedCol.first()).toBeVisible();
   });
 
   test('changing sort category updates results', async ({ page }) => {
@@ -135,7 +135,7 @@ test.describe('Career Leaderboards flow', () => {
 
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
     const rows = page.locator('.ibl-data-table').first().locator('tbody tr');
-    expect(await rows.count()).toBeGreaterThan(0);
+    await expect(rows.first()).toBeVisible();
   });
 
   test('table has sticky rank and name columns', async ({ page }) => {
@@ -143,8 +143,8 @@ test.describe('Career Leaderboards flow', () => {
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
 
     const table = page.locator('.ibl-data-table').first();
-    expect(await table.locator('.sticky-col-1').count()).toBeGreaterThan(0);
-    expect(await table.locator('.sticky-col-2').count()).toBeGreaterThan(0);
+    await expect(table.locator('.sticky-col-1').first()).toBeVisible();
+    await expect(table.locator('.sticky-col-2').first()).toBeVisible();
   });
 
   test('sorted column is highlighted', async ({ page }) => {
@@ -152,7 +152,7 @@ test.describe('Career Leaderboards flow', () => {
     await expect(page.locator('.ibl-data-table').first()).toBeVisible();
 
     const sortedCol = page.locator('.ibl-data-table').first().locator('th.sorted-col');
-    expect(await sortedCol.count()).toBeGreaterThanOrEqual(1);
+    await expect(sortedCol.first()).toBeVisible();
   });
 
   test('changing board type works', async ({ page }) => {
@@ -166,7 +166,7 @@ test.describe('Career Leaderboards flow', () => {
 
       await expect(page.locator('.ibl-data-table').first()).toBeVisible();
       const rows = page.locator('.ibl-data-table').first().locator('tbody tr');
-      expect(await rows.count()).toBeGreaterThan(0);
+      await expect(rows.first()).toBeVisible();
     }
   });
 

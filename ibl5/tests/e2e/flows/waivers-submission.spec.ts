@@ -22,7 +22,7 @@ test.describe('Waivers: add player', () => {
     await expect(playerSelect).toBeVisible();
 
     const options = playerSelect.locator('option');
-    expect(await options.count()).toBeGreaterThanOrEqual(1);
+    await expect(options.first()).toBeVisible();
   });
 
   test('submit add: sign free agent', async ({ appState, page }) => {
@@ -130,7 +130,7 @@ test.describe('Waivers: closed state', () => {
     await page.goto('modules.php?name=Waivers');
 
     const form = page.locator('form[name="Waiver_Move"]');
-    expect(await form.count()).toBe(0);
+    await expect(form).toHaveCount(0);
   });
 
   test('no PHP errors on closed waivers page', async ({

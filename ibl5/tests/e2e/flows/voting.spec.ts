@@ -27,7 +27,7 @@ test.describe('ASG Voting', () => {
     for (const cat of ['ECF', 'ECB', 'WCF', 'WCB']) {
       const table = page.locator(`#${cat}`);
       // Tables may be hidden initially (click to expand)
-      expect(await table.count()).toBe(1);
+      await expect(table).toHaveCount(1);
     }
   });
 
@@ -44,14 +44,14 @@ test.describe('ASG Voting', () => {
 
     // Should have checkboxes
     const checkboxes = firstVisibleTable.locator('input[type="checkbox"]');
-    expect(await checkboxes.count()).toBeGreaterThan(0);
+    await expect(checkboxes.first()).toBeVisible();
   });
 
   test('submit button visible', async ({ page }) => {
     const submitBtn = page.locator('button, input[type="submit"]').filter({
       hasText: /submit votes/i,
     });
-    expect(await submitBtn.count()).toBeGreaterThan(0);
+    await expect(submitBtn.first()).toBeVisible();
   });
 
   test('no PHP errors on ASG ballot', async ({ page }) => {
@@ -85,7 +85,7 @@ test.describe('ASG Voting: submission', () => {
 
       const table = page.locator(`#${cat}`);
       // Wait for table visibility
-      await table.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+      await expect(table).toBeVisible();
 
       // Select first 4 checkboxes
       const checkboxes = table.locator('input[type="checkbox"]');
@@ -137,7 +137,7 @@ test.describe('EOY Voting', () => {
     // Category tables: MVP, Six, ROY, GM
     for (const cat of ['MVP', 'Six', 'ROY', 'GM']) {
       const table = page.locator(`#${cat}`);
-      expect(await table.count()).toBe(1);
+      await expect(table).toHaveCount(1);
     }
   });
 
@@ -150,14 +150,14 @@ test.describe('EOY Voting', () => {
     await expect(firstTable).toBeVisible();
 
     const radios = firstTable.locator('input[type="radio"]');
-    expect(await radios.count()).toBeGreaterThan(0);
+    await expect(radios.first()).toBeVisible();
   });
 
   test('submit button visible', async ({ page }) => {
     const submitBtn = page.locator('button, input[type="submit"]').filter({
       hasText: /submit votes/i,
     });
-    expect(await submitBtn.count()).toBeGreaterThan(0);
+    await expect(submitBtn.first()).toBeVisible();
   });
 
   test('no PHP errors on EOY ballot', async ({ page }) => {
@@ -189,7 +189,7 @@ test.describe('EOY Voting: submission', () => {
       }
 
       const table = page.locator(`#${cat}`);
-      await table.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+      await expect(table).toBeVisible();
 
       // For each slot (1st, 2nd, 3rd), pick a different candidate
       for (let slot = 1; slot <= 3; slot++) {

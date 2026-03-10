@@ -52,7 +52,6 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
 
     const teamLinks = page.locator('a[href*="teamID="]');
     await expect(teamLinks.first()).toBeVisible();
-    expect(await teamLinks.count()).toBeGreaterThan(0);
   });
 
   test('dropdown link navigates to correct page', async ({ page }) => {

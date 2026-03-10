@@ -44,7 +44,7 @@ test.describe('Draft board: renders', () => {
   test('undrafted players listed with radio buttons', async ({ page }) => {
     // When Metros own the current pick, radio buttons appear for undrafted players
     const radios = page.locator('input[type="radio"][name="player"]');
-    expect(await radios.count()).toBeGreaterThan(0);
+    await expect(radios.first()).toBeVisible();
   });
 
   test('drafted players have drafted class', async ({ page }) => {

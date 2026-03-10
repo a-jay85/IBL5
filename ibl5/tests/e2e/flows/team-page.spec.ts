@@ -22,7 +22,7 @@ test.describe('Team page flow', () => {
     if (await banner.isVisible()) {
       // Action links flank the logo
       const actionLinks = banner.locator('.team-action-link');
-      expect(await actionLinks.count()).toBeGreaterThan(0);
+      await expect(actionLinks.first()).toBeVisible();
     }
   });
 
@@ -54,7 +54,7 @@ test.describe('Team page flow', () => {
   test('team cards display sidebar info', async ({ page }) => {
     const cards = page.locator('.team-card');
     if (await cards.first().isVisible()) {
-      expect(await cards.count()).toBeGreaterThanOrEqual(1);
+      await expect(cards.first()).toBeVisible();
     }
   });
 

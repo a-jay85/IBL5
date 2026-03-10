@@ -36,7 +36,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             (`ordinal`, `name`, `age`, `pid`, `tid`, `peak`, `pos`,
              `oo`, `od`, `do`, `dd`, `po`, `pd`, `to`, `td`,
              `Clutch`, `Consistency`,
-             `PGDepth`, `SGDepth`, `SFDepth`, `PFDepth`, `CDepth`, `active`,
+             `PGDepth`, `SGDepth`, `SFDepth`, `PFDepth`, `CDepth`, `on_depth_chart`,
              `stats_gs`, `stats_gm`, `stats_min`, `stats_fgm`, `stats_fga`,
              `stats_ftm`, `stats_fta`, `stats_3gm`, `stats_3ga`,
              `stats_orb`, `stats_drb`, `stats_ast`, `stats_stl`, `stats_to`, `stats_blk`, `stats_pf`,
@@ -98,7 +98,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `SFDepth` = VALUES(`SFDepth`),
             `PFDepth` = VALUES(`PFDepth`),
             `CDepth` = VALUES(`CDepth`),
-            `active` = VALUES(`active`),
+            `on_depth_chart` = VALUES(`on_depth_chart`),
             `stats_gs` = VALUES(`stats_gs`),
             `stats_gm` = VALUES(`stats_gm`),
             `stats_min` = VALUES(`stats_min`),
@@ -204,7 +204,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         $types = 'isiiiis'   // ordinal, name, age, pid, tid, peak, pos
             . 'iiiiiiii'     // oo, od, do, dd, po, pd, to, td
             . 'ii'           // Clutch, Consistency
-            . 'iiiiii'       // PGDepth..CDepth, active
+            . 'iiiiii'       // PGDepth..CDepth, on_depth_chart
             . 'iiiii'        // stats_gs..stats_fga
             . 'iiii'         // stats_ftm..stats_3ga
             . 'iiiiiii'      // stats_orb..stats_pf
@@ -248,7 +248,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             (int) $data['SFDepth'],
             (int) $data['PFDepth'],
             (int) $data['CDepth'],
-            (int) $data['active'],
+            (int) $data['on_depth_chart'],
             (int) $data['seasonGamesStarted'],
             (int) $data['seasonGamesPlayed'],
             (int) $data['seasonMIN'],

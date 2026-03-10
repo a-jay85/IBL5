@@ -87,8 +87,8 @@ function rookieoption($pid)
 
     // Validate player ownership
     $ownershipValidation = $validator->validatePlayerOwnership($player, $userTeamName);
-    if (!$ownershipValidation['valid']) {
-        echo '<div class="ibl-alert ibl-alert--error">' . \Utilities\HtmlSanitizer::safeHtmlOutput($ownershipValidation['error']) . '</div>';
+    if (!$ownershipValidation->isValid()) {
+        echo '<div class="ibl-alert ibl-alert--error">' . \Utilities\HtmlSanitizer::safeHtmlOutput($ownershipValidation->getError()) . '</div>';
         echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
         PageLayout\PageLayout::footer();
         return;

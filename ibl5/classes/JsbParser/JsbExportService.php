@@ -170,7 +170,7 @@ class JsbExportService implements JsbExportServiceInterface
             foreach ($group as $item) {
                 $dateStr = $item['created_at'];
 
-                if ($item['itemtype'] === '1') {
+                if ($item['itemtype'] === \Trading\TradeItemType::Player->value) {
                     // Player trade
                     $fromJsbId = $this->resolveTeamToJsbId($item['trade_from']);
                     $toJsbId = $this->resolveTeamToJsbId($item['trade_to']);
@@ -180,7 +180,7 @@ class JsbExportService implements JsbExportServiceInterface
                         'to_team' => $toJsbId,
                         'player_id' => $item['itemid'],
                     ];
-                } elseif ($item['itemtype'] === '0') {
+                } elseif ($item['itemtype'] === \Trading\TradeItemType::DraftPick->value) {
                     // Draft pick trade
                     $fromJsbId = $this->resolveTeamToJsbId($item['trade_from']);
                     $toJsbId = $this->resolveTeamToJsbId($item['trade_to']);
@@ -191,7 +191,7 @@ class JsbExportService implements JsbExportServiceInterface
                         'draft_year' => $item['itemid'],
                     ];
                 }
-                // itemtype 'cash' is not represented in .trn format
+                // TradeItemType::Cash is not represented in .trn format
             }
 
             if ($trnItems !== [] && $dateStr !== '') {

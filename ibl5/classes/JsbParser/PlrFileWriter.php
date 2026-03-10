@@ -88,7 +88,7 @@ class PlrFileWriter implements PlrFileWriterInterface
         'SFDepth' => [self::OFFSET_SF_DEPTH, self::WIDTH_DEPTH],
         'PFDepth' => [self::OFFSET_PF_DEPTH, self::WIDTH_DEPTH],
         'CDepth' => [self::OFFSET_C_DEPTH, self::WIDTH_DEPTH],
-        'active' => [self::OFFSET_ACTIVE, self::WIDTH_ACTIVE],
+        'on_depth_chart' => [self::OFFSET_ACTIVE, self::WIDTH_ACTIVE],
         'bird' => [self::OFFSET_BIRD, self::WIDTH_BIRD],
         'cy' => [self::OFFSET_CY, self::WIDTH_CY],
         'cyt' => [self::OFFSET_CYT, self::WIDTH_CYT],

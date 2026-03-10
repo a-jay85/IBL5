@@ -33,13 +33,14 @@ class WaiversController implements WaiversControllerInterface
     private WaiversView $view;
     private \Services\NewsService $newsService;
     private TeamQueryRepositoryInterface $teamQueryRepo;
+    private \Utilities\NukeCompat $nukeCompat;
 
     /**
      * Constructor
      *
      * @param \mysqli $db Modern mysqli connection
      */
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?\Utilities\NukeCompat $nukeCompat = null)
     {
         $this->db = $db;
         $this->repository = new WaiversRepository($db);
@@ -49,6 +50,7 @@ class WaiversController implements WaiversControllerInterface
         $this->view = new WaiversView();
         $this->newsService = new \Services\NewsService($db);
         $this->teamQueryRepo = new \Team\TeamQueryRepository($db);
+        $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
     }
     
     /**
@@ -56,8 +58,8 @@ class WaiversController implements WaiversControllerInterface
      */
     public function handleWaiverRequest($user, string $action): void
     {
-        if (!is_user($user)) {
-            loginbox();
+        if (!$this->nukeCompat->isUser($user)) {
+            $this->nukeCompat->loginBox();
             return;
         }
 
@@ -82,7 +84,7 @@ class WaiversController implements WaiversControllerInterface
         $userInfo = $this->commonRepository->getUserByUsername($username);
 
         if ($userInfo === null) {
-            loginbox();
+            $this->nukeCompat->loginBox();
             return;
         }
 

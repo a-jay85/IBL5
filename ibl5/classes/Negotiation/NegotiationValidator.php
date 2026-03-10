@@ -10,11 +10,10 @@ use Player\Player;
 use Player\PlayerContractValidator;
 use Player\PlayerData;
 use Services\CommonValidator;
+use Services\ValidationResult;
 
 /**
  * @see NegotiationValidatorInterface
- *
- * @phpstan-import-type ValidationResult from NegotiationValidatorInterface
  */
 class NegotiationValidator implements NegotiationValidatorInterface
 {
@@ -26,62 +25,47 @@ class NegotiationValidator implements NegotiationValidatorInterface
         $this->repository = new NegotiationRepository($db);
         $this->contractValidator = new PlayerContractValidator();
     }
-    
+
     /**
      * @see NegotiationValidatorInterface::validateNegotiationEligibility()
-     *
-     * @return ValidationResult
      */
-    public function validateNegotiationEligibility(Player $player, string $userTeamName): array
+    public function validateNegotiationEligibility(Player $player, string $userTeamName): ValidationResult
     {
-        // Check if player is on user's team using common validator
-        /** @var array{valid: bool, error?: string} $ownershipResult */
         $ownershipResult = CommonValidator::validatePlayerOwnership($player, $userTeamName);
-        if (!$ownershipResult['valid']) {
+        if (!$ownershipResult->isValid()) {
             return $ownershipResult;
         }
-        
-        // Create PlayerData object for contract validator
+
         $playerData = $this->createPlayerData($player);
-        
-        // Check if player can renegotiate contract
+
         if (!$this->contractValidator->canRenegotiateContract($playerData)) {
-            return [
-                'valid' => false,
-                'error' => 'Sorry, this player is not eligible for a contract extension at this time.'
-            ];
+            return ValidationResult::failure('Sorry, this player is not eligible for a contract extension at this time.');
         }
-        
-        return ['valid' => true];
+
+        return ValidationResult::success();
     }
-    
+
     /**
      * @see NegotiationValidatorInterface::validateFreeAgencyNotActive()
-     *
-     * @return ValidationResult
      */
-    public function validateFreeAgencyNotActive(): array
-    {   
+    public function validateFreeAgencyNotActive(): ValidationResult
+    {
         $isActive = $this->repository->isFreeAgencyActive();
-        
+
         if ($isActive) {
-            return [
-                'valid' => false,
-                'error' => 'Sorry, the contract extension feature is not available during free agency.'
-            ];
+            return ValidationResult::failure('Sorry, the contract extension feature is not available during free agency.');
         }
-        
-        return ['valid' => true];
+
+        return ValidationResult::success();
     }
-    
+
     /**
      * Create a PlayerData object from Player for contract validation
      */
     private function createPlayerData(Player $player): PlayerData
     {
         $playerData = new PlayerData();
-        
-        // Map contract fields
+
         $playerData->contractCurrentYear = $player->contractCurrentYear ?? 0;
         $playerData->contractYear1Salary = $player->contractYear1Salary ?? 0;
         $playerData->contractYear2Salary = $player->contractYear2Salary ?? 0;
@@ -89,11 +73,10 @@ class NegotiationValidator implements NegotiationValidatorInterface
         $playerData->contractYear4Salary = $player->contractYear4Salary ?? 0;
         $playerData->contractYear5Salary = $player->contractYear5Salary ?? 0;
         $playerData->contractYear6Salary = $player->contractYear6Salary ?? 0;
-        
-        // Map fields needed for rookie option check
+
         $playerData->draftRound = $player->draftRound ?? 0;
         $playerData->yearsOfExperience = $player->yearsOfExperience ?? 0;
-        
+
         return $playerData;
     }
 }

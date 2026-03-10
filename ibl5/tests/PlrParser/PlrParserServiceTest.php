@@ -389,7 +389,7 @@ class PlrParserServiceTest extends TestCase
             'SFDepth' => 0,
             'PFDepth' => 0,
             'CDepth' => 0,
-            'active' => 1,
+            'on_depth_chart' => 1,
             'injuryDaysLeft' => 0,
             'seasonGamesStarted' => 40,
             'seasonGamesPlayed' => 40,

@@ -151,13 +151,13 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
             ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory&teamID=' . $teamId],
         ];
 
-        if ($this->config->allowWaivers === 'Yes') {
+        if ($this->config->allowWaivers === \Settings\SettingName::AllowWaiverMoves->enabledValue()) {
             $links[] = ['rawHtml' => 'Waivers: <a href="modules.php?name=Waivers&amp;action=add">Add</a> | <a href="modules.php?name=Waivers&amp;action=waive">Waive</a>'];
         }
 
         if ($this->config->seasonPhase === 'Draft') {
             array_unshift($links, ['label' => 'Draft', 'url' => 'modules.php?name=Draft', 'badge' => 'LIVE']);
-        } elseif ($this->config->showDraftLink === 'On') {
+        } elseif ($this->config->showDraftLink === \Settings\SettingName::ShowDraftLink->enabledValue()) {
             array_unshift($links, ['label' => 'Draft', 'url' => 'modules.php?name=Draft']);
         }
 

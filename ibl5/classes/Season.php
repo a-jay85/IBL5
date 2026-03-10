@@ -172,7 +172,7 @@ class Season
             return true;
         }
 
-        return $this->allowTrades === 'Yes';
+        return $this->allowTrades === \Settings\SettingName::AllowTrades->enabledValue();
     }
 
     /**

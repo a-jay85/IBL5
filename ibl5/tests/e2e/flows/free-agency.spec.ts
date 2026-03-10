@@ -283,8 +283,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
   test('submit veteran minimum offer', async ({ page }) => {
     // FA Forward pid=12 (exp=3, vet min=61)
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=12');
-    // Click the Veterans Exception button — use CSS :has(>) to target the direct parent div
-    const vetBtn = page.locator('div:has(> span.ibl-label:text("Veterans Exception:")) .ibl-btn--sm.ibl-btn--primary').first();
+    const vetBtn = page.getByTestId('quick-offer-vetmin');
     await vetBtn.click();
     await page.waitForURL(/result=offer_success/);
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
@@ -293,7 +292,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
   test('submit MLE offer', async ({ page }) => {
     // FA Center pid=11 — team has HasMLE=1
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    const mleBtn = page.locator('div:has(> span.ibl-label:text("Mid-Level Exception")) .ibl-btn--sm.ibl-btn--primary').first();
+    const mleBtn = page.getByTestId('quick-offer-mle-yr1');
     await mleBtn.click();
     await page.waitForURL(/result=offer_success/);
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
@@ -312,7 +311,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
   test('submit LLE offer', async ({ page }) => {
     // FA Center pid=11 — team has HasLLE=1
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    const lleBtn = page.locator('div:has(> span.ibl-label:text("Lower-Level Exception:")) .ibl-btn--sm.ibl-btn--primary').first();
+    const lleBtn = page.getByTestId('quick-offer-lle');
     await lleBtn.click();
     await page.waitForURL(/result=offer_success/);
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
@@ -331,7 +330,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
   test('submit max contract offer', async ({ page }) => {
     // pid=11: max contract buttons are always present under "Max Level Contract" label
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    const maxBtn = page.locator('div:has(> span.ibl-label:text("Max Level Contract")) .ibl-btn--sm.ibl-btn--primary').first();
+    const maxBtn = page.getByTestId('quick-offer-max-yr1');
     await maxBtn.click();
     await page.waitForURL(/result=offer_success/);
     await expect(page.locator('.ibl-alert--success')).toBeVisible();

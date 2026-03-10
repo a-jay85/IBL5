@@ -78,7 +78,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $updateResult = $this->repository->updatePlayerRookieOption($playerID, $draftRound, $extensionAmount);
 
         // Assert
-        $this->assertTrue($ownershipResult['valid'], 'Ownership validation should pass');
+        $this->assertTrue($ownershipResult->isValid(), 'Ownership validation should pass');
         $this->assertTrue($eligibilityResult['valid'], 'Eligibility validation should pass');
         $this->assertEquals(175, $eligibilityResult['finalYearSalary'], 'Should return cy3 for first round');
         $this->assertTrue($updateResult, 'Database update should succeed');
@@ -118,7 +118,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $updateResult = $this->repository->updatePlayerRookieOption($playerID, $draftRound, $extensionAmount);
 
         // Assert
-        $this->assertTrue($ownershipResult['valid']);
+        $this->assertTrue($ownershipResult->isValid());
         $this->assertTrue($eligibilityResult['valid']);
         $this->assertTrue($updateResult);
         $this->assertQueryExecuted('cy4');
@@ -154,7 +154,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $updateResult = $this->repository->updatePlayerRookieOption($playerID, $draftRound, $extensionAmount);
 
         // Assert
-        $this->assertTrue($ownershipResult['valid']);
+        $this->assertTrue($ownershipResult->isValid());
         $this->assertTrue($eligibilityResult['valid']);
         $this->assertEquals(110, $eligibilityResult['finalYearSalary'], 'Should return cy2 for second round');
         $this->assertTrue($updateResult);
@@ -194,7 +194,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $updateResult = $this->repository->updatePlayerRookieOption($playerID, $draftRound, $extensionAmount);
 
         // Assert
-        $this->assertTrue($ownershipResult['valid']);
+        $this->assertTrue($ownershipResult->isValid());
         $this->assertTrue($eligibilityResult['valid']);
         $this->assertTrue($updateResult);
         $this->assertQueryExecuted('cy3');
@@ -222,10 +222,10 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $ownershipResult = $this->validator->validatePlayerOwnership($mockPlayer, 'Miami Cyclones');
 
         // Assert
-        $this->assertFalse($ownershipResult['valid']);
-        $this->assertArrayHasKey('error', $ownershipResult);
-        $this->assertStringContainsString('not on your team', $ownershipResult['error']);
-        $this->assertStringContainsString('Test Rookie', $ownershipResult['error']);
+        $this->assertFalse($ownershipResult->isValid());
+        $this->assertNotNull($ownershipResult->getError());
+        $this->assertStringContainsString('not on your team', $ownershipResult->getError() ?? '');
+        $this->assertStringContainsString('Test Rookie', $ownershipResult->getError() ?? '');
 
         // Database should NOT be updated
         $this->assertQueryNotExecuted('UPDATE ibl_plr');
@@ -251,8 +251,8 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $ownershipResult = $this->validator->validatePlayerOwnership($mockPlayer, 'Miami Cyclones');
 
         // Assert
-        $this->assertFalse($ownershipResult['valid']);
-        $this->assertArrayHasKey('error', $ownershipResult);
+        $this->assertFalse($ownershipResult->isValid());
+        $this->assertNotNull($ownershipResult->getError());
     }
 
     // ========== ELIGIBILITY VALIDATION FAILURES ==========
@@ -450,12 +450,12 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $step2 = $this->validator->validateEligibilityAndGetSalary($mockPlayer, 'Regular Season');
         $step3 = false;
 
-        if ($step1['valid'] && $step2['valid']) {
+        if ($step1->isValid() && $step2['valid']) {
             $step3 = $this->repository->updatePlayerRookieOption($playerID, $draftRound, $extensionAmount);
         }
 
         // Assert - All steps succeeded
-        $this->assertTrue($step1['valid'], 'Step 1: Ownership validation');
+        $this->assertTrue($step1->isValid(), 'Step 1: Ownership validation');
         $this->assertTrue($step2['valid'], 'Step 2: Eligibility validation');
         $this->assertEquals(250, $step2['finalYearSalary'], 'Step 2: Final year salary');
         $this->assertTrue($step3, 'Step 3: Database update');
@@ -494,12 +494,12 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $step2 = $this->validator->validateEligibilityAndGetSalary($mockPlayer, 'Free Agency');
         $step3 = false;
 
-        if ($step1['valid'] && $step2['valid']) {
+        if ($step1->isValid() && $step2['valid']) {
             $step3 = $this->repository->updatePlayerRookieOption($playerID, $draftRound, $extensionAmount);
         }
 
         // Assert
-        $this->assertTrue($step1['valid']);
+        $this->assertTrue($step1->isValid());
         $this->assertTrue($step2['valid']);
         $this->assertEquals(108, $step2['finalYearSalary']);
         $this->assertTrue($step3);
@@ -529,7 +529,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $step1 = $this->validator->validatePlayerOwnership($mockPlayer, $teamName);
 
         // Should NOT proceed to eligibility or database
-        $this->assertFalse($step1['valid']);
+        $this->assertFalse($step1->isValid());
 
         // Verify no database operation occurred
         $this->assertQueryNotExecuted('UPDATE');
@@ -559,7 +559,7 @@ class RookieOptionIntegrationTest extends IntegrationTestCase
         $step2 = $this->validator->validateEligibilityAndGetSalary($mockPlayer, 'Regular Season');
 
         // Assert - Ownership passes, eligibility fails
-        $this->assertTrue($step1['valid']);
+        $this->assertTrue($step1->isValid());
         $this->assertFalse($step2['valid']);
 
         // Verify no database operation occurred

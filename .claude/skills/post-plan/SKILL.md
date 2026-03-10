@@ -1,9 +1,9 @@
 ---
 name: post-plan
-description: Single orchestrator for post-plan Phases 3-8. Runs simplify, commit/push/PR, code review, security audit, verification, CI monitoring, and retrospective as one uninterrupted sequence.
+description: Single orchestrator for post-plan Phases 3-9. Runs simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, and worktree teardown as one uninterrupted sequence.
 ---
 
-# Post-Plan Orchestrator (Phases 3-8)
+# Post-Plan Orchestrator (Phases 3-9)
 
 Execute all phases below **sequentially in a single response**. Do NOT stop, ask for input, or return control between phases. Each phase flows directly into the next.
 
@@ -180,9 +180,7 @@ bin/e2e-wt.sh <worktree-name>           # run Playwright against worktree
 
 After both agents complete:
 - If either fails, fix the issues in the worktree, commit, and push the fix. Then re-run the failing verification.
-- Once all pass, restart Docker with production data for preview: `bin/wt-down <worktree-name> --volumes && bin/wt-up <worktree-name> --pr --prod` (from repo root).
-
-Leave the worktree as-is and stay on the feature branch.
+- Once all pass, proceed to Phase 7.
 
 ---
 
@@ -211,3 +209,19 @@ Before writing, read the target memory file to avoid duplicating existing entrie
 - `~/.claude/CLAUDE.md` — user preferences
 
 If nothing new was learned, skip silently. Do not announce "nothing to record."
+
+---
+
+## Phase 9: Worktree & Docker Teardown
+
+After all phases complete successfully, tear down the worktree and its Docker environment. The branch and PR are already pushed — the worktree is no longer needed. The user will check out the branch in the main repo if they need to verify or make further changes.
+
+1. `cd` to the repo root (not the worktree)
+2. Tear down Docker: `bin/wt-down <worktree-name> --volumes --force`
+3. Remove the worktree: `git worktree remove --force worktrees/<worktree-name>`
+4. Switch back to master: `git checkout master`
+
+**Skip this phase if:**
+- The worktree was not created by Phase 1 (e.g., pre-existing worktree the user asked you to work in)
+- Any earlier phase failed and there are uncommitted fixes in the worktree
+- The user explicitly asked to keep the worktree

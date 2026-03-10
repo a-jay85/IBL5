@@ -95,7 +95,7 @@ When modifying HTML output, selectors, or user-facing text in View classes, run 
 
 ## Workflow Continuity
 
-Post-plan Phases 3-8 are consolidated into a single `/post-plan` skill invocation. After Phase 2 (Implementation), invoke `/post-plan` which handles simplify, commit/push/PR, code review, security audit, verification, CI monitoring, and retrospective internally.
+Post-plan Phases 3-9 are consolidated into a single `/post-plan` skill invocation. After Phase 2 (Implementation), invoke `/post-plan` which handles simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, and worktree teardown internally.
 
 ## Mandatory Rules
 

@@ -13,7 +13,8 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Always resolve to the main repo root, even when run from a worktree.
+REPO_ROOT="$(cd "$(dirname "$0")/.." && dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 
 # --- Parse arguments ---
 WORKTREE_NAME=""
@@ -115,7 +116,7 @@ $stmt->bind_param("sssi", $email, $hash, $user, $time);
 $stmt->execute();
 
 // nuke_users — check if exists first (username is the key)
-$check = $db->prepare("SELECT uid FROM nuke_users WHERE username = ?");
+$check = $db->prepare("SELECT user_id FROM nuke_users WHERE username = ?");
 $check->bind_param("s", $user);
 $check->execute();
 $result = $check->get_result();

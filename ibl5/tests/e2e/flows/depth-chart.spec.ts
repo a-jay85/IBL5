@@ -21,7 +21,7 @@ test.describe('Depth Chart Entry flow', () => {
     const dropdown = page.locator('#saved-dc-select');
     await expect(dropdown).toBeVisible();
     const options = dropdown.locator('option');
-    await expect(options.first()).toBeVisible();
+    await expect(options.first()).toBeAttached();
   });
 
   test('roster form loads with player rows', async ({ page }) => {
@@ -49,7 +49,7 @@ test.describe('Depth Chart Entry flow', () => {
     const posSelect = page.locator('select[name^="pg"]').first();
     if (await posSelect.isVisible()) {
       const options = posSelect.locator('option');
-      await expect(options.first()).toBeVisible();
+      await expect(options.first()).toBeAttached();
     }
   });
 

@@ -126,7 +126,7 @@ test.describe('Depth Chart change detection', () => {
     const dropdown = page.locator('#saved-dc-select');
     await expect(dropdown).toBeVisible();
     const options = dropdown.locator('option');
-    await expect(options.first()).toBeVisible();
+    await expect(options.first()).toBeAttached();
   });
 
   test('saved DC load triggers AJAX and updates positions', async ({

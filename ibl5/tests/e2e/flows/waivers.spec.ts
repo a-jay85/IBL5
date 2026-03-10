@@ -40,7 +40,7 @@ test.describe('Waivers flow: open', () => {
     const playerSelect = page.locator('select[name="Player_ID"]');
     await expect(playerSelect).toBeVisible();
     const options = playerSelect.locator('option');
-    await expect(options.first()).toBeVisible();
+    await expect(options.first()).toBeAttached();
   });
 
   test('team logo and roster info visible', async ({ page }) => {

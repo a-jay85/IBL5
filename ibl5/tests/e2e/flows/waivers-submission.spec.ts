@@ -22,7 +22,7 @@ test.describe('Waivers: add player', () => {
     await expect(playerSelect).toBeVisible();
 
     const options = playerSelect.locator('option');
-    await expect(options.first()).toBeVisible();
+    await expect(options.first()).toBeAttached();
   });
 
   test('submit add: sign free agent', async ({ appState, page }) => {

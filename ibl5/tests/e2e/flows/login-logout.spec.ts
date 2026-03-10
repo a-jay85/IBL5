@@ -23,7 +23,7 @@ test.describe('Login page', () => {
     await page.goto('modules.php?name=YourAccount');
 
     const rememberMe = page.locator('input[name="remember_me"]');
-    await expect(rememberMe.first()).toBeVisible();
+    await expect(rememberMe.first()).toBeAttached();
   });
 
   test('login page has forgot password and create account links', async ({

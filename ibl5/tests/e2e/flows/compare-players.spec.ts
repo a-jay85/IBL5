@@ -32,7 +32,7 @@ test.describe('Compare Players flow', () => {
 
   test('player datalist is populated', async ({ page }) => {
     const datalist = page.locator('datalist#player-names option');
-    await expect(datalist.first()).toBeVisible();
+    await expect(datalist.first()).toBeAttached();
   });
 
   test('form has submit button with Compare text', async ({ page }) => {

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Start a Docker environment for a worktree with its own PHP-Apache + MariaDB.
-# Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod]
+# Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data]
 
 set -euo pipefail
 
@@ -9,6 +9,7 @@ WORKTREE_NAME=""
 USE_PR=false
 SEED_DB=false
 PROD_DB=false
+NO_DATA=false
 
 # Wrapper to suppress MariaDB "password on command line" warning
 db_exec() {
@@ -24,19 +25,26 @@ for arg in "$@"; do
         --pr) USE_PR=true ;;
         --seed) SEED_DB=true ;;
         --prod) PROD_DB=true ;;
+        --no-data) NO_DATA=true ;;
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
         *) WORKTREE_NAME="$arg" ;;
     esac
 done
 
 if [ -z "$WORKTREE_NAME" ]; then
-    echo "Usage: bin/wt-up <worktree-name> [--pr] [--seed]" >&2
+    echo "Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod] [--no-data]" >&2
     echo "" >&2
     echo "Options:" >&2
-    echo "  --pr     Use PR number as URL slug (e.g., pr-42.localhost)" >&2
-    echo "  --seed   Import ci-seed.sql for test data" >&2
-    echo "  --prod   Import prod-seed.sql (run bin/db-export-prod first)" >&2
+    echo "  --pr       Use PR number as URL slug (e.g., pr-42.localhost)" >&2
+    echo "  --seed     Import ci-seed.sql for test data (schema + CI seed)" >&2
+    echo "  --prod     Import prod-seed.sql (default if no data flag given)" >&2
+    echo "  --no-data  Schema only, no seed data" >&2
     exit 1
+fi
+
+# Default to prod data if no data flag was explicitly set
+if [ "$SEED_DB" = false ] && [ "$PROD_DB" = false ] && [ "$NO_DATA" = false ]; then
+    PROD_DB=true
 fi
 
 WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"

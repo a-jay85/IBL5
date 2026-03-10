@@ -6,6 +6,7 @@ namespace RecordHolders;
 
 use League\LeagueContext;
 use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
+use Utilities\IblSeasonDateHelper;
 
 /**
  * RecordHoldersRepository - Data access layer for all-time IBL records.
@@ -62,114 +63,6 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
     }
 
     /**
-     * @see RecordHoldersRepositoryInterface::getTopPlayerSingleGame()
-     *
-     * @return list<PlayerSingleGameRecord>
-     */
-    public function getTopPlayerSingleGame(string $statExpression, string $dateFilter): array
-    {
-        $query = "SELECT
-                bs.pid,
-                p.name,
-                h.teamid AS tid,
-                h.team AS team_name,
-                bs.Date AS `date`,
-                COALESCE(sch.BoxID, 0) AS BoxID,
-                COALESCE(bst.gameOfThatDay, 0) AS gameOfThatDay,
-                CASE WHEN h.teamid = bs.visitorTID THEN bs.homeTID ELSE bs.visitorTID END AS oppTid,
-                opp.team_name AS opp_team_name,
-                {$statExpression} AS value
-            FROM {$this->boxScoresTable} bs
-            JOIN ibl_plr p ON p.pid = bs.pid
-            JOIN ibl_hist h ON h.pid = bs.pid AND h.year = ({$this->seasonYearExpression()})
-            LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
-                AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
-            LEFT JOIN (
-                SELECT Date, visitorTeamID, homeTeamID, MIN(gameOfThatDay) AS gameOfThatDay
-                FROM {$this->boxScoresTeamsTable}
-                GROUP BY Date, visitorTeamID, homeTeamID
-            ) bst ON bst.Date = bs.Date AND bst.visitorTeamID = bs.visitorTID AND bst.homeTeamID = bs.homeTID
-            LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
-                WHEN h.teamid = bs.visitorTID THEN bs.homeTID
-                ELSE bs.visitorTID END
-            WHERE {$dateFilter}
-                AND bs.visitorTID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
-                AND bs.homeTID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
-            ORDER BY value DESC, bs.Date ASC
-            LIMIT 5";
-
-        $rows = $this->fetchAll($query);
-
-        /** @var list<PlayerSingleGameRecord> $records */
-        $records = [];
-        foreach ($rows as $row) {
-            /** @var array{pid: int, name: string, tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} $row */
-            $records[] = [
-                'pid' => $row['pid'],
-                'name' => $row['name'],
-                'tid' => $row['tid'],
-                'team_name' => $row['team_name'],
-                'date' => $row['date'],
-                'BoxID' => $row['BoxID'],
-                'gameOfThatDay' => $row['gameOfThatDay'],
-                'oppTid' => $row['oppTid'],
-                'opp_team_name' => $row['opp_team_name'],
-                'value' => $row['value'],
-            ];
-        }
-
-        return $records;
-    }
-
-    /**
-     * @see RecordHoldersRepositoryInterface::getTopSeasonAverage()
-     *
-     * @return list<PlayerSeasonRecord>
-     */
-    public function getTopSeasonAverage(string $statColumn, string $gamesColumn, int $minGames = 50): array
-    {
-        $safeColumn = preg_replace('/[^a-zA-Z0-9_]/', '', $statColumn);
-        if ($safeColumn === null || $safeColumn === '') {
-            return [];
-        }
-        $safeGames = preg_replace('/[^a-zA-Z0-9_]/', '', $gamesColumn);
-        if ($safeGames === null || $safeGames === '') {
-            return [];
-        }
-
-        $query = "SELECT
-                h.pid,
-                h.name,
-                h.teamid,
-                h.team,
-                h.year,
-                ROUND(h.{$safeColumn} / h.{$safeGames}, 1) AS value
-            FROM ibl_hist h
-            WHERE h.{$safeGames} >= ?
-                AND h.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
-            ORDER BY value DESC
-            LIMIT 5";
-
-        $rows = $this->fetchAll($query, 'i', $minGames);
-
-        /** @var list<PlayerSeasonRecord> $records */
-        $records = [];
-        foreach ($rows as $row) {
-            /** @var array{pid: int, name: string, teamid: int, team: string, year: int, value: float} $row */
-            $records[] = [
-                'pid' => $row['pid'],
-                'name' => $row['name'],
-                'teamid' => $row['teamid'],
-                'team' => $row['team'],
-                'year' => $row['year'],
-                'value' => $row['value'],
-            ];
-        }
-
-        return $records;
-    }
-
-    /**
      * @see RecordHoldersRepositoryInterface::getQuadrupleDoubles()
      *
      * @return list<QuadrupleDoubleRecord>
@@ -193,7 +86,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 bs.gameBLK AS blocks
             FROM {$this->boxScoresTable} bs
             JOIN ibl_plr p ON p.pid = bs.pid
-            JOIN ibl_hist h ON h.pid = bs.pid AND h.year = ({$this->seasonYearExpression()})
+            JOIN ibl_hist h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
             LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
                 AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
             LEFT JOIN (
@@ -267,58 +160,6 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                 'name' => $row['name'],
                 'pid' => $row['pid'] !== null ? (int) $row['pid'] : null,
                 'appearances' => $row['appearances'],
-            ];
-        }
-
-        return $records;
-    }
-
-    /**
-     * @see RecordHoldersRepositoryInterface::getTopTeamSingleGame()
-     *
-     * @return list<TeamSingleGameRecord>
-     */
-    public function getTopTeamSingleGame(string $statExpression, string $dateFilter, string $order = 'DESC'): array
-    {
-        $safeOrder = $order === 'ASC' ? 'ASC' : 'DESC';
-
-        $query = "SELECT
-                t.teamid AS tid,
-                t.team_name,
-                bs.Date AS `date`,
-                COALESCE(sch.BoxID, 0) AS BoxID,
-                COALESCE(bs.gameOfThatDay, 0) AS gameOfThatDay,
-                CASE WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID ELSE bs.visitorTeamID END AS oppTid,
-                opp.team_name AS opp_team_name,
-                {$statExpression} AS value
-            FROM {$this->boxScoresTeamsTable} bs
-            JOIN {$this->teamInfoTable} t ON t.team_name = bs.name
-            LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
-                AND sch.Visitor = bs.visitorTeamID AND sch.Home = bs.homeTeamID
-            LEFT JOIN {$this->teamInfoTable} opp ON opp.teamid = CASE
-                WHEN t.teamid = bs.visitorTeamID THEN bs.homeTeamID
-                ELSE bs.visitorTeamID END
-            WHERE {$dateFilter}
-                AND bs.visitorTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
-                AND bs.homeTeamID BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
-            ORDER BY value {$safeOrder}, bs.Date ASC
-            LIMIT 5";
-
-        $rows = $this->fetchAll($query);
-
-        /** @var list<TeamSingleGameRecord> $records */
-        $records = [];
-        foreach ($rows as $row) {
-            /** @var array{tid: int, team_name: string, date: string, BoxID: int, gameOfThatDay: int, oppTid: int, opp_team_name: string, value: int} $row */
-            $records[] = [
-                'tid' => $row['tid'],
-                'team_name' => $row['team_name'],
-                'date' => $row['date'],
-                'BoxID' => $row['BoxID'],
-                'gameOfThatDay' => $row['gameOfThatDay'],
-                'oppTid' => $row['oppTid'],
-                'opp_team_name' => $row['opp_team_name'],
-                'value' => $row['value'],
             ];
         }
 
@@ -613,8 +454,8 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         $records = [];
         foreach ($bestStreaks as $tid => $data) {
             if ($data['streak'] === $maxStreak && $maxStreak > 0) {
-                $startYear = $this->dateToSeasonEndingYear($data['start']);
-                $endYear = $this->dateToSeasonEndingYear($data['end']);
+                $startYear = IblSeasonDateHelper::dateToSeasonEndingYear($data['start']);
+                $endYear = IblSeasonDateHelper::dateToSeasonEndingYear($data['end']);
                 $records[] = [
                     'team_name' => $this->resolveTeamName($tid),
                     'streak' => $data['streak'],
@@ -653,7 +494,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
             $visitorScore = $row['visitorScore'];
             $homeScore = $row['homeScore'];
             $visitorWon = $visitorScore > $homeScore;
-            $seasonYear = $this->dateToSeasonEndingYear($date);
+            $seasonYear = IblSeasonDateHelper::dateToSeasonEndingYear($date);
 
             foreach ([$visitorTid, $homeTid] as $tid) {
                 $key = $tid . '-' . $seasonYear;
@@ -795,7 +636,7 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
                     {$expression} AS value
                 FROM {$this->boxScoresTable} bs
                 JOIN ibl_plr p ON p.pid = bs.pid
-                JOIN ibl_hist h ON h.pid = bs.pid AND h.year = ({$this->seasonYearExpression()})
+                JOIN ibl_hist h ON h.pid = bs.pid AND h.year = (" . self::SEASON_YEAR_EXPRESSION . ")
                 LEFT JOIN {$this->scheduleTable} sch ON sch.Date = bs.Date
                     AND sch.Visitor = bs.visitorTID AND sch.Home = bs.homeTID
                 LEFT JOIN (
@@ -1091,28 +932,4 @@ class RecordHoldersRepository extends \BaseMysqliRepository implements RecordHol
         return array_map(static fn(array $row): string => $row['Date'], $rows);
     }
 
-    /**
-     * Get the season ending year from a date string.
-     *
-     * Oct-Dec: season ends next year. Jan-Jun: season ends this year.
-     */
-    private function dateToSeasonEndingYear(string $date): int
-    {
-        $timestamp = strtotime($date);
-        if ($timestamp === false) {
-            return 0;
-        }
-        $month = (int) date('n', $timestamp);
-        $year = (int) date('Y', $timestamp);
-
-        return $month >= 10 ? $year + 1 : $year;
-    }
-
-    /**
-     * SQL expression to derive season ending year from box score date.
-     */
-    private function seasonYearExpression(): string
-    {
-        return self::SEASON_YEAR_EXPRESSION;
-    }
 }

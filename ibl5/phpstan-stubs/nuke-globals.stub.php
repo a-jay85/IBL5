@@ -59,13 +59,13 @@ function loginbox(): void {}
 /** @return string|null */
 function buildRedirectUrl(): ?string { return null; }
 
-/** @return int 1 if authenticated, 0 otherwise */
-function is_user(mixed $cookie): int { return 0; }
+/** @return bool */
+function is_user(mixed $cookie): bool { return false; }
 
 /**
- * @return array<int, string>|null null when unauthenticated
+ * @return array<int, string>
  */
-function cookiedecode(mixed $cookie): ?array { return null; }
+function cookiedecode(mixed $cookie): array { return []; }
 
 /** @return string */
 function get_theme(): string { return ''; }
@@ -93,8 +93,8 @@ function themefooter(): void {}
  */
 function getusrinfo(mixed $user): ?array { return null; }
 
-/** @return int 1 if admin, 0 otherwise */
-function is_admin(mixed $admin = null): int { return 0; }
+/** @return bool */
+function is_admin(mixed $admin = null): bool { return false; }
 
 /** @return string */
 function formatTimestamp(int|string $timestamp): string { return ''; }

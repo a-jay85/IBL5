@@ -88,9 +88,51 @@ if [ -z "$WORKTREE_NAME" ]; then
 fi
 
 WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
+
+# If the worktree directory is gone (already removed), try to find and stop
+# orphaned containers by name pattern (slug = worktree name or pr-NNN).
 if [ ! -d "$WORKTREE_PATH" ]; then
-    echo "Error: Worktree not found at $WORKTREE_PATH" >&2
-    exit 1
+    echo "Worktree directory not found at $WORKTREE_PATH"
+    echo "Searching for orphaned Docker containers..."
+
+    # Try the worktree name as slug, and also check for pr-* slugs
+    found_orphan=false
+    for slug in "$WORKTREE_NAME" $(docker ps -a --format '{{.Names}}' | grep -o 'ibl5-php-pr-[0-9]*' | sed 's/ibl5-php-//' || true); do
+        php_container="ibl5-php-$slug"
+        db_container="ibl5-db-$slug"
+        if docker inspect "$php_container" &>/dev/null || docker inspect "$db_container" &>/dev/null; then
+            found_orphan=true
+            echo "Found orphaned containers for slug: $slug"
+            # Get project name from container label
+            project=$(docker inspect "$php_container" --format '{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || echo "ibl5-$slug")
+            [ -z "$project" ] && project="ibl5-$slug"
+            # Stop containers (no compose file, so use docker rm directly)
+            for c in "$php_container" "$db_container"; do
+                if docker inspect "$c" &>/dev/null; then
+                    echo "  Stopping $c..."
+                    docker stop "$c" 2>/dev/null || true
+                    docker rm "$c" 2>/dev/null || true
+                fi
+            done
+            # Remove volume if requested
+            if [ "$REMOVE_VOLUMES" = true ]; then
+                for vol in $(docker volume ls --format '{{.Name}}' | grep "$slug" || true); do
+                    echo "  Removing volume: $vol"
+                    docker volume rm "$vol" 2>/dev/null || true
+                done
+            fi
+            # Remove network
+            for net in $(docker network ls --format '{{.Name}}' | grep "$project" || true); do
+                docker network rm "$net" 2>/dev/null || true
+            done
+            echo "  Done."
+        fi
+    done
+
+    if [ "$found_orphan" = false ]; then
+        echo "No orphaned containers found for '$WORKTREE_NAME'."
+    fi
+    exit 0
 fi
 
 COMPOSE_FILE="$WORKTREE_PATH/docker-compose.yml"

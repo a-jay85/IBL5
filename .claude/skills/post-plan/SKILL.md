@@ -28,6 +28,7 @@ Fix any issues found directly in the worktree files before proceeding.
 3. Create a commit with conventional format: `<type>: <short summary>` followed by `## Section` headers with bullet points
 4. Push the branch: `git push -u origin <branch-name>`
 5. Create a PR: `gh pr create --fill` (or with explicit `--title` and `--body`)
+6. Start Docker environment: `bin/wt-up <worktree-name> --pr --prod` (from repo root — creates isolated environment with production data at `http://pr-NNN.localhost/ibl5/`)
 
 **Stacked PRs:** If the current branch was created from another feature branch (not `master`), set `--base <parent-branch>` so the PR targets the parent branch instead of master.
 

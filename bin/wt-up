@@ -1,0 +1,196 @@
+#!/bin/bash
+# Start a Docker environment for a worktree with its own PHP-Apache + MariaDB.
+# Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod]
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+WORKTREE_NAME=""
+USE_PR=false
+SEED_DB=false
+PROD_DB=false
+
+# Wrapper to suppress MariaDB "password on command line" warning
+db_exec() {
+    docker exec "$@" 2>&1 | grep -v '\[Warning\].*password' || true
+}
+db_exec_stdin() {
+    docker exec -i "$@" 2>&1 | grep -v '\[Warning\].*password' || true
+}
+
+# Parse arguments
+for arg in "$@"; do
+    case "$arg" in
+        --pr) USE_PR=true ;;
+        --seed) SEED_DB=true ;;
+        --prod) PROD_DB=true ;;
+        -*) echo "Unknown option: $arg" >&2; exit 1 ;;
+        *) WORKTREE_NAME="$arg" ;;
+    esac
+done
+
+if [ -z "$WORKTREE_NAME" ]; then
+    echo "Usage: bin/wt-up <worktree-name> [--pr] [--seed]" >&2
+    echo "" >&2
+    echo "Options:" >&2
+    echo "  --pr     Use PR number as URL slug (e.g., pr-42.localhost)" >&2
+    echo "  --seed   Import ci-seed.sql for test data" >&2
+    echo "  --prod   Import prod-seed.sql (run bin/db-export-prod first)" >&2
+    exit 1
+fi
+
+WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
+if [ ! -d "$WORKTREE_PATH" ]; then
+    echo "Error: Worktree not found at $WORKTREE_PATH" >&2
+    exit 1
+fi
+
+# Determine URL slug
+SLUG="$WORKTREE_NAME"
+if [ "$USE_PR" = true ]; then
+    if ! command -v gh &> /dev/null; then
+        echo "Error: gh CLI required for --pr flag" >&2
+        exit 1
+    fi
+    PR_NUMBER=$(cd "$WORKTREE_PATH" && gh pr view --json number -q .number 2>/dev/null || true)
+    if [ -z "$PR_NUMBER" ]; then
+        echo "Error: No PR found for branch in worktree '$WORKTREE_NAME'" >&2
+        exit 1
+    fi
+    SLUG="pr-$PR_NUMBER"
+fi
+
+# Ensure external network exists
+if ! docker network inspect ibl5-proxy &>/dev/null; then
+    echo "Creating ibl5-proxy network..."
+    docker network create ibl5-proxy
+fi
+
+# Check if Traefik is running
+if ! docker ps --format '{{.Names}}' | grep -q '^ibl5-traefik$'; then
+    echo "Warning: Traefik is not running. Start it with: docker compose up -d"
+    echo "         (from $REPO_ROOT)"
+fi
+
+# Build CSS for the worktree
+STYLE_CSS="$WORKTREE_PATH/ibl5/themes/IBL/style/style.css"
+# Replace symlink with real file so Docker can mount the worktree cleanly
+if [ -L "$STYLE_CSS" ]; then
+    rm "$STYLE_CSS"
+fi
+echo "Building CSS for worktree..."
+(cd "$WORKTREE_PATH/ibl5" && bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css 2>/dev/null) || true
+# Fallback: copy from main repo if build failed or produced empty file
+if [ ! -s "$STYLE_CSS" ]; then
+    echo "CSS build failed or empty — copying from main repo..."
+    cp "$REPO_ROOT/ibl5/themes/IBL/style/style.css" "$STYLE_CSS" 2>/dev/null || true
+fi
+
+# Copy config.php into worktree (can't use bind mount — VirtioFS fails on nested mounts)
+CONFIG_PHP="$WORKTREE_PATH/ibl5/config.php"
+if [ ! -s "$CONFIG_PHP" ] || [ -L "$CONFIG_PHP" ]; then
+    [ -L "$CONFIG_PHP" ] && rm "$CONFIG_PHP"
+    cp "$REPO_ROOT/ibl5/config.php" "$CONFIG_PHP" 2>/dev/null || true
+fi
+
+# Generate compose file from template
+COMPOSE_FILE="$WORKTREE_PATH/docker-compose.yml"
+TEMPLATE="$REPO_ROOT/docker/worktree-compose.template.yml"
+
+if [ ! -f "$TEMPLATE" ]; then
+    echo "Error: Template not found at $TEMPLATE" >&2
+    exit 1
+fi
+
+sed -e "s|{{SLUG}}|$SLUG|g" \
+    -e "s|{{WORKTREE_PATH}}|$WORKTREE_PATH|g" \
+    -e "s|{{REPO_ROOT}}|$REPO_ROOT|g" \
+    "$TEMPLATE" > "$COMPOSE_FILE"
+
+echo "Starting environment for '$WORKTREE_NAME' (slug: $SLUG)..."
+docker compose -f "$COMPOSE_FILE" -p "ibl5-$SLUG" up -d --build
+
+# Wait for MariaDB to be healthy
+echo "Waiting for MariaDB (db-$SLUG) to be ready..."
+RETRIES=0
+MAX_RETRIES=30
+until docker exec "ibl5-db-$SLUG" healthcheck.sh --connect --innodb_initialized &>/dev/null; do
+    RETRIES=$((RETRIES + 1))
+    if [ "$RETRIES" -ge "$MAX_RETRIES" ]; then
+        echo "Error: MariaDB did not become healthy after ${MAX_RETRIES} attempts" >&2
+        exit 1
+    fi
+    sleep 2
+done
+echo "MariaDB is ready."
+
+DB_CONTAINER="ibl5-db-$SLUG"
+DB_CMD="mariadb -u root -proot iblhoops_ibl5"
+
+if [ "$PROD_DB" = true ]; then
+    # --prod: import the full production dump (structure + data included)
+    PROD_SEED="$REPO_ROOT/ibl5/fixtures/prod-seed.sql"
+    if [ ! -f "$PROD_SEED" ]; then
+        echo "Error: $PROD_SEED not found. Run bin/db-export-prod first." >&2
+        exit 1
+    fi
+    echo "Importing prod-seed.sql..."
+    sed 's/ DEFINER=[^ ]* / /g' "$PROD_SEED" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
+else
+    # Default: import schema (+ optional ci-seed)
+    SCHEMA_FILE="$WORKTREE_PATH/ibl5/schema.sql"
+    if [ -f "$SCHEMA_FILE" ]; then
+        echo "Importing schema.sql..."
+        sed 's/ DEFINER=[^ ]* / /g' "$SCHEMA_FILE" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
+    fi
+
+    # Optionally seed with CI test data
+    if [ "$SEED_DB" = true ]; then
+        CI_SEED="$WORKTREE_PATH/ibl5/tests/e2e/fixtures/ci-seed.sql"
+        if [ -f "$CI_SEED" ]; then
+            echo "Importing ci-seed.sql..."
+            db_exec_stdin "$DB_CONTAINER" $DB_CMD < "$CI_SEED"
+        else
+            echo "Warning: ci-seed.sql not found at $CI_SEED"
+        fi
+    fi
+fi
+
+# Always run migrations (idempotent — skips already-applied ones)
+# This ensures the worktree's branch-specific migrations are applied
+# even when importing a prod dump that may predate them.
+MIGRATIONS_DIR="$WORKTREE_PATH/ibl5/migrations"
+if [ -d "$MIGRATIONS_DIR" ] && ls "$MIGRATIONS_DIR"/*.sql &>/dev/null; then
+    echo "Running migrations..."
+    db_exec "$DB_CONTAINER" $DB_CMD \
+        -e "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"
+    for migration in "$MIGRATIONS_DIR"/*.sql; do
+        [ -f "$migration" ] || continue
+        BASENAME=$(basename "$migration")
+        ALREADY=$(db_exec "$DB_CONTAINER" $DB_CMD -N \
+            -e "SELECT COUNT(*) FROM schema_migrations WHERE version='$BASENAME';")
+        if [ "$ALREADY" = "0" ]; then
+            echo "  Applying $BASENAME..."
+            sed 's/ DEFINER=[^ ]* / /g' "$migration" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
+            db_exec "$DB_CONTAINER" $DB_CMD \
+                -e "INSERT INTO schema_migrations (version) VALUES ('$BASENAME');"
+        fi
+    done
+fi
+
+echo ""
+echo "================================================"
+echo "  Worktree environment ready!"
+echo "================================================"
+echo ""
+echo "  URL:     http://$SLUG.localhost/ibl5/"
+echo "  Adminer: http://localhost:8082 (server: db-$SLUG)"
+echo "  DB CLI:  docker exec -it $DB_CONTAINER $DB_CMD"
+echo ""
+
+# Safari warning
+if [ "$(uname)" = "Darwin" ]; then
+    echo "  Note: *.localhost auto-resolves in Chrome/Firefox."
+    echo "  Safari users: add '127.0.0.1 $SLUG.localhost' to /etc/hosts."
+    echo ""
+fi

@@ -12,7 +12,10 @@
     "test:e2e:isolated": "./bin/e2e-local.sh",
     "docker:up": "cd .. && docker compose up -d",
     "docker:down": "cd .. && docker compose down",
-    "docker:logs": "cd .. && docker compose logs -f php"
+    "docker:logs": "cd .. && docker compose logs -f php",
+    "wt:up": "cd .. && bin/wt-up",
+    "wt:down": "cd .. && bin/wt-down",
+    "wt:list": "cd .. && bin/wt-list"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",

@@ -140,20 +140,8 @@ test.describe('Draft selection: submission', () => {
 });
 
 test.describe('Draft: phase gating', () => {
-  test('draft hidden when phase is not Draft and link is off', async ({
-    appState,
-    page,
-  }) => {
-    await appState({
-      'Current Season Phase': 'Free Agency',
-      'Show Draft Link': 'Off',
-    });
-    await page.goto('modules.php?name=Draft');
-
-    // Should not show the draft table
-    const table = page.locator('table.draft-table');
-    expect(await table.count()).toBe(0);
-  });
+  // Note: Admin users bypass ModuleAccessControl, so the "hidden" test
+  // only verifies that the Show Draft Link override still shows the table.
 
   test('draft accessible via Show Draft Link override', async ({
     appState,

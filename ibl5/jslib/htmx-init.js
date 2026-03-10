@@ -8,28 +8,7 @@
 (function () {
     'use strict';
 
-    // Disable hx-boost on all forms — form boosting is Phase 3 (follow-up PR).
-    // Without this, forms inside #site-content inherit hx-boost="true" and
-    // submit via AJAX instead of normal navigation.
-    function disableBoostOnForms(root) {
-        var forms = (root || document).querySelectorAll('#site-content form:not([hx-boost])');
-        for (var i = 0; i < forms.length; i++) {
-            forms[i].setAttribute('hx-boost', 'false');
-        }
-    }
-
-    // Run on initial page load (script is in <head>, so DOM isn't ready yet)
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () {
-            disableBoostOnForms(document);
-        });
-    } else {
-        disableBoostOnForms(document);
-    }
-
     document.addEventListener('htmx:afterSwap', function () {
-        // Disable boost on any new forms in the swapped content
-        disableBoostOnForms(document);
         // Re-run sorttable on new .sortable tables
         if (window.sorttable) {
             var tables = document.querySelectorAll('table.sortable:not(.sorttable_done)');

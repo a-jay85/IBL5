@@ -98,3 +98,9 @@ function is_admin(mixed $admin = null): bool { return false; }
 
 /** @return string */
 function formatTimestamp(int|string $timestamp): string { return ''; }
+
+/**
+ * PHP-Nuke filter function — sanitizes input.
+ * @return string
+ */
+function filter(mixed $what, string $strip = '', mixed $save = '', string $type = ''): string { return ''; }

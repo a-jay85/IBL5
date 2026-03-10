@@ -32,7 +32,7 @@ teardown_worktree() {
 
     # Extract project name from compose file (slug is in container names)
     local slug
-    slug=$(grep 'container_name: ibl5-php-' "$compose_file" | sed 's/.*ibl5-php-//' | tr -d ' ')
+    slug=$(grep 'container_name: ibl5-php-' "$compose_file" | sed 's/.*ibl5-php-//' | tr -d ' ' || true)
 
     if [ -z "$slug" ]; then
         echo "Warning: Could not determine slug for $wt_name, skipping"

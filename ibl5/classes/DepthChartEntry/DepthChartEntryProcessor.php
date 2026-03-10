@@ -48,7 +48,7 @@ class DepthChartEntryProcessor implements DepthChartEntryProcessorInterface
                 'sf' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'sf' . $i)),
                 'pf' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'pf' . $i)),
                 'c' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'c' . $i)),
-                'active' => $this->sanitizeActiveValue($this->extractIntValue($postData, 'active' . $i)),
+                'canPlayInGame' => $this->sanitizeActiveValue($this->extractIntValue($postData, 'canPlayInGame' . $i)),
                 'min' => $this->sanitizeMinutesValue($this->extractIntValue($postData, 'min' . $i)),
                 'of' => $this->sanitizeFocusValue($this->extractIntValue($postData, 'OF' . $i)),
                 'df' => $this->sanitizeFocusValue($this->extractIntValue($postData, 'DF' . $i)),
@@ -60,7 +60,7 @@ class DepthChartEntryProcessor implements DepthChartEntryProcessorInterface
             
             $playerData[] = $player;
             
-            if ($player['active'] === 1) {
+            if ($player['canPlayInGame'] === 1) {
                 $activePlayers++;
             }
 
@@ -169,7 +169,7 @@ class DepthChartEntryProcessor implements DepthChartEntryProcessorInterface
                 $player['sf'],
                 $player['pf'],
                 $player['c'],
-                $player['active'],
+                $player['canPlayInGame'],
                 $player['min'],
                 $player['of'],
                 $player['df'],

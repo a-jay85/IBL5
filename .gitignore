@@ -44,4 +44,5 @@ test-results/
 **/playwright/.auth/
 ibl5/.env.test
 docker-compose.override.yml
+docker-compose.worktree.yml
 .e2e-active

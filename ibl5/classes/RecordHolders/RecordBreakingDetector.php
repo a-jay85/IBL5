@@ -7,6 +7,7 @@ namespace RecordHolders;
 use RecordHolders\Contracts\RecordBreakingDetectorInterface;
 use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
 use Utilities\BoxScoreUrlBuilder;
+use Utilities\IblSeasonDateHelper;
 
 /**
  * RecordBreakingDetector - Detects and announces broken/tied all-time IBL records.
@@ -249,7 +250,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
 
         foreach ($allQuadDoubles as $qd) {
             if (isset($targetDates[$qd['date']])) {
-                $gameType = $this->getGameTypeFromDate($qd['date']);
+                $gameType = IblSeasonDateHelper::getGameTypeFromDate($qd['date']);
                 $gameTypeLabel = self::GAME_TYPE_LABELS[$gameType] ?? 'regular season';
                 $announcements[] = $this->formatQuadrupleDoubleMessage(
                     $qd['name'],
@@ -316,7 +317,7 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
         /** @var array<string, list<string>> $grouped */
         $grouped = [];
         foreach ($dates as $date) {
-            $gameType = $this->getGameTypeFromDate($date);
+            $gameType = IblSeasonDateHelper::getGameTypeFromDate($date);
             $grouped[$gameType][] = $date;
         }
         return $grouped;
@@ -430,26 +431,6 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
     {
         \Discord::postToChannel('#trades', $message);
         \Discord::postToChannel('#general-chat', $message);
-    }
-
-    /**
-     * Determine the game type from a date.
-     */
-    private function getGameTypeFromDate(string $date): string
-    {
-        $timestamp = strtotime($date);
-        if ($timestamp === false) {
-            return 'regularSeason';
-        }
-        $month = (int) date('n', $timestamp);
-
-        if ($month === 10) {
-            return 'heat';
-        }
-        if ($month === 6) {
-            return 'playoffs';
-        }
-        return 'regularSeason';
     }
 
     /**

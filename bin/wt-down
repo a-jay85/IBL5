@@ -39,11 +39,16 @@ teardown_worktree() {
         return
     fi
 
-    echo "Stopping environment: $slug (worktree: $wt_name)..."
+    # Detect the actual project name from the running container (may differ from convention)
+    local project
+    project=$(docker inspect "ibl5-php-$slug" --format '{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || echo "ibl5-$slug")
+    [ -z "$project" ] && project="ibl5-$slug"
+
+    echo "Stopping environment: $slug (worktree: $wt_name, project: $project)..."
     if [ "$REMOVE_VOLUMES" = true ]; then
-        docker compose -f "$compose_file" -p "ibl5-$slug" down -v
+        docker compose -f "$compose_file" -p "$project" down -v
     else
-        docker compose -f "$compose_file" -p "ibl5-$slug" down
+        docker compose -f "$compose_file" -p "$project" down
     fi
 
     rm -f "$compose_file"

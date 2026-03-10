@@ -8,7 +8,6 @@ services:
     volumes:
       - {{WORKTREE_PATH}}/ibl5:/var/www/html/ibl5
       - {{REPO_ROOT}}/ibl5/vendor:/var/www/html/ibl5/vendor
-      - {{REPO_ROOT}}/ibl5/config.php:/var/www/html/ibl5/config.php
     depends_on:
       db-{{SLUG}}:
         condition: service_healthy

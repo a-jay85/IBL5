@@ -83,6 +83,13 @@ if [ ! -s "$STYLE_CSS" ]; then
     cp "$REPO_ROOT/ibl5/themes/IBL/style/style.css" "$STYLE_CSS" 2>/dev/null || true
 fi
 
+# Copy config.php into worktree (can't use bind mount — VirtioFS fails on nested mounts)
+CONFIG_PHP="$WORKTREE_PATH/ibl5/config.php"
+if [ ! -s "$CONFIG_PHP" ] || [ -L "$CONFIG_PHP" ]; then
+    [ -L "$CONFIG_PHP" ] && rm "$CONFIG_PHP"
+    cp "$REPO_ROOT/ibl5/config.php" "$CONFIG_PHP" 2>/dev/null || true
+fi
+
 # Generate compose file from template
 COMPOSE_FILE="$WORKTREE_PATH/docker-compose.yml"
 TEMPLATE="$REPO_ROOT/docker/worktree-compose.template.yml"

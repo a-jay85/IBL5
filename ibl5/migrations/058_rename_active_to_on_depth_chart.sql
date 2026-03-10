@@ -1,9 +1,10 @@
--- Migration 058: Rename `active` column to `on_depth_chart` on ibl_plr
--- The `active` column means "on a depth chart" (1=yes), NOT "active/retired status".
--- Renaming eliminates this confusion.
+-- Migration 058: Rename `active` column to `dc_canPlayInGame` on ibl_plr
+-- The `active` column controls whether a player can play in the game (1=yes).
+-- All players are on the depth chart; only those marked "Yes" actually play.
+-- Renaming to `dc_canPlayInGame` eliminates the ambiguity.
 
 -- Rename the column
-ALTER TABLE `ibl_plr` CHANGE COLUMN IF EXISTS `active` `on_depth_chart` tinyint(1) DEFAULT NULL COMMENT 'On depth chart (1=yes)';
+ALTER TABLE `ibl_plr` CHANGE COLUMN IF EXISTS `active` `dc_canPlayInGame` tinyint(1) DEFAULT NULL COMMENT 'Can play in game (1=yes)';
 
 -- Rename indexes to match (drop old, add new)
 DROP INDEX IF EXISTS `idx_active` ON `ibl_plr`;
@@ -11,9 +12,9 @@ DROP INDEX IF EXISTS `idx_tid_active` ON `ibl_plr`;
 DROP INDEX IF EXISTS `idx_tid_pos_active` ON `ibl_plr`;
 
 ALTER TABLE `ibl_plr`
-    ADD INDEX IF NOT EXISTS `idx_on_depth_chart` (`on_depth_chart`),
-    ADD INDEX IF NOT EXISTS `idx_tid_on_depth_chart` (`tid`, `on_depth_chart`),
-    ADD INDEX IF NOT EXISTS `idx_tid_pos_on_depth_chart` (`tid`, `pos`, `on_depth_chart`);
+    ADD INDEX IF NOT EXISTS `idx_dc_canPlayInGame` (`dc_canPlayInGame`),
+    ADD INDEX IF NOT EXISTS `idx_tid_dc_canPlayInGame` (`tid`, `dc_canPlayInGame`),
+    ADD INDEX IF NOT EXISTS `idx_tid_pos_dc_canPlayInGame` (`tid`, `pos`, `dc_canPlayInGame`);
 
 -- Recreate the view with the renamed column
 CREATE OR REPLACE VIEW `vw_player_current` AS
@@ -26,7 +27,7 @@ SELECT
     `p`.`pos` AS `position`,
     `p`.`htft` AS `htft`,
     `p`.`htin` AS `htin`,
-    `p`.`on_depth_chart` AS `on_depth_chart`,
+    `p`.`dc_canPlayInGame` AS `dc_canPlayInGame`,
     `p`.`retired` AS `retired`,
     `p`.`exp` AS `experience`,
     `p`.`bird` AS `bird_rights`,

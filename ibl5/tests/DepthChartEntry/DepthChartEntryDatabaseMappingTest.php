@@ -26,7 +26,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
             'sf' => 0,
             'pf' => 0,
             'c' => 0,
-            'active' => 1,
+            'canPlayInGame' => 1,
             'min' => 30,
             'of' => 2,
             'df' => 1,
@@ -42,7 +42,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
             'dc_SFDepth',  // Should get value from $processedPlayerData['sf']
             'dc_PFDepth',  // Should get value from $processedPlayerData['pf']
             'dc_CDepth',   // Should get value from $processedPlayerData['c']
-            'dc_active',   // Should get value from $processedPlayerData['active']
+            'dc_active',   // Should get value from $processedPlayerData['canPlayInGame']
             'dc_minutes',  // Should get value from $processedPlayerData['min']
             'dc_of',       // Should get value from $processedPlayerData['of']
             'dc_df',       // Should get value from $processedPlayerData['df']
@@ -78,7 +78,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
             'sf' => 'dc_SFDepth',
             'pf' => 'dc_PFDepth',
             'c' => 'dc_CDepth',
-            'active' => 'dc_active',
+            'canPlayInGame' => 'dc_active',
             'min' => 'dc_minutes',
             'of' => 'dc_of',
             'df' => 'dc_df',
@@ -100,7 +100,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
             $processedPlayerData['sf'],      // position 3: dc_SFDepth
             $processedPlayerData['pf'],      // position 4: dc_PFDepth
             $processedPlayerData['c'],       // position 5: dc_CDepth
-            $processedPlayerData['active'],  // position 6: dc_active
+            $processedPlayerData['canPlayInGame'],  // position 6: dc_active
             $processedPlayerData['min'],     // position 7: dc_minutes
             $processedPlayerData['of'],      // position 8: dc_of
             $processedPlayerData['df'],      // position 9: dc_df
@@ -136,7 +136,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
             'sf' => 0,
             'pf' => 0,
             'c' => 1,
-            'active' => 1,
+            'canPlayInGame' => 1,
             'min' => 20,
             'of' => 0,     // unsigned: 0-3
             'df' => 0,     // unsigned: 0-3
@@ -167,7 +167,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
             'sf1' => '0',
             'pf1' => '0',
             'c1' => '0',
-            'active1' => '1',   // lowercase
+            'canPlayInGame1' => '1',   // lowercase
             'min1' => '30',     // lowercase
             'OF1' => '2',       // UPPERCASE
             'DF1' => '1',       // UPPERCASE
@@ -177,7 +177,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
         ];
 
         // Step 2: Processor converts POST to processed array with lowercase keys
-        $processedKeys = ['pg', 'sg', 'sf', 'pf', 'c', 'active', 'min', 'of', 'df', 'oi', 'di', 'bh'];
+        $processedKeys = ['pg', 'sg', 'sf', 'pf', 'c', 'canPlayInGame', 'min', 'of', 'df', 'oi', 'di', 'bh'];
 
         // Step 3: Repository maps processed array to database columns
         $databaseColumns = [
@@ -241,7 +241,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
             3 => 'sf',
             4 => 'pf',
             5 => 'c',
-            6 => 'active',
+            6 => 'canPlayInGame',
             7 => 'min',
             8 => 'of',
             9 => 'df',

@@ -45,7 +45,7 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
         $sf = $depthChartValues['sf'];
         $pf = $depthChartValues['pf'];
         $c = $depthChartValues['c'];
-        $active = $depthChartValues['active'];
+        $active = $depthChartValues['canPlayInGame'];
         $min = $depthChartValues['min'];
         $of = $depthChartValues['of'];
         $df = $depthChartValues['df'];

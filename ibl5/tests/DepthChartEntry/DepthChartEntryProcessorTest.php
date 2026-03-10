@@ -25,7 +25,7 @@ class DepthChartEntryProcessorTest extends TestCase
             'sf1' => '0',
             'pf1' => '0',
             'c1' => '0',
-            'active1' => '1',
+            'canPlayInGame1' => '1',
             'min1' => '30',
             'OF1' => '0',
             'DF1' => '1',
@@ -39,7 +39,7 @@ class DepthChartEntryProcessorTest extends TestCase
             'sf2' => '0',
             'pf2' => '0',
             'c2' => '0',
-            'active2' => '1',
+            'canPlayInGame2' => '1',
             'min2' => '25',
             'OF2' => '0',
             'DF2' => '0',
@@ -66,7 +66,7 @@ class DepthChartEntryProcessorTest extends TestCase
             'sf1' => '0',
             'pf1' => '0',
             'c1' => '0',
-            'active1' => '1',
+            'canPlayInGame1' => '1',
             'min1' => '30',
             'OF1' => '0',
             'DF1' => '0',
@@ -91,7 +91,7 @@ class DepthChartEntryProcessorTest extends TestCase
             'sf1' => '0',
             'pf1' => '0',
             'c1' => '0',
-            'active1' => '1',
+            'canPlayInGame1' => '1',
             'min1' => '30',
             'OF1' => '0',
             'DF1' => '0',
@@ -117,7 +117,7 @@ class DepthChartEntryProcessorTest extends TestCase
                 'sf' => '0',
                 'pf' => '0',
                 'c' => '0',
-                'active' => '1',
+                'canPlayInGame' => '1',
                 'min' => '30',
                 'of' => '0',
                 'df' => '1',
@@ -144,7 +144,7 @@ class DepthChartEntryProcessorTest extends TestCase
             'sf1' => '0',
             'pf1' => '0',
             'c1' => '0',
-            'active1' => '2',  // Invalid (should be 0 or 1)
+            'canPlayInGame1' => '2',  // Invalid (should be 0 or 1)
             'min1' => '100',  // Out of range (should be capped at 40)
             'OF1' => '10',  // Out of range (should be capped at 3)
             'DF1' => '-5',  // Out of range (should be 0)
@@ -165,7 +165,7 @@ class DepthChartEntryProcessorTest extends TestCase
         $this->assertEquals(0, $result['playerData'][0]['sg']);
         
         // Active should be 0 (invalid value)
-        $this->assertEquals(0, $result['playerData'][0]['active']);
+        $this->assertEquals(0, $result['playerData'][0]['canPlayInGame']);
         
         // Minutes should be capped at 40
         $this->assertEquals(40, $result['playerData'][0]['min']);
@@ -189,7 +189,7 @@ class DepthChartEntryProcessorTest extends TestCase
             'sf1' => '0',
             'pf1' => '0',
             'c1' => '0',
-            'active1' => '1',
+            'canPlayInGame1' => '1',
             'min1' => '30',
             'OF1' => '0',
             'DF1' => '0',
@@ -216,7 +216,7 @@ class DepthChartEntryProcessorTest extends TestCase
                 'sf' => 0,
                 'pf' => 0,
                 'c' => 0,
-                'active' => 1,
+                'canPlayInGame' => 1,
                 'min' => 30,
                 'of' => 0,
                 'df' => 1,
@@ -241,7 +241,7 @@ class DepthChartEntryProcessorTest extends TestCase
             'sf1' => '3',
             'pf1' => '4',
             'c1' => '5',
-            'active1' => '1',
+            'canPlayInGame1' => '1',
             'min1' => '30',
             'OF1' => '0',
             'DF1' => '0',

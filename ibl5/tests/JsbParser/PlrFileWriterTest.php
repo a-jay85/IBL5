@@ -133,13 +133,13 @@ class PlrFileWriterTest extends TestCase
             'SFDepth' => 0,
             'PFDepth' => 0,
             'CDepth' => 0,
-            'on_depth_chart' => 1,
+            'dc_canPlayInGame' => 1,
         ]);
 
         $this->assertSame(1, PlrFileWriter::readField($modified, 'PGDepth'));
         $this->assertSame(2, PlrFileWriter::readField($modified, 'SGDepth'));
         $this->assertSame(0, PlrFileWriter::readField($modified, 'SFDepth'));
-        $this->assertSame(1, PlrFileWriter::readField($modified, 'on_depth_chart'));
+        $this->assertSame(1, PlrFileWriter::readField($modified, 'dc_canPlayInGame'));
     }
 
     public function testApplyChangesUpdatesContract(): void
@@ -292,7 +292,7 @@ class PlrFileWriterTest extends TestCase
         $modified = PlrFileWriter::applyChangesToRecord($record, [
             'tid' => 10,
             'PGDepth' => 1,
-            'on_depth_chart' => 1,
+            'dc_canPlayInGame' => 1,
             'cy' => 2,
             'cyt' => 5,
             'bird' => 4,
@@ -300,7 +300,7 @@ class PlrFileWriterTest extends TestCase
 
         $this->assertSame(10, PlrFileWriter::readField($modified, 'tid'));
         $this->assertSame(1, PlrFileWriter::readField($modified, 'PGDepth'));
-        $this->assertSame(1, PlrFileWriter::readField($modified, 'on_depth_chart'));
+        $this->assertSame(1, PlrFileWriter::readField($modified, 'dc_canPlayInGame'));
         $this->assertSame(2, PlrFileWriter::readField($modified, 'cy'));
         $this->assertSame(5, PlrFileWriter::readField($modified, 'cyt'));
         $this->assertSame(4, PlrFileWriter::readField($modified, 'bird'));

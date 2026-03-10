@@ -37,10 +37,7 @@ if [ -z "$WORKTREE_NAME" ]; then
     exit 1
 fi
 
-SLUG="$WORKTREE_NAME"
 WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
-PHP_CONTAINER="ibl5-php-$SLUG"
-DB_CONTAINER="ibl5-db-$SLUG"
 
 # --- Pre-flight checks ---
 if [ ! -d "$WORKTREE_PATH" ]; then
@@ -48,17 +45,29 @@ if [ ! -d "$WORKTREE_PATH" ]; then
     exit 1
 fi
 
-if ! docker ps --format '{{.Names}}' | grep -q "^${PHP_CONTAINER}$"; then
-    echo "Error: PHP container '$PHP_CONTAINER' is not running." >&2
-    echo "Start it with: bin/wt-up $WORKTREE_NAME --seed" >&2
+# --- Detect slug (plain name or pr-NNN) ---
+# wt-up uses the worktree name as slug by default, or pr-NNN with --pr flag.
+# Try both and use whichever has running containers.
+SLUG=""
+if docker ps --format '{{.Names}}' | grep -q "^ibl5-php-${WORKTREE_NAME}$"; then
+    SLUG="$WORKTREE_NAME"
+else
+    # Check for --pr slug by looking up the PR number for this worktree's branch
+    PR_NUMBER=$(cd "$WORKTREE_PATH" && gh pr view --json number -q .number 2>/dev/null || true)
+    if [ -n "$PR_NUMBER" ] && docker ps --format '{{.Names}}' | grep -q "^ibl5-php-pr-${PR_NUMBER}$"; then
+        SLUG="pr-$PR_NUMBER"
+    fi
+fi
+
+if [ -z "$SLUG" ]; then
+    echo "Error: No running Docker containers found for worktree '$WORKTREE_NAME'." >&2
+    echo "Start them with: bin/wt-up $WORKTREE_NAME --seed" >&2
     exit 1
 fi
 
-if ! docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER}$"; then
-    echo "Error: DB container '$DB_CONTAINER' is not running." >&2
-    echo "Start it with: bin/wt-up $WORKTREE_NAME --seed" >&2
-    exit 1
-fi
+PHP_CONTAINER="ibl5-php-$SLUG"
+DB_CONTAINER="ibl5-db-$SLUG"
+echo "Detected slug: $SLUG (containers: $PHP_CONTAINER, $DB_CONTAINER)"
 
 # --- Fix .env.test inside Docker ---
 # The worktree symlink points to a host path that doesn't exist inside the container.

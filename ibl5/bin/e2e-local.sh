@@ -16,8 +16,8 @@ MYSQL_ARGS="-h 127.0.0.1 --skip-ssl -u root -proot"
 DB_NAME="ibl5_e2e_test"
 
 # Pre-flight: verify Docker Apache is running
-if ! curl -sf "http://localhost/ibl5/" > /dev/null 2>&1; then
-    echo "ERROR: Docker Apache is not responding at http://localhost/ibl5/"
+if ! curl -sf "http://main.localhost/ibl5/" > /dev/null 2>&1; then
+    echo "ERROR: Docker Apache is not responding at http://main.localhost/ibl5/"
     echo "Start it with: docker compose up -d"
     exit 1
 fi

@@ -1,0 +1,86 @@
+#!/bin/bash
+# Export production database for use in worktree Docker environments.
+# Box score tables are limited to a single season to keep the dump small.
+#
+# Usage: bin/db-export-prod [season-ending-year]
+#   season-ending-year  The calendar year the season's playoffs end (default: current year)
+#
+# IBL seasons run October → June:
+#   HEAT starts in October of year Y-1, playoffs end in June of year Y.
+#   So "2007" exports games from 2006-10-01 through 2007-06-30.
+#
+# Output: ibl5/fixtures/prod-seed.sql (gitignored)
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+OUTPUT="$REPO_ROOT/ibl5/fixtures/prod-seed.sql"
+
+# Default to current calendar year
+SEASON_END_YEAR="${1:-$(date +%Y)}"
+SEASON_START="$((SEASON_END_YEAR - 1))-10-01"
+SEASON_END="${SEASON_END_YEAR}-06-30"
+
+DB_HOST="127.0.0.1"
+DB_USER="root"
+DB_PASS="root"
+DB_NAME="iblhoops_ibl5"
+DUMP_OPTS="--skip-ssl --single-transaction --skip-lock-tables"
+
+echo "Exporting production DB (box scores limited to ${SEASON_START} – ${SEASON_END})..."
+
+# Tables to export with season-filtered box scores
+BOX_TABLES="ibl_box_scores ibl_box_scores_teams"
+
+# Tables/views to skip entirely (exported separately or not needed)
+SKIP_REGEX="^(ibl_box_scores|ibl_box_scores_teams)$"
+
+# 1. Get list of all real tables (skip views — engine is NULL)
+ALL_TABLES=$(mariadb -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" \
+    -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND engine IS NOT NULL ORDER BY table_name;" 2>/dev/null)
+
+# 2. Build list of tables excluding box scores
+REGULAR_TABLES=""
+for t in $ALL_TABLES; do
+    if ! echo "$t" | grep -qE "$SKIP_REGEX"; then
+        REGULAR_TABLES="$REGULAR_TABLES $t"
+    fi
+done
+
+mkdir -p "$(dirname "$OUTPUT")"
+
+# 3. Dump structure for ALL tables (including box scores) — no data
+#    Include --routines and --triggers here (only in this step)
+echo "-- Dumping table structure..."
+mariadb-dump -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
+    $DUMP_OPTS --routines --triggers --no-data "$DB_NAME" > "$OUTPUT" 2>/dev/null
+
+# 4. Dump data for regular tables (skip triggers — already in structure dump)
+echo "-- Dumping data for regular tables..."
+# shellcheck disable=SC2086
+mariadb-dump -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
+    $DUMP_OPTS --no-create-info --skip-triggers "$DB_NAME" $REGULAR_TABLES >> "$OUTPUT" 2>/dev/null
+
+# 5. Dump filtered box score data (skip triggers — already in structure dump)
+for tbl in $BOX_TABLES; do
+    echo "-- Dumping $tbl (season ${SEASON_END_YEAR} only)..."
+    mariadb-dump -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
+        $DUMP_OPTS --no-create-info --skip-triggers \
+        --where="Date BETWEEN '${SEASON_START}' AND '${SEASON_END}'" \
+        "$DB_NAME" "$tbl" >> "$OUTPUT" 2>/dev/null
+done
+
+# 6. Dump views (structure only — they have no data)
+echo "-- Dumping views..."
+VIEWS=$(mariadb -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" \
+    -N -e "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB_NAME' AND table_type='VIEW' ORDER BY table_name;" 2>/dev/null)
+if [ -n "$VIEWS" ]; then
+    # shellcheck disable=SC2086
+    mariadb-dump -h "$DB_HOST" --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
+        $DUMP_OPTS "$DB_NAME" $VIEWS >> "$OUTPUT" 2>/dev/null
+fi
+
+SIZE=$(du -h "$OUTPUT" | cut -f1)
+echo ""
+echo "Done: $OUTPUT ($SIZE)"
+echo "Season: Oct ${SEASON_START%%-*} – Jun ${SEASON_END_YEAR} (HEAT through playoffs)"

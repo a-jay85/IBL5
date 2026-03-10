@@ -22,7 +22,7 @@ cd ibl5 && bunx playwright test tests/e2e/smoke/public-pages.spec.ts
 
 ## Prerequisites
 
-- **MAMP must be running** — E2E tests hit the real local server (`http://localhost/ibl5/`), unlike PHPUnit tests which use mocks
+- **Docker must be running** — E2E tests hit the local server (`http://main.localhost/ibl5/`), unlike PHPUnit tests which use mocks
 - **`.env.test` must exist** with valid credentials — copy from `.env.test.example`
 - **CSS must be rebuilt after branch switches** — `css:watch` may not detect source changes from `git checkout`. Run `bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css` if tests depend on CSS from another branch
 

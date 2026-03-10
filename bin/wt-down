@@ -95,9 +95,16 @@ if [ ! -d "$WORKTREE_PATH" ]; then
     echo "Worktree directory not found at $WORKTREE_PATH"
     echo "Searching for orphaned Docker containers..."
 
-    # Try the worktree name as slug, and also check for pr-* slugs
+    # Build list of slugs to check: the worktree name itself, plus its
+    # PR-based slug (pr-NNN) if the branch has an open PR.
+    slugs=("$WORKTREE_NAME")
+    pr_slug=$(gh pr view "$WORKTREE_NAME" --json number --jq '.number' 2>/dev/null || true)
+    if [ -n "$pr_slug" ]; then
+        slugs+=("pr-$pr_slug")
+    fi
+
     found_orphan=false
-    for slug in "$WORKTREE_NAME" $(docker ps -a --format '{{.Names}}' | grep -o 'ibl5-php-pr-[0-9]*' | sed 's/ibl5-php-//' || true); do
+    for slug in "${slugs[@]}"; do
         php_container="ibl5-php-$slug"
         db_container="ibl5-db-$slug"
         if docker inspect "$php_container" &>/dev/null || docker inspect "$db_container" &>/dev/null; then

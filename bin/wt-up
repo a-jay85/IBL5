@@ -94,7 +94,7 @@ if [ ! -s "$CONFIG_PHP" ] || [ -L "$CONFIG_PHP" ]; then
 fi
 
 # Generate compose file from template
-COMPOSE_FILE="$WORKTREE_PATH/docker-compose.yml"
+COMPOSE_FILE="$WORKTREE_PATH/docker-compose.worktree.yml"
 TEMPLATE="$REPO_ROOT/docker/worktree-compose.template.yml"
 
 if [ ! -f "$TEMPLATE" ]; then

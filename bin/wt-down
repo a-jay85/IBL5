@@ -24,7 +24,7 @@ teardown_worktree() {
     local wt_path="$1"
     local wt_name
     wt_name=$(basename "$wt_path")
-    local compose_file="$wt_path/docker-compose.yml"
+    local compose_file="$wt_path/docker-compose.worktree.yml"
 
     if [ ! -f "$compose_file" ]; then
         return
@@ -65,7 +65,7 @@ if [ "$ALL" = true ]; then
     found=false
     for wt in "$WORKTREES_DIR"/*/; do
         [ -d "$wt" ] || continue
-        if [ -f "$wt/docker-compose.yml" ]; then
+        if [ -f "$wt/docker-compose.worktree.yml" ]; then
             found=true
             teardown_worktree "$wt"
         fi
@@ -135,10 +135,10 @@ if [ ! -d "$WORKTREE_PATH" ]; then
     exit 0
 fi
 
-COMPOSE_FILE="$WORKTREE_PATH/docker-compose.yml"
+COMPOSE_FILE="$WORKTREE_PATH/docker-compose.worktree.yml"
 if [ ! -f "$COMPOSE_FILE" ]; then
     echo "No Docker environment found for worktree '$WORKTREE_NAME'."
-    echo "(No docker-compose.yml in $WORKTREE_PATH)"
+    echo "(No docker-compose.worktree.yml in $WORKTREE_PATH)"
     exit 0
 fi
 

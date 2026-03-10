@@ -84,7 +84,6 @@ Commit body: `<type>: <short summary>` then `## Section` headers with bullet poi
 ## PHP / Database Gotchas
 
 - PHP class constants cannot be interpolated in double-quoted strings; use concatenation instead.
-- The `active` field on players means "on a depth chart", NOT "active/retired status".
 - `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` affects `COALESCE` — nullable LEFT JOIN columns may still produce `null` despite COALESCE.
 - Database views may filter results unexpectedly; check view definitions before assuming query bugs.
 

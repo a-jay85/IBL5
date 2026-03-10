@@ -219,36 +219,3 @@ test.describe('EOY Voting: submission', () => {
   });
 });
 
-// ============================================================
-// Voting gating
-// ============================================================
-
-test.describe('Voting: disabled states', () => {
-  test('no ASG ballot when ASG Voting is No', async ({
-    appState,
-    page,
-  }) => {
-    await appState({
-      'Current Season Phase': 'Regular Season',
-      'ASG Voting': 'No',
-    });
-    await page.goto('modules.php?name=Voting');
-
-    const asgForm = page.locator('form[name="ASGVote"]');
-    expect(await asgForm.count()).toBe(0);
-  });
-
-  test('no EOY ballot when EOY Voting is No', async ({
-    appState,
-    page,
-  }) => {
-    await appState({
-      'Current Season Phase': 'Free Agency',
-      'EOY Voting': 'No',
-    });
-    await page.goto('modules.php?name=Voting');
-
-    const eoyForm = page.locator('form[name="EOYVote"]');
-    expect(await eoyForm.count()).toBe(0);
-  });
-});

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Start a Docker environment for a worktree with its own PHP-Apache + MariaDB.
-# Usage: bin/wt-up <worktree-name> [--pr] [--seed]
+# Usage: bin/wt-up <worktree-name> [--pr] [--seed] [--prod]
 
 set -euo pipefail
 
@@ -8,13 +8,14 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORKTREE_NAME=""
 USE_PR=false
 SEED_DB=false
+PROD_DB=false
 
 # Wrapper to suppress MariaDB "password on command line" warning
 db_exec() {
-    docker exec "$@" 2>&1 | grep -v '\[Warning\].*password'
+    docker exec "$@" 2>&1 | grep -v '\[Warning\].*password' || true
 }
 db_exec_stdin() {
-    docker exec -i "$@" 2>&1 | grep -v '\[Warning\].*password'
+    docker exec -i "$@" 2>&1 | grep -v '\[Warning\].*password' || true
 }
 
 # Parse arguments
@@ -22,6 +23,7 @@ for arg in "$@"; do
     case "$arg" in
         --pr) USE_PR=true ;;
         --seed) SEED_DB=true ;;
+        --prod) PROD_DB=true ;;
         -*) echo "Unknown option: $arg" >&2; exit 1 ;;
         *) WORKTREE_NAME="$arg" ;;
     esac
@@ -33,6 +35,7 @@ if [ -z "$WORKTREE_NAME" ]; then
     echo "Options:" >&2
     echo "  --pr     Use PR number as URL slug (e.g., pr-42.localhost)" >&2
     echo "  --seed   Import ci-seed.sql for test data" >&2
+    echo "  --prod   Import prod-seed.sql (run bin/db-export-prod first)" >&2
     exit 1
 fi
 
@@ -124,41 +127,52 @@ echo "MariaDB is ready."
 DB_CONTAINER="ibl5-db-$SLUG"
 DB_CMD="mariadb -u root -proot iblhoops_ibl5"
 
-# Seed database with schema (strip DEFINER clauses that reference production users)
-SCHEMA_FILE="$WORKTREE_PATH/ibl5/schema.sql"
-if [ -f "$SCHEMA_FILE" ]; then
-    echo "Importing schema.sql..."
-    sed 's/ DEFINER=[^ ]* / /g' "$SCHEMA_FILE" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
-fi
+if [ "$PROD_DB" = true ]; then
+    # --prod: import the full production dump (structure + data included)
+    PROD_SEED="$REPO_ROOT/ibl5/fixtures/prod-seed.sql"
+    if [ ! -f "$PROD_SEED" ]; then
+        echo "Error: $PROD_SEED not found. Run bin/db-export-prod first." >&2
+        exit 1
+    fi
+    echo "Importing prod-seed.sql..."
+    sed 's/ DEFINER=[^ ]* / /g' "$PROD_SEED" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
+else
+    # Default: import schema + migrations (+ optional ci-seed)
+    SCHEMA_FILE="$WORKTREE_PATH/ibl5/schema.sql"
+    if [ -f "$SCHEMA_FILE" ]; then
+        echo "Importing schema.sql..."
+        sed 's/ DEFINER=[^ ]* / /g' "$SCHEMA_FILE" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
+    fi
 
-# Run migrations if they exist
-MIGRATIONS_DIR="$WORKTREE_PATH/ibl5/migrations"
-if [ -d "$MIGRATIONS_DIR" ] && ls "$MIGRATIONS_DIR"/*.sql &>/dev/null; then
-    echo "Running migrations..."
-    db_exec "$DB_CONTAINER" $DB_CMD \
-        -e "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"
-    for migration in "$MIGRATIONS_DIR"/*.sql; do
-        [ -f "$migration" ] || continue
-        BASENAME=$(basename "$migration")
-        ALREADY=$(db_exec "$DB_CONTAINER" $DB_CMD -N \
-            -e "SELECT COUNT(*) FROM schema_migrations WHERE version='$BASENAME';")
-        if [ "$ALREADY" = "0" ]; then
-            echo "  Applying $BASENAME..."
-            sed 's/ DEFINER=[^ ]* / /g' "$migration" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
-            db_exec "$DB_CONTAINER" $DB_CMD \
-                -e "INSERT INTO schema_migrations (version) VALUES ('$BASENAME');"
+    # Run migrations if they exist
+    MIGRATIONS_DIR="$WORKTREE_PATH/ibl5/migrations"
+    if [ -d "$MIGRATIONS_DIR" ] && ls "$MIGRATIONS_DIR"/*.sql &>/dev/null; then
+        echo "Running migrations..."
+        db_exec "$DB_CONTAINER" $DB_CMD \
+            -e "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"
+        for migration in "$MIGRATIONS_DIR"/*.sql; do
+            [ -f "$migration" ] || continue
+            BASENAME=$(basename "$migration")
+            ALREADY=$(db_exec "$DB_CONTAINER" $DB_CMD -N \
+                -e "SELECT COUNT(*) FROM schema_migrations WHERE version='$BASENAME';")
+            if [ "$ALREADY" = "0" ]; then
+                echo "  Applying $BASENAME..."
+                sed 's/ DEFINER=[^ ]* / /g' "$migration" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
+                db_exec "$DB_CONTAINER" $DB_CMD \
+                    -e "INSERT INTO schema_migrations (version) VALUES ('$BASENAME');"
+            fi
+        done
+    fi
+
+    # Optionally seed with CI test data
+    if [ "$SEED_DB" = true ]; then
+        CI_SEED="$WORKTREE_PATH/ibl5/tests/e2e/fixtures/ci-seed.sql"
+        if [ -f "$CI_SEED" ]; then
+            echo "Importing ci-seed.sql..."
+            db_exec_stdin "$DB_CONTAINER" $DB_CMD < "$CI_SEED"
+        else
+            echo "Warning: ci-seed.sql not found at $CI_SEED"
         fi
-    done
-fi
-
-# Optionally seed with CI test data
-if [ "$SEED_DB" = true ]; then
-    CI_SEED="$WORKTREE_PATH/ibl5/tests/e2e/fixtures/ci-seed.sql"
-    if [ -f "$CI_SEED" ]; then
-        echo "Importing ci-seed.sql..."
-        db_exec_stdin "$DB_CONTAINER" $DB_CMD < "$CI_SEED"
-    else
-        echo "Warning: ci-seed.sql not found at $CI_SEED"
     fi
 fi
 

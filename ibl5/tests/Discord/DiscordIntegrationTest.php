@@ -270,36 +270,26 @@ class DiscordIntegrationTest extends IntegrationTestCase
     }
 
     /**
-     * Test postToChannel detects localhost server
-     */
-    public function testPostToChannelDetectsLocalhost(): void
-    {
-        $serverName = 'localhost';
-        $isLocalhost = ($serverName === 'localhost' || $serverName === '127.0.0.1');
-
-        $this->assertTrue($isLocalhost);
-    }
-
-    /**
-     * Test postToChannel detects 127.0.0.1 as localhost
-     */
-    public function testPostToChannelDetects127001AsLocalhost(): void
-    {
-        $serverName = '127.0.0.1';
-        $isLocalhost = ($serverName === 'localhost' || $serverName === '127.0.0.1');
-
-        $this->assertTrue($isLocalhost);
-    }
-
-    /**
-     * Test postToChannel detects production server
+     * Test postToChannel treats iblhoops.net as production
      */
     public function testPostToChannelDetectsProductionServer(): void
     {
         $serverName = 'iblhoops.net';
-        $isLocalhost = ($serverName === 'localhost' || $serverName === '127.0.0.1');
+        $isProduction = ($serverName === 'iblhoops.net');
 
-        $this->assertFalse($isLocalhost);
+        $this->assertTrue($isProduction);
+    }
+
+    /**
+     * Test postToChannel treats non-production hosts as testing
+     */
+    public function testPostToChannelDetectsNonProductionHosts(): void
+    {
+        $nonProductionHosts = ['localhost', '127.0.0.1', 'main.localhost', ''];
+        foreach ($nonProductionHosts as $host) {
+            $isProduction = ($host === 'iblhoops.net');
+            $this->assertFalse($isProduction, "Host '{$host}' should not be detected as production");
+        }
     }
 
     // ============================================

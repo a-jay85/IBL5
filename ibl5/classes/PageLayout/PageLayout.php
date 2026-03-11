@@ -4,10 +4,24 @@ declare(strict_types=1);
 
 namespace PageLayout;
 
+use Utilities\HtmxHelper;
+
 class PageLayout
 {
     public static function header(): void
     {
+        // Populate $cookie/$user globals for all request types.
+        // online() does this for full page loads, but boosted requests
+        // skip online() — modules still need $cookie for team lookups.
+        /** @var string $user */
+        global $user;
+        cookiedecode($user);
+
+        if (HtmxHelper::isBoostedRequest()) {
+            self::renderBoostedHeader();
+            return;
+        }
+
         online();
         self::renderHead();
         include "includes/counter.php";
@@ -22,6 +36,26 @@ class PageLayout
         }
         if (defined('HOME_FILE')) {
             blocks("Center");
+        }
+    }
+
+    private static function renderBoostedHeader(): void
+    {
+        /** @var string $sitename */
+        global $sitename;
+        /** @var string $pagetitle */
+        global $pagetitle;
+
+        echo '<title>' . \Utilities\HtmlSanitizer::e($sitename . ' ' . $pagetitle) . '</title>';
+
+        if (
+            isset($_SESSION['flash_success'])
+            && is_string($_SESSION['flash_success'])
+            && $_SESSION['flash_success'] !== ''
+        ) {
+            $flashMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($_SESSION['flash_success']);
+            unset($_SESSION['flash_success']);
+            echo '<div class="ibl-alert ibl-alert--success">' . $flashMessage . '</div>';
         }
     }
 
@@ -66,12 +100,18 @@ class PageLayout
         }
         echo "<title>$sitename $pagetitle</title>\n";
         echo '<meta name="google-site-verification" content="3y3xJYDHSYUitn7cbfFfI6C2BiK_q66dtRfykpzHW5w" />';
+        echo "<script src=\"jslib/htmx.min.js\"></script>";
+        // Prevent hx-boost from intercepting forms (Phase 3 follow-up).
+        // MutationObserver marks forms with hx-boost="false" as they enter
+        // the DOM, before HTMX's DOMContentLoaded handler processes them.
+        echo '<script>new MutationObserver(function(ms){ms.forEach(function(m){m.addedNodes.forEach(function(n){if(n.nodeType===1){if(n.tagName==="FORM")n.setAttribute("hx-boost","false");if(n.querySelectorAll){var fs=n.querySelectorAll("form");for(var i=0;i<fs.length;i++)fs[i].setAttribute("hx-boost","false")}}})})}).observe(document.documentElement,{childList:true,subtree:true})</script>';
         echo "<script src=\"jslib/sorttable.js\"></script>";
         echo "<script src=\"jslib/responsive-tables.js\"></script>";
         echo "<script src=\"jslib/name-abbreviation.js\"></script>";
         echo "<script src=\"jslib/user-team-highlighter.js\"></script>";
         echo "<script src=\"jslib/sticky-page-header.js\"></script>";
         echo "<script src=\"jslib/contract-hint.js\"></script>";
+        echo "<script src=\"jslib/htmx-init.js\"></script>";
 
         // Meta tags (inlined from includes/meta.php)
         $charsetValue = defined('_CHARSET') ? \_CHARSET : null;
@@ -155,9 +195,6 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
 }
 </script>';
 
-        // Navigation JavaScript for mobile menu toggle
-        echo '<script src="jslib/navigation.js" defer></script>';
-
         // FOUT prevention inline styles
         echo '<style>
 /* FOUT Prevention - Hide body until fonts are loaded */
@@ -178,8 +215,13 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
         themeheader();
     }
 
-    public static function footer(): never
+    public static function footer(): void
     {
+        if (HtmxHelper::isBoostedRequest()) {
+            ob_end_flush();
+            return;
+        }
+
         if (defined('HOME_FILE')) {
             blocks("Down");
         }

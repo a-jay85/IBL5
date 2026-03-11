@@ -237,6 +237,9 @@
         <testsuite name="Bootstrap Module Tests">
             <directory>tests/Bootstrap</directory>
         </testsuite>
+        <testsuite name="Unit Tests">
+            <directory>tests/Unit</directory>
+        </testsuite>
     </testsuites>
     <source baseline="phpunit-baseline.xml">
         <include>

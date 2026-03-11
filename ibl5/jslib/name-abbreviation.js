@@ -228,7 +228,13 @@
         resizeTimer = setTimeout(processAll, 150);
     }
 
-    document.addEventListener('DOMContentLoaded', processAll);
+    window.IBL_refreshNameAbbreviations = processAll;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', processAll);
+    } else {
+        processAll();
+    }
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleResize);
 })();

@@ -230,6 +230,7 @@ test.describe('Free Agency -- submit and manage offers', () => {
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
     await page.waitForURL(/result=offer_success|error=/);
     if (page.url().includes('error=')) {
+      customOfferSkipped = true;
       test.skip(true, 'Team cap space insufficient for multi-year offer — skipping');
     }
     await expect(page.locator('.ibl-alert--success')).toBeVisible();

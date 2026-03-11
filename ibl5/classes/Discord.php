@@ -22,37 +22,31 @@ class Discord
     private static bool $configLoaded = false;
 
     /**
-     * Check if running in a test environment (PHPUnit or E2E)
-     *
-     * Detects PHPUnit via constants, E2E via env var or .e2e-active sentinel file.
+     * Check if running inside PHPUnit
      */
-    private static function isTestEnvironment(): bool
+    private static function isPhpUnit(): bool
     {
-        if (defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL)) {
-            return true;
-        }
+        return defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL);
+    }
 
-        if (getenv('E2E_TESTING') === '1') {
-            return true;
-        }
-
-        // e2e-local.sh creates .e2e-active next to config.php to switch to the test DB.
-        // Check for it here so Discord calls are also suppressed in that environment.
-        return file_exists(__DIR__ . '/../.e2e-active');
+    /**
+     * Check if running on the production server (iblhoops.net)
+     *
+     * Any other host (localhost, Docker, CI, etc.) is non-production.
+     */
+    private static function isProduction(): bool
+    {
+        return ($_SERVER['SERVER_NAME'] ?? '') === 'iblhoops.net';
     }
 
     /**
      * Get the guild ID for the current environment
      *
-     * Uses the testing server on localhost, production server otherwise.
+     * Uses the production Discord server on iblhoops.net, testing server otherwise.
      */
     public static function getGuildID(): string
     {
-        $serverName = $_SERVER['SERVER_NAME'] ?? 'localhost';
-        if ($serverName === 'localhost' || $serverName === '127.0.0.1') {
-            return self::IBL_GUILD_ID_TESTING;
-        }
-        return self::IBL_GUILD_ID;
+        return self::isProduction() ? self::IBL_GUILD_ID : self::IBL_GUILD_ID_TESTING;
     }
 
     /**
@@ -143,7 +137,7 @@ class Discord
             return null;
         }
 
-        if (self::isTestEnvironment()) {
+        if (self::isPhpUnit()) {
             return null;
         }
 
@@ -200,7 +194,7 @@ class Discord
             return null;
         }
 
-        if (self::isTestEnvironment()) {
+        if (!self::isProduction()) {
             return null;
         }
 
@@ -272,7 +266,7 @@ class Discord
             return null;
         }
 
-        if (self::isTestEnvironment()) {
+        if (!self::isProduction()) {
             return null;
         }
 
@@ -340,22 +334,17 @@ class Discord
             return;
         }
 
-        if (self::isTestEnvironment()) {
-            return;
-        }
-
         // Ensure config is loaded
         self::loadConfig();
 
         // Map channel names (with #) to config keys (without #)
         $channelKey = ltrim($channelName, '#');
 
-        // Use testing webhook for localhost, otherwise use channel-specific webhook
-        $serverName = $_SERVER['SERVER_NAME'] ?? 'localhost';
-        if ($serverName === "localhost" || $serverName === '127.0.0.1') {
-            $url = self::$webhooks['testing'] ?? null;
-        } else {
+        // Use channel-specific webhook on production, testing webhook everywhere else
+        if (self::isProduction()) {
             $url = self::$webhooks[$channelKey] ?? null;
+        } else {
+            $url = self::$webhooks['testing'] ?? null;
         }
 
         if ($url !== null) {

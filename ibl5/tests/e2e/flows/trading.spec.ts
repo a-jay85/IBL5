@@ -93,7 +93,7 @@ test.describe('Trading flow', () => {
     await expect(page.locator('form[name="Trade_Offer"]')).toBeVisible();
 
     const checkboxes = page.locator('.trading-roster input[type="checkbox"]');
-    expect(await checkboxes.count()).toBeGreaterThan(0);
+    await expect(checkboxes.first()).toBeVisible();
   });
 
   test('trade review page loads', async ({ page }) => {
@@ -148,7 +148,7 @@ test.describe('Trade offer form structure', () => {
     for (let i = 0; i < 2; i++) {
       const card = teamCards.nth(i);
       await expect(card.locator('.team-card__title')).toBeVisible();
-      expect(await card.locator('input[type="number"]').count()).toBeGreaterThan(0);
+      await expect(card.locator('input[type="number"]').first()).toBeVisible();
     }
   });
 
@@ -171,7 +171,7 @@ test.describe('Trade offer form structure', () => {
       'per36mins',
       'contracts',
     ];
-    expect(await tabs.count()).toBe(expectedDisplays.length);
+    await expect(tabs).toHaveCount(expectedDisplays.length);
 
     for (const display of expectedDisplays) {
       await expect(
@@ -346,8 +346,8 @@ test.describe('Trade offer form: roster preview interactions', () => {
     const incomingRows = preview.locator('tr.trade-incoming-row');
     const outgoingRows = preview.locator('tr.trade-outgoing-row');
 
-    expect(await incomingRows.count()).toBeGreaterThan(0);
-    expect(await outgoingRows.count()).toBeGreaterThan(0);
+    await expect(incomingRows.first()).toBeVisible();
+    await expect(outgoingRows.first()).toBeVisible();
   });
 
   test('debounced refresh coalesces rapid changes', async ({ page }) => {
@@ -391,8 +391,8 @@ test.describe('Trade offer form: cap warnings', () => {
     const capWarningLogos = page.locator('.cap-warning-logo');
     const capWarningBanners = page.locator('.cap-warning-banner');
 
-    expect(await capWarningLogos.count()).toBe(0);
-    expect(await capWarningBanners.count()).toBe(0);
+    await expect(capWarningLogos).toHaveCount(0);
+    await expect(capWarningBanners).toHaveCount(0);
   });
 
   test('cap warning classes appear when post-trade cap exceeds hard cap', async ({

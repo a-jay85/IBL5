@@ -34,7 +34,7 @@ test.describe('Transaction History flow', () => {
     const table = page.locator('.txn-table');
     await expect(table).toBeVisible();
     const rows = table.locator('tbody tr');
-    expect(await rows.count()).toBeGreaterThan(0);
+    await expect(rows.first()).toBeVisible();
   });
 
   test('filtering by category shows matching badge spans', async ({
@@ -46,7 +46,7 @@ test.describe('Transaction History flow', () => {
     await expect(page.locator('.txn-table')).toBeVisible();
     // Rows should have category-2 badge spans
     const badges = page.locator('.txn-badge--2');
-    expect(await badges.count()).toBeGreaterThan(0);
+    await expect(badges.first()).toBeVisible();
   });
 
   test('filtering by year reflects selection in dropdown', async ({

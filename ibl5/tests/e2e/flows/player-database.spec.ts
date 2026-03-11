@@ -11,7 +11,7 @@ test.describe('Player Database flow', () => {
     // Under parallel MAMP load, the page may render blank — retry once
     const body = await page.locator('body').innerText();
     if (body.trim().length < 20) {
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded');
       await page.goto('modules.php?name=PlayerDatabase');
     }
   });
@@ -27,7 +27,7 @@ test.describe('Player Database flow', () => {
     // After search, a results table should appear
     await expect(page.locator('table').first()).toBeVisible();
     const rows = page.locator('table tbody tr');
-    expect(await rows.count()).toBeGreaterThan(0);
+    await expect(rows.first()).toBeVisible();
   });
 
   test('filter by position returns results', async ({ page }) => {

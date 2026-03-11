@@ -284,9 +284,14 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
             return ['success' => false, 'message' => 'No champion found for ' . (int) $year . ' — playoffs may be incomplete.'];
         }
 
+        if ($result->playersArchived === 0) {
+            return ['success' => false, 'message' => 'No players archived for ' . (int) $year . '. All players may be missing from ibl_plr.'];
+        }
+
         $message = $result->playersArchived . ' players archived to ibl_hist for ' . (int) $year . '.';
-        if ($result->messages !== []) {
-            $message .= ' ' . implode(' ', $result->messages);
+        $warningCount = count($result->messages);
+        if ($warningCount > 0) {
+            $message .= ' (' . $warningCount . ' warnings)';
         }
 
         return ['success' => true, 'message' => $message];

@@ -205,8 +205,8 @@ class TradingServiceTest extends TestCase
             ->willReturn(1);
         $mockRepo->expects($this->once())->method('getAllTradeOffers')
             ->willReturn([
-                ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
-                ['tradeofferid' => 2, 'itemid' => 200, 'itemtype' => '1', 'from' => 'Heat', 'to' => 'Bulls', 'approval' => 'Bulls', 'created_at' => '', 'updated_at' => ''],
+                ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+                ['tradeofferid' => 2, 'itemid' => 200, 'itemtype' => '1', 'trade_from' => 'Heat', 'trade_to' => 'Bulls', 'approval' => 'Bulls', 'created_at' => '', 'updated_at' => ''],
             ]);
         $mockRepo->method('getPlayerById')
             ->willReturn(['name' => 'Test Player', 'pos' => 'PG']);
@@ -232,8 +232,8 @@ class TradingServiceTest extends TestCase
             ->willReturn(1);
         $mockRepo->expects($this->once())->method('getAllTradeOffers')
             ->willReturn([
-                ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'from' => 'Celtics', 'to' => 'Lakers', 'approval' => 'Lakers', 'created_at' => '', 'updated_at' => ''],
-                ['tradeofferid' => 2, 'itemid' => 200, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Heat', 'approval' => 'Heat', 'created_at' => '', 'updated_at' => ''],
+                ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'trade_from' => 'Celtics', 'trade_to' => 'Lakers', 'approval' => 'Lakers', 'created_at' => '', 'updated_at' => ''],
+                ['tradeofferid' => 2, 'itemid' => 200, 'itemtype' => '1', 'trade_from' => 'Lakers', 'trade_to' => 'Heat', 'approval' => 'Heat', 'created_at' => '', 'updated_at' => ''],
             ]);
         $mockRepo->method('getPlayerById')
             ->willReturn(['name' => 'Test Player', 'pos' => 'PG']);
@@ -285,7 +285,7 @@ class TradingServiceTest extends TestCase
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
         $mockRepo->method('getAllTradeOffers')->willReturn([
-            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockCashRepo->method('getCashTransactionByOffer')->willReturn([
             'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
@@ -312,7 +312,7 @@ class TradingServiceTest extends TestCase
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
         $mockRepo->method('getAllTradeOffers')->willReturn([
-            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockCashRepo->method('getCashTransactionByOffer')->willReturn([
             'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
@@ -338,7 +338,7 @@ class TradingServiceTest extends TestCase
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
         $mockRepo->method('getAllTradeOffers')->willReturn([
-            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockCashRepo->method('getCashTransactionByOffer')->willReturn([
             'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
@@ -378,7 +378,7 @@ class TradingServiceTest extends TestCase
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
         $mockRepo->method('getAllTradeOffers')->willReturn([
-            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockCashRepo->method('getCashTransactionByOffer')->willReturn([
             'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
@@ -402,7 +402,7 @@ class TradingServiceTest extends TestCase
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
         $mockRepo->method('getAllTradeOffers')->willReturn([
-            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockCashRepo->method('getCashTransactionByOffer')->willReturn(null);
         $mockRepo->method('getAllTeamsWithCity')->willReturn([]);
@@ -423,7 +423,7 @@ class TradingServiceTest extends TestCase
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
         $mockRepo->method('getAllTradeOffers')->willReturn([
-            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+            ['tradeofferid' => 1, 'itemid' => 0, 'itemtype' => 'cash', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockCashRepo->method('getCashTransactionByOffer')->willReturn([
             'tradeOfferID' => 1, 'sendingTeam' => 'Lakers', 'receivingTeam' => 'Celtics',
@@ -454,8 +454,8 @@ class TradingServiceTest extends TestCase
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
         $mockRepo->method('getAllTradeOffers')->willReturn([
-            ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
-            ['tradeofferid' => 1, 'itemid' => 200, 'itemtype' => '1', 'from' => 'Celtics', 'to' => 'Lakers', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+            ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+            ['tradeofferid' => 1, 'itemid' => 200, 'itemtype' => '1', 'trade_from' => 'Celtics', 'trade_to' => 'Lakers', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockRepo->method('getPlayerById')
             ->willReturn(['name' => 'Test Player', 'pos' => 'PG']);
@@ -481,7 +481,7 @@ class TradingServiceTest extends TestCase
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
         $mockRepo->method('getAllTradeOffers')->willReturn([
-            ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+            ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockRepo->method('getPlayerById')
             ->willReturn(['name' => 'Test Player', 'pos' => 'PG']);
@@ -509,7 +509,7 @@ class TradingServiceTest extends TestCase
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
         $mockRepo->method('getAllTradeOffers')->willReturn([
-            ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+            ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockRepo->method('getPlayerById')
             ->willReturn(['name' => 'Test Player', 'pos' => 'PG']);
@@ -540,7 +540,7 @@ class TradingServiceTest extends TestCase
         $mockCommon->method('getTeamnameFromUsername')->willReturn('Lakers');
         $mockCommon->method('getTidFromTeamname')->willReturn(1);
         $mockRepo->method('getAllTradeOffers')->willReturn([
-            ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
+            ['tradeofferid' => 1, 'itemid' => 100, 'itemtype' => '1', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics', 'approval' => 'Celtics', 'created_at' => '', 'updated_at' => ''],
         ]);
         $mockRepo->method('getPlayerById')
             ->willReturn(['name' => 'Test Player', 'pos' => 'PG']);

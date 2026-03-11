@@ -44,8 +44,8 @@ interface JsbExportRepositoryInterface
      *     tradeofferid: int,
      *     itemid: int,
      *     itemtype: string,
-     *     from: string,
-     *     to: string,
+     *     trade_from: string,
+     *     trade_to: string,
      *     created_at: string
      * }>
      */

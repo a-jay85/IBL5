@@ -165,7 +165,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
         }
 
         return $this->execute(
-            "INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, `from`, `to`, approval) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to, approval) VALUES (?, ?, ?, ?, ?, ?)",
             $typeString,
             $tradeOfferId,
             $itemId,

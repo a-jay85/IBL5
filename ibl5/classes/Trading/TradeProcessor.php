@@ -80,8 +80,8 @@ class TradeProcessor implements TradeProcessorInterface
             foreach ($tradeRows as $tradeRow) {
                 $itemId = $tradeRow['itemid'];
                 $itemType = $tradeRow['itemtype'];
-                $offeringTeamName = $tradeRow['from'];
-                $listeningTeamName = $tradeRow['to'];
+                $offeringTeamName = $tradeRow['trade_from'];
+                $listeningTeamName = $tradeRow['trade_to'];
 
                 $result = $this->processTradeItem($itemId, $itemType, $offeringTeamName, $listeningTeamName, $offerId);
                 $storytext .= $result['tradeLine'];

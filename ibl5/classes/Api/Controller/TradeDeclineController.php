@@ -48,15 +48,15 @@ class TradeDeclineController implements ControllerInterface
         // Determine the offering team from trade rows
         $offeringTeam = '';
         foreach ($tradeRows as $row) {
-            $from = $row['from'] ?? '';
+            $from = $row['trade_from'] ?? '';
             if ($from !== '' && $from !== $approvalTeam) {
                 $offeringTeam = $from;
                 break;
             }
         }
-        // For self-trades (or localhost where approval='test'), fall back to first row's 'from'
+        // For self-trades (or localhost where approval='test'), fall back to first row's 'trade_from'
         if ($offeringTeam === '') {
-            $offeringTeam = $tradeRows[0]['from'] ?? '';
+            $offeringTeam = $tradeRows[0]['trade_from'] ?? '';
         }
 
         // On localhost, TradingRepository sets approval to 'test' — skip Discord ID verification

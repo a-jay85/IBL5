@@ -66,7 +66,7 @@ class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepo
     {
         $rows = $this->fetchAll(
             'SELECT ti.tradeofferid, ti.itemid, ti.itemtype,
-                    ti.`from`, ti.`to`, ti.created_at
+                    ti.trade_from, ti.trade_to, ti.created_at
              FROM ibl_trade_info ti
              INNER JOIN ibl_trade_offers to2 ON ti.tradeofferid = to2.id
              WHERE ti.approval = ? AND ti.created_at >= ?
@@ -82,8 +82,8 @@ class JsbExportRepository extends \BaseMysqliRepository implements JsbExportRepo
                 'tradeofferid' => is_int($row['tradeofferid']) ? $row['tradeofferid'] : 0,
                 'itemid' => is_int($row['itemid']) ? $row['itemid'] : 0,
                 'itemtype' => is_string($row['itemtype']) ? $row['itemtype'] : '',
-                'from' => is_string($row['from']) ? $row['from'] : '',
-                'to' => is_string($row['to']) ? $row['to'] : '',
+                'trade_from' => is_string($row['trade_from']) ? $row['trade_from'] : '',
+                'trade_to' => is_string($row['trade_to']) ? $row['trade_to'] : '',
                 'created_at' => is_string($row['created_at']) ? $row['created_at'] : '',
             ];
         }

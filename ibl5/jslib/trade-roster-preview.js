@@ -503,11 +503,17 @@
     }
 
     // Session-restored checkboxes or pre-filled cash on page load
-    document.addEventListener('DOMContentLoaded', function () {
+    function initSessionRestored() {
         var checked = getCheckedPids();
         if (checked.user.length > 0 || checked.partner.length > 0 || hasAnyCash()) {
             updateCapWarnings();
             fetchRosterPreview();
         }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSessionRestored);
+    } else {
+        initSessionRestored();
+    }
 })();

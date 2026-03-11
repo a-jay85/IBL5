@@ -118,7 +118,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
             'fallbackBaseUrl' => 'modules.php?name=DepthChartEntry',
         ], JSON_THROW_ON_ERROR);
         echo '<script>window.IBL_AJAX_TABS_CONFIG = ' . $ajaxTabsConfig . ';</script>';
-        echo '<script src="jslib/ajax-tabs.js" defer></script>';
+        echo '<script src="jslib/ajax-tabs.js"></script>';
 
         // NextSim position tables section
         $this->renderNextSimSection($teamID, $team, $season);
@@ -186,7 +186,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
             'params' => ['teamID' => $teamID],
         ], JSON_THROW_ON_ERROR);
         echo '<script>window.IBL_NEXTSIM_TABS_CONFIG = ' . $nextSimTabsConfig . ';</script>';
-        echo '<script src="jslib/nextsim-tabs.js" defer></script>';
+        echo '<script src="jslib/nextsim-tabs.js"></script>';
     }
 
     private function getUserTeamName(string $username): string

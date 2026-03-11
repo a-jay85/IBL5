@@ -51,5 +51,9 @@
 
     window.IBL_refreshUserTeamHighlighter = highlightUserTeam;
 
-    document.addEventListener('DOMContentLoaded', highlightUserTeam);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', highlightUserTeam);
+    } else {
+        highlightUserTeam();
+    }
 })();

@@ -108,8 +108,8 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
             'currentRosterPids' => $currentRosterPids,
         ], JSON_THROW_ON_ERROR);
         echo '<script>window.IBL_DEPTH_CHART_CONFIG = ' . $jsConfig . ';</script>';
-        echo '<script src="jslib/depth-chart-changes.js" defer></script>';
-        echo '<script src="jslib/saved-depth-charts.js" defer></script>';
+        echo '<script src="jslib/depth-chart-changes.js"></script>';
+        echo '<script src="jslib/saved-depth-charts.js"></script>';
 
         // Output JS configuration for AJAX tab switching
         $ajaxTabsConfig = json_encode([

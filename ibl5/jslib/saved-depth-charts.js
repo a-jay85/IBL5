@@ -7,7 +7,7 @@
 (function () {
     'use strict';
 
-    document.addEventListener('DOMContentLoaded', function () {
+    function initSavedDepthCharts() {
         var config = window.IBL_DEPTH_CHART_CONFIG;
         if (!config || !config.teamId || !config.apiBaseUrl) {
             return;
@@ -309,5 +309,11 @@
                 });
         }
 
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSavedDepthCharts);
+    } else {
+        initSavedDepthCharts();
+    }
 })();

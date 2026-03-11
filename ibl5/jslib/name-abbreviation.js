@@ -230,7 +230,11 @@
 
     window.IBL_refreshNameAbbreviations = processAll;
 
-    document.addEventListener('DOMContentLoaded', processAll);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', processAll);
+    } else {
+        processAll();
+    }
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleResize);
 })();

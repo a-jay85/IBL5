@@ -17,4 +17,9 @@ RUN echo '<Directory /var/www/html>\n\
 
 RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
 
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+
 EXPOSE 80
+
+ENTRYPOINT ["entrypoint.sh"]
+CMD ["apache2-foreground"]

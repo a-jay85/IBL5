@@ -28,6 +28,3 @@ BEGIN
   END IF;
 END$$
 DELIMITER ;
-
--- Verify trigger creation
-SELECT 'Trigger ibl_plr_before_insert_uuid created successfully' AS status;

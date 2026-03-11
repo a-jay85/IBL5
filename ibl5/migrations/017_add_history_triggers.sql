@@ -94,7 +94,6 @@ BEGIN
 END$$
 DELIMITER ;
 
-SELECT 'Trigger trg_gm_tenure_track created successfully' AS status;
 
 
 -- ---------------------------------------------------------------------------
@@ -135,7 +134,6 @@ BEGIN
 END$$
 DELIMITER ;
 
-SELECT 'Trigger trg_team_identity_sync created successfully' AS status;
 
 
 -- ---------------------------------------------------------------------------
@@ -172,4 +170,3 @@ BEGIN
 END$$
 DELIMITER ;
 
-SELECT 'Trigger trg_season_rollover created successfully' AS status;

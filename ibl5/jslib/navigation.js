@@ -149,6 +149,15 @@
             }
         });
 
+        // Close mobile menu when a boosted link is tapped
+        // so the user can see the new content loading behind the menu
+        mobileMenu.addEventListener('click', function(e) {
+            var link = e.target.closest('a[hx-boost="true"]');
+            if (link) {
+                closeMenu();
+            }
+        });
+
         // Handle mobile dropdown toggles
         var mobileDropdownBtns = document.querySelectorAll('.mobile-dropdown-btn');
         mobileDropdownBtns.forEach(function(btn) {

@@ -237,14 +237,30 @@ test.describe('Free Agency -- submit and manage offers', () => {
   });
 
   test('offer appears in Contract Offers table on main page', async ({ page }) => {
-    if (customOfferSkipped) {
-      test.skip(true, 'No offer was submitted — skipping verification');
-    }
-    // Previous test left a 2-year offer for pid=11 — verify it shows on main page
+    // Submit a custom offer well under the soft cap (team salary ~2200, cap 5000)
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    const form = offerForm(page);
+    await form.locator('input[name="offeryear1"]').fill('200');
+    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
+    await page.waitForURL(/result=offer_success/);
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+
+    // Verify the offer row appears in the Contract Offers section on the main page
     await page.goto('modules.php?name=FreeAgency');
-    const body = await page.locator('body').textContent() ?? '';
-    // Verify the offered salary value appears in the Contract Offers section
-    expect(body).toContain('200');
+    const offersTable = page.locator('table.fa-table', {
+      has: page.locator('th', { hasText: 'Contract Offers' }),
+    });
+    await expect(
+      offersTable.locator('a[href*="pa=negotiate&pid=11"]'),
+    ).toBeVisible();
+
+    // Cleanup: delete the offer
+    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
+    if (await deleteBtn.count() > 0) {
+      await deleteBtn.click();
+      await page.waitForURL(/result=deleted/);
+    }
   });
 
   test('cleanup 2-year offer', async ({ page }) => {

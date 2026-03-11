@@ -101,7 +101,7 @@ function themeheader()
     echo $navView->render();
 
     echo "<body bgcolor=\"$bgcolor1\" style=\"--page-bg: $bgcolor1;\"" . ($teamId ? " data-user-team-id=\"$teamId\"" : '') . ">";
-    echo "<div class=\"site-content\">\n";
+    echo "<div class=\"site-content\" id=\"site-content\" hx-boost=\"true\" hx-target=\"#site-content\" hx-swap=\"innerHTML show:window:top\" hx-indicator=\"#site-content\">\n";
 }
 
 function themefooter()

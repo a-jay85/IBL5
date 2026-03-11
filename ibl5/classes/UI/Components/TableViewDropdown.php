@@ -59,7 +59,15 @@ class TableViewDropdown
     public function renderDropdown(): string
     {
         $html = '<div class="ibl-view-dropdown" style="--team-tab-bg-color: #' . $this->color1 . '; --team-tab-active-color: #' . $this->color2 . '">';
-        $html .= '<select class="ibl-view-select">';
+        // Inline onchange provides a fallback before ajax-tabs.js loads.
+        // Once ajax-tabs.js initializes, it sets window.IBL_AJAX_TABS_READY
+        // which disables this handler so the AJAX path takes over.
+        $safeBaseUrl = HtmlSanitizer::safeHtmlOutput($this->baseUrl);
+        $onchange = "if(window.IBL_AJAX_TABS_READY)return;"
+            . "var v=this.value,d=v,s='';"
+            . "if(v.indexOf('split:')===0){d='split';s='&amp;split='+v.substring(6)}"
+            . "window.location.href='" . $safeBaseUrl . "&amp;display='+d+s";
+        $html .= '<select class="ibl-view-select" onchange="' . $onchange . '">';
 
         foreach ($this->groups as $groupLabel => $options) {
             $safeGroupLabel = HtmlSanitizer::safeHtmlOutput($groupLabel);

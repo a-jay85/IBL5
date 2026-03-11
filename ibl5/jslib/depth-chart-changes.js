@@ -158,7 +158,7 @@
     // Expose for external callers (saved-depth-charts.js, resetDepthChart)
     window.IBL_recalculateDepthChartGlows = recalculateAll;
 
-    document.addEventListener('DOMContentLoaded', function () {
+    function initDepthChartChanges() {
         var form = document.forms['DepthChartEntry'];
         if (!form) {
             return;
@@ -174,7 +174,13 @@
                 updateGlow(this);
             });
         }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDepthChartChanges);
+    } else {
+        initDepthChartChanges();
+    }
 
     // Recalculate glows on every pageshow (fires after DOMContentLoaded).
     // Covers two back-button scenarios:

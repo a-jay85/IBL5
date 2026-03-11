@@ -49,7 +49,7 @@ public function getPlayer(int $playerId): ?Player
 Use `$mysqli_db` (modern MySQLi) over legacy `$db`.
 
 ### 4. Schema Verification
-**Always verify table/column names in `ibl5/schema.sql`** before writing queries. Never assume structures exist.
+**Always verify table/column names in `ibl5/migrations/000_baseline_schema.sql`** (and subsequent migrations) before writing queries. Never assume structures exist.
 
 ### 5. Statistics Formatting
 Use `BasketballStats\StatsFormatter` for ALL stats formatting (never `number_format()` directly).
@@ -67,7 +67,7 @@ After refactoring, compare localhost against iblhoops.net. Output must match exa
 | Task | Command |
 |------|---------|
 | Run tests | `cd ibl5 && vendor/bin/phpunit` |
-| Schema | `ibl5/schema.sql` |
+| Schema | `ibl5/migrations/000_baseline_schema.sql` |
 | Stats formatting | `BasketballStats\StatsFormatter` |
 | Skills guide | `.github/SKILLS_GUIDE.md` |
 

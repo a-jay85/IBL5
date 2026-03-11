@@ -403,7 +403,7 @@
 | Action | Command/Location |
 |--------|------------------|
 | Run tests | `cd ibl5 && vendor/bin/phpunit tests/` |
-| Schema reference | `ibl5/schema.sql` |
+| Schema reference | `ibl5/migrations/000_baseline_schema.sql` |
 | CI/CD | `.github/workflows/tests.yml` |
 | Interface examples | `classes/Player/Contracts/`, `classes/FreeAgency/Contracts/` |
 | Stats formatting | `BasketballStats\StatsFormatter` |

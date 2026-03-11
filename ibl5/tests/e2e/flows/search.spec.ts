@@ -135,7 +135,7 @@ test.describe('Search flow', () => {
 
     // Should have results on the offset page
     const results = page.locator('.search-result');
-    expect(await results.count()).toBeGreaterThan(0);
+    await expect(results.first()).toBeVisible();
   });
 
   test('no PHP errors on form page', async ({ page }) => {

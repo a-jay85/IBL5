@@ -49,7 +49,7 @@ test.describe('Record Holders flow', () => {
 
   test('player record rows contain player links', async ({ page }) => {
     const playerLinks = page.locator('.record-section a[href*="pid="]');
-    expect(await playerLinks.count()).toBeGreaterThan(0);
+    await expect(playerLinks.first()).toBeVisible();
   });
 
   test('team record rows contain team-colored cells', async ({ page }) => {

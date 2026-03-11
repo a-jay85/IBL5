@@ -24,7 +24,7 @@ test.describe('Depth Chart change detection', () => {
     const glowCells = page.locator(
       '[class*="dc-glow-"]',
     );
-    expect(await glowCells.count()).toBe(0);
+    await expect(glowCells).toHaveCount(0);
   });
 
   test('changing a position select triggers glow on the cell', async ({
@@ -56,7 +56,7 @@ test.describe('Depth Chart change detection', () => {
 
     // The parent cell or row should now have a glow class
     const glowCells = page.locator('[class*="dc-glow-"]');
-    expect(await glowCells.count()).toBeGreaterThan(0);
+    await expect(glowCells.first()).toBeVisible();
   });
 
   test('reverting a select to original value removes glow', async ({
@@ -86,16 +86,13 @@ test.describe('Depth Chart change detection', () => {
 
     // Change to different value
     await firstSelect.selectOption(differentValue);
-    expect(await page.locator('[class*="dc-glow-"]').count()).toBeGreaterThan(0);
+    await expect(page.locator('[class*="dc-glow-"]').first()).toBeVisible();
 
     // Revert to original value
     await firstSelect.selectOption(originalValue);
 
-    // Glow should be removed (or at least reduced)
-    // Allow a brief moment for JS to update
-    await page.waitForTimeout(100);
-    const glowCount = await page.locator('[class*="dc-glow-"]').count();
-    expect(glowCount).toBe(0);
+    // Glow should be removed (auto-retries until JS updates DOM)
+    await expect(page.locator('[class*="dc-glow-"]')).toHaveCount(0);
   });
 
   test('multiple changes increase glow intensity', async ({ page }) => {
@@ -122,14 +119,14 @@ test.describe('Depth Chart change detection', () => {
 
     // Multiple glowing cells should exist
     const glowCells = page.locator('[class*="dc-glow-"]');
-    expect(await glowCells.count()).toBeGreaterThan(0);
+    await expect(glowCells.first()).toBeVisible();
   });
 
   test('saved DC dropdown present and has options', async ({ page }) => {
     const dropdown = page.locator('#saved-dc-select');
     await expect(dropdown).toBeVisible();
     const options = dropdown.locator('option');
-    expect(await options.count()).toBeGreaterThanOrEqual(1);
+    await expect(options.first()).toBeAttached();
   });
 
   test('saved DC load triggers AJAX and updates positions', async ({
@@ -157,10 +154,8 @@ test.describe('Depth Chart change detection', () => {
     if (savedValue) {
       await dropdown.selectOption(savedValue);
 
-      // Wait briefly for AJAX handling
-      await page.waitForTimeout(500);
-
-      // Page should still be functional (no errors)
+      // Wait for AJAX to complete, then verify no errors
+      await page.waitForLoadState('networkidle');
       await assertNoPhpErrors(page);
     }
   });

@@ -44,6 +44,14 @@ jobs:
       - name: Pull latest code on server
         run: ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} "cd www && git pull origin"
 
+      - name: Install PHP dependencies
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '
+            set -e
+            cd www/ibl5
+            composer install --no-dev --no-interaction --optimize-autoloader
+          '
+
       - name: Run database migrations
         run: |
           ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} '

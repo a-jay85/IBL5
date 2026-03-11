@@ -6,7 +6,6 @@ namespace Tests\HistArchiver;
 
 use HistArchiver\Contracts\HistArchiverServiceInterface;
 use HistArchiver\HistArchiveResult;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\ArchiveSeasonHistStep;

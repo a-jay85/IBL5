@@ -237,6 +237,9 @@
         <testsuite name="Updater Module Tests">
             <directory>tests/Updater</directory>
         </testsuite>
+        <testsuite name="HistArchiver Module Tests">
+            <directory>tests/HistArchiver</directory>
+        </testsuite>
         <testsuite name="Bootstrap Module Tests">
             <directory>tests/Bootstrap</directory>
         </testsuite>

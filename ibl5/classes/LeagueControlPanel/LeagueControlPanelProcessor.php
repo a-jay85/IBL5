@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LeagueControlPanel;
 
+use HistArchiver\Contracts\HistArchiverServiceInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelProcessorInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use Discord\Discord;
@@ -29,10 +30,14 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
     private const SIM_LENGTH_MAX = 180;
 
     private LeagueControlPanelRepositoryInterface $repository;
+    private ?HistArchiverServiceInterface $histArchiver;
 
-    public function __construct(LeagueControlPanelRepositoryInterface $repository)
-    {
+    public function __construct(
+        LeagueControlPanelRepositoryInterface $repository,
+        ?HistArchiverServiceInterface $histArchiver = null,
+    ) {
         $this->repository = $repository;
+        $this->histArchiver = $histArchiver;
     }
 
     /**
@@ -55,6 +60,8 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
             'reset_eoy_voting' => $this->resetEoyVoting(),
             'set_waivers_to_free_agents' => $this->setWaiversToFreeAgents(),
             'set_fa_factors_pfw' => $this->setFaFactorsPfw($postData),
+            'archive_season_hist' => $this->archiveSeasonHist($postData),
+            'validate_plr_accuracy' => $this->validatePlrAccuracy($postData),
             default => ['success' => false, 'message' => 'Unknown action: ' . $action],
         };
     }
@@ -254,5 +261,62 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
         $this->repository->setFreeAgencyFactorsForPfw();
 
         return ['success' => true, 'message' => "The columns that affect each team's Play For Winner demand factor have been updated."];
+    }
+
+    /**
+     * @param array<string, mixed> $postData
+     * @return array{success: bool, message: string}
+     */
+    private function archiveSeasonHist(array $postData): array
+    {
+        if ($this->histArchiver === null) {
+            return ['success' => false, 'message' => 'HistArchiver service not configured.'];
+        }
+
+        $year = $postData['season_year'] ?? null;
+        if (!is_string($year) || !ctype_digit($year)) {
+            return ['success' => false, 'message' => 'Invalid season year.'];
+        }
+
+        $result = $this->histArchiver->archiveSeason((int) $year);
+
+        if ($result->skippedNoChampion) {
+            return ['success' => false, 'message' => 'No champion found for ' . (int) $year . ' — playoffs may be incomplete.'];
+        }
+
+        $message = $result->playersArchived . ' players archived to ibl_hist for ' . (int) $year . '.';
+        if ($result->messages !== []) {
+            $message .= ' ' . implode(' ', $result->messages);
+        }
+
+        return ['success' => true, 'message' => $message];
+    }
+
+    /**
+     * @param array<string, mixed> $postData
+     * @return array{success: bool, message: string}
+     */
+    private function validatePlrAccuracy(array $postData): array
+    {
+        if ($this->histArchiver === null) {
+            return ['success' => false, 'message' => 'HistArchiver service not configured.'];
+        }
+
+        $year = $postData['season_year'] ?? null;
+        if (!is_string($year) || !ctype_digit($year)) {
+            return ['success' => false, 'message' => 'Invalid season year.'];
+        }
+
+        $report = $this->histArchiver->validatePlrVsBoxScores((int) $year);
+
+        if ($report->getDiscrepancyCount() === 0) {
+            return ['success' => true, 'message' => 'All ' . $report->totalPlayers . ' players match between ibl_hist and box scores for ' . (int) $year . '.'];
+        }
+
+        $message = $report->getDiscrepancyCount() . ' discrepancies found across '
+            . ($report->totalPlayers - $report->matchCount) . ' players for ' . (int) $year
+            . ' (' . $report->matchCount . '/' . $report->totalPlayers . ' match).';
+
+        return ['success' => false, 'message' => $message];
     }
 }

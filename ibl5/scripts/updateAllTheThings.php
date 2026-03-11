@@ -198,6 +198,13 @@ try {
 
     $updaterService->addStep(new Updater\Steps\ParseJsbFilesStep($jsbService, $basePath, $season, $filePrefix));
 
+    // IBL-only: archive season stats to ibl_hist when champion is crowned
+    if (!$isOlympics) {
+        $histArchiverRepo = new HistArchiver\HistArchiverRepository($mysqli_db, $leagueContext);
+        $histArchiverService = new HistArchiver\HistArchiverService($histArchiverRepo);
+        $updaterService->addStep(new Updater\Steps\ArchiveSeasonHistStep($histArchiverService, $season->endingYear));
+    }
+
     $controller = new Updater\UpdaterController($updaterService, $view);
     $controller->run();
 

@@ -283,7 +283,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
             $output .= '<tr>';
             $output .= '<td class="player-cell"><a href="' . $playerPageUrl . '"><img src="images/player/' . $pid . '.jpg" alt="' . $safeName . '" width="65" height="90" loading="lazy"></a>';
             $output .= '<a href="' . $playerPageUrl . '">' . $safeName . '</a></td>';
-            $output .= '<td><a href="../online/team.php?tid=' . $teamTid . '&amp;yr=' . $teamYr . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
+            $output .= '<td><a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamTid . '&amp;yr=' . $teamYr . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
             $output .= '<td>' . $seasonLink . '</td>';
             $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
             $output .= '</tr>';
@@ -424,7 +424,7 @@ class RecordHoldersView implements RecordHoldersViewInterface
             foreach ($teams as $i => $team) {
                 $safeTid = (int) ($teamTids[$i] ?? 0);
                 $safeTeam = HtmlSanitizer::safeHtmlOutput($team);
-                $teamLogos .= '<a href="../online/team.php?tid=' . $safeTid . '">'
+                $teamLogos .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $safeTid . '">'
                     . '<img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '">'
                     . '</a> ';
             }
@@ -538,9 +538,9 @@ class RecordHoldersView implements RecordHoldersViewInterface
         $output = '<tr>';
         $output .= '<td class="player-cell"><a href="' . $playerPageUrl . '"><img src="images/player/' . $pid . '.jpg" alt="' . $safeName . '" width="65" height="90" loading="lazy"></a>';
         $output .= '<a href="' . $playerPageUrl . '">' . $safeName . '</a></td>';
-        $output .= '<td><a href="../online/team.php?tid=' . $teamTid . '&amp;yr=' . $teamYr . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
+        $output .= '<td><a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamTid . '&amp;yr=' . $teamYr . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
         $output .= '<td>' . $dateCell . '</td>';
-        $output .= '<td><a href="../online/team.php?tid=' . $oppTid . '&amp;yr=' . $oppYr . '"><img src="images/topics/' . $safeOppTeam . '.png" alt="' . strtoupper($safeOppTeam) . '"></a></td>';
+        $output .= '<td><a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $oppTid . '&amp;yr=' . $oppYr . '"><img src="images/topics/' . $safeOppTeam . '.png" alt="' . strtoupper($safeOppTeam) . '"></a></td>';
         $output .= '<td class="ibl-stat-highlight">' . $amount . '</td>';
         $output .= '</tr>';
 

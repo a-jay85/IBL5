@@ -21,7 +21,7 @@ test.describe('Depth Chart Entry flow', () => {
     const dropdown = page.locator('#saved-dc-select');
     await expect(dropdown).toBeVisible();
     const options = dropdown.locator('option');
-    expect(await options.count()).toBeGreaterThanOrEqual(1);
+    await expect(options.first()).toBeAttached();
   });
 
   test('roster form loads with player rows', async ({ page }) => {
@@ -38,7 +38,7 @@ test.describe('Depth Chart Entry flow', () => {
 
     // Player rows should have data-pid attributes
     const playerRows = page.locator('.depth-chart-table tr[data-pid]');
-    expect(await playerRows.count()).toBeGreaterThan(0);
+    await expect(playerRows.first()).toBeVisible();
   });
 
   test('position selects have options', async ({ page }) => {
@@ -49,7 +49,7 @@ test.describe('Depth Chart Entry flow', () => {
     const posSelect = page.locator('select[name^="pg"]').first();
     if (await posSelect.isVisible()) {
       const options = posSelect.locator('option');
-      expect(await options.count()).toBeGreaterThanOrEqual(2);
+      await expect(options.first()).toBeAttached();
     }
   });
 

@@ -15,6 +15,14 @@ MYSQL="mariadb"
 MYSQL_ARGS="-h 127.0.0.1 --skip-ssl -u root -proot"
 DB_NAME="ibl5_e2e_test"
 
+# Pre-flight: ensure vendor/ exists (auto-install if missing)
+if [[ ! -f "$IBL5_DIR/vendor/autoload.php" ]]; then
+    echo "==> vendor/autoload.php missing — running composer install..."
+    (cd "$IBL5_DIR" && composer install --no-interaction --no-progress)
+    # Restart PHP container so it picks up the new vendor/
+    (cd "$IBL5_DIR/.." && docker compose restart php)
+fi
+
 # Pre-flight: verify Docker Apache is running
 if ! curl -sf "http://main.localhost/ibl5/" > /dev/null 2>&1; then
     echo "ERROR: Docker Apache is not responding at http://main.localhost/ibl5/"

@@ -23,6 +23,6 @@ IFS=$'\n' numbered=($(printf '%s\n' "${numbered[@]}" | sort))
 echo "Applying ${#numbered[@]} migrations..."
 for f in "${numbered[@]}"; do
     echo "  -> $(basename "$f")"
-    sed 's/DEFINER=`[^`]*`@`[^`]*`//g' "$f" | mysql "$@"
+    sed 's/DEFINER=`[^`]*`@`[^`]*`//g' "$f" | mysql "$@" 2> >(grep -v 'Using a password' >&2)
 done
 echo "Done."

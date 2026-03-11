@@ -86,15 +86,13 @@ inject_config_guard
 echo "==> Creating database $DB_NAME..."
 $MYSQL $MYSQL_ARGS -e "DROP DATABASE IF EXISTS $DB_NAME; CREATE DATABASE $DB_NAME;"
 
-echo "==> Importing schema.sql..."
-# Strip DEFINER clauses (schema.sql references production user)
-sed 's/DEFINER=`[^`]*`@`[^`]*`//g' \
-    "$IBL5_DIR/schema.sql" \
-    | $MYSQL $MYSQL_ARGS "$DB_NAME"
-
-# Migrations are skipped: schema.sql is auto-synced from production after each
-# migration run, so it already contains all migration changes. CI runs migrations
-# because its schema.sql may lag behind, but locally we always have the latest.
+echo "==> Applying migrations (000 = baseline schema, then alterations)..."
+for f in "$IBL5_DIR"/migrations/*.sql; do
+    base=$(basename "$f")
+    [[ "$base" =~ ^[0-9]{1,3}[a-z]?_ ]] || continue
+    echo "  -> $base"
+    sed 's/DEFINER=`[^`]*`@`[^`]*`//g' "$f" | $MYSQL $MYSQL_ARGS "$DB_NAME"
+done
 
 echo "==> Importing ci-seed.sql..."
 $MYSQL $MYSQL_ARGS "$DB_NAME" < "$IBL5_DIR/tests/e2e/fixtures/ci-seed.sql"

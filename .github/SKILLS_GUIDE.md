@@ -105,7 +105,7 @@ Content only loads when working with matching files...
 | `**/*.php` | All PHP files |
 | `ibl5/tests/**/*.php` | Test files only |
 | `**/*View.php` | View class files |
-| `ibl5/schema.sql` | Specific file |
+| `ibl5/migrations/**` | Migration files |
 | `{src,lib}/**/*.ts` | Multiple directories |
 
 ### 4. Unconditional Rules
@@ -208,4 +208,4 @@ Example prompts:
 | `php-classes.md` | `ibl5/classes/**/*.php` | Working in classes |
 | `phpunit-tests.md` | `ibl5/tests/**/*.php` | Working on tests |
 | `view-rendering.md` | `**/*View.php` | Working on View files |
-| `schema-reference.md` | `ibl5/schema.sql` | Viewing schema |
+| `schema-reference.md` | `ibl5/migrations/**` | Viewing schema/migrations |

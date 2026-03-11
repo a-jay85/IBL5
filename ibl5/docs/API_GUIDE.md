@@ -213,7 +213,7 @@ Link: <.../players?page=2>; rel="next"
 
 ### Prerequisites
 
-1. Review the database schema: `ibl5/schema.sql`
+1. Review the database schema: `ibl5/migrations/000_baseline_schema.sql`
 2. Understand the existing database views (already created)
 3. Familiarize yourself with UUID implementation
 
@@ -333,7 +333,7 @@ curl -H "If-None-Match: \"etag-value\"" \
 - [DATABASE_GUIDE.md](DATABASE_GUIDE.md) - Schema reference and query patterns
 - [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) - Coding standards and security
 - [REFACTORING_HISTORY.md](ibl5/docs/REFACTORING_HISTORY.md) - Complete refactoring timeline
-- `ibl5/schema.sql` - Complete database schema with views
+- `ibl5/migrations/000_baseline_schema.sql` - Baseline database schema with views
 - `ibl5/migrations/` - Database migration history
 
 ## Notes

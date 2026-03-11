@@ -1,11 +1,15 @@
 /**
  * IBL5 Navigation - Premium Mobile Menu
  * Handles hamburger animation and staggered menu reveals
+ *
+ * Runs immediately when DOM is ready, or defers if still loading.
+ * Does not rely on DOMContentLoaded alone, so it works reliably
+ * even when loaded dynamically or with cached scripts.
  */
 (function() {
     'use strict';
 
-    document.addEventListener('DOMContentLoaded', function() {
+    function initNavigation() {
         var hamburger = document.getElementById('nav-hamburger');
         var mobileMenu = document.getElementById('nav-mobile-menu');
         var menuOverlay = document.getElementById('nav-overlay');
@@ -188,10 +192,11 @@
                 }
             });
         });
-    });
+    }
 
-    // Desktop/Mobile view toggle
-    (function() {
+    // Desktop/Mobile view toggle — runs immediately (no DOM dependency
+    // beyond the toggle buttons which are parsed before this script).
+    function initViewToggle() {
         var desktopToggle = document.getElementById('desktop-view-toggle');
         var mobileToggle = document.getElementById('mobile-view-toggle');
 
@@ -216,5 +221,19 @@
         if (mobileToggle) {
             mobileToggle.addEventListener('click', enableMobileView);
         }
-    })();
+    }
+
+    // Run immediately if DOM is ready, otherwise wait.
+    // defer scripts run when readyState is 'interactive' (after parsing),
+    // so the 'else' branch is typically taken. The 'loading' check is a
+    // safety net for edge cases (e.g., slow script load, browser quirks).
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            initNavigation();
+            initViewToggle();
+        });
+    } else {
+        initNavigation();
+        initViewToggle();
+    }
 })();

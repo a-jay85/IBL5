@@ -195,9 +195,6 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
 }
 </script>';
 
-        // Navigation JavaScript for mobile menu toggle
-        echo '<script src="jslib/navigation.js" defer></script>';
-
         // FOUT prevention inline styles
         echo '<style>
 /* FOUT Prevention - Hide body until fonts are loaded */

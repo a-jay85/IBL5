@@ -22,6 +22,26 @@ class Discord
     private static bool $configLoaded = false;
 
     /**
+     * Check if running in a test environment (PHPUnit or E2E)
+     *
+     * Detects PHPUnit via constants, E2E via env var or .e2e-active sentinel file.
+     */
+    private static function isTestEnvironment(): bool
+    {
+        if (defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL)) {
+            return true;
+        }
+
+        if (getenv('E2E_TESTING') === '1') {
+            return true;
+        }
+
+        // e2e-local.sh creates .e2e-active next to config.php to switch to the test DB.
+        // Check for it here so Discord calls are also suppressed in that environment.
+        return file_exists(__DIR__ . '/../.e2e-active');
+    }
+
+    /**
      * Get the guild ID for the current environment
      *
      * Uses the testing server on localhost, production server otherwise.
@@ -123,8 +143,7 @@ class Discord
             return null;
         }
 
-        // Skip actual HTTP calls during PHPUnit testing
-        if (defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL)) {
+        if (self::isTestEnvironment()) {
             return null;
         }
 
@@ -181,8 +200,7 @@ class Discord
             return null;
         }
 
-        // Skip actual HTTP calls during PHPUnit testing
-        if (defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL)) {
+        if (self::isTestEnvironment()) {
             return null;
         }
 
@@ -254,8 +272,7 @@ class Discord
             return null;
         }
 
-        // Skip actual HTTP calls during PHPUnit testing
-        if (defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL)) {
+        if (self::isTestEnvironment()) {
             return null;
         }
 
@@ -323,8 +340,7 @@ class Discord
             return;
         }
 
-        // Skip Discord posting during PHPUnit testing
-        if (defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL)) {
+        if (self::isTestEnvironment()) {
             return;
         }
 

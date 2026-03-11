@@ -104,6 +104,7 @@ class TeamController implements TeamControllerInterface
         } catch (\RuntimeException $e) {
             echo '<div class="ibl-alert ibl-alert--error">Team not found.</div>';
             \PageLayout\PageLayout::footer();
+            return;
         }
 
         echo $this->view->render($pageData);
@@ -119,7 +120,7 @@ class TeamController implements TeamControllerInterface
             'fallbackBaseUrl' => 'modules.php?name=Team&op=team&teamID=' . $teamID,
         ], JSON_THROW_ON_ERROR);
         echo '<script>window.IBL_AJAX_TABS_CONFIG = ' . $jsConfig . ';</script>';
-        echo '<script src="jslib/ajax-tabs.js" defer></script>';
+        echo '<script src="jslib/ajax-tabs.js"></script>';
 
         \PageLayout\PageLayout::footer();
     }

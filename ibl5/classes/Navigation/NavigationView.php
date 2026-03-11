@@ -95,6 +95,7 @@ class NavigationView
         </nav>
 
         <?= $this->mobileNavView->render($menus, $myTeamMenu, $accountMenu) ?>
+        <script src="jslib/navigation.js"></script>
         <?php
         return (string) ob_get_clean();
     }

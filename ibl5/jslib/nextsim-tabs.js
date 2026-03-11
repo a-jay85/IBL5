@@ -6,6 +6,9 @@
  * the new position table via the nextsim-api endpoint and swaps
  * the container's innerHTML.
  *
+ * Runs immediately (DOM elements exist above this script) so it works
+ * both on initial page load and after HTMX content swaps.
+ *
  * Progressive enhancement: falls back to NextSim module page without JS.
  *
  * Reads config from window.IBL_NEXTSIM_TABS_CONFIG:
@@ -17,76 +20,82 @@
 (function () {
     'use strict';
 
-    document.addEventListener('DOMContentLoaded', function () {
-        var config = window.IBL_NEXTSIM_TABS_CONFIG;
-        if (!config || !config.apiBaseUrl || !config.params) {
+    var config = window.IBL_NEXTSIM_TABS_CONFIG;
+    if (!config || !config.apiBaseUrl || !config.params) {
+        return;
+    }
+
+    var container = document.querySelector('.nextsim-tab-container');
+    if (!container) {
+        return;
+    }
+
+    var currentController = null;
+
+    container.addEventListener('click', function (e) {
+        var tab = e.target.closest('.ibl-tab');
+        if (!tab) {
             return;
         }
 
-        var container = document.querySelector('.nextsim-tab-container');
-        if (!container) {
+        var position = tab.getAttribute('data-display');
+        if (!position) {
             return;
         }
 
-        var isLoading = false;
+        e.preventDefault();
 
-        container.addEventListener('click', function (e) {
-            var tab = e.target.closest('.ibl-tab');
-            if (!tab) {
-                return;
-            }
+        // Optimistic UI: update active tab immediately
+        var tabs = container.querySelectorAll('.ibl-tab');
+        for (var i = 0; i < tabs.length; i++) {
+            tabs[i].classList.remove('ibl-tab--active');
+        }
+        tab.classList.add('ibl-tab--active');
 
-            var position = tab.getAttribute('data-display');
-            if (!position) {
-                return;
-            }
+        // Abort any in-flight request so the new selection takes priority
+        if (currentController) {
+            currentController.abort();
+        }
+        currentController = new AbortController();
 
-            e.preventDefault();
+        container.classList.add('ajax-loading');
 
-            if (isLoading) {
-                return;
-            }
+        var url = config.apiBaseUrl
+            + '&position=' + encodeURIComponent(position)
+            + '&teamID=' + encodeURIComponent(config.params.teamID);
 
-            // Optimistic UI: update active tab immediately
-            var tabs = container.querySelectorAll('.ibl-tab');
-            for (var i = 0; i < tabs.length; i++) {
-                tabs[i].classList.remove('ibl-tab--active');
-            }
-            tab.classList.add('ibl-tab--active');
+        fetch(url, { signal: currentController.signal })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Failed to fetch NextSim tab content');
+                }
+                return response.json();
+            })
+            .then(function (data) {
+                currentController = null;
+                container.classList.remove('ajax-loading');
+                if (data.html) {
+                    container.innerHTML = data.html;
 
-            isLoading = true;
-
-            var url = config.apiBaseUrl
-                + '&position=' + encodeURIComponent(position)
-                + '&teamID=' + encodeURIComponent(config.params.teamID);
-
-            fetch(url)
-                .then(function (response) {
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch NextSim tab content');
+                    // Re-initialize column highlights on the new table
+                    if (typeof window.IBL_initNextSimHighlight === 'function') {
+                        window.IBL_initNextSimHighlight(container);
                     }
-                    return response.json();
-                })
-                .then(function (data) {
-                    isLoading = false;
-                    if (data.html) {
-                        container.innerHTML = data.html;
 
-                        // Re-initialize column highlights on the new table
-                        if (typeof window.IBL_initNextSimHighlight === 'function') {
-                            window.IBL_initNextSimHighlight(container);
-                        }
-
-                        // Re-run responsive table logic to re-measure
-                        if (typeof window.IBL_refreshResponsiveTables === 'function') {
-                            window.IBL_refreshResponsiveTables();
-                        }
+                    // Re-run responsive table logic to re-measure
+                    if (typeof window.IBL_refreshResponsiveTables === 'function') {
+                        window.IBL_refreshResponsiveTables();
                     }
-                })
-                .catch(function (err) {
-                    isLoading = false;
-                    console.error('Error fetching NextSim tab:', err);
-                });
-        });
+                }
+            })
+            .catch(function (err) {
+                // Ignore aborted requests — a newer request superseded this one
+                if (err.name === 'AbortError') {
+                    return;
+                }
+                currentController = null;
+                container.classList.remove('ajax-loading');
+                console.error('Error fetching NextSim tab:', err);
+            });
     });
 })();

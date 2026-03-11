@@ -150,7 +150,7 @@ $tradeConfig = [
 ];
 ?>
 <script>window.IBL_TRADE_CONFIG = <?= json_encode($tradeConfig, JSON_HEX_TAG | JSON_THROW_ON_ERROR) ?>;</script>
-<script src="jslib/trade-roster-preview.js" defer></script>
+<script src="jslib/trade-roster-preview.js"></script>
 </form>
         <?php
         return (string) ob_get_clean();

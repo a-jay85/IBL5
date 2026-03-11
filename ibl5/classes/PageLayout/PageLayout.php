@@ -10,6 +10,13 @@ class PageLayout
 {
     public static function header(): void
     {
+        // Populate $cookie/$user globals for all request types.
+        // online() does this for full page loads, but boosted requests
+        // skip online() — modules still need $cookie for team lookups.
+        /** @var string $user */
+        global $user;
+        cookiedecode($user);
+
         if (HtmxHelper::isBoostedRequest()) {
             self::renderBoostedHeader();
             return;

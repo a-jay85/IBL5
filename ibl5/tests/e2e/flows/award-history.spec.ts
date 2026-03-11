@@ -22,7 +22,7 @@ test.describe('Award History flow', () => {
     page,
   }) => {
     const radioButtons = page.locator('input[name="aw_sortby"]');
-    expect(await radioButtons.count()).toBeGreaterThanOrEqual(2);
+    await expect(radioButtons.first()).toBeVisible();
 
     // Sort by year should be checked by default
     const yearRadio = page.locator('input[name="aw_sortby"][value="year"]');
@@ -38,7 +38,7 @@ test.describe('Award History flow', () => {
     const table = page.locator('.ibl-data-table.sortable');
     await expect(table.first()).toBeVisible();
     const rows = table.first().locator('tbody tr');
-    expect(await rows.count()).toBeGreaterThan(0);
+    await expect(rows.first()).toBeVisible();
   });
 
   test('searching by partial name returns results', async ({ page }) => {
@@ -48,7 +48,7 @@ test.describe('Award History flow', () => {
     const table = page.locator('.ibl-data-table');
     await expect(table.first()).toBeVisible();
     const rows = table.first().locator('tbody tr');
-    expect(await rows.count()).toBeGreaterThan(0);
+    await expect(rows.first()).toBeVisible();
   });
 
   test('searching by award name returns matching rows', async ({ page }) => {
@@ -83,7 +83,7 @@ test.describe('Award History flow', () => {
     await expect(table.first()).toBeVisible();
 
     const playerLinks = table.first().locator('td a[href*="pid="]');
-    expect(await playerLinks.count()).toBeGreaterThan(0);
+    await expect(playerLinks.first()).toBeVisible();
   });
 
   test('table has expected headers', async ({ page }) => {

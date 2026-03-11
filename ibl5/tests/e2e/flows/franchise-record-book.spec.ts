@@ -32,7 +32,7 @@ test.describe('Franchise Record Book flow', () => {
     await expect(grid.first()).toBeVisible();
 
     const tables = page.locator('.stat-table');
-    expect(await tables.count()).toBeGreaterThan(0);
+    await expect(tables.first()).toBeVisible();
   });
 
   test('selecting a team navigates to team view', async ({ page }) => {
@@ -86,7 +86,7 @@ test.describe('Franchise Record Book flow', () => {
 
     // Should load without errors and show stat tables
     const tables = page.locator('.stat-table');
-    expect(await tables.count()).toBeGreaterThan(0);
+    await expect(tables.first()).toBeVisible();
   });
 
   test('no PHP errors on league-wide view', async ({ page }) => {

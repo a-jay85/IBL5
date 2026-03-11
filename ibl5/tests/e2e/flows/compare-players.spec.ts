@@ -32,7 +32,7 @@ test.describe('Compare Players flow', () => {
 
   test('player datalist is populated', async ({ page }) => {
     const datalist = page.locator('datalist#player-names option');
-    expect(await datalist.count()).toBeGreaterThan(0);
+    await expect(datalist.first()).toBeAttached();
   });
 
   test('form has submit button with Compare text', async ({ page }) => {
@@ -72,7 +72,7 @@ test.describe('Compare Players flow', () => {
 
     for (let i = 0; i < Math.min(tableCount, 3); i++) {
       const rows = tables.nth(i).locator('tbody tr');
-      expect(await rows.count()).toBe(2);
+      await expect(rows).toHaveCount(2);
     }
   });
 

@@ -185,12 +185,17 @@ A dedicated "no PHP errors" test (like in `public-pages.spec.ts`) is preferred �
 
 ## Assertion Patterns
 
+**Prefer web-first assertions** — they auto-retry until the condition is met or timeout is reached. Manual `expect(await loc.count())` does NOT retry and causes flaky tests when elements haven't rendered yet.
+
 ```typescript
 // Page loads with expected title
 await expect(page).toHaveTitle(/IBL/i);
 
-// Element is visible
+// Element is visible (auto-retries)
 await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+
+// Element exists in DOM but isn't visible (<option>, <datalist>, hidden inputs)
+await expect(page.locator('select option').first()).toBeAttached();
 
 // Element contains text
 await expect(page.locator('.ibl-title')).toContainText(/standings/i);
@@ -198,14 +203,34 @@ await expect(page.locator('.ibl-title')).toContainText(/standings/i);
 // Element is NOT visible (e.g., login prompt when authenticated)
 await expect(page.getByText('Sign In')).not.toBeVisible();
 
-// Element count
+// Exact element count (auto-retries)
 await expect(page.locator('.trading-roster')).toHaveCount(2);
 
-// Count is at least N
-expect(await page.locator('input[type="checkbox"]').count()).toBeGreaterThan(0);
+// At least one element exists (auto-retries) — use instead of manual count > 0
+await expect(page.locator('input[type="checkbox"]').first()).toBeVisible();
+
+// At least N elements (no web-first equivalent — manual count is OK here)
+expect(await page.locator('option').count()).toBeGreaterThanOrEqual(28);
 
 // No PHP errors in page body
 expect(body, `PHP error on ${url}`).not.toContain('Fatal error');
+```
+
+**Anti-patterns to avoid:**
+```typescript
+// ❌ No auto-retry — flaky in slow CI
+expect(await loc.count()).toBeGreaterThan(0);
+expect(await loc.count()).toBe(1);
+
+// ✅ Auto-retries until timeout
+await expect(loc.first()).toBeVisible();
+await expect(loc).toHaveCount(1);
+
+// ❌ <option> elements are never "visible"
+await expect(selectLocator.locator('option').first()).toBeVisible();
+
+// ✅ Use toBeAttached() for DOM-only elements
+await expect(selectLocator.locator('option').first()).toBeAttached();
 ```
 
 ## State Control for Season-Phase-Dependent Tests

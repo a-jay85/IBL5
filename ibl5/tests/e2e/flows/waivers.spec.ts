@@ -18,7 +18,7 @@ test.describe('Waivers flow: closed', () => {
 
   test('shows closed message with no form elements', async ({ page }) => {
     const form = page.locator('form[name="Waiver_Move"]');
-    expect(await form.count()).toBe(0);
+    await expect(form).toHaveCount(0);
   });
 });
 
@@ -40,7 +40,7 @@ test.describe('Waivers flow: open', () => {
     const playerSelect = page.locator('select[name="Player_ID"]');
     await expect(playerSelect).toBeVisible();
     const options = playerSelect.locator('option');
-    expect(await options.count()).toBeGreaterThanOrEqual(1);
+    await expect(options.first()).toBeAttached();
   });
 
   test('team logo and roster info visible', async ({ page }) => {

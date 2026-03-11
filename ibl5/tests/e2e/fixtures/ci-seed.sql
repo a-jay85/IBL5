@@ -226,7 +226,7 @@ INSERT INTO ibl_plr (
    0, 5,
    6, 4, 200, 'Test University',
    1, 5, 2021, 'Metros', 'Metros',
-   40, 1200, 200, 450, 100, 120,
+   41, 1260, 200, 450, 100, 120,
    60, 150, 40, 120, 180, 50,
    80, 20, 90,
    'plr-uuid-00000000-0000-000000000001'),
@@ -236,7 +236,7 @@ INSERT INTO ibl_plr (
    0, 3,
    6, 8, 220, 'Test State',
    1, 12, 2023, 'Metros', 'Metros',
-   38, 1100, 180, 400, 90, 110,
+   41, 1260, 180, 400, 90, 110,
    40, 120, 50, 130, 150, 45,
    70, 25, 85,
    'plr-uuid-00000000-0000-000000000002'),
@@ -256,7 +256,7 @@ INSERT INTO ibl_plr (
    0, 4,
    6, 2, 190, 'Stars Academy',
    1, 8, 2022, 'Stars', 'Stars',
-   40, 1250, 210, 460, 110, 130,
+   41, 1300, 210, 460, 110, 130,
    65, 160, 35, 110, 200, 55,
    75, 15, 80,
    'plr-uuid-00000000-0000-000000000004'),
@@ -266,7 +266,7 @@ INSERT INTO ibl_plr (
    0, 6,
    6, 7, 215, 'Stars College',
    2, 3, 2020, 'Stars', 'Stars',
-   40, 1150, 190, 420, 95, 115,
+   41, 1260, 190, 420, 95, 115,
    45, 130, 45, 140, 160, 48,
    65, 22, 88,
    'plr-uuid-00000000-0000-000000000005'),
@@ -276,7 +276,7 @@ INSERT INTO ibl_plr (
    0, 5,
    6, 1, 185, 'Phoenixes Academy',
    1, 10, 2021, 'Phoenixes', 'Phoenixes',
-   40, 1200, 200, 440, 105, 125,
+   41, 1260, 200, 440, 105, 125,
    55, 145, 38, 115, 190, 52,
    72, 18, 82,
    'plr-uuid-00000000-0000-000000000006'),
@@ -286,7 +286,7 @@ INSERT INTO ibl_plr (
    0, 7,
    6, 11, 240, 'Phoenixes College',
    1, 6, 2019, 'Phoenixes', 'Phoenixes',
-   40, 1300, 220, 480, 115, 135,
+   41, 1300, 220, 480, 115, 135,
    20, 60, 60, 160, 100, 40,
    60, 35, 95,
    'plr-uuid-00000000-0000-000000000007');
@@ -315,7 +315,7 @@ INSERT INTO ibl_plr (
    0, 5, 4,
    6, 3, 195, 'Guard Academy',
    1, 15, 2021, 'Metros', 'Metros',
-   40, 1200, 200, 450, 100, 120,
+   41, 1260, 200, 450, 100, 120,
    60, 150, 40, 120, 180, 50,
    80, 20, 90,
    'plr-uuid-00000000-0000-000000000010'),
@@ -325,7 +325,7 @@ INSERT INTO ibl_plr (
    0, 8, 0,
    7, 0, 250, 'Center College',
    1, 20, 2018, 'Stars', 'Stars',
-   38, 1100, 180, 400, 90, 110,
+   41, 1260, 180, 400, 90, 110,
    40, 120, 50, 130, 150, 45,
    70, 25, 85,
    'plr-uuid-00000000-0000-000000000011'),
@@ -335,7 +335,7 @@ INSERT INTO ibl_plr (
    0, 3, 2,
    6, 6, 210, 'Forward University',
    2, 5, 2023, 'Stars', 'Stars',
-   40, 1150, 190, 420, 95, 115,
+   41, 1260, 190, 420, 95, 115,
    45, 130, 45, 140, 160, 48,
    65, 22, 88,
    'plr-uuid-00000000-0000-000000000012');
@@ -353,13 +353,13 @@ INSERT INTO ibl_hist (
   orb, reb, ast, stl, blk, tvr, pf, pts, salary
 ) VALUES
   (10, 'FA Guard', 2026, 'Metros', 1,
-   40, 1200, 200, 450, 100, 120, 60, 150,
+   41, 1260, 200, 450, 100, 120, 60, 150,
    40, 160, 180, 50, 20, 80, 90, 620, 0),
   (11, 'FA Center', 2026, 'Stars', 2,
-   38, 1100, 180, 400, 90, 110, 40, 120,
+   41, 1260, 180, 400, 90, 110, 40, 120,
    50, 180, 150, 45, 25, 70, 85, 530, 0),
   (12, 'FA Forward', 2026, 'Stars', 2,
-   40, 1150, 190, 420, 95, 115, 45, 130,
+   41, 1260, 190, 420, 95, 115, 45, 130,
    45, 185, 160, 48, 22, 65, 88, 565, 0);
 
 -- Team MLE/LLE flags: Metros have both exceptions available
@@ -389,7 +389,7 @@ INSERT INTO ibl_plr (
    0, 4,
    6, 1, 185, 'PG University',
    1, 7, 2022, 'Metros', 'Metros',
-   40, 1200, 200, 450, 100, 120,
+   41, 1260, 200, 450, 100, 120,
    60, 150, 30, 100, 200, 55,
    75, 10, 80,
    'plr-uuid-00000000-0000-000000000020'),
@@ -399,7 +399,7 @@ INSERT INTO ibl_plr (
    0, 3,
    6, 6, 205, 'SF University',
    1, 15, 2023, 'Metros', 'Metros',
-   38, 1100, 180, 400, 90, 110,
+   41, 1260, 180, 400, 90, 110,
    40, 120, 35, 120, 140, 45,
    65, 20, 85,
    'plr-uuid-00000000-0000-000000000021'),
@@ -409,7 +409,7 @@ INSERT INTO ibl_plr (
    0, 6,
    7, 0, 245, 'Center University',
    1, 3, 2020, 'Metros', 'Metros',
-   40, 1300, 220, 480, 115, 135,
+   41, 1300, 220, 480, 115, 135,
    20, 60, 60, 160, 100, 40,
    60, 35, 95,
    'plr-uuid-00000000-0000-000000000022'),
@@ -419,7 +419,7 @@ INSERT INTO ibl_plr (
    0, 4,
    6, 2, 190, 'Cougars Academy',
    1, 11, 2022, 'Cougars', 'Cougars',
-   40, 1200, 195, 440, 100, 120,
+   41, 1260, 195, 440, 100, 120,
    55, 140, 35, 110, 185, 50,
    70, 15, 80,
    'plr-uuid-00000000-0000-000000000023'),
@@ -429,7 +429,7 @@ INSERT INTO ibl_plr (
    0, 5,
    6, 7, 215, 'Cougars College',
    1, 9, 2021, 'Cougars', 'Cougars',
-   40, 1250, 210, 460, 105, 125,
+   41, 1300, 210, 460, 105, 125,
    45, 130, 45, 140, 160, 48,
    65, 22, 88,
    'plr-uuid-00000000-0000-000000000024');
@@ -504,25 +504,25 @@ INSERT INTO ibl_hist (
   orb, reb, ast, stl, blk, tvr, pf, pts, salary
 ) VALUES
   (1, 'Test Player', 2026, 'Metros', 1,
-   40, 1200, 200, 450, 100, 120, 60, 150,
+   41, 1260, 200, 450, 100, 120, 60, 150,
    40, 160, 180, 50, 20, 80, 90, 620, 800),
   (2, 'Test Player Two', 2026, 'Metros', 1,
-   38, 1100, 180, 400, 90, 110, 40, 120,
+   41, 1260, 180, 400, 90, 110, 40, 120,
    50, 180, 150, 45, 25, 70, 85, 530, 600),
   (3, 'Retired Legend', 2025, 'Stars', 2,
-   40, 1300, 250, 500, 150, 180, 30, 100,
+   41, 1300, 250, 500, 150, 180, 30, 100,
    80, 220, 100, 40, 50, 60, 100, 710, 2000),
   (4, 'Stars Guard', 2026, 'Stars', 2,
-   40, 1250, 210, 460, 110, 130, 65, 160,
+   41, 1300, 210, 460, 110, 130, 65, 160,
    35, 145, 200, 55, 15, 75, 80, 660, 1800),
   (5, 'Stars Forward', 2026, 'Stars', 2,
-   40, 1150, 190, 420, 95, 115, 45, 130,
+   41, 1260, 190, 420, 95, 115, 45, 130,
    45, 185, 160, 48, 22, 65, 88, 565, 1400),
   (6, 'Phoenixes Guard', 2026, 'Phoenixes', 14,
-   40, 1200, 200, 440, 105, 125, 55, 145,
+   41, 1260, 200, 440, 105, 125, 55, 145,
    38, 153, 190, 52, 18, 72, 82, 615, 1700),
   (7, 'Phoenixes Center', 2026, 'Phoenixes', 14,
-   40, 1300, 220, 480, 115, 135, 20, 60,
+   41, 1300, 220, 480, 115, 135, 20, 60,
    60, 220, 100, 40, 35, 60, 95, 610, 1300);
 
 -- ============================================================
@@ -688,6 +688,173 @@ ON DUPLICATE KEY UPDATE title = VALUES(title);
 INSERT INTO nuke_authors (aid, name) VALUES
   ('admin', 'Admin')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+-- ============================================================
+-- Draft class prospects (for Draft E2E tests)
+-- 4 undrafted + 2 already drafted
+-- ============================================================
+
+INSERT INTO ibl_draft_class (name, pos, age, team, fga, fgp, fta, ftp, tga, tgp, orb, drb, ast, stl, tvr, blk, oo, `do`, po, `to`, od, dd, pd, td, talent, skill, intangibles, drafted, sta) VALUES
+  ('Prospect Guard',    'PG', 19, 'Duke',       60, 55, 50, 70, 40, 45, 30, 40, 65, 50, 45, 20, 60, 55, 40, 50, 55, 50, 40, 45, 70, 65, 60, 0, 75),
+  ('Prospect Wing',     'SF', 20, 'Kentucky',   55, 50, 45, 65, 35, 40, 40, 50, 50, 45, 40, 30, 55, 50, 50, 45, 50, 55, 45, 50, 65, 60, 55, 0, 70),
+  ('Prospect Big',      'C',  21, 'Gonzaga',    50, 55, 55, 60, 20, 30, 55, 60, 35, 30, 35, 55, 45, 40, 60, 35, 45, 40, 60, 40, 60, 55, 65, 0, 80),
+  ('Prospect Shooter',  'SG', 19, 'Villanova',  65, 60, 40, 75, 60, 55, 25, 35, 45, 40, 50, 15, 65, 45, 35, 50, 50, 45, 35, 45, 55, 50, 50, 0, 68),
+  ('Already Drafted PG','PG', 20, 'UCLA',       58, 52, 48, 68, 38, 42, 32, 42, 60, 48, 42, 18, 58, 52, 38, 48, 52, 48, 38, 42, 68, 62, 58, 1, 72),
+  ('Already Drafted PF','PF', 21, 'Michigan',   52, 48, 50, 62, 25, 35, 48, 55, 40, 35, 38, 40, 50, 45, 55, 40, 48, 45, 55, 42, 62, 58, 60, 1, 76);
+
+-- Update drafted prospects with team names
+UPDATE ibl_draft_class SET team = 'Stars' WHERE name = 'Already Drafted PG';
+UPDATE ibl_draft_class SET team = 'Cougars' WHERE name = 'Already Drafted PF';
+
+-- ============================================================
+-- Draft picks for round 1 (Metros pick 1 = on the clock)
+-- Only need a few picks; pick 1 has empty player (on the clock)
+-- ============================================================
+
+INSERT INTO ibl_draft (year, team, tid, player, round, pick, uuid) VALUES
+  (2026, 'Metros',    1,  '', 1, 1, 'draft-uuid-r1p01'),
+  (2026, 'Stars',     2,  '', 1, 2, 'draft-uuid-r1p02'),
+  (2026, 'Cougars',   3,  '', 1, 3, 'draft-uuid-r1p03'),
+  (2026, 'Diesels',   4,  '', 1, 4, 'draft-uuid-r1p04');
+
+-- ============================================================
+-- GM owner names (for EOY Voting GM of Year ballot)
+-- ============================================================
+
+UPDATE ibl_team_info SET owner_name = 'GM TestUser' WHERE teamid = 1;
+UPDATE ibl_team_info SET owner_name = 'GM Stars'    WHERE teamid = 2;
+UPDATE ibl_team_info SET owner_name = 'GM Cougars'  WHERE teamid = 3;
+UPDATE ibl_team_info SET owner_name = 'GM Diesels'  WHERE teamid = 4;
+UPDATE ibl_team_info SET owner_name = 'GM Minutemen' WHERE teamid = 5;
+UPDATE ibl_team_info SET owner_name = 'GM Rage'     WHERE teamid = 6;
+UPDATE ibl_team_info SET owner_name = 'GM Tropics'  WHERE teamid = 7;
+UPDATE ibl_team_info SET owner_name = 'GM Monarchs' WHERE teamid = 8;
+UPDATE ibl_team_info SET owner_name = 'GM Flames'   WHERE teamid = 9;
+UPDATE ibl_team_info SET owner_name = 'GM Spurs'    WHERE teamid = 10;
+UPDATE ibl_team_info SET owner_name = 'GM Pioneers' WHERE teamid = 11;
+UPDATE ibl_team_info SET owner_name = 'GM Royals'   WHERE teamid = 12;
+UPDATE ibl_team_info SET owner_name = 'GM Apollos'  WHERE teamid = 13;
+UPDATE ibl_team_info SET owner_name = 'GM Phoenixes' WHERE teamid = 14;
+UPDATE ibl_team_info SET owner_name = 'GM Blues'    WHERE teamid = 15;
+UPDATE ibl_team_info SET owner_name = 'GM Blizzard' WHERE teamid = 16;
+UPDATE ibl_team_info SET owner_name = 'GM Huskies'  WHERE teamid = 17;
+UPDATE ibl_team_info SET owner_name = 'GM Bucks'    WHERE teamid = 18;
+UPDATE ibl_team_info SET owner_name = 'GM Nuggets'  WHERE teamid = 19;
+UPDATE ibl_team_info SET owner_name = 'GM Pilots'   WHERE teamid = 20;
+UPDATE ibl_team_info SET owner_name = 'GM Mavericks' WHERE teamid = 21;
+UPDATE ibl_team_info SET owner_name = 'GM Cavaliers' WHERE teamid = 22;
+UPDATE ibl_team_info SET owner_name = 'GM Supersonics' WHERE teamid = 23;
+UPDATE ibl_team_info SET owner_name = 'GM Nets'     WHERE teamid = 24;
+UPDATE ibl_team_info SET owner_name = 'GM Generals' WHERE teamid = 25;
+UPDATE ibl_team_info SET owner_name = 'GM Pacers'   WHERE teamid = 26;
+UPDATE ibl_team_info SET owner_name = 'GM Jazz'     WHERE teamid = 27;
+UPDATE ibl_team_info SET owner_name = 'GM Thunder'  WHERE teamid = 28;
+
+-- ============================================================
+-- Additional players for voting candidate coverage
+-- Need players on non-Metros teams across conferences/positions
+-- for ASG ballot categories (ECF, ECB, WCF, WCB)
+-- Existing: pid 4,5 (Stars/Western), pid 6,7 (Phoenixes/Eastern),
+--           pid 23,24 (Cougars/Eastern)
+-- Need more Western backcourt + frontcourt candidates
+-- ============================================================
+
+INSERT INTO ibl_plr (
+  pid, name, age, peak, tid, pos, ordinal,
+  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  cy, cyt, cy1, cy2,
+  retired, exp,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_to, stats_blk, stats_pf,
+  uuid
+) VALUES
+  -- Spurs PG (Western/Midwest backcourt)
+  (30, 'Spurs Guard', 25, 27, 10, 'PG', 1,
+   80, 75, 70, 65, 60, 72, 68, 70, 65,
+   1, 2, 500, 550,
+   0, 3,
+   6, 2, 190, 'Spurs Academy',
+   1, 14, 2023, 'Spurs', 'Spurs',
+   41, 1260, 200, 450, 100, 120,
+   60, 150, 40, 120, 180, 50,
+   80, 20, 90,
+   'plr-uuid-00000000-0000-000000000030'),
+  -- Flames SF (Western/Pacific frontcourt)
+  (31, 'Flames Forward', 27, 28, 9, 'SF', 1,
+   78, 74, 68, 64, 58, 70, 66, 68, 63,
+   1, 2, 600, 660,
+   0, 5,
+   6, 7, 215, 'Flames College',
+   1, 9, 2021, 'Flames', 'Flames',
+   41, 1260, 190, 420, 95, 115,
+   45, 130, 45, 140, 160, 48,
+   65, 22, 88,
+   'plr-uuid-00000000-0000-000000000031'),
+  -- Minutemen SG (Eastern/Atlantic backcourt)
+  (32, 'Minutemen Guard', 26, 27, 5, 'SG', 1,
+   79, 73, 69, 63, 59, 71, 67, 69, 64,
+   1, 2, 700, 770,
+   0, 4,
+   6, 3, 195, 'Minutemen Academy',
+   1, 11, 2022, 'Minutemen', 'Minutemen',
+   41, 1260, 195, 440, 100, 120,
+   55, 140, 35, 110, 185, 50,
+   70, 15, 80,
+   'plr-uuid-00000000-0000-000000000032'),
+  -- Royals PF (Eastern/Central frontcourt)
+  (33, 'Royals Forward', 28, 28, 12, 'PF', 1,
+   81, 76, 71, 66, 62, 73, 69, 71, 66,
+   1, 2, 800, 880,
+   0, 6,
+   6, 8, 225, 'Royals College',
+   1, 7, 2020, 'Royals', 'Royals',
+   41, 1300, 210, 460, 105, 125,
+   30, 80, 50, 150, 120, 42,
+   60, 30, 90,
+   'plr-uuid-00000000-0000-000000000033');
+
+-- Starters for new players (needed to appear in voting)
+UPDATE ibl_plr SET dc_PGDepth = 1, PGDepth = 1 WHERE pid = 30;
+UPDATE ibl_plr SET dc_SFDepth = 1, SFDepth = 1 WHERE pid = 31;
+UPDATE ibl_plr SET dc_SGDepth = 1, SGDepth = 1 WHERE pid = 32;
+UPDATE ibl_plr SET dc_PFDepth = 1, PFDepth = 1 WHERE pid = 33;
+
+-- Player history for voting candidates (must have current year stats)
+INSERT INTO ibl_hist (
+  pid, name, year, team, teamid,
+  games, minutes, fgm, fga, ftm, fta, tgm, tga,
+  orb, reb, ast, stl, blk, tvr, pf, pts, salary
+) VALUES
+  (30, 'Spurs Guard', 2026, 'Spurs', 10,
+   41, 1260, 200, 450, 100, 120, 60, 150,
+   40, 160, 180, 50, 20, 80, 90, 620, 500),
+  (31, 'Flames Forward', 2026, 'Flames', 9,
+   41, 1260, 190, 420, 95, 115, 45, 130,
+   45, 185, 160, 48, 22, 65, 88, 565, 600),
+  (32, 'Minutemen Guard', 2026, 'Minutemen', 5,
+   41, 1260, 195, 440, 100, 120, 55, 140,
+   35, 145, 185, 50, 15, 70, 80, 600, 700),
+  (33, 'Royals Forward', 2026, 'Royals', 12,
+   41, 1300, 210, 460, 105, 125, 30, 80,
+   50, 200, 120, 42, 30, 60, 90, 590, 800),
+  (20, 'Metros PG', 2026, 'Metros', 1,
+   41, 1260, 200, 450, 100, 120, 60, 150,
+   30, 130, 200, 55, 10, 75, 80, 620, 300),
+  (21, 'Metros SF', 2026, 'Metros', 1,
+   41, 1260, 180, 400, 90, 110, 40, 120,
+   35, 155, 140, 45, 20, 65, 85, 530, 200),
+  (22, 'Metros Center', 2026, 'Metros', 1,
+   41, 1300, 220, 480, 115, 135, 20, 60,
+   60, 220, 100, 40, 35, 60, 95, 610, 300),
+  (23, 'Cougars Guard', 2026, 'Cougars', 3,
+   41, 1260, 195, 440, 100, 120, 55, 140,
+   35, 145, 185, 50, 15, 70, 80, 600, 1300),
+  (24, 'Cougars Forward', 2026, 'Cougars', 3,
+   41, 1300, 210, 460, 105, 125, 45, 130,
+   45, 185, 160, 48, 22, 65, 88, 565, 1500);
 
 -- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the

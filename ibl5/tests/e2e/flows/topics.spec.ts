@@ -28,7 +28,7 @@ test.describe('Topics flow', () => {
     expect(hasGrid || hasEmpty).toBe(true);
 
     if (hasGrid) {
-      expect(await page.locator('.topic-card').count()).toBeGreaterThan(0);
+      await expect(page.locator('.topic-card').first()).toBeVisible();
     }
   });
 

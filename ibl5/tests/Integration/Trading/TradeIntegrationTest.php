@@ -54,8 +54,8 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange
         $offerId = 123;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 1001, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics'],
-            ['itemid' => 1002, 'itemtype' => '1', 'from' => 'Celtics', 'to' => 'Lakers'],
+            ['itemid' => 1001, 'itemtype' => '1', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics'],
+            ['itemid' => 1002, 'itemtype' => '1', 'trade_from' => 'Celtics', 'trade_to' => 'Lakers'],
         ]);
         $this->mockDb->setMockData([
             ['pid' => 1001, 'pos' => 'PG', 'name' => 'Player One', 'tid' => 1],
@@ -85,7 +85,7 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange
         $offerId = 123;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 1001, 'itemtype' => '1', 'from' => 'Bulls', 'to' => 'Heat']
+            ['itemid' => 1001, 'itemtype' => '1', 'trade_from' => 'Bulls', 'trade_to' => 'Heat']
         ]);
         $this->mockDb->setMockData([
             ['pos' => 'SF', 'name' => 'Michael Jordan']
@@ -115,8 +115,8 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange
         $offerId = 124;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 1001, 'itemtype' => '1', 'from' => 'Knicks', 'to' => 'Nets'],
-            ['itemid' => 2001, 'itemtype' => '0', 'from' => 'Nets', 'to' => 'Knicks'],
+            ['itemid' => 1001, 'itemtype' => '1', 'trade_from' => 'Knicks', 'trade_to' => 'Nets'],
+            ['itemid' => 2001, 'itemtype' => '0', 'trade_from' => 'Nets', 'trade_to' => 'Knicks'],
         ]);
         $this->mockDb->setMockData([
             ['pos' => 'C', 'name' => 'Patrick Ewing'],
@@ -154,7 +154,7 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange
         $offerId = 124;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 2001, 'itemtype' => '0', 'from' => 'Knicks', 'to' => 'Nets']
+            ['itemid' => 2001, 'itemtype' => '0', 'trade_from' => 'Knicks', 'trade_to' => 'Nets']
         ]);
         $this->mockDb->setMockData([
             [
@@ -192,7 +192,7 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange
         $offerId = 125;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 30013000, 'itemtype' => 'cash', 'from' => 'Warriors', 'to' => 'Spurs']
+            ['itemid' => 30013000, 'itemtype' => 'cash', 'trade_from' => 'Warriors', 'trade_to' => 'Spurs']
         ]);
         $this->mockDb->setMockData([
             [
@@ -235,10 +235,10 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange - 2 players and 2 picks
         $offerId = 126;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 1001, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics'],
-            ['itemid' => 1002, 'itemtype' => '1', 'from' => 'Lakers', 'to' => 'Celtics'],
-            ['itemid' => 2001, 'itemtype' => '0', 'from' => 'Celtics', 'to' => 'Lakers'],
-            ['itemid' => 2002, 'itemtype' => '0', 'from' => 'Celtics', 'to' => 'Lakers'],
+            ['itemid' => 1001, 'itemtype' => '1', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics'],
+            ['itemid' => 1002, 'itemtype' => '1', 'trade_from' => 'Lakers', 'trade_to' => 'Celtics'],
+            ['itemid' => 2001, 'itemtype' => '0', 'trade_from' => 'Celtics', 'trade_to' => 'Lakers'],
+            ['itemid' => 2002, 'itemtype' => '0', 'trade_from' => 'Celtics', 'trade_to' => 'Lakers'],
         ]);
         $this->mockDb->setMockData([
             ['pos' => 'PG', 'name' => 'Magic Johnson'],
@@ -290,7 +290,7 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange
         $offerId = 127;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 1001, 'itemtype' => '1', 'from' => 'Rockets', 'to' => 'Mavs']
+            ['itemid' => 1001, 'itemtype' => '1', 'trade_from' => 'Rockets', 'trade_to' => 'Mavs']
         ]);
         $this->mockDb->setMockData([
             ['pos' => 'C', 'name' => 'Hakeem Olajuwon']
@@ -315,7 +315,7 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange
         $offerId = 128;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 1001, 'itemtype' => '1', 'from' => 'Jazz', 'to' => 'Suns']
+            ['itemid' => 1001, 'itemtype' => '1', 'trade_from' => 'Jazz', 'trade_to' => 'Suns']
         ]);
         $this->mockDb->setMockData([
             ['pos' => 'PF', 'name' => 'Karl Malone']
@@ -326,7 +326,7 @@ class TradeIntegrationTest extends IntegrationTestCase
 
         // Assert
         $this->assertTrue($result['success']);
-        $this->assertQueryExecuted('DELETE FROM ibl_trade_info');
+        $this->assertQueryExecuted('UPDATE ibl_trade_info');
         $this->assertQueryExecuted('DELETE FROM ibl_trade_cash');
         $this->assertQueryExecuted('DELETE FROM ibl_trade_offers');
     }
@@ -399,8 +399,8 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange - 1-for-1 player trade; verify UPDATE executes for both players
         $offerId = 130;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 2001, 'itemtype' => '1', 'from' => 'Hawks', 'to' => 'Pacers'],
-            ['itemid' => 2002, 'itemtype' => '1', 'from' => 'Pacers', 'to' => 'Hawks'],
+            ['itemid' => 2001, 'itemtype' => '1', 'trade_from' => 'Hawks', 'trade_to' => 'Pacers'],
+            ['itemid' => 2002, 'itemtype' => '1', 'trade_from' => 'Pacers', 'trade_to' => 'Hawks'],
         ]);
         $this->mockDb->setMockData([
             ['pid' => 2001, 'pos' => 'PF', 'name' => 'Dominique Wilkins', 'tid' => 3],
@@ -432,8 +432,8 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange - pick-for-pick trade (two picks exchanged)
         $offerId = 131;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 3001, 'itemtype' => '0', 'from' => 'Clippers', 'to' => 'Raptors'],
-            ['itemid' => 3002, 'itemtype' => '0', 'from' => 'Raptors', 'to' => 'Clippers'],
+            ['itemid' => 3001, 'itemtype' => '0', 'trade_from' => 'Clippers', 'trade_to' => 'Raptors'],
+            ['itemid' => 3002, 'itemtype' => '0', 'trade_from' => 'Raptors', 'trade_to' => 'Clippers'],
         ]);
         $this->mockDb->setMockData([
             [
@@ -483,7 +483,7 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange - cash trade creates pipe-prefixed player records
         $offerId = 132;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 40014000, 'itemtype' => 'cash', 'from' => 'Nuggets', 'to' => 'Thunder']
+            ['itemid' => 40014000, 'itemtype' => 'cash', 'trade_from' => 'Nuggets', 'trade_to' => 'Thunder']
         ]);
         $this->mockDb->setMockData([
             [
@@ -552,9 +552,9 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange - complex trade: 2 players + 1 pick
         $offerId = 133;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 6001, 'itemtype' => '1', 'from' => 'Bucks', 'to' => 'Pistons'],
-            ['itemid' => 6002, 'itemtype' => '1', 'from' => 'Pistons', 'to' => 'Bucks'],
-            ['itemid' => 7001, 'itemtype' => '0', 'from' => 'Pistons', 'to' => 'Bucks'],
+            ['itemid' => 6001, 'itemtype' => '1', 'trade_from' => 'Bucks', 'trade_to' => 'Pistons'],
+            ['itemid' => 6002, 'itemtype' => '1', 'trade_from' => 'Pistons', 'trade_to' => 'Bucks'],
+            ['itemid' => 7001, 'itemtype' => '0', 'trade_from' => 'Pistons', 'trade_to' => 'Bucks'],
         ]);
         $this->mockDb->setMockData([
             ['pid' => 6001, 'pos' => 'PF', 'name' => 'Giannis Antetokounmpo', 'tid' => 5],
@@ -599,8 +599,8 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Arrange - after a successful trade, all three trade tables should be cleaned up
         $offerId = 134;
         $this->mockDb->setMockTradeInfo([
-            ['itemid' => 8001, 'itemtype' => '1', 'from' => 'Grizzlies', 'to' => 'Pelicans'],
-            ['itemid' => 8002, 'itemtype' => '1', 'from' => 'Pelicans', 'to' => 'Grizzlies'],
+            ['itemid' => 8001, 'itemtype' => '1', 'trade_from' => 'Grizzlies', 'trade_to' => 'Pelicans'],
+            ['itemid' => 8002, 'itemtype' => '1', 'trade_from' => 'Pelicans', 'trade_to' => 'Grizzlies'],
         ]);
         $this->mockDb->setMockData([
             ['pid' => 8001, 'pos' => 'PG', 'name' => 'Ja Morant', 'tid' => 7],
@@ -613,16 +613,10 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Assert
         $this->assertTrue($result['success']);
 
-        // All three trade tables should have DELETE queries executed
-        $this->assertQueryExecuted('DELETE FROM ibl_trade_info');
+        // Trade info rows are marked completed (not deleted) for TRN export
+        $this->assertQueryExecuted('UPDATE ibl_trade_info');
+        // Cash and offer parent rows are still deleted
         $this->assertQueryExecuted('DELETE FROM ibl_trade_cash');
         $this->assertQueryExecuted('DELETE FROM ibl_trade_offers');
-
-        // Verify the correct offer ID was used in the cleanup queries
-        $deleteQueries = array_filter(
-            $this->getExecutedQueries(),
-            static fn(string $q): bool => stripos($q, 'DELETE') === 0
-        );
-        $this->assertGreaterThanOrEqual(3, count($deleteQueries), 'Should have at least 3 DELETE queries for complete cleanup');
     }
 }

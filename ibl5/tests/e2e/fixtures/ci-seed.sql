@@ -613,7 +613,7 @@ INSERT INTO ibl_olympics_league_config (season_ending_year, team_slot, team_name
 
 INSERT INTO ibl_trade_offers (id) VALUES (1), (2);
 
-INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, `from`, `to`, approval) VALUES
+INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to, approval) VALUES
   -- Offer 1: Stars Guard (pid=4) from Stars to Metros, player (pid=2) from Metros to Stars
   (1, 4, '1', 'Stars', 'Metros', 'Metros'),
   (1, 2, '1', 'Metros', 'Stars', 'Metros'),

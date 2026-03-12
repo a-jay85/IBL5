@@ -508,7 +508,8 @@ ALTER TABLE `ibl_trade_info` MODIFY COLUMN `approval` varchar(128) COLLATE utf8m
 -- =============================================================================
 -- ibl_trade_queue
 -- =============================================================================
-ALTER TABLE `ibl_trade_queue` MODIFY COLUMN `query` text COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'SQL query to execute for trade processing';
+ALTER TABLE `ibl_trade_queue` MODIFY COLUMN `operation_type` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Type: player_transfer, pick_transfer';
+ALTER TABLE `ibl_trade_queue` MODIFY COLUMN `params` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'JSON-encoded operation parameters';
 ALTER TABLE `ibl_trade_queue` MODIFY COLUMN `tradeline` text COLLATE utf8mb4_unicode_ci COMMENT 'Human-readable trade summary line';
 
 -- =============================================================================

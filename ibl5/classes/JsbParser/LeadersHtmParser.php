@@ -106,7 +106,7 @@ class LeadersHtmParser implements LeadersHtmParserInterface
         $sections = [];
 
         // Find all table rows
-        if (preg_match_all('/<tr>(.*?)<\/tr>/si', $content, $matches) === 0 || $matches === []) {
+        if (preg_match_all('/<tr>(.*?)<\/tr>/si', $content, $matches) === 0) {
             return [];
         }
 
@@ -151,7 +151,7 @@ class LeadersHtmParser implements LeadersHtmParserInterface
      */
     private static function extractHeaderText(string $rowContent): string
     {
-        if (preg_match_all('/<th[^>]*>(.*?)<\/th>/si', $rowContent, $matches) === 0 || $matches === []) {
+        if (preg_match_all('/<th[^>]*>(.*?)<\/th>/si', $rowContent, $matches) === 0) {
             return '';
         }
 
@@ -299,7 +299,7 @@ class LeadersHtmParser implements LeadersHtmParserInterface
      */
     private static function extractCellValues(string $rowHtml): array
     {
-        if (preg_match_all('/<td[^>]*>(.*?)<\/td>/si', $rowHtml, $matches) === 0 || $matches === []) {
+        if (preg_match_all('/<td[^>]*>(.*?)<\/td>/si', $rowHtml, $matches) === 0) {
             return [];
         }
 

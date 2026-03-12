@@ -405,12 +405,12 @@ function resetPlayerDatabase() {
     <td><?= (int) $player->ratingBlocks ?></td>
     <td><?= (int) $player->ratingFouls ?></td>
     <td><?= (int) $player->ratingOutsideOffense ?></td>
-    <td><?= (int) $player->ratingOutsideDefense ?></td>
     <td><?= (int) $player->ratingDriveOffense ?></td>
-    <td><?= (int) $player->ratingDriveDefense ?></td>
     <td><?= (int) $player->ratingPostOffense ?></td>
-    <td><?= (int) $player->ratingPostDefense ?></td>
     <td><?= (int) $player->ratingTransitionOffense ?></td>
+    <td><?= (int) $player->ratingOutsideDefense ?></td>
+    <td><?= (int) $player->ratingDriveDefense ?></td>
+    <td><?= (int) $player->ratingPostDefense ?></td>
     <td><?= (int) $player->ratingTransitionDefense ?></td>
     <td><?= (int) $player->ratingTalent ?></td>
     <td><?= (int) $player->ratingSkill ?></td>

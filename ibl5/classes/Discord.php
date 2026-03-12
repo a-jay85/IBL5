@@ -22,17 +22,19 @@ class Discord
     private static bool $configLoaded = false;
 
     /**
-     * Check if running inside PHPUnit
+     * Check if running under PHPUnit.
      */
     private static function isPhpUnit(): bool
     {
-        return defined('PHPUNIT_RUNNING') || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL);
+        return defined('PHPUNIT_RUNNING')
+            || (defined('PHPUNIT_COMPOSER_INSTALL') && PHPUNIT_COMPOSER_INSTALL);
     }
 
     /**
-     * Check if running on the production server (iblhoops.net)
+     * Check if the current request is on the production site.
      *
-     * Any other host (localhost, Docker, CI, etc.) is non-production.
+     * Only iblhoops.net is production. Everything else — localhost, Docker
+     * worktrees (*.localhost), staging, CI — is treated as non-production.
      */
     private static function isProduction(): bool
     {
@@ -42,7 +44,7 @@ class Discord
     /**
      * Get the guild ID for the current environment
      *
-     * Uses the production Discord server on iblhoops.net, testing server otherwise.
+     * Uses the testing server on localhost, production server otherwise.
      */
     public static function getGuildID(): string
     {
@@ -194,6 +196,7 @@ class Discord
             return null;
         }
 
+        // DMs go to real users — only send on production
         if (!self::isProduction()) {
             return null;
         }
@@ -266,6 +269,7 @@ class Discord
             return null;
         }
 
+        // Trade DMs go to real users — only send on production
         if (!self::isProduction()) {
             return null;
         }
@@ -334,13 +338,17 @@ class Discord
             return;
         }
 
+        if (self::isPhpUnit()) {
+            return;
+        }
+
         // Ensure config is loaded
         self::loadConfig();
 
         // Map channel names (with #) to config keys (without #)
         $channelKey = ltrim($channelName, '#');
 
-        // Use channel-specific webhook on production, testing webhook everywhere else
+        // Production: use channel-specific webhook. Everything else: testing webhook.
         if (self::isProduction()) {
             $url = self::$webhooks[$channelKey] ?? null;
         } else {

@@ -185,8 +185,8 @@ class TradingService implements TradingServiceInterface
 
         foreach ($allTradeRows as $row) {
             $offerId = $row['tradeofferid'];
-            $from = $row['from'];
-            $to = $row['to'];
+            $from = $row['trade_from'];
+            $to = $row['trade_to'];
             $approval = $row['approval'];
             $itemId = $row['itemid'];
             $itemType = $row['itemtype'];

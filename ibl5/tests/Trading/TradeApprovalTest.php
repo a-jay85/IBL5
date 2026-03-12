@@ -71,7 +71,7 @@ class TradeApprovalTest extends TestCase
         foreach ($tradeInfoInserts as $query) {
             // For cash items, extract the from, to, and approval teams
             if (strpos($query, "'cash'") !== false) {
-                // Pattern matches: VALUES ('tradeid', 'itemid', 'cash', 'from', 'to', 'approval')
+                // Pattern matches: VALUES ('tradeid', 'itemid', 'cash', 'trade_from', 'trade_to', 'approval')
                 if (preg_match("/VALUES\s*\(\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'cash'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/i", $query, $matches)) {
                     $from = $matches[1];
                     $to = $matches[2];
@@ -119,7 +119,7 @@ class TradeApprovalTest extends TestCase
         foreach ($queries as $query) {
             if (strpos($query, "'cash'") !== false) {
                 // Extract approval value
-                // Pattern matches: VALUES ('tradeid', 'itemid', 'cash', 'from', 'to', 'approval')
+                // Pattern matches: VALUES ('tradeid', 'itemid', 'cash', 'trade_from', 'trade_to', 'approval')
                 if (preg_match("/VALUES\s*\(\s*'[^']+'\s*,\s*'[^']+'\s*,\s*'cash'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*,\s*'([^']+)'\s*\)/i", $query, $matches)) {
                     $from = $matches[1];
                     $to = $matches[2];

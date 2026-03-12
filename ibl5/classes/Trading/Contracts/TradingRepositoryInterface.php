@@ -246,10 +246,15 @@ interface TradingRepositoryInterface
      * Excludes retired players, cash placeholders (ordinal >= 100000),
      * and buyout/cash records whose names start with '|'.
      *
+     * During the offseason (Playoffs/Draft/Free Agency), also excludes players
+     * whose contracts have expired (next-year salary is $0), since these players
+     * are effectively free agents even though they remain assigned to the team.
+     *
      * @param int $teamId Team ID
+     * @param bool $isOffseason Whether to apply offseason contract expiry filtering
      * @return int Number of active players on the team's roster
      */
-    public function getTeamPlayerCount(int $teamId): int;
+    public function getTeamPlayerCount(int $teamId, bool $isOffseason = false): int;
 
     /**
      * Get all teams with city, name, colors and ID for trading UI

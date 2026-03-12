@@ -94,8 +94,12 @@ class TradeValidator implements TradeValidatorInterface
         int $userPlayersSent,
         int $partnerPlayersSent
     ): array {
-        $userCurrentRoster = $this->repository->getTeamPlayerCount($userTeamId);
-        $partnerCurrentRoster = $this->repository->getTeamPlayerCount($partnerTeamId);
+        $isOffseason = $this->season->phase === "Playoffs"
+            || $this->season->phase === "Draft"
+            || $this->season->phase === "Free Agency";
+
+        $userCurrentRoster = $this->repository->getTeamPlayerCount($userTeamId, $isOffseason);
+        $partnerCurrentRoster = $this->repository->getTeamPlayerCount($partnerTeamId, $isOffseason);
 
         $userPostTradeRoster = $userCurrentRoster - $userPlayersSent + $partnerPlayersSent;
         $partnerPostTradeRoster = $partnerCurrentRoster - $partnerPlayersSent + $userPlayersSent;

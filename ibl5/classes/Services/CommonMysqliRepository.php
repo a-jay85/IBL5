@@ -141,14 +141,19 @@ class CommonMysqliRepository extends \BaseMysqliRepository
      */
     public function getTeamDiscordID(string $teamName): ?int
     {
-        /** @var array{discordID: int|null}|null $result */
+        /** @var array{discordID: int|string|null}|null $result */
         $result = $this->fetchOne(
             "SELECT discordID FROM ibl_team_info WHERE team_name = ? LIMIT 1",
             "s",
             $teamName
         );
 
-        return $result !== null ? ($result['discordID'] ?? null) : null;
+        if ($result === null) {
+            return null;
+        }
+
+        $discordID = $result['discordID'] ?? null;
+        return $discordID !== null ? (int) $discordID : null;
     }
 
     /**

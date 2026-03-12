@@ -160,6 +160,8 @@ class Discord
             CURLOPT_HEADER => false,
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 10,
         ]);
 
         $response = curl_exec($curl);

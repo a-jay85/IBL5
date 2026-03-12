@@ -66,11 +66,7 @@ test.describe('Draft board: renders', () => {
   test('submit button is fixed to bottom of viewport', async ({ page }) => {
     const container = page.locator('.draft-submit-container');
     await expect(container).toBeVisible();
-
-    const position = await container.evaluate(
-      (el) => getComputedStyle(el).position,
-    );
-    expect(position).toBe('fixed');
+    await expect(container).toHaveCSS('position', 'fixed');
   });
 
   test('submit button visible without scrolling', async ({ page }) => {

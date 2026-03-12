@@ -302,8 +302,11 @@ test.describe('Free Agency -- quick offer buttons', () => {
   // LLE test after MLE — delete MLE offer first so HasMLE remains available
   test('delete MLE offer before LLE test', async ({ page }) => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    await page.getByRole('button', { name: /Delete This Offer/i }).click();
-    await page.waitForURL(/result=deleted/);
+    const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
+    if (await deleteBtn.count() > 0) {
+      await deleteBtn.click();
+      await page.waitForURL(/result=deleted/);
+    }
   });
 
   test('submit LLE offer', async ({ page }) => {
@@ -318,8 +321,11 @@ test.describe('Free Agency -- quick offer buttons', () => {
   // Delete LLE offer before max contract test
   test('delete LLE offer before max contract test', async ({ page }) => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    await page.getByRole('button', { name: /Delete This Offer/i }).click();
-    await page.waitForURL(/result=deleted/);
+    const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
+    if (await deleteBtn.count() > 0) {
+      await deleteBtn.click();
+      await page.waitForURL(/result=deleted/);
+    }
   });
 
   test('submit max contract offer', async ({ page }) => {

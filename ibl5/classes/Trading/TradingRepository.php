@@ -165,7 +165,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
         }
 
         return $this->execute(
-            "INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, `from`, `to`, approval) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to, approval) VALUES (?, ?, ?, ?, ?, ?)",
             $typeString,
             $tradeOfferId,
             $itemId,
@@ -262,6 +262,18 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     {
         return $this->execute(
             "DELETE FROM ibl_trade_info WHERE tradeofferid = ?",
+            "i",
+            $offerId
+        );
+    }
+
+    /**
+     * @see TradingRepositoryInterface::markTradeInfoCompleted()
+     */
+    public function markTradeInfoCompleted(int $offerId): int
+    {
+        return $this->execute(
+            "UPDATE ibl_trade_info SET approval = 'completed' WHERE tradeofferid = ?",
             "i",
             $offerId
         );
@@ -382,7 +394,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     {
         /** @var list<TradeInfoRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_trade_info ORDER BY tradeofferid ASC"
+            "SELECT * FROM ibl_trade_info WHERE approval != 'completed' ORDER BY tradeofferid ASC"
         );
     }
 

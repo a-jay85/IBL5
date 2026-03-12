@@ -19,7 +19,7 @@ namespace Trading\Contracts;
  * @phpstan-type TeamNameRow array{team_name: string}
  * @phpstan-type TeamWithCityRow array{teamid: int, team_name: string, team_city: string, color1: string, color2: string}
  * @phpstan-type TradingPlayerRow array{pos: string, name: string, pid: int, ordinal: ?int, cy: ?int, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
- * @phpstan-type TradeInfoRow array{tradeofferid: int, itemid: int, itemtype: string, from: string, to: string, approval: string, created_at: string, updated_at: string}
+ * @phpstan-type TradeInfoRow array{tradeofferid: int, itemid: int, itemtype: string, trade_from: string, trade_to: string, approval: string, created_at: string, updated_at: string}
  * @phpstan-type DraftPickRow array{pickid: int, ownerofpick: string, teampick: string, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
  * @phpstan-type TradingDraftPickRow array{pickid: int, ownerofpick: string, teampick: string, teampick_id: int, year: string, round: string, notes: ?string, created_at: string, updated_at: string}
  */
@@ -170,6 +170,17 @@ interface TradingRepositoryInterface
     public function deleteTradeInfoByOfferId(int $offerId): int;
 
     /**
+     * Mark trade info rows as completed for a given offer ID.
+     *
+     * Sets the approval column to 'completed' so the rows are preserved
+     * for TRN export while no longer appearing as pending trades.
+     *
+     * @param int $offerId Trade offer ID
+     * @return int Number of rows affected
+     */
+    public function markTradeInfoCompleted(int $offerId): int;
+
+    /**
      * Get the last inserted ID
      *
      * @return int Last insert ID
@@ -221,9 +232,11 @@ interface TradingRepositoryInterface
     public function getTeamDraftPicksForTrading(int $teamId): array;
 
     /**
-     * Get all trade offers ordered by offer ID
+     * Get all pending trade offers ordered by offer ID
      *
-     * Returns all rows from ibl_trade_info for the trade review page.
+     * Returns pending (non-completed) rows from ibl_trade_info for the trade
+     * review page. Excludes rows with approval='completed' which are preserved
+     * only for TRN export.
      *
      * @return list<TradeInfoRow> Trade info rows ordered by tradeofferid ASC
      */

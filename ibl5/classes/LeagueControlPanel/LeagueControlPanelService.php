@@ -36,6 +36,8 @@ class LeagueControlPanelService implements LeagueControlPanelServiceInterface
 
         $simLengthInDays = $this->repository->getSimLengthInDays();
 
+        $seasonEndingYear = (int) ($settings['Season Ending Year'] ?? '0');
+
         return [
             'phase' => $settings['Current Season Phase'] ?? 'Preseason',
             'allowTrades' => $settings['Allow Trades'] ?? 'No',
@@ -44,7 +46,8 @@ class LeagueControlPanelService implements LeagueControlPanelServiceInterface
             'freeAgencyNotifications' => $settings['Free Agency Notifications'] ?? 'Off',
             'triviaMode' => $settings['Trivia Mode'] ?? 'Off',
             'simLengthInDays' => $simLengthInDays,
-            'seasonEndingYear' => (int) ($settings['Season Ending Year'] ?? '0'),
+            'seasonEndingYear' => $seasonEndingYear,
+            'hasFinalsMvp' => $this->repository->hasFinalsMvp($seasonEndingYear),
         ];
     }
 }

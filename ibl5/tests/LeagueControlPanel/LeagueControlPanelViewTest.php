@@ -219,7 +219,7 @@ class LeagueControlPanelViewTest extends TestCase
         $leagueConfig = $overrides['leagueConfig'] ?? ['short_name' => 'ibl', 'full_name' => 'Internet Basketball League'];
         /** @var string $currentLeague */
         $currentLeague = $overrides['currentLeague'] ?? 'ibl';
-        /** @var array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int} $panelData */
+        /** @var array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} $panelData */
         $panelData = $overrides['panelData'] ?? self::createPanelData();
         /** @var string|null $resultMessage */
         $resultMessage = array_key_exists('resultMessage', $overrides) ? $overrides['resultMessage'] : null;
@@ -231,11 +231,11 @@ class LeagueControlPanelViewTest extends TestCase
 
     /**
      * @param array<string, mixed> $overrides
-     * @return array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int}
+     * @return array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool}
      */
     private static function createPanelData(array $overrides = []): array
     {
-        /** @var array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int} */
+        /** @var array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int, hasFinalsMvp: bool} */
         return array_merge([
             'phase' => 'Regular Season',
             'allowTrades' => 'Yes',
@@ -245,6 +245,7 @@ class LeagueControlPanelViewTest extends TestCase
             'triviaMode' => 'Off',
             'simLengthInDays' => 3,
             'seasonEndingYear' => 2026,
+            'hasFinalsMvp' => false,
         ], $overrides);
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LeagueControlPanel;
 
+use LeagueControlPanel\Contracts\AwardGenerationServiceInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelProcessorInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use Discord\Discord;
@@ -29,10 +30,14 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
     private const SIM_LENGTH_MAX = 180;
 
     private LeagueControlPanelRepositoryInterface $repository;
+    private AwardGenerationServiceInterface $awardGenerationService;
 
-    public function __construct(LeagueControlPanelRepositoryInterface $repository)
-    {
+    public function __construct(
+        LeagueControlPanelRepositoryInterface $repository,
+        AwardGenerationServiceInterface $awardGenerationService,
+    ) {
         $this->repository = $repository;
+        $this->awardGenerationService = $awardGenerationService;
     }
 
     /**
@@ -55,6 +60,8 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
             'reset_eoy_voting' => $this->resetEoyVoting(),
             'set_waivers_to_free_agents' => $this->setWaiversToFreeAgents(),
             'set_fa_factors_pfw' => $this->setFaFactorsPfw($postData),
+            'generate_awards' => $this->generateAwards($postData),
+            'set_finals_mvp' => $this->setFinalsMvp($postData),
             default => ['success' => false, 'message' => 'Unknown action: ' . $action],
         };
     }
@@ -254,5 +261,74 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
         $this->repository->setFreeAgencyFactorsForPfw();
 
         return ['success' => true, 'message' => "The columns that affect each team's Play For Winner demand factor have been updated."];
+    }
+
+    /**
+     * @param array<string, mixed> $postData
+     * @return array{success: bool, message: string}
+     */
+    private function generateAwards(array $postData): array
+    {
+        $currentPhase = $postData['current_phase'] ?? '';
+        if (!is_string($currentPhase)) {
+            $currentPhase = '';
+        }
+
+        if ($currentPhase !== 'Playoffs' && $currentPhase !== 'Draft') {
+            return [
+                'success' => false,
+                'message' => 'Season awards can only be generated during Playoffs or Draft phase.',
+            ];
+        }
+
+        // Resolve season year from settings
+        $yearSetting = $this->repository->getSetting('Season Ending Year');
+        if ($yearSetting === null) {
+            return ['success' => false, 'message' => 'Season Ending Year setting not found.'];
+        }
+        $year = (int) $yearSetting;
+
+        // Resolve Leaders.htm path
+        $raw = defined('IBL5_ROOT') ? IBL5_ROOT : null;
+        $ibl5Root = is_string($raw) ? $raw : dirname(__DIR__);
+        $leadersHtmPath = $ibl5Root . '/Leaders.htm';
+
+        if (!file_exists($leadersHtmPath)) {
+            return ['success' => false, 'message' => 'Leaders.htm not found at: ' . $leadersHtmPath];
+        }
+
+        $result = $this->awardGenerationService->generateSeasonAwards($year, $leadersHtmPath);
+
+        return [
+            'success' => $result['success'],
+            'message' => $result['message'],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $postData
+     * @return array{success: bool, message: string}
+     */
+    private function setFinalsMvp(array $postData): array
+    {
+        $name = $postData['finals_mvp_name'] ?? '';
+        if (!is_string($name)) {
+            $name = '';
+        }
+        $name = trim($name);
+
+        if ($name === '') {
+            return ['success' => false, 'message' => 'Finals MVP name cannot be empty.'];
+        }
+
+        $yearSetting = $this->repository->getSetting('Season Ending Year');
+        if ($yearSetting === null) {
+            return ['success' => false, 'message' => 'Season Ending Year setting not found.'];
+        }
+        $year = (int) $yearSetting;
+
+        $this->repository->upsertAward($year, 'IBL Finals MVP', $name);
+
+        return ['success' => true, 'message' => 'IBL Finals MVP set to ' . $name . ' for ' . $year . '.'];
     }
 }

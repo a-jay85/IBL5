@@ -269,4 +269,49 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
 
         return true;
     }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::upsertAward()
+     */
+    public function upsertAward(int $year, string $award, string $name): int
+    {
+        return $this->execute(
+            "INSERT INTO ibl_awards (year, Award, name)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE name = VALUES(name)",
+            'iss',
+            $year,
+            $award,
+            $name
+        );
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::upsertGmAward()
+     */
+    public function upsertGmAward(int $year, string $name): int
+    {
+        return $this->execute(
+            "INSERT INTO ibl_gm_awards (year, Award, name)
+            VALUES (?, 'GM of the Year', ?)
+            ON DUPLICATE KEY UPDATE name = VALUES(name)",
+            'is',
+            $year,
+            $name
+        );
+    }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::hasFinalsMvp()
+     */
+    public function hasFinalsMvp(int $year): bool
+    {
+        $row = $this->fetchOne(
+            "SELECT table_ID FROM ibl_awards WHERE year = ? AND Award = 'IBL Finals MVP' LIMIT 1",
+            'i',
+            $year
+        );
+
+        return $row !== null;
+    }
 }

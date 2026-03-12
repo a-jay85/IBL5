@@ -19,7 +19,9 @@ if (!is_admin()) {
 // Wire dependencies
 $repository = new LeagueControlPanel\LeagueControlPanelRepository($mysqli_db);
 $service    = new LeagueControlPanel\LeagueControlPanelService($repository);
-$processor  = new LeagueControlPanel\LeagueControlPanelProcessor($repository);
+$votingResultsService = new Voting\VotingResultsService($mysqli_db);
+$awardGenerationService = new LeagueControlPanel\AwardGenerationService($repository, $votingResultsService);
+$processor  = new LeagueControlPanel\LeagueControlPanelProcessor($repository, $awardGenerationService);
 $view       = new LeagueControlPanel\LeagueControlPanelView();
 
 // POST → Processor → PRG redirect

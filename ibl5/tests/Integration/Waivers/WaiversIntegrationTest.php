@@ -786,6 +786,9 @@ class WaiversIntegrationTest extends IntegrationTestCase
     {
         $stubSeason = $this->createStub(\Season::class);
         $stubSeason->phase = $phase;
+        $stubSeason->method('isOffseasonPhase')->willReturn(
+            $phase === 'Draft' || $phase === 'Free Agency'
+        );
 
         return $stubSeason;
     }

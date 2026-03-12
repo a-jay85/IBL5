@@ -23,10 +23,12 @@ class WaiversProcessorTest extends TestCase
         // Create mock Season for regular season
         $this->mockSeasonRegular = $this->createMock(\Season::class);
         $this->mockSeasonRegular->phase = 'Regular Season';
-        
+        $this->mockSeasonRegular->method('isOffseasonPhase')->willReturn(false);
+
         // Create mock Season for free agency
         $this->mockSeasonFreeAgency = $this->createMock(\Season::class);
         $this->mockSeasonFreeAgency->phase = 'Free Agency';
+        $this->mockSeasonFreeAgency->method('isOffseasonPhase')->willReturn(true);
     }
     
     /**

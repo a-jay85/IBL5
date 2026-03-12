@@ -270,7 +270,7 @@ class WaiversController implements WaiversControllerInterface
         if ($action === 'waive') {
             $tableResult = $this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamID, $season);
             $styleTeam = $team;
-        } elseif ($season->phase === 'Free Agency') {
+        } elseif ($season->isOffseasonPhase()) {
             $tableResult = $league->getFreeAgentsResult($season);
             $styleTeam = \Team::initialize($this->db, \League::FREE_AGENTS_TEAMID);
         } else {
@@ -325,7 +325,7 @@ class WaiversController implements WaiversControllerInterface
 
         if ($action === 'waive') {
             $result = $this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamID);
-        } elseif ($season->phase === 'Free Agency') {
+        } elseif ($season->isOffseasonPhase()) {
             $result = $league->getFreeAgentsResult($season);
         } else {
             $result = $league->getWaivedPlayersResult();

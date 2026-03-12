@@ -369,7 +369,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         $yearHeaders = [];
         if ($season !== null) {
             $baseYear = $season->endingYear;
-            if ($season->isFreeAgencyPhase()) {
+            if ($season->isOffseasonPhase()) {
                 $baseYear++;
             }
             for ($i = 0; $i < 6; $i++) {

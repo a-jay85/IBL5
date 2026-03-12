@@ -78,6 +78,14 @@ class Season
     }
 
     /**
+     * Check if current season phase is an offseason phase (Draft or Free Agency)
+     */
+    public function isOffseasonPhase(): bool
+    {
+        return $this->phase === 'Draft' || $this->phase === 'Free Agency';
+    }
+
+    /**
      * Check if trades are currently allowed (mock implementation)
      *
      * @see \Season::areTradesAllowed()

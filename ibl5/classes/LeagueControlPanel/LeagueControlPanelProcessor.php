@@ -269,10 +269,7 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
      */
     private function generateAwards(array $postData): array
     {
-        $currentPhase = $postData['current_phase'] ?? '';
-        if (!is_string($currentPhase)) {
-            $currentPhase = '';
-        }
+        $currentPhase = $this->repository->getSetting('Current Season Phase') ?? '';
 
         if ($currentPhase !== 'Playoffs' && $currentPhase !== 'Draft') {
             return [

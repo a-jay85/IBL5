@@ -301,14 +301,27 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     /**
      * @see TradingRepositoryInterface::getTeamPlayerCount()
      */
-    public function getTeamPlayerCount(int $teamId): int
+    public function getTeamPlayerCount(int $teamId, bool $isOffseason = false): int
     {
+        $sql = "SELECT COUNT(*) AS cnt FROM ibl_plr WHERE tid = ? AND retired = 0 AND ordinal <= 960 AND name NOT LIKE '|%'";
+
+        if ($isOffseason) {
+            // During offseason, exclude players whose contracts have expired.
+            // The effective contract year is cy + 1; if that year's salary is $0,
+            // the player is effectively a free agent.
+            $sql .= " AND CASE COALESCE(cy, 0) + 1"
+                . " WHEN 1 THEN cy1"
+                . " WHEN 2 THEN cy2"
+                . " WHEN 3 THEN cy3"
+                . " WHEN 4 THEN cy4"
+                . " WHEN 5 THEN cy5"
+                . " WHEN 6 THEN cy6"
+                . " ELSE 0"
+                . " END != 0";
+        }
+
         /** @var array{cnt: int}|null $result */
-        $result = $this->fetchOne(
-            "SELECT COUNT(*) AS cnt FROM ibl_plr WHERE tid = ? AND retired = 0 AND ordinal <= 960 AND name NOT LIKE '|%'",
-            "i",
-            $teamId
-        );
+        $result = $this->fetchOne($sql, "i", $teamId);
         if ($result === null) {
             return 0;
         }

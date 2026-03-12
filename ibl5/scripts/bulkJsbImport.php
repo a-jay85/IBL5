@@ -41,7 +41,7 @@ require_once __DIR__ . '/../db/db.php';
 $dryRun = in_array('--dry-run', $argv, true);
 
 $fileTypeFilter = null;
-$validTypes = ['car', 'his', 'trn', 'asw'];
+$validTypes = ['car', 'his', 'trn', 'asw', 'awa'];
 foreach ($argv as $arg) {
     if (str_starts_with($arg, '--file-type=')) {
         $fileTypeFilter = substr($arg, strlen('--file-type='));
@@ -126,7 +126,7 @@ foreach ($dirs as $dirPath) {
 
     // Check for JSB files
     $hasJsbFiles = false;
-    foreach (['IBL5.car', 'IBL5.his', 'IBL5.trn', 'IBL5.asw'] as $jsbFile) {
+    foreach (['IBL5.car', 'IBL5.his', 'IBL5.trn', 'IBL5.asw', 'IBL5.awa'] as $jsbFile) {
         if (file_exists($dirPath . '/' . $jsbFile)) {
             $hasJsbFiles = true;
             break;
@@ -179,19 +179,20 @@ if ($parseErrors !== []) {
 // ── Dry run: list files and exit ────────────────────────────────────────────
 if ($dryRun) {
     echo str_pad('Directory', 40) . str_pad('Year', 8) . str_pad('Phase', 25);
-    echo str_pad('.car', 5) . str_pad('.his', 5) . str_pad('.trn', 5) . ".asw\n";
-    echo str_repeat('-', 90) . "\n";
+    echo str_pad('.car', 5) . str_pad('.his', 5) . str_pad('.trn', 5) . str_pad('.asw', 5) . ".awa\n";
+    echo str_repeat('-', 95) . "\n";
 
     foreach ($entries as $entry) {
         $car = file_exists($entry['path'] . '/IBL5.car') ? 'Y' : '-';
         $his = file_exists($entry['path'] . '/IBL5.his') ? 'Y' : '-';
         $trn = file_exists($entry['path'] . '/IBL5.trn') ? 'Y' : '-';
         $asw = file_exists($entry['path'] . '/IBL5.asw') ? 'Y' : '-';
+        $awa = file_exists($entry['path'] . '/IBL5.awa') ? 'Y' : '-';
 
         echo str_pad($entry['dir'], 40)
             . str_pad((string) $entry['year'], 8)
             . str_pad($entry['phase'], 25)
-            . str_pad($car, 5) . str_pad($his, 5) . str_pad($trn, 5) . $asw . "\n";
+            . str_pad($car, 5) . str_pad($his, 5) . str_pad($trn, 5) . str_pad($asw, 5) . $awa . "\n";
     }
 
     echo sprintf("\nTotal: %d directories ready for processing.\n", count($entries));
@@ -209,7 +210,7 @@ $totalSkipped = 0;
 $totalErrors = 0;
 $filesProcessed = 0;
 
-$fileTypes = $fileTypeFilter !== null ? [$fileTypeFilter] : ['trn', 'car', 'his', 'asw'];
+$fileTypes = $fileTypeFilter !== null ? [$fileTypeFilter] : ['trn', 'car', 'his', 'asw', 'awa'];
 
 foreach ($fileTypes as $fileType) {
     echo "\n" . str_repeat('=', 50) . "\n";
@@ -242,6 +243,7 @@ foreach ($fileTypes as $fileType) {
                 'his' => $service->processHisFile($filePath, $sourceLabel),
                 'trn' => $service->processTrnFile($filePath, $sourceLabel),
                 'asw' => $service->processAswFile($filePath, $entry['year']),
+                'awa' => $service->processAwaFile($filePath, $entry['path'] . '/IBL5.car'),
                 default => throw new \RuntimeException("Unknown file type: {$fileType}"),
             };
 

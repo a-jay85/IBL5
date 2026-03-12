@@ -71,7 +71,7 @@ jobs:
 
       - name: Install Composer dependencies
         working-directory: ibl5
-        run: composer install --no-interaction --no-progress --prefer-dist
+        run: composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
 
       # --- App Setup (must exist before Docker build) ---
       - name: Create config.php

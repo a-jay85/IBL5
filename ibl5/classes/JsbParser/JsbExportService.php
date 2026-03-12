@@ -172,8 +172,8 @@ class JsbExportService implements JsbExportServiceInterface
 
                 if ($item['itemtype'] === '1') {
                     // Player trade
-                    $fromJsbId = $this->resolveTeamToJsbId($item['from']);
-                    $toJsbId = $this->resolveTeamToJsbId($item['to']);
+                    $fromJsbId = $this->resolveTeamToJsbId($item['trade_from']);
+                    $toJsbId = $this->resolveTeamToJsbId($item['trade_to']);
                     $trnItems[] = [
                         'marker' => TrnFileParser::TRADE_MARKER_PLAYER,
                         'from_team' => $fromJsbId,
@@ -182,8 +182,8 @@ class JsbExportService implements JsbExportServiceInterface
                     ];
                 } elseif ($item['itemtype'] === '0') {
                     // Draft pick trade
-                    $fromJsbId = $this->resolveTeamToJsbId($item['from']);
-                    $toJsbId = $this->resolveTeamToJsbId($item['to']);
+                    $fromJsbId = $this->resolveTeamToJsbId($item['trade_from']);
+                    $toJsbId = $this->resolveTeamToJsbId($item['trade_to']);
                     $trnItems[] = [
                         'marker' => TrnFileParser::TRADE_MARKER_DRAFT_PICK,
                         'from_team' => $fromJsbId,
@@ -250,8 +250,8 @@ class JsbExportService implements JsbExportServiceInterface
     /**
      * Group trade items by tradeofferid.
      *
-     * @param list<array{tradeofferid: int, itemid: int, itemtype: string, from: string, to: string, created_at: string}> $items
-     * @return array<int, list<array{tradeofferid: int, itemid: int, itemtype: string, from: string, to: string, created_at: string}>>
+     * @param list<array{tradeofferid: int, itemid: int, itemtype: string, trade_from: string, trade_to: string, created_at: string}> $items
+     * @return array<int, list<array{tradeofferid: int, itemid: int, itemtype: string, trade_from: string, trade_to: string, created_at: string}>>
      */
     private function groupTradeItems(array $items): array
     {

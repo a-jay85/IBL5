@@ -152,21 +152,11 @@ else
         sed 's/ DEFINER=[^ ]* / /g' "$SCHEMA_FILE" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
     fi
 
-    # Optionally seed with CI test data
-    if [ "$SEED_DB" = true ]; then
-        CI_SEED="$WORKTREE_PATH/ibl5/tests/e2e/fixtures/ci-seed.sql"
-        if [ -f "$CI_SEED" ]; then
-            echo "Importing ci-seed.sql..."
-            db_exec_stdin "$DB_CONTAINER" $DB_CMD < "$CI_SEED"
-        else
-            echo "Warning: ci-seed.sql not found at $CI_SEED"
-        fi
-    fi
 fi
 
 # Always run migrations (idempotent — skips already-applied ones)
-# This ensures the worktree's branch-specific migrations are applied
-# even when importing a prod dump that may predate them.
+# Migrations run BEFORE ci-seed to match CI pipeline order
+# (schema → migrations → seed), ensuring renamed columns exist.
 MIGRATIONS_DIR="$WORKTREE_PATH/ibl5/migrations"
 if [ -d "$MIGRATIONS_DIR" ] && ls "$MIGRATIONS_DIR"/*.sql &>/dev/null; then
     echo "Running migrations..."
@@ -184,6 +174,17 @@ if [ -d "$MIGRATIONS_DIR" ] && ls "$MIGRATIONS_DIR"/*.sql &>/dev/null; then
                 -e "INSERT INTO schema_migrations (version) VALUES ('$BASENAME');"
         fi
     done
+fi
+
+# Optionally seed with CI test data (after migrations so renamed columns exist)
+if [ "$SEED_DB" = true ]; then
+    CI_SEED="$WORKTREE_PATH/ibl5/tests/e2e/fixtures/ci-seed.sql"
+    if [ -f "$CI_SEED" ]; then
+        echo "Importing ci-seed.sql..."
+        db_exec_stdin "$DB_CONTAINER" $DB_CMD < "$CI_SEED"
+    else
+        echo "Warning: ci-seed.sql not found at $CI_SEED"
+    fi
 fi
 
 echo ""

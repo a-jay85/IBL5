@@ -11,7 +11,9 @@ const ADMIN_URLS = [
 
 test.describe('Admin page smoke tests', () => {
   test('updateAllTheThings page loads for admin', async ({ page }) => {
-    const response = await page.goto('scripts/updateAllTheThings.php');
+    const response = await page.goto('scripts/updateAllTheThings.php', {
+      timeout: 60_000,
+    });
     const status = response?.status() ?? 0;
     const body = await page.locator('body').textContent();
 

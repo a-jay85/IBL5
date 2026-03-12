@@ -108,7 +108,12 @@ jobs:
       - name: Install mariadb-client
         run: sudo apt-get install -y mariadb-client
 
-      - name: Create database and apply migrations
+      - name: Import database schema
+        run: |
+          sed 's/DEFINER=`[^`]*`@`[^`]*`//g' ibl5/schema.sql \
+            | mariadb -h 127.0.0.1 -u root -proot ibl5
+
+      - name: Apply migrations
         run: |
           chmod +x ibl5/bin/run-migrations-ci.sh
           ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5

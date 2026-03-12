@@ -2997,20 +2997,22 @@ BEGIN
 
   IF OLD.user_ibl_team <> NEW.user_ibl_team THEN
 
-    -- ===== Dual-write: sync ibl_team_info.gm_username =====
+    -- ===== Dual-write: sync gm_username =====
 
     -- Clear gm_username on old team
     IF OLD.user_ibl_team <> '' THEN
       UPDATE ibl_team_info
-         SET gm_username = NULL
+         SET gm_username = NULL,
+             discordID = NULL
        WHERE team_name = OLD.user_ibl_team
          AND gm_username = OLD.username;
     END IF;
 
-    -- Set gm_username on new team
+    -- Set gm_username and discordID on new team
     IF NEW.user_ibl_team <> '' THEN
       UPDATE ibl_team_info
-         SET gm_username = NEW.username
+         SET gm_username = NEW.username,
+             discordID = NEW.discordID
        WHERE team_name = NEW.user_ibl_team;
     END IF;
 
@@ -3063,6 +3065,17 @@ BEGIN
       END IF;
     END IF;
 
+  END IF;
+
+  -- ===== Sync discordID changes (even without team change) =====
+  IF OLD.discordID <> NEW.discordID
+     OR (OLD.discordID IS NULL AND NEW.discordID IS NOT NULL)
+     OR (OLD.discordID IS NOT NULL AND NEW.discordID IS NULL) THEN
+    IF NEW.user_ibl_team <> '' THEN
+      UPDATE ibl_team_info
+         SET discordID = NEW.discordID
+       WHERE team_name = NEW.user_ibl_team;
+    END IF;
   END IF;
 END */;;
 DELIMITER ;

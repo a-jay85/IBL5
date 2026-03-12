@@ -128,7 +128,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
     public function getHealthyAndInjuredPlayersOrderedByName(int $teamId, ?\Season $season = null): array
     {
         $freeAgencyCondition = '';
-        if ($season !== null && $season->phase === 'Free Agency') {
+        if ($season !== null && $season->isOffseasonPhase()) {
             // During Free Agency, only count players who have a salary for next year
             $freeAgencyCondition = " AND (
                 (p.cy = 0 AND p.cy1 > 0) OR
@@ -163,7 +163,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
     public function getHealthyPlayersOrderedByName(int $teamId, ?\Season $season = null): array
     {
         $freeAgencyCondition = '';
-        if ($season !== null && $season->phase === 'Free Agency') {
+        if ($season !== null && $season->isOffseasonPhase()) {
             // During Free Agency, only count players who have a salary for next year
             $freeAgencyCondition = " AND (
                 (p.cy = 0 AND p.cy1 > 0) OR
@@ -322,7 +322,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
 
         foreach ($resultContracts as $contract) {
             $yearUnderContract = $contract['cy'] ?? 0;
-            if ($season->phase === "Free Agency") {
+            if ($season->isOffseasonPhase()) {
                 $yearUnderContract++;
             }
 

@@ -27,7 +27,7 @@ class Contracts
      */
     public static function render(\mysqli $db, iterable $result, \Team $team, \Season $season, array $starterPids = [], array $excludeFromCapPids = []): string
     {
-        $isFreeAgency = $season->isFreeAgencyPhase();
+        $isFreeAgency = $season->isOffseasonPhase();
         $isExtensionPhase = in_array($season->phase, ['Preseason', 'Regular Season', 'Playoffs'], true);
 
         if ($isFreeAgency) {

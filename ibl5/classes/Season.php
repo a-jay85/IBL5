@@ -150,6 +150,17 @@ class Season
     }
 
     /**
+     * Check if the current phase is an offseason phase (Draft or Free Agency)
+     *
+     * During offseason phases, salary/roster displays shift to show next season's
+     * contracts instead of the current (now-expired) season's contracts.
+     */
+    public function isOffseasonPhase(): bool
+    {
+        return $this->phase === 'Draft' || $this->phase === 'Free Agency';
+    }
+
+    /**
      * Check if trades are currently allowed.
      *
      * Trades are allowed when the "Allow Trades" setting is "Yes",

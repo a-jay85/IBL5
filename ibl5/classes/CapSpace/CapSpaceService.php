@@ -125,10 +125,10 @@ class CapSpaceService
      */
     public function getDisplayYears(\Season $season): array
     {
-        $beginningYear = ($season->phase === 'Free Agency')
+        $beginningYear = $season->isOffseasonPhase()
             ? $season->beginningYear + 1
             : $season->beginningYear;
-        $endingYear = ($season->phase === 'Free Agency')
+        $endingYear = $season->isOffseasonPhase()
             ? $season->endingYear + 1
             : $season->endingYear;
 

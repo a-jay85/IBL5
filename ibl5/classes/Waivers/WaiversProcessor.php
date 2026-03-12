@@ -48,7 +48,7 @@ class WaiversProcessor implements WaiversProcessorInterface
         ];
         $playerData = PlayerDataConverter::arrayToPlayerData($playerArray);
         
-        if ($season->phase === 'Free Agency') {
+        if ($season->isOffseasonPhase()) {
             $currentSeasonSalary = $this->contractCalculator->getNextSeasonSalary($playerData);
             $experience = ($playerData->yearsOfExperience ?? 0) + 1;
         } else {
@@ -95,7 +95,7 @@ class WaiversProcessor implements WaiversProcessorInterface
         $playerDataObj = PlayerDataConverter::arrayToPlayerData($playerData);
         
         // Determine current season salary and experience based on phase
-        if ($season->phase === 'Free Agency') {
+        if ($season->isOffseasonPhase()) {
             $currentSeasonSalary = $this->contractCalculator->getNextSeasonSalary($playerDataObj);
             $experience = ($playerDataObj->yearsOfExperience ?? 0) + 1;
         } else {

@@ -105,7 +105,7 @@ class DraftView implements DraftViewInterface
             $playerName = HtmlSanitizer::safeHtmlOutput($player['name']);
             $rowClass = ($isPlayerDrafted !== 0 && $isPlayerDrafted !== null) ? ' class="drafted"' : '';
 
-            if ($teamLogo === $pickOwner && $isPlayerDrafted === 0) {
+            if ($teamLogo === $pickOwner && ($isPlayerDrafted === 0 || $isPlayerDrafted === null)) {
                 $html .= '<tr' . $rowClass . '>
                     <td class="sticky-col"><input type="radio" name="player" value="' . htmlspecialchars($player['name'], ENT_QUOTES) . '"></td>
                     <td class="sticky-col-2" style="white-space: nowrap;">' . $playerName . '</td>';
@@ -176,7 +176,7 @@ class DraftView implements DraftViewInterface
     public function hasUndraftedPlayers(array $players): bool
     {
         foreach ($players as $player) {
-            if ($player['drafted'] === 0) {
+            if ($player['drafted'] === 0 || $player['drafted'] === null) {
                 return true;
             }
         }

@@ -2462,15 +2462,15 @@ CREATE TABLE `ibl_trade_info` (
   `tradeofferid` int(11) NOT NULL DEFAULT 0 COMMENT 'FK to ibl_trade_offers.id',
   `itemid` int(11) NOT NULL DEFAULT 0 COMMENT 'ID of traded item (player pid or draft pick id)',
   `itemtype` varchar(128) NOT NULL DEFAULT '' COMMENT 'Item category: 0=draft pick, 1=player, cash=cash',
-  `from` varchar(128) NOT NULL DEFAULT '' COMMENT 'Sending team name',
-  `to` varchar(128) NOT NULL DEFAULT '' COMMENT 'Receiving team name',
+  `trade_from` varchar(128) NOT NULL DEFAULT '' COMMENT 'Sending team name',
+  `trade_to` varchar(128) NOT NULL DEFAULT '' COMMENT 'Receiving team name',
   `approval` varchar(128) NOT NULL DEFAULT '' COMMENT 'Team approval status',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_tradeofferid` (`tradeofferid`),
-  KEY `idx_from` (`from`),
-  KEY `idx_to` (`to`)
+  KEY `idx_trade_from` (`trade_from`),
+  KEY `idx_trade_to` (`trade_to`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_trade_offers`;

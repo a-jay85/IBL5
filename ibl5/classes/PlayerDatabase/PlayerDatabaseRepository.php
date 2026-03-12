@@ -144,7 +144,7 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
         }
 
         $whereClause = implode(' AND ', $conditions);
-        $query = "SELECT ibl_plr.*, ibl_team_info.color1, ibl_team_info.color2
+        $query = "SELECT ibl_plr.*, ibl_team_info.team_name AS teamname, ibl_team_info.color1, ibl_team_info.color2
             FROM ibl_plr
             LEFT JOIN ibl_team_info ON ibl_plr.tid = ibl_team_info.teamid
             WHERE $whereClause

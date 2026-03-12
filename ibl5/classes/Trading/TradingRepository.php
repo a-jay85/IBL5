@@ -394,7 +394,7 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     {
         /** @var list<TradeInfoRow> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_trade_info ORDER BY tradeofferid ASC"
+            "SELECT * FROM ibl_trade_info WHERE approval != 'completed' ORDER BY tradeofferid ASC"
         );
     }
 

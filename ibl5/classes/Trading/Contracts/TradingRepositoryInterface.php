@@ -232,9 +232,11 @@ interface TradingRepositoryInterface
     public function getTeamDraftPicksForTrading(int $teamId): array;
 
     /**
-     * Get all trade offers ordered by offer ID
+     * Get all pending trade offers ordered by offer ID
      *
-     * Returns all rows from ibl_trade_info for the trade review page.
+     * Returns pending (non-completed) rows from ibl_trade_info for the trade
+     * review page. Excludes rows with approval='completed' which are preserved
+     * only for TRN export.
      *
      * @return list<TradeInfoRow> Trade info rows ordered by tradeofferid ASC
      */

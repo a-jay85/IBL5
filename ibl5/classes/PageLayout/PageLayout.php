@@ -117,7 +117,7 @@ class PageLayout
         $charsetValue = defined('_CHARSET') ? \_CHARSET : null;
         $charset = is_string($charsetValue) ? $charsetValue : 'UTF-8';
         echo "<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset={$charset}\">\n";
-        echo "<meta id=\"viewport-meta\" name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
+        echo "<meta id=\"viewport-meta\" name=\"viewport\" content=\"width=device-width, initial-scale=1.0, viewport-fit=cover\">\n";
         echo "<script>(function(){try{if(localStorage.getItem('ibl_desktop_view')==='1'){document.getElementById('viewport-meta').setAttribute('content','width=1440');document.documentElement.classList.add('desktop-view-active');}}catch(e){}})()</script>\n";
         echo "<META HTTP-EQUIV=\"EXPIRES\" CONTENT=\"0\">\n";
         echo "<META NAME=\"RESOURCE-TYPE\" CONTENT=\"DOCUMENT\">\n";

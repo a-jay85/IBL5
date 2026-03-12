@@ -63,6 +63,31 @@ test.describe('Draft board: renders', () => {
     await expect(submitBtn.first()).toBeVisible();
   });
 
+  test('submit button is fixed to bottom of viewport', async ({ page }) => {
+    const container = page.locator('.draft-submit-container');
+    await expect(container).toBeVisible();
+
+    const position = await container.evaluate(
+      (el) => getComputedStyle(el).position,
+    );
+    expect(position).toBe('fixed');
+  });
+
+  test('submit button visible without scrolling', async ({ page }) => {
+    const submitBtn = page.locator('.draft-submit-container .ibl-btn');
+    await expect(submitBtn).toBeVisible();
+    await expect(submitBtn).toBeInViewport();
+  });
+
+  test('submit button remains visible after scrolling', async ({ page }) => {
+    // Scroll to the bottom of the draft table
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+
+    const submitBtn = page.locator('.draft-submit-container .ibl-btn');
+    await expect(submitBtn).toBeVisible();
+    await expect(submitBtn).toBeInViewport();
+  });
+
   test('no PHP errors on draft board', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Draft board');
   });

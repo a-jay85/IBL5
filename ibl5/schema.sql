@@ -2487,7 +2487,8 @@ DROP TABLE IF EXISTS `ibl_trade_queue`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `ibl_trade_queue` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `query` text NOT NULL COMMENT 'SQL query to execute for trade processing',
+  `operation_type` varchar(50) NOT NULL DEFAULT '' COMMENT 'Type: player_transfer, pick_transfer',
+  `params` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'JSON-encoded operation parameters' CHECK (json_valid(`params`)),
   `tradeline` text DEFAULT NULL COMMENT 'Human-readable trade summary line',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

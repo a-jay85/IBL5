@@ -92,7 +92,12 @@ class TradeProcessor implements TradeProcessorInterface
 
             $this->createNewsStory($storytitle, $storytext);
             $this->sendNotifications($offeringTeamName, $listeningTeamName, $storytext);
-            $this->repository->deleteTradeOffer($offerId);
+
+            // Preserve trade_info rows for TRN export by marking them completed,
+            // then clean up only the parent offer and cash rows.
+            $this->repository->markTradeInfoCompleted($offerId);
+            $this->cashRepository->deleteTradeCashByOfferId($offerId);
+            $this->repository->deleteTradeOfferById($offerId);
 
             $this->db->commit();
 

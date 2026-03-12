@@ -268,6 +268,18 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
+     * @see TradingRepositoryInterface::markTradeInfoCompleted()
+     */
+    public function markTradeInfoCompleted(int $offerId): int
+    {
+        return $this->execute(
+            "UPDATE ibl_trade_info SET approval = 'completed' WHERE tradeofferid = ?",
+            "i",
+            $offerId
+        );
+    }
+
+    /**
      * @see TradingRepositoryInterface::getLastInsertId()
      */
     public function getLastInsertId(): int

@@ -170,6 +170,17 @@ interface TradingRepositoryInterface
     public function deleteTradeInfoByOfferId(int $offerId): int;
 
     /**
+     * Mark trade info rows as completed for a given offer ID.
+     *
+     * Sets the approval column to 'completed' so the rows are preserved
+     * for TRN export while no longer appearing as pending trades.
+     *
+     * @param int $offerId Trade offer ID
+     * @return int Number of rows affected
+     */
+    public function markTradeInfoCompleted(int $offerId): int;
+
+    /**
      * Get the last inserted ID
      *
      * @return int Last insert ID

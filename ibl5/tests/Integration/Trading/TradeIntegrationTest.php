@@ -326,7 +326,7 @@ class TradeIntegrationTest extends IntegrationTestCase
 
         // Assert
         $this->assertTrue($result['success']);
-        $this->assertQueryExecuted('DELETE FROM ibl_trade_info');
+        $this->assertQueryExecuted('UPDATE ibl_trade_info');
         $this->assertQueryExecuted('DELETE FROM ibl_trade_cash');
         $this->assertQueryExecuted('DELETE FROM ibl_trade_offers');
     }
@@ -613,16 +613,10 @@ class TradeIntegrationTest extends IntegrationTestCase
         // Assert
         $this->assertTrue($result['success']);
 
-        // All three trade tables should have DELETE queries executed
-        $this->assertQueryExecuted('DELETE FROM ibl_trade_info');
+        // Trade info rows are marked completed (not deleted) for TRN export
+        $this->assertQueryExecuted('UPDATE ibl_trade_info');
+        // Cash and offer parent rows are still deleted
         $this->assertQueryExecuted('DELETE FROM ibl_trade_cash');
         $this->assertQueryExecuted('DELETE FROM ibl_trade_offers');
-
-        // Verify the correct offer ID was used in the cleanup queries
-        $deleteQueries = array_filter(
-            $this->getExecutedQueries(),
-            static fn(string $q): bool => stripos($q, 'DELETE') === 0
-        );
-        $this->assertGreaterThanOrEqual(3, count($deleteQueries), 'Should have at least 3 DELETE queries for complete cleanup');
     }
 }

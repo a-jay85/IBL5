@@ -232,6 +232,9 @@ class CapSpaceServiceTest extends TestCase
         $mockSeason->phase = $phase;
         $mockSeason->beginningYear = $beginningYear;
         $mockSeason->endingYear = $endingYear;
+        $mockSeason->method('isOffseasonPhase')->willReturn(
+            $phase === 'Draft' || $phase === 'Free Agency'
+        );
         return $mockSeason;
     }
 }

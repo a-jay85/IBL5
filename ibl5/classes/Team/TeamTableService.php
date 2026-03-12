@@ -33,7 +33,7 @@ class TeamTableService implements TeamTableServiceInterface
     {
         $season = new \Season($this->db);
 
-        $isFreeAgency = $season->isFreeAgencyPhase();
+        $isFreeAgency = $season->isOffseasonPhase();
 
         if ($teamID === 0) {
             $result = $this->repository->getFreeAgents($isFreeAgency);
@@ -140,7 +140,7 @@ class TeamTableService implements TeamTableServiceInterface
     public function getRosterAndStarters(int $teamID): array
     {
         $season = new \Season($this->db);
-        $isFreeAgency = $season->isFreeAgencyPhase();
+        $isFreeAgency = $season->isOffseasonPhase();
 
         if ($isFreeAgency) {
             $result = $this->repository->getFreeAgencyRoster($teamID);

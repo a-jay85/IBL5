@@ -12,6 +12,7 @@ use Shared\Contracts\SharedRepositoryInterface;
  */
 class DraftSelectionHandler implements DraftSelectionHandlerInterface
 {
+    private \mysqli $db;
     private DraftValidator $validator;
     private DraftRepository $repository;
     private \Services\CommonMysqliRepository $commonRepository;
@@ -22,6 +23,7 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
 
     public function __construct(\mysqli $db, SharedRepositoryInterface $sharedRepository, \Season $season)
     {
+        $this->db = $db;
         $this->sharedRepository = $sharedRepository;
         $this->season = $season;
 
@@ -54,12 +56,25 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
     private function processDraftSelection(string $teamName, string $playerName, int $draftRound, int $draftPick): string
     {
         $date = date('Y-m-d h:i:s');
-        $draftTableUpdated = $this->repository->updateDraftTable($playerName, $date, $draftRound, $draftPick);
-        $rookieTableUpdated = $this->repository->updateRookieTable($playerName, $teamName);
-        $playerCreated = $this->repository->createPlayerFromDraftClass($playerName, $teamName);
-        if (!$draftTableUpdated || !$rookieTableUpdated || !$playerCreated) {
+
+        $this->db->begin_transaction();
+        try {
+            $draftTableUpdated = $this->repository->updateDraftTable($playerName, $date, $draftRound, $draftPick);
+            $rookieTableUpdated = $this->repository->updateRookieTable($playerName, $teamName);
+            $playerCreated = $this->repository->createPlayerFromDraftClass($playerName, $teamName);
+
+            if (!$draftTableUpdated || !$rookieTableUpdated || !$playerCreated) {
+                $this->db->rollback();
+                return $this->processor->getDatabaseErrorMessage();
+            }
+
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            error_log('Draft selection DB error: ' . $e->getMessage());
             return $this->processor->getDatabaseErrorMessage();
         }
+
         return $this->sendNotifications($teamName, $playerName, $draftRound, $draftPick);
     }
 
@@ -72,27 +87,38 @@ class DraftSelectionHandler implements DraftSelectionHandlerInterface
             $teamName,
             $playerName
         );
-        $nextTeamDraftPick = $this->repository->getNextTeamOnClock();
-        $teamOnTheClock = null;
+
+        $nextPick = $this->repository->getCurrentDraftPick();
         $discordIDOfTeamOnTheClock = null;
-        if ($nextTeamDraftPick !== null) {
-            $nextTeamTid = $this->commonRepository->getTidFromTeamname($nextTeamDraftPick) ?? 0;
+        if ($nextPick !== null) {
             $teamOnTheClock = $this->sharedRepository->getCurrentOwnerOfDraftPick(
                 $this->season->endingYear,
-                $draftRound,
-                $nextTeamTid
+                $nextPick['round'],
+                $nextPick['tid']
             );
             if ($teamOnTheClock !== null) {
                 $discordIDOfTeamOnTheClock = $this->commonRepository->getTeamDiscordID($teamOnTheClock);
             }
         }
-        \Discord::postToChannel('#general-chat', $message);
+
+        try {
+            \Discord::postToChannel('#general-chat', $message);
+        } catch (\Throwable $e) {
+            error_log('Draft Discord #general-chat error: ' . $e->getMessage());
+        }
+
         $messageWithNextTeam = $this->processor->createNextTeamMessage(
             $message,
             $discordIDOfTeamOnTheClock,
             $this->season->endingYear
         );
-        \Discord::postToChannel('#draft-picks', $messageWithNextTeam);
+
+        try {
+            \Discord::postToChannel('#draft-picks', $messageWithNextTeam);
+        } catch (\Throwable $e) {
+            error_log('Draft Discord #draft-picks error: ' . $e->getMessage());
+        }
+
         return $this->processor->getSuccessMessage($message);
     }
 }

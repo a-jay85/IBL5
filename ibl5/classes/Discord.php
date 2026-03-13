@@ -38,7 +38,9 @@ class Discord
      */
     private static function isProduction(): bool
     {
-        return ($_SERVER['SERVER_NAME'] ?? '') === 'iblhoops.net';
+        $serverName = $_SERVER['SERVER_NAME'] ?? '';
+
+        return $serverName === 'iblhoops.net' || $serverName === 'www.iblhoops.net';
     }
 
     /**

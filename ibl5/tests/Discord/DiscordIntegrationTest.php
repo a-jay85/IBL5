@@ -270,14 +270,15 @@ class DiscordIntegrationTest extends IntegrationTestCase
     }
 
     /**
-     * Test postToChannel treats iblhoops.net as production
+     * Test postToChannel treats iblhoops.net and www.iblhoops.net as production
      */
     public function testPostToChannelDetectsProductionServer(): void
     {
-        $serverName = 'iblhoops.net';
-        $isProduction = ($serverName === 'iblhoops.net');
-
-        $this->assertTrue($isProduction);
+        $productionHosts = ['iblhoops.net', 'www.iblhoops.net'];
+        foreach ($productionHosts as $host) {
+            $isProduction = ($host === 'iblhoops.net' || $host === 'www.iblhoops.net');
+            $this->assertTrue($isProduction, "Host '{$host}' should be detected as production");
+        }
     }
 
     /**
@@ -287,7 +288,7 @@ class DiscordIntegrationTest extends IntegrationTestCase
     {
         $nonProductionHosts = ['localhost', '127.0.0.1', 'main.localhost', ''];
         foreach ($nonProductionHosts as $host) {
-            $isProduction = ($host === 'iblhoops.net');
+            $isProduction = ($host === 'iblhoops.net' || $host === 'www.iblhoops.net');
             $this->assertFalse($isProduction, "Host '{$host}' should not be detected as production");
         }
     }

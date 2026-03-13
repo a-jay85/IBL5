@@ -234,8 +234,9 @@ ALTER TABLE ibl_fa_offers ADD INDEX IF NOT EXISTS idx_team (team);
 -- Trade Indexes
 -- ---------------------------------------------------------------------------
 ALTER TABLE ibl_trade_info ADD INDEX IF NOT EXISTS idx_tradeofferid (tradeofferid);
-ALTER TABLE ibl_trade_info ADD INDEX IF NOT EXISTS idx_from (`from`);
-ALTER TABLE ibl_trade_info ADD INDEX IF NOT EXISTS idx_to (`to`);
+-- Note: `from` and `to` columns are renamed to `trade_from` and `trade_to` in migration 059.
+-- In CI, schema.sql already has the new names, so indexing the old names would fail.
+-- Migration 059 handles creating idx_trade_from and idx_trade_to with IF NOT EXISTS.
 
 -- ============================================================================
 -- PART 3: ADD TIMESTAMP COLUMNS FOR AUDIT TRAILS

@@ -18,9 +18,15 @@ on:
       - 'ibl5/composer.lock'
       - 'ibl5/bun.lock'
       - 'ibl5/package.json'
+      - 'Dockerfile'
+      - 'docker/opcache.ini'
+      - 'docker/entrypoint.sh'
     branches:
       - master
       - develop
+
+permissions:
+  packages: write
 
 jobs:
   cache-dependencies:
@@ -126,6 +132,21 @@ jobs:
           cp /var/cache/apt/archives/*.deb ~/playwright-apt-cache/ 2>/dev/null || true
           echo "Cached $(ls ~/playwright-apt-cache/*.deb 2>/dev/null | wc -l) .deb files"
 
+      # --- Docker Image ---
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push PHP image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/a-jay85/ibl5/php-apache:latest
+
       # --- Summary ---
       - name: Cache summary
         run: |
@@ -163,3 +184,6 @@ jobs:
             echo "- Apt cache: updated" >> $GITHUB_STEP_SUMMARY
           fi
           echo "- Key: \`${{ runner.os }}-playwright-apt-${{ steps.playwright-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Docker" >> $GITHUB_STEP_SUMMARY
+          echo "- PHP-Apache image: pushed to ghcr.io/a-jay85/ibl5/php-apache:latest" >> $GITHUB_STEP_SUMMARY

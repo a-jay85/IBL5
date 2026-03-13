@@ -15,7 +15,7 @@ services:
       retries: 10
 
   php:
-    build: .
+    image: ghcr.io/a-jay85/ibl5/php-apache:latest
     environment:
       DB_HOST: mariadb
       E2E_TESTING: 1

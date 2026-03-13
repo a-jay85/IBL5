@@ -59,7 +59,7 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertStringContainsString('confirm(', $output);
 
         // Check that it handles different field types correctly
-        $this->assertStringContainsString('active', $output);
+        $this->assertStringContainsString('canPlayInGame', $output);
         $this->assertStringContainsString('pg|sg|sf|pf|c', $output);
         $this->assertStringContainsString('min|OF|DF', $output);
         $this->assertStringContainsString('OI|DI|BH', $output);

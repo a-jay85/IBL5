@@ -342,7 +342,7 @@ class TradeOffer implements TradeOfferInterface
      *
      * @param int $tradeOfferId Trade offer ID
      * @param int $itemId Item ID (player PID or pick ID)
-     * @param int $assetType Asset type (0=pick, 1=player)
+     * @param int $assetType Asset type (0=pick, 1=player) from form data
      * @param string $offeringTeamName Offering team name
      * @param string $listeningTeamName Listening team name
      * @param string $approvalTeamName Name of team that needs to approve
@@ -350,18 +350,20 @@ class TradeOffer implements TradeOfferInterface
      */
     protected function insertTradeItem(int $tradeOfferId, int $itemId, int $assetType, string $offeringTeamName, string $listeningTeamName, string $approvalTeamName): array
     {
+        $itemType = TradeItemType::fromFormInt($assetType);
+
         // Use repository with prepared statements
         $this->repository->insertTradeItem(
             $tradeOfferId,
             $itemId,
-            $assetType,
+            $itemType,
             $offeringTeamName,
             $listeningTeamName,
             $approvalTeamName
         );
 
         $tradeText = "";
-        if ($assetType === 0) {
+        if ($itemType === TradeItemType::DraftPick) {
             $tradeText = $this->getPickTradeText($itemId, $offeringTeamName, $listeningTeamName);
         } else {
             $tradeText = $this->getPlayerTradeText($itemId, $offeringTeamName, $listeningTeamName);
@@ -452,7 +454,7 @@ class TradeOffer implements TradeOfferInterface
         $this->repository->insertTradeItem(
             $tradeOfferId,
             $itemId,
-            'cash',
+            TradeItemType::Cash,
             $offeringTeamName,
             $listeningTeamName,
             $approvalTeamName

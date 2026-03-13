@@ -31,7 +31,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
         $rosterPlayer = ['pid' => 100, 'name' => 'Test Player'];
         $dcSettings = [
             'pg' => 1, 'sg' => 2, 'sf' => 3, 'pf' => 4, 'c' => 5,
-            'active' => 1, 'min' => 30, 'of' => 2, 'df' => 3, 'oi' => 1, 'di' => 2, 'bh' => 4,
+            'canPlayInGame' => 1, 'min' => 30, 'of' => 2, 'df' => 3, 'oi' => 1, 'di' => 2, 'bh' => 4,
         ];
 
         $result = $this->service->buildPlayerSnapshot($rosterPlayer, $dcSettings, 1);

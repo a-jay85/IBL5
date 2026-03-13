@@ -1,5 +1,5 @@
 -- CI E2E seed data: minimal rows for Playwright smoke tests.
--- Imported AFTER schema.sql into the CI MariaDB service container.
+-- Imported AFTER migrations into the CI MariaDB service container.
 
 -- ============================================================
 -- PHP-Nuke bootstrap tables

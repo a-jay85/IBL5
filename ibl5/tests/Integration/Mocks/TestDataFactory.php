@@ -243,7 +243,7 @@ class TestDataFactory
             'id' => 1,
             'tradeofferid' => 1,
             'itemid' => 100,
-            'itemtype' => '1', // '1' = player, '0' = pick, 'cash' = cash
+            'itemtype' => \Trading\TradeItemType::Player->value,
             'from' => 'Test Team',
             'to' => 'Other Team',
             'approval' => 'pending',

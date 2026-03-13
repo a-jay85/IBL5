@@ -64,8 +64,8 @@ All 30 modules in `ibl5/classes/` follow Repository/Service/View pattern with in
 Classes autoload from `ibl5/classes/`. Never use `require_once`.
 
 ### Database
-- Schema: `ibl5/schema.sql` - **always verify table/column names here**
-- **Schema is reference-only:** `schema.sql` is a snapshot of production's database schema. Never edit it directly to make schema changes. Instead, create migration files. `schema.sql` will not be reimported into production.
+- Schema: `ibl5/migrations/000_baseline_schema.sql` - **always verify table/column names here** (check subsequent migrations for alterations)
+- **Migrations are the single source of truth.** `000_baseline_schema.sql` is the production snapshot; all subsequent migrations alter it. There is no separate `schema.sql`.
 - Use `$mysqli_db` (modern MySQLi) over legacy `$db`
 - 51 InnoDB tables with foreign keys, 84 legacy MyISAM tables, 23 database views
 - **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on `$mysqli_db`. See `core-coding.md` for type comparison rules. The legacy `$db` connection does NOT have native types.

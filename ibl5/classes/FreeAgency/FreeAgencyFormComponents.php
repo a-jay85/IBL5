@@ -137,15 +137,17 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
      * @param array<int> $offers Salary amounts for each year
      * @param int $finalYear Final year of contract
      * @param int $offerType Offer type (0=normal, 1-6=MLE, 7=LLE, 8=VET)
+     * @param string $testId data-testid prefix for the button (e.g. "quick-offer-mle")
      * @return string HTML form
      */
-    private function renderOfferButtonForm(array $offers, int $finalYear, int $offerType = 0): string
+    private function renderOfferButtonForm(array $offers, int $finalYear, int $offerType = 0, string $testId = ''): string
     {
+        $testIdAttr = $testId !== '' ? ' data-testid="' . htmlspecialchars($testId) . '"' : '';
         ob_start();
         ?>
 <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
     <?= $this->renderHiddenFields($offers, $offerType) ?>
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary"><?= (int) $offers[$finalYear - 1] ?></button>
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary"<?= $testIdAttr ?>><?= (int) $offers[$finalYear - 1] ?></button>
 </form>
         <?php
         return (string) ob_get_clean();
@@ -198,7 +200,8 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         return $this->renderButtonRow(
             $label,
             $contractOfferConfigs,
-            0
+            0,
+            'quick-offer-max'
         );
     }
 
@@ -238,7 +241,8 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         echo $this->renderButtonRow(
             'Mid-Level Exception (click the button that corresponds to the final year you wish to offer):',
             $contractOfferConfigs,
-            0
+            0,
+            'quick-offer-mle'
         );
     }
 
@@ -259,7 +263,8 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         echo $this->renderButtonRow(
             'Lower-Level Exception:',
             $contractOfferConfigs,
-            0
+            0,
+            'quick-offer-lle'
         );
     }
 
@@ -280,7 +285,8 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         echo $this->renderButtonRow(
             'Veterans Exception:',
             $contractOfferConfigs,
-            0
+            0,
+            'quick-offer-vetmin'
         );
     }
 
@@ -290,20 +296,26 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
      * @param string $label Label text for the row
      * @param array<array{offers: array<int>, offerType?: string}> $contractOfferConfigs Contract offer configurations by years
      * @param int $fillCells Unused, kept for interface compatibility
+     * @param string $testIdPrefix data-testid prefix for buttons (e.g. "quick-offer-mle"); year suffix appended for multi-button rows
      * @return string HTML flex row content
      */
-    private function renderButtonRow(string $label, array $contractOfferConfigs, int $fillCells = 0): string
+    private function renderButtonRow(string $label, array $contractOfferConfigs, int $fillCells = 0, string $testIdPrefix = ''): string
     {
+        $isSingleButton = count($contractOfferConfigs) === 1;
         ob_start();
         ?>
 <div class="offer-button-row">
     <span class="ibl-label"><?= htmlspecialchars($label) ?></span>
     <div class="offer-button-row__buttons">
-        <?php foreach ($contractOfferConfigs as $config): ?>
+        <?php foreach ($contractOfferConfigs as $index => $config): ?>
             <?php
             $offerType = isset($config['offerType']) ? (int) $config['offerType'] : 0;
             $finalYear = count($config['offers']);
-            echo $this->renderOfferButtonForm($config['offers'], $finalYear, $offerType);
+            $testId = $testIdPrefix;
+            if ($testId !== '' && !$isSingleButton) {
+                $testId .= '-yr' . ($index + 1);
+            }
+            echo $this->renderOfferButtonForm($config['offers'], $finalYear, $offerType, $testId);
             ?>
         <?php endforeach; ?>
     </div>

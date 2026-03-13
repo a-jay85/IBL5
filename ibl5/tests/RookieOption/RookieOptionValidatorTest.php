@@ -34,8 +34,8 @@ class RookieOptionValidatorTest extends TestCase
 
         $result = $this->validator->validatePlayerOwnership($mockPlayer, 'Test Team');
 
-        $this->assertTrue($result['valid']);
-        $this->assertArrayNotHasKey('error', $result);
+        $this->assertTrue($result->isValid());
+        $this->assertNull($result->getError());
     }
 
     /**
@@ -50,10 +50,10 @@ class RookieOptionValidatorTest extends TestCase
 
         $result = $this->validator->validatePlayerOwnership($mockPlayer, 'Test Team');
 
-        $this->assertFalse($result['valid']);
-        $this->assertArrayHasKey('error', $result);
-        $this->assertStringContainsString('SG Other Player', $result['error']);
-        $this->assertStringContainsString('not on your team', $result['error']);
+        $this->assertFalse($result->isValid());
+        $this->assertNotNull($result->getError());
+        $this->assertStringContainsString('SG Other Player', $result->getError() ?? '');
+        $this->assertStringContainsString('not on your team', $result->getError() ?? '');
     }
 
     /**

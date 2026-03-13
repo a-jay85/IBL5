@@ -97,13 +97,13 @@ interface TradingRepositoryInterface
      *
      * @param int $tradeOfferId Trade offer ID
      * @param int $itemId Item ID (player pid, pick pickid, or composite for cash)
-     * @param int|string $itemType Item type (1=player, 0=pick, 'cash'=cash)
+     * @param \Trading\TradeItemType $itemType Item type enum
      * @param string $fromTeam Offering team name
      * @param string $toTeam Receiving team name
      * @param string $approvalTeam Team that must approve (typically listening team)
      * @return int Number of rows affected
      */
-    public function insertTradeItem(int $tradeOfferId, int $itemId, $itemType, string $fromTeam, string $toTeam, string $approvalTeam): int;
+    public function insertTradeItem(int $tradeOfferId, int $itemId, \Trading\TradeItemType $itemType, string $fromTeam, string $toTeam, string $approvalTeam): int;
 
     /**
      * Get trade items by offer ID

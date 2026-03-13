@@ -208,7 +208,7 @@ class TradingService implements TradingServiceInterface
                 ];
             }
 
-            if ($itemType === 'cash') {
+            if ($itemType === TradeItemType::Cash->value) {
                 $cashItems = $this->resolveCashItems($from, $to, $offerId, $seasonEndingYear);
                 array_push($tradeOffers[$offerId]['items'], ...$cashItems);
             } else {
@@ -220,7 +220,7 @@ class TradingService implements TradingServiceInterface
                 );
 
                 // Collect player PIDs for roster preview (classify by sending team)
-                if ($itemType === '1') {
+                if ($itemType === TradeItemType::Player->value) {
                     if ($from === $tradeOffers[$offerId]['from']) {
                         $tradeOffers[$offerId]['previewData']['fromPids'][] = $itemId;
                     } else {
@@ -244,11 +244,11 @@ class TradingService implements TradingServiceInterface
      */
     private function resolveTradeItem(int $itemId, string $itemType, string $from, string $to): array
     {
-        if ($itemType === '0') {
+        if ($itemType === TradeItemType::DraftPick->value) {
             return $this->resolvePickItem($itemId, $from, $to);
         }
 
-        // itemtype === '1' (player)
+        // itemtype === Player
         return $this->resolvePlayerItem($itemId, $from, $to);
     }
 

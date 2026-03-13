@@ -21,13 +21,15 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
     private SeriesRecordsService $service;
     private SeriesRecordsView $view;
     private CommonMysqliRepository $commonRepository;
+    private \Utilities\NukeCompat $nukeCompat;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?\Utilities\NukeCompat $nukeCompat = null)
     {
         $this->repository = new SeriesRecordsRepository($db);
         $this->service = new SeriesRecordsService();
         $this->view = new SeriesRecordsView($this->service);
         $this->commonRepository = new CommonMysqliRepository($db);
+        $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
     }
 
     /**
@@ -72,10 +74,8 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
      */
     public function main(mixed $user): void
     {
-        if (is_user($user)) {
-            /** @var array<int, string> $cookie */
-            global $cookie;
-            cookiedecode($user);
+        if ($this->nukeCompat->isUser($user)) {
+            $cookie = $this->nukeCompat->cookieDecode($user);
             $username = $cookie[1] ?? '';
 
             if ($username !== '') {

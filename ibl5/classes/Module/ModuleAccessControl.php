@@ -84,7 +84,7 @@ class ModuleAccessControl
             $requiredPhase = self::PHASE_RESTRICTED_MODULES[$moduleName];
             if ($this->season->phase !== $requiredPhase) {
                 // Draft module can be made accessible outside Draft phase via "Show Draft Link" toggle
-                if ($moduleName === 'Draft' && $this->season->showDraftLink === 'On') {
+                if ($moduleName === 'Draft' && $this->season->showDraftLink === \Settings\SettingName::ShowDraftLink->enabledValue()) {
                     // Allow access — admin has explicitly enabled the Draft link
                 } else {
                     return false;
@@ -93,8 +93,8 @@ class ModuleAccessControl
         }
 
         // Trivia mode check
-        $triviaMode = $this->settings['Trivia Mode'] ?? 'Off';
-        if ($triviaMode === 'On' && in_array($moduleName, self::TRIVIA_HIDDEN_MODULES, true)) {
+        $triviaMode = $this->settings[\Settings\SettingName::TriviaMode->value] ?? \Settings\SettingName::TriviaMode->disabledValue();
+        if ($triviaMode === \Settings\SettingName::TriviaMode->enabledValue() && in_array($moduleName, self::TRIVIA_HIDDEN_MODULES, true)) {
             return false;
         }
 

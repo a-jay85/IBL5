@@ -18,13 +18,15 @@ class TeamController implements TeamControllerInterface
     private \mysqli $db;
     private TeamServiceInterface $service;
     private TeamViewInterface $view;
+    private \Utilities\NukeCompat $nukeCompat;
 
-    public function __construct(\mysqli $db)
+    public function __construct(\mysqli $db, ?\Utilities\NukeCompat $nukeCompat = null)
     {
         $this->db = $db;
         $repository = new TeamRepository($db);
         $this->service = new TeamService($db, $repository);
         $this->view = new TeamView();
+        $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
     }
 
     /**
@@ -87,9 +89,8 @@ class TeamController implements TeamControllerInterface
 
         $userTeamName = '';
         global $user;
-        if (is_user($user)) {
-            /** @var array<int, string> $cookie */
-            global $cookie;
+        if ($this->nukeCompat->isUser($user)) {
+            $cookie = $this->nukeCompat->cookieDecode($user);
             $username = (string) ($cookie[1] ?? '');
             if ($username !== '') {
                 $commonRepo = new \Services\CommonMysqliRepository($this->db);

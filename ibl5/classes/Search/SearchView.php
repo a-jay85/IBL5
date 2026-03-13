@@ -24,6 +24,13 @@ use Utilities\HtmlSanitizer;
  */
 class SearchView implements SearchViewInterface
 {
+    private \Utilities\NukeCompat $nukeCompat;
+
+    public function __construct(?\Utilities\NukeCompat $nukeCompat = null)
+    {
+        $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
+    }
+
     /**
      * @see SearchViewInterface::render()
      * @param SearchPageData $data
@@ -304,7 +311,7 @@ class SearchView implements SearchViewInterface
             $title = HtmlSanitizer::safeHtmlOutput($result['title']);
             $aid = HtmlSanitizer::safeHtmlOutput($result['aid']);
             $informant = HtmlSanitizer::safeHtmlOutput($result['informant']);
-            $time = HtmlSanitizer::safeHtmlOutput(formatTimestamp($result['time']));
+            $time = HtmlSanitizer::safeHtmlOutput($this->nukeCompat->formatTimestamp($result['time']));
             $comments = $result['comments'];
             $topicId = $result['topicId'];
             $topicText = HtmlSanitizer::safeHtmlOutput($result['topicText']);
@@ -364,7 +371,7 @@ class SearchView implements SearchViewInterface
             $tid = $result['tid'];
             $sid = $result['sid'];
             $subject = HtmlSanitizer::safeHtmlOutput($result['subject']);
-            $date = HtmlSanitizer::safeHtmlOutput(formatTimestamp($result['date']));
+            $date = HtmlSanitizer::safeHtmlOutput($this->nukeCompat->formatTimestamp($result['date']));
             $name = HtmlSanitizer::safeHtmlOutput($result['name']);
             $articleTitle = HtmlSanitizer::safeHtmlOutput($result['articleTitle']);
             $replyCount = $result['replyCount'];

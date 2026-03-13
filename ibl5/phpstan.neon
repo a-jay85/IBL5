@@ -23,3 +23,7 @@ services:
         class: PHPStanRules\RequireStrictTypesRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanDirectNukeGlobalsRule
+        tags:
+            - phpstan.rules.rule

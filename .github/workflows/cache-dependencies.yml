@@ -145,7 +145,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}/php-apache:latest
+          tags: ghcr.io/a-jay85/ibl5/php-apache:latest
 
       # --- Summary ---
       - name: Cache summary
@@ -186,4 +186,4 @@ jobs:
           echo "- Key: \`${{ runner.os }}-playwright-apt-${{ steps.playwright-version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Docker" >> $GITHUB_STEP_SUMMARY
-          echo "- PHP-Apache image: pushed to ghcr.io/${{ github.repository }}/php-apache:latest" >> $GITHUB_STEP_SUMMARY
+          echo "- PHP-Apache image: pushed to ghcr.io/a-jay85/ibl5/php-apache:latest" >> $GITHUB_STEP_SUMMARY

@@ -501,8 +501,7 @@ ALTER TABLE `ibl_trade_cash` MODIFY COLUMN `cy6` int DEFAULT NULL COMMENT 'Cash 
 ALTER TABLE `ibl_trade_info` MODIFY COLUMN `tradeofferid` int NOT NULL DEFAULT '0' COMMENT 'FK to ibl_trade_offers.id';
 ALTER TABLE `ibl_trade_info` MODIFY COLUMN `itemid` int NOT NULL DEFAULT '0' COMMENT 'ID of traded item (player pid or draft pick id)';
 ALTER TABLE `ibl_trade_info` MODIFY COLUMN `itemtype` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Item category: 0=draft pick, 1=player, cash=cash';
-ALTER TABLE `ibl_trade_info` MODIFY COLUMN `from` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Sending team name';
-ALTER TABLE `ibl_trade_info` MODIFY COLUMN `to` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Receiving team name';
+-- `from`/`to` columns renamed to `trade_from`/`trade_to` by migration 059; comments added there
 ALTER TABLE `ibl_trade_info` MODIFY COLUMN `approval` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT 'Team approval status';
 
 -- =============================================================================

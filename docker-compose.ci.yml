@@ -1,0 +1,33 @@
+# Minimal Docker Compose for CI E2E tests.
+# No Traefik, Mailpit, Adminer, persistent volumes, or external networks.
+services:
+  mariadb:
+    image: mariadb:10.6
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: ibl5
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  php:
+    build: .
+    environment:
+      DB_HOST: mariadb
+      E2E_TESTING: 1
+    volumes:
+      - ./ibl5:/var/www/html/ibl5
+    ports:
+      - "8080:80"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost/ibl5/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

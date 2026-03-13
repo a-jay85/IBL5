@@ -7,31 +7,10 @@ on:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    services:
-      mariadb:
-        image: mariadb:10.6
-        env:
-          MARIADB_ROOT_PASSWORD: root
-          MARIADB_DATABASE: ibl5
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v6
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mysqli, gd, pdo_mysql, opcache
-          ini-values: opcache.enable=1, opcache.enable_cli=1, opcache.memory_consumption=128, opcache.validate_timestamps=0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -92,14 +71,47 @@ jobs:
 
       - name: Install Composer dependencies
         working-directory: ibl5
-        run: composer install --no-interaction --no-progress --prefer-dist
+        run: composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+
+      # --- App Setup (must exist before Docker build) ---
+      - name: Create config.php
+        working-directory: ibl5
+        run: |
+          cat > config.php <<'PHPCFG'
+          <?php
+          if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
+              header("Location: index.php");
+              exit();
+          }
+          $display_errors = true;
+          $dbhost = getenv('DB_HOST') ?: '127.0.0.1';
+          $dbuname = 'root';
+          $dbpass = 'root';
+          $dbname = 'ibl5';
+          $prefix = 'nuke';
+          $user_prefix = 'nuke';
+          $dbtype = 'MySQL';
+          $sitekey = 'ci-test-key-not-secret';
+          $subscription_url = '';
+          $admin_file = 'admin';
+          PHPCFG
+
+      - name: Build CSS
+        working-directory: ibl5
+        run: bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
+
+      # --- Docker Compose ---
+      - name: Start Docker containers
+        run: docker compose -f docker-compose.ci.yml up -d --build --wait
 
       # --- Database Setup ---
+      - name: Install mariadb-client
+        run: sudo apt-get install -y mariadb-client
+
       - name: Import database schema
         run: |
-          # Strip DEFINER clauses that reference the production user
           sed 's/DEFINER=`[^`]*`@`[^`]*`//g' ibl5/schema.sql \
-            | mysql -h 127.0.0.1 -u root -proot ibl5
+            | mariadb -h 127.0.0.1 -u root -proot ibl5
 
       - name: Apply migrations
         run: |
@@ -107,19 +119,22 @@ jobs:
           ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
 
       - name: Import seed data
-        run: mysql -h 127.0.0.1 -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
+        run: mariadb -h 127.0.0.1 -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
 
       - name: Create test user
         env:
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
           IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
         run: |
-          php <<'PHPSCRIPT'
+          docker compose -f docker-compose.ci.yml exec \
+            -e IBL_TEST_USER="$IBL_TEST_USER" \
+            -e IBL_TEST_PASS="$IBL_TEST_PASS" \
+            -T php php <<'PHPSCRIPT'
           <?php
           $hash = password_hash(getenv('IBL_TEST_PASS'), PASSWORD_BCRYPT);
           $user = getenv('IBL_TEST_USER');
           $email = 'ci-test@example.com';
-          $db = new mysqli('127.0.0.1', 'root', 'root', 'ibl5');
+          $db = new mysqli('mariadb', 'root', 'root', 'ibl5');
 
           // roles_mask = 1 grants ADMIN role (Delight\Auth\Role::ADMIN)
           // Required for admin page E2E tests (updateAllTheThings.php, block.php)
@@ -140,50 +155,6 @@ jobs:
           echo "Test user created: $user\n";
           PHPSCRIPT
 
-      # --- App Setup ---
-      - name: Create config.php
-        working-directory: ibl5
-        run: |
-          cat > config.php <<'PHPCFG'
-          <?php
-          if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
-              header("Location: index.php");
-              exit();
-          }
-          $display_errors = true;
-          $dbhost = '127.0.0.1';
-          $dbuname = 'root';
-          $dbpass = 'root';
-          $dbname = 'ibl5';
-          $prefix = 'nuke';
-          $user_prefix = 'nuke';
-          $dbtype = 'MySQL';
-          $sitekey = 'ci-test-key-not-secret';
-          $subscription_url = '';
-          $admin_file = 'admin';
-          PHPCFG
-
-      - name: Build CSS
-        working-directory: ibl5
-        run: bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
-
-      - name: Start PHP server
-        run: |
-          PHP_CLI_SERVER_WORKERS=4 E2E_TESTING=1 php -S 0.0.0.0:8080 -t $GITHUB_WORKSPACE $GITHUB_WORKSPACE/ibl5/router.php &
-          echo "PHP server PID: $!"
-
-      - name: Wait for server
-        run: |
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:8080/ibl5/ > /dev/null 2>&1; then
-              echo "Server ready after ${i}s"
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "Server failed to start"
-          exit 1
-
       # --- Run Tests ---
       - name: Run E2E tests
         working-directory: ibl5
@@ -200,3 +171,7 @@ jobs:
           name: playwright-report
           path: ibl5/playwright-report/
           retention-days: 7
+
+      - name: Stop Docker containers
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down

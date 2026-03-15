@@ -9,7 +9,7 @@
  *   - Position fields (pg, sg, sf, pf, c): distance along 1st→2nd→3rd→4th→ok→No spectrum
  *   - Intensity fields (OI, DI, BH): absolute numeric difference (max 4)
  *   - Minutes (min): proportional to difference, ceil(diff/8) capped at 5
- *   - Categorical (OF, DF, active): always level 1
+ *   - Categorical (OF, DF, canPlayInGame): always level 1
  *
  * Exposes window.IBL_recalculateDepthChartGlows() for use after loading a saved
  * depth chart or resetting the form.
@@ -34,7 +34,7 @@
 
     /**
      * Strip trailing digits from a select name to determine field type.
-     * "pg12" → "pg", "OI3" → "OI", "active5" → "active", "min7" → "min"
+     * "pg12" → "pg", "OI3" → "OI", "canPlayInGame5" → "canPlayInGame", "min7" → "min"
      */
     function getFieldPrefix(name) {
         return name.replace(/\d+$/, '');
@@ -75,7 +75,7 @@
             return Math.min(Math.ceil(minDiff / 8), 5);
         }
 
-        // Categorical fields (OF, DF, active): always level 1
+        // Categorical fields (OF, DF, canPlayInGame): always level 1
         return 1;
     }
 

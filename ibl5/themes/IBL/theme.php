@@ -125,7 +125,8 @@ function themeindex($aid, $informant, $time, $title, $counter, $topic, $thetext,
     // Note: $title may contain trusted HTML links from News module (already filtered there)
     // We strip the deprecated <font> tags but preserve the links
     $safeTitle = str_replace(['<font class="storycat">', '</font>'], ['<span class="ibl-badge">', '</span>'], $title);
-    $safeTime = \Utilities\HtmlSanitizer::safeHtmlOutput($time);
+    $nukeCompat = new \Utilities\NukeCompat();
+    $safeTime = $nukeCompat->formatLocalTime($time);
     $safeTopictext = \Utilities\HtmlSanitizer::safeHtmlOutput($topictext);
     $safeCounter = (int)$counter;
 
@@ -203,7 +204,8 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
     // Note: $title may contain trusted HTML links from News module (already filtered there)
     // We strip the deprecated <font> tags but preserve the links
     $safeTitle = str_replace(['<font class="storycat">', '</font>'], ['<span class="ibl-badge">', '</span>'], $title);
-    $safeDatetime = \Utilities\HtmlSanitizer::safeHtmlOutput($datetime);
+    $nukeCompat = new \Utilities\NukeCompat();
+    $safeDatetime = $nukeCompat->formatLocalTime($datetime);
     $safeTopictext = \Utilities\HtmlSanitizer::safeHtmlOutput($topictext);
     $safeAid = \Utilities\HtmlSanitizer::safeHtmlOutput($aid);
 

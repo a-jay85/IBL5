@@ -172,7 +172,34 @@ class Season
             return true;
         }
 
-        return $this->allowTrades === 'Yes';
+        return $this->allowTrades === \Settings\SettingName::AllowTrades->enabledValue();
+    }
+
+    /**
+     * Phases during which waivers are always available (injury replacements).
+     *
+     * @var list<string>
+     */
+    private const WAIVERS_ALWAYS_ON_PHASES = ['HEAT', 'Regular Season', 'Playoffs'];
+
+    /**
+     * Check if waivers are currently allowed.
+     *
+     * - HEAT, Regular Season, Playoffs: always allowed (teams need injury replacements)
+     * - Draft: never allowed
+     * - Free Agency, Preseason: depends on "Allow Waiver Moves" toggle
+     */
+    public function areWaiversAllowed(): bool
+    {
+        if (in_array($this->phase, self::WAIVERS_ALWAYS_ON_PHASES, true)) {
+            return true;
+        }
+
+        if ($this->phase === 'Draft') {
+            return false;
+        }
+
+        return $this->allowWaivers === \Settings\SettingName::AllowWaiverMoves->enabledValue();
     }
 
     /**

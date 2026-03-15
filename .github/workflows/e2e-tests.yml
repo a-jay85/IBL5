@@ -119,21 +119,15 @@ jobs:
         run: docker compose -f docker-compose.ci.yml up -d --wait
 
       # --- Database Setup ---
-      - name: Install mariadb-client
-        run: sudo apt-get install -y mariadb-client
-
-      - name: Import database schema
-        run: |
-          sed 's/DEFINER=`[^`]*`@`[^`]*`//g' ibl5/schema.sql \
-            | mariadb -h 127.0.0.1 -u root -proot ibl5
-
-      - name: Apply migrations
+      - name: Create database and apply migrations
         run: |
           chmod +x ibl5/bin/run-migrations-ci.sh
           ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
 
       - name: Import seed data
-        run: mariadb -h 127.0.0.1 -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
+        run: |
+          docker compose -f docker-compose.ci.yml exec -T mariadb \
+            mariadb -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
 
       - name: Create test user
         env:

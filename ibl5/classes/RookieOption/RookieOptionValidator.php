@@ -15,12 +15,9 @@ class RookieOptionValidator implements RookieOptionValidatorInterface
 {
     /**
      * @see RookieOptionValidatorInterface::validatePlayerOwnership()
-     *
-     * @return array{valid: bool, error?: string}
      */
-    public function validatePlayerOwnership(Player $player, string $userTeamName): array
+    public function validatePlayerOwnership(Player $player, string $userTeamName): \Services\ValidationResult
     {
-        /** @var array{valid: bool, error?: string} */
         return CommonValidator::validatePlayerOwnership($player, $userTeamName);
     }
 

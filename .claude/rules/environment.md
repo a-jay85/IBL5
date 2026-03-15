@@ -1,9 +1,5 @@
 # Environment Commands
 
-## Bun
-
-Bun is available in all shells via `~/.zshenv`. No need to source shell configs before running `bun` or `bunx` commands.
-
 ## CSS Development (Tailwind 4)
 
 ```bash

@@ -126,11 +126,11 @@ class TradeProcessor implements TradeProcessorInterface
      */
     protected function processTradeItem(int $itemId, string $itemType, string $offeringTeamName, string $listeningTeamName, int $offerId): array
     {
-        if ($itemType === 'cash') {
+        if ($itemType === TradeItemType::Cash->value) {
             return $this->processCashTransaction($itemId, $offeringTeamName, $listeningTeamName, $offerId);
-        } elseif ($itemType === '0') {
+        } elseif ($itemType === TradeItemType::DraftPick->value) {
             return $this->processDraftPick($itemId, $offeringTeamName, $listeningTeamName);
-        } elseif ($itemType === '1') {
+        } elseif ($itemType === TradeItemType::Player->value) {
             return $this->processPlayer($itemId, $offeringTeamName, $listeningTeamName);
         }
 

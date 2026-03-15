@@ -44,7 +44,7 @@ IBL5/
 │   ├── modules/              # Legacy PHP-Nuke entry points
 │   ├── db/                   # Database connection setup
 │   ├── design/               # CSS source files (Tailwind)
-│   └── schema.sql            # Database schema reference
+│   └── migrations/            # SQL migrations (000 = baseline schema)
 ├── .claude/                  # Claude Code rules and skills
 ├── .github/                  # CI/CD workflows, Copilot instructions
 └── CLAUDE.md                 # AI agent instructions

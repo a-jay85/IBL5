@@ -6,7 +6,7 @@
 ## Quick Reference
 
 ### ⚠️ SCHEMA VERIFICATION REQUIREMENT
-**Always reference `ibl5/schema.sql` for table/column names and relationships.** Never assume database structures exist without verification. This prevents hallucination of non-existent tables.
+**Always reference `ibl5/migrations/000_baseline_schema.sql` (and subsequent migrations) for table/column names and relationships.** Never assume database structures exist without verification. This prevents hallucination of non-existent tables.
 
 ### Current Status
 - **Total Tables:** 136 (51 InnoDB, 84 MyISAM legacy, 23 views)
@@ -22,8 +22,8 @@
 - **Draft:** `ibl_draft`, `ibl_draft_picks`
 
 ## Schema Location
-- **File:** `/ibl5/schema.sql` (MariaDB 10.6.20 export)
-- **Migrations:** `/ibl5/migrations/` (for schema changes)
+- **Baseline:** `/ibl5/migrations/000_baseline_schema.sql` (production snapshot)
+- **Migrations:** `/ibl5/migrations/` (001+ alter the baseline)
 
 ## Database Architecture
 
@@ -51,13 +51,13 @@ Core data integrity constraints implemented:
 - `ibl_hist.pid` → `ibl_plr.pid`
 - `ibl_draft_picks.tid` → `ibl_team_info.teamid`
 - `ibl_box_scores.gameid` → `ibl_schedule.Date`
-- And 21 more... (see schema.sql for complete list)
+- And 21 more... (see `000_baseline_schema.sql` for complete list)
 
 ## Best Practices
 
 ### For Queries
 - Use prepared statements with mysqli or PDO
-- Reference `schema.sql` for table structures
+- Reference `000_baseline_schema.sql` for table structures
 - Leverage existing indexes for WHERE/JOIN clauses
 - Use database views for complex API queries
 
@@ -150,14 +150,14 @@ $query = "SELECT * FROM vw_player_current WHERE uuid = ?";
 - **Migration 030 (Feb 2026):** Dropped `ibl_team_history`, created `vw_team_awards` and `vw_franchise_summary` views ✅
 
 ## Additional Resources
-- Schema Reference: `/ibl5/schema.sql`
+- Baseline Schema: `/ibl5/migrations/000_baseline_schema.sql`
 - Migration Scripts: `/ibl5/migrations/`
 - **[Development Guide](DEVELOPMENT_GUIDE.md)** - Refactoring and testing
 - **[API Guide](API_GUIDE.md)** - API development best practices
 - **[Refactoring History](ibl5/docs/REFACTORING_HISTORY.md)** - Complete refactoring timeline
 
 ## Need Help?
-- Check schema.sql for table structures and relationships
+- Check `000_baseline_schema.sql` for table structures and relationships
 - Review existing queries in codebase for patterns
 - Use database views for complex API queries
 - Follow migration best practices for schema changes

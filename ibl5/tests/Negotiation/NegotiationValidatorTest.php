@@ -47,8 +47,8 @@ class NegotiationValidatorTest extends TestCase
         $result = $this->validator->validateNegotiationEligibility($player, $userTeamName);
 
         // Assert
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('not on your team', $result['error']);
+        $this->assertFalse($result->isValid());
+        $this->assertStringContainsString('not on your team', $result->getError() ?? '');
     }
 
     /**
@@ -67,7 +67,7 @@ class NegotiationValidatorTest extends TestCase
         $result = $this->validator->validateNegotiationEligibility($player, $userTeamName);
 
         // Assert
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -86,8 +86,8 @@ class NegotiationValidatorTest extends TestCase
         $result = $this->validator->validateNegotiationEligibility($player, $userTeamName);
 
         // Assert
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('not eligible for a contract extension', $result['error']);
+        $this->assertFalse($result->isValid());
+        $this->assertStringContainsString('not eligible for a contract extension', $result->getError() ?? '');
     }
 
     /**
@@ -105,7 +105,7 @@ class NegotiationValidatorTest extends TestCase
         $result = $this->validator->validateNegotiationEligibility($player, $userTeamName);
 
         // Assert
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -124,7 +124,7 @@ class NegotiationValidatorTest extends TestCase
         $result = $this->validator->validateNegotiationEligibility($player, $userTeamName);
 
         // Assert
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -147,8 +147,8 @@ class NegotiationValidatorTest extends TestCase
         $result = $this->validator->validateNegotiationEligibility($player, $userTeamName);
 
         // Assert
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('not eligible for a contract extension', $result['error']);
+        $this->assertFalse($result->isValid());
+        $this->assertStringContainsString('not eligible for a contract extension', $result->getError() ?? '');
     }
 
     /**
@@ -163,11 +163,11 @@ class NegotiationValidatorTest extends TestCase
         ]);
 
         // Act
-        $result = $this->validator->validateFreeAgencyNotActive('nuke');
+        $result = $this->validator->validateFreeAgencyNotActive();
 
         // Assert
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('not available during free agency', $result['error']);
+        $this->assertFalse($result->isValid());
+        $this->assertStringContainsString('not available during free agency', $result->getError() ?? '');
     }
 
     /**
@@ -182,10 +182,10 @@ class NegotiationValidatorTest extends TestCase
         ]);
 
         // Act
-        $result = $this->validator->validateFreeAgencyNotActive('nuke');
+        $result = $this->validator->validateFreeAgencyNotActive();
 
         // Assert
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->isValid());
     }
 
     /**
@@ -198,10 +198,10 @@ class NegotiationValidatorTest extends TestCase
         $this->mockDb->setMockData([]);
 
         // Act
-        $result = $this->validator->validateFreeAgencyNotActive('nuke');
+        $result = $this->validator->validateFreeAgencyNotActive();
 
         // Assert
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->isValid());
     }
 
     /**

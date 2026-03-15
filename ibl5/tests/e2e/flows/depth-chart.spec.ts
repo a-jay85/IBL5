@@ -57,7 +57,7 @@ test.describe('Depth Chart Entry flow', () => {
     const form = page.locator('.depth-chart-form');
     if (!(await form.isVisible().catch(() => false))) return;
 
-    const activeSelects = page.locator('select[name^="active"]');
+    const activeSelects = page.locator('select[name^="canPlayInGame"]');
     const count = await activeSelects.count();
     if (count === 0) return;
 

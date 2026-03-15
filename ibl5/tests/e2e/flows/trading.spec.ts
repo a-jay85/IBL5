@@ -622,7 +622,12 @@ test.describe('Trading pages: no PHP errors', () => {
 
 test.describe('Trading: trades-closed state', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Allow Trades': 'No' });
+    // Phase must NOT be Draft or Free Agency — areTradesAllowed() always
+    // returns true during those phases regardless of the Allow Trades setting.
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'Allow Trades': 'No',
+    });
     await page.goto('modules.php?name=Trading');
   });
 

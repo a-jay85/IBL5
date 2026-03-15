@@ -28,8 +28,8 @@ jobs:
       uses: shivammathur/setup-php@v2
       with:
         php-version: ${{ matrix.php-version }}
-        extensions: mbstring, intl
-        coverage: none
+        extensions: mbstring, intl, pcov
+        coverage: pcov
 
     - name: Cache vendor directory
       uses: actions/cache@v5
@@ -47,14 +47,67 @@ jobs:
       working-directory: ibl5
       run: composer install --no-progress --no-interaction
 
-    - name: Run PHPUnit tests
+    - name: Run PHPUnit tests with coverage
       working-directory: ibl5
       run: |
         vendor/bin/phpunit \
           --configuration phpunit.ci.xml \
           --testdox \
-          --no-coverage \
+          --coverage-clover coverage/clover.xml \
           --colors=always
+
+    - name: Check coverage threshold
+      working-directory: ibl5
+      run: php bin/check-coverage coverage/clover.xml 60
+
+    - name: Upload coverage report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: ibl5/coverage/
+        retention-days: 7
+
+  audit-php:
+    name: PHP Dependency Audit
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.4'
+        coverage: none
+
+    - name: Install dependencies
+      working-directory: ibl5
+      run: composer install --no-progress --no-interaction
+
+    - name: Audit PHP dependencies
+      working-directory: ibl5
+      run: composer audit
+
+  audit-js:
+    name: JS Dependency Audit
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      working-directory: ibl5
+      run: bun install --frozen-lockfile
+
+    - name: Audit JS dependencies
+      working-directory: ibl5
+      run: npx auditdeps
 
   phpstan:
     name: PHPStan Analysis

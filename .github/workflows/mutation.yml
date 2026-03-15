@@ -1,0 +1,86 @@
+name: Mutation Testing
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'  # Monday 3am UTC
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  mutation:
+    name: Infection PHP
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.event.label.name == 'mutation-test')
+    timeout-minutes: 60
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.4'
+        extensions: mbstring, intl, pcov
+        coverage: pcov
+
+    - name: Cache vendor directory
+      uses: actions/cache@v5
+      with:
+        path: ibl5/vendor
+        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-vendor-
+
+    - name: Create config.php
+      working-directory: ibl5
+      run: cp config.php.example config.php
+
+    - name: Install dependencies
+      working-directory: ibl5
+      run: composer install --no-progress --no-interaction
+
+    - name: Generate coverage for Infection
+      working-directory: ibl5
+      run: |
+        vendor/bin/phpunit \
+          --configuration phpunit.ci.xml \
+          --coverage-clover coverage/clover.xml \
+          --coverage-xml coverage/coverage-xml \
+          --log-junit coverage/junit.xml \
+          --no-progress
+
+    - name: Run Infection
+      working-directory: ibl5
+      run: |
+        vendor/bin/infection \
+          --configuration=infection.json5 \
+          --coverage=coverage \
+          --show-mutations \
+          --no-progress
+
+    - name: Upload mutation reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: mutation-reports
+        path: |
+          ibl5/infection.log
+          ibl5/infection-report.html
+          ibl5/infection-summary.log
+        retention-days: 14
+
+    - name: Post summary
+      if: always()
+      working-directory: ibl5
+      run: |
+        if [ -f infection-summary.log ]; then
+          echo "## Mutation Testing Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat infection-summary.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi

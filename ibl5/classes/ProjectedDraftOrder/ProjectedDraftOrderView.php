@@ -70,10 +70,10 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         $html .= '<th>Pick</th>';
         $html .= '<th>Team</th>';
         $html .= '<th>Record</th>';
-        $html .= '<th>Notes</th>';
         if ($showPlayer) {
             $html .= '<th>Player</th>';
         }
+        $html .= '<th>Notes</th>';
         $html .= '</tr></thead>';
         $html .= '<tbody>';
 
@@ -159,13 +159,14 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         }
 
         $html .= $this->renderRecordCell($slot);
-        $titleAttr = $slot['notes'] !== '' ? ' title="Click/tap to expand"' : '';
-        $html .= '<td class="projected-draft-order-notes"' . $titleAttr . ' onclick="this.classList.toggle(\'is-expanded\')">'
-            . HtmlSanitizer::safeHtmlOutput($slot['notes']) . '</td>';
 
         if ($showPlayer) {
             $html .= '<td>' . HtmlSanitizer::e($slot['player']) . '</td>';
         }
+
+        $titleAttr = $slot['notes'] !== '' ? ' title="Click/tap to expand"' : '';
+        $html .= '<td class="projected-draft-order-notes"' . $titleAttr . ' onclick="this.classList.toggle(\'is-expanded\')">'
+            . HtmlSanitizer::safeHtmlOutput($slot['notes']) . '</td>';
 
         $html .= '</tr>';
         return $html;

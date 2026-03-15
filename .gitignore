@@ -38,6 +38,12 @@ ibl5/shellScripts/.env
 !/IBL6
 .htaccess
 
+# Coverage & mutation reports
+ibl5/coverage/
+ibl5/infection.log
+ibl5/infection-report.html
+ibl5/infection-summary.log
+
 # Playwright
 playwright-report/
 test-results/

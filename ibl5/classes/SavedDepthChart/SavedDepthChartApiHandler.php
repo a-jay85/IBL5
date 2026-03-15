@@ -131,7 +131,7 @@ class SavedDepthChartApiHandler
                 'dc_SFDepth' => $player['dc_SFDepth'],
                 'dc_PFDepth' => $player['dc_PFDepth'],
                 'dc_CDepth' => $player['dc_CDepth'],
-                'dc_active' => $player['dc_active'],
+                'dc_canPlayInGame' => $player['dc_canPlayInGame'],
                 'dc_minutes' => $player['dc_minutes'],
                 'dc_of' => $player['dc_of'],
                 'dc_df' => $player['dc_df'],

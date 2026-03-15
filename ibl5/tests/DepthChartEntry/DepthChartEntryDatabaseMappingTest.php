@@ -42,7 +42,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
             'dc_SFDepth',  // Should get value from $processedPlayerData['sf']
             'dc_PFDepth',  // Should get value from $processedPlayerData['pf']
             'dc_CDepth',   // Should get value from $processedPlayerData['c']
-            'dc_active',   // Should get value from $processedPlayerData['canPlayInGame']
+            'dc_canPlayInGame',   // Should get value from $processedPlayerData['canPlayInGame']
             'dc_minutes',  // Should get value from $processedPlayerData['min']
             'dc_of',       // Should get value from $processedPlayerData['of']
             'dc_df',       // Should get value from $processedPlayerData['df']
@@ -58,7 +58,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
                     dc_SFDepth = ?,
                     dc_PFDepth = ?,
                     dc_CDepth = ?,
-                    dc_active = ?,
+                    dc_canPlayInGame = ?,
                     dc_minutes = ?,
                     dc_of = ?,
                     dc_df = ?,
@@ -78,7 +78,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
             'sf' => 'dc_SFDepth',
             'pf' => 'dc_PFDepth',
             'c' => 'dc_CDepth',
-            'canPlayInGame' => 'dc_active',
+            'canPlayInGame' => 'dc_canPlayInGame',
             'min' => 'dc_minutes',
             'of' => 'dc_of',
             'df' => 'dc_df',
@@ -100,7 +100,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
             $processedPlayerData['sf'],      // position 3: dc_SFDepth
             $processedPlayerData['pf'],      // position 4: dc_PFDepth
             $processedPlayerData['c'],       // position 5: dc_CDepth
-            $processedPlayerData['canPlayInGame'],  // position 6: dc_active
+            $processedPlayerData['canPlayInGame'],  // position 6: dc_canPlayInGame
             $processedPlayerData['min'],     // position 7: dc_minutes
             $processedPlayerData['of'],      // position 8: dc_of
             $processedPlayerData['df'],      // position 9: dc_df
@@ -186,7 +186,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
             'dc_SFDepth',
             'dc_PFDepth',
             'dc_CDepth',
-            'dc_active',
+            'dc_canPlayInGame',
             'dc_minutes',
             'dc_of',
             'dc_df',
@@ -225,7 +225,7 @@ class DepthChartEntryDatabaseMappingTest extends TestCase
             3 => 'dc_SFDepth',
             4 => 'dc_PFDepth',
             5 => 'dc_CDepth',
-            6 => 'dc_active',
+            6 => 'dc_canPlayInGame',
             7 => 'dc_minutes',
             8 => 'dc_of',
             9 => 'dc_df',

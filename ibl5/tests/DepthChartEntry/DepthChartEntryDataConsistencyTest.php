@@ -41,7 +41,7 @@ class DepthChartEntryDataConsistencyTest extends TestCase
             'dc_SFDepth' => 0,
             'dc_PFDepth' => 0,
             'dc_CDepth' => 0,
-            'dc_active' => 1,
+            'dc_canPlayInGame' => 1,
             'dc_minutes' => 30,
             'dc_of' => 2,      // Drive
             'dc_df' => 1,      // Outside
@@ -195,7 +195,7 @@ class DepthChartEntryDataConsistencyTest extends TestCase
             'dc_SFDepth' => 0,
             'dc_PFDepth' => 0,
             'dc_CDepth' => 0,
-            'dc_active' => 1,
+            'dc_canPlayInGame' => 1,
             'dc_minutes' => 35,
             'dc_of' => 1,   // Outside
             'dc_df' => 3,   // Post
@@ -266,7 +266,7 @@ class DepthChartEntryDataConsistencyTest extends TestCase
             'dc_SFDepth' => $processedPlayer['sf'],
             'dc_PFDepth' => $processedPlayer['pf'],
             'dc_CDepth' => $processedPlayer['c'],
-            'dc_active' => $processedPlayer['canPlayInGame'],
+            'dc_canPlayInGame' => $processedPlayer['canPlayInGame'],
             'dc_minutes' => $processedPlayer['min'],
             'dc_of' => $processedPlayer['of'],
             'dc_df' => $processedPlayer['df'],
@@ -305,7 +305,7 @@ class DepthChartEntryDataConsistencyTest extends TestCase
             'dc_SFDepth' => 0,
             'dc_PFDepth' => 0,
             'dc_CDepth' => 1,
-            'dc_active' => 1,
+            'dc_canPlayInGame' => 1,
             'dc_minutes' => 20,
             'dc_of' => 0,    // Auto
             'dc_df' => 0,    // Auto

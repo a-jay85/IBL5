@@ -47,9 +47,6 @@ mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5
 ./bin/db-query "DESCRIBE ibl_plr"
 ```
 
-**db-query pitfalls:**
-- **Never use `!=` in SQL queries passed via double quotes.** Bash interprets `!` as history expansion inside double quotes, mangling the query (`sh: : command not found`). Use SQL's `<>` operator instead: `./bin/db-query "SELECT * FROM t WHERE col <> ''"`.
-
 **When to use `db-query`:** Use this script to explore the database schema, verify data after making changes, check record counts, and validate your work. This is the preferred method for Claude to query the local database since it's configured for auto-approval in the user's Claude Code settings.
 
 ## MariaDB Strict Mode & Triggers

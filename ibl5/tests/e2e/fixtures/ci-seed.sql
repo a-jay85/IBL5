@@ -858,6 +858,54 @@ INSERT INTO ibl_hist (
    45, 185, 160, 48, 22, 65, 88, 565, 1500);
 
 -- ============================================================
+-- Played schedule games (covers win/loss, streak, record, score display)
+-- ============================================================
+
+-- Metros win as visitor (no box score link — BoxID=0, no ibl_box_scores_teams row)
+INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid) VALUES
+  (2026, '2026-02-20', 1, 2, 105, 98, 0, 'sched-played-01')
+ON DUPLICATE KEY UPDATE VScore=VALUES(VScore);
+
+-- Metros loss at home (no box score link)
+INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid) VALUES
+  (2026, '2026-02-22', 3, 1, 110, 99, 0, 'sched-played-02')
+ON DUPLICATE KEY UPDATE VScore=VALUES(VScore);
+
+-- Metros win as visitor, legacy BoxID=42
+INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid) VALUES
+  (2026, '2026-02-24', 1, 4, 102, 95, 42, 'sched-played-03')
+ON DUPLICATE KEY UPDATE VScore=VALUES(VScore);
+
+-- ============================================================
+-- Box score row for IBL6 URL path (gameOfThatDay > 0)
+-- ============================================================
+
+INSERT INTO ibl_box_scores_teams (Date, visitorTeamID, homeTeamID, gameOfThatDay, name) VALUES
+  ('2026-02-20', 1, 2, 1, 'Metros')
+ON DUPLICATE KEY UPDATE gameOfThatDay=VALUES(gameOfThatDay);
+
+-- ============================================================
+-- Power rankings (covers SOS tier dots, SOS summary)
+-- ============================================================
+
+INSERT INTO ibl_power (TeamID, ranking, last_win, last_loss, streak_type, streak, sos, remaining_sos, sos_rank, remaining_sos_rank) VALUES
+  (1, 72.0, 7, 3, 'W', 3, 0.510, 0.523, 5, 4),
+  (2, 58.0, 6, 4, 'W', 1, 0.490, 0.480, 12, 14),
+  (3, 47.0, 5, 5, 'L', 2, 0.505, 0.498, 8, 9),
+  (4, 35.0, 4, 6, 'L', 3, 0.470, 0.455, 18, 17)
+ON DUPLICATE KEY UPDATE ranking=VALUES(ranking), last_win=VALUES(last_win), last_loss=VALUES(last_loss),
+  streak_type=VALUES(streak_type), streak=VALUES(streak), sos=VALUES(sos),
+  remaining_sos=VALUES(remaining_sos), sos_rank=VALUES(sos_rank), remaining_sos_rank=VALUES(remaining_sos_rank);
+
+-- ============================================================
+-- June game (covers playoff month relabeling + reorder)
+-- ============================================================
+
+INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid) VALUES
+  (2026, '2026-06-05', 1, 2, 0, 0, 0, 'sched-playoff-june-01')
+ON DUPLICATE KEY UPDATE VScore=VALUES(VScore);
+
+-- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the
 -- workflow via PHP bcrypt hash at runtime — not seeded here.
 -- ============================================================

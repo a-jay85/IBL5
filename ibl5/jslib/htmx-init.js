@@ -8,6 +8,23 @@
 (function () {
     'use strict';
 
+    // Prevent hx-boost from intercepting links to non-PHP pages (static
+    // .htm files, directory listings).  By the time htmx:beforeRequest fires
+    // the original click's default action is already prevented, so we must
+    // navigate manually when cancelling the htmx request.
+    document.addEventListener('htmx:beforeRequest', function (evt) {
+        var elt = evt.detail.elt;
+        if (!elt || elt.tagName !== 'A') return;
+        var href = elt.getAttribute('href');
+        if (!href || href === '' || href === '/') return;
+        // Allow PHP endpoints and root index
+        if (href.indexOf('.php') !== -1) return;
+        // Everything else (static files, directories, etc.) — fall back to
+        // normal browser navigation so the full page loads correctly.
+        evt.preventDefault();
+        window.location.href = href;
+    });
+
     document.addEventListener('htmx:afterSwap', function () {
         // Re-run sorttable on new .sortable tables
         if (window.sorttable) {

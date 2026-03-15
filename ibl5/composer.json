@@ -11,14 +11,16 @@
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan-phpunit": "^2.0",
         "phpstan/phpstan-strict-rules": "^2.0",
-        "phpstan/phpstan-deprecation-rules": "^2.0"
+        "phpstan/phpstan-deprecation-rules": "^2.0",
+        "infection/infection": "^0.32.6"
     },
     "scripts": {
         "pre-autoload-dump": "if [ -L vendor ]; then echo 'ERROR: vendor/ is a symlink (worktree). Do not run composer install/dump-autoload here — it corrupts shared autoload paths. Run from the main repo instead.' && exit 1; fi",
         "lint:php": "vendor/bin/phpcs --standard=PSR12 src",
         "lint:php:fix": "vendor/bin/phpcbf --standard=PSR12 src",
         "analyse": "vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=1G",
-        "analyse:baseline": "vendor/bin/phpstan analyse --configuration=phpstan.neon --generate-baseline --memory-limit=1G"
+        "analyse:baseline": "vendor/bin/phpstan analyse --configuration=phpstan.neon --generate-baseline --memory-limit=1G",
+        "mutation": "vendor/bin/infection --configuration=infection.json5 --coverage=coverage"
     },
     "autoload": {
         "psr-4": {
@@ -33,7 +35,8 @@
     },
     "config": {
         "allow-plugins": {
-            "phpstan/extension-installer": true
+            "phpstan/extension-installer": true,
+            "infection/extension-installer": true
         }
     }
 }

@@ -27,8 +27,8 @@ services:
     environment:
       MARIADB_ROOT_PASSWORD: root
       MARIADB_DATABASE: iblhoops_ibl5
-      MARIADB_USER: iblhoops_chibul
-      MARIADB_PASSWORD: "whereWTFhappens19!"
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASS}
     volumes:
       - db-{{SLUG}}-data:/var/lib/mysql
     healthcheck:

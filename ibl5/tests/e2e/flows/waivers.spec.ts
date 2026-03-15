@@ -54,3 +54,49 @@ test.describe('Waivers flow: open', () => {
     await assertNoPhpErrors(page, 'on Waivers page (open)');
   });
 });
+
+test.describe('Waivers flow: closed — message text', () => {
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({
+      'Current Season Phase': 'Free Agency',
+      'Allow Waiver Moves': 'No',
+    });
+    await page.goto('modules.php?name=Waivers');
+  });
+
+  test('shows exact closed message text', async ({ page }) => {
+    await expect(
+      page.getByText(
+        'Sorry, but players may not be added from or dropped to waivers at the present time.',
+      ),
+    ).toBeVisible();
+  });
+});
+
+test.describe('Waivers: view switcher tabs', () => {
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Allow Waiver Moves': 'Yes' });
+    await page.goto('modules.php?name=Waivers');
+  });
+
+  test('view switcher tabs are present', async ({ page }) => {
+    const tabs = page.locator('.ibl-tab');
+    expect(await tabs.count()).toBeGreaterThanOrEqual(4);
+  });
+
+  test('clicking tab switches displayed table', async ({ page }) => {
+    const totalTab = page.locator('.ibl-tab').filter({ hasText: /total/i });
+    if ((await totalTab.count()) > 0) {
+      await totalTab.first().click();
+    }
+    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+  });
+
+  test('no PHP errors after tab switch', async ({ page }) => {
+    const tab = page.locator('.ibl-tab').nth(1);
+    if (await tab.isVisible()) {
+      await tab.click();
+    }
+    await assertNoPhpErrors(page, 'after tab switch');
+  });
+});

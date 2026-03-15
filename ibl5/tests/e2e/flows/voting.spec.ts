@@ -16,15 +16,6 @@ test.describe('ASG Voting', () => {
       'ASG Voting': 'Yes',
     });
     await page.goto('modules.php?name=Voting');
-
-    // Retry if a parallel test changed the phase between appState and page load
-    if ((await page.locator('form[name="ASGVote"]').count()) === 0) {
-      await appState({
-        'Current Season Phase': 'Regular Season',
-        'ASG Voting': 'Yes',
-      });
-      await page.goto('modules.php?name=Voting');
-    }
   });
 
   test('ASG ballot form renders', async ({ page }) => {

@@ -126,7 +126,9 @@ test.describe('Waivers: closed state', () => {
     appState,
     page,
   }) => {
-    await appState({ 'Allow Waiver Moves': 'No' });
+    // Phase must be Free Agency or Preseason for the toggle to matter —
+    // during HEAT/Regular Season/Playoffs, waivers are always open.
+    await appState({ 'Current Season Phase': 'Free Agency', 'Allow Waiver Moves': 'No' });
     await page.goto('modules.php?name=Waivers');
 
     const form = page.locator('form[name="Waiver_Move"]');
@@ -137,7 +139,7 @@ test.describe('Waivers: closed state', () => {
     appState,
     page,
   }) => {
-    await appState({ 'Allow Waiver Moves': 'No' });
+    await appState({ 'Current Season Phase': 'Free Agency', 'Allow Waiver Moves': 'No' });
     await page.goto('modules.php?name=Waivers');
 
     await assertNoPhpErrors(page, 'on Waivers page (closed)');

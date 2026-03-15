@@ -248,5 +248,27 @@
         <include>
             <directory>classes</directory>
         </include>
+        <exclude>
+            <!-- Interfaces — zero executable statements -->
+            <directory>classes/*/Contracts</directory>
+            <!-- Repositories — need live DB, not unit-testable -->
+            <directory suffix="Repository.php">classes</directory>
+            <!-- Views — HTML output, covered by E2E tests -->
+            <directory suffix="View.php">classes</directory>
+            <directory suffix="ViewHelper.php">classes</directory>
+            <directory suffix="FormComponents.php">classes</directory>
+            <!-- Controllers/Handlers — HTTP glue -->
+            <directory suffix="Controller.php">classes</directory>
+            <directory suffix="Handler.php">classes</directory>
+            <!-- Legacy modules not under active development -->
+            <directory>classes/SiteStatistics</directory>
+            <directory>classes/OneOnOneGame</directory>
+            <directory>classes/Database</directory>
+            <!-- Legacy god-class files -->
+            <file>classes/MySQL.php</file>
+            <file>classes/UI.php</file>
+            <file>classes/Game.php</file>
+            <file>classes/JSB.php</file>
+        </exclude>
     </source>
 </phpunit>

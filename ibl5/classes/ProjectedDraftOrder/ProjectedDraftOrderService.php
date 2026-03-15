@@ -88,8 +88,8 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
             return $this->calculateDraftOrder($seasonYear);
         }
 
-        $savedPicks = $this->repository->getFinalDraftOrder($seasonYear);
-        if ($savedPicks === []) {
+        $savedRound1 = $this->repository->getFinalDraftOrder($seasonYear, 1);
+        if ($savedRound1 === []) {
             return $this->calculateDraftOrder($seasonYear);
         }
 
@@ -113,45 +113,15 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         }
 
         // Build round-1 from saved picks, enriching with standings and ownership data
-        $round1 = [];
-        foreach ($savedPicks as $savedPick) {
-            $team = $teamMap[$savedPick['tid']] ?? null;
-            if ($team === null) {
-                continue;
-            }
+        $round1 = $this->buildRoundFromSavedPicks($savedRound1, 1, $teamMap, $nameToIdMap, $pickOwnership, $projectedPickByTeam);
 
-            $teamName = $savedPick['team'];
-            $ownership = $pickOwnership[$teamName][1] ?? null;
-            $ownerName = $ownership !== null ? $ownership['ownerName'] : $teamName;
-            $notes = $ownership !== null ? $ownership['notes'] : '';
-            $isTraded = $ownerName !== $teamName;
-            $ownerId = $nameToIdMap[$ownerName] ?? $savedPick['tid'];
-            $ownerTeam = $teamMap[$ownerId] ?? $team;
+        // Build round-2 from saved picks
+        $savedRound2 = $this->repository->getFinalDraftOrder($seasonYear, 2);
+        $round2 = $savedRound2 !== []
+            ? $this->buildRoundFromSavedPicks($savedRound2, 2, $teamMap, $nameToIdMap, $pickOwnership, [])
+            : $projected['round2'];
 
-            // Movement: positive = moved up, negative = moved down (lottery only)
-            $projectedPick = $projectedPickByTeam[$savedPick['tid']] ?? $savedPick['pick'];
-            $movement = $projectedPick - $savedPick['pick'];
-
-            $round1[] = [
-                'pick' => $savedPick['pick'],
-                'teamId' => $savedPick['tid'],
-                'teamName' => $teamName,
-                'wins' => $team['wins'],
-                'losses' => $team['losses'],
-                'color1' => $team['color1'],
-                'color2' => $team['color2'],
-                'ownerId' => $ownerId,
-                'ownerName' => $ownerName,
-                'ownerColor1' => $ownerTeam['color1'],
-                'ownerColor2' => $ownerTeam['color2'],
-                'isTraded' => $isTraded,
-                'notes' => $notes,
-                'movement' => $movement,
-                'player' => $savedPick['player'],
-            ];
-        }
-
-        return ['round1' => $round1, 'round2' => $projected['round2']];
+        return ['round1' => $round1, 'round2' => $round2];
     }
 
     /** @param list<int> $lotteryTeamIds */
@@ -209,6 +179,58 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         $ownership = $pickOwnership[$firstTeamName][1] ?? null;
         $ownerName = $ownership !== null ? $ownership['ownerName'] : $firstTeamName;
         $this->repository->upsertLotteryWinnerAward($seasonYear, $ownerName);
+    }
+
+    /**
+     * Build draft slots from saved picks, enriching with standings and ownership data.
+     *
+     * @param list<array{pick: int, team: string, tid: int, player: string}> $savedPicks
+     * @param array<int, StandingsRow> $teamMap
+     * @param array<string, int> $nameToIdMap
+     * @param array<string, array<int, array{ownerName: string, notes: string}>> $pickOwnership
+     * @param array<int, int> $projectedPickByTeam
+     * @return list<DraftSlot>
+     */
+    private function buildRoundFromSavedPicks(array $savedPicks, int $round, array $teamMap, array $nameToIdMap, array $pickOwnership, array $projectedPickByTeam): array
+    {
+        $slots = [];
+        foreach ($savedPicks as $savedPick) {
+            $team = $teamMap[$savedPick['tid']] ?? null;
+            if ($team === null) {
+                continue;
+            }
+
+            $teamName = $savedPick['team'];
+            $ownership = $pickOwnership[$teamName][$round] ?? null;
+            $ownerName = $ownership !== null ? $ownership['ownerName'] : $teamName;
+            $notes = $ownership !== null ? $ownership['notes'] : '';
+            $isTraded = $ownerName !== $teamName;
+            $ownerId = $nameToIdMap[$ownerName] ?? $savedPick['tid'];
+            $ownerTeam = $teamMap[$ownerId] ?? $team;
+
+            $projectedPick = $projectedPickByTeam[$savedPick['tid']] ?? $savedPick['pick'];
+            $movement = $projectedPick - $savedPick['pick'];
+
+            $slots[] = [
+                'pick' => $savedPick['pick'],
+                'teamId' => $savedPick['tid'],
+                'teamName' => $teamName,
+                'wins' => $team['wins'],
+                'losses' => $team['losses'],
+                'color1' => $team['color1'],
+                'color2' => $team['color2'],
+                'ownerId' => $ownerId,
+                'ownerName' => $ownerName,
+                'ownerColor1' => $ownerTeam['color1'],
+                'ownerColor2' => $ownerTeam['color2'],
+                'isTraded' => $isTraded,
+                'notes' => $notes,
+                'movement' => $movement,
+                'player' => $savedPick['player'],
+            ];
+        }
+
+        return $slots;
     }
 
     /**

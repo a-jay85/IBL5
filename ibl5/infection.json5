@@ -1,0 +1,36 @@
+{
+    "$schema": "vendor/infection/infection/resources/schema.json",
+    "source": {
+        "directories": ["classes"],
+        "excludes": [
+            "*Repository*",
+            "*View*", "*ViewHelper*", "*FormComponents*",
+            "*Controller*", "*Handler*",
+            "*/Contracts/*",
+            "SiteStatistics", "Bootstrap", "Database", "Auth", "Cache",
+            "JsbParser", "PlrParser", "Scripts", "Discord",
+            "OneOnOneGame", "UI.php", "Game.php", "JSB.php"
+        ]
+    },
+    "phpUnit": {
+        "configDir": ".",
+        "customPath": "vendor/bin/phpunit"
+    },
+    "mutators": {
+        "@default": true,
+        "CastFloat": false,
+        "CastInt": false,
+        "CastString": false
+    },
+    "testFramework": "phpunit",
+    "testFrameworkOptions": "--configuration=phpunit.ci.xml",
+    "minMsi": 60,
+    "minCoveredMsi": 70,
+    "threads": 4,
+    "logs": {
+        "text": "infection.log",
+        "html": "infection-report.html",
+        "summary": "infection-summary.log"
+    },
+    "tmpDir": "/tmp"
+}

@@ -145,3 +145,36 @@ test.describe('Waivers: closed state', () => {
     await assertNoPhpErrors(page, 'on Waivers page (closed)');
   });
 });
+
+// ============================================================
+// Waive form and result banner
+// ============================================================
+
+test.describe('Waivers: waive form and result banner', () => {
+  test('waive form has Action=waive hidden field', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Waiver Moves': 'Yes' });
+    await page.goto('modules.php?name=Waivers&action=waive');
+
+    const form = page.locator('form[name="Waiver_Move"]');
+    await expect(form).toBeVisible();
+
+    const actionInput = form.locator('input[name="Action"]');
+    await expect(actionInput).toHaveValue('waive');
+  });
+
+  test('player_dropped success banner', async ({ appState, page }) => {
+    await appState({ 'Allow Waiver Moves': 'Yes' });
+    await page.goto(
+      'modules.php?name=Waivers&action=waive&result=player_dropped',
+    );
+
+    const successBanner = page.locator('.ibl-alert--success');
+    await expect(successBanner).toBeVisible();
+    await expect(successBanner).toContainText(
+      'Player successfully dropped to waivers.',
+    );
+  });
+});

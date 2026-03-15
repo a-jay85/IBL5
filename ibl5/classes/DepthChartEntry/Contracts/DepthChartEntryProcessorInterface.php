@@ -10,7 +10,7 @@ namespace DepthChartEntry\Contracts;
  * Transforms raw POST data into structured player data and statistics,
  * including sanitization, validation bounds checking, and aggregation.
  *
- * @phpstan-type ProcessedPlayerData array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, active: int, min: int, of: int, df: int, oi: int, di: int, bh: int, injury: int}
+ * @phpstan-type ProcessedPlayerData array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, df: int, oi: int, di: int, bh: int, injury: int}
  * @phpstan-type ProcessedSubmission array{playerData: list<ProcessedPlayerData>, activePlayers: int, pos_1: int, pos_2: int, pos_3: int, pos_4: int, pos_5: int, hasStarterAtMultiplePositions: bool, nameOfProblemStarter: string}
  */
 interface DepthChartEntryProcessorInterface
@@ -25,14 +25,14 @@ interface DepthChartEntryProcessorInterface
      * **Processing Steps:**
      * 1. Loop through POST data for players 1 to maxPlayers
      * 2. For each player, sanitize and validate all 13 depth chart fields
-     * 3. Count active players (where active=1)
+     * 3. Count active players (where canPlayInGame=1)
      * 4. Count non-injured players at each position (where pos_N > 0 and not injured)
      * 5. Detect if any player is starting (depth=1) at multiple positions
      * 
      * **Sanitization Rules Applied:**
      * - Player names: trim whitespace, remove HTML tags via strip_tags()
      * - Depth values (pg-c): clamped to 0-5 range
-     * - Active: normalized to 0 or 1
+     * - Can Play In Game: normalized to 0 or 1
      * - Minutes: clamped to 0-40 range
      * - Focus values (OF/DF): clamped to 0-3 range
      * - Settings (OI/DI/BH): clamped to -2 to 2 range

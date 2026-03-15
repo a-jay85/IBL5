@@ -1,5 +1,5 @@
 ---
-paths: ibl5/schema.sql
+paths: ibl5/migrations/000_baseline_schema.sql
 ---
 
 # Database Schema Reference

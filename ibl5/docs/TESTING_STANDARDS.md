@@ -17,7 +17,7 @@
 - Mock functionality should not be used unless absolutely necessary
 - Instantiation of classes should be done via the class autoloader
 - Do not write tests that only test mocks or instantiation
-- **Schema Reference**: Use `ibl5/schema.sql` to understand table structures when creating test data
+- **Schema Reference**: Use `ibl5/migrations/000_baseline_schema.sql` to understand table structures when creating test data
 
 ---
 

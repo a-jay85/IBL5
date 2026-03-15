@@ -98,6 +98,24 @@ class Season
 
         return $this->allowTrades === 'Yes';
     }
+
+    /**
+     * Check if waivers are currently allowed (mock implementation)
+     *
+     * @see \Season::areWaiversAllowed()
+     */
+    public function areWaiversAllowed(): bool
+    {
+        if (in_array($this->phase, ['HEAT', 'Regular Season', 'Playoffs'], true)) {
+            return true;
+        }
+
+        if ($this->phase === 'Draft') {
+            return false;
+        }
+
+        return $this->allowWaivers === 'Yes';
+    }
     
     public function getSeasonEndingYear(): string
     {

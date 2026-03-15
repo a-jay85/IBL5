@@ -26,7 +26,7 @@ class CommonValidatorTest extends TestCase
 
         $result = CommonValidator::validatePlayerOwnership($player, 'Test Team');
 
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->isValid());
     }
 
     public function testValidatePlayerOwnershipReturnsInvalidWhenPlayerOnDifferentTeam(): void
@@ -39,8 +39,8 @@ class CommonValidatorTest extends TestCase
 
         $result = CommonValidator::validatePlayerOwnership($player, 'Test Team');
 
-        $this->assertFalse($result['valid']);
-        $this->assertArrayHasKey('error', $result);
+        $this->assertFalse($result->isValid());
+        $this->assertNotNull($result->getError());
     }
 
     public function testValidatePlayerOwnershipErrorIncludesPlayerInfo(): void
@@ -53,8 +53,8 @@ class CommonValidatorTest extends TestCase
 
         $result = CommonValidator::validatePlayerOwnership($player, 'Test Team');
 
-        $this->assertStringContainsString('C Big Center', $result['error']);
-        $this->assertStringContainsString('not on your team', $result['error']);
+        $this->assertStringContainsString('C Big Center', $result->getError() ?? '');
+        $this->assertStringContainsString('not on your team', $result->getError() ?? '');
     }
 
     public function testValidatePlayerOwnershipHandlesMissingPositionAndName(): void
@@ -65,8 +65,8 @@ class CommonValidatorTest extends TestCase
 
         $result = CommonValidator::validatePlayerOwnership($player, 'Test Team');
 
-        $this->assertFalse($result['valid']);
-        $this->assertStringContainsString('This player', $result['error']);
+        $this->assertFalse($result->isValid());
+        $this->assertStringContainsString('This player', $result->getError() ?? '');
     }
 
     public function testValidatePlayerOwnershipIsCaseSensitive(): void
@@ -80,7 +80,7 @@ class CommonValidatorTest extends TestCase
         // Different case - should fail
         $result = CommonValidator::validatePlayerOwnership($player, 'test team');
 
-        $this->assertFalse($result['valid']);
+        $this->assertFalse($result->isValid());
     }
 
     public function testValidatePlayerOwnershipWithEmptyTeamName(): void
@@ -94,6 +94,6 @@ class CommonValidatorTest extends TestCase
         $result = CommonValidator::validatePlayerOwnership($player, '');
 
         // Empty strings should match
-        $this->assertTrue($result['valid']);
+        $this->assertTrue($result->isValid());
     }
 }

@@ -1,0 +1,36 @@
+#!/bin/bash
+# Print the next available migration number.
+# Checks the main repo (not the current worktree) to avoid collisions
+# with migrations added by other branches after the worktree was created.
+
+MAIN_DIR="$(cd "$(dirname "$0")/.." && pwd)/ibl5/migrations"
+
+# Also check the main repo at the canonical path (for worktrees that diverged)
+CANONICAL_DIR="/Users/ajaynicolas/Documents/GitHub/IBL5/ibl5/migrations"
+
+# Find the highest migration number across both locations
+get_max() {
+    local dir="$1"
+    if [ -d "$dir" ]; then
+        ls "$dir"/*.sql 2>/dev/null | sed 's/.*\///' | grep -oE '^[0-9]+' | sort -n | tail -1
+    fi
+}
+
+MAX_MAIN=$(get_max "$MAIN_DIR")
+MAX_CANONICAL=$(get_max "$CANONICAL_DIR")
+
+# Use the higher of the two
+if [ -z "$MAX_MAIN" ] && [ -z "$MAX_CANONICAL" ]; then
+    echo "No migrations found" >&2
+    exit 1
+fi
+
+MAX=$MAX_MAIN
+if [ -n "$MAX_CANONICAL" ] && [ "$MAX_CANONICAL" -gt "${MAX:-0}" ] 2>/dev/null; then
+    MAX=$MAX_CANONICAL
+fi
+
+NEXT=$((10#$MAX + 1))
+PADDED=$(printf "%03d" "$NEXT")
+
+echo "$PADDED"

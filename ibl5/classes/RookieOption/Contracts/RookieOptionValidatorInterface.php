@@ -12,7 +12,6 @@ use Player\Player;
  * Defines validation rules for rookie option exercises. Validates player
  * ownership and eligibility based on experience and contract status.
  *
- * @phpstan-type ValidationResult array{valid: bool, error?: string|null}
  * @phpstan-type EligibilityResult array{valid: bool, error?: string|null, finalYearSalary?: int}
  *
  * @package RookieOption\Contracts
@@ -22,18 +21,10 @@ interface RookieOptionValidatorInterface
     /**
      * Validates that the player is on the user's team
      *
-     * Ensures the requesting user owns the player they're trying to exercise
-     * a rookie option on.
-     *
      * @param Player $player Player object with teamName property
      * @param string $userTeamName The user's team name
-     * @return array{valid: bool, error?: string} Validation result
-     *
-     * **Behaviors:**
-     * - Delegates to CommonValidator::validatePlayerOwnership()
-     * - Case-sensitive team name comparison
      */
-    public function validatePlayerOwnership(Player $player, string $userTeamName): array;
+    public function validatePlayerOwnership(Player $player, string $userTeamName): \Services\ValidationResult;
 
     /**
      * Validates rookie option eligibility and returns final year salary if eligible

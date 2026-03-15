@@ -81,7 +81,7 @@ function theindex($catid)
         $row2 = $db->sql_fetchrow($db->sql_query("select title from " . $prefix . "_stories_cat where catid='$catid'"));
         $title1 = \Utilities\HtmlSanitizer::safeHtmlOutput($row2['title']);
         $title = "$title1: $title";
-        themeindex($aid, $informant, $datetime, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
+        themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);
     }
     PageLayout\PageLayout::footer();
 }

@@ -82,7 +82,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
                 "INSERT INTO {$this->playersTable}
                     (depth_chart_id, pid, player_name, ordinal,
                      dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth,
-                     dc_active, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh)
+                     dc_canPlayInGame, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 "iisiiiiiiiiiiiii",
                 $depthChartId,
@@ -94,7 +94,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
                 $snapshot['dc_SFDepth'],
                 $snapshot['dc_PFDepth'],
                 $snapshot['dc_CDepth'],
-                $snapshot['dc_active'],
+                $snapshot['dc_canPlayInGame'],
                 $snapshot['dc_minutes'],
                 $snapshot['dc_of'],
                 $snapshot['dc_df'],
@@ -254,14 +254,14 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
 
     /**
      * @see SavedDepthChartRepositoryInterface::getLiveRosterSettings()
-     * @return list<array{pid: int, name: string, ordinal: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}>
+     * @return list<array{pid: int, name: string, ordinal: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_canPlayInGame: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}>
      */
     public function getLiveRosterSettings(int $tid): array
     {
-        /** @var list<array{pid: int, name: string, ordinal: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> */
+        /** @var list<array{pid: int, name: string, ordinal: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_canPlayInGame: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> */
         return $this->fetchAll(
             "SELECT pid, name, ordinal, dc_PGDepth, dc_SGDepth, dc_SFDepth, dc_PFDepth, dc_CDepth,
-                    dc_active, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh
+                    dc_canPlayInGame, dc_minutes, dc_of, dc_df, dc_oi, dc_di, dc_bh
              FROM {$this->plrTable}
              WHERE tid = ? AND retired = '0' AND ordinal <= ?
              ORDER BY ordinal ASC",

@@ -133,7 +133,7 @@
                 setSelectValue(form, 'sf' + depthCount, player.dc_SFDepth);
                 setSelectValue(form, 'pf' + depthCount, player.dc_PFDepth);
                 setSelectValue(form, 'c' + depthCount, player.dc_CDepth);
-                setSelectValue(form, 'canPlayInGame' + depthCount, player.dc_active);
+                setSelectValue(form, 'canPlayInGame' + depthCount, player.dc_canPlayInGame);
                 setSelectValue(form, 'min' + depthCount, player.dc_minutes);
                 setSelectValue(form, 'OF' + depthCount, player.dc_of);
                 setSelectValue(form, 'DF' + depthCount, player.dc_df);

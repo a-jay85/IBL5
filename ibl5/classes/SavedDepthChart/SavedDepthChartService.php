@@ -276,7 +276,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             'dc_SFDepth' => $dcSettings['sf'] ?? 0,
             'dc_PFDepth' => $dcSettings['pf'] ?? 0,
             'dc_CDepth' => $dcSettings['c'] ?? 0,
-            'dc_active' => $dcSettings['canPlayInGame'] ?? 0,
+            'dc_canPlayInGame' => $dcSettings['canPlayInGame'] ?? 0,
             'dc_minutes' => $dcSettings['min'] ?? 0,
             'dc_of' => $dcSettings['of'] ?? 0,
             'dc_df' => $dcSettings['df'] ?? 0,
@@ -509,7 +509,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
                 'dc_SFDepth' => $player['dc_SFDepth'],
                 'dc_PFDepth' => $player['dc_PFDepth'],
                 'dc_CDepth' => $player['dc_CDepth'],
-                'dc_active' => $player['dc_active'],
+                'dc_canPlayInGame' => $player['dc_canPlayInGame'],
                 'dc_minutes' => $player['dc_minutes'],
                 'dc_of' => $player['dc_of'],
                 'dc_df' => $player['dc_df'],
@@ -544,12 +544,12 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
      * match for every player. Detects roster changes from trades.
      *
      * @param list<SavedDepthChartPlayerRow> $dcPlayers Saved DC player settings
-     * @param list<array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $liveRosterPlayers Live ibl_plr settings
+     * @param list<array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_canPlayInGame: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $liveRosterPlayers Live ibl_plr settings
      */
     private function isDepthChartMatchingLive(array $dcPlayers, array $liveRosterPlayers): bool
     {
         // Build map of live settings by PID
-        /** @var array<int, array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_active: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $liveByPid */
+        /** @var array<int, array{pid: int, dc_PGDepth: int, dc_SGDepth: int, dc_SFDepth: int, dc_PFDepth: int, dc_CDepth: int, dc_canPlayInGame: int, dc_minutes: int, dc_of: int, dc_df: int, dc_oi: int, dc_di: int, dc_bh: int}> $liveByPid */
         $liveByPid = [];
         foreach ($liveRosterPlayers as $player) {
             $liveByPid[$player['pid']] = $player;
@@ -574,7 +574,7 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
         // Compare all 12 dc_* columns for each player
         $dcColumns = [
             'dc_PGDepth', 'dc_SGDepth', 'dc_SFDepth', 'dc_PFDepth', 'dc_CDepth',
-            'dc_active', 'dc_minutes', 'dc_of', 'dc_df', 'dc_oi', 'dc_di', 'dc_bh',
+            'dc_canPlayInGame', 'dc_minutes', 'dc_of', 'dc_df', 'dc_oi', 'dc_di', 'dc_bh',
         ];
 
         foreach ($savedByPid as $pid => $savedPlayer) {

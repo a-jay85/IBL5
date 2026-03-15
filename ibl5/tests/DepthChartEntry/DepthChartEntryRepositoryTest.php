@@ -86,7 +86,7 @@ class DepthChartEntryRepositoryTest extends TestCase
         $this->assertStringContainsString('dc_SFDepth', $lastQuery);
         $this->assertStringContainsString('dc_PFDepth', $lastQuery);
         $this->assertStringContainsString('dc_CDepth', $lastQuery);
-        $this->assertStringContainsString('dc_active', $lastQuery);
+        $this->assertStringContainsString('dc_canPlayInGame', $lastQuery);
         $this->assertStringContainsString('dc_minutes', $lastQuery);
         $this->assertStringContainsString('dc_of', $lastQuery);
         $this->assertStringContainsString('dc_df', $lastQuery);

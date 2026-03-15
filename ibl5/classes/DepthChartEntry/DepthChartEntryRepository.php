@@ -64,7 +64,7 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
                     dc_SFDepth = ?, 
                     dc_PFDepth = ?, 
                     dc_CDepth = ?, 
-                    dc_active = ?, 
+                    dc_canPlayInGame = ?,
                     dc_minutes = ?, 
                     dc_of = ?, 
                     dc_df = ?, 

@@ -19,7 +19,7 @@ class JsbExportService implements JsbExportServiceInterface
     /**
      * Map of database field names to PlrFileWriter field names.
      *
-     * Depth chart fields (dc_PGDepth–dc_CDepth, dc_active) are intentionally excluded —
+     * Depth chart fields (dc_PGDepth–dc_CDepth, dc_active/dc_canPlayInGame) are intentionally excluded —
      * those are managed by DepthChartEntry and not exported to the .plr file.
      *
      * @var array<string, string>
@@ -170,7 +170,7 @@ class JsbExportService implements JsbExportServiceInterface
             foreach ($group as $item) {
                 $dateStr = $item['created_at'];
 
-                if ($item['itemtype'] === '1') {
+                if ($item['itemtype'] === \Trading\TradeItemType::Player->value) {
                     // Player trade
                     $fromJsbId = $this->resolveTeamToJsbId($item['trade_from']);
                     $toJsbId = $this->resolveTeamToJsbId($item['trade_to']);
@@ -180,7 +180,7 @@ class JsbExportService implements JsbExportServiceInterface
                         'to_team' => $toJsbId,
                         'player_id' => $item['itemid'],
                     ];
-                } elseif ($item['itemtype'] === '0') {
+                } elseif ($item['itemtype'] === \Trading\TradeItemType::DraftPick->value) {
                     // Draft pick trade
                     $fromJsbId = $this->resolveTeamToJsbId($item['trade_from']);
                     $toJsbId = $this->resolveTeamToJsbId($item['trade_to']);
@@ -191,7 +191,7 @@ class JsbExportService implements JsbExportServiceInterface
                         'draft_year' => $item['itemid'],
                     ];
                 }
-                // itemtype 'cash' is not represented in .trn format
+                // TradeItemType::Cash is not represented in .trn format
             }
 
             if ($trnItems !== [] && $dateStr !== '') {

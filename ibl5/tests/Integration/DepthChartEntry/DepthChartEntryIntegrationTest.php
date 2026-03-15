@@ -105,7 +105,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             'sf1' => '0',
             'pf1' => '3',
             'c1' => '0',
-            'active1' => '1',
+            'canPlayInGame1' => '1',
             'min1' => '32',
             'OF1' => '2',
             'DF1' => '1',
@@ -128,7 +128,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $this->assertEquals(0, $playerData['sf']);
         $this->assertEquals(3, $playerData['pf']);
         $this->assertEquals(0, $playerData['c']);
-        $this->assertEquals(1, $playerData['active']);
+        $this->assertEquals(1, $playerData['canPlayInGame']);
         $this->assertEquals(32, $playerData['min']);
         $this->assertEquals(2, $playerData['of']);
         $this->assertEquals(1, $playerData['df']);
@@ -177,7 +177,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             $player['sf'],
             $player['pf'],
             $player['c'],
-            $player['active'],
+            $player['canPlayInGame'],
             $player['min'],
             $player['of'],
             $player['df'],
@@ -444,7 +444,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $playerName = 'Test Player';
         $depthChartValues = [
             'pg' => 1, 'sg' => 2, 'sf' => 3, 'pf' => 4, 'c' => 5,
-            'active' => 1, 'min' => 35,
+            'canPlayInGame' => 1, 'min' => 35,
             'of' => 2, 'df' => 1, 'oi' => -1, 'di' => 2, 'bh' => 0
         ];
         $this->mockDb->setAffectedRows(1);
@@ -483,7 +483,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $playerName = 'Unchanged Player';
         $depthChartValues = [
             'pg' => 0, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0,
-            'active' => 1, 'min' => 0,
+            'canPlayInGame' => 1, 'min' => 0,
             'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0
         ];
         $this->mockDb->setAffectedRows(0); // No rows affected
@@ -504,9 +504,9 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
     {
         // Arrange
         $players = [
-            ['name' => 'Player 1', 'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0, 'active' => 1, 'min' => 30, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
-            ['name' => 'Player 2', 'pg' => 0, 'sg' => 1, 'sf' => 0, 'pf' => 0, 'c' => 0, 'active' => 1, 'min' => 28, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
-            ['name' => 'Player 3', 'pg' => 0, 'sg' => 0, 'sf' => 1, 'pf' => 0, 'c' => 0, 'active' => 1, 'min' => 32, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
+            ['name' => 'Player 1', 'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 30, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
+            ['name' => 'Player 2', 'pg' => 0, 'sg' => 1, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 28, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
+            ['name' => 'Player 3', 'pg' => 0, 'sg' => 0, 'sf' => 1, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 32, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
         ];
         $this->mockDb->setAffectedRows(1);
 
@@ -536,7 +536,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $postData = [
             'Name1' => '<script>alert("xss")</script>John Smith',
             'pg1' => '1', 'sg1' => '0', 'sf1' => '0', 'pf1' => '0', 'c1' => '0',
-            'active1' => '1', 'min1' => '30',
+            'canPlayInGame1' => '1', 'min1' => '30',
             'OF1' => '0', 'DF1' => '0', 'OI1' => '0', 'DI1' => '0', 'BH1' => '0',
             'Injury1' => '0'
         ];
@@ -561,7 +561,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             'pg1' => '99',  // Should clamp to 5
             'sg1' => '-5',  // Should clamp to 0
             'sf1' => '3', 'pf1' => '0', 'c1' => '0',
-            'active1' => '999', // Should normalize to 0 (not 1)
+            'canPlayInGame1' => '999', // Should normalize to 0 (not 1)
             'min1' => '100',    // Should clamp to 40
             'OF1' => '10',      // Should clamp to 3
             'DF1' => '-10',     // Should clamp to 0
@@ -578,7 +578,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         // Assert - Values clamped to valid ranges
         $this->assertEquals(5, $player['pg'], 'PG depth should clamp to 5');
         $this->assertEquals(0, $player['sg'], 'SG depth should clamp to 0');
-        $this->assertEquals(0, $player['active'], 'Active should be 0 or 1');
+        $this->assertEquals(0, $player['canPlayInGame'], 'Active should be 0 or 1');
         $this->assertEquals(40, $player['min'], 'Minutes should clamp to 40');
         $this->assertEquals(3, $player['of'], 'OF should clamp to 3');
         $this->assertEquals(0, $player['df'], 'DF should clamp to 0');
@@ -597,7 +597,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
         $postData = [
             'Name1' => 'Test',
             'pg1' => '1', 'sg1' => '0', 'sf1' => '0', 'pf1' => '0', 'c1' => '0',
-            'active1' => '1', 'min1' => '30',
+            'canPlayInGame1' => '1', 'min1' => '30',
             'OF1' => '2', 'DF1' => '1',
             'OI1' => '-2',  // Valid negative
             'DI1' => '-1',  // Valid negative
@@ -730,7 +730,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             $postData["sf{$idx}"] = (string) $pos['sf'];
             $postData["pf{$idx}"] = (string) $pos['pf'];
             $postData["c{$idx}"] = (string) $pos['c'];
-            $postData["active{$idx}"] = '1';
+            $postData["canPlayInGame{$idx}"] = '1';
             $postData["min{$idx}"] = '25';
             $postData["OF{$idx}"] = '0';
             $postData["DF{$idx}"] = '0';
@@ -775,7 +775,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             $postData["sf{$idx}"] = (string) $pos['sf'];
             $postData["pf{$idx}"] = (string) $pos['pf'];
             $postData["c{$idx}"] = (string) $pos['c'];
-            $postData["active{$idx}"] = ($i < $activeCount) ? '1' : '0';
+            $postData["canPlayInGame{$idx}"] = ($i < $activeCount) ? '1' : '0';
             $postData["min{$idx}"] = '25';
             $postData["OF{$idx}"] = '0';
             $postData["DF{$idx}"] = '0';
@@ -818,7 +818,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             $postData["sf{$idx}"] = (string) $pos['sf'];
             $postData["pf{$idx}"] = (string) $pos['pf'];
             $postData["c{$idx}"] = (string) $pos['c'];
-            $postData["active{$idx}"] = '1';
+            $postData["canPlayInGame{$idx}"] = '1';
             $postData["min{$idx}"] = '25';
             $postData["OF{$idx}"] = '0';
             $postData["DF{$idx}"] = '0';
@@ -843,7 +843,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             "sf{$index}" => '0',
             "pf{$index}" => '0',
             "c{$index}" => '0',
-            "active{$index}" => '1',
+            "canPlayInGame{$index}" => '1',
             "min{$index}" => '30',
             "OF{$index}" => '0',
             "DF{$index}" => '0',
@@ -868,7 +868,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             $postData["sf{$i}"] = ($i > 6 && $i <= 9) ? (string) ($i - 6) : '0';
             $postData["pf{$i}"] = ($i > 9 && $i <= 12) ? (string) ($i - 9) : '0';
             $postData["c{$i}"] = ($i > 12) ? (string) ($i - 12) : '0';
-            $postData["active{$i}"] = ($i <= $activeCount) ? '1' : '0';
+            $postData["canPlayInGame{$i}"] = ($i <= $activeCount) ? '1' : '0';
             $postData["min{$i}"] = '25';
             $postData["OF{$i}"] = '0';
             $postData["DF{$i}"] = '0';
@@ -937,7 +937,7 @@ class DepthChartEntryIntegrationTest extends IntegrationTestCase
             $postData["sf{$i}"] = ($i == 6) ? '1' : '0';
             $postData["pf{$i}"] = ($i == 7) ? '1' : '0';
             $postData["c{$i}"] = ($i == 8) ? '1' : '0';
-            $postData["active{$i}"] = '1';
+            $postData["canPlayInGame{$i}"] = '1';
             $postData["min{$i}"] = '25';
             $postData["OF{$i}"] = '0';
             $postData["DF{$i}"] = '0';

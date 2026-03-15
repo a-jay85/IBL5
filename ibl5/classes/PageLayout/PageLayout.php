@@ -112,6 +112,7 @@ class PageLayout
         echo "<script src=\"jslib/sticky-page-header.js\"></script>";
         echo "<script src=\"jslib/contract-hint.js\"></script>";
         echo "<script src=\"jslib/htmx-init.js\"></script>";
+        echo "<script src=\"jslib/local-time.js\"></script>";
 
         // Meta tags (inlined from includes/meta.php)
         $charsetValue = defined('_CHARSET') ? \_CHARSET : null;

@@ -132,7 +132,7 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
                     <th>' . $slot2 . '</th>
                     <th>' . $slot3 . '</th>
                     <th>' . $slot4 . '</th>
-                    <th>active</th>
+                    <th>active?</th>
                     <th>min</th>
                     <th>OF</th>
                     <th>DF</th>
@@ -184,7 +184,7 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         $dcDi = $player['dc_di'] ?? 0;
         $dcBh = $player['dc_bh'] ?? 0;
 
-        echo "<td><select name=\"active{$depthCount}\">";
+        echo "<td><select name=\"canPlayInGame{$depthCount}\">";
         $this->renderActiveOptions($dcActive);
         echo "</select></td>";
 
@@ -251,7 +251,7 @@ function resetDepthChart() {
         
         var defaultValue = '0';
         
-        if (name.match(/^active\d+$/)) {
+        if (name.match(/^canPlayInGame\d+$/)) {
             defaultValue = '1';
         } else if (name.match(/^(pg|sg|sf|pf|c)\d+$/)) {
             defaultValue = '0';
@@ -352,7 +352,7 @@ JAVASCRIPT;
                 $posKey = strtolower($position);
                 echo '<td>' . $player[$posKey] . '</td>';
             }
-            echo '<td>' . $player['active'] . '</td>
+            echo '<td>' . $player['canPlayInGame'] . '</td>
                 <td>' . $player['min'] . '</td>
                 <td>' . $player['of'] . '</td>
                 <td>' . $player['df'] . '</td>

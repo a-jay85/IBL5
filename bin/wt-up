@@ -145,13 +145,8 @@ if [ "$PROD_DB" = true ]; then
     echo "Importing prod-seed.sql..."
     sed 's/ DEFINER=[^ ]* / /g' "$PROD_SEED" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
 else
-    # Default: import schema (+ optional ci-seed)
-    SCHEMA_FILE="$WORKTREE_PATH/ibl5/schema.sql"
-    if [ -f "$SCHEMA_FILE" ]; then
-        echo "Importing schema.sql..."
-        sed 's/ DEFINER=[^ ]* / /g' "$SCHEMA_FILE" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
-    fi
-
+    # Default: migrations handle schema creation (migration 000 is the baseline)
+    echo "Schema will be created by migrations below."
 fi
 
 # Always run migrations (idempotent — skips already-applied ones)

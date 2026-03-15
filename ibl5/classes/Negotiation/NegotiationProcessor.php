@@ -48,14 +48,14 @@ class NegotiationProcessor implements NegotiationProcessorInterface
         
         // Validate free agency is not active
         $freeAgencyValidation = $this->validator->validateFreeAgencyNotActive();
-        if (!$freeAgencyValidation['valid']) {
-            return $output . NegotiationViewHelper::renderError((string) ($freeAgencyValidation['error'] ?? ''));
+        if (!$freeAgencyValidation->isValid()) {
+            return $output . NegotiationViewHelper::renderError($freeAgencyValidation->getError() ?? '');
         }
 
         // Validate negotiation eligibility
         $eligibilityValidation = $this->validator->validateNegotiationEligibility($player, $userTeamName);
-        if (!$eligibilityValidation['valid']) {
-            return $output . NegotiationViewHelper::renderError((string) ($eligibilityValidation['error'] ?? ''));
+        if (!$eligibilityValidation->isValid()) {
+            return $output . NegotiationViewHelper::renderError($eligibilityValidation->getError() ?? '');
         }
 
         // Get team factors for demand calculation

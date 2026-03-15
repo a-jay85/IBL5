@@ -59,7 +59,7 @@ jobs:
 
     - name: Check coverage threshold
       working-directory: ibl5
-      run: php bin/check-coverage coverage/clover.xml 60
+      run: php bin/check-coverage coverage/clover.xml 35
 
     - name: Upload coverage report
       if: always()

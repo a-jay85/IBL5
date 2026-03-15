@@ -99,16 +99,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v6
 
-    - name: Setup Bun
-      uses: oven-sh/setup-bun@v2
-
-    - name: Install dependencies
-      working-directory: ibl5
-      run: bun install --frozen-lockfile
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
 
     - name: Audit JS dependencies
       working-directory: ibl5
-      run: bunx auditdeps
+      run: npm audit --audit-level=high
 
   phpstan:
     name: PHPStan Analysis

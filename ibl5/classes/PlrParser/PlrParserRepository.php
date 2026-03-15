@@ -204,7 +204,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         $types = 'isiiiis'   // ordinal, name, age, pid, tid, peak, pos
             . 'iiiiiiii'     // oo, od, do, dd, po, pd, to, td
             . 'ii'           // Clutch, Consistency
-            . 'iiiiii'       // PGDepth..CDepth, dc_canPlayInGame
+            . 'iiiiii'       // PGDepth..CDepth, canPlayInGame → dc_canPlayInGame
             . 'iiiii'        // stats_gs..stats_fga
             . 'iiii'         // stats_ftm..stats_3ga
             . 'iiiiiii'      // stats_orb..stats_pf
@@ -248,7 +248,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             (int) $data['SFDepth'],
             (int) $data['PFDepth'],
             (int) $data['CDepth'],
-            (int) $data['dc_canPlayInGame'],
+            (int) $data['canPlayInGame'],
             (int) $data['seasonGamesStarted'],
             (int) $data['seasonGamesPlayed'],
             (int) $data['seasonMIN'],

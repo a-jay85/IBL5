@@ -138,6 +138,61 @@ class HistArchiverServiceTest extends TestCase
         $this->assertSame(0, $report->getDiscrepancyCount());
     }
 
+    public function testValidateWithEmptyResultSet(): void
+    {
+        $this->repository->method('getValidationComparison')->with(2026)->willReturn([]);
+
+        $report = $this->service->validatePlrVsBoxScores(2026);
+
+        $this->assertSame(0, $report->totalPlayers);
+        $this->assertSame(0, $report->matchCount);
+        $this->assertSame(0, $report->getDiscrepancyCount());
+    }
+
+    public function testValidateMultiplePlayersWithMixedResults(): void
+    {
+        $this->repository->method('getValidationComparison')->with(2026)->willReturn([
+            $this->makeComparisonRow(1, 'Player One'),
+            $this->makeComparisonRow(2, 'Player Two'),
+            $this->makeComparisonRowWithDiff(3, 'Player Three', column: 'pts', histValue: 1500, bsValue: 1502),
+        ]);
+
+        $report = $this->service->validatePlrVsBoxScores(2026);
+
+        $this->assertSame(3, $report->totalPlayers);
+        $this->assertSame(2, $report->matchCount);
+        $this->assertSame(1, $report->getDiscrepancyCount());
+    }
+
+    public function testValidateMultipleDiscrepanciesOnSamePlayer(): void
+    {
+        $row = $this->makeComparisonRow(1, 'Player One');
+        $row['hist_pts'] = 1500;
+        $row['bs_pts'] = 1502;
+        $row['hist_games'] = 82;
+        $row['bs_games'] = 80;
+        $this->repository->method('getValidationComparison')->with(2026)->willReturn([$row]);
+
+        $report = $this->service->validatePlrVsBoxScores(2026);
+
+        $this->assertSame(1, $report->totalPlayers);
+        $this->assertSame(0, $report->matchCount);
+        $this->assertSame(2, $report->getDiscrepancyCount());
+    }
+
+    public function testArchiveWithNoBoxScores(): void
+    {
+        $this->repository->method('hasChampionForYear')->willReturn(true);
+        $this->repository->method('getRegularSeasonTotals')->willReturn([]);
+        $this->repository->expects($this->never())->method('upsertHistRow');
+
+        $result = $this->service->archiveSeason(2026);
+
+        $this->assertFalse($result->skippedNoChampion);
+        $this->assertSame(0, $result->playersArchived);
+        $this->assertSame(0, $result->rowsUpserted);
+    }
+
     public function testValidateDetectsDiscrepancy(): void
     {
         $this->repository->method('getValidationComparison')->with(2026)->willReturn([

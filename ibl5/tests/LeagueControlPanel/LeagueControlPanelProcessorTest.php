@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\LeagueControlPanel;
 
+use HistArchiver\Contracts\HistArchiverServiceInterface;
+use HistArchiver\HistArchiveResult;
+use HistArchiver\PlrValidationReport;
 use LeagueControlPanel\Contracts\LeagueControlPanelProcessorInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use LeagueControlPanel\LeagueControlPanelProcessor;
@@ -344,9 +347,157 @@ class LeagueControlPanelProcessorTest extends TestCase
         $this->assertTrue($result['success']);
     }
 
+    // --- Archive Season Hist ---
+
+    public function testArchiveSeasonHistWhenArchiverNotConfigured(): void
+    {
+        $processor = $this->createProcessorWithStub();
+
+        $result = $processor->dispatch('archive_season_hist', ['season_year' => '2026']);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('not configured', $result['message']);
+    }
+
+    public function testArchiveSeasonHistMissingSeasonYear(): void
+    {
+        $processor = $this->createProcessorWithArchiver($this->createStub(HistArchiverServiceInterface::class));
+
+        $result = $processor->dispatch('archive_season_hist', []);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Invalid season year', $result['message']);
+    }
+
+    public function testArchiveSeasonHistNonDigitSeasonYear(): void
+    {
+        $processor = $this->createProcessorWithArchiver($this->createStub(HistArchiverServiceInterface::class));
+
+        $result = $processor->dispatch('archive_season_hist', ['season_year' => '2026a']);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Invalid season year', $result['message']);
+    }
+
+    public function testArchiveSeasonHistSkipsWhenNoChampion(): void
+    {
+        $archiver = $this->createStub(HistArchiverServiceInterface::class);
+        $archiver->method('archiveSeason')->willReturn(HistArchiveResult::skipped());
+
+        $processor = $this->createProcessorWithArchiver($archiver);
+        $result = $processor->dispatch('archive_season_hist', ['season_year' => '2026']);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('No champion found', $result['message']);
+    }
+
+    public function testArchiveSeasonHistFailsWhenZeroPlayers(): void
+    {
+        $archiver = $this->createStub(HistArchiverServiceInterface::class);
+        $archiver->method('archiveSeason')->willReturn(HistArchiveResult::completed(0, 0, []));
+
+        $processor = $this->createProcessorWithArchiver($archiver);
+        $result = $processor->dispatch('archive_season_hist', ['season_year' => '2026']);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('No players archived', $result['message']);
+    }
+
+    public function testArchiveSeasonHistSuccessNoWarnings(): void
+    {
+        $archiver = $this->createStub(HistArchiverServiceInterface::class);
+        $archiver->method('archiveSeason')->willReturn(HistArchiveResult::completed(3, 3, []));
+
+        $processor = $this->createProcessorWithArchiver($archiver);
+        $result = $processor->dispatch('archive_season_hist', ['season_year' => '2026']);
+
+        $this->assertTrue($result['success']);
+        $this->assertStringContainsString('3 players archived', $result['message']);
+        $this->assertStringNotContainsString('warnings', $result['message']);
+    }
+
+    public function testArchiveSeasonHistSuccessWithWarnings(): void
+    {
+        $archiver = $this->createStub(HistArchiverServiceInterface::class);
+        $archiver->method('archiveSeason')->willReturn(
+            HistArchiveResult::completed(2, 2, ['WARNING: x', 'WARNING: y']),
+        );
+
+        $processor = $this->createProcessorWithArchiver($archiver);
+        $result = $processor->dispatch('archive_season_hist', ['season_year' => '2026']);
+
+        $this->assertTrue($result['success']);
+        $this->assertStringContainsString('2 players archived', $result['message']);
+        $this->assertStringContainsString('2 warnings', $result['message']);
+    }
+
+    // --- Validate PLR Accuracy ---
+
+    public function testValidatePlrAccuracyWhenArchiverNotConfigured(): void
+    {
+        $processor = $this->createProcessorWithStub();
+
+        $result = $processor->dispatch('validate_plr_accuracy', ['season_year' => '2026']);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('not configured', $result['message']);
+    }
+
+    public function testValidatePlrAccuracyInvalidSeasonYear(): void
+    {
+        $processor = $this->createProcessorWithArchiver($this->createStub(HistArchiverServiceInterface::class));
+
+        $result = $processor->dispatch('validate_plr_accuracy', ['season_year' => 'abc']);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Invalid season year', $result['message']);
+    }
+
+    public function testValidatePlrAccuracyZeroDiscrepancies(): void
+    {
+        $archiver = $this->createStub(HistArchiverServiceInterface::class);
+        $archiver->method('validatePlrVsBoxScores')->willReturn(
+            new PlrValidationReport(totalPlayers: 5, matchCount: 5, discrepancies: []),
+        );
+
+        $processor = $this->createProcessorWithArchiver($archiver);
+        $result = $processor->dispatch('validate_plr_accuracy', ['season_year' => '2026']);
+
+        $this->assertTrue($result['success']);
+        $this->assertStringContainsString('All 5 players match', $result['message']);
+    }
+
+    public function testValidatePlrAccuracyWithDiscrepancies(): void
+    {
+        $archiver = $this->createStub(HistArchiverServiceInterface::class);
+        $archiver->method('validatePlrVsBoxScores')->willReturn(
+            new PlrValidationReport(
+                totalPlayers: 5,
+                matchCount: 3,
+                discrepancies: [
+                    ['pid' => 1, 'name' => 'A', 'column' => 'pts', 'hist_value' => 100, 'box_score_value' => 102],
+                    ['pid' => 2, 'name' => 'B', 'column' => 'ast', 'hist_value' => 50, 'box_score_value' => 48],
+                ],
+            ),
+        );
+
+        $processor = $this->createProcessorWithArchiver($archiver);
+        $result = $processor->dispatch('validate_plr_accuracy', ['season_year' => '2026']);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('2 discrepancies', $result['message']);
+        $this->assertStringContainsString('3/5 match', $result['message']);
+    }
+
     private function createProcessorWithStub(): LeagueControlPanelProcessor
     {
         $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
         return new LeagueControlPanelProcessor($stub);
+    }
+
+    private function createProcessorWithArchiver(HistArchiverServiceInterface $archiver): LeagueControlPanelProcessor
+    {
+        $stub = $this->createStub(LeagueControlPanelRepositoryInterface::class);
+        return new LeagueControlPanelProcessor($stub, $archiver);
     }
 }

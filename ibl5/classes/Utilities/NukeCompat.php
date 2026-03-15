@@ -72,6 +72,56 @@ class NukeCompat
     }
 
     /**
+     * Format a timestamp as a <time> element for client-side local timezone display.
+     *
+     * Returns an HTML <time> element with an ISO 8601 UTC datetime attribute.
+     * JavaScript (local-time.js) converts the display to the user's local timezone.
+     * If JS is disabled, the server-rendered UTC fallback remains visible.
+     *
+     * @return string Trusted HTML — do NOT pass through HtmlSanitizer
+     */
+    public function formatLocalTime(int|string $timestamp): string
+    {
+        $unixTime = $this->toUnixTimestamp($timestamp);
+        $isoUtc = gmdate('c', $unixTime);
+        $fallback = HtmlSanitizer::safeHtmlOutput(gmdate('l, F d @ H:i T', $unixTime));
+
+        return '<time datetime="' . $isoUtc . '" class="local-time">' . $fallback . '</time>';
+    }
+
+    /**
+     * Convert a timestamp (numeric or datetime string) to a Unix timestamp.
+     */
+    private function toUnixTimestamp(int|string $timestamp): int
+    {
+        if (is_numeric($timestamp)) {
+            return (int) $timestamp;
+        }
+
+        $matches = [];
+        preg_match(
+            '/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/',
+            $timestamp,
+            $matches
+        );
+
+        if (count($matches) < 7) {
+            return 0;
+        }
+
+        $result = gmmktime(
+            (int) $matches[4],
+            (int) $matches[5],
+            (int) $matches[6],
+            (int) $matches[2],
+            (int) $matches[3],
+            (int) $matches[1]
+        );
+
+        return $result !== false ? $result : 0;
+    }
+
+    /**
      * Display the login box (outputs HTML directly).
      */
     public function loginBox(): void

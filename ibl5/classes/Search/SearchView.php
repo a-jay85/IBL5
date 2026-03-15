@@ -311,7 +311,7 @@ class SearchView implements SearchViewInterface
             $title = HtmlSanitizer::safeHtmlOutput($result['title']);
             $aid = HtmlSanitizer::safeHtmlOutput($result['aid']);
             $informant = HtmlSanitizer::safeHtmlOutput($result['informant']);
-            $time = HtmlSanitizer::safeHtmlOutput($this->nukeCompat->formatTimestamp($result['time']));
+            $time = $this->nukeCompat->formatLocalTime($result['time']);
             $comments = $result['comments'];
             $topicId = $result['topicId'];
             $topicText = HtmlSanitizer::safeHtmlOutput($result['topicText']);
@@ -371,7 +371,7 @@ class SearchView implements SearchViewInterface
             $tid = $result['tid'];
             $sid = $result['sid'];
             $subject = HtmlSanitizer::safeHtmlOutput($result['subject']);
-            $date = HtmlSanitizer::safeHtmlOutput($this->nukeCompat->formatTimestamp($result['date']));
+            $date = $this->nukeCompat->formatLocalTime($result['date']);
             $name = HtmlSanitizer::safeHtmlOutput($result['name']);
             $articleTitle = HtmlSanitizer::safeHtmlOutput($result['articleTitle']);
             $replyCount = $result['replyCount'];

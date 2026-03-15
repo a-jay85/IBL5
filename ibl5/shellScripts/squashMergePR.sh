@@ -41,7 +41,7 @@ REMOTE_SHA=$(git rev-parse "origin/$BRANCH")
 gh pr merge --squash --delete-branch || fail "gh pr merge"
 
 # 8a. Wait for GitHub to delete the origin branch
-sleep 10
+sleep 5
 
 # 9. mergeAndPush
 bash "$SCRIPT_DIR/mergeMasterToProdAndPush.sh"

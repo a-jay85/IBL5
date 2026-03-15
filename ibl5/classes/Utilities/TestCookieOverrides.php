@@ -103,7 +103,7 @@ final class TestCookieOverrides
                     if ($line === '' || $line[0] === '#') {
                         continue;
                     }
-                    if (str_starts_with($line, 'E2E_TESTING=1')) {
+                    if ($line === 'E2E_TESTING=1') {
                         return true;
                     }
                 }

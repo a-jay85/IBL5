@@ -62,6 +62,12 @@ class ModuleAccessControl
             }
             $stmt->close();
         }
+
+        // E2E cookie overrides — merge per-request test state (no DB race)
+        $cookieOverrides = \Utilities\TestCookieOverrides::getOverrides();
+        if (isset($cookieOverrides['Trivia Mode'])) {
+            $this->settings['Trivia Mode'] = $cookieOverrides['Trivia Mode'];
+        }
     }
 
     /**

@@ -44,7 +44,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
         $this->assertSame(3, $result['dc_SFDepth']);
         $this->assertSame(4, $result['dc_PFDepth']);
         $this->assertSame(5, $result['dc_CDepth']);
-        $this->assertSame(1, $result['dc_active']);
+        $this->assertSame(1, $result['dc_canPlayInGame']);
         $this->assertSame(30, $result['dc_minutes']);
         $this->assertSame(2, $result['dc_of']);
         $this->assertSame(3, $result['dc_df']);
@@ -137,7 +137,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
                 'dc_SFDepth' => 0,
                 'dc_PFDepth' => 0,
                 'dc_CDepth' => 0,
-                'dc_active' => 1,
+                'dc_canPlayInGame' => 1,
                 'dc_minutes' => 30,
                 'dc_of' => 2,
                 'dc_df' => 3,
@@ -172,7 +172,7 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
                 'depth_chart_id' => 1, 'pid' => 100, 'player_name' => 'Traded Player',
                 'ordinal' => 1, 'dc_PGDepth' => 1, 'dc_SGDepth' => 0,
                 'dc_SFDepth' => 0, 'dc_PFDepth' => 0, 'dc_CDepth' => 0,
-                'dc_active' => 1, 'dc_minutes' => 30, 'dc_of' => 2,
+                'dc_canPlayInGame' => 1, 'dc_minutes' => 30, 'dc_of' => 2,
                 'dc_df' => 3, 'dc_oi' => 1, 'dc_di' => 2, 'dc_bh' => 4,
             ],
         ]);

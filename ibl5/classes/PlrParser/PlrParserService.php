@@ -166,7 +166,7 @@ class PlrParserService implements PlrParserServiceInterface
             'SFDepth' => (int) substr($line, 134, 1),
             'PFDepth' => (int) substr($line, 135, 1),
             'CDepth' => (int) substr($line, 136, 1),
-            'dc_canPlayInGame' => (int) substr($line, 137, 1),
+            'canPlayInGame' => (int) substr($line, 137, 1),
             'injuryDaysLeft' => (int) substr($line, 140, 4),
             'seasonGamesStarted' => (int) substr($line, 144, 4),
             'seasonGamesPlayed' => (int) substr($line, 148, 4),

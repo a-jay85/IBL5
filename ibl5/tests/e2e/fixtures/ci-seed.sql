@@ -530,8 +530,9 @@ INSERT INTO ibl_hist (
 -- ============================================================
 
 INSERT INTO ibl_draft_picks (ownerofpick, owner_tid, teampick, teampick_tid, year, round) VALUES
-  ('Metros', 1, 'Metros', 1, 2026, 1),
-  ('Stars',  2, 'Stars',  2, 2026, 1);
+  ('Metros',    1,  'Metros',    1,  2026, 1),
+  ('Stars',     2,  'Stars',     2,  2026, 1),
+  ('Phoenixes', 14, 'Phoenixes', 14, 2026, 1);
 
 -- Franchise Record Book data (tables created by migration 037c_create_rcb_tables.sql)
 

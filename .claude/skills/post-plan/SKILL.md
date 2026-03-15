@@ -204,6 +204,16 @@ Check if anything was learned during this implementation that would help future 
 - Patterns that worked well or failed
 - Codebase assumptions that turned out wrong
 
+**Do NOT save any of these — they create token waste without preventing errors:**
+- Workarounds for issues already fixed (in code, hooks, or CI)
+- Facts derivable by reading the code (type casts, return types, enum values)
+- Platform/tool implementation details (Claude Code internals, IDE quirks)
+- Niche domain knowledge for inactive workstreams
+- Developer workflow tips that don't prevent bugs (counting tricks, tool preferences)
+- One-time debugging notes for problems already resolved
+
+**Litmus test:** "If I delete this note and hit the same situation next month, would I introduce a bug or just spend 30 seconds re-discovering it?" Only save if the answer is "introduce a bug."
+
 Before writing, read the target memory file to avoid duplicating existing entries. Context hierarchy:
 - `memory/MEMORY.md` — experiential learnings
 - Project `CLAUDE.md` — canonical rules

@@ -52,3 +52,4 @@ ibl5/.env.test
 docker-compose.override.yml
 docker-compose.worktree.yml
 .e2e-active
+ibl5/vendor

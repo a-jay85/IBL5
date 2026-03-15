@@ -67,10 +67,8 @@ Classes autoload from `ibl5/classes/`. Never use `require_once`.
 - Schema: `ibl5/migrations/000_baseline_schema.sql` - **always verify table/column names here** (check subsequent migrations for alterations)
 - **Migrations are the single source of truth.** `000_baseline_schema.sql` is the production snapshot; all subsequent migrations alter it. There is no separate `schema.sql`.
 - Use `$mysqli_db` (modern MySQLi) over legacy `$db`
-- 51 InnoDB tables with foreign keys, 84 legacy MyISAM tables, 23 database views
 - **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on `$mysqli_db`. See `core-coding.md` for type comparison rules. The legacy `$db` connection does NOT have native types.
-- **Docker MariaDB:** Start the database with `docker compose up -d` from the repo root. See `database-access.md` for connection details and the auto-approved `./bin/db-query` wrapper.
-- **Docker PHP-Apache:** `docker compose up -d` also starts a PHP 8.4 Apache container serving the site at `http://main.localhost/ibl5/`. The `DB_HOST` env var is set to `mariadb` in the container; `config.php` uses `getenv('DB_HOST') ?: '127.0.0.1'` so it works both inside Docker and on the host. See `ibl5/docs/DOCKER_SETUP.md` for full details.
+- **Docker:** `docker compose up -d` starts MariaDB + PHP-Apache (`http://main.localhost/ibl5/`). See `database-access.md` for connection details and `ibl5/docs/DOCKER_SETUP.md` for full setup.
 - **CLI MariaDB access:** `mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5`. For quick queries, prefer the `./bin/db-query "SQL"` wrapper.
 
 ## Git & Commits
@@ -81,21 +79,11 @@ When committing, only include files relevant to the current task. Always review 
 
 Commit body: `<type>: <short summary>` then `## Section` headers with bullet points.
 
-## PHP / Database Gotchas
-
-- PHP class constants cannot be interpolated in double-quoted strings; use concatenation instead.
-- `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` affects `COALESCE` — nullable LEFT JOIN columns may still produce `null` despite COALESCE.
-- Database views may filter results unexpectedly; check view definitions before assuming query bugs.
-
 ## Frontend / CSS
 
 When debugging CSS layout issues, immediately check for inherited properties like `white-space: nowrap` that may override your fixes. Use browser DevTools-style reasoning: inspect computed styles, not just the element's own rules.
 
 When modifying HTML output, selectors, or user-facing text in View classes, run `bun run test:e2e` before considering the task complete.
-
-## Workflow Continuity
-
-Post-plan Phases 3-9 are consolidated into a single `/post-plan` skill invocation. After Phase 2 (Implementation), invoke `/post-plan` which handles simplify, commit/push/PR, code review, security audit, verification, CI monitoring, retrospective, and worktree teardown internally.
 
 ## Mandatory Rules
 
@@ -125,20 +113,3 @@ After completing a module refactoring or significant feature, update these files
 ### Production Validation
 After refactoring, compare output against iblhoops.net. Results must match exactly.
 
-## Progressive Loading
-
-Context-aware rules auto-load when relevant:
-
-**Always Loaded** (`.claude/rules/`):
-- `workflow-continuity.md` → `/post-plan` orchestrator rules for post-plan workflow
-- `core-coding.md` → key constants, common repository helpers, gotchas
-- `environment.md` → bun, CSS, IBLbot commands
-
-**Path-Conditional** (`.claude/rules/`):
-- `php-classes.md` → editing `ibl5/classes/**/*.php`
-- `phpunit-tests.md` → editing `ibl5/tests/**/*.php`
-- `playwright-tests.md` → editing `ibl5/tests/e2e/**/*.ts`
-- `view-rendering.md` → editing `**/*View.php`
-- `database-access.md` → editing `**/*Repository.php`
-
-**Task-Discovery** (`.claude/skills/`): Discovered automatically when relevant skills are invoked. Includes refactoring-workflow, security-audit, phpunit-testing, basketball-stats, contract-rules, database-repository, documentation-updates.

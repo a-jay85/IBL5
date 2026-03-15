@@ -45,7 +45,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Free Agency Preview', 'url' => 'modules.php?name=FreeAgencyPreview'],
                     ['label' => 'Contract List', 'url' => 'modules.php?name=ContractList'],
                     ['label' => 'Player Movement', 'url' => 'modules.php?name=PlayerMovement'],
-                    ['label' => 'JSB Export', 'url' => 'ibl/IBL'],
+                    ['label' => 'JSB Export', 'url' => 'ibl/IBL', 'external' => true],
                 ],
             ],
             'Stats' => [

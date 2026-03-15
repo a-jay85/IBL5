@@ -517,7 +517,12 @@ test.describe('Trade submission: validation errors', () => {
     appState,
     page,
   }) => {
-    await appState({ 'Allow Trades': 'No' });
+    // areTradesAllowed() returns true during Draft/Free Agency regardless of setting.
+    // Must use a non-FA phase to test the "Allow Trades" check.
+    await appState({
+      'Allow Trades': 'No',
+      'Current Season Phase': 'Regular Season',
+    });
     await page.goto('modules.php?name=Trading');
 
     await expect(

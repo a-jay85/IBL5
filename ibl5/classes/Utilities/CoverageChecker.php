@@ -17,7 +17,7 @@ final class CoverageChecker
             return CoverageResult::failure(0.0, $threshold, 'Failed to parse Clover XML: ' . $cloverFile);
         }
 
-        $metricsResult = $xml->xpath('//project/metrics');
+        $metricsResult = $xml->xpath('/coverage/project/metrics');
         if (!is_array($metricsResult) || $metricsResult === []) {
             return CoverageResult::failure(0.0, $threshold, 'No project metrics found in Clover XML');
         }

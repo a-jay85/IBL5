@@ -50,6 +50,7 @@ jobs:
     - name: Run PHPUnit tests with coverage
       working-directory: ibl5
       run: |
+        mkdir -p coverage
         vendor/bin/phpunit \
           --configuration phpunit.ci.xml \
           --testdox \
@@ -107,7 +108,7 @@ jobs:
 
     - name: Audit JS dependencies
       working-directory: ibl5
-      run: npx auditdeps
+      run: bunx auditdeps
 
   phpstan:
     name: PHPStan Analysis

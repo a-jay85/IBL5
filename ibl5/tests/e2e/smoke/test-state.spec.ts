@@ -42,21 +42,13 @@ test.describe('test-state.php endpoint', () => {
     expect(body.error).toContain('Unknown settings');
   });
 
-  test('appState fixture sets and restores state', async ({
+  test('appState fixture overrides page state via cookie', async ({
     appState,
-    request,
+    page,
   }) => {
-    const before = await getState(request);
-    const originalPhase = before['Current Season Phase'];
-
-    // Set state via fixture
-    await appState({ 'Current Season Phase': 'Draft' });
-
-    const during = await getState(request);
-    expect(during['Current Season Phase']).toBe('Draft');
-
-    // Fixture teardown will restore after this test completes.
-    // We can't verify the restore happens here (it runs in afterEach),
-    // but we verified the set works.
+    await appState({ 'Current Season Phase': 'Draft', 'Show Draft Link': 'On' });
+    await page.goto('modules.php?name=Draft');
+    // Verify Draft module loaded (accessible when Show Draft Link is On)
+    await expect(page.locator('.ibl-title').first()).toBeVisible();
   });
 });

@@ -87,6 +87,12 @@ class Season
             'Free Agency Notifications',
         ]);
 
+        // E2E cookie overrides — merge per-request test state (no DB race)
+        $cookieOverrides = \Utilities\TestCookieOverrides::getOverrides();
+        foreach ($cookieOverrides as $key => $value) {
+            $settings[$key] = $value;
+        }
+
         $this->phase = $settings['Current Season Phase'] ?? '';
 
         $this->endingYear = (int)($settings['Current Season Ending Year'] ?? '0');

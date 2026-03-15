@@ -44,8 +44,8 @@ export async function setState(
 export type SetStateFn = (settings: Settings) => Promise<SetStateResult>;
 
 /**
- * Creates the appState fixture function for use in both
- * authenticated and public test fixtures.
+ * Creates the legacy DB-mutating appState fixture.
+ * Retained for test-state.spec.ts and future DB-mutation use cases.
  */
 export function createAppStateFixture() {
   return async ({ request }: { request: APIRequestContext }, use: (fn: SetStateFn) => Promise<void>) => {
@@ -71,5 +71,37 @@ export function createAppStateFixture() {
         await setState(request, toRestore);
       }
     }
+  };
+}
+
+/**
+ * Creates a cookie-based appState fixture that eliminates DB race conditions.
+ *
+ * Instead of mutating ibl_settings rows (which parallel tests can overwrite),
+ * this sets a `_test_overrides` cookie that PHP reads per-request. State travels
+ * with the request — zero race window, no cleanup needed.
+ */
+export function createCookieStateFixture() {
+  return async (
+    { context }: { context: import('@playwright/test').BrowserContext },
+    use: (fn: SetStateFn) => Promise<void>,
+  ) => {
+    let mergedOverrides: Settings = {};
+
+    const setStateFn: SetStateFn = async (settings) => {
+      mergedOverrides = { ...mergedOverrides, ...settings };
+      const encoded = encodeURIComponent(JSON.stringify(mergedOverrides));
+      const baseUrl = process.env.BASE_URL ?? 'http://main.localhost/ibl5/';
+      await context.addCookies([{
+        name: '_test_overrides',
+        value: encoded,
+        domain: new URL(baseUrl).hostname,
+        path: '/',
+      }]);
+      return { previous: {}, applied: settings };
+    };
+
+    await use(setStateFn);
+    // No teardown needed — cookies are scoped to the browser context
   };
 }

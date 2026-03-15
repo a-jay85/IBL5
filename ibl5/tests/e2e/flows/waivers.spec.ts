@@ -8,14 +8,10 @@ test.describe.configure({ mode: 'serial' });
 
 test.describe('Waivers flow: closed', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Allow Waiver Moves': 'No' });
+    // Phase must be Free Agency or Preseason for the toggle to matter —
+    // during HEAT/Regular Season/Playoffs, waivers are always open.
+    await appState({ 'Current Season Phase': 'Free Agency', 'Allow Waiver Moves': 'No' });
     await page.goto('modules.php?name=Waivers');
-
-    // Retry if a parallel test changed the setting between appState and page load
-    if ((await page.locator('form[name="Waiver_Move"]').count()) > 0) {
-      await appState({ 'Allow Waiver Moves': 'No' });
-      await page.goto('modules.php?name=Waivers');
-    }
   });
 
   test('page loads without PHP errors', async ({ page }) => {

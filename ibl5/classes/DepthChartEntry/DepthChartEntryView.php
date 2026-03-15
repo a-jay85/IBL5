@@ -176,7 +176,7 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
             $this->renderPositionCell($player, $posKey, $depthCount);
         }
 
-        $dcActive = $player['dc_active'] ?? 0;
+        $dcActive = $player['dc_canPlayInGame'] ?? 0;
         $dcMinutes = $player['dc_minutes'] ?? 0;
         $dcOf = $player['dc_of'] ?? 0;
         $dcDf = $player['dc_df'] ?? 0;

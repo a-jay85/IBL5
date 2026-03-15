@@ -165,6 +165,213 @@ test.describe('EOY Voting', () => {
   });
 });
 
+// ============================================================
+// ASG Voting: validation errors
+// ============================================================
+
+test.describe('ASG Voting: validation errors', () => {
+  test('too few ASG votes shows error', async ({ appState, page }) => {
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'ASG Voting': 'Yes',
+    });
+    await page.goto('modules.php?name=Voting');
+
+    // Expand ECF category and select only 2 checkboxes (need 4)
+    const ecfHeader = page.locator('.voting-category').first();
+    await ecfHeader.click();
+
+    const ecfTable = page.locator('#ECF');
+    await expect(ecfTable).toBeVisible();
+
+    const checkboxes = ecfTable.locator('input[type="checkbox"]');
+    const count = Math.min(await checkboxes.count(), 2);
+    for (let i = 0; i < count; i++) {
+      await checkboxes.nth(i).check();
+    }
+
+    // Submit with too few votes
+    const submitBtn = page.locator('button, input[type="submit"]').filter({
+      hasText: /submit votes/i,
+    });
+
+    await Promise.all([
+      page.waitForNavigation(),
+      submitBtn.first().click(),
+    ]);
+
+    const body = await page.locator('body').textContent();
+    expect(body).toContain('less than FOUR');
+  });
+
+  test('no PHP errors on validation page', async ({ appState, page }) => {
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'ASG Voting': 'Yes',
+    });
+    await page.goto('modules.php?name=Voting');
+
+    // Same flow: expand ECF, select only 2, submit
+    const ecfHeader = page.locator('.voting-category').first();
+    await ecfHeader.click();
+
+    const ecfTable = page.locator('#ECF');
+    await expect(ecfTable).toBeVisible();
+
+    const checkboxes = ecfTable.locator('input[type="checkbox"]');
+    const count = Math.min(await checkboxes.count(), 2);
+    for (let i = 0; i < count; i++) {
+      await checkboxes.nth(i).check();
+    }
+
+    const submitBtn = page.locator('button, input[type="submit"]').filter({
+      hasText: /submit votes/i,
+    });
+
+    await Promise.all([
+      page.waitForNavigation(),
+      submitBtn.first().click(),
+    ]);
+
+    await assertNoPhpErrors(page, 'after ASG validation error');
+  });
+});
+
+// ============================================================
+// EOY Voting: validation errors
+// ============================================================
+
+test.describe('EOY Voting: validation errors', () => {
+  test('missing EOY vote shows error', async ({ appState, page }) => {
+    await appState({
+      'Current Season Phase': 'Free Agency',
+      'EOY Voting': 'Yes',
+    });
+    await page.goto('modules.php?name=Voting');
+
+    // Fill ROY, Six, GM but leave MVP empty
+    for (const cat of ['ROY', 'Six', 'GM']) {
+      const header = page.locator('.voting-category').filter({
+        hasText: new RegExp(
+          cat === 'ROY'
+            ? 'Rookie|ROY'
+            : cat === 'Six'
+              ? 'Sixth|6th'
+              : 'GM|General Manager',
+          'i',
+        ),
+      });
+
+      if ((await header.count()) > 0) {
+        await header.first().click();
+      }
+
+      const table = page.locator(`#${cat}`);
+      await expect(table).toBeVisible();
+
+      for (let slot = 1; slot <= 3; slot++) {
+        const radios = table.locator(
+          `input[type="radio"][name="${cat}[${slot}]"]`,
+        );
+        const radioCount = await radios.count();
+        if (radioCount >= slot) {
+          await radios.nth(slot - 1).check();
+        }
+      }
+    }
+
+    // Submit without selecting MVP
+    const submitBtn = page.locator('button, input[type="submit"]').filter({
+      hasText: /submit votes/i,
+    });
+
+    await Promise.all([
+      page.waitForNavigation(),
+      submitBtn.first().click(),
+    ]);
+
+    const body = await page.locator('body').textContent();
+    expect(body).toContain('you must select an MVP');
+  });
+
+  test('duplicate EOY selections shows error', async ({ appState, page }) => {
+    await appState({
+      'Current Season Phase': 'Free Agency',
+      'EOY Voting': 'Yes',
+    });
+    await page.goto('modules.php?name=Voting');
+
+    // Expand all categories and fill them
+    for (const cat of ['MVP', 'Six', 'ROY', 'GM']) {
+      const header = page.locator('.voting-category').filter({
+        hasText: new RegExp(
+          cat === 'MVP'
+            ? 'MVP|Most Valuable'
+            : cat === 'Six'
+              ? 'Sixth|6th'
+              : cat === 'ROY'
+                ? 'Rookie|ROY'
+                : 'GM|General Manager',
+          'i',
+        ),
+      });
+
+      if ((await header.count()) > 0) {
+        await header.first().click();
+      }
+
+      const table = page.locator(`#${cat}`);
+      await expect(table).toBeVisible();
+
+      if (cat === 'MVP') {
+        // Set same player for MVP[1] and MVP[2] to trigger duplicate error
+        const firstRadio = table.locator(
+          'input[type="radio"][name="MVP[1]"]',
+        ).first();
+        const value = await firstRadio.getAttribute('value');
+
+        // Check the first radio for slot 1
+        await firstRadio.check();
+
+        // Check the radio with the same value for slot 2
+        const slot2Radio = table.locator(
+          `input[type="radio"][name="MVP[2]"][value="${value}"]`,
+        );
+        await slot2Radio.check();
+
+        // Pick a different player for slot 3
+        const slot3Radios = table.locator(
+          'input[type="radio"][name="MVP[3]"]',
+        );
+        await slot3Radios.nth(2).check();
+      } else {
+        for (let slot = 1; slot <= 3; slot++) {
+          const radios = table.locator(
+            `input[type="radio"][name="${cat}[${slot}]"]`,
+          );
+          const radioCount = await radios.count();
+          if (radioCount >= slot) {
+            await radios.nth(slot - 1).check();
+          }
+        }
+      }
+    }
+
+    // Submit
+    const submitBtn = page.locator('button, input[type="submit"]').filter({
+      hasText: /submit votes/i,
+    });
+
+    await Promise.all([
+      page.waitForNavigation(),
+      submitBtn.first().click(),
+    ]);
+
+    const body = await page.locator('body').textContent();
+    expect(body).toContain('same player for multiple MVP slots');
+  });
+});
+
 test.describe('EOY Voting: submission', () => {
   test('submit valid EOY votes', async ({ appState, page }) => {
     await appState({

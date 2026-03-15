@@ -2,6 +2,9 @@ import { test, expect } from '../fixtures/auth';
 import type { Page } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
+// Serial: trades-closed and trades-open blocks toggle the same setting.
+test.describe.configure({ mode: 'serial' });
+
 // ---------------------------------------------------------------------------
 // Shared constants & helpers
 // ---------------------------------------------------------------------------
@@ -610,5 +613,87 @@ test.describe('Trading pages: no PHP errors', () => {
     await page.goto('modules.php?name=Trading&op=reviewtrade');
 
     await assertNoPhpErrors(page);
+  });
+});
+
+// ===========================================================================
+// Trading: trades-closed state
+// ===========================================================================
+
+test.describe('Trading: trades-closed state', () => {
+  test.beforeEach(async ({ appState, page }) => {
+    // Phase must NOT be Draft or Free Agency — areTradesAllowed() always
+    // returns true during those phases regardless of the Allow Trades setting.
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'Allow Trades': 'No',
+    });
+    await page.goto('modules.php?name=Trading');
+  });
+
+  test('shows closed message when trades disabled', async ({ page }) => {
+    await expect(
+      page.getByText('Sorry, but trades are not allowed right now.'),
+    ).toBeVisible();
+  });
+
+  test('no PHP errors on closed trading page', async ({ page }) => {
+    await assertNoPhpErrors(page);
+  });
+});
+
+// ===========================================================================
+// Trading: result banners
+// ===========================================================================
+
+test.describe('Trading: result banners', () => {
+  test.beforeEach(async ({ appState }) => {
+    await appState({ 'Allow Trades': 'Yes' });
+  });
+
+  test('offer_sent success banner', async ({ page }) => {
+    await page.goto('modules.php?name=Trading&op=reviewtrade&result=offer_sent');
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+    await expect(page.locator('.ibl-alert--success')).toContainText(
+      'Trade offer sent!',
+    );
+  });
+
+  test('trade_accepted success banner', async ({ page }) => {
+    await page.goto(
+      'modules.php?name=Trading&op=reviewtrade&result=trade_accepted',
+    );
+    await expect(page.locator('.ibl-alert--success')).toBeVisible();
+    await expect(page.locator('.ibl-alert--success')).toContainText(
+      'Trade accepted!',
+    );
+  });
+
+  test('trade_rejected info banner', async ({ page }) => {
+    await page.goto(
+      'modules.php?name=Trading&op=reviewtrade&result=trade_rejected',
+    );
+    await expect(page.locator('.ibl-alert--info')).toBeVisible();
+    await expect(page.locator('.ibl-alert--info')).toContainText(
+      'Trade offer rejected.',
+    );
+  });
+
+  test('already_processed warning banner', async ({ page }) => {
+    await page.goto(
+      'modules.php?name=Trading&op=reviewtrade&result=already_processed',
+    );
+    await expect(page.locator('.ibl-alert--warning')).toBeVisible();
+    await expect(page.locator('.ibl-alert--warning')).toContainText(
+      'already been accepted, declined, or withdrawn',
+    );
+  });
+
+  test('error param renders error banner', async ({ page }) => {
+    await page.goto(
+      'modules.php?name=Trading&op=reviewtrade&error=Test+error',
+    );
+    await expect(page.locator('.ibl-alert--error')).toBeVisible();
+    await expect(page.locator('.ibl-alert--error')).toContainText('Test error');
   });
 });

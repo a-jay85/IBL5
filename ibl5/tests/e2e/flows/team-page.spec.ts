@@ -66,3 +66,66 @@ test.describe('Team page flow', () => {
     }
   });
 });
+
+// ===========================================================================
+// Team page: additional display modes
+// ===========================================================================
+
+test.describe('Team page: additional display modes', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('modules.php?name=Team&op=team&teamID=1');
+  });
+
+  test('dropdown switches to per36mins', async ({ page }) => {
+    const dropdown = page.locator('.ibl-view-select').first();
+    await dropdown.selectOption('per36mins');
+    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+  });
+
+  test('dropdown switches to chunk', async ({ page }) => {
+    const dropdown = page.locator('.ibl-view-select').first();
+    await dropdown.selectOption('chunk');
+    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+  });
+
+  test('dropdown switches to playoffs', async ({ page }) => {
+    const dropdown = page.locator('.ibl-view-select').first();
+    await dropdown.selectOption('playoffs');
+    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+  });
+});
+
+// ===========================================================================
+// Team page: error and banner states
+// ===========================================================================
+
+test.describe('Team page: error and banner states', () => {
+  test('invalid teamID shows error', async ({ page }) => {
+    await page.goto('modules.php?name=Team&op=team&teamID=999');
+    await expect(page.locator('.ibl-alert--error')).toBeVisible();
+    await expect(page.locator('.ibl-alert--error')).toContainText(
+      'Team not found.',
+    );
+  });
+
+  test('extension_accepted banner renders', async ({ page }) => {
+    await page.goto(
+      'modules.php?name=Team&op=team&teamID=1&result=extension_accepted&msg=Player+agreed',
+    );
+    const successBanner = page.locator('.ibl-alert--success');
+    await expect(successBanner).toBeVisible();
+    await expect(successBanner).toContainText('Player response:');
+  });
+});
+
+// ===========================================================================
+// Team page: historical year view
+// ===========================================================================
+
+test.describe('Team page: historical year view', () => {
+  test('historical year view renders with year in title', async ({ page }) => {
+    await page.goto('modules.php?name=Team&op=team&teamID=1&yr=2024');
+    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    await assertNoPhpErrors(page, 'on historical year view');
+  });
+});

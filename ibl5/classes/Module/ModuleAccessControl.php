@@ -79,6 +79,11 @@ class ModuleAccessControl
             return false;
         }
 
+        // Waivers: phase-aware access (HEAT/RS/Playoffs always on, Draft never, FA/Preseason toggle)
+        if ($moduleName === 'Waivers') {
+            return $this->season->areWaiversAllowed();
+        }
+
         // Phase-restricted modules
         if (isset(self::PHASE_RESTRICTED_MODULES[$moduleName])) {
             $requiredPhase = self::PHASE_RESTRICTED_MODULES[$moduleName];

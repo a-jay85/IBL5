@@ -65,7 +65,7 @@ class WaiversController implements WaiversControllerInterface
 
         $season = new \Season($this->db);
 
-        if ($season->allowWaivers !== "Yes") {
+        if (!$season->areWaiversAllowed()) {
             $this->view->renderWaiversClosed();
             return;
         }

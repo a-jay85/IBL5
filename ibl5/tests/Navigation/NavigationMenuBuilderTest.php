@@ -157,9 +157,14 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertSame('LIVE', $faLink['badge'] ?? null);
     }
 
-    public function testWaiversLinksWhenAllowed(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('waiversLinkProvider')]
+    public function testWaiversLinkBehavior(string $seasonPhase, string $allowWaivers, bool $expectWaiversLink): void
     {
-        $builder = new NavigationMenuBuilder($this->createConfig(allowWaivers: 'Yes'));
+        $builder = new NavigationMenuBuilder($this->createConfig(
+            seasonPhase: $seasonPhase,
+            allowWaivers: $allowWaivers,
+        ));
+
         $menu = $builder->getMyTeamMenu();
         $this->assertNotNull($menu);
 
@@ -168,21 +173,31 @@ class NavigationMenuBuilderTest extends TestCase
             static fn (array $link): bool => str_contains($link['rawHtml'] ?? '', 'Waivers')
         );
 
-        $this->assertNotEmpty($waiversLinks, 'Waivers link should be present when allowed');
+        if ($expectWaiversLink) {
+            $this->assertNotEmpty($waiversLinks, "Waivers link should be present during $seasonPhase");
+        } else {
+            $this->assertEmpty($waiversLinks, "Waivers link should not be present during $seasonPhase");
+        }
     }
 
-    public function testWaiversLinksWhenNotAllowed(): void
+    /**
+     * @return array<string, array{string, string, bool}>
+     */
+    public static function waiversLinkProvider(): array
     {
-        $builder = new NavigationMenuBuilder($this->createConfig(allowWaivers: 'No'));
-        $menu = $builder->getMyTeamMenu();
-        $this->assertNotNull($menu);
-
-        $waiversLinks = array_filter(
-            $menu['links'],
-            static fn (array $link): bool => str_contains($link['rawHtml'] ?? '', 'Waivers')
-        );
-
-        $this->assertEmpty($waiversLinks, 'Waivers link should not be present when not allowed');
+        return [
+            'HEAT, toggle off — always on' => ['HEAT', 'No', true],
+            'HEAT, toggle on — always on' => ['HEAT', 'Yes', true],
+            'Regular Season, toggle off — always on' => ['Regular Season', 'No', true],
+            'Regular Season, toggle on — always on' => ['Regular Season', 'Yes', true],
+            'Playoffs, toggle off — always on' => ['Playoffs', 'No', true],
+            'Draft, toggle off — never' => ['Draft', 'No', false],
+            'Draft, toggle on — never' => ['Draft', 'Yes', false],
+            'Free Agency, toggle off — toggle-dependent' => ['Free Agency', 'No', false],
+            'Free Agency, toggle on — toggle-dependent' => ['Free Agency', 'Yes', true],
+            'Preseason, toggle off — toggle-dependent' => ['Preseason', 'No', false],
+            'Preseason, toggle on — toggle-dependent' => ['Preseason', 'Yes', true],
+        ];
     }
 
     public function testOlympicsVariant(): void

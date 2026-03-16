@@ -13,34 +13,30 @@ use Updater\Steps\ArchiveSeasonHistStep;
 
 class ArchiveSeasonHistStepTest extends TestCase
 {
-    private HistArchiverServiceInterface&MockObject $service;
-
-    protected function setUp(): void
-    {
-        $this->service = $this->createMock(HistArchiverServiceInterface::class);
-    }
-
     public function testImplementsPipelineStepInterface(): void
     {
-        $step = new ArchiveSeasonHistStep($this->service, 2026);
+        $service = $this->createStub(HistArchiverServiceInterface::class);
+        $step = new ArchiveSeasonHistStep($service, 2026);
 
         $this->assertInstanceOf(PipelineStepInterface::class, $step);
     }
 
     public function testGetLabel(): void
     {
-        $step = new ArchiveSeasonHistStep($this->service, 2026);
+        $service = $this->createStub(HistArchiverServiceInterface::class);
+        $step = new ArchiveSeasonHistStep($service, 2026);
 
         $this->assertSame('Season history archived', $step->getLabel());
     }
 
     public function testSkipsWhenNoChampion(): void
     {
-        $this->service->method('archiveSeason')->with(2026)->willReturn(
+        $service = $this->createStub(HistArchiverServiceInterface::class);
+        $service->method('archiveSeason')->willReturn(
             HistArchiveResult::skipped(),
         );
 
-        $step = new ArchiveSeasonHistStep($this->service, 2026);
+        $step = new ArchiveSeasonHistStep($service, 2026);
         $result = $step->execute();
 
         $this->assertTrue($result->success);
@@ -49,11 +45,12 @@ class ArchiveSeasonHistStepTest extends TestCase
 
     public function testSuccessfulArchive(): void
     {
-        $this->service->method('archiveSeason')->with(2026)->willReturn(
+        $service = $this->createStub(HistArchiverServiceInterface::class);
+        $service->method('archiveSeason')->willReturn(
             HistArchiveResult::completed(rowsUpserted: 150, playersArchived: 150, messages: []),
         );
 
-        $step = new ArchiveSeasonHistStep($this->service, 2026);
+        $step = new ArchiveSeasonHistStep($service, 2026);
         $result = $step->execute();
 
         $this->assertTrue($result->success);
@@ -62,7 +59,8 @@ class ArchiveSeasonHistStepTest extends TestCase
 
     public function testArchiveWithWarnings(): void
     {
-        $this->service->method('archiveSeason')->with(2026)->willReturn(
+        $service = $this->createStub(HistArchiverServiceInterface::class);
+        $service->method('archiveSeason')->willReturn(
             HistArchiveResult::completed(
                 rowsUpserted: 148,
                 playersArchived: 148,
@@ -73,7 +71,7 @@ class ArchiveSeasonHistStepTest extends TestCase
             ),
         );
 
-        $step = new ArchiveSeasonHistStep($this->service, 2026);
+        $step = new ArchiveSeasonHistStep($service, 2026);
         $result = $step->execute();
 
         $this->assertTrue($result->success);

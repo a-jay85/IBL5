@@ -6,6 +6,7 @@ namespace LeagueControlPanel;
 
 use LeagueControlPanel\Contracts\LeagueControlPanelRepositoryInterface;
 use LeagueControlPanel\Contracts\LeagueControlPanelServiceInterface;
+use Utilities\TestCookieOverrides;
 
 /**
  * @see LeagueControlPanelServiceInterface
@@ -31,8 +32,14 @@ class LeagueControlPanelService implements LeagueControlPanelServiceInterface
             'Show Draft Link',
             'Free Agency Notifications',
             'Trivia Mode',
-            'Season Ending Year',
+            'Current Season Ending Year',
         ]);
+
+        // E2E cookie overrides — merge per-request test state (no DB race)
+        $cookieOverrides = TestCookieOverrides::getOverrides();
+        foreach ($cookieOverrides as $key => $value) {
+            $settings[$key] = $value;
+        }
 
         $simLengthInDays = $this->repository->getSimLengthInDays();
 
@@ -44,7 +51,7 @@ class LeagueControlPanelService implements LeagueControlPanelServiceInterface
             'freeAgencyNotifications' => $settings['Free Agency Notifications'] ?? 'Off',
             'triviaMode' => $settings['Trivia Mode'] ?? 'Off',
             'simLengthInDays' => $simLengthInDays,
-            'seasonEndingYear' => (int) ($settings['Season Ending Year'] ?? '0'),
+            'seasonEndingYear' => (int) ($settings['Current Season Ending Year'] ?? '0'),
         ];
     }
 }

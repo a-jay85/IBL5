@@ -24,7 +24,7 @@ class HistArchiverServiceTest extends TestCase
 
     public function testArchiveSkipsWhenNoChampion(): void
     {
-        $this->repository->method('hasChampionForYear')->with(2026)->willReturn(false);
+        $this->repository->expects($this->once())->method('hasChampionForYear')->with(2026)->willReturn(false);
         $this->repository->expects($this->never())->method('getRegularSeasonTotals');
 
         $result = $this->service->archiveSeason(2026);
@@ -40,7 +40,7 @@ class HistArchiverServiceTest extends TestCase
         $this->repository->method('getRegularSeasonTotals')->willReturn([
             $this->makePlayerRow(1, 'Ghost Player'),
         ]);
-        $this->repository->method('getPlayerRatingsAndContract')->with(1)->willReturn(null);
+        $this->repository->expects($this->once())->method('getPlayerRatingsAndContract')->with(1)->willReturn(null);
         $this->repository->expects($this->never())->method('upsertHistRow');
 
         $result = $this->service->archiveSeason(2026);
@@ -58,7 +58,7 @@ class HistArchiverServiceTest extends TestCase
         $this->repository->method('getRegularSeasonTotals')->willReturn([
             $this->makePlayerRow(100, 'John Doe', games: 82, pts: 1500),
         ]);
-        $this->repository->method('getPlayerRatingsAndContract')->with(100)->willReturn(
+        $this->repository->expects($this->once())->method('getPlayerRatingsAndContract')->with(100)->willReturn(
             $this->makeRatingsArray(tid: 5, salary: 3000),
         );
 
@@ -96,7 +96,7 @@ class HistArchiverServiceTest extends TestCase
         $this->repository->method('getPlayerRatingsAndContract')->willReturn(
             $this->makeRatingsArray(),
         );
-        $this->repository->method('upsertHistRow')->willReturn(1);
+        $this->repository->expects($this->exactly(3))->method('upsertHistRow')->willReturn(1);
 
         $result = $this->service->archiveSeason(2026);
 
@@ -115,7 +115,7 @@ class HistArchiverServiceTest extends TestCase
             $this->makeRatingsArray(),
         );
         // ON DUPLICATE KEY UPDATE returns 2 for update, 1 for insert
-        $this->repository->method('upsertHistRow')
+        $this->repository->expects($this->exactly(2))->method('upsertHistRow')
             ->willReturnOnConsecutiveCalls(1, 2);
 
         $result1 = $this->service->archiveSeason(2026);
@@ -127,7 +127,7 @@ class HistArchiverServiceTest extends TestCase
 
     public function testValidateNoDiscrepancies(): void
     {
-        $this->repository->method('getValidationComparison')->with(2026)->willReturn([
+        $this->repository->expects($this->once())->method('getValidationComparison')->with(2026)->willReturn([
             $this->makeComparisonRow(1, 'Player One', games: 82, pts: 1500),
         ]);
 
@@ -140,7 +140,7 @@ class HistArchiverServiceTest extends TestCase
 
     public function testValidateWithEmptyResultSet(): void
     {
-        $this->repository->method('getValidationComparison')->with(2026)->willReturn([]);
+        $this->repository->expects($this->once())->method('getValidationComparison')->with(2026)->willReturn([]);
 
         $report = $this->service->validatePlrVsBoxScores(2026);
 
@@ -151,7 +151,7 @@ class HistArchiverServiceTest extends TestCase
 
     public function testValidateMultiplePlayersWithMixedResults(): void
     {
-        $this->repository->method('getValidationComparison')->with(2026)->willReturn([
+        $this->repository->expects($this->once())->method('getValidationComparison')->with(2026)->willReturn([
             $this->makeComparisonRow(1, 'Player One'),
             $this->makeComparisonRow(2, 'Player Two'),
             $this->makeComparisonRowWithDiff(3, 'Player Three', column: 'pts', histValue: 1500, bsValue: 1502),
@@ -171,7 +171,7 @@ class HistArchiverServiceTest extends TestCase
         $row['bs_pts'] = 1502;
         $row['hist_games'] = 82;
         $row['bs_games'] = 80;
-        $this->repository->method('getValidationComparison')->with(2026)->willReturn([$row]);
+        $this->repository->expects($this->once())->method('getValidationComparison')->with(2026)->willReturn([$row]);
 
         $report = $this->service->validatePlrVsBoxScores(2026);
 
@@ -195,7 +195,7 @@ class HistArchiverServiceTest extends TestCase
 
     public function testValidateDetectsDiscrepancy(): void
     {
-        $this->repository->method('getValidationComparison')->with(2026)->willReturn([
+        $this->repository->expects($this->once())->method('getValidationComparison')->with(2026)->willReturn([
             $this->makeComparisonRowWithDiff(1, 'Player One', column: 'pts', histValue: 1500, bsValue: 1502),
         ]);
 

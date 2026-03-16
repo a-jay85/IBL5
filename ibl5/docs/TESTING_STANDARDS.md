@@ -254,7 +254,6 @@ vendor/bin/phpunit --filter testMethodName # Run tests matching pattern
 vendor/bin/phpunit --testsuite suiteName   # Run specific test suite
 
 # Configuration
-vendor/bin/phpunit -c phpunit.ci.xml       # Use specific config file
 vendor/bin/phpunit --configuration file    # Same as -c
 
 # Display issue details (IMPORTANT - default only shows counts)

@@ -389,7 +389,6 @@
 - ScheduleParser, SeasonPhaseHelper, StandingsGrouper
 
 **Infrastructure Improvements:**
-- Added `phpunit.ci.xml` for CI/CD optimization
 - Enhanced `phpunit.xml` with comprehensive test suite definitions
 - Created IntegrationTestCase base class (208 lines) for database testing with transaction rollback
 - Refactored PowerRankingsUpdater, ScheduleUpdater, StandingsUpdater to use new utilities

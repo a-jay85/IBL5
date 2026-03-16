@@ -18,7 +18,7 @@ cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary
 cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary | tail -n 3
 ```
 
-**PHPUnit output rule:** Always use `--no-progress --no-output --testdox-summary`. Only read output below `Summary of tests with errors, failures, or issues:`. Add `--filter`, `--testsuite`, `--display-all-issues`, or `-c phpunit.ci.xml` as needed. See `phpunit-tests.md` for full rules.
+**PHPUnit output rule:** Always use `--no-progress --no-output --testdox-summary`. Only read output below `Summary of tests with errors, failures, or issues:`. Add `--filter`, `--testsuite`, or `--display-all-issues` as needed. See `phpunit-tests.md` for full rules.
 
 ### Static Analysis (PHPStan)
 

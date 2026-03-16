@@ -9,7 +9,6 @@ paths: ibl5/tests/**/*.php
 # CORRECT commands
 vendor/bin/phpunit tests/Module/
 vendor/bin/phpunit --filter testMethodName
-vendor/bin/phpunit -c phpunit.ci.xml        # Use specific config
 vendor/bin/phpunit --display-all-issues     # Show ALL issues (deprecations, warnings, etc.)
 
 # Token-saving: When just checking if tests pass (not debugging)

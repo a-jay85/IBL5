@@ -52,7 +52,6 @@ jobs:
       run: |
         mkdir -p coverage
         vendor/bin/phpunit \
-          --configuration phpunit.ci.xml \
           --testdox \
           --coverage-clover coverage/clover.xml \
           --colors=always

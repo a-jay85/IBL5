@@ -46,7 +46,7 @@ class LeagueStartersService implements LeagueStartersServiceInterface
      */
     public function getAllStartersByPosition(): array
     {
-        $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+        $positions = \JSB::PLAYER_POSITIONS;
 
         /** @var array<string, array<int, Player>> $startersByPosition */
         $startersByPosition = [];

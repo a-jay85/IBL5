@@ -29,14 +29,7 @@ class SeriesRecordsRepository extends \BaseMysqliRepository implements SeriesRec
     public function getTeamsForSeriesRecords(): array
     {
         /** @var list<array{teamid: int, team_city: string, team_name: string, color1: string, color2: string}> */
-        return $this->fetchAll(
-            "SELECT teamid, team_city, team_name, color1, color2
-             FROM ibl_team_info
-             WHERE teamid BETWEEN 1 AND ?
-             ORDER BY teamid ASC",
-            "i",
-            \League::MAX_REAL_TEAMID
-        );
+        return $this->fetchAllRealTeams('teamid ASC');
     }
 
     /**

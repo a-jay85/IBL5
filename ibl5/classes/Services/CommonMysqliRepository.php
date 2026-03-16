@@ -213,6 +213,18 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     }
 
     /**
+     * Gets all real teams (excludes Free Agents, All-Star teams, Rookies, etc.)
+     *
+     * @param string $orderBy SQL ORDER BY clause (must be a whitelisted column name)
+     * @return list<TeamInfoRow>
+     */
+    public function getAllRealTeams(string $orderBy = 'team_name ASC'): array
+    {
+        /** @var list<TeamInfoRow> */
+        return $this->fetchAllRealTeams($orderBy);
+    }
+
+    /**
      * Gets total salary for a team for the current year
      *
      * @param string $teamName Team name

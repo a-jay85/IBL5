@@ -23,7 +23,7 @@
         "CastString": false
     },
     "testFramework": "phpunit",
-    "testFrameworkOptions": "--configuration=phpunit.ci.xml",
+    "testFrameworkOptions": "",
     "minMsi": 60,
     "minCoveredMsi": 70,
     "threads": 4,

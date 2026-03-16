@@ -14,7 +14,6 @@ Write PHPUnit 13+ tests following behavior-focused testing principles.
 vendor/bin/phpunit tests/Module/
 vendor/bin/phpunit --filter testMethodName
 vendor/bin/phpunit --testsuite "Module Tests"
-vendor/bin/phpunit -c phpunit.ci.xml        # Use specific config file
 vendor/bin/phpunit --display-all-issues     # Show ALL issues (deprecations, warnings, etc.)
 
 # ❌ WRONG - These do NOT exist in PHPUnit 13.x
@@ -212,10 +211,8 @@ $result = $stmt->get_result();
 
 ## Test Registration
 
-Register new tests in **BOTH** configuration files:
+Register new tests in `ibl5/phpunit.xml`:
 
-### Standard Tests (Run Locally & CI/CD)
-Add to **both** `ibl5/phpunit.xml` and `ibl5/phpunit.ci.xml`:
 ```xml
 <testsuites>
     <testsuite name="ModuleName Tests">
@@ -224,25 +221,13 @@ Add to **both** `ibl5/phpunit.xml` and `ibl5/phpunit.ci.xml`:
 </testsuites>
 ```
 
-### Local-Only Tests (Requires Credentials)
-Add **only** to `ibl5/phpunit.xml` (not CI/CD):
-```xml
-<!-- Example: DatabaseConnectionTest.php -->
-<testsuite name="Root Tests">
-    <file>tests/DatabaseConnectionTest.php</file>
-</testsuite>
-```
-
-**Why Two Configs?**
-- `phpunit.xml` - runs locally (includes tests requiring MAMP credentials)
-- `phpunit.ci.xml` - runs in CI/CD pipeline (excludes local-only tests)
-- CI/CD uses: `vendor/bin/phpunit --configuration phpunit.ci.xml`
+Both local and CI use the same `phpunit.xml` configuration.
 
 ## Completion Criteria
 
 **Unit Tests:**
 - [ ] All tests pass: `vendor/bin/phpunit tests/ModuleName/`
-- [ ] Tests registered in **both** `ibl5/phpunit.xml` and `ibl5/phpunit.ci.xml` (unless local-only)
+- [ ] Tests registered in `ibl5/phpunit.xml`
 - [ ] No `markTestSkipped()` calls
 - [ ] No ReflectionClass for private methods
 - [ ] Zero warnings, zero failures
@@ -253,7 +238,7 @@ Add **only** to `ibl5/phpunit.xml` (not CI/CD):
 - [ ] Tests complete workflows, not isolated components
 - [ ] Asserts both outcomes and database operations (`assertQueryExecuted`, etc.)
 - [ ] Prevents external notifications (`$_SERVER['SERVER_NAME'] = 'localhost'`)
-- [ ] Registered in **both** `phpunit.xml` and `phpunit.ci.xml`
+- [ ] Registered in `phpunit.xml`
 
 ## Templates
 

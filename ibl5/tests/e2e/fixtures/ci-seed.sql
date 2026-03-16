@@ -71,7 +71,11 @@ INSERT INTO nuke_modules (title, custom_title, active, view) VALUES
   ('Draft',               'Draft',               1, 0),
   ('TeamOffDefStats',     'TeamOffDefStats',     1, 0),
   ('Transaction',         'Transaction',         1, 0),
-  ('Topics',              'Topics',              1, 0);
+  ('Topics',              'Topics',              1, 0),
+  ('VotingResults',       'VotingResults',       1, 0),
+  ('AllStarAppearances',  'AllStarAppearances',  1, 0),
+  ('SeasonArchive',       'SeasonArchive',       1, 0),
+  ('OneOnOneGame',        'OneOnOneGame',        1, 0);
 
 -- ============================================================
 -- IBL season bootstrap
@@ -904,6 +908,37 @@ ON DUPLICATE KEY UPDATE ranking=VALUES(ranking), last_win=VALUES(last_win), last
 INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid) VALUES
   (2026, '2026-06-05', 1, 2, 0, 0, 0, 'sched-playoff-june-01')
 ON DUPLICATE KEY UPDATE VScore=VALUES(VScore);
+
+-- ============================================================
+-- Injury data (Injuries module E2E tests)
+-- Set 'injured' column > 0 on a player to appear on Injuries page
+-- ============================================================
+
+UPDATE ibl_plr SET injured = 5 WHERE pid = 5;
+UPDATE ibl_plr SET injured = 3 WHERE pid = 7;
+
+-- ============================================================
+-- All-Star appearance data (AllStarAppearances module)
+-- Award must match '%Conference All-Star' pattern
+-- ============================================================
+
+INSERT INTO ibl_awards (year, Award, name) VALUES
+  (2026, 'Eastern Conference All-Star', 'Test Player'),
+  (2025, 'Eastern Conference All-Star', 'Test Player'),
+  (2024, 'Eastern Conference All-Star', 'Test Player'),
+  (2026, 'Western Conference All-Star', 'Stars Guard'),
+  (2025, 'Western Conference All-Star', 'Stars Guard');
+
+-- ============================================================
+-- News article for News module tests (needs ihome=0 or catid=0
+-- to show on News index)
+-- ============================================================
+
+INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ihome, comments, counter) VALUES
+  (0, 'admin', 'Welcome to the new IBL season', '2026-03-10 10:00:00',
+   'The new season is here with exciting changes and new rosters.',
+   'Full article body text with details about the upcoming season.',
+   1, 0, 2, 10);
 
 -- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the

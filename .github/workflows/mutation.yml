@@ -49,7 +49,6 @@ jobs:
       run: |
         mkdir -p coverage
         vendor/bin/phpunit \
-          --configuration phpunit.ci.xml \
           --coverage-clover coverage/clover.xml \
           --coverage-xml coverage/coverage-xml \
           --log-junit coverage/junit.xml \

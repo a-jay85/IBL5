@@ -71,7 +71,11 @@ INSERT INTO nuke_modules (title, custom_title, active, view) VALUES
   ('Draft',               'Draft',               1, 0),
   ('TeamOffDefStats',     'TeamOffDefStats',     1, 0),
   ('Transaction',         'Transaction',         1, 0),
-  ('Topics',              'Topics',              1, 0);
+  ('Topics',              'Topics',              1, 0),
+  ('VotingResults',       'VotingResults',       1, 0),
+  ('AllStarAppearances',  'AllStarAppearances',  1, 0),
+  ('SeasonArchive',       'SeasonArchive',       1, 0),
+  ('OneOnOneGame',        'OneOnOneGame',        1, 0);
 
 -- ============================================================
 -- IBL season bootstrap
@@ -612,7 +616,7 @@ INSERT INTO ibl_olympics_league_config (season_ending_year, team_slot, team_name
 -- Test user is on Metros (tid=1). Offers must involve Metros.
 -- ============================================================
 
-INSERT INTO ibl_trade_offers (id) VALUES (1), (2);
+INSERT INTO ibl_trade_offers (id) VALUES (1), (2), (3), (4), (5), (6);
 
 INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to, approval) VALUES
   -- Offer 1: Stars Guard (pid=4) from Stars to Metros, player (pid=2) from Metros to Stars
@@ -620,7 +624,20 @@ INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to
   (1, 2, '1', 'Metros', 'Stars', 'Metros'),
   -- Offer 2: Phoenixes Guard (pid=6) from Phoenixes to Metros, draft pick from Metros to Phoenixes
   (2, 6, '1', 'Phoenixes', 'Metros', 'Metros'),
-  (2, 1, '0', 'Metros', 'Phoenixes', 'Metros');
+  (2, 1, '0', 'Metros', 'Phoenixes', 'Metros'),
+  -- Offers 3-6: extra offers so review card tests survive parallel consumption by submission tests
+  -- Offer 3: Cougars Guard (pid=23) from Cougars to Metros
+  (3, 23, '1', 'Cougars', 'Metros', 'Metros'),
+  (3, 21, '1', 'Metros', 'Cougars', 'Metros'),
+  -- Offer 4: Stars Forward (pid=5) from Stars to Metros
+  (4, 5, '1', 'Stars', 'Metros', 'Metros'),
+  (4, 20, '1', 'Metros', 'Stars', 'Metros'),
+  -- Offer 5: Phoenixes Center (pid=7) from Phoenixes to Metros
+  (5, 7, '1', 'Phoenixes', 'Metros', 'Metros'),
+  (5, 22, '1', 'Metros', 'Phoenixes', 'Metros'),
+  -- Offer 6: Cougars Forward (pid=24) from Cougars to Metros
+  (6, 24, '1', 'Cougars', 'Metros', 'Metros'),
+  (6, 10, '1', 'Metros', 'Cougars', 'Metros');
 
 -- ============================================================
 -- Stories for search pagination (need >10 results for "the")
@@ -637,7 +654,12 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic) VA
   (2, 'admin', 'The Royals trade for the young center',    '2026-02-13 10:00:00', 'The rebuild continues',           '', 1),
   (3, 'admin', 'The Apollos extend the franchise player',  '2026-02-12 10:00:00', 'The max deal locks them in',      '', 1),
   (8, 'admin', 'The Blues sign the top free agent',        '2026-02-11 10:00:00', 'The biggest signing of the period', '', 1),
-  (1, 'admin', 'The Blizzard waive the backup guard',      '2026-02-10 10:00:00', 'The roster move was expected',     '', 1);
+  (1, 'admin', 'The Blizzard waive the backup guard',      '2026-02-10 10:00:00', 'The roster move was expected',     '', 1),
+  (2, 'admin', 'The Huskies pull off the trade deadline deal', '2026-02-09 10:00:00', 'The swingman fits the system',   '', 1),
+  (1, 'admin', 'The Bucks waive the reserve center',      '2026-02-08 10:00:00', 'The move opens the roster spot',  '', 1),
+  (8, 'admin', 'The Nuggets sign the veteran shooter',    '2026-02-07 10:00:00', 'The addition fills the gap',      '', 1),
+  (2, 'admin', 'The Pilots trade the young prospect',     '2026-02-06 10:00:00', 'The rebuild enters the next phase', '', 1),
+  (3, 'admin', 'The Mavericks extend the all-star guard', '2026-02-05 10:00:00', 'The deal is the largest in IBL history', '', 1);
 
 -- ============================================================
 -- Saved depth chart configs (for depth-chart-changes.spec.ts)
@@ -904,6 +926,101 @@ ON DUPLICATE KEY UPDATE ranking=VALUES(ranking), last_win=VALUES(last_win), last
 INSERT INTO ibl_schedule (Year, Date, Visitor, Home, VScore, HScore, BoxID, uuid) VALUES
   (2026, '2026-06-05', 1, 2, 0, 0, 0, 'sched-playoff-june-01')
 ON DUPLICATE KEY UPDATE VScore=VALUES(VScore);
+
+-- ============================================================
+-- Injury data (Injuries module E2E tests)
+-- Set 'injured' column > 0 on a player to appear on Injuries page
+-- ============================================================
+
+UPDATE ibl_plr SET injured = 5 WHERE pid = 5;
+UPDATE ibl_plr SET injured = 3 WHERE pid = 7;
+
+-- ============================================================
+-- All-Star appearance data (AllStarAppearances module)
+-- Award must match '%Conference All-Star' pattern
+-- ============================================================
+
+INSERT INTO ibl_awards (year, Award, name) VALUES
+  (2026, 'Eastern Conference All-Star', 'Test Player'),
+  (2025, 'Eastern Conference All-Star', 'Test Player'),
+  (2024, 'Eastern Conference All-Star', 'Test Player'),
+  (2026, 'Western Conference All-Star', 'Stars Guard'),
+  (2025, 'Western Conference All-Star', 'Stars Guard');
+
+-- ============================================================
+-- News article for News module tests (needs ihome=0 or catid=0
+-- to show on News index)
+-- ============================================================
+
+INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ihome, comments, counter) VALUES
+  (0, 'admin', 'Welcome to the new IBL season', '2026-03-10 10:00:00',
+   'The new season is here with exciting changes and new rosters.',
+   'Full article body text with details about the upcoming season.',
+   1, 0, 2, 10);
+
+-- ============================================================
+-- Rookie players for EOY ROY ballot (exp=1, stats_gm >= 41)
+-- Needed so duplicate EOY test doesn't fail on missing ROY
+-- ============================================================
+
+INSERT INTO ibl_plr (
+  pid, name, age, peak, tid, pos, ordinal,
+  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  cy, cyt, cy1, cy2,
+  retired, exp,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_to, stats_blk, stats_pf,
+  uuid
+) VALUES
+  (40, 'Rookie Guard', 20, 25, 4, 'PG', 1,
+   75, 70, 65, 60, 55, 68, 64, 66, 61,
+   1, 3, 300, 330,
+   0, 1,
+   6, 2, 185, 'Rookie University',
+   1, 1, 2025, 'Diesels', 'Diesels',
+   41, 1260, 180, 420, 80, 100,
+   50, 130, 30, 100, 170, 45,
+   70, 12, 75,
+   'plr-uuid-00000000-0000-000000000040'),
+  (41, 'Rookie Wing', 21, 26, 11, 'SF', 1,
+   73, 68, 63, 58, 53, 66, 62, 64, 59,
+   1, 3, 250, 275,
+   0, 1,
+   6, 6, 205, 'Rookie College',
+   1, 3, 2025, 'Pioneers', 'Pioneers',
+   41, 1260, 170, 400, 75, 95,
+   40, 110, 35, 110, 140, 40,
+   60, 18, 80,
+   'plr-uuid-00000000-0000-000000000041'),
+  (42, 'Rookie Big', 22, 27, 15, 'C', 1,
+   77, 72, 67, 62, 57, 70, 66, 68, 63,
+   1, 3, 200, 220,
+   0, 1,
+   7, 0, 240, 'Rookie State',
+   1, 5, 2025, 'Blues', 'Blues',
+   41, 1300, 200, 440, 90, 110,
+   15, 40, 55, 150, 80, 35,
+   55, 30, 90,
+   'plr-uuid-00000000-0000-000000000042');
+
+-- Rookie player history (for stats to show on ballot)
+INSERT INTO ibl_hist (
+  pid, name, year, team, teamid,
+  games, minutes, fgm, fga, ftm, fta, tgm, tga,
+  orb, reb, ast, stl, blk, tvr, pf, pts, salary
+) VALUES
+  (40, 'Rookie Guard', 2026, 'Diesels', 4,
+   41, 1260, 180, 420, 80, 100, 50, 130,
+   30, 130, 170, 45, 12, 70, 75, 540, 300),
+  (41, 'Rookie Wing', 2026, 'Pioneers', 11,
+   41, 1260, 170, 400, 75, 95, 40, 110,
+   35, 145, 140, 40, 18, 60, 80, 495, 250),
+  (42, 'Rookie Big', 2026, 'Blues', 15,
+   41, 1300, 200, 440, 90, 110, 15, 40,
+   55, 205, 80, 35, 30, 55, 90, 540, 200);
 
 -- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the

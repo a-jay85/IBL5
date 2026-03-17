@@ -21,14 +21,7 @@ class LeagueStartersRepository extends \BaseMysqliRepository implements LeagueSt
     public function getAllStartersWithTeamData(): array
     {
         return $this->fetchAll(
-            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2,
-                CASE
-                    WHEN p.PGDepth = 1 THEN 'PG'
-                    WHEN p.SGDepth = 1 THEN 'SG'
-                    WHEN p.SFDepth = 1 THEN 'SF'
-                    WHEN p.PFDepth = 1 THEN 'PF'
-                    WHEN p.CDepth  = 1 THEN 'C'
-                END AS starter_position
+            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
             FROM ibl_plr p
             JOIN ibl_team_info t ON p.tid = t.teamid
             WHERE p.retired = 0

@@ -247,7 +247,6 @@ class LeagueStartersServiceTest extends TestCase
             'teamname' => $teamname,
             'color1' => '#000000',
             'color2' => '#FFFFFF',
-            'starter_position' => $position,
             'loyalty' => 3,
             'playingTime' => 3,
             'winner' => 3,

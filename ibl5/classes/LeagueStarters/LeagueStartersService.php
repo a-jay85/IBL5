@@ -61,6 +61,14 @@ class LeagueStartersService implements LeagueStartersServiceInterface
 
         $starterRows = $this->repository->getAllStartersWithTeamData();
 
+        $depthColumns = [
+            'PG' => 'PGDepth',
+            'SG' => 'SGDepth',
+            'SF' => 'SFDepth',
+            'PF' => 'PFDepth',
+            'C' => 'CDepth',
+        ];
+
         /** @var array<int, array<string, Player>> $starterMap tid => [position => Player] */
         $starterMap = [];
         foreach ($starterRows as $row) {
@@ -68,22 +76,24 @@ class LeagueStartersService implements LeagueStartersServiceInterface
             if (!is_int($tid)) {
                 continue;
             }
-            $position = is_string($row['starter_position']) ? $row['starter_position'] : '';
-            if ($position === '' || !in_array($position, $positions, true)) {
-                continue;
-            }
-            if (isset($starterMap[$tid][$position])) {
-                continue;
-            }
             $teamname = is_string($row['teamname']) ? $row['teamname'] : '';
             $color1 = is_string($row['color1']) ? $row['color1'] : '';
             $color2 = is_string($row['color2']) ? $row['color2'] : '';
-            /** @var PlayerRow $row */
-            $player = Player::withPlrRow($this->db, $row);
-            $player->teamName = $teamname;
-            $player->teamColor1 = $color1;
-            $player->teamColor2 = $color2;
-            $starterMap[$tid][$position] = $player;
+
+            foreach ($depthColumns as $position => $column) {
+                if (($row[$column] ?? 0) !== 1) {
+                    continue;
+                }
+                if (isset($starterMap[$tid][$position])) {
+                    continue;
+                }
+                /** @var PlayerRow $row */
+                $player = Player::withPlrRow($this->db, $row);
+                $player->teamName = $teamname;
+                $player->teamColor1 = $color1;
+                $player->teamColor2 = $color2;
+                $starterMap[$tid][$position] = $player;
+            }
         }
 
         foreach ($teams as $teamRow) {

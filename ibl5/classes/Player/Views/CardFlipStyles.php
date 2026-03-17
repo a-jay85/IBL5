@@ -117,35 +117,48 @@ JS
         : '';
 
         return <<<JS
-document.addEventListener('DOMContentLoaded', function() {
-    const flipContainers = document.querySelectorAll('{$containerSelector}');
+(function() {
+    function initFlip() {
+        var flipContainers = document.querySelectorAll('{$containerSelector}');
 
-    flipContainers.forEach(function(container) {
-        const flipIcons = container.querySelectorAll('{$iconSelector}');
+        flipContainers.forEach(function(container) {
+            if (container.dataset.flipInit) return;
+            container.dataset.flipInit = '1';
 
-        flipIcons.forEach(function(flipIcon) {
-            flipIcon.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                container.classList.toggle('flipped');
-                {$labelToggleCode}
-                // Remove pulse animation after first flip
-                flipIcons.forEach(function(icon) {
-                    icon.classList.remove('pulse');
+            var flipIcons = container.querySelectorAll('{$iconSelector}');
+
+            flipIcons.forEach(function(flipIcon) {
+                flipIcon.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    container.classList.toggle('flipped');
+                    {$labelToggleCode}
+                    // Remove pulse animation after first flip
+                    flipIcons.forEach(function(icon) {
+                        icon.classList.remove('pulse');
+                    });
                 });
             });
-        });
 
-        // Add pulse for first 5 seconds to draw attention
-        if (flipIcons.length > 0) {
-            setTimeout(function() {
-                flipIcons.forEach(function(icon) {
-                    icon.classList.remove('pulse');
-                });
-            }, 5000);
-        }
-    });
-});
+            // Add pulse for first 5 seconds to draw attention
+            if (flipIcons.length > 0) {
+                setTimeout(function() {
+                    flipIcons.forEach(function(icon) {
+                        icon.classList.remove('pulse');
+                    });
+                }, 5000);
+            }
+        });
+    }
+
+    // Run on initial page load and on HTMX content swaps
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initFlip);
+    } else {
+        initFlip();
+    }
+    document.body.addEventListener('htmx:afterSettle', initFlip);
+})();
 JS;
     }
 
@@ -203,32 +216,44 @@ HTML;
     private static function getTouchScrollScript(string $containerSelector): string
     {
         return <<<JS
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('{$containerSelector} .player-stats-card').forEach(function(card) {
-        var startX, startY, initScrollLeft, scrollDir;
-        card.addEventListener('touchstart', function(e) {
-            if (card.scrollWidth <= card.clientWidth) return;
-            startX = e.touches[0].pageX;
-            startY = e.touches[0].pageY;
-            initScrollLeft = card.scrollLeft;
-            scrollDir = null;
-        }, {passive: true});
-        card.addEventListener('touchmove', function(e) {
-            if (startX === undefined) return;
-            var dx = startX - e.touches[0].pageX;
-            var dy = startY - e.touches[0].pageY;
-            if (scrollDir === null) scrollDir = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
-            if (scrollDir === 'h') {
-                e.preventDefault();
-                card.scrollLeft = initScrollLeft + dx;
-            }
-        }, {passive: false});
-        card.addEventListener('touchend', function() {
-            startX = undefined;
-            scrollDir = null;
-        }, {passive: true});
-    });
-});
+(function() {
+    function initTouchScroll() {
+        document.querySelectorAll('{$containerSelector} .player-stats-card').forEach(function(card) {
+            if (card.dataset.touchScrollInit) return;
+            card.dataset.touchScrollInit = '1';
+
+            var startX, startY, initScrollLeft, scrollDir;
+            card.addEventListener('touchstart', function(e) {
+                if (card.scrollWidth <= card.clientWidth) return;
+                startX = e.touches[0].pageX;
+                startY = e.touches[0].pageY;
+                initScrollLeft = card.scrollLeft;
+                scrollDir = null;
+            }, {passive: true});
+            card.addEventListener('touchmove', function(e) {
+                if (startX === undefined) return;
+                var dx = startX - e.touches[0].pageX;
+                var dy = startY - e.touches[0].pageY;
+                if (scrollDir === null) scrollDir = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+                if (scrollDir === 'h') {
+                    e.preventDefault();
+                    card.scrollLeft = initScrollLeft + dx;
+                }
+            }, {passive: false});
+            card.addEventListener('touchend', function() {
+                startX = undefined;
+                scrollDir = null;
+            }, {passive: true});
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTouchScroll);
+    } else {
+        initTouchScroll();
+    }
+    document.body.addEventListener('htmx:afterSettle', initTouchScroll);
+})();
 JS;
     }
 }

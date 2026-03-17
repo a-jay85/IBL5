@@ -4,34 +4,39 @@ declare(strict_types=1);
 
 namespace LeagueStarters;
 
+use LeagueStarters\Contracts\LeagueStartersRepositoryInterface;
 use LeagueStarters\Contracts\LeagueStartersServiceInterface;
 use Player\Player;
-use Team\Contracts\TeamQueryRepositoryInterface;
 
 /**
  * LeagueStartersService - Business logic for league starters display
  *
- * Retrieves starting lineups for all teams in the league.
+ * Retrieves starting lineups for all teams using batch queries (2-3 total)
+ * instead of per-team/per-position individual lookups.
  *
  * @see LeagueStartersServiceInterface For the interface contract
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class LeagueStartersService implements LeagueStartersServiceInterface
 {
     private \mysqli $db;
     private \League $league;
-    private TeamQueryRepositoryInterface $teamQueryRepo;
+    private LeagueStartersRepositoryInterface $repository;
+    private ?Player $placeholderPlayer = null;
 
     /**
-     * Constructor
-     *
      * @param \mysqli $db Database connection
      * @param \League $league League object
+     * @param LeagueStartersRepositoryInterface|null $repository Optional repository (test seam)
      */
-    public function __construct(\mysqli $db, \League $league)
-    {
+    public function __construct(
+        \mysqli $db,
+        \League $league,
+        ?LeagueStartersRepositoryInterface $repository = null
+    ) {
         $this->db = $db;
         $this->league = $league;
-        $this->teamQueryRepo = new \Team\TeamQueryRepository($db);
+        $this->repository = $repository ?? new LeagueStartersRepository($db);
     }
 
     /**
@@ -41,13 +46,54 @@ class LeagueStartersService implements LeagueStartersServiceInterface
      */
     public function getAllStartersByPosition(): array
     {
-        $teams = $this->league->getAllTeamsResult();
         $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
+
         /** @var array<string, array<int, Player>> $startersByPosition */
         $startersByPosition = [];
-
         foreach ($positions as $position) {
             $startersByPosition[$position] = [];
+        }
+
+        $teams = $this->league->getAllTeamsResult();
+        if ($teams === []) {
+            return $startersByPosition;
+        }
+
+        $starterRows = $this->repository->getAllStartersWithTeamData();
+
+        $depthColumns = [
+            'PG' => 'PGDepth',
+            'SG' => 'SGDepth',
+            'SF' => 'SFDepth',
+            'PF' => 'PFDepth',
+            'C' => 'CDepth',
+        ];
+
+        /** @var array<int, array<string, Player>> $starterMap tid => [position => Player] */
+        $starterMap = [];
+        foreach ($starterRows as $row) {
+            $tid = $row['tid'];
+            if (!is_int($tid)) {
+                continue;
+            }
+            $teamname = is_string($row['teamname']) ? $row['teamname'] : '';
+            $color1 = is_string($row['color1']) ? $row['color1'] : '';
+            $color2 = is_string($row['color2']) ? $row['color2'] : '';
+
+            foreach ($depthColumns as $position => $column) {
+                if (($row[$column] ?? 0) !== 1) {
+                    continue;
+                }
+                if (isset($starterMap[$tid][$position])) {
+                    continue;
+                }
+                /** @var PlayerRow $row */
+                $player = Player::withPlrRow($this->db, $row);
+                $player->teamName = $teamname;
+                $player->teamColor1 = $color1;
+                $player->teamColor2 = $color2;
+                $starterMap[$tid][$position] = $player;
+            }
         }
 
         foreach ($teams as $teamRow) {
@@ -55,21 +101,28 @@ class LeagueStartersService implements LeagueStartersServiceInterface
             $team = \Team::initialize($this->db, $teamRow);
 
             foreach ($positions as $position) {
-                $playerId = $this->teamQueryRepo->getLastSimStarterPlayerIDForPosition($team->teamID, $position);
-                if ($playerId === 0) {
-                    // Placeholder player — with minimal CI seed data, ~140 of these
-                    // lookups cause >10s page load. Avoid CI flow tests for this module.
-                    $playerId = 4040404;
+                if (isset($starterMap[$team->teamID][$position])) {
+                    $player = $starterMap[$team->teamID][$position];
+                    $player->teamCity = $team->city;
+                } else {
+                    $player = clone $this->getOrLoadPlaceholder();
+                    $player->teamName = $team->name;
+                    $player->teamCity = $team->city;
+                    $player->teamColor1 = $team->color1;
+                    $player->teamColor2 = $team->color2;
                 }
-                $player = Player::withPlayerID($this->db, $playerId);
-                $player->teamName = $team->name;
-                $player->teamCity = $team->city;
-                $player->teamColor1 = $team->color1;
-                $player->teamColor2 = $team->color2;
                 $startersByPosition[$position][] = $player;
             }
         }
 
         return $startersByPosition;
+    }
+
+    private function getOrLoadPlaceholder(): Player
+    {
+        if ($this->placeholderPlayer === null) {
+            $this->placeholderPlayer = Player::withPlayerID($this->db, 4040404);
+        }
+        return $this->placeholderPlayer;
     }
 }

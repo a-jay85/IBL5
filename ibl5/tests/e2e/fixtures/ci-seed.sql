@@ -616,7 +616,7 @@ INSERT INTO ibl_olympics_league_config (season_ending_year, team_slot, team_name
 -- Test user is on Metros (tid=1). Offers must involve Metros.
 -- ============================================================
 
-INSERT INTO ibl_trade_offers (id) VALUES (1), (2);
+INSERT INTO ibl_trade_offers (id) VALUES (1), (2), (3), (4), (5), (6);
 
 INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to, approval) VALUES
   -- Offer 1: Stars Guard (pid=4) from Stars to Metros, player (pid=2) from Metros to Stars
@@ -624,7 +624,20 @@ INSERT INTO ibl_trade_info (tradeofferid, itemid, itemtype, trade_from, trade_to
   (1, 2, '1', 'Metros', 'Stars', 'Metros'),
   -- Offer 2: Phoenixes Guard (pid=6) from Phoenixes to Metros, draft pick from Metros to Phoenixes
   (2, 6, '1', 'Phoenixes', 'Metros', 'Metros'),
-  (2, 1, '0', 'Metros', 'Phoenixes', 'Metros');
+  (2, 1, '0', 'Metros', 'Phoenixes', 'Metros'),
+  -- Offers 3-6: extra offers so review card tests survive parallel consumption by submission tests
+  -- Offer 3: Cougars Guard (pid=23) from Cougars to Metros
+  (3, 23, '1', 'Cougars', 'Metros', 'Metros'),
+  (3, 21, '1', 'Metros', 'Cougars', 'Metros'),
+  -- Offer 4: Stars Forward (pid=5) from Stars to Metros
+  (4, 5, '1', 'Stars', 'Metros', 'Metros'),
+  (4, 20, '1', 'Metros', 'Stars', 'Metros'),
+  -- Offer 5: Phoenixes Center (pid=7) from Phoenixes to Metros
+  (5, 7, '1', 'Phoenixes', 'Metros', 'Metros'),
+  (5, 22, '1', 'Metros', 'Phoenixes', 'Metros'),
+  -- Offer 6: Cougars Forward (pid=24) from Cougars to Metros
+  (6, 24, '1', 'Cougars', 'Metros', 'Metros'),
+  (6, 10, '1', 'Metros', 'Cougars', 'Metros');
 
 -- ============================================================
 -- Stories for search pagination (need >10 results for "the")
@@ -641,7 +654,12 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic) VA
   (2, 'admin', 'The Royals trade for the young center',    '2026-02-13 10:00:00', 'The rebuild continues',           '', 1),
   (3, 'admin', 'The Apollos extend the franchise player',  '2026-02-12 10:00:00', 'The max deal locks them in',      '', 1),
   (8, 'admin', 'The Blues sign the top free agent',        '2026-02-11 10:00:00', 'The biggest signing of the period', '', 1),
-  (1, 'admin', 'The Blizzard waive the backup guard',      '2026-02-10 10:00:00', 'The roster move was expected',     '', 1);
+  (1, 'admin', 'The Blizzard waive the backup guard',      '2026-02-10 10:00:00', 'The roster move was expected',     '', 1),
+  (2, 'admin', 'The Huskies pull off the trade deadline deal', '2026-02-09 10:00:00', 'The swingman fits the system',   '', 1),
+  (1, 'admin', 'The Bucks waive the reserve center',      '2026-02-08 10:00:00', 'The move opens the roster spot',  '', 1),
+  (8, 'admin', 'The Nuggets sign the veteran shooter',    '2026-02-07 10:00:00', 'The addition fills the gap',      '', 1),
+  (2, 'admin', 'The Pilots trade the young prospect',     '2026-02-06 10:00:00', 'The rebuild enters the next phase', '', 1),
+  (3, 'admin', 'The Mavericks extend the all-star guard', '2026-02-05 10:00:00', 'The deal is the largest in IBL history', '', 1);
 
 -- ============================================================
 -- Saved depth chart configs (for depth-chart-changes.spec.ts)

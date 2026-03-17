@@ -31,7 +31,7 @@ Fix any issues found directly in the worktree files before proceeding.
 
 **Stacked PRs:** If the current branch was created from another feature branch (not `master`), set `--base <parent-branch>` so the PR targets the parent branch instead of master.
 
-**Manual testing in PR description:** Only include a "Manual Testing" section if the PR has functionality not already covered by existing E2E (Playwright) and unit (PHPUnit) tests. If automated tests fully cover the changed behavior, omit the section entirely. When included, use a markdown checklist (`- [ ]`) — minimal, no redundancy with automated checks.
+**Manual testing in PR description:** Always include a "Manual Testing" section. If automated tests (PHPUnit + Playwright) fully cover the changed behavior, write: `No manual testing needed — all changes are covered by unit and E2E tests.` Otherwise, list only steps that automated tests don't cover as a markdown checklist (`- [ ]`) — minimal, no redundancy with automated checks.
 
 **Model guidance:** Use Haiku agents for the commit message generation if delegating.
 

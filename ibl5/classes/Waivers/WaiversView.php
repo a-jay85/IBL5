@@ -32,7 +32,10 @@ class WaiversView implements WaiversViewInterface
         ob_start();
         ?>
         <h2 class="ibl-title">Waivers</h2>
-        <?= $this->renderResultBanner($result, $error) ?>
+        <?= \UI\AlertRenderer::fromCode($result, [
+            'player_added'   => ['class' => 'ibl-alert--success', 'message' => 'Player successfully signed from waivers.'],
+            'player_dropped' => ['class' => 'ibl-alert--success', 'message' => 'Player successfully dropped to waivers.'],
+        ], $error) ?>
         <form name="Waiver_Move" method="post" action="" style="max-width: 600px; margin: 0 auto;">
             <input type="hidden" name="Team_Name" value="<?= $teamNameEscaped ?>">
             <div class="text-center">
@@ -67,31 +70,6 @@ class WaiversView implements WaiversViewInterface
         }
     }
 
-    private function renderResultBanner(?string $result, ?string $error): string
-    {
-        if ($error !== null) {
-            $errorEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($error);
-            return '<div class="ibl-alert ibl-alert--error">' . $errorEscaped . '</div>';
-        }
-
-        if ($result === null) {
-            return '';
-        }
-
-        $banners = [
-            'player_added'   => ['class' => 'ibl-alert--success', 'message' => 'Player successfully signed from waivers.'],
-            'player_dropped' => ['class' => 'ibl-alert--success', 'message' => 'Player successfully dropped to waivers.'],
-        ];
-
-        if (!isset($banners[$result])) {
-            return '';
-        }
-
-        $banner = $banners[$result];
-        $messageEscaped = \Utilities\HtmlSanitizer::safeHtmlOutput($banner['message']);
-        return '<div class="ibl-alert ' . $banner['class'] . '">' . $messageEscaped . '</div>';
-    }
-    
     /**
      * @see WaiversViewInterface::buildPlayerOption()
      */

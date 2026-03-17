@@ -40,7 +40,13 @@ class FreeAgencyView implements FreeAgencyViewInterface
         $allOtherPlayers = $mainPageData['allOtherPlayers'];
 
         ob_start();
-        echo $this->renderResultBanner($result);
+        echo \UI\AlertRenderer::fromCode($result, [
+            'offer_success' => ['class' => 'ibl-alert--success', 'message' => 'Your offer is legal and has been saved.'],
+            'deleted' => ['class' => 'ibl-alert--info', 'message' => 'Your offer has been deleted.'],
+            'already_signed' => ['class' => 'ibl-alert--warning', 'message' => 'This player was previously signed to a team this Free Agency period.'],
+            'rookie_option_success' => ['class' => 'ibl-alert--success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
+            'email_failed' => ['class' => 'ibl-alert--warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
+        ]);
         ?>
 <h2 class="ibl-title">Free Agency</h2>
 <img src="images/logo/<?= $team->teamID ?>.jpg" alt="Team Logo" class="team-logo-banner">
@@ -53,35 +59,6 @@ class FreeAgencyView implements FreeAgencyViewInterface
 <?= $this->renderOtherFreeAgents($team, $season, $allOtherPlayers) ?>
         <?php
         return (string) ob_get_clean();
-    }
-
-    /**
-     * Render a result banner from PRG redirect query param
-     *
-     * @param string|null $result Result code from query parameter
-     * @return string HTML alert banner or empty string
-     */
-    private function renderResultBanner(?string $result): string
-    {
-        if ($result === null) {
-            return '';
-        }
-
-        $banners = [
-            'offer_success' => ['class' => 'ibl-alert--success', 'message' => 'Your offer is legal and has been saved.'],
-            'deleted' => ['class' => 'ibl-alert--info', 'message' => 'Your offer has been deleted.'],
-            'already_signed' => ['class' => 'ibl-alert--warning', 'message' => 'This player was previously signed to a team this Free Agency period.'],
-            'rookie_option_success' => ['class' => 'ibl-alert--success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
-            'email_failed' => ['class' => 'ibl-alert--warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
-        ];
-
-        if (!isset($banners[$result])) {
-            return '';
-        }
-
-        $banner = $banners[$result];
-        $safeMessage = \Utilities\HtmlSanitizer::safeHtmlOutput($banner['message']);
-        return '<div class="ibl-alert ' . $banner['class'] . '">' . $safeMessage . '</div>';
     }
 
     /**

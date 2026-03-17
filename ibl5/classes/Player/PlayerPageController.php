@@ -55,7 +55,13 @@ class PlayerPageController
         // Render result banner from PRG redirect
         $result = $_GET['result'] ?? null;
         if (is_string($result)) {
-            $html .= $this->renderResultBanner($result);
+            $banner = \UI\AlertRenderer::fromCode($result, [
+                'rookie_option_success' => ['class' => 'ibl-alert--success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
+                'email_failed' => ['class' => 'ibl-alert--warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
+            ]);
+            if ($banner !== '') {
+                $html .= '<tr><td colspan="2">' . $banner . '</td></tr>';
+            }
         }
 
         // Generate team color scheme
@@ -117,25 +123,6 @@ class PlayerPageController
         $html .= PlayerStatsFlipCardView::getFlipStyles($colorScheme);
 
         return $html;
-    }
-
-    /**
-     * Render result banner from PRG redirect
-     */
-    private function renderResultBanner(string $result): string
-    {
-        $resultBanners = [
-            'rookie_option_success' => ['class' => 'ibl-alert--success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
-            'email_failed' => ['class' => 'ibl-alert--warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
-        ];
-
-        if (!isset($resultBanners[$result])) {
-            return '';
-        }
-
-        $banner = $resultBanners[$result];
-        $safeMessage = HtmlSanitizer::safeHtmlOutput($banner['message']);
-        return '<tr><td colspan="2"><div class="ibl-alert ' . $banner['class'] . '">' . $safeMessage . '</div></td></tr>';
     }
 
     /**

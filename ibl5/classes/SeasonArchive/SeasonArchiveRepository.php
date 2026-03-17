@@ -147,11 +147,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
      */
     public function getTeamColors(): array
     {
-        $rows = $this->fetchAll(
-            "SELECT teamid, team_name, color1, color2 FROM {$this->teamInfoTable} WHERE teamid BETWEEN 1 AND ?",
-            "i",
-            \League::MAX_REAL_TEAMID
-        );
+        $rows = $this->fetchAllRealTeams('teamid ASC');
 
         $colors = [];
         foreach ($rows as $row) {

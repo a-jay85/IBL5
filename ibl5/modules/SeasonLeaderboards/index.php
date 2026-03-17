@@ -49,7 +49,7 @@ echo $view->renderFilterForm($teams, $years, $filters);
 
 // Get and render season leaders
 $leadersData = $repository->getSeasonLeaders($filters, $limit);
-$rows = $leadersData['result'];
+$rows = $leadersData['results'];
 $numRows = $leadersData['count'];
 
 // Set active sort column for highlighting

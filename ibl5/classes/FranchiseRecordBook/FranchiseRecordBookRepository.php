@@ -112,17 +112,8 @@ class FranchiseRecordBookRepository extends \BaseMysqliRepository implements Fra
      */
     public function getAllTeams(): array
     {
-        /** @var list<TeamInfo> $rows */
-        $rows = $this->fetchAll(
-            "SELECT teamid, team_name, color1, color2
-             FROM ibl_team_info
-             WHERE teamid BETWEEN 1 AND ?
-             ORDER BY team_name ASC",
-            'i',
-            \League::MAX_REAL_TEAMID
-        );
-
-        return $rows;
+        /** @var list<TeamInfo> */
+        return $this->fetchAllRealTeams('team_name ASC');
     }
 
     /**

@@ -98,12 +98,8 @@ class LeagueScheduleService implements LeagueScheduleServiceInterface
             $visitorTeam = $commonRepo->getTeamnameFromTeamID($visitor);
             $homeTeam = $commonRepo->getTeamnameFromTeamID($home);
 
-            $visitorTier = $this->teamPowerRankings !== []
-                ? StrengthOfScheduleCalculator::assignTier($this->teamPowerRankings[$visitor] ?? 0.0)
-                : '';
-            $homeTier = $this->teamPowerRankings !== []
-                ? StrengthOfScheduleCalculator::assignTier($this->teamPowerRankings[$home] ?? 0.0)
-                : '';
+            $visitorTier = StrengthOfScheduleCalculator::assignTierOrEmpty($this->teamPowerRankings, $this->teamPowerRankings[$visitor] ?? 0.0);
+            $homeTier = StrengthOfScheduleCalculator::assignTierOrEmpty($this->teamPowerRankings, $this->teamPowerRankings[$home] ?? 0.0);
 
             $gamesByMonth[$monthKey]['dates'][$date][] = [
                 'date' => $date,

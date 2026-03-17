@@ -70,9 +70,7 @@ class TeamScheduleService implements TeamScheduleServiceInterface
             $dateFormat = $game->dateObject instanceof \DateTime ? $game->dateObject->format('F') : '';
 
             $opponentRanking = $this->teamPowerRankings[$opposingTeamId] ?? 0.0;
-            $opponentTier = $this->teamPowerRankings !== []
-                ? StrengthOfScheduleCalculator::assignTier($opponentRanking)
-                : '';
+            $opponentTier = StrengthOfScheduleCalculator::assignTierOrEmpty($this->teamPowerRankings, $opponentRanking);
 
             $row = [
                 'game' => $game,

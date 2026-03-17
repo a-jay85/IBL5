@@ -77,9 +77,7 @@ class NextSimService implements NextSimServiceInterface
                 'opposingTeam' => $opposingTeam,
                 'locationPrefix' => $game->getUserTeamLocationPrefix($teamId),
                 'opposingStarters' => $this->getOpposingStartingLineup($opposingTeam),
-                'opponentTier' => $this->teamPowerRankings !== []
-                    ? StrengthOfScheduleCalculator::assignTier($opponentRanking)
-                    : '',
+                'opponentTier' => StrengthOfScheduleCalculator::assignTierOrEmpty($this->teamPowerRankings, $opponentRanking),
                 'opponentPowerRanking' => $opponentRanking,
             ];
         }
@@ -95,9 +93,7 @@ class NextSimService implements NextSimServiceInterface
     public function getUserStartingLineup(\Team $team): array
     {
         $starters = [];
-        $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
-
-        foreach ($positions as $position) {
+        foreach (\JSB::PLAYER_POSITIONS as $position) {
             $playerId = $this->teamQueryRepo->getCurrentlySetStarterPlayerIDForPosition($team->teamID, $position);
             if ($playerId === 0) {
                 continue;
@@ -117,9 +113,8 @@ class NextSimService implements NextSimServiceInterface
     private function getOpposingStartingLineup(\Team $opposingTeam): array
     {
         $starters = [];
-        $positions = ['PG', 'SG', 'SF', 'PF', 'C'];
 
-        foreach ($positions as $position) {
+        foreach (\JSB::PLAYER_POSITIONS as $position) {
             $playerId = $this->teamQueryRepo->getLastSimStarterPlayerIDForPosition($opposingTeam->teamID, $position);
             if ($playerId === 0) {
                 continue;

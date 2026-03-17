@@ -941,6 +941,70 @@ INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ih
    1, 0, 2, 10);
 
 -- ============================================================
+-- Rookie players for EOY ROY ballot (exp=1, stats_gm >= 41)
+-- Needed so duplicate EOY test doesn't fail on missing ROY
+-- ============================================================
+
+INSERT INTO ibl_plr (
+  pid, name, age, peak, tid, pos, ordinal,
+  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  cy, cyt, cy1, cy2,
+  retired, exp,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_to, stats_blk, stats_pf,
+  uuid
+) VALUES
+  (40, 'Rookie Guard', 20, 25, 4, 'PG', 1,
+   75, 70, 65, 60, 55, 68, 64, 66, 61,
+   1, 3, 300, 330,
+   0, 1,
+   6, 2, 185, 'Rookie University',
+   1, 1, 2025, 'Diesels', 'Diesels',
+   41, 1260, 180, 420, 80, 100,
+   50, 130, 30, 100, 170, 45,
+   70, 12, 75,
+   'plr-uuid-00000000-0000-000000000040'),
+  (41, 'Rookie Wing', 21, 26, 11, 'SF', 1,
+   73, 68, 63, 58, 53, 66, 62, 64, 59,
+   1, 3, 250, 275,
+   0, 1,
+   6, 6, 205, 'Rookie College',
+   1, 3, 2025, 'Pioneers', 'Pioneers',
+   41, 1260, 170, 400, 75, 95,
+   40, 110, 35, 110, 140, 40,
+   60, 18, 80,
+   'plr-uuid-00000000-0000-000000000041'),
+  (42, 'Rookie Big', 22, 27, 15, 'C', 1,
+   77, 72, 67, 62, 57, 70, 66, 68, 63,
+   1, 3, 200, 220,
+   0, 1,
+   7, 0, 240, 'Rookie State',
+   1, 5, 2025, 'Blues', 'Blues',
+   41, 1300, 200, 440, 90, 110,
+   15, 40, 55, 150, 80, 35,
+   55, 30, 90,
+   'plr-uuid-00000000-0000-000000000042');
+
+-- Rookie player history (for stats to show on ballot)
+INSERT INTO ibl_hist (
+  pid, name, year, team, teamid,
+  games, minutes, fgm, fga, ftm, fta, tgm, tga,
+  orb, reb, ast, stl, blk, tvr, pf, pts, salary
+) VALUES
+  (40, 'Rookie Guard', 2026, 'Diesels', 4,
+   41, 1260, 180, 420, 80, 100, 50, 130,
+   30, 130, 170, 45, 12, 70, 75, 540, 300),
+  (41, 'Rookie Wing', 2026, 'Pioneers', 11,
+   41, 1260, 170, 400, 75, 95, 40, 110,
+   35, 145, 140, 40, 18, 60, 80, 495, 250),
+  (42, 'Rookie Big', 2026, 'Blues', 15,
+   41, 1300, 200, 440, 90, 110, 15, 40,
+   55, 205, 80, 35, 30, 55, 90, 540, 200);
+
+-- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the
 -- workflow via PHP bcrypt hash at runtime — not seeded here.
 -- ============================================================

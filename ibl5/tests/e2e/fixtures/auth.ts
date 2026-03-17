@@ -17,7 +17,7 @@ export type { SetStateFn };
  *
  * NOTE: The test user has admin privileges, which bypasses
  * ModuleAccessControl phase-gating. Tests asserting "module hidden
- * when phase is X" will always pass for admin users regardless of
+ * when phase is X" will always fail for admin users regardless of
  * the phase setting.
  */
 export const test = base.extend<{ appState: SetStateFn }>({

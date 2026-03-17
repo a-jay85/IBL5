@@ -324,13 +324,17 @@ test.describe('Trade submission: players-only (UI)', () => {
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
     await assertNoPhpErrors(page, 'after player trade submission');
 
-    // Track offer IDs for cleanup
+    // Track only the NEW offer ID for cleanup (exclude pre-existing seed offers)
     const buttons = page.locator('[data-preview-offer]');
     const count = await buttons.count();
+    // The newest offer has the highest ID — only clean up that one
+    let maxId = 0;
     for (let i = 0; i < count; i++) {
       const idStr = await buttons.nth(i).getAttribute('data-preview-offer');
-      createdOfferIds.push(parseInt(idStr ?? '0', 10));
+      const id = parseInt(idStr ?? '0', 10);
+      if (id > maxId) maxId = id;
     }
+    if (maxId > 0) createdOfferIds.push(maxId);
   });
 
   test.afterAll(async ({ request }) => {

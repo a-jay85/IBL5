@@ -12,6 +12,11 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 const offerForm = (page: import('@playwright/test').Page) =>
   page.locator('form[name="FAOffer"]').filter({ has: page.locator('input[type="number"]') });
 
+// File-level serial mode: describe blocks share FA offer state (pid=11, pid=12).
+// Without this, "submit and manage offers" and "quick offer buttons" interleave,
+// causing race conditions where one block's delete removes another block's offer.
+test.describe.configure({ mode: 'serial' });
+
 test.describe('Free Agency -- main page', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Free Agency' });

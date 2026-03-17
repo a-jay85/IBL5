@@ -169,8 +169,9 @@ class Season
     /**
      * Check if trades are currently allowed.
      *
-     * Trades are allowed when the "Allow Trades" setting is "Yes",
-     * OR when the season phase is Draft or Free Agency (regardless of the setting).
+     * Returns true unconditionally during Draft and Free Agency phases,
+     * regardless of the "Allow Trades" setting value. Only checks the
+     * setting during other phases (Preseason, HEAT, Regular Season, Playoffs).
      */
     public function areTradesAllowed(): bool
     {
@@ -191,9 +192,10 @@ class Season
     /**
      * Check if waivers are currently allowed.
      *
-     * - HEAT, Regular Season, Playoffs: always allowed (teams need injury replacements)
-     * - Draft: never allowed
-     * - Free Agency, Preseason: depends on "Allow Waiver Moves" toggle
+     * Returns true unconditionally during HEAT, Regular Season, and Playoffs
+     * (teams need injury replacements), regardless of the "Allow Waiver Moves"
+     * setting. Returns false unconditionally during Draft. Only checks the
+     * setting during Free Agency and Preseason phases.
      */
     public function areWaiversAllowed(): bool
     {

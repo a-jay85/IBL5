@@ -216,6 +216,14 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
         themeheader();
     }
 
+    /**
+     * Render page footer and terminate output.
+     *
+     * Return type is void (not never) because HTMX boosted requests return
+     * early without calling die(). Callers that invoke footer() inside a
+     * conditional block (catch, if/else) MUST add an explicit `return` after
+     * the block to prevent undefined-variable errors on the HTMX path.
+     */
     public static function footer(): void
     {
         if (HtmxHelper::isBoostedRequest()) {

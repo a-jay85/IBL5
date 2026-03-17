@@ -1,0 +1,33 @@
+#!/bin/bash
+# Remove a git worktree, using --force because symlinked files
+# (vendor/, config.php, .env.test, style.css) appear as untracked
+# changes and block normal removal.
+#
+# Usage: bin/wt-remove <worktree-name>
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+if [ $# -lt 1 ]; then
+    echo "Usage: bin/wt-remove <worktree-name>" >&2
+    exit 1
+fi
+
+NAME="$1"
+WT_PATH="$REPO_ROOT/worktrees/$NAME"
+
+if [ ! -d "$WT_PATH" ]; then
+    echo "Error: worktree '$NAME' not found at $WT_PATH" >&2
+    exit 1
+fi
+
+echo "Removing worktree '$NAME'..."
+git worktree remove --force "$WT_PATH"
+echo "Done. Worktree '$NAME' removed."
+
+# Clean up the branch if it still exists locally
+if git rev-parse --verify "$NAME" >/dev/null 2>&1; then
+    echo "Deleting local branch '$NAME'..."
+    git branch -D "$NAME" 2>/dev/null || true
+fi

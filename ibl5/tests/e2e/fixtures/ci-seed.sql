@@ -1,5 +1,13 @@
 -- CI E2E seed data: minimal rows for Playwright smoke tests.
 -- Imported AFTER migrations into the CI MariaDB service container.
+--
+-- RULES:
+-- 1. Use INSERT ... ON DUPLICATE KEY UPDATE for any rows that may already
+--    exist from migrations (e.g., ibl_settings). Plain INSERT fails with
+--    ERROR 1062 Duplicate entry.
+-- 2. Seed values must meet PHP WHERE-clause thresholds. For example, EOY MVP
+--    requires stats_gm >= 41 AND stats_min / stats_gm >= 30. Always check
+--    the PHP query before setting seed data values.
 
 -- ============================================================
 -- PHP-Nuke bootstrap tables

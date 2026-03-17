@@ -63,7 +63,13 @@ class TradingView implements TradingViewInterface
         $k--;
 
         ob_start();
-        echo $this->renderResultBanner($pageData['result'] ?? null, $pageData['error'] ?? null);
+        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, [
+            'offer_sent' => ['class' => 'ibl-alert--success', 'message' => 'Trade offer sent!'],
+            'trade_accepted' => ['class' => 'ibl-alert--success', 'message' => 'Trade accepted!'],
+            'trade_rejected' => ['class' => 'ibl-alert--info', 'message' => 'Trade offer rejected.'],
+            'accept_error' => ['class' => 'ibl-alert--error', 'message' => 'Error processing trade.'],
+            'already_processed' => ['class' => 'ibl-alert--warning', 'message' => 'This trade has already been accepted, declined, or withdrawn.'],
+        ], $pageData['error'] ?? null);
         ?>
 <form name="Trade_Offer" method="post" action="/ibl5/modules/Trading/maketradeoffer.php">
     <input type="hidden" name="offeringTeam" value="<?= $userTeam ?>">
@@ -71,7 +77,7 @@ class TradingView implements TradingViewInterface
         <h2 class="ibl-title">Trading</h2>
         <div class="team-cards-row">
             <div class="trading-layout__card">
-                <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $userTeamId ?>" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>;">
+                <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $userTeamId ?>" style="<?= TableStyles::inlineVars($pageData['userTeamColor1'], $pageData['userTeamColor2']) ?>">
                     <colgroup>
                         <col style="width: 50px;">
                         <col style="width: 40px;">
@@ -98,7 +104,7 @@ class TradingView implements TradingViewInterface
             <div class="trading-layout__card">
                 <input type="hidden" name="switchCounter" value="<?= (int) $switchCounter ?>">
                 <input type="hidden" name="listeningTeam" value="<?= $partnerTeam ?>">
-                <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $partnerTeamId ?>" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>;">
+                <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $partnerTeamId ?>" style="<?= TableStyles::inlineVars($pageData['partnerTeamColor1'], $pageData['partnerTeamColor2']) ?>">
                     <colgroup>
                         <col style="width: 50px;">
                         <col style="width: 40px;">
@@ -174,7 +180,13 @@ $tradeConfig = [
         $reviewConfigs = [];
 
         ob_start();
-        echo $this->renderResultBanner($pageData['result'] ?? null, $pageData['error'] ?? null);
+        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, [
+            'offer_sent' => ['class' => 'ibl-alert--success', 'message' => 'Trade offer sent!'],
+            'trade_accepted' => ['class' => 'ibl-alert--success', 'message' => 'Trade accepted!'],
+            'trade_rejected' => ['class' => 'ibl-alert--info', 'message' => 'Trade offer rejected.'],
+            'accept_error' => ['class' => 'ibl-alert--error', 'message' => 'Error processing trade.'],
+            'already_processed' => ['class' => 'ibl-alert--warning', 'message' => 'This trade has already been accepted, declined, or withdrawn.'],
+        ], $pageData['error'] ?? null);
         ?>
 <div style="text-align: center;">
     <h2 class="ibl-title">Trading</h2>
@@ -273,41 +285,6 @@ $tradeConfig = [
 </table>
         <?php
         return (string) ob_get_clean();
-    }
-
-    /**
-     * Render a result banner from PRG redirect query params
-     *
-     * @param string|null $result Result code from query parameter
-     * @param string|null $error Error message from query parameter
-     * @return string HTML alert banner or empty string
-     */
-    private function renderResultBanner(?string $result, ?string $error): string
-    {
-        if ($error !== null) {
-            $errorEscaped = HtmlSanitizer::safeHtmlOutput($error);
-            return '<div class="ibl-alert ibl-alert--error">' . $errorEscaped . '</div>';
-        }
-
-        if ($result === null) {
-            return '';
-        }
-
-        $banners = [
-            'offer_sent' => ['class' => 'ibl-alert--success', 'message' => 'Trade offer sent!'],
-            'trade_accepted' => ['class' => 'ibl-alert--success', 'message' => 'Trade accepted!'],
-            'trade_rejected' => ['class' => 'ibl-alert--info', 'message' => 'Trade offer rejected.'],
-            'accept_error' => ['class' => 'ibl-alert--error', 'message' => 'Error processing trade.'],
-            'already_processed' => ['class' => 'ibl-alert--warning', 'message' => 'This trade has already been accepted, declined, or withdrawn.'],
-        ];
-
-        if (!isset($banners[$result])) {
-            return '';
-        }
-
-        $banner = $banners[$result];
-        $messageEscaped = HtmlSanitizer::safeHtmlOutput($banner['message']);
-        return '<div class="ibl-alert ' . $banner['class'] . '">' . $messageEscaped . '</div>';
     }
 
     /**
@@ -467,7 +444,7 @@ $tradeConfig = [
         ob_start();
         ?>
 <div class="team-cards-row">
-    <div class="team-card" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>;">
+    <div class="team-card" style="<?= TableStyles::inlineVars($userColor1, $userColor2) ?>">
         <div class="team-card__header"><h3 class="team-card__title"><?= $userTeam ?> &mdash; Cash Exchange</h3></div>
         <div class="team-card__body--flush">
             <table class="ibl-data-table trading-cash-exchange" data-no-responsive data-side="user">
@@ -488,7 +465,7 @@ $tradeConfig = [
             </table>
         </div>
     </div>
-    <div class="team-card" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>;">
+    <div class="team-card" style="<?= TableStyles::inlineVars($partnerColor1, $partnerColor2) ?>">
         <div class="team-card__header"><h3 class="team-card__title"><?= $partnerTeam ?> &mdash; Cash Exchange</h3></div>
         <div class="team-card__body--flush">
             <table class="ibl-data-table trading-cash-exchange" data-no-responsive data-side="partner">

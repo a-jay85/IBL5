@@ -43,32 +43,14 @@ class TransactionHistoryRepository extends \BaseMysqliRepository implements Tran
      */
     public function getTransactions(?int $categoryId, ?int $year, ?int $month): array
     {
-        $conditions = ["catid IN (" . self::CATEGORY_IDS . ")"];
-        $params = [];
-        $types = '';
+        $where = new \Services\QueryConditions(["catid IN (" . self::CATEGORY_IDS . ")"]);
+        $where->addIfNotNull('catid = ?', 'i', $categoryId);
+        $where->addIfNotNull('YEAR(time) = ?', 'i', $year);
+        $where->addIfNotNull('MONTH(time) = ?', 'i', $month);
 
-        if ($categoryId !== null) {
-            $conditions[] = "catid = ?";
-            $params[] = $categoryId;
-            $types .= 'i';
-        }
-
-        if ($year !== null) {
-            $conditions[] = "YEAR(time) = ?";
-            $params[] = $year;
-            $types .= 'i';
-        }
-
-        if ($month !== null) {
-            $conditions[] = "MONTH(time) = ?";
-            $params[] = $month;
-            $types .= 'i';
-        }
-
-        $whereClause = implode(' AND ', $conditions);
-        $query = "SELECT sid, catid, title, time FROM nuke_stories WHERE {$whereClause} ORDER BY time DESC LIMIT 500";
+        $query = "SELECT sid, catid, title, time FROM nuke_stories WHERE {$where->toWhereClause()} ORDER BY time DESC LIMIT 500";
 
         /** @var array<int, array{sid: string, catid: string, title: string, time: string}> */
-        return $this->fetchAll($query, $types, ...$params);
+        return $this->fetchAll($query, $where->getTypes(), ...$where->getParams());
     }
 }

@@ -164,12 +164,9 @@ class TeamView implements TeamViewInterface
     private function renderDraftPicksSection(object $team, string $draftPicksTable): string
     {
         /** @var \Team $team */
-        $color1 = \UI\TableStyles::sanitizeColor($team->color1);
-        $color2 = \UI\TableStyles::sanitizeColor($team->color2);
-
         ob_start();
         ?>
-<div class="team-card" style="--team-color-primary: #<?= $color1 ?>; --team-color-secondary: #<?= $color2 ?>;">
+<div class="team-card" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <div class="team-card__header">
         <h3 class="team-card__title">Draft Picks</h3>
     </div>

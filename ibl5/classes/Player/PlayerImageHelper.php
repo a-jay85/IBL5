@@ -76,6 +76,46 @@ class PlayerImageHelper implements PlayerImageHelperInterface
     }
 
     /**
+     * Render a player photo img tag at specified dimensions
+     *
+     * @param int|string|null $playerID Player ID
+     * @param string $alt Alt text for the image
+     * @param int $width Image width
+     * @param int $height Image height
+     * @return string HTML img tag
+     */
+    public static function renderPhoto(int|string|null $playerID, string $alt = '', int $width = 65, int $height = 90): string
+    {
+        $url = self::getImageUrl($playerID);
+        $safeAlt = \Utilities\HtmlSanitizer::safeHtmlOutput($alt);
+
+        return '<img src="' . $url . '" alt="' . $safeAlt . '" width="' . $width . '" height="' . $height . '" loading="lazy">';
+    }
+
+    /**
+     * Render a player cell with a large photo (65x90) and name link
+     *
+     * Used in RecordHolders and similar views that display player photos
+     * at larger than thumbnail size.
+     *
+     * @param int $playerID Player ID
+     * @param string $name Player name (will be HTML-escaped)
+     * @param string $cellClass CSS class for the td element
+     * @return string HTML td element with photo and linked name
+     */
+    public static function renderLargePlayerCell(int $playerID, string $name, string $cellClass = 'player-cell'): string
+    {
+        $safeName = \Utilities\HtmlSanitizer::safeHtmlOutput($name);
+        $url = 'modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID;
+        $photo = self::renderPhoto($playerID, $name);
+
+        return '<td class="' . $cellClass . '">'
+            . '<a href="' . $url . '">' . $photo . '</a>'
+            . '<a href="' . $url . '">' . $safeName . '</a>'
+            . '</td>';
+    }
+
+    /**
      * @see PlayerImageHelperInterface::renderPlayerCell()
      */
     public static function renderPlayerCell(int $playerID, string $displayName, array $starterPids = [], string $nameStatusClass = ''): string

@@ -57,6 +57,8 @@ class LeagueStartersService implements LeagueStartersServiceInterface
             foreach ($positions as $position) {
                 $playerId = $this->teamQueryRepo->getLastSimStarterPlayerIDForPosition($team->teamID, $position);
                 if ($playerId === 0) {
+                    // Placeholder player — with minimal CI seed data, ~140 of these
+                    // lookups cause >10s page load. Avoid CI flow tests for this module.
                     $playerId = 4040404;
                 }
                 $player = Player::withPlayerID($this->db, $playerId);

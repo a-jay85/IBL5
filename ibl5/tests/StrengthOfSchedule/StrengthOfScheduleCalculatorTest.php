@@ -106,6 +106,18 @@ class StrengthOfScheduleCalculatorTest extends TestCase
         $this->assertSame([], $ranks);
     }
 
+    public function testAssignTierOrEmptyReturnsEmptyWhenNoRankings(): void
+    {
+        $this->assertSame('', StrengthOfScheduleCalculator::assignTierOrEmpty([], 75.0));
+    }
+
+    public function testAssignTierOrEmptyReturnsTierWhenRankingsExist(): void
+    {
+        $rankings = [1 => 75.0, 2 => 40.0];
+        $this->assertSame('elite', StrengthOfScheduleCalculator::assignTierOrEmpty($rankings, 75.0));
+        $this->assertSame('weak', StrengthOfScheduleCalculator::assignTierOrEmpty($rankings, 40.0));
+    }
+
     public function testCalculateAverageOpponentWinPctSingleGame(): void
     {
         $games = [

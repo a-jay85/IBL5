@@ -80,6 +80,18 @@ class StrengthOfScheduleCalculator
     }
 
     /**
+     * Assign a difficulty tier if rankings are available, otherwise return empty string
+     *
+     * @param array<int, float> $rankings Power rankings map (empty = no rankings available)
+     * @param float $powerRanking Power ranking score for a specific team
+     * @return string Tier name or empty string if rankings unavailable
+     */
+    public static function assignTierOrEmpty(array $rankings, float $powerRanking): string
+    {
+        return $rankings !== [] ? self::assignTier($powerRanking) : '';
+    }
+
+    /**
      * Rank teams by SOS (1 = hardest schedule)
      *
      * @param array<int, float> $sosValues Map of team ID → SOS value

@@ -27,11 +27,7 @@ class CapSpaceRepository extends \BaseMysqliRepository implements CapSpaceReposi
     public function getAllTeams(): array
     {
         /** @var list<TeamInfoRow> */
-        return $this->fetchAll(
-            "SELECT * FROM ibl_team_info WHERE teamid BETWEEN 1 AND ? ORDER BY teamid ASC",
-            "i",
-            \League::MAX_REAL_TEAMID
-        );
+        return $this->fetchAllRealTeams('teamid ASC');
     }
 
     /**

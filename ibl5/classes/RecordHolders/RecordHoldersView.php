@@ -6,6 +6,7 @@ namespace RecordHolders;
 
 use RecordHolders\Contracts\RecordHoldersViewInterface;
 use RecordHolders\Contracts\RecordHoldersServiceInterface;
+use Player\PlayerImageHelper;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
@@ -278,11 +279,8 @@ class RecordHoldersView implements RecordHoldersViewInterface
 
             $seasonLink = '<a href="' . TeamCellHelper::teamPageUrl($teamTid, $teamYr) . '">' . $safeSeason . '</a>';
 
-            $playerPageUrl = 'modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid;
-
             $output .= '<tr>';
-            $output .= '<td class="player-cell"><a href="' . $playerPageUrl . '"><img src="images/player/' . $pid . '.jpg" alt="' . $safeName . '" width="65" height="90" loading="lazy"></a>';
-            $output .= '<a href="' . $playerPageUrl . '">' . $safeName . '</a></td>';
+            $output .= PlayerImageHelper::renderLargePlayerCell($pid, $record['name']);
             $output .= '<td><a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamTid . '&amp;yr=' . $teamYr . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
             $output .= '<td>' . $seasonLink . '</td>';
             $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
@@ -434,13 +432,11 @@ class RecordHoldersView implements RecordHoldersViewInterface
         $years = $allStar['years'] !== '' ? str_replace(', ', '<br>', $safeYears) : '';
 
         $output .= '<tr>';
-        $output .= '<td class="player-cell">';
         if ($pid !== null) {
-            $playerPageUrl = 'modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid;
-            $output .= '<a href="' . $playerPageUrl . '"><img src="images/player/' . $pid . '.jpg" alt="' . $safeName . '" width="65" height="90" loading="lazy"></a>';
-            $output .= '<a href="' . $playerPageUrl . '">' . $safeName . '</a>';
+            $output .= PlayerImageHelper::renderLargePlayerCell($pid, $allStar['name']);
+        } else {
+            $output .= '<td class="player-cell"></td>';
         }
-        $output .= '</td>';
         $output .= '<td>' . $teamLogos . '</td>';
         $output .= '<td class="ibl-stat-highlight">' . $amount . '</td>';
         $output .= '<td colspan="2">' . $years . '</td>';
@@ -533,11 +529,8 @@ class RecordHoldersView implements RecordHoldersViewInterface
             ? '<a href="' . $safeBoxScoreUrl . '">' . $safeDate . '</a>'
             : $safeDate;
 
-        $playerPageUrl = 'modules.php?name=Player&amp;pa=showpage&amp;pid=' . $pid;
-
         $output = '<tr>';
-        $output .= '<td class="player-cell"><a href="' . $playerPageUrl . '"><img src="images/player/' . $pid . '.jpg" alt="' . $safeName . '" width="65" height="90" loading="lazy"></a>';
-        $output .= '<a href="' . $playerPageUrl . '">' . $safeName . '</a></td>';
+        $output .= PlayerImageHelper::renderLargePlayerCell($pid, $record['name']);
         $output .= '<td><a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamTid . '&amp;yr=' . $teamYr . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
         $output .= '<td>' . $dateCell . '</td>';
         $output .= '<td><a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $oppTid . '&amp;yr=' . $oppYr . '"><img src="images/topics/' . $safeOppTeam . '.png" alt="' . strtoupper($safeOppTeam) . '"></a></td>';

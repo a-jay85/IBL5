@@ -35,16 +35,10 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
 <div style="max-width: 480px; margin: 0 auto;">
         <?php
 
-        // Error banner from PRG redirect
-        if ($error !== null) {
-            $safeError = HtmlSanitizer::safeHtmlOutput($error);
-            ?>
-<div class="ibl-alert ibl-alert--error"><?= $safeError ?></div>
-            <?php
-        }
-
-        // Result banner from PRG redirect
-        echo $this->renderResultBanner($result);
+        echo \UI\AlertRenderer::fromCode($result, [
+            'rookie_option_success' => ['class' => 'ibl-alert--success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
+            'email_failed' => ['class' => 'ibl-alert--warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
+        ], $error);
 
         // Card: Player Info + Rookie Option Form
         ?>
@@ -79,23 +73,4 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
         return (string) ob_get_clean();
     }
 
-    private function renderResultBanner(?string $result): string
-    {
-        if ($result === null) {
-            return '';
-        }
-
-        $banners = [
-            'rookie_option_success' => ['class' => 'ibl-alert--success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],
-            'email_failed' => ['class' => 'ibl-alert--warning', 'message' => 'Rookie option exercised, but the notification email failed to send. Please notify the commissioner.'],
-        ];
-
-        if (!isset($banners[$result])) {
-            return '';
-        }
-
-        $banner = $banners[$result];
-        $safeMessage = HtmlSanitizer::safeHtmlOutput($banner['message']);
-        return '<div class="ibl-alert ' . $banner['class'] . '">' . $safeMessage . '</div>';
-    }
 }

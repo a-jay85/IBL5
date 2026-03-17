@@ -37,42 +37,32 @@ class SeasonLeaderboardsRepository extends \BaseMysqliRepository implements Seas
      */
     public function getSeasonLeaders(array $filters, int $limit = 0): array
     {
-        $conditions = ["h.name IS NOT NULL"];
-        /** @var list<string|int> $params */
-        $params = [];
-        $types = "";
+        $where = new \Services\QueryConditions(["h.name IS NOT NULL"]);
 
-        // Add year filter if specified
         $yearFilter = (string) ($filters['year'] ?? '');
         if ($yearFilter !== '') {
-            $conditions[] = "h.year = ?";
-            $types .= "s";
-            $params[] = $yearFilter;
+            $where->add('h.year = ?', 's', $yearFilter);
         }
 
-        // Add team filter if specified and not "All"
         $teamId = (int) ($filters['team'] ?? 0);
         if ($teamId !== 0) {
-            $conditions[] = "h.teamid = ?";
-            $types .= "i";
-            $params[] = $teamId;
+            $where->add('h.teamid = ?', 'i', $teamId);
         }
 
-        $whereClause = implode(' AND ', $conditions);
         $sortBy = $this->getSortColumn((string) ($filters['sortby'] ?? '1'));
 
         // NOTE: $sortBy is validated in getSortColumn() against a strict whitelist
         $query = "SELECT h.*, t.team_city, t.color1, t.color2
             FROM ibl_hist h
             LEFT JOIN {$this->teamInfoTable} t ON h.teamid = t.teamid
-            WHERE $whereClause ORDER BY $sortBy DESC"
+            WHERE {$where->toWhereClause()} ORDER BY $sortBy DESC"
             . ($limit > 0 ? " LIMIT $limit" : "");
 
         /** @var list<HistRow> $rows */
-        $rows = $this->fetchAll($query, $types, ...$params);
+        $rows = $this->fetchAll($query, $where->getTypes(), ...$where->getParams());
 
         return [
-            'result' => $rows,
+            'results' => $rows,
             'count' => count($rows)
         ];
     }

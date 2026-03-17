@@ -45,48 +45,22 @@ class AwardHistoryRepository extends BaseMysqliRepository implements AwardHistor
      */
     public function searchAwards(array $params): array
     {
-        $conditions = [];
-        $bindParams = [];
-        $bindTypes = '';
-
-        // Build WHERE conditions based on provided params
-        if ($params['year'] !== null) {
-            $conditions[] = 'a.year = ?';
-            $bindParams[] = $params['year'];
-            $bindTypes .= 'i';
-        }
-
+        $where = new \Services\QueryConditions();
+        $where->addIfNotNull('a.year = ?', 'i', $params['year']);
         if ($params['award'] !== null) {
-            $conditions[] = 'a.Award LIKE ?';
-            $bindParams[] = '%' . $params['award'] . '%';
-            $bindTypes .= 's';
+            $where->add('a.Award LIKE ?', 's', '%' . $params['award'] . '%');
         }
-
         if ($params['name'] !== null) {
-            $conditions[] = 'a.name LIKE ?';
-            $bindParams[] = '%' . $params['name'] . '%';
-            $bindTypes .= 's';
+            $where->add('a.name LIKE ?', 's', '%' . $params['name'] . '%');
         }
 
-        // Build the query - LEFT JOIN to get pid for player photos
-        $query = 'SELECT a.year, a.Award, a.name, a.table_ID, p.pid FROM ibl_awards a LEFT JOIN ibl_plr p ON a.name = p.name';
-        
-        if ($conditions !== []) {
-            $query .= ' WHERE ' . implode(' AND ', $conditions);
-        }
-
-        // Add ORDER BY clause using whitelisted column
         $sortColumn = self::SORT_COLUMN_MAP[$params['sortby']] ?? 'year';
-        $query .= ' ORDER BY ' . $sortColumn . ' ASC';
-
-        // Execute query
-        if ($bindParams === []) {
-            $results = $this->fetchAll($query);
-        } else {
-            $results = $this->fetchAll($query, $bindTypes, ...$bindParams);
-        }
+        $whereClause = $where->toWhereClause();
+        $query = "SELECT a.year, a.Award, a.name, a.table_ID, p.pid FROM ibl_awards a LEFT JOIN ibl_plr p ON a.name = p.name WHERE $whereClause ORDER BY $sortColumn ASC";
 
         /** @var array<int, array{year: int, Award: string, name: string, table_ID: int}> $results */
+        $results = $this->fetchAll($query, $where->getTypes(), ...$where->getParams());
+
         return [
             'results' => $results,
             'count' => count($results),

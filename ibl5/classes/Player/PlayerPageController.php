@@ -62,10 +62,6 @@ class PlayerPageController
         $teamColors = TeamColorHelper::getTeamColors($this->mysqliDb, $player->teamID ?? 0);
         $colorScheme = TeamColorHelper::generateColorScheme($teamColors['color1'], $teamColors['color2']);
 
-        // Flip card styles
-        $html .= PlayerTradingCardFlipView::getFlipStyles();
-        $html .= PlayerStatsFlipCardView::getFlipStyles($colorScheme);
-
         // Trading card
         $playerRepository = new PlayerRepository($this->mysqliDb);
         $playerName = $player->name ?? '';
@@ -115,6 +111,10 @@ class PlayerPageController
             $sharedRepository,
             $colorScheme
         );
+
+        // Flip card scripts (must come after card HTML so elements exist for immediate init)
+        $html .= PlayerTradingCardFlipView::getFlipStyles();
+        $html .= PlayerStatsFlipCardView::getFlipStyles($colorScheme);
 
         return $html;
     }

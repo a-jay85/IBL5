@@ -58,9 +58,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: process.env.CI
-        ? [/auth\.setup\.ts/, /visual-regression/]
-        : /auth\.setup\.ts/,
+      testIgnore: /auth\.setup\.ts/,
     },
   ],
 });

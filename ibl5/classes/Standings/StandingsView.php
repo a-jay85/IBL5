@@ -83,6 +83,7 @@ class StandingsView implements StandingsViewInterface
 
             // Convert BulkStandingsRow to StandingsRow by aliasing gamesBack/magicNumber
             $standings = $this->adaptBulkRows($regionTeams, $isConference);
+            $standings = $this->resolveH2HTiedGroups($standings, 'gamesBack');
 
             $groupingType = $isConference ? 'Conference' : 'Division';
             $html .= $this->renderHeader($region, $groupingType);

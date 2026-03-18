@@ -90,7 +90,8 @@ class TradeDeclineController implements ControllerInterface
         // Look up offering team's GM Discord ID from ibl_team_info
         $offeringTeamDiscordId = '';
         if ($offeringTeam !== '') {
-            $offeringTeamDiscordId = $this->getTeamDiscordId($offeringTeam);
+            $commonRepo = new \Services\CommonMysqliRepository($this->db);
+            $offeringTeamDiscordId = (string) ($commonRepo->getTeamDiscordID($offeringTeam) ?? '');
         }
 
         $responder->success([
@@ -98,39 +99,5 @@ class TradeDeclineController implements ControllerInterface
             'offering_team' => $offeringTeam,
             'offering_gm_discord_id' => $offeringTeamDiscordId,
         ]);
-    }
-
-    /**
-     * Get a team's GM Discord ID from ibl_team_info.
-     */
-    private function getTeamDiscordId(string $teamName): string
-    {
-        $stmt = $this->db->prepare(
-            "SELECT discordID FROM ibl_team_info WHERE team_name = ? LIMIT 1"
-        );
-        if ($stmt === false) {
-            return '';
-        }
-
-        $stmt->bind_param('s', $teamName);
-        if (!$stmt->execute()) {
-            $stmt->close();
-            return '';
-        }
-
-        $result = $stmt->get_result();
-        if ($result === false) {
-            $stmt->close();
-            return '';
-        }
-
-        $row = $result->fetch_assoc();
-        $stmt->close();
-
-        if ($row === null || !isset($row['discordID'])) {
-            return '';
-        }
-
-        return (string) $row['discordID'];
     }
 }

@@ -36,39 +36,6 @@ jobs:
         working-directory: ibl5
         run: bun install
 
-      - name: Get Playwright version
-        id: playwright-version
-        working-directory: ibl5
-        run: echo "version=$(bunx playwright --version)" >> $GITHUB_OUTPUT
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v5
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        working-directory: ibl5
-        run: bunx playwright install chromium --with-deps
-
-      - name: Restore Playwright system deps from cache
-        uses: actions/cache/restore@v5
-        id: apt-cache
-        with:
-          path: ~/playwright-apt-cache
-          key: ${{ runner.os }}-playwright-apt-${{ steps.playwright-version.outputs.version }}
-
-      - name: Install Playwright system deps
-        working-directory: ibl5
-        run: |
-          if [ -d ~/playwright-apt-cache ] && ls ~/playwright-apt-cache/*.deb 1>/dev/null 2>&1; then
-            echo "Installing $(ls ~/playwright-apt-cache/*.deb | wc -l) cached .deb files"
-            sudo cp ~/playwright-apt-cache/*.deb /var/cache/apt/archives/
-          fi
-          bunx playwright install-deps chromium
-
       - name: Install Composer dependencies
         working-directory: ibl5
         run: composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
@@ -188,12 +155,21 @@ jobs:
 
       - name: Run E2E tests
         if: always()
-        working-directory: ibl5
         env:
-          BASE_URL: http://localhost:8080/ibl5/
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
           IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
-        run: bunx playwright test
+        run: |
+          docker run --rm \
+            --network ibl5-e2e \
+            --user "$(id -u):$(id -g)" \
+            -v "${{ github.workspace }}/ibl5:/ibl5" \
+            -w /ibl5 \
+            -e "BASE_URL=http://php/ibl5/" \
+            -e "IBL_TEST_USER=$IBL_TEST_USER" \
+            -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
+            -e "HOME=/tmp" \
+            mcr.microsoft.com/playwright:v1.58.2-jammy \
+            npx playwright test
 
       - name: Upload test results
         if: always()

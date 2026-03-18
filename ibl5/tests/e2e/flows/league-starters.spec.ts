@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { gotoWithRetry } from '../helpers/navigation';
 
 // League Starters — public page showing starting lineups by position.
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('League Starters flow', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('modules.php?name=LeagueStarters');
+    await gotoWithRetry(page, 'modules.php?name=LeagueStarters');
   });
 
   test('page loads with title', async ({ page }) => {

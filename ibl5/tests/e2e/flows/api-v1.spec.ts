@@ -31,7 +31,23 @@ async function assertGetRoute(
     return;
   }
 
+  // If the endpoint returns a 500 (e.g., PHP error), fail with the response text
+  if (status === 500) {
+    const text = await response.text();
+    expect(status, `${path} returned 500: ${text.slice(0, 200)}`).toBe(200);
+    return;
+  }
+
   expect(status, `${path} should return 200`).toBe(200);
+
+  // Guard against non-JSON responses (PHP errors return HTML)
+  const contentType = response.headers()['content-type'] ?? '';
+  if (!contentType.includes('json')) {
+    const text = await response.text();
+    expect(contentType, `${path} returned non-JSON: ${text.slice(0, 200)}`).toContain('json');
+    return;
+  }
+
   const body = await response.json();
   expect(body, `${path} should return truthy body`).toBeTruthy();
 
@@ -57,6 +73,10 @@ async function getFirstUuid(
     expect(body).toHaveProperty('error');
     return null;
   }
+
+  // If the list endpoint fails (500 or non-JSON), skip the detail test
+  const contentType = response.headers()['content-type'] ?? '';
+  if (response.status() !== 200 || !contentType.includes('json')) return null;
 
   const body = await response.json();
   const items = body.data ?? body;

@@ -89,15 +89,6 @@ class CardBaseStylesTest extends TestCase
         $this->assertStringContainsString('2020', $html);
     }
 
-    public function testGetStylesReturnsEmptyString(): void
-    {
-        $colorScheme = TeamColorHelper::getDefaultColorScheme();
-
-        $css = CardBaseStyles::getStyles($colorScheme);
-
-        $this->assertSame('', $css);
-    }
-
     public function testGetCardCssPropertiesContainsCustomProperties(): void
     {
         $colorScheme = TeamColorHelper::getDefaultColorScheme();

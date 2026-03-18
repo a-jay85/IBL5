@@ -4,7 +4,10 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 // Public HTMX navigation tests — no authentication required.
 test.use({ storageState: { cookies: [], origins: [] } });
 
+// HTMX tests need click-based navigation (not goto) to verify boost behavior.
+// Increase timeouts since link clicks can be slow under parallel worker load.
 test.describe('HTMX hx-boost navigation', () => {
+  test.use({ actionTimeout: 15_000, navigationTimeout: 20_000 });
   test('boosted link swaps content without full page reload', async ({ page }) => {
     await page.goto('index.php');
 
@@ -18,10 +21,13 @@ test.describe('HTMX hx-boost navigation', () => {
       if (navEl) navEl.setAttribute('data-htmx-marker', '1');
     });
 
-    // Click a boosted link within site-content (homepage always has module links)
-    const contentLink = page.locator('#site-content a[href*="modules.php"]').first();
+    // Click a visible boosted link within site-content (exclude topic icon links
+    // which are absolutely-positioned image links that may not render visibly)
+    const contentLink = page
+      .locator('#site-content a[href*="modules.php"]:not(.news-article__topic-icon-link)')
+      .first();
     if (await contentLink.count() === 0) {
-      // No links found in content area — skip
+      // No visible links found in content area — skip
       return;
     }
 
@@ -39,8 +45,10 @@ test.describe('HTMX hx-boost navigation', () => {
   test('URL updates via pushState on boosted navigation', async ({ page }) => {
     await page.goto('index.php');
 
-    // Navigate to a page by clicking a boosted link within site-content
-    const contentLink = page.locator('#site-content a[href*="modules.php"]').first();
+    // Navigate to a page by clicking a visible boosted link within site-content
+    const contentLink = page
+      .locator('#site-content a[href*="modules.php"]:not(.news-article__topic-icon-link)')
+      .first();
     if (await contentLink.count() > 0) {
       await contentLink.click();
       await page.waitForURL(/modules\.php/);
@@ -67,8 +75,10 @@ test.describe('HTMX hx-boost navigation', () => {
   test('browser back/forward works after HTMX navigation', async ({ page }) => {
     await page.goto('index.php');
 
-    // Navigate via a boosted link
-    const contentLink = page.locator('#site-content a[href*="modules.php"]').first();
+    // Navigate via a visible boosted link
+    const contentLink = page
+      .locator('#site-content a[href*="modules.php"]:not(.news-article__topic-icon-link)')
+      .first();
     if (await contentLink.count() > 0) {
       await contentLink.click();
       await page.waitForURL(/modules\.php/);

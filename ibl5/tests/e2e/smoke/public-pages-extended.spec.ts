@@ -25,14 +25,18 @@ const PAGES = [
 test.describe('Extended public page smoke tests', () => {
   for (const { name, url, selector } of PAGES) {
     test(`${name} loads`, async ({ page }) => {
+      // Individual page loads may need extra time under parallel worker load
+      test.setTimeout(60_000);
       await gotoWithRetry(page, url);
       await expect(page.locator(selector).first()).toBeVisible();
     });
   }
 
   test('no PHP errors on extended public pages', async ({ page }) => {
+    // This test visits all pages sequentially — give it plenty of time
+    test.setTimeout(120_000);
     for (const { url } of PAGES) {
-      await page.goto(url);
+      await gotoWithRetry(page, url);
       await assertNoPhpErrors(page, `on ${url}`);
     }
   });

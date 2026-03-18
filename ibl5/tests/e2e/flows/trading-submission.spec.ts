@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import type { Page, APIRequestContext } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { gotoWithRetry } from '../helpers/navigation';
 
 // Serial: tests create and consume trade offers sequentially.
 test.describe.configure({ mode: 'serial' });
@@ -140,7 +141,7 @@ async function findPartner(
   predicate: (fd: FormData) => boolean,
   maxTries = 10,
 ): Promise<FormData | null> {
-  await page.goto('modules.php?name=Trading');
+  await gotoWithRetry(page, 'modules.php?name=Trading');
   const teamLinks = page.locator('.trading-team-select a');
   const linkCount = await teamLinks.count();
 
@@ -150,7 +151,7 @@ async function findPartner(
 
     const form = page.locator('form[name="Trade_Offer"]');
     if ((await form.count()) === 0) {
-      await page.goto('modules.php?name=Trading');
+      await gotoWithRetry(page, 'modules.php?name=Trading');
       continue;
     }
 
@@ -158,7 +159,7 @@ async function findPartner(
     if (predicate(fd)) {
       return fd;
     }
-    await page.goto('modules.php?name=Trading');
+    await gotoWithRetry(page, 'modules.php?name=Trading');
   }
   return null;
 }
@@ -241,7 +242,7 @@ async function collectNewOfferIds(
   page: Page,
   excludeIds: Set<number>,
 ): Promise<number[]> {
-  await page.goto('modules.php?name=Trading&op=reviewtrade');
+  await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
   const buttons = page.locator('[data-preview-offer]');
   const count = await buttons.count();
   const ids: number[] = [];
@@ -259,7 +260,7 @@ async function collectNewOfferIds(
  * Collect all offer IDs currently on the review page.
  */
 async function collectAllOfferIds(page: Page): Promise<Set<number>> {
-  await page.goto('modules.php?name=Trading&op=reviewtrade');
+  await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
   const buttons = page.locator('[data-preview-offer]');
   const count = await buttons.count();
   const ids = new Set<number>();
@@ -527,7 +528,7 @@ test.describe('Trade submission: validation errors', () => {
       'Allow Trades': 'No',
       'Current Season Phase': 'Regular Season',
     });
-    await page.goto('modules.php?name=Trading');
+    await gotoWithRetry(page, 'modules.php?name=Trading');
 
     await expect(
       page.locator('form[name="Trade_Offer"]'),
@@ -606,7 +607,7 @@ test.describe('Trade submission: accept and reject', () => {
     }
 
     await appState({ 'Allow Trades': 'Yes' });
-    await page.goto('modules.php?name=Trading&op=reviewtrade');
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
 
     const offerBCard = page.locator('.trade-offer-card').filter({
       has: page.locator(`[data-preview-offer="${offerBId}"]`),
@@ -655,7 +656,7 @@ test.describe('Trade submission: accept and reject', () => {
 
   test('accept offer via UI', async ({ appState, page, request }) => {
     await appState({ 'Allow Trades': 'Yes' });
-    await page.goto('modules.php?name=Trading&op=reviewtrade');
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
 
     // Find any offer card with an Accept button (user has the "hammer").
     // Self-created offers show "Awaiting Approval" — only partner-created
@@ -693,7 +694,7 @@ test.describe('Trade submission: accept and reject', () => {
 test.describe('Trade review page: no PHP errors after mutations', () => {
   test('review page has no PHP errors', async ({ appState, page }) => {
     await appState({ 'Allow Trades': 'Yes' });
-    await page.goto('modules.php?name=Trading&op=reviewtrade');
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
     await assertNoPhpErrors(page, 'on review page after mutations');
   });
 });

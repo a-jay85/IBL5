@@ -125,7 +125,7 @@ test.describe('Trade offer form structure', () => {
     await navigateToTradeForm(page);
   });
 
-  test('roster tables have team-colored styling and logo banners', async ({
+  test('roster tables have team-colored styling and collapsible details', async ({
     page,
   }) => {
     const rosters = page.locator('.trading-roster.team-table');
@@ -138,9 +138,16 @@ test.describe('Trade offer form structure', () => {
       // Each roster should have a team-color CSS variable set
       const style = await roster.getAttribute('style');
       expect(style).toContain('--team-color-primary');
-      // Logo banner image in thead
-      const banner = roster.locator('thead .team-logo-banner');
-      await expect(banner).toBeVisible();
+    }
+
+    // Logo should be in <summary>, not in <thead>
+    const details = page.locator('.trading-roster-details');
+    await expect(details).toHaveCount(2);
+    for (let i = 0; i < 2; i++) {
+      const summary = details.nth(i).locator('.trading-roster-details__summary');
+      await expect(summary).toBeVisible();
+      const logo = summary.locator('.trading-roster-details__logo');
+      await expect(logo).toBeVisible();
     }
   });
 
@@ -439,9 +446,9 @@ test.describe('Trade offer form: cap warnings', () => {
     );
     await expect(warningLogo).toBeVisible();
 
-    // Cap warning banner on the user team's roster header
+    // Cap warning banner on the user team's roster details summary
     const warningBanner = page.locator(
-      `.trading-roster[data-team-id="${config}"] thead tr:first-child th.cap-warning-banner`,
+      `.trading-roster-details:has(.trading-roster[data-team-id="${config}"]) .trading-roster-details__summary.cap-warning-banner`,
     );
     await expect(warningBanner).toBeVisible();
   });
@@ -688,5 +695,72 @@ test.describe('Trading: result banners', () => {
     );
     await expect(page.locator('.ibl-alert--error')).toBeVisible();
     await expect(page.locator('.ibl-alert--error')).toContainText('Test error');
+  });
+});
+
+// ===========================================================================
+// Trading — mobile viewport
+// ===========================================================================
+
+test.describe('Trading — mobile viewport', () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  test('trade form collapsible roster cards toggle on mobile', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Trades': 'Yes' });
+    await navigateToTradeForm(page);
+
+    const details = page.locator('.trading-roster-details');
+    await expect(details).toHaveCount(2);
+
+    // Both should start open
+    for (let i = 0; i < 2; i++) {
+      await expect(details.nth(i)).toHaveAttribute('open', '');
+    }
+
+    // Collapse first roster by clicking its summary
+    const firstSummary = details.first().locator('.trading-roster-details__summary');
+    await firstSummary.click();
+
+    // First roster table should be hidden, second still open
+    await expect(details.first()).not.toHaveAttribute('open', '');
+    await expect(details.nth(1)).toHaveAttribute('open', '');
+
+    // Re-open first roster
+    await firstSummary.click();
+    await expect(details.first()).toHaveAttribute('open', '');
+  });
+
+  test('trade review uses semantic layout on mobile', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Trades': 'Yes' });
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+
+    // Semantic layout should be present, not table layout
+    await expect(page.locator('.trading-layout__header')).toBeVisible();
+    await expect(page.locator('.trading-review-wrapper')).toBeVisible();
+    await expect(page.locator('table.trading-layout')).toHaveCount(0);
+  });
+
+  test('no PHP errors on trade form at mobile viewport', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Trades': 'Yes' });
+    await navigateToTradeForm(page);
+    await assertNoPhpErrors(page);
+  });
+
+  test('no PHP errors on trade review at mobile viewport', async ({
+    appState,
+    page,
+  }) => {
+    await appState({ 'Allow Trades': 'Yes' });
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+    await assertNoPhpErrors(page);
   });
 });

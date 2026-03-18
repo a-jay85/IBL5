@@ -79,61 +79,71 @@ class TradingView implements TradingViewInterface
         <h2 class="ibl-title">Trading</h2>
         <div class="team-cards-row">
             <div class="trading-layout__card">
-                <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $userTeamId ?>" style="<?= TableStyles::inlineVars($pageData['userTeamColor1'], $pageData['userTeamColor2']) ?>">
-                    <colgroup>
-                        <col style="width: 50px;">
-                        <col style="width: 40px;">
-                        <col>
-                        <col style="width: 70px;">
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th colspan="4"><img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="team-logo-banner" style="margin-bottom: 0;"></th>
-                        </tr>
-                        <tr>
-                            <th></th>
-                            <th>Pos</th>
-                            <th>Name</th>
-                            <th>Salary</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?= $userPlayerRows['html'] ?>
-                        <?= $userPickRows['html'] ?>
-                    </tbody>
-                </table>
+                <details class="trading-roster-details" open>
+                    <summary class="trading-roster-details__summary" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>">
+                        <img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="trading-roster-details__logo">
+                        <?= $userTeam ?>
+                        <span class="trading-roster-details__count"><?= count($pageData['userPlayers']) + count($pageData['userPicks']) ?> items</span>
+                        <span class="trading-roster-details__chevron"></span>
+                    </summary>
+                    <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $userTeamId ?>" style="<?= TableStyles::inlineVars($pageData['userTeamColor1'], $pageData['userTeamColor2']) ?>">
+                        <colgroup>
+                            <col style="width: 50px;">
+                            <col style="width: 40px;">
+                            <col>
+                            <col style="width: 70px;">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Pos</th>
+                                <th>Name</th>
+                                <th>Salary</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?= $userPlayerRows['html'] ?>
+                            <?= $userPickRows['html'] ?>
+                        </tbody>
+                    </table>
+                </details>
             </div>
             <div class="trading-layout__card">
                 <input type="hidden" name="switchCounter" value="<?= (int) $switchCounter ?>">
                 <input type="hidden" name="listeningTeam" value="<?= $partnerTeam ?>">
-                <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $partnerTeamId ?>" style="<?= TableStyles::inlineVars($pageData['partnerTeamColor1'], $pageData['partnerTeamColor2']) ?>">
-                    <colgroup>
-                        <col style="width: 50px;">
-                        <col style="width: 40px;">
-                        <col>
-                        <col style="width: 70px;">
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th colspan="4"><img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="team-logo-banner" style="margin-bottom: 0;"></th>
-                        </tr>
-                        <tr>
-                            <th></th>
-                            <th>Pos</th>
-                            <th>Name</th>
-                            <th>Salary</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?= $partnerPlayerRows['html'] ?>
-                        <?= $partnerPickRows['html'] ?>
-                    </tbody>
-                </table>
+                <details class="trading-roster-details" open>
+                    <summary class="trading-roster-details__summary" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>">
+                        <img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="trading-roster-details__logo">
+                        <?= $partnerTeam ?>
+                        <span class="trading-roster-details__count"><?= count($pageData['partnerPlayers']) + count($pageData['partnerPicks']) ?> items</span>
+                        <span class="trading-roster-details__chevron"></span>
+                    </summary>
+                    <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $partnerTeamId ?>" style="<?= TableStyles::inlineVars($pageData['partnerTeamColor1'], $pageData['partnerTeamColor2']) ?>">
+                        <colgroup>
+                            <col style="width: 50px;">
+                            <col style="width: 40px;">
+                            <col>
+                            <col style="width: 70px;">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Pos</th>
+                                <th>Name</th>
+                                <th>Salary</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?= $partnerPlayerRows['html'] ?>
+                            <?= $partnerPickRows['html'] ?>
+                        </tbody>
+                    </table>
+                </details>
             </div>
         </div>
 <?= $this->renderCashExchange($seasonEndingYear, $seasonPhase, $cashStartYear, $cashEndYear, $userTeam, $partnerTeam, $userColor1, $userColor2, $partnerColor1, $partnerColor2, $previousFormData) ?>
 <?= $this->renderRosterPreview($userTeamId, $partnerTeamId, $userTeam, $partnerTeam, $userColor1, $partnerColor1) ?>
-        <div style="text-align: center; padding: 1rem;">
+        <div class="trading-layout__submit">
             <input type="hidden" name="fieldsCounter" value="<?= (int) $k ?>">
             <button type="submit" class="ibl-btn ibl-btn--primary">Make Trade Offer</button>
         </div>
@@ -190,15 +200,14 @@ $tradeConfig = [
             'already_processed' => ['class' => 'ibl-alert--warning', 'message' => 'This trade has already been accepted, declined, or withdrawn.'],
         ], $pageData['error'] ?? null);
         ?>
-<div style="text-align: center;">
+<div class="trading-layout__header">
     <h2 class="ibl-title">Trading</h2>
     <img src="images/logo/<?= $userTeamId ?>.jpg" alt="Team Logo" class="team-logo-banner">
 </div>
-<table class="trading-layout" style="margin: 0 auto;">
-    <tr>
-        <td style="vertical-align: top;">
+<div class="trading-review-wrapper">
+    <div class="trading-review-offers">
 <?php if ($tradeOffers === []): ?>
-            <p style="padding: 1rem; text-align: center;">No pending trade offers.</p>
+        <p class="trading-no-offers">No pending trade offers.</p>
 <?php else: ?>
     <?php foreach ($tradeOffers as $offerId => $offer):
         $preview = $offer['previewData'];
@@ -220,17 +229,12 @@ $tradeConfig = [
             'userTeamId' => $userTeamId,
         ];
     ?>
-            <?= $this->renderTradeOfferCard((int) $offerId, $offer, $userTeam, $userTeamId) ?>
+        <?= $this->renderTradeOfferCard((int) $offerId, $offer, $userTeam, $userTeamId) ?>
     <?php endforeach; ?>
 <?php endif; ?>
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <?= $this->renderTeamSelectionLinks($teams) ?>
-        </td>
-    </tr>
-</table>
+    </div>
+    <?= $this->renderTeamSelectionLinks($teams) ?>
+</div>
 <?php if ($reviewConfigs !== []): ?>
 <script>window.IBL_TRADE_REVIEW_CONFIGS = <?= json_encode($reviewConfigs, JSON_HEX_TAG | JSON_THROW_ON_ERROR) ?>;</script>
 <script src="jslib/trade-review-preview.js" defer></script>
@@ -504,20 +508,20 @@ $tradeConfig = [
 
         ob_start();
         ?>
-<div class="trade-offer-card" style="margin-bottom: 1rem; padding: 1rem; border: 1px solid var(--gray-200); border-radius: var(--radius-md); background: white;">
-    <div style="margin-bottom: 0.5rem;">
+<div class="trade-offer-card">
+    <div class="trade-offer-card__header">
         <strong>Trade Offer #<?= $offerId ?></strong>
     </div>
-    <div style="display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+    <div class="trade-offer-card__actions">
 <?php if ($offer['hasHammer']): ?>
-        <form name="tradeaccept" method="post" action="/ibl5/modules/Trading/accepttradeoffer.php" style="margin: 0;">
+        <form name="tradeaccept" method="post" action="/ibl5/modules/Trading/accepttradeoffer.php" class="trade-offer-card__form">
             <input type="hidden" name="offer" value="<?= $offerId ?>">
             <button type="submit" class="ibl-btn ibl-btn--success" onclick="this.disabled=true;this.textContent='Submitting...'; this.form.submit();">Accept</button>
         </form>
 <?php else: ?>
-        <span style="color: var(--gray-500); font-style: italic;">Awaiting Approval</span>
+        <span class="trade-offer-card__awaiting">Awaiting Approval</span>
 <?php endif; ?>
-        <form name="tradereject" method="post" action="/ibl5/modules/Trading/rejecttradeoffer.php" style="margin: 0;">
+        <form name="tradereject" method="post" action="/ibl5/modules/Trading/rejecttradeoffer.php" class="trade-offer-card__form">
             <input type="hidden" name="offer" value="<?= $offerId ?>">
             <input type="hidden" name="teamRejecting" value="<?= $userTeam ?>">
             <input type="hidden" name="teamReceiving" value="<?= $oppositeTeam ?>">
@@ -533,12 +537,12 @@ $tradeConfig = [
         <?php if ($item['notes'] !== null):
             $notesEscaped = HtmlSanitizer::safeHtmlOutput($item['notes']);
         ?>
-            <p style="margin-left: 1rem; font-style: italic; color: var(--gray-600);"><?= $notesEscaped ?></p>
+            <p class="trade-offer-card__notes"><?= $notesEscaped ?></p>
         <?php endif; ?>
     <?php endif; ?>
 <?php endforeach; ?>
     </div>
-    <div style="text-align: center; margin-top: 0.5rem;">
+    <div class="trade-offer-card__preview-wrap">
         <button type="button" class="ibl-btn ibl-btn--neutral ibl-btn--sm" data-preview-offer="<?= $offerId ?>">Preview</button>
     </div>
 </div>

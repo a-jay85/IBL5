@@ -102,10 +102,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             }
 
             // Resolve username from team name
-            /** @var string $rawTeamName */
-            $rawTeamName = $postData['Team_Name'] ?? '';
-            // Look up which user owns this team - we need to find from nuke_users
-            $username = $this->resolveUsernameForTeam($teamName);
+            $username = $commonRepo->getUsernameFromTeamname($teamName) ?? '';
             if ($username === '') {
                 return;
             }
@@ -140,33 +137,6 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             // Don't fail the main submission if snapshot save fails
             error_log('SavedDepthChart snapshot error: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * Resolve username that owns the given team name
-     */
-    private function resolveUsernameForTeam(string $teamName): string
-    {
-        $query = "SELECT gm_username FROM ibl_team_info WHERE team_name = ? LIMIT 1";
-        $stmt = $this->db->prepare($query);
-        if ($stmt === false) {
-            return '';
-        }
-        $stmt->bind_param('s', $teamName);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result === false) {
-            $stmt->close();
-            return '';
-        }
-        $row = $result->fetch_assoc();
-        $stmt->close();
-
-        if (!is_array($row) || !isset($row['gm_username'])) {
-            return '';
-        }
-
-        return (string) $row['gm_username'];
     }
 
     /**

@@ -64,7 +64,7 @@ class BannersView
             if ($banner['bgImage'] !== null) {
                 $bgImage = $banner['bgImage'];
                 if (str_starts_with($bgImage, './') || str_starts_with($bgImage, '/')) {
-                    $bgStyle = ' style="background-image: url(' . HtmlSanitizer::e($bgImage) . ')"';
+                    $bgStyle = ' style="--banner-bg-image: url(\'' . HtmlSanitizer::e($bgImage) . '\')"';
                 }
             }
 

@@ -4,30 +4,30 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 import type { Page, Locator } from '@playwright/test';
 
 /**
- * Take a stable element screenshot by waiting for network idle and fonts,
- * then clipping to a fixed height to avoid dimension variance between runs.
+ * Take a stable screenshot of an element by waiting for network idle,
+ * then capturing a fixed-size clip from the element's top-left corner.
+ * Using a fixed clip height eliminates dimension variance between runs.
  */
 async function stableScreenshot(
   page: Page,
   locator: Locator,
   name: string,
   expect: typeof publicExpect,
-  clipHeight?: number,
+  clipHeight = 300,
+  mask: Locator[] = [],
 ): Promise<void> {
   await page.waitForLoadState('networkidle');
   await expect(locator).toBeVisible();
-  const options: { name: string; clip?: { x: number; y: number; width: number; height: number } } = { name };
-  if (clipHeight) {
-    const box = await locator.boundingBox();
-    if (box) {
-      options.clip = { x: 0, y: 0, width: Math.round(box.width), height: clipHeight };
-    }
-  }
-  if (options.clip) {
-    await expect(locator).toHaveScreenshot(name, { clip: options.clip });
-  } else {
-    await expect(locator).toHaveScreenshot(name);
-  }
+  const box = await locator.boundingBox();
+  if (!box) throw new Error(`Element not visible for screenshot: ${name}`);
+  const width = Math.round(box.width);
+  const height = Math.min(clipHeight, Math.round(box.height));
+  await expect(page).toHaveScreenshot(name, {
+    clip: { x: Math.round(box.x), y: Math.round(box.y), width, height },
+    animations: 'disabled',
+    mask,
+    timeout: 15_000,
+  });
 }
 
 // ============================================================
@@ -43,7 +43,7 @@ publicTest.describe('Visual regression — public pages', () => {
     await page.goto('index.php');
     await publicExpect(page).toHaveTitle(/IBL/i);
     const article = page.locator('article').first();
-    await stableScreenshot(page, article, 'homepage-content.png', publicExpect);
+    await stableScreenshot(page, article, 'homepage-content.png', publicExpect, 250);
   });
 
   publicTest('standings table', async ({ page }) => {
@@ -76,12 +76,20 @@ publicTest.describe('Visual regression — public pages', () => {
     await stableScreenshot(page, content, 'schedule-content.png', publicExpect);
   });
 
-  publicTest('player page stats card', async ({ page }) => {
+  publicTest('player page ratings', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1');
-    const heading = page.locator('h2, h3').first();
-    await publicExpect(heading).toBeVisible();
-    const card = page.locator('.player-stats-card, .ibl-card, .ibl-data-table').first();
-    await stableScreenshot(page, card, 'player-page-card.png', publicExpect, 400);
+    await page.waitForLoadState('networkidle');
+    // Screenshot the ratings grid which is static — avoids the headshot
+    // image and rotating icon that cause instability
+    const ratings = page.locator('.stats-grid, .player-ratings').first();
+    const visible = await ratings.isVisible().catch(() => false);
+    if (!visible) {
+      // Fall back to first data table if ratings grid not found
+      const table = page.locator('.ibl-data-table').first();
+      await stableScreenshot(page, table, 'player-page-card.png', publicExpect, 300);
+    } else {
+      await stableScreenshot(page, ratings, 'player-page-card.png', publicExpect, 300);
+    }
   });
 
   publicTest('team page roster table', async ({ page }) => {

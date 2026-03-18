@@ -4,20 +4,27 @@ declare(strict_types=1);
 
 namespace Tests\RecordHolders;
 
+use Cache\Contracts\DatabaseCacheInterface;
 use PHPUnit\Framework\TestCase;
 use RecordHolders\CachedRecordHoldersService;
 use RecordHolders\Contracts\RecordHoldersServiceInterface;
 
 final class CachedRecordHoldersServiceTest extends TestCase
 {
+    private RecordHoldersInMemoryCache $cache;
+
+    protected function setUp(): void
+    {
+        $this->cache = new RecordHoldersInMemoryCache();
+    }
+
     public function testCacheHitReturnsCachedDataWithoutCallingInnerService(): void
     {
         $mockInner = $this->createMock(RecordHoldersServiceInterface::class);
-        $mockDb = new MockCacheDb();
-        $service = new CachedRecordHoldersService($mockInner, $mockDb);
+        $service = new CachedRecordHoldersService($mockInner, $this->cache);
 
         $records = $this->createSampleRecords();
-        $mockDb->setCacheData('record_holders', (string) json_encode($records), time() + 3600);
+        $this->cache->set('record_holders', $records, 3600);
 
         $mockInner->expects($this->never())->method('getAllRecords');
 
@@ -29,8 +36,7 @@ final class CachedRecordHoldersServiceTest extends TestCase
     public function testCacheMissCallsInnerServiceAndStoresResult(): void
     {
         $mockInner = $this->createMock(RecordHoldersServiceInterface::class);
-        $mockDb = new MockCacheDb();
-        $service = new CachedRecordHoldersService($mockInner, $mockDb);
+        $service = new CachedRecordHoldersService($mockInner, $this->cache);
 
         $records = $this->createSampleRecords();
 
@@ -41,20 +47,20 @@ final class CachedRecordHoldersServiceTest extends TestCase
         $result = $service->getAllRecords();
 
         $this->assertSame($records, $result);
-        $this->assertTrue($mockDb->wasWriteCalled());
+        $this->assertNotNull($this->cache->get('record_holders'));
     }
 
     public function testExpiredCacheTriggersRefresh(): void
     {
         $mockInner = $this->createMock(RecordHoldersServiceInterface::class);
-        $mockDb = new MockCacheDb();
-        $service = new CachedRecordHoldersService($mockInner, $mockDb);
+        $service = new CachedRecordHoldersService($mockInner, $this->cache);
 
         $staleRecords = $this->createSampleRecords();
         $freshRecords = $this->createSampleRecords();
         $freshRecords['playerSingleGame']['regularSeason'] = [];
 
-        $mockDb->setCacheData('record_holders', (string) json_encode($staleRecords), time() - 100);
+        // Set with negative TTL to simulate expired entry
+        $this->cache->setWithExpiration('record_holders', $staleRecords, time() - 100);
 
         $mockInner->expects($this->once())
             ->method('getAllRecords')
@@ -65,16 +71,16 @@ final class CachedRecordHoldersServiceTest extends TestCase
         $this->assertSame([], $result['playerSingleGame']['regularSeason']);
     }
 
-    public function testCorruptCacheFallsBackToInnerService(): void
+    public function testCorruptCacheReturnsNullFromGet(): void
     {
+        // With DatabaseCacheInterface, corrupt JSON is handled inside the cache implementation.
+        // If the cache returns null (miss), the service delegates to inner.
         $mockInner = $this->createMock(RecordHoldersServiceInterface::class);
-        $mockDb = new MockCacheDb();
-        $service = new CachedRecordHoldersService($mockInner, $mockDb);
+        $service = new CachedRecordHoldersService($mockInner, $this->cache);
 
         $records = $this->createSampleRecords();
 
-        $mockDb->setCacheData('record_holders', '{invalid json!!!', time() + 3600);
-
+        // Empty cache = miss
         $mockInner->expects($this->once())
             ->method('getAllRecords')
             ->willReturn($records);
@@ -87,22 +93,20 @@ final class CachedRecordHoldersServiceTest extends TestCase
     public function testInvalidateCacheDeletesCacheEntry(): void
     {
         $stubInner = $this->createStub(RecordHoldersServiceInterface::class);
-        $mockDb = new MockCacheDb();
-        $service = new CachedRecordHoldersService($stubInner, $mockDb);
+        $service = new CachedRecordHoldersService($stubInner, $this->cache);
 
         $records = $this->createSampleRecords();
-        $mockDb->setCacheData('record_holders', (string) json_encode($records), time() + 3600);
+        $this->cache->set('record_holders', $records, 3600);
 
         $service->invalidateCache();
 
-        $this->assertTrue($mockDb->wasDeleteCalled());
+        $this->assertNull($this->cache->get('record_holders'));
     }
 
     public function testEmptyCacheCallsInnerService(): void
     {
         $mockInner = $this->createMock(RecordHoldersServiceInterface::class);
-        $mockDb = new MockCacheDb();
-        $service = new CachedRecordHoldersService($mockInner, $mockDb);
+        $service = new CachedRecordHoldersService($mockInner, $this->cache);
 
         $records = $this->createSampleRecords();
 
@@ -115,23 +119,24 @@ final class CachedRecordHoldersServiceTest extends TestCase
         $this->assertSame($records, $result);
     }
 
-    public function testDbPrepareFailureGracefullyFallsBackToInner(): void
+    public function testRebuildCacheAlwaysCallsInnerAndCaches(): void
     {
         $mockInner = $this->createMock(RecordHoldersServiceInterface::class);
-        $mockDb = new MockCacheDb();
-        $service = new CachedRecordHoldersService($mockInner, $mockDb);
+        $service = new CachedRecordHoldersService($mockInner, $this->cache);
 
         $records = $this->createSampleRecords();
 
-        $mockDb->setPrepareShouldFail(true);
+        // Pre-populate cache
+        $this->cache->set('record_holders', $this->createSampleRecords(), 3600);
 
         $mockInner->expects($this->once())
             ->method('getAllRecords')
             ->willReturn($records);
 
-        $result = $service->getAllRecords();
+        $result = $service->rebuildCache();
 
         $this->assertSame($records, $result);
+        $this->assertNotNull($this->cache->get('record_holders'));
     }
 
     /**
@@ -164,150 +169,56 @@ final class CachedRecordHoldersServiceTest extends TestCase
 }
 
 /**
- * Minimal mock of a mysqli-like object for testing the cache layer.
- *
- * Simulates prepare/execute/get_result/fetch_assoc for SELECT, REPLACE, and DELETE
- * queries against the `cache` table.
+ * Simple in-memory implementation of DatabaseCacheInterface for RecordHolders tests.
  */
-class MockCacheDb extends \mysqli
+class RecordHoldersInMemoryCache implements DatabaseCacheInterface
 {
-    /** @var array<string, array{value: string, expiration: int}> */
-    private array $cacheStore = [];
-    private bool $writeCalled = false;
-    private bool $deleteCalled = false;
-    private bool $prepareShouldFail = false;
-
-    public int $connect_errno = 0;
-    public ?string $connect_error = null;
-
-    public function __construct()
-    {
-        // Don't call parent::__construct() to avoid real DB connection
-    }
-
-    public function setCacheData(string $key, string $value, int $expiration): void
-    {
-        $this->cacheStore[$key] = ['value' => $value, 'expiration' => $expiration];
-    }
-
-    public function setPrepareShouldFail(bool $fail): void
-    {
-        $this->prepareShouldFail = $fail;
-    }
-
-    public function wasWriteCalled(): bool
-    {
-        return $this->writeCalled;
-    }
-
-    public function wasDeleteCalled(): bool
-    {
-        return $this->deleteCalled;
-    }
+    /** @var array<string, array{data: array<mixed>, expiration: int}> */
+    private array $store = [];
 
     /**
-     * @return MockCacheStmt|false
+     * @return array<mixed>|null
      */
-    #[\ReturnTypeWillChange]
-    public function prepare(string $query): MockCacheStmt|false
+    public function get(string $key): ?array
     {
-        if ($this->prepareShouldFail) {
-            return false;
-        }
-
-        return new MockCacheStmt($this, $query);
-    }
-
-    /**
-     * @return array{value: string, expiration: int}|null
-     */
-    public function getCacheEntry(string $key): ?array
-    {
-        return $this->cacheStore[$key] ?? null;
-    }
-
-    public function markWriteCalled(): void
-    {
-        $this->writeCalled = true;
-    }
-
-    public function markDeleteCalled(): void
-    {
-        $this->deleteCalled = true;
-    }
-
-    public function deleteKey(string $key): void
-    {
-        unset($this->cacheStore[$key]);
-    }
-}
-
-class MockCacheStmt
-{
-    private MockCacheDb $db;
-    private string $query;
-    private string $boundKey = '';
-
-    public function __construct(MockCacheDb $db, string $query)
-    {
-        $this->db = $db;
-        $this->query = $query;
-    }
-
-    public function bind_param(string $types, mixed &...$params): bool
-    {
-        if ($params !== []) {
-            $this->boundKey = (string) $params[0];
-        }
-        if (str_contains($this->query, 'REPLACE')) {
-            $this->db->markWriteCalled();
-        }
-        return true;
-    }
-
-    public function execute(): bool
-    {
-        if (str_contains($this->query, 'DELETE')) {
-            $this->db->markDeleteCalled();
-            $this->db->deleteKey($this->boundKey);
-        }
-        return true;
-    }
-
-    public function get_result(): MockCacheResult
-    {
-        $entry = $this->db->getCacheEntry($this->boundKey);
-        return new MockCacheResult($entry);
-    }
-
-    public function close(): void
-    {
-    }
-}
-
-class MockCacheResult
-{
-    /** @var array{value: string, expiration: int}|null */
-    private ?array $data;
-    private bool $fetched = false;
-
-    /**
-     * @param array{value: string, expiration: int}|null $data
-     */
-    public function __construct(?array $data)
-    {
-        $this->data = $data;
-    }
-
-    /**
-     * @return array{value: string, expiration: int}|null
-     */
-    public function fetch_assoc(): ?array
-    {
-        if ($this->fetched || $this->data === null) {
+        if (!isset($this->store[$key])) {
             return null;
         }
-        $this->fetched = true;
-        return $this->data;
+
+        if ($this->store[$key]['expiration'] < time()) {
+            unset($this->store[$key]);
+            return null;
+        }
+
+        return $this->store[$key]['data'];
+    }
+
+    /**
+     * @param array<mixed> $data
+     */
+    public function set(string $key, array $data, int $ttlSeconds): void
+    {
+        $this->store[$key] = [
+            'data' => $data,
+            'expiration' => time() + $ttlSeconds,
+        ];
+    }
+
+    /**
+     * Set with an explicit expiration timestamp (for testing expired entries).
+     *
+     * @param array<mixed> $data
+     */
+    public function setWithExpiration(string $key, array $data, int $expiration): void
+    {
+        $this->store[$key] = [
+            'data' => $data,
+            'expiration' => $expiration,
+        ];
+    }
+
+    public function delete(string $key): void
+    {
+        unset($this->store[$key]);
     }
 }

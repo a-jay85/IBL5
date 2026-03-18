@@ -23,7 +23,7 @@ class DatabaseCache implements DatabaseCacheInterface
     /**
      * @see DatabaseCacheInterface::get()
      *
-     * @return list<array<string, mixed>>|null
+     * @return array<mixed>|null
      */
     public function get(string $key): ?array
     {
@@ -59,14 +59,14 @@ class DatabaseCache implements DatabaseCacheInterface
             return null;
         }
 
-        /** @var list<array<string, mixed>> $decoded */
+        /** @var array<mixed> $decoded */
         return $decoded;
     }
 
     /**
      * @see DatabaseCacheInterface::set()
      *
-     * @param list<array<string, mixed>> $data
+     * @param array<mixed> $data
      */
     public function set(string $key, array $data, int $ttlSeconds): void
     {

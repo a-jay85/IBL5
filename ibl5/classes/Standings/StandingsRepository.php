@@ -14,8 +14,10 @@ use Standings\Contracts\StandingsRepositoryInterface;
  * Supports both conference and division groupings.
  *
  * @phpstan-import-type StandingsRow from StandingsRepositoryInterface
+ * @phpstan-import-type BulkStandingsRow from StandingsRepositoryInterface
  * @phpstan-import-type StreakRow from StandingsRepositoryInterface
  * @phpstan-import-type PythagoreanStats from StandingsRepositoryInterface
+ * @phpstan-import-type SeriesRecordRow from StandingsRepositoryInterface
  *
  * @see StandingsRepositoryInterface For the interface contract
  * @see \BaseMysqliRepository For base class documentation
@@ -103,6 +105,33 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
 
         /** @var list<StandingsRow> */
         return $this->fetchAll($query, "s", $region);
+    }
+
+    /**
+     * @see StandingsRepositoryInterface::getAllStandings()
+     *
+     * @return list<BulkStandingsRow>
+     */
+    public function getAllStandings(): array
+    {
+        /** @var list<BulkStandingsRow> */
+        return $this->fetchAll(
+            "SELECT
+                s.tid, s.team_name, s.leagueRecord, s.pct,
+                s.confGB, s.divGB,
+                s.confRecord, s.divRecord, s.homeRecord, s.awayRecord,
+                s.gamesUnplayed,
+                s.confMagicNumber, s.divMagicNumber,
+                s.clinchedConference, s.clinchedDivision, s.clinchedPlayoffs, s.clinchedLeague,
+                s.wins,
+                (s.homeWins + s.homeLosses) AS homeGames,
+                (s.awayWins + s.awayLosses) AS awayGames,
+                s.conference, s.division,
+                t.color1, t.color2
+            FROM {$this->standingsTable} s
+            JOIN {$this->teamInfoTable} t ON s.tid = t.teamid",
+            ""
+        );
     }
 
     /**
@@ -206,6 +235,20 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         }
 
         return $result;
+    }
+
+    /**
+     * @see StandingsRepositoryInterface::getSeriesRecords()
+     *
+     * @return list<SeriesRecordRow>
+     */
+    public function getSeriesRecords(): array
+    {
+        /** @var list<SeriesRecordRow> */
+        return $this->fetchAll(
+            "SELECT self, opponent, wins, losses FROM vw_series_records ORDER BY self, opponent",
+            ""
+        );
     }
 
     /**

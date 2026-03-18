@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Integration\Standings;
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use SeriesRecords\SeriesRecordsService;
 use Tests\Integration\IntegrationTestCase;
 use Tests\Integration\Mocks\TestDataFactory;
 use Standings\StandingsRepository;
@@ -34,7 +35,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
     {
         parent::setUp();
         $this->repository = new StandingsRepository($GLOBALS['mysqli_db']);
-        $this->view = new StandingsView($this->repository, 2025);
+        $this->view = new StandingsView($this->repository, 2025, new SeriesRecordsService());
     }
 
     protected function tearDown(): void

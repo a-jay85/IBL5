@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Standings;
 
+use SeriesRecords\Contracts\SeriesRecordsServiceInterface;
 use Standings\Contracts\StandingsRepositoryInterface;
 use Standings\Contracts\StandingsViewInterface;
 use UI\TeamCellHelper;
@@ -15,6 +16,7 @@ use UI\TeamCellHelper;
  * Handles clinched indicators (X/Y/Z) and team streak display.
  *
  * @phpstan-import-type StandingsRow from StandingsRepositoryInterface
+ * @phpstan-import-type BulkStandingsRow from StandingsRepositoryInterface
  * @phpstan-import-type StreakRow from StandingsRepositoryInterface
  * @phpstan-import-type PythagoreanStats from StandingsRepositoryInterface
  *
@@ -24,6 +26,7 @@ use UI\TeamCellHelper;
 class StandingsView implements StandingsViewInterface
 {
     private StandingsRepositoryInterface $repository;
+    private SeriesRecordsServiceInterface $seriesRecordsService;
     private int $seasonYear;
 
     /** @var array<int, StreakRow>|null Pre-loaded streak data keyed by team ID */
@@ -32,16 +35,24 @@ class StandingsView implements StandingsViewInterface
     /** @var array<int, PythagoreanStats>|null Pre-loaded Pythagorean stats keyed by team ID */
     private ?array $allPythagoreanStats = null;
 
+    /** @var array<int, array<int, array{wins: int, losses: int}>>|null Pre-loaded H2H series matrix */
+    private ?array $seriesMatrix = null;
+
     /**
      * Constructor
      *
      * @param StandingsRepositoryInterface $repository Standings data repository
      * @param int $seasonYear Season ending year (e.g. 2025 for the 2024-25 season)
+     * @param SeriesRecordsServiceInterface $seriesRecordsService Series records service for H2H data
      */
-    public function __construct(StandingsRepositoryInterface $repository, int $seasonYear)
-    {
+    public function __construct(
+        StandingsRepositoryInterface $repository,
+        int $seasonYear,
+        SeriesRecordsServiceInterface $seriesRecordsService
+    ) {
         $this->repository = $repository;
         $this->seasonYear = $seasonYear;
+        $this->seriesRecordsService = $seriesRecordsService;
     }
 
     /**
@@ -49,25 +60,38 @@ class StandingsView implements StandingsViewInterface
      */
     public function render(): string
     {
-        // Pre-load all streak and Pythagorean data in 2 queries instead of per-team
+        // Pre-load all streak, Pythagorean, and H2H data in bulk queries
         $this->allStreakData = $this->repository->getAllStreakData();
         $this->allPythagoreanStats = $this->repository->getAllPythagoreanStats($this->seasonYear);
+        $this->seriesMatrix = $this->seriesRecordsService->buildSeriesMatrix(
+            $this->repository->getSeriesRecords()
+        );
 
+        // Bulk-fetch all standings in 1 query instead of 6
+        $allStandings = $this->repository->getAllStandings();
+        $grouped = $this->groupStandings($allStandings);
+
+        $regions = ['Eastern', 'Western', 'Atlantic', 'Central', 'Midwest', 'Pacific'];
         $html = '';
 
-        // Conference standings
-        $html .= $this->renderRegion('Eastern');
-        $html .= $this->renderRegion('Western');
+        foreach ($regions as $region) {
+            $isConference = in_array($region, \League::CONFERENCE_NAMES, true);
+            $gbColumn = $isConference ? 'confGB' : 'divGB';
 
-        // Division standings
-        $html .= $this->renderRegion('Atlantic');
-        $html .= $this->renderRegion('Central');
-        $html .= $this->renderRegion('Midwest');
-        $html .= $this->renderRegion('Pacific');
+            $regionTeams = $grouped[$region] ?? [];
+            $this->sortStandings($regionTeams, $gbColumn);
+
+            // Convert BulkStandingsRow to StandingsRow by aliasing gamesBack/magicNumber
+            $standings = $this->adaptBulkRows($regionTeams, $isConference);
+
+            $groupingType = $isConference ? 'Conference' : 'Division';
+            $html .= $this->renderStandingsTable($region, $groupingType, $standings);
+        }
 
         // Clear pre-loaded data
         $this->allStreakData = null;
         $this->allPythagoreanStats = null;
+        $this->seriesMatrix = null;
 
         return $html;
     }
@@ -84,15 +108,122 @@ class StandingsView implements StandingsViewInterface
         if ($this->allPythagoreanStats === null) {
             $this->allPythagoreanStats = $this->repository->getAllPythagoreanStats($this->seasonYear);
         }
+        if ($this->seriesMatrix === null) {
+            $this->seriesMatrix = $this->seriesRecordsService->buildSeriesMatrix(
+                $this->repository->getSeriesRecords()
+            );
+        }
 
         $groupingType = $this->getGroupingType($region);
         $standings = $this->repository->getStandingsByRegion($region);
 
+        return $this->renderStandingsTable($region, $groupingType, $standings);
+    }
+
+    /**
+     * Render a complete standings table: resolve H2H ties, render header + rows + closing tags
+     *
+     * @param string $region Region name (e.g. 'Eastern', 'Atlantic')
+     * @param string $groupingType 'Conference' or 'Division'
+     * @param list<StandingsRow> $standings Sorted standings data
+     * @return string Complete HTML for one standings table
+     */
+    private function renderStandingsTable(string $region, string $groupingType, array $standings): string
+    {
+        $standings = $this->resolveH2HTiedGroups($standings);
+
         $html = $this->renderHeader($region, $groupingType);
         $html .= $this->renderRows($standings);
-        $html .= '</tbody></table></div></div>'; // Close table, scroll container, and wrapper
+        $html .= '</tbody></table></div></div>';
 
         return $html;
+    }
+
+    /**
+     * Group bulk standings rows by conference and division
+     *
+     * @param list<BulkStandingsRow> $allStandings
+     * @return array<string, list<BulkStandingsRow>>
+     */
+    private function groupStandings(array $allStandings): array
+    {
+        /** @var array<string, list<BulkStandingsRow>> $grouped */
+        $grouped = [];
+
+        foreach ($allStandings as $team) {
+            $grouped[$team['conference']][] = $team;
+            $grouped[$team['division']][] = $team;
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * Sort standings in-place replicating SQL ORDER BY
+     *
+     * @param list<BulkStandingsRow> $teams
+     * @param string $gbColumn Column name for games back sorting ('confGB' or 'divGB')
+     */
+    private function sortStandings(array &$teams, string $gbColumn): void
+    {
+        usort($teams, function (array $a, array $b) use ($gbColumn): int {
+            // 1. Games back ASC
+            $gbA = $gbColumn === 'confGB' ? $a['confGB'] : $a['divGB'];
+            $gbB = $gbColumn === 'confGB' ? $b['confGB'] : $b['divGB'];
+            $gbCmp = (float) $gbA <=> (float) $gbB;
+            if ($gbCmp !== 0) {
+                return $gbCmp;
+            }
+
+            // 2. Clinch priority DESC
+            $clinchCmp = $this->getClinchTierScore($b) <=> $this->getClinchTierScore($a);
+            if ($clinchCmp !== 0) {
+                return $clinchCmp;
+            }
+
+            // 3. Wins DESC
+            return $b['wins'] <=> $a['wins'];
+        });
+    }
+
+    /**
+     * Convert bulk standings rows to the StandingsRow format expected by renderTeamRow()
+     *
+     * @param list<BulkStandingsRow> $teams
+     * @param bool $isConference Whether to use conference or division GB/magic columns
+     * @return list<StandingsRow>
+     */
+    private function adaptBulkRows(array $teams, bool $isConference): array
+    {
+        /** @var list<StandingsRow> $result */
+        $result = [];
+
+        foreach ($teams as $team) {
+            $result[] = [
+                'tid' => $team['tid'],
+                'team_name' => $team['team_name'],
+                'leagueRecord' => $team['leagueRecord'],
+                'pct' => $team['pct'],
+                'gamesBack' => $isConference ? $team['confGB'] : $team['divGB'],
+                'confRecord' => $team['confRecord'],
+                'divRecord' => $team['divRecord'],
+                'homeRecord' => $team['homeRecord'],
+                'awayRecord' => $team['awayRecord'],
+                'gamesUnplayed' => $team['gamesUnplayed'],
+                'magicNumber' => $isConference ? $team['confMagicNumber'] : $team['divMagicNumber'],
+                'clinchedConference' => $team['clinchedConference'],
+                'clinchedDivision' => $team['clinchedDivision'],
+                'clinchedPlayoffs' => $team['clinchedPlayoffs'],
+                'clinchedLeague' => $team['clinchedLeague'],
+                'wins' => $team['wins'],
+                'homeGames' => $team['homeGames'],
+                'awayGames' => $team['awayGames'],
+                'color1' => $team['color1'],
+                'color2' => $team['color2'],
+            ];
+        }
+
+        return $result;
     }
 
     /**
@@ -369,6 +500,111 @@ class StandingsView implements StandingsViewInterface
         }
 
         return true;
+    }
+
+    /**
+     * Compute clinch tier score for a team (higher = better clinch status)
+     *
+     * @param array{clinchedLeague: int, clinchedConference: int, clinchedDivision: int, clinchedPlayoffs: int, ...} $team
+     */
+    private function getClinchTierScore(array $team): int
+    {
+        return $team['clinchedLeague'] * 4
+            + $team['clinchedConference'] * 3
+            + $team['clinchedDivision'] * 2
+            + $team['clinchedPlayoffs'];
+    }
+
+    /**
+     * Resolve H2H tie-breaking for groups of teams tied on GB, clinch tier, and wins
+     *
+     * Walks the sorted standings list, identifies groups of teams with the same
+     * games-back, clinch tier, and wins, then sorts each group by aggregate H2H
+     * win percentage (best H2H first for standings).
+     *
+     * @param list<StandingsRow> $teams Standings sorted by SQL (GB, clinch, wins)
+     * @return list<StandingsRow> Re-sorted standings with H2H tie-breaking applied
+     */
+    private function resolveH2HTiedGroups(array $teams): array
+    {
+        if (count($teams) <= 1 || $this->seriesMatrix === null || $this->seriesMatrix === []) {
+            return $teams;
+        }
+
+        /** @var list<StandingsRow> $result */
+        $result = [];
+        $count = count($teams);
+        $groupStart = 0;
+
+        for ($i = 1; $i <= $count; $i++) {
+            if ($i < $count
+                && $teams[$i]['gamesBack'] === $teams[$groupStart]['gamesBack']
+                && $this->getClinchTierScore($teams[$i]) === $this->getClinchTierScore($teams[$groupStart])
+                && $teams[$i]['wins'] === $teams[$groupStart]['wins']
+            ) {
+                continue;
+            }
+
+            $group = array_slice($teams, $groupStart, $i - $groupStart);
+
+            if (count($group) > 1) {
+                $group = $this->sortTiedGroup($group);
+            }
+
+            array_push($result, ...$group);
+            $groupStart = $i;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Sort a tied group by aggregate H2H win percentage (best first for standings)
+     *
+     * For each team, computes aggregate H2H record against all other teams in the
+     * group, then sorts descending by H2H win pct.
+     *
+     * @param list<StandingsRow> $group Teams tied on GB/clinch/wins
+     * @return list<StandingsRow> Sorted group (best H2H first)
+     */
+    private function sortTiedGroup(array $group): array
+    {
+        $tids = array_map(static fn (array $t): int => $t['tid'], $group);
+
+        /** @var array<int, float> */
+        $aggregateH2HPct = [];
+        foreach ($group as $team) {
+            $totalWins = 0;
+            $totalLosses = 0;
+            foreach ($tids as $opponentTid) {
+                if ($opponentTid === $team['tid']) {
+                    continue;
+                }
+                $totalWins += $this->seriesMatrix[$team['tid']][$opponentTid]['wins'] ?? 0;
+                $totalLosses += $this->seriesMatrix[$team['tid']][$opponentTid]['losses'] ?? 0;
+            }
+            $aggregateH2HPct[$team['tid']] = $this->safeWinPct($totalWins, $totalLosses);
+        }
+
+        // Sort descending by H2H pct (best first for standings)
+        usort($group, static function (array $a, array $b) use ($aggregateH2HPct): int {
+            return $aggregateH2HPct[$b['tid']] <=> $aggregateH2HPct[$a['tid']];
+        });
+
+        return $group;
+    }
+
+    /**
+     * Safe division for win percentage calculation
+     */
+    private function safeWinPct(int $wins, int $losses): float
+    {
+        $total = $wins + $losses;
+        if ($total === 0) {
+            return 0.0;
+        }
+
+        return $wins / $total;
     }
 
     /**

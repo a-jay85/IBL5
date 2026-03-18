@@ -1837,6 +1837,12 @@ td.ibl-team-cell--colored {
 /* ---------- Trading mobile responsive ---------- */
 
 @media (max-width: 768px) {
+    /* Stack roster cards vertically so the open one gets full width */
+    .trading-layout__card {
+        flex-basis: 100%;
+        max-width: 100%;
+    }
+
     /* Sticky submit button */
     .trading-layout__submit {
         position: sticky;

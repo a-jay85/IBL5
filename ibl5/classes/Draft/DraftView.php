@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Draft;
 
 use Draft\Contracts\DraftViewInterface;
+use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 
 /**
@@ -71,7 +72,7 @@ class DraftView implements DraftViewInterface
                     <th class="sticky-col sticky-corner">Draft</th>
                     <th class="sticky-col-2 sticky-corner">Name</th>
                     <th>Pos</th>
-                    <th>Team</th>
+                    <th class="ibl-team-cell--colored">Team</th>
                     <th>Age</th>
                     <th>fga</th>
                     <th>fgp</th>
@@ -120,10 +121,23 @@ class DraftView implements DraftViewInterface
             }
 
             $safePos = HtmlSanitizer::safeHtmlOutput($player['pos']);
-            $safeTeam = HtmlSanitizer::safeHtmlOutput($player['team']);
+            $teamTid = $player['team_tid'];
             $html .= '
-            <td>' . $safePos . '</td>
-            <td>' . $safeTeam . '</td>
+            <td>' . $safePos . '</td>';
+
+            if ($teamTid !== null) {
+                $html .= TeamCellHelper::renderTeamCell(
+                    $teamTid,
+                    $player['team'],
+                    $player['color1'] ?? 'FFFFFF',
+                    $player['color2'] ?? '000000',
+                );
+            } else {
+                $safeTeam = HtmlSanitizer::safeHtmlOutput($player['team']);
+                $html .= '<td>' . $safeTeam . '</td>';
+            }
+
+            $html .= '
             <td>' . (int) $player['age'] . '</td>
             <td>' . (int) $player['fga'] . '</td>
             <td>' . (int) $player['fgp'] . '</td>

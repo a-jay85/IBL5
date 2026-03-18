@@ -118,11 +118,6 @@ class Discord
      */
     public static function sendCurlPOST(string $url, string $arrayContent): ?string
     {
-        // Defensive check: only send if Discord class exists (allows graceful degradation)
-        if (!class_exists('Discord', false)) {
-            return null;
-        }
-
         if (self::isPhpUnit()) {
             return null;
         }
@@ -177,11 +172,6 @@ class Discord
      */
     public static function sendDM(string $recipientDiscordId, string $message): ?string
     {
-        // Defensive check: only send if Discord class exists (allows graceful degradation)
-        if (!class_exists('Discord', false)) {
-            return null;
-        }
-
         // DMs go to real users — only send on production
         if (!self::isProduction()) {
             return null;
@@ -189,12 +179,14 @@ class Discord
 
         // Skip if recipient has no Discord ID
         if ($recipientDiscordId === '') {
+            error_log('Discord::sendDM skipped: recipient has no Discord ID');
             return null;
         }
 
         self::loadConfig();
 
         if (self::$iblbotUrl === '') {
+            error_log('Discord::sendDM skipped: iblbot_url is empty in config');
             return null;
         }
 
@@ -218,6 +210,8 @@ class Discord
             CURLOPT_HEADER => false,
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 10,
         ]);
 
         $response = curl_exec($curl);
@@ -225,7 +219,7 @@ class Discord
 
         $error = curl_error($curl);
         if ($error !== '') {
-            throw new \Exception('cURL error sending Discord DM: ' . $error);
+            throw new \Exception('cURL error sending Discord DM to ' . $recipientDiscordId . ': ' . $error);
         }
 
         // IBLbot Express endpoint returns HTTP 200 on success
@@ -250,11 +244,6 @@ class Discord
      */
     public static function sendTradeDM(string $recipientDiscordId, int $tradeOfferId, string $offeringTeamName, string $tradeText): ?string
     {
-        // Defensive check: only send if Discord class exists (allows graceful degradation)
-        if (!class_exists('Discord', false)) {
-            return null;
-        }
-
         // Trade DMs go to real users — only send on production
         if (!self::isProduction()) {
             return null;
@@ -262,12 +251,14 @@ class Discord
 
         // Skip if recipient has no Discord ID
         if ($recipientDiscordId === '') {
+            error_log("Discord::sendTradeDM skipped for trade #{$tradeOfferId}: recipient has no Discord ID (team: {$offeringTeamName})");
             return null;
         }
 
         self::loadConfig();
 
         if (self::$iblbotUrl === '') {
+            error_log("Discord::sendTradeDM skipped for trade #{$tradeOfferId}: iblbot_url is empty in config");
             return null;
         }
 
@@ -294,6 +285,8 @@ class Discord
             CURLOPT_HEADER => false,
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 10,
         ]);
 
         $response = curl_exec($curl);
@@ -301,7 +294,7 @@ class Discord
 
         $error = curl_error($curl);
         if ($error !== '') {
-            throw new \Exception('cURL error sending trade DM: ' . $error);
+            throw new \Exception("cURL error sending trade DM #{$tradeOfferId} to {$recipientDiscordId}: {$error}");
         }
 
         if ($httpCode < 200 || $httpCode >= 300) {
@@ -319,11 +312,6 @@ class Discord
      */
     public static function postToChannel(string $channelName, string $messageContent): void
     {
-        // Defensive check: only send if Discord class exists (allows graceful degradation)
-        if (!class_exists('Discord', false)) {
-            return;
-        }
-
         if (self::isPhpUnit()) {
             return;
         }

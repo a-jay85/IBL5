@@ -11,6 +11,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -163,6 +165,30 @@ jobs:
           echo "Test user created: $user\n";
           PHPSCRIPT
 
+      # --- Visual Regression Baselines ---
+      - name: Generate missing visual regression baselines
+        id: baselines
+        working-directory: ibl5
+        env:
+          BASE_URL: http://localhost:8080/ibl5/
+          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
+          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
+        run: |
+          SNAP_DIR="tests/e2e/smoke/visual-regression.spec.ts-snapshots"
+          if ! ls "$SNAP_DIR"/*-linux.png 1>/dev/null 2>&1; then
+            echo "No Linux baselines found — generating..."
+            bunx playwright test tests/e2e/smoke/visual-regression.spec.ts --update-snapshots
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add "$SNAP_DIR"/*-linux.png
+            git commit -m "ci: generate Linux visual regression baselines"
+            git push
+            echo "generated=true" >> $GITHUB_OUTPUT
+          else
+            echo "Linux baselines already exist"
+            echo "generated=false" >> $GITHUB_OUTPUT
+          fi
+
       # --- Run Tests ---
       - name: Run E2E tests
         working-directory: ibl5
@@ -170,7 +196,13 @@ jobs:
           BASE_URL: http://localhost:8080/ibl5/
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
           IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
-        run: bunx playwright test
+        run: |
+          if [ "${{ steps.baselines.outputs.generated }}" = "true" ]; then
+            echo "Baselines just generated — skipping visual regression this run"
+            bunx playwright test --grep-invert "Visual regression"
+          else
+            bunx playwright test
+          fi
 
       - name: Upload test results
         if: always()

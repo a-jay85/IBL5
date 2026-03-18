@@ -27,7 +27,7 @@ MYSQL_CMD="mariadb"
 echo "Starting database export and import process..."
 echo "================================================"
 
-# Step 1: Export from remote database
+# Step 1: Export from remote database with inline DEFINER removal
 echo ""
 echo "Step 1: Exporting from remote database..."
 echo "Remote: ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PORT}/${REMOTE_DATABASE}"
@@ -37,33 +37,21 @@ MYSQL_PWD="${REMOTE_PASSWORD}" "${MYSQLDUMP_CMD}" \
   --port="${REMOTE_PORT}" \
   --user="${REMOTE_USER}" \
   --add-drop-table \
-  --complete-insert \
   --skip-lock-tables \
-  "${REMOTE_DATABASE}" > "${DUMP_FILE}"
+  --single-transaction \
+  --compress \
+  "${REMOTE_DATABASE}" \
+  | sed 's/\/\*!50017 DEFINER=[^*]*\*\///g; s/ DEFINER=[^ ]*/ /g; s/  */ /g' \
+  > "${DUMP_FILE}"
 
-# Check if export was successful
-if [ $? -ne 0 ]; then
+# Check if export was successful (check PIPESTATUS for the dump command)
+if [ ${PIPESTATUS[0]} -ne 0 ]; then
   echo "ERROR: Failed to export remote database!"
   exit 1
 fi
 
 echo "Export completed successfully: ${DUMP_FILE}"
 echo "  File size: $(du -h "${DUMP_FILE}" | cut -f1)"
-
-# Step 1.5: Remove DEFINER clauses to make schema portable
-echo ""
-echo "Step 1.5: Removing DEFINER clauses for portability..."
-
-# Remove DEFINER from CREATE statements
-sed -i '' "s/\/\*!50017 DEFINER=[^*]*\*\///g" "${DUMP_FILE}"
-
-# Remove DEFINER from inline definitions
-sed -i '' "s/ DEFINER=[^ ]*/ /g" "${DUMP_FILE}"
-
-# Clean up any double spaces left behind
-sed -i '' "s/  */ /g" "${DUMP_FILE}"
-
-echo "DEFINER clauses removed successfully"
 
 # Step 2: Import to local database
 echo ""
@@ -74,6 +62,8 @@ MYSQL_PWD="${LOCAL_PASSWORD}" "${MYSQL_CMD}" \
   --host="${LOCAL_HOST}" \
   --port="${LOCAL_PORT}" \
   --user="${LOCAL_USER}" \
+  --max-allowed-packet=256M \
+  --init-command="SET FOREIGN_KEY_CHECKS=0, UNIQUE_CHECKS=0, AUTOCOMMIT=0;" \
   "${LOCAL_DATABASE}" < "${DUMP_FILE}"
 
 # Check if import was successful

@@ -83,7 +83,6 @@ class TradingView implements TradingViewInterface
                     <summary class="trading-roster-details__summary" style="--team-color-primary: #<?= $userColor1 ?>; --team-color-secondary: #<?= $userColor2 ?>">
                         <img src="images/logo/<?= $userTeamId ?>.jpg" alt="<?= $userTeam ?>" class="trading-roster-details__logo">
                         <?= $userTeam ?>
-                        <span class="trading-roster-details__count"><?= count($pageData['userPlayers']) + count($pageData['userPicks']) ?> items</span>
                         <span class="trading-roster-details__chevron"></span>
                     </summary>
                     <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $userTeamId ?>" style="<?= TableStyles::inlineVars($pageData['userTeamColor1'], $pageData['userTeamColor2']) ?>">
@@ -115,7 +114,6 @@ class TradingView implements TradingViewInterface
                     <summary class="trading-roster-details__summary" style="--team-color-primary: #<?= $partnerColor1 ?>; --team-color-secondary: #<?= $partnerColor2 ?>">
                         <img src="images/logo/<?= $partnerTeamId ?>.jpg" alt="<?= $partnerTeam ?>" class="trading-roster-details__logo">
                         <?= $partnerTeam ?>
-                        <span class="trading-roster-details__count"><?= count($pageData['partnerPlayers']) + count($pageData['partnerPicks']) ?> items</span>
                         <span class="trading-roster-details__chevron"></span>
                     </summary>
                     <table class="ibl-data-table trading-roster team-table" data-team-id="<?= $partnerTeamId ?>" style="<?= TableStyles::inlineVars($pageData['partnerTeamColor1'], $pageData['partnerTeamColor2']) ?>">

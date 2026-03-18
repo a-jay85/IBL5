@@ -1798,14 +1798,8 @@ td.ibl-team-cell--colored {
     object-fit: contain;
 }
 
-.trading-roster-details__count {
-    margin-left: auto;
-    font-size: 0.8rem;
-    opacity: 0.8;
-    font-weight: 400;
-}
-
 .trading-roster-details__chevron {
+    margin-left: auto;
     display: inline-block;
     width: 0.6em;
     height: 0.6em;

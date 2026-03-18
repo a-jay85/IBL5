@@ -50,6 +50,7 @@ class DebugOutput
 
         // SECURITY: Escape content to prevent XSS
         // Allow only basic HTML tags for formatting (br tags are common in debug output)
+        // deliberate: HtmlSanitizer::e() strips <br> tags via stripslashes; keep htmlspecialchars here
         $safeContent = htmlspecialchars($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         // Restore <br> tags after escaping (they're safe and commonly used)
         $safeContent = str_replace(['&lt;br&gt;', '&lt;br/&gt;', '&lt;br /&gt;'], '<br>', $safeContent);

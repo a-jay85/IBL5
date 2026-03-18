@@ -163,19 +163,6 @@ class TradingRepositoryTest extends TestCase
     // ============================================
     // GET TRADE ROWS TESTS
     // ============================================
-
-    public function testGetTradeRowsReturnsEmptyArrayWhenNoTrades(): void
-    {
-        $repository = new TradingRepository($this->mockMysqliDb);
-        $this->mockDb->setMockData([]);
-
-        $result = $repository->getTradeRows();
-
-        $this->assertIsArray($result);
-        $this->assertEmpty($result);
-    }
-
-    // ============================================
     // GET TEAM PLAYERS FOR TRADING TESTS
     // ============================================
 

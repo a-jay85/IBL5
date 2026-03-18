@@ -18,7 +18,7 @@ interface PlayerViewInterface
      * 
      * Views should use output buffering (ob_start/ob_get_clean) internally
      * and return the complete HTML string. All output should be sanitized
-     * using HtmlSanitizer::safeHtmlOutput() or htmlspecialchars().
+     * using HtmlSanitizer::safeHtmlOutput() or HtmlSanitizer::e().
      * 
      * @return string Rendered HTML content
      */

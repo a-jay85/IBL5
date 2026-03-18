@@ -6,6 +6,7 @@ namespace UI\Tables;
 
 use Player\Player;
 use Player\PlayerImageHelper;
+use Utilities\HtmlSanitizer;
 
 /**
  * Contracts - Displays team contracts table
@@ -132,7 +133,7 @@ class Contracts
         $hasExtension = !$isCashPlayer && !$hasRookieOption && $isExtensionPhase && $player->canRenegotiateContract();
         ?>
         <tr<?= $row['isCashRow'] ? ' data-cash-row' : '' ?>>
-            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
             <td><?= (int)$player->age ?></td>
             <td><?= (int)$player->yearsOfExperience ?></td>

@@ -180,6 +180,14 @@ jobs:
           path: ibl5/playwright-report/
           retention-days: 7
 
+      - name: Upload snapshot diffs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: snapshot-diffs
+          path: ibl5/test-results/
+          retention-days: 7
+
       - name: Stop Docker containers
         if: always()
         run: docker compose -f docker-compose.ci.yml down

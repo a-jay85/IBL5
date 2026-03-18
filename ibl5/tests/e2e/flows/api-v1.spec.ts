@@ -1,145 +1,204 @@
 import { test, expect } from '@playwright/test';
 
-// REST API v1 Tests — no browser rendering, uses page.request.get().
+// REST API v1 Tests — no browser rendering, uses page.request.
 // API requires X-API-Key header for authentication.
-// If no API key is available, tests verify 401 response.
+// In CI, the test API key is seeded in ci-seed.sql.
+// Locally, set IBL_API_KEY in .env.test or tests fall through to 401 checks.
 test.use({ storageState: { cookies: [], origins: [] } });
 
 const BASE_URL = '/ibl5/api/v1';
+const API_KEY = process.env.IBL_API_KEY || 'e2e-test-key-do-not-use-in-production';
 
-test.describe('API v1 endpoints', () => {
-  test('GET /season returns 200 or 401', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/season`);
-    const status = response.status();
+const authHeaders = { 'X-API-Key': API_KEY };
 
-    if (status === 401) {
-      // No API key configured — verify 401 response structure
-      const body = await response.json();
-      expect(body).toHaveProperty('error');
-      return;
-    }
+/**
+ * Helper: make a GET request and verify either 401 (with error structure)
+ * or 200 (with response shape validation).
+ */
+async function assertGetRoute(
+  request: import('@playwright/test').APIRequestContext,
+  path: string,
+  validateBody?: (body: unknown) => void,
+): Promise<void> {
+  const response = await request.get(`${BASE_URL}${path}`, {
+    headers: authHeaders,
+  });
+  const status = response.status();
 
-    expect(status).toBe(200);
+  if (status === 401) {
     const body = await response.json();
-    expect(body).toBeTruthy();
+    expect(body, `401 response for ${path} should have error property`).toHaveProperty('error');
+    return;
+  }
+
+  expect(status, `${path} should return 200`).toBe(200);
+  const body = await response.json();
+  expect(body, `${path} should return truthy body`).toBeTruthy();
+
+  if (validateBody) {
+    validateBody(body);
+  }
+}
+
+/**
+ * Fetch a list endpoint and return the first item's UUID.
+ * Returns null if 401 (with assertion) or no items available.
+ */
+async function getFirstUuid(
+  request: import('@playwright/test').APIRequestContext,
+  listPath: string,
+): Promise<string | null> {
+  const response = await request.get(`${BASE_URL}/${listPath}`, {
+    headers: authHeaders,
   });
 
-  test('GET /teams returns 200 or 401', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/teams`);
-    const status = response.status();
-
-    if (status === 401) {
-      const body = await response.json();
-      expect(body).toHaveProperty('error');
-      return;
-    }
-
-    expect(status).toBe(200);
+  if (response.status() === 401) {
     const body = await response.json();
-    expect(Array.isArray(body.data) || typeof body === 'object').toBe(true);
+    expect(body).toHaveProperty('error');
+    return null;
+  }
+
+  const body = await response.json();
+  const items = body.data ?? body;
+  if (!Array.isArray(items) || items.length === 0) return null;
+
+  return (items[0].uuid ?? items[0].id) || null;
+}
+
+test.describe('API v1 — list endpoints', () => {
+  test('GET /season returns season data', async ({ request }) => {
+    await assertGetRoute(request, '/season', (body: unknown) => {
+      expect(typeof body).toBe('object');
+    });
   });
 
-  test('GET /standings returns 200 or 401', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/standings`);
-    const status = response.status();
-
-    if (status === 401) {
-      const body = await response.json();
-      expect(body).toHaveProperty('error');
-      return;
-    }
-
-    expect(status).toBe(200);
-    const body = await response.json();
-    expect(body).toBeTruthy();
+  test('GET /teams returns team list', async ({ request }) => {
+    await assertGetRoute(request, '/teams', (body: unknown) => {
+      const b = body as Record<string, unknown>;
+      expect(Array.isArray(b.data) || typeof b === 'object').toBe(true);
+    });
   });
 
-  test('GET /standings/Eastern returns 200 or 401', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/standings/Eastern`);
-    const status = response.status();
-
-    if (status === 401) {
-      const body = await response.json();
-      expect(body).toHaveProperty('error');
-      return;
-    }
-
-    expect(status).toBe(200);
-    const body = await response.json();
-    expect(body).toBeTruthy();
+  test('GET /players returns player list', async ({ request }) => {
+    await assertGetRoute(request, '/players', (body: unknown) => {
+      const b = body as Record<string, unknown>;
+      expect(Array.isArray(b.data) || typeof b === 'object').toBe(true);
+    });
   });
 
-  test('GET /players returns 200 or 401', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/players`);
-    const status = response.status();
-
-    if (status === 401) {
-      const body = await response.json();
-      expect(body).toHaveProperty('error');
-      return;
-    }
-
-    expect(status).toBe(200);
-    const body = await response.json();
-    expect(body).toBeTruthy();
+  test('GET /standings returns standings data', async ({ request }) => {
+    await assertGetRoute(request, '/standings');
   });
 
-  test('GET /injuries returns 200 or 401', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/injuries`);
-    const status = response.status();
-
-    if (status === 401) {
-      const body = await response.json();
-      expect(body).toHaveProperty('error');
-      return;
-    }
-
-    expect(status).toBe(200);
-    const body = await response.json();
-    // May be empty array if no injuries
-    expect(body).toBeTruthy();
+  test('GET /standings/Eastern returns Eastern conference', async ({ request }) => {
+    await assertGetRoute(request, '/standings/Eastern');
   });
 
-  test('GET /stats/leaders returns 200 or 401', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/stats/leaders`);
-    const status = response.status();
-
-    if (status === 401) {
-      const body = await response.json();
-      expect(body).toHaveProperty('error');
-      return;
-    }
-
-    expect(status).toBe(200);
-    const body = await response.json();
-    expect(body).toBeTruthy();
+  test('GET /standings/Western returns Western conference', async ({ request }) => {
+    await assertGetRoute(request, '/standings/Western');
   });
 
+  test('GET /injuries returns injuries data', async ({ request }) => {
+    await assertGetRoute(request, '/injuries');
+  });
+
+  test('GET /stats/leaders returns leaders data', async ({ request }) => {
+    await assertGetRoute(request, '/stats/leaders');
+  });
+
+  test('GET /games returns game list', async ({ request }) => {
+    await assertGetRoute(request, '/games');
+  });
+});
+
+test.describe('API v1 — detail endpoints (require valid UUIDs)', () => {
+  test('GET /players/{uuid} returns player detail', async ({ request }) => {
+    const uuid = await getFirstUuid(request, 'players');
+    if (!uuid) { test.skip(); return; }
+    await assertGetRoute(request, `/players/${uuid}`, (body: unknown) => {
+      expect(typeof body).toBe('object');
+    });
+  });
+
+  test('GET /players/{uuid}/stats returns player stats', async ({ request }) => {
+    const uuid = await getFirstUuid(request, 'players');
+    if (!uuid) { test.skip(); return; }
+    await assertGetRoute(request, `/players/${uuid}/stats`);
+  });
+
+  test('GET /players/{uuid}/history returns player history', async ({ request }) => {
+    const uuid = await getFirstUuid(request, 'players');
+    if (!uuid) { test.skip(); return; }
+    await assertGetRoute(request, `/players/${uuid}/history`);
+  });
+
+  test('GET /teams/{uuid} returns team detail', async ({ request }) => {
+    const uuid = await getFirstUuid(request, 'teams');
+    if (!uuid) { test.skip(); return; }
+    await assertGetRoute(request, `/teams/${uuid}`, (body: unknown) => {
+      expect(typeof body).toBe('object');
+    });
+  });
+
+  test('GET /teams/{uuid}/roster returns team roster', async ({ request }) => {
+    const uuid = await getFirstUuid(request, 'teams');
+    if (!uuid) { test.skip(); return; }
+    await assertGetRoute(request, `/teams/${uuid}/roster`);
+  });
+
+  test('GET /games/{uuid} returns game detail', async ({ request }) => {
+    const uuid = await getFirstUuid(request, 'games');
+    if (!uuid) { test.skip(); return; }
+    await assertGetRoute(request, `/games/${uuid}`);
+  });
+
+  test('GET /games/{uuid}/boxscore returns boxscore', async ({ request }) => {
+    const uuid = await getFirstUuid(request, 'games');
+    if (!uuid) { test.skip(); return; }
+    await assertGetRoute(request, `/games/${uuid}/boxscore`);
+  });
+});
+
+test.describe('API v1 — error handling', () => {
   test('GET /nonexistent returns 404', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/nonexistent`);
+    const response = await request.get(`${BASE_URL}/nonexistent`, {
+      headers: authHeaders,
+    });
     const status = response.status();
-
-    // Should be 404 (or 401 if auth required before routing)
     expect([401, 404]).toContain(status);
-
     const body = await response.json();
     expect(body).toHaveProperty('error');
   });
 
-  test('unauthenticated requests return proper error structure', async ({
-    request,
-  }) => {
-    // Make request without API key — should get 401
+  test('unauthenticated requests return proper error structure', async ({ request }) => {
     const response = await request.get(`${BASE_URL}/season`, {
       headers: { 'X-API-Key': '' },
     });
-
     const status = response.status();
-    // Either 401 (no key) or 200 (if somehow no auth needed)
     if (status === 401) {
       const body = await response.json();
       expect(body).toHaveProperty('error');
       expect(body.error).toBeTruthy();
     }
+  });
+
+  test('invalid UUID returns 404 or 400', async ({ request }) => {
+    const response = await request.get(`${BASE_URL}/players/not-a-valid-uuid`, {
+      headers: authHeaders,
+    });
+    const status = response.status();
+    expect([401, 404]).toContain(status);
+  });
+
+  test('POST to trade accept without auth returns 401', async ({ request }) => {
+    const response = await request.post(`${BASE_URL}/trades/999/accept`);
+    const status = response.status();
+    expect([401, 404]).toContain(status);
+  });
+
+  test('POST to trade decline without auth returns 401', async ({ request }) => {
+    const response = await request.post(`${BASE_URL}/trades/999/decline`);
+    const status = response.status();
+    expect([401, 404]).toContain(status);
   });
 });

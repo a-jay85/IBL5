@@ -37,6 +37,50 @@ test.describe('One-on-One Game flow', () => {
     await expect(reviewButton).toBeVisible();
   });
 
+  test('submitting a match produces results', async ({ page }) => {
+    // The page has a form with two visible select dropdowns and a submit button
+    const form = page.locator('form').filter({ has: page.getByRole('button', { name: /begin/i }) });
+    const selects = form.locator('select');
+    const selectCount = await selects.count();
+    if (selectCount < 2) {
+      test.skip();
+      return;
+    }
+
+    const firstSelect = selects.nth(0);
+    const secondSelect = selects.nth(1);
+
+    // Get options from first select (skip any blank/placeholder)
+    const options = firstSelect.locator('option');
+    const optionCount = await options.count();
+    if (optionCount < 2) {
+      test.skip();
+      return;
+    }
+
+    // Select different players in each dropdown using index
+    await firstSelect.selectOption({ index: 1 });
+    await secondSelect.selectOption({ index: Math.min(2, optionCount - 1) });
+
+    // Submit the form
+    await page.getByRole('button', { name: /begin/i }).click();
+
+    // Wait for results page — verify error message disappears or results appear
+    await page.waitForLoadState('networkidle');
+    const body = await page.locator('body').textContent();
+    // Results should contain score or game info (not just the form)
+    const hasResults =
+      body?.includes('Score') ||
+      body?.includes('Winner') ||
+      body?.includes('won') ||
+      body?.includes('pts') ||
+      body?.includes('Final') ||
+      body?.includes('Game ID') ||
+      body?.includes('Quarter');
+    expect(hasResults).toBe(true);
+    await assertNoPhpErrors(page, 'on OneOnOneGame results page');
+  });
+
   test('no PHP errors on game page', async ({ page }) => {
     await assertNoPhpErrors(page, 'on OneOnOneGame page');
   });

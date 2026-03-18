@@ -25,15 +25,23 @@ try {
 
 export default defineConfig({
   testDir: './tests/e2e',
-  fullyParallel: true,
+  testMatch: /visual-regression\.spec\.ts/,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 1,
-  workers: 4,
+  retries: 0,
+  workers: 1,
   reporter: [['html', { open: 'never' }], ['list']],
 
   expect: {
-    timeout: 5_000,
+    timeout: 10_000,
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.005,
+    },
   },
+
+  // Strip OS and browser from snapshot file names — baselines are OS-agnostic
+  // via Docker. Result: "standings-table.png" instead of "standings-table-chromium-linux.png"
+  snapshotPathTemplate: '{testDir}/{testFileDir}/{testFileName}-snapshots/{arg}{ext}',
 
   use: {
     baseURL: process.env.BASE_URL || 'http://main.localhost/ibl5/',
@@ -41,6 +49,8 @@ export default defineConfig({
     navigationTimeout: 20_000,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    viewport: { width: 1280, height: 900 },
+    reducedMotion: 'reduce',
   },
 
   projects: [
@@ -52,10 +62,11 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 900 },
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /visual-regression/],
+      testIgnore: /auth\.setup\.ts/,
     },
   ],
 });

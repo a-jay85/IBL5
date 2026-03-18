@@ -80,6 +80,11 @@
                 state.initialized = true;
                 fetchRosterPreview(offerId);
             }
+
+            // Scroll preview into view on mobile
+            if (window.innerWidth <= 768) {
+                state.panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
         }
     }
 

@@ -25,9 +25,3 @@ fi
 echo "Removing worktree '$NAME'..."
 git worktree remove --force "$WT_PATH"
 echo "Done. Worktree '$NAME' removed."
-
-# Clean up the branch if it still exists locally
-if git rev-parse --verify "$NAME" >/dev/null 2>&1; then
-    echo "Deleting local branch '$NAME'..."
-    git branch -D "$NAME" 2>/dev/null || true
-fi

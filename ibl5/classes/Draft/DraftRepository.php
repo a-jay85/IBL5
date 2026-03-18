@@ -175,19 +175,6 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
     }
 
     /**
-     * @see DraftRepositoryInterface::getNextTeamOnClock()
-     */
-    public function getNextTeamOnClock(): ?string
-    {
-        /** @var array{team: string}|null $row */
-        $row = $this->fetchOne(
-            "SELECT team FROM ibl_draft WHERE player = '' ORDER BY round ASC, pick ASC LIMIT 1"
-        );
-
-        return $row !== null ? $row['team'] : null;
-    }
-
-    /**
      * @see DraftRepositoryInterface::getAllDraftClassPlayers()
      */
     public function getAllDraftClassPlayers(): array

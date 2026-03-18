@@ -92,50 +92,6 @@ class DraftRepositoryTest extends TestCase
         $this->assertStringContainsString('drafted', $queries[0]);
     }
 
-    public function testGetNextTeamOnClockReturnsTeamName()
-    {
-        $this->mockDb->setMockData([
-            ['team' => 'Boston Celtics']
-        ]);
-
-        $result = $this->repository->getNextTeamOnClock();
-
-        $this->assertEquals('Boston Celtics', $result);
-    }
-
-    public function testGetNextTeamOnClockReturnsNullWhenDraftComplete()
-    {
-        $this->mockDb->setMockData([]);
-        $this->mockDb->setNumRows(0);
-
-        $result = $this->repository->getNextTeamOnClock();
-
-        $this->assertNull($result);
-    }
-
-    public function testGetNextTeamOnClockQueriesCorrectly()
-    {
-        $this->mockDb->setMockData([
-            ['team' => 'Chicago Bulls']
-        ]);
-
-        $this->repository->getNextTeamOnClock();
-
-        $queries = $this->mockDb->getExecutedQueries();
-        // With prepared statements, we track the actual executed query after parameter binding
-        // The query should contain the WHERE clause, ORDER BY, and LIMIT
-        $hasCorrectQuery = false;
-        foreach ($queries as $query) {
-            if (stripos($query, "WHERE player = ''") !== false &&
-                stripos($query, 'ORDER BY round ASC, pick ASC') !== false &&
-                stripos($query, 'LIMIT 1') !== false) {
-                $hasCorrectQuery = true;
-                break;
-            }
-        }
-        $this->assertTrue($hasCorrectQuery, "Expected query not found in: " . implode("\n", $queries));
-    }
-
     // Tests for getTeamDiscordID have been moved to CommonRepositoryTest
     // as this method now delegates to CommonRepository
 

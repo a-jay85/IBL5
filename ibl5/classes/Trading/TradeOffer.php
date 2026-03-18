@@ -484,6 +484,7 @@ class TradeOffer implements TradeOfferInterface
     {
         // Skip notification if Discord is not available
         if ($this->discord === null) {
+            error_log("Trade #{$tradeOfferId}: Discord notification skipped — Discord class not initialized");
             return;
         }
 
@@ -493,12 +494,16 @@ class TradeOffer implements TradeOfferInterface
 
             $receivingUserDiscordID = $this->discord->getDiscordIDFromTeamname($listeningTeamName);
 
+            if ($receivingUserDiscordID === '' || $receivingUserDiscordID === '0') {
+                error_log("Trade #{$tradeOfferId}: Discord notification skipped — no Discord ID for team '{$listeningTeamName}'");
+                return;
+            }
+
             $cleanTradeText = str_replace(['<br>', '&nbsp;', '<i>', '</i>'], ["\n", " ", "_", "_"], $tradeText);
 
             \Discord::sendTradeDM($receivingUserDiscordID, $tradeOfferId, $offeringTeamName, $cleanTradeText);
         } catch (\Exception $e) {
-            // Log error but don't fail the trade offer
-            error_log("Discord notification failed in sendTradeNotification: " . $e->getMessage());
+            error_log("Trade #{$tradeOfferId}: Discord notification failed — " . $e->getMessage());
         }
     }
 }

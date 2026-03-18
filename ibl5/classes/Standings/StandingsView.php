@@ -83,12 +83,9 @@ class StandingsView implements StandingsViewInterface
 
             // Convert BulkStandingsRow to StandingsRow by aliasing gamesBack/magicNumber
             $standings = $this->adaptBulkRows($regionTeams, $isConference);
-            $standings = $this->resolveH2HTiedGroups($standings, 'gamesBack');
 
             $groupingType = $isConference ? 'Conference' : 'Division';
-            $html .= $this->renderHeader($region, $groupingType);
-            $html .= $this->renderRows($standings);
-            $html .= '</tbody></table></div></div>';
+            $html .= $this->renderStandingsTable($region, $groupingType, $standings);
         }
 
         // Clear pre-loaded data
@@ -119,11 +116,25 @@ class StandingsView implements StandingsViewInterface
 
         $groupingType = $this->getGroupingType($region);
         $standings = $this->repository->getStandingsByRegion($region);
-        $standings = $this->resolveH2HTiedGroups($standings, 'gamesBack');
+
+        return $this->renderStandingsTable($region, $groupingType, $standings);
+    }
+
+    /**
+     * Render a complete standings table: resolve H2H ties, render header + rows + closing tags
+     *
+     * @param string $region Region name (e.g. 'Eastern', 'Atlantic')
+     * @param string $groupingType 'Conference' or 'Division'
+     * @param list<StandingsRow> $standings Sorted standings data
+     * @return string Complete HTML for one standings table
+     */
+    private function renderStandingsTable(string $region, string $groupingType, array $standings): string
+    {
+        $standings = $this->resolveH2HTiedGroups($standings);
 
         $html = $this->renderHeader($region, $groupingType);
         $html .= $this->renderRows($standings);
-        $html .= '</tbody></table></div></div>'; // Close table, scroll container, and wrapper
+        $html .= '</tbody></table></div></div>';
 
         return $html;
     }
@@ -155,7 +166,7 @@ class StandingsView implements StandingsViewInterface
      */
     private function sortStandings(array &$teams, string $gbColumn): void
     {
-        usort($teams, static function (array $a, array $b) use ($gbColumn): int {
+        usort($teams, function (array $a, array $b) use ($gbColumn): int {
             // 1. Games back ASC
             $gbA = $gbColumn === 'confGB' ? $a['confGB'] : $a['divGB'];
             $gbB = $gbColumn === 'confGB' ? $b['confGB'] : $b['divGB'];
@@ -165,11 +176,7 @@ class StandingsView implements StandingsViewInterface
             }
 
             // 2. Clinch priority DESC
-            $clinchA = $a['clinchedLeague'] * 4 + $a['clinchedConference'] * 3
-                     + $a['clinchedDivision'] * 2 + $a['clinchedPlayoffs'];
-            $clinchB = $b['clinchedLeague'] * 4 + $b['clinchedConference'] * 3
-                     + $b['clinchedDivision'] * 2 + $b['clinchedPlayoffs'];
-            $clinchCmp = $clinchB <=> $clinchA;
+            $clinchCmp = $this->getClinchTierScore($b) <=> $this->getClinchTierScore($a);
             if ($clinchCmp !== 0) {
                 return $clinchCmp;
             }
@@ -498,14 +505,14 @@ class StandingsView implements StandingsViewInterface
     /**
      * Compute clinch tier score for a team (higher = better clinch status)
      *
-     * @param StandingsRow $team Team standings data
+     * @param array{clinchedLeague: int, clinchedConference: int, clinchedDivision: int, clinchedPlayoffs: int, ...} $team
      */
     private function getClinchTierScore(array $team): int
     {
-        return ($team['clinchedLeague'] === 1 ? 4 : 0)
-            + ($team['clinchedConference'] === 1 ? 3 : 0)
-            + ($team['clinchedDivision'] === 1 ? 2 : 0)
-            + ($team['clinchedPlayoffs'] === 1 ? 1 : 0);
+        return $team['clinchedLeague'] * 4
+            + $team['clinchedConference'] * 3
+            + $team['clinchedDivision'] * 2
+            + $team['clinchedPlayoffs'];
     }
 
     /**
@@ -516,10 +523,9 @@ class StandingsView implements StandingsViewInterface
      * win percentage (best H2H first for standings).
      *
      * @param list<StandingsRow> $teams Standings sorted by SQL (GB, clinch, wins)
-     * @param string $gbColumn Key name for games-back value in the array
      * @return list<StandingsRow> Re-sorted standings with H2H tie-breaking applied
      */
-    private function resolveH2HTiedGroups(array $teams, string $gbColumn): array
+    private function resolveH2HTiedGroups(array $teams): array
     {
         if (count($teams) <= 1 || $this->seriesMatrix === null || $this->seriesMatrix === []) {
             return $teams;
@@ -532,7 +538,7 @@ class StandingsView implements StandingsViewInterface
 
         for ($i = 1; $i <= $count; $i++) {
             if ($i < $count
-                && $teams[$i][$gbColumn] === $teams[$groupStart][$gbColumn]
+                && $teams[$i]['gamesBack'] === $teams[$groupStart]['gamesBack']
                 && $this->getClinchTierScore($teams[$i]) === $this->getClinchTierScore($teams[$groupStart])
                 && $teams[$i]['wins'] === $teams[$groupStart]['wins']
             ) {

@@ -17,6 +17,7 @@ use Standings\Contracts\StandingsRepositoryInterface;
  * @phpstan-import-type BulkStandingsRow from StandingsRepositoryInterface
  * @phpstan-import-type StreakRow from StandingsRepositoryInterface
  * @phpstan-import-type PythagoreanStats from StandingsRepositoryInterface
+ * @phpstan-import-type SeriesRecordRow from StandingsRepositoryInterface
  *
  * @see StandingsRepositoryInterface For the interface contract
  * @see \BaseMysqliRepository For base class documentation
@@ -234,6 +235,20 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
         }
 
         return $result;
+    }
+
+    /**
+     * @see StandingsRepositoryInterface::getSeriesRecords()
+     *
+     * @return list<SeriesRecordRow>
+     */
+    public function getSeriesRecords(): array
+    {
+        /** @var list<SeriesRecordRow> */
+        return $this->fetchAll(
+            "SELECT self, opponent, wins, losses FROM vw_series_records ORDER BY self, opponent",
+            ""
+        );
     }
 
     /**

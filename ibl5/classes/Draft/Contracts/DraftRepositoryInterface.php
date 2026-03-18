@@ -47,7 +47,10 @@ namespace Draft\Contracts;
  *     ranking: float|null,
  *     invite: string|null,
  *     drafted: int|null,
- *     sta: int|null
+ *     sta: int|null,
+ *     team_tid: int|null,
+ *     color1: string|null,
+ *     color2: string|null
  * }
  *
  * @phpstan-type DraftPickRow = array{team: string, tid: int, round: int, pick: int}

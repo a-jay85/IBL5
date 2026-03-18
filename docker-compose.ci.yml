@@ -1,5 +1,10 @@
 # Minimal Docker Compose for CI E2E tests.
 # No Traefik, Mailpit, Adminer, persistent volumes, or external networks.
+
+networks:
+  default:
+    name: ibl5-e2e
+
 services:
   mariadb:
     image: mariadb:10.6

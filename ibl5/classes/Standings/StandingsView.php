@@ -15,6 +15,7 @@ use UI\TeamCellHelper;
  * Handles clinched indicators (X/Y/Z) and team streak display.
  *
  * @phpstan-import-type StandingsRow from StandingsRepositoryInterface
+ * @phpstan-import-type BulkStandingsRow from StandingsRepositoryInterface
  * @phpstan-import-type StreakRow from StandingsRepositoryInterface
  * @phpstan-import-type PythagoreanStats from StandingsRepositoryInterface
  *
@@ -53,17 +54,28 @@ class StandingsView implements StandingsViewInterface
         $this->allStreakData = $this->repository->getAllStreakData();
         $this->allPythagoreanStats = $this->repository->getAllPythagoreanStats($this->seasonYear);
 
+        // Bulk-fetch all standings in 1 query instead of 6
+        $allStandings = $this->repository->getAllStandings();
+        $grouped = $this->groupStandings($allStandings);
+
+        $regions = ['Eastern', 'Western', 'Atlantic', 'Central', 'Midwest', 'Pacific'];
         $html = '';
 
-        // Conference standings
-        $html .= $this->renderRegion('Eastern');
-        $html .= $this->renderRegion('Western');
+        foreach ($regions as $region) {
+            $isConference = in_array($region, \League::CONFERENCE_NAMES, true);
+            $gbColumn = $isConference ? 'confGB' : 'divGB';
 
-        // Division standings
-        $html .= $this->renderRegion('Atlantic');
-        $html .= $this->renderRegion('Central');
-        $html .= $this->renderRegion('Midwest');
-        $html .= $this->renderRegion('Pacific');
+            $regionTeams = $grouped[$region] ?? [];
+            $this->sortStandings($regionTeams, $gbColumn);
+
+            // Convert BulkStandingsRow to StandingsRow by aliasing gamesBack/magicNumber
+            $standings = $this->adaptBulkRows($regionTeams, $isConference);
+
+            $groupingType = $isConference ? 'Conference' : 'Division';
+            $html .= $this->renderHeader($region, $groupingType);
+            $html .= $this->renderRows($standings);
+            $html .= '</tbody></table></div></div>';
+        }
 
         // Clear pre-loaded data
         $this->allStreakData = null;
@@ -93,6 +105,97 @@ class StandingsView implements StandingsViewInterface
         $html .= '</tbody></table></div></div>'; // Close table, scroll container, and wrapper
 
         return $html;
+    }
+
+    /**
+     * Group bulk standings rows by conference and division
+     *
+     * @param list<BulkStandingsRow> $allStandings
+     * @return array<string, list<BulkStandingsRow>>
+     */
+    private function groupStandings(array $allStandings): array
+    {
+        /** @var array<string, list<BulkStandingsRow>> $grouped */
+        $grouped = [];
+
+        foreach ($allStandings as $team) {
+            $grouped[$team['conference']][] = $team;
+            $grouped[$team['division']][] = $team;
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * Sort standings in-place replicating SQL ORDER BY
+     *
+     * @param list<BulkStandingsRow> $teams
+     * @param string $gbColumn Column name for games back sorting ('confGB' or 'divGB')
+     */
+    private function sortStandings(array &$teams, string $gbColumn): void
+    {
+        usort($teams, static function (array $a, array $b) use ($gbColumn): int {
+            // 1. Games back ASC
+            $gbA = $gbColumn === 'confGB' ? $a['confGB'] : $a['divGB'];
+            $gbB = $gbColumn === 'confGB' ? $b['confGB'] : $b['divGB'];
+            $gbCmp = (float) $gbA <=> (float) $gbB;
+            if ($gbCmp !== 0) {
+                return $gbCmp;
+            }
+
+            // 2. Clinch priority DESC
+            $clinchA = $a['clinchedLeague'] * 4 + $a['clinchedConference'] * 3
+                     + $a['clinchedDivision'] * 2 + $a['clinchedPlayoffs'];
+            $clinchB = $b['clinchedLeague'] * 4 + $b['clinchedConference'] * 3
+                     + $b['clinchedDivision'] * 2 + $b['clinchedPlayoffs'];
+            $clinchCmp = $clinchB <=> $clinchA;
+            if ($clinchCmp !== 0) {
+                return $clinchCmp;
+            }
+
+            // 3. Wins DESC
+            return $b['wins'] <=> $a['wins'];
+        });
+    }
+
+    /**
+     * Convert bulk standings rows to the StandingsRow format expected by renderTeamRow()
+     *
+     * @param list<BulkStandingsRow> $teams
+     * @param bool $isConference Whether to use conference or division GB/magic columns
+     * @return list<StandingsRow>
+     */
+    private function adaptBulkRows(array $teams, bool $isConference): array
+    {
+        /** @var list<StandingsRow> $result */
+        $result = [];
+
+        foreach ($teams as $team) {
+            $result[] = [
+                'tid' => $team['tid'],
+                'team_name' => $team['team_name'],
+                'leagueRecord' => $team['leagueRecord'],
+                'pct' => $team['pct'],
+                'gamesBack' => $isConference ? $team['confGB'] : $team['divGB'],
+                'confRecord' => $team['confRecord'],
+                'divRecord' => $team['divRecord'],
+                'homeRecord' => $team['homeRecord'],
+                'awayRecord' => $team['awayRecord'],
+                'gamesUnplayed' => $team['gamesUnplayed'],
+                'magicNumber' => $isConference ? $team['confMagicNumber'] : $team['divMagicNumber'],
+                'clinchedConference' => $team['clinchedConference'],
+                'clinchedDivision' => $team['clinchedDivision'],
+                'clinchedPlayoffs' => $team['clinchedPlayoffs'],
+                'clinchedLeague' => $team['clinchedLeague'],
+                'wins' => $team['wins'],
+                'homeGames' => $team['homeGames'],
+                'awayGames' => $team['awayGames'],
+                'color1' => $team['color1'],
+                'color2' => $team['color2'],
+            ];
+        }
+
+        return $result;
     }
 
     /**

@@ -60,6 +60,7 @@ jobs:
         vendor/bin/infection \
           --configuration=infection.json5 \
           --coverage=coverage \
+          --skip-initial-tests \
           --show-mutations \
           --no-progress
 

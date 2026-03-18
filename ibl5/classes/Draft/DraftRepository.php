@@ -140,12 +140,12 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
                 pid, name, age, tid, pos,
                 sta, oo, od, po, `to`, `do`, dd, pd, td,
                 talent, skill, intangibles,
-                active, bird, exp, cy, cyt
+                active, bird, exp, cy, cyt, retired
             ) VALUES (
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?, ?,
-                1, 0, 0, 0, 0
+                1, 0, 0, 0, 0, 0
             )",
             "isiisiiiiiiiiiiii",
             $pid, $name, $age, $teamId, $pos,
@@ -193,7 +193,12 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
     public function getAllDraftClassPlayers(): array
     {
         /** @var list<DraftClassPlayerRow> */
-        return $this->fetchAll("SELECT * FROM ibl_draft_class ORDER BY drafted, name");
+        return $this->fetchAll(
+            "SELECT dc.*, t.teamid AS team_tid, t.color1, t.color2
+            FROM ibl_draft_class dc
+            LEFT JOIN ibl_team_info t ON dc.team = t.team_name
+            ORDER BY dc.drafted, dc.name"
+        );
     }
 
     /**

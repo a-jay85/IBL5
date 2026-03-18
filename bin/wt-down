@@ -67,11 +67,17 @@ teardown_worktree() {
     project=$(docker inspect "ibl5-php-$slug" --format '{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || echo "ibl5-$slug")
     [ -z "$project" ] && project="ibl5-$slug"
 
+    # --env-file ensures ${DB_USER}/${DB_PASS} resolve (same fix as wt-up)
+    local env_flag=""
+    if [ -f "$REPO_ROOT/.env" ]; then
+        env_flag="--env-file $REPO_ROOT/.env"
+    fi
+
     echo "Stopping environment: $slug (worktree: $wt_name, project: $project)..."
     if [ "$REMOVE_VOLUMES" = true ]; then
-        docker compose -f "$compose_file" -p "$project" down -v
+        docker compose -f "$compose_file" $env_flag -p "$project" down -v
     else
-        docker compose -f "$compose_file" -p "$project" down
+        docker compose -f "$compose_file" $env_flag -p "$project" down
     fi
 
     rm -f "$compose_file"

@@ -10,10 +10,15 @@ COPY docker/opcache.ini $PHP_INI_DIR/conf.d/opcache.ini
 
 RUN a2enmod rewrite headers
 
-RUN echo '<Directory /var/www/html>\n\
+RUN printf '<Directory /var/www/html>\n\
     AllowOverride All\n\
     Require all granted\n\
-</Directory>' > /etc/apache2/conf-available/ibl5.conf \
+</Directory>\n\
+\n\
+<Directory /var/www/html/ibl5>\n\
+    RewriteEngine On\n\
+    RewriteRule ^api/v1/(.*)$ api.php?route=$1 [QSA,L]\n\
+</Directory>\n' > /etc/apache2/conf-available/ibl5.conf \
     && a2enconf ibl5
 
 RUN cp "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"

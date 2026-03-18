@@ -3,6 +3,7 @@ name: E2E Tests
 on:
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
   e2e:
@@ -11,6 +12,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          # PAT is needed when update-baselines label is present so the push triggers a new CI run.
+          # Default GITHUB_TOKEN pushes don't trigger workflows (GitHub's anti-loop protection).
+          token: ${{ contains(github.event.pull_request.labels.*.name, 'update-baselines') && secrets.CI_PAT || github.token }}
+          ref: ${{ github.head_ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -68,19 +74,8 @@ jobs:
         run: bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
 
       # --- Docker Compose ---
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull or build PHP image
-        run: |
-          if ! docker pull ghcr.io/a-jay85/ibl5/php-apache:latest 2>/dev/null; then
-            echo "GHCR image not found, building locally..."
-            docker build -t ghcr.io/a-jay85/ibl5/php-apache:latest .
-          fi
+      - name: Build PHP image
+        run: docker build -t ghcr.io/a-jay85/ibl5/php-apache:latest .
 
       - name: Start Docker containers
         run: docker compose -f docker-compose.ci.yml up -d --wait
@@ -137,6 +132,8 @@ jobs:
         run: docker pull mcr.microsoft.com/playwright:v1.58.2-jammy
 
       - name: Run visual regression tests
+        id: visual-regression
+        continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'update-baselines') }}
         env:
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
           IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
@@ -153,8 +150,47 @@ jobs:
             mcr.microsoft.com/playwright:v1.58.2-jammy \
             npx playwright test --config=playwright.visual.config.ts
 
+      # --- Auto-update baselines when label is present ---
+      - name: Regenerate visual regression baselines
+        if: steps.visual-regression.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        env:
+          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
+          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
+        run: |
+          docker run --rm \
+            --network ibl5-e2e \
+            --user "$(id -u):$(id -g)" \
+            -v "${{ github.workspace }}/ibl5:/ibl5" \
+            -w /ibl5 \
+            -e "BASE_URL=http://php/ibl5/" \
+            -e "IBL_TEST_USER=$IBL_TEST_USER" \
+            -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
+            -e "HOME=/tmp" \
+            mcr.microsoft.com/playwright:v1.58.2-jammy \
+            npx playwright test --config=playwright.visual.config.ts --update-snapshots
+
+      - name: Commit and push updated baselines
+        if: steps.visual-regression.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/
+          if git diff --cached --quiet; then
+            echo "No baseline changes detected"
+          else
+            git commit -m "test: update visual regression baselines [auto]"
+            git push
+            echo "BASELINES_PUSHED=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: Remove update-baselines label
+        if: steps.visual-regression.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        env:
+          GH_TOKEN: ${{ secrets.CI_PAT }}
+        run: gh pr edit ${{ github.event.pull_request.number }} --remove-label update-baselines
+
       - name: Run E2E tests
-        if: always()
+        if: always() && env.BASELINES_PUSHED != 'true'
         env:
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
           IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}

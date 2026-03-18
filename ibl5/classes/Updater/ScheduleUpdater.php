@@ -9,6 +9,7 @@ use Utilities\UuidGenerator;
 use Utilities\SchFileParser;
 use Utilities\ScheduleHtmParser;
 use Utilities\DateParser;
+use Utilities\HtmlSanitizer;
 
 class ScheduleUpdater extends \BaseMysqliRepository {
     private \Season $season;
@@ -279,7 +280,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
             } catch (\Exception $e) {
                 $errorMessage = "Failed to insert schedule data for game between {$visitorName} and {$homeName}: " . $e->getMessage();
                 error_log("[ScheduleUpdater] Database insert error: {$errorMessage}");
-                echo "<b><font color=red>Script Error: Failed to insert schedule data for game between {$visitorName} and {$homeName}.</font></b>";
+                echo '<strong class="ibl-form-error">Script Error: Failed to insert schedule data for game between ' . HtmlSanitizer::e($visitorName) . ' and ' . HtmlSanitizer::e($homeName) . '.</strong>';
                 throw new \RuntimeException($errorMessage, 1002);
             }
         }

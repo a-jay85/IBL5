@@ -152,7 +152,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         if ($this->offerData['offer1'] > $hardCapSpace1) {
             return [
                 'valid' => false,
-                'error' => "Sorry, you do not have sufficient cap space under the hard cap to make the offer. You offered {$this->offerData['offer1']} in the first year of the contract, which is more than {$hardCapSpace1}, the amount of hard cap space you have available."
+                'error' => "Sorry, you do not have sufficient cap space under the hard cap to make the offer. You offered " . (int) $this->offerData['offer1'] . " in the first year of the contract, which is more than {$hardCapSpace1}, the amount of hard cap space you have available."
             ];
         }
 
@@ -169,7 +169,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         if ($this->offerData['offer1'] > $this->offerData['amendedCapSpaceYear1']) {
             return [
                 'valid' => false,
-                'error' => "Sorry, you do not have sufficient cap space under the soft cap to make the offer. You offered {$this->offerData['offer1']} in the first year of the contract, which is more than {$this->offerData['amendedCapSpaceYear1']}, the amount of soft cap space you have available."
+                'error' => "Sorry, you do not have sufficient cap space under the soft cap to make the offer. You offered " . (int) $this->offerData['offer1'] . " in the first year of the contract, which is more than " . (int) $this->offerData['amendedCapSpaceYear1'] . ", the amount of soft cap space you have available."
             ];
         }
 
@@ -186,7 +186,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         if ($this->offerData['offer1'] > $this->offerData['year1Max']) {
             return [
                 'valid' => false,
-                'error' => "Sorry, you tried to offer a contract larger than the maximum allowed for this player based on their years of service. The maximum you are allowed to offer this player is {$this->offerData['year1Max']} in the first year of their contract."
+                'error' => "Sorry, you tried to offer a contract larger than the maximum allowed for this player based on their years of service. The maximum you are allowed to offer this player is " . (int) $this->offerData['year1Max'] . " in the first year of their contract."
             ];
         }
 
@@ -245,7 +245,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
 
                 return [
                     'valid' => false,
-                    'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$this->offerData['offer1']} which means the maximum raise allowed each year is {$maxRaise}. Your offer in Year {$year} was {$currentOffer}, which is more than your Year " . ($year - 1) . " offer, {$previousOffer}, plus the max increase of {$maxRaise}. Given your offer in Year " . ($year - 1) . ", the most you can offer in Year {$year} is {$legalOffer}."
+                    'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was " . (int) $this->offerData['offer1'] . " which means the maximum raise allowed each year is {$maxRaise}. Your offer in Year {$year} was {$currentOffer}, which is more than your Year " . ($year - 1) . " offer, {$previousOffer}, plus the max increase of {$maxRaise}. Given your offer in Year " . ($year - 1) . ", the most you can offer in Year {$year} is {$legalOffer}."
                 ];
             }
         }

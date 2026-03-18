@@ -45,7 +45,7 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
         $teamName = $this->sanitizeInput($rawTeamName);
 
         if ($teamName === '') {
-            echo "<font color=red><b>Error: Missing required team information.</b></font>";
+            echo '<strong class="ibl-form-error">Error: Missing required team information.</strong>';
             return;
         }
 
@@ -146,13 +146,13 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
     {
         $safeTeamName = preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $teamName);
         if ($safeTeamName === null) {
-            echo "<font color=red>Invalid team name for file creation.</font>";
+            echo '<strong class="ibl-form-error">Invalid team name for file creation.</strong>';
             return;
         }
         $safeTeamName = str_replace(['..', '/', '\\'], '', $safeTeamName);
 
         if ($safeTeamName === '') {
-            echo "<font color=red>Invalid team name for file creation.</font>";
+            echo '<strong class="ibl-form-error">Invalid team name for file creation.</strong>';
             return;
         }
 
@@ -172,10 +172,10 @@ class DepthChartEntrySubmissionHandler implements DepthChartEntrySubmissionHandl
             if ($bytesWritten !== false && $bytesWritten > 0) {
                 \Mail\MailService::fromConfig()->send('ibldepthcharts@gmail.com', $teamName . " Depth Chart", $convertedContent, 'ibldepthcharts@gmail.com');
             } else {
-                echo "<font color=red>Depth chart failed to save properly; please contact the commissioner.</font>";
+                echo '<strong class="ibl-form-error">Depth chart failed to save properly; please contact the commissioner.</strong>';
             }
         } else {
-            echo "<font color=red>Invalid file path detected. Please contact the commissioner.</font>";
+            echo '<strong class="ibl-form-error">Invalid file path detected. Please contact the commissioner.</strong>';
         }
     }
 }

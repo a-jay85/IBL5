@@ -165,8 +165,9 @@ jobs:
           echo "Test user created: $user\n";
           PHPSCRIPT
 
-      # --- Run Tests ---
+      # --- Visual Regression Baselines ---
       - name: Generate missing visual regression baselines
+        id: baselines
         working-directory: ibl5
         env:
           BASE_URL: http://localhost:8080/ibl5/
@@ -180,19 +181,29 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add "$SNAP_DIR"/*-linux.png
-            git commit -m "ci: generate Linux visual regression baselines [skip ci]"
+            git commit -m "ci: generate Linux visual regression baselines"
             git push
+            echo "generated=true" >> $GITHUB_OUTPUT
           else
             echo "Linux baselines already exist — skipping generation"
+            echo "generated=false" >> $GITHUB_OUTPUT
           fi
 
+      # --- Run Tests ---
       - name: Run E2E tests
         working-directory: ibl5
         env:
           BASE_URL: http://localhost:8080/ibl5/
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
           IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
-        run: bunx playwright test
+          BASELINES_GENERATED: ${{ steps.baselines.outputs.generated }}
+        run: |
+          if [ "$BASELINES_GENERATED" = "true" ]; then
+            echo "Baselines just generated — skipping visual regression comparison this run"
+            bunx playwright test --grep-invert "Visual regression"
+          else
+            bunx playwright test
+          fi
 
       - name: Upload test results
         if: always()

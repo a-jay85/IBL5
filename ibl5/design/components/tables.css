@@ -1678,6 +1678,243 @@ td.ibl-team-cell--colored {
     text-align: right;
 }
 
+/* Trade offer cards */
+.trade-offer-card {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--gray-200, #e5e7eb);
+    border-radius: var(--radius-md, 0.375rem);
+    background: white;
+    box-shadow: var(--shadow-sm, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+}
+
+.trade-offer-card p {
+    margin: 0.25rem 0;
+}
+
+/* Trading button variants (base .ibl-btn defined in forms.css) */
+.ibl-btn--primary {
+    background: var(--gradient-navy-header);
+    color: white;
+}
+
+.ibl-btn--primary:hover {
+    background: linear-gradient(135deg, var(--navy-700, #334155), var(--navy-800, #1e293b));
+}
+
+.ibl-btn--success {
+    background: linear-gradient(135deg, var(--success-500, #22c55e), var(--success-600, #16a34a));
+    color: white;
+}
+
+.ibl-btn--success:hover {
+    background: linear-gradient(135deg, var(--success-400, #4ade80), var(--success-500, #22c55e));
+}
+
+.ibl-btn--danger {
+    background: linear-gradient(135deg, var(--error-500, #ef4444), var(--error-600, #dc2626));
+    color: white;
+}
+
+.ibl-btn--danger:hover {
+    background: linear-gradient(135deg, var(--error-400, #f87171), var(--error-500, #ef4444));
+}
+
+/* Link styling for Trading */
+.ibl-link {
+    color: var(--navy-700, #334155);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 150ms ease;
+}
+
+.ibl-link:hover {
+    color: var(--accent-500, #f97316);
+}
+
+/* ---------- Trading layout: inline-style replacements ---------- */
+
+.trading-layout__submit {
+    text-align: center;
+    padding: 1rem;
+}
+
+.trading-layout__header {
+    text-align: center;
+}
+
+.trading-review-wrapper {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.trading-review-offers {
+    margin-bottom: var(--space-4);
+}
+
+.trading-no-offers {
+    padding: 1rem;
+    text-align: center;
+}
+
+.trade-offer-card__header {
+    margin-bottom: 0.5rem;
+}
+
+.trade-offer-card__actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.trade-offer-card__form {
+    margin: 0;
+}
+
+.trade-offer-card__awaiting {
+    color: var(--gray-500, #6b7280);
+    font-style: italic;
+}
+
+.trade-offer-card__notes {
+    margin-left: 1rem;
+    font-style: italic;
+    color: var(--gray-600, #4b5563);
+}
+
+.trade-offer-card__preview-wrap {
+    text-align: center;
+    margin-top: 0.5rem;
+}
+
+/* ---------- Collapsible roster details ---------- */
+
+.trading-roster-details {
+    border: none;
+}
+
+.trading-roster-details__summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(135deg,
+        var(--team-color-primary, #1e293b),
+        color-mix(in srgb, var(--team-color-primary, #1e293b) 70%, black));
+    color: var(--team-color-secondary, white);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.025em;
+    cursor: pointer;
+    list-style: none;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    user-select: none;
+}
+
+.trading-roster-details__summary::-webkit-details-marker {
+    display: none;
+}
+
+.trading-roster-details__logo {
+    height: 32px;
+    width: auto;
+    object-fit: contain;
+}
+
+.trading-roster-details__count {
+    margin-left: auto;
+    font-size: 0.8rem;
+    opacity: 0.8;
+    font-weight: 400;
+}
+
+.trading-roster-details__chevron {
+    display: inline-block;
+    width: 0.6em;
+    height: 0.6em;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.trading-roster-details[open] > .trading-roster-details__summary .trading-roster-details__chevron {
+    transform: rotate(-135deg);
+}
+
+/* Remove top border-radius on table when inside details (summary has it) */
+.trading-roster-details .ibl-data-table {
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+/* ---------- Checkbox tap targets ---------- */
+
+.trading-roster input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--accent-500, #f97316);
+}
+
+/* ---------- Trading mobile responsive ---------- */
+
+@media (max-width: 768px) {
+    /* Sticky submit button */
+    .trading-layout__submit {
+        position: sticky;
+        bottom: 0;
+        background: var(--page-bg, #eeeeee);
+        padding: var(--space-3) var(--space-4);
+        border-top: 1px solid var(--gray-200, #e5e7eb);
+        z-index: 10;
+    }
+
+    /* Roster table adjustments */
+    .trading-roster {
+        table-layout: auto;
+    }
+
+    .trading-roster td:nth-child(1),
+    .trading-roster th:nth-child(1) {
+        width: 44px;
+        min-width: 44px;
+    }
+
+    .trading-roster td:nth-child(4),
+    .trading-roster th:nth-child(4) {
+        min-width: 55px;
+    }
+
+    /* Bigger checkbox tap area */
+    .trading-roster td:nth-child(1) {
+        padding: 0.5rem;
+    }
+
+    /* Team selection 2-column grid */
+    .trading-team-select {
+        min-width: 0;
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .trading-team-select tbody {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .trading-team-select tr {
+        display: contents;
+    }
+
+    /* Cash exchange wider inputs */
+    .trading-cash-exchange input[type="number"] {
+        width: 100px;
+    }
+}
+
 /* ==========================================================================
    Draft History Table
    ========================================================================== */

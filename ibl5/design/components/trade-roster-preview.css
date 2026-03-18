@@ -214,8 +214,14 @@
    Cap Warning — over hard cap indicators on roster tables and preview tabs
    ========================================================================== */
 
-/* Red tint on roster checklist logo banner when team exceeds hard cap */
-.trading-roster thead th.cap-warning-banner img {
+/* Red tint on roster details summary when team exceeds hard cap */
+.trading-roster-details__summary.cap-warning-banner {
+    background: linear-gradient(135deg,
+        color-mix(in srgb, #dc2626 60%, var(--team-color-primary, #1e293b)),
+        color-mix(in srgb, #dc2626 40%, var(--team-color-primary, #1e293b)));
+}
+
+.trading-roster-details__summary.cap-warning-banner .trading-roster-details__logo {
     filter: grayscale(1) brightness(0.45) sepia(1) hue-rotate(-30deg) saturate(8);
 }
 

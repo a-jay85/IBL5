@@ -52,3 +52,7 @@ ibl5/.env.test
 docker-compose.override.yml
 docker-compose.worktree.yml
 .e2e-active
+
+# OS-specific Playwright snapshots (baselines are OS-agnostic via Docker)
+ibl5/tests/e2e/**/*-darwin.png
+ibl5/tests/e2e/**/*-win32.png

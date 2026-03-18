@@ -104,27 +104,9 @@ class Discord
 
     public function getDiscordIDFromTeamname(string $teamname): string
     {
-        $stmt = $this->db->prepare(
-            "SELECT discordID FROM ibl_team_info WHERE team_name = ? LIMIT 1"
-        );
-        if ($stmt === false) {
-            throw new \Exception('Prepare failed: ' . $this->db->error);
-        }
+        $repo = new \Services\CommonMysqliRepository($this->db);
 
-        $stmt->bind_param('s', $teamname);
-        if (!$stmt->execute()) {
-            throw new \Exception('Execute failed: ' . $stmt->error);
-        }
-
-        $result = $stmt->get_result();
-        if ($result === false) {
-            $stmt->close();
-            throw new \Exception('Failed to get result: ' . $stmt->error);
-        }
-        $row = $result->fetch_assoc();
-        $stmt->close();
-
-        return (string)($row['discordID'] ?? '');
+        return (string) ($repo->getTeamDiscordID($teamname) ?? '');
     }
 
     /**

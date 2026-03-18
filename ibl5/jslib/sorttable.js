@@ -52,7 +52,6 @@ window.sorttable = {
       var th = headerCells[i];
       th.setAttribute('role', 'columnheader');
       th.setAttribute('aria-sort', 'none');
-      th.style.cursor = 'pointer';
       th.setAttribute('data-sort-col', String(i));
       th.addEventListener('click', sorttable._handleClick);
     }

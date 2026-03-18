@@ -163,6 +163,7 @@ authTest.describe('Visual regression — authenticated pages', () => {
   authTest('no PHP errors on visual regression pages', async ({ appState, page }) => {
     await appState({ 'Allow Trades': 'Yes', 'Current Season Phase': 'Free Agency' });
     const urls = [
+      'index.php',
       'modules.php?name=Trading',
       'modules.php?name=DepthChartEntry',
       'modules.php?name=FreeAgency',

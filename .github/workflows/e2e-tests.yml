@@ -164,9 +164,6 @@ jobs:
           PHPSCRIPT
 
       # --- Run Tests ---
-      - name: Pull Playwright Docker image
-        run: docker pull mcr.microsoft.com/playwright:v1.58.2-jammy
-
       - name: Run E2E tests
         working-directory: ibl5
         env:
@@ -175,8 +172,12 @@ jobs:
           IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
         run: bunx playwright test
 
+      - name: Pull Playwright Docker image
+        if: always()
+        run: docker pull mcr.microsoft.com/playwright:v1.58.2-jammy
+
       - name: Run visual regression tests
-        if: always() && steps.playwright-cache.conclusion != 'failure'
+        if: always()
         env:
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
           IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}

@@ -4,26 +4,20 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 import type { Page, Locator } from '@playwright/test';
 
 /**
- * Take a stable screenshot of an element by waiting for network idle,
- * then capturing a fixed-size clip from the element's top-left corner.
- * Using a fixed clip height eliminates dimension variance between runs.
+ * Take a stable element screenshot by waiting for network idle first.
+ * Uses element-level screenshots with optional image masking for
+ * elements containing dynamic images (headshots, logos).
  */
 async function stableScreenshot(
   page: Page,
   locator: Locator,
   name: string,
   expect: typeof publicExpect,
-  clipHeight = 300,
   mask: Locator[] = [],
 ): Promise<void> {
   await page.waitForLoadState('networkidle');
   await expect(locator).toBeVisible();
-  const box = await locator.boundingBox();
-  if (!box) throw new Error(`Element not visible for screenshot: ${name}`);
-  const width = Math.round(box.width);
-  const height = Math.min(clipHeight, Math.round(box.height));
-  await expect(page).toHaveScreenshot(name, {
-    clip: { x: Math.round(box.x), y: Math.round(box.y), width, height },
+  await expect(locator).toHaveScreenshot(name, {
     animations: 'disabled',
     mask,
     timeout: 15_000,
@@ -43,19 +37,19 @@ publicTest.describe('Visual regression — public pages', () => {
     await page.goto('index.php');
     await publicExpect(page).toHaveTitle(/IBL/i);
     const article = page.locator('article').first();
-    await stableScreenshot(page, article, 'homepage-content.png', publicExpect, 250);
+    await stableScreenshot(page, article, 'homepage-content.png', publicExpect);
   });
 
   publicTest('standings table', async ({ page }) => {
     await page.goto('modules.php?name=Standings');
     const table = page.locator('.ibl-data-table').first();
-    await stableScreenshot(page, table, 'standings-table.png', publicExpect, 400);
+    await stableScreenshot(page, table, 'standings-table.png', publicExpect);
   });
 
   publicTest('season leaderboards table', async ({ page }) => {
     await page.goto('modules.php?name=SeasonLeaderboards');
     const table = page.locator('.ibl-data-table').first();
-    await stableScreenshot(page, table, 'season-leaderboards-table.png', publicExpect, 400);
+    await stableScreenshot(page, table, 'season-leaderboards-table.png', publicExpect);
   });
 
   publicTest('career leaderboards form', async ({ page }) => {
@@ -67,7 +61,7 @@ publicTest.describe('Visual regression — public pages', () => {
   publicTest('draft history table', async ({ page }) => {
     await page.goto('modules.php?name=DraftHistory');
     const table = page.locator('.ibl-data-table').first();
-    await stableScreenshot(page, table, 'draft-history-table.png', publicExpect, 400);
+    await stableScreenshot(page, table, 'draft-history-table.png', publicExpect);
   });
 
   publicTest('schedule page', async ({ page }) => {
@@ -79,23 +73,21 @@ publicTest.describe('Visual regression — public pages', () => {
   publicTest('player page ratings', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1');
     await page.waitForLoadState('networkidle');
-    // Screenshot the ratings grid which is static — avoids the headshot
-    // image and rotating icon that cause instability
+    // Target the ratings grid — avoids headshot image instability
     const ratings = page.locator('.stats-grid, .player-ratings').first();
     const visible = await ratings.isVisible().catch(() => false);
     if (!visible) {
-      // Fall back to first data table if ratings grid not found
       const table = page.locator('.ibl-data-table').first();
-      await stableScreenshot(page, table, 'player-page-card.png', publicExpect, 300);
+      await stableScreenshot(page, table, 'player-page-card.png', publicExpect);
     } else {
-      await stableScreenshot(page, ratings, 'player-page-card.png', publicExpect, 300);
+      await stableScreenshot(page, ratings, 'player-page-card.png', publicExpect);
     }
   });
 
   publicTest('team page roster table', async ({ page }) => {
     await page.goto('modules.php?name=Team&op=team&teamID=1');
     const table = page.locator('.ibl-data-table').first();
-    await stableScreenshot(page, table, 'team-roster-table.png', publicExpect, 400);
+    await stableScreenshot(page, table, 'team-roster-table.png', publicExpect);
   });
 
   publicTest('no PHP errors on visual regression pages', async ({ page }) => {
@@ -126,7 +118,7 @@ authTest.describe('Visual regression — authenticated pages', () => {
     await appState({ 'Allow Trades': 'Yes' });
     await page.goto('modules.php?name=Trading');
     const teamSelect = page.locator('.trading-team-select');
-    await stableScreenshot(page, teamSelect, 'trading-team-select.png', authExpect, 400);
+    await stableScreenshot(page, teamSelect, 'trading-team-select.png', authExpect);
   });
 
   authTest('depth chart entry page', async ({ page }) => {
@@ -140,7 +132,7 @@ authTest.describe('Visual regression — authenticated pages', () => {
     await appState({ 'Current Season Phase': 'Free Agency' });
     await page.goto('modules.php?name=FreeAgency');
     const content = page.locator('.ibl-data-table, .ibl-card').first();
-    await stableScreenshot(page, content, 'free-agency-content.png', authExpect, 400);
+    await stableScreenshot(page, content, 'free-agency-content.png', authExpect);
   });
 
   authTest('desktop navigation bar', async ({ page }) => {

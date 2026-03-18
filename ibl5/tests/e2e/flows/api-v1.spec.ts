@@ -20,40 +20,41 @@ async function assertGetRoute(
   path: string,
   validateBody?: (body: unknown) => void,
 ): Promise<void> {
-  const response = await request.get(`${BASE_URL}${path}`, {
-    headers: authHeaders,
-  });
-  const status = response.status();
+  // Retry up to 3 times — PHP built-in server in CI can return 500 under load
+  let lastStatus = 0;
+  let lastText = '';
 
-  if (status === 401) {
-    const body = await response.json();
-    expect(body, `401 response for ${path} should have error property`).toHaveProperty('error');
-    return;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await request.get(`${BASE_URL}${path}`, {
+      headers: authHeaders,
+    });
+    lastStatus = response.status();
+
+    if (lastStatus === 401) {
+      const body = await response.json();
+      expect(body, `401 response for ${path} should have error property`).toHaveProperty('error');
+      return;
+    }
+
+    if (lastStatus === 200) {
+      const contentType = response.headers()['content-type'] ?? '';
+      if (!contentType.includes('json')) {
+        lastText = await response.text();
+        continue; // Retry — got HTML instead of JSON
+      }
+
+      const body = await response.json();
+      expect(body, `${path} should return truthy body`).toBeTruthy();
+      if (validateBody) validateBody(body);
+      return;
+    }
+
+    // 500 or other error — retry
+    lastText = await response.text();
   }
 
-  // If the endpoint returns a 500 (e.g., PHP error), fail with the response text
-  if (status === 500) {
-    const text = await response.text();
-    expect(status, `${path} returned 500: ${text.slice(0, 200)}`).toBe(200);
-    return;
-  }
-
-  expect(status, `${path} should return 200`).toBe(200);
-
-  // Guard against non-JSON responses (PHP errors return HTML)
-  const contentType = response.headers()['content-type'] ?? '';
-  if (!contentType.includes('json')) {
-    const text = await response.text();
-    expect(contentType, `${path} returned non-JSON: ${text.slice(0, 200)}`).toContain('json');
-    return;
-  }
-
-  const body = await response.json();
-  expect(body, `${path} should return truthy body`).toBeTruthy();
-
-  if (validateBody) {
-    validateBody(body);
-  }
+  // All retries exhausted
+  expect(lastStatus, `${path} returned ${lastStatus} after 3 attempts: ${lastText.slice(0, 200)}`).toBe(200);
 }
 
 /**

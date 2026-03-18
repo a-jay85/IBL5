@@ -30,64 +30,6 @@ class CardFlipStyles
     }
 
     /**
-     * Get flip container CSS for Y-axis rotation (trading cards)
-     *
-     * @deprecated CSS is now centralized in design/components/player-cards.css.
-     *
-     * @param string $containerClass Class for the flip container
-     * @param string $innerClass Class for the inner wrapper
-     * @return string Empty string — styles are in centralized CSS
-     */
-    public static function getYAxisFlipCss(string $containerClass, string $innerClass): string
-    {
-        return '';
-    }
-
-    /**
-     * Get flip container CSS for X-axis rotation (stats cards)
-     *
-     * @deprecated CSS is now centralized in design/components/player-cards.css.
-     *
-     * @param string $containerClass Class for the flip container
-     * @param string $innerClass Class for the inner wrapper
-     * @return string Empty string — styles are in centralized CSS
-     */
-    public static function getXAxisFlipCss(string $containerClass, string $innerClass): string
-    {
-        return '';
-    }
-
-    /**
-     * Get flip icon/button CSS
-     *
-     * @deprecated CSS is now centralized in design/components/player-cards.css.
-     *
-     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string} $colorScheme Color scheme from TeamColorHelper
-     * @param string $iconClass CSS class for the flip icon
-     * @param bool $isButton Whether it's a button (stats) or icon (trading card)
-     * @return string Empty string — styles are in centralized CSS
-     */
-    public static function getFlipIconCss(array $colorScheme, string $iconClass, bool $isButton = false): string
-    {
-        return '';
-    }
-
-    /**
-     * Get pulse animation CSS
-     *
-     * @deprecated CSS is now centralized in design/components/player-cards.css.
-     *
-     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string} $colorScheme Color scheme from TeamColorHelper
-     * @param string $iconClass CSS class for the flip icon
-     * @param string $animationName Name for the keyframes animation
-     * @return string Empty string — styles are in centralized CSS
-     */
-    public static function getPulseAnimationCss(array $colorScheme, string $iconClass, string $animationName = 'pulse-glow'): string
-    {
-        return '';
-    }
-
-    /**
      * Get the flip JavaScript for any flip container
      *
      * @param string $containerSelector CSS selector for flip containers

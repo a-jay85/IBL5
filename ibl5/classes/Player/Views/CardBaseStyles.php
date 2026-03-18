@@ -41,20 +41,6 @@ class CardBaseStyles
     }
 
     /**
-     * Get complete shared CSS for trading cards (front and back)
-     *
-     * @deprecated CSS is now centralized in design/components/player-cards.css.
-     *             Use getCardCssProperties() to set custom properties on container elements.
-     *
-     * @param array{primary: string, secondary: string, gradient_start: string, gradient_mid: string, gradient_end: string, border: string, border_rgb: string, accent: string, text: string, text_muted: string} $colorScheme Color scheme from TeamColorHelper
-     * @return string Empty string — styles are in centralized CSS
-     */
-    public static function getStyles(array $colorScheme): string
-    {
-        return '';
-    }
-
-    /**
      * Render the common card top section (header, photo, stats grid, draft info)
      *
      * This HTML is identical between front and back trading cards.

@@ -59,7 +59,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
         if ($this->offerData['offer1'] < $this->offerData['vetmin']) {
             return [
                 'valid' => false,
-                'error' => "Sorry, you must enter an amount greater than the Veteran's Minimum in the first year of a free agency offer.<br>Your offer in Year 1 was <b>{$this->offerData['offer1']}</b>, but should be at least <b>{$this->offerData['vetmin']}</b>."
+                'error' => "Sorry, you must enter an amount greater than the Veteran's Minimum in the first year of a free agency offer. Your offer in Year 1 was {$this->offerData['offer1']}, but should be at least {$this->offerData['vetmin']}."
             ];
         }
 

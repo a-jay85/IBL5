@@ -45,8 +45,25 @@ class TransactionHistoryRepository extends \BaseMysqliRepository implements Tran
     {
         $where = new \Services\QueryConditions(["catid IN (" . self::CATEGORY_IDS . ")"]);
         $where->addIfNotNull('catid = ?', 'i', $categoryId);
-        $where->addIfNotNull('YEAR(time) = ?', 'i', $year);
-        $where->addIfNotNull('MONTH(time) = ?', 'i', $month);
+
+        // Use sargable date range instead of YEAR()/MONTH() to allow index usage
+        if ($year !== null && $month !== null) {
+            $startDate = sprintf('%04d-%02d-01 00:00:00', $year, $month);
+            if ($month === 12) {
+                $endDate = sprintf('%04d-01-01 00:00:00', $year + 1);
+            } else {
+                $endDate = sprintf('%04d-%02d-01 00:00:00', $year, $month + 1);
+            }
+            $where->add('time >= ?', 's', $startDate);
+            $where->add('time < ?', 's', $endDate);
+        } elseif ($year !== null) {
+            $startDate = sprintf('%04d-01-01 00:00:00', $year);
+            $endDate = sprintf('%04d-01-01 00:00:00', $year + 1);
+            $where->add('time >= ?', 's', $startDate);
+            $where->add('time < ?', 's', $endDate);
+        } elseif ($month !== null) {
+            $where->add('MONTH(time) = ?', 'i', $month);
+        }
 
         $query = "SELECT sid, catid, title, time FROM nuke_stories WHERE {$where->toWhereClause()} ORDER BY time DESC LIMIT 500";
 

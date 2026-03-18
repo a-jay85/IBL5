@@ -11,6 +11,7 @@ namespace Standings\Contracts;
  * Implementations must provide data for conferences, divisions, and team streaks.
  *
  * @phpstan-type StandingsRow array{tid: int, team_name: string, leagueRecord: string, pct: string, gamesBack: string, confRecord: string, divRecord: string, homeRecord: string, awayRecord: string, gamesUnplayed: int, magicNumber: int|string, clinchedConference: int, clinchedDivision: int, clinchedPlayoffs: int, clinchedLeague: int, wins: int, homeGames: int, awayGames: int, color1: string, color2: string}
+ * @phpstan-type BulkStandingsRow array{tid: int, team_name: string, leagueRecord: string, pct: string, confGB: string, divGB: string, confRecord: string, divRecord: string, homeRecord: string, awayRecord: string, gamesUnplayed: int, confMagicNumber: int|string, divMagicNumber: int|string, clinchedConference: int, clinchedDivision: int, clinchedPlayoffs: int, clinchedLeague: int, wins: int, homeGames: int, awayGames: int, conference: string, division: string, color1: string, color2: string}
  * @phpstan-type StreakRow array{last_win: int, last_loss: int, streak_type: string, streak: int, ranking: int, sos: float|string, remaining_sos: float|string, sos_rank: int, remaining_sos_rank: int}
  * @phpstan-type PythagoreanStats array{pointsScored: int, pointsAllowed: int}
  *
@@ -25,6 +26,13 @@ interface StandingsRepositoryInterface
      * @return list<StandingsRow> Array of team standings data sorted by games back
      */
     public function getStandingsByRegion(string $region): array;
+
+    /**
+     * Get standings for all teams with conference and division columns
+     *
+     * @return list<BulkStandingsRow>
+     */
+    public function getAllStandings(): array;
 
     /**
      * Get streak, last 10 games, and power ranking data for a team

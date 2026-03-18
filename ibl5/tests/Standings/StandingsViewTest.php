@@ -31,7 +31,7 @@ class StandingsViewTest extends TestCase
     }
 
     /**
-     * Create a standard team data array for tests
+     * Create a standard team data array for tests (per-region format with gamesBack/magicNumber aliases)
      *
      * @param array<string, mixed> $overrides Fields to override
      * @return array<string, mixed>
@@ -62,9 +62,45 @@ class StandingsViewTest extends TestCase
         ], $overrides);
     }
 
+    /**
+     * Create a bulk standings row (getAllStandings format with conference/division columns)
+     *
+     * @param array<string, mixed> $overrides Fields to override
+     * @return array<string, mixed>
+     */
+    private function makeBulkTeamData(array $overrides = []): array
+    {
+        return array_merge([
+            'tid' => 1,
+            'team_name' => 'Celtics',
+            'leagueRecord' => '5-3',
+            'pct' => '0.625',
+            'confGB' => '0.0',
+            'divGB' => '0.0',
+            'confMagicNumber' => 75,
+            'divMagicNumber' => 70,
+            'gamesUnplayed' => 74,
+            'confRecord' => '3-2',
+            'divRecord' => '1-1',
+            'homeRecord' => '3-1',
+            'awayRecord' => '2-2',
+            'homeGames' => 4,
+            'awayGames' => 4,
+            'clinchedConference' => 0,
+            'clinchedDivision' => 0,
+            'clinchedPlayoffs' => 0,
+            'clinchedLeague' => 0,
+            'wins' => 5,
+            'conference' => 'Eastern',
+            'division' => 'Atlantic',
+            'color1' => '000000',
+            'color2' => 'FFFFFF',
+        ], $overrides);
+    }
+
     public function testRenderReturnsString(): void
     {
-        $this->mockRepository->method('getStandingsByRegion')->willReturn([]);
+        $this->mockRepository->method('getAllStandings')->willReturn([]);
         $this->mockRepository->method('getAllStreakData')->willReturn([]);
         $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
@@ -75,7 +111,7 @@ class StandingsViewTest extends TestCase
 
     public function testRenderIncludesAllConferences(): void
     {
-        $this->mockRepository->method('getStandingsByRegion')->willReturn([]);
+        $this->mockRepository->method('getAllStandings')->willReturn([]);
         $this->mockRepository->method('getAllStreakData')->willReturn([]);
         $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
@@ -87,7 +123,7 @@ class StandingsViewTest extends TestCase
 
     public function testRenderIncludesAllDivisions(): void
     {
-        $this->mockRepository->method('getStandingsByRegion')->willReturn([]);
+        $this->mockRepository->method('getAllStandings')->willReturn([]);
         $this->mockRepository->method('getAllStreakData')->willReturn([]);
         $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
 
@@ -97,6 +133,58 @@ class StandingsViewTest extends TestCase
         $this->assertStringContainsString('Central Division', $result);
         $this->assertStringContainsString('Midwest Division', $result);
         $this->assertStringContainsString('Pacific Division', $result);
+    }
+
+    public function testRenderUsesAllStandingsNotPerRegion(): void
+    {
+        $this->mockRepository->expects($this->once())
+            ->method('getAllStandings')
+            ->willReturn([]);
+        $this->mockRepository->expects($this->never())
+            ->method('getStandingsByRegion');
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $this->view->render();
+    }
+
+    public function testRenderGroupsAndDisplaysTeamsCorrectly(): void
+    {
+        $bulkData = [
+            $this->makeBulkTeamData(['tid' => 1, 'team_name' => 'Celtics', 'conference' => 'Eastern', 'division' => 'Atlantic', 'confGB' => '0.0', 'divGB' => '0.0', 'confMagicNumber' => 70, 'divMagicNumber' => 65, 'wins' => 10]),
+            $this->makeBulkTeamData(['tid' => 2, 'team_name' => 'Lakers', 'conference' => 'Western', 'division' => 'Pacific', 'confGB' => '0.0', 'divGB' => '0.0', 'confMagicNumber' => 72, 'divMagicNumber' => 68, 'wins' => 8]),
+        ];
+
+        $this->mockRepository->method('getAllStandings')->willReturn($bulkData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->render();
+
+        // Celtics should appear in Eastern Conference and Atlantic Division sections
+        $this->assertStringContainsString('Celtics', $result);
+        $this->assertStringContainsString('Lakers', $result);
+    }
+
+    public function testRenderSortsByGamesBackThenClinchThenWins(): void
+    {
+        $bulkData = [
+            $this->makeBulkTeamData(['tid' => 1, 'team_name' => 'TeamA', 'conference' => 'Eastern', 'division' => 'Atlantic', 'confGB' => '5.0', 'divGB' => '5.0', 'confMagicNumber' => 70, 'divMagicNumber' => 65, 'wins' => 30]),
+            $this->makeBulkTeamData(['tid' => 2, 'team_name' => 'TeamB', 'conference' => 'Eastern', 'division' => 'Atlantic', 'confGB' => '0.0', 'divGB' => '0.0', 'confMagicNumber' => 60, 'divMagicNumber' => 55, 'wins' => 35]),
+        ];
+
+        $this->mockRepository->method('getAllStandings')->willReturn($bulkData);
+        $this->mockRepository->method('getAllStreakData')->willReturn([]);
+        $this->mockRepository->method('getAllPythagoreanStats')->willReturn([]);
+
+        $result = $this->view->render();
+
+        // TeamB (0.0 GB) should appear before TeamA (5.0 GB)
+        $posB = strpos($result, 'TeamB');
+        $posA = strpos($result, 'TeamA');
+        $this->assertNotFalse($posB);
+        $this->assertNotFalse($posA);
+        $this->assertLessThan($posA, $posB);
     }
 
     public function testRenderRegionGeneratesTableHeaders(): void

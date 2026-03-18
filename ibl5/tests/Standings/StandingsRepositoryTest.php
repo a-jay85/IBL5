@@ -127,6 +127,16 @@ class StandingsRepositoryTest extends TestCase
         $this->assertEquals(2500, $result['pointsAllowed']);
     }
 
+    public function testGetAllStandingsReturnsArray(): void
+    {
+        $mockDb = $this->createMockDatabaseWithPreparedStatement([]);
+        $repository = new StandingsRepository($mockDb);
+
+        $result = $repository->getAllStandings();
+
+        $this->assertIsArray($result);
+    }
+
     /**
      * Create a basic mock database object
      */

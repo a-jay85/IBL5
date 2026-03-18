@@ -83,7 +83,8 @@ INSERT INTO nuke_modules (title, custom_title, active, view) VALUES
   ('VotingResults',       'VotingResults',       1, 0),
   ('AllStarAppearances',  'AllStarAppearances',  1, 0),
   ('SeasonArchive',       'SeasonArchive',       1, 0),
-  ('OneOnOneGame',        'OneOnOneGame',        1, 0);
+  ('OneOnOneGame',        'OneOnOneGame',        1, 0),
+  ('SiteStatistics',      'SiteStatistics',      1, 0);
 
 -- ============================================================
 -- IBL season bootstrap
@@ -445,6 +446,37 @@ INSERT INTO ibl_plr (
    45, 130, 45, 140, 160, 48,
    65, 22, 88,
    'plr-uuid-00000000-0000-000000000024');
+
+-- ============================================================
+-- Placeholder player for LeagueStarters module
+-- LeagueStartersService::getOrLoadPlaceholder() loads pid=4040404
+-- as a stand-in for teams with no starter at a given position.
+-- Without this row, Player::withPlayerID queries a nonexistent row
+-- 24 times per position (for 24 teams without starters), slowing
+-- the page under CI's PHP built-in server.
+-- ============================================================
+INSERT INTO ibl_plr (
+  pid, name, age, peak, tid, pos, ordinal,
+  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  cy, cyt, cy1, cy2,
+  retired, exp,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_to, stats_blk, stats_pf,
+  uuid
+) VALUES
+  (4040404, 'No Starter', 0, 0, 0, 'C', 0,
+   0, 0, 0, 0, 0, 0, 0, 0, 0,
+   0, 0, 0, 0,
+   0, 0,
+   0, 0, 0, '',
+   0, 0, 0, '', '',
+   0, 0, 0, 0, 0, 0,
+   0, 0, 0, 0, 0, 0,
+   0, 0, 0,
+   'plr-uuid-placeholder-4040404');
 
 -- ============================================================
 -- Depth chart starters (NextSim needs dc_*Depth=1 and *Depth=1)
@@ -1029,6 +1061,52 @@ INSERT INTO ibl_hist (
   (42, 'Rookie Big', 2026, 'Blues', 15,
    41, 1300, 200, 440, 90, 110, 15, 40,
    55, 205, 80, 35, 30, 55, 90, 540, 200);
+
+-- ============================================================
+-- API Key for E2E tests
+-- Raw key: "e2e-test-key-do-not-use-in-production"
+-- SHA-256 hash: computed below
+-- ============================================================
+INSERT INTO ibl_api_keys (key_hash, key_prefix, owner_name, permission_level, rate_limit_tier, is_active)
+VALUES (
+  SHA2('e2e-test-key-do-not-use-in-production', 256),
+  'e2e-test',
+  'E2E Test Suite',
+  'public',
+  'unlimited',
+  1
+) ON DUPLICATE KEY UPDATE is_active = 1;
+
+-- ============================================================
+-- SiteStatistics seed data (nuke_counter + nuke_stats_* tables)
+-- Minimal data so SiteStatistics module pages don't error on empty tables
+-- ============================================================
+INSERT IGNORE INTO nuke_counter (type, var, count) VALUES
+  ('total', 'hits', 12345),
+  ('browser', 'Chrome', 8000),
+  ('browser', 'Firefox', 3000),
+  ('browser', 'Safari', 1345),
+  ('os', 'Windows', 6000),
+  ('os', 'Linux', 4000),
+  ('os', 'macOS', 2345);
+
+INSERT IGNORE INTO nuke_stats_year (year, hits) VALUES
+  (2025, 50000),
+  (2026, 12345);
+
+INSERT IGNORE INTO nuke_stats_month (year, month, hits) VALUES
+  (2025, 1, 4000),
+  (2025, 6, 5000),
+  (2026, 1, 6000),
+  (2026, 2, 6345);
+
+INSERT IGNORE INTO nuke_stats_date (year, month, date, hits) VALUES
+  (2025, 1, 15, 200),
+  (2026, 1, 10, 300);
+
+INSERT IGNORE INTO nuke_stats_hour (year, month, date, hour, hits) VALUES
+  (2025, 1, 15, 12, 50),
+  (2026, 1, 10, 14, 75);
 
 -- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the

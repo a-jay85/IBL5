@@ -28,7 +28,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1,
-  workers: process.env.CI ? 4 : undefined,
+  workers: 4,
   reporter: [['html', { open: 'never' }], ['list']],
 
   expect: {
@@ -38,7 +38,7 @@ export default defineConfig({
   use: {
     baseURL: process.env.BASE_URL || 'http://main.localhost/ibl5/',
     actionTimeout: 10_000,
-    navigationTimeout: 15_000,
+    navigationTimeout: 20_000,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },

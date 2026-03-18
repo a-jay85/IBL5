@@ -74,8 +74,10 @@ jobs:
         run: bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
 
       # --- Docker Compose ---
-      - name: Build PHP image
-        run: docker build -t ghcr.io/a-jay85/ibl5/php-apache:latest .
+      - name: Pull or build PHP image
+        run: |
+          docker pull ghcr.io/a-jay85/ibl5/php-apache:latest || \
+          docker build -t ghcr.io/a-jay85/ibl5/php-apache:latest .
 
       - name: Start Docker containers
         run: docker compose -f docker-compose.ci.yml up -d --wait

@@ -127,6 +127,33 @@ class StandingsRepositoryTest extends TestCase
         $this->assertEquals(2500, $result['pointsAllowed']);
     }
 
+    public function testGetSeriesRecordsReturnsRows(): void
+    {
+        $expectedData = [
+            ['self' => 1, 'opponent' => 2, 'wins' => 3, 'losses' => 2],
+            ['self' => 2, 'opponent' => 1, 'wins' => 2, 'losses' => 3],
+        ];
+
+        $mockDb = $this->createMockDatabaseWithPreparedStatement($expectedData);
+        $repository = new StandingsRepository($mockDb);
+
+        $result = $repository->getSeriesRecords();
+
+        $this->assertCount(2, $result);
+        $this->assertSame(1, $result[0]['self']);
+        $this->assertSame(2, $result[0]['opponent']);
+    }
+
+    public function testGetSeriesRecordsReturnsEmptyWhenNoRecords(): void
+    {
+        $mockDb = $this->createMockDatabaseWithPreparedStatement([]);
+        $repository = new StandingsRepository($mockDb);
+
+        $result = $repository->getSeriesRecords();
+
+        $this->assertSame([], $result);
+    }
+
     /**
      * Create a basic mock database object
      */

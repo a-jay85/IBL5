@@ -186,7 +186,7 @@ jobs:
           fi
 
       - name: Remove update-baselines label
-        if: steps.visual-regression.outcome == 'failure' && contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        if: always() && contains(github.event.pull_request.labels.*.name, 'update-baselines')
         env:
           GH_TOKEN: ${{ secrets.CI_PAT }}
         run: gh pr edit ${{ github.event.pull_request.number }} --remove-label update-baselines

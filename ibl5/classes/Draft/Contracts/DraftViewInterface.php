@@ -111,9 +111,9 @@ interface DraftViewInterface
      *  - Undrafted players (drafted=0):
      *    * If current user owns pick: shows radio button + clickable name
      *    * If user doesn't own pick: shows no radio button, locked appearance
-     *  - Player names escaped with HtmlSanitizer::e(ENT_QUOTES) for safe output
+     *  - Player names escaped with HtmlSanitizer::e() for safe output
      *  - Uses HtmlSanitizer::safeHtmlOutput() for all numeric stats and ratings
-     *  - Radio button value uses HtmlSanitizer::e to handle apostrophes in names
+     *  - Radio button value uses HtmlSanitizer::e() to handle apostrophes in names
      *  - Table uses "sortable" class for jQuery sorting functionality
      *  - NEVER throws exceptions
      *

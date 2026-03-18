@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace UI;
 
+use Utilities\HtmlSanitizer;
+
 /**
  * DebugOutput - Displays debug information in a collapsible panel
  *
@@ -50,7 +52,8 @@ class DebugOutput
 
         // SECURITY: Escape content to prevent XSS
         // Allow only basic HTML tags for formatting (br tags are common in debug output)
-        // deliberate: HtmlSanitizer::e() strips <br> tags via stripslashes; keep htmlspecialchars here
+        // deliberate: keep htmlspecialchars here — the str_replace below restores <br> tags
+        // after escaping, a two-step pattern that can't be collapsed into HtmlSanitizer::e()
         $safeContent = htmlspecialchars($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         // Restore <br> tags after escaping (they're safe and commonly used)
         $safeContent = str_replace(['&lt;br&gt;', '&lt;br/&gt;', '&lt;br /&gt;'], '<br>', $safeContent);
@@ -60,7 +63,7 @@ class DebugOutput
 <div style="margin: 10px 0; border: 1px solid #ccc; border-radius: 4px;">
     <div style="padding: 8px; background-color: #f5f5f5; border-bottom: 1px solid #ccc; cursor: pointer;"
          onclick="toggleDebug<?= $id ?>()">
-        <span id="debugIcon<?= $id ?>">&#9654;</span> <?= htmlspecialchars($title, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?>
+        <span id="debugIcon<?= $id ?>">&#9654;</span> <?= HtmlSanitizer::e($title) ?>
     </div>
     <pre id="debugContent<?= $id ?>" style="display: none; margin: 0; padding: 8px; background-color: #fff; overflow: auto;"><?= $safeContent ?></pre>
 </div>

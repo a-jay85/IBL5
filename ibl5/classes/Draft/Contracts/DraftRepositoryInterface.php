@@ -193,24 +193,6 @@ interface DraftRepositoryInterface
     public function isPlayerAlreadyDrafted(string $playerName): bool;
 
     /**
-     * Get the next team on the clock (team with the next available pick)
-     *
-     * @return string|null The team name with the next available pick, or null if draft is complete
-     *
-     * IMPORTANT BEHAVIORS:
-     *  - Finds first unpicked position (player field is empty)
-     *  - Orders by round ASC, then pick ASC (lowest round/pick first)
-     *  - Returns null if no unpicked positions exist (draft complete)
-     *  - NEVER throws exceptions
-     *
-     * Examples:
-     *  $team = $repo->getNextTeamOnClock();
-     *  // Returns 'New York' if they own next pick
-     *  // Returns null if draft is complete (all picks filled)
-     */
-    public function getNextTeamOnClock(): ?string;
-
-    /**
      * Get all players in the draft class roster
      *
      * Retrieves the complete list of available draft prospects from ibl_draft_class.

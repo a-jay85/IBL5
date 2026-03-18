@@ -49,7 +49,6 @@ updateDraftTable(string $playerName, string $date, int $draftRound, int $draftPi
 updateRookieTable(string $playerName, string $teamName): bool
 createPlayerFromDraftClass(string $playerName, string $teamName): bool
 isPlayerAlreadyDrafted(string $playerName): bool
-getNextTeamOnClock(): ?string
 getAllDraftClassPlayers(): array
 getCurrentDraftPick(): ?array
 ```

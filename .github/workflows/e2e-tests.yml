@@ -164,20 +164,12 @@ jobs:
           PHPSCRIPT
 
       # --- Run Tests ---
-      - name: Run E2E tests
-        working-directory: ibl5
-        env:
-          BASE_URL: http://localhost:8080/ibl5/
-          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
-          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
-        run: bunx playwright test
-
+      # Visual regression runs FIRST — before functional E2E tests which modify
+      # the database (trades, waivers, etc.) and would invalidate the baselines.
       - name: Pull Playwright Docker image
-        if: always()
         run: docker pull mcr.microsoft.com/playwright:v1.58.2-jammy
 
       - name: Run visual regression tests
-        if: always()
         env:
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
           IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
@@ -193,6 +185,15 @@ jobs:
             -e "HOME=/tmp" \
             mcr.microsoft.com/playwright:v1.58.2-jammy \
             npx playwright test --config=playwright.visual.config.ts
+
+      - name: Run E2E tests
+        if: always()
+        working-directory: ibl5
+        env:
+          BASE_URL: http://localhost:8080/ibl5/
+          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
+          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
+        run: bunx playwright test
 
       - name: Upload test results
         if: always()

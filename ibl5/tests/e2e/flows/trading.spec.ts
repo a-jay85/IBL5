@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 import type { Page } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { gotoWithRetry } from '../helpers/navigation';
 
 // Serial: trades-closed and trades-open blocks toggle the same setting.
 test.describe.configure({ mode: 'serial' });
@@ -13,7 +14,7 @@ test.describe.configure({ mode: 'serial' });
  * Navigate to the trade offer form by picking the first available partner.
  */
 async function navigateToTradeForm(page: Page): Promise<void> {
-  await page.goto('modules.php?name=Trading');
+  await gotoWithRetry(page, 'modules.php?name=Trading');
 
   const firstTeamLink = page.locator('.trading-team-select a').first();
   await expect(firstTeamLink).toBeVisible();
@@ -72,7 +73,7 @@ async function mockRosterPreviewApi(page: Page): Promise<void> {
 test.describe('Trading flow', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Allow Trades': 'Yes' });
-    await page.goto('modules.php?name=Trading');
+    await gotoWithRetry(page, 'modules.php?name=Trading');
   });
 
   test('navigate to trade form via team select', async ({ page }) => {
@@ -100,7 +101,7 @@ test.describe('Trading flow', () => {
   });
 
   test('trade review page loads', async ({ page }) => {
-    await page.goto('modules.php?name=Trading&op=reviewtrade');
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
 
     // Should show either trade offer cards or an empty state
     const hasOffers = await page.locator('.trade-offer-card').count();
@@ -453,7 +454,7 @@ test.describe('Trade offer form: cap warnings', () => {
 test.describe('Trade review page: offer cards and preview', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Allow Trades': 'Yes' });
-    await page.goto('modules.php?name=Trading&op=reviewtrade');
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
   });
 
   test('offer cards have Preview buttons', async ({ page }) => {
@@ -598,7 +599,7 @@ test.describe('Trade review page: offer cards and preview', () => {
 test.describe('Trading pages: no PHP errors', () => {
   test('no PHP errors on trade form', async ({ appState, page }) => {
     await appState({ 'Allow Trades': 'Yes' });
-    await page.goto('modules.php?name=Trading');
+    await gotoWithRetry(page, 'modules.php?name=Trading');
 
     const firstTeamLink = page.locator('.trading-team-select a').first();
     const href = await firstTeamLink.getAttribute('href');
@@ -610,7 +611,7 @@ test.describe('Trading pages: no PHP errors', () => {
 
   test('no PHP errors on trade review page', async ({ appState, page }) => {
     await appState({ 'Allow Trades': 'Yes' });
-    await page.goto('modules.php?name=Trading&op=reviewtrade');
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
 
     await assertNoPhpErrors(page);
   });
@@ -628,7 +629,7 @@ test.describe('Trading: trades-closed state', () => {
       'Current Season Phase': 'Regular Season',
       'Allow Trades': 'No',
     });
-    await page.goto('modules.php?name=Trading');
+    await gotoWithRetry(page, 'modules.php?name=Trading');
   });
 
   test('shows closed message when trades disabled', async ({ page }) => {
@@ -652,7 +653,7 @@ test.describe('Trading: result banners', () => {
   });
 
   test('offer_sent success banner', async ({ page }) => {
-    await page.goto('modules.php?name=Trading&op=reviewtrade&result=offer_sent');
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade&result=offer_sent');
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
     await expect(page.locator('.ibl-alert--success')).toContainText(
       'Trade offer sent!',
@@ -660,7 +661,8 @@ test.describe('Trading: result banners', () => {
   });
 
   test('trade_accepted success banner', async ({ page }) => {
-    await page.goto(
+    await gotoWithRetry(
+      page,
       'modules.php?name=Trading&op=reviewtrade&result=trade_accepted',
     );
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
@@ -670,7 +672,8 @@ test.describe('Trading: result banners', () => {
   });
 
   test('trade_rejected info banner', async ({ page }) => {
-    await page.goto(
+    await gotoWithRetry(
+      page,
       'modules.php?name=Trading&op=reviewtrade&result=trade_rejected',
     );
     await expect(page.locator('.ibl-alert--info')).toBeVisible();
@@ -680,7 +683,8 @@ test.describe('Trading: result banners', () => {
   });
 
   test('already_processed warning banner', async ({ page }) => {
-    await page.goto(
+    await gotoWithRetry(
+      page,
       'modules.php?name=Trading&op=reviewtrade&result=already_processed',
     );
     await expect(page.locator('.ibl-alert--warning')).toBeVisible();
@@ -690,7 +694,8 @@ test.describe('Trading: result banners', () => {
   });
 
   test('error param renders error banner', async ({ page }) => {
-    await page.goto(
+    await gotoWithRetry(
+      page,
       'modules.php?name=Trading&op=reviewtrade&error=Test+error',
     );
     await expect(page.locator('.ibl-alert--error')).toBeVisible();

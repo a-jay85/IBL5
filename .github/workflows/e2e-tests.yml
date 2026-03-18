@@ -175,6 +175,7 @@ jobs:
           if ! ls "$SNAP_DIR"/*-linux.png 1>/dev/null 2>&1; then
             echo "No Linux baselines found — generating..."
             bunx playwright test tests/e2e/smoke/visual-regression.spec.ts --update-snapshots
+            git checkout "${{ github.head_ref }}"
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add "$SNAP_DIR"/*-linux.png

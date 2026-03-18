@@ -1,30 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { gotoWithRetry } from '../helpers/navigation';
 
 // League Starters — public page showing starting lineups by position.
 test.use({ storageState: { cookies: [], origins: [] } });
 
-/**
- * Navigate to LeagueStarters, skipping the test if the page is blank
- * (indicates missing depth chart seed data in CI).
- */
-async function gotoLeagueStarters(page: import('@playwright/test').Page): Promise<void> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await page.waitForTimeout(attempt * 1000);
-    try {
-      await page.goto('modules.php?name=LeagueStarters', { timeout: 15_000 });
-    } catch {
-      continue;
-    }
-    const body = await page.locator('body').innerText();
-    if (body.trim().length >= 20) return;
-  }
-  test.skip(true, 'LeagueStarters page returned blank — likely missing depth chart data');
-}
-
 test.describe('League Starters flow', () => {
   test.beforeEach(async ({ page }) => {
-    await gotoLeagueStarters(page);
+    await gotoWithRetry(page, 'modules.php?name=LeagueStarters');
   });
 
   test('page loads with title', async ({ page }) => {

@@ -448,6 +448,37 @@ INSERT INTO ibl_plr (
    'plr-uuid-00000000-0000-000000000024');
 
 -- ============================================================
+-- Placeholder player for LeagueStarters module
+-- LeagueStartersService::getOrLoadPlaceholder() loads pid=4040404
+-- as a stand-in for teams with no starter at a given position.
+-- Without this row, Player::withPlayerID queries a nonexistent row
+-- 24 times per position (for 24 teams without starters), slowing
+-- the page under CI's PHP built-in server.
+-- ============================================================
+INSERT INTO ibl_plr (
+  pid, name, age, peak, tid, pos, ordinal,
+  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  cy, cyt, cy1, cy2,
+  retired, exp,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_to, stats_blk, stats_pf,
+  uuid
+) VALUES
+  (4040404, 'No Starter', 0, 0, 0, 'C', 0,
+   0, 0, 0, 0, 0, 0, 0, 0, 0,
+   0, 0, 0, 0,
+   0, 0,
+   0, 0, 0, '',
+   0, 0, 0, '', '',
+   0, 0, 0, 0, 0, 0,
+   0, 0, 0, 0, 0, 0,
+   0, 0, 0,
+   'plr-uuid-placeholder-4040404');
+
+-- ============================================================
 -- Depth chart starters (NextSim needs dc_*Depth=1 and *Depth=1)
 -- ============================================================
 

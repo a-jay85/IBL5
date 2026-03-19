@@ -48,7 +48,7 @@ class RookieOptionFormView implements RookieOptionFormViewInterface
         <h2 class="ibl-card__title"><?= $playerPosition ?> <?= $playerName ?> - Rookie Option</h2>
     </div>
     <div class="ibl-card__body" style="text-align: center;">
-        <img src="<?= htmlspecialchars($playerImageUrl, ENT_QUOTES, 'UTF-8') ?>" alt="<?= $playerName ?>" style="max-width: 120px; border-radius: 0.375rem; margin: 0 auto 0.75rem;">
+        <img src="<?= HtmlSanitizer::e($playerImageUrl) ?>" alt="<?= $playerName ?>" style="max-width: 120px; border-radius: 0.375rem; margin: 0 auto 0.75rem;">
         <div>
             <span class="ibl-label">Rookie Option Value:</span>
             <strong style="font-weight: bold;"><?= $rookieOptionValue ?></strong>

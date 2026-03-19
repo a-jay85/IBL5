@@ -7,6 +7,7 @@ namespace PlayerDatabase;
 use Player\PlayerImageHelper;
 use PlayerDatabase\Contracts\PlayerDatabaseViewInterface;
 use UI\TeamCellHelper;
+use Utilities\HtmlSanitizer;
 
 /**
  * @see PlayerDatabaseViewInterface
@@ -96,14 +97,14 @@ class PlayerDatabaseView implements PlayerDatabaseViewInterface
         <div class="ibl-filter-form__row">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="search_name">Name:</label>
-                <input id="search_name" type="text" name="search_name" style="width: 10rem;" value="<?= htmlspecialchars($search_name) ?>">
+                <input id="search_name" type="text" name="search_name" style="width: 10rem;" value="<?= HtmlSanitizer::e($search_name) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="pos">Position:</label>
                 <select id="pos" name="pos">
                     <option value="">-</option>
                     <?php foreach ($positions as $position): ?>
-                        <option value="<?= htmlspecialchars($position) ?>"<?= ($pos === $position) ? ' selected' : '' ?>><?= htmlspecialchars($position) ?></option>
+                        <option value="<?= HtmlSanitizer::e($position) ?>"<?= ($pos === $position) ? ' selected' : '' ?>><?= HtmlSanitizer::e($position) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -122,23 +123,23 @@ class PlayerDatabaseView implements PlayerDatabaseViewInterface
         <div class="ibl-filter-form__row">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="age">Max Age:</label>
-                <input id="age" type="text" name="age" style="width: 3.5rem;" value="<?= htmlspecialchars($age) ?>">
+                <input id="age" type="text" name="age" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($age) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="exp">Min Exp:</label>
-                <input id="exp" type="text" name="exp" style="width: 3.5rem;" value="<?= htmlspecialchars($exp) ?>">
+                <input id="exp" type="text" name="exp" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($exp) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="exp_max">Max Exp:</label>
-                <input id="exp_max" type="text" name="exp_max" style="width: 3.5rem;" value="<?= htmlspecialchars($exp_max) ?>">
+                <input id="exp_max" type="text" name="exp_max" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($exp_max) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="bird">Min Bird:</label>
-                <input id="bird" type="text" name="bird" style="width: 3.5rem;" value="<?= htmlspecialchars($bird) ?>">
+                <input id="bird" type="text" name="bird" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($bird) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="bird_max">Max Bird:</label>
-                <input id="bird_max" type="text" name="bird_max" style="width: 3.5rem;" value="<?= htmlspecialchars($bird_max) ?>">
+                <input id="bird_max" type="text" name="bird_max" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($bird_max) ?>">
             </div>
         </div>
     </fieldset>
@@ -148,57 +149,57 @@ class PlayerDatabaseView implements PlayerDatabaseViewInterface
         <div class="ibl-filter-form__row" style="margin-bottom: 0.5rem;">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_fga">2ga:</label>
-                <input id="r_fga" type="text" name="r_fga" style="width: 3.5rem;" value="<?= htmlspecialchars($r_fga) ?>">
+                <input id="r_fga" type="text" name="r_fga" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_fga) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_fgp">2gp:</label>
-                <input id="r_fgp" type="text" name="r_fgp" style="width: 3.5rem;" value="<?= htmlspecialchars($r_fgp) ?>">
+                <input id="r_fgp" type="text" name="r_fgp" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_fgp) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_fta">fta:</label>
-                <input id="r_fta" type="text" name="r_fta" style="width: 3.5rem;" value="<?= htmlspecialchars($r_fta) ?>">
+                <input id="r_fta" type="text" name="r_fta" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_fta) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_ftp">ftp:</label>
-                <input id="r_ftp" type="text" name="r_ftp" style="width: 3.5rem;" value="<?= htmlspecialchars($r_ftp) ?>">
+                <input id="r_ftp" type="text" name="r_ftp" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_ftp) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_tga">3ga:</label>
-                <input id="r_tga" type="text" name="r_tga" style="width: 3.5rem;" value="<?= htmlspecialchars($r_tga) ?>">
+                <input id="r_tga" type="text" name="r_tga" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_tga) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_tgp">3gp:</label>
-                <input id="r_tgp" type="text" name="r_tgp" style="width: 3.5rem;" value="<?= htmlspecialchars($r_tgp) ?>">
+                <input id="r_tgp" type="text" name="r_tgp" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_tgp) ?>">
             </div>
         </div>
         <div class="ibl-filter-form__row">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_orb">orb:</label>
-                <input id="r_orb" type="text" name="r_orb" style="width: 3.5rem;" value="<?= htmlspecialchars($r_orb) ?>">
+                <input id="r_orb" type="text" name="r_orb" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_orb) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_drb">drb:</label>
-                <input id="r_drb" type="text" name="r_drb" style="width: 3.5rem;" value="<?= htmlspecialchars($r_drb) ?>">
+                <input id="r_drb" type="text" name="r_drb" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_drb) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_ast">ast:</label>
-                <input id="r_ast" type="text" name="r_ast" style="width: 3.5rem;" value="<?= htmlspecialchars($r_ast) ?>">
+                <input id="r_ast" type="text" name="r_ast" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_ast) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_stl">stl:</label>
-                <input id="r_stl" type="text" name="r_stl" style="width: 3.5rem;" value="<?= htmlspecialchars($r_stl) ?>">
+                <input id="r_stl" type="text" name="r_stl" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_stl) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_blk">blk:</label>
-                <input id="r_blk" type="text" name="r_blk" style="width: 3.5rem;" value="<?= htmlspecialchars($r_blk) ?>">
+                <input id="r_blk" type="text" name="r_blk" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_blk) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_to">tvr:</label>
-                <input id="r_to" type="text" name="r_to" style="width: 3.5rem;" value="<?= htmlspecialchars($r_to) ?>">
+                <input id="r_to" type="text" name="r_to" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_to) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="r_foul">foul:</label>
-                <input id="r_foul" type="text" name="r_foul" style="width: 3.5rem;" value="<?= htmlspecialchars($r_foul) ?>">
+                <input id="r_foul" type="text" name="r_foul" style="width: 3.5rem;" value="<?= HtmlSanitizer::e($r_foul) ?>">
             </div>
         </div>
     </fieldset>
@@ -208,37 +209,37 @@ class PlayerDatabaseView implements PlayerDatabaseViewInterface
         <div class="ibl-filter-form__row" style="margin-bottom: 0.5rem;">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="oo">oo:</label>
-                <input id="oo" type="text" name="oo" style="width: 3rem;" value="<?= htmlspecialchars($oo) ?>">
+                <input id="oo" type="text" name="oo" style="width: 3rem;" value="<?= HtmlSanitizer::e($oo) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="do">do:</label>
-                <input id="do" type="text" name="do" style="width: 3rem;" value="<?= htmlspecialchars($do) ?>">
+                <input id="do" type="text" name="do" style="width: 3rem;" value="<?= HtmlSanitizer::e($do) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="po">po:</label>
-                <input id="po" type="text" name="po" style="width: 3rem;" value="<?= htmlspecialchars($po) ?>">
+                <input id="po" type="text" name="po" style="width: 3rem;" value="<?= HtmlSanitizer::e($po) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="to">to:</label>
-                <input id="to" type="text" name="to" style="width: 3rem;" value="<?= htmlspecialchars($to) ?>">
+                <input id="to" type="text" name="to" style="width: 3rem;" value="<?= HtmlSanitizer::e($to) ?>">
             </div>
         </div>
         <div class="ibl-filter-form__row">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="od">od:</label>
-                <input id="od" type="text" name="od" style="width: 3rem;" value="<?= htmlspecialchars($od) ?>">
+                <input id="od" type="text" name="od" style="width: 3rem;" value="<?= HtmlSanitizer::e($od) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="dd">dd:</label>
-                <input id="dd" type="text" name="dd" style="width: 3rem;" value="<?= htmlspecialchars($dd) ?>">
+                <input id="dd" type="text" name="dd" style="width: 3rem;" value="<?= HtmlSanitizer::e($dd) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="pd">pd:</label>
-                <input id="pd" type="text" name="pd" style="width: 3rem;" value="<?= htmlspecialchars($pd) ?>">
+                <input id="pd" type="text" name="pd" style="width: 3rem;" value="<?= HtmlSanitizer::e($pd) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="td">td:</label>
-                <input id="td" type="text" name="td" style="width: 3rem;" value="<?= htmlspecialchars($td) ?>">
+                <input id="td" type="text" name="td" style="width: 3rem;" value="<?= HtmlSanitizer::e($td) ?>">
             </div>
         </div>
     </fieldset>
@@ -248,29 +249,29 @@ class PlayerDatabaseView implements PlayerDatabaseViewInterface
         <div class="ibl-filter-form__row" style="margin-bottom: 0.5rem;">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="talent">Talent:</label>
-                <input id="talent" type="text" name="talent" style="width: 3rem;" value="<?= htmlspecialchars($talent) ?>">
+                <input id="talent" type="text" name="talent" style="width: 3rem;" value="<?= HtmlSanitizer::e($talent) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="skill">Skill:</label>
-                <input id="skill" type="text" name="skill" style="width: 3rem;" value="<?= htmlspecialchars($skill) ?>">
+                <input id="skill" type="text" name="skill" style="width: 3rem;" value="<?= HtmlSanitizer::e($skill) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="intangibles">Intangibles:</label>
-                <input id="intangibles" type="text" name="intangibles" style="width: 3rem;" value="<?= htmlspecialchars($intangibles) ?>">
+                <input id="intangibles" type="text" name="intangibles" style="width: 3rem;" value="<?= HtmlSanitizer::e($intangibles) ?>">
             </div>
         </div>
         <div class="ibl-filter-form__row">
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="Clutch">Clutch:</label>
-                <input id="Clutch" type="text" name="Clutch" style="width: 3rem;" value="<?= htmlspecialchars($Clutch) ?>">
+                <input id="Clutch" type="text" name="Clutch" style="width: 3rem;" value="<?= HtmlSanitizer::e($Clutch) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="Consistency">Consistency:</label>
-                <input id="Consistency" type="text" name="Consistency" style="width: 3rem;" value="<?= htmlspecialchars($Consistency) ?>">
+                <input id="Consistency" type="text" name="Consistency" style="width: 3rem;" value="<?= HtmlSanitizer::e($Consistency) ?>">
             </div>
             <div class="ibl-filter-form__group">
                 <label class="ibl-filter-form__label" for="college">College:</label>
-                <input id="college" type="text" name="college" style="width: 10rem;" value="<?= htmlspecialchars($college) ?>">
+                <input id="college" type="text" name="college" style="width: 10rem;" value="<?= HtmlSanitizer::e($college) ?>">
             </div>
         </div>
     </fieldset>
@@ -375,17 +376,17 @@ function resetPlayerDatabase() {
         if ($retired === 1) {
             ?>
 <tr>
-    <td><?= htmlspecialchars($position) ?></td>
+    <td><?= HtmlSanitizer::e($position) ?></td>
     <?= PlayerImageHelper::renderFlexiblePlayerCell($pid, $playerName) ?>
     <td colspan="30"> --- Retired --- </td>
-    <td><?= htmlspecialchars($college) ?></td>
+    <td><?= HtmlSanitizer::e($college) ?></td>
 </tr>
             <?php
         } else {
             $teamID = (int) $player->teamID;
             ?>
 <tr>
-    <td><?= htmlspecialchars($position) ?></td>
+    <td><?= HtmlSanitizer::e($position) ?></td>
     <?= PlayerImageHelper::renderFlexiblePlayerCell($pid, $playerName) ?>
     <td><?= $player->age !== null ? (string) $player->age : '' ?></td>
     <?= TeamCellHelper::renderTeamCellOrFreeAgent($teamID, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000') ?>
@@ -417,7 +418,7 @@ function resetPlayerDatabase() {
     <td><?= (int) $player->ratingIntangibles ?></td>
     <td><?= (int) $player->ratingClutch ?></td>
     <td><?= (int) $player->ratingConsistency ?></td>
-    <td><?= htmlspecialchars($college) ?></td>
+    <td><?= HtmlSanitizer::e($college) ?></td>
 </tr>
             <?php
         }

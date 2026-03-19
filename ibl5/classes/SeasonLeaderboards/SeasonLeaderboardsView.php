@@ -9,6 +9,7 @@ use SeasonLeaderboards\Contracts\SeasonLeaderboardsRepositoryInterface;
 use UI\TeamCellHelper;
 use SeasonLeaderboards\Contracts\SeasonLeaderboardsServiceInterface;
 use SeasonLeaderboards\Contracts\SeasonLeaderboardsViewInterface;
+use Utilities\HtmlSanitizer;
 
 /**
  * @see SeasonLeaderboardsViewInterface
@@ -83,7 +84,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
         </div>
         <div class="ibl-filter-form__group">
             <label class="ibl-filter-form__label">Limit:</label>
-            <input type="number" name="limit" value="<?= htmlspecialchars($limitValue, ENT_QUOTES | ENT_HTML5) ?>" min="1" placeholder="50">
+            <input type="number" name="limit" value="<?= HtmlSanitizer::e($limitValue) ?>" min="1" placeholder="50">
             <span class="ibl-filter-form__label">Records</span>
         </div>
         <button type="submit" class="ibl-filter-form__submit">Search Season Data</button>
@@ -107,7 +108,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
             $tid = $team['TeamID'];
             $teamName = $team['Team'];
             $selected = ($selectedTeam === $tid) ? ' selected' : '';
-            $html .= '<option value="' . $tid . '"' . $selected . '>' . htmlspecialchars($teamName, ENT_QUOTES | ENT_HTML5) . '</option>' . "\n";
+            $html .= '<option value="' . $tid . '"' . $selected . '>' . HtmlSanitizer::e($teamName) . '</option>' . "\n";
         }
         return $html;
     }
@@ -142,7 +143,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
         $i = 1;
         foreach ($sortOptions as $label) {
             $selected = ($i === (int)$selectedSort) ? ' selected' : '';
-            $html .= '<option value="' . $i . '"' . $selected . '>' . htmlspecialchars($label, ENT_QUOTES | ENT_HTML5) . '</option>' . "\n";
+            $html .= '<option value="' . $i . '"' . $selected . '>' . HtmlSanitizer::e($label) . '</option>' . "\n";
             $i++;
         }
         return $html;

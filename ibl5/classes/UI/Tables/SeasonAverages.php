@@ -8,6 +8,7 @@ use Player\Player;
 use Player\PlayerImageHelper;
 use Player\PlayerStats;
 use UI\TeamCellHelper;
+use Utilities\HtmlSanitizer;
 
 /**
  * SeasonAverages - Displays season averages statistics table
@@ -75,7 +76,7 @@ class SeasonAverages
 <?php if ($moduleName === "LeagueStarters"):
     echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamID ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
 endif; ?>
-            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
             <td><?= $playerStats->seasonGamesPlayed ?></td>
             <td><?= $playerStats->seasonGamesStarted ?></td>
@@ -105,7 +106,7 @@ endif; ?>
     $labelColspan = ($moduleName === "LeagueStarters") ? 3 : 2;
 ?>
         <tr>
-            <td colspan="<?= $labelColspan ?>"><?= htmlspecialchars($team->name) ?> Offense</td>
+            <td colspan="<?= $labelColspan ?>"><?= HtmlSanitizer::e($team->name) ?> Offense</td>
             <td><?= $teamStats->seasonOffenseGamesPlayed ?></td>
             <td><?= $teamStats->seasonOffenseGamesPlayed ?></td>
             <td class="sep-r-team"></td>
@@ -128,7 +129,7 @@ endif; ?>
             <td><?= $teamStats->seasonOffensePointsPerGame ?></td>
         </tr>
         <tr>
-            <td colspan="<?= $labelColspan ?>"><?= htmlspecialchars($team->name) ?> Defense</td>
+            <td colspan="<?= $labelColspan ?>"><?= HtmlSanitizer::e($team->name) ?> Defense</td>
             <td><?= $teamStats->seasonDefenseGamesPlayed ?></td>
             <td><?= $teamStats->seasonDefenseGamesPlayed ?></td>
             <td class="sep-r-team"></td>

@@ -22,11 +22,12 @@ publicTest.describe('Visual regression — public pages', () => {
     });
   });
 
+  // DELIBERATE FAILURE — testing E2E PR comment with screenshots (revert after verifying)
   publicTest('standings table', async ({ page }) => {
     await page.goto('modules.php?name=Standings');
     await page.waitForLoadState('networkidle');
-    const table = page.locator('.ibl-data-table').first();
-    await publicExpect(table).toBeVisible();
+    const table = page.locator('.nonexistent-table-class').first();
+    await publicExpect(table).toBeVisible({ timeout: 5000 });
     await publicExpect(table).toHaveScreenshot('standings-table.png', {
       animations: 'disabled',
     });

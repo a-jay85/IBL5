@@ -67,8 +67,8 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
     <input type="hidden" name="name" value="Transaction_History">
     <div class="ibl-filter-form__row">
         <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label">Category:</label>
-            <select name="cat">
+            <label class="ibl-filter-form__label" for="txn-cat">Category:</label>
+            <select id="txn-cat" name="cat">
                 <option value="0">All Categories</option>
                 <?php foreach ($categories as $catId => $catName): ?>
                     <option value="<?= $catId ?>"<?= $selectedCategory === $catId ? ' selected' : '' ?>><?php $catNameSafe = HtmlSanitizer::safeHtmlOutput($catName); echo $catNameSafe; ?></option>
@@ -76,8 +76,8 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             </select>
         </div>
         <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label">Year:</label>
-            <select name="year">
+            <label class="ibl-filter-form__label" for="txn-year">Year:</label>
+            <select id="txn-year" name="year">
                 <option value="0">All Years</option>
                 <?php foreach ($availableYears as $year): ?>
                     <option value="<?= $year ?>"<?= $selectedYear === $year ? ' selected' : '' ?>><?= $year ?></option>
@@ -85,8 +85,8 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
             </select>
         </div>
         <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label">Month:</label>
-            <select name="month">
+            <label class="ibl-filter-form__label" for="txn-month">Month:</label>
+            <select id="txn-month" name="month">
                 <option value="0">All Months</option>
                 <?php foreach ($monthNames as $num => $name): ?>
                     <option value="<?= $num ?>"<?= $selectedMonth === $num ? ' selected' : '' ?>><?php $nameSafe = HtmlSanitizer::safeHtmlOutput($name); echo $nameSafe; ?></option>

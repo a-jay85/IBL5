@@ -6,8 +6,6 @@ import { assertNoA11yViolations, type A11yOptions } from '../helpers/accessibili
 // Each entry should have a comment explaining why it's excluded.
 const SITE_WIDE_DISABLED_RULES: string[] = [
   'color-contrast', // PHP-Nuke legacy palette — nearly every page affected
-  'link-name', // Team cell links (ibl-team-cell__name) render as empty <a> tags
-  'image-alt', // Team logos and legacy images missing alt text
 ];
 
 const A11Y_OPTIONS: A11yOptions = { disableRules: SITE_WIDE_DISABLED_RULES };

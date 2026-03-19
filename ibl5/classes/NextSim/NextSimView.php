@@ -167,7 +167,8 @@ window.IBL_initNextSimHighlight();
         $html = '<div class="next-sim-day-row">';
         $html .= '<div class="next-sim-game-date">' . $gameDate . '</div>';
         $html .= '<div class="next-sim-day-label">Day ' . $dayNumberSafe . ' ' . $locationPrefixSafe . '</div>';
-        $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $opposingTeamId . '">';
+        $safeOppTeamName = HtmlSanitizer::safeHtmlOutput($opposingTeam->name ?? '');
+        $html .= '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $opposingTeamId . '" aria-label="' . $safeOppTeamName . '">';
         $html .= '<img src="./images/logo/new' . $opposingTeamId . '.png" alt="" class="next-sim-game-logo" width="20" height="20">';
         $html .= '</a>';
         $html .= '<div class="next-sim-record">' . $seasonRecord;
@@ -355,11 +356,13 @@ window.IBL_initNextSimHighlight();
         $teamLink = 'modules.php?name=Team&amp;op=team&amp;teamID=' . $teamId;
         $logoImg = '<img src="./images/logo/new' . $teamId . '.png" alt="" class="next-sim-game-logo" width="20" height="20">';
 
+        $safeTeamName = HtmlSanitizer::safeHtmlOutput($team->name ?? '');
+
         if ($gameData === null) {
             // User row: team icon
 
             return '<td class="next-sim-game-info-cell"><span>'
-                . '<a href="' . $teamLink . '">' . $logoImg . '</a>'
+                . '<a href="' . $teamLink . '" aria-label="' . $safeTeamName . '">' . $logoImg . '</a>'
                 . '</span></td>';
         }
 
@@ -368,7 +371,7 @@ window.IBL_initNextSimHighlight();
 
         return '<td class="next-sim-game-info-cell"><span>'
             . $locationPrefixSafe . ' '
-            . '<a href="' . $teamLink . '">' . $logoImg . '</a>'
+            . '<a href="' . $teamLink . '" aria-label="' . $safeTeamName . '">' . $logoImg . '</a>'
             . '</span></td>';
     }
 }

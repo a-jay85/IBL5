@@ -81,7 +81,7 @@ class ConfigBootstrap implements BootstrapStepInterface
         require_once $this->basePath . '/config.php';
 
         if (!isset($GLOBALS['dbname']) || $GLOBALS['dbname'] === '' || $GLOBALS['dbname'] === false) {
-            echo "<br><br><center><img src=images/logo.gif><br><br><b>There seems that PHP-Nuke isn't installed yet.<br>(The values in config.php file are the default ones)<br><br>You can proceed with the <a href='./install/index.php'>web installation</a> now.</center></b>";
+            echo "<br><br><center><img src=images/logo.gif alt=\"\"><br><br><b>There seems that PHP-Nuke isn't installed yet.<br>(The values in config.php file are the default ones)<br><br>You can proceed with the <a href='./install/index.php'>web installation</a> now.</center></b>";
             exit();
         }
     }

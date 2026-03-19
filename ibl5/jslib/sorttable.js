@@ -155,7 +155,7 @@ window.sorttable = {
   _addIndicator: function (th, id, symbol) {
     var span = document.createElement('span');
     span.id = id;
-    span.innerHTML = '&nbsp;' + symbol;
+    span.textContent = ' ' + symbol;
     th.appendChild(span);
   },
 

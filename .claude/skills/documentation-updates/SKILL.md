@@ -1,6 +1,8 @@
 ---
 name: documentation-updates
 description: Update IBL5 documentation during pull requests and feature development. Use when updating docs, creating README files, or documenting completed work.
+effort: low
+model: haiku
 ---
 
 # IBL5 Documentation Updates

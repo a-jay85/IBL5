@@ -107,6 +107,68 @@ jobs:
       working-directory: ibl5
       run: npm audit --audit-level=high
 
+  db-integration:
+    name: Database Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: ibl5
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.4'
+        extensions: mbstring, intl, mysqli
+        coverage: none
+
+    - name: Cache vendor directory
+      uses: actions/cache@v5
+      with:
+        path: ibl5/vendor
+        key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-vendor-
+
+    - name: Create config.php
+      working-directory: ibl5
+      run: cp config.php.example config.php
+
+    - name: Install dependencies
+      working-directory: ibl5
+      run: composer install --no-progress --no-interaction
+
+    - name: Apply migrations
+      working-directory: ibl5
+      run: bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
+
+    - name: Import seed data
+      working-directory: ibl5
+      run: mysql -h 127.0.0.1 -u root -proot ibl5 < tests/DatabaseIntegration/fixtures/db-seed.sql
+
+    - name: Run database integration tests
+      working-directory: ibl5
+      env:
+        DB_HOST: 127.0.0.1
+        DB_USER: root
+        DB_PASS: root
+        DB_NAME: ibl5
+      run: vendor/bin/phpunit --configuration phpunit.db.xml --no-progress --no-output --testdox-summary
+
   phpstan:
     name: PHPStan Analysis
     runs-on: ubuntu-latest

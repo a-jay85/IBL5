@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Team\Views;
 
+use Utilities\HtmlSanitizer;
+
 /**
  * Pure renderer for championship/conference/division banners.
  *
@@ -24,9 +26,9 @@ class BannersView
         $color1 = $bannerData['color1'];
         $color2 = $bannerData['color2'];
 
-        $iblBanner = $this->renderBannerGroup($bannerData['championships'], $color1, $color2);
-        $confBanner = $this->renderBannerGroup($bannerData['conferenceTitles'], $color1, $color2);
-        $divBanner = $this->renderBannerGroup($bannerData['divisionTitles'], $color1, $color2);
+        $iblBanner = $this->renderBannerGroup($bannerData['championships']);
+        $confBanner = $this->renderBannerGroup($bannerData['conferenceTitles']);
+        $divBanner = $this->renderBannerGroup($bannerData['divisionTitles']);
 
         $bannerOutput = $iblBanner . $confBanner . $divBanner;
 
@@ -34,8 +36,9 @@ class BannersView
             return '';
         }
 
-        return "<center><table><tr><td bgcolor=\"#$color1\" align=\"center\"><font color=\"#$color2\"><h2>$teamName Banners</h2></font></td></tr>"
-            . $bannerOutput . "</table></center>";
+        return '<div class="banners-container" style="--banner-primary: #' . HtmlSanitizer::e($color1) . '; --banner-secondary: #' . HtmlSanitizer::e($color2) . ';">'
+            . '<div class="banners-header"><h2>' . HtmlSanitizer::e($teamName) . ' Banners</h2></div>'
+            . $bannerOutput . '</div>';
     }
 
     /**
@@ -43,7 +46,7 @@ class BannersView
      *
      * @param BannerGroupData $group
      */
-    private function renderBannerGroup(array $group, string $color1, string $color2): string
+    private function renderBannerGroup(array $group): string
     {
         if ($group['banners'] === []) {
             return '';
@@ -54,23 +57,31 @@ class BannersView
 
         foreach ($group['banners'] as $banner) {
             if ($count % 5 === 0) {
-                $output .= "<tr><td align=\"center\"><table><tr>";
+                $output .= '<div class="banners-row">';
             }
 
-            $bgAttr = $banner['bgImage'] !== null ? " background=\"{$banner['bgImage']}\"" : '';
-            $output .= "<td><table><tr bgcolor=$color1><td valign=top height=80 width=120$bgAttr><font color=#$color2>
-                    <center><b>{$banner['year']}<br>
-                    {$banner['name']}<br>{$banner['label']}</b></center></td></tr></table></td>";
+            $bgStyle = '';
+            if ($banner['bgImage'] !== null) {
+                $bgImage = $banner['bgImage'];
+                if (str_starts_with($bgImage, './') || str_starts_with($bgImage, '/')) {
+                    $bgStyle = ' style="--banner-bg-image: url(\'' . HtmlSanitizer::e($bgImage) . '\')"';
+                }
+            }
+
+            $output .= '<div class="banner-item"' . $bgStyle . '>'
+                . '<strong>' . HtmlSanitizer::e((string) $banner['year']) . '<br>'
+                . HtmlSanitizer::e($banner['name']) . '<br>' . HtmlSanitizer::e($banner['label']) . '</strong>'
+                . '</div>';
 
             $count++;
 
             if ($count % 5 === 0) {
-                $output .= "</tr></table></td></tr>";
+                $output .= '</div>';
             }
         }
 
-        if (substr($output, -23) !== "</tr></table></td></tr>") {
-            $output .= "</tr></table></td></tr>";
+        if ($count % 5 !== 0) {
+            $output .= '</div>';
         }
 
         return $output;

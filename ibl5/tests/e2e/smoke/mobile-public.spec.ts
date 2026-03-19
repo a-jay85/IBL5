@@ -84,11 +84,50 @@ test.describe('Mobile public page smoke tests', () => {
     await assertNoHorizontalOverflow(page, 'on team schedule');
   });
 
+  test('draft history year detail — no horizontal overflow on mobile', async ({ page }) => {
+    test.setTimeout(60_000);
+    await gotoWithRetry(page, 'modules.php?name=DraftHistory&year=2026');
+    // CI seed has 2026 draft picks; local DB may not — skip if no table rendered
+    const table = page.locator('.ibl-data-table').first();
+    const visible = await table.isVisible().catch(() => false);
+    if (!visible) {
+      test.skip(true, 'draft history year 2026 has no data (local DB state)');
+    }
+    await expect(table).toBeVisible();
+    await assertNoHorizontalOverflow(page, 'on draft history year detail');
+    await assertScrollWrappersPresent(page, 'on draft history year detail');
+  });
+
+  test('draft history team view — no horizontal overflow on mobile', async ({ page }) => {
+    test.setTimeout(60_000);
+    await gotoWithRetry(page, 'modules.php?name=DraftHistory&teamID=1');
+    await expect(page.locator('.ibl-title').first()).toBeVisible();
+    await assertNoHorizontalOverflow(page, 'on draft history team view');
+  });
+
+  test('franchise record book team view — no horizontal overflow on mobile', async ({ page }) => {
+    test.setTimeout(60_000);
+    await gotoWithRetry(page, 'modules.php?name=FranchiseRecordBook&teamid=1');
+    await expect(page.locator('.ibl-title, .ibl-data-table, table').first()).toBeVisible();
+    await assertNoHorizontalOverflow(page, 'on franchise record book team view');
+  });
+
+  test('season archive year detail — no horizontal overflow on mobile', async ({ page }) => {
+    test.setTimeout(60_000);
+    await gotoWithRetry(page, 'modules.php?name=SeasonArchive&year=2026');
+    await expect(page.locator('.ibl-title').first()).toBeVisible();
+    await assertNoHorizontalOverflow(page, 'on season archive year detail');
+  });
+
   test('no PHP errors on mobile public pages', async ({ page }) => {
     test.setTimeout(120_000);
     const urls = [
       ...PAGES.map(p => p.url),
       'modules.php?name=Schedule&teamID=1',
+      'modules.php?name=DraftHistory&year=2026',
+      'modules.php?name=DraftHistory&teamID=1',
+      'modules.php?name=FranchiseRecordBook&teamid=1',
+      'modules.php?name=SeasonArchive&year=2026',
     ];
     for (const url of urls) {
       await gotoWithRetry(page, url);

@@ -103,11 +103,11 @@ jobs:
         id: cml-cache
         with:
           path: ~/.cml
-          key: ${{ runner.os }}-cml-0.20.7
+          key: ${{ runner.os }}-cml-0.20.6
 
       - name: Install CML
         if: steps.cml-cache.outputs.cache-hit != 'true'
-        run: npm install --prefix ~/.cml @cmlrun/cml@0.20.7
+        run: npm install --prefix ~/.cml @dvcorg/cml@0.20.6
 
       # --- Docker Image ---
       - name: Log in to GHCR

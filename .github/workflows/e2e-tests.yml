@@ -401,7 +401,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
 
     steps:
@@ -456,13 +456,13 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.cml
-          key: ${{ runner.os }}-cml-0.20.7
+          key: ${{ runner.os }}-cml-0.20.6
 
       - name: Install CML (fallback if cache miss)
         if: always() && github.event_name == 'pull_request'
         run: |
           if [ ! -f ~/.cml/node_modules/.bin/cml ]; then
-            npm install --prefix ~/.cml @cmlrun/cml@0.20.7
+            npm install --prefix ~/.cml @dvcorg/cml@0.20.6
           fi
           echo "$HOME/.cml/node_modules/.bin" >> $GITHUB_PATH
 

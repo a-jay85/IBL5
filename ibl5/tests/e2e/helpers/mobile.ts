@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Page, Locator } from '@playwright/test';
 import { expect } from '@playwright/test';
 
 /**
@@ -28,4 +28,23 @@ export async function assertScrollWrappersPresent(page: Page, context?: string):
     page.locator('.table-scroll-container').first(),
     `No .table-scroll-container found${context ? ` ${context}` : ''}`,
   ).toBeAttached();
+}
+
+/**
+ * Assert that a scroll container element is scrollable (content overflows the container).
+ * Unlike assertNoHorizontalOverflow (which checks document.body), this checks the container itself.
+ */
+export async function assertScrollContainerIsScrollable(
+  page: Page,
+  containerLocator: Locator,
+  context?: string,
+): Promise<void> {
+  const metrics = await containerLocator.evaluate((el: Element) => ({
+    scrollWidth: (el as HTMLElement).scrollWidth,
+    clientWidth: (el as HTMLElement).clientWidth,
+  }));
+  expect(
+    metrics.scrollWidth,
+    `Scroll container is not scrollable${context ? ` ${context}` : ''}: scrollWidth=${metrics.scrollWidth} <= clientWidth=${metrics.clientWidth}`,
+  ).toBeGreaterThan(metrics.clientWidth);
 }

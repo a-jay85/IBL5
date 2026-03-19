@@ -285,6 +285,89 @@ abstract class DatabaseTestCase extends TestCase
         ]);
     }
 
+    /**
+     * Insert a draft row into ibl_draft.
+     * FK on tid → ibl_team_info requires a valid team ID.
+     *
+     * @param array<string, int|string> $overrides
+     */
+    protected function insertDraftRow(int $year, int $round, int $pick, int $tid, string $player = '', array $overrides = []): int
+    {
+        $defaults = [
+            'year' => $year,
+            'round' => $round,
+            'pick' => $pick,
+            'tid' => $tid,
+            'team' => 'Metros',
+            'player' => $player,
+            'uuid' => sprintf('draft-%04d-%d-%02d-%s', $year, $round, $pick, bin2hex(random_bytes(4))),
+        ];
+
+        return $this->insertRow('ibl_draft', array_merge($defaults, $overrides));
+    }
+
+    /**
+     * Insert a draft class prospect row into ibl_draft_class.
+     *
+     * @param array<string, int|string> $overrides
+     */
+    protected function insertDraftClassRow(string $name, string $pos = 'PG', array $overrides = []): int
+    {
+        $defaults = [
+            'name' => $name,
+            'pos' => $pos,
+            'age' => 19,
+            'team' => '',
+            'fga' => 50,
+            'fgp' => 50,
+            'fta' => 50,
+            'ftp' => 50,
+            'tga' => 50,
+            'tgp' => 50,
+            'orb' => 50,
+            'drb' => 50,
+            'ast' => 50,
+            'stl' => 50,
+            'tvr' => 50,
+            'blk' => 50,
+            'oo' => 50,
+            'od' => 50,
+            'po' => 50,
+            'to' => 50,
+            'do' => 50,
+            'dd' => 50,
+            'pd' => 50,
+            'td' => 50,
+            'talent' => 50,
+            'skill' => 50,
+            'intangibles' => 50,
+            'drafted' => 0,
+            'sta' => 80,
+        ];
+
+        return $this->insertRow('ibl_draft_class', array_merge($defaults, $overrides));
+    }
+
+    /**
+     * Insert a draft pick ownership row into ibl_draft_picks.
+     * FK on owner_tid and teampick_tid → ibl_team_info.
+     *
+     * @param array<string, int|string> $overrides
+     */
+    protected function insertDraftPickRow(int $ownerTid, int $teampickTid, int $year, int $round, array $overrides = []): int
+    {
+        $defaults = [
+            'ownerofpick' => 'Metros',
+            'owner_tid' => $ownerTid,
+            'teampick' => 'Metros',
+            'teampick_tid' => $teampickTid,
+            'year' => $year,
+            'round' => $round,
+        ];
+
+        return $this->insertRow('ibl_draft_picks', array_merge($defaults, $overrides));
+    }
+
     private function requireEnv(string $name): string
     {
         $value = getenv($name);

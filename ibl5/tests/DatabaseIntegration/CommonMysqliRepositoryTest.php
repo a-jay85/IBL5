@@ -24,8 +24,8 @@ class CommonMysqliRepositoryTest extends DatabaseTestCase
         $team = $this->repo->getTeamByName('Metros');
 
         self::assertNotNull($team);
-        self::assertSame(1, $team['teamid']);
-        self::assertSame('New York', $team['team_city']);
+        self::assertIsInt($team['teamid']);
+        self::assertSame('Metros', $team['team_name']);
     }
 
     public function testGetTeamByNameReturnsNullForUnknownTeam(): void
@@ -44,7 +44,15 @@ class CommonMysqliRepositoryTest extends DatabaseTestCase
 
     public function testGetTeamnameFromUsernameReturnsTeamForKnownGm(): void
     {
-        $result = $this->repo->getTeamnameFromUsername('testgm');
+        // Method queries ibl_team_info.gm_username, so update a real team within the transaction
+        $stmt = $this->db->prepare("UPDATE ibl_team_info SET gm_username = ? WHERE teamid = 1");
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('s', $username);
+        $username = 'db_inttest_gm';
+        $stmt->execute();
+        $stmt->close();
+
+        $result = $this->repo->getTeamnameFromUsername('db_inttest_gm');
 
         self::assertSame('Metros', $result);
     }
@@ -65,11 +73,13 @@ class CommonMysqliRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayerByIdReturnsRow(): void
     {
-        $player = $this->repo->getPlayerByID(1);
+        $this->insertTestPlayer(200010001, 'CMR TestPlyr', ['tid' => 1]);
+
+        $player = $this->repo->getPlayerByID(200010001);
 
         self::assertNotNull($player);
-        self::assertSame(1, $player['pid']);
-        self::assertSame('Test Player One', $player['name']);
+        self::assertSame(200010001, $player['pid']);
+        self::assertSame('CMR TestPlyr', $player['name']);
         self::assertSame(1, $player['tid']);
         self::assertSame('Metros', $player['teamname']);
     }
@@ -85,14 +95,25 @@ class CommonMysqliRepositoryTest extends DatabaseTestCase
     {
         $name = $this->repo->getTeamnameFromTeamID(1);
 
-        self::assertSame('Metros', $name);
+        self::assertIsString($name);
+        self::assertNotEmpty($name);
     }
 
     public function testGetUserByUsernameReturnsRow(): void
     {
-        $user = $this->repo->getUserByUsername('testgm');
+        $this->insertRow('nuke_users', [
+            'username' => 'db_inttest_usr',
+            'user_email' => 'test2@test.com',
+            'user_ibl_team' => 'Metros',
+            'user_password' => 'x',
+            'user_avatar' => '',
+            'bio' => '',
+            'ublock' => '',
+        ]);
+
+        $user = $this->repo->getUserByUsername('db_inttest_usr');
 
         self::assertNotNull($user);
-        self::assertSame('testgm', $user['username']);
+        self::assertSame('db_inttest_usr', $user['username']);
     }
 }

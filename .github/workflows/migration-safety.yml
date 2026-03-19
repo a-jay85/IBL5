@@ -131,6 +131,8 @@ jobs:
         # Note: migrate-seed marks ALL files as applied, which defeats the purpose
         # of this test — we need the PHP runner to actually execute post-baseline migrations.
         mysql -h 127.0.0.1 -u root -proot ibl5_php \
+          -e "CREATE TABLE IF NOT EXISTS migrations (id INT AUTO_INCREMENT PRIMARY KEY, migration VARCHAR(255) NOT NULL, batch INT NOT NULL);"
+        mysql -h 127.0.0.1 -u root -proot ibl5_php \
           -e "INSERT INTO migrations (migration, batch) VALUES ('000_baseline_schema.sql', 0);"
         php bin/migrate
 

@@ -144,16 +144,17 @@ VALUES (2, 2, 'admin', 'Sharks trade for draft pick', '2023-07-10 14:30:00', 'De
 ON DUPLICATE KEY UPDATE title = VALUES(title);
 
 -- Awards: needed by SeasonArchive and RecordHolders
+-- Use a distinct name to avoid conflicting with PlayerRepositoryTest (which expects no awards for 'Test Player One')
 INSERT INTO ibl_awards (year, Award, name, table_ID)
-VALUES (2024, 'Eastern Conference All-Star', 'Test Player One', 10001)
+VALUES (2024, 'Eastern Conference All-Star', 'Seed Awards Player', 10001)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 INSERT INTO ibl_awards (year, Award, name, table_ID)
-VALUES (2024, 'MVP', 'Test Player One', 10002)
+VALUES (2024, 'MVP', 'Seed Awards Player', 10002)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 INSERT INTO ibl_awards (year, Award, name, table_ID)
-VALUES (2023, 'Eastern Conference All-Star', 'Test Player One', 10003)
+VALUES (2023, 'Eastern Conference All-Star', 'Seed Awards Player', 10003)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 -- GM Awards: needed by SeasonArchive getAllGmAwardsWithTeams()

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace UI\Tables;
 
 use Player\PlayerImageHelper;
+use Utilities\HtmlSanitizer;
 
 /**
  * SplitStats - Renders per-game averages table for split stats views
@@ -30,7 +31,7 @@ class SplitStats
 
         foreach ($rows as $dbRow) {
             $playerRows[] = [
-                'name' => htmlspecialchars((string) ($dbRow['name'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                'name' => HtmlSanitizer::e((string) ($dbRow['name'] ?? '')),
                 'pos' => (string) ($dbRow['pos'] ?? ''),
                 'pid' => (int) $dbRow['pid'],
                 'games' => (int) $dbRow['games'],
@@ -56,7 +57,7 @@ class SplitStats
         }
 
         /** @var string $safeSplitLabel */
-        $safeSplitLabel = htmlspecialchars($splitLabel, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $safeSplitLabel = HtmlSanitizer::e($splitLabel);
 
         ob_start();
         ?>
@@ -92,7 +93,7 @@ class SplitStats
 <?php endif; ?>
 <?php foreach ($playerRows as $row): ?>
         <tr>
-            <td><?= htmlspecialchars($row['pos']) ?></td>
+            <td><?= HtmlSanitizer::e($row['pos']) ?></td>
             <?= PlayerImageHelper::renderPlayerCell($row['pid'], $row['name'], $starterPids) ?>
             <td><?= $row['games'] ?></td>
             <td class="sep-r-team"><?= $row['min'] ?></td>

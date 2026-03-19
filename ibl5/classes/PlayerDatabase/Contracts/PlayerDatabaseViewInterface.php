@@ -10,7 +10,7 @@ use Player\PlayerData;
  * Interface for player search view rendering
  * 
  * Defines the contract for rendering player search form and results.
- * All output is properly escaped to prevent XSS attacks using htmlspecialchars().
+ * All output is properly escaped to prevent XSS attacks using HtmlSanitizer::e().
  * Uses output buffering pattern for clean HTML generation.
  */
 interface PlayerDatabaseViewInterface
@@ -19,7 +19,7 @@ interface PlayerDatabaseViewInterface
      * Render the search form with all filter fields
      * 
      * The form submits to modules.php?name=PlayerDatabase via POST.
-     * All input values are repopulated with htmlspecialchars() escaping.
+     * All input values are repopulated with HtmlSanitizer::e() escaping.
      * 
      * Form includes:
      * - Basics: name (text), position (dropdown), include retirees (dropdown)
@@ -86,7 +86,7 @@ interface PlayerDatabaseViewInterface
      * - All statistical and rating values right-aligned
      * - College name at end
      * 
-     * All string output (name, team, college) is escaped with htmlspecialchars().
+     * All string output (name, team, college) is escaped with HtmlSanitizer::e().
      * All numeric values output as-is (no escaping needed).
      * Links use href="modules.php?name=Player&amp;pa=showpage&amp;pid=PID" (note &amp;)
      * Team links use href="team.php?tid=TID"

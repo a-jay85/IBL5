@@ -8,7 +8,7 @@ namespace ComparePlayers\Contracts;
  * ComparePlayersViewInterface - View rendering for player comparison
  * 
  * Defines HTML rendering methods for the player comparison feature.
- * All output is properly escaped with htmlspecialchars() to prevent XSS.
+ * All output is properly escaped with HtmlSanitizer::e() to prevent XSS.
  * Uses output buffering pattern for clean HTML generation.
  */
 interface ComparePlayersViewInterface
@@ -106,7 +106,7 @@ interface ComparePlayersViewInterface
      *  - <p> spacing between tables
      * 
      * SECURITY:
-     *  - All string values escaped with htmlspecialchars()
+     *  - All string values escaped with HtmlSanitizer::e()
      *  - Numeric values output directly (no escaping needed)
      *  - Array access uses proper syntax: $player['key']
      * 

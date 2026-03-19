@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyFormComponentsInterface;
+use Utilities\HtmlSanitizer;
 
 /**
  * @see FreeAgencyFormComponentsInterface
@@ -142,7 +143,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
      */
     private function renderOfferButtonForm(array $offers, int $finalYear, int $offerType = 0, string $testId = ''): string
     {
-        $testIdAttr = $testId !== '' ? ' data-testid="' . htmlspecialchars($testId) . '"' : '';
+        $testIdAttr = $testId !== '' ? ' data-testid="' . HtmlSanitizer::e($testId) . '"' : '';
         ob_start();
         ?>
 <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
@@ -171,7 +172,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         }
 
         // Essential form data - uses player properties
-        echo "<input type=\"hidden\" name=\"teamname\" value=\"" . htmlspecialchars($this->teamName) . "\">\n";
+        echo "<input type=\"hidden\" name=\"teamname\" value=\"" . HtmlSanitizer::e($this->teamName) . "\">\n";
         echo "<input type=\"hidden\" name=\"playerID\" value=\"" . (int) $this->player->playerID . "\">\n";
         echo "<input type=\"hidden\" name=\"offerType\" value=\"" . $offerType . "\">\n";
 
@@ -305,7 +306,7 @@ class FreeAgencyFormComponents implements FreeAgencyFormComponentsInterface
         ob_start();
         ?>
 <div class="offer-button-row">
-    <span class="ibl-label"><?= htmlspecialchars($label) ?></span>
+    <span class="ibl-label"><?= HtmlSanitizer::e($label) ?></span>
     <div class="offer-button-row__buttons">
         <?php foreach ($contractOfferConfigs as $index => $config): ?>
             <?php

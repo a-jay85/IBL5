@@ -144,6 +144,22 @@ interface TradingRepositoryInterface
     public function getPlayerById(int $playerId): ?array;
 
     /**
+     * Get multiple players by their IDs in a single query
+     *
+     * @param list<int> $playerIds Player IDs to look up
+     * @return array<int, PlayerRow> Player rows keyed by pid
+     */
+    public function getPlayersByIds(array $playerIds): array;
+
+    /**
+     * Get multiple draft picks by their IDs in a single query
+     *
+     * @param list<int> $pickIds Pick IDs to look up
+     * @return array<int, DraftPickRow> Pick rows keyed by pickid
+     */
+    public function getDraftPicksByIds(array $pickIds): array;
+
+    /**
      * Check if a player ID exists in the database
      *
      * @param int $playerId Player ID to check

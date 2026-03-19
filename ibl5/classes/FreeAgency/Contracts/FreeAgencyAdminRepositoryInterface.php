@@ -107,6 +107,14 @@ interface FreeAgencyAdminRepositoryInterface
     public function insertNewsStory(string $title, string $homeText, string $bodyText): int;
 
     /**
+     * Get demand values for multiple players in a single query
+     *
+     * @param list<int> $playerIds Player IDs to look up
+     * @return array<int, DemandRow> Demand rows keyed by player ID
+     */
+    public function getPlayerDemandsBatch(array $playerIds): array;
+
+    /**
      * Clear all offers from the free agency offers table
      */
     public function clearAllOffers(): void;

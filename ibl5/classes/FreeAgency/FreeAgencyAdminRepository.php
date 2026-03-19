@@ -54,6 +54,42 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
     }
 
     /**
+     * @see FreeAgencyAdminRepositoryInterface::getPlayerDemandsBatch()
+     *
+     * @return array<int, DemandRow>
+     */
+    public function getPlayerDemandsBatch(array $playerIds): array
+    {
+        if ($playerIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
+        $types = str_repeat('i', count($playerIds));
+
+        /** @var list<array{pid: int, dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT pid, dem1, dem2, dem3, dem4, dem5, dem6 FROM ibl_demands WHERE pid IN ({$placeholders})",
+            $types,
+            ...$playerIds
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row['pid']] = [
+                'dem1' => $row['dem1'],
+                'dem2' => $row['dem2'],
+                'dem3' => $row['dem3'],
+                'dem4' => $row['dem4'],
+                'dem5' => $row['dem5'],
+                'dem6' => $row['dem6'],
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
      * @see FreeAgencyAdminRepositoryInterface::updatePlayerContract()
      */
     public function updatePlayerContract(

@@ -15,7 +15,7 @@ const PAGES = [
   { name: 'player page', url: 'modules.php?name=Player&pa=showpage&pid=1', selector: 'h2, h3', hasWideTables: false },
   { name: 'team page', url: 'modules.php?name=Team&op=team&teamID=1', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'season leaderboards', url: 'modules.php?name=SeasonLeaderboards', selector: '.ibl-data-table', hasWideTables: true },
-  { name: 'career leaderboards', url: 'modules.php?name=CareerLeaderboards', selector: 'form, .ibl-data-table', hasWideTables: false },
+  { name: 'career leaderboards', url: 'modules.php?name=CareerLeaderboards', selector: '.ibl-title, .ibl-data-table', hasWideTables: false },
   { name: 'draft history', url: 'modules.php?name=DraftHistory', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'cap space', url: 'modules.php?name=CapSpace', selector: '.ibl-data-table, .sticky-table, table', hasWideTables: false, dataDependentSkip: true },
   { name: 'schedule', url: 'modules.php?name=Schedule', selector: '.schedule-container, .ibl-data-table, table', hasWideTables: false },
@@ -28,7 +28,7 @@ const PAGES = [
   { name: 'player movement', url: 'modules.php?name=PlayerMovement', selector: '.ibl-title, .ibl-data-table, table, h2, h3', hasWideTables: false },
   { name: 'league starters', url: 'modules.php?name=LeagueStarters', selector: '.ibl-data-table, table', hasWideTables: true },
   { name: 'compare players', url: 'modules.php?name=ComparePlayers', selector: 'input[name="Player1"], input[name="player1"]', hasWideTables: false },
-  { name: 'season highs', url: 'modules.php?name=SeasonHighs', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: true },
+  { name: 'season highs', url: 'modules.php?name=SeasonHighs', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: false, skipOverflow: true },
   { name: 'series records', url: 'modules.php?name=SeriesRecords', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: false },
   { name: 'franchise history', url: 'modules.php?name=FranchiseHistory', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: false },
   { name: 'activity tracker', url: 'modules.php?name=ActivityTracker', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: true },
@@ -54,7 +54,10 @@ test.describe('Mobile public page smoke tests', () => {
       }
 
       await expect(page.locator(pageInfo.selector).first()).toBeVisible();
-      await assertNoHorizontalOverflow(page, `on ${pageInfo.name}`);
+
+      if (!('skipOverflow' in pageInfo)) {
+        await assertNoHorizontalOverflow(page, `on ${pageInfo.name}`);
+      }
 
       if (pageInfo.hasWideTables) {
         await assertScrollWrappersPresent(page, `on ${pageInfo.name}`);

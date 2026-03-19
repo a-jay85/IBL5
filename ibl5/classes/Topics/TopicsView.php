@@ -168,7 +168,7 @@ class TopicsView implements TopicsViewInterface
      */
     private function renderTopicSelect(array $topics): string
     {
-        $output = '<select name="topic" class="search-form__select">';
+        $output = '<select name="topic" aria-label="Topic" class="search-form__select">';
         $safeAllTopics = HtmlSanitizer::safeHtmlOutput(_ALLTOPICS);
         $output .= '<option value="">' . $safeAllTopics . '</option>';
 
@@ -189,7 +189,7 @@ class TopicsView implements TopicsViewInterface
      */
     private function renderCategorySelect(array $categories): string
     {
-        $output = '<select name="category" class="search-form__select">';
+        $output = '<select name="category" aria-label="Category" class="search-form__select">';
         $safeArticles = HtmlSanitizer::safeHtmlOutput(_ARTICLES);
         $output .= '<option value="0">' . $safeArticles . '</option>';
 
@@ -210,7 +210,7 @@ class TopicsView implements TopicsViewInterface
      */
     private function renderAuthorSelect(array $authors): string
     {
-        $output = '<select name="author" class="search-form__select">';
+        $output = '<select name="author" aria-label="Author" class="search-form__select">';
         $safeAllAuthors = HtmlSanitizer::safeHtmlOutput(_ALLAUTHORS);
         $output .= '<option value="">' . $safeAllAuthors . '</option>';
 
@@ -249,7 +249,7 @@ class TopicsView implements TopicsViewInterface
             90 => '3 ' . $monthsLabel,
         ];
 
-        $output = '<select name="days" class="search-form__select">';
+        $output = '<select name="days" aria-label="Date range" class="search-form__select">';
 
         foreach ($options as $value => $label) {
             $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
@@ -315,7 +315,7 @@ class TopicsView implements TopicsViewInterface
 
         $output = '<div class="topic-card" style="animation-delay: ' . $delay . 'ms">';
         $output .= '<div class="topic-card__header">';
-        $output .= '<a href="modules.php?name=News&amp;topic=' . $topicId . '" class="topic-card__image-link">';
+        $output .= '<a href="modules.php?name=News&amp;topic=' . $topicId . '" class="topic-card__image-link" aria-label="' . $topicText . '">';
         $output .= '<img src="' . $imagePath . '" alt="" class="topic-card__image" loading="lazy">';
         $output .= '</a>';
         $output .= '<div class="topic-card__meta">';

@@ -46,7 +46,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
         $mockInner->expects($this->once())
             ->method('getLeaderboards')
             ->with('ibl_hist', 'pts', 0, 0)
-            ->willReturn(['result' => $rows, 'count' => 3]);
+            ->willReturn(['results' => $rows, 'count' => 3]);
 
         $result = $repository->getLeaderboards('ibl_hist', 'pts', 0, 10);
 
@@ -72,9 +72,9 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
         // Sort by assists
         $result = $repository->getLeaderboards('ibl_hist', 'ast', 0, 0);
 
-        $this->assertSame(1, $result['result'][0]['pid']); // 300 ast
-        $this->assertSame(2, $result['result'][1]['pid']); // 200 ast
-        $this->assertSame(3, $result['result'][2]['pid']); // 100 ast
+        $this->assertSame(1, $result['results'][0]['pid']); // 300 ast
+        $this->assertSame(2, $result['results'][1]['pid']); // 200 ast
+        $this->assertSame(3, $result['results'][2]['pid']); // 100 ast
     }
 
     public function testActiveOnlyFilterExcludesRetiredPlayers(): void
@@ -92,8 +92,8 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
         $result = $repository->getLeaderboards('ibl_hist', 'pts', 1, 0);
 
         $this->assertSame(2, $result['count']);
-        $this->assertSame(1, $result['result'][0]['pid']);
-        $this->assertSame(3, $result['result'][1]['pid']);
+        $this->assertSame(1, $result['results'][0]['pid']);
+        $this->assertSame(3, $result['results'][1]['pid']);
     }
 
     public function testLimitRestrictsResultCount(): void
@@ -142,7 +142,7 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
         $mockInner = $this->createMock(CareerLeaderboardsRepositoryInterface::class);
         $repository = new CachedCareerLeaderboardsRepository($mockInner, $this->cache);
 
-        $sampleResult = ['result' => [['pid' => 1, 'name' => 'Test', 'pts' => 100, 'retired' => 0]], 'count' => 1];
+        $sampleResult = ['results' => [['pid' => 1, 'name' => 'Test', 'pts' => 100, 'retired' => 0]], 'count' => 1];
 
         $mockInner->expects($this->exactly(12))
             ->method('getLeaderboards')
@@ -206,8 +206,8 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
         $result = $repository->getLeaderboards('ibl_season_career_avgs', 'pts', 1, 2);
 
         $this->assertSame(2, $result['count']);
-        $this->assertSame(3, $result['result'][0]['pid']); // 300 pts
-        $this->assertSame(4, $result['result'][1]['pid']); // 200 pts
+        $this->assertSame(3, $result['results'][0]['pid']); // 300 pts
+        $this->assertSame(4, $result['results'][1]['pid']); // 200 pts
     }
 
     /**

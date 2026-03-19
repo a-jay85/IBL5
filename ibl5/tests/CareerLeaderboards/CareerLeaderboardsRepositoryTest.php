@@ -81,7 +81,7 @@ final class CareerLeaderboardsRepositoryTest extends TestCase
         // Should not throw exception and return result array
         $result = $repository->getLeaderboards('ibl_hist', 'pts', 0, 10);
         $this->assertIsArray($result);
-        $this->assertArrayHasKey('result', $result);
+        $this->assertArrayHasKey('results', $result);
         $this->assertArrayHasKey('count', $result);
         $this->assertEquals(2, $result['count']);
     }

@@ -6,6 +6,7 @@ namespace PlayerDatabase;
 
 use BaseMysqliRepository;
 use PlayerDatabase\Contracts\PlayerDatabaseRepositoryInterface;
+use Services\QueryConditions;
 
 /**
  * PlayerDatabaseRepository - Database operations for player search
@@ -72,60 +73,29 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
      */
     public function searchPlayers(array $params): array
     {
-        $conditions = ['ibl_plr.pid > 0'];
-        $bindParams = [];
-        $bindTypes = '';
-
+        $baseConditions = ['ibl_plr.pid > 0'];
         if ($params['active'] === 0) {
-            $conditions[] = 'ibl_plr.retired = 0';
+            $baseConditions[] = 'ibl_plr.retired = 0';
         }
+        $qc = new QueryConditions($baseConditions);
 
-        if ($params['search_name'] !== null) {
-            $conditions[] = 'ibl_plr.name LIKE ?';
-            $bindParams[] = '%' . $params['search_name'] . '%';
-            $bindTypes .= 's';
-        }
+        // String filters (LIKE)
+        $nameSearch = is_string($params['search_name']) ? '%' . $params['search_name'] . '%' : null;
+        $qc->addIfNotNull('ibl_plr.name LIKE ?', 's', $nameSearch);
 
-        if ($params['college'] !== null) {
-            $conditions[] = 'ibl_plr.college LIKE ?';
-            $bindParams[] = '%' . $params['college'] . '%';
-            $bindTypes .= 's';
-        }
+        $collegeSearch = is_string($params['college']) ? '%' . $params['college'] . '%' : null;
+        $qc->addIfNotNull('ibl_plr.college LIKE ?', 's', $collegeSearch);
 
-        if ($params['pos'] !== null) {
-            $conditions[] = 'ibl_plr.pos = ?';
-            $bindParams[] = $params['pos'];
-            $bindTypes .= 's';
-        }
+        $qc->addIfNotNull('ibl_plr.pos = ?', 's', is_string($params['pos']) ? $params['pos'] : null);
 
-        if ($params['age'] !== null) {
-            $conditions[] = 'ibl_plr.age <= ?';
-            $bindParams[] = $params['age'];
-            $bindTypes .= 'i';
-        }
+        // Integer filters (range)
+        $qc->addIfNotNull('ibl_plr.age <= ?', 'i', is_int($params['age']) ? $params['age'] : null);
+        $qc->addIfNotNull('ibl_plr.exp >= ?', 'i', is_int($params['exp']) ? $params['exp'] : null);
+        $qc->addIfNotNull('ibl_plr.exp <= ?', 'i', is_int($params['exp_max']) ? $params['exp_max'] : null);
+        $qc->addIfNotNull('ibl_plr.bird >= ?', 'i', is_int($params['bird']) ? $params['bird'] : null);
+        $qc->addIfNotNull('ibl_plr.bird <= ?', 'i', is_int($params['bird_max']) ? $params['bird_max'] : null);
 
-        if ($params['exp'] !== null) {
-            $conditions[] = 'ibl_plr.exp >= ?';
-            $bindParams[] = $params['exp'];
-            $bindTypes .= 'i';
-        }
-        if ($params['exp_max'] !== null) {
-            $conditions[] = 'ibl_plr.exp <= ?';
-            $bindParams[] = $params['exp_max'];
-            $bindTypes .= 'i';
-        }
-
-        if ($params['bird'] !== null) {
-            $conditions[] = 'ibl_plr.bird >= ?';
-            $bindParams[] = $params['bird'];
-            $bindTypes .= 'i';
-        }
-        if ($params['bird_max'] !== null) {
-            $conditions[] = 'ibl_plr.bird <= ?';
-            $bindParams[] = $params['bird_max'];
-            $bindTypes .= 'i';
-        }
-
+        // Rating filters (>= threshold)
         $greaterThanFilters = [
             'Clutch', 'Consistency', 'talent', 'skill', 'intangibles',
             'oo', 'do', 'po', 'to', 'od', 'dd', 'pd', 'td',
@@ -135,24 +105,20 @@ class PlayerDatabaseRepository extends BaseMysqliRepository implements PlayerDat
 
         foreach ($greaterThanFilters as $filter) {
             $filterValue = $params[$filter] ?? null;
-            if ($filterValue !== null) {
+            if (is_int($filterValue)) {
                 $column = self::COLUMN_MAP[$filter];
-                $conditions[] = "ibl_plr.$column >= ?";
-                $bindParams[] = $filterValue;
-                $bindTypes .= 'i';
+                $qc->add("ibl_plr.$column >= ?", 'i', $filterValue);
             }
         }
 
-        $whereClause = implode(' AND ', $conditions);
+        $whereClause = $qc->toWhereClause();
         $query = "SELECT ibl_plr.*, ibl_team_info.team_name AS teamname, ibl_team_info.color1, ibl_team_info.color2
             FROM ibl_plr
             LEFT JOIN ibl_team_info ON ibl_plr.tid = ibl_team_info.teamid
             WHERE $whereClause
             ORDER BY ibl_plr.retired ASC, ibl_plr.ordinal ASC";
 
-        // Use executeQuery from BaseMysqliRepository for dynamic parameter binding
-        // executeQuery handles prepare, bind_param, execute, and error logging
-        $stmt = $this->executeQuery($query, $bindTypes, ...$bindParams);
+        $stmt = $this->executeQuery($query, $qc->getTypes(), ...$qc->getParams());
         $result = $stmt->get_result();
 
         if ($result === false) {

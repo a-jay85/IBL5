@@ -7,6 +7,7 @@ on:
 
 jobs:
   e2e:
+    name: Visual Regression
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -82,6 +83,9 @@ jobs:
       - name: Start Docker containers
         run: docker compose -f docker-compose.ci.yml up -d --wait
 
+      - name: Pull Playwright image (background)
+        run: nohup docker pull mcr.microsoft.com/playwright:v1.58.2-jammy > /tmp/playwright-pull.log 2>&1 &
+
       # --- Database Setup ---
       - name: Create database and apply migrations
         run: |
@@ -128,10 +132,15 @@ jobs:
           PHPSCRIPT
 
       # --- Run Tests ---
-      # Visual regression runs FIRST — before functional E2E tests which modify
+      # Visual regression runs in its own job — before functional E2E tests which modify
       # the database (trades, waivers, etc.) and would invalidate the baselines.
-      - name: Pull Playwright Docker image
-        run: docker pull mcr.microsoft.com/playwright:v1.58.2-jammy
+      - name: Wait for Playwright image
+        run: |
+          while ! docker image inspect mcr.microsoft.com/playwright:v1.58.2-jammy >/dev/null 2>&1; do
+            echo "Waiting for Playwright image pull..."
+            sleep 2
+          done
+          echo "Playwright image ready"
 
       - name: Run visual regression tests
         id: visual-regression
@@ -182,7 +191,6 @@ jobs:
           else
             git commit -m "test: update visual regression baselines [auto]"
             git push
-            echo "BASELINES_PUSHED=true" >> "$GITHUB_ENV"
           fi
 
       - name: Remove update-baselines label
@@ -191,8 +199,153 @@ jobs:
           GH_TOKEN: ${{ secrets.CI_PAT }}
         run: gh pr edit ${{ github.event.pull_request.number }} --remove-label update-baselines
 
-      - name: Run E2E tests
-        if: always() && env.BASELINES_PUSHED != 'true'
+      - name: Upload visual regression report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-regression-report
+          path: ibl5/test-results/
+          retention-days: 7
+
+      - name: Stop Docker containers
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down
+
+  e2e-shards:
+    name: E2E Tests (shard ${{ matrix.shard-index }}/${{ matrix.total-shards }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard-index: [1, 2, 3]
+        total-shards: [3]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      # --- Dependency Caching ---
+      - name: Cache vendor directory
+        uses: actions/cache@v5
+        with:
+          path: ibl5/vendor
+          key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-vendor-
+
+      - name: Cache node_modules
+        uses: actions/cache@v5
+        with:
+          path: ibl5/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install JS dependencies
+        working-directory: ibl5
+        run: bun install
+
+      - name: Install Composer dependencies
+        working-directory: ibl5
+        run: composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+
+      # --- App Setup ---
+      - name: Create config.php
+        working-directory: ibl5
+        run: |
+          cat > config.php <<'PHPCFG'
+          <?php
+          if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
+              header("Location: index.php");
+              exit();
+          }
+          $display_errors = true;
+          $dbhost = getenv('DB_HOST') ?: '127.0.0.1';
+          $dbuname = 'root';
+          $dbpass = 'root';
+          $dbname = 'ibl5';
+          $prefix = 'nuke';
+          $user_prefix = 'nuke';
+          $dbtype = 'MySQL';
+          $sitekey = 'ci-test-key-not-secret';
+          $subscription_url = '';
+          $admin_file = 'admin';
+          PHPCFG
+
+      - name: Build CSS
+        working-directory: ibl5
+        run: bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
+
+      # --- Docker Compose ---
+      - name: Pull or build PHP image
+        run: |
+          docker pull ghcr.io/a-jay85/ibl5/php-apache:latest || \
+          docker build -t ghcr.io/a-jay85/ibl5/php-apache:latest .
+
+      - name: Start Docker containers
+        run: docker compose -f docker-compose.ci.yml up -d --wait
+
+      - name: Pull Playwright image (background)
+        run: nohup docker pull mcr.microsoft.com/playwright:v1.58.2-jammy > /tmp/playwright-pull.log 2>&1 &
+
+      # --- Database Setup ---
+      - name: Create database and apply migrations
+        run: |
+          chmod +x ibl5/bin/run-migrations-ci.sh
+          ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
+
+      - name: Import seed data
+        run: |
+          docker compose -f docker-compose.ci.yml exec -T mariadb \
+            mariadb -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
+
+      - name: Create test user
+        env:
+          IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
+          IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
+        run: |
+          docker compose -f docker-compose.ci.yml exec \
+            -e IBL_TEST_USER="$IBL_TEST_USER" \
+            -e IBL_TEST_PASS="$IBL_TEST_PASS" \
+            -T php php <<'PHPSCRIPT'
+          <?php
+          $hash = password_hash(getenv('IBL_TEST_PASS'), PASSWORD_BCRYPT);
+          $user = getenv('IBL_TEST_USER');
+          $email = 'ci-test@example.com';
+          $db = new mysqli('mariadb', 'root', 'root', 'ibl5');
+
+          // roles_mask = 1 grants ADMIN role (Delight\Auth\Role::ADMIN)
+          // Required for admin page E2E tests (updateAllTheThings.php, block.php)
+          $stmt = $db->prepare("INSERT INTO auth_users (email, password, username, status, verified, resettable, roles_mask, registered, force_logout) VALUES (?, ?, ?, 0, 1, 1, 1, ?, 0)");
+          $time = time();
+          $stmt->bind_param('sssi', $email, $hash, $user, $time);
+          $stmt->execute();
+
+          $stmt = $db->prepare("INSERT INTO nuke_users (username, user_email, user_ibl_team, user_password, name, user_avatar, bio, ublock, theme, user_regdate) VALUES (?, ?, 'Metros', ?, 'CI Test User', '', '', '', '', NOW())");
+          $stmt->bind_param('sss', $user, $email, $hash);
+          $stmt->execute();
+
+          $stmt = $db->prepare("UPDATE ibl_team_info SET gm_username = ? WHERE team_name = 'Metros'");
+          $stmt->bind_param('s', $user);
+          $stmt->execute();
+
+          $db->close();
+          echo "Test user created: $user\n";
+          PHPSCRIPT
+
+      # --- Run Sharded Tests ---
+      - name: Wait for Playwright image
+        run: |
+          while ! docker image inspect mcr.microsoft.com/playwright:v1.58.2-jammy >/dev/null 2>&1; do
+            echo "Waiting for Playwright image pull..."
+            sleep 2
+          done
+          echo "Playwright image ready"
+
+      - name: Run E2E tests (shard ${{ matrix.shard-index }}/${{ matrix.total-shards }})
         env:
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
           IBL_TEST_PASS: ${{ secrets.IBL_TEST_PASS }}
@@ -207,24 +360,53 @@ jobs:
             -e "IBL_TEST_PASS=$IBL_TEST_PASS" \
             -e "HOME=/tmp" \
             mcr.microsoft.com/playwright:v1.58.2-jammy \
-            npx playwright test
+            npx playwright test \
+              --shard=${{ matrix.shard-index }}/${{ matrix.total-shards }} \
+              --reporter=blob
 
-      - name: Upload test results
+      - name: Upload blob report
         if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: blob-report-${{ matrix.shard-index }}
+          path: ibl5/blob-report/
+          retention-days: 1
+
+      - name: Stop Docker containers
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down
+
+  merge-reports:
+    name: Merge E2E Reports
+    needs: [e2e-shards]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install JS dependencies
+        working-directory: ibl5
+        run: bun install
+
+      - name: Download blob reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: blob-report-*
+          path: ibl5/all-blob-reports
+          merge-multiple: true
+
+      - name: Merge reports
+        working-directory: ibl5
+        run: npx playwright merge-reports --reporter=html ./all-blob-reports
+
+      - name: Upload merged report
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: ibl5/playwright-report/
           retention-days: 7
-
-      - name: Upload visual regression report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: visual-regression-report
-          path: ibl5/test-results/
-          retention-days: 7
-
-      - name: Stop Docker containers
-        if: always()
-        run: docker compose -f docker-compose.ci.yml down

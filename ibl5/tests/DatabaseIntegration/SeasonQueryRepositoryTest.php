@@ -21,6 +21,12 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetSeasonPhaseReturnsString(): void
     {
+        // Ensure the setting exists (CI seed may not have it)
+        $this->db->query(
+            "INSERT INTO ibl_settings (name, value) VALUES ('Current Season Phase', 'Regular Season')
+             ON DUPLICATE KEY UPDATE value = value"
+        );
+
         $phase = $this->repo->getSeasonPhase();
 
         self::assertIsString($phase);
@@ -29,6 +35,12 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetSeasonEndingYearReturnsString(): void
     {
+        // Ensure the setting exists (CI seed may not have it)
+        $this->db->query(
+            "INSERT INTO ibl_settings (name, value) VALUES ('Current Season Ending Year', '2099')
+             ON DUPLICATE KEY UPDATE value = value"
+        );
+
         $year = $this->repo->getSeasonEndingYear();
 
         self::assertIsString($year);
@@ -37,16 +49,19 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetBulkSettingsReturnsMappedValues(): void
     {
-        // Insert a custom setting within the transaction
-        $this->insertRow('ibl_settings', [
-            'name' => 'DB_IntTest_Setting',
-            'value' => 'test_value_42',
-        ]);
+        // Use REPLACE to safely insert test settings (PK on name)
+        $this->db->query(
+            "REPLACE INTO ibl_settings (name, value) VALUES ('DB_IntTest_BulkSetting', 'test_value_42')"
+        );
+        $this->db->query(
+            "INSERT INTO ibl_settings (name, value) VALUES ('Current Season Phase', 'Regular Season')
+             ON DUPLICATE KEY UPDATE value = value"
+        );
 
-        $map = $this->repo->getBulkSettings(['DB_IntTest_Setting', 'Current Season Phase']);
+        $map = $this->repo->getBulkSettings(['DB_IntTest_BulkSetting', 'Current Season Phase']);
 
-        self::assertArrayHasKey('DB_IntTest_Setting', $map);
-        self::assertSame('test_value_42', $map['DB_IntTest_Setting']);
+        self::assertArrayHasKey('DB_IntTest_BulkSetting', $map);
+        self::assertSame('test_value_42', $map['DB_IntTest_BulkSetting']);
         self::assertArrayHasKey('Current Season Phase', $map);
     }
 
@@ -102,10 +117,8 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetLastRegularSeasonGameDateReturnsStringOrNull(): void
     {
-        // Production schedule data exists, so MAX(Date) WHERE Date < playoffs_start returns a date
-        // For a real season year, this should return a date string
-        $year = (int) $this->repo->getSeasonEndingYear();
-        $date = $this->repo->getLastRegularSeasonGameDate($year);
+        // Use a fixed year — method returns null when no schedule data exists
+        $date = $this->repo->getLastRegularSeasonGameDate(2099);
 
         if ($date !== null) {
             self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $date);
@@ -119,7 +132,8 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
         $first = $this->repo->getFirstBoxScoreDate();
         $last = $this->repo->getLastBoxScoreDate();
 
-        // Production DB should have box score data
+        // Returns empty string if no box score data exists (CI seed),
+        // or a date string if production data exists
         self::assertIsString($first);
         self::assertIsString($last);
     }

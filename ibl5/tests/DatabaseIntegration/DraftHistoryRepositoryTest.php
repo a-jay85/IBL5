@@ -26,10 +26,18 @@ class DraftHistoryRepositoryTest extends DatabaseTestCase
 
     public function testGetLastDraftYearReturnsInt(): void
     {
+        // Insert a test player with a known draft year to avoid dependency on production data
+        $this->insertTestPlayer(200030003, 'DH LastYear', [
+            'draftyear' => 2050,
+            'draftround' => 1,
+            'draftpickno' => 1,
+            'draftedby' => 'Metros',
+        ]);
+
         $year = $this->repo->getLastDraftYear();
 
         self::assertIsInt($year);
-        self::assertGreaterThanOrEqual(1988, $year);
+        self::assertGreaterThanOrEqual(2050, $year);
     }
 
     public function testGetDraftPicksByYearReturnsRows(): void

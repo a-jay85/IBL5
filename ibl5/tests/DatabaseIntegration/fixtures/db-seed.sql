@@ -37,3 +37,108 @@ ON DUPLICATE KEY UPDATE value = VALUES(value);
 INSERT INTO ibl_settings (name, value)
 VALUES ('Phase', 'Regular Season')
 ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+-- Additional settings needed by LeagueControlPanel tests
+INSERT INTO ibl_settings (name, value)
+VALUES ('Current Season Phase', 'Regular Season')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+INSERT INTO ibl_settings (name, value)
+VALUES ('Sim Length in Days', '3')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+INSERT INTO ibl_settings (name, value)
+VALUES ('Allow Waiver Moves', 'Yes')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+INSERT INTO ibl_settings (name, value)
+VALUES ('Show Draft Link', 'Off')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+INSERT INTO ibl_settings (name, value)
+VALUES ('ASG Voting', 'No')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+INSERT INTO ibl_settings (name, value)
+VALUES ('EOY Voting', 'No')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+INSERT INTO ibl_settings (name, value)
+VALUES ('Free Agency Notifications', 'Yes')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+INSERT INTO ibl_settings (name, value)
+VALUES ('Trivia Mode', 'Off')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
+
+-- Standings: Metros and Sharks in same division/conference
+INSERT INTO ibl_standings (tid, team_name, pct, leagueRecord, wins, losses, conference, confRecord, confGB, division, divRecord, divGB, homeRecord, awayRecord, gamesUnplayed)
+VALUES (1, 'Metros', 0.600, '30-20', 30, 20, 'Eastern', '18-12', 0.0, 'Atlantic', '8-4', 0.0, '18-7', '12-13', 32)
+ON DUPLICATE KEY UPDATE team_name = VALUES(team_name), wins = VALUES(wins), losses = VALUES(losses);
+
+INSERT INTO ibl_standings (tid, team_name, pct, leagueRecord, wins, losses, conference, confRecord, confGB, division, divRecord, divGB, homeRecord, awayRecord, gamesUnplayed)
+VALUES (2, 'Sharks', 0.400, '20-30', 20, 30, 'Western', '10-18', 5.0, 'Pacific', '4-8', 3.0, '12-13', '8-17', 32)
+ON DUPLICATE KEY UPDATE team_name = VALUES(team_name), wins = VALUES(wins), losses = VALUES(losses);
+
+-- Power ratings for both teams
+INSERT INTO ibl_power (TeamID, ranking, last_win, last_loss, streak_type, streak, sos, remaining_sos)
+VALUES (1, 75.5, 7, 3, 'W', 3, 0.510, 0.490)
+ON DUPLICATE KEY UPDATE ranking = VALUES(ranking);
+
+INSERT INTO ibl_power (TeamID, ranking, last_win, last_loss, streak_type, streak, sos, remaining_sos)
+VALUES (2, 45.2, 4, 6, 'L', 2, 0.480, 0.520)
+ON DUPLICATE KEY UPDATE ranking = VALUES(ranking);
+
+-- Championship banner for Metros
+INSERT INTO ibl_banners (year, currentname, bannername, bannertype)
+VALUES (2024, 'Metros', 'Metros', 1);
+
+-- GM tenure for Metros franchise
+INSERT INTO ibl_gm_tenures (franchise_id, gm_username, start_season_year, end_season_year, is_mid_season_start, is_mid_season_end)
+VALUES (1, 'testgm', 2020, NULL, 0, 0)
+ON DUPLICATE KEY UPDATE gm_username = VALUES(gm_username);
+
+-- Historical player stats (ibl_hist) for franchise history queries
+INSERT INTO ibl_hist (pid, name, year, team, teamid, games, minutes, fgm, fga, ftm, fta, tgm, tga, orb, reb, ast, stl, blk, tvr, pf, pts, salary)
+VALUES (1, 'Test Player One', 2024, 'Metros', 1, 50, 1600, 300, 600, 100, 120, 50, 130, 40, 200, 150, 50, 20, 80, 100, 750, 1500)
+ON DUPLICATE KEY UPDATE games = VALUES(games);
+
+-- Franchise seasons for historical name lookups
+INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year, team_city, team_name)
+VALUES (1, 2023, 2024, 'New York', 'Metros')
+ON DUPLICATE KEY UPDATE team_name = VALUES(team_name);
+
+-- nuke_modules: Draft module entry (needed by setSeasonPhase/setShowDraftLink tests)
+-- Note: nuke_modules uses MyISAM — not covered by transaction rollback.
+-- Tests that modify this table must clean up manually.
+INSERT INTO nuke_modules (title, custom_title, active, view, inmenu, mod_group, admins)
+VALUES ('Draft', 'Draft', 1, 0, 1, 0, '')
+ON DUPLICATE KEY UPDATE active = 1;
+
+-- ASG voting rows for Metros and Sharks
+INSERT INTO ibl_votes_ASG (teamid, team_city, team_name, East_F1)
+VALUES (1, 'New York', 'Metros', 'Some Player')
+ON DUPLICATE KEY UPDATE East_F1 = VALUES(East_F1);
+
+INSERT INTO ibl_votes_ASG (teamid, team_city, team_name, West_F1)
+VALUES (2, 'San Diego', 'Sharks', 'Another Player')
+ON DUPLICATE KEY UPDATE West_F1 = VALUES(West_F1);
+
+-- EOY voting rows for Metros and Sharks
+INSERT INTO ibl_votes_EOY (teamid, team_city, team_name, MVP_1)
+VALUES (1, 'New York', 'Metros', 'Some Player')
+ON DUPLICATE KEY UPDATE MVP_1 = VALUES(MVP_1);
+
+INSERT INTO ibl_votes_EOY (teamid, team_city, team_name, MVP_1)
+VALUES (2, 'San Diego', 'Sharks', 'Another Player')
+ON DUPLICATE KEY UPDATE MVP_1 = VALUES(MVP_1);
+
+-- Transaction history entries (nuke_stories with transaction categories)
+-- Note: nuke_stories uses MyISAM — not covered by transaction rollback.
+INSERT INTO nuke_stories (sid, catid, aid, title, time, hometext, comments, counter, topic, informant, ihome, acomm, haspoll, pollID, score, ratings)
+VALUES (1, 1, 'admin', 'Metros sign Test Player One', '2024-03-15 12:00:00', 'Details...', 0, 0, 1, '', 0, 0, 0, 0, 0, 0)
+ON DUPLICATE KEY UPDATE title = VALUES(title);
+
+INSERT INTO nuke_stories (sid, catid, aid, title, time, hometext, comments, counter, topic, informant, ihome, acomm, haspoll, pollID, score, ratings)
+VALUES (2, 2, 'admin', 'Sharks trade for draft pick', '2023-07-10 14:30:00', 'Details...', 0, 0, 1, '', 0, 0, 0, 0, 0, 0)
+ON DUPLICATE KEY UPDATE title = VALUES(title);

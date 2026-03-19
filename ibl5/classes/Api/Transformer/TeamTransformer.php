@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace Api\Transformer;
 
+/**
+ * @phpstan-import-type TeamListRow from \Api\Repository\ApiTeamRepository
+ * @phpstan-import-type TeamDetailRow from \Api\Repository\ApiTeamRepository
+ */
 class TeamTransformer
 {
     /**
      * Transform a team row for list endpoints.
      *
-     * @param array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, discordID: int|null} $row
+     * @param TeamListRow $row
      * @return array<string, mixed>
      */
     public function transform(array $row): array
@@ -31,7 +35,7 @@ class TeamTransformer
     /**
      * Transform a team row for detail endpoint (includes standings/power data).
      *
-     * @param array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, discordID: int|null, league_record: string|null, conference_record: string|null, division_record: string|null, home_wins: int|null, home_losses: int|null, away_wins: int|null, away_losses: int|null, win_percentage: float|null, conference_games_back: string|null, division_games_back: string|null, games_remaining: int|null} $row
+     * @param TeamDetailRow $row
      * @return array<string, mixed>
      */
     public function transformDetail(array $row): array

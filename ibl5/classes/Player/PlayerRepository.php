@@ -13,6 +13,7 @@ use Player\Contracts\PlayerRepositoryInterface;
  * Extends BaseMysqliRepository for standardized prepared statement handling.
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type HistoricalPlayerRow from PlayerRepositoryInterface
  * @phpstan-import-type AwardRow from PlayerRepositoryInterface
  * @phpstan-import-type PlayerNewsRow from PlayerRepositoryInterface
  * @phpstan-import-type OneOnOneWinRow from PlayerRepositoryInterface
@@ -245,7 +246,7 @@ class PlayerRepository extends BaseMysqliRepository implements PlayerRepositoryI
     /**
      * Fill a PlayerData object from a historical player row
      *
-     * @param array{pid: ?int, year: ?int, name: ?string, team: ?string, teamid: ?int, salary: ?int, r_2ga: ?int, r_2gp: ?int, r_fta: ?int, r_ftp: ?int, r_3ga: ?int, r_3gp: ?int, r_orb: ?int, r_drb: ?int, r_ast: ?int, r_stl: ?int, r_blk: ?int, r_tvr: ?int, r_oo: ?int, r_od: ?int, r_do: ?int, r_dd: ?int, r_po: ?int, r_pd: ?int, r_to: ?int, r_td: ?int, ...} $plrRow
+     * @param HistoricalPlayerRow $plrRow
      */
     public function fillFromHistoricalRow(array $plrRow): PlayerData
     {

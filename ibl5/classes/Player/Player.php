@@ -14,6 +14,7 @@ use Player\Contracts\PlayerInterface;
  *
  * @see PlayerInterface
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type HistoricalPlayerRow from \Player\Contracts\PlayerRepositoryInterface
  */
 class Player implements PlayerInterface
 {
@@ -296,14 +297,13 @@ class Player implements PlayerInterface
      * Create a Player instance from a historical player row
      *
      * @param \mysqli $db Database connection
-     * @param array<string, mixed> $plrRow Historical player row data
+     * @param HistoricalPlayerRow $plrRow Historical player row data
      * @return self Populated Player instance
      */
     public static function withHistoricalPlrRow(\mysqli $db, array $plrRow): self
     {
         $instance = new self();
         $instance->initialize($db);
-        /** @phpstan-ignore argument.type (HistoricalRow from SELECT * has all required fields) */
         $instance->playerData = $instance->repository->fillFromHistoricalRow($plrRow);
         $instance->syncPropertiesFromPlayerData();
         return $instance;

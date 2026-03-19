@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Player;
 
 use Player\Contracts\PlayerImageHelperInterface;
+use Utilities\HtmlSanitizer;
 
 /**
  * @see PlayerImageHelperInterface
@@ -50,7 +51,7 @@ class PlayerImageHelper implements PlayerImageHelperInterface
             return self::PLACEHOLDER_DATA_URI;
         }
         
-        return htmlspecialchars($basePath . $playerID . '.jpg', ENT_QUOTES, 'UTF-8');
+        return HtmlSanitizer::e($basePath . $playerID . '.jpg');
     }
     
     /**
@@ -87,7 +88,7 @@ class PlayerImageHelper implements PlayerImageHelperInterface
     public static function renderPhoto(int|string|null $playerID, string $alt = '', int $width = 65, int $height = 90): string
     {
         $url = self::getImageUrl($playerID);
-        $safeAlt = \Utilities\HtmlSanitizer::safeHtmlOutput($alt);
+        $safeAlt = HtmlSanitizer::safeHtmlOutput($alt);
 
         return '<img src="' . $url . '" alt="' . $safeAlt . '" width="' . $width . '" height="' . $height . '" loading="lazy">';
     }
@@ -105,7 +106,7 @@ class PlayerImageHelper implements PlayerImageHelperInterface
      */
     public static function renderLargePlayerCell(int $playerID, string $name, string $cellClass = 'player-cell'): string
     {
-        $safeName = \Utilities\HtmlSanitizer::safeHtmlOutput($name);
+        $safeName = HtmlSanitizer::safeHtmlOutput($name);
         $url = 'modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID;
         $photo = self::renderPhoto($playerID, $name);
 
@@ -126,7 +127,7 @@ class PlayerImageHelper implements PlayerImageHelperInterface
 
         // Cash rows (pipe-delimited names) get a single span — no thumbnail or abbreviation
         if ($hasPipe) {
-            $cleanName = \Utilities\HtmlSanitizer::e(str_replace('|', '', strip_tags($displayName)));
+            $cleanName = HtmlSanitizer::e(str_replace('|', '', strip_tags($displayName)));
             return '<td class="sticky-col ibl-player-cell' . $starterClass . '">'
                 . '<span class="ibl-player-cell__name' . $statusClass . '">' . $cleanName . '</span>'
                 . '</td>';
@@ -149,7 +150,7 @@ class PlayerImageHelper implements PlayerImageHelperInterface
     public static function renderPlayerLink(int $playerID, string $rawName): string
     {
         $resolved = self::resolvePlayerDisplay($playerID, $rawName);
-        $safeName = \Utilities\HtmlSanitizer::safeHtmlOutput($resolved['name']);
+        $safeName = HtmlSanitizer::safeHtmlOutput($resolved['name']);
 
         return '<a href="./modules.php?name=Player&amp;pa=showpage&amp;pid=' . $playerID . '">'
             . $resolved['thumbnail']

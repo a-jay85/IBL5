@@ -119,7 +119,7 @@ class PeriodAverages
                 break;
             }
             $playerRows[] = [
-                'name' => htmlspecialchars((string) ($dbRow['name'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                'name' => HtmlSanitizer::e((string) ($dbRow['name'] ?? '')),
                 'pos' => (string) $dbRow['pos'],
                 'pid' => (int) $dbRow['pid'],
                 'games' => $dbRow['games'],
@@ -175,7 +175,7 @@ class PeriodAverages
     <tbody>
 <?php foreach ($playerRows as $row): ?>
         <tr>
-            <td><?= htmlspecialchars($row['pos']) ?></td>
+            <td><?= HtmlSanitizer::e($row['pos']) ?></td>
             <?= PlayerImageHelper::renderPlayerCell($row['pid'], $row['name'], $starterPids) ?>
             <td><?= (int)$row['games'] ?></td>
             <td class="sep-r-team"><?= $row['min'] ?></td>

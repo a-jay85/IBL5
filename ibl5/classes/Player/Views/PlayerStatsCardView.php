@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
+use Utilities\HtmlSanitizer;
+
 /**
  * PlayerStatsCardView - Reusable horizontal stats card wrapper
  * 
@@ -49,7 +51,7 @@ class PlayerStatsCardView
         ?>
 <div class="player-stats-card" style="<?= $cssProps ?>">
     <?php if ($statsType !== ''): ?>
-    <div class="stats-type-indicator"><?= htmlspecialchars($statsType, ENT_QUOTES, 'UTF-8') ?></div>
+    <div class="stats-type-indicator"><?= HtmlSanitizer::e($statsType) ?></div>
     <?php endif; ?>
     <?= $tableContent ?>
 </div>

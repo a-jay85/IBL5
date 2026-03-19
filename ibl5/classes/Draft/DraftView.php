@@ -108,7 +108,7 @@ class DraftView implements DraftViewInterface
 
             if ($teamLogo === $pickOwner && ($isPlayerDrafted === 0 || $isPlayerDrafted === null)) {
                 $html .= '<tr' . $rowClass . '>
-                    <td class="sticky-col"><input type="radio" name="player" value="' . htmlspecialchars($player['name'], ENT_QUOTES) . '"></td>
+                    <td class="sticky-col"><input type="radio" name="player" value="' . HtmlSanitizer::e($player['name']) . '"></td>
                     <td class="sticky-col-2" style="white-space: nowrap;">' . $playerName . '</td>';
             } elseif ($isPlayerDrafted === 1) {
                 $html .= '<tr' . $rowClass . '>

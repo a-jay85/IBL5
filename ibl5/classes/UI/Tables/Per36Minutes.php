@@ -9,6 +9,7 @@ use Player\PlayerStats;
 use Player\Player;
 use Player\PlayerImageHelper;
 use UI\TeamCellHelper;
+use Utilities\HtmlSanitizer;
 
 /**
  * Per36Minutes - Displays per-36-minute statistics table
@@ -102,7 +103,7 @@ class Per36Minutes
 <?php if ($moduleName === "LeagueStarters"):
     echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamID ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
 endif; ?>
-            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell($player->playerID ?? 0, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
             <td><?= $playerStats->seasonGamesPlayed ?></td>
             <td><?= $playerStats->seasonGamesStarted ?></td>

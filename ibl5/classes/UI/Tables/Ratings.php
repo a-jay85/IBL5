@@ -8,6 +8,7 @@ use Player\Player;
 use Player\PlayerImageHelper;
 use UI\Components\TooltipLabel;
 use UI\TeamCellHelper;
+use Utilities\HtmlSanitizer;
 
 /**
  * Ratings - Displays player ratings table
@@ -74,7 +75,7 @@ class Ratings
     echo TeamCellHelper::renderTeamCellOrFreeAgent($player->teamID ?? 0, $player->teamName ?? '', $player->teamColor1 ?? 'FFFFFF', $player->teamColor2 ?? '000000');
 endif; ?>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->playerID, $player->decoratedName ?? '', $starterPids, $player->nameStatusClass) ?>
-            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <td class="sep-r-team"><?= (int)$player->age ?></td>
             <td><?= (int)$player->ratingFieldGoalAttempts ?></td>
             <td class="sep-r-weak"><?= (int)$player->ratingFieldGoalPercentage ?></td>

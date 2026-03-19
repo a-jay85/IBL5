@@ -204,3 +204,8 @@ ON DUPLICATE KEY UPDATE `Start Date` = VALUES(`Start Date`);
 INSERT INTO ibl_team_awards (year, name, Award)
 VALUES (2024, 'Metros', 'Best Record')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+-- Draft Order Finalized: needed by ProjectedDraftOrderRepository
+INSERT INTO ibl_settings (name, value)
+VALUES ('Draft Order Finalized', 'No')
+ON DUPLICATE KEY UPDATE value = VALUES(value);

@@ -75,16 +75,8 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
      */
     public function getTeamCapSpaceNextSeason(string $teamName): int
     {
-        /** @var array{total_salary: int|null}|null $result */
-        $result = $this->fetchOne(
-            "SELECT SUM(next_year_salary) AS total_salary
-             FROM vw_current_salary
-             WHERE teamname = ?",
-            "s",
-            $teamName
-        );
-
-        return \League::HARD_CAP_MAX - (int) ($result['total_salary'] ?? 0);
+        $commonRepo = new \Services\CommonMysqliRepository($this->db);
+        return $commonRepo->getTeamCapSpaceNextSeason($teamName);
     }
 
     /**

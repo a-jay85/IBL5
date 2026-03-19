@@ -97,7 +97,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
 
         $this->view->renderFormFooter();
 
-        echo '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
+        echo '<div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Player ratings">';
         echo $this->getTableOutput($teamID, $display, $split);
         echo '</div></div>';
 

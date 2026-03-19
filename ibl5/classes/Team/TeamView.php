@@ -64,7 +64,7 @@ class TeamView implements TeamViewInterface
             <?= $bannerHtml ?>
             <?= $this->renderExtensionResultBanner($extensionResult, $extensionMsg) ?>
             <div class="table-scroll-wrapper">
-                <div class="table-scroll-container">
+                <div class="table-scroll-container" tabindex="0" role="region" aria-label="Team roster">
                     <?= $tableOutput ?>
                 </div>
             </div>

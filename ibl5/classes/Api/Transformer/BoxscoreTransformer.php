@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace Api\Transformer;
 
+/**
+ * @phpstan-import-type BoxscoreTeamRow from \Api\Repository\ApiGameRepository
+ * @phpstan-import-type BoxscorePlayerRow from \Api\Repository\ApiGameRepository
+ */
 class BoxscoreTransformer
 {
     /**
      * Transform a team box score row from ibl_box_scores_teams.
      *
-     * @param array{name: string, visitorQ1points: int, visitorQ2points: int, visitorQ3points: int, visitorQ4points: int, visitorOTpoints: int, homeQ1points: int, homeQ2points: int, homeQ3points: int, homeQ4points: int, homeOTpoints: int, gameMIN: int|null, game2GM: int, game2GA: int, gameFTM: int, gameFTA: int, game3GM: int, game3GA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int, attendance: int, capacity: int, visitorWins: int, visitorLosses: int, homeWins: int, homeLosses: int, calc_points: int, calc_rebounds: int, calc_fg_made: int} $row
+     * @param BoxscoreTeamRow $row
      * @return array<string, mixed>
      */
     public function transformTeamStats(array $row): array
@@ -54,7 +58,7 @@ class BoxscoreTransformer
     /**
      * Transform a player box score line from ibl_box_scores.
      *
-     * @param array{player_uuid: string|null, name: string, pos: string, gameMIN: int, game2GM: int, game2GA: int, gameFTM: int, gameFTA: int, game3GM: int, game3GA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int, calc_points: int, calc_rebounds: int, calc_fg_made: int} $row
+     * @param BoxscorePlayerRow $row
      * @return array<string, mixed>
      */
     public function transformPlayerLine(array $row): array

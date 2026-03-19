@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Api\Transformer;
 
+/**
+ * @phpstan-import-type InjuredPlayerRow from \Api\Repository\ApiInjuriesRepository
+ */
 class InjuryTransformer
 {
     /**
      * Transform an injured player row.
      *
-     * @param array{player_uuid: string, pid: int, name: string, pos: string, injured: int, teamid: int|null, team_uuid: string|null, team_city: string|null, team_name: string|null} $row
+     * @param InjuredPlayerRow $row
      * @return array<string, mixed>
      */
     public function transform(array $row): array

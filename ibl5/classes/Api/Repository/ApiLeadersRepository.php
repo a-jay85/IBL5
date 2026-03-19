@@ -6,6 +6,9 @@ namespace Api\Repository;
 
 use Api\Pagination\Paginator;
 
+/**
+ * @phpstan-type LeaderRow array{player_uuid: string, pid: int, name: string, teamid: int, team_uuid: string|null, team_city: string|null, team_name: string|null, year: int, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, ...}
+ */
 class ApiLeadersRepository extends \BaseMysqliRepository
 {
     /**
@@ -32,7 +35,7 @@ class ApiLeadersRepository extends \BaseMysqliRepository
      * Get paginated list of statistical leaders.
      *
      * @param array<string, string> $filters Optional filters (season, category, min_games)
-     * @return array<int, array<string, mixed>>
+     * @return list<LeaderRow>
      */
     public function getLeaders(Paginator $paginator, array $filters = []): array
     {
@@ -57,6 +60,7 @@ class ApiLeadersRepository extends \BaseMysqliRepository
         $params[] = $paginator->getLimit();
         $params[] = $paginator->getOffset();
 
+        /** @var list<LeaderRow> */
         return $this->fetchAll($query, $types, ...$params);
     }
 

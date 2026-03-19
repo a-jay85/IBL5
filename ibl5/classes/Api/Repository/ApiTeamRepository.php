@@ -7,6 +7,10 @@ namespace Api\Repository;
 use Api\Pagination\Paginator;
 use League\LeagueContext;
 
+/**
+ * @phpstan-type TeamListRow array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, discordID: int|null}
+ * @phpstan-type TeamDetailRow array{teamid: int, uuid: string, team_city: string, team_name: string, owner_name: string, arena: string, conference: string|null, division: string|null, discordID: int|null, league_record: string|null, conference_record: string|null, division_record: string|null, home_wins: int|null, home_losses: int|null, away_wins: int|null, away_losses: int|null, win_percentage: float|null, conference_games_back: string|null, division_games_back: string|null, games_remaining: int|null}
+ */
 class ApiTeamRepository extends \BaseMysqliRepository
 {
     private string $teamInfoTable;
@@ -22,12 +26,13 @@ class ApiTeamRepository extends \BaseMysqliRepository
     /**
      * Get paginated list of teams.
      *
-     * @return array<int, array<string, mixed>>
+     * @return list<TeamListRow>
      */
     public function getTeams(Paginator $paginator): array
     {
         $orderBy = $paginator->getOrderByClause();
 
+        /** @var list<TeamListRow> */
         return $this->fetchAll(
             "SELECT t.teamid, t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,
                     s.conference, s.division,
@@ -62,10 +67,11 @@ class ApiTeamRepository extends \BaseMysqliRepository
     /**
      * Get a single team by UUID with standings data.
      *
-     * @return array<string, mixed>|null
+     * @return TeamDetailRow|null
      */
     public function getTeamByUuid(string $uuid): ?array
     {
+        /** @var TeamDetailRow|null */
         return $this->fetchOne(
             "SELECT t.teamid, t.uuid, t.team_city, t.team_name, t.owner_name, t.arena,
                     s.conference, s.division,

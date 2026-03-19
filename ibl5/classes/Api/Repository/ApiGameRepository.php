@@ -7,6 +7,11 @@ namespace Api\Repository;
 use Api\Pagination\Paginator;
 use League\LeagueContext;
 
+/**
+ * @phpstan-type GameViewRow array{game_uuid: string, season_year: int, game_date: string, game_status: string, box_score_id: int, game_of_that_day: int, visitor_uuid: string, visitor_city: string, visitor_name: string, visitor_full_name: string, visitor_score: int, visitor_team_id: int, home_uuid: string, home_city: string, home_name: string, home_full_name: string, home_score: int, home_team_id: int, ...}
+ * @phpstan-type BoxscoreTeamRow array{name: string, visitorQ1points: int, visitorQ2points: int, visitorQ3points: int, visitorQ4points: int, visitorOTpoints: int, homeQ1points: int, homeQ2points: int, homeQ3points: int, homeQ4points: int, homeOTpoints: int, gameMIN: int|null, game2GM: int, game2GA: int, gameFTM: int, gameFTA: int, game3GM: int, game3GA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int, attendance: int, capacity: int, visitorWins: int, visitorLosses: int, homeWins: int, homeLosses: int, calc_points: int, calc_rebounds: int, calc_fg_made: int, ...}
+ * @phpstan-type BoxscorePlayerRow array{player_uuid: string|null, name: string, pos: string, gameMIN: int, game2GM: int, game2GA: int, gameFTM: int, gameFTA: int, game3GM: int, game3GA: int, gameORB: int, gameDRB: int, gameAST: int, gameSTL: int, gameTOV: int, gameBLK: int, gamePF: int, calc_points: int, calc_rebounds: int, calc_fg_made: int, player_tid: int|null, ...}
+ */
 class ApiGameRepository extends \BaseMysqliRepository
 {
     private string $boxScoresTable;
@@ -23,7 +28,7 @@ class ApiGameRepository extends \BaseMysqliRepository
      * Get paginated list of games from the schedule view.
      *
      * @param array<string, string> $filters Optional filters (season, status, team, date, date_start, date_end)
-     * @return array<int, array<string, mixed>>
+     * @return list<GameViewRow>
      */
     public function getGames(Paginator $paginator, array $filters = []): array
     {
@@ -41,6 +46,7 @@ class ApiGameRepository extends \BaseMysqliRepository
         $params[] = $paginator->getLimit();
         $params[] = $paginator->getOffset();
 
+        /** @var list<GameViewRow> */
         return $this->fetchAll($query, $types, ...$params);
     }
 
@@ -68,10 +74,11 @@ class ApiGameRepository extends \BaseMysqliRepository
     /**
      * Get a single game by UUID.
      *
-     * @return array<string, mixed>|null
+     * @return GameViewRow|null
      */
     public function getGameByUuid(string $uuid): ?array
     {
+        /** @var GameViewRow|null */
         return $this->fetchOne(
             'SELECT * FROM vw_schedule_upcoming WHERE game_uuid = ?',
             's',
@@ -82,10 +89,11 @@ class ApiGameRepository extends \BaseMysqliRepository
     /**
      * Get team box score stats for a game identified by date and team IDs.
      *
-     * @return array<int, array<string, mixed>>
+     * @return list<BoxscoreTeamRow>
      */
     public function getBoxscoreTeams(int $visitorTeamId, int $homeTeamId, string $date): array
     {
+        /** @var list<BoxscoreTeamRow> */
         return $this->fetchAll(
             "SELECT * FROM {$this->boxScoresTeamsTable} WHERE visitorTeamID = ? AND homeTeamID = ? AND Date = ? ORDER BY id ASC",
             'iis',
@@ -98,10 +106,11 @@ class ApiGameRepository extends \BaseMysqliRepository
     /**
      * Get player box score lines for a game identified by date and team IDs.
      *
-     * @return array<int, array<string, mixed>>
+     * @return list<BoxscorePlayerRow>
      */
     public function getBoxscorePlayers(int $visitorTid, int $homeTid, string $date): array
     {
+        /** @var list<BoxscorePlayerRow> */
         return $this->fetchAll(
             "SELECT b.*, COALESCE(p.name, b.name) AS name, p.uuid AS player_uuid, p.tid AS player_tid
              FROM {$this->boxScoresTable} b

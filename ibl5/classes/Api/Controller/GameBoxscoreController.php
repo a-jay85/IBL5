@@ -57,7 +57,6 @@ class GameBoxscoreController implements ControllerInterface
             return;
         }
 
-        /** @phpstan-ignore argument.type (DB view guarantees array shape) */
         $gameData = $gameTransformer->transform($game);
 
         $visitorTeamStats = null;
@@ -66,7 +65,6 @@ class GameBoxscoreController implements ControllerInterface
         $homePlayers = [];
 
         foreach ($teamRows as $teamRow) {
-            /** @phpstan-ignore argument.type (DB row guarantees array shape) */
             $transformed = $boxscoreTransformer->transformTeamStats($teamRow);
             if ($visitorTeamStats === null) {
                 $visitorTeamStats = $transformed;
@@ -77,7 +75,6 @@ class GameBoxscoreController implements ControllerInterface
 
         foreach ($playerRows as $playerRow) {
             $playerTid = is_int($playerRow['player_tid'] ?? null) ? $playerRow['player_tid'] : 0;
-            /** @phpstan-ignore argument.type (DB row guarantees array shape) */
             $transformedPlayer = $boxscoreTransformer->transformPlayerLine($playerRow);
             if ($playerTid === $visitorTeamId) {
                 $visitorPlayers[] = $transformedPlayer;

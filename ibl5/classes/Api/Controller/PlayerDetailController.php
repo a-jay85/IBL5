@@ -42,7 +42,6 @@ class PlayerDetailController implements ControllerInterface
             return;
         }
 
-        /** @phpstan-ignore argument.type (DB view guarantees array shape) */
         $data = $transformer->transformDetail($row);
         $responder->success($data, [], 200, $etag->getHeaders($tag));
     }

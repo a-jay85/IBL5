@@ -56,15 +56,15 @@ class StatisticsView
         global $sitename, $textcolor2;
         
         \PageLayout\PageLayout::header();
-        title("$sitename " . _STATS);
-        OpenTable();
-        OpenTable();
+        \title("$sitename " . _STATS);
+        \OpenTable();
+        \OpenTable();
         
         echo "<center><font class=\"option\"><b>$sitename " . _STATS . "</b></font><br><br>" 
             . _WERECEIVED . " <b>$totalHits</b> " . _PAGESVIEWS . " $startDate<br><br>"
             . "[ <a href=\"modules.php?name={$this->moduleName}&op=Stats\">" . _VIEWDETAILED . "</a> ]</center>";
         
-        CloseTable();
+        \CloseTable();
         echo "<br><br>";
         
         $this->renderBrowserStats($browserStats);
@@ -75,7 +75,7 @@ class StatisticsView
         
         $this->renderMiscStats($miscCounts);
         
-        CloseTable();
+        \CloseTable();
         \PageLayout\PageLayout::footer();
     }
 
@@ -89,7 +89,7 @@ class StatisticsView
     {
         global $textcolor2;
         
-        OpenTable2();
+        \OpenTable2();
         echo "<table cellspacing=\"0\" cellpadding=\"2\" border=\"0\" align=\"center\"><tr><td colspan=\"2\">\n";
         echo "<center><font color=\"$textcolor2\"><b>" . _BROWSERS . "</b></font></center><br></td></tr>\n";
         
@@ -103,7 +103,7 @@ class StatisticsView
         $this->renderBrowserRow(_UNKNOWN, 'question.gif', _OTHER, $browserStats['Other'] ?? ['count' => 0, 'percentage' => 0]);
         
         echo "</table>";
-        CloseTable();
+        \CloseTable();
     }
 
     /**
@@ -135,7 +135,7 @@ class StatisticsView
     {
         global $textcolor2;
         
-        OpenTable2();
+        \OpenTable2();
         echo "<table cellspacing=\"0\" cellpadding=\"2\" border=\"0\" align=\"center\"><tr><td colspan=\"2\">\n";
         echo "<center><font color=\"$textcolor2\"><b>" . _OPERATINGSYS . "</b></font></center><br></td></tr>\n";
         
@@ -151,7 +151,7 @@ class StatisticsView
         $this->renderOSRow(_UNKNOWN, 'question.gif', $osStats['Other'] ?? ['count' => 0, 'percentage' => 0]);
         
         echo "</table>\n";
-        CloseTable();
+        \CloseTable();
     }
 
     /**
@@ -182,7 +182,7 @@ class StatisticsView
     {
         global $textcolor2;
         
-        OpenTable2();
+        \OpenTable2();
         echo "<table cellspacing=\"0\" cellpadding=\"2\" border=\"0\" align=\"center\"><tr><td colspan=\"2\">\n";
         echo "<center><font color=\"$textcolor2\"><b>" . _MISCSTATS . "</b></font></center><br></td></tr>\n";
         
@@ -202,7 +202,7 @@ class StatisticsView
         }
         
         echo "</table>\n";
-        CloseTable();
+        \CloseTable();
     }
 
     /**
@@ -229,11 +229,11 @@ class StatisticsView
         global $sitename;
         
         \PageLayout\PageLayout::header();
-        title("$sitename " . _STATS);
-        
+        \title("$sitename " . _STATS);
+
         $total++;
-        OpenTable();
-        OpenTable();
+        \OpenTable();
+        \OpenTable();
         
         echo "<center><font class=\"option\"><b>$sitename " . _STATS . "</b></font><br><br>"
             . _WERECEIVED . " <b>$total</b> " . _PAGESVIEWS . " $startDate<br>"
@@ -254,7 +254,7 @@ class StatisticsView
         
         echo "[ <a href=\"modules.php?name={$this->moduleName}\">" . _RETURNBASICSTATS . "</a> ]</center>";
         
-        CloseTable();
+        \CloseTable();
     }
 
     /**

@@ -34,6 +34,9 @@ class StandingsIntegrationTest extends IntegrationTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Route series records query to empty result so standings rows
+        // don't leak into buildSeriesMatrix() causing undefined key warnings
+        $this->mockDb->onQuery('vw_series_records', []);
         $this->repository = new StandingsRepository($GLOBALS['mysqli_db']);
         $this->view = new StandingsView($this->repository, 2025, new SeriesRecordsService());
     }

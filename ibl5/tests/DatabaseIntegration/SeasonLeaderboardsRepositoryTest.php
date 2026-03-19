@@ -117,7 +117,8 @@ class SeasonLeaderboardsRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getSeasonLeaders([], 2);
 
-        self::assertLessThanOrEqual(2, $result['count']);
+        self::assertSame(2, $result['count']);
+        self::assertCount(2, $result['results']);
     }
 
     public function testInvalidSortDefaultsToPpg(): void

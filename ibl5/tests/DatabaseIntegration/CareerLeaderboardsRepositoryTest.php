@@ -157,7 +157,8 @@ class CareerLeaderboardsRepositoryTest extends DatabaseTestCase
 
         $result = $this->repo->getLeaderboards('ibl_hist', 'pts', 0, 3);
 
-        self::assertLessThanOrEqual(3, $result['count']);
+        self::assertSame(3, $result['count']);
+        self::assertCount(3, $result['results']);
     }
 
     public function testOrdersDescBySortColumn(): void

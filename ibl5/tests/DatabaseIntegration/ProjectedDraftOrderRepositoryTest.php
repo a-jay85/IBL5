@@ -11,10 +11,10 @@ use ProjectedDraftOrder\ProjectedDraftOrderRepository;
  *
  * Tests read queries, write operations (saveFinalDraftOrder), and nested transactions.
  *
- * NOTE: saveFinalDraftOrder() calls $this->db->begin_transaction() inside the test's
- * outer transaction. MariaDB InnoDB silently ignores nested BEGIN (no error), and the
- * internal COMMIT operates within the outer transaction scope. The outer ROLLBACK in
- * tearDown still discards everything.
+ * NOTE: saveFinalDraftOrder() calls $this->db->begin_transaction() internally, which
+ * implicitly commits the test's outer transaction (MariaDB/InnoDB behavior). This means
+ * write tests cannot rely on the base class ROLLBACK for cleanup. Instead, tearDown
+ * manually deletes test data inserted by write operations (all use year 2099).
  */
 class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
 {
@@ -24,6 +24,22 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
     {
         parent::setUp();
         $this->repo = new ProjectedDraftOrderRepository($this->db);
+    }
+
+    protected function tearDown(): void
+    {
+        // Clean up data that may have been committed by saveFinalDraftOrder's nested transaction.
+        // The base class ROLLBACK cannot undo these because begin_transaction() implicitly commits.
+        if (isset($this->db)) {
+            try {
+                $this->db->query("DELETE FROM ibl_draft WHERE year = 2099");
+                $this->db->query("DELETE FROM ibl_team_awards WHERE year = 2099 AND Award = 'IBL Draft Lottery Winners'");
+                $this->db->query("UPDATE ibl_settings SET value = 'No' WHERE name = 'Draft Order Finalized'");
+            } catch (\Throwable) {
+                // Connection may already be closed
+            }
+        }
+        parent::tearDown();
     }
 
     public function testGetAllTeamsWithStandingsReturnsJoinedRows(): void

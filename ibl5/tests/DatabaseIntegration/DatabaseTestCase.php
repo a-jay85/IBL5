@@ -42,9 +42,13 @@ abstract class DatabaseTestCase extends TestCase
 
     protected function tearDown(): void
     {
-        if (isset($this->db) && $this->db->connect_errno === 0) {
-            $this->db->rollback();
-            $this->db->close();
+        if (isset($this->db)) {
+            try {
+                $this->db->rollback();
+                $this->db->close();
+            } catch (\Throwable) {
+                // Connection may already be closed or in an unrecoverable state
+            }
         }
 
         parent::tearDown();

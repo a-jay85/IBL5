@@ -176,14 +176,13 @@ class StatisticsRepository extends \BaseMysqliRepository
         $topicsActive = function_exists('is_active') ? is_active("Topics") : false;
         $linksActive = function_exists('is_active') ? is_active("Web_Links") : false;
 
-        /** @var array{users: int, authors: int, stories: int, comments: int, submissions: int}|null $row */
+        /** @var array{users: int, authors: int, stories: int, comments: int}|null $row */
         $row = $this->fetchOne(
             "SELECT
                 (SELECT COUNT(*) FROM {$this->userPrefix}_users) AS users,
                 (SELECT COUNT(*) FROM {$this->prefix}_authors) AS authors,
                 (SELECT COUNT(*) FROM {$this->prefix}_stories) AS stories,
-                (SELECT COUNT(*) FROM {$this->prefix}_comments) AS comments,
-                (SELECT COUNT(*) FROM {$this->prefix}_queue) AS submissions"
+                (SELECT COUNT(*) FROM {$this->prefix}_comments) AS comments"
         );
 
         $counts = [
@@ -191,7 +190,6 @@ class StatisticsRepository extends \BaseMysqliRepository
             'authors' => intval($row['authors'] ?? 0),
             'stories' => intval($row['stories'] ?? 0),
             'comments' => intval($row['comments'] ?? 0),
-            'submissions' => intval($row['submissions'] ?? 0),
             'topics' => 0,
             'links' => 0,
             'linkCategories' => 0,

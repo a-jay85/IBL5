@@ -130,7 +130,7 @@ class StatisticsController
         
         $this->view->renderBackLinks();
         
-        CloseTable();
+        \CloseTable();
         \PageLayout\PageLayout::footer();
     }
 
@@ -149,8 +149,8 @@ class StatisticsController
         $currentMonth = (int)$parts[1];
         
         \PageLayout\PageLayout::header();
-        title("$sitename " . _STATS);
-        opentable();
+        \title("$sitename " . _STATS);
+        \OpenTable();
         
         $monthlyStats = $this->repository->getMonthlyStats($year);
         $totalMonthlyHits = $this->repository->getTotalMonthlyHits($year);
@@ -165,7 +165,7 @@ class StatisticsController
         
         $this->view->renderDetailNavigation();
         
-        closetable();
+        \CloseTable();
         \PageLayout\PageLayout::footer();
     }
 
@@ -185,8 +185,8 @@ class StatisticsController
         $currentDate = (int)$parts[0];
         
         \PageLayout\PageLayout::header();
-        title("$sitename " . _STATS);
-        opentable();
+        \title("$sitename " . _STATS);
+        \OpenTable();
         
         $dailyStats = $this->repository->getDailyStats($year, $month);
         $totalDailyHits = $this->repository->getTotalDailyHits($year, $month);
@@ -202,7 +202,7 @@ class StatisticsController
         
         $this->view->renderDetailNavigation();
         
-        closetable();
+        \CloseTable();
         \PageLayout\PageLayout::footer();
     }
 
@@ -219,8 +219,8 @@ class StatisticsController
         global $sitename;
         
         \PageLayout\PageLayout::header();
-        title("$sitename " . _STATS);
-        opentable();
+        \title("$sitename " . _STATS);
+        \OpenTable();
         
         $hourlyStats = $this->repository->getHourlyStats($year, $month, $date);
         $totalHourlyHits = $this->repository->getTotalHourlyHits($year, $month, $date);
@@ -236,7 +236,7 @@ class StatisticsController
         
         $this->view->renderDetailNavigation();
         
-        closetable();
+        \CloseTable();
         \PageLayout\PageLayout::footer();
     }
 }

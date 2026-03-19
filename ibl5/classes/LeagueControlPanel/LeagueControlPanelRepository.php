@@ -90,22 +90,29 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function setSeasonPhase(string $phase): bool
     {
-        $this->execute(
-            "UPDATE ibl_settings SET value = ? WHERE name = 'Current Season Phase'",
-            "s",
-            $phase
-        );
+        $this->db->begin_transaction();
+        try {
+            $this->execute(
+                "UPDATE ibl_settings SET value = ? WHERE name = 'Current Season Phase'",
+                "s",
+                $phase
+            );
 
-        if ($phase === 'Preseason' || $phase === 'HEAT') {
-            $this->execute(
-                "UPDATE ibl_settings SET value = 'Off' WHERE name = 'Show Draft Link'"
-            );
-            $this->execute(
-                "UPDATE nuke_modules SET active = 0 WHERE title = 'Draft'"
-            );
+            if ($phase === 'Preseason' || $phase === 'HEAT') {
+                $this->execute(
+                    "UPDATE ibl_settings SET value = 'Off' WHERE name = 'Show Draft Link'"
+                );
+                $this->execute(
+                    "UPDATE nuke_modules SET active = 0 WHERE title = 'Draft'"
+                );
+            }
+
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
         }
-
-        return true;
     }
 
     /**
@@ -127,20 +134,27 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function setShowDraftLink(string $value): bool
     {
-        $this->execute(
-            "UPDATE ibl_settings SET value = ? WHERE name = 'Show Draft Link'",
-            "s",
-            $value
-        );
+        $this->db->begin_transaction();
+        try {
+            $this->execute(
+                "UPDATE ibl_settings SET value = ? WHERE name = 'Show Draft Link'",
+                "s",
+                $value
+            );
 
-        $moduleActive = $value === 'On' ? 1 : 0;
-        $this->execute(
-            "UPDATE nuke_modules SET active = ? WHERE title = 'Draft'",
-            "i",
-            $moduleActive
-        );
+            $moduleActive = $value === 'On' ? 1 : 0;
+            $this->execute(
+                "UPDATE nuke_modules SET active = ? WHERE title = 'Draft'",
+                "i",
+                $moduleActive
+            );
 
-        return true;
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
     }
 
     /**
@@ -148,22 +162,29 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function resetAllStarVoting(): bool
     {
-        $this->execute(
-            "UPDATE ibl_votes_ASG SET East_F1 = NULL, East_F2 = NULL, East_F3 = NULL, East_F4 = NULL,
-                West_F1 = NULL, West_F2 = NULL, West_F3 = NULL, West_F4 = NULL,
-                East_B1 = NULL, East_B2 = NULL, East_B3 = NULL, East_B4 = NULL,
-                West_B1 = NULL, West_B2 = NULL, West_B3 = NULL, West_B4 = NULL"
-        );
+        $this->db->begin_transaction();
+        try {
+            $this->execute(
+                "UPDATE ibl_votes_ASG SET East_F1 = NULL, East_F2 = NULL, East_F3 = NULL, East_F4 = NULL,
+                    West_F1 = NULL, West_F2 = NULL, West_F3 = NULL, West_F4 = NULL,
+                    East_B1 = NULL, East_B2 = NULL, East_B3 = NULL, East_B4 = NULL,
+                    West_B1 = NULL, West_B2 = NULL, West_B3 = NULL, West_B4 = NULL"
+            );
 
-        $this->execute(
-            "UPDATE ibl_settings SET value = 'Yes' WHERE name = 'ASG Voting'"
-        );
+            $this->execute(
+                "UPDATE ibl_settings SET value = 'Yes' WHERE name = 'ASG Voting'"
+            );
 
-        $this->execute(
-            "UPDATE ibl_team_info SET asg_vote = 'No Vote'"
-        );
+            $this->execute(
+                "UPDATE ibl_team_info SET asg_vote = 'No Vote'"
+            );
 
-        return true;
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
     }
 
     /**
@@ -171,22 +192,29 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function resetEndOfYearVoting(): bool
     {
-        $this->execute(
-            "UPDATE ibl_votes_EOY SET MVP_1 = NULL, MVP_2 = NULL, MVP_3 = NULL,
-                Six_1 = NULL, Six_2 = NULL, Six_3 = NULL,
-                ROY_1 = NULL, ROY_2 = NULL, ROY_3 = NULL,
-                GM_1 = NULL, GM_2 = NULL, GM_3 = NULL"
-        );
+        $this->db->begin_transaction();
+        try {
+            $this->execute(
+                "UPDATE ibl_votes_EOY SET MVP_1 = NULL, MVP_2 = NULL, MVP_3 = NULL,
+                    Six_1 = NULL, Six_2 = NULL, Six_3 = NULL,
+                    ROY_1 = NULL, ROY_2 = NULL, ROY_3 = NULL,
+                    GM_1 = NULL, GM_2 = NULL, GM_3 = NULL"
+            );
 
-        $this->execute(
-            "UPDATE ibl_settings SET value = 'Yes' WHERE name = 'EOY Voting'"
-        );
+            $this->execute(
+                "UPDATE ibl_settings SET value = 'Yes' WHERE name = 'EOY Voting'"
+            );
 
-        $this->execute(
-            "UPDATE ibl_team_info SET eoy_vote = 'No Vote'"
-        );
+            $this->execute(
+                "UPDATE ibl_team_info SET eoy_vote = 'No Vote'"
+            );
 
-        return true;
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
     }
 
     /**

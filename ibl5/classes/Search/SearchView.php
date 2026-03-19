@@ -132,7 +132,7 @@ class SearchView implements SearchViewInterface
      */
     private function renderTopicSelect(array $topics, int $selectedTopic): string
     {
-        $output = '<select name="topic" class="search-form__select">';
+        $output = '<select name="topic" aria-label="Topic" class="search-form__select">';
         $safeAllTopics = HtmlSanitizer::safeHtmlOutput(_ALLTOPICS);
         $output .= '<option value="">' . $safeAllTopics . '</option>';
 
@@ -154,7 +154,7 @@ class SearchView implements SearchViewInterface
      */
     private function renderCategorySelect(array $categories, int $selectedCategory): string
     {
-        $output = '<select name="category" class="search-form__select">';
+        $output = '<select name="category" aria-label="Category" class="search-form__select">';
         $safeArticles = HtmlSanitizer::safeHtmlOutput(_ARTICLES);
         $output .= '<option value="0">' . $safeArticles . '</option>';
 
@@ -176,7 +176,7 @@ class SearchView implements SearchViewInterface
      */
     private function renderAuthorSelect(array $authors, string $selectedAuthor): string
     {
-        $output = '<select name="author" class="search-form__select">';
+        $output = '<select name="author" aria-label="Author" class="search-form__select">';
         $safeAllAuthors = HtmlSanitizer::safeHtmlOutput(_ALLAUTHORS);
         $output .= '<option value="">' . $safeAllAuthors . '</option>';
 
@@ -216,7 +216,7 @@ class SearchView implements SearchViewInterface
             90 => '3 ' . $monthsLabel,
         ];
 
-        $output = '<select name="days" class="search-form__select">';
+        $output = '<select name="days" aria-label="Date range" class="search-form__select">';
 
         foreach ($options as $value => $label) {
             $selected = ($value === $selectedDays) ? ' selected' : '';

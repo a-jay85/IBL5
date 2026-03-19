@@ -142,3 +142,64 @@ ON DUPLICATE KEY UPDATE title = VALUES(title);
 INSERT INTO nuke_stories (sid, catid, aid, title, time, hometext, comments, counter, topic, informant, ihome, acomm, haspoll, pollID, score, ratings)
 VALUES (2, 2, 'admin', 'Sharks trade for draft pick', '2023-07-10 14:30:00', 'Details...', 0, 0, 1, '', 0, 0, 0, 0, 0, 0)
 ON DUPLICATE KEY UPDATE title = VALUES(title);
+
+-- Awards: needed by SeasonArchive and RecordHolders
+INSERT INTO ibl_awards (year, Award, name, table_ID)
+VALUES (2024, 'Eastern Conference All-Star', 'Test Player One', 10001)
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+INSERT INTO ibl_awards (year, Award, name, table_ID)
+VALUES (2024, 'MVP', 'Test Player One', 10002)
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+INSERT INTO ibl_awards (year, Award, name, table_ID)
+VALUES (2023, 'Eastern Conference All-Star', 'Test Player One', 10003)
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+-- GM Awards: needed by SeasonArchive getAllGmAwardsWithTeams()
+INSERT INTO ibl_gm_awards (year, Award, name, table_ID)
+VALUES (2024, 'GM of the Year', 'testgm', 10001)
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+-- Schedule: needed by RecordHolders JOIN to schedule, SplitStats wins/losses
+INSERT INTO ibl_schedule (`Year`, BoxID, `Date`, Visitor, VScore, Home, HScore, uuid)
+VALUES (2025, 1, '2025-01-15', 2, 85, 1, 104, 'sched-0001-0001-0001-000000000001')
+ON DUPLICATE KEY UPDATE VScore = VALUES(VScore);
+
+-- RCB alltime records: needed by FranchiseRecordBook (stat_category is ENUM)
+INSERT INTO ibl_rcb_alltime_records (scope, team_id, record_type, stat_category, ranking, player_name, stat_value, stat_raw, season_year)
+VALUES ('team', 1, 'single_season', 'ppg', 1, 'Test Player One', 25.5000, 255, 2024)
+ON DUPLICATE KEY UPDATE player_name = VALUES(player_name);
+
+INSERT INTO ibl_rcb_alltime_records (scope, team_id, record_type, stat_category, ranking, player_name, stat_value, stat_raw, season_year)
+VALUES ('league', 0, 'career', 'ppg', 1, 'Test Player One', 22.3000, 223, 0)
+ON DUPLICATE KEY UPDATE player_name = VALUES(player_name);
+
+INSERT INTO ibl_rcb_alltime_records (scope, team_id, record_type, stat_category, ranking, player_name, stat_value, stat_raw, season_year)
+VALUES ('league', 0, 'single_season', 'rpg', 1, 'Test Player One', 12.1000, 121, 2024)
+ON DUPLICATE KEY UPDATE player_name = VALUES(player_name);
+
+-- RCB season records: needed by SeasonHighs getRcbSeasonHighs() (stat_category is ENUM)
+INSERT INTO ibl_rcb_season_records (season_year, scope, team_id, context, stat_category, ranking, player_name, player_position, stat_value, record_season_year)
+VALUES (2025, 'league', 0, 'home', 'pts', 1, 'Test Player One', 'PG', 45, 2025)
+ON DUPLICATE KEY UPDATE player_name = VALUES(player_name);
+
+-- Draft picks: needed by TeamQuery getDraftPicks()
+INSERT INTO ibl_draft_picks (ownerofpick, owner_tid, teampick, teampick_tid, year, round, notes)
+VALUES ('Metros', 1, 'Metros', 1, 2025, 1, 'Own pick')
+ON DUPLICATE KEY UPDATE notes = VALUES(notes);
+
+-- Cache: needed by RecordHolders getLastAnnouncedDate()
+INSERT INTO `cache` (`key`, `value`, `expiration`)
+VALUES ('test_seed_key', 'test_value', 0)
+ON DUPLICATE KEY UPDATE `value` = VALUES(`value`);
+
+-- Sim dates: needed by RecordHolders getUnannouncedGameDates()
+INSERT INTO ibl_sim_dates (Sim, `Start Date`, `End Date`)
+VALUES (1, '2025-01-10', '2025-01-20')
+ON DUPLICATE KEY UPDATE `Start Date` = VALUES(`Start Date`);
+
+-- Team awards: needed by vw_team_awards and SeasonArchive
+INSERT INTO ibl_team_awards (year, name, Award)
+VALUES (2024, 'Metros', 'Best Record')
+ON DUPLICATE KEY UPDATE name = VALUES(name);

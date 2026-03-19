@@ -179,9 +179,8 @@ test.describe('Responsive scroll container tests', () => {
   test('standings — sticky column stays visible after scroll', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Standings');
-    await expect(page.locator('.responsive-table tbody td.sticky-col').first()).toBeVisible();
-    const container = page.locator('.responsive-table').first().locator('xpath=ancestor::div[contains(@class,"table-scroll-container")]');
-    const result = await container.evaluate((el: Element) => {
+    await expect(page.locator('.table-scroll-container tbody td.sticky-col').first()).toBeVisible();
+    const result = await page.locator('.table-scroll-container').first().evaluate((el: Element) => {
       const c = el as HTMLElement;
       c.scrollLeft = c.scrollWidth;
       const stickyCell = c.querySelector('tbody td.sticky-col');

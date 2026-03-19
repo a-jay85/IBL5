@@ -97,6 +97,18 @@ jobs:
         working-directory: ibl5
         run: bun install
 
+      # --- CML (for PR comment screenshots) ---
+      - name: Cache CML
+        uses: actions/cache@v5
+        id: cml-cache
+        with:
+          path: ~/.cml
+          key: ${{ runner.os }}-cml-0.20.6
+
+      - name: Install CML
+        if: steps.cml-cache.outputs.cache-hit != 'true'
+        run: npm install --prefix ~/.cml @dvcorg/cml@0.20.6
+
       # --- Docker Image ---
       - name: Log in to GHCR
         uses: docker/login-action@v4
@@ -132,6 +144,13 @@ jobs:
             echo "- node_modules cache: updated" >> $GITHUB_STEP_SUMMARY
           fi
           echo "- Key: \`${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### CML" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.cml-cache.outputs.cache-hit }}" == "true" ]; then
+            echo "- CML cache: already up-to-date" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- CML cache: updated" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Docker" >> $GITHUB_STEP_SUMMARY
           echo "- PHP-Apache image: pushed to ghcr.io/a-jay85/ibl5/php-apache:latest" >> $GITHUB_STEP_SUMMARY

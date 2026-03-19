@@ -6,28 +6,31 @@ import { assertNoHorizontalOverflow, assertScrollWrappersPresent } from '../help
 // Mobile smoke tests for public pages — 375x812 viewport (iPhone SE).
 test.use({ viewport: { width: 375, height: 812 } });
 
+// hasWideTables: only true for pages whose tables are always wider than 375px regardless
+// of seed data. responsive-tables.js only wraps tables that overflow, so data-dependent
+// pages may not have scroll wrappers in CI. The overflow check still catches real issues.
 const PAGES = [
   { name: 'homepage', url: 'index.php', selector: 'body', hasWideTables: false },
   { name: 'standings', url: 'modules.php?name=Standings', selector: '.ibl-data-table', hasWideTables: true },
-  { name: 'player page', url: 'modules.php?name=Player&pa=showpage&pid=1', selector: 'h2, h3', hasWideTables: true },
+  { name: 'player page', url: 'modules.php?name=Player&pa=showpage&pid=1', selector: 'h2, h3', hasWideTables: false },
   { name: 'team page', url: 'modules.php?name=Team&op=team&teamID=1', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'season leaderboards', url: 'modules.php?name=SeasonLeaderboards', selector: '.ibl-data-table', hasWideTables: true },
-  { name: 'career leaderboards', url: 'modules.php?name=CareerLeaderboards', selector: 'button, .ibl-data-table', hasWideTables: true },
+  { name: 'career leaderboards', url: 'modules.php?name=CareerLeaderboards', selector: 'form, .ibl-data-table', hasWideTables: false },
   { name: 'draft history', url: 'modules.php?name=DraftHistory', selector: '.ibl-data-table', hasWideTables: true },
-  { name: 'cap space', url: 'modules.php?name=CapSpace', selector: '.ibl-data-table, .sticky-table, table', hasWideTables: true, dataDependentSkip: true },
+  { name: 'cap space', url: 'modules.php?name=CapSpace', selector: '.ibl-data-table, .sticky-table, table', hasWideTables: false, dataDependentSkip: true },
   { name: 'schedule', url: 'modules.php?name=Schedule', selector: '.schedule-container, .ibl-data-table, table', hasWideTables: false },
-  { name: 'injuries', url: 'modules.php?name=Injuries', selector: '.ibl-title, h2, h3', hasWideTables: true },
+  { name: 'injuries', url: 'modules.php?name=Injuries', selector: '.ibl-title, h2, h3', hasWideTables: false },
   { name: 'player database', url: 'modules.php?name=PlayerDatabase', selector: 'form[name="Search"]', hasWideTables: false },
-  { name: 'projected draft order', url: 'modules.php?name=ProjectedDraftOrder', selector: '.ibl-title, .ibl-data-table, table', hasWideTables: true },
-  { name: 'draft pick locator', url: 'modules.php?name=DraftPickLocator', selector: '.ibl-title, table', hasWideTables: true },
-  { name: 'free agency preview', url: 'modules.php?name=FreeAgencyPreview', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: true },
+  { name: 'projected draft order', url: 'modules.php?name=ProjectedDraftOrder', selector: '.ibl-title, .ibl-data-table, table', hasWideTables: false },
+  { name: 'draft pick locator', url: 'modules.php?name=DraftPickLocator', selector: '.ibl-title, table', hasWideTables: false },
+  { name: 'free agency preview', url: 'modules.php?name=FreeAgencyPreview', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: false },
   { name: 'contract list', url: 'modules.php?name=ContractList', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: true },
-  { name: 'player movement', url: 'modules.php?name=PlayerMovement', selector: '.ibl-title, .ibl-data-table, table, h2, h3', hasWideTables: true },
+  { name: 'player movement', url: 'modules.php?name=PlayerMovement', selector: '.ibl-title, .ibl-data-table, table, h2, h3', hasWideTables: false },
   { name: 'league starters', url: 'modules.php?name=LeagueStarters', selector: '.ibl-data-table, table', hasWideTables: true },
   { name: 'compare players', url: 'modules.php?name=ComparePlayers', selector: 'input[name="Player1"], input[name="player1"]', hasWideTables: false },
   { name: 'season highs', url: 'modules.php?name=SeasonHighs', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: true },
-  { name: 'series records', url: 'modules.php?name=SeriesRecords', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: true },
-  { name: 'franchise history', url: 'modules.php?name=FranchiseHistory', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: true },
+  { name: 'series records', url: 'modules.php?name=SeriesRecords', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: false },
+  { name: 'franchise history', url: 'modules.php?name=FranchiseHistory', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: false },
   { name: 'activity tracker', url: 'modules.php?name=ActivityTracker', selector: '.ibl-data-table, table, .ibl-title', hasWideTables: true },
 ] as const;
 

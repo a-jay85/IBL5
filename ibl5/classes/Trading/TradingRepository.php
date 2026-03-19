@@ -222,6 +222,64 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
+     * @see TradingRepositoryInterface::getPlayersByIds()
+     *
+     * @return array<int, PlayerRow>
+     */
+    public function getPlayersByIds(array $playerIds): array
+    {
+        if ($playerIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
+        $types = str_repeat('i', count($playerIds));
+
+        /** @var list<PlayerRow> $rows */
+        $rows = $this->fetchAll(
+            "SELECT * FROM ibl_plr WHERE pid IN ({$placeholders})",
+            $types,
+            ...$playerIds
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row['pid']] = $row;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @see TradingRepositoryInterface::getDraftPicksByIds()
+     *
+     * @return array<int, DraftPickRow>
+     */
+    public function getDraftPicksByIds(array $pickIds): array
+    {
+        if ($pickIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($pickIds), '?'));
+        $types = str_repeat('i', count($pickIds));
+
+        /** @var list<DraftPickRow> $rows */
+        $rows = $this->fetchAll(
+            "SELECT * FROM ibl_draft_picks WHERE pickid IN ({$placeholders})",
+            $types,
+            ...$pickIds
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row['pickid']] = $row;
+        }
+
+        return $result;
+    }
+
+    /**
      * @see TradingRepositoryInterface::playerIdExists()
      */
     public function playerIdExists(int $playerId): bool

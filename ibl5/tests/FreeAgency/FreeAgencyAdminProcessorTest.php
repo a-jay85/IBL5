@@ -153,6 +153,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
     {
         $stub = $this->createStub(FreeAgencyAdminRepositoryInterface::class);
         $stub->method('getAllOffersWithBirdYears')->willReturn([]);
+        $stub->method('getPlayerDemandsBatch')->willReturn([]);
 
         $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
         $result = $processor->processDay(1);
@@ -179,8 +180,8 @@ class FreeAgencyAdminProcessorTest extends TestCase
         // Demands: dem1=1000, rest 0 → total=1000, years=1
         // day 1: demands = (1000/1)*((11-1)/10) = 1000
         // perceived value 1.0 <= 1000/2 = 500 → auto-reject
-        $stub->method('getPlayerDemands')->willReturn([
-            'dem1' => 1000, 'dem2' => 0, 'dem3' => 0, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0,
+        $stub->method('getPlayerDemandsBatch')->willReturn([
+            100 => ['dem1' => 1000, 'dem2' => 0, 'dem3' => 0, 'dem4' => 0, 'dem5' => 0, 'dem6' => 0],
         ]);
 
         $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);

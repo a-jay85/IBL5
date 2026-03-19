@@ -1,0 +1,35 @@
+# IBL5 robots.txt
+# Throttle crawlers to prevent process exhaustion on shared hosting
+
+User-agent: *
+Crawl-delay: 10
+Disallow: /admin/
+Disallow: /admin.php
+Disallow: /ibl/
+Disallow: /iblforum/
+Disallow: /previous-ibl-archive/
+Disallow: /.git/
+Disallow: /vendor/
+Disallow: /tests/
+Disallow: /docs/
+Disallow: /scripts/
+Disallow: /classes/
+Disallow: /bin/
+Disallow: /config/
+Disallow: /migrations/
+Disallow: /config.php
+Disallow: /mainfile.php
+
+# Block Facebook crawler (was causing redirect loop)
+User-agent: facebookexternalhit
+Disallow: /
+
+# Block aggressive SEO bots
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /

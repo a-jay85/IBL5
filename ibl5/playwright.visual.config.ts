@@ -30,7 +30,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   workers: 1,
-  reporter: [['html', { open: 'never' }], ['list']],
+  reporter: [['html', { open: 'never' }], ['json', { outputFile: 'test-results.json' }], ['list']],
 
   expect: {
     timeout: 10_000,

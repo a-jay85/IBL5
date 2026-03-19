@@ -30,8 +30,8 @@ class WaiversRepositoryTest extends DatabaseTestCase
         // Verify actual DB state via follow-up SELECT
         $stmt = $this->db->prepare("SELECT ordinal, droptime FROM ibl_plr WHERE pid = ?");
         self::assertNotFalse($stmt);
-        $stmt->bind_param('i', $pid);
         $pid = 1;
+        $stmt->bind_param('i', $pid);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
@@ -65,8 +65,8 @@ class WaiversRepositoryTest extends DatabaseTestCase
         // Verify DB state
         $stmt = $this->db->prepare("SELECT tid, ordinal, droptime, cy1, cyt FROM ibl_plr WHERE pid = ?");
         self::assertNotFalse($stmt);
-        $stmt->bind_param('i', $pid);
         $pid = 2;
+        $stmt->bind_param('i', $pid);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();

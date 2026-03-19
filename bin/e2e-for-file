@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Resolve PHP file path → matching E2E test file(s).
+# Usage: bin/e2e-for-file <php-file-path>
+# Output: One E2E test path per line (relative to ibl5/), or nothing if no mapping.
+
+set -euo pipefail
+
+FILE="${1:-}"
+[[ -z "$FILE" ]] && exit 0
+[[ "$FILE" != *.php ]] && exit 0
+
+# Resolve repo root (where bin/ lives)
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+IBL5_DIR="$REPO_ROOT/ibl5"
+
+# Extract module name from classes/<ModuleName>/...
+MODULE=""
+if [[ "$FILE" =~ classes/([^/]+)/ ]]; then
+  MODULE="${BASH_REMATCH[1]}"
+fi
+[[ -z "$MODULE" ]] && exit 0
+
+# Infrastructure modules → smoke tests
+INFRA_MODULES="Navigation PageLayout UI Utilities Bootstrap"
+for infra in $INFRA_MODULES; do
+  if [[ "$MODULE" == "$infra" ]]; then
+    for f in "$IBL5_DIR"/tests/e2e/smoke/*.spec.ts; do
+      [[ -f "$f" ]] && echo "${f#"$IBL5_DIR/"}"
+    done
+    exit 0
+  fi
+done
+
+# PascalCase → kebab-case with acronym support
+# "GMContactList" → "gm-contact-list", "TeamOffDefStats" → "team-off-def-stats"
+kebab=$(echo "$MODULE" | sed -E 's/([A-Z]+)([A-Z][a-z])/\1-\2/g' | sed -E 's/([a-z])([A-Z])/\1-\2/g' | tr '[:upper:]' '[:lower:]')
+
+# Build set of all module kebab names for disambiguation
+ALL_KEBABS=()
+for dir in "$IBL5_DIR"/classes/*/; do
+  mod=$(basename "$dir")
+  k=$(echo "$mod" | sed -E 's/([A-Z]+)([A-Z][a-z])/\1-\2/g' | sed -E 's/([a-z])([A-Z])/\1-\2/g' | tr '[:upper:]' '[:lower:]')
+  ALL_KEBABS+=("$k")
+done
+
+# Glob for exact match and related files (name.spec.ts + name-*.spec.ts)
+for f in "$IBL5_DIR"/tests/e2e/*/${kebab}.spec.ts "$IBL5_DIR"/tests/e2e/*/${kebab}-*.spec.ts; do
+  [[ -f "$f" ]] || continue
+  # Extract the test base name (e.g., "player-database" from "player-database.spec.ts")
+  base=$(basename "$f" .spec.ts)
+  # Skip if this base name matches a MORE SPECIFIC module's kebab name
+  if [[ "$base" != "$kebab" ]]; then
+    skip=false
+    for other in "${ALL_KEBABS[@]}"; do
+      if [[ "$other" == "$base" && "$other" != "$kebab" ]]; then
+        skip=true
+        break
+      fi
+    done
+    $skip && continue
+  fi
+  echo "${f#"$IBL5_DIR/"}"
+done
+
+exit 0

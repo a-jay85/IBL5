@@ -42,9 +42,13 @@ abstract class DatabaseTestCase extends TestCase
 
     protected function tearDown(): void
     {
-        if (isset($this->db) && $this->db->ping()) {
-            $this->db->rollback();
-            $this->db->close();
+        if (isset($this->db)) {
+            try {
+                $this->db->rollback();
+                $this->db->close();
+            } catch (\Throwable) {
+                // Connection may already be closed or in an unrecoverable state
+            }
         }
 
         parent::tearDown();
@@ -228,6 +232,57 @@ abstract class DatabaseTestCase extends TestCase
         ];
 
         $this->insertRow('ibl_plr', array_merge($defaults, $overrides));
+    }
+
+    /**
+     * Insert a row into ibl_hist with sensible defaults.
+     *
+     * @param array<string, int|string> $overrides Column overrides
+     */
+    protected function insertHistRow(int $pid, string $name, int $year, array $overrides = []): void
+    {
+        $defaults = [
+            'pid' => $pid,
+            'name' => $name,
+            'year' => $year,
+            'team' => 'Metros',
+            'teamid' => 1,
+            'games' => 50,
+            'minutes' => 1600,
+            'fgm' => 300,
+            'fga' => 600,
+            'ftm' => 100,
+            'fta' => 120,
+            'tgm' => 50,
+            'tga' => 130,
+            'orb' => 40,
+            'reb' => 200,
+            'ast' => 150,
+            'stl' => 50,
+            'blk' => 20,
+            'tvr' => 80,
+            'pf' => 100,
+            'pts' => 750,
+            'salary' => 1500,
+        ];
+
+        $this->insertRow('ibl_hist', array_merge($defaults, $overrides));
+    }
+
+    /**
+     * Insert a row into ibl_franchise_seasons.
+     * Needed by tests that activate VIEW JOINs through franchise_seasons.
+     */
+    protected function insertFranchiseSeasonRow(int $franchiseId, int $seasonEndingYear, string $teamName = 'Metros'): void
+    {
+        $seasonYear = $seasonEndingYear - 1;
+        $this->insertRow('ibl_franchise_seasons', [
+            'franchise_id' => $franchiseId,
+            'season_year' => $seasonYear,
+            'season_ending_year' => $seasonEndingYear,
+            'team_city' => 'New York',
+            'team_name' => $teamName,
+        ]);
     }
 
     private function requireEnv(string $name): string

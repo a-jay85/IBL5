@@ -154,18 +154,24 @@ async function assertApiErrorRoute(
   validateBody?: (body: unknown) => void,
 ): Promise<void> {
   let lastStatus = 0;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  // More retries than assertGetRoute — error routes are more susceptible to
+  // Apache serving the HTML homepage under load (200 HTML vs expected 404 JSON).
+  for (let attempt = 0; attempt < 5; attempt++) {
     const response = method === 'get'
       ? await request.get(`${BASE_URL}${path}`, { headers: authHeaders })
       : await request.post(`${BASE_URL}${path}`);
     lastStatus = response.status();
     const contentType = response.headers()['content-type'] ?? '';
-    if (!contentType.includes('json')) continue;
+    if (!contentType.includes('json')) {
+      // Brief pause before retry — gives Apache time to recover from load
+      await new Promise((r) => setTimeout(r, 200));
+      continue;
+    }
     expect(expectedStatuses, `${path} returned ${lastStatus}`).toContain(lastStatus);
     if (validateBody) validateBody(await response.json());
     return;
   }
-  expect(expectedStatuses, `${path} returned non-JSON (status ${lastStatus}) after 3 attempts`).toContain(lastStatus);
+  expect(expectedStatuses, `${path} returned non-JSON (status ${lastStatus}) after 5 attempts`).toContain(lastStatus);
 }
 
 test.describe('API v1 — error handling', () => {
@@ -177,13 +183,16 @@ test.describe('API v1 — error handling', () => {
 
   test('unauthenticated requests return proper error structure', async ({ request }) => {
     let lastStatus = 0;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       const response = await request.get(`${BASE_URL}/season`, {
         headers: { 'X-API-Key': '' },
       });
       lastStatus = response.status();
       const contentType = response.headers()['content-type'] ?? '';
-      if (!contentType.includes('json')) continue;
+      if (!contentType.includes('json')) {
+        await new Promise((r) => setTimeout(r, 200));
+        continue;
+      }
       if (lastStatus === 401) {
         const body = await response.json();
         expect(body).toHaveProperty('error');
@@ -191,7 +200,7 @@ test.describe('API v1 — error handling', () => {
       }
       return;
     }
-    expect(lastStatus, '/season (unauth) returned non-JSON after 3 attempts').toBe(401);
+    expect(lastStatus, '/season (unauth) returned non-JSON after 5 attempts').toBe(401);
   });
 
   test('invalid UUID returns 404 or 400', async ({ request }) => {

@@ -32,7 +32,7 @@ class TransactionHistoryView implements TransactionHistoryViewInterface
 
         if ($data['transactions'] !== []) {
             $output .= '<div class="table-scroll-wrapper">';
-            $output .= '<div class="table-scroll-container">';
+            $output .= '<div class="table-scroll-container" tabindex="0" role="region" aria-label="Transaction history">';
             $output .= $this->renderTable($data['transactions'], $data['categories']);
             $output .= '</div></div>';
         } else {

@@ -92,7 +92,7 @@ class ComparePlayersView implements ComparePlayersViewInterface
         ];
 
         $output = '<h2 class="ibl-title">Current Ratings</h2>';
-        $output .= '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
+        $output .= '<div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Current ratings comparison">';
         $output .= '<table class="sortable ibl-data-table responsive-table">';
         $output .= '<thead><tr>';
         foreach ($headers as $h) {
@@ -166,7 +166,7 @@ class ComparePlayersView implements ComparePlayersViewInterface
         ];
 
         $output = '<h2 class="ibl-title">Current Season Stats</h2>';
-        $output .= '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
+        $output .= '<div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Current season stats comparison">';
         $output .= '<table class="sortable ibl-data-table responsive-table">';
         $output .= '<thead><tr>';
         foreach ($headers as $h) {
@@ -240,7 +240,7 @@ class ComparePlayersView implements ComparePlayersViewInterface
         ];
 
         $output = '<h2 class="ibl-title">Career Stats</h2>';
-        $output .= '<div class="table-scroll-wrapper"><div class="table-scroll-container">';
+        $output .= '<div class="table-scroll-wrapper"><div class="table-scroll-container" tabindex="0" role="region" aria-label="Career stats comparison">';
         $output .= '<table class="sortable ibl-data-table responsive-table">';
         $output .= '<thead><tr>';
         foreach ($headers as $h) {

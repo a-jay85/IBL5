@@ -150,6 +150,22 @@
     }
 
     /**
+     * Ensure a scroll container has tabindex, role, and aria-label for keyboard access.
+     */
+    function ensureA11yAttrs(container, table) {
+        if (!container.hasAttribute("tabindex")) {
+            container.setAttribute("tabindex", "0");
+        }
+        if (!container.hasAttribute("role")) {
+            container.setAttribute("role", "region");
+        }
+        if (!container.hasAttribute("aria-label")) {
+            var label = table.getAttribute("aria-label") || "Scrollable data table";
+            container.setAttribute("aria-label", label);
+        }
+    }
+
+    /**
      * Ensure table is wrapped in .table-scroll-wrapper > .table-scroll-container.
      * Handles 3 cases:
      * 1. Already fully wrapped (Standings) - no-op
@@ -172,6 +188,7 @@
             wrapper.className = "table-scroll-wrapper";
             container.parentNode.insertBefore(wrapper, container);
             wrapper.appendChild(container);
+            ensureA11yAttrs(container, table);
             constrainWrapper(wrapper);
             return;
         }
@@ -185,6 +202,7 @@
         table.parentNode.insertBefore(wrapper, table);
         wrapper.appendChild(container);
         container.appendChild(table);
+        ensureA11yAttrs(container, table);
         constrainWrapper(wrapper);
     }
 

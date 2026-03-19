@@ -67,7 +67,7 @@ class TableViewDropdown
             . "var v=this.value,d=v,s='';"
             . "if(v.indexOf('split:')===0){d='split';s='&amp;split='+v.substring(6)}"
             . "window.location.href='" . $safeBaseUrl . "&amp;display='+d+s";
-        $html .= '<select class="ibl-view-select" onchange="' . $onchange . '">';
+        $html .= '<select class="ibl-view-select" aria-label="Stats display" onchange="' . $onchange . '">';
 
         foreach ($this->groups as $groupLabel => $options) {
             $safeGroupLabel = HtmlSanitizer::safeHtmlOutput($groupLabel);

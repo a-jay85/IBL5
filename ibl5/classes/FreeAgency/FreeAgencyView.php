@@ -75,7 +75,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         ob_start();
         ?>
 <div class="table-scroll-wrapper">
-<div class="table-scroll-container">
+<div class="table-scroll-container" tabindex="0" role="region" aria-label="Players under contract">
 <table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <?= $this->renderColgroups(false, false) ?>
     <?= $this->renderTableHeader('Players Under Contract', false, $team, false, false, $season) ?>
@@ -159,7 +159,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         ob_start();
         ?>
 <div class="table-scroll-wrapper">
-<div class="table-scroll-container">
+<div class="table-scroll-container" tabindex="0" role="region" aria-label="Contract offers">
 <table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <?= $this->renderColgroups(false) ?>
     <?= $this->renderTableHeader('Contract Offers', false, $team, false, true, $season) ?>
@@ -217,7 +217,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         ob_start();
         ?>
 <div class="table-scroll-wrapper">
-<div class="table-scroll-container">
+<div class="table-scroll-container" tabindex="0" role="region" aria-label="Unsigned free agents">
 <table class="ibl-data-table team-table fa-table sortable" style="<?= \UI\TableStyles::inlineVars($team->color1, $team->color2) ?>">
     <?= $this->renderColgroups(false) ?>
     <?= $this->renderTableHeader('Unsigned Free Agents', true, $team, false, true, $season) ?>

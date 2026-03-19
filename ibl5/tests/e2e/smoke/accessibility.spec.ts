@@ -26,6 +26,30 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'cap space', url: 'modules.php?name=CapSpace' },
   { name: 'player page', url: 'modules.php?name=Player&pa=showpage&pid=1' },
   { name: 'team page', url: 'modules.php?name=Team&op=team&teamID=1' },
+  { name: 'activity tracker', url: 'modules.php?name=ActivityTracker' },
+  { name: 'all-star appearances', url: 'modules.php?name=AllStarAppearances' },
+  { name: 'award history', url: 'modules.php?name=AwardHistory' },
+  { name: 'contract list', url: 'modules.php?name=ContractList' },
+  { name: 'draft pick locator', url: 'modules.php?name=DraftPickLocator' },
+  { name: 'franchise history', url: 'modules.php?name=FranchiseHistory' },
+  { name: 'franchise record book', url: 'modules.php?name=FranchiseRecordBook' },
+  { name: 'free agency preview', url: 'modules.php?name=FreeAgencyPreview' },
+  { name: 'injuries', url: 'modules.php?name=Injuries' },
+  { name: 'league starters', url: 'modules.php?name=LeagueStarters' },
+  { name: 'one on one game', url: 'modules.php?name=OneOnOneGame' },
+  { name: 'player database', url: 'modules.php?name=PlayerDatabase' },
+  { name: 'player movement', url: 'modules.php?name=PlayerMovement' },
+  { name: 'projected draft order', url: 'modules.php?name=ProjectedDraftOrder' },
+  { name: 'record holders', url: 'modules.php?name=RecordHolders' },
+  { name: 'schedule', url: 'modules.php?name=Schedule' },
+  { name: 'season archive', url: 'modules.php?name=SeasonArchive' },
+  { name: 'season highs', url: 'modules.php?name=SeasonHighs' },
+  { name: 'series records', url: 'modules.php?name=SeriesRecords' },
+  { name: 'team off/def stats', url: 'modules.php?name=TeamOffDefStats' },
+  { name: 'transaction history', url: 'modules.php?name=TransactionHistory' },
+  { name: 'search', url: 'modules.php?name=Search' },
+  { name: 'topics', url: 'modules.php?name=Topics' },
+  { name: 'voting results', url: 'modules.php?name=VotingResults' },
 ];
 
 publicTest.describe('Public page accessibility', () => {
@@ -57,6 +81,10 @@ const authPages: Array<{
   { name: 'depth chart entry', url: 'modules.php?name=DepthChartEntry' },
   { name: 'waivers', url: 'modules.php?name=Waivers' },
   { name: 'gm contact list', url: 'modules.php?name=GMContactList' },
+  { name: 'compare players', url: 'modules.php?name=ComparePlayers' },
+  { name: 'draft', url: 'modules.php?name=Draft', state: { 'Show Draft Link': 'Yes' } },
+  { name: 'next sim', url: 'modules.php?name=NextSim' },
+  { name: 'your account', url: 'modules.php?name=YourAccount' },
 ];
 
 authTest.describe('Authenticated page accessibility', () => {

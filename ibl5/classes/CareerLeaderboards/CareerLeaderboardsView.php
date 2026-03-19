@@ -6,6 +6,7 @@ namespace CareerLeaderboards;
 
 use CareerLeaderboards\Contracts\CareerLeaderboardsViewInterface;
 use Player\PlayerImageHelper;
+use Utilities\HtmlSanitizer;
 
 /**
  * @see CareerLeaderboardsViewInterface
@@ -67,7 +68,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
             <select name="boards_type">
                 <?php foreach ($boardTypes as $key => $value): ?>
                     <?php $selected = ($boardsType === $value) ? ' selected' : ''; ?>
-                    <option value="<?= htmlspecialchars($value) ?>"<?= $selected ?>><?= htmlspecialchars($value) ?></option>
+                    <option value="<?= HtmlSanitizer::e($value) ?>"<?= $selected ?>><?= HtmlSanitizer::e($value) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -76,7 +77,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
             <select name="sort_cat">
                 <?php foreach ($sortCategories as $key => $value): ?>
                     <?php $selected = ($sortCat === $value) ? ' selected' : ''; ?>
-                    <option value="<?= htmlspecialchars($value) ?>"<?= $selected ?>><?= htmlspecialchars($value) ?></option>
+                    <option value="<?= HtmlSanitizer::e($value) ?>"<?= $selected ?>><?= HtmlSanitizer::e($value) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
@@ -89,7 +90,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
         </div>
         <div class="ibl-filter-form__group">
             <label class="ibl-filter-form__label">Limit:</label>
-            <input type="number" name="display" value="<?= htmlspecialchars($display) ?>">
+            <input type="number" name="display" value="<?= HtmlSanitizer::e($display) ?>">
             <span class="ibl-filter-form__label">Records</span>
         </div>
         <input type="hidden" name="submitted" value="1">
@@ -155,25 +156,25 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
 <tr>
     <td class="rank-cell sticky-col-1"><?= $rank ?></td>
     <?= $playerCell ?>
-    <td<?= $this->sortAttr('games') ?>><?= htmlspecialchars((string) $stats['games']) ?></td>
-    <td<?= $this->sortAttr('minutes') ?>><?= htmlspecialchars($stats['minutes']) ?></td>
-    <td<?= $this->sortAttr('fgm') ?>><?= htmlspecialchars($stats['fgm']) ?></td>
-    <td<?= $this->sortAttr('fga') ?>><?= htmlspecialchars($stats['fga']) ?></td>
-    <td<?= $this->sortAttr('fgp') ?>><?= htmlspecialchars($stats['fgp']) ?></td>
-    <td<?= $this->sortAttr('ftm') ?>><?= htmlspecialchars($stats['ftm']) ?></td>
-    <td<?= $this->sortAttr('fta') ?>><?= htmlspecialchars($stats['fta']) ?></td>
-    <td<?= $this->sortAttr('ftp') ?>><?= htmlspecialchars($stats['ftp']) ?></td>
-    <td<?= $this->sortAttr('tgm') ?>><?= htmlspecialchars($stats['tgm']) ?></td>
-    <td<?= $this->sortAttr('tga') ?>><?= htmlspecialchars($stats['tga']) ?></td>
-    <td<?= $this->sortAttr('tgp') ?>><?= htmlspecialchars($stats['tgp']) ?></td>
-    <td<?= $this->sortAttr('orb') ?>><?= htmlspecialchars($stats['orb']) ?></td>
-    <td<?= $this->sortAttr('reb') ?>><?= htmlspecialchars($stats['reb']) ?></td>
-    <td<?= $this->sortAttr('ast') ?>><?= htmlspecialchars($stats['ast']) ?></td>
-    <td<?= $this->sortAttr('stl') ?>><?= htmlspecialchars($stats['stl']) ?></td>
-    <td<?= $this->sortAttr('tvr') ?>><?= htmlspecialchars($stats['tvr']) ?></td>
-    <td<?= $this->sortAttr('blk') ?>><?= htmlspecialchars($stats['blk']) ?></td>
-    <td<?= $this->sortAttr('pf') ?>><?= htmlspecialchars($stats['pf']) ?></td>
-    <td<?= $this->sortAttr('pts') ?>><?= htmlspecialchars($stats['pts']) ?></td>
+    <td<?= $this->sortAttr('games') ?>><?= HtmlSanitizer::e((string) $stats['games']) ?></td>
+    <td<?= $this->sortAttr('minutes') ?>><?= HtmlSanitizer::e($stats['minutes']) ?></td>
+    <td<?= $this->sortAttr('fgm') ?>><?= HtmlSanitizer::e($stats['fgm']) ?></td>
+    <td<?= $this->sortAttr('fga') ?>><?= HtmlSanitizer::e($stats['fga']) ?></td>
+    <td<?= $this->sortAttr('fgp') ?>><?= HtmlSanitizer::e($stats['fgp']) ?></td>
+    <td<?= $this->sortAttr('ftm') ?>><?= HtmlSanitizer::e($stats['ftm']) ?></td>
+    <td<?= $this->sortAttr('fta') ?>><?= HtmlSanitizer::e($stats['fta']) ?></td>
+    <td<?= $this->sortAttr('ftp') ?>><?= HtmlSanitizer::e($stats['ftp']) ?></td>
+    <td<?= $this->sortAttr('tgm') ?>><?= HtmlSanitizer::e($stats['tgm']) ?></td>
+    <td<?= $this->sortAttr('tga') ?>><?= HtmlSanitizer::e($stats['tga']) ?></td>
+    <td<?= $this->sortAttr('tgp') ?>><?= HtmlSanitizer::e($stats['tgp']) ?></td>
+    <td<?= $this->sortAttr('orb') ?>><?= HtmlSanitizer::e($stats['orb']) ?></td>
+    <td<?= $this->sortAttr('reb') ?>><?= HtmlSanitizer::e($stats['reb']) ?></td>
+    <td<?= $this->sortAttr('ast') ?>><?= HtmlSanitizer::e($stats['ast']) ?></td>
+    <td<?= $this->sortAttr('stl') ?>><?= HtmlSanitizer::e($stats['stl']) ?></td>
+    <td<?= $this->sortAttr('tvr') ?>><?= HtmlSanitizer::e($stats['tvr']) ?></td>
+    <td<?= $this->sortAttr('blk') ?>><?= HtmlSanitizer::e($stats['blk']) ?></td>
+    <td<?= $this->sortAttr('pf') ?>><?= HtmlSanitizer::e($stats['pf']) ?></td>
+    <td<?= $this->sortAttr('pts') ?>><?= HtmlSanitizer::e($stats['pts']) ?></td>
 </tr>
         <?php
         return (string) ob_get_clean();

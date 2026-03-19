@@ -41,13 +41,6 @@ interface TradingRepositoryInterface
     public function getAllTeams(): array;
 
     /**
-     * Get trade rows from trade info table
-     *
-     * @return list<TradeInfoRow> Trade rows
-     */
-    public function getTradeRows(): array;
-
-    /**
      * Get players involved in a trade
      *
      * @param string $teamName Team name

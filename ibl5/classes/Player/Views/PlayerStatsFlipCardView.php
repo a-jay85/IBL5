@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
+use Utilities\HtmlSanitizer;
+
 /**
  * PlayerStatsFlipCardView - Flippable stats card for Averages/Totals pairs
  * 
@@ -74,7 +76,7 @@ class PlayerStatsFlipCardView
         $cssProps = CardBaseStyles::getCardCssProperties($colorScheme);
 
         $flipIcon = CardFlipStyles::getFlipIcon();
-        $escapedCategory = htmlspecialchars($statsCategory, ENT_QUOTES, 'UTF-8');
+        $escapedCategory = HtmlSanitizer::e($statsCategory);
 
         ob_start();
         ?>

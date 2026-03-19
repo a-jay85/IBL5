@@ -244,7 +244,7 @@ class UpdaterView implements Contracts\UpdaterViewInterface
                 . HtmlSanitizer::safeHtmlOutput($summaryLabel) . '</summary>'
                 . '<div class="updater-details__content">';
             foreach ($summaries as $msg) {
-                $html .= '<p>' . htmlspecialchars($msg, $flags, 'UTF-8') . '</p>';
+                $html .= '<p>' . HtmlSanitizer::e($msg) . '</p>';
             }
             $html .= '</div></details>';
         }
@@ -259,7 +259,7 @@ class UpdaterView implements Contracts\UpdaterViewInterface
             if ($errors !== []) {
                 foreach ($errors as $msg) {
                     $html .= '<p class="text-error">'
-                        . htmlspecialchars($msg, $flags, 'UTF-8') . '</p>';
+                        . HtmlSanitizer::e($msg) . '</p>';
                 }
             } else {
                 $html .= '<p class="text-error">Error details were not captured. '

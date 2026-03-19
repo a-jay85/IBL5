@@ -9,6 +9,7 @@ use Player\Player;
 use Player\PlayerImageHelper;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use UI\TeamCellHelper;
+use Utilities\HtmlSanitizer;
 
 /**
  * @see FreeAgencyViewInterface
@@ -98,7 +99,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         $hasExtension = !$hasRookieOption && $isExtensionPhase && $player->canRenegotiateContract();
         ?>
         <tr>
-            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $playerName) ?>
             <td><?= $player->age ?? 0 ?></td>
             <?= $this->renderPlayerRatings($player) ?>
@@ -132,7 +133,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     <tfoot>
         <tr>
             <td colspan="17" class="cap-footer-spacer"></td>
-            <td colspan="10" style="text-align: right;"><strong><?= htmlspecialchars($team->name) ?> Total Salary</strong></td>
+            <td colspan="10" style="text-align: right;"><strong><?= HtmlSanitizer::e($team->name) ?> Total Salary</strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
                 <td class="col-salary"><strong><?= $salary ?></strong></td>
             <?php endforeach; ?>
@@ -171,7 +172,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
             ?>
         <tr>
             <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Offer</a></td>
-            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
             <td><?= $player->age ?? 0 ?></td>
             <?= $this->renderPlayerRatings($player) ?>
@@ -188,7 +189,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
     <tfoot>
         <tr>
             <td colspan="18" class="cap-footer-spacer"></td>
-            <td colspan="10" style="text-align: right;"><strong><?= htmlspecialchars($team->name) ?> Total Salary Plus Contract Offers</strong></td>
+            <td colspan="10" style="text-align: right;"><strong><?= HtmlSanitizer::e($team->name) ?> Total Salary Plus Contract Offers</strong></td>
             <?php foreach ($capMetrics['totalSalaries'] as $salary): ?>
                 <td class="col-salary"><strong><?= $salary ?></strong></td>
             <?php endforeach; ?>
@@ -236,14 +237,14 @@ class FreeAgencyView implements FreeAgencyViewInterface
                     <a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Offer</a>
                 <?php endif; ?>
             </td>
-            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?php $resolved = PlayerImageHelper::resolvePlayerDisplay($player->playerID ?? 0, $player->name ?? ''); ?>
             <td class="ibl-player-cell"><a href="modules.php?name=Player&amp;pa=showpage&amp;pid=<?= $player->playerID ?? 0 ?>">
                 <?= $resolved['thumbnail'] ?>
                 <?php if (($player->birdYears ?? 0) >= 3): ?>
-                    *<em><?= htmlspecialchars($resolved['name']) ?></em>*
+                    *<em><?= HtmlSanitizer::e($resolved['name']) ?></em>*
                 <?php else: ?>
-                    <?= htmlspecialchars($resolved['name']) ?>
+                    <?= HtmlSanitizer::e($resolved['name']) ?>
                 <?php endif; ?>
             </a></td>
             <td><?= $player->age ?? 0 ?></td>
@@ -288,7 +289,7 @@ class FreeAgencyView implements FreeAgencyViewInterface
         ?>
         <tr>
             <td><a href="modules.php?name=FreeAgency&amp;pa=negotiate&amp;pid=<?= $player->playerID ?? 0 ?>">Offer</a></td>
-            <td><?= htmlspecialchars($player->position ?? '') ?></td>
+            <td><?= HtmlSanitizer::e($player->position ?? '') ?></td>
             <?= PlayerImageHelper::renderFlexiblePlayerCell($player->playerID ?? 0, $player->name ?? '') ?>
             <?= $this->renderTeamCell($player) ?>
             <td><?= $player->age ?? 0 ?></td>

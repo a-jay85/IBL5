@@ -69,17 +69,6 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * @see TradingRepositoryInterface::getTradeRows()
-     */
-    public function getTradeRows(): array
-    {
-        /** @var list<TradeInfoRow> */
-        return $this->fetchAll(
-            "SELECT * FROM ibl_trade_info"
-        );
-    }
-
-    /**
      * @see TradingRepositoryInterface::getTradePlayers()
      */
     public function getTradePlayers(string $teamName, int $row): array

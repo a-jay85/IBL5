@@ -7,6 +7,7 @@ namespace FreeAgency;
 use FreeAgency\Contracts\FreeAgencyNegotiationViewInterface;
 use Player\Player;
 use Player\PlayerImageHelper;
+use Utilities\HtmlSanitizer;
 
 /**
  * @see FreeAgencyNegotiationViewInterface
@@ -64,11 +65,11 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
         ?>
 <div class="ibl-card">
     <div class="ibl-card__header">
-        <h2 class="ibl-card__title"><?= htmlspecialchars($player->position ?? '') ?> <?= htmlspecialchars($player->name ?? '') ?> - Contract Negotiation</h2>
+        <h2 class="ibl-card__title"><?= HtmlSanitizer::e($player->position ?? '') ?> <?= HtmlSanitizer::e($player->name ?? '') ?> - Contract Negotiation</h2>
     </div>
     <div class="ibl-card__body">
         <div class="offer-player-info">
-            <img src="<?= htmlspecialchars(PlayerImageHelper::getImageUrl($player->playerID)) ?>" alt="<?= htmlspecialchars($player->name ?? '') ?>" class="offer-player-img">
+            <img src="<?= HtmlSanitizer::e(PlayerImageHelper::getImageUrl($player->playerID)) ?>" alt="<?= HtmlSanitizer::e($player->name ?? '') ?>" class="offer-player-img">
             <?= $this->formComponents->renderPlayerRatings() ?>
         </div>
     </div>
@@ -95,7 +96,7 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
                 </div>
             </div>
 
-            <input type="hidden" name="teamname" value="<?= htmlspecialchars($team->name) ?>">
+            <input type="hidden" name="teamname" value="<?= HtmlSanitizer::e($team->name) ?>">
             <input type="hidden" name="playerID" value="<?= (int) $player->playerID ?>">
             <input type="hidden" name="offerType" value="0">
 
@@ -121,7 +122,7 @@ class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
 <?php if ($hasExistingOffer): ?>
 <div class="offer-delete-section">
     <form method="post" action="modules.php?name=FreeAgency&pa=deleteoffer">
-        <input type="hidden" name="teamname" value="<?= htmlspecialchars($team->name) ?>">
+        <input type="hidden" name="teamname" value="<?= HtmlSanitizer::e($team->name) ?>">
         <input type="hidden" name="playerID" value="<?= (int) $player->playerID ?>">
         <button type="submit" class="ibl-btn ibl-btn--danger">Delete This Offer</button>
     </form>

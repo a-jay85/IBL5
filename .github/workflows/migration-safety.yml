@@ -126,8 +126,12 @@ jobs:
         sed -i "s/\$dbname = \"iblhoops_\";/\$dbname = \"ibl5_php\";/" config.php.parity
         cp config.php.parity config.php
 
-        # Seed (marks 000_baseline as already applied) then run remaining
-        php bin/migrate-seed
+        # Mark only the baseline as applied (batch 0) so migrate-seed guard passes,
+        # then let php bin/migrate apply all subsequent migrations (001+).
+        # Note: migrate-seed marks ALL files as applied, which defeats the purpose
+        # of this test — we need the PHP runner to actually execute post-baseline migrations.
+        mysql -h 127.0.0.1 -u root -proot ibl5_php \
+          -e "INSERT INTO migrations (migration, batch) VALUES ('000_baseline_schema.sql', 0);"
         php bin/migrate
 
     - name: Dump and compare schemas

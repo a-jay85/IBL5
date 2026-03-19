@@ -94,7 +94,7 @@ class AwardHistoryView implements AwardHistoryViewInterface
     public function renderTableHeader(): string
     {
         $output = '<div class="table-scroll-wrapper">';
-        $output .= '<div class="table-scroll-container">';
+        $output .= '<div class="table-scroll-container" tabindex="0" role="region" aria-label="Award history">';
         $output .= '<table class="ibl-data-table sortable">';
         $output .= '<thead><tr>';
         $output .= '<th>Year</th>';

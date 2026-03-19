@@ -64,8 +64,8 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
 <form name="CareerLeaderboards" method="post" action="modules.php?name=CareerLeaderboards" class="ibl-filter-form">
     <div class="ibl-filter-form__row">
         <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label">Type:</label>
-            <select name="boards_type">
+            <label for="cl-type" class="ibl-filter-form__label">Type:</label>
+            <select id="cl-type" name="boards_type">
                 <?php foreach ($boardTypes as $key => $value): ?>
                     <?php $selected = ($boardsType === $value) ? ' selected' : ''; ?>
                     <option value="<?= HtmlSanitizer::e($value) ?>"<?= $selected ?>><?= HtmlSanitizer::e($value) ?></option>
@@ -73,8 +73,8 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
             </select>
         </div>
         <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label">Category:</label>
-            <select name="sort_cat">
+            <label for="cl-category" class="ibl-filter-form__label">Category:</label>
+            <select id="cl-category" name="sort_cat">
                 <?php foreach ($sortCategories as $key => $value): ?>
                     <?php $selected = ($sortCat === $value) ? ' selected' : ''; ?>
                     <option value="<?= HtmlSanitizer::e($value) ?>"<?= $selected ?>><?= HtmlSanitizer::e($value) ?></option>
@@ -82,15 +82,15 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
             </select>
         </div>
         <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label">Include Retirees:</label>
-            <select name="active">
+            <label for="cl-retirees" class="ibl-filter-form__label">Include Retirees:</label>
+            <select id="cl-retirees" name="active">
                 <option value="0"<?= ($active === '0') ? ' selected' : '' ?>>Yes</option>
                 <option value="1"<?= ($active === '1') ? ' selected' : '' ?>>No</option>
             </select>
         </div>
         <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label">Limit:</label>
-            <input type="number" name="display" value="<?= HtmlSanitizer::e($display) ?>">
+            <label for="cl-limit" class="ibl-filter-form__label">Limit:</label>
+            <input id="cl-limit" type="number" name="display" value="<?= HtmlSanitizer::e($display) ?>">
             <span class="ibl-filter-form__label">Records</span>
         </div>
         <input type="hidden" name="submitted" value="1">
@@ -108,7 +108,7 @@ class CareerLeaderboardsView implements CareerLeaderboardsViewInterface
     {
         ob_start();
         ?>
-<div class="table-scroll-container">
+<div class="table-scroll-container" tabindex="0" role="region" aria-label="Career leaderboards">
 <table class="sortable ibl-data-table responsive-table">
     <thead>
         <tr>

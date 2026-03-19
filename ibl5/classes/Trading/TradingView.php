@@ -456,7 +456,7 @@ $tradeConfig = [
 ?>
                 <tr>
                     <td>
-                        <input type="number" name="userSendsCash<?= $i ?>" value="<?= $prevUserCash ?>" min="0" max="2000" aria-label="Cash for <?= $yearLabelEscaped ?>">
+                        <input type="number" name="userSendsCash<?= $i ?>" value="<?= $prevUserCash ?>" min="0" max="2000" aria-label="<?= $userTeam ?> cash for <?= $yearLabelEscaped ?>">
                         for <?= $yearLabelEscaped ?>
                     </td>
                 </tr>
@@ -477,7 +477,7 @@ $tradeConfig = [
 ?>
                 <tr>
                     <td>
-                        <input type="number" name="partnerSendsCash<?= $i ?>" value="<?= $prevPartnerCash ?>" min="0" max="2000" aria-label="Cash for <?= $yearLabelEscaped ?>">
+                        <input type="number" name="partnerSendsCash<?= $i ?>" value="<?= $prevPartnerCash ?>" min="0" max="2000" aria-label="<?= $partnerTeam ?> cash for <?= $yearLabelEscaped ?>">
                         for <?= $yearLabelEscaped ?>
                     </td>
                 </tr>

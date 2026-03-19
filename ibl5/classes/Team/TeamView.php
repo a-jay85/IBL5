@@ -53,7 +53,7 @@ class TeamView implements TeamViewInterface
 
         $bannerHtml = $isActualTeam
             ? $this->renderTeamBanner($teamID, $team, $imagesPath, $userTeamName, $isOwnTeam)
-            : "<div class=\"team-logo-fallback\"><img src=\"./{$imagesPath}logo/{$teamID}.jpg\"></div>";
+            : "<div class=\"team-logo-fallback\"><img src=\"./{$imagesPath}logo/{$teamID}.jpg\" alt=\"\"></div>";
 
         ob_start();
         ?>
@@ -147,7 +147,7 @@ class TeamView implements TeamViewInterface
     <?= $tradeButton ?>
     <a href="modules.php?name=Schedule&amp;teamID=<?= $teamID ?>" class="team-action-link">Schedule</a>
     <div class="team-banner-logo">
-        <img src="./<?= $imagesPath ?>logo/<?= $teamID ?>.jpg">
+        <img src="./<?= $imagesPath ?>logo/<?= $teamID ?>.jpg" alt="<?= HtmlSanitizer::e($team->name ?? '') ?> logo">
     </div>
     <a href="modules.php?name=DraftHistory&amp;teamID=<?= $teamID ?>" class="team-action-link">Draft History</a>
     <?= $discordButton ?>

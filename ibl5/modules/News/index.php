@@ -111,7 +111,8 @@ function theindex($new_topic = "0")
         if ($catid != 0) {
             $row3 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));
             $title1 = \Utilities\HtmlSanitizer::safeHtmlOutput($row3['title']);
-            $title = "<a class='readmore' href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\"><font class=\"storycat\">$title1</font></a>: $title";
+            $catLabel = $title1 !== '' ? $title1 : 'Category';
+            $title = "<a class='readmore' href=\"modules.php?name=News&amp;file=categories&amp;op=newindex&amp;catid=$catid\" aria-label=\"$catLabel\"><font class=\"storycat\">$title1</font></a>: $title";
         }
         $morelink = implode(' | ', $morelink_parts);
         themeindex($aid, $informant, $time, $title, $counter, $topic, $hometext, $notes, $morelink, $topicname, $topicimage, $topictext);

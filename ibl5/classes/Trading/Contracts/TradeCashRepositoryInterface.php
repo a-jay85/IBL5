@@ -103,6 +103,14 @@ interface TradeCashRepositoryInterface
     public function clearTradeCash(): int;
 
     /**
+     * Get cash transactions for multiple offer IDs in a single query
+     *
+     * @param list<int> $offerIds Trade offer IDs to look up
+     * @return array<string, TradeCashRow> Cash rows keyed by "{offerId}:{sendingTeam}"
+     */
+    public function getCashTransactionsByOfferIds(array $offerIds): array;
+
+    /**
      * Delete trade cash by offer ID
      *
      * @param int $offerId Trade offer ID

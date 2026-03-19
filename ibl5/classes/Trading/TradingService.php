@@ -181,6 +181,28 @@ class TradingService implements TradingServiceInterface
      */
     private function groupTradeOffers(array $allTradeRows, string $userTeam, int $seasonEndingYear): array
     {
+        // Pre-load all players, picks, and cash in batch to avoid N+1 queries
+        $playerIds = [];
+        $pickIds = [];
+        $offerIds = [];
+        foreach ($allTradeRows as $row) {
+            $from = $row['trade_from'];
+            $to = $row['trade_to'];
+            if ($from !== $userTeam && $to !== $userTeam) {
+                continue;
+            }
+            if ($row['itemtype'] === TradeItemType::Player->value) {
+                $playerIds[] = $row['itemid'];
+            } elseif ($row['itemtype'] === TradeItemType::DraftPick->value) {
+                $pickIds[] = $row['itemid'];
+            } elseif ($row['itemtype'] === TradeItemType::Cash->value) {
+                $offerIds[] = $row['tradeofferid'];
+            }
+        }
+        $playersMap = $this->repository->getPlayersByIds(array_values(array_unique($playerIds)));
+        $picksMap = $this->repository->getDraftPicksByIds(array_values(array_unique($pickIds)));
+        $cashMap = $this->cashRepository->getCashTransactionsByOfferIds(array_values(array_unique($offerIds)));
+
         $tradeOffers = [];
 
         foreach ($allTradeRows as $row) {
@@ -209,14 +231,16 @@ class TradingService implements TradingServiceInterface
             }
 
             if ($itemType === TradeItemType::Cash->value) {
-                $cashItems = $this->resolveCashItems($from, $to, $offerId, $seasonEndingYear);
+                $cashItems = $this->resolveCashItemsFromMap($from, $to, $offerId, $seasonEndingYear, $cashMap);
                 array_push($tradeOffers[$offerId]['items'], ...$cashItems);
             } else {
-                $tradeOffers[$offerId]['items'][] = $this->resolveTradeItem(
+                $tradeOffers[$offerId]['items'][] = $this->resolveTradeItemFromMaps(
                     $itemId,
                     $itemType,
                     $from,
-                    $to
+                    $to,
+                    $playersMap,
+                    $picksMap
                 );
 
                 // Collect player PIDs for roster preview (classify by sending team)
@@ -234,32 +258,50 @@ class TradingService implements TradingServiceInterface
     }
 
     /**
-     * Resolve a non-cash trade item into a displayable description
+     * Resolve a non-cash trade item from pre-loaded maps
      *
-     * @param int $itemId Item ID
-     * @param string $itemType Item type ('0' for pick, '1' for player)
-     * @param string $from Sending team
-     * @param string $to Receiving team
+     * @param array<int, PlayerRow> $playersMap
+     * @param array<int, DraftPickRow> $picksMap
      * @return array{type: string, description: string, notes: string|null, from: string, to: string}
      */
-    private function resolveTradeItem(int $itemId, string $itemType, string $from, string $to): array
+    private function resolveTradeItemFromMaps(int $itemId, string $itemType, string $from, string $to, array $playersMap, array $picksMap): array
     {
         if ($itemType === TradeItemType::DraftPick->value) {
-            return $this->resolvePickItem($itemId, $from, $to);
+            $pick = $picksMap[$itemId] ?? null;
+            $description = '';
+            $notes = null;
+
+            if ($pick !== null) {
+                $notes = $pick['notes'] ?? null;
+                if ($notes === '') {
+                    $notes = null;
+                }
+                $description = "The {$from} send the {$pick['teampick']} {$pick['year']} Round {$pick['round']} draft pick to the {$to}.";
+            }
+
+            return ['type' => 'pick', 'description' => $description, 'notes' => $notes, 'from' => $from, 'to' => $to];
         }
 
         // itemtype === Player
-        return $this->resolvePlayerItem($itemId, $from, $to);
+        $player = $playersMap[$itemId] ?? null;
+        $description = '';
+
+        if ($player !== null) {
+            $description = "The {$from} send {$player['pos']} {$player['name']} to the {$to}.";
+        }
+
+        return ['type' => 'player', 'description' => $description, 'notes' => null, 'from' => $from, 'to' => $to];
     }
 
     /**
-     * Resolve a cash trade item into per-year line items with season labels
+     * Resolve cash items from a pre-loaded cash map
      *
+     * @param array<string, TradeCashRow> $cashMap Keyed by "{offerId}:{sendingTeam}"
      * @return list<array{type: string, description: string, notes: string|null, from: string, to: string}>
      */
-    private function resolveCashItems(string $from, string $to, int $offerId, int $seasonEndingYear): array
+    private function resolveCashItemsFromMap(string $from, string $to, int $offerId, int $seasonEndingYear, array $cashMap): array
     {
-        $cashDetails = $this->cashRepository->getCashTransactionByOffer($offerId, $from);
+        $cashDetails = $cashMap[$offerId . ':' . $from] ?? null;
         $items = [];
 
         if ($cashDetails !== null) {
@@ -285,62 +327,6 @@ class TradingService implements TradingServiceInterface
         }
 
         return $items;
-    }
-
-    /**
-     * Resolve a draft pick trade item
-     *
-     * @return array{type: string, description: string, notes: string|null, from: string, to: string}
-     */
-    private function resolvePickItem(int $itemId, string $from, string $to): array
-    {
-        $pick = $this->repository->getDraftPickById($itemId);
-        $description = '';
-        $notes = null;
-
-        if ($pick !== null) {
-            $pickTeam = $pick['teampick'];
-            $pickYear = $pick['year'];
-            $pickRound = $pick['round'];
-            $notes = $pick['notes'] ?? null;
-            if ($notes === '') {
-                $notes = null;
-            }
-            $description = "The {$from} send the {$pickTeam} {$pickYear} Round {$pickRound} draft pick to the {$to}.";
-        }
-
-        return [
-            'type' => 'pick',
-            'description' => $description,
-            'notes' => $notes,
-            'from' => $from,
-            'to' => $to,
-        ];
-    }
-
-    /**
-     * Resolve a player trade item
-     *
-     * @return array{type: string, description: string, notes: string|null, from: string, to: string}
-     */
-    private function resolvePlayerItem(int $itemId, string $from, string $to): array
-    {
-        $player = $this->repository->getPlayerById($itemId);
-        $description = '';
-
-        if ($player !== null) {
-            $playerName = $player['name'];
-            $playerPos = $player['pos'];
-            $description = "The {$from} send {$playerPos} {$playerName} to the {$to}.";
-        }
-
-        return [
-            'type' => 'player',
-            'description' => $description,
-            'notes' => null,
-            'from' => $from,
-            'to' => $to,
-        ];
     }
 
     /**
@@ -391,6 +377,13 @@ class TradingService implements TradingServiceInterface
             $cashStartYear = 2;
         }
 
+        // Batch-load all cash transactions for preview data
+        $offerIds = array_values(array_unique(array_map(
+            static fn (int $id): int => $id,
+            array_keys($tradeOffers)
+        )));
+        $cashMap = $this->cashRepository->getCashTransactionsByOfferIds($offerIds);
+
         /** @var array<int, array{from: string, to: string, approval: string, oppositeTeam: string, hasHammer: bool, items: list<array{type: string, description: string, notes: string|null, from: string, to: string}>, previewData: array{fromPids: list<int>, toPids: list<int>, fromTeamId: int, toTeamId: int, fromColor1: string, toColor1: string, fromCash: array<int, int>, toCash: array<int, int>, cashStartYear: int, cashEndYear: int, seasonEndingYear: int}}> $enriched */
         $enriched = [];
 
@@ -401,9 +394,9 @@ class TradingService implements TradingServiceInterface
             $fromTeamData = $teamLookup[$fromTeam] ?? ['teamid' => 0, 'color1' => '000000'];
             $toTeamData = $teamLookup[$toTeam] ?? ['teamid' => 0, 'color1' => '000000'];
 
-            // Get cash amounts for each direction
-            $fromCashRow = $this->cashRepository->getCashTransactionByOffer($offerId, $fromTeam);
-            $toCashRow = $this->cashRepository->getCashTransactionByOffer($offerId, $toTeam);
+            // Look up cash from pre-loaded batch map
+            $fromCashRow = $cashMap[$offerId . ':' . $fromTeam] ?? null;
+            $toCashRow = $cashMap[$offerId . ':' . $toTeam] ?? null;
 
             $fromCash = [];
             $toCash = [];

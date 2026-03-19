@@ -77,4 +77,28 @@ class CommonMysqliRepositoryTest extends IntegrationTestCase
 
         $this->assertNull($result);
     }
+
+    // ============================================
+    // getTeamSalarySummary() tests
+    // ============================================
+
+    public function testGetTeamSalarySummaryReturnsBothSalaryTotals(): void
+    {
+        $this->mockDb->setMockData([['current_salary' => 5000, 'next_year_salary' => 4500]]);
+
+        $result = $this->repository->getTeamSalarySummary('Metros');
+
+        $this->assertSame(5000, $result['current']);
+        $this->assertSame(4500, $result['nextYear']);
+    }
+
+    public function testGetTeamSalarySummaryReturnsZerosForEmptyTeam(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $result = $this->repository->getTeamSalarySummary('Empty Team');
+
+        $this->assertSame(0, $result['current']);
+        $this->assertSame(0, $result['nextYear']);
+    }
 }

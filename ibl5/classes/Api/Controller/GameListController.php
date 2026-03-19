@@ -58,7 +58,6 @@ class GameListController implements ControllerInterface
         $total = $repo->countGames($filters);
         $rows = $repo->getGames($paginator, $filters);
 
-        /** @phpstan-ignore argument.type (DB view guarantees array shape) */
         $data = array_map([$transformer, 'transform'], $rows);
 
         $tag = $etag->generateFromCollection($rows);

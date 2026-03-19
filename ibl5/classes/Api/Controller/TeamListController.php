@@ -35,7 +35,6 @@ class TeamListController implements ControllerInterface
         $total = $repo->countTeams();
         $rows = $repo->getTeams($paginator);
 
-        /** @phpstan-ignore argument.type (DB query guarantees array shape) */
         $data = array_map([$transformer, 'transform'], $rows);
 
         $tag = $etag->generateFromCollection($rows);

@@ -13,6 +13,7 @@ use Voting\Contracts\VotingBallotViewInterface;
  * VotingBallotService - Assembles ballot candidate data for voting
  *
  * @phpstan-import-type BallotCategory from VotingBallotViewInterface
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  *
  * @see VotingBallotServiceInterface For the interface contract
  */
@@ -81,14 +82,13 @@ class VotingBallotService implements VotingBallotServiceInterface
      * @param string $code Category code
      * @param string $title Display title
      * @param string $instruction Voter instruction
-     * @param array<int, array<string, mixed>> $rows Raw player rows
+     * @param list<PlayerRow> $rows Raw player rows
      * @return BallotCategory
      */
     private function buildPlayerCategory(string $code, string $title, string $instruction, array $rows): array
     {
         $candidates = [];
         foreach ($rows as $row) {
-            /** @phpstan-ignore argument.type (League methods return full PlayerRow arrays from SELECT * queries) */
             $player = Player::withPlrRow($this->db, $row);
             $playerStats = PlayerStats::withPlrRow($this->db, $row);
             $candidates[] = [

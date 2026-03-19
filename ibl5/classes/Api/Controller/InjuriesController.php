@@ -30,7 +30,6 @@ class InjuriesController implements ControllerInterface
 
         $rows = $repo->getInjuredPlayers();
 
-        /** @phpstan-ignore argument.type (DB row guarantees array shape) */
         $data = array_map([$transformer, 'transform'], $rows);
 
         $tag = $etag->generateFromCollection($rows);

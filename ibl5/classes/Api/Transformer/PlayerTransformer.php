@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Api\Transformer;
 
+/**
+ * @phpstan-import-type PlayerCurrentRow from \Api\Repository\ApiPlayerRepository
+ */
 class PlayerTransformer
 {
     /**
      * Transform a player row from vw_player_current for list endpoints.
      *
-     * @param array{player_uuid: string, pid: int, name: string, position: string, age: int, htft: int, htin: int, experience: int, teamid: int|null, team_uuid: string|null, team_city: string|null, team_name: string|null, full_team_name: string|null, current_salary: int, year1_salary: int, year2_salary: int, games_played: int, points_per_game: float|null, fg_percentage: float|null, ft_percentage: float|null, three_pt_percentage: float|null} $row
+     * @param PlayerCurrentRow $row
      * @return array<string, mixed>
      */
     public function transform(array $row): array
@@ -41,7 +44,7 @@ class PlayerTransformer
     /**
      * Transform a player row for detail endpoints (includes full stats).
      *
-     * @param array{player_uuid: string, pid: int, name: string, position: string, age: int, htft: int, htin: int, experience: int, bird_rights: int, teamid: int|null, team_uuid: string|null, team_city: string|null, team_name: string|null, full_team_name: string|null, current_salary: int, year1_salary: int, year2_salary: int, games_played: int, minutes_played: int, field_goals_made: int, field_goals_attempted: int, free_throws_made: int, free_throws_attempted: int, three_pointers_made: int, three_pointers_attempted: int, offensive_rebounds: int, defensive_rebounds: int, assists: int, steals: int, turnovers: int, blocks: int, personal_fouls: int, points_per_game: float|null, fg_percentage: float|null, ft_percentage: float|null, three_pt_percentage: float|null} $row
+     * @param PlayerCurrentRow $row
      * @return array<string, mixed>
      */
     public function transformDetail(array $row): array

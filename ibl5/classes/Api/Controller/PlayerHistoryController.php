@@ -35,7 +35,6 @@ class PlayerHistoryController implements ControllerInterface
             return;
         }
 
-        /** @phpstan-ignore argument.type (DB row guarantees array shape) */
         $data = array_map([$transformer, 'transformSeason'], $rows);
 
         $tag = $etag->generateFromCollection($rows);

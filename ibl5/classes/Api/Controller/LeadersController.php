@@ -48,7 +48,6 @@ class LeadersController implements ControllerInterface
         $total = $repo->countLeaders($filters);
         $rows = $repo->getLeaders($paginator, $filters);
 
-        /** @phpstan-ignore argument.type (DB row guarantees array shape) */
         $data = array_map([$transformer, 'transform'], $rows);
 
         $tag = $etag->generateFromCollection($rows);

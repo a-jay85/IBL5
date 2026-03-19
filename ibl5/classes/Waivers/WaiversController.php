@@ -183,7 +183,7 @@ class WaiversController implements WaiversControllerInterface
 
         $season = new \Season($this->db);
         /** @var array{hasExistingContract: bool, salary: int} $contractData */
-        $contractData = $this->processor->determineContractData($player, $season); /** @phpstan-ignore argument.type (PlayerRow has all contract fields) */
+        $contractData = $this->processor->determineContractData($player, $season);
         $playerSalary = $contractData['salary'];
 
         if (!$this->validator->validateAdd($playerID, $healthyRosterSlots, $totalSalary, $playerSalary)) {
@@ -334,8 +334,7 @@ class WaiversController implements WaiversControllerInterface
         }
 
         foreach ($result as $playerRow) {
-            /** @phpstan-ignore argument.type (PlayerRow from SELECT * matches withPlrRow expectation) */
-            $player = Player::withPlrRow($this->db, $playerRow);
+                $player = Player::withPlrRow($this->db, $playerRow);
             $contract = $this->processor->getPlayerContractDisplay($player, $season);
             $waitTime = '';
 

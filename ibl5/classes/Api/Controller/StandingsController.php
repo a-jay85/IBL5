@@ -30,7 +30,6 @@ class StandingsController implements ControllerInterface
         $etag = new ETagHandler();
 
         $rows = $repo->getStandings($conference);
-        /** @phpstan-ignore argument.type (DB view guarantees array shape) */
         $data = array_map([$transformer, 'transform'], $rows);
 
         $tag = $etag->generateFromCollection($rows);

@@ -167,6 +167,8 @@ if [ "$PROD_DB" = true ]; then
         exit 1
     fi
     echo "Importing prod-seed.sql..."
+    # Strip DEFINER clauses — prod exports contain DEFINER=user@host that may
+    # not match the Docker MariaDB user, causing ERROR 1449 on import.
     sed 's/ DEFINER=[^ ]* / /g' "$PROD_SEED" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
 else
     # Default: migrations handle schema creation (migration 000 is the baseline)
@@ -188,7 +190,7 @@ if [ -d "$MIGRATIONS_DIR" ] && ls "$MIGRATIONS_DIR"/*.sql &>/dev/null; then
             -e "SELECT COUNT(*) FROM schema_migrations WHERE version='$BASENAME';")
         if [ "$ALREADY" = "0" ]; then
             echo "  Applying $BASENAME..."
-            sed 's/ DEFINER=[^ ]* / /g' "$migration" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
+            db_exec_stdin "$DB_CONTAINER" $DB_CMD < "$migration"
             db_exec "$DB_CONTAINER" $DB_CMD \
                 -e "INSERT INTO schema_migrations (version) VALUES ('$BASENAME');"
         fi

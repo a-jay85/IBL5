@@ -143,9 +143,11 @@ A:hover {
 }
 
 /* --- Layout Constraints ---
-   Prevent legacy table-based layouts from causing horizontal overflow. */
+   Prevent legacy table-based layouts from causing horizontal overflow.
+   Scoped to non-.ibl-data-table elements so modern tables don't inherit
+   overflow-x: auto (which creates a scroll container and breaks sticky). */
 
-table,
+table:not(.ibl-data-table),
 center {
     max-width: 100%;
     overflow-x: auto;

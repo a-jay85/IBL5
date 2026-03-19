@@ -12,6 +12,7 @@ use Waivers\Contracts\WaiversProcessorInterface;
 
 /**
  * @see WaiversProcessorInterface
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class WaiversProcessor implements WaiversProcessorInterface
 {
@@ -87,7 +88,7 @@ class WaiversProcessor implements WaiversProcessorInterface
     /**
      * @see WaiversProcessorInterface::determineContractData()
      *
-     * @param array{cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, exp: int} $playerData
+     * @param PlayerRow $playerData
      * @return array{hasExistingContract: bool, salary: int}
      */
     public function determineContractData(array $playerData, Season $season): array

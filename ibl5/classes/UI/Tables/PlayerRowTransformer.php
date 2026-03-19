@@ -15,6 +15,7 @@ use Player\PlayerStats;
  * across SeasonTotals, SeasonAverages, Per36Minutes, and Ratings.
  *
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
+ * @phpstan-import-type HistoricalPlayerRow from \Player\Contracts\PlayerRepositoryInterface
  */
 class PlayerRowTransformer
 {
@@ -51,7 +52,7 @@ class PlayerRowTransformer
                 if (!is_array($plrRow)) {
                     continue;
                 }
-                /** @var array<string, mixed> $plrRow */
+                /** @var HistoricalPlayerRow $plrRow */
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
                 /** @var PlayerStats $playerStats */
                 $playerStats = PlayerStats::withHistoricalPlrRow($db, $plrRow);
@@ -95,7 +96,7 @@ class PlayerRowTransformer
                 if (!is_array($plrRow)) {
                     continue;
                 }
-                /** @var array<string, mixed> $plrRow */
+                /** @var HistoricalPlayerRow $plrRow */
                 $player = Player::withHistoricalPlrRow($db, $plrRow);
             }
 

@@ -35,11 +35,9 @@ class InjuriesService implements InjuriesServiceInterface
         $season = new \Season($this->db);
         $injuredPlayers = [];
 
-        /** @var array<int, array<string, mixed>> $injuredRows */
         $injuredRows = $this->league->getInjuredPlayersResult();
 
         foreach ($injuredRows as $injuredPlayerRow) {
-            /** @phpstan-ignore argument.type (PlayerRow from SELECT * matches withPlrRow expectation) */
             $player = Player::withPlrRow($this->db, $injuredPlayerRow);
             $playerID = $player->playerID ?? 0;
             $team = Team::initialize($this->db, $playerID > 0 ? ($player->teamID ?? 0) : 0);

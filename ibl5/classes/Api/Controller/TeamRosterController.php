@@ -42,7 +42,6 @@ class TeamRosterController implements ControllerInterface
         }
 
         $rows = $repo->getPlayers($paginator, $filters);
-        /** @phpstan-ignore argument.type (DB view guarantees array shape) */
         $data = array_map([$transformer, 'transform'], $rows);
 
         $tag = $etag->generateFromCollection($rows);

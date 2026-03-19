@@ -11,6 +11,11 @@ const API_KEY = process.env.IBL_API_KEY || 'e2e-test-key-do-not-use-in-productio
 
 const authHeaders = { 'X-API-Key': API_KEY };
 
+// Known UUIDs seeded in ci-seed.sql — used to avoid dynamic list-endpoint dependency
+const SEED_PLAYER_UUID = 'plr-uuid-00000000-0000-000000000001';
+const SEED_TEAM_UUID = 'team-uuid-01';
+const SEED_GAME_UUID = 'sched-uuid-0001';
+
 /**
  * Helper: make a GET request and verify either 401 (with error structure)
  * or 200 (with response shape validation).
@@ -55,35 +60,6 @@ async function assertGetRoute(
 
   // All retries exhausted
   expect(lastStatus, `${path} returned ${lastStatus} after 3 attempts: ${lastText.slice(0, 200)}`).toBe(200);
-}
-
-/**
- * Fetch a list endpoint and return the first item's UUID.
- * Returns null if 401 (with assertion) or no items available.
- */
-async function getFirstUuid(
-  request: import('@playwright/test').APIRequestContext,
-  listPath: string,
-): Promise<string | null> {
-  const response = await request.get(`${BASE_URL}/${listPath}`, {
-    headers: authHeaders,
-  });
-
-  if (response.status() === 401) {
-    const body = await response.json();
-    expect(body).toHaveProperty('error');
-    return null;
-  }
-
-  // If the list endpoint fails (500 or non-JSON), skip the detail test
-  const contentType = response.headers()['content-type'] ?? '';
-  if (response.status() !== 200 || !contentType.includes('json')) return null;
-
-  const body = await response.json();
-  const items = body.data ?? body;
-  if (!Array.isArray(items) || items.length === 0) return null;
-
-  return (items[0].uuid ?? items[0].id) || null;
 }
 
 test.describe('API v1 — list endpoints', () => {
@@ -134,108 +110,108 @@ test.describe('API v1 — list endpoints', () => {
 
 test.describe('API v1 — detail endpoints (require valid UUIDs)', () => {
   test('GET /players/{uuid} returns player detail', async ({ request }) => {
-    const uuid = await getFirstUuid(request, 'players');
-    if (!uuid) { test.skip(); return; }
-    await assertGetRoute(request, `/players/${uuid}`, (body: unknown) => {
+    await assertGetRoute(request, `/players/${SEED_PLAYER_UUID}`, (body: unknown) => {
       expect(typeof body).toBe('object');
     });
   });
 
   test('GET /players/{uuid}/stats returns player stats', async ({ request }) => {
-    const uuid = await getFirstUuid(request, 'players');
-    if (!uuid) { test.skip(); return; }
-    await assertGetRoute(request, `/players/${uuid}/stats`);
+    await assertGetRoute(request, `/players/${SEED_PLAYER_UUID}/stats`);
   });
 
   test('GET /players/{uuid}/history returns player history', async ({ request }) => {
-    const uuid = await getFirstUuid(request, 'players');
-    if (!uuid) { test.skip(); return; }
-    await assertGetRoute(request, `/players/${uuid}/history`);
+    await assertGetRoute(request, `/players/${SEED_PLAYER_UUID}/history`);
   });
 
   test('GET /teams/{uuid} returns team detail', async ({ request }) => {
-    const uuid = await getFirstUuid(request, 'teams');
-    if (!uuid) { test.skip(); return; }
-    await assertGetRoute(request, `/teams/${uuid}`, (body: unknown) => {
+    await assertGetRoute(request, `/teams/${SEED_TEAM_UUID}`, (body: unknown) => {
       expect(typeof body).toBe('object');
     });
   });
 
   test('GET /teams/{uuid}/roster returns team roster', async ({ request }) => {
-    const uuid = await getFirstUuid(request, 'teams');
-    if (!uuid) { test.skip(); return; }
-    await assertGetRoute(request, `/teams/${uuid}/roster`);
+    await assertGetRoute(request, `/teams/${SEED_TEAM_UUID}/roster`);
   });
 
   test('GET /games/{uuid} returns game detail', async ({ request }) => {
-    const uuid = await getFirstUuid(request, 'games');
-    if (!uuid) { test.skip(); return; }
-    await assertGetRoute(request, `/games/${uuid}`);
+    await assertGetRoute(request, `/games/${SEED_GAME_UUID}`);
   });
 
   test('GET /games/{uuid}/boxscore returns boxscore', async ({ request }) => {
-    const uuid = await getFirstUuid(request, 'games');
-    if (!uuid) { test.skip(); return; }
-    await assertGetRoute(request, `/games/${uuid}/boxscore`);
+    await assertGetRoute(request, `/games/${SEED_GAME_UUID}/boxscore`);
   });
 });
 
 /**
- * Helper: check if a response is a non-API HTML page (rewrite not working).
- * In CI, the Apache rewrite from .htaccess may not route to api.php,
- * causing the PHP-Nuke homepage (200 HTML) to be served instead.
+ * Helper: make an API request with retries, skipping non-JSON responses
+ * (PHP built-in server can serve HTML homepage under load).
  */
-function isNonApiResponse(response: import('@playwright/test').APIResponse): boolean {
-  if (response.status() !== 200) return false;
-  const contentType = response.headers()['content-type'] ?? '';
-  return !contentType.includes('json');
+async function assertApiErrorRoute(
+  request: import('@playwright/test').APIRequestContext,
+  method: 'get' | 'post',
+  path: string,
+  expectedStatuses: number[],
+  validateBody?: (body: unknown) => void,
+): Promise<void> {
+  let lastStatus = 0;
+  // More retries than assertGetRoute — error routes are more susceptible to
+  // Apache serving the HTML homepage under load (200 HTML vs expected 404 JSON).
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const response = method === 'get'
+      ? await request.get(`${BASE_URL}${path}`, { headers: authHeaders })
+      : await request.post(`${BASE_URL}${path}`);
+    lastStatus = response.status();
+    const contentType = response.headers()['content-type'] ?? '';
+    if (!contentType.includes('json')) {
+      // Brief pause before retry — gives Apache time to recover from load
+      await new Promise((r) => setTimeout(r, 200));
+      continue;
+    }
+    expect(expectedStatuses, `${path} returned ${lastStatus}`).toContain(lastStatus);
+    if (validateBody) validateBody(await response.json());
+    return;
+  }
+  expect(expectedStatuses, `${path} returned non-JSON (status ${lastStatus}) after 5 attempts`).toContain(lastStatus);
 }
 
 test.describe('API v1 — error handling', () => {
   test('GET /nonexistent returns 404', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/nonexistent`, {
-      headers: authHeaders,
+    await assertApiErrorRoute(request, 'get', '/nonexistent', [401, 404], (body) => {
+      expect(body).toHaveProperty('error');
     });
-    if (isNonApiResponse(response)) { test.skip(); return; }
-    const status = response.status();
-    expect([401, 404]).toContain(status);
-    const body = await response.json();
-    expect(body).toHaveProperty('error');
   });
 
   test('unauthenticated requests return proper error structure', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/season`, {
-      headers: { 'X-API-Key': '' },
-    });
-    if (isNonApiResponse(response)) { test.skip(); return; }
-    const status = response.status();
-    if (status === 401) {
-      const body = await response.json();
-      expect(body).toHaveProperty('error');
-      expect(body.error).toBeTruthy();
+    let lastStatus = 0;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const response = await request.get(`${BASE_URL}/season`, {
+        headers: { 'X-API-Key': '' },
+      });
+      lastStatus = response.status();
+      const contentType = response.headers()['content-type'] ?? '';
+      if (!contentType.includes('json')) {
+        await new Promise((r) => setTimeout(r, 200));
+        continue;
+      }
+      if (lastStatus === 401) {
+        const body = await response.json();
+        expect(body).toHaveProperty('error');
+        expect(body.error).toBeTruthy();
+      }
+      return;
     }
+    expect(lastStatus, '/season (unauth) returned non-JSON after 5 attempts').toBe(401);
   });
 
   test('invalid UUID returns 404 or 400', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/players/not-a-valid-uuid`, {
-      headers: authHeaders,
-    });
-    if (isNonApiResponse(response)) { test.skip(); return; }
-    const status = response.status();
-    expect([401, 404]).toContain(status);
+    await assertApiErrorRoute(request, 'get', '/players/not-a-valid-uuid', [401, 404]);
   });
 
   test('POST to trade accept without auth returns 401', async ({ request }) => {
-    const response = await request.post(`${BASE_URL}/trades/999/accept`);
-    if (isNonApiResponse(response)) { test.skip(); return; }
-    const status = response.status();
-    expect([401, 404]).toContain(status);
+    await assertApiErrorRoute(request, 'post', '/trades/999/accept', [401, 404]);
   });
 
   test('POST to trade decline without auth returns 401', async ({ request }) => {
-    const response = await request.post(`${BASE_URL}/trades/999/decline`);
-    if (isNonApiResponse(response)) { test.skip(); return; }
-    const status = response.status();
-    expect([401, 404]).toContain(status);
+    await assertApiErrorRoute(request, 'post', '/trades/999/decline', [401, 404]);
   });
 });

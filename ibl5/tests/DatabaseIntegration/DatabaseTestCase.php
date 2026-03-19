@@ -134,6 +134,102 @@ abstract class DatabaseTestCase extends TestCase
         ]);
     }
 
+    /**
+     * Insert a player boxscore row with reasonable defaults for the 29-column table.
+     * Generated columns (game_type, season_year, calc_points, calc_rebounds, calc_fg_made)
+     * are computed automatically by MariaDB.
+     *
+     * @param array<string, int|string> $overrides Additional column overrides (e.g. uuid)
+     */
+    protected function insertPlayerBoxscoreRow(
+        string $date,
+        int $pid,
+        string $name,
+        string $pos,
+        int $visitorTid,
+        int $homeTid,
+        int $teamId,
+        int $minutes = 30,
+        int $points2m = 5,
+        int $points2a = 10,
+        int $ftm = 4,
+        int $fta = 5,
+        int $points3m = 2,
+        int $points3a = 6,
+        int $orb = 2,
+        int $drb = 6,
+        int $ast = 5,
+        int $stl = 2,
+        int $tov = 2,
+        int $blk = 1,
+        int $pf = 3,
+        array $overrides = [],
+    ): int {
+        $data = array_merge([
+            'Date' => $date,
+            'name' => $name,
+            'pos' => $pos,
+            'pid' => $pid,
+            'visitorTID' => $visitorTid,
+            'homeTID' => $homeTid,
+            'teamID' => $teamId,
+            'gameMIN' => $minutes,
+            'game2GM' => $points2m,
+            'game2GA' => $points2a,
+            'gameFTM' => $ftm,
+            'gameFTA' => $fta,
+            'game3GM' => $points3m,
+            'game3GA' => $points3a,
+            'gameORB' => $orb,
+            'gameDRB' => $drb,
+            'gameAST' => $ast,
+            'gameSTL' => $stl,
+            'gameTOV' => $tov,
+            'gameBLK' => $blk,
+            'gamePF' => $pf,
+            'gameOfThatDay' => 1,
+            'attendance' => 10000,
+            'capacity' => 15000,
+            'visitorWins' => 20,
+            'visitorLosses' => 10,
+            'homeWins' => 25,
+            'homeLosses' => 5,
+            'uuid' => bin2hex(random_bytes(4)) . '-' . bin2hex(random_bytes(2)) . '-' . bin2hex(random_bytes(2)) . '-' . bin2hex(random_bytes(2)) . '-' . bin2hex(random_bytes(6)),
+        ], $overrides);
+
+        return $this->insertRow('ibl_box_scores', $data);
+    }
+
+    /**
+     * Insert a test player into ibl_plr with sensible defaults.
+     * Uses high PIDs (200000000+) to avoid conflicts with production data.
+     *
+     * @param array<string, int|string|float> $overrides Column overrides
+     */
+    protected function insertTestPlayer(int $pid, string $name, array $overrides = []): void
+    {
+        $defaults = [
+            'pid' => $pid,
+            'name' => $name,
+            'age' => 27,
+            'tid' => 1,
+            'pos' => 'PG',
+            'sta' => 80,
+            'exp' => 5,
+            'bird' => 3,
+            'cy' => 1,
+            'cyt' => 3,
+            'cy1' => 1500,
+            'cy2' => 1600,
+            'retired' => 0,
+            'ordinal' => 1,
+            'droptime' => 0,
+            'uuid' => sprintf('test-%09d-0000-000000000001', $pid),
+        ];
+
+        $this->insertRow('ibl_plr', array_merge($defaults, $overrides));
+    }
+
     private function requireEnv(string $name): string
     {
         $value = getenv($name);

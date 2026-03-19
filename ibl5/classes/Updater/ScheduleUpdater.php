@@ -126,8 +126,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
      */
     private function insertPlayoffGamesFromScheduleHtm(string $scheduleTable): string
     {
-        $ibl5RootRaw = defined('IBL5_ROOT') ? IBL5_ROOT : null;
-        $ibl5Root = is_string($ibl5RootRaw) ? $ibl5RootRaw : '.';
+        $ibl5Root = \Bootstrap\AppPaths::root();
         $leagueDir = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'IBL';
         $scheduleHtmPath = $ibl5Root . '/ibl/' . $leagueDir . '/Schedule.htm';
 
@@ -196,8 +195,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $this->preloadTeamNameMap();
 
-        $ibl5RootRaw = defined('IBL5_ROOT') ? IBL5_ROOT : null;
-        $ibl5Root = is_string($ibl5RootRaw) ? $ibl5RootRaw : '.';
+        $ibl5Root = \Bootstrap\AppPaths::root();
         $filePrefix = $this->leagueContext !== null ? $this->leagueContext->getFilePrefix() : 'IBL5';
         $schFilePath = $ibl5Root . '/' . $filePrefix . '.sch';
 

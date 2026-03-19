@@ -51,8 +51,7 @@ mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5
 
 ## MariaDB Strict Mode & Triggers
 
-- **NOT NULL columns without DEFAULT reject INSERTs before BEFORE INSERT triggers fire.** If a column is `NOT NULL` with no `DEFAULT`, MariaDB strict mode (enabled by default since 10.2) throws `Field 'x' doesn't have a default value` *before* any BEFORE INSERT trigger can auto-populate it. Always provide explicit values for NOT NULL columns in INSERT statements — don't rely on triggers to save you. Example: `ibl_plr.uuid` and `ibl_team_info.uuid` must be included in INSERTs even though BEFORE INSERT triggers exist.
-- **DEFINER clauses in migration 000 are stripped automatically.** `run-migrations-ci.sh` and `wt-up` pipe all migrations through `sed` to strip `DEFINER=...` clauses from the production dump in `000_baseline_schema.sql`.
+- **NOT NULL columns without DEFAULT reject INSERTs before BEFORE INSERT triggers fire.** If a column is `NOT NULL` with no `DEFAULT`, MariaDB strict mode (enabled by default since 10.2) throws `Field 'x' doesn't have a default value` *before* any BEFORE INSERT trigger can auto-populate it. All uuid columns now have `DEFAULT (UUID())` (migration 065), so uuid is no longer an example of this problem. The rule still applies to other NOT NULL columns without defaults.
 
 ## Multiple Claude Instances Protocol
 

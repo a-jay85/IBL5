@@ -65,7 +65,7 @@ Need a data table?
 - **`overflow-y: visible` gets promoted:** If one axis is `auto`/`scroll`/`hidden` and the other is `visible`, the `visible` is promoted to `auto` by the browser. So `overflow-x: auto; overflow-y: visible` actually becomes `overflow-x: auto; overflow-y: auto`.
 - **`overflow-y: clip` does NOT get promoted** but the element is still a scroll container if the other axis is `auto`/`scroll`. Sticky is captured per-element, not per-axis.
 - **Consequence:** Pure CSS cannot do page-level sticky headers inside a horizontal scroll container. Pattern 3a uses JavaScript (`sticky-page-header.js`) to clone the thead into a fixed overlay.
-- **`base.css` sets `table { overflow-x: auto }`** in `@layer base`. This makes every `<table>` a scroll container and breaks sticky. Pattern 4 overrides this with `overflow: visible` (components layer beats base layer).
+- **`base.css` scopes `overflow-x: auto` to `table:not(.ibl-data-table)`** in `@layer base`. Modern `.ibl-data-table` tables are unaffected. Sticky variants still set `overflow: visible` to override `.ibl-data-table`'s own `overflow: hidden` (used for border-radius clipping).
 - **Rounded corners require `overflow: hidden`** to clip, but that breaks sticky. Solution: set `overflow: visible` on the table and apply `border-radius` directly to corner cells. For Pattern 4, corner `th` cells also need `box-shadow` in `var(--page-bg, #eeeeee)` to mask rows scrolling behind the rounded corners.
 - **`--page-bg` CSS variable** is set on `<body>` by `theme.php` from `$bgcolor1` (dev: `#BBBBBB`, prod: `#EEEEEE`).
 - **`css:watch` may not rebuild.** After editing CSS, verify the compiled output contains your new rules: `grep -c "your-class" themes/IBL/style/style.css`. If 0, manually rebuild.
@@ -81,7 +81,7 @@ Need a data table?
 | `.sticky-scroll-wrapper` | `auto` | This element provides the actual scroll viewport |
 | `.sticky-scroll-wrapper.page-sticky` (desktop) | `auto` (unchanged) | JS handles viewport sticky; wrapper still scrolls horizontally |
 | `.table-scroll-container` | `auto` (desktop) / `scroll` (mobile) | Horizontal scroll container |
-| `table, center` (legacy base.css) | `auto` | Prevent legacy layout overflow |
+| `table:not(.ibl-data-table), center` (legacy base.css) | `auto` | Prevent legacy layout overflow |
 
 **Rule:** Never set `overflow: hidden` on any element containing `position: sticky` cells.
 

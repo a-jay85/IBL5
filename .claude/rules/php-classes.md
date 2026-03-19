@@ -93,13 +93,5 @@ Values from `array<string, mixed>` are `mixed`. Before concatenation, casting, o
 ### `$_GET`/`$_POST` values are `mixed`
 Superglobal values are `mixed`, not `string`. Use `is_string($_GET['key'])` to narrow before passing to string-typed methods.
 
-### Runtime-defined constants are `mixed`
-Constants defined with `define()` at runtime (e.g., `IBL5_ROOT`) return `mixed` from the `defined() ? CONST : fallback` pattern. PHPStan cannot infer their type. Narrow with `is_string()` before using in string operations:
-```php
-// ❌ PHPStan error: binaryOp.invalid — mixed . '/path'
-$path = defined('IBL5_ROOT') ? IBL5_ROOT : '/fallback';
-
-// ✅ Narrow the mixed constant value first
-$raw = defined('IBL5_ROOT') ? IBL5_ROOT : null;
-$path = is_string($raw) ? $raw : '/fallback';
-```
+### Use `AppPaths::root()` instead of the `IBL5_ROOT` constant
+The `IBL5_ROOT` constant is defined at runtime with `define()`, making it `mixed` to PHPStan. Use `\Bootstrap\AppPaths::root()` instead — it returns `string` directly with no narrowing needed.

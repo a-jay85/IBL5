@@ -47,8 +47,8 @@ class CommonMysqliRepositoryTest extends DatabaseTestCase
         // Method queries ibl_team_info.gm_username, so update a real team within the transaction
         $stmt = $this->db->prepare("UPDATE ibl_team_info SET gm_username = ? WHERE teamid = 1");
         self::assertNotFalse($stmt);
-        $stmt->bind_param('s', $username);
         $username = 'db_inttest_gm';
+        $stmt->bind_param('s', $username);
         $stmt->execute();
         $stmt->close();
 

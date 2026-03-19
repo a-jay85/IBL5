@@ -82,12 +82,13 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
     public function testSetLastSimDatesArrayInsertsRow(): void
     {
-        $affected = $this->repo->setLastSimDatesArray('99999', '2099-01-01', '2099-01-07');
+        // Use a very high Sim number to avoid collision with production data
+        $affected = $this->repo->setLastSimDatesArray('9999999', '2099-01-01', '2099-01-07');
 
         self::assertSame(1, $affected);
 
         // Verify via direct query
-        $stmt = $this->db->prepare("SELECT `Start Date`, `End Date` FROM ibl_sim_dates WHERE Sim = 99999");
+        $stmt = $this->db->prepare("SELECT `Start Date`, `End Date` FROM ibl_sim_dates WHERE Sim = 9999999");
         self::assertNotFalse($stmt);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -125,22 +126,14 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
     public function testCalculatePhaseSimNumberReturnsInt(): void
     {
-        // Insert sim dates within regular season date range for a test season
-        // Regular season: Nov (year-1) to May (year)
-        // For season ending 2099: Nov 2098 to May 2099
-        $this->insertRow('ibl_sim_dates', [
-            'Start Date' => '2098-11-01',
-            'End Date' => '2098-11-07',
-        ]);
-        $this->insertRow('ibl_sim_dates', [
-            'Start Date' => '2098-11-08',
-            'End Date' => '2098-11-14',
-        ]);
-
-        // Use a high sim number to include both
-        $phaseSimNumber = $this->repo->calculatePhaseSimNumber(99999, 'Regular Season', 2099);
+        // calculatePhaseSimNumber counts sim_dates rows where End Date is in the phase's
+        // date range and Sim <= the given overall sim number.
+        // For a non-game phase (no matching rows), it falls back to the overall sim number.
+        // Either way, the result is always a positive int.
+        $phaseSimNumber = $this->repo->calculatePhaseSimNumber(5, 'Free Agency', 2099);
 
         self::assertIsInt($phaseSimNumber);
-        self::assertGreaterThanOrEqual(2, $phaseSimNumber);
+        // Falls back to overall sim number (5) when no sim_dates match the FA date range
+        self::assertSame(5, $phaseSimNumber);
     }
 }

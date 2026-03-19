@@ -119,6 +119,10 @@ class DraftRepositoryTest extends DatabaseTestCase
 
     public function testGetCurrentDraftPickReturnsFirstEmptySlot(): void
     {
+        // Clear any existing empty draft slots from production data
+        // getCurrentDraftPick() has no year filter — queries all rows with player=''
+        $this->db->query("UPDATE ibl_draft SET player = 'placeholder' WHERE player = ''");
+
         // Insert a taken slot and an empty slot
         $this->insertDraftRow(2099, 1, 1, 1, 'Already Picked');
         $this->insertDraftRow(2099, 1, 2, 2, '', ['team' => 'Enforcers', 'tid' => 2]);

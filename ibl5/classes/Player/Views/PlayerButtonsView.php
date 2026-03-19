@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Player\Views;
 
+use Utilities\HtmlSanitizer;
+
 /**
  * PlayerButtonsView - Renders action buttons for player pages
  * 
@@ -41,7 +43,7 @@ class PlayerButtonsView
         ?>
 <table class="player-button renegotiation-button">
     <tr>
-        <td><a href="modules.php?name=Player&pa=negotiate&pid=<?= $playerID ?>">RENEGOTIATE<BR>CONTRACT</a></td>
+        <td><a href="modules.php?name=Player&pa=negotiate&pid=<?= HtmlSanitizer::e($playerID) ?>">RENEGOTIATE<br>CONTRACT</a></td>
     </tr>
 </table>
         <?php
@@ -60,7 +62,7 @@ class PlayerButtonsView
         ?>
 <table class="player-button rookie-option-button">
     <tr>
-        <td><a href="modules.php?name=Player&pa=rookieoption&pid=<?= $playerID ?>&from=player">ROOKIE<BR>OPTION</a></td>
+        <td><a href="modules.php?name=Player&pa=rookieoption&pid=<?= HtmlSanitizer::e($playerID) ?>&from=player">ROOKIE<br>OPTION</a></td>
     </tr>
 </table>
         <?php

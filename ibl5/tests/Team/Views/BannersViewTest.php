@@ -84,6 +84,6 @@ class BannersViewTest extends TestCase
         $html = $this->view->render($data);
 
         // 7 banners should produce 2 rows (5 + 2)
-        $this->assertSame(2, substr_count($html, '<tr><td align="center"><table><tr>'));
+        $this->assertSame(2, substr_count($html, 'banners-row'));
     }
 }

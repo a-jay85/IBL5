@@ -86,6 +86,25 @@ test.describe('Mobile authenticated page smoke tests', () => {
     await assertNoHorizontalOverflow(page, 'on your account');
   });
 
+  test('trading offer form — no horizontal overflow on mobile', async ({ appState, page }) => {
+    await appState({ 'Allow Trades': 'Yes' });
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=offertrade&partner=Stars');
+    await expect(page.locator('form[name="Trade_Offer"]')).toBeVisible();
+    await assertNoHorizontalOverflow(page, 'on trading offer form');
+  });
+
+  test('free agency negotiate page — no horizontal overflow on mobile', async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Free Agency' });
+    await gotoWithRetry(page, 'modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    const card = page.locator('.ibl-card__title').first();
+    const visible = await card.isVisible().catch(() => false);
+    if (!visible) {
+      test.skip(true, 'negotiate page for pid=11 unavailable (local DB state)');
+    }
+    await expect(card).toBeVisible();
+    await assertNoHorizontalOverflow(page, 'on free agency negotiate page');
+  });
+
   test('no PHP errors on mobile auth pages', async ({ appState, page }) => {
     test.setTimeout(120_000);
     await appState({
@@ -97,6 +116,8 @@ test.describe('Mobile authenticated page smoke tests', () => {
       ...AUTH_PAGES.map(p => p.url),
       'modules.php?name=VotingResults',
       'modules.php?name=YourAccount',
+      'modules.php?name=Trading&op=offertrade&partner=Stars',
+      'modules.php?name=FreeAgency&pa=negotiate&pid=11',
     ];
     for (const url of urls) {
       await gotoWithRetry(page, url);

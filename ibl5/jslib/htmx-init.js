@@ -26,13 +26,10 @@
     });
 
     document.addEventListener('htmx:afterSwap', function () {
-        // Re-run sorttable on new .sortable tables
+        // Re-run sorttable on new .sortable tables (skips already-initialized
+        // tables via data-sorttable attribute guard in makeSortable)
         if (window.sorttable) {
-            var tables = document.querySelectorAll('table.sortable:not(.sorttable_done)');
-            for (var i = 0; i < tables.length; i++) {
-                window.sorttable.makeSortable(tables[i]);
-                tables[i].classList.add('sorttable_done');
-            }
+            window.sorttable.init();
         }
 
         // Re-initialize responsive table wrappers

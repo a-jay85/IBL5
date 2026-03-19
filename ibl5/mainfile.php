@@ -14,7 +14,9 @@
 
 $ua = $_SERVER['HTTP_USER_AGENT'];
 if (preg_match('/facebookexternalhit/si',$ua)) {
-    header('Location: robots.txt');
+    http_response_code(403);
+    header('Content-Type: text/plain');
+    echo 'Forbidden';
     die();
 }
 

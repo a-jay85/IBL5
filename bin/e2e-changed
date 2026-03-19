@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Run accumulated E2E tests from the current Claude Code session.
+# Usage: bin/e2e-changed [--dry-run] [--pid <PID>] [--clear] [-- playwright-args...]
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+IBL5_DIR="$REPO_ROOT/ibl5"
+
+DRY_RUN=false
+CLEAR_ONLY=false
+TARGET_PID="$PPID"
+PW_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run)  DRY_RUN=true; shift ;;
+    --clear)    CLEAR_ONLY=true; shift ;;
+    --pid)      TARGET_PID="$2"; shift 2 ;;
+    --)         shift; PW_ARGS=("$@"); break ;;
+    *)          echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+ACCUMULATOR="/tmp/claude-e2e-tests-${TARGET_PID}.txt"
+
+if [[ ! -f "$ACCUMULATOR" ]] || [[ ! -s "$ACCUMULATOR" ]]; then
+  echo "No E2E tests needed."
+  exit 0
+fi
+
+# Deduplicate
+TESTS=$(sort -u "$ACCUMULATOR")
+
+if $CLEAR_ONLY; then
+  rm -f "$ACCUMULATOR"
+  echo "Cleared accumulated E2E test list."
+  exit 0
+fi
+
+echo "Accumulated E2E tests:"
+echo "$TESTS"
+echo ""
+
+if $DRY_RUN; then
+  exit 0
+fi
+
+# Build file list for Playwright
+TEST_FILES=()
+while IFS= read -r line; do
+  [[ -n "$line" ]] && TEST_FILES+=("$line")
+done <<< "$TESTS"
+
+echo "Running ${#TEST_FILES[@]} test file(s)..."
+cd "$IBL5_DIR" && bunx playwright test "${TEST_FILES[@]}" ${PW_ARGS[@]+"${PW_ARGS[@]}"}
+
+# Clear on success
+rm -f "$ACCUMULATOR"

@@ -207,6 +207,16 @@ jobs:
           path: ibl5/test-results/
           retention-days: 7
 
+      - name: Upload visual regression JSON and screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-regression-results
+          path: |
+            ibl5/test-results.json
+            ibl5/test-results/
+          retention-days: 1
+
       - name: Stop Docker containers
         if: always()
         run: docker compose -f docker-compose.ci.yml down
@@ -372,16 +382,27 @@ jobs:
           path: ibl5/blob-report/
           retention-days: 1
 
+      - name: Upload shard test results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-shard-${{ matrix.shard-index }}
+          path: ibl5/test-results/
+          retention-days: 1
+
       - name: Stop Docker containers
         if: always()
         run: docker compose -f docker-compose.ci.yml down
 
   merge-reports:
     name: Merge E2E Reports
-    needs: [e2e-shards]
+    needs: [e2e, e2e-shards]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v6
@@ -400,9 +421,28 @@ jobs:
           path: ibl5/all-blob-reports
           merge-multiple: true
 
+      - name: Download visual regression results
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          name: visual-regression-results
+          path: ibl5/visual-results/
+        continue-on-error: true
+
+      - name: Download shard test results
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-shard-*
+          path: ibl5/shard-test-results/
+          merge-multiple: true
+        continue-on-error: true
+
       - name: Merge reports
         working-directory: ibl5
-        run: npx playwright merge-reports --reporter=html ./all-blob-reports
+        run: |
+          npx playwright merge-reports --reporter=html ./all-blob-reports
+          npx playwright merge-reports --reporter=json ./all-blob-reports > test-results.json
 
       - name: Upload merged report
         uses: actions/upload-artifact@v7
@@ -410,3 +450,36 @@ jobs:
           name: playwright-report
           path: ibl5/playwright-report/
           retention-days: 7
+
+      - name: Restore CML cache
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/cache@v5
+        with:
+          path: ~/.cml
+          key: ${{ runner.os }}-cml-0.20.7
+
+      - name: Install CML (fallback if cache miss)
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          if [ ! -f ~/.cml/node_modules/.bin/cml ]; then
+            npm install --prefix ~/.cml @cmlrun/cml@0.20.7
+          fi
+          echo "$HOME/.cml/node_modules/.bin" >> $GITHUB_PATH
+
+      - name: Generate E2E report with screenshots
+        if: always() && github.event_name == 'pull_request'
+        working-directory: ibl5
+        run: |
+          node ../.github/scripts/summarize-e2e-results.mjs \
+            --visual=visual-results/test-results.json \
+            --visual-screenshots=visual-results/test-results/ \
+            --functional=test-results.json \
+            --functional-screenshots=shard-test-results/ \
+            --artifact-url="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            > /tmp/e2e-comment.md
+
+      - name: Post E2E results to PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          REPO_TOKEN: ${{ github.token }}
+        run: cml comment update --target=pr --publish /tmp/e2e-comment.md

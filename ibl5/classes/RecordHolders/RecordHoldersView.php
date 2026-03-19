@@ -345,7 +345,8 @@ class RecordHoldersView implements RecordHoldersViewInterface
             $seasonLink = '<a href="' . TeamCellHelper::teamPageUrl($teamTid, $teamYr) . '">' . $safeSeason . '</a>';
 
             $output .= '<tr>';
-            $output .= '<td><a href="' . TeamCellHelper::teamPageUrl($teamTid, $teamYr) . '" aria-label="' . $safeTeam . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
+            $teamLabel = $safeTeam !== '' ? $safeTeam : 'Team';
+            $output .= '<td><a href="' . TeamCellHelper::teamPageUrl($teamTid, $teamYr) . '" aria-label="' . $teamLabel . '"><img src="images/topics/' . $safeTeam . '.png" alt="' . strtoupper($safeTeam) . '"></a></td>';
             $output .= '<td>' . $seasonLink . '</td>';
             $output .= '<td class="ibl-stat-highlight">' . $safeAmount . '</td>';
             $output .= '</tr>';

@@ -70,8 +70,9 @@ class CardBaseStyles
 
         $teamLogoHtml = '';
         if ($teamID > 0) {
+            $safeTeamName = HtmlSanitizer::safeHtmlOutput($teamName);
             $teamLogoHtml = '<div class="card-team-logo">'
-                . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamID . '">'
+                . '<a href="modules.php?name=Team&amp;op=team&amp;teamID=' . $teamID . '" aria-label="' . $safeTeamName . '">'
                 . '<img src="images/logo/new' . $teamID . '.png"'
                 . ' alt="" width="83" height="83" loading="lazy">'
                 . '</a></div>';

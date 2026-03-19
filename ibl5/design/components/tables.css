@@ -46,8 +46,9 @@
 
    STICKY HEADER GOTCHAS:
    - The fixed nav is 72px tall. All sticky top values must be 72px, not 0.
-   - base.css sets `table { overflow-x: auto }` which creates a scroll
-     container and breaks sticky. Override with overflow:visible on the table.
+   - base.css scopes overflow-x:auto to table:not(.ibl-data-table), so modern
+     tables are unaffected. But .ibl-data-table still sets overflow:hidden for
+     border-radius clipping — sticky variants must override with overflow:visible.
    - overflow:auto on ANY axis makes the element a scroll container per CSS
      spec. Even overflow-x:auto + overflow-y:visible → both become auto.
      This is why Pattern 3a needs JS instead of pure CSS.

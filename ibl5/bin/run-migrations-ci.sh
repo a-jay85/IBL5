@@ -5,7 +5,6 @@
 # Applies 000_baseline_schema.sql first (creates all tables), then numbered
 # migrations (001_*, 002_*, 033b_*, etc.) which alter them.
 # Skips .php data migrations (need production data) and .md files.
-# Strips DEFINER clauses from all migrations (only 000 has them from the prod dump).
 set -euo pipefail
 trap 'echo "ERROR: Failed applying migration: $(basename "${f:-unknown}")"; exit 1' ERR
 
@@ -23,6 +22,6 @@ IFS=$'\n' numbered=($(printf '%s\n' "${numbered[@]}" | sort))
 echo "Applying ${#numbered[@]} migrations..."
 for f in "${numbered[@]}"; do
     echo "  -> $(basename "$f")"
-    sed 's/DEFINER=`[^`]*`@`[^`]*`//g' "$f" | mysql "$@" 2> >(grep -v 'Using a password' >&2)
+    mysql "$@" < "$f" 2> >(grep -v 'Using a password' >&2)
 done
 echo "Done."

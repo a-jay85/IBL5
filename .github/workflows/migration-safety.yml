@@ -1,0 +1,150 @@
+name: Migration Safety
+
+on:
+  push:
+    branches: [ master, develop ]
+    paths:
+      - 'ibl5/migrations/**.sql'
+  pull_request:
+    branches: [ master, develop ]
+    paths:
+      - 'ibl5/migrations/**.sql'
+
+jobs:
+  idempotency-check:
+    name: Bash/PHP Runner Idempotency
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: iblhoops_ibl5
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mariadb-admin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.4'
+        extensions: mbstring, intl, mysqli
+        coverage: none
+
+    - name: Install dependencies
+      working-directory: ibl5
+      run: composer install --no-progress --no-interaction
+
+    - name: Create config.php for CI
+      working-directory: ibl5
+      run: |
+        cp config.php.example config.php
+        sed -i "s/\$dbhost = getenv('DB_HOST') ?: 'localhost';/\$dbhost = '127.0.0.1';/" config.php
+        sed -i "s/\$dbuname = \"iblhoops_\";/\$dbuname = \"root\";/" config.php
+        sed -i "s/\$dbpass = \"password\";/\$dbpass = \"root\";/" config.php
+        sed -i "s/\$dbname = \"iblhoops_\";/\$dbname = \"iblhoops_ibl5\";/" config.php
+
+    - name: Apply migrations via bash runner
+      run: ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot iblhoops_ibl5
+
+    - name: Seed PHP migration tracker
+      working-directory: ibl5
+      run: php bin/migrate-seed
+
+    - name: Assert PHP runner sees nothing pending
+      working-directory: ibl5
+      run: |
+        output=$(php bin/migrate --status)
+        echo "$output"
+        if [ "$output" != "Nothing to migrate." ]; then
+          echo "FAIL: PHP runner has pending migrations after bash runner applied all."
+          echo "This means the bash and PHP runners disagree on which files exist."
+          exit 1
+        fi
+
+  schema-parity-check:
+    name: Bash vs PHP Schema Parity
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mariadb-admin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.4'
+        extensions: mbstring, intl, mysqli
+        coverage: none
+
+    - name: Install dependencies
+      working-directory: ibl5
+      run: composer install --no-progress --no-interaction
+
+    - name: Create databases
+      run: |
+        mysql -h 127.0.0.1 -u root -proot -e "CREATE DATABASE ibl5_bash;"
+        mysql -h 127.0.0.1 -u root -proot -e "CREATE DATABASE ibl5_php;"
+
+    - name: "Bash path: apply all migrations"
+      run: ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5_bash
+
+    - name: "PHP path: apply baseline via mysql client, then PHP runner for the rest"
+      working-directory: ibl5
+      run: |
+        # Apply baseline schema via mysql client (same as bash would)
+        sed 's/DEFINER=`[^`]*`@`[^`]*`//g' migrations/000_baseline_schema.sql \
+          | mysql -h 127.0.0.1 -u root -proot ibl5_php
+
+        # Create config pointing to ibl5_php database
+        cp config.php.example config.php.parity
+        sed -i "s/\$dbhost = getenv('DB_HOST') ?: 'localhost';/\$dbhost = '127.0.0.1';/" config.php.parity
+        sed -i "s/\$dbuname = \"iblhoops_\";/\$dbuname = \"root\";/" config.php.parity
+        sed -i "s/\$dbpass = \"password\";/\$dbpass = \"root\";/" config.php.parity
+        sed -i "s/\$dbname = \"iblhoops_\";/\$dbname = \"ibl5_php\";/" config.php.parity
+        cp config.php.parity config.php
+
+        # Seed (marks 000_baseline as already applied) then run remaining
+        php bin/migrate-seed
+        php bin/migrate
+
+    - name: Dump and compare schemas
+      run: |
+        mysqldump -h 127.0.0.1 -u root -proot \
+          --no-data --no-create-db --skip-comments --skip-triggers \
+          --ignore-table=ibl5_bash.migrations \
+          ibl5_bash | sed 's/ibl5_bash/COMPARED_DB/g' > /tmp/schema_bash.sql
+
+        mysqldump -h 127.0.0.1 -u root -proot \
+          --no-data --no-create-db --skip-comments --skip-triggers \
+          --ignore-table=ibl5_php.migrations \
+          ibl5_php | sed 's/ibl5_php/COMPARED_DB/g' > /tmp/schema_php.sql
+
+        if diff /tmp/schema_bash.sql /tmp/schema_php.sql; then
+          echo "PASS: Bash and PHP runners produce identical schemas."
+        else
+          echo "FAIL: Schema divergence detected between bash and PHP runners."
+          exit 1
+        fi

@@ -1,4 +1,4 @@
--- Migration 065: Convert remaining MyISAM nuke_* tables to InnoDB
+-- Migration 066: Convert remaining MyISAM nuke_* tables to InnoDB
 --
 -- Completes the engine migration started in 001. No MyISAM-specific features
 -- are in use. ALTER TABLE preserves all indexes, triggers, and data.

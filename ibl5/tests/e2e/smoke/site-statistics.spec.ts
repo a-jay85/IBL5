@@ -20,13 +20,7 @@ test.describe('SiteStatistics smoke tests', () => {
       const response = await page.goto(url);
       const status = response?.status() ?? 0;
 
-      // If the module is not available (missing language file, etc.), skip
-      if (status === 500) {
-        test.skip(true, 'SiteStatistics returned 500 — likely missing language file');
-        return;
-      }
-
-      expect(status).toBe(200);
+      expect(status, `SiteStatistics ${name} returned ${status}`).toBe(200);
       await assertNoPhpErrors(page, `on SiteStatistics ${name}`);
     });
   }

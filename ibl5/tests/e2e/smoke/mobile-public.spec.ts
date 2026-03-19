@@ -179,20 +179,21 @@ test.describe('Responsive scroll container tests', () => {
   test('standings — sticky column stays visible after scroll', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Standings');
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-    const result = await page.locator('.table-scroll-container').first().evaluate((el: Element) => {
-      const container = el as HTMLElement;
-      container.scrollLeft = container.scrollWidth;
-      const firstCell = container.querySelector('tbody td:first-child');
-      const secondCell = container.querySelector('tbody td:nth-child(2)');
-      if (!firstCell || !secondCell) return null;
+    await expect(page.locator('.responsive-table tbody td.sticky-col').first()).toBeVisible();
+    const container = page.locator('.responsive-table').first().locator('xpath=ancestor::div[contains(@class,"table-scroll-container")]');
+    const result = await container.evaluate((el: Element) => {
+      const c = el as HTMLElement;
+      c.scrollLeft = c.scrollWidth;
+      const stickyCell = c.querySelector('tbody td.sticky-col');
+      const nextCell = stickyCell?.nextElementSibling;
+      if (!stickyCell || !nextCell) return null;
       return {
-        firstLeft: firstCell.getBoundingClientRect().left,
-        secondLeft: secondCell.getBoundingClientRect().left,
+        stickyLeft: stickyCell.getBoundingClientRect().left,
+        nextLeft: nextCell.getBoundingClientRect().left,
       };
     });
     expect(result).not.toBeNull();
-    expect(result!.firstLeft, 'sticky column scrolled out of viewport').toBeGreaterThanOrEqual(0);
+    expect(result!.stickyLeft, 'sticky column scrolled out of viewport').toBeGreaterThanOrEqual(0);
   });
 
   test('season leaderboards — scroll shadow indicator present on load', async ({ page }) => {

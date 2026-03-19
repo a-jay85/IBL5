@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -12,7 +13,9 @@ use PHPUnit\Framework\TestCase;
  * - Connects via env vars: DB_HOST, DB_USER, DB_PASS, DB_NAME
  * - Sets MYSQLI_OPT_INT_AND_FLOAT_NATIVE to match production
  * - Wraps each test in begin_transaction() / rollback() for isolation
+ * - Excluded from default PHPUnit suite via #[Group('database')]
  */
+#[Group('database')]
 abstract class DatabaseTestCase extends TestCase
 {
     protected \mysqli $db;
@@ -89,6 +92,46 @@ abstract class DatabaseTestCase extends TestCase
         $stmt->close();
 
         return $id;
+    }
+
+    protected function insertTeamBoxscoreRow(string $date, string $name, int $gameOfDay, int $visitorTid, int $homeTid): int
+    {
+        return $this->insertRow('ibl_box_scores_teams', [
+            'Date' => $date,
+            'name' => $name,
+            'gameOfThatDay' => $gameOfDay,
+            'visitorTeamID' => $visitorTid,
+            'homeTeamID' => $homeTid,
+            'attendance' => 10000,
+            'capacity' => 15000,
+            'visitorWins' => 20,
+            'visitorLosses' => 10,
+            'homeWins' => 25,
+            'homeLosses' => 5,
+            'visitorQ1points' => 20,
+            'visitorQ2points' => 22,
+            'visitorQ3points' => 18,
+            'visitorQ4points' => 25,
+            'visitorOTpoints' => 0,
+            'homeQ1points' => 28,
+            'homeQ2points' => 24,
+            'homeQ3points' => 22,
+            'homeQ4points' => 30,
+            'homeOTpoints' => 0,
+            'game2GM' => 30,
+            'game2GA' => 60,
+            'gameFTM' => 15,
+            'gameFTA' => 20,
+            'game3GM' => 8,
+            'game3GA' => 22,
+            'gameORB' => 10,
+            'gameDRB' => 30,
+            'gameAST' => 20,
+            'gameSTL' => 8,
+            'gameTOV' => 12,
+            'gameBLK' => 5,
+            'gamePF' => 18,
+        ]);
     }
 
     private function requireEnv(string $name): string

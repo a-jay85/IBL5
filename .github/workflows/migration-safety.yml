@@ -105,8 +105,8 @@ jobs:
 
     - name: Create databases
       run: |
-        mariadb -h 127.0.0.1 -u root -proot -e "CREATE DATABASE ibl5_bash;"
-        mariadb -h 127.0.0.1 -u root -proot -e "CREATE DATABASE ibl5_php;"
+        mysql -h 127.0.0.1 -u root -proot -e "CREATE DATABASE ibl5_bash;"
+        mysql -h 127.0.0.1 -u root -proot -e "CREATE DATABASE ibl5_php;"
 
     - name: "Bash path: apply all migrations"
       run: ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5_bash
@@ -116,7 +116,7 @@ jobs:
       run: |
         # Apply baseline schema via mysql client (same as bash would)
         sed 's/DEFINER=`[^`]*`@`[^`]*`//g' migrations/000_baseline_schema.sql \
-          | mariadb -h 127.0.0.1 -u root -proot ibl5_php
+          | mysql -h 127.0.0.1 -u root -proot ibl5_php
 
         # Create config pointing to ibl5_php database
         cp config.php.example config.php.parity

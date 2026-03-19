@@ -46,7 +46,7 @@ class WaiversView implements WaiversViewInterface
                     </div>
                     <div class="ibl-card__body">
                         <div class="ibl-form-group">
-                            <select name="Player_ID" class="ibl-select">
+                            <select name="Player_ID" class="ibl-select" aria-label="Select player">
                                 <option value="">Select player...</option>
                                 <?php foreach ($players as $optionHtml): ?>
                                 <?= $optionHtml ?>

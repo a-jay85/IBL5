@@ -257,7 +257,7 @@ class StandingsView implements StandingsViewInterface
         ?>
         <h2 class="ibl-title"><?= $title; ?></h2>
         <div class="table-scroll-wrapper">
-        <div class="table-scroll-container">
+        <div class="table-scroll-container" tabindex="0" role="region" aria-label="Standings">
         <table class="sortable ibl-data-table">
             <thead>
                 <tr>

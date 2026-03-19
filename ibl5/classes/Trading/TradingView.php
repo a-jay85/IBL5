@@ -425,7 +425,7 @@ $tradeConfig = [
         <button type="button" class="ibl-tab" data-display="contracts" role="tab">Contracts</button>
     </div>
     <div class="table-scroll-wrapper">
-        <div class="table-scroll-container">
+        <div class="table-scroll-container" tabindex="0" role="region" aria-label="Trade roster preview">
             <div class="trade-roster-preview__empty">Select players to preview roster changes</div>
         </div>
     </div>
@@ -456,7 +456,7 @@ $tradeConfig = [
 ?>
                 <tr>
                     <td>
-                        <input type="number" name="userSendsCash<?= $i ?>" value="<?= $prevUserCash ?>" min="0" max="2000">
+                        <input type="number" name="userSendsCash<?= $i ?>" value="<?= $prevUserCash ?>" min="0" max="2000" aria-label="Cash for <?= $yearLabelEscaped ?>">
                         for <?= $yearLabelEscaped ?>
                     </td>
                 </tr>
@@ -477,7 +477,7 @@ $tradeConfig = [
 ?>
                 <tr>
                     <td>
-                        <input type="number" name="partnerSendsCash<?= $i ?>" value="<?= $prevPartnerCash ?>" min="0" max="2000">
+                        <input type="number" name="partnerSendsCash<?= $i ?>" value="<?= $prevPartnerCash ?>" min="0" max="2000" aria-label="Cash for <?= $yearLabelEscaped ?>">
                         for <?= $yearLabelEscaped ?>
                     </td>
                 </tr>
@@ -579,7 +579,7 @@ $tradeConfig = [
         <button type="button" class="ibl-tab" data-display="contracts" role="tab">Contracts</button>
     </div>
     <div class="table-scroll-wrapper">
-        <div class="table-scroll-container">
+        <div class="table-scroll-container" tabindex="0" role="region" aria-label="Trade review roster preview">
             <div class="trade-roster-preview__loading">Loading</div>
         </div>
     </div>

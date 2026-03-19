@@ -6,10 +6,7 @@ import { assertNoA11yViolations, type A11yOptions } from '../helpers/accessibili
 // Each entry should have a comment explaining why it's excluded.
 const SITE_WIDE_DISABLED_RULES: string[] = [
   'color-contrast', // PHP-Nuke legacy palette — nearly every page affected
-  'select-name', // PHP-Nuke form selects lack <label> associations
   'link-name', // Team cell links (ibl-team-cell__name) render as empty <a> tags
-  'scrollable-region-focusable', // table-scroll-container divs not keyboard-focusable
-  'label', // PHP-Nuke form inputs lack <label> associations
   'image-alt', // Team logos and legacy images missing alt text
 ];
 

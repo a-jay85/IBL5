@@ -184,31 +184,31 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         $dcDi = $player['dc_di'] ?? 0;
         $dcBh = $player['dc_bh'] ?? 0;
 
-        echo "<td><select name=\"canPlayInGame{$depthCount}\">";
+        echo "<td><select name=\"canPlayInGame{$depthCount}\" aria-label=\"Active status for {$player_name_html}\">";
         $this->renderActiveOptions($dcActive);
         echo "</select></td>";
 
-        echo "<td><select name=\"min{$depthCount}\">";
+        echo "<td><select name=\"min{$depthCount}\" aria-label=\"Minutes for {$player_name_html}\">";
         $this->renderMinutesOptions($dcMinutes, $player_staminacap);
         echo "</select></td>";
 
-        echo "<td><select name=\"OF{$depthCount}\">";
+        echo "<td><select name=\"OF{$depthCount}\" aria-label=\"Offense for {$player_name_html}\">";
         $this->renderOffDefOptions($dcOf);
         echo "</select></td>";
 
-        echo "<td><select name=\"DF{$depthCount}\">";
+        echo "<td><select name=\"DF{$depthCount}\" aria-label=\"Defense for {$player_name_html}\">";
         $this->renderOffDefOptions($dcDf);
         echo "</select></td>";
 
-        echo "<td><select name=\"OI{$depthCount}\">";
+        echo "<td><select name=\"OI{$depthCount}\" aria-label=\"Offensive intensity for {$player_name_html}\">";
         $this->renderSettingOptions($dcOi);
         echo "</select></td>";
 
-        echo "<td><select name=\"DI{$depthCount}\">";
+        echo "<td><select name=\"DI{$depthCount}\" aria-label=\"Defensive intensity for {$player_name_html}\">";
         $this->renderSettingOptions($dcDi);
         echo "</select></td>";
 
-        echo "<td><select name=\"BH{$depthCount}\">";
+        echo "<td><select name=\"BH{$depthCount}\" aria-label=\"Ball handling for {$player_name_html}\">";
         $this->renderSettingOptions($dcBh);
         echo "</select></td></tr>";
     }
@@ -223,7 +223,9 @@ class DepthChartEntryView implements DepthChartEntryViewInterface
         /** @var int $currentValue */
         $currentValue = $player[$dcField];
 
-        echo "<td><select name=\"{$fieldName}\">";
+        $posLabel = strtoupper($posKey);
+        $playerNameHtml = HtmlSanitizer::safeHtmlOutput($player['name']);
+        echo "<td><select name=\"{$fieldName}\" aria-label=\"{$posLabel} depth for {$playerNameHtml}\">";
         $this->renderPositionOptions($currentValue);
         echo "</select></td>";
     }

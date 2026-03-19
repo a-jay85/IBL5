@@ -325,10 +325,10 @@ class DepthChartEntryDataConsistencyTest extends TestCase
 
         // More specifically, verify that the settings fields have value 0
         // Check for the specific pattern of settings dropdowns with value 0 selected
-        $this->assertMatchesRegularExpression('/<select name="OF\d+">.*?value="0" SELECTED/s', $html, 'OF should have value 0 selected');
-        $this->assertMatchesRegularExpression('/<select name="DF\d+">.*?value="0" SELECTED/s', $html, 'DF should have value 0 selected');
-        $this->assertMatchesRegularExpression('/<select name="OI\d+">.*?value="0" SELECTED/s', $html, 'OI should have value 0 selected');
-        $this->assertMatchesRegularExpression('/<select name="DI\d+">.*?value="0" SELECTED/s', $html, 'DI should have value 0 selected');
-        $this->assertMatchesRegularExpression('/<select name="BH\d+">.*?value="0" SELECTED/s', $html, 'BH should have value 0 selected');
+        $this->assertMatchesRegularExpression('/<select name="OF\d+"[^>]*>.*?value="0" SELECTED/s', $html, 'OF should have value 0 selected');
+        $this->assertMatchesRegularExpression('/<select name="DF\d+"[^>]*>.*?value="0" SELECTED/s', $html, 'DF should have value 0 selected');
+        $this->assertMatchesRegularExpression('/<select name="OI\d+"[^>]*>.*?value="0" SELECTED/s', $html, 'OI should have value 0 selected');
+        $this->assertMatchesRegularExpression('/<select name="DI\d+"[^>]*>.*?value="0" SELECTED/s', $html, 'DI should have value 0 selected');
+        $this->assertMatchesRegularExpression('/<select name="BH\d+"[^>]*>.*?value="0" SELECTED/s', $html, 'BH should have value 0 selected');
     }
 }

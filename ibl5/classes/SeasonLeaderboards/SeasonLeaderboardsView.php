@@ -65,26 +65,26 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
 <form name="Leaderboards" method="post" action="modules.php?name=SeasonLeaderboards" class="ibl-filter-form">
     <div class="ibl-filter-form__row">
         <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label">Team:</label>
-            <select name="team">
+            <label for="sl-team" class="ibl-filter-form__label">Team:</label>
+            <select id="sl-team" name="team">
                 <?php echo $this->renderTeamOptions($teams, $selectedTeam); ?>
             </select>
         </div>
         <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label">Year:</label>
-            <select name="year">
+            <label for="sl-year" class="ibl-filter-form__label">Year:</label>
+            <select id="sl-year" name="year">
                 <?php echo $this->renderYearOptions($years, $selectedYear); ?>
             </select>
         </div>
         <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label">Sort By:</label>
-            <select name="sortby">
+            <label for="sl-sortby" class="ibl-filter-form__label">Sort By:</label>
+            <select id="sl-sortby" name="sortby">
                 <?php echo $this->renderSortOptions($selectedSort); ?>
             </select>
         </div>
         <div class="ibl-filter-form__group">
-            <label class="ibl-filter-form__label">Limit:</label>
-            <input type="number" name="limit" value="<?= HtmlSanitizer::e($limitValue) ?>" min="1" placeholder="50">
+            <label for="sl-limit" class="ibl-filter-form__label">Limit:</label>
+            <input id="sl-limit" type="number" name="limit" value="<?= HtmlSanitizer::e($limitValue) ?>" min="1" placeholder="50">
             <span class="ibl-filter-form__label">Records</span>
         </div>
         <button type="submit" class="ibl-filter-form__submit">Search Season Data</button>
@@ -156,7 +156,7 @@ class SeasonLeaderboardsView implements SeasonLeaderboardsViewInterface
     {
         ob_start();
         ?>
-<div class="table-scroll-container">
+<div class="table-scroll-container" tabindex="0" role="region" aria-label="Season leaderboards">
 <table class="sortable ibl-data-table responsive-table">
     <thead>
         <tr>

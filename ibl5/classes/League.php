@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 /**
  * League - IBL league-wide operations and queries
- * 
+ *
  * Extends BaseMysqliRepository for standardized database access.
  * Provides league configuration, voting candidates, and team operations.
- * 
+ *
  * @see BaseMysqliRepository For base class documentation and error codes
+ * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class League extends BaseMysqliRepository
 {
@@ -75,7 +76,7 @@ class League extends BaseMysqliRepository
      * Get All-Star voting candidates for a conference/position
      *
      * @param string $votingCategory Voting category (e.g., 'EC-CF', 'WC-CB')
-     * @return array<int, array<string, mixed>> All matching players
+     * @return list<PlayerRow> All matching players
      */
     public function getAllStarCandidatesResult(string $votingCategory): array
     {
@@ -100,16 +101,18 @@ class League extends BaseMysqliRepository
           AND p.stats_gm > '14'
         ORDER BY p.name";
 
+        /** @var list<PlayerRow> */
         return $this->fetchAll($query);
     }
 
     /**
      * Get all injured players
      *
-     * @return array<int, array<string, mixed>> All injured players
+     * @return list<PlayerRow> All injured players
      */
     public function getInjuredPlayersResult(): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
@@ -123,10 +126,11 @@ class League extends BaseMysqliRepository
      * Get all free agents for the season
      *
      * @param Season $season Current season
-     * @return array<int, array<string, mixed>> All free agent players
+     * @return list<PlayerRow> All free agent players
      */
     public function getFreeAgentsResult(Season $season): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
@@ -141,10 +145,11 @@ class League extends BaseMysqliRepository
     /**
      * Get all waived players
      *
-     * @return array<int, array<string, mixed>> All waived players
+     * @return list<PlayerRow> All waived players
      */
     public function getWaivedPlayersResult(): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT *
             FROM ibl_plr
@@ -161,10 +166,11 @@ class League extends BaseMysqliRepository
     /**
      * Get MVP award candidates
      *
-     * @return array<int, array<string, mixed>> All MVP candidates
+     * @return list<PlayerRow> All MVP candidates
      */
     public function getMVPCandidatesResult(): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
             FROM ibl_plr p
@@ -179,10 +185,11 @@ class League extends BaseMysqliRepository
     /**
      * Get Sixth Person of the Year award candidates
      *
-     * @return array<int, array<string, mixed>> All Sixth Person candidates
+     * @return list<PlayerRow> All Sixth Person candidates
      */
     public function getSixthPersonOfTheYearCandidatesResult(): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
             FROM ibl_plr p
@@ -198,10 +205,11 @@ class League extends BaseMysqliRepository
     /**
      * Get Rookie of the Year award candidates
      *
-     * @return array<int, array<string, mixed>> All Rookie of the Year candidates
+     * @return list<PlayerRow> All Rookie of the Year candidates
      */
     public function getRookieOfTheYearCandidatesResult(): array
     {
+        /** @var list<PlayerRow> */
         return $this->fetchAll(
             "SELECT p.*, t.team_name AS teamname, t.team_city, t.color1, t.color2
             FROM ibl_plr p

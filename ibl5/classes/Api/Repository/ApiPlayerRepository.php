@@ -6,13 +6,16 @@ namespace Api\Repository;
 
 use Api\Pagination\Paginator;
 
+/**
+ * @phpstan-type PlayerCurrentRow array{player_uuid: string, pid: int, name: string, position: string, age: int, htft: int, htin: int, experience: int, bird_rights: int, teamid: int|null, team_uuid: string|null, team_city: string|null, team_name: string|null, full_team_name: string|null, current_salary: int, year1_salary: int, year2_salary: int, games_played: int, minutes_played: int, field_goals_made: int, field_goals_attempted: int, free_throws_made: int, free_throws_attempted: int, three_pointers_made: int, three_pointers_attempted: int, offensive_rebounds: int, defensive_rebounds: int, assists: int, steals: int, turnovers: int, blocks: int, personal_fouls: int, points_per_game: float|null, fg_percentage: float|null, ft_percentage: float|null, three_pt_percentage: float|null, ...}
+ */
 class ApiPlayerRepository extends \BaseMysqliRepository
 {
     /**
      * Get paginated list of players from the API view.
      *
      * @param array<string, string> $filters Optional filters (position, team UUID, search)
-     * @return array<int, array<string, mixed>>
+     * @return list<PlayerCurrentRow>
      */
     public function getPlayers(Paginator $paginator, array $filters = []): array
     {
@@ -46,6 +49,7 @@ class ApiPlayerRepository extends \BaseMysqliRepository
         $params[] = $paginator->getLimit();
         $params[] = $paginator->getOffset();
 
+        /** @var list<PlayerCurrentRow> */
         return $this->fetchAll($query, $types, ...$params);
     }
 
@@ -89,10 +93,11 @@ class ApiPlayerRepository extends \BaseMysqliRepository
     /**
      * Get a single player by UUID from the API view.
      *
-     * @return array<string, mixed>|null
+     * @return PlayerCurrentRow|null
      */
     public function getPlayerByUuid(string $uuid): ?array
     {
+        /** @var PlayerCurrentRow|null */
         return $this->fetchOne(
             'SELECT * FROM vw_player_current WHERE player_uuid = ?',
             's',

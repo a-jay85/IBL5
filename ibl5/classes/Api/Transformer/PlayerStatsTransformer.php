@@ -6,12 +6,16 @@ namespace Api\Transformer;
 
 use BasketballStats\StatsFormatter;
 
+/**
+ * @phpstan-import-type CareerStatsRow from \Api\Repository\ApiPlayerStatsRepository
+ * @phpstan-import-type SeasonHistoryRow from \Api\Repository\ApiPlayerStatsRepository
+ */
 class PlayerStatsTransformer
 {
     /**
      * Transform a career stats row from vw_player_career_stats.
      *
-     * @param array{player_uuid: string, pid: int, name: string, career_games: int, career_minutes: int, career_points: int|float, career_rebounds: int, career_assists: int, career_steals: int, career_blocks: int, ppg_career: float|null, rpg_career: float|null, apg_career: float|null, fg_pct_career: float|null, ft_pct_career: float|null, three_pt_pct_career: float|null, playoff_minutes: int, draft_year: int|null, draft_round: int|null, draft_pick: int|null, drafted_by_team: string|null, draft_team_id: int|null} $row
+     * @param CareerStatsRow $row
      * @return array<string, mixed>
      */
     public function transformCareer(array $row): array
@@ -53,7 +57,7 @@ class PlayerStatsTransformer
     /**
      * Transform a season history row from ibl_hist.
      *
-     * @param array{player_uuid: string, pid: int, name: string, year: int, teamid: int, team: string, team_uuid: string|null, team_city: string|null, team_name: string|null, games: int, minutes: int, fgm: int, fga: int, ftm: int, fta: int, tgm: int, tga: int, orb: int, reb: int, ast: int, stl: int, blk: int, tvr: int, pf: int, pts: int, salary: int} $row
+     * @param SeasonHistoryRow $row
      * @return array<string, mixed>
      */
     public function transformSeason(array $row): array

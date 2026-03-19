@@ -122,7 +122,7 @@ class CareerLeaderboardsRepository extends \BaseMysqliRepository implements Care
         $rows = $this->fetchAll($query);
 
         return [
-            'result' => $rows,
+            'results' => $rows,
             'count' => count($rows)
         ];
     }

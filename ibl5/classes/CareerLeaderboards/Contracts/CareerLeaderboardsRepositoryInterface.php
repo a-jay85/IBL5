@@ -11,7 +11,7 @@ namespace CareerLeaderboards\Contracts;
  * multiple table types (regular season, playoffs, H.E.A.T., Olympics, Rookie, Sophomore, All-Star).
  *
  * @phpstan-type CareerStatsRow array{pid: int, name: string, games: int|float|string, minutes: int|float|string, fgm: int|float|string, fga: int|float|string, fgpct?: float|string|null, ftm: int|float|string, fta: int|float|string, ftpct?: float|string|null, tgm: int|float|string, tga: int|float|string, tpct?: float|string|null, orb: int|float|string, reb: int|float|string, ast: int|float|string, stl: int|float|string, tvr: int|float|string, blk: int|float|string, pf: int|float|string, pts: int|float|string, retired: int|string}
- * @phpstan-type LeaderboardResult array{result: list<CareerStatsRow>, count: int}
+ * @phpstan-type LeaderboardResult array{results: list<CareerStatsRow>, count: int}
  */
 interface CareerLeaderboardsRepositoryInterface
 {
@@ -25,7 +25,7 @@ interface CareerLeaderboardsRepositoryInterface
      * @param string $sortColumn Column name to sort by (must be in whitelist)
      * @param int $activeOnly 1 to exclude retired players, 0 to include all
      * @param int $limit Maximum records to return (0 for default cap of 5000)
-     * @return LeaderboardResult Result with keys 'result' and 'count'
+     * @return LeaderboardResult Result with keys 'results' and 'count'
      *
      * **Valid Tables:**
      * - ibl_hist (aggregated by player for regular season totals)

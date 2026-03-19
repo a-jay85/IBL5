@@ -113,9 +113,7 @@ class SeasonHighsView implements SeasonHighsViewInterface
             // Link player names to their profile page when pid is available
             if (isset($row['pid'])) {
                 $pid = $row['pid'];
-                $playerThumbnail = PlayerImageHelper::renderThumbnail($pid);
-                /** @var string $name */
-                $name = "<a href=\"modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a>";
+                $name = PlayerImageHelper::renderPlayerLink((int) $pid, (string) $row['name']);
 
                 // Build team cell for player stats
                 if ($isPlayerStats) {

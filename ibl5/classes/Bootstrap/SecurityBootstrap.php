@@ -29,7 +29,9 @@ class SecurityBootstrap implements BootstrapStepInterface
         $rawUa = $_SERVER['HTTP_USER_AGENT'] ?? '';
         $ua = is_string($rawUa) ? $rawUa : '';
         if (preg_match('/facebookexternalhit/si', $ua) === 1) {
-            header('Location: robots.txt');
+            http_response_code(403);
+            header('Content-Type: text/plain');
+            echo 'Forbidden';
             exit();
         }
     }

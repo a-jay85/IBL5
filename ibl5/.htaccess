@@ -7,6 +7,11 @@ Deny from 114.119.0.0/16
 Deny from 47.82.0.0/16
 Deny from 47.79.0.0/16
 Deny from 47.128.0.0/16
+# Tencent Cloud — part of distributed ?pid= scraping botnet
+Deny from 43.131.0.0/16
+Deny from 43.152.0.0/16
+Deny from 43.156.0.0/16
+Deny from 170.106.0.0/16
 
 # API v1 routing - rewrite /api/v1/* to api.php
 RewriteRule ^api/v1/(.*)$ api.php?route=$1 [QSA,L]

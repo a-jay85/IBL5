@@ -10,7 +10,7 @@ test.describe('Sortable table functionality', () => {
       await page.goto('modules.php?name=Standings');
     });
 
-    test('clicking a column header sorts the table', async ({ page }) => {
+    test('clicking a column header sorts the table descending', async ({ page }) => {
       const firstTable = page.locator('table.sortable').first();
       // Wait for sorttable to initialize
       await expect(firstTable).toHaveAttribute('data-sorttable', 'true');
@@ -19,12 +19,12 @@ test.describe('Sortable table functionality', () => {
       const winPctHeader = firstTable.locator('thead th:nth-child(3)');
       await winPctHeader.click();
 
-      // Verify the header got the sorted class
-      await expect(winPctHeader).toHaveClass(/sorttable_sorted/);
+      // Verify the header got the sorted_reverse class (descending first)
+      await expect(winPctHeader).toHaveClass(/sorttable_sorted_reverse/);
 
-      // Verify ascending indicator exists
-      const fwdIndicator = page.locator('#sorttable_sortfwdind');
-      await expect(fwdIndicator).toBeAttached();
+      // Verify descending indicator exists
+      const revIndicator = page.locator('#sorttable_sortrevind');
+      await expect(revIndicator).toBeAttached();
     });
 
     test('clicking same header twice reverses sort', async ({ page }) => {
@@ -33,17 +33,17 @@ test.describe('Sortable table functionality', () => {
 
       const winPctHeader = firstTable.locator('thead th:nth-child(3)');
 
-      // First click — ascending
-      await winPctHeader.click();
-      await expect(winPctHeader).toHaveClass(/sorttable_sorted(?!_reverse)/);
-
-      // Second click — descending
+      // First click — descending
       await winPctHeader.click();
       await expect(winPctHeader).toHaveClass(/sorttable_sorted_reverse/);
 
-      // Verify reverse indicator exists
-      const revIndicator = page.locator('#sorttable_sortrevind');
-      await expect(revIndicator).toBeAttached();
+      // Second click — ascending
+      await winPctHeader.click();
+      await expect(winPctHeader).toHaveClass(/sorttable_sorted(?!_reverse)/);
+
+      // Verify ascending indicator exists
+      const fwdIndicator = page.locator('#sorttable_sortfwdind');
+      await expect(fwdIndicator).toBeAttached();
     });
 
     test('aria-sort attribute is set correctly', async ({ page }) => {
@@ -55,17 +55,17 @@ test.describe('Sortable table functionality', () => {
       // After init — should be none
       await expect(winPctHeader).toHaveAttribute('aria-sort', 'none');
 
-      // First click — ascending
-      await winPctHeader.click();
-      await expect(winPctHeader).toHaveAttribute('aria-sort', 'ascending');
-
-      // Second click — descending
+      // First click — descending
       await winPctHeader.click();
       await expect(winPctHeader).toHaveAttribute('aria-sort', 'descending');
 
-      // Third click — back to ascending
+      // Second click — ascending
       await winPctHeader.click();
       await expect(winPctHeader).toHaveAttribute('aria-sort', 'ascending');
+
+      // Third click — back to descending
+      await winPctHeader.click();
+      await expect(winPctHeader).toHaveAttribute('aria-sort', 'descending');
     });
 
     test('switching columns clears previous sort state', async ({ page }) => {
@@ -75,13 +75,13 @@ test.describe('Sortable table functionality', () => {
       const col3 = firstTable.locator('thead th:nth-child(3)');
       const col4 = firstTable.locator('thead th:nth-child(4)');
 
-      // Sort by column 3
+      // Sort by column 3 (descending on first click)
       await col3.click();
-      await expect(col3).toHaveClass(/sorttable_sorted/);
+      await expect(col3).toHaveClass(/sorttable_sorted_reverse/);
 
       // Sort by column 4 — column 3 should lose sorted class
       await col4.click();
-      await expect(col4).toHaveClass(/sorttable_sorted/);
+      await expect(col4).toHaveClass(/sorttable_sorted_reverse/);
       await expect(col3).not.toHaveClass(/sorttable_sorted/);
       await expect(col3).toHaveAttribute('aria-sort', 'none');
     });
@@ -99,7 +99,7 @@ test.describe('Sortable table functionality', () => {
       if (streakIdx >= 0) {
         const streakHeader = headers.nth(streakIdx);
         await streakHeader.click();
-        await expect(streakHeader).toHaveClass(/sorttable_sorted/);
+        await expect(streakHeader).toHaveClass(/sorttable_sorted_reverse/);
 
         // Verify customkey cells exist (they have the attribute)
         const customKeyCells = firstTable.locator(
@@ -123,8 +123,8 @@ test.describe('Sortable table functionality', () => {
       // Click the first sortable header
       const firstHeader = sortableTable.locator('thead th').first();
       await firstHeader.click();
-      await expect(firstHeader).toHaveClass(/sorttable_sorted/);
-      await expect(firstHeader).toHaveAttribute('aria-sort', 'ascending');
+      await expect(firstHeader).toHaveClass(/sorttable_sorted_reverse/);
+      await expect(firstHeader).toHaveAttribute('aria-sort', 'descending');
     });
 
     test('no PHP errors on franchise history page', async ({ page }) => {

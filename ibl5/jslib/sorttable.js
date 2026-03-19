@@ -64,18 +64,7 @@ window.sorttable = {
     var tbody = table.tBodies[0];
     var col = parseInt(th.getAttribute('data-sort-col'), 10);
 
-    // Already sorted ascending — reverse it
-    if (th.classList.contains('sorttable_sorted')) {
-      sorttable._reverse(tbody);
-      th.classList.remove('sorttable_sorted');
-      th.classList.add('sorttable_sorted_reverse');
-      th.setAttribute('aria-sort', 'descending');
-      sorttable._removeIndicator('sorttable_sortfwdind');
-      sorttable._addIndicator(th, 'sorttable_sortrevind', '\u25B4');
-      return;
-    }
-
-    // Already sorted descending — reverse it
+    // Already sorted descending — reverse to ascending
     if (th.classList.contains('sorttable_sorted_reverse')) {
       sorttable._reverse(tbody);
       th.classList.remove('sorttable_sorted_reverse');
@@ -83,6 +72,17 @@ window.sorttable = {
       th.setAttribute('aria-sort', 'ascending');
       sorttable._removeIndicator('sorttable_sortrevind');
       sorttable._addIndicator(th, 'sorttable_sortfwdind', '\u25BE');
+      return;
+    }
+
+    // Already sorted ascending — reverse to descending
+    if (th.classList.contains('sorttable_sorted')) {
+      sorttable._reverse(tbody);
+      th.classList.remove('sorttable_sorted');
+      th.classList.add('sorttable_sorted_reverse');
+      th.setAttribute('aria-sort', 'descending');
+      sorttable._removeIndicator('sorttable_sortfwdind');
+      sorttable._addIndicator(th, 'sorttable_sortrevind', '\u25B4');
       return;
     }
 
@@ -105,13 +105,14 @@ window.sorttable = {
       rows.push([sorttable._getKey(tbody.rows[j].cells[col]), tbody.rows[j]]);
     }
     rows.sort(cmp);
-    for (var j = 0; j < rows.length; j++) {
+    // Reverse for descending (highest first) on initial click
+    for (var j = rows.length - 1; j >= 0; j--) {
       tbody.appendChild(rows[j][1]);
     }
 
-    th.classList.add('sorttable_sorted');
-    th.setAttribute('aria-sort', 'ascending');
-    sorttable._addIndicator(th, 'sorttable_sortfwdind', '\u25BE');
+    th.classList.add('sorttable_sorted_reverse');
+    th.setAttribute('aria-sort', 'descending');
+    sorttable._addIndicator(th, 'sorttable_sortrevind', '\u25B4');
   },
 
   _getKey: function (td) {

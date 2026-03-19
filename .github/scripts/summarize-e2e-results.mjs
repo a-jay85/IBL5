@@ -158,17 +158,36 @@ function truncateError(msg) {
   return firstLine.length > 200 ? firstLine.slice(0, 200) + '...' : firstLine;
 }
 
-// --- Match screenshots from directory to failed tests ---
+// --- Resolve screenshot paths against the downloaded artifacts directory ---
 
-function matchScreenshotsFromDir(failed, screenshotsDir) {
+function resolveScreenshots(failed, screenshotsDir) {
   if (!screenshotsDir) return;
   const allScreenshots = findScreenshots(screenshotsDir);
+  if (allScreenshots.length === 0) return;
 
   for (const test of failed) {
-    if (test.screenshots.length > 0) continue;
+    // Try to resolve JSON attachment paths by matching filenames against
+    // files in the screenshots directory. JSON records absolute paths from
+    // the CI container (e.g., /ibl5/test-results/...) but the actual files
+    // are in the downloaded artifact directory.
+    const resolved = [];
+    for (const jsonPath of test.screenshots) {
+      const filename = jsonPath.split('/').pop();
+      const parentDir = jsonPath.split('/').slice(-2, -1)[0] ?? '';
+      const match = allScreenshots.find(s =>
+        s.endsWith(filename) && s.includes(parentDir)
+      );
+      if (match) {
+        resolved.push(match);
+      }
+    }
 
-    // Try to match by test title — Playwright stores screenshots in directories
-    // named after the test (slugified)
+    if (resolved.length > 0) {
+      test.screenshots = resolved;
+      continue;
+    }
+
+    // Fallback: fuzzy-match by test title slug
     const slug = test.title
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
@@ -176,12 +195,11 @@ function matchScreenshotsFromDir(failed, screenshotsDir) {
 
     const matches = allScreenshots.filter(s => {
       const dir = s.toLowerCase();
-      // Check if any part of the path contains a slug-like match
       return dir.includes(slug) || slug.split('-').every(word => dir.includes(word));
     });
 
     if (matches.length > 0) {
-      test.screenshots.push(...matches);
+      test.screenshots = matches;
     }
   }
 }
@@ -194,7 +212,7 @@ function generateSectionMarkdown(label, report, screenshotsDir) {
   }
 
   const results = walkSuites(report.suites);
-  matchScreenshotsFromDir(results.failed, screenshotsDir);
+  resolveScreenshots(results.failed, screenshotsDir);
 
   const lines = [];
   const failCount = results.failed.length;

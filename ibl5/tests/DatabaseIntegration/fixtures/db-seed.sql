@@ -25,8 +25,8 @@ VALUES (2, 'Test Player Two', 22, 0, 'SF', 75, 1, 0, 0, 0, 0, 0, 0, 1000, 0, 'bb
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 -- Users: one GM mapped to Metros
-INSERT INTO nuke_users (user_id, username, user_email, user_ibl_team, name, user_password, date_started)
-VALUES (1, 'testgm', 'test@example.com', 'New York Metros', 'Test GM', 'hashed', '2020')
+INSERT INTO nuke_users (user_id, username, user_email, user_ibl_team, name, user_password, date_started, user_avatar, bio, ublock)
+VALUES (1, 'testgm', 'test@example.com', 'Metros', 'Test GM', 'hashed', '2020', '', '', '')
 ON DUPLICATE KEY UPDATE username = VALUES(username);
 
 -- Settings: commonly read by services

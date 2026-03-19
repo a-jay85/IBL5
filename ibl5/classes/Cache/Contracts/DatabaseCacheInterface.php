@@ -18,7 +18,7 @@ interface DatabaseCacheInterface
      * Returns null on cache miss, expired entry, corrupt JSON, or database error.
      *
      * @param string $key Cache key
-     * @return list<array<string, mixed>>|null Decoded array on hit, null on miss
+     * @return array<mixed>|null Decoded array on hit, null on miss
      */
     public function get(string $key): ?array;
 
@@ -29,7 +29,7 @@ interface DatabaseCacheInterface
      * Silently fails on database errors (prepare failure, encode failure).
      *
      * @param string $key Cache key
-     * @param list<array<string, mixed>> $data Data to cache (must be JSON-encodable)
+     * @param array<mixed> $data Data to cache (must be JSON-encodable)
      * @param int $ttlSeconds Time-to-live in seconds
      */
     public function set(string $key, array $data, int $ttlSeconds): void;

@@ -17,6 +17,7 @@ if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
+use Cache\DatabaseCache;
 use RecordHolders\RecordHoldersRepository;
 use RecordHolders\RecordHoldersService;
 use RecordHolders\CachedRecordHoldersService;
@@ -31,7 +32,8 @@ global $mysqli_db;
 
 $repository = new RecordHoldersRepository($mysqli_db);
 $innerService = new RecordHoldersService($repository);
-$service = new CachedRecordHoldersService($innerService, $mysqli_db);
+$cache = new DatabaseCache($mysqli_db);
+$service = new CachedRecordHoldersService($innerService, $cache);
 $view = new RecordHoldersView();
 
 $records = $service->getAllRecords();

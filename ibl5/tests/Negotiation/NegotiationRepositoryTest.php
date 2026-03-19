@@ -154,6 +154,32 @@ class NegotiationRepositoryTest extends TestCase
     }
 
     // ============================================
+    // GET TEAM CAP SPACE NEXT SEASON TESTS
+    // ============================================
+
+    public function testGetTeamCapSpaceNextSeasonReturnsHardCapWhenNoSalaryData(): void
+    {
+        $repository = new NegotiationRepository($this->mockMysqliDb);
+        $this->mockDb->setMockData([]);
+
+        $result = $repository->getTeamCapSpaceNextSeason('Empty Team');
+
+        $this->assertSame(\League::HARD_CAP_MAX, $result);
+    }
+
+    public function testGetTeamCapSpaceNextSeasonReturnsCapMinusSalary(): void
+    {
+        $repository = new NegotiationRepository($this->mockMysqliDb);
+        $this->mockDb->setMockData([
+            ['total_salary' => 5000]
+        ]);
+
+        $result = $repository->getTeamCapSpaceNextSeason('Test Team');
+
+        $this->assertSame(\League::HARD_CAP_MAX - 5000, $result);
+    }
+
+    // ============================================
     // MULTIPLE INSTANCES TEST
     // ============================================
 

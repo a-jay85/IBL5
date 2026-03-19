@@ -228,11 +228,11 @@ final class CachedCareerLeaderboardsRepositoryTest extends TestCase
  */
 class InMemoryCache implements DatabaseCacheInterface
 {
-    /** @var array<string, array{data: list<array<string, mixed>>, expiration: int}> */
+    /** @var array<string, array{data: array<mixed>, expiration: int}> */
     private array $store = [];
 
     /**
-     * @return list<array<string, mixed>>|null
+     * @return array<mixed>|null
      */
     public function get(string $key): ?array
     {
@@ -249,7 +249,7 @@ class InMemoryCache implements DatabaseCacheInterface
     }
 
     /**
-     * @param list<array<string, mixed>> $data
+     * @param array<mixed> $data
      */
     public function set(string $key, array $data, int $ttlSeconds): void
     {

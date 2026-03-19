@@ -1,4 +1,4 @@
--- Add DEFAULT uuid() to all uuid columns that lack it.
+-- Add DEFAULT (UUID()) to all uuid columns that lack it.
 -- MariaDB 10.6 supports uuid() as a DEFAULT expression.
 -- ibl_olympics_team_info already has DEFAULT uuid() (set in baseline).
 -- failed_jobs.uuid is varchar(255) and a Laravel queue table — left as-is.

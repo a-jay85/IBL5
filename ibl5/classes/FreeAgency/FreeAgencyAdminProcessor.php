@@ -47,6 +47,13 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
 
         $processedPlayers = [];
 
+        // Pre-load all demands in a single batch query to avoid N+1
+        $playerIds = array_values(array_unique(array_map(
+            static fn (array $row): int => $row['pid'],
+            $offers
+        )));
+        $demandsMap = $this->repository->getPlayerDemandsBatch($playerIds);
+
         foreach ($offers as $row) {
             /** @var OfferRow $row */
             $playerName = $row['name'];
@@ -92,8 +99,8 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             // Build extended news text for all offers
             $newsBodyText .= "The {$offeringTeamName} offered {$playerName} a {$offerYears}-year deal worth a total of {$offerTotal} million dollars.<br>\n";
 
-            // Get demands for this player
-            $demands = $this->getPlayerDemands($playerId, $day);
+            // Get demands for this player (from pre-loaded batch)
+            $demands = $this->calculateDemandValue($demandsMap[$playerId] ?? null, $day);
 
             // Check if offer is auto-rejected (under half of demands)
             if ($perceivedValue <= $demands / 2) {
@@ -304,15 +311,12 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
     }
 
     /**
-     * Get player demands adjusted for the current day
+     * Calculate day-adjusted demand value from pre-loaded demand data
      *
-     * Fetches raw demand data from repository and applies the day-adjusted
-     * demand calculation formula.
+     * @param array{dem1: int, dem2: int, dem3: int, dem4: int, dem5: int, dem6: int}|null $demRow
      */
-    private function getPlayerDemands(int $playerID, int $day): float
+    private function calculateDemandValue(?array $demRow, int $day): float
     {
-        $demRow = $this->repository->getPlayerDemands($playerID);
-
         if ($demRow === null) {
             return 0.0;
         }

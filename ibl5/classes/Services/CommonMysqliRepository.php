@@ -291,6 +291,29 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     }
 
     /**
+     * Gets both current and next-year salary totals for a team in a single query
+     *
+     * @param string $teamName Team name
+     * @return array{current: int, nextYear: int} Salary totals in thousands
+     */
+    public function getTeamSalarySummary(string $teamName): array
+    {
+        /** @var array{current_salary: int|null, next_year_salary: int|null}|null $result */
+        $result = $this->fetchOne(
+            "SELECT SUM(current_salary) AS current_salary, SUM(next_year_salary) AS next_year_salary
+            FROM vw_current_salary
+            WHERE teamname = ?",
+            "s",
+            $teamName
+        );
+
+        return [
+            'current' => (int) ($result['current_salary'] ?? 0),
+            'nextYear' => (int) ($result['next_year_salary'] ?? 0),
+        ];
+    }
+
+    /**
      * Gets cap space for next season for a team
      *
      * @param string $teamName Team name

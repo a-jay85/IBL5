@@ -66,7 +66,7 @@ class CachedCareerLeaderboardsRepository implements CareerLeaderboardsRepository
         if ($rows === null) {
             // Cache miss — fetch all rows from the inner repository (no active filter, no limit, default sort)
             $innerResult = $this->inner->getLeaderboards($tableKey, 'pts', 0, 0);
-            $rows = $innerResult['result'];
+            $rows = $innerResult['results'];
             $this->cache->set($cacheKey, $rows, self::TTL_SECONDS);
         }
 
@@ -91,7 +91,7 @@ class CachedCareerLeaderboardsRepository implements CareerLeaderboardsRepository
         }
 
         return [
-            'result' => $rows,
+            'results' => $rows,
             'count' => count($rows),
         ];
     }
@@ -116,7 +116,7 @@ class CachedCareerLeaderboardsRepository implements CareerLeaderboardsRepository
             $innerResult = $this->inner->getLeaderboards($tableKey, 'pts', 0, 0);
             $this->cache->set(
                 self::CACHE_KEY_PREFIX . $tableKey,
-                $innerResult['result'],
+                $innerResult['results'],
                 self::TTL_SECONDS
             );
         }

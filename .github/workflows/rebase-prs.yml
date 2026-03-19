@@ -1,0 +1,57 @@
+name: Auto-Rebase PRs
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  rebase:
+    name: Rebase open PRs onto master
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Rebase open PR branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get all open PRs targeting master
+          prs=$(gh pr list --base master --state open --json number,headRefName --jq '.[] | "\(.number) \(.headRefName)"')
+
+          if [ -z "$prs" ]; then
+            echo "No open PRs targeting master"
+            exit 0
+          fi
+
+          while IFS=' ' read -r pr_number branch; do
+            echo "::group::PR #${pr_number} (${branch})"
+
+            # Fetch the branch
+            if ! git fetch origin "$branch"; then
+              echo "::warning::Could not fetch branch ${branch}, skipping"
+              echo "::endgroup::"
+              continue
+            fi
+
+            # Attempt rebase
+            git checkout "origin/${branch}" --detach
+            if git rebase origin/master; then
+              git push origin "HEAD:${branch}" --force-with-lease
+              echo "✓ Rebased ${branch} onto master"
+            else
+              git rebase --abort
+              echo "::warning::Rebase conflict on ${branch} (PR #${pr_number}) — skipping"
+            fi
+
+            git checkout --detach origin/master
+            echo "::endgroup::"
+          done <<< "$prs"

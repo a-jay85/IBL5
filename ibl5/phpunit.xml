@@ -244,6 +244,10 @@
             <directory>tests/Settings</directory>
         </testsuite>
     </testsuites>
+    <!-- Database Integration Tests (tests/DatabaseIntegration/) are NOT registered
+         as a suite. They require a running MariaDB and env vars:
+         DB_HOST, DB_USER, DB_PASS, DB_NAME.
+         Run explicitly via: vendor/bin/phpunit tests/DatabaseIntegration/ -->
     <source baseline="phpunit-baseline.xml">
         <include>
             <directory>classes</directory>

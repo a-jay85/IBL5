@@ -44,7 +44,7 @@ class SavedDepthChartRepository extends \BaseMysqliRepository implements SavedDe
                 "INSERT INTO {$this->headerTable}
                     (tid, username, name, phase, season_year, sim_start_date, sim_number_start, is_active)
                  VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
-                "isssissi",
+                "isssisi",
                 $tid,
                 $username,
                 $name,

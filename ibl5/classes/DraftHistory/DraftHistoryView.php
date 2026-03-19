@@ -128,7 +128,6 @@ class DraftHistoryView implements DraftHistoryViewInterface
 
         foreach ($draftPicks as $pick) {
             $pid = $pick['pid'];
-            $name = HtmlSanitizer::safeHtmlOutput($pick['name']);
             $pos = HtmlSanitizer::safeHtmlOutput($pick['pos']);
             $round = $pick['draftround'];
             $pickNo = $pick['draftpickno'];
@@ -145,12 +144,12 @@ class DraftHistoryView implements DraftHistoryViewInterface
                 $pick['draftedby'],
             );
 
-            $playerThumbnail = PlayerImageHelper::renderThumbnail($pid);
+            $playerLink = PlayerImageHelper::renderPlayerLink((int) $pid, (string) $pick['name']);
 
             $output .= "<tr data-team-id=\"{$teamId}\">
     <td class=\"sticky-col-1\">{$round}</td>
     <td class=\"sticky-col-2\">{$pickNo}</td>
-    <td class=\"name-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a></td>
+    <td class=\"name-cell\">{$playerLink}</td>
     <td>{$pos}</td>
     {$teamCell}
     <td>{$college}</td>
@@ -193,7 +192,6 @@ class DraftHistoryView implements DraftHistoryViewInterface
 
         foreach ($draftPicks as $pick) {
             $pid = $pick['pid'];
-            $name = HtmlSanitizer::safeHtmlOutput($pick['name']);
             $pos = HtmlSanitizer::safeHtmlOutput($pick['pos']);
             $round = $pick['draftround'];
             $pickNo = $pick['draftpickno'];
@@ -202,12 +200,12 @@ class DraftHistoryView implements DraftHistoryViewInterface
             $isRetired = $pick['retired'] !== 0;
 
             $retiredBadge = $isRetired ? ' <span class="draft-retired-badge">(ret.)</span>' : '';
-            $playerThumbnail = PlayerImageHelper::renderThumbnail($pid);
+            $playerLink = PlayerImageHelper::renderPlayerLink((int) $pid, (string) $pick['name']);
 
             $output .= "<tr>
     <td>{$round}</td>
     <td>{$pickNo}</td>
-    <td class=\"name-cell\"><a href=\"./modules.php?name=Player&amp;pa=showpage&amp;pid={$pid}\">{$playerThumbnail}{$name}</a>{$retiredBadge}</td>
+    <td class=\"name-cell\">{$playerLink}{$retiredBadge}</td>
     <td>{$pos}</td>
     <td>{$college}</td>
     <td>{$draftYear}</td>

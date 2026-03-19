@@ -64,7 +64,7 @@ if ($filters['submitted'] != null) {
         
         // Render player rows
         $rank = 1;
-        foreach ($leadersData['result'] as $row) {
+        foreach ($leadersData['results'] as $row) {
             $stats = $service->processPlayerRow($row, $tableType);
             echo $view->renderPlayerRow($stats, $rank);
             $rank++;

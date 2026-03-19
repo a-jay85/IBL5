@@ -73,6 +73,19 @@ test.describe('Mobile authenticated page smoke tests', () => {
     await assertNoHorizontalOverflow(page, 'on gm contact list');
   });
 
+  test('voting results — no horizontal overflow on mobile', async ({ appState, page }) => {
+    await appState({ 'ASG Voting': 'Yes' });
+    await page.goto('modules.php?name=VotingResults');
+    await expect(page.getByText('Sign In')).not.toBeVisible();
+    await assertNoHorizontalOverflow(page, 'on voting results');
+  });
+
+  test('your account — no horizontal overflow on mobile', async ({ page }) => {
+    await page.goto('modules.php?name=YourAccount');
+    await expect(page.getByText('Sign In')).not.toBeVisible();
+    await assertNoHorizontalOverflow(page, 'on your account');
+  });
+
   test('no PHP errors on mobile auth pages', async ({ appState, page }) => {
     test.setTimeout(120_000);
     await appState({
@@ -80,7 +93,12 @@ test.describe('Mobile authenticated page smoke tests', () => {
       'Current Season Phase': 'Free Agency',
       'ASG Voting': 'Yes',
     });
-    for (const { url } of AUTH_PAGES) {
+    const urls = [
+      ...AUTH_PAGES.map(p => p.url),
+      'modules.php?name=VotingResults',
+      'modules.php?name=YourAccount',
+    ];
+    for (const url of urls) {
       await gotoWithRetry(page, url);
       await assertNoPhpErrors(page, `on ${url} (mobile)`);
     }

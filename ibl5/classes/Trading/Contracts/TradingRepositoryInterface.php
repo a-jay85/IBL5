@@ -41,24 +41,6 @@ interface TradingRepositoryInterface
     public function getAllTeams(): array;
 
     /**
-     * Get players involved in a trade
-     *
-     * @param string $teamName Team name
-     * @param int $row Row number
-     * @return list<array<string, mixed>> Player data from ibl_trade_players
-     */
-    public function getTradePlayers(string $teamName, int $row): array;
-
-    /**
-     * Get draft picks involved in a trade
-     *
-     * @param string $teamName Team name
-     * @param int $row Row number
-     * @return list<array<string, mixed>> Draft pick data from ibl_trade_picks
-     */
-    public function getTradePicks(string $teamName, int $row): array;
-
-    /**
      * Update player's team after trade
      *
      * @param int $playerId Player ID
@@ -76,14 +58,6 @@ interface TradingRepositoryInterface
      * @return int Number of rows affected
      */
     public function updateDraftPickOwner(int $year, int $pick, string $newOwner): int;
-
-    /**
-     * Check if a player ID exists in trade players table
-     *
-     * @param int $playerId Player ID
-     * @return bool True if exists
-     */
-    public function playerExistsInTrade(int $playerId): bool;
 
     /**
      * Insert a trade item (player, pick, or cash consideration)

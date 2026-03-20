@@ -45,6 +45,10 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'search', url: 'modules.php?name=Search' },
   { name: 'topics', url: 'modules.php?name=Topics' },
   { name: 'voting results', url: 'modules.php?name=VotingResults' },
+  { name: 'news index', url: 'modules.php?name=News' },
+  { name: 'news categories', url: 'modules.php?name=News&file=categories' },
+  { name: 'news article', url: 'modules.php?name=News&file=article&sid=1' },
+  { name: 'team schedule', url: 'modules.php?name=Schedule&teamID=1' },
 ];
 
 publicTest.describe('Public page accessibility', () => {
@@ -80,6 +84,16 @@ const authPages: Array<{
   { name: 'draft', url: 'modules.php?name=Draft', state: { 'Show Draft Link': 'Yes' } },
   { name: 'next sim', url: 'modules.php?name=NextSim' },
   { name: 'your account', url: 'modules.php?name=YourAccount' },
+  {
+    name: 'voting ASG ballot',
+    url: 'modules.php?name=Voting',
+    state: { 'Current Season Phase': 'Regular Season', 'ASG Voting': 'Yes' },
+  },
+  {
+    name: 'voting EOY ballot',
+    url: 'modules.php?name=Voting',
+    state: { 'Current Season Phase': 'Free Agency', 'EOY Voting': 'Yes' },
+  },
 ];
 
 authTest.describe('Authenticated page accessibility', () => {

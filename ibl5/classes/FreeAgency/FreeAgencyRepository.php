@@ -73,35 +73,40 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
      */
     public function saveOffer(array $offerData): bool
     {
-        // First delete any existing offer
-        $this->deleteOffer($offerData['tid'], $offerData['pid']);
+        $this->db->begin_transaction();
+        try {
+            $this->deleteOffer($offerData['tid'], $offerData['pid']);
 
-        // Insert the new offer
-        $affected = $this->execute(
-            "INSERT INTO ibl_fa_offers
-             (name, pid, team, tid, offer1, offer2, offer3, offer4, offer5, offer6,
-              modifier, random, perceivedvalue, mle, lle, offer_type)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            "sisiiiiiiiiidiii",
-            $offerData['playerName'],
-            $offerData['pid'],
-            $offerData['teamName'],
-            $offerData['tid'],
-            $offerData['offer1'],
-            $offerData['offer2'],
-            $offerData['offer3'],
-            $offerData['offer4'],
-            $offerData['offer5'],
-            $offerData['offer6'],
-            $offerData['modifier'],
-            $offerData['random'],
-            $offerData['perceivedValue'],
-            $offerData['mle'],
-            $offerData['lle'],
-            $offerData['offerType']
-        );
+            $affected = $this->execute(
+                "INSERT INTO ibl_fa_offers
+                 (name, pid, team, tid, offer1, offer2, offer3, offer4, offer5, offer6,
+                  modifier, random, perceivedvalue, mle, lle, offer_type)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "sisiiiiiiiiidiii",
+                $offerData['playerName'],
+                $offerData['pid'],
+                $offerData['teamName'],
+                $offerData['tid'],
+                $offerData['offer1'],
+                $offerData['offer2'],
+                $offerData['offer3'],
+                $offerData['offer4'],
+                $offerData['offer5'],
+                $offerData['offer6'],
+                $offerData['modifier'],
+                $offerData['random'],
+                $offerData['perceivedValue'],
+                $offerData['mle'],
+                $offerData['lle'],
+                $offerData['offerType']
+            );
 
-        return $affected > 0;
+            $this->db->commit();
+            return $affected > 0;
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
     }
 
     /**

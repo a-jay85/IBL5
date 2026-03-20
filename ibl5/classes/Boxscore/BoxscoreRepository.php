@@ -81,23 +81,28 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
      */
     private function deleteBoxScoresForDateRange(string $startDate, string $endDate): true
     {
-        // Delete player boxscores
-        $this->execute(
-            "DELETE FROM {$this->playerTable} WHERE Date BETWEEN ? AND ?",
-            "ss",
-            $startDate,
-            $endDate
-        );
+        $this->db->begin_transaction();
+        try {
+            $this->execute(
+                "DELETE FROM {$this->playerTable} WHERE Date BETWEEN ? AND ?",
+                "ss",
+                $startDate,
+                $endDate
+            );
 
-        // Delete team boxscores
-        $this->execute(
-            "DELETE FROM {$this->teamTable} WHERE Date BETWEEN ? AND ?",
-            "ss",
-            $startDate,
-            $endDate
-        );
+            $this->execute(
+                "DELETE FROM {$this->teamTable} WHERE Date BETWEEN ? AND ?",
+                "ss",
+                $startDate,
+                $endDate
+            );
 
-        return true;
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
     }
 
     /**

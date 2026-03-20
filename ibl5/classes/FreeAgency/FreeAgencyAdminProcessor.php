@@ -201,46 +201,54 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
         $successCount = 0;
         $errorCount = 0;
 
-        foreach ($signings as $signing) {
-            // Update player contract
-            $affected = $this->repository->updatePlayerContract(
-                $signing['playerId'],
-                $signing['teamId'],
-                $signing['offerYears'],
-                $signing['offers']['offer1'],
-                $signing['offers']['offer2'],
-                $signing['offers']['offer3'],
-                $signing['offers']['offer4'],
-                $signing['offers']['offer5'],
-                $signing['offers']['offer6']
-            );
+        $this->db->begin_transaction();
+        try {
+            foreach ($signings as $signing) {
+                // Update player contract
+                $affected = $this->repository->updatePlayerContract(
+                    $signing['playerId'],
+                    $signing['teamId'],
+                    $signing['offerYears'],
+                    $signing['offers']['offer1'],
+                    $signing['offers']['offer2'],
+                    $signing['offers']['offer3'],
+                    $signing['offers']['offer4'],
+                    $signing['offers']['offer5'],
+                    $signing['offers']['offer6']
+                );
 
-            if ($affected > 0) {
-                $successCount++;
-            } else {
-                $errorCount++;
+                if ($affected > 0) {
+                    $successCount++;
+                } else {
+                    $errorCount++;
+                }
+
+                // Mark MLE as used if applicable
+                if ($signing['usedMle']) {
+                    $this->repository->markMleUsed($signing['teamName']);
+                }
+
+                // Mark LLE as used if applicable
+                if ($signing['usedLle']) {
+                    $this->repository->markLleUsed($signing['teamName']);
+                }
             }
 
-            // Mark MLE as used if applicable
-            if ($signing['usedMle']) {
-                $this->repository->markMleUsed($signing['teamName']);
+            // Insert news story if there were signings
+            if ($successCount > 0 && $newsHomeText !== '' && $newsBodyText !== '') {
+                $affected = $this->repository->insertNewsStory($newsTitle, $newsHomeText, $newsBodyText);
+
+                if ($affected > 0) {
+                    $successCount++;
+                } else {
+                    $errorCount++;
+                }
             }
 
-            // Mark LLE as used if applicable
-            if ($signing['usedLle']) {
-                $this->repository->markLleUsed($signing['teamName']);
-            }
-        }
-
-        // Insert news story if there were signings
-        if ($successCount > 0 && $newsHomeText !== '' && $newsBodyText !== '') {
-            $affected = $this->repository->insertNewsStory($newsTitle, $newsHomeText, $newsBodyText);
-
-            if ($affected > 0) {
-                $successCount++;
-            } else {
-                $errorCount++;
-            }
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
         }
 
         if ($errorCount === 0 && $successCount > 0) {

@@ -173,9 +173,17 @@ class ExtensionProcessor implements ExtensionProcessorInterface
 
         if ($evaluation['accepted']) {
             $currentSalary = $player->currentSeasonSalary ?? 0;
-            $this->dbOps->updatePlayerContract($playerName, $offer, $currentSalary);
-            $this->dbOps->markExtensionUsedThisSeason($teamName);
-            $this->dbOps->createAcceptedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears, $offerDetails);
+
+            $this->db->begin_transaction();
+            try {
+                $this->dbOps->updatePlayerContract($playerName, $offer, $currentSalary);
+                $this->dbOps->markExtensionUsedThisSeason($teamName);
+                $this->dbOps->createAcceptedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears, $offerDetails);
+                $this->db->commit();
+            } catch (\Throwable $e) {
+                $this->db->rollback();
+                throw $e;
+            }
 
             // Send Discord notification
             if (class_exists('Discord')) {

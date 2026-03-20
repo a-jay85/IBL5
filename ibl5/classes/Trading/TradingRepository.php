@@ -69,34 +69,6 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
     }
 
     /**
-     * @see TradingRepositoryInterface::getTradePlayers()
-     */
-    public function getTradePlayers(string $teamName, int $row): array
-    {
-        /** @var list<array<string, mixed>> */
-        return $this->fetchAll(
-            "SELECT * FROM ibl_trade_players WHERE teamname = ? AND row = ?",
-            "si",
-            $teamName,
-            $row
-        );
-    }
-
-    /**
-     * @see TradingRepositoryInterface::getTradePicks()
-     */
-    public function getTradePicks(string $teamName, int $row): array
-    {
-        /** @var list<array<string, mixed>> */
-        return $this->fetchAll(
-            "SELECT * FROM ibl_trade_picks WHERE teamname = ? AND row = ?",
-            "si",
-            $teamName,
-            $row
-        );
-    }
-
-    /**
      * @see TradingRepositoryInterface::updatePlayerTeam()
      */
     public function updatePlayerTeam(int $playerId, int $newTeamId): int
@@ -121,20 +93,6 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
             $year,
             $pick
         );
-    }
-
-    /**
-     * @see TradingRepositoryInterface::playerExistsInTrade()
-     */
-    public function playerExistsInTrade(int $playerId): bool
-    {
-        $result = $this->fetchOne(
-            "SELECT pid FROM ibl_trade_players WHERE pid = ?",
-            "i",
-            $playerId
-        );
-
-        return $result !== null;
     }
 
     /**

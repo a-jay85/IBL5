@@ -560,6 +560,9 @@ check_css_frontend() {
         while IFS= read -r file; do
             [[ -z "$file" ]] && continue
             local rel="${file#$CLASSES_DIR/}"
+            case "$rel" in
+                PageLayout/PageLayout.php) continue ;;  # FOUT prevention — must be inline in <head>
+            esac
             finding "MEDIUM" "Inline \`<style>\` block in \`$rel\`"
             found_e1=true
         done <<< "$style_hits"

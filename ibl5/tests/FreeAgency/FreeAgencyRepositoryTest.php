@@ -65,6 +65,21 @@ class FreeAgencyRepositoryTest extends TestCase
             {
                 return addslashes($string);
             }
+
+            public function begin_transaction(int $flags = 0, ?string $name = null): bool
+            {
+                return true;
+            }
+
+            public function commit(int $flags = 0, ?string $name = null): bool
+            {
+                return true;
+            }
+
+            public function rollback(int $flags = 0, ?string $name = null): bool
+            {
+                return true;
+            }
         };
         
         $GLOBALS['mysqli_db'] = $this->mockMysqliDb;

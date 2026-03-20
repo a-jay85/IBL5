@@ -319,4 +319,35 @@ class SeasonTest extends \PHPUnit\Framework\TestCase
         // June 7 + 1 = June 8
         $this->assertSame('2025-06-08', $result->format('Y-m-d'));
     }
+
+    // --- Merged from SeasonAreTradesAllowedTest ---
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('tradesAllowedProvider')]
+    public function testAreTradesAllowed(string $phase, string $allowTrades, bool $expected): void
+    {
+        $season = new \Tests\Integration\Mocks\Season($this->createStub(\mysqli::class));
+        $season->phase = $phase;
+        $season->allowTrades = $allowTrades;
+
+        $this->assertSame($expected, $season->areTradesAllowed());
+    }
+
+    /**
+     * @return array<string, array{string, string, bool}>
+     */
+    public static function tradesAllowedProvider(): array
+    {
+        return [
+            'draft phase overrides No setting' => ['Draft', 'No', true],
+            'draft phase with Yes setting' => ['Draft', 'Yes', true],
+            'free agency phase overrides No setting' => ['Free Agency', 'No', true],
+            'free agency phase with Yes setting' => ['Free Agency', 'Yes', true],
+            'regular season with Yes setting' => ['Regular Season', 'Yes', true],
+            'regular season with No setting' => ['Regular Season', 'No', false],
+            'preseason with Yes setting' => ['Preseason', 'Yes', true],
+            'preseason with No setting' => ['Preseason', 'No', false],
+            'playoffs with Yes setting' => ['Playoffs', 'Yes', true],
+            'playoffs with No setting' => ['Playoffs', 'No', false],
+        ];
+    }
 }

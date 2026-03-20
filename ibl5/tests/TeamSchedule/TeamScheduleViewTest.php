@@ -38,16 +38,16 @@ class TeamScheduleViewTest extends TestCase
         $this->assertIsString($result);
     }
 
-    public function testRenderContainsStyleBlock(): void
+    public function testRenderContainsTeamColorCustomProperties(): void
     {
         $mockTeam = $this->createMockTeam();
         $games = [];
 
         $result = $this->view->render($mockTeam, $games, 7, 'Regular Season');
 
-        $this->assertStringContainsString('<style>', $result);
-        $this->assertStringContainsString('--team-primary', $result);
-        $this->assertStringContainsString('--team-secondary', $result);
+        $this->assertStringNotContainsString('<style>', $result);
+        $this->assertStringContainsString('--team-primary:', $result);
+        $this->assertStringContainsString('--team-secondary:', $result);
     }
 
     public function testRenderContainsTeamLogo(): void

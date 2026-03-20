@@ -133,7 +133,7 @@ class MailService implements MailServiceInterface
             $mail->Host = $this->smtpConfig['host'];
             $mail->Port = $this->smtpConfig['port'];
             $mail->SMTPSecure = $this->smtpConfig['encryption'];
-            $mail->SMTPAuth = true;
+            $mail->SMTPAuth = $this->smtpConfig['username'] !== '';
             $mail->Username = $this->smtpConfig['username'];
             $mail->Password = $this->smtpConfig['password'];
 

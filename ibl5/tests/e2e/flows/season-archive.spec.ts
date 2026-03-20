@@ -52,21 +52,16 @@ test.describe('Season Archive flow', () => {
     }
   });
 
-  test('detail page has section elements when data exists', async ({ page }) => {
+  test('detail page renders without errors for year 2026', async ({ page }) => {
     await page.goto('modules.php?name=SeasonArchive&year=2026');
-    const sections = page.locator('.season-archive-section');
-    const count = await sections.count();
-    // Sections only render when archive data exists for the year
-    if (count > 0) {
-      expect(count).toBeGreaterThanOrEqual(1);
-    }
+    await assertNoPhpErrors(page, 'on Season Archive detail year=2026');
+    // Sections render when archive data exists; just verify no errors
   });
 
   test('nonexistent year shows no sections', async ({ page }) => {
     await page.goto('modules.php?name=SeasonArchive&year=1800');
     await assertNoPhpErrors(page, 'on Season Archive year=1800');
-    const sections = page.locator('.season-archive-section');
-    expect(await sections.count()).toBe(0);
+    await expect(page.locator('.season-archive-section')).toHaveCount(0);
   });
 
   test('index table is sortable', async ({ page }) => {

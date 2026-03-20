@@ -1113,6 +1113,8 @@ INSERT IGNORE INTO nuke_stats_hour (year, month, date, hour, hits) VALUES
 -- Vote names use "Player Name, Team" format matching extractPlayerName().
 -- Player names match ibl_plr.name so PIDs resolve and player links render.
 -- ============================================================
+-- ASG table has no PK/UNIQUE — delete first for idempotency on re-runs
+DELETE FROM ibl_votes_ASG WHERE teamid IN (1, 2);
 INSERT INTO ibl_votes_ASG (teamid, team_city, team_name, East_F1, East_F2, East_B1, East_B2, West_F1, West_F2, West_B1, West_B2) VALUES
   (1, 'Test', 'Metros', 'Test Player, Metros', 'Test Player Two, Metros', 'Stars Guard, Stars', 'FA Guard, Metros',
    'FA Forward, Stars', 'FA Center, Stars', 'Test Player, Metros', 'Stars Guard, Stars'),

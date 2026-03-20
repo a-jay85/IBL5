@@ -41,7 +41,8 @@ test.describe('Series Records flow', () => {
     // Non-diagonal cell (index 2) should have background-color
     const recordCell = firstRow.locator('td').nth(2);
     const style = await recordCell.getAttribute('style');
-    expect(style).toContain('background-color');
+    expect(style).toBeTruthy();
+    expect(style!).toContain('background-color');
   });
 
   test('table uses page-sticky wrapper', async ({ page }) => {

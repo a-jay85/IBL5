@@ -13,32 +13,43 @@ test.describe('Draft Pick Locator flow', () => {
     await expect(page.locator('.ibl-title')).toContainText(/Draft Pick Locator/i);
   });
 
-  test('pick locator table is visible', async ({ page }) => {
-    const table = page.locator('.draft-pick-table, .sticky-table, .ibl-data-table, table').first();
-    await expect(table).toBeVisible();
+  test('container has .draft-pick-locator-container', async ({ page }) => {
+    await expect(page.locator('.draft-pick-locator-container')).toBeVisible();
   });
 
-  test('table has team rows with data-team-id', async ({ page }) => {
+  test('pick locator table is visible', async ({ page }) => {
+    await expect(page.locator('.draft-pick-table').first()).toBeVisible();
+  });
+
+  test('thead has two header rows', async ({ page }) => {
+    await expect(page.locator('.draft-pick-table thead tr')).toHaveCount(2);
+  });
+
+  test('has at least 28 team rows', async ({ page }) => {
     const teamRows = page.locator('tr[data-team-id]');
-    const count = await teamRows.count();
-    expect(count).toBeGreaterThanOrEqual(1);
+    expect(await teamRows.count()).toBeGreaterThanOrEqual(28);
+  });
+
+  test('year spans in first header row', async ({ page }) => {
+    const yearSpans = page.locator('.draft-pick-table thead tr:first-child th[colspan="2"]');
+    expect(await yearSpans.count()).toBeGreaterThanOrEqual(6);
+
+    const firstYearText = (await yearSpans.first().textContent())!.trim();
+    expect(firstYearText).toMatch(/\d{4}/);
+  });
+
+  test('first column cells have sticky-col class', async ({ page }) => {
+    await expect(
+      page.locator('tbody tr[data-team-id]:first-child td.sticky-col').first()
+    ).toBeVisible();
   });
 
   test('own picks and traded picks are distinguished', async ({ page }) => {
     const ownPicks = page.locator('.draft-pick-own');
     const tradedPicks = page.locator('.draft-pick-traded');
-    // At least own picks should exist
     const ownCount = await ownPicks.count();
     const tradedCount = await tradedPicks.count();
     expect(ownCount + tradedCount).toBeGreaterThan(0);
-  });
-
-  test('sticky scroll wrapper exists for wide matrix', async ({ page }) => {
-    const wrapper = page.locator('.sticky-scroll-wrapper, .draft-pick-locator-container');
-    const count = await wrapper.count();
-    if (count > 0) {
-      await expect(wrapper.first()).toBeVisible();
-    }
   });
 
   test('no PHP errors', async ({ page }) => {

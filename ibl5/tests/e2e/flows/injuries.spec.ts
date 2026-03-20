@@ -13,35 +13,39 @@ test.describe('Injuries flow', () => {
     await expect(page.locator('.ibl-title')).toContainText(/Injured Players/i);
   });
 
-  test('injuries table or empty state is displayed', async ({ page }) => {
-    // May show a table of injuries or indicate no injuries
-    const table = page.locator('.injuries-table, .ibl-data-table');
-    const count = await table.count();
-    if (count > 0) {
-      await expect(table.first()).toBeVisible();
-      const headerText = await table.first().locator('thead').textContent();
-      expect(headerText).toContain('Player');
-      expect(headerText).toContain('Team');
-      expect(headerText).toContain('Days');
-    }
-    // If no injuries, the page should still load without errors
+  test('table has .injuries-table class', async ({ page }) => {
+    await expect(page.locator('table.injuries-table')).toBeVisible();
   });
 
-  test('injury rows have data-team-id when present', async ({ page }) => {
+  test('4 column headers: Pos, Player, Team, Days', async ({ page }) => {
+    const headers = page.locator('.injuries-table thead th');
+    await expect(headers).toHaveCount(4);
+
+    await expect(headers.nth(0)).toContainText('Pos');
+    await expect(headers.nth(1)).toContainText('Player');
+    await expect(headers.nth(2)).toContainText('Team');
+    await expect(headers.nth(3)).toContainText('Days');
+  });
+
+  test('at least 2 injured player rows', async ({ page }) => {
+    // CI seed has pid=5 (5 days) and pid=7 (3 days)
+    const teamRows = page.locator('.injuries-table tbody tr[data-team-id]');
+    expect(await teamRows.count()).toBeGreaterThanOrEqual(2);
+  });
+
+  test('injury rows have data-team-id attribute', async ({ page }) => {
     const teamRows = page.locator('tr[data-team-id]');
-    const count = await teamRows.count();
-    // Injuries are data-dependent; just verify structure if present
-    if (count > 0) {
-      const firstTeamId = await teamRows.first().getAttribute('data-team-id');
-      expect(firstTeamId).toBeTruthy();
-    }
+    const firstTeamId = await teamRows.first().getAttribute('data-team-id');
+    expect(firstTeamId).toBeTruthy();
   });
 
-  test('days column has highlight styling when present', async ({ page }) => {
-    const highlights = page.locator('.ibl-stat-highlight');
-    const count = await highlights.count();
+  test('days cells have tooltip when lastSimEndDate is set', async ({ page }) => {
+    // .ibl-tooltip only renders when lastSimEndDate is set in CI settings
+    const tooltips = page.locator('.injuries-table td .ibl-tooltip');
+    const count = await tooltips.count();
     if (count > 0) {
-      await expect(highlights.first()).toBeVisible();
+      const title = await tooltips.first().getAttribute('title');
+      expect(title).toBeTruthy();
     }
   });
 

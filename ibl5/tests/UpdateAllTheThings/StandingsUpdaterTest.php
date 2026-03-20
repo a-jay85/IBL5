@@ -94,10 +94,10 @@ class StandingsUpdaterTest extends TestCase
         unset($this->updater, $this->mockDb, $this->mockSeason);
     }
 
-    public function testUpdateTruncatesStandingsTable(): void
+    public function testUpdateDoesNotTruncateStandingsTable(): void
     {
         $this->mockDb->setReturnTrue(true);
-        $this->updater->setTestTeamMap([]);
+        $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([]);
 
         ob_start();
@@ -105,8 +105,13 @@ class StandingsUpdaterTest extends TestCase
         ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertNotEmpty($queries);
-        $this->assertSame('TRUNCATE TABLE ibl_standings', $queries[0]);
+        // No TRUNCATE — uses upsert instead
+        foreach ($queries as $query) {
+            $this->assertStringNotContainsString('TRUNCATE', $query);
+        }
+        // Verify upserts were issued
+        $upserts = array_filter($queries, static fn (string $q): bool => str_contains($q, 'ON DUPLICATE KEY UPDATE'));
+        $this->assertNotEmpty($upserts);
     }
 
     public function testGameResultsProduceCorrectTotalWinLoss(): void
@@ -656,7 +661,7 @@ class StandingsUpdaterTest extends TestCase
         $this->assertInstanceOf(\Updater\StandingsUpdater::class, $updater);
     }
 
-    public function testOlympicsContextTruncatesOlympicsStandingsTable(): void
+    public function testOlympicsContextUpsertsOlympicsStandingsTable(): void
     {
         $olympicsContext = $this->createStub(\League\LeagueContext::class);
         $olympicsContext->method('getTableName')->willReturnCallback(
@@ -671,7 +676,7 @@ class StandingsUpdaterTest extends TestCase
         );
 
         $updater = new TestableStandingsUpdater($this->mockDb, $this->mockSeason, $olympicsContext);
-        $updater->setTestTeamMap([]);
+        $updater->setTestTeamMap($this->defaultTeamMap);
         $updater->setTestGames([]);
         $this->mockDb->setReturnTrue(true);
 
@@ -680,8 +685,13 @@ class StandingsUpdaterTest extends TestCase
         ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
-        $this->assertNotEmpty($queries);
-        $this->assertSame('TRUNCATE TABLE ibl_olympics_standings', $queries[0]);
+        // No TRUNCATE — uses upsert into Olympics table
+        foreach ($queries as $query) {
+            $this->assertStringNotContainsString('TRUNCATE', $query);
+        }
+        $upserts = array_filter($queries, static fn (string $q): bool =>
+            str_contains($q, 'INSERT INTO ibl_olympics_standings') && str_contains($q, 'ON DUPLICATE KEY UPDATE'));
+        $this->assertNotEmpty($upserts);
     }
 
     public function testOlympicsContextFetchTeamMapQueriesOlympicsLeagueConfig(): void

@@ -179,15 +179,8 @@ test.describe('Responsive scroll container tests', () => {
   test('standings — sticky column stays visible after scroll', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Standings');
-    // admin-pages.spec.ts runs updateAllTheThings.php which TRUNCATEs ibl_standings
-    // and recomputes from schedule data. When it runs before this test (same shard),
-    // standings rows are gone. Skip if no rows rendered.
-    await expect(page.locator('.table-scroll-container').first()).toBeAttached();
-    const hasStickyCol = await page.locator('.table-scroll-container tbody td.sticky-col')
-      .first().isVisible({ timeout: 5_000 }).catch(() => false);
-    if (!hasStickyCol) {
-      test.skip(true, 'standings has no tbody rows (seed data not present in this shard)');
-    }
+    await expect(page.locator('.table-scroll-container tbody td.sticky-col').first())
+      .toBeAttached({ timeout: 10_000 });
     const result = await page.locator('.table-scroll-container').first().evaluate((el: Element) => {
       const c = el as HTMLElement;
       c.scrollLeft = c.scrollWidth;

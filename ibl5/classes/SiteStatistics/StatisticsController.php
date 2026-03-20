@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SiteStatistics;
 
+use Utilities\HtmlSanitizer;
+
 /**
  * Controller for site statistics module
  * Orchestrates data retrieval, processing, and view rendering
@@ -149,7 +151,7 @@ class StatisticsController
         $currentMonth = (int)$parts[1];
         
         \PageLayout\PageLayout::header();
-        \title("$sitename " . _STATS);
+        \title(HtmlSanitizer::e($sitename) . " " . _STATS);
         \OpenTable();
         
         $monthlyStats = $this->repository->getMonthlyStats($year);
@@ -185,7 +187,7 @@ class StatisticsController
         $currentDate = (int)$parts[0];
         
         \PageLayout\PageLayout::header();
-        \title("$sitename " . _STATS);
+        \title(HtmlSanitizer::e($sitename) . " " . _STATS);
         \OpenTable();
         
         $dailyStats = $this->repository->getDailyStats($year, $month);
@@ -219,7 +221,7 @@ class StatisticsController
         global $sitename;
         
         \PageLayout\PageLayout::header();
-        \title("$sitename " . _STATS);
+        \title(HtmlSanitizer::e($sitename) . " " . _STATS);
         \OpenTable();
         
         $hourlyStats = $this->repository->getHourlyStats($year, $month, $date);

@@ -54,8 +54,11 @@ while IFS= read -r branch; do
 
     if [[ "$branch" == "$CURRENT" ]]; then
         if is_dirty; then
-            echo "  SKIP    $branch (dirty working tree — commit or stash first)"
-            ((SKIPPED++))
+            echo "  stash + reset $branch"
+            git stash push -q
+            git reset --hard "$remote_ref" -q
+            git stash pop -q
+            ((SYNCED++))
         else
             git reset --hard "$remote_ref" -q
             echo "  reset   $branch"

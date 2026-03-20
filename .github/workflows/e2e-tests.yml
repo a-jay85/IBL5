@@ -415,7 +415,7 @@ jobs:
         run: bun install
 
       - name: Download blob reports
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: blob-report-*
           path: ibl5/all-blob-reports
@@ -423,7 +423,7 @@ jobs:
 
       - name: Download visual regression results
         if: always()
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: visual-regression-results
           path: ibl5/visual-results/
@@ -431,7 +431,7 @@ jobs:
 
       - name: Download shard test results
         if: always()
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: test-results-shard-*
           path: ibl5/shard-test-results/

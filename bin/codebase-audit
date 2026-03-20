@@ -1,0 +1,936 @@
+#!/bin/bash
+# bin/codebase-audit — Daily codebase hygiene audit for IBL5
+# Runs ~35 mechanical checks across 10 categories, outputs structured markdown.
+# Usage: bin/codebase-audit [--quiet]
+#   --quiet  Suppress stdout summary (used by launchd)
+
+set -euo pipefail
+
+QUIET=false
+[[ "${1:-}" == "--quiet" ]] && QUIET=true
+
+# Resolve repo root (script lives in <repo>/bin/)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+IBL5_DIR="$REPO_ROOT/ibl5"
+CLASSES_DIR="$IBL5_DIR/classes"
+TESTS_DIR="$IBL5_DIR/tests"
+MIGRATIONS_DIR="$IBL5_DIR/migrations"
+DESIGN_DIR="$IBL5_DIR/design"
+MEMORY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-Documents-GitHub-IBL5/memory"
+RULES_DIR="$REPO_ROOT/.claude/rules"
+
+RESULTS_DIR="$HOME/.claude/audit-results"
+mkdir -p "$RESULTS_DIR"
+TODAY=$(date +%Y-%m-%d)
+REPORT="$RESULTS_DIR/$TODAY.md"
+
+# Counters
+CRITICAL=0
+HIGH=0
+MEDIUM=0
+LOW=0
+INFO=0
+
+# Temporary file for findings
+FINDINGS=$(mktemp)
+trap 'rm -f "$FINDINGS"' EXIT
+
+# macOS doesn't have GNU timeout; use perl as fallback
+run_timeout() {
+    local secs="$1"; shift
+    perl -e "alarm $secs; exec @ARGV" -- "$@"
+}
+
+finding() {
+    local severity="$1"
+    shift
+    echo "- **[$severity]** $*" >> "$FINDINGS"
+    case "$severity" in
+        CRITICAL) CRITICAL=$((CRITICAL + 1)) ;;
+        HIGH)     HIGH=$((HIGH + 1)) ;;
+        MEDIUM)   MEDIUM=$((MEDIUM + 1)) ;;
+        LOW)      LOW=$((LOW + 1)) ;;
+        INFO)     INFO=$((INFO + 1)) ;;
+    esac
+}
+
+section() {
+    echo "" >> "$FINDINGS"
+    echo "## $1" >> "$FINDINGS"
+    echo "" >> "$FINDINGS"
+}
+
+subsection() {
+    echo "" >> "$FINDINGS"
+    echo "### $1" >> "$FINDINGS"
+    echo "" >> "$FINDINGS"
+}
+
+# ============================================================================
+# A. Architecture Conformance
+# ============================================================================
+check_architecture() {
+    section "A. Architecture Conformance"
+
+    # A1: Modules with Contracts/ but missing *Repository.php
+    subsection "A1: Incomplete refactors (Contracts/ without Repository)"
+    local found_a1=false
+    for dir in "$CLASSES_DIR"/*/; do
+        local mod
+        mod=$(basename "$dir")
+        if [[ -d "$dir/Contracts" ]] && ! ls "$dir"/*Repository.php &>/dev/null; then
+            # Skip modules that legitimately don't need repositories
+            case "$mod" in
+                Bootstrap|Cache|Module|Navigation|PageLayout|Services|Shared|UI|Utilities) continue ;;
+            esac
+            finding "LOW" "Module \`$mod\` has Contracts/ but no Repository class"
+            found_a1=true
+        fi
+    done
+    $found_a1 || echo "- No issues found." >> "$FINDINGS"
+
+    # A2: Loose PHP files in classes/ root
+    subsection "A2: Loose files in classes/ root"
+    local found_a2=false
+    for f in "$CLASSES_DIR"/*.php; do
+        [[ -f "$f" ]] || continue
+        local base
+        base=$(basename "$f")
+        finding "MEDIUM" "Loose file in classes/ root: \`$base\` (should be in a module directory)"
+        found_a2=true
+    done
+    $found_a2 || echo "- No issues found." >> "$FINDINGS"
+
+    # A3: Refactored modules (have Contracts/) missing README.md
+    subsection "A3: Refactored modules missing README.md"
+    local found_a3=false
+    for dir in "$CLASSES_DIR"/*/; do
+        local mod
+        mod=$(basename "$dir")
+        if [[ -d "$dir/Contracts" ]] && [[ ! -f "$dir/README.md" ]]; then
+            case "$mod" in
+                Bootstrap|Cache|Module|Services|Shared|Utilities) continue ;;
+            esac
+            finding "LOW" "Refactored module \`$mod\` is missing README.md"
+            found_a3=true
+        fi
+    done
+    $found_a3 || echo "- No issues found." >> "$FINDINGS"
+
+    # A4: Modules without Contracts/ directory
+    subsection "A4: Modules not yet interface-driven"
+    local found_a4=false
+    for dir in "$CLASSES_DIR"/*/; do
+        local mod
+        mod=$(basename "$dir")
+        if [[ ! -d "$dir/Contracts" ]]; then
+            case "$mod" in
+                BasketballStats|Database|League|Module|PageLayout|Statistics|StrengthOfSchedule|Utilities|YourAccount) ;;
+                *) finding "INFO" "Module \`$mod\` has no Contracts/ directory"
+                   found_a4=true ;;
+            esac
+        fi
+    done
+    $found_a4 || echo "- No issues found." >> "$FINDINGS"
+}
+
+# ============================================================================
+# B. Test Coverage Gaps
+# ============================================================================
+check_test_coverage() {
+    section "B. Test Coverage Gaps"
+
+    # B1: Class files without corresponding tests
+    subsection "B1: Classes without test files"
+    local found_b1=false
+    local count_b1=0
+    while IFS= read -r -d '' classfile; do
+        local base
+        base=$(basename "$classfile" .php)
+        # Skip interfaces, views, abstract classes, traits, etc.
+        case "$base" in
+            *Interface|*View|*Abstract*|*Trait|*Exception|*Enum|*Controller) continue ;;
+        esac
+        # Skip Contracts directory
+        local relpath="${classfile#$CLASSES_DIR/}"
+        case "$relpath" in
+            */Contracts/*) continue ;;
+        esac
+        # Check for corresponding test
+        if ! find "$TESTS_DIR" -name "${base}Test.php" -print -quit 2>/dev/null | grep -q .; then
+            if [[ $count_b1 -lt 20 ]]; then
+                finding "LOW" "No test file for \`$relpath\`"
+            fi
+            count_b1=$((count_b1 + 1))
+            found_b1=true
+        fi
+    done < <(find "$CLASSES_DIR" -name "*.php" -not -path "*/Contracts/*" -print0 2>/dev/null)
+    if [[ $count_b1 -gt 20 ]]; then
+        finding "LOW" "... and $((count_b1 - 20)) more classes without tests"
+    fi
+    $found_b1 || echo "- No issues found." >> "$FINDINGS"
+
+    # B2: Orphaned test files
+    subsection "B2: Orphaned test files (source class deleted/renamed)"
+    local found_b2=false
+    while IFS= read -r -d '' testfile; do
+        local testbase
+        testbase=$(basename "$testfile" .php)
+        local classname="${testbase%Test}"
+        # Skip integration/functional test patterns
+        case "$testbase" in
+            *IntegrationTest|*FunctionalTest|*E2ETest) continue ;;
+        esac
+        # Look for corresponding class file anywhere in classes/
+        if ! find "$CLASSES_DIR" -name "${classname}.php" -print -quit 2>/dev/null | grep -q .; then
+            local reltest="${testfile#$TESTS_DIR/}"
+            finding "MEDIUM" "Orphaned test: \`$reltest\` — no matching class \`$classname\`"
+            found_b2=true
+        fi
+    done < <(find "$TESTS_DIR" -name "*Test.php" -print0 2>/dev/null)
+    $found_b2 || echo "- No issues found." >> "$FINDINGS"
+}
+
+# ============================================================================
+# C. Code Quality / Smells
+# ============================================================================
+check_code_quality() {
+    section "C. Code Quality / Smells"
+
+    # C1: Methods exceeding 50 lines (uses php -r for accurate detection)
+    subsection "C1: Long methods (>50 lines)"
+    local found_c1=false
+    local long_methods
+    long_methods=$(php -r '
+        $dir = $argv[1];
+        $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
+        $results = [];
+        foreach ($iter as $file) {
+            if ($file->getExtension() !== "php") continue;
+            $path = $file->getPathname();
+            $tokens = @token_get_all(file_get_contents($path));
+            $inFunction = false;
+            $funcName = "";
+            $braceCount = 0;
+            $funcStartLine = 0;
+            foreach ($tokens as $i => $token) {
+                if (is_array($token) && $token[0] === T_FUNCTION) {
+                    for ($j = $i + 1; $j < count($tokens); $j++) {
+                        if (is_array($tokens[$j]) && $tokens[$j][0] === T_STRING) {
+                            $funcName = $tokens[$j][1];
+                            $funcStartLine = $token[2];
+                            $inFunction = true;
+                            $braceCount = 0;
+                            break;
+                        }
+                        if (!is_array($tokens[$j]) && $tokens[$j] === "(") break;
+                    }
+                }
+                if ($inFunction && !is_array($token)) {
+                    if ($token === "{") $braceCount++;
+                    if ($token === "}") {
+                        $braceCount--;
+                        if ($braceCount === 0) {
+                            $endLine = 0;
+                            for ($k = $i; $k >= 0; $k--) {
+                                if (is_array($tokens[$k])) { $endLine = $tokens[$k][2]; break; }
+                            }
+                            $length = $endLine - $funcStartLine;
+                            if ($length > 50) {
+                                $rel = str_replace($argv[1] . "/", "", $path);
+                                $results[] = "$rel:$funcStartLine $funcName() — $length lines";
+                            }
+                            $inFunction = false;
+                        }
+                    }
+                }
+            }
+        }
+        sort($results);
+        foreach (array_slice($results, 0, 15) as $r) echo $r . "\n";
+        if (count($results) > 15) echo "..." . (count($results) - 15) . " more\n";
+    ' "$CLASSES_DIR" 2>/dev/null || true)
+
+    if [[ -n "$long_methods" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            if [[ "$line" == ...* ]]; then
+                finding "MEDIUM" "$line long methods"
+            else
+                finding "MEDIUM" "Long method: \`$line\`"
+            fi
+            found_c1=true
+        done <<< "$long_methods"
+    fi
+    $found_c1 || echo "- No issues found." >> "$FINDINGS"
+
+    # C2: Classes with 10+ public methods
+    subsection "C2: God classes (10+ public methods)"
+    local found_c2=false
+    while IFS= read -r -d '' phpfile; do
+        local count
+        count=$(grep -c -E '^[[:space:]]+public[[:space:]]+function[[:space:]]' "$phpfile" 2>/dev/null || true)
+        count=$(echo "$count" | tr -d '[:space:]')
+        [[ -z "$count" ]] && count=0
+        if [[ "$count" -ge 10 ]]; then
+            local rel="${phpfile#$CLASSES_DIR/}"
+            finding "MEDIUM" "God class smell: \`$rel\` has $count public methods"
+            found_c2=true
+        fi
+    done < <(find "$CLASSES_DIR" -name "*.php" -not -path "*/Contracts/*" -print0 2>/dev/null)
+    $found_c2 || echo "- No issues found." >> "$FINDINGS"
+
+    # C3: Empty catch blocks (multi-line check via php)
+    subsection "C3: Empty catch blocks"
+    local found_c3=false
+    local empty_catches
+    empty_catches=$(php -r '
+        $dir = $argv[1];
+        $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
+        foreach ($iter as $file) {
+            if ($file->getExtension() !== "php") continue;
+            $content = file_get_contents($file->getPathname());
+            if (preg_match("/catch\s*\([^)]*\)\s*\{\s*\}/s", $content)) {
+                echo str_replace($argv[1] . "/", "", $file->getPathname()) . "\n";
+            }
+        }
+    ' "$CLASSES_DIR" 2>/dev/null || true)
+    if [[ -n "$empty_catches" ]]; then
+        while IFS= read -r rel; do
+            [[ -z "$rel" ]] && continue
+            finding "HIGH" "Empty catch block in \`$rel\`"
+            found_c3=true
+        done <<< "$empty_catches"
+    fi
+    $found_c3 || echo "- No issues found." >> "$FINDINGS"
+
+    # C4: @-suppressed errors
+    subsection "C4: Error suppression (@)"
+    local found_c4=false
+    while IFS= read -r -d '' phpfile; do
+        local rel="${phpfile#$IBL5_DIR/}"
+        # Exclusion list — known legitimate uses
+        case "$rel" in
+            mainfile.php|classes/Bootstrap/*|classes/MySQL.php|scripts/updateAllTheThings.php|language/lang-english.php) continue ;;
+        esac
+        # Check for @function_call() pattern (not in comments)
+        if grep -n -E '^[^/]*@[a-zA-Z_]+\(' "$phpfile" 2>/dev/null | head -1 | grep -q .; then
+            finding "MEDIUM" "Error suppression (\`@\`) in \`$rel\`"
+            found_c4=true
+        fi
+    done < <(find "$CLASSES_DIR" -name "*.php" -print0 2>/dev/null)
+    $found_c4 || echo "- No issues found." >> "$FINDINGS"
+
+    # C5: Functions with 5+ parameters
+    subsection "C5: Long parameter lists (5+ params)"
+    local found_c5=false
+    local long_params
+    long_params=$(php -r '
+        $dir = $argv[1];
+        $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
+        $count = 0;
+        foreach ($iter as $file) {
+            if ($file->getExtension() !== "php") continue;
+            $lines = file($file->getPathname());
+            foreach ($lines as $num => $line) {
+                if (preg_match("/function\s+(\w+)\s*\((.+)\)/", $line, $m)) {
+                    $params = substr_count($m[2], ",") + 1;
+                    if ($params >= 5) {
+                        $rel = str_replace($argv[1] . "/", "", $file->getPathname());
+                        echo "$rel:" . ($num + 1) . " " . $m[1] . "() — $params params\n";
+                        $count++;
+                        if ($count >= 15) return;
+                    }
+                }
+            }
+        }
+    ' "$CLASSES_DIR" 2>/dev/null || true)
+    if [[ -n "$long_params" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            finding "LOW" "Long parameter list: \`$line\`"
+            found_c5=true
+        done <<< "$long_params"
+    fi
+    $found_c5 || echo "- No issues found." >> "$FINDINGS"
+}
+
+# ============================================================================
+# D. Security Regression Detection
+# ============================================================================
+check_security() {
+    section "D. Security Regression Detection"
+
+    # D1: PHP files with echo/output but no HtmlSanitizer
+    subsection "D1: Output without XSS protection"
+    local found_d1=false
+    local count_d1=0
+    while IFS= read -r -d '' phpfile; do
+        local rel="${phpfile#$CLASSES_DIR/}"
+        # Only check View files and Controllers
+        case "$rel" in
+            *View.php|*Controller.php) ;;
+            *) continue ;;
+        esac
+        # Check if file has echo/print but not HtmlSanitizer
+        if grep -q -w 'echo\|print' "$phpfile" 2>/dev/null; then
+            if ! grep -q 'HtmlSanitizer' "$phpfile" 2>/dev/null; then
+                if [[ $count_d1 -lt 10 ]]; then
+                    finding "HIGH" "Output without HtmlSanitizer in \`$rel\`"
+                fi
+                count_d1=$((count_d1 + 1))
+                found_d1=true
+            fi
+        fi
+    done < <(find "$CLASSES_DIR" -name "*.php" -print0 2>/dev/null)
+    if [[ $count_d1 -gt 10 ]]; then
+        finding "HIGH" "... and $((count_d1 - 10)) more files with output but no HtmlSanitizer"
+    fi
+    $found_d1 || echo "- No issues found." >> "$FINDINGS"
+
+    # D2: Dangerous functions
+    subsection "D2: Dangerous functions"
+    local found_d2=false
+    local dangerous_hits
+    dangerous_hits=$(php -r '
+        $dirs = array_slice($argv, 1);
+        foreach ($dirs as $dir) {
+            $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
+            foreach ($iter as $file) {
+                if ($file->getExtension() !== "php") continue;
+                $path = $file->getPathname();
+                $rel = $path;
+                // Build relative path
+                foreach ($dirs as $d) {
+                    $rel = str_replace($d . "/", "", $rel);
+                }
+                // Exclusion list
+                if (strpos($rel, "Migration/MigrationRunner.php") !== false) continue;
+                if (strpos($rel, "vendor/") !== false) continue;
+                $content = file_get_contents($path);
+                if (preg_match("/\b(eval|exec|system|passthru|shell_exec|proc_open|popen)\s*\(/", $content)) {
+                    // Verify not in a comment
+                    $lines = file($path);
+                    foreach ($lines as $num => $line) {
+                        if (preg_match("/\b(eval|exec|system|passthru|shell_exec|proc_open|popen)\s*\(/", $line) &&
+                            !preg_match("/^\s*\/\//", $line) && !preg_match("/^\s*\*/", $line)) {
+                            echo "$rel\n";
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    ' "$CLASSES_DIR" "$IBL5_DIR/scripts" 2>/dev/null || true)
+    if [[ -n "$dangerous_hits" ]]; then
+        while IFS= read -r rel; do
+            [[ -z "$rel" ]] && continue
+            finding "CRITICAL" "Dangerous function call in \`$rel\`"
+            found_d2=true
+        done <<< "$dangerous_hits"
+    fi
+    $found_d2 || echo "- No issues found." >> "$FINDINGS"
+
+    # D3: Debug leftovers
+    subsection "D3: Debug leftovers"
+    local found_d3=false
+    local debug_hits
+    debug_hits=$(grep -rn -E '(var_dump|print_r|debug_print_backtrace|debug_zval_dump)[[:space:]]*\(' "$CLASSES_DIR" --include="*.php" 2>/dev/null | grep -v -E '^[[:space:]]*//' || true)
+    if [[ -n "$debug_hits" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            local file="${line%%:*}"
+            local rel="${file#$CLASSES_DIR/}"
+            # Skip DebugOutput class
+            case "$rel" in
+                UI/DebugOutput.php) continue ;;
+            esac
+            local funcname
+            funcname=$(echo "$line" | sed -n 's/.*\(var_dump\|print_r\|debug_print_backtrace\|debug_zval_dump\).*/\1/p' | head -1)
+            finding "HIGH" "Debug function \`$funcname()\` in \`$rel\`"
+            found_d3=true
+        done <<< "$debug_hits"
+    fi
+    $found_d3 || echo "- No issues found." >> "$FINDINGS"
+
+    # D4: Direct superglobal access without filter_input (deduplicated by file)
+    subsection "D4: Unfiltered superglobal access"
+    local found_d4=false
+    local superglobal_files
+    superglobal_files=$(grep -rl -E '\$_(GET|POST|REQUEST|COOKIE)\[' "$CLASSES_DIR" --include="*.php" 2>/dev/null || true)
+    if [[ -n "$superglobal_files" ]]; then
+        while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            local rel="${file#$CLASSES_DIR/}"
+            finding "HIGH" "Direct superglobal access in \`$rel\`"
+            found_d4=true
+        done <<< "$superglobal_files"
+    fi
+    $found_d4 || echo "- No issues found." >> "$FINDINGS"
+
+    # D5: Hardcoded credentials
+    subsection "D5: Hardcoded credentials"
+    local found_d5=false
+    local cred_hits
+    cred_hits=$(grep -rn -i -E '(password|secret|api_key|apikey)[[:space:]]*=[[:space:]]*["'"'"'].{4,}' "$CLASSES_DIR" --include="*.php" 2>/dev/null | grep -v -i -E '(placeholder|example|test|mock|empty|null|getenv|config)' || true)
+    if [[ -n "$cred_hits" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            local file="${line%%:*}"
+            local rel="${file#$CLASSES_DIR/}"
+            finding "CRITICAL" "Possible hardcoded credential in \`$rel\`"
+            found_d5=true
+        done <<< "$cred_hits"
+    fi
+    $found_d5 || echo "- No issues found." >> "$FINDINGS"
+
+    # D6: Merge conflict markers
+    subsection "D6: Merge conflict markers"
+    local found_d6=false
+    local conflict_hits
+    conflict_hits=$(cd "$REPO_ROOT" && git grep -l '^<<<<<<< ' -- '*.php' '*.css' '*.js' '*.md' 2>/dev/null || true)
+    if [[ -n "$conflict_hits" ]]; then
+        while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            finding "CRITICAL" "Merge conflict markers in \`$file\`"
+            found_d6=true
+        done <<< "$conflict_hits"
+    fi
+    $found_d6 || echo "- No issues found." >> "$FINDINGS"
+}
+
+# ============================================================================
+# E. CSS / Frontend
+# ============================================================================
+check_css_frontend() {
+    section "E. CSS / Frontend"
+
+    # E1: <style> blocks in PHP class files
+    subsection "E1: Inline style blocks in PHP"
+    local found_e1=false
+    local style_hits
+    style_hits=$(grep -rl '<style' "$CLASSES_DIR" --include="*.php" 2>/dev/null || true)
+    if [[ -n "$style_hits" ]]; then
+        while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            local rel="${file#$CLASSES_DIR/}"
+            finding "MEDIUM" "Inline \`<style>\` block in \`$rel\`"
+            found_e1=true
+        done <<< "$style_hits"
+    fi
+    $found_e1 || echo "- No issues found." >> "$FINDINGS"
+
+    # E2: number_format() outside StatsFormatter
+    subsection "E2: Banned number_format() usage"
+    local found_e2=false
+    local nf_hits
+    nf_hits=$(grep -rn -w 'number_format' "$CLASSES_DIR" --include="*.php" 2>/dev/null || true)
+    if [[ -n "$nf_hits" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            local file="${line%%:*}"
+            local rel="${file#$CLASSES_DIR/}"
+            case "$rel" in
+                BasketballStats/StatsFormatter.php) continue ;;
+            esac
+            finding "MEDIUM" "Banned \`number_format()\` in \`$rel\` — use StatsFormatter"
+            found_e2=true
+        done <<< "$nf_hits"
+    fi
+    $found_e2 || echo "- No issues found." >> "$FINDINGS"
+
+    # E3: Deprecated HTML tags
+    subsection "E3: Deprecated HTML tags"
+    local found_e3=false
+    local deprecated_hits
+    deprecated_hits=$(grep -rn -i -E '<(b|i|center|font|u)[> ]' "$CLASSES_DIR" --include="*.php" 2>/dev/null | grep -v -E '^[[:space:]]*//' | head -15 || true)
+    if [[ -n "$deprecated_hits" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            local file="${line%%:*}"
+            local rel="${file#$CLASSES_DIR/}"
+            # Skip SiteStatistics (legacy PHP-Nuke module)
+            case "$rel" in
+                SiteStatistics/*) continue ;;
+            esac
+            local tag
+            tag=$(echo "$line" | sed -n 's/.*\(<[bBiIuU]\>[^a-zA-Z]\|<[Cc][Ee][Nn][Tt][Ee][Rr]\|<[Ff][Oo][Nn][Tt]\).*/\1/p' | head -1)
+            finding "LOW" "Deprecated HTML tag in \`$rel\`"
+            found_e3=true
+        done <<< "$deprecated_hits"
+    fi
+    $found_e3 || echo "- No issues found." >> "$FINDINGS"
+
+    # E4: !important in design/ CSS
+    subsection "E4: Unnecessary !important in CSS"
+    local found_e4=false
+    if [[ -d "$DESIGN_DIR" ]]; then
+        local important_hits
+        important_hits=$(grep -rn '!important' "$DESIGN_DIR" --include="*.css" 2>/dev/null || true)
+        if [[ -n "$important_hits" ]]; then
+            while IFS= read -r line; do
+                [[ -z "$line" ]] && continue
+                local file="${line%%:*}"
+                local rel="${file#$DESIGN_DIR/}"
+                # Check if it's a legitimate use
+                if echo "$line" | grep -q -i -E '(iOS|Safari|user-agent|js-|javascript)'; then
+                    continue
+                fi
+                finding "MEDIUM" "\`!important\` in \`design/$rel\` — should use layer ordering instead"
+                found_e4=true
+            done <<< "$important_hits"
+        fi
+    fi
+    $found_e4 || echo "- No issues found." >> "$FINDINGS"
+
+    # E5: Non-standard @layer names (uses php for negative lookahead equivalent)
+    subsection "E5: Non-standard @layer names"
+    local found_e5=false
+    if [[ -d "$DESIGN_DIR" ]]; then
+        local layer_hits
+        layer_hits=$(php -r '
+            $dir = $argv[1];
+            $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
+            foreach ($iter as $file) {
+                if ($file->getExtension() !== "css") continue;
+                $lines = file($file->getPathname());
+                foreach ($lines as $num => $line) {
+                    if (preg_match("/@layer\s+(\w+)/", $line, $m)) {
+                        $name = $m[1];
+                        if (!in_array($name, ["theme", "base", "components", "utilities"])) {
+                            $rel = str_replace($argv[1] . "/", "", $file->getPathname());
+                            echo "$rel:" . ($num + 1) . " @layer $name\n";
+                        }
+                    }
+                }
+            }
+        ' "$DESIGN_DIR" 2>/dev/null || true)
+        if [[ -n "$layer_hits" ]]; then
+            while IFS= read -r line; do
+                [[ -z "$line" ]] && continue
+                finding "HIGH" "Non-standard \`@layer\` in \`design/$line\` — Tailwind 4 drops custom layers"
+                found_e5=true
+            done <<< "$layer_hits"
+        fi
+    fi
+    $found_e5 || echo "- No issues found." >> "$FINDINGS"
+}
+
+# ============================================================================
+# F. Dependencies
+# ============================================================================
+check_dependencies() {
+    section "F. Dependencies"
+
+    # F1: Composer audit
+    subsection "F1: Known vulnerabilities"
+    if command -v composer &>/dev/null; then
+        local audit_output
+        if audit_output=$(cd "$IBL5_DIR" && run_timeout 30 composer audit --format=plain 2>&1); then
+            echo "- No known vulnerabilities." >> "$FINDINGS"
+        else
+            if echo "$audit_output" | grep -q 'No security vulnerability'; then
+                echo "- No known vulnerabilities." >> "$FINDINGS"
+            elif echo "$audit_output" | grep -q -i -E 'timed out|Could not resolve|network'; then
+                finding "INFO" "Composer audit skipped (network unavailable)"
+            else
+                local audit_count=0
+                while IFS= read -r line; do
+                    [[ -z "$line" ]] && continue
+                    finding "HIGH" "Vulnerability: $line"
+                    audit_count=$((audit_count + 1))
+                    [[ $audit_count -ge 10 ]] && break
+                done <<< "$audit_output"
+            fi
+        fi
+    else
+        finding "INFO" "Composer not found — skipping audit"
+    fi
+
+    # F2: Outdated direct dependencies
+    subsection "F2: Outdated packages"
+    if command -v composer &>/dev/null; then
+        local outdated_output
+        if outdated_output=$(cd "$IBL5_DIR" && run_timeout 30 composer outdated --direct --format=json 2>/dev/null); then
+            local outdated_count
+            outdated_count=$(echo "$outdated_output" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('installed',[])))" 2>/dev/null || echo 0)
+            if [[ "$outdated_count" -gt 0 ]]; then
+                local outdated_list
+                outdated_list=$(echo "$outdated_output" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+for p in d.get('installed', [])[:10]:
+    print(f\"{p['name']}: {p.get('version','?')} -> {p.get('latest','?')}\")
+" 2>/dev/null || true)
+                while IFS= read -r line; do
+                    [[ -z "$line" ]] && continue
+                    finding "LOW" "Outdated: $line"
+                done <<< "$outdated_list"
+            else
+                echo "- All direct dependencies up to date." >> "$FINDINGS"
+            fi
+        else
+            finding "INFO" "Composer outdated check skipped (network unavailable or error)"
+        fi
+    fi
+}
+
+# ============================================================================
+# G. Database
+# ============================================================================
+check_database() {
+    section "G. Database"
+
+    # G1: sql_query() with string interpolation (potential injection)
+    subsection "G1: Potential SQL injection"
+    local found_g1=false
+    local sqli_hits
+    sqli_hits=$(php -r '
+        $dir = $argv[1];
+        $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
+        $seen = [];
+        foreach ($iter as $file) {
+            if ($file->getExtension() !== "php") continue;
+            $path = $file->getPathname();
+            $rel = str_replace($dir . "/", "", $path);
+            // Exclusion list
+            if (strpos($rel, "SiteStatistics/") === 0 || $rel === "MySQL.php") continue;
+            $content = file_get_contents($path);
+            if (preg_match("/sql_query\s*\(\s*[\"'"'"'].*\\$/m", $content) ||
+                preg_match("/sql_query\s*\(\s*[\"'"'"'].*\.\s*\\$/m", $content)) {
+                if (!isset($seen[$rel])) {
+                    echo "$rel\n";
+                    $seen[$rel] = true;
+                }
+            }
+        }
+    ' "$CLASSES_DIR" 2>/dev/null || true)
+    if [[ -n "$sqli_hits" ]]; then
+        while IFS= read -r rel; do
+            [[ -z "$rel" ]] && continue
+            finding "HIGH" "Potential SQL injection via string interpolation in \`$rel\`"
+            found_g1=true
+        done <<< "$sqli_hits"
+    fi
+    $found_g1 || echo "- No issues found." >> "$FINDINGS"
+
+    # G2: Table names in Repository code not in migration schema
+    subsection "G2: Unknown table references"
+    local found_g2=false
+    if [[ -f "$MIGRATIONS_DIR/000_baseline_schema.sql" ]]; then
+        local known_tables
+        known_tables=$(grep -o -i -E 'CREATE[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?`?[a-zA-Z_]+' "$MIGRATIONS_DIR"/*.sql 2>/dev/null | sed 's/.*[[:space:]]//' | tr -d '`' | sort -u)
+
+        while IFS= read -r -d '' repofile; do
+            local rel="${repofile#$CLASSES_DIR/}"
+            # Extract ibl_ table names from SQL clauses
+            local tables_used
+            tables_used=$(grep -o -E '(FROM|JOIN|INTO|UPDATE)[[:space:]]+`?(ibl_[a-zA-Z_]+)' "$repofile" 2>/dev/null | sed 's/.*[[:space:]]//' | tr -d '`' | sort -u || true)
+            while IFS= read -r table; do
+                [[ -z "$table" ]] && continue
+                if ! echo "$known_tables" | grep -qx "$table"; then
+                    if ! grep -q "$table" "$MIGRATIONS_DIR"/*.sql 2>/dev/null; then
+                        finding "MEDIUM" "Unknown table \`$table\` referenced in \`$rel\`"
+                        found_g2=true
+                    fi
+                fi
+            done <<< "$tables_used"
+        done < <(find "$CLASSES_DIR" -name "*Repository.php" -print0 2>/dev/null)
+    fi
+    $found_g2 || echo "- No issues found." >> "$FINDINGS"
+}
+
+# ============================================================================
+# H. Git Hygiene
+# ============================================================================
+check_git_hygiene() {
+    section "H. Git Hygiene"
+
+    # H1: Stale local branches (>30 days, not merged)
+    subsection "H1: Stale branches (>30 days, unmerged)"
+    local found_h1=false
+    local cutoff
+    cutoff=$(date -j -v-30d +%s 2>/dev/null || date -d '30 days ago' +%s 2>/dev/null || echo 0)
+    if [[ "$cutoff" -gt 0 ]]; then
+        while IFS= read -r branch; do
+            [[ -z "$branch" ]] && continue
+            branch=$(echo "$branch" | xargs)
+            [[ "$branch" == "master" || "$branch" == "main" ]] && continue
+            local last_commit
+            last_commit=$(cd "$REPO_ROOT" && git log -1 --format=%ct "$branch" 2>/dev/null || echo 0)
+            if [[ "$last_commit" -lt "$cutoff" && "$last_commit" -gt 0 ]]; then
+                local now
+                now=$(date +%s)
+                local age_days=$(( (now - last_commit) / 86400 ))
+                local merged=""
+                if cd "$REPO_ROOT" && git branch --merged master 2>/dev/null | grep -qw "$branch"; then
+                    merged=" (merged)"
+                fi
+                finding "LOW" "Stale branch \`$branch\` — ${age_days}d old${merged}"
+                found_h1=true
+            fi
+        done <<< "$(cd "$REPO_ROOT" && git branch --format='%(refname:short)' 2>/dev/null)"
+    fi
+    $found_h1 || echo "- No stale branches." >> "$FINDINGS"
+
+    # H2: Uncommitted changes
+    subsection "H2: Uncommitted changes"
+    local status
+    status=$(cd "$REPO_ROOT" && git status --porcelain 2>/dev/null || true)
+    if [[ -n "$status" ]]; then
+        local changed_count
+        changed_count=$(echo "$status" | wc -l | xargs)
+        finding "INFO" "$changed_count uncommitted change(s) in main repo"
+    else
+        echo "- Working tree clean." >> "$FINDINGS"
+    fi
+
+    # H3: Active worktrees
+    subsection "H3: Active worktrees"
+    local worktrees
+    worktrees=$(cd "$REPO_ROOT" && git worktree list 2>/dev/null | tail -n +2 || true)
+    if [[ -n "$worktrees" ]]; then
+        while IFS= read -r wt; do
+            [[ -z "$wt" ]] && continue
+            finding "INFO" "Active worktree: $wt"
+        done <<< "$worktrees"
+    else
+        echo "- No active worktrees." >> "$FINDINGS"
+    fi
+}
+
+# ============================================================================
+# I. Documentation Freshness
+# ============================================================================
+check_documentation() {
+    section "I. Documentation Freshness"
+
+    # I1: Key documentation last-commit age
+    subsection "I1: Documentation staleness"
+    local found_i1=false
+    for doc in STRATEGIC_PRIORITIES.md REFACTORING_HISTORY.md ibl5/docs/DEVELOPMENT_GUIDE.md; do
+        if [[ -f "$REPO_ROOT/$doc" ]]; then
+            local last_epoch
+            last_epoch=$(cd "$REPO_ROOT" && git log -1 --format=%ct -- "$doc" 2>/dev/null || echo 0)
+            if [[ "$last_epoch" -gt 0 ]]; then
+                local now
+                now=$(date +%s)
+                local age_days=$(( (now - last_epoch) / 86400 ))
+                if [[ "$age_days" -gt 30 ]]; then
+                    local last_commit_date
+                    last_commit_date=$(cd "$REPO_ROOT" && git log -1 --format=%ci -- "$doc" 2>/dev/null | cut -d' ' -f1)
+                    finding "LOW" "\`$doc\` last updated ${age_days}d ago ($last_commit_date)"
+                    found_i1=true
+                fi
+            fi
+        fi
+    done
+    $found_i1 || echo "- Key docs are fresh." >> "$FINDINGS"
+
+    # I2: Test count drift
+    subsection "I2: Test count drift"
+    local actual_test_count
+    actual_test_count=$(find "$TESTS_DIR" -name "*Test.php" 2>/dev/null | wc -l | xargs)
+    finding "INFO" "Current test file count: $actual_test_count"
+}
+
+# ============================================================================
+# J. Memory / Context File Health
+# ============================================================================
+check_memory_health() {
+    section "J. Memory / Context File Health"
+
+    # J1: Memory files referencing non-existent file paths
+    subsection "J1: Stale file references in memory/rules"
+    local found_j1=false
+    local dirs_to_check=()
+    [[ -d "$MEMORY_DIR" ]] && dirs_to_check+=("$MEMORY_DIR")
+    [[ -d "$RULES_DIR" ]] && dirs_to_check+=("$RULES_DIR")
+    [[ -d "$REPO_ROOT/.claude/commands" ]] && dirs_to_check+=("$REPO_ROOT/.claude/commands")
+
+    if [[ ${#dirs_to_check[@]} -gt 0 ]]; then
+        for dir in "${dirs_to_check[@]}"; do
+            while IFS= read -r -d '' mdfile; do
+                # Extract file paths that look like ibl5/ or classes/ references
+                local paths
+                paths=$(grep -o -E '(ibl5|classes)/[a-zA-Z0-9_/.+-]+\.(php|css|sql|md|js)' "$mdfile" 2>/dev/null | sort -u || true)
+                while IFS= read -r path; do
+                    [[ -z "$path" ]] && continue
+                    # Try to resolve relative to repo root
+                    if [[ ! -f "$REPO_ROOT/$path" && ! -f "$IBL5_DIR/${path#ibl5/}" && ! -f "$REPO_ROOT/ibl5/$path" ]]; then
+                        local mdrel="${mdfile#$REPO_ROOT/}"
+                        [[ "$mdrel" == "$mdfile" ]] && mdrel="${mdfile#$HOME/}"
+                        finding "LOW" "Stale path \`$path\` referenced in \`$mdrel\`"
+                        found_j1=true
+                    fi
+                done <<< "$paths"
+            done < <(find "$dir" -name "*.md" -print0 2>/dev/null)
+        done
+    fi
+    $found_j1 || echo "- No stale file references found." >> "$FINDINGS"
+
+    # J2: MEMORY.md entries pointing to deleted memory files
+    subsection "J2: Broken MEMORY.md links"
+    local found_j2=false
+    local memory_md="$MEMORY_DIR/MEMORY.md"
+    if [[ -f "$memory_md" ]]; then
+        local linked_files
+        linked_files=$(grep -o -E 'memory/[a-zA-Z0-9_.-]+\.md' "$memory_md" 2>/dev/null | sort -u || true)
+        while IFS= read -r link; do
+            [[ -z "$link" ]] && continue
+            if [[ ! -f "$MEMORY_DIR/${link#memory/}" ]]; then
+                finding "MEDIUM" "MEMORY.md links to \`$link\` which doesn't exist"
+                found_j2=true
+            fi
+        done <<< "$linked_files"
+    fi
+    $found_j2 || echo "- All MEMORY.md links valid." >> "$FINDINGS"
+}
+
+
+# ============================================================================
+# Main execution
+# ============================================================================
+main() {
+    check_architecture
+    check_test_coverage
+    check_code_quality
+    check_security
+    check_css_frontend
+    check_dependencies
+    check_database
+    check_git_hygiene
+    check_documentation
+    check_memory_health
+
+    # Build the report
+    local TOTAL=$((CRITICAL + HIGH + MEDIUM + LOW + INFO))
+
+    {
+        echo "# Codebase Audit — $TODAY"
+        echo ""
+        echo "| Severity | Count |"
+        echo "|----------|-------|"
+        echo "| CRITICAL | $CRITICAL |"
+        echo "| HIGH | $HIGH |"
+        echo "| MEDIUM | $MEDIUM |"
+        echo "| LOW | $LOW |"
+        echo "| INFO | $INFO |"
+        echo "| **Total** | **$TOTAL** |"
+        echo ""
+        echo "---"
+        echo ""
+        cat "$FINDINGS"
+    } > "$REPORT"
+
+    # Symlink latest.md
+    ln -sf "$TODAY.md" "$RESULTS_DIR/latest.md"
+
+    if ! $QUIET; then
+        echo "Audit complete: $TOTAL findings ($CRITICAL critical, $HIGH high, $MEDIUM medium, $LOW low, $INFO info)"
+        echo "Report: $REPORT"
+    fi
+}
+
+main

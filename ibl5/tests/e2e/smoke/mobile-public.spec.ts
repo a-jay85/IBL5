@@ -179,8 +179,9 @@ test.describe('Responsive scroll container tests', () => {
   test('standings — sticky column stays visible after scroll', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Standings');
-    // Standings tbody requires seed data in ibl_standings + ibl_team_info (JOIN).
-    // CI seed import silently fails for some shards — skip if no rows rendered.
+    // admin-pages.spec.ts runs updateAllTheThings.php which TRUNCATEs ibl_standings
+    // and recomputes from schedule data. When it runs before this test (same shard),
+    // standings rows are gone. Skip if no rows rendered.
     await expect(page.locator('.table-scroll-container').first()).toBeAttached();
     const hasStickyCol = await page.locator('.table-scroll-container tbody td.sticky-col')
       .first().isVisible({ timeout: 5_000 }).catch(() => false);

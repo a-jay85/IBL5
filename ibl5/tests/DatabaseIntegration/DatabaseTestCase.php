@@ -368,6 +368,47 @@ abstract class DatabaseTestCase extends TestCase
         return $this->insertRow('ibl_draft_picks', array_merge($defaults, $overrides));
     }
 
+    /**
+     * Insert a schedule row into ibl_schedule with auto-generated uuid.
+     *
+     * @param array<string, int|string> $overrides Column overrides
+     */
+    protected function insertScheduleRow(
+        int $year,
+        string $date,
+        int $visitorTid,
+        int $visitorScore,
+        int $homeTid,
+        int $homeScore,
+        int $boxId = 0,
+        array $overrides = [],
+    ): int {
+        $defaults = [
+            'Year' => $year,
+            'Date' => $date,
+            'Visitor' => $visitorTid,
+            'VScore' => $visitorScore,
+            'Home' => $homeTid,
+            'HScore' => $homeScore,
+            'BoxID' => $boxId,
+            'uuid' => sprintf('sched-%s-%s', $date, bin2hex(random_bytes(6))),
+        ];
+
+        return $this->insertRow('ibl_schedule', array_merge($defaults, $overrides));
+    }
+
+    /**
+     * Insert an award row into ibl_awards.
+     */
+    protected function insertAwardRow(string $playerName, string $award, int $year): int
+    {
+        return $this->insertRow('ibl_awards', [
+            'name' => $playerName,
+            'Award' => $award,
+            'year' => $year,
+        ]);
+    }
+
     private function requireEnv(string $name): string
     {
         $value = getenv($name);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Api\Middleware;
 
+use Api\Middleware\Contracts\ClockInterface;
 use Api\Middleware\RateLimiter;
 use Api\Repository\RateLimitRepository;
 use PHPUnit\Framework\TestCase;
@@ -56,7 +57,10 @@ class RateLimiterTest extends TestCase
     public function testRejectsRequestOverLimit(): void
     {
         $stubRepo = $this->createStub(RateLimitRepository::class);
-        $rateLimiter = new RateLimiter($stubRepo);
+        $fixedClock = $this->createStub(ClockInterface::class);
+        $fixedClock->method('now')->willReturn(1_700_000_000);
+
+        $rateLimiter = new RateLimiter($stubRepo, $fixedClock);
         $apiKey = $this->makeApiKey();
 
         $stubRepo->method('getRequestCount')->willReturn(61);
@@ -66,7 +70,7 @@ class RateLimiterTest extends TestCase
         $this->assertSame('60', $result['Retry-After']);
         $this->assertSame('60', $result['X-RateLimit-Limit']);
         $this->assertSame('0', $result['X-RateLimit-Remaining']);
-        $this->assertArrayHasKey('X-RateLimit-Reset', $result);
+        $this->assertSame('1700000060', $result['X-RateLimit-Reset']);
     }
 
     public function testElevatedTierHasHigherLimit(): void

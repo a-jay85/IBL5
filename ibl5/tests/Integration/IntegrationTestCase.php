@@ -99,6 +99,22 @@ abstract class IntegrationTestCase extends TestCase
     }
 
     /**
+     * Execute a callable that writes to stdout, capturing and returning the output.
+     * Cleans the buffer on exception so it never leaks into subsequent tests.
+     */
+    protected function captureOutput(callable $fn): string
+    {
+        ob_start();
+        try {
+            $fn();
+            return (string) ob_get_clean();
+        } catch (\Throwable $e) {
+            ob_end_clean();
+            throw $e;
+        }
+    }
+
+    /**
      * Get all queries executed during the test
      */
     protected function getExecutedQueries(): array

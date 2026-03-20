@@ -36,15 +36,30 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
         };
     }
 
+    protected function tearDown(): void
+    {
+        $_GET = [];
+    }
+
+    private function captureOutput(callable $fn): string
+    {
+        ob_start();
+        try {
+            $fn();
+            return (string) ob_get_clean();
+        } catch (\Throwable $e) {
+            ob_end_clean();
+            throw $e;
+        }
+    }
+
     public function testHandleReturnsEmptyHtmlWhenTeamIDMissing(): void
     {
         $_GET = [];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
@@ -59,9 +74,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
@@ -76,9 +89,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
@@ -93,9 +104,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
@@ -111,9 +120,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
@@ -129,9 +136,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
@@ -142,22 +147,16 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
     public function testHandleFallsBackToRatingsWhenDisplayMissing(): void
     {
-        // Valid teamID but no display param — should default to 'ratings'
-        // DB prepare returns false, so we get empty result from the DB,
-        // but the handler should not error
         $_GET = ['teamID' => '1'];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
 
         $this->assertIsArray($decoded);
-        // DB returns false, so we get empty HTML from the roster query
         $this->assertSame('', $decoded['html']);
     }
 
@@ -167,9 +166,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
@@ -184,9 +181,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
@@ -201,9 +196,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        ob_end_clean();
+        $this->captureOutput(fn () => $handler->handle());
 
         // Verify the handler doesn't throw an exception
         $this->assertTrue(true);
@@ -211,33 +204,26 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
     public function testHandleAcceptsEmptyAddPids(): void
     {
-        // Empty addPids is valid (showing removals only)
         $_GET = ['teamID' => '1', 'addPids' => '', 'removePids' => '1,2'];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
 
         $this->assertIsArray($decoded);
-        // DB returns false, so empty HTML
         $this->assertSame('', $decoded['html']);
     }
 
     public function testHandleAcceptsEmptyRemovePids(): void
     {
-        // Empty removePids is valid (showing additions only)
         $_GET = ['teamID' => '1', 'addPids' => '1,2', 'removePids' => ''];
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
@@ -248,7 +234,6 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
     public function testBuildCashRowsIgnoredWhenDisplayIsNotContracts(): void
     {
-        // Cash params present but display is 'ratings' — no cash rows should be built
         $_GET = [
             'teamID' => '1',
             'display' => 'ratings',
@@ -262,21 +247,17 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
 
         $this->assertIsArray($decoded);
-        // DB returns false, so empty HTML — but the point is no crash from cash logic
         $this->assertSame('', $decoded['html']);
     }
 
     public function testBuildCashRowsSkippedWhenCashParamsMissing(): void
     {
-        // Contracts display but no cash params — should not crash
         $_GET = [
             'teamID' => '1',
             'display' => 'contracts',
@@ -284,9 +265,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
@@ -311,9 +290,7 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
@@ -338,15 +315,12 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
 
         $this->assertIsArray($decoded);
-        // Over-limit cash defaults to 0, so no cash rows generated
         $this->assertSame('', $decoded['html']);
     }
 
@@ -366,19 +340,12 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         $handler = new TradeRosterPreviewApiHandler($this->mockDb);
 
-        ob_start();
-        $handler->handle();
-        $output = (string) ob_get_clean();
+        $output = $this->captureOutput(fn () => $handler->handle());
 
         /** @var array{html: string} $decoded */
         $decoded = json_decode($output, true);
 
         $this->assertIsArray($decoded);
         $this->assertSame('', $decoded['html']);
-    }
-
-    protected function tearDown(): void
-    {
-        $_GET = [];
     }
 }

@@ -111,7 +111,7 @@ function blocks($side)
 {
     global $storynum, $prefix, $multilingual, $currentlang, $db, $user;
     if ($multilingual == 1) {
-        $querylang = "AND (blanguage='$currentlang' OR blanguage='')";
+        $querylang = "AND (blanguage='" . $db->db_connect_id->real_escape_string($currentlang) . "' OR blanguage='')";
     } else {
         $querylang = "";
     }
@@ -197,9 +197,9 @@ function online()
         $uname = substr($uname, 0, 25);
         $row = $db->sql_fetchrow($result);
         if ($row) {
-            $db->sql_query("UPDATE " . $prefix . "_session SET uname='" . addslashes($uname) . "', time='$ctime', host_addr='$ip', guest='$guest' WHERE uname='" . addslashes($uname) . "'");
+            $db->sql_query("UPDATE " . $prefix . "_session SET uname='" . addslashes($uname) . "', time='$ctime', host_addr='" . $db->db_connect_id->real_escape_string($ip) . "', guest='$guest' WHERE uname='" . addslashes($uname) . "'");
         } else {
-            $db->sql_query("INSERT INTO " . $prefix . "_session (uname, time, host_addr, guest) VALUES ('" . addslashes($uname) . "', '$ctime', '$ip', '$guest')");
+            $db->sql_query("INSERT INTO " . $prefix . "_session (uname, time, host_addr, guest) VALUES ('" . addslashes($uname) . "', '$ctime', '" . $db->db_connect_id->real_escape_string($ip) . "', '$guest')");
         }
     }
     $db->sql_freeresult($result);
@@ -414,7 +414,7 @@ function get_author($aid)
     if (isset($users[$aid]) and is_array($users[$aid])) {
         $row = $users[$aid];
     } else {
-        $sql = "SELECT url, email FROM " . $prefix . "_authors WHERE aid='$aid'";
+        $sql = "SELECT url, email FROM " . $prefix . "_authors WHERE aid='" . $db->db_connect_id->real_escape_string($aid) . "'";
         $result = $db->sql_query($sql);
         $row = $db->sql_fetchrow($result);
         $users[$aid] = $row;
@@ -499,7 +499,7 @@ function headlines($bid, $cenbox = 0)
         $fp = fsockopen($rdf['host'], 80, $errno, $errstr, 15);
         if (!$fp) {
             $content = "";
-            $db->sql_query("UPDATE " . $prefix . "_blocks SET content='$content', time='$btime' WHERE bid='$bid'");
+            $db->sql_query("UPDATE " . $prefix . "_blocks SET content='" . $db->db_connect_id->real_escape_string($content) . "', time='$btime' WHERE bid='$bid'");
             $cont = 0;
             themecenterbox($title, $content);
             return;
@@ -528,7 +528,7 @@ function headlines($bid, $cenbox = 0)
                 $title2 = stripslashes($title2);
                 if (empty($items[$i]) and $cont != 1) {
                     $content = "";
-                    $db->sql_query("UPDATE " . $prefix . "_blocks SET content='$content', time='$btime' WHERE bid='$bid'");
+                    $db->sql_query("UPDATE " . $prefix . "_blocks SET content='" . $db->db_connect_id->real_escape_string($content) . "', time='$btime' WHERE bid='$bid'");
                     $cont = 0;
                     themecenterbox($title, $content);
                     return;
@@ -541,7 +541,7 @@ function headlines($bid, $cenbox = 0)
             }
 
         }
-        $db->sql_query("UPDATE " . $prefix . "_blocks SET content='$content', time='$btime' WHERE bid='$bid'");
+        $db->sql_query("UPDATE " . $prefix . "_blocks SET content='" . $db->db_connect_id->real_escape_string($content) . "', time='$btime' WHERE bid='$bid'");
     }
     $siteurl = str_replace("http://", "", $url);
     $siteurl = explode("/", $siteurl);

@@ -179,6 +179,14 @@ test.describe('Responsive scroll container tests', () => {
   test('standings — sticky column stays visible after scroll', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Standings');
+    // Debug: log what the page actually contains in CI
+    const diag = await page.evaluate(() => ({
+      scrollContainers: document.querySelectorAll('.table-scroll-container').length,
+      tbodyRows: document.querySelectorAll('.table-scroll-container tbody tr').length,
+      stickyCols: document.querySelectorAll('td.sticky-col').length,
+      h2Count: document.querySelectorAll('h2').length,
+    }));
+    console.log('STANDINGS DIAG:', JSON.stringify(diag));
     // Wait for tbody rows to render (query JOINs ibl_team_info) — toBeAttached
     // retries for up to 10s and works even if the element is below the fold
     await expect(page.locator('.table-scroll-container tbody td.sticky-col').first())

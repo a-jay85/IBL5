@@ -480,6 +480,7 @@ jobs:
 
       - name: Post E2E results to PR
         if: always() && github.event_name == 'pull_request'
+        working-directory: ibl5
         env:
           REPO_TOKEN: ${{ github.token }}
         run: cml comment update --target=pr --publish /tmp/e2e-comment.md

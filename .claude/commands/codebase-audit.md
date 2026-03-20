@@ -10,7 +10,7 @@ Run the codebase audit and triage findings into actionable buckets.
 ### 1. Run the audit
 
 ```bash
-cd /Users/ajaynicolas/Documents/GitHub/IBL5 && bin/codebase-audit
+cd "$(git rev-parse --show-toplevel)" && bin/codebase-audit
 ```
 
 ### 2. Read the report

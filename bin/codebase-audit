@@ -202,7 +202,7 @@ check_code_quality() {
     subsection "C1: Long methods (>50 lines)"
     local found_c1=false
     local long_methods
-    long_methods=$(/opt/homebrew/bin/php -r '
+    long_methods=$(php -r '
         $dir = $argv[1];
         $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
         $results = [];
@@ -285,13 +285,13 @@ check_code_quality() {
     subsection "C3: Empty catch blocks"
     local found_c3=false
     local empty_catches
-    empty_catches=$(/opt/homebrew/bin/php -r '
+    empty_catches=$(php -r '
         $dir = $argv[1];
         $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
         foreach ($iter as $file) {
             if ($file->getExtension() !== "php") continue;
             $content = file_get_contents($file->getPathname());
-            if (preg_match("/catch\s*\([^)]*\)\s*\{\s*\}/", $content)) {
+            if (preg_match("/catch\s*\([^)]*\)\s*\{\s*\}/s", $content)) {
                 echo str_replace($argv[1] . "/", "", $file->getPathname()) . "\n";
             }
         }
@@ -326,7 +326,7 @@ check_code_quality() {
     subsection "C5: Long parameter lists (5+ params)"
     local found_c5=false
     local long_params
-    long_params=$(/opt/homebrew/bin/php -r '
+    long_params=$(php -r '
         $dir = $argv[1];
         $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
         $count = 0;
@@ -393,7 +393,7 @@ check_security() {
     subsection "D2: Dangerous functions"
     local found_d2=false
     local dangerous_hits
-    dangerous_hits=$(/opt/homebrew/bin/php -r '
+    dangerous_hits=$(php -r '
         $dirs = array_slice($argv, 1);
         foreach ($dirs as $dir) {
             $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
@@ -447,7 +447,7 @@ check_security() {
                 UI/DebugOutput.php) continue ;;
             esac
             local funcname
-            funcname=$(echo "$line" | sed -n 's/.*\(var_dump\|print_r\).*/\1/p' | head -1)
+            funcname=$(echo "$line" | sed -n 's/.*\(var_dump\|print_r\|debug_print_backtrace\|debug_zval_dump\).*/\1/p' | head -1)
             finding "HIGH" "Debug function \`$funcname()\` in \`$rel\`"
             found_d3=true
         done <<< "$debug_hits"
@@ -473,7 +473,7 @@ check_security() {
     subsection "D5: Hardcoded credentials"
     local found_d5=false
     local cred_hits
-    cred_hits=$(grep -rn -i -E '(password|secret|api_key|apikey)[[:space:]]*=[[:space:]]*["\x27].{4,}' "$CLASSES_DIR" --include="*.php" 2>/dev/null | grep -v -i -E '(placeholder|example|test|mock|empty|null|getenv|config)' || true)
+    cred_hits=$(grep -rn -i -E '(password|secret|api_key|apikey)[[:space:]]*=[[:space:]]*["'"'"'].{4,}' "$CLASSES_DIR" --include="*.php" 2>/dev/null | grep -v -i -E '(placeholder|example|test|mock|empty|null|getenv|config)' || true)
     if [[ -n "$cred_hits" ]]; then
         while IFS= read -r line; do
             [[ -z "$line" ]] && continue
@@ -589,7 +589,7 @@ check_css_frontend() {
     local found_e5=false
     if [[ -d "$DESIGN_DIR" ]]; then
         local layer_hits
-        layer_hits=$(/opt/homebrew/bin/php -r '
+        layer_hits=$(php -r '
             $dir = $argv[1];
             $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
             foreach ($iter as $file) {
@@ -625,9 +625,9 @@ check_dependencies() {
 
     # F1: Composer audit
     subsection "F1: Known vulnerabilities"
-    if command -v /opt/homebrew/bin/composer &>/dev/null; then
+    if command -v composer &>/dev/null; then
         local audit_output
-        if audit_output=$(cd "$IBL5_DIR" && run_timeout 30 /opt/homebrew/bin/composer audit --format=plain 2>&1); then
+        if audit_output=$(cd "$IBL5_DIR" && run_timeout 30 composer audit --format=plain 2>&1); then
             echo "- No known vulnerabilities." >> "$FINDINGS"
         else
             if echo "$audit_output" | grep -q 'No security vulnerability'; then
@@ -650,9 +650,9 @@ check_dependencies() {
 
     # F2: Outdated direct dependencies
     subsection "F2: Outdated packages"
-    if command -v /opt/homebrew/bin/composer &>/dev/null; then
+    if command -v composer &>/dev/null; then
         local outdated_output
-        if outdated_output=$(cd "$IBL5_DIR" && run_timeout 30 /opt/homebrew/bin/composer outdated --direct --format=json 2>/dev/null); then
+        if outdated_output=$(cd "$IBL5_DIR" && run_timeout 30 composer outdated --direct --format=json 2>/dev/null); then
             local outdated_count
             outdated_count=$(echo "$outdated_output" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('installed',[])))" 2>/dev/null || echo 0)
             if [[ "$outdated_count" -gt 0 ]]; then
@@ -686,7 +686,7 @@ check_database() {
     subsection "G1: Potential SQL injection"
     local found_g1=false
     local sqli_hits
-    sqli_hits=$(/opt/homebrew/bin/php -r '
+    sqli_hits=$(php -r '
         $dir = $argv[1];
         $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
         $seen = [];
@@ -720,13 +720,13 @@ check_database() {
     local found_g2=false
     if [[ -f "$MIGRATIONS_DIR/000_baseline_schema.sql" ]]; then
         local known_tables
-        known_tables=$(grep -o -i -E 'CREATE[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?`?[a-zA-Z_]+' "$MIGRATIONS_DIR"/*.sql 2>/dev/null | sed 's/.*`\?\([a-zA-Z_]*\)$/\1/' | sort -u)
+        known_tables=$(grep -o -i -E 'CREATE[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?`?[a-zA-Z_]+' "$MIGRATIONS_DIR"/*.sql 2>/dev/null | sed 's/.*[[:space:]]//' | tr -d '`' | sort -u)
 
         while IFS= read -r -d '' repofile; do
             local rel="${repofile#$CLASSES_DIR/}"
             # Extract ibl_ table names from SQL clauses
             local tables_used
-            tables_used=$(grep -o -E '(FROM|JOIN|INTO|UPDATE)[[:space:]]+`?(ibl_[a-zA-Z_]+)' "$repofile" 2>/dev/null | sed 's/.*[[:space:]]//' | sort -u || true)
+            tables_used=$(grep -o -E '(FROM|JOIN|INTO|UPDATE)[[:space:]]+`?(ibl_[a-zA-Z_]+)' "$repofile" 2>/dev/null | sed 's/.*[[:space:]]//' | tr -d '`' | sort -u || true)
             while IFS= read -r table; do
                 [[ -z "$table" ]] && continue
                 if ! echo "$known_tables" | grep -qx "$table"; then
@@ -756,7 +756,7 @@ check_git_hygiene() {
         while IFS= read -r branch; do
             [[ -z "$branch" ]] && continue
             branch=$(echo "$branch" | xargs)
-            [[ "$branch" == "master" || "$branch" == "main" || "$branch" == "*"* ]] && continue
+            [[ "$branch" == "master" || "$branch" == "main" ]] && continue
             local last_commit
             last_commit=$(cd "$REPO_ROOT" && git log -1 --format=%ct "$branch" 2>/dev/null || echo 0)
             if [[ "$last_commit" -lt "$cutoff" && "$last_commit" -gt 0 ]]; then

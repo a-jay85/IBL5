@@ -97,6 +97,16 @@ jobs:
           docker compose -f docker-compose.ci.yml exec -T mariadb \
             mariadb -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
 
+      - name: Verify seed data
+        run: |
+          docker compose -f docker-compose.ci.yml exec -T mariadb \
+            mariadb -u root -proot ibl5 -e "
+              SELECT 'standings' AS tbl, COUNT(*) AS cnt FROM ibl_standings
+              UNION ALL SELECT 'team_info', COUNT(*) FROM ibl_team_info
+              UNION ALL SELECT 'nuke_config', COUNT(*) FROM nuke_config
+              UNION ALL SELECT 'ibl_plr', COUNT(*) FROM ibl_plr;
+            "
+
       - name: Create test user
         env:
           IBL_TEST_USER: ${{ secrets.IBL_TEST_USER }}
@@ -311,6 +321,16 @@ jobs:
         run: |
           docker compose -f docker-compose.ci.yml exec -T mariadb \
             mariadb -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
+
+      - name: Verify seed data
+        run: |
+          docker compose -f docker-compose.ci.yml exec -T mariadb \
+            mariadb -u root -proot ibl5 -e "
+              SELECT 'standings' AS tbl, COUNT(*) AS cnt FROM ibl_standings
+              UNION ALL SELECT 'team_info', COUNT(*) FROM ibl_team_info
+              UNION ALL SELECT 'nuke_config', COUNT(*) FROM nuke_config
+              UNION ALL SELECT 'ibl_plr', COUNT(*) FROM ibl_plr;
+            "
 
       - name: Create test user
         env:

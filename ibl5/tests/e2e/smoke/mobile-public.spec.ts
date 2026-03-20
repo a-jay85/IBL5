@@ -179,12 +179,10 @@ test.describe('Responsive scroll container tests', () => {
   test('standings — sticky column stays visible after scroll', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Standings');
-    // Standings tbody rows require seed data — skip if no rows rendered
-    const stickyCell = page.locator('.table-scroll-container tbody td.sticky-col').first();
-    const hasStickyCol = await stickyCell.isVisible().catch(() => false);
-    if (!hasStickyCol) {
-      test.skip(true, 'standings has no tbody rows with sticky columns (seed data missing)');
-    }
+    // Wait for tbody rows to render (query JOINs ibl_team_info) — toBeAttached
+    // retries for up to 10s and works even if the element is below the fold
+    await expect(page.locator('.table-scroll-container tbody td.sticky-col').first())
+      .toBeAttached({ timeout: 10_000 });
     const result = await page.locator('.table-scroll-container').first().evaluate((el: Element) => {
       const c = el as HTMLElement;
       c.scrollLeft = c.scrollWidth;

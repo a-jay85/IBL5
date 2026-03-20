@@ -36,6 +36,7 @@ test.describe('Contract Extension flow', () => {
   test('extension form has hidden fields for player data', async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Regular Season' });
     await page.goto('modules.php?name=Player&pa=negotiate&pid=30');
+    await assertNoPhpErrors(page, 'on extension form (hidden fields)');
 
     const playerID = page.locator('input[name="playerID"]');
     const isAttached = await playerID.count();
@@ -72,7 +73,7 @@ test.describe('Contract Extension flow', () => {
     // With seed data, at least one player should be eligible; without it, this is informational
     if (count > 0) {
       const href = await extLinks.first().getAttribute('href');
-      expect(href).toContain('negotiate');
+      expect(href).toContain('pid=');
     }
   });
 

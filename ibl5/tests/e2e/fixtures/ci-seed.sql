@@ -1194,7 +1194,8 @@ INSERT INTO ibl_plr (
    41, 1260, 200, 440, 100, 120,
    50, 130, 35, 120, 150, 50,
    70, 15, 80,
-   'plr-uuid-00000000-0000-000000000030');
+   'plr-uuid-00000000-0000-000000000030')
+ON DUPLICATE KEY UPDATE name = VALUES(name), cy = VALUES(cy), cyt = VALUES(cyt);
 
 -- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the

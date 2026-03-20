@@ -43,15 +43,11 @@ test.describe('Homepage flow', () => {
   });
 });
 
-test.describe('Homepage authenticated view', () => {
-  // Use auth fixture for authenticated tests
-  test('authenticated user sees personalized content', async ({ appState, page }) => {
+test.describe('Homepage with state override', () => {
+  test('homepage renders correctly with trivia mode off', async ({ appState, page }) => {
     await appState({ 'Trivia Mode': 'Off' });
-    // This test uses public fixture — it checks that unauthenticated
-    // homepage still works. Authenticated homepage is covered by the
-    // smoke test in public-pages.spec.ts which verifies page loads.
     await page.goto('index.php');
-    await assertNoPhpErrors(page, 'on homepage (public view)');
+    await assertNoPhpErrors(page, 'on homepage with trivia off');
     await expect(page).toHaveTitle(/IBL/i);
   });
 });

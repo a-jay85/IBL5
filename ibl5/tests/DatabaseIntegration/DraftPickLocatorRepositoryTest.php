@@ -23,7 +23,7 @@ class DraftPickLocatorRepositoryTest extends DatabaseTestCase
     {
         $teams = $this->repo->getAllTeams();
 
-        self::assertNotEmpty($teams);
+        self::assertCount(28, $teams);
         foreach ($teams as $team) {
             self::assertGreaterThanOrEqual(1, $team['teamid']);
             self::assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $team['teamid']);

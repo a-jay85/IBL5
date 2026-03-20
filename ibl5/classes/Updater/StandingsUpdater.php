@@ -87,8 +87,6 @@ class StandingsUpdater extends \BaseMysqliRepository {
         $standingsTable = $this->resolveTable('ibl_standings');
 
         echo "<p>Updating the {$standingsTable} database table...<p>";
-        $this->execute("TRUNCATE TABLE {$standingsTable}", '');
-        echo "TRUNCATE TABLE {$standingsTable}<p>";
 
         $this->computeAndInsertStandings();
 
@@ -362,7 +360,36 @@ class StandingsUpdater extends \BaseMysqliRepository {
                     homeRecord, awayRecord,
                     confWins, confLosses, divWins, divLosses,
                     homeWins, homeLosses, awayWins, awayLosses
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    team_name = VALUES(team_name),
+                    leagueRecord = VALUES(leagueRecord),
+                    wins = VALUES(wins),
+                    losses = VALUES(losses),
+                    pct = VALUES(pct),
+                    gamesUnplayed = VALUES(gamesUnplayed),
+                    conference = VALUES(conference),
+                    confGB = VALUES(confGB),
+                    confRecord = VALUES(confRecord),
+                    division = VALUES(division),
+                    divGB = VALUES(divGB),
+                    divRecord = VALUES(divRecord),
+                    homeRecord = VALUES(homeRecord),
+                    awayRecord = VALUES(awayRecord),
+                    confWins = VALUES(confWins),
+                    confLosses = VALUES(confLosses),
+                    divWins = VALUES(divWins),
+                    divLosses = VALUES(divLosses),
+                    homeWins = VALUES(homeWins),
+                    homeLosses = VALUES(homeLosses),
+                    awayWins = VALUES(awayWins),
+                    awayLosses = VALUES(awayLosses),
+                    confMagicNumber = NULL,
+                    divMagicNumber = NULL,
+                    clinchedConference = NULL,
+                    clinchedDivision = NULL,
+                    clinchedPlayoffs = NULL,
+                    clinchedLeague = NULL",
                 "issiidisdssdsssiiiiiiii",
                 $team['tid'],
                 $team['teamName'],

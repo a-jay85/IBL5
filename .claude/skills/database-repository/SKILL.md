@@ -1,6 +1,7 @@
 ---
 name: database-repository
 description: Database repository pattern using BaseMysqliRepository with prepared statements for IBL5. Use when creating repositories, writing database queries, or extending BaseMysqliRepository.
+effort: low
 ---
 
 # Database Repository Pattern

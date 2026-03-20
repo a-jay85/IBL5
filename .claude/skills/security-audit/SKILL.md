@@ -1,6 +1,7 @@
 ---
 name: security-audit
 description: Security vulnerability patterns for IBL5 PHP code. Use when auditing security, fixing vulnerabilities, or reviewing code for security issues.
+effort: low
 ---
 
 # IBL5 Security Patterns

@@ -1,6 +1,7 @@
 ---
 name: basketball-stats
 description: Basketball statistics formatting using BasketballStats\StatsFormatter for percentages, averages, and totals. Use when displaying stats, calculating averages, or formatting basketball numbers.
+effort: low
 ---
 
 # Basketball Statistics Formatting

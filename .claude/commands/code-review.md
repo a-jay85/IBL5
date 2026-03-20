@@ -3,6 +3,7 @@ allowed-tools: Bash(gh pr diff:*), Bash(gh pr view:*), Bash(gh pr comment:*),
   Bash(gh issue view:*), Bash(gh search:*), Bash(gh pr list:*), Bash(gh api:*),
   Bash(git log:*), Bash(git rev-parse:*), Bash(git show:*)
 description: Token-efficient code review for pull requests
+model: sonnet
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.

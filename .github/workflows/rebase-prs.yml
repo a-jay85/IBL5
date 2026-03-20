@@ -36,17 +36,66 @@ jobs:
             exit 0
           fi
 
+          # --- Phase 1: Fetch all branches and build patch-id sets ---
+          # Detects "stacked" branches — branches that carry commits belonging to
+          # another open PR branch. Rebasing a stacked branch onto master replays
+          # the parent branch's commits as duplicate cherry-picks. We skip stacked
+          # branches; they'll be rebased naturally once their parent PR merges.
+
+          branches=()
+          pr_numbers=()
+          while IFS=' ' read -r pr_number branch; do
+            if git fetch origin "$branch" 2>/dev/null; then
+              branches+=("$branch")
+              pr_numbers+=("$pr_number")
+            else
+              echo "::warning::Could not fetch branch ${branch}, skipping"
+            fi
+          done <<< "$prs"
+
+          tmpdir=$(mktemp -d)
+          trap 'rm -rf "$tmpdir"' EXIT
+
+          for i in "${!branches[@]}"; do
+            git format-patch --stdout "origin/master..origin/${branches[$i]}" 2>/dev/null \
+              | git patch-id --stable 2>/dev/null \
+              | awk '{print $1}' \
+              | sort -u > "${tmpdir}/${i}.patches"
+          done
+
+          # Branch B is "stacked on" branch A if every patch-id in A also appears
+          # in B (strict subset: A ⊂ B). Stacked branches are skipped.
+          declare -A stacked_on
+          for i in "${!branches[@]}"; do
+            b_count=$(wc -l < "${tmpdir}/${i}.patches")
+            [ "$b_count" -eq 0 ] && continue
+            for j in "${!branches[@]}"; do
+              [ "$i" = "$j" ] && continue
+              a_count=$(wc -l < "${tmpdir}/${j}.patches")
+              [ "$a_count" -eq 0 ] && continue
+              [ "$a_count" -ge "$b_count" ] && continue
+              common=$(comm -12 "${tmpdir}/${j}.patches" "${tmpdir}/${i}.patches" | wc -l)
+              if [ "$common" -eq "$a_count" ]; then
+                stacked_on[$i]="${branches[$j]}"
+                break
+              fi
+            done
+          done
+
+          # --- Phase 2: Rebase non-stacked branches ---
           rebased=0
           skipped=0
           failed=0
+          stacked_count=0
 
-          while IFS=' ' read -r pr_number branch; do
+          for i in "${!branches[@]}"; do
+            branch="${branches[$i]}"
+            pr_number="${pr_numbers[$i]}"
             echo "::group::PR #${pr_number} (${branch})"
 
-            # Fetch the branch
-            if ! git fetch origin "$branch"; then
-              echo "::warning::Could not fetch branch ${branch}, skipping"
-              ((++skipped))
+            if [ -n "${stacked_on[$i]:-}" ]; then
+              echo "Stacked on ${stacked_on[$i]} — skipping to avoid commit duplication"
+              ((++stacked_count))
               echo "::endgroup::"
               continue
             fi
@@ -75,9 +124,10 @@ jobs:
 
             git checkout --detach origin/master
             echo "::endgroup::"
-          done <<< "$prs"
+          done
 
           echo "## Rebase Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "- Rebased: ${rebased}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Skipped (up-to-date or unfetchable): ${skipped}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Skipped (stacked on another PR): ${stacked_count}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Skipped (up-to-date): ${skipped}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Conflicts: ${failed}" >> "$GITHUB_STEP_SUMMARY"

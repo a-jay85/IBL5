@@ -82,11 +82,53 @@ jobs:
             done
           done
 
+          # --- Phase 1.5: Detect orphaned stacking remnants ---
+          # After a parent branch is squash-merged, its children still carry the
+          # parent's individual commits. Git rebase can't drop them because the
+          # squash commit has a different patch-id. We detect these orphans by
+          # finding patch-ids shared across 2+ branches — those are remnants of
+          # a common ancestor that was squash-merged away.
+
+          # Build patch-id→SHA mapping for each branch (needed for interactive rebase)
+          for i in "${!branches[@]}"; do
+            git format-patch --stdout "origin/master..origin/${branches[$i]}" 2>/dev/null \
+              | git patch-id --stable 2>/dev/null \
+              > "${tmpdir}/${i}.pidmap"
+          done
+
+          # Count how many branches each patch-id appears in
+          declare -A pid_count
+          for i in "${!branches[@]}"; do
+            [ -n "${stacked_on[$i]:-}" ] && continue
+            while read pid sha; do
+              pid_count[$pid]=$(( ${pid_count[$pid]:-0} + 1 ))
+            done < "${tmpdir}/${i}.pidmap"
+          done
+
+          # Build per-branch drop lists (SHAs of orphaned commits)
+          orphan_total=0
+          for i in "${!branches[@]}"; do
+            [ -n "${stacked_on[$i]:-}" ] && continue
+            > "${tmpdir}/${i}.drop"
+            while read pid sha; do
+              if [ "${pid_count[$pid]:-0}" -ge 2 ]; then
+                echo "$sha" >> "${tmpdir}/${i}.drop"
+              fi
+            done < "${tmpdir}/${i}.pidmap"
+            drop_n=$(wc -l < "${tmpdir}/${i}.drop")
+            if [ "$drop_n" -gt 0 ]; then
+              echo "Branch ${branches[$i]}: ${drop_n} orphaned commit(s) to drop"
+              orphan_total=$((orphan_total + drop_n))
+            fi
+          done
+          [ "$orphan_total" -gt 0 ] && echo "Total orphaned commits to drop: ${orphan_total}"
+
           # --- Phase 2: Rebase non-stacked branches ---
           rebased=0
           skipped=0
           failed=0
           stacked_count=0
+          dropped=0
 
           for i in "${!branches[@]}"; do
             branch="${branches[$i]}"
@@ -103,23 +145,50 @@ jobs:
             # Check if branch is already up-to-date with master
             merge_base=$(git merge-base "origin/${branch}" origin/master)
             master_sha=$(git rev-parse origin/master)
-            if [ "$merge_base" = "$master_sha" ]; then
+
+            drop_n=$(wc -l < "${tmpdir}/${i}.drop")
+
+            if [ "$merge_base" = "$master_sha" ] && [ "$drop_n" -eq 0 ]; then
               echo "Already up-to-date, skipping"
               ((++skipped))
               echo "::endgroup::"
               continue
             fi
 
-            # Attempt rebase
+            # Attempt rebase — use interactive rebase to drop orphaned commits
             git checkout "origin/${branch}" --detach
-            if git rebase origin/master; then
-              git push origin "HEAD:${branch}" --force-with-lease
-              echo "✓ Rebased ${branch} onto master — CI will trigger via pull_request: synchronize"
-              ((++rebased))
+
+            if [ "$drop_n" -gt 0 ]; then
+              echo "Dropping ${drop_n} orphaned stacking remnant(s)"
+
+              # Build a sed script that changes "pick <sha>" → "drop <sha>" for
+              # each orphaned commit. Uses address matching (/^pick SHA/) so it
+              # works regardless of git's abbreviated SHA length (core.abbrev).
+              > "${tmpdir}/${i}.sed"
+              while read sha; do
+                echo "/^pick ${sha:0:7}/s/^pick/drop/" >> "${tmpdir}/${i}.sed"
+              done < "${tmpdir}/${i}.drop"
+
+              if GIT_SEQUENCE_EDITOR="sed -i -f ${tmpdir}/${i}.sed" git rebase -i origin/master; then
+                git push origin "HEAD:${branch}" --force-with-lease
+                echo "✓ Rebased ${branch} (dropped ${drop_n} orphan(s))"
+                ((++rebased))
+                dropped=$((dropped + drop_n))
+              else
+                git rebase --abort
+                echo "::warning::Rebase conflict on ${branch} (PR #${pr_number}) — skipping"
+                ((++failed))
+              fi
             else
-              git rebase --abort
-              echo "::warning::Rebase conflict on ${branch} (PR #${pr_number}) — skipping"
-              ((++failed))
+              if git rebase origin/master; then
+                git push origin "HEAD:${branch}" --force-with-lease
+                echo "✓ Rebased ${branch} onto master"
+                ((++rebased))
+              else
+                git rebase --abort
+                echo "::warning::Rebase conflict on ${branch} (PR #${pr_number}) — skipping"
+                ((++failed))
+              fi
             fi
 
             git checkout --detach origin/master
@@ -128,6 +197,7 @@ jobs:
 
           echo "## Rebase Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "- Rebased: ${rebased}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Orphaned commits dropped: ${dropped}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Skipped (stacked on another PR): ${stacked_count}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Skipped (up-to-date): ${skipped}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Conflicts: ${failed}" >> "$GITHUB_STEP_SUMMARY"

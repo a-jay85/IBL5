@@ -69,8 +69,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
             }
         }
 
-        $html = $this->renderTeamColorStyles($color1, $color2);
-        $html .= '<div class="schedule-container schedule-container--team">';
+        $html = '<div class="schedule-container schedule-container--team" style="--team-primary:#' . $color1 . ';--team-secondary:#' . $color2 . ';">';
         $html .= $this->renderTeamBanner($teamId, $teamName);
         $html .= $this->renderHeader($simLengthInDays, $firstUpcomingId);
         $html .= $this->renderMonthNav($gamesByMonth, $isPlayoffPhase, $playoffMonthKey);
@@ -79,17 +78,6 @@ class TeamScheduleView implements TeamScheduleViewInterface
         $html .= $this->renderScrollScripts($firstUpcomingId);
 
         return $html;
-    }
-
-    /**
-     * Render CSS custom properties for team colors
-     *
-     * Sets --team-primary and --team-secondary on the container element.
-     * The corresponding style rules are in design/components/existing-components.css.
-     */
-    private function renderTeamColorStyles(string $color1, string $color2): string
-    {
-        return '<style>.schedule-container--team{--team-primary:#' . $color1 . ';--team-secondary:#' . $color2 . ';}</style>';
     }
 
     /**

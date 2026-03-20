@@ -11,7 +11,7 @@ use Tests\Integration\Mocks\MockDatabaseResult;
 /**
  * Tests for MockDatabase::onQuery() pattern-based query routing.
  */
-class MockDatabaseQueryRoutingTest extends TestCase
+class MockDatabaseTest extends TestCase
 {
     private MockDatabase $mockDb;
 

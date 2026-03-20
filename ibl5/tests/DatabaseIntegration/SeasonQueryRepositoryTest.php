@@ -21,12 +21,6 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetSeasonPhaseReturnsString(): void
     {
-        // Ensure the setting exists (CI seed may not have it)
-        $this->db->query(
-            "INSERT INTO ibl_settings (name, value) VALUES ('Current Season Phase', 'Regular Season')
-             ON DUPLICATE KEY UPDATE value = value"
-        );
-
         $phase = $this->repo->getSeasonPhase();
 
         self::assertIsString($phase);
@@ -35,12 +29,6 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
 
     public function testGetSeasonEndingYearReturnsString(): void
     {
-        // Ensure the setting exists (CI seed may not have it)
-        $this->db->query(
-            "INSERT INTO ibl_settings (name, value) VALUES ('Current Season Ending Year', '2099')
-             ON DUPLICATE KEY UPDATE value = value"
-        );
-
         $year = $this->repo->getSeasonEndingYear();
 
         self::assertIsString($year);
@@ -52,10 +40,6 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
         // Use REPLACE to safely insert test settings (PK on name)
         $this->db->query(
             "REPLACE INTO ibl_settings (name, value) VALUES ('DB_IntTest_BulkSetting', 'test_value_42')"
-        );
-        $this->db->query(
-            "INSERT INTO ibl_settings (name, value) VALUES ('Current Season Phase', 'Regular Season')
-             ON DUPLICATE KEY UPDATE value = value"
         );
 
         $map = $this->repo->getBulkSettings(['DB_IntTest_BulkSetting', 'Current Season Phase']);

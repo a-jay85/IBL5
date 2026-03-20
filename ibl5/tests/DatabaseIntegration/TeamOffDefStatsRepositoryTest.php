@@ -38,13 +38,12 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
         $this->insertTeamBoxscoreRow('2099-01-15', 'Metros', 1, 2, 1);
     }
 
-    public function testGetAllTeamStatsReturnsRowsForAllRealTeams(): void
+    public function testGetAllTeamStatsReturns28Rows(): void
     {
         $stats = $this->repo->getAllTeamStats(2099);
 
         // LEFT JOIN ensures all real teams appear regardless of data
-        // Count varies: 28 in production, fewer in CI seed
-        self::assertNotEmpty($stats);
+        self::assertCount(28, $stats);
         foreach ($stats as $row) {
             self::assertGreaterThanOrEqual(1, $row['teamid']);
             self::assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $row['teamid']);

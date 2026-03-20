@@ -61,13 +61,16 @@ test.describe('Player stat view mobile smoke tests', () => {
       const url = `${PLAYER_BASE_URL}&${view.param}`;
       await gotoWithRetry(page, url);
 
+      const content = page.locator('.player-stats-card, h2, h3').first();
+
       if (view.dataDependentSkip) {
-        const content = page.locator('.ibl-data-table, .player-stats-card, h2, h3').first();
         const visible = await content.isVisible().catch(() => false);
         if (!visible) {
           test.skip(true, `player ${view.name} rendered no content (seed data)`);
         }
       }
+
+      await expect(content).toBeVisible();
 
       if (!('skipOverflow' in view)) {
         await assertNoHorizontalOverflow(page, `on player ${view.name}`);
@@ -112,14 +115,16 @@ test.describe('Team display mode mobile smoke tests', () => {
       const url = `${TEAM_BASE_URL}&${view.param}`;
       await gotoWithRetry(page, url);
 
+      const content = page.locator('.ibl-data-table, table, h2, h3').first();
+
       if (view.dataDependentSkip) {
-        const content = page.locator('.ibl-data-table, table, h2, h3').first();
         const visible = await content.isVisible().catch(() => false);
         if (!visible) {
           test.skip(true, `team ${view.name} rendered no content (seed data)`);
         }
       }
 
+      await expect(content).toBeVisible();
       await assertNoHorizontalOverflow(page, `on team ${view.name}`);
 
       if (view.hasWideTables) {

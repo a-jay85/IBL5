@@ -1,6 +1,7 @@
 ---
 name: phpunit-testing
 description: PHPUnit 13+ test writing with behavior-focused patterns and mock objects for IBL5. Use when writing tests, creating test files, or reviewing test quality.
+effort: low
 ---
 
 # IBL5 PHPUnit Testing

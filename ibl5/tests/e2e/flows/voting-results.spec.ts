@@ -1,47 +1,70 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
 
-// VotingResults — public page.
-test.use({ storageState: { cookies: [], origins: [] } });
+// VotingResults — authenticated (needs appState for phase control).
+// Serial mode: two describe blocks toggle the same setting.
+test.describe.configure({ mode: 'serial' });
 
-test.describe('Voting Results flow', () => {
-  test('page loads without PHP errors', async ({ page }) => {
+test.describe('Voting Results — Regular Season (ASG)', () => {
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Regular Season' });
     await gotoWithRetry(page, 'modules.php?name=VotingResults');
-    await assertNoPhpErrors(page, 'on VotingResults page');
   });
 
-  test('page displays title or content', async ({ page }) => {
-    await gotoWithRetry(page, 'modules.php?name=VotingResults');
-    // VotingResults may show results tables or a "no results" state
-    const body = await page.locator('body').textContent();
-    expect(body!.length).toBeGreaterThan(100);
+  test('shows ASG category tables', async ({ page }) => {
+    await expect(page.locator('.voting-results-table').first()).toBeVisible();
   });
 
-  test('voting results tables have expected structure when present', async ({ page }) => {
-    await gotoWithRetry(page, 'modules.php?name=VotingResults');
-    const tables = page.locator('.voting-results-table, .ibl-data-table');
-    const count = await tables.count();
-    if (count > 0) {
-      const firstTable = tables.first();
-      await expect(firstTable).toBeVisible();
-      // Each results table should have Player and Votes columns
-      const headerText = await firstTable.locator('thead').textContent();
-      expect(headerText).toContain('Player');
-    }
+  test('has at least 4 ASG category titles', async ({ page }) => {
+    const titles = page.locator('.ibl-title');
+    expect(await titles.count()).toBeGreaterThanOrEqual(4);
+
+    // Should contain Eastern/Western conference category names
+    const allText = await titles.allTextContents();
+    const joined = allText.join(' ');
+    expect(joined).toMatch(/Eastern|Western/i);
   });
 
-  test('player links work in results when present', async ({ page }) => {
-    await gotoWithRetry(page, 'modules.php?name=VotingResults');
-    const playerLinks = page.locator('.voting-results-table a[href*="pid="], .ibl-data-table a[href*="pid="]');
-    const count = await playerLinks.count();
-    if (count > 0) {
-      const href = await playerLinks.first().getAttribute('href');
-      expect(href).toContain('pid=');
-    }
+  test('tables have Player and Votes columns', async ({ page }) => {
+    const firstTable = page.locator('.voting-results-table').first();
+    const headers = firstTable.locator('thead th');
+    await expect(headers).toHaveCount(2);
+    await expect(headers.nth(0)).toContainText('Player');
+    await expect(headers.nth(1)).toContainText('Votes');
   });
 
-  test('no PHP errors on voting results', async ({ page }) => {
-    await assertNoPhpErrors(page, 'on VotingResults');
+  test('player cells have pid= links', async ({ page }) => {
+    await expect(
+      page.locator('.voting-results-table a[href*="pid="]').first()
+    ).toBeVisible();
+  });
+
+  test('no PHP errors', async ({ page }) => {
+    await assertNoPhpErrors(page, 'on VotingResults Regular Season');
+  });
+});
+
+test.describe('Voting Results — Off-Season (EOY)', () => {
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Off-Season' });
+    await gotoWithRetry(page, 'modules.php?name=VotingResults');
+  });
+
+  test('shows EOY award tables', async ({ page }) => {
+    const tables = page.locator('.voting-results-table');
+    expect(await tables.count()).toBeGreaterThanOrEqual(4);
+  });
+
+  test('EOY category titles include MVP and ROY', async ({ page }) => {
+    const titles = page.locator('.ibl-title');
+    const allText = await titles.allTextContents();
+    const joined = allText.join(' ');
+    expect(joined).toMatch(/Most Valuable Player/i);
+    expect(joined).toMatch(/Rookie of the Year/i);
+  });
+
+  test('no PHP errors', async ({ page }) => {
+    await assertNoPhpErrors(page, 'on VotingResults Off-Season');
   });
 });

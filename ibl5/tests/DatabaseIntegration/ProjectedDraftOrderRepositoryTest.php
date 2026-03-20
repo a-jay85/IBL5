@@ -46,7 +46,7 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getAllTeamsWithStandings();
 
-        self::assertNotEmpty($result);
+        self::assertCount(28, $result);
         $first = $result[0];
         self::assertArrayHasKey('tid', $first);
         self::assertArrayHasKey('team_name', $first);

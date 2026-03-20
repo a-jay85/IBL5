@@ -67,7 +67,7 @@ class FranchiseRecordBookRepositoryTest extends DatabaseTestCase
     {
         $result = $this->repo->getAllTeams();
 
-        self::assertNotEmpty($result);
+        self::assertCount(28, $result);
         foreach ($result as $team) {
             self::assertArrayHasKey('teamid', $team);
             self::assertGreaterThanOrEqual(1, $team['teamid']);

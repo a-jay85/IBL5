@@ -12,7 +12,7 @@
  */
 
 import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 
 // --- Argument parsing ---
 
@@ -238,8 +238,10 @@ function generateSectionMarkdown(label, report, screenshotsDir) {
       lines.push(`\`${test.errorMessage}\``);
 
       for (const screenshot of test.screenshots) {
+        // Use absolute paths so CML --publish can find files regardless of CWD
+        const absPath = resolve(screenshot);
         lines.push('');
-        lines.push(`![${test.title}](${screenshot})`);
+        lines.push(`![${test.title}](${absPath})`);
       }
 
       lines.push('');

@@ -1,6 +1,7 @@
 ---
 name: contract-rules
 description: IBL CBA salary cap rules including Bird Rights, veteran minimums, and maximum contracts. Use when working on extensions, free agency, negotiations, or salary calculations.
+effort: low
 ---
 
 # IBL Contract Rules (CBA)

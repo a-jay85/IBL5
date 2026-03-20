@@ -338,7 +338,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
 
             return 0;
         } catch (\Exception $e) {
-            // If there's an error, return 0 as a safe default
+            error_log('ExtensionProcessor::calculateMoneyCommittedAtPosition failed: ' . $e->getMessage());
             return 0;
         }
     }
@@ -379,7 +379,7 @@ class ExtensionProcessor implements ExtensionProcessorInterface
                 $stmt->close();
             }
         } catch (\Exception $e) {
-            // Log error if needed
+            error_log('ExtensionProcessor::getTeamTraditionData failed: ' . $e->getMessage());
         }
 
         return [

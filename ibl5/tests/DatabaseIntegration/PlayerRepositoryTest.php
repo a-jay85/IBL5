@@ -21,14 +21,20 @@ class PlayerRepositoryTest extends DatabaseTestCase
 
     public function testLoadByIdReturnsPlayerData(): void
     {
-        $player = $this->repo->loadByID(1);
+        $this->insertTestPlayer(200010002, 'PLR LoadTest', [
+            'age' => 25,
+            'pos' => 'SF',
+            'tid' => 1,
+        ]);
 
-        self::assertSame(1, $player->playerID);
-        self::assertSame('Test Player One', $player->name);
+        $player = $this->repo->loadByID(200010002);
+
+        self::assertSame(200010002, $player->playerID);
+        self::assertSame('PLR LoadTest', $player->name);
         self::assertSame(1, $player->teamID);
         self::assertSame('Metros', $player->teamName);
-        self::assertSame('PG', $player->position);
-        self::assertSame(27, $player->age);
+        self::assertSame('SF', $player->position);
+        self::assertSame(25, $player->age);
     }
 
     public function testLoadByIdThrowsForUnknownPlayer(): void
@@ -41,12 +47,17 @@ class PlayerRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayerStatsReturnsRowWithNativeTypes(): void
     {
-        $row = $this->repo->getPlayerStats(1);
+        $this->insertTestPlayer(200010003, 'PLR StatsTest', [
+            'tid' => 2,
+            'pos' => 'SG',
+        ]);
+
+        $row = $this->repo->getPlayerStats(200010003);
 
         self::assertNotNull($row);
-        self::assertSame(1, $row['pid']);
-        self::assertSame(1, $row['tid']);
-        self::assertSame('PG', $row['pos']);
+        self::assertSame(200010003, $row['pid']);
+        self::assertSame(2, $row['tid']);
+        self::assertSame('SG', $row['pos']);
     }
 
     public function testGetPlayerStatsReturnsNullForUnknownPlayer(): void
@@ -58,7 +69,9 @@ class PlayerRepositoryTest extends DatabaseTestCase
 
     public function testGetFreeAgencyDemandsReturnsZeroesWhenNoDemandRow(): void
     {
-        $demands = $this->repo->getFreeAgencyDemands(1);
+        $this->insertTestPlayer(200010004, 'PLR DemandTst');
+
+        $demands = $this->repo->getFreeAgencyDemands(200010004);
 
         self::assertSame(0, $demands['dem1']);
         self::assertSame(0, $demands['dem2']);
@@ -70,7 +83,9 @@ class PlayerRepositoryTest extends DatabaseTestCase
 
     public function testGetAwardsReturnsEmptyWhenNoAwards(): void
     {
-        $awards = $this->repo->getAwards('Test Player One');
+        $this->insertTestPlayer(200010005, 'PLR NoAwards');
+
+        $awards = $this->repo->getAwards('PLR NoAwards');
 
         self::assertSame([], $awards);
     }
@@ -80,13 +95,13 @@ class PlayerRepositoryTest extends DatabaseTestCase
         $this->insertRow('ibl_awards', [
             'year' => 2025,
             'Award' => 'MVP',
-            'name' => 'Test Player One',
+            'name' => 'PLR AwardTest',
         ]);
 
-        $awards = $this->repo->getAwards('Test Player One');
+        $awards = $this->repo->getAwards('PLR AwardTest');
 
         self::assertCount(1, $awards);
         self::assertSame('MVP', $awards[0]['Award']);
-        self::assertSame('Test Player One', $awards[0]['name']);
+        self::assertSame('PLR AwardTest', $awards[0]['name']);
     }
 }

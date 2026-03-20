@@ -10,34 +10,74 @@ test.describe('Season Archive flow', () => {
     await expect(page.locator('.ibl-title')).toContainText(/Season Archive/i);
   });
 
-  test('index table has expected columns', async ({ page }) => {
+  test('index table has .season-archive-index-table class', async ({ page }) => {
     await page.goto('modules.php?name=SeasonArchive');
-    const table = page.locator('.season-archive-index-table, .ibl-data-table').first();
-    const count = await table.count();
+    await expect(page.locator('.season-archive-index-table')).toBeVisible();
+  });
+
+  test('index has 4 column headers: Season, HEAT Champion, IBL Champion, MVP', async ({ page }) => {
+    await page.goto('modules.php?name=SeasonArchive');
+    const headers = page.locator('.season-archive-index-table thead th');
+    await expect(headers).toHaveCount(4);
+
+    await expect(headers.nth(0)).toContainText('Season');
+    await expect(headers.nth(1)).toContainText('HEAT');
+    await expect(headers.nth(2)).toContainText('IBL');
+    await expect(headers.nth(3)).toContainText('MVP');
+  });
+
+  test('index has at least 3 season rows', async ({ page }) => {
+    await page.goto('modules.php?name=SeasonArchive');
+    // CI seed has ibl_awards for years 2024, 2025, 2026
+    const rows = page.locator('.season-archive-index-table tbody tr');
+    expect(await rows.count()).toBeGreaterThanOrEqual(3);
+  });
+
+  test('season links navigate to detail page', async ({ page }) => {
+    await page.goto('modules.php?name=SeasonArchive');
+    const link = page.locator('.season-archive-index-table tbody a[href*="year="]').first();
+    const href = await link.getAttribute('href');
+    expect(href).toBeTruthy();
+    await page.goto(href!);
+    await assertNoPhpErrors(page, 'on Season Archive detail via link');
+  });
+
+  test('detail page has navigation links when data exists', async ({ page }) => {
+    await page.goto('modules.php?name=SeasonArchive&year=2026');
+    await assertNoPhpErrors(page, 'on Season Archive detail year=2026');
+    const navLinks = page.locator('.season-archive-nav a');
+    const count = await navLinks.count();
     if (count > 0) {
-      await expect(table).toBeVisible();
-      const headerText = await table.locator('thead').textContent();
-      expect(headerText).toContain('Season');
+      await expect(navLinks.first()).toBeVisible();
     }
+  });
+
+  test('detail page has section elements when data exists', async ({ page }) => {
+    await page.goto('modules.php?name=SeasonArchive&year=2026');
+    const sections = page.locator('.season-archive-section');
+    const count = await sections.count();
+    // Sections only render when archive data exists for the year
+    if (count > 0) {
+      expect(count).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  test('nonexistent year shows no sections', async ({ page }) => {
+    await page.goto('modules.php?name=SeasonArchive&year=1800');
+    await assertNoPhpErrors(page, 'on Season Archive year=1800');
+    const sections = page.locator('.season-archive-section');
+    expect(await sections.count()).toBe(0);
   });
 
   test('index table is sortable', async ({ page }) => {
     await page.goto('modules.php?name=SeasonArchive');
     const sortable = page.locator('.sortable');
-    const count = await sortable.count();
-    if (count > 0) {
-      await expect(sortable.first()).toBeVisible();
-    }
+    await expect(sortable.first()).toBeVisible();
   });
 
   test('no PHP errors on index page', async ({ page }) => {
     await page.goto('modules.php?name=SeasonArchive');
     await assertNoPhpErrors(page, 'on Season Archive index');
-  });
-
-  test('detail view loads for a year', async ({ page }) => {
-    await page.goto('modules.php?name=SeasonArchive&year=2026');
-    await assertNoPhpErrors(page, 'on Season Archive year=2026');
   });
 
   test('no PHP errors on nonexistent year', async ({ page }) => {

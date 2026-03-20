@@ -14,25 +14,60 @@ test.describe('Franchise History flow', () => {
   });
 
   test('franchise table is visible with expected columns', async ({ page }) => {
-    const table = page.locator('.ibl-data-table, .sticky-table').first();
+    const table = page.locator('.sticky-table').first();
     await expect(table).toBeVisible();
 
     const headerText = await table.locator('thead').textContent();
     expect(headerText).toContain('Team');
   });
 
-  test('team rows have data-team-id attributes', async ({ page }) => {
-    const teamRows = page.locator('tr[data-team-id]');
-    const count = await teamRows.count();
-    expect(count).toBeGreaterThanOrEqual(1);
+  test('all 10+ column headers present with key headers', async ({ page }) => {
+    const headers = page.locator('.sticky-table thead th');
+    expect(await headers.count()).toBeGreaterThanOrEqual(10);
+
+    const headerTexts = await headers.allTextContents();
+    const joined = headerTexts.join(' ');
+    expect(joined).toContain('Team');
+    // textContent() strips internal whitespace, so match without spaces
+    expect(joined).toMatch(/All-Time\s*Record/);
+    expect(joined).toMatch(/IBL\s*Titles/);
   });
 
-  test('sticky scroll wrapper exists for wide table', async ({ page }) => {
-    const wrapper = page.locator('.sticky-scroll-wrapper');
-    const count = await wrapper.count();
-    if (count > 0) {
-      await expect(wrapper.first()).toBeVisible();
+  test('sticky corner cell has correct classes', async ({ page }) => {
+    await expect(page.locator('thead th.sticky-col.sticky-corner')).toBeVisible();
+  });
+
+  test('has at least 28 team rows', async ({ page }) => {
+    const teamRows = page.locator('tr[data-team-id]');
+    expect(await teamRows.count()).toBeGreaterThanOrEqual(28);
+  });
+
+  test('record cells match wins-losses format', async ({ page }) => {
+    const firstRow = page.locator('tr[data-team-id]').first();
+    // All-Time Record is the 2nd column (index 1)
+    const recordCell = firstRow.locator('td').nth(1);
+    const text = (await recordCell.textContent())!.trim();
+    expect(text).toMatch(/\d+-\d+/);
+  });
+
+  test('championship columns have numeric values', async ({ page }) => {
+    const firstRow = page.locator('tr[data-team-id]').first();
+    // Last 4 columns are championship-related counts
+    const cells = firstRow.locator('td');
+    const count = await cells.count();
+    for (let i = count - 4; i < count; i++) {
+      const text = (await cells.nth(i).textContent())!.trim();
+      expect(text).toMatch(/^\d+$/);
     }
+  });
+
+  test('team cells link to Team module', async ({ page }) => {
+    const firstRowLink = page.locator('tr[data-team-id] a[href*="name=Team"]').first();
+    await expect(firstRowLink).toBeVisible();
+  });
+
+  test('sticky scroll wrapper is visible', async ({ page }) => {
+    await expect(page.locator('.sticky-scroll-wrapper').first()).toBeVisible();
   });
 
   test('table is sortable', async ({ page }) => {

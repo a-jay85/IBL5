@@ -3,12 +3,32 @@ set -e
 
 # Sync all local tracking branches with their origin counterparts.
 #
+# Safety: stashes any uncommitted changes before syncing, then restores
+# them afterward so local work is never lost.
+#
 # For each branch:
-#   - No dirty working tree → hard reset to origin
-#   - Dirty working tree (current branch only) → stash, reset, pop
-#   - Skips branches with no origin counterpart
+#   - Hard reset to origin (non-current branches via branch -f)
+#   - Current branch via reset --hard
+#   - Skips branches with no origin counterpart or checked out in a worktree
 
 CURRENT=$(git branch --show-current)
+
+# Stash uncommitted changes upfront so they survive the reset
+STASHED=0
+if ! git diff --quiet HEAD 2>/dev/null || ! git diff --cached --quiet HEAD 2>/dev/null; then
+    echo "Stashing uncommitted changes..."
+    git stash push -q -m "syncBranches: auto-stash before sync"
+    STASHED=1
+fi
+
+# Restore stash on exit (normal or error) so changes are never stranded
+restore_stash() {
+    if [[ "$STASHED" -eq 1 ]]; then
+        echo "Restoring stashed changes..."
+        git stash pop -q
+    fi
+}
+trap restore_stash EXIT
 
 echo "Fetching origin..."
 git fetch origin -q --prune
@@ -21,11 +41,6 @@ WORKTREE_BRANCHES=$(git worktree list --porcelain | grep '^branch ' | sed 's|^br
 
 is_in_worktree() {
     echo "$WORKTREE_BRANCHES" | grep -qx "$1"
-}
-
-# Check if current working tree is dirty
-is_dirty() {
-    ! git diff --quiet HEAD 2>/dev/null || ! git diff --cached --quiet HEAD 2>/dev/null
 }
 
 # Iterate local branches that have an origin tracking branch
@@ -53,17 +68,9 @@ while IFS= read -r branch; do
     fi
 
     if [[ "$branch" == "$CURRENT" ]]; then
-        if is_dirty; then
-            echo "  stash + reset $branch"
-            git stash push -q
-            git reset --hard "$remote_ref" -q
-            git stash pop -q
-            ((SYNCED++))
-        else
-            git reset --hard "$remote_ref" -q
-            echo "  reset   $branch"
-            ((SYNCED++))
-        fi
+        git reset --hard "$remote_ref" -q
+        echo "  reset   $branch"
+        ((SYNCED++))
     else
         git branch -f "$branch" "$remote_ref"
         echo "  reset   $branch"

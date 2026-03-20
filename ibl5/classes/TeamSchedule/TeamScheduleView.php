@@ -276,7 +276,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
             $html .= ' <span class="schedule-game__record">(' . $safeVisitorRecord . ')</span>';
         }
         $html .= '</span></a>';
-        $html .= '<a href="' . $visitorUrl . '" class="schedule-game__logo-link">';
+        $html .= '<a href="' . $visitorUrl . '" class="schedule-game__logo-link" aria-label="' . $safeVisitorName . '">';
         $html .= '<img class="schedule-game__logo" src="images/logo/new' . $visitorTeamId . '.png" alt="" width="25" height="25" loading="lazy">';
         $html .= '</a>';
 
@@ -298,7 +298,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
         // Home logo + team (same as League Schedule)
         $safeHomeName = HtmlSanitizer::safeHtmlOutput($homeName);
         $safeHomeRecord = HtmlSanitizer::safeHtmlOutput($homeRecord);
-        $html .= '<a href="' . $homeUrl . '" class="schedule-game__logo-link">';
+        $html .= '<a href="' . $homeUrl . '" class="schedule-game__logo-link" aria-label="' . $safeHomeName . '">';
         $html .= '<img class="schedule-game__logo" src="images/logo/new' . $homeTeamId . '.png" alt="" width="25" height="25" loading="lazy">';
         $html .= '</a>';
         $html .= '<a href="' . $homeUrl . '" class="schedule-game__team-link">';

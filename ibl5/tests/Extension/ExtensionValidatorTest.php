@@ -19,7 +19,7 @@ use Services\CommonContractValidator;
  * - Raise percentage validation (Bird vs non-Bird)
  * - Salary decrease validation
  */
-class ExtensionValidationTest extends TestCase
+class ExtensionValidatorTest extends TestCase
 {
     private ExtensionValidator $extensionValidator;
     private CommonContractValidator $contractValidator;

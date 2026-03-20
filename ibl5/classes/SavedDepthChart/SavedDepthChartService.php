@@ -41,54 +41,63 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
     ): int {
         $snapshots = $this->buildAllSnapshots($rosterPlayers, $postData);
 
-        if ($loadedDcId > 0) {
-            $existingDc = $this->repository->getSavedDepthChartById($loadedDcId, $tid);
-            if ($existingDc !== null) {
-                $this->repository->updateDepthChartPlayers($loadedDcId, $snapshots);
+        $this->db->begin_transaction();
+        try {
+            if ($loadedDcId > 0) {
+                $existingDc = $this->repository->getSavedDepthChartById($loadedDcId, $tid);
+                if ($existingDc !== null) {
+                    $this->repository->updateDepthChartPlayers($loadedDcId, $snapshots);
 
-                $this->repository->deactivateOthersForTeam($tid, $loadedDcId, $season->lastSimEndDate, $season->lastSimNumber);
-                if ($existingDc['is_active'] === 0) {
-                    $this->repository->reactivate($loadedDcId, $tid);
+                    $this->repository->deactivateOthersForTeam($tid, $loadedDcId, $season->lastSimEndDate, $season->lastSimNumber);
+                    if ($existingDc['is_active'] === 0) {
+                        $this->repository->reactivate($loadedDcId, $tid);
+                    }
+
+                    $this->db->commit();
+                    return $loadedDcId;
+                }
+            }
+
+            // Check if most recent DC is unused (no sim has consumed it yet)
+            $mostRecent = $this->repository->getMostRecentDepthChart($tid);
+            if ($mostRecent !== null && $mostRecent['sim_end_date'] === null) {
+                // Unused DC exists — update it instead of creating a new one
+                $this->repository->updateDepthChartPlayers($mostRecent['id'], $snapshots);
+
+                // Ensure it's the only active DC
+                $this->repository->deactivateOthersForTeam($tid, $mostRecent['id'], $season->lastSimEndDate, $season->lastSimNumber);
+                if ($mostRecent['is_active'] === 0) {
+                    $this->repository->reactivate($mostRecent['id'], $tid);
                 }
 
-                return $loadedDcId;
-            }
-        }
-
-        // Check if most recent DC is unused (no sim has consumed it yet)
-        $mostRecent = $this->repository->getMostRecentDepthChart($tid);
-        if ($mostRecent !== null && $mostRecent['sim_end_date'] === null) {
-            // Unused DC exists — update it instead of creating a new one
-            $this->repository->updateDepthChartPlayers($mostRecent['id'], $snapshots);
-
-            // Ensure it's the only active DC
-            $this->repository->deactivateOthersForTeam($tid, $mostRecent['id'], $season->lastSimEndDate, $season->lastSimNumber);
-            if ($mostRecent['is_active'] === 0) {
-                $this->repository->reactivate($mostRecent['id'], $tid);
+                $this->db->commit();
+                return $mostRecent['id'];
             }
 
-            return $mostRecent['id'];
+            // No unused DC — create new one
+            $this->repository->deactivateForTeam($tid, $season->lastSimEndDate, $season->lastSimNumber);
+
+            $simStartDate = $this->calculateNextSimStartDate($season->lastSimEndDate);
+            $simNumberStart = $season->lastSimNumber + 1;
+
+            $dcId = $this->repository->createSavedDepthChart(
+                $tid,
+                $username,
+                $name,
+                $season->phase,
+                $season->endingYear,
+                $simStartDate,
+                $simNumberStart
+            );
+
+            $this->repository->saveDepthChartPlayers($dcId, $snapshots);
+
+            $this->db->commit();
+            return $dcId;
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
         }
-
-        // No unused DC — create new one
-        $this->repository->deactivateForTeam($tid, $season->lastSimEndDate, $season->lastSimNumber);
-
-        $simStartDate = $this->calculateNextSimStartDate($season->lastSimEndDate);
-        $simNumberStart = $season->lastSimNumber + 1;
-
-        $dcId = $this->repository->createSavedDepthChart(
-            $tid,
-            $username,
-            $name,
-            $season->phase,
-            $season->endingYear,
-            $simStartDate,
-            $simNumberStart
-        );
-
-        $this->repository->saveDepthChartPlayers($dcId, $snapshots);
-
-        return $dcId;
     }
 
     /**

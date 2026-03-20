@@ -161,7 +161,7 @@ class WaiversController implements WaiversControllerInterface
         $this->createWaiverNewsStory($teamName, $player['name'], 'waive', '');
 
         // Send Discord notification
-        $hometext = "The " . $teamName . " cut " . $player['name'] . " to waivers.";
+        $hometext = "The " . \Utilities\HtmlSanitizer::e($teamName) . " cut " . \Utilities\HtmlSanitizer::e($player['name']) . " to waivers.";
         \Discord::postToChannel('#waiver-wire', $hometext);
 
         return ['success' => true, 'result' => 'player_dropped'];
@@ -204,8 +204,8 @@ class WaiversController implements WaiversControllerInterface
         $this->createWaiverNewsStory($teamName, $player['name'], 'add', $salaryStr);
 
         // Send email notification
-        $storytitle = $teamName . " make waiver additions";
-        $hometext = "The " . $teamName . " sign " . $player['name'] . " from waivers for " . $salaryStr . ".";
+        $storytitle = \Utilities\HtmlSanitizer::e($teamName) . " make waiver additions";
+        $hometext = "The " . \Utilities\HtmlSanitizer::e($teamName) . " sign " . \Utilities\HtmlSanitizer::e($player['name']) . " from waivers for " . \Utilities\HtmlSanitizer::e($salaryStr) . ".";
         \Mail\MailService::fromConfig()->send(self::NOTIFICATION_EMAIL_RECIPIENT, $storytitle, $hometext, self::NOTIFICATION_EMAIL_SENDER);
 
         // Send Discord notification
@@ -220,12 +220,12 @@ class WaiversController implements WaiversControllerInterface
         
         if ($action === 'waive') {
             $topicID = 32;
-            $storytitle = $teamName . " make waiver cuts";
-            $hometext = "The " . $teamName . " cut " . $playerName . " to waivers.";
+            $storytitle = \Utilities\HtmlSanitizer::e($teamName) . " make waiver cuts";
+            $hometext = "The " . \Utilities\HtmlSanitizer::e($teamName) . " cut " . \Utilities\HtmlSanitizer::e($playerName) . " to waivers.";
         } else {
             $topicID = 33;
-            $storytitle = $teamName . " make waiver additions";
-            $hometext = "The " . $teamName . " sign " . $playerName . " from waivers for " . $contract . ".";
+            $storytitle = \Utilities\HtmlSanitizer::e($teamName) . " make waiver additions";
+            $hometext = "The " . \Utilities\HtmlSanitizer::e($teamName) . " sign " . \Utilities\HtmlSanitizer::e($playerName) . " from waivers for " . \Utilities\HtmlSanitizer::e($contract) . ".";
         }
         
         $categoryID = $this->newsService->getCategoryIDByTitle(self::WAIVER_POOL_MOVES_CATEGORY);

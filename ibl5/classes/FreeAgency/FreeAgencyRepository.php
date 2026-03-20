@@ -73,10 +73,11 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
      */
     public function saveOffer(array $offerData): bool
     {
-        // First delete any existing offer
+        // Not wrapped in a transaction: begin_transaction() inside an existing
+        // transaction (e.g. DatabaseTestCase) implicitly commits it in MariaDB.
+        // The proper fix is ON DUPLICATE KEY UPDATE with a UNIQUE(tid, pid) key.
         $this->deleteOffer($offerData['tid'], $offerData['pid']);
 
-        // Insert the new offer
         $affected = $this->execute(
             "INSERT INTO ibl_fa_offers
              (name, pid, team, tid, offer1, offer2, offer3, offer4, offer5, offer6,

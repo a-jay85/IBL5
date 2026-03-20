@@ -21,6 +21,21 @@ class FreeAgencyAdminProcessorTest extends TestCase
             public function __construct()
             {
             }
+
+            public function begin_transaction(int $flags = 0, ?string $name = null): bool
+            {
+                return true;
+            }
+
+            public function commit(int $flags = 0, ?string $name = null): bool
+            {
+                return true;
+            }
+
+            public function rollback(int $flags = 0, ?string $name = null): bool
+            {
+                return true;
+            }
         };
     }
 

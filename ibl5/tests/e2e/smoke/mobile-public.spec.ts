@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
-import { assertNoHorizontalOverflow, assertScrollWrappersPresent } from '../helpers/mobile';
+import { assertNoHorizontalOverflow, assertScrollWrappersPresent, assertScrollContainerIsScrollable } from '../helpers/mobile';
 
 // Mobile smoke tests for public pages — 375x812 viewport (iPhone SE).
 test.use({ viewport: { width: 375, height: 812 } });
@@ -119,6 +119,18 @@ test.describe('Mobile public page smoke tests', () => {
     await assertNoHorizontalOverflow(page, 'on season archive year detail');
   });
 
+  test('registration form — no horizontal overflow on mobile', async ({ page }) => {
+    await gotoWithRetry(page, 'modules.php?name=YourAccount&op=new_user');
+    await expect(page.locator('#register-username')).toBeVisible();
+    await assertNoHorizontalOverflow(page, 'on registration form');
+  });
+
+  test('forgot password form — no horizontal overflow on mobile', async ({ page }) => {
+    await gotoWithRetry(page, 'modules.php?name=YourAccount&op=pass_lost');
+    await expect(page.locator('#reset-email')).toBeVisible();
+    await assertNoHorizontalOverflow(page, 'on forgot password form');
+  });
+
   test('no PHP errors on mobile public pages', async ({ page }) => {
     test.setTimeout(120_000);
     const urls = [
@@ -128,10 +140,78 @@ test.describe('Mobile public page smoke tests', () => {
       'modules.php?name=DraftHistory&teamID=1',
       'modules.php?name=FranchiseRecordBook&teamid=1',
       'modules.php?name=SeasonArchive&year=2026',
+      'modules.php?name=YourAccount&op=new_user',
+      'modules.php?name=YourAccount&op=pass_lost',
     ];
     for (const url of urls) {
       await gotoWithRetry(page, url);
       await assertNoPhpErrors(page, `on ${url} (mobile)`);
     }
+  });
+});
+
+test.describe('Responsive scroll container tests', () => {
+  test.beforeEach(async ({ appState }) => {
+    await appState({ 'Trivia Mode': 'Off' });
+  });
+
+  test('standings — scroll container is scrollable on mobile', async ({ page }) => {
+    test.setTimeout(60_000);
+    await gotoWithRetry(page, 'modules.php?name=Standings');
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await assertScrollContainerIsScrollable(page, page.locator('.table-scroll-container').first(), 'on standings');
+  });
+
+  test('season leaderboards — scroll container is scrollable on mobile', async ({ page }) => {
+    test.setTimeout(60_000);
+    await gotoWithRetry(page, 'modules.php?name=SeasonLeaderboards');
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await assertScrollContainerIsScrollable(page, page.locator('.table-scroll-container').first(), 'on season leaderboards');
+  });
+
+  test('contract list — scroll container is scrollable on mobile', async ({ page }) => {
+    test.setTimeout(60_000);
+    await gotoWithRetry(page, 'modules.php?name=ContractList');
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await assertScrollContainerIsScrollable(page, page.locator('.table-scroll-container').first(), 'on contract list');
+  });
+
+  test('standings — sticky column stays visible after scroll', async ({ page }) => {
+    test.setTimeout(60_000);
+    await gotoWithRetry(page, 'modules.php?name=Standings');
+    await expect(page.locator('.table-scroll-container tbody td.sticky-col').first())
+      .toBeAttached({ timeout: 10_000 });
+    const result = await page.locator('.table-scroll-container').first().evaluate((el: Element) => {
+      const c = el as HTMLElement;
+      c.scrollLeft = c.scrollWidth;
+      const cell = c.querySelector('tbody td.sticky-col');
+      const nextCell = cell?.nextElementSibling;
+      if (!cell || !nextCell) return null;
+      return {
+        stickyLeft: cell.getBoundingClientRect().left,
+        nextLeft: nextCell.getBoundingClientRect().left,
+      };
+    });
+    expect(result).not.toBeNull();
+    expect(result!.stickyLeft, 'sticky column scrolled out of viewport').toBeGreaterThanOrEqual(0);
+  });
+
+  test('season leaderboards — scroll shadow indicator present on load', async ({ page }) => {
+    test.setTimeout(60_000);
+    await gotoWithRetry(page, 'modules.php?name=SeasonLeaderboards');
+    await expect(page.locator('.table-scroll-wrapper').first()).toBeAttached();
+    await expect(page.locator('.table-scroll-wrapper').first()).not.toHaveClass(/scrolled-end/);
+  });
+
+  test('season leaderboards — scroll shadow disappears after scrolling to end', async ({ page }) => {
+    test.setTimeout(60_000);
+    await gotoWithRetry(page, 'modules.php?name=SeasonLeaderboards');
+    await expect(page.locator('.table-scroll-container').first()).toBeAttached();
+    await page.locator('.table-scroll-container').first().evaluate((el: Element) => {
+      const container = el as HTMLElement;
+      container.scrollLeft = container.scrollWidth;
+      el.dispatchEvent(new Event('scroll'));
+    });
+    await expect(page.locator('.table-scroll-wrapper').first()).toHaveClass(/scrolled-end/);
   });
 });

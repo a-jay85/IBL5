@@ -13,30 +13,44 @@ test.describe('Free Agency Preview flow', () => {
     await expect(page.locator('.ibl-title')).toContainText(/Free Agent Preview/i);
   });
 
-  test('preview table is visible with expected columns', async ({ page }) => {
-    const table = page.locator('.ibl-data-table, .sticky-table').first();
-    await expect(table).toBeVisible();
+  test('sticky-scroll-wrapper contains sticky-table', async ({ page }) => {
+    await expect(
+      page.locator('.sticky-scroll-wrapper .sticky-scroll-container .sticky-table')
+    ).toBeVisible();
+  });
 
-    const headerText = await table.locator('thead').textContent();
-    expect(headerText).toContain('Player');
-    expect(headerText).toContain('Team');
-    expect(headerText).toContain('Pos');
+  test('Player column header is sticky-corner', async ({ page }) => {
+    const cornerHeader = page.locator('thead th.sticky-col.sticky-corner');
+    await expect(cornerHeader).toBeVisible();
+    await expect(cornerHeader).toContainText('Player');
+  });
+
+  test('table has at least 20 column headers', async ({ page }) => {
+    const headers = page.locator('.sticky-table thead th');
+    expect(await headers.count()).toBeGreaterThanOrEqual(20);
+  });
+
+  test('at least 3 player rows present', async ({ page }) => {
+    // CI seed has 3 players with expiring contracts (pid=10,11,12)
+    const rows = page.locator('.sticky-table tbody tr[data-team-id]');
+    expect(await rows.count()).toBeGreaterThanOrEqual(3);
+  });
+
+  test('position cells contain basketball positions', async ({ page }) => {
+    const firstPosCell = page.locator('tbody tr[data-team-id]').first().locator('td.fa-preview-pos-col');
+    const posCount = await firstPosCell.count();
+    if (posCount > 0) {
+      const text = (await firstPosCell.textContent())!.trim();
+      expect(text).toMatch(/^(PG|SG|SF|PF|C)$/);
+    }
   });
 
   test('player links point to player pages', async ({ page }) => {
-    const playerLinks = page.locator('.ibl-data-table a[href*="pid="], .sticky-table a[href*="pid="]');
+    const playerLinks = page.locator('.sticky-table a[href*="pid="]');
     const count = await playerLinks.count();
     if (count > 0) {
       const href = await playerLinks.first().getAttribute('href');
       expect(href).toContain('name=Player');
-    }
-  });
-
-  test('sticky scroll wrapper exists for wide table', async ({ page }) => {
-    const wrapper = page.locator('.sticky-scroll-wrapper');
-    const count = await wrapper.count();
-    if (count > 0) {
-      await expect(wrapper.first()).toBeVisible();
     }
   });
 

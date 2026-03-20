@@ -1109,6 +1109,44 @@ INSERT IGNORE INTO nuke_stats_hour (year, month, date, hour, hits) VALUES
   (2026, 1, 10, 14, 75);
 
 -- ============================================================
+-- Voting Results test data (ASG and EOY ballots)
+-- Vote names use "Player Name, Team" format matching extractPlayerName().
+-- Player names match ibl_plr.name so PIDs resolve and player links render.
+-- ============================================================
+-- ASG table has no PK/UNIQUE — delete first for idempotency on re-runs
+DELETE FROM ibl_votes_ASG WHERE teamid IN (1, 2);
+INSERT INTO ibl_votes_ASG (teamid, team_city, team_name, East_F1, East_F2, East_B1, East_B2, West_F1, West_F2, West_B1, West_B2) VALUES
+  (1, 'Test', 'Metros', 'Test Player, Metros', 'Test Player Two, Metros', 'Stars Guard, Stars', 'FA Guard, Metros',
+   'FA Forward, Stars', 'FA Center, Stars', 'Test Player, Metros', 'Stars Guard, Stars'),
+  (2, 'Test', 'Stars', 'Test Player, Metros', 'Stars Guard, Stars', 'Test Player Two, Metros', 'FA Guard, Metros',
+   'FA Forward, Stars', 'Test Player, Metros', 'FA Center, Stars', 'Stars Guard, Stars');
+
+INSERT INTO ibl_votes_EOY (teamid, team_city, team_name, MVP_1, MVP_2, MVP_3, Six_1, Six_2, Six_3, ROY_1, ROY_2, ROY_3, GM_1, GM_2, GM_3) VALUES
+  (1, 'Test', 'Metros', 'Test Player, Metros', 'Stars Guard, Stars', 'Test Player Two, Metros',
+   'FA Guard, Metros', 'FA Forward, Stars', 'Test Player Two, Metros',
+   'Rookie Guard, Diesels', 'Rookie Wing, Pioneers', 'Rookie Big, Blues',
+   'TestUser', 'Stars GM', 'Blues GM'),
+  (2, 'Test', 'Stars', 'Stars Guard, Stars', 'Test Player, Metros', 'FA Forward, Stars',
+   'FA Guard, Metros', 'Stars Guard, Stars', 'Test Player Two, Metros',
+   'Rookie Guard, Diesels', 'Rookie Big, Blues', 'Rookie Wing, Pioneers',
+   'Stars GM', 'TestUser', 'Blues GM')
+ON DUPLICATE KEY UPDATE
+  team_city = VALUES(team_city),
+  team_name = VALUES(team_name),
+  MVP_1 = VALUES(MVP_1),
+  MVP_2 = VALUES(MVP_2),
+  MVP_3 = VALUES(MVP_3),
+  Six_1 = VALUES(Six_1),
+  Six_2 = VALUES(Six_2),
+  Six_3 = VALUES(Six_3),
+  ROY_1 = VALUES(ROY_1),
+  ROY_2 = VALUES(ROY_2),
+  ROY_3 = VALUES(ROY_3),
+  GM_1 = VALUES(GM_1),
+  GM_2 = VALUES(GM_2),
+  GM_3 = VALUES(GM_3);
+
+-- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the
 -- workflow via PHP bcrypt hash at runtime — not seeded here.
 -- ============================================================

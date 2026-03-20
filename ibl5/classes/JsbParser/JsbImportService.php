@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JsbParser;
 
+use JsbParser\Contracts\JsbImportRepositoryInterface;
 use JsbParser\Contracts\JsbImportServiceInterface;
 
 /**
@@ -14,7 +15,7 @@ use JsbParser\Contracts\JsbImportServiceInterface;
  */
 class JsbImportService implements JsbImportServiceInterface
 {
-    private JsbImportRepository $repository;
+    private JsbImportRepositoryInterface $repository;
     private PlayerIdResolver $resolver;
 
     /** @var int Auto-incrementing trade group ID for grouping trade items */
@@ -26,7 +27,7 @@ class JsbImportService implements JsbImportServiceInterface
      */
     private const AFFECTED_ROWS_INSERTED = 1;
 
-    public function __construct(JsbImportRepository $repository, PlayerIdResolver $resolver)
+    public function __construct(JsbImportRepositoryInterface $repository, PlayerIdResolver $resolver)
     {
         $this->repository = $repository;
         $this->resolver = $resolver;

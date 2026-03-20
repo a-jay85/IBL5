@@ -82,4 +82,19 @@ interface JsbImportRepositoryInterface
      * @return int Affected rows (1=inserted, 2=updated, 0=unchanged)
      */
     public function upsertRcbSeasonRecord(array $record): int;
+
+    /**
+     * Get the maximum trade_group_id currently in the database.
+     *
+     * @return int Maximum trade_group_id, or 0 if no trades exist
+     */
+    public function fetchMaxTradeGroupId(): int;
+
+    /**
+     * Look up a player name by pid.
+     *
+     * @param int $pid Player ID
+     * @return string|null Player name, or null if not found
+     */
+    public function getPlayerName(int $pid): ?string;
 }

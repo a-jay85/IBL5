@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Api\Middleware;
 
+use Api\Middleware\Contracts\ClockInterface;
 use Api\Middleware\Contracts\RateLimiterInterface;
 use Api\Repository\RateLimitRepository;
 
@@ -17,10 +18,12 @@ class RateLimiter implements RateLimiterInterface
     ];
 
     private RateLimitRepository $repository;
+    private ClockInterface $clock;
 
-    public function __construct(RateLimitRepository $repository)
+    public function __construct(RateLimitRepository $repository, ?ClockInterface $clock = null)
     {
         $this->repository = $repository;
+        $this->clock = $clock ?? new SystemClock();
     }
 
     /**
@@ -54,7 +57,7 @@ class RateLimiter implements RateLimiterInterface
                 'Retry-After' => '60',
                 'X-RateLimit-Limit' => (string) $limit,
                 'X-RateLimit-Remaining' => '0',
-                'X-RateLimit-Reset' => (string) (time() + 60),
+                'X-RateLimit-Reset' => (string) ($this->clock->now() + 60),
             ];
         }
 

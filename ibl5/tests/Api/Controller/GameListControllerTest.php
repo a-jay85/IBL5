@@ -12,6 +12,7 @@ class GameListControllerTest extends IntegrationTestCase
 {
     public function testHandleCallsResponderWithGameData(): void
     {
+        $this->mockDb->onQuery('SELECT COUNT', [['total' => 1]]);
         $this->mockDb->setMockData([
             [
                 'game_uuid' => 'game-uuid-1',
@@ -35,7 +36,6 @@ class GameListControllerTest extends IntegrationTestCase
                 'home_score' => 142,
                 'created_at' => '2026-01-01 00:00:00',
                 'updated_at' => '2026-01-15 12:00:00',
-                'total' => 1, // Mock COUNT(*) result reuses same data
             ],
         ]);
 

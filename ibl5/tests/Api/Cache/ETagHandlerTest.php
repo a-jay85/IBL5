@@ -16,6 +16,11 @@ class ETagHandlerTest extends TestCase
         $this->handler = new ETagHandler();
     }
 
+    protected function tearDown(): void
+    {
+        unset($_SERVER['HTTP_IF_NONE_MATCH']);
+    }
+
     public function testGenerateReturnsQuotedMd5(): void
     {
         $etag = $this->handler->generate('2026-01-15 12:00:00');
@@ -95,8 +100,6 @@ class ETagHandlerTest extends TestCase
         $_SERVER['HTTP_IF_NONE_MATCH'] = '"abc123"';
 
         $this->assertTrue($this->handler->matches($etag));
-
-        unset($_SERVER['HTTP_IF_NONE_MATCH']);
     }
 
     public function testMatchesReturnsFalseWhenHeaderDiffers(): void
@@ -105,8 +108,6 @@ class ETagHandlerTest extends TestCase
         $_SERVER['HTTP_IF_NONE_MATCH'] = '"different"';
 
         $this->assertFalse($this->handler->matches($etag));
-
-        unset($_SERVER['HTTP_IF_NONE_MATCH']);
     }
 
     public function testMatchesReturnsFalseWhenNoHeader(): void

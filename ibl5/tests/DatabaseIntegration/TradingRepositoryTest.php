@@ -16,6 +16,9 @@ use Trading\TradingRepository;
  *
  * NOTE: playerExistsInTrade() also queries ibl_trade_players (non-existent). Not tested.
  *
+ * NOTE: updateDraftPickOwner() references non-existent columns (currentteam, pick) in
+ * ibl_draft_picks. The table has ownerofpick/owner_tid and year/round instead. Dead code.
+ *
  * IMPORTANT: testDeleteTradeOfferRemovesAllRelatedRows MUST be last in this file.
  * deleteTradeOffer() calls begin_transaction() internally, which implicitly commits
  * the outer DatabaseTestCase transaction. tearDown rollback becomes a no-op.
@@ -59,16 +62,16 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayersByIdsWithMultipleIds(): void
     {
-        $this->insertTestPlayer(200030001, 'Trade Batch P1', ['tid' => 1]);
-        $this->insertTestPlayer(200030002, 'Trade Batch P2', ['tid' => 2]);
+        $this->insertTestPlayer(200030101, 'Trade Batch P1', ['tid' => 1]);
+        $this->insertTestPlayer(200030102, 'Trade Batch P2', ['tid' => 2]);
 
-        $result = $this->repo->getPlayersByIds([200030001, 200030002]);
+        $result = $this->repo->getPlayersByIds([200030101, 200030102]);
 
         self::assertCount(2, $result);
-        self::assertArrayHasKey(200030001, $result);
-        self::assertArrayHasKey(200030002, $result);
-        self::assertSame('Trade Batch P1', $result[200030001]['name']);
-        self::assertSame('Trade Batch P2', $result[200030002]['name']);
+        self::assertArrayHasKey(200030101, $result);
+        self::assertArrayHasKey(200030102, $result);
+        self::assertSame('Trade Batch P1', $result[200030101]['name']);
+        self::assertSame('Trade Batch P2', $result[200030102]['name']);
     }
 
     public function testGetPlayersByIdsEmptyArrayReturnsEmpty(): void
@@ -115,14 +118,14 @@ class TradingRepositoryTest extends DatabaseTestCase
     public function testInsertTradeItemAndRetrieveByOfferId(): void
     {
         $offerId = $this->insertTradeOfferRow();
-        $this->insertTestPlayer(200030003, 'Trade Item Plr', ['tid' => 1]);
+        $this->insertTestPlayer(200030103, 'Trade Item Plr', ['tid' => 1]);
 
-        $this->repo->insertTradeItem($offerId, 200030003, TradeItemType::Player, 'Metros', 'Sharks', 'Metros');
+        $this->repo->insertTradeItem($offerId, 200030103, TradeItemType::Player, 'Metros', 'Sharks', 'Metros');
 
         $trades = $this->repo->getTradesByOfferId($offerId);
         self::assertCount(1, $trades);
         self::assertSame($offerId, $trades[0]['tradeofferid']);
-        self::assertSame(200030003, $trades[0]['itemid']);
+        self::assertSame(200030103, $trades[0]['itemid']);
         self::assertSame('1', $trades[0]['itemtype']);
         self::assertSame('Metros', $trades[0]['trade_from']);
         self::assertSame('Sharks', $trades[0]['trade_to']);
@@ -192,9 +195,9 @@ class TradingRepositoryTest extends DatabaseTestCase
         // First count existing players on tid=3
         $baseline = $this->repo->getTeamPlayerCount(3);
 
-        $this->insertTestPlayer(200030004, 'Trade Count P1', ['tid' => 3, 'ordinal' => 100]);
-        $this->insertTestPlayer(200030005, 'Trade Count P2', ['tid' => 3, 'ordinal' => 200]);
-        $this->insertTestPlayer(200030006, 'Trade Count P3', ['tid' => 3, 'ordinal' => 300]);
+        $this->insertTestPlayer(200030104, 'Trade Count P1', ['tid' => 3, 'ordinal' => 100]);
+        $this->insertTestPlayer(200030105, 'Trade Count P2', ['tid' => 3, 'ordinal' => 200]);
+        $this->insertTestPlayer(200030106, 'Trade Count P3', ['tid' => 3, 'ordinal' => 300]);
 
         $count = $this->repo->getTeamPlayerCount(3);
 
@@ -204,7 +207,7 @@ class TradingRepositoryTest extends DatabaseTestCase
     public function testGetTeamPlayerCountOffseasonExcludesExpired(): void
     {
         // Player with cy=1, cyt=1 — next year is cy+1=2, cy2=0 → expired
-        $this->insertTestPlayer(200030007, 'Trade Expired', [
+        $this->insertTestPlayer(200030107, 'Trade Expired', [
             'tid' => 4,
             'ordinal' => 100,
             'cy' => 1,
@@ -217,7 +220,7 @@ class TradingRepositoryTest extends DatabaseTestCase
 
         // The expired player should not be counted (cy2=0 means no salary next year)
         // Insert a non-expired player for comparison
-        $this->insertTestPlayer(200030008, 'Trade Active', [
+        $this->insertTestPlayer(200030108, 'Trade Active', [
             'tid' => 4,
             'ordinal' => 200,
             'cy' => 1,
@@ -249,12 +252,12 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testUpdatePlayerTeamAndVerify(): void
     {
-        $this->insertTestPlayer(200030009, 'Trade Update P', ['tid' => 1]);
+        $this->insertTestPlayer(200030109, 'Trade Update P', ['tid' => 1]);
 
-        $affected = $this->repo->updatePlayerTeam(200030009, 5);
+        $affected = $this->repo->updatePlayerTeam(200030109, 5);
         self::assertSame(1, $affected);
 
-        $player = $this->repo->getPlayerById(200030009);
+        $player = $this->repo->getPlayerById(200030109);
         self::assertNotNull($player);
         self::assertSame(5, $player['tid']);
     }
@@ -276,9 +279,9 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayerByIdReturnsRow(): void
     {
-        $this->insertTestPlayer(200030010, 'Trade Fetch P', ['tid' => 2]);
+        $this->insertTestPlayer(200030110, 'Trade Fetch P', ['tid' => 2]);
 
-        $player = $this->repo->getPlayerById(200030010);
+        $player = $this->repo->getPlayerById(200030110);
 
         self::assertNotNull($player);
         self::assertSame('Trade Fetch P', $player['name']);
@@ -299,9 +302,9 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayerForTradeValidationReturnsOrdinalAndCy(): void
     {
-        $this->insertTestPlayer(200030011, 'Trade Valid P', ['ordinal' => 150, 'cy' => 2]);
+        $this->insertTestPlayer(200030111, 'Trade Valid P', ['ordinal' => 150, 'cy' => 2]);
 
-        $result = $this->repo->getPlayerForTradeValidation(200030011);
+        $result = $this->repo->getPlayerForTradeValidation(200030111);
 
         self::assertNotNull($result);
         self::assertSame(150, $result['ordinal']);
@@ -312,8 +315,8 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testGetTeamPlayersForTradingExcludesPipeNames(): void
     {
-        $this->insertTestPlayer(200030012, 'Trade UI Plr', ['tid' => 5, 'ordinal' => 100]);
-        $this->insertTestPlayer(200030013, '|Cash Trade', ['tid' => 5, 'ordinal' => 200]);
+        $this->insertTestPlayer(200030112, 'Trade UI Plr', ['tid' => 5, 'ordinal' => 100]);
+        $this->insertTestPlayer(200030113, '|Cash Trade', ['tid' => 5, 'ordinal' => 200]);
 
         $players = $this->repo->getTeamPlayersForTrading(5);
 

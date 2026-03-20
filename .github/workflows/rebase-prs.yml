@@ -46,7 +46,7 @@ jobs:
             # Fetch the branch
             if ! git fetch origin "$branch"; then
               echo "::warning::Could not fetch branch ${branch}, skipping"
-              ((skipped++))
+              ((++skipped))
               echo "::endgroup::"
               continue
             fi
@@ -56,7 +56,7 @@ jobs:
             master_sha=$(git rev-parse origin/master)
             if [ "$merge_base" = "$master_sha" ]; then
               echo "Already up-to-date, skipping"
-              ((skipped++))
+              ((++skipped))
               echo "::endgroup::"
               continue
             fi
@@ -66,11 +66,11 @@ jobs:
             if git rebase origin/master; then
               git push origin "HEAD:${branch}" --force-with-lease
               echo "✓ Rebased ${branch} onto master — CI will trigger via pull_request: synchronize"
-              ((rebased++))
+              ((++rebased))
             else
               git rebase --abort
               echo "::warning::Rebase conflict on ${branch} (PR #${pr_number}) — skipping"
-              ((failed++))
+              ((++failed))
             fi
 
             git checkout --detach origin/master

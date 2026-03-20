@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace JsbParser;
 
+use JsbParser\Contracts\JsbExportRepositoryInterface;
 use JsbParser\Contracts\JsbExportServiceInterface;
 
 /**
@@ -14,7 +15,7 @@ use JsbParser\Contracts\JsbExportServiceInterface;
  */
 class JsbExportService implements JsbExportServiceInterface
 {
-    private JsbExportRepository $repository;
+    private JsbExportRepositoryInterface $repository;
 
     /**
      * Map of database field names to PlrFileWriter field names.
@@ -76,7 +77,7 @@ class JsbExportService implements JsbExportServiceInterface
         'Mavericks' => 28,
     ];
 
-    public function __construct(JsbExportRepository $repository)
+    public function __construct(JsbExportRepositoryInterface $repository)
     {
         $this->repository = $repository;
     }

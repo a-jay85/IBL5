@@ -12,6 +12,7 @@ class LeadersControllerTest extends IntegrationTestCase
 {
     public function testHandleCallsResponderWithLeaderData(): void
     {
+        $this->mockDb->onQuery('SELECT COUNT', [['total' => 1]]);
         $this->mockDb->setMockData([
             [
                 'player_uuid' => 'player-uuid-1',
@@ -42,7 +43,6 @@ class LeadersControllerTest extends IntegrationTestCase
                 'team' => 'Celtics',
                 'created_at' => '2025-01-01 00:00:00',
                 'updated_at' => '2026-01-15 12:00:00',
-                'total' => 1, // Mock COUNT(*) result reuses same data
             ],
         ]);
 

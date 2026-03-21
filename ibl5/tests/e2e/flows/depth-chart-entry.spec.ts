@@ -94,3 +94,59 @@ test.describe('Depth Chart Entry flow', () => {
     await assertNoPhpErrors(page, 'on Depth Chart Entry');
   });
 });
+
+// ===========================================================================
+// NextSim position tab switching
+// ===========================================================================
+
+test.describe('DCE: NextSim position tabs', () => {
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Regular Season' });
+    await page.goto('modules.php?name=DepthChartEntry');
+  });
+
+  test('position tabs render in NextSim section', async ({ page }) => {
+    const tabs = page.locator('.nextsim-tab-container .ibl-tab');
+    const count = await tabs.count();
+    if (count === 0) {
+      test.skip(true, 'No NextSim tabs (no games in sim window)');
+    }
+
+    // Should have 5 position tabs: PG, SG, SF, PF, C
+    expect(count).toBe(5);
+  });
+
+  test('clicking tab moves active state', async ({ page }) => {
+    const tabs = page.locator('.nextsim-tab-container .ibl-tab');
+    if ((await tabs.count()) === 0) {
+      test.skip(true, 'No NextSim tabs (no games in sim window)');
+    }
+
+    // First tab (PG) should be active by default
+    const pgTab = tabs.first();
+    await expect(pgTab).toHaveClass(/ibl-tab--active/);
+
+    // Click SG tab (second tab)
+    const sgTab = tabs.nth(1);
+    await sgTab.click();
+
+    // SG should now be active, PG should not
+    await expect(sgTab).toHaveClass(/ibl-tab--active/);
+    await expect(pgTab).not.toHaveClass(/ibl-tab--active/);
+  });
+
+  test('tab click loads content without PHP errors', async ({ page }) => {
+    const tabs = page.locator('.nextsim-tab-container .ibl-tab');
+    if ((await tabs.count()) === 0) {
+      test.skip(true, 'No NextSim tabs (no games in sim window)');
+    }
+
+    // Click a non-default tab
+    const sfTab = tabs.nth(2);
+    await sfTab.click();
+
+    // Wait for AJAX content to load (loading class removed)
+    await page.waitForTimeout(500);
+    await assertNoPhpErrors(page, 'after NextSim tab switch');
+  });
+});

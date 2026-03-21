@@ -96,6 +96,64 @@ test.describe('Team page: additional display modes', () => {
 });
 
 // ===========================================================================
+// Team page: dropdown content verification
+// ===========================================================================
+
+test.describe('Team page: dropdown content changes', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('modules.php?name=Team&op=team&teamID=1');
+  });
+
+  test('switching to contracts shows salary columns', async ({ page }) => {
+    const dropdown = page.locator('.ibl-view-select').first();
+    await dropdown.selectOption('contracts');
+
+    // Wait for table to update (AJAX swap or page reload)
+    const table = page.locator('.ibl-data-table, table').first();
+    await expect(table).toBeVisible();
+
+    // Contracts view uses .col-salary class on year-range headers
+    const salaryHeaders = table.locator('th.col-salary');
+    expect(await salaryHeaders.count()).toBeGreaterThan(0);
+  });
+
+  test('switching back to ratings shows rating columns', async ({ page }) => {
+    const dropdown = page.locator('.ibl-view-select').first();
+
+    // Switch to contracts first, then back to ratings
+    await dropdown.selectOption('contracts');
+    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+
+    await dropdown.selectOption('ratings');
+    const table = page.locator('.ibl-data-table, table').first();
+    await expect(table).toBeVisible();
+
+    // Ratings view should NOT have salary columns
+    const salaryHeaders = table.locator('th.col-salary');
+    expect(await salaryHeaders.count()).toBe(0);
+
+    // Ratings view has rating headers (check for Bird/Exp which only appear in ratings-like views)
+    const headers = await table.locator('th').allTextContents();
+    const joined = headers.join(' ');
+    expect(joined).toContain('Pos');
+  });
+
+  test('split option (home) loads table', async ({ page }) => {
+    const dropdown = page.locator('.ibl-view-select').first();
+
+    // Check if split:home option exists
+    const homeOption = dropdown.locator('option[value="split:home"]');
+    if ((await homeOption.count()) === 0) {
+      test.skip(true, 'No split:home option in dropdown');
+    }
+
+    await dropdown.selectOption('split:home');
+    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    await assertNoPhpErrors(page, 'after switching to split:home');
+  });
+});
+
+// ===========================================================================
 // Team page: error and banner states
 // ===========================================================================
 

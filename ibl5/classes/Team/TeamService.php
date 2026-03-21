@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Team;
 
+use League\League;
 use Team\Contracts\TeamServiceInterface;
 use Team\Contracts\TeamRepositoryInterface;
 use Team\Views\AwardsView;
@@ -463,7 +464,7 @@ class TeamService implements TeamServiceInterface
         $teamQueryRepo = new TeamQueryRepository($this->db);
         $resultPicks = $teamQueryRepo->getDraftPicks($team->teamID);
 
-        $league = new \League($this->db);
+        $league = new League($this->db);
         $allTeamsResult = $league->getAllTeamsResult();
 
         /** @var array<string, \Team> $teamsArray */

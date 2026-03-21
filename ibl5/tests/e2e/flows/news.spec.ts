@@ -5,10 +5,9 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('News module flow', () => {
-  test('news index page loads with content', async ({ page }) => {
+  test('news index page loads with content area', async ({ page }) => {
     await page.goto('modules.php?name=News');
-    const body = await page.locator('body').textContent();
-    expect(body!.length).toBeGreaterThan(100);
+    await expect(page.locator('#site-content').first()).toBeVisible();
     await assertNoPhpErrors(page, 'on News index');
   });
 
@@ -40,6 +39,25 @@ test.describe('News module flow', () => {
       await page.goto(href!);
       await assertNoPhpErrors(page, 'on News article detail via Read More');
     }
+  });
+
+  test('article detail page has title and body content', async ({ page }) => {
+    await page.goto('modules.php?name=News');
+    const link = page.locator('.news-article__link[href*="sid="]').first();
+    if ((await link.count()) === 0) return;
+
+    const href = await link.getAttribute('href');
+    await page.goto(href!);
+
+    // Article should have a visible heading (title)
+    const heading = page.locator('h2, h3, .news-article__title').first();
+    await expect(heading).toBeVisible();
+
+    // Article body should have substantial text content
+    const bodyText = await page.locator('#site-content').textContent();
+    expect(bodyText!.length).toBeGreaterThan(20);
+
+    await assertNoPhpErrors(page, 'on article detail content check');
   });
 
   test('article meta-items are visible when present', async ({ page }) => {

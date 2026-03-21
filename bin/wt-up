@@ -171,6 +171,18 @@ if [ "$PROD_DB" = true ]; then
     # Strip DEFINER clauses — prod exports contain DEFINER=user@host that may
     # not match the Docker MariaDB user, causing ERROR 1449 on import.
     sed 's/ DEFINER=[^ ]* / /g' "$PROD_SEED" | db_exec_stdin "$DB_CONTAINER" $DB_CMD
+
+    # Backfill schema_migrations from the prod dump's 'migrations' table.
+    # The prod dump tracks applied migrations in 'migrations' (id, migration, batch),
+    # but wt-up's runner uses 'schema_migrations' (version). Bridge the two so the
+    # runner skips already-applied migrations instead of re-running them.
+    echo "Backfilling schema_migrations from prod dump..."
+    db_exec "$DB_CONTAINER" $DB_CMD \
+        -e "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"
+    db_exec "$DB_CONTAINER" $DB_CMD \
+        -e "INSERT IGNORE INTO schema_migrations (version) VALUES ('000_baseline_schema.sql');"
+    db_exec "$DB_CONTAINER" $DB_CMD \
+        -e "INSERT IGNORE INTO schema_migrations (version) SELECT migration FROM migrations;" 2>/dev/null || true
 else
     # Default: migrations handle schema creation (migration 000 is the baseline)
     echo "Schema will be created by migrations below."

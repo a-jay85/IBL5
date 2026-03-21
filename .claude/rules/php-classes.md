@@ -32,8 +32,7 @@ class MyRepository extends BaseMysqliRepository
 }
 ```
 
-**Note:** PHP-Nuke modules in `/ibl5/modules/` may still use legacy `$db` patterns.
-The `MySQL` class is deprecated and only exists for PHP-Nuke backward compatibility.
+**Note:** The `MySQL` class exists only for PHP-Nuke backward compatibility and should not be used in new code.
 
 ## View Rendering Pattern
 Use output buffering with `HtmlSanitizer::e()` for XSS-safe output:

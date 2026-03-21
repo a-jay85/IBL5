@@ -123,20 +123,22 @@ test.describe('DCE: NextSim position tabs', () => {
     // Mock the nextsim-api to prevent flaky server-dependent innerHTML swap.
     // The AJAX endpoint is already tested in ajax-api-endpoints.spec.ts —
     // this test verifies the JS click handler (optimistic UI + fetch trigger).
-    let apiCalled = false;
-    await page.route('**/op=nextsim-api**', async (route) => {
-      apiCalled = true;
-      // Return empty html to prevent innerHTML swap (preserves optimistic UI)
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json; charset=utf-8',
-        body: JSON.stringify({ html: '' }),
-      });
-    });
+    const apiRequests: string[] = [];
+    await page.route(
+      (url) => url.toString().includes('op=nextsim-api'),
+      async (route) => {
+        apiRequests.push(route.request().url());
+        // Return empty html to prevent innerHTML swap (preserves optimistic UI)
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json; charset=utf-8',
+          body: JSON.stringify({ html: '' }),
+        });
+      },
+    );
 
-    await appState({ 'Current Season Phase': 'Regular Season' });
-    await page.goto('modules.php?name=DepthChartEntry');
-
+    // Navigate AFTER route is registered (beforeEach already navigated,
+    // but the route must intercept the fetch triggered by the tab click)
     const tabs = page.locator('.nextsim-tab-container .ibl-tab');
     const count = await tabs.count();
     if (count < 2) {
@@ -154,8 +156,12 @@ test.describe('DCE: NextSim position tabs', () => {
     await expect(tabs.nth(1)).toHaveClass(/ibl-tab--active/);
     await expect(tabs.first()).not.toHaveClass(/ibl-tab--active/);
 
-    // Verify the AJAX request was triggered
-    expect(apiCalled).toBe(true);
+    // Wait briefly for the fetch to fire, then verify it was intercepted
+    await page.waitForTimeout(1000);
+    expect(
+      apiRequests.length,
+      'nextsim-api request should have been intercepted',
+    ).toBeGreaterThan(0);
   });
 
   test('tab click loads content without PHP errors', async ({ page }) => {

@@ -25,7 +25,7 @@ $repo->getTeamDiscordID(string $teamName): ?int
 | Retired players | `retired` is TINYINT — check `retired === 0` (int) |
 | Free agents | `tid` is INT — check `tid === 0` or empty username |
 | Team lookup | Some methods use `tid` (int), others use team name (string) |
-| Querying "all teams" | `ibl_team_info` contains special teams beyond the 28 real franchises: Rookies (40), Sophomores (41), All-Star Away (50), All-Star Home (51), and Free Agents (0). When querying all league teams (dropdowns, standings, rosters, record books, etc.), always use `WHERE teamid BETWEEN 1 AND League::MAX_REAL_TEAMID` — not just `WHERE teamid <> 0`. Only include teamid 0 (Free Agents/Waivers) or the All-Star/Rookie IDs when there is a specific reason to (e.g., free agency lists, All-Star voting). See `League::getAllTeamsResult()` for the canonical pattern. |
+| Querying "all teams" | Use `League::isRealFranchise($id)` in PHP or `WHERE teamid BETWEEN 1 AND League::MAX_REAL_TEAMID` in SQL. Special team constants: `FREE_AGENTS_TEAMID(0)`, `ROOKIES_TEAMID(40)`, `SOPHOMORES_TEAMID(41)`, `ALL_STAR_AWAY_TEAMID(50)`, `ALL_STAR_HOME_TEAMID(51)`. |
 | Null in queries | Build conditional SQL; `bind_param` has no NULL type |
 | Database booleans (INT cols) | `hasMLE === 1`, `hasLLE === 1` (native int) |
 | Division guards | Use `=== 0` or `=== 0.0`, not `== 0` |

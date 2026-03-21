@@ -246,17 +246,19 @@ If nothing new was learned, skip silently. Do not announce "nothing to record."
 
 ---
 
-## Phase 9: Worktree & Docker Teardown
+## Phase 9: Worktree Preview Environment
 
-After all phases complete successfully, tear down the worktree and its Docker environment. The branch and PR are already pushed — the worktree is no longer needed. The user will check out the branch in the main repo if they need to verify or make further changes.
+After all phases complete successfully, ensure the worktree's Docker environment is running so the user can visually verify the changes in the browser. The worktree persists until the PR merges to master, when a git hook cleans up automatically.
 
 1. `cd` to the repo root (not the worktree)
-2. Tear down Docker: `bin/wt-down <worktree-name> --volumes --force`
-3. Remove the worktree: `bin/wt-remove <worktree-name>`
-4. If Phase 7.5 auto-merged, delete the local branch: `git branch -D <branch-name>`
-5. Switch back to master: `git checkout master`
+2. Check if Docker env is already running:
+   `docker ps --format '{{.Names}}' | grep -q "^ibl5-php-<slug>$"`
+3. If NOT running: start it with `bin/wt-up <worktree-name> --prod`
+   - If `ibl5/fixtures/prod-seed.sql` doesn't exist, use `--seed` instead
+   - If `wt-up` fails, warn but do not fail the workflow
+4. Print the preview URL: `http://<slug>.localhost/ibl5/`
+5. Do NOT run `wt-down`, `wt-remove`, or `git branch -D`
 
 **Skip this phase if:**
 - The worktree was not created by Phase 1 (e.g., pre-existing worktree the user asked you to work in)
 - Any earlier phase failed and there are uncommitted fixes in the worktree
-- The user explicitly asked to keep the worktree

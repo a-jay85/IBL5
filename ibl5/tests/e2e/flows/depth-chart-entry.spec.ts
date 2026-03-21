@@ -116,7 +116,27 @@ test.describe('DCE: NextSim position tabs', () => {
     expect(count).toBe(5);
   });
 
-  test('clicking tab moves active state', async ({ page }) => {
+  test('clicking tab triggers AJAX and updates active state', async ({
+    appState,
+    page,
+  }) => {
+    // Mock the nextsim-api to prevent flaky server-dependent innerHTML swap.
+    // The AJAX endpoint is already tested in ajax-api-endpoints.spec.ts —
+    // this test verifies the JS click handler (optimistic UI + fetch trigger).
+    let apiCalled = false;
+    await page.route('**/op=nextsim-api**', async (route) => {
+      apiCalled = true;
+      // Return empty html to prevent innerHTML swap (preserves optimistic UI)
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json; charset=utf-8',
+        body: JSON.stringify({ html: '' }),
+      });
+    });
+
+    await appState({ 'Current Season Phase': 'Regular Season' });
+    await page.goto('modules.php?name=DepthChartEntry');
+
     const tabs = page.locator('.nextsim-tab-container .ibl-tab');
     const count = await tabs.count();
     if (count < 2) {
@@ -127,17 +147,15 @@ test.describe('DCE: NextSim position tabs', () => {
     // First tab (PG) should be active by default
     await expect(tabs.first()).toHaveClass(/ibl-tab--active/);
 
-    // Click SG tab — triggers AJAX which replaces container innerHTML.
-    // The JS removes ajax-loading BEFORE setting innerHTML, so we can't
-    // use the loading class as a wait signal. Instead, wait for the new
-    // active tab element to appear (a fresh locator re-queries the DOM).
+    // Click SG tab — JS immediately sets optimistic active state
     await tabs.nth(1).click();
 
-    // Wait for the AJAX-rendered SG tab with active class to appear
-    const activeSgTab = page.locator(
-      '.nextsim-tab-container .ibl-tab--active[data-display="SG"]',
-    );
-    await expect(activeSgTab).toBeVisible({ timeout: 10000 });
+    // Optimistic UI: active class should move synchronously (before AJAX)
+    await expect(tabs.nth(1)).toHaveClass(/ibl-tab--active/);
+    await expect(tabs.first()).not.toHaveClass(/ibl-tab--active/);
+
+    // Verify the AJAX request was triggered
+    expect(apiCalled).toBe(true);
   });
 
   test('tab click loads content without PHP errors', async ({ page }) => {

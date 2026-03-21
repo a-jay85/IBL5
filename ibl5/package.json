@@ -18,10 +18,12 @@
     "docker:logs": "cd .. && docker compose logs -f php",
     "wt:up": "cd .. && bin/wt-up",
     "wt:down": "cd .. && bin/wt-down",
-    "wt:list": "cd .. && bin/wt-list"
+    "wt:list": "cd .. && bin/wt-list",
+    "lighthouse": "bunx @lhci/cli autorun"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.56.0",
     "@tailwindcss/cli": "^4.0.0",
     "tailwindcss": "^4.0.0"

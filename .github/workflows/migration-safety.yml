@@ -158,3 +158,111 @@ jobs:
           echo "FAIL: Schema divergence detected between bash and PHP runners."
           exit 1
         fi
+
+  schema-completeness:
+    name: Schema Completeness
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: ibl5_completeness
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mariadb-admin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Apply all migrations
+      run: |
+        chmod +x ibl5/bin/run-migrations-ci.sh
+        ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5_completeness
+
+    - name: Check FK integrity
+      run: |
+        # Find FK references to non-existent tables
+        mysql -h 127.0.0.1 -u root -proot ibl5_completeness -N -e "
+          SELECT
+            CONCAT(kcu.TABLE_NAME, '.', kcu.COLUMN_NAME, ' -> ',
+                   kcu.REFERENCED_TABLE_NAME, '.', kcu.REFERENCED_COLUMN_NAME)
+          FROM information_schema.KEY_COLUMN_USAGE kcu
+          WHERE kcu.TABLE_SCHEMA = 'ibl5_completeness'
+            AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+            AND kcu.REFERENCED_TABLE_NAME NOT IN (
+              SELECT t.TABLE_NAME FROM information_schema.TABLES t
+              WHERE t.TABLE_SCHEMA = 'ibl5_completeness'
+            );
+        " > /tmp/broken_fks.txt
+
+        if [ -s /tmp/broken_fks.txt ]; then
+          echo "FAIL: Foreign keys reference non-existent tables:"
+          cat /tmp/broken_fks.txt
+          exit 1
+        fi
+        echo "PASS: All FK references resolve."
+
+    - name: Check required tables exist
+      run: |
+        REQUIRED_TABLES=(
+          ibl_plr ibl_team_info ibl_schedule ibl_box_scores
+          ibl_hist nuke_users nuke_stories auth_users ibl_settings
+          ibl_draft ibl_demands ibl_awards ibl_trades
+        )
+        MISSING=""
+        for table in "${REQUIRED_TABLES[@]}"; do
+          count=$(mysql -h 127.0.0.1 -u root -proot ibl5_completeness -N -e "
+            SELECT COUNT(*) FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = 'ibl5_completeness' AND TABLE_NAME = '$table';
+          ")
+          if [ "$count" = "0" ]; then
+            MISSING="$MISSING $table"
+          fi
+        done
+
+        if [ -n "$MISSING" ]; then
+          echo "FAIL: Required tables missing:$MISSING"
+          exit 1
+        fi
+        echo "PASS: All ${#REQUIRED_TABLES[@]} required tables exist."
+
+    - name: Check critical columns
+      run: |
+        # Verify key columns that the application depends on
+        CHECKS=(
+          "ibl_plr:pid,name,tid,pos,uuid"
+          "ibl_team_info:teamid,team_city,team_name,uuid"
+          "ibl_schedule:Date,Year,Visitor,Home,uuid"
+          "nuke_users:user_id,username,user_email,user_ibl_team"
+          "ibl_settings:settingskey,settingsvalue"
+        )
+
+        FAIL=0
+        for check in "${CHECKS[@]}"; do
+          table="${check%%:*}"
+          columns="${check##*:}"
+          IFS=',' read -ra cols <<< "$columns"
+          for col in "${cols[@]}"; do
+            count=$(mysql -h 127.0.0.1 -u root -proot ibl5_completeness -N -e "
+              SELECT COUNT(*) FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = 'ibl5_completeness'
+                AND TABLE_NAME = '$table' AND COLUMN_NAME = '$col';
+            ")
+            if [ "$count" = "0" ]; then
+              echo "FAIL: $table.$col missing"
+              FAIL=1
+            fi
+          done
+        done
+
+        if [ "$FAIL" = "1" ]; then
+          exit 1
+        fi
+        echo "PASS: All critical columns present."

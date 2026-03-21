@@ -321,8 +321,35 @@ class WaiversProcessorTest extends TestCase
             'cy3' => 550,
             'cy4' => 600
         ]);
-        
+
         $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonFreeAgency);
         $this->assertEquals('500 550 600', $contract);
     }
+
+    // ── Mutation hardening: null experience paths ────────────
+
+    public function testGetPlayerContractDisplayWithNullExperience(): void
+    {
+        $player = $this->createMockPlayer([
+            'cy1' => 0,
+            // 'exp' not set → yearsOfExperience is null → defaults to 0
+        ]);
+
+        $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonRegular);
+        // Null experience defaults to 0 (rookie) → vet min for rookies
+        $this->assertEquals('35', $contract);
+    }
+
+    public function testGetPlayerContractDisplayDuringFreeAgencyWithNullExperience(): void
+    {
+        $player = $this->createMockPlayer([
+            'cy1' => 0,
+            // 'exp' not set → offseason path: (null ?? 0) + 1 = 1 year experience
+        ]);
+
+        $contract = $this->processor->getPlayerContractDisplay($player, $this->mockSeasonFreeAgency);
+        // Offseason bumps experience by 1: 0 + 1 = 1 → vet min for 1 year
+        $this->assertEquals('35', $contract);
+    }
+
 }

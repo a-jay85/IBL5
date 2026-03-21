@@ -45,12 +45,12 @@ class CommonMysqliRepository extends \BaseMysqliRepository
      * Gets the team name associated with a username
      * 
      * @param string|null $username Username to look up (nullable)
-     * @return string|null Team name if found, "Free Agents" if username is empty, or null if username not found
+     * @return string|null Team name if found, League::FREE_AGENTS_TEAM_NAME if username is empty, or null if not found
      */
     public function getTeamnameFromUsername(?string $username): ?string
     {
         if ($username === null || $username === '') {
-            return "Free Agents";
+            return \League::FREE_AGENTS_TEAM_NAME;
         }
 
         /** @var array{team_name: string}|null $result */

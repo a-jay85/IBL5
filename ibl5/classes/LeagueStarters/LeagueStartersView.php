@@ -88,13 +88,13 @@ class LeagueStartersView implements LeagueStartersViewInterface
     {
         switch ($display) {
             case 'total_s':
-                return \UI::seasonTotals($this->db, $result, $team, '', [], $this->moduleName);
+                return \UI\Tables\SeasonTotals::render($this->db, $result, $team, '', [], $this->moduleName);
             case 'avg_s':
-                return \UI::seasonAverages($this->db, $result, $team, '', [], $this->moduleName);
+                return \UI\Tables\SeasonAverages::render($this->db, $result, $team, '', [], $this->moduleName);
             case 'per36mins':
-                return \UI::per36Minutes($this->db, $result, $team, '', [], $this->moduleName);
+                return \UI\Tables\Per36Minutes::render($this->db, $result, $team, '', [], $this->moduleName);
             default:
-                return \UI::ratings($this->db, $result, $team, '', $this->season, $this->moduleName);
+                return \UI\Tables\Ratings::render($this->db, $result, $team, '', $this->season, $this->moduleName);
         }
     }
 }

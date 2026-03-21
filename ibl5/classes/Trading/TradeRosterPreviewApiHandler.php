@@ -494,9 +494,9 @@ class TradeRosterPreviewApiHandler
             case 'contracts':
                 return \UI\Tables\Contracts::render($this->db, $roster, $team, $season, $starterPids, $removePids);
             case 'chunk':
-                return \UI::periodAverages($this->db, $team, $season, null, null, $starterPids, $rosterPids);
+                return \UI\Tables\PeriodAverages::render($this->db, $team, $season, null, null, $starterPids, $rosterPids);
             case 'playoffs':
-                return \UI::periodAverages($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids, $rosterPids);
+                return \UI\Tables\PeriodAverages::render($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids, $rosterPids);
             case 'split':
                 $splitRepo = new \Team\SplitStatsRepository($this->db);
                 $splitKey = $split ?? 'home';

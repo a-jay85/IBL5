@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Scripts;
 
+use League\League;
 use Scripts\Contracts\MaintenanceRepositoryInterface;
 
 /**
@@ -26,7 +27,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
         return $this->fetchAll(
             "SELECT team_name FROM ibl_team_info WHERE teamid BETWEEN 1 AND ?",
             "i",
-            \League::MAX_REAL_TEAMID
+            League::MAX_REAL_TEAMID
         );
     }
 

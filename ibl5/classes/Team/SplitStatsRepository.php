@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Team;
 
+use League\League;
 use Team\Contracts\SplitStatsRepositoryInterface;
 
 /**
@@ -110,15 +111,15 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
             $keys[] = 'month_' . $month;
         }
 
-        foreach (\League::DIVISION_NAMES as $division) {
+        foreach (League::DIVISION_NAMES as $division) {
             $keys[] = 'div_' . strtolower($division);
         }
 
-        foreach (\League::CONFERENCE_NAMES as $conference) {
+        foreach (League::CONFERENCE_NAMES as $conference) {
             $keys[] = 'conf_' . strtolower($conference);
         }
 
-        for ($tid = 1; $tid <= \League::MAX_REAL_TEAMID; $tid++) {
+        for ($tid = 1; $tid <= League::MAX_REAL_TEAMID; $tid++) {
             $keys[] = 'vs_' . $tid;
         }
 
@@ -143,7 +144,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
         // div_X
         if (str_starts_with($splitKey, 'div_')) {
             $divKey = substr($splitKey, 4);
-            foreach (\League::DIVISION_NAMES as $division) {
+            foreach (League::DIVISION_NAMES as $division) {
                 if (strtolower($division) === $divKey) {
                     return 'vs. ' . $division;
                 }
@@ -154,7 +155,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
         // conf_X
         if (str_starts_with($splitKey, 'conf_')) {
             $confKey = substr($splitKey, 5);
-            foreach (\League::CONFERENCE_NAMES as $conference) {
+            foreach (League::CONFERENCE_NAMES as $conference) {
                 if (strtolower($conference) === $confKey) {
                     return 'vs. ' . $conference;
                 }
@@ -250,7 +251,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
         if (str_starts_with($splitKey, 'div_')) {
             $divKey = substr($splitKey, 4);
             $divisionName = '';
-            foreach (\League::DIVISION_NAMES as $division) {
+            foreach (League::DIVISION_NAMES as $division) {
                 if (strtolower($division) === $divKey) {
                     $divisionName = $division;
                     break;
@@ -267,7 +268,7 @@ class SplitStatsRepository extends \BaseMysqliRepository implements SplitStatsRe
         if (str_starts_with($splitKey, 'conf_')) {
             $confKey = substr($splitKey, 5);
             $conferenceName = '';
-            foreach (\League::CONFERENCE_NAMES as $conference) {
+            foreach (League::CONFERENCE_NAMES as $conference) {
                 if (strtolower($conference) === $confKey) {
                     $conferenceName = $conference;
                     break;

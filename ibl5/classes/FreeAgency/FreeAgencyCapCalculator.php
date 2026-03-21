@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyCapCalculatorInterface;
+use League\League;
 use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
 
@@ -175,8 +176,8 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
         
         return [
             'totalSalaries' => $totalSalaries,
-            'softCapSpace' => array_map(fn($salary) => \League::SOFT_CAP_MAX - $salary, $totalSalaries),
-            'hardCapSpace' => array_map(fn($salary) => \League::HARD_CAP_MAX - $salary, $totalSalaries),
+            'softCapSpace' => array_map(fn($salary) => League::SOFT_CAP_MAX - $salary, $totalSalaries),
+            'hardCapSpace' => array_map(fn($salary) => League::HARD_CAP_MAX - $salary, $totalSalaries),
             'rosterSpots' => $rosterSpots,
         ];
     }

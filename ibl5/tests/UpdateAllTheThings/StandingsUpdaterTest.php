@@ -365,7 +365,7 @@ class StandingsUpdaterTest extends TestCase
 
     public function testAssignGroupingsForConferences(): void
     {
-        foreach (\League::CONFERENCE_NAMES as $conference) {
+        foreach (\League\League::CONFERENCE_NAMES as $conference) {
             $reflection = new ReflectionClass($this->updater);
             $method = $reflection->getMethod('assignGroupingsFor');
             $result = $method->invoke($this->updater, $conference);
@@ -379,7 +379,7 @@ class StandingsUpdaterTest extends TestCase
 
     public function testAssignGroupingsForDivisions(): void
     {
-        foreach (\League::DIVISION_NAMES as $division) {
+        foreach (\League\League::DIVISION_NAMES as $division) {
             $reflection = new ReflectionClass($this->updater);
             $method = $reflection->getMethod('assignGroupingsFor');
             $result = $method->invoke($this->updater, $division);

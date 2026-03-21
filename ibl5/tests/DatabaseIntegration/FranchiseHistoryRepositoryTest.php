@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration;
 
 use FranchiseHistory\FranchiseHistoryRepository;
+use League\League;
 
 /**
  * Database integration tests for FranchiseHistoryRepository.
@@ -49,7 +50,7 @@ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
         $result = $this->repo->getAllFranchiseHistory(2024);
 
         $teamIds = array_column($result, 'teamid');
-        self::assertNotContains(\League::FREE_AGENTS_TEAMID, $teamIds);
+        self::assertNotContains(League::FREE_AGENTS_TEAMID, $teamIds);
     }
 
     public function testOnlyIncludesRealTeams(): void
@@ -58,7 +59,7 @@ class FranchiseHistoryRepositoryTest extends DatabaseTestCase
 
         foreach ($result as $row) {
             self::assertGreaterThanOrEqual(1, $row['teamid']);
-            self::assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $row['teamid']);
+            self::assertLessThanOrEqual(League::MAX_REAL_TEAMID, $row['teamid']);
         }
     }
 

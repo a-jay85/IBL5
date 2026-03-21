@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Standings;
 
+use League\League;
 use League\LeagueContext;
 use Standings\Contracts\StandingsRepositoryInterface;
 
@@ -44,7 +45,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      */
     private function getGroupingColumns(string $region): array
     {
-        if (in_array($region, \League::CONFERENCE_NAMES, true)) {
+        if (in_array($region, League::CONFERENCE_NAMES, true)) {
             return [
                 'grouping' => 'conference',
                 'gbColumn' => 'confGB',
@@ -52,7 +53,7 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
             ];
         }
 
-        if (in_array($region, \League::DIVISION_NAMES, true)) {
+        if (in_array($region, League::DIVISION_NAMES, true)) {
             return [
                 'grouping' => 'division',
                 'gbColumn' => 'divGB',

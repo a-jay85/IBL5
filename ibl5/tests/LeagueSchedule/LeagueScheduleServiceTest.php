@@ -7,6 +7,7 @@ namespace Tests\LeagueSchedule;
 use LeagueSchedule\Contracts\LeagueScheduleRepositoryInterface;
 use LeagueSchedule\LeagueScheduleService;
 use LeagueSchedule\Contracts\LeagueScheduleServiceInterface;
+use League\League;
 use PHPUnit\Framework\TestCase;
 
 class LeagueScheduleServiceTest extends TestCase
@@ -29,7 +30,7 @@ class LeagueScheduleServiceTest extends TestCase
         $season->projectedNextSimEndDate = new \DateTime('2025-11-15');
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(\League::class);
+        $league = $this->createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
         $commonRepo = $this->createStub(\Services\CommonMysqliRepository::class);
@@ -85,7 +86,7 @@ class LeagueScheduleServiceTest extends TestCase
         $season->projectedNextSimEndDate = new \DateTime('2025-10-15');
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(\League::class);
+        $league = $this->createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
         $commonRepo = $this->createStub(\Services\CommonMysqliRepository::class);
@@ -126,7 +127,7 @@ class LeagueScheduleServiceTest extends TestCase
         $season->projectedNextSimEndDate = new \DateTime('2025-11-15');
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(\League::class);
+        $league = $this->createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
         $commonRepo = $this->createStub(\Services\CommonMysqliRepository::class);
@@ -172,7 +173,7 @@ class LeagueScheduleServiceTest extends TestCase
         $season->projectedNextSimEndDate = new \DateTime('2025-10-15');
         $season->phase = 'Playoffs';
 
-        $league = $this->createStub(\League::class);
+        $league = $this->createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
         $commonRepo = $this->createStub(\Services\CommonMysqliRepository::class);
@@ -211,7 +212,7 @@ class LeagueScheduleServiceTest extends TestCase
         $season->projectedNextSimEndDate = new \DateTime('2025-10-15');
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(\League::class);
+        $league = $this->createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
         $commonRepo = $this->createStub(\Services\CommonMysqliRepository::class);
@@ -235,7 +236,7 @@ class LeagueScheduleServiceTest extends TestCase
         $season->projectedNextSimEndDate = new \DateTime('2025-11-15');
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(\League::class);
+        $league = $this->createStub(League::class);
         $league->method('getSimLengthInDays')->willReturn(7);
 
         $commonRepo = $this->createStub(\Services\CommonMysqliRepository::class);

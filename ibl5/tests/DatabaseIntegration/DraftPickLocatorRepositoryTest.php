@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration;
 
 use DraftPickLocator\DraftPickLocatorRepository;
+use League\League;
 
 /**
  * Tests DraftPickLocatorRepository against real MariaDB — draft pick ownership queries.
@@ -26,7 +27,7 @@ class DraftPickLocatorRepositoryTest extends DatabaseTestCase
         self::assertCount(28, $teams);
         foreach ($teams as $team) {
             self::assertGreaterThanOrEqual(1, $team['teamid']);
-            self::assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $team['teamid']);
+            self::assertLessThanOrEqual(League::MAX_REAL_TEAMID, $team['teamid']);
             self::assertArrayHasKey('team_city', $team);
             self::assertArrayHasKey('team_name', $team);
         }

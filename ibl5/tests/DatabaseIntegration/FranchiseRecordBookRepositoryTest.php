@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration;
 
 use FranchiseRecordBook\FranchiseRecordBookRepository;
+use League\League;
 
 class FranchiseRecordBookRepositoryTest extends DatabaseTestCase
 {
@@ -71,7 +72,7 @@ class FranchiseRecordBookRepositoryTest extends DatabaseTestCase
         foreach ($result as $team) {
             self::assertArrayHasKey('teamid', $team);
             self::assertGreaterThanOrEqual(1, $team['teamid']);
-            self::assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $team['teamid']);
+            self::assertLessThanOrEqual(League::MAX_REAL_TEAMID, $team['teamid']);
         }
     }
 

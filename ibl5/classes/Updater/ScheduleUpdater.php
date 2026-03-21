@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Updater;
 
+use League\League;
 use League\LeagueContext;
 use Utilities\UuidGenerator;
 use Utilities\SchFileParser;
@@ -86,7 +87,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         $rows = $this->fetchAll(
             "SELECT team_name, teamid FROM {$teamInfoTable} WHERE teamid BETWEEN 1 AND ?",
             "i",
-            \League::MAX_REAL_TEAMID
+            League::MAX_REAL_TEAMID
         );
 
         foreach ($rows as $row) {

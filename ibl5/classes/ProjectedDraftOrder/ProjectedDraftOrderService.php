@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ProjectedDraftOrder;
 
+use League\League;
 use ProjectedDraftOrder\Contracts\ProjectedDraftOrderRepositoryInterface;
 use ProjectedDraftOrder\Contracts\ProjectedDraftOrderServiceInterface;
 
@@ -51,7 +52,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
         $divisionWinnerTeams = [];
         $conferenceWinnerTeams = [];
 
-        foreach (\League::CONFERENCE_NAMES as $conference) {
+        foreach (League::CONFERENCE_NAMES as $conference) {
             $conferenceTeams = $teamsByConference[$conference] ?? [];
             $result = $this->determinePlayoffTeams($conferenceTeams, $h2h, $pointDiffs);
             array_push($nonPlayoffTeams, ...$result['nonPlayoff']);

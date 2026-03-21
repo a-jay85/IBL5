@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use League\League;
 use TeamOffDefStats\TeamOffDefStatsRepository;
 
 /**
@@ -46,7 +47,7 @@ class TeamOffDefStatsRepositoryTest extends DatabaseTestCase
         self::assertCount(28, $stats);
         foreach ($stats as $row) {
             self::assertGreaterThanOrEqual(1, $row['teamid']);
-            self::assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $row['teamid']);
+            self::assertLessThanOrEqual(League::MAX_REAL_TEAMID, $row['teamid']);
             self::assertArrayHasKey('team_name', $row);
             self::assertArrayHasKey('offense_games', $row);
             self::assertArrayHasKey('defense_games', $row);

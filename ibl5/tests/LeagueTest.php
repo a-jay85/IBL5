@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests;
 
 use PHPUnit\Framework\TestCase;
-use League;
+use League\League;
 
 /**
  * LeagueTest - Tests for League class constants and utility methods

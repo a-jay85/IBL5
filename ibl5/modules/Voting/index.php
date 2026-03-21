@@ -31,7 +31,7 @@ function userinfo(string $username): void
 
     $commonRepository = new \Services\CommonMysqliRepository($mysqli_db);
     $season = new \Season($mysqli_db);
-    $league = new \League($mysqli_db);
+    $league = new \League\League($mysqli_db);
 
     $voterTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
     $tid = $commonRepository->getTidFromTeamname($voterTeamName) ?? 0;

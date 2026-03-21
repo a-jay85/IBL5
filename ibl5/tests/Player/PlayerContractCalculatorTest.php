@@ -618,4 +618,39 @@ class PlayerContractCalculatorTest extends TestCase
 
         $this->assertSame(0, $result);
     }
+
+    public function testGetCurrentSeasonSalaryWithBothCurrentYearAndYear1Null(): void
+    {
+        $playerData = new PlayerData();
+        // Both null: contractCurrentYear ?? 0 → year 0 → contractYear1Salary ?? 0 → 0
+
+        $result = $this->calculator->getCurrentSeasonSalary($playerData);
+
+        $this->assertSame(0, $result);
+    }
+
+    public function testGetCurrentSeasonSalaryDistinguishesYearsByValue(): void
+    {
+        // Different salary per year catches year-mapping mutations
+        $playerData = new PlayerData();
+        $playerData->contractCurrentYear = 3;
+        $playerData->contractYear1Salary = 100;
+        $playerData->contractYear2Salary = 200;
+        $playerData->contractYear3Salary = 300;
+        $playerData->contractYear4Salary = 400;
+
+        $this->assertSame(300, $this->calculator->getCurrentSeasonSalary($playerData));
+        $this->assertSame(400, $this->calculator->getNextSeasonSalary($playerData));
+    }
+
+    public function testGetSalaryForNullMiddleYearReturnsZero(): void
+    {
+        $playerData = new PlayerData();
+        $playerData->contractCurrentYear = 3;
+        // contractYear3Salary is null → $salaryMap[3] ?? 0 → 0
+
+        $result = $this->calculator->getCurrentSeasonSalary($playerData);
+
+        $this->assertSame(0, $result);
+    }
 }

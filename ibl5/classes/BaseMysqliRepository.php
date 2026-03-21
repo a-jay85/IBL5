@@ -306,10 +306,23 @@ abstract class BaseMysqliRepository
     protected function execute(string $query, string $types = '', mixed ...$params): int
     {
         $stmt = $this->executeQuery($query, $types, ...$params);
-        $affectedRows = (int) $stmt->affected_rows;
+        $affectedRows = $this->getAffectedRows($stmt);
         $stmt->close();
 
         return $affectedRows;
+    }
+
+    /**
+     * Get affected rows from a prepared statement.
+     *
+     * Extracted as a protected method so test doubles can override it,
+     * since mysqli_stmt::$affected_rows is a virtual/readonly property
+     * that cannot be set on mock objects.
+     */
+    protected function getAffectedRows(object $stmt): int
+    {
+        /** @var \mysqli_stmt $stmt */
+        return (int) $stmt->affected_rows;
     }
 
     /**
@@ -349,6 +362,60 @@ abstract class BaseMysqliRepository
         /** @var \mysqli $db */
         $db = $this->db;
         return (int) $db->insert_id;
+    }
+
+    /**
+     * Execute a callable within a database transaction.
+     *
+     * If already inside a transaction (e.g., from DatabaseTestCase), uses a
+     * SAVEPOINT instead of BEGIN to avoid implicitly committing the outer transaction.
+     *
+     * @template T
+     * @param callable(): T $fn
+     * @return T
+     */
+    protected function transactional(callable $fn): mixed
+    {
+        if ($this->isInTransaction()) {
+            $savepoint = 'sp_' . bin2hex(random_bytes(4));
+            $this->db->savepoint($savepoint);
+            try {
+                $result = $fn();
+                $this->db->release_savepoint($savepoint);
+                return $result;
+            } catch (\Throwable $e) {
+                $this->db->query("ROLLBACK TO SAVEPOINT " . $savepoint);
+                throw $e;
+            }
+        }
+
+        $this->db->begin_transaction();
+        try {
+            $result = $fn();
+            $this->db->commit();
+            return $result;
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            throw $e;
+        }
+    }
+
+    /**
+     * Check if the connection is currently inside a transaction.
+     */
+    private function isInTransaction(): bool
+    {
+        try {
+            $result = $this->db->query("SELECT @@in_transaction AS in_tx");
+        } catch (\Throwable) {
+            return false;
+        }
+        if (!$result instanceof \mysqli_result) {
+            return false;
+        }
+        /** @var array{in_tx: int}|null $row */
+        $row = $result->fetch_assoc();
+        return $row !== null && $row['in_tx'] === 1;
     }
 
     /**

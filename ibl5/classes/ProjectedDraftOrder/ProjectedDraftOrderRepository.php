@@ -86,8 +86,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
      */
     public function saveFinalDraftOrder(int $year, array $picks): void
     {
-        $this->db->begin_transaction();
-        try {
+        $this->transactional(function () use ($year, $picks): void {
             // Delete all draft rows from previous years (out of date)
             $this->execute(
                 "DELETE FROM ibl_draft WHERE year < ?",
@@ -118,12 +117,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
             $this->execute(
                 "UPDATE ibl_settings SET value = 'Yes' WHERE name = 'Draft Order Finalized'",
             );
-
-            $this->db->commit();
-        } catch (\Throwable $e) {
-            $this->db->rollback();
-            throw $e;
-        }
+        });
     }
 
     /** @return list<array{pick: int, team: string, tid: int, player: string}> */

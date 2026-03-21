@@ -90,8 +90,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function setSeasonPhase(string $phase): bool
     {
-        $this->db->begin_transaction();
-        try {
+        $this->transactional(function () use ($phase): void {
             $this->execute(
                 "UPDATE ibl_settings SET value = ? WHERE name = 'Current Season Phase'",
                 "s",
@@ -106,13 +105,9 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
                     "UPDATE nuke_modules SET active = 0 WHERE title = 'Draft'"
                 );
             }
+        });
 
-            $this->db->commit();
-            return true;
-        } catch (\Throwable $e) {
-            $this->db->rollback();
-            throw $e;
-        }
+        return true;
     }
 
     /**
@@ -134,8 +129,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function setShowDraftLink(string $value): bool
     {
-        $this->db->begin_transaction();
-        try {
+        $this->transactional(function () use ($value): void {
             $this->execute(
                 "UPDATE ibl_settings SET value = ? WHERE name = 'Show Draft Link'",
                 "s",
@@ -148,13 +142,9 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
                 "i",
                 $moduleActive
             );
+        });
 
-            $this->db->commit();
-            return true;
-        } catch (\Throwable $e) {
-            $this->db->rollback();
-            throw $e;
-        }
+        return true;
     }
 
     /**
@@ -162,8 +152,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function resetAllStarVoting(): bool
     {
-        $this->db->begin_transaction();
-        try {
+        $this->transactional(function (): void {
             $this->execute(
                 "UPDATE ibl_votes_ASG SET East_F1 = NULL, East_F2 = NULL, East_F3 = NULL, East_F4 = NULL,
                     West_F1 = NULL, West_F2 = NULL, West_F3 = NULL, West_F4 = NULL,
@@ -178,13 +167,9 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
             $this->execute(
                 "UPDATE ibl_team_info SET asg_vote = 'No Vote'"
             );
+        });
 
-            $this->db->commit();
-            return true;
-        } catch (\Throwable $e) {
-            $this->db->rollback();
-            throw $e;
-        }
+        return true;
     }
 
     /**
@@ -192,8 +177,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
      */
     public function resetEndOfYearVoting(): bool
     {
-        $this->db->begin_transaction();
-        try {
+        $this->transactional(function (): void {
             $this->execute(
                 "UPDATE ibl_votes_EOY SET MVP_1 = NULL, MVP_2 = NULL, MVP_3 = NULL,
                     Six_1 = NULL, Six_2 = NULL, Six_3 = NULL,
@@ -208,13 +192,9 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
             $this->execute(
                 "UPDATE ibl_team_info SET eoy_vote = 'No Vote'"
             );
+        });
 
-            $this->db->commit();
-            return true;
-        } catch (\Throwable $e) {
-            $this->db->rollback();
-            throw $e;
-        }
+        return true;
     }
 
     /**

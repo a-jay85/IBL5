@@ -308,6 +308,63 @@ final class RecordHoldersServiceTest extends TestCase
         $this->assertSame('', $firstCategory[0]['boxScoreUrl']);
     }
 
+    public function testTeamGameRecordFormatsCorrectly(): void
+    {
+        $teamRecord = [
+            'tid' => 7,
+            'team_name' => 'Bulls',
+            'date' => '1995-03-12',
+            'BoxID' => 0,
+            'gameOfThatDay' => 2,
+            'oppTid' => 2,
+            'opp_team_name' => 'Heat',
+            'value' => 162,
+        ];
+
+        $batchResult = $this->buildBatchTeamResult([$teamRecord]);
+        $this->mockRepository->method('getTopTeamSingleGameBatch')
+            ->willReturn($batchResult);
+        $this->configureNonTeamGameMocksEmpty();
+
+        $result = $this->service->getAllRecords();
+
+        $firstCategory = array_values($result['teamGameRecords'])[0];
+        $this->assertCount(1, $firstCategory);
+        $record = $firstCategory[0];
+
+        $this->assertSame(7, $record['teamTid']);
+        $this->assertSame('chi', $record['teamAbbr']);
+        $this->assertSame(2, $record['oppTid']);
+        $this->assertSame('mia', $record['oppAbbr']);
+        $this->assertSame('162', $record['amount']);
+        $this->assertSame('March 12, 1995', $record['dateDisplay']);
+        $this->assertStringContainsString('1995-03-12-game-2/boxscore', $record['boxScoreUrl']);
+    }
+
+    public function testBestSeasonRecordFormatsWinLoss(): void
+    {
+        $seasonRecord = [
+            'team_name' => 'Nets',
+            'year' => 2000,
+            'wins' => 72,
+            'losses' => 10,
+        ];
+
+        $this->mockRepository->method('getBestWorstSeasonRecord')
+            ->willReturn([$seasonRecord]);
+        $this->mockRepository->method('getBestWorstSeasonStart')->willReturn([]);
+        $this->mockRepository->method('getLongestStreak')->willReturn([]);
+        $this->configureNonSeasonMocksEmpty();
+
+        $result = $this->service->getAllRecords();
+
+        $bestRecord = $result['teamSeasonRecords']['Best Season Record'];
+        $this->assertCount(1, $bestRecord);
+        $this->assertSame('72-10', $bestRecord[0]['amount']);
+        $this->assertSame('bkn', $bestRecord[0]['teamAbbr']);
+        $this->assertSame('1999-00', $bestRecord[0]['season']);
+    }
+
     public function testTeamSeasonRecordsContainsExpectedCategories(): void
     {
         $this->configureEmptyMocks();
@@ -529,6 +586,24 @@ final class RecordHoldersServiceTest extends TestCase
         $this->mockRepository->method('getMostAllStarAppearances')->willReturn([]);
         $this->mockRepository->method('getTopTeamHalfScore')->willReturn([]);
         $this->mockRepository->method('getLargestMarginOfVictory')->willReturn([]);
+        $this->mockRepository->method('getMostPlayoffAppearances')->willReturn([]);
+        $this->mockRepository->method('getMostTitlesByType')->willReturn([]);
+    }
+
+    /**
+     * Configure all mocks except team game record mocks to return empty.
+     */
+    private function configureNonTeamGameMocksEmpty(): void
+    {
+        $this->mockRepository->method('getTopPlayerSingleGameBatch')->willReturn($this->buildBatchPlayerResult([]));
+        $this->mockRepository->method('getTopSeasonAverageBatch')->willReturn($this->buildBatchSeasonResult([]));
+        $this->mockRepository->method('getQuadrupleDoubles')->willReturn([]);
+        $this->mockRepository->method('getMostAllStarAppearances')->willReturn([]);
+        $this->mockRepository->method('getTopTeamHalfScore')->willReturn([]);
+        $this->mockRepository->method('getLargestMarginOfVictory')->willReturn([]);
+        $this->mockRepository->method('getBestWorstSeasonRecord')->willReturn([]);
+        $this->mockRepository->method('getLongestStreak')->willReturn([]);
+        $this->mockRepository->method('getBestWorstSeasonStart')->willReturn([]);
         $this->mockRepository->method('getMostPlayoffAppearances')->willReturn([]);
         $this->mockRepository->method('getMostTitlesByType')->willReturn([]);
     }

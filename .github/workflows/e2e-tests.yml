@@ -5,6 +5,10 @@ on:
     branches: [master]
     types: [opened, synchronize, reopened, labeled]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   e2e:
     name: Visual Regression

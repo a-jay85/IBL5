@@ -10,6 +10,10 @@ on:
     paths:
       - 'ibl5/migrations/**.sql'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   idempotency-check:
     name: Bash/PHP Runner Idempotency

@@ -11,14 +11,14 @@ IBL5 is an Internet Basketball League fantasy basketball site powered by Jump Sh
 ## Commands
 
 ```bash
-# Run all tests (always use these flags)
-cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary
+# Run all tests
+bin/test
 
-# Quick pass/fail check (append | tail -n 3)
-cd ibl5 && vendor/bin/phpunit --no-progress --no-output --testdox-summary | tail -n 3
+# Quick pass/fail check
+bin/test | tail -3
 ```
 
-**PHPUnit output rule:** Always use `--no-progress --no-output --testdox-summary`. Only read output below `Summary of tests with errors, failures, or issues:`. Add `--filter`, `--testsuite`, or `--display-all-issues` as needed. See `phpunit-tests.md` for full rules.
+`bin/test` wraps PHPUnit with standard flags (`--no-progress --no-output --testdox-summary`). Pass additional flags directly: `bin/test --filter testMethodName`, `bin/test --testsuite "Module"`. Only read output below `Summary of tests with errors, failures, or issues:`. See `phpunit-tests.md` for full rules.
 
 ### Static Analysis (PHPStan)
 
@@ -66,8 +66,7 @@ Classes autoload from `ibl5/classes/`. Never use `require_once`.
 ### Database
 - Schema: `ibl5/migrations/000_baseline_schema.sql` - **always verify table/column names here** (check subsequent migrations for alterations)
 - **Migrations are the single source of truth.** `000_baseline_schema.sql` is the production snapshot; all subsequent migrations alter it. There is no separate `schema.sql`.
-- Use `$mysqli_db` (modern MySQLi) over legacy `$db`
-- **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on `$mysqli_db`. See `core-coding.md` for type comparison rules. The legacy `$db` connection does NOT have native types.
+- **Native types enabled:** `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is set on `$mysqli_db`. See `core-coding.md` for type comparison rules.
 - **Docker:** `docker compose up -d` starts MariaDB + PHP-Apache (`http://main.localhost/ibl5/`). See `database-access.md` for connection details and `ibl5/docs/DOCKER_SETUP.md` for full setup.
 - **CLI MariaDB access:** `mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5`. For quick queries, prefer the `./bin/db-query "SQL"` wrapper.
 

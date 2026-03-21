@@ -580,4 +580,50 @@ class ExtensionOfferEvaluatorTest extends TestCase
         // Assert
         $this->assertEquals(120, $millions); // 12000 / 100 = 120 million
     }
+
+    // ============================================
+    // NULL-COALESCING EDGE CASES (mutation hardening)
+    // ============================================
+
+    public function testCalculateWinnerModifierWithMissingTeamFactors(): void
+    {
+        // Empty team factors → wins ?? 0, losses ?? 0 → winDiff = 0
+        $result = $this->evaluator->calculateWinnerModifier([], ['winner' => 3]);
+
+        $this->assertSame(0.0, $result);
+    }
+
+    public function testCalculateWinnerModifierWithMissingPreference(): void
+    {
+        // Missing 'winner' key → defaults to 1, so (1-1) = 0 → modifier = 0
+        $result = $this->evaluator->calculateWinnerModifier(
+            ['wins' => 50, 'losses' => 32],
+            []
+        );
+
+        $this->assertSame(0.0, $result);
+    }
+
+    public function testCalculateTraditionModifierWithMissingTeamFactors(): void
+    {
+        $result = $this->evaluator->calculateTraditionModifier([], ['tradition' => 3]);
+
+        $this->assertSame(0.0, $result);
+    }
+
+    public function testCalculateLoyaltyModifierWithMissingPreference(): void
+    {
+        // Missing 'loyalty' key → defaults to 1, so (1-1) = 0
+        $result = $this->evaluator->calculateLoyaltyModifier([]);
+
+        $this->assertSame(0.0, $result);
+    }
+
+    public function testCalculatePlayingTimeModifierWithMissingData(): void
+    {
+        // Missing money_committed → defaults to 0; missing playingTime → defaults to 1
+        $result = $this->evaluator->calculatePlayingTimeModifier([], []);
+
+        $this->assertSame(0.0, $result);
+    }
 }

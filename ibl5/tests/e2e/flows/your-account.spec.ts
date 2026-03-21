@@ -114,6 +114,32 @@ test.describe('Registration validation errors', () => {
   });
 });
 
+test.describe('Registration: duplicate username', () => {
+  test('existing username shows error', async ({ page }) => {
+    await page.goto('modules.php?name=YourAccount&op=new_user');
+
+    // Use a username known to exist in the database (test user from .env.test)
+    const testUser = process.env.IBL_TEST_USER || 'A-Jay';
+    await page.locator('#register-username').fill(testUser);
+    await page.locator('#register-email').fill('duplicate@test.example');
+    await page.locator('#register-password').fill('testpass12345');
+    await page.locator('#register-password2').fill('testpass12345');
+
+    const submitBtn = page.locator('button[type="submit"]').filter({
+      hasText: /create account/i,
+    });
+
+    await Promise.all([
+      page.waitForNavigation(),
+      submitBtn.click(),
+    ]);
+
+    // Should show error about username already being taken
+    const body = await page.locator('body').textContent();
+    expect(body).toMatch(/already|taken|exists|in use/i);
+  });
+});
+
 test.describe('Forgot password page', () => {
   test('forgot password form renders', async ({ page }) => {
     await page.goto('modules.php?name=YourAccount&op=pass_lost');

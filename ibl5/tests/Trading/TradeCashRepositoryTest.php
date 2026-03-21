@@ -10,7 +10,7 @@ use Trading\TradeCashRepository;
 /**
  * TradeCashRepositoryTest - Tests for TradeCashRepository database operations
  *
- * Tests all 11 methods: CRUD operations for cash transactions, cash player records,
+ * Tests cash transaction operations: cash player records,
  * cash trade offers, team cash salary records, and bulk clear.
  */
 class TradeCashRepositoryTest extends TestCase

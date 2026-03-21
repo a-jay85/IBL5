@@ -173,21 +173,21 @@ class TeamTableService implements TeamTableServiceInterface
         $yrStr = $yr ?? '';
         switch ($display) {
             case 'total_s':
-                return \UI::seasonTotals($this->db, $result, $team, $yrStr, $starterPids);
+                return \UI\Tables\SeasonTotals::render($this->db, $result, $team, $yrStr, $starterPids);
             case 'avg_s':
-                return \UI::seasonAverages($this->db, $result, $team, $yrStr, $starterPids);
+                return \UI\Tables\SeasonAverages::render($this->db, $result, $team, $yrStr, $starterPids);
             case 'per36mins':
-                return \UI::per36Minutes($this->db, $result, $team, $yrStr, $starterPids);
+                return \UI\Tables\Per36Minutes::render($this->db, $result, $team, $yrStr, $starterPids);
             case 'chunk':
-                return \UI::periodAverages($this->db, $team, $season, null, null, $starterPids);
+                return \UI\Tables\PeriodAverages::render($this->db, $team, $season, null, null, $starterPids);
             case 'playoffs':
-                return \UI::periodAverages($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids);
+                return \UI\Tables\PeriodAverages::render($this->db, $team, $season, $season->playoffsStartDate, $season->playoffsEndDate, $starterPids);
             case 'contracts':
-                return \UI::contracts($this->db, $result, $team, $season, $starterPids);
+                return \UI\Tables\Contracts::render($this->db, $result, $team, $season, $starterPids);
             case 'split':
                 return $this->renderSplitStats($team, $season, $split ?? 'home', $starterPids);
             default:
-                return \UI::ratings($this->db, $result, $team, $yrStr, $season, '', $starterPids);
+                return \UI\Tables\Ratings::render($this->db, $result, $team, $yrStr, $season, '', $starterPids);
         }
     }
 

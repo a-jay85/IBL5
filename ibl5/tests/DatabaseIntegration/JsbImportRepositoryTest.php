@@ -380,8 +380,16 @@ class JsbImportRepositoryTest extends DatabaseTestCase
 
     public function testResolveTeamIdByNameFindsAlias(): void
     {
-        // 'Hornets' maps to 'Sting' via TEAM_NAME_ALIASES
-        // 'Sting' is in the seed (ibl_team_info, teamid=10)
+        // Rename teamid=10 to 'Sting' within the transaction so the alias
+        // 'Hornets' → 'Sting' resolves (CI seed uses 'Spurs' for teamid=10)
+        $stmt = $this->db->prepare('UPDATE ibl_team_info SET team_name = ? WHERE teamid = ?');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('si', $name, $tid);
+        $name = 'Sting';
+        $tid = 10;
+        $stmt->execute();
+        $stmt->close();
+
         $result = $this->repo->resolveTeamIdByName('Hornets');
 
         self::assertSame(10, $result);

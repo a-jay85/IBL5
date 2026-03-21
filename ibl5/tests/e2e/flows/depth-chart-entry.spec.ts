@@ -94,3 +94,66 @@ test.describe('Depth Chart Entry flow', () => {
     await assertNoPhpErrors(page, 'on Depth Chart Entry');
   });
 });
+
+// ===========================================================================
+// NextSim position tab switching
+// ===========================================================================
+
+test.describe('DCE: NextSim position tabs', () => {
+  test.beforeEach(async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Regular Season' });
+    await page.goto('modules.php?name=DepthChartEntry');
+  });
+
+  test('position tabs render in NextSim section', async ({ page }) => {
+    const tabs = page.locator('.nextsim-tab-container .ibl-tab');
+    const count = await tabs.count();
+    if (count === 0) {
+      test.skip(true, 'No NextSim tabs (no games in sim window)');
+    }
+
+    // Should have 5 position tabs: PG, SG, SF, PF, C
+    expect(count).toBe(5);
+  });
+
+  test('clicking tab moves active state', async ({ page }) => {
+    const tabs = page.locator('.nextsim-tab-container .ibl-tab');
+    const count = await tabs.count();
+    if (count < 2) {
+      test.skip(true, 'No NextSim tabs (no games in sim window)');
+      return;
+    }
+
+    // First tab (PG) should be active by default
+    await expect(tabs.first()).toHaveClass(/ibl-tab--active/);
+
+    // Click SG tab — triggers AJAX which replaces container innerHTML.
+    // The JS removes ajax-loading BEFORE setting innerHTML, so we can't
+    // use the loading class as a wait signal. Instead, wait for the new
+    // active tab element to appear (a fresh locator re-queries the DOM).
+    await tabs.nth(1).click();
+
+    // Wait for the AJAX-rendered SG tab with active class to appear
+    const activeSgTab = page.locator(
+      '.nextsim-tab-container .ibl-tab--active[data-display="SG"]',
+    );
+    await expect(activeSgTab).toBeVisible({ timeout: 10000 });
+  });
+
+  test('tab click loads content without PHP errors', async ({ page }) => {
+    const tabs = page.locator('.nextsim-tab-container .ibl-tab');
+    const count = await tabs.count();
+    if (count < 3) {
+      test.skip(true, 'No NextSim tabs (no games in sim window)');
+      return;
+    }
+
+    // Click a non-default tab
+    const sfTab = tabs.nth(2);
+    await sfTab.click();
+
+    // Wait for AJAX content to load
+    await page.waitForTimeout(500);
+    await assertNoPhpErrors(page, 'after NextSim tab switch');
+  });
+});

@@ -82,7 +82,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             }
 
             $gameInfoLine = substr($line, 0, 58);
-            $boxscoreGameInfo = \Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase, $league);
+            $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase, $league);
 
             $upsertAction = $this->processGameUpsert($boxscoreGameInfo);
 
@@ -194,14 +194,14 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
      * Process a single 2000-byte game line: insert team totals and player stats
      *
      * @param string $line The 2000-byte game line
-     * @param \Boxscore $boxscoreGameInfo Parsed game info (with possible overrides)
+     * @param Boxscore $boxscoreGameInfo Parsed game info (with possible overrides)
      * @param string|null $visitorTeamName Override for visitor team-total name
      * @param string|null $homeTeamName Override for home team-total name
      * @return int Number of lines processed
      */
     private function processGameLine(
         string $line,
-        \Boxscore $boxscoreGameInfo,
+        Boxscore $boxscoreGameInfo,
         ?string $visitorTeamName = null,
         ?string $homeTeamName = null,
     ): int {
@@ -324,7 +324,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
     private function processRisingStarsGame(string $line, int $seasonEndingYear, array &$messages): void
     {
         $gameInfoLine = substr($line, 0, 58);
-        $boxscoreGameInfo = \Boxscore::withGameInfoLine($gameInfoLine, $seasonEndingYear, 'Regular Season/Playoffs');
+        $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $seasonEndingYear, 'Regular Season/Playoffs');
         $boxscoreGameInfo->overrideGameContext(
             sprintf('%d-%02d-%02d', $seasonEndingYear, \Season::IBL_ALL_STAR_MONTH, \Season::IBL_RISING_STARS_GAME_DAY),
             self::RISING_STARS_VISITOR_TID,
@@ -366,7 +366,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $gameDate = sprintf('%d-%02d-%02d', $seasonEndingYear, \Season::IBL_ALL_STAR_MONTH, \Season::IBL_ALL_STAR_GAME_DAY);
 
         $gameInfoLine = substr($line, 0, 58);
-        $boxscoreGameInfo = \Boxscore::withGameInfoLine($gameInfoLine, $seasonEndingYear, 'Regular Season/Playoffs');
+        $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $seasonEndingYear, 'Regular Season/Playoffs');
         $boxscoreGameInfo->overrideGameContext(
             $gameDate,
             self::ALL_STAR_VISITOR_TID,
@@ -434,7 +434,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
      *
      * @return string 'insert', 'skip', or 'update'
      */
-    protected function processGameUpsert(\Boxscore $boxscoreGameInfo): string
+    protected function processGameUpsert(Boxscore $boxscoreGameInfo): string
     {
         $existingGame = $this->repository->findTeamBoxscore(
             $boxscoreGameInfo->gameDate,

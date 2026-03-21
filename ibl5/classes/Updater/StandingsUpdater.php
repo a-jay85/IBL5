@@ -419,7 +419,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
             $log .= "Inserted standings for team: {$team['teamName']}<br>";
         }
 
-        \UI::displayDebugOutput($log, 'Computed Standings');
+        \UI\DebugOutput::display($log, 'Computed Standings');
     }
 
     private function updateMagicNumbers(string $region): void {
@@ -460,7 +460,7 @@ class StandingsUpdater extends \BaseMysqliRepository {
             $log .= $this->updateTeamMagicNumber($teamID, $teamName, $magicNumber, $groupingMagicNumber);
         }
 
-        \UI::displayDebugOutput($log, "{$region} Magic Number Update Log");
+        \UI\DebugOutput::display($log, "{$region} Magic Number Update Log");
 
         $this->checkIfRegionIsClinched($region);
         if ($grouping === 'conference') {

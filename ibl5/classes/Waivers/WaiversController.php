@@ -304,13 +304,13 @@ class WaiversController implements WaiversControllerInterface
     {
         switch ($display) {
             case 'total_s':
-                return \UI::seasonTotals($this->db, $result, $team, '');
+                return \UI\Tables\SeasonTotals::render($this->db, $result, $team, '');
             case 'avg_s':
-                return \UI::seasonAverages($this->db, $result, $team, '');
+                return \UI\Tables\SeasonAverages::render($this->db, $result, $team, '');
             case 'per36mins':
-                return \UI::per36Minutes($this->db, $result, $team, '');
+                return \UI\Tables\Per36Minutes::render($this->db, $result, $team, '');
             default:
-                return \UI::ratings($this->db, $result, $team, '', $season);
+                return \UI\Tables\Ratings::render($this->db, $result, $team, '', $season);
         }
     }
 

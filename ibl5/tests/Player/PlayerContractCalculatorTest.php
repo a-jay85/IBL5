@@ -580,4 +580,42 @@ class PlayerContractCalculatorTest extends TestCase
         $this->assertCount(6, $longBuyout);
         $this->assertCount(2, $shortBuyout);
     }
+
+    // ── Mutation hardening: null contractCurrentYear ────────────
+
+    public function testGetCurrentSeasonSalaryWithNullContractCurrentYear(): void
+    {
+        $playerData = new PlayerData();
+        // contractCurrentYear is null → defaults to 0 via null coalescing
+        // Year 0 falls into getSalaryForYear year=0 branch → returns contractYear1Salary ?? 0
+        $playerData->contractYear1Salary = 750;
+
+        $result = $this->calculator->getCurrentSeasonSalary($playerData);
+
+        // Year 0 → defaults to year 1 salary
+        $this->assertSame(750, $result);
+    }
+
+    public function testGetNextSeasonSalaryWithNullContractCurrentYear(): void
+    {
+        $playerData = new PlayerData();
+        // contractCurrentYear null → 0 + 1 = 1 → returns contractYear1Salary
+        $playerData->contractYear1Salary = 500;
+
+        $result = $this->calculator->getNextSeasonSalary($playerData);
+
+        $this->assertSame(500, $result);
+    }
+
+    public function testGetSalaryForYearBeyondSixReturnsZero(): void
+    {
+        $playerData = new PlayerData();
+        $playerData->contractCurrentYear = 6;
+        $playerData->contractYear6Salary = 3000;
+
+        // Next season after year 6 = year 7 → off the books → 0
+        $result = $this->calculator->getNextSeasonSalary($playerData);
+
+        $this->assertSame(0, $result);
+    }
 }

@@ -409,6 +409,68 @@ abstract class DatabaseTestCase extends TestCase
         ]);
     }
 
+    /**
+     * Insert a row into ibl_trade_offers (auto-increment only) and return the new ID.
+     */
+    protected function insertTradeOfferRow(): int
+    {
+        $stmt = $this->db->prepare("INSERT INTO ibl_trade_offers () VALUES ()");
+        self::assertNotFalse($stmt, 'Failed to prepare trade offer insert: ' . $this->db->error);
+        $stmt->execute();
+        $id = (int) $this->db->insert_id;
+        $stmt->close();
+        return $id;
+    }
+
+    /**
+     * Insert a row into ibl_trade_info.
+     */
+    protected function insertTradeInfoRow(int $offerId, int $itemId, string $itemType, string $from, string $to, string $approval = ''): void
+    {
+        $this->insertRow('ibl_trade_info', [
+            'tradeofferid' => $offerId,
+            'itemid' => $itemId,
+            'itemtype' => $itemType,
+            'trade_from' => $from,
+            'trade_to' => $to,
+            'approval' => $approval,
+        ]);
+    }
+
+    /**
+     * Insert a row into ibl_trade_cash (offer-based pattern).
+     *
+     * @param array{cy1?: int, cy2?: int, cy3?: int, cy4?: int, cy5?: int, cy6?: int} $years
+     */
+    protected function insertTradeCashRow(int $offerId, string $sending, string $receiving, array $years = []): void
+    {
+        $this->insertRow('ibl_trade_cash', [
+            'tradeOfferID' => $offerId,
+            'sendingTeam' => $sending,
+            'receivingTeam' => $receiving,
+            'cy1' => $years['cy1'] ?? 0,
+            'cy2' => $years['cy2'] ?? 0,
+            'cy3' => $years['cy3'] ?? 0,
+            'cy4' => $years['cy4'] ?? 0,
+            'cy5' => $years['cy5'] ?? 0,
+            'cy6' => $years['cy6'] ?? 0,
+        ]);
+    }
+
+    /**
+     * Insert a row into ibl_trade_queue and return the new ID.
+     *
+     * @param array<string, mixed> $params JSON-encodable parameters
+     */
+    protected function insertTradeQueueRow(string $opType, array $params, string $tradeline): int
+    {
+        return $this->insertRow('ibl_trade_queue', [
+            'operation_type' => $opType,
+            'params' => json_encode($params, JSON_THROW_ON_ERROR),
+            'tradeline' => $tradeline,
+        ]);
+    }
+
     private function requireEnv(string $name): string
     {
         $value = getenv($name);

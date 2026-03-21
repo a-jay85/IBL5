@@ -17,7 +17,6 @@ use Trading\Contracts\TradeCashRepositoryInterface;
  * @see BaseMysqliRepository For base class documentation and error codes
  *
  * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradeCashRepositoryInterface
- * @phpstan-import-type CashTransactionData from \Trading\Contracts\TradeCashRepositoryInterface
  * @phpstan-import-type CashPlayerData from \Trading\Contracts\TradeCashRepositoryInterface
  * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradeCashRepositoryInterface
  */
@@ -32,73 +31,6 @@ class TradeCashRepository extends BaseMysqliRepository implements TradeCashRepos
     public function __construct(\mysqli $db)
     {
         parent::__construct($db);
-    }
-
-    /**
-     * @see TradeCashRepositoryInterface::getCashDetails()
-     */
-    public function getCashDetails(string $teamName, int $row): ?array
-    {
-        /** @var TradeCashRow|null */
-        return $this->fetchOne(
-            "SELECT * FROM ibl_trade_cash WHERE teamname = ? AND row = ?",
-            "si",
-            $teamName,
-            $row
-        );
-    }
-
-    /**
-     * @see TradeCashRepositoryInterface::insertPositiveCashTransaction()
-     */
-    public function insertPositiveCashTransaction(array $data): int
-    {
-        return $this->execute(
-            "INSERT INTO ibl_trade_cash (teamname, year1, year2, year3, year4, year5, year6, row)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            "siiiiiii",
-            $data['teamname'],
-            $data['year1'],
-            $data['year2'],
-            $data['year3'],
-            $data['year4'],
-            $data['year5'],
-            $data['year6'],
-            $data['row']
-        );
-    }
-
-    /**
-     * @see TradeCashRepositoryInterface::insertNegativeCashTransaction()
-     */
-    public function insertNegativeCashTransaction(array $data): int
-    {
-        return $this->execute(
-            "INSERT INTO ibl_trade_cash (teamname, year1, year2, year3, year4, year5, year6, row)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            "siiiiiii",
-            $data['teamname'],
-            -$data['year1'],
-            -$data['year2'],
-            -$data['year3'],
-            -$data['year4'],
-            -$data['year5'],
-            -$data['year6'],
-            $data['row']
-        );
-    }
-
-    /**
-     * @see TradeCashRepositoryInterface::deleteCashTransaction()
-     */
-    public function deleteCashTransaction(string $teamName, int $row): int
-    {
-        return $this->execute(
-            "DELETE FROM ibl_trade_cash WHERE teamname = ? AND row = ?",
-            "si",
-            $teamName,
-            $row
-        );
     }
 
     /**

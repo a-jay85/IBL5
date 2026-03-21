@@ -145,6 +145,23 @@ class SeasonLeaderboardsRepositoryTest extends DatabaseTestCase
         }
     }
 
+    public function testGetSeasonLeadersReturnsEmptyForNoMatchingData(): void
+    {
+        $result = $this->repo->getSeasonLeaders(['year' => '8888'], 0);
+
+        self::assertSame(0, $result['count']);
+        self::assertSame([], $result['results']);
+    }
+
+    public function testGetYearsReturnsEmptyWhenNoHistData(): void
+    {
+        $this->db->query("DELETE FROM ibl_hist");
+
+        $years = $this->repo->getYears();
+
+        self::assertSame([], $years);
+    }
+
     public function testGetYearsReturnsDistinctDescending(): void
     {
         $pid = 200000061;

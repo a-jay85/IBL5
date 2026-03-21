@@ -55,8 +55,7 @@ $query = "SELECT * FROM vw_player_current WHERE uuid = ?";
 - `ibl_box_scores.gameid` -> `ibl_schedule.Date`
 
 ## Engine Status
-- **InnoDB (51):** All critical IBL tables - ACID transactions
-- **MyISAM (84):** Legacy PhpNuke CMS tables
+- **All tables are InnoDB** — ACID transactions, full rollback support in tests.
 
 ## Best Practices
 - Use prepared statements with mysqli

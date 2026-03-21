@@ -8,13 +8,6 @@ use Trading\TradeCashRepository;
 
 /**
  * Tests TradeCashRepository against real MariaDB — cash trade offers, player records, salary queries.
- *
- * NOTE: The following methods reference columns (teamname, year1-year6, row) that do not exist
- * in the ibl_trade_cash table schema. They are dead code and are not tested:
- *   - getCashDetails()
- *   - insertPositiveCashTransaction()
- *   - insertNegativeCashTransaction()
- *   - deleteCashTransaction()
  */
 class TradeCashRepositoryTest extends DatabaseTestCase
 {

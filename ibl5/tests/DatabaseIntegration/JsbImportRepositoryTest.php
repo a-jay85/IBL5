@@ -11,7 +11,7 @@ use JsbParser\JsbImportRepository;
  * ibl_jsb_transactions, ibl_jsb_history, ibl_jsb_allstar_rosters,
  * ibl_jsb_allstar_scores, ibl_rcb_alltime_records, ibl_rcb_season_records.
  *
- * resolveTeamId() is pure logic (no DB) — not tested here.
+ * Also covers resolveTeamId() (pure logic) and getPlayerName() (DB read).
  */
 class JsbImportRepositoryTest extends DatabaseTestCase
 {
@@ -427,5 +427,26 @@ class JsbImportRepositoryTest extends DatabaseTestCase
         $result = $this->repo->fetchMaxTradeGroupId();
 
         self::assertGreaterThanOrEqual(99999, $result);
+    }
+
+    // ── resolveTeamId ───────────────────────────────────────────
+
+    public function testResolveTeamIdReturnsValidId(): void
+    {
+        self::assertSame(5, $this->repo->resolveTeamId(5));
+        self::assertSame(0, $this->repo->resolveTeamId(0));
+        self::assertSame(28, $this->repo->resolveTeamId(28));
+        self::assertNull($this->repo->resolveTeamId(99));
+        self::assertNull($this->repo->resolveTeamId(-1));
+    }
+
+    // ── getPlayerName ───────────────────────────────────────────
+
+    public function testGetPlayerNameReturnsNameOrNull(): void
+    {
+        $this->insertTestPlayer(200100010, 'JSB Name Lookup');
+
+        self::assertSame('JSB Name Lookup', $this->repo->getPlayerName(200100010));
+        self::assertNull($this->repo->getPlayerName(999999999));
     }
 }

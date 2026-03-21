@@ -100,4 +100,24 @@ class SeriesRecordsRepositoryTest extends DatabaseTestCase
 
         self::assertGreaterThanOrEqual(28, $result);
     }
+
+    // ── Negative paths ──────────────────────────────────────────
+
+    public function testGetSeriesRecordsReturnsEmptyWhenScheduleIsEmpty(): void
+    {
+        $this->db->query('DELETE FROM ibl_schedule WHERE 1=1');
+
+        $result = $this->repo->getSeriesRecords();
+
+        self::assertSame([], $result);
+    }
+
+    public function testGetMaxTeamIdReturnsZeroWhenScheduleIsEmpty(): void
+    {
+        $this->db->query('DELETE FROM ibl_schedule WHERE 1=1');
+
+        $result = $this->repo->getMaxTeamId();
+
+        self::assertSame(0, $result);
+    }
 }

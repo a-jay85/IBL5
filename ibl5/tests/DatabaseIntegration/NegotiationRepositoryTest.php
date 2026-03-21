@@ -102,4 +102,13 @@ class NegotiationRepositoryTest extends DatabaseTestCase
             self::assertGreaterThanOrEqual(1, $maximums[$key], "Key $key should be >= 1");
         }
     }
+
+    // ── Negative path ───────────────────────────────────────────
+
+    public function testGetPositionSalaryCommitmentReturnsZeroForUnknownTeam(): void
+    {
+        $result = $this->repo->getPositionSalaryCommitment('ZZ_NoTeam_B9', 'PG', 'SomePlayer');
+
+        self::assertSame(0, $result);
+    }
 }

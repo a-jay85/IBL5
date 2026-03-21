@@ -389,6 +389,41 @@ class TeamRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $series['loser_games']);
     }
 
+    // ── getFreeAgencyRoster ────────────────────────────────────
+
+    public function testGetFreeAgencyRosterExcludesExpiringContracts(): void
+    {
+        // Non-expiring: cy=1, cyt=3 (cy != cyt → included)
+        $this->insertTestPlayer(200100001, 'FA Roster Keep', ['tid' => 1, 'cy' => 1, 'cyt' => 3]);
+        // Expiring: cy=3, cyt=3 (cy == cyt → excluded by SQL `cyt != cy`)
+        $this->insertTestPlayer(200100002, 'FA Roster Expire', ['tid' => 1, 'cy' => 3, 'cyt' => 3]);
+
+        $result = $this->repo->getFreeAgencyRoster(1);
+
+        $names = array_column($result, 'name');
+        self::assertContains('FA Roster Keep', $names);
+        self::assertNotContains('FA Roster Expire', $names);
+    }
+
+    // ── getEntireLeagueRoster ───────────────────────────────────
+
+    public function testGetEntireLeagueRosterExcludesBuyoutAndRetired(): void
+    {
+        $this->insertTestPlayer(200100003, 'League Active', ['retired' => 0]);
+        $this->insertTestPlayer(200100004, 'League Retired', ['retired' => 1]);
+        $this->insertTestPlayer(200100005, 'Cash Buyouts', ['retired' => 0, 'name' => 'Cash Buyouts']);
+
+        $result = $this->repo->getEntireLeagueRoster();
+
+        self::assertNotEmpty($result);
+        $names = array_column($result, 'name');
+        self::assertContains('League Active', $names);
+        self::assertNotContains('League Retired', $names);
+        foreach ($names as $name) {
+            self::assertStringNotContainsString('Buyouts', $name);
+        }
+    }
+
     private function ensureStandingsAndPowerExist(int $tid, string $division, string $conference): void
     {
         // Use REPLACE to ensure data exists within transaction regardless of DB state

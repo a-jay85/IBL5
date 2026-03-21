@@ -8,9 +8,6 @@ use Negotiation\NegotiationRepository;
 
 /**
  * Tests NegotiationRepository against real MariaDB — team performance, salary queries, FA status.
- *
- * Note: nuke_modules is MyISAM and does not support transactions.
- * The isFreeAgencyActive test reads existing production data rather than inserting.
  */
 class NegotiationRepositoryTest extends DatabaseTestCase
 {
@@ -80,7 +77,7 @@ class NegotiationRepositoryTest extends DatabaseTestCase
 
     public function testIsFreeAgencyActiveReturnsBool(): void
     {
-        // nuke_modules is MyISAM — reads existing production data
+        // Reads existing seed data for module active status
         $active = $this->repo->isFreeAgencyActive();
 
         self::assertIsBool($active);

@@ -11,46 +11,11 @@ namespace Trading\Contracts;
  * Extracted from TradingRepositoryInterface to follow single-responsibility principle.
  *
  * @phpstan-type TradeCashRow array{tradeOfferID: int, sendingTeam: string, receivingTeam: string, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
- * @phpstan-type CashTransactionData array{teamname: string, year1: int, year2: int, year3: int, year4: int, year5: int, year6: int, row: int}
  * @phpstan-type CashPlayerData array{ordinal: int, pid: int, name: string, tid: int, exp: int, cy: int, cyt: int, cy1: int, cy2: int, cy3: int, cy4: int, cy5: int, cy6: int, retired: int}
  * @phpstan-type TradingPlayerRow array{pos: string, name: string, pid: int, ordinal: ?int, cy: ?int, cy1: ?int, cy2: ?int, cy3: ?int, cy4: ?int, cy5: ?int, cy6: ?int}
  */
 interface TradeCashRepositoryInterface
 {
-    /**
-     * Get cash transaction details for a specific team and row
-     *
-     * @param string $teamName Team name
-     * @param int $row Row number
-     * @return TradeCashRow|null Cash details or null if not found
-     */
-    public function getCashDetails(string $teamName, int $row): ?array;
-
-    /**
-     * Insert positive cash transaction (team receiving cash)
-     *
-     * @param CashTransactionData $data Cash transaction data with keys: teamname, year1-6, row
-     * @return int Number of rows affected
-     */
-    public function insertPositiveCashTransaction(array $data): int;
-
-    /**
-     * Insert negative cash transaction (team sending cash)
-     *
-     * @param CashTransactionData $data Cash transaction data with keys: teamname, year1-6, row
-     * @return int Number of rows affected
-     */
-    public function insertNegativeCashTransaction(array $data): int;
-
-    /**
-     * Delete cash transaction for a team and row
-     *
-     * @param string $teamName Team name
-     * @param int $row Row number
-     * @return int Number of rows affected
-     */
-    public function deleteCashTransaction(string $teamName, int $row): int;
-
     /**
      * Get cash transaction by offer ID and sending team
      *

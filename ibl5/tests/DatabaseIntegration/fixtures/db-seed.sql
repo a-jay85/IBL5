@@ -224,8 +224,6 @@ VALUES
 ON DUPLICATE KEY UPDATE team_name = VALUES(team_name);
 
 -- nuke_modules: Draft and Free_Agency entries
--- Note: nuke_modules uses MyISAM — not covered by transaction rollback.
--- Tests that modify this table must clean up manually.
 INSERT INTO nuke_modules (title, custom_title, active, view, inmenu, mod_group, admins)
 VALUES ('Draft', 'Draft', 1, 0, 1, 0, '')
 ON DUPLICATE KEY UPDATE active = 1;
@@ -253,7 +251,6 @@ VALUES (2, 'Los Angeles', 'Stars', 'Another Player')
 ON DUPLICATE KEY UPDATE MVP_1 = VALUES(MVP_1);
 
 -- Transaction history entries (nuke_stories with transaction categories)
--- Note: nuke_stories uses MyISAM — not covered by transaction rollback.
 INSERT INTO nuke_stories (sid, catid, aid, title, time, hometext, comments, counter, topic, informant, ihome, acomm, haspoll, pollID, score, ratings)
 VALUES (1, 1, 'admin', 'Metros sign Test Player One', '2024-03-15 12:00:00', 'Details...', 0, 0, 1, '', 0, 0, 0, 0, 0, 0)
 ON DUPLICATE KEY UPDATE title = VALUES(title);

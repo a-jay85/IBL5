@@ -122,4 +122,11 @@ class DraftPickLocatorRepositoryTest extends DatabaseTestCase
             self::assertLessThan($secondIndex, $firstIndex);
         }
     }
+
+    public function testGetDraftPicksForTeamReturnsEmptyForTeamWithNoPicks(): void
+    {
+        $picks = $this->repo->getDraftPicksForTeam(99999);
+
+        self::assertSame([], $picks);
+    }
 }

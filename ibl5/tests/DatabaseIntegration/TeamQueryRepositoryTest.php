@@ -377,6 +377,6 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
     public function testCanAddBuyoutExceedingLimitReturnsFalse(): void
     {
         // Adding the entire hard cap always exceeds the buyout percentage limit
-        self::assertFalse($this->repo->canAddBuyoutWithoutExceedingBuyoutLimit(99999, \League::HARD_CAP_MAX));
+        self::assertFalse($this->repo->canAddBuyoutWithoutExceedingBuyoutLimit(99999, League::HARD_CAP_MAX));
     }
 }

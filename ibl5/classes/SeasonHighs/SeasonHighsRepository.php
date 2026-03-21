@@ -64,7 +64,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         };
 
         // For player stats (no suffix), JOIN with ibl_plr to get full names
-        // The ibl_box_scores.name field is varchar(16) which truncates longer names
+        // The ibl_box_scores.name field truncates longer names (see Boxscore::MAX_PLAYER_NAME_LENGTH)
         // The ibl_plr.name field is varchar(32) which stores full names
         // Also JOIN with ibl_schedule to get BoxID for linking to box scores
         // Also JOIN with ibl_team_info to get team colors for styled team cell

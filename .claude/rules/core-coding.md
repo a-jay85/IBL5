@@ -10,7 +10,7 @@ Quick reference for frequently-used patterns not covered in CLAUDE.md.
 $repo->getUserByUsername(string $username): ?array
 $repo->getTeamByName(string $teamName): ?array
 $repo->getPlayerByID(int $playerID): ?array
-$repo->getTeamnameFromUsername(?string $username): ?string  // Returns "Free Agents" if null/empty; null if not found
+$repo->getTeamnameFromUsername(?string $username): ?string  // Returns League::FREE_AGENTS_TEAM_NAME if null/empty; null if not found
 $repo->getTidFromTeamname(string $teamName): ?int
 $repo->getTeamTotalSalary(string $teamName): int
 $repo->getTeamDiscordID(string $teamName): ?int

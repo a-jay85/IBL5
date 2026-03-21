@@ -203,7 +203,7 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
     public function setWaiversToFreeAgents(): bool
     {
         $this->execute(
-            "UPDATE ibl_plr SET teamname = 'Free Agents', bird = 0 WHERE retired <> 1 AND ordinal > " . \JSB::WAIVERS_ORDINAL
+            "UPDATE ibl_plr SET teamname = '" . \League::FREE_AGENTS_TEAM_NAME . "', bird = 0 WHERE retired <> 1 AND ordinal > " . \JSB::WAIVERS_ORDINAL
         );
 
         return true;

@@ -6,9 +6,6 @@ namespace Bootstrap;
 
 /**
  * Typed path constants for the application.
- *
- * Replaces the runtime-defined IBL5_ROOT constant (which PHPStan sees as mixed)
- * with a typed static method that returns string directly.
  */
 final class AppPaths
 {

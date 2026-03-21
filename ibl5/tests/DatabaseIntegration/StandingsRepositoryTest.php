@@ -132,6 +132,32 @@ class StandingsRepositoryTest extends DatabaseTestCase
         self::assertGreaterThan(0, $result['pointsAllowed']);
     }
 
+    // ── getAllPythagoreanStats ─────────────────────────────────
+
+    public function testGetAllPythagoreanStatsReturnsKeyedArray(): void
+    {
+        $this->insertFranchiseSeasonRow(1, 2098, 'Metros');
+        $this->insertFranchiseSeasonRow(2, 2098, 'Sharks');
+        $this->insertTeamBoxscoreRow('2098-01-20', 'Metros', 1, 2, 1);
+        $this->insertTeamBoxscoreRow('2098-01-20', 'Sharks', 1, 2, 1);
+
+        $result = $this->repo->getAllPythagoreanStats(2098);
+
+        self::assertNotEmpty($result);
+        $firstKey = array_key_first($result);
+        self::assertIsInt($firstKey);
+        $firstRow = $result[$firstKey];
+        self::assertArrayHasKey('pointsScored', $firstRow);
+        self::assertArrayHasKey('pointsAllowed', $firstRow);
+    }
+
+    public function testGetAllPythagoreanStatsReturnsEmptyForNoBoxscores(): void
+    {
+        $result = $this->repo->getAllPythagoreanStats(8888);
+
+        self::assertSame([], $result);
+    }
+
     public function testGetSeriesRecordsReflectsScheduleData(): void
     {
         // Seed data has schedule row: Year=2025, Visitor=2, VScore=85, Home=1, HScore=104

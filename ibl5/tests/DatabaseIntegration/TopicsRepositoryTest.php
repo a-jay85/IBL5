@@ -8,7 +8,7 @@ use Topics\TopicsRepository;
 
 /**
  * Tests TopicsRepository against real MariaDB — topic listings with
- * story counts and recent articles from nuke_* tables (MyISAM, read-only).
+ * story counts and recent articles from nuke_* tables (read-only).
  */
 class TopicsRepositoryTest extends DatabaseTestCase
 {
@@ -43,7 +43,7 @@ class TopicsRepositoryTest extends DatabaseTestCase
             self::assertArrayHasKey('recentArticles', $first);
             self::assertIsArray($first['recentArticles']);
         }
-        // If empty, the method executed without error — sufficient for MyISAM read-only tests
+        // If empty, the method executed without error — sufficient for read-only tests
         self::assertIsArray($topics);
     }
 }

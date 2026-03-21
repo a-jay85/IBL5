@@ -257,4 +257,23 @@ class SavedDepthChartRepositoryTest extends DatabaseTestCase
 
         self::assertFalse($result);
     }
+
+    // ── getLiveRosterSettings ───────────────────────────────────
+
+    public function testGetLiveRosterSettingsReturnsPlayersForTeam(): void
+    {
+        $this->insertTestPlayer(200100020, 'Live Roster P1', ['tid' => 1, 'retired' => 0, 'ordinal' => 100]);
+
+        $result = $this->repo->getLiveRosterSettings(1);
+
+        self::assertNotEmpty($result);
+        $names = array_column($result, 'name');
+        self::assertContains('Live Roster P1', $names);
+
+        $first = $result[0];
+        self::assertArrayHasKey('dc_PGDepth', $first);
+        self::assertArrayHasKey('dc_minutes', $first);
+        self::assertArrayHasKey('dc_of', $first);
+        self::assertArrayHasKey('dc_bh', $first);
+    }
 }

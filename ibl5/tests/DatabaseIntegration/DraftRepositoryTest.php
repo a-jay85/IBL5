@@ -117,6 +117,34 @@ class DraftRepositoryTest extends DatabaseTestCase
         self::assertTrue($found, 'Inserted draft class player not found in getAllDraftClassPlayers');
     }
 
+    // ── createPlayerFromDraftClass ─────────────────────────────
+
+    public function testCreatePlayerFromDraftClassInsertsNewPlayer(): void
+    {
+        $this->insertDraftClassRow('B10 Draft Prospect', 'PG', [
+            'oo' => 70, 'od' => 65, 'po' => 50, 'to' => 55,
+            'do' => 60, 'dd' => 68, 'pd' => 45, 'td' => 52,
+            'age' => 22, 'talent' => 80, 'skill' => 75, 'intangibles' => 70,
+        ]);
+
+        $result = $this->repo->createPlayerFromDraftClass('B10 Draft Prospect', 'Metros');
+
+        self::assertTrue($result);
+
+        $stmt = $this->db->prepare("SELECT pid, name, tid, pos FROM ibl_plr WHERE name = ? AND pid >= 90000");
+        self::assertNotFalse($stmt);
+        $name = 'B10 Draft Prospect';
+        $stmt->bind_param('s', $name);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row, 'Drafted player should exist in ibl_plr');
+        self::assertGreaterThanOrEqual(90000, $row['pid']);
+        self::assertSame(1, $row['tid']);
+        self::assertSame('PG', $row['pos']);
+    }
+
     public function testGetCurrentDraftPickReturnsFirstEmptySlot(): void
     {
         // Clear any existing empty draft slots from production data

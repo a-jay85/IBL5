@@ -8,11 +8,9 @@ use Search\SearchRepository;
 
 /**
  * Tests SearchRepository against real MariaDB — story, comment, and user
- * searches across nuke_* tables (MyISAM, read-only queries), plus topic,
+ * searches across nuke_* tables (read-only queries), plus topic,
  * category, and author lookups.
- *
- * MyISAM tables don't support transaction rollback, but all methods here
- * are read-only. Tests rely on CI seed data (nuke_stories, nuke_users).
+ * All methods here are read-only. Tests rely on CI seed data.
  */
 class SearchRepositoryTest extends DatabaseTestCase
 {

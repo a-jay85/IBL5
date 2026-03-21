@@ -8,9 +8,7 @@ use TransactionHistory\TransactionHistoryRepository;
 
 /**
  * Tests TransactionHistoryRepository against real MariaDB.
- *
- * Note: nuke_stories uses MyISAM, so inserts are NOT rolled back by transaction.
- * Tests only read seed data — no writes to MyISAM tables.
+ * Tests only read seed data.
  */
 class TransactionHistoryRepositoryTest extends DatabaseTestCase
 {

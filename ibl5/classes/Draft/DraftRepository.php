@@ -140,7 +140,7 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
                 pid, name, age, tid, pos,
                 sta, oo, od, po, `to`, `do`, dd, pd, td,
                 talent, skill, intangibles,
-                active, bird, exp, cy, cyt, retired
+                dc_canPlayInGame, bird, exp, cy, cyt, retired
             ) VALUES (
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?, ?,

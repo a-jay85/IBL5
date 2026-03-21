@@ -185,4 +185,85 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
         $value = $this->repo->getSetting('Trivia Mode');
         self::assertSame('Off', $value);
     }
+
+    // ── setShowDraftLink ────────────────────────────────────────
+
+    public function testSetShowDraftLinkUpdatesSettingsAndModule(): void
+    {
+        $this->repo->setShowDraftLink('On');
+
+        $value = $this->repo->getSetting('Show Draft Link');
+        self::assertSame('On', $value);
+
+        $stmt = $this->db->prepare("SELECT active FROM nuke_modules WHERE title = 'Draft'");
+        self::assertNotFalse($stmt);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertSame(1, $row['active']);
+    }
+
+    // ── setWaiversToFreeAgents ──────────────────────────────────
+
+    public function testSetWaiversToFreeAgentsMovesPlayers(): void
+    {
+        $this->insertTestPlayer(200100030, 'Waiver Player B10', [
+            'tid' => 1,
+            'ordinal' => 970,
+            'retired' => 0,
+            'bird' => 3,
+        ]);
+
+        $this->repo->setWaiversToFreeAgents();
+
+        $stmt = $this->db->prepare("SELECT tid, bird FROM ibl_plr WHERE pid = ?");
+        self::assertNotFalse($stmt);
+        $pid = 200100030;
+        $stmt->bind_param('i', $pid);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertSame(0, $row['tid']);
+        self::assertSame(0, $row['bird']);
+    }
+
+    // ── setFreeAgencyFactorsForPfw ──────────────────────────────
+
+    public function testSetFreeAgencyFactorsForPfwUpdatesTeamInfo(): void
+    {
+        $this->db->query("DELETE FROM ibl_standings WHERE tid = 1");
+        $this->insertRow('ibl_standings', [
+            'tid' => 1,
+            'team_name' => 'Metros',
+            'wins' => 42,
+            'losses' => 8,
+            'pct' => 0.840,
+            'leagueRecord' => '42-8',
+            'conference' => 'East',
+            'division' => 'Atlantic',
+            'confRecord' => '25-5',
+            'confGB' => 0.0,
+            'divRecord' => '12-0',
+            'divGB' => 0.0,
+            'homeRecord' => '25-0',
+            'awayRecord' => '17-8',
+            'gamesUnplayed' => 0,
+        ]);
+
+        $this->repo->setFreeAgencyFactorsForPfw();
+
+        $stmt = $this->db->prepare("SELECT Contract_Wins, Contract_Losses FROM ibl_team_info WHERE teamid = 1");
+        self::assertNotFalse($stmt);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertSame(42, $row['Contract_Wins']);
+        self::assertSame(8, $row['Contract_Losses']);
+    }
 }

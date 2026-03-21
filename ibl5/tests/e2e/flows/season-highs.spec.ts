@@ -14,38 +14,48 @@ test.describe('Season Highs flow', () => {
   });
 
   test('stat tables are displayed in grid layout', async ({ page }) => {
+    // CI seed has box scores — grid should render
     const grid = page.locator('.ibl-grid');
-    const count = await grid.count();
-    if (count > 0) {
-      await expect(grid.first()).toBeVisible();
-    }
-    // Individual stat tables should be visible
+    await expect(grid.first()).toBeVisible();
+
     const tables = page.locator('.stat-table, .ibl-data-table');
     await expect(tables.first()).toBeVisible();
   });
 
-  test('stat tables have rank and value columns', async ({ page }) => {
+  test('multiple stat category tables visible', async ({ page }) => {
+    // CI seed box scores produce points, rebounds, assists categories at minimum
+    const tables = page.locator('.stat-table, .ibl-data-table');
+    const count = await tables.count();
+    expect(count).toBeGreaterThanOrEqual(3);
+  });
+
+  test('stat tables have header content', async ({ page }) => {
     const table = page.locator('.stat-table, .ibl-data-table').first();
     await expect(table).toBeVisible();
-    // Tables use colspan headers for stat category names
     const headerText = await table.locator('thead').textContent();
     expect(headerText!.length).toBeGreaterThan(0);
   });
 
-  test('player links exist in stat tables', async ({ page }) => {
+  test('player links navigate to valid player pages', async ({ page }) => {
     const playerLinks = page.locator('.stat-table a[href*="pid="], .ibl-data-table a[href*="pid="]');
-    const count = await playerLinks.count();
-    if (count > 0) {
-      const href = await playerLinks.first().getAttribute('href');
-      expect(href).toContain('name=Player');
-    }
+    await expect(playerLinks.first()).toBeVisible();
+
+    const href = await playerLinks.first().getAttribute('href');
+    expect(href).toContain('name=Player');
+
+    // Navigate to player page and verify
+    await page.goto(href!);
+    await assertNoPhpErrors(page, 'on player page from Season Highs');
+    await expect(page.locator('h2, h3').first()).toBeVisible();
   });
 
-  test('multiple stat categories are displayed', async ({ page }) => {
-    const tables = page.locator('.stat-table, .ibl-data-table');
-    const count = await tables.count();
-    // Should have multiple stat category tables (points, rebounds, assists, etc.)
-    expect(count).toBeGreaterThanOrEqual(1);
+  test('stat values are numeric', async ({ page }) => {
+    const valueCells = page.locator('.value-cell');
+    const count = await valueCells.count();
+    if (count > 0) {
+      const text = await valueCells.first().textContent();
+      expect(text?.trim()).toMatch(/^\d+(\.\d+)?$/);
+    }
   });
 
   test('no PHP errors', async ({ page }) => {

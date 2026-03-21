@@ -125,16 +125,20 @@ test.describe('DCE: NextSim position tabs', () => {
     }
 
     // First tab (PG) should be active by default
-    const pgTab = tabs.first();
-    await expect(pgTab).toHaveClass(/ibl-tab--active/);
+    await expect(tabs.first()).toHaveClass(/ibl-tab--active/);
 
-    // Click SG tab (second tab)
-    const sgTab = tabs.nth(1);
-    await sgTab.click();
+    // Click SG tab — this triggers AJAX which replaces container innerHTML
+    // (including all tab elements). Wait for the swap to complete.
+    await tabs.nth(1).click();
 
-    // SG should now be active, PG should not
-    await expect(sgTab).toHaveClass(/ibl-tab--active/);
-    await expect(pgTab).not.toHaveClass(/ibl-tab--active/);
+    // Wait for AJAX to finish — container loses ajax-loading class
+    const container = page.locator('.nextsim-tab-container');
+    await expect(container).not.toHaveClass(/ajax-loading/, { timeout: 10000 });
+
+    // After AJAX swap, new tab elements exist — re-query and verify active state
+    const newTabs = page.locator('.nextsim-tab-container .ibl-tab');
+    await expect(newTabs.nth(1)).toHaveClass(/ibl-tab--active/);
+    await expect(newTabs.first()).not.toHaveClass(/ibl-tab--active/);
   });
 
   test('tab click loads content without PHP errors', async ({ page }) => {

@@ -32,32 +32,24 @@ test.describe('Topics flow', () => {
     }
   });
 
-  test('search form present with filters and radios', async ({ page }) => {
-    // Skip if no topics (empty state has no search form)
-    const grid = page.locator('.topics-grid');
-    if ((await grid.count()) === 0) {
-      test.skip(true, 'No topics rendered — search form not shown');
-    }
+  // CI seed has 3 nuke_topics rows and stories linked to topic=1,
+  // so the topics grid will render with search form visible.
 
+  test('search form present with filters and radios', async ({ page }) => {
+    await expect(page.locator('.topics-grid')).toBeVisible();
     await assertSearchFormPresent(page);
     await assertFilterDropdownsPresent(page);
     await assertSearchTypeRadiosPresent(page);
   });
 
   test('search form submits to Search module', async ({ page }) => {
-    const grid = page.locator('.topics-grid');
-    if ((await grid.count()) === 0) {
-      test.skip(true, 'No topics rendered — search form not shown');
-    }
-
+    await expect(page.locator('.topics-grid')).toBeVisible();
     await assertSearchSubmitsTo(page, 'trade', 'name=Search');
   });
 
   test('topic card links work', async ({ page }) => {
     const topicLinks = page.locator('.topic-card__title a');
-    if ((await topicLinks.count()) === 0) {
-      test.skip(true, 'No topic card links available');
-    }
+    await expect(topicLinks.first()).toBeVisible();
 
     const href = await topicLinks.first().getAttribute('href');
     expect(href).toContain('name=News');

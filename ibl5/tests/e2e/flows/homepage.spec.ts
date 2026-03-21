@@ -11,31 +11,27 @@ test.describe('Homepage flow', () => {
     await expect(page).toHaveTitle(/IBL/i);
   });
 
-  test('news section renders article titles', async ({ page }) => {
-    // CI seed has 3 news articles — at least 1 should render
-    const articles = page.locator('.ibl-story, .story-title, [class*="story"]');
-    const count = await articles.count();
+  test('navigation bar renders', async ({ page }) => {
+    await expect(page.locator('nav.fixed').first()).toBeVisible();
+  });
+
+  test('news section renders article links', async ({ page }) => {
+    // CI seed has news articles — look for article links with sid=
+    const articleLinks = page.locator('a[href*="sid="]');
+    await expect(articleLinks.first()).toBeVisible();
+  });
+
+  test('article links point to News module', async ({ page }) => {
+    const articleLinks = page.locator('a[href*="sid="]');
+    const count = await articleLinks.count();
     if (count > 0) {
-      await expect(articles.first()).toBeVisible();
-    } else {
-      // Fallback: news articles might render as links
-      const newsLinks = page.locator('a[href*="sid="]');
-      expect(await newsLinks.count()).toBeGreaterThanOrEqual(1);
+      const href = await articleLinks.first().getAttribute('href');
+      expect(href).toContain('News');
     }
   });
 
-  test('article titles are non-empty', async ({ page }) => {
-    // Look for story content in the main body
-    const body = await page.locator('body').textContent();
-    // CI seed articles should be present
-    expect(body).toContain('IBL');
-  });
-
-  test('sidebar renders content', async ({ page }) => {
-    // The homepage should have sidebar blocks
-    const body = await page.locator('body').textContent();
-    // Page should have substantial content (not just a bare title)
-    expect(body!.length).toBeGreaterThan(100);
+  test('main content area renders', async ({ page }) => {
+    await expect(page.locator('#site-content').first()).toBeVisible();
   });
 
   test('no PHP errors on homepage', async ({ page }) => {

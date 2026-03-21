@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace TeamOffDefStats;
 
+use League\League;
 use TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface;
 
 /**
@@ -76,7 +77,7 @@ class TeamOffDefStatsRepository extends \BaseMysqliRepository implements TeamOff
             FROM ibl_team_info ti
             LEFT JOIN ibl_team_offense_stats tos ON ti.teamid = tos.teamID AND tos.season_year = ?
             LEFT JOIN ibl_team_defense_stats tds ON ti.teamid = tds.teamID AND tds.season_year = ?
-            WHERE ti.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
+            WHERE ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
             ORDER BY ti.team_city
         ";
 

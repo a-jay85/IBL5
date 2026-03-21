@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CapSpace;
 
 use CapSpace\Contracts\CapSpaceRepositoryInterface;
+use League\League;
 use Team\Contracts\TeamQueryRepositoryInterface;
 
 /**
@@ -73,12 +74,12 @@ class CapSpaceService
 
         // Calculate available salary for each year
         $availableSalary = [
-            'year1' => \League::HARD_CAP_MAX - $salaryCapSpent['year1'],
-            'year2' => \League::HARD_CAP_MAX - $salaryCapSpent['year2'],
-            'year3' => \League::HARD_CAP_MAX - $salaryCapSpent['year3'],
-            'year4' => \League::HARD_CAP_MAX - $salaryCapSpent['year4'],
-            'year5' => \League::HARD_CAP_MAX - $salaryCapSpent['year5'],
-            'year6' => \League::HARD_CAP_MAX - $salaryCapSpent['year6'],
+            'year1' => League::HARD_CAP_MAX - $salaryCapSpent['year1'],
+            'year2' => League::HARD_CAP_MAX - $salaryCapSpent['year2'],
+            'year3' => League::HARD_CAP_MAX - $salaryCapSpent['year3'],
+            'year4' => League::HARD_CAP_MAX - $salaryCapSpent['year4'],
+            'year5' => League::HARD_CAP_MAX - $salaryCapSpent['year5'],
+            'year6' => League::HARD_CAP_MAX - $salaryCapSpent['year6'],
         ];
 
         // Get salary by position — fetch all players under contract once, partition by position

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Standings;
 
+use League\League;
 use SeriesRecords\Contracts\SeriesRecordsServiceInterface;
 use Standings\Contracts\StandingsRepositoryInterface;
 use Standings\Contracts\StandingsViewInterface;
@@ -75,7 +76,7 @@ class StandingsView implements StandingsViewInterface
         $html = '';
 
         foreach ($regions as $region) {
-            $isConference = in_array($region, \League::CONFERENCE_NAMES, true);
+            $isConference = in_array($region, League::CONFERENCE_NAMES, true);
             $gbColumn = $isConference ? 'confGB' : 'divGB';
 
             $regionTeams = $grouped[$region] ?? [];
@@ -234,7 +235,7 @@ class StandingsView implements StandingsViewInterface
      */
     private function getGroupingType(string $region): string
     {
-        if (in_array($region, \League::CONFERENCE_NAMES, true)) {
+        if (in_array($region, League::CONFERENCE_NAMES, true)) {
             return 'Conference';
         }
 

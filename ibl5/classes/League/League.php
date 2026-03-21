@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+namespace League;
+
+use BaseMysqliRepository;
+use JSB;
+use Season;
+
 /**
  * League - IBL league-wide operations and queries
  *
@@ -247,7 +253,7 @@ class League extends BaseMysqliRepository
             WHERE teamid BETWEEN 1 AND ?
             ORDER BY owner_name",
             "i",
-            League::MAX_REAL_TEAMID
+            self::MAX_REAL_TEAMID
         );
     }
 
@@ -264,7 +270,7 @@ class League extends BaseMysqliRepository
             WHERE teamid BETWEEN 1 AND ?
             ORDER BY teamid ASC",
             "i",
-            League::MAX_REAL_TEAMID
+            self::MAX_REAL_TEAMID
         );
     }
 }

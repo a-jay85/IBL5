@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace LeagueSchedule\Contracts;
 
+use League\League;
+
 /**
  * LeagueScheduleServiceInterface - Contract for league schedule business logic
  *
@@ -46,13 +48,13 @@ interface LeagueScheduleServiceInterface
      * Get organized schedule page data
      *
      * @param \Season $season Current season
-     * @param \League $league Current league
+     * @param League $league Current league
      * @param \Services\CommonMysqliRepository $commonRepo Common repository for team name lookups
      * @return SchedulePageData
      */
     public function getSchedulePageData(
         \Season $season,
-        \League $league,
+        League $league,
         \Services\CommonMysqliRepository $commonRepo
     ): array;
 }

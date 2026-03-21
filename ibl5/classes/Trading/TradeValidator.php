@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Trading;
 
+use League\League;
 use Trading\Contracts\TradeValidatorInterface;
 
 /**
@@ -69,11 +70,11 @@ class TradeValidator implements TradeValidatorInterface
 
         $errors = [];
 
-        if ($userPostTradeCapTotal > \League::HARD_CAP_MAX) {
+        if ($userPostTradeCapTotal > League::HARD_CAP_MAX) {
             $errors[] = 'This trade is illegal since it puts you over the hard cap.';
         }
 
-        if ($partnerPostTradeCapTotal > \League::HARD_CAP_MAX) {
+        if ($partnerPostTradeCapTotal > League::HARD_CAP_MAX) {
             $errors[] = 'This trade is illegal since it puts other team over the hard cap.';
         }
 

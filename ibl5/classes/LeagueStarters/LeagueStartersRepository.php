@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LeagueStarters;
 
+use League\League;
 use LeagueStarters\Contracts\LeagueStartersRepositoryInterface;
 
 /**
@@ -28,7 +29,7 @@ class LeagueStartersRepository extends \BaseMysqliRepository implements LeagueSt
               AND p.tid BETWEEN 1 AND ?
               AND (p.PGDepth = 1 OR p.SGDepth = 1 OR p.SFDepth = 1 OR p.PFDepth = 1 OR p.CDepth = 1)",
             'i',
-            \League::MAX_REAL_TEAMID
+            League::MAX_REAL_TEAMID
         );
     }
 }

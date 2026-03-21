@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Player;
 
+use League\League;
 use Player\Views\PlayerButtonsView;
 use Player\Views\PlayerMenuView;
 use Player\Views\PlayerTradingCardFlipView;
@@ -92,7 +93,7 @@ class PlayerPageController
         $html .= '</td></tr>';
 
         // Action buttons
-        $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? \League::FREE_AGENTS_TEAM_NAME;
+        $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? League::FREE_AGENTS_TEAM_NAME;
         $userTeam = \Team::initialize($this->mysqliDb, $userTeamName);
 
         $actionButtons = $this->renderActionButtons($pageService, $player, $playerID, $userTeam, $season);

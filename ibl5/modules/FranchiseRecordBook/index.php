@@ -37,7 +37,7 @@ if (is_string($_GET['teamid'] ?? null)) {
 }
 
 // Get record book data
-if (League::isRealFranchise($teamId)) {
+if (\League\League::isRealFranchise($teamId)) {
     $data = $service->getTeamRecordBook($teamId);
 } else {
     $data = $service->getLeagueRecordBook();

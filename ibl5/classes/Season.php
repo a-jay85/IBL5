@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use League\League;
+
 /**
  * Season - IBL season information and configuration
  *

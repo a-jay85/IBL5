@@ -7,6 +7,7 @@ namespace Tests\FreeAgency;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyCapCalculator;
+use League\League;
 use Team\Contracts\TeamQueryRepositoryInterface;
 
 /**
@@ -78,8 +79,8 @@ class FreeAgencyCapCalculatorTest extends TestCase
         // Assert - Should have full cap space and max roster spots (ALL 6 years)
         for ($i = 0; $i < 6; $i++) {
             $this->assertEquals(0, $result['totalSalaries'][$i], "totalSalaries year $i should be 0");
-            $this->assertEquals(\League::SOFT_CAP_MAX, $result['softCapSpace'][$i], "softCapSpace year $i");
-            $this->assertEquals(\League::HARD_CAP_MAX, $result['hardCapSpace'][$i], "hardCapSpace year $i");
+            $this->assertEquals(League::SOFT_CAP_MAX, $result['softCapSpace'][$i], "softCapSpace year $i");
+            $this->assertEquals(League::HARD_CAP_MAX, $result['hardCapSpace'][$i], "hardCapSpace year $i");
             $this->assertEquals(\Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][$i], "rosterSpots year $i");
         }
     }
@@ -205,7 +206,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
         $result = $this->calculator->calculateTeamCapMetrics(1);
 
         // Assert
-        $buffer = \League::HARD_CAP_MAX - \League::SOFT_CAP_MAX;
+        $buffer = League::HARD_CAP_MAX - League::SOFT_CAP_MAX;
 
         for ($i = 0; $i < 6; $i++) {
             $expectedHardCap = $result['softCapSpace'][$i] + $buffer;

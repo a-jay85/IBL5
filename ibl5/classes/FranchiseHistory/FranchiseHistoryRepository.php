@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FranchiseHistory;
 
 use FranchiseHistory\Contracts\FranchiseHistoryRepositoryInterface;
+use League\League;
 
 /**
  * FranchiseHistoryRepository - Data access layer for franchise history
@@ -38,7 +39,7 @@ class FranchiseHistoryRepository extends \BaseMysqliRepository implements Franch
              WHERE ti.teamid <> ?
              ORDER BY ti.teamid ASC",
             "i",
-            \League::FREE_AGENTS_TEAMID
+            League::FREE_AGENTS_TEAMID
         );
 
         // Query 2: Rolling 5-season window from ibl_team_win_loss directly (avoids double materialization)

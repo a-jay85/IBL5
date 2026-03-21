@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Trading;
 
 use PHPUnit\Framework\TestCase;
+use League\League;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -405,7 +406,7 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->validateSalaryCaps($tradeData);
 
         $this->assertTrue($result['valid']);
-        $this->assertEquals(\League::HARD_CAP_MAX, $result['userPostTradeCapTotal']);
+        $this->assertEquals(League::HARD_CAP_MAX, $result['userPostTradeCapTotal']);
     }
 
     /**
@@ -423,7 +424,7 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->validateSalaryCaps($tradeData);
 
         $this->assertFalse($result['valid']);
-        $this->assertEquals(\League::HARD_CAP_MAX + 1, $result['userPostTradeCapTotal']);
+        $this->assertEquals(League::HARD_CAP_MAX + 1, $result['userPostTradeCapTotal']);
     }
 
     /**
@@ -441,8 +442,8 @@ class TradeValidatorTest extends TestCase
         $result = $this->validator->validateSalaryCaps($tradeData);
 
         $this->assertTrue($result['valid']);
-        $this->assertEquals(\League::HARD_CAP_MAX, $result['userPostTradeCapTotal']);
-        $this->assertEquals(\League::HARD_CAP_MAX, $result['partnerPostTradeCapTotal']);
+        $this->assertEquals(League::HARD_CAP_MAX, $result['userPostTradeCapTotal']);
+        $this->assertEquals(League::HARD_CAP_MAX, $result['partnerPostTradeCapTotal']);
     }
 
     /**
@@ -802,7 +803,7 @@ class TradeValidatorTest extends TestCase
 
     public static function boundaryCapValuesProvider(): array
     {
-        $hardCap = \League::HARD_CAP_MAX;
+        $hardCap = League::HARD_CAP_MAX;
 
         return [
             'user exactly at cap' => [$hardCap, 5000, 0, 0, true],

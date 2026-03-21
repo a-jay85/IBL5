@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Trading;
 
+use League\League;
 use Trading\Contracts\TradingViewInterface;
 use Player\PlayerImageHelper;
 use UI\TableStyles;
@@ -146,7 +147,7 @@ $tradeConfig = [
     'switchCounter' => $switchCounter,
     'userFutureSalary' => $pageData['userFutureSalary']['player'],
     'partnerFutureSalary' => $pageData['partnerFutureSalary']['player'],
-    'hardCap' => \League::HARD_CAP_MAX,
+    'hardCap' => League::HARD_CAP_MAX,
     'seasonEndingYear' => $seasonEndingYear,
     'seasonPhase' => $seasonPhase,
     'cashStartYear' => $cashStartYear,

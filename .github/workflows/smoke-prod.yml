@@ -1,0 +1,36 @@
+name: Production Smoke Test
+
+on:
+  # Run after deploy completes
+  workflow_run:
+    workflows: ["Build and Deploy"]
+    types: [completed]
+
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Base URL to test'
+        default: 'https://www.iblhoops.net'
+
+  # Daily health check at 8am UTC
+  schedule:
+    - cron: '0 8 * * *'
+
+jobs:
+  smoke:
+    name: Production Health Check
+    runs-on: ubuntu-latest
+    # Skip if triggered by a failed deploy
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run smoke tests
+        run: |
+          chmod +x bin/smoke-prod
+          bin/smoke-prod "${{ github.event.inputs.base_url || 'https://www.iblhoops.net' }}"

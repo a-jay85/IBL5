@@ -244,7 +244,7 @@ jobs:
           "ibl_team_info:teamid,team_city,team_name,uuid"
           "ibl_schedule:Date,Year,Visitor,Home,uuid"
           "nuke_users:user_id,username,user_email,user_ibl_team"
-          "ibl_settings:settingskey,settingsvalue"
+          "ibl_settings:name,value"
           "ibl_draft_picks:pickid,ownerofpick,owner_tid,year,round"
           "ibl_trade_info:id,tradeofferid,itemid,trade_from,trade_to"
           "ibl_standings:tid,team_name,wins,losses,pct"

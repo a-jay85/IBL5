@@ -89,4 +89,11 @@ class ApiStandingsRepositoryTest extends DatabaseTestCase
             }
         }
     }
+
+    // ── Negative path ───────────────────────────────────────────
+
+    public function testGetStandingsReturnsEmptyForNonExistentConference(): void
+    {
+        self::assertSame([], $this->repo->getStandings('ZZ_Nonexistent_Conf'));
+    }
 }

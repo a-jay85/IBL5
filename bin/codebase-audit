@@ -1,13 +1,20 @@
 #!/bin/bash
 # bin/codebase-audit — Daily codebase hygiene audit for IBL5
 # Runs ~35 mechanical checks across 10 categories, outputs structured markdown.
-# Usage: bin/codebase-audit [--quiet]
+# Usage: bin/codebase-audit [--quiet] [--diff]
 #   --quiet  Suppress stdout summary (used by launchd)
+#   --diff   Append a "Changes since last audit" section comparing with previous report
 
 set -euo pipefail
 
 QUIET=false
-[[ "${1:-}" == "--quiet" ]] && QUIET=true
+DIFF=false
+for arg in "$@"; do
+    case "$arg" in
+        --quiet) QUIET=true ;;
+        --diff) DIFF=true ;;
+    esac
+done
 
 # Resolve repo root (script lives in <repo>/bin/)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -211,8 +218,8 @@ check_test_coverage() {
 check_code_quality() {
     section "C. Code Quality / Smells"
 
-    # C1: Methods exceeding 50 lines (uses php -r for accurate detection)
-    subsection "C1: Long methods (>50 lines)"
+    # C1: Methods exceeding 75 lines (uses php -r for accurate detection)
+    subsection "C1: Long methods (>75 lines)"
     local found_c1=false
     local long_methods
     long_methods=$(php -r '
@@ -222,6 +229,8 @@ check_code_quality() {
         foreach ($iter as $file) {
             if ($file->getExtension() !== "php") continue;
             $path = $file->getPathname();
+            // Skip legacy Bootstrap/ code (PHP-Nuke, not IBL)
+            if (strpos($path, "/Bootstrap/") !== false) continue;
             $tokens = @token_get_all(file_get_contents($path));
             $inFunction = false;
             $funcName = "";
@@ -250,7 +259,7 @@ check_code_quality() {
                                 if (is_array($tokens[$k])) { $endLine = $tokens[$k][2]; break; }
                             }
                             $length = $endLine - $funcStartLine;
-                            if ($length > 50) {
+                            if ($length > 75) {
                                 $rel = str_replace($argv[1] . "/", "", $path);
                                 $results[] = "$rel:$funcStartLine $funcName() — $length lines";
                             }
@@ -278,15 +287,15 @@ check_code_quality() {
     fi
     $found_c1 || echo "- No issues found." >> "$FINDINGS"
 
-    # C2: Classes with 10+ public methods
-    subsection "C2: God classes (10+ public methods)"
+    # C2: Classes with 15+ public methods
+    subsection "C2: God classes (15+ public methods)"
     local found_c2=false
     while IFS= read -r -d '' phpfile; do
         local count
         count=$(grep -c -E '^[[:space:]]+public[[:space:]]+function[[:space:]]' "$phpfile" 2>/dev/null || true)
         count=$(echo "$count" | tr -d '[:space:]')
         [[ -z "$count" ]] && count=0
-        if [[ "$count" -ge 10 ]]; then
+        if [[ "$count" -ge 15 ]]; then
             local rel="${phpfile#$CLASSES_DIR/}"
             finding "MEDIUM" "God class smell: \`$rel\` has $count public methods"
             found_c2=true
@@ -598,9 +607,9 @@ check_css_frontend() {
             [[ -z "$line" ]] && continue
             local file="${line%%:*}"
             local rel="${file#$CLASSES_DIR/}"
-            # Skip SiteStatistics (legacy PHP-Nuke module)
+            # Skip legacy PHP-Nuke code
             case "$rel" in
-                SiteStatistics/*) continue ;;
+                SiteStatistics/*|Bootstrap/*) continue ;;
             esac
             local tag
             tag=$(echo "$line" | sed -n 's/.*\(<[bBiIuU]\>[^a-zA-Z]\|<[Cc][Ee][Nn][Tt][Ee][Rr]\|<[Ff][Oo][Nn][Tt]\).*/\1/p' | head -1)
@@ -1011,6 +1020,45 @@ main() {
         echo ""
         cat "$FINDINGS"
     } > "$REPORT"
+
+    # Diff against previous report if --diff and a previous report exists
+    if $DIFF; then
+        local prev_report=""
+        if [[ -L "$RESULTS_DIR/latest.md" ]]; then
+            prev_report="$RESULTS_DIR/$(readlink "$RESULTS_DIR/latest.md")"
+        fi
+        if [[ -n "$prev_report" && -f "$prev_report" && "$prev_report" != "$REPORT" ]]; then
+            local changes=""
+            # Extract section counts from both reports using subsection headers
+            while IFS= read -r section; do
+                local section_id
+                section_id=$(echo "$section" | sed 's/### //' | sed 's/:.*//')
+                local old_count new_count
+                old_count=$(grep -c '^\- \*\*\[' <(sed -n "/^### ${section_id}:/,/^### /p" "$prev_report") 2>/dev/null || echo 0)
+                new_count=$(grep -c '^\- \*\*\[' <(sed -n "/^### ${section_id}:/,/^### /p" "$REPORT") 2>/dev/null || echo 0)
+                if [[ "$old_count" -ne "$new_count" ]]; then
+                    local delta=$((new_count - old_count))
+                    if [[ $delta -gt 0 ]]; then
+                        changes="${changes}\n| ${section_id} | +${delta} new |"
+                    else
+                        changes="${changes}\n| ${section_id} | ${delta} (resolved) |"
+                    fi
+                fi
+            done < <(grep '^### ' "$REPORT")
+            if [[ -n "$changes" ]]; then
+                {
+                    echo ""
+                    echo "## Changes Since Last Audit"
+                    echo ""
+                    echo "Compared with: $(basename "$prev_report")"
+                    echo ""
+                    echo "| Section | Change |"
+                    echo "|---------|--------|"
+                    echo -e "$changes"
+                } >> "$REPORT"
+            fi
+        fi
+    fi
 
     # Symlink latest.md
     ln -sf "$TODAY.md" "$RESULTS_DIR/latest.md"

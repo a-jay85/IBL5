@@ -184,4 +184,110 @@ class SavedDepthChartServiceTest extends IntegrationTestCase
         $this->assertSame([100], $result['tradedPids']);
         $this->assertSame([300], $result['newPlayerPids']);
     }
+
+    // ── saveOnSubmit ─────────────────────────────────────────
+
+    public function testSaveOnSubmitUpdatesExistingDcWhenLoadedDcIdIsPositive(): void
+    {
+        // getSavedDepthChartById returns existing DC
+        $this->mockDb->setMockData([
+            [
+                'id' => 5, 'tid' => 1, 'username' => 'testuser', 'name' => 'My DC',
+                'phase' => 'Regular Season', 'season_year' => 2024,
+                'sim_start_date' => '2024-01-01', 'sim_end_date' => null,
+                'sim_number_start' => 1, 'sim_number_end' => null,
+                'is_active' => 1, 'created_at' => '2024-01-01 00:00:00',
+                'updated_at' => '2024-01-01 00:00:00',
+            ],
+        ]);
+
+        $season = new \Season($this->mockDb);
+        $result = $this->service->saveOnSubmit(1, 'testuser', 'My DC', [], [], 5, $season);
+
+        $this->assertSame(5, $result);
+        $this->assertQueryExecuted('ibl_saved_depth_chart_players');
+    }
+
+    public function testSaveOnSubmitReactivatesInactiveDc(): void
+    {
+        // DC exists but is_active = 0
+        $this->mockDb->setMockData([
+            [
+                'id' => 5, 'tid' => 1, 'username' => 'testuser', 'name' => 'Inactive DC',
+                'phase' => 'Regular Season', 'season_year' => 2024,
+                'sim_start_date' => '2024-01-01', 'sim_end_date' => null,
+                'sim_number_start' => 1, 'sim_number_end' => null,
+                'is_active' => 0, 'created_at' => '2024-01-01 00:00:00',
+                'updated_at' => '2024-01-01 00:00:00',
+            ],
+        ]);
+
+        $season = new \Season($this->mockDb);
+        $result = $this->service->saveOnSubmit(1, 'testuser', null, [], [], 5, $season);
+
+        $this->assertSame(5, $result);
+        // Should have executed reactivate UPDATE
+        $this->assertQueryExecuted('ibl_saved_depth_charts');
+    }
+
+    public function testSaveOnSubmitReusesUnusedMostRecentDc(): void
+    {
+        // loadedDcId = 0, so skip first branch
+        // getSavedDepthChartById returns null (no loaded DC found)
+        // getMostRecentDepthChart returns unused DC (sim_end_date = null)
+        $this->mockDb->onQuery('SELECT.*FROM ibl_saved_depth_charts WHERE id', []);
+        $this->mockDb->setMockData([
+            [
+                'id' => 10, 'tid' => 1, 'username' => 'testuser', 'name' => null,
+                'phase' => 'Regular Season', 'season_year' => 2024,
+                'sim_start_date' => '2024-01-01', 'sim_end_date' => null,
+                'sim_number_start' => 1, 'sim_number_end' => null,
+                'is_active' => 0, 'created_at' => '2024-01-01 00:00:00',
+                'updated_at' => '2024-01-01 00:00:00',
+            ],
+        ]);
+
+        $season = new \Season($this->mockDb);
+        $result = $this->service->saveOnSubmit(1, 'testuser', null, [], [], 0, $season);
+
+        $this->assertSame(10, $result);
+    }
+
+    // ── nameOrCreateActive ─────────────────────────────────────────
+
+    public function testNameOrCreateActiveRenamesExistingActiveDc(): void
+    {
+        // getActiveDepthChartForTeam returns an active DC
+        $this->mockDb->setMockData([
+            [
+                'id' => 7, 'tid' => 1, 'username' => 'testuser', 'name' => 'Old Name',
+                'phase' => 'Regular Season', 'season_year' => 2024,
+                'sim_start_date' => '2024-01-01', 'sim_end_date' => null,
+                'sim_number_start' => 1, 'sim_number_end' => null,
+                'is_active' => 1, 'created_at' => '2024-01-01 00:00:00',
+                'updated_at' => '2024-01-01 00:00:00',
+            ],
+        ]);
+
+        $season = new \Season($this->mockDb);
+        $result = $this->service->nameOrCreateActive(1, 'testuser', 'New Name', $season);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(7, $result['id']);
+        $this->assertSame('New Name', $result['name']);
+    }
+
+    public function testNameOrCreateActiveReturnsErrorWhenNoPlayersOnRoster(): void
+    {
+        // getActiveDepthChartForTeam returns null (no active DC)
+        // getLiveRosterSettings returns empty (no players)
+        $this->mockDb->setMockData([]);
+
+        $season = new \Season($this->mockDb);
+        $result = $this->service->nameOrCreateActive(1, 'testuser', 'My DC', $season);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('No players found on roster', $result['error']);
+    }
+
 }

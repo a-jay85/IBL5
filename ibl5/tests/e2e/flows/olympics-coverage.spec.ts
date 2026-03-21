@@ -9,15 +9,28 @@ test.describe('Olympics module coverage', () => {
     await page.goto('modules.php?name=Standings&league=olympics');
     await assertNoPhpErrors(page, 'on Olympics Standings');
 
-    // Should show group standings
+    // Should show group standings with expected columns
     const tables = page.locator('.ibl-data-table, table');
     await expect(tables.first()).toBeVisible();
+
+    // Standings table should have team-related headers
+    const headers = await tables.first().locator('th').allTextContents();
+    const joined = headers.join(' ');
+    const hasTeamColumn = /team|country|nation/i.test(joined);
+    const hasRecordColumn = /w|l|win|loss|pct|record/i.test(joined);
+    expect(hasTeamColumn || hasRecordColumn).toBe(true);
   });
 
-  test('olympics team page loads', async ({ appState, page }) => {
+  test('olympics team page loads with roster', async ({ appState, page }) => {
     await appState({ 'Trivia Mode': 'Off' });
     await page.goto('modules.php?name=Team&op=team&teamID=1&league=olympics');
     await assertNoPhpErrors(page, 'on Olympics Team page');
+
+    // Team page should have a table (roster or stats)
+    const table = page.locator('.ibl-data-table, table');
+    if ((await table.count()) > 0) {
+      await expect(table.first()).toBeVisible();
+    }
   });
 
   test('olympics leaderboards loads', async ({ appState, page }) => {

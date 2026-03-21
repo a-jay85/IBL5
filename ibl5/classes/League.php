@@ -27,6 +27,18 @@ class League extends BaseMysqliRepository
 
     const FREE_AGENTS_TEAMID = 0;
     const MAX_REAL_TEAMID = 28;
+    const ROOKIES_TEAMID = 40;
+    const SOPHOMORES_TEAMID = 41;
+    const ALL_STAR_AWAY_TEAMID = 50;
+    const ALL_STAR_HOME_TEAMID = 51;
+
+    /**
+     * Check if a team ID represents a real franchise (not Free Agents, All-Star, Rookies, etc.)
+     */
+    public static function isRealFranchise(int $teamId): bool
+    {
+        return $teamId >= 1 && $teamId <= self::MAX_REAL_TEAMID;
+    }
 
     /**
      * Constructor - inherits from BaseMysqliRepository

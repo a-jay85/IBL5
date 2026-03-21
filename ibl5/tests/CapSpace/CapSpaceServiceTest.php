@@ -130,6 +130,17 @@ class CapSpaceServiceTest extends TestCase
         $this->assertEquals(2025, $result['endingYear']);
     }
 
+    public function testGetDisplayYearsForDraftPhaseShiftsYearsForward(): void
+    {
+        $mockSeason = $this->createMockSeason('Draft', 2024, 2025);
+
+        $result = $this->service->getDisplayYears($mockSeason);
+
+        // Draft is an offseason phase — years shift forward by 1
+        $this->assertEquals(2025, $result['beginningYear']);
+        $this->assertEquals(2026, $result['endingYear']);
+    }
+
     public function testFreeAgencySlotsCalculation(): void
     {
         $mockTeam = $this->createMockTeamWithMleLle(1, 1);

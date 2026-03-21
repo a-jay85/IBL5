@@ -471,6 +471,57 @@ abstract class DatabaseTestCase extends TestCase
         ]);
     }
 
+    /**
+     * Insert a row into ibl_fa_offers with sensible defaults.
+     * Returns the auto-increment primary_key.
+     *
+     * @param array<string, int|float|string> $overrides Column overrides
+     */
+    protected function insertFaOfferRow(int $pid, int $tid, string $playerName, string $teamName, array $overrides = []): int
+    {
+        $defaults = [
+            'name' => $playerName,
+            'pid' => $pid,
+            'team' => $teamName,
+            'tid' => $tid,
+            'offer1' => 1500,
+            'offer2' => 0,
+            'offer3' => 0,
+            'offer4' => 0,
+            'offer5' => 0,
+            'offer6' => 0,
+            'modifier' => 1.0,
+            'random' => 0.5,
+            'perceivedvalue' => 3000.0,
+            'MLE' => 0,
+            'LLE' => 0,
+            'offer_type' => 0,
+        ];
+
+        return $this->insertRow('ibl_fa_offers', array_merge($defaults, $overrides));
+    }
+
+    /**
+     * Insert a row into ibl_demands. PK is `name` (varchar).
+     *
+     * @param array<string, int> $overrides Column overrides for dem1–dem6
+     */
+    protected function insertDemandRow(string $name, int $pid, array $overrides = []): void
+    {
+        $defaults = [
+            'name' => $name,
+            'pid' => $pid,
+            'dem1' => 1500,
+            'dem2' => 0,
+            'dem3' => 0,
+            'dem4' => 0,
+            'dem5' => 0,
+            'dem6' => 0,
+        ];
+
+        $this->insertRow('ibl_demands', array_merge($defaults, $overrides));
+    }
+
     private function requireEnv(string $name): string
     {
         $value = getenv($name);

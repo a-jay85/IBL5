@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LeagueStarters;
 
+use League\League;
 use LeagueStarters\Contracts\LeagueStartersRepositoryInterface;
 use LeagueStarters\Contracts\LeagueStartersServiceInterface;
 use Player\Player;
@@ -20,18 +21,18 @@ use Player\Player;
 class LeagueStartersService implements LeagueStartersServiceInterface
 {
     private \mysqli $db;
-    private \League $league;
+    private League $league;
     private LeagueStartersRepositoryInterface $repository;
     private ?Player $placeholderPlayer = null;
 
     /**
      * @param \mysqli $db Database connection
-     * @param \League $league League object
+     * @param League $league League object
      * @param LeagueStartersRepositoryInterface|null $repository Optional repository (test seam)
      */
     public function __construct(
         \mysqli $db,
-        \League $league,
+        League $league,
         ?LeagueStartersRepositoryInterface $repository = null
     ) {
         $this->db = $db;

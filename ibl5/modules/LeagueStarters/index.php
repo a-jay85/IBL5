@@ -29,7 +29,7 @@ $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 $pagetitle = "- $module_name";
 
-$league = new League($mysqli_db);
+$league = new \League\League($mysqli_db);
 
 // Initialize services
 $service = new LeagueStartersService($mysqli_db, $league);

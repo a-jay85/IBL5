@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use League\League;
 use SeasonLeaderboards\SeasonLeaderboardsRepository;
 
 /**
@@ -140,7 +141,7 @@ class SeasonLeaderboardsRepositoryTest extends DatabaseTestCase
         self::assertNotEmpty($result);
         foreach ($result as $row) {
             self::assertGreaterThanOrEqual(1, $row['TeamID']);
-            self::assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $row['TeamID']);
+            self::assertLessThanOrEqual(League::MAX_REAL_TEAMID, $row['TeamID']);
         }
     }
 

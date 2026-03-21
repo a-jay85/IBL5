@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Player;
 
+use League\League;
 use Player\Contracts\PlayerPageServiceInterface;
 use Player\Views\PlayerViewFactory;
 
@@ -54,7 +55,7 @@ class PlayerPageService implements PlayerPageServiceInterface
 
         /** @var \Team $userTeam */
         /** @var \Season $season */
-        return $userTeam->name !== \League::FREE_AGENTS_TEAM_NAME
+        return $userTeam->name !== League::FREE_AGENTS_TEAM_NAME
             && $userTeam->hasUsedExtensionThisSeason === 0
             && $player->canRenegotiateContract()
             && $player->teamID === $userTeam->teamID
@@ -77,7 +78,7 @@ class PlayerPageService implements PlayerPageServiceInterface
     {
         /** @var \Team $userTeam */
         /** @var \Season $season */
-        return $userTeam->name !== \League::FREE_AGENTS_TEAM_NAME
+        return $userTeam->name !== League::FREE_AGENTS_TEAM_NAME
             && $player->canRookieOption($season->phase)
             && $player->teamID === $userTeam->teamID;
     }

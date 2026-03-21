@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Negotiation;
 
+use League\League;
 use Negotiation\Contracts\NegotiationDemandCalculatorInterface;
 use Negotiation\Contracts\NegotiationViewHelperInterface;
 use Player\Player;
@@ -123,7 +124,7 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
             <?php else: ?>
                 <li><strong>No Bird Rights:</strong> You may add no more than <?= $raisePercentageDisplay ?>% of the amount you offer in the first year as a raise between years (for instance, if you offer <?= $exampleSalary ?> in Year 1, you cannot offer a raise of more than <?= $exampleRaise ?> between any two subsequent years.)</li>
             <?php endif; ?>
-            <li>When re-signing your own players, you can go over the soft cap and up to the hard cap (<?= \League::HARD_CAP_MAX ?>).</li>
+            <li>When re-signing your own players, you can go over the soft cap and up to the hard cap (<?= League::HARD_CAP_MAX ?>).</li>
         </ul>
     </div>
 </div>

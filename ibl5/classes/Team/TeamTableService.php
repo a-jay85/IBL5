@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Team;
 
+use League\League;
 use Team\Contracts\TeamTableServiceInterface;
 use Team\Contracts\TeamRepositoryInterface;
 use UI\Components\TableViewDropdown;
@@ -252,14 +253,14 @@ class TeamTableService implements TeamTableServiceInterface
 
         // vs. Division
         $vsDivision = [];
-        foreach (\League::DIVISION_NAMES as $division) {
+        foreach (League::DIVISION_NAMES as $division) {
             $vsDivision['split:div_' . strtolower($division)] = 'vs. ' . $division;
         }
         $groups['vs. Division'] = $vsDivision;
 
         // vs. Conference
         $vsConference = [];
-        foreach (\League::CONFERENCE_NAMES as $conference) {
+        foreach (League::CONFERENCE_NAMES as $conference) {
             $vsConference['split:conf_' . strtolower($conference)] = 'vs. ' . $conference;
         }
         $groups['vs. Conference'] = $vsConference;

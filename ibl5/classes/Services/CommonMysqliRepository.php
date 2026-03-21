@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Services;
 
+use League\League;
+
 /**
  * CommonMysqliRepository - Centralized repository for common database queries using mysqli
  *
@@ -50,7 +52,7 @@ class CommonMysqliRepository extends \BaseMysqliRepository
     public function getTeamnameFromUsername(?string $username): ?string
     {
         if ($username === null || $username === '') {
-            return \League::FREE_AGENTS_TEAM_NAME;
+            return League::FREE_AGENTS_TEAM_NAME;
         }
 
         /** @var array{team_name: string}|null $result */
@@ -321,6 +323,6 @@ class CommonMysqliRepository extends \BaseMysqliRepository
      */
     public function getTeamCapSpaceNextSeason(string $teamName): int
     {
-        return \League::HARD_CAP_MAX - $this->getTeamNextYearSalary($teamName);
+        return League::HARD_CAP_MAX - $this->getTeamNextYearSalary($teamName);
     }
 }

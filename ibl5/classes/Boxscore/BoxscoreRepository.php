@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Boxscore;
 
 use Boxscore\Contracts\BoxscoreRepositoryInterface;
+use League\League;
 use League\LeagueContext;
 
 /**
@@ -177,7 +178,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         /** @var list<array{name: string}> $rows */
         $rows = $this->fetchAll(
             "SELECT name FROM {$this->teamTable}
-             WHERE Date = ? AND visitorTeamID = " . \League::ALL_STAR_AWAY_TEAMID . " AND homeTeamID = " . \League::ALL_STAR_HOME_TEAMID . "
+             WHERE Date = ? AND visitorTeamID = " . League::ALL_STAR_AWAY_TEAMID . " AND homeTeamID = " . League::ALL_STAR_HOME_TEAMID . "
              ORDER BY id ASC
              LIMIT 2",
             "s",
@@ -204,7 +205,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
             "SELECT id, Date, name, visitorTeamID, homeTeamID
              FROM {$this->teamTable}
              WHERE name IN ('Team Away', 'Team Home')
-               AND visitorTeamID = " . \League::ALL_STAR_AWAY_TEAMID . " AND homeTeamID = " . \League::ALL_STAR_HOME_TEAMID . "
+               AND visitorTeamID = " . League::ALL_STAR_AWAY_TEAMID . " AND homeTeamID = " . League::ALL_STAR_HOME_TEAMID . "
              ORDER BY Date ASC, id ASC",
             ""
         );
@@ -222,7 +223,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
             "SELECT COALESCE(p.name, bs.name) AS name
              FROM {$this->playerTable} bs
              LEFT JOIN ibl_plr p ON bs.pid = p.pid
-             WHERE bs.Date = ? AND bs.visitorTID = " . \League::ALL_STAR_AWAY_TEAMID . " AND bs.homeTID = " . \League::ALL_STAR_HOME_TEAMID . " AND bs.teamID = ?
+             WHERE bs.Date = ? AND bs.visitorTID = " . League::ALL_STAR_AWAY_TEAMID . " AND bs.homeTID = " . League::ALL_STAR_HOME_TEAMID . " AND bs.teamID = ?
              ORDER BY bs.id ASC",
             "si",
             $date,

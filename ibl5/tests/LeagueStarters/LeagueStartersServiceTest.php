@@ -7,19 +7,20 @@ namespace Tests\LeagueStarters;
 use LeagueStarters\Contracts\LeagueStartersRepositoryInterface;
 use LeagueStarters\LeagueStartersService;
 use PHPUnit\Framework\TestCase;
+use League\League;
 use Tests\Integration\Mocks\TestDataFactory;
 
 class LeagueStartersServiceTest extends TestCase
 {
     private \MockDatabase $mockDb;
     private object $mockMysqliDb;
-    private \League $mockLeague;
+    private League $mockLeague;
 
     protected function setUp(): void
     {
         $this->mockDb = new \MockDatabase();
         $this->setupMockMysqliDb();
-        $this->mockLeague = new \League($this->mockMysqliDb);
+        $this->mockLeague = new League($this->mockMysqliDb);
     }
 
     protected function tearDown(): void

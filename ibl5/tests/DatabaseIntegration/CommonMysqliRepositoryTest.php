@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use League\League;
 use Services\CommonMysqliRepository;
 
 /**
@@ -255,6 +256,6 @@ class CommonMysqliRepositoryTest extends DatabaseTestCase
         self::assertIsInt($capSpace);
         // Cap space = HARD_CAP_MAX - next year salary
         $nextYear = $this->repo->getTeamNextYearSalary('Metros');
-        self::assertSame(\League::HARD_CAP_MAX - $nextYear, $capSpace);
+        self::assertSame(League::HARD_CAP_MAX - $nextYear, $capSpace);
     }
 }

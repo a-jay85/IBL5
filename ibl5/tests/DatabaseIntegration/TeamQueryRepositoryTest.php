@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use League\League;
 use Team\TeamQueryRepository;
 
 class TeamQueryRepositoryTest extends DatabaseTestCase
@@ -317,7 +318,7 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
         self::assertTrue($resultUnder);
 
         // Adding the entire hard cap should exceed it (since team already has players)
-        $resultOver = $this->repo->canAddContractWithoutGoingOverHardCap(self::TEST_TID, \League::HARD_CAP_MAX);
+        $resultOver = $this->repo->canAddContractWithoutGoingOverHardCap(self::TEST_TID, League::HARD_CAP_MAX);
         self::assertFalse($resultOver);
     }
 

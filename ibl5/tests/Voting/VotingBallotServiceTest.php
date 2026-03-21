@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Voting;
 
 use PHPUnit\Framework\TestCase;
+use League\League;
 use Voting\VotingBallotService;
 use Voting\Contracts\VotingBallotServiceInterface;
 
@@ -25,7 +26,7 @@ class VotingBallotServiceTest extends TestCase
         $season = $this->createStub(\Season::class);
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(\League::class);
+        $league = $this->createStub(League::class);
         $league->method('getAllStarCandidatesResult')->willReturn([]);
 
         $service = new VotingBallotService($db);
@@ -45,7 +46,7 @@ class VotingBallotServiceTest extends TestCase
         $season = $this->createStub(\Season::class);
         $season->phase = 'Playoffs';
 
-        $league = $this->createStub(\League::class);
+        $league = $this->createStub(League::class);
         $league->method('getMVPCandidatesResult')->willReturn([]);
         $league->method('getSixthPersonOfTheYearCandidatesResult')->willReturn([]);
         $league->method('getRookieOfTheYearCandidatesResult')->willReturn([]);
@@ -68,7 +69,7 @@ class VotingBallotServiceTest extends TestCase
         $season = $this->createStub(\Season::class);
         $season->phase = 'Regular Season';
 
-        $league = $this->createStub(\League::class);
+        $league = $this->createStub(League::class);
         $league->method('getAllStarCandidatesResult')->willReturn([]);
 
         $service = new VotingBallotService($db);
@@ -87,7 +88,7 @@ class VotingBallotServiceTest extends TestCase
         $season = $this->createStub(\Season::class);
         $season->phase = 'Draft';
 
-        $league = $this->createStub(\League::class);
+        $league = $this->createStub(League::class);
         $league->method('getMVPCandidatesResult')->willReturn([]);
         $league->method('getSixthPersonOfTheYearCandidatesResult')->willReturn([]);
         $league->method('getRookieOfTheYearCandidatesResult')->willReturn([]);
@@ -109,7 +110,7 @@ class VotingBallotServiceTest extends TestCase
         $season = $this->createStub(\Season::class);
         $season->phase = 'Playoffs';
 
-        $league = $this->createStub(\League::class);
+        $league = $this->createStub(League::class);
         $league->method('getMVPCandidatesResult')->willReturn([]);
         $league->method('getSixthPersonOfTheYearCandidatesResult')->willReturn([]);
         $league->method('getRookieOfTheYearCandidatesResult')->willReturn([]);

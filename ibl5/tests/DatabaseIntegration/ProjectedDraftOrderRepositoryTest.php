@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use League\League;
 use ProjectedDraftOrder\ProjectedDraftOrderRepository;
 
 /**
@@ -40,7 +41,7 @@ class ProjectedDraftOrderRepositoryTest extends DatabaseTestCase
         // Should only include real teams (1-28)
         foreach ($result as $row) {
             self::assertGreaterThanOrEqual(1, $row['tid']);
-            self::assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $row['tid']);
+            self::assertLessThanOrEqual(League::MAX_REAL_TEAMID, $row['tid']);
         }
     }
 

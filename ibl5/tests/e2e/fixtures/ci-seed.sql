@@ -567,7 +567,15 @@ INSERT INTO ibl_hist (
    38, 153, 190, 52, 18, 72, 82, 615, 1700),
   (7, 'Phoenixes Center', 2026, 'Phoenixes', 14,
    41, 1300, 220, 480, 115, 135, 20, 60,
-   60, 220, 100, 40, 35, 60, 95, 610, 1300);
+   60, 220, 100, 40, 35, 60, 95, 610, 1300),
+  -- RecordHolders: full-season row (games >= 50 threshold for season averages)
+  (3, 'Retired Legend', 2024, 'Stars', 2,
+   55, 1800, 320, 650, 200, 240, 40, 130,
+   100, 280, 130, 50, 60, 70, 120, 920, 2200),
+  -- PlayerMovement: pid=4 played for Metros (tid=1) in 2025, now on Stars (tid=2)
+  (4, 'Stars Guard', 2025, 'Metros', 1,
+   41, 1280, 200, 440, 100, 120, 60, 150,
+   30, 140, 190, 50, 12, 70, 78, 620, 1600);
 
 -- ============================================================
 -- Draft picks (DraftHistory page)

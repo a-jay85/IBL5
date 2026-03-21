@@ -1147,6 +1147,57 @@ ON DUPLICATE KEY UPDATE
   GM_3 = VALUES(GM_3);
 
 -- ============================================================
+-- Round 2 draft picks (ProjectedDraftOrder round separator tests)
+-- ============================================================
+
+INSERT INTO ibl_draft_picks (ownerofpick, owner_tid, teampick, teampick_tid, year, round) VALUES
+  ('Metros',    1,  'Metros',    1,  2026, 2),
+  ('Stars',     2,  'Stars',     2,  2026, 2),
+  ('Phoenixes', 14, 'Phoenixes', 14, 2026, 2)
+ON DUPLICATE KEY UPDATE ownerofpick = VALUES(ownerofpick);
+
+-- ============================================================
+-- Additional news articles (homepage flow tests)
+-- ============================================================
+
+INSERT INTO nuke_stories (catid, aid, title, time, hometext, bodytext, topic, ihome, comments, counter) VALUES
+  (0, 'admin', 'Trade deadline approaches', '2026-03-08 14:00:00',
+   'Teams are making final moves before the deadline.',
+   'Full details about trade deadline activity.', 1, 0, 5, 25),
+  (0, 'admin', 'All-Star Game recap', '2026-03-05 18:00:00',
+   'The Eastern Conference won the All-Star Game.',
+   'Complete recap of the All-Star festivities.', 1, 0, 3, 15);
+
+-- ============================================================
+-- Extension-eligible player on Metros (contract extension flow tests)
+-- cy = cyt = 2 → final contract year → eligible for extension
+-- ============================================================
+
+INSERT INTO ibl_plr (
+  pid, name, age, peak, tid, pos, ordinal,
+  sta, oo, od, `do`, dd, po, pd, `to`, td,
+  cy, cyt, cy1, cy2,
+  retired, exp,
+  htft, htin, wt, college,
+  draftround, draftpickno, draftyear, draftedby, draftedbycurrentname,
+  stats_gm, stats_min, stats_fgm, stats_fga, stats_ftm, stats_fta,
+  stats_3gm, stats_3ga, stats_orb, stats_drb, stats_ast, stats_stl,
+  stats_to, stats_blk, stats_pf,
+  uuid
+) VALUES
+  (30, 'Extension Vet', 30, 30, 1, 'SG', 6,
+   85, 80, 75, 70, 65, 78, 74, 76, 71,
+   2, 2, 1500, 1650,
+   0, 8,
+   6, 3, 200, 'Veteran College',
+   1, 5, 2018, 'Metros', 'Metros',
+   41, 1260, 200, 440, 100, 120,
+   50, 130, 35, 120, 150, 50,
+   70, 15, 80,
+   'plr-uuid-00000000-0000-000000000030')
+ON DUPLICATE KEY UPDATE name = VALUES(name), cy = VALUES(cy), cyt = VALUES(cyt);
+
+-- ============================================================
 -- NOTE: Test user (nuke_users + auth_users) is created by the
 -- workflow via PHP bcrypt hash at runtime — not seeded here.
 -- ============================================================

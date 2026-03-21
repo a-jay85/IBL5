@@ -39,14 +39,50 @@ test.describe('Injuries flow', () => {
     expect(firstTeamId).toBeTruthy();
   });
 
-  test('days cells have tooltip when lastSimEndDate is set', async ({ page }) => {
-    // .ibl-tooltip only renders when lastSimEndDate is set in CI settings
-    const tooltips = page.locator('.injuries-table td .ibl-tooltip');
-    const count = await tooltips.count();
-    if (count > 0) {
-      const title = await tooltips.first().getAttribute('title');
-      expect(title).toBeTruthy();
+  test('days values are positive integers', async ({ page }) => {
+    const daysCells = page.locator('.injuries-table tbody td.ibl-stat-highlight');
+    const count = await daysCells.count();
+    expect(count).toBeGreaterThanOrEqual(2);
+
+    for (let i = 0; i < count; i++) {
+      const text = await daysCells.nth(i).textContent();
+      const value = parseInt(text?.trim() ?? '', 10);
+      expect(value).toBeGreaterThan(0);
     }
+  });
+
+  test('days cells have tooltip with return date', async ({ page }) => {
+    // CI seed has ibl_sim_dates with End Date — tooltips should render
+    const tooltips = page.locator('.injuries-table td .ibl-tooltip');
+    await expect(tooltips.first()).toBeVisible();
+
+    const title = await tooltips.first().getAttribute('title');
+    expect(title).toBeTruthy();
+    expect(title).toContain('Returns:');
+  });
+
+  test('player name links navigate to player page', async ({ page }) => {
+    const playerLinks = page.locator('.injuries-table a[href*="pid="]');
+    await expect(playerLinks.first()).toBeVisible();
+
+    const href = await playerLinks.first().getAttribute('href');
+    expect(href).toContain('name=Player');
+
+    await page.goto(href!);
+    await assertNoPhpErrors(page, 'on player page from Injuries');
+    await expect(page.locator('h2, h3').first()).toBeVisible();
+  });
+
+  test('team name cells link to team pages', async ({ page }) => {
+    const teamLinks = page.locator('.injuries-table a[href*="teamID="]');
+    const count = await teamLinks.count();
+    expect(count).toBeGreaterThanOrEqual(1);
+
+    const href = await teamLinks.first().getAttribute('href');
+    expect(href).toContain('name=Team');
+
+    await page.goto(href!);
+    await assertNoPhpErrors(page, 'on team page from Injuries');
   });
 
   test('no PHP errors', async ({ page }) => {

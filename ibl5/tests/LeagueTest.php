@@ -124,6 +124,36 @@ class LeagueTest extends TestCase
         $this->assertEquals(0, League::FREE_AGENTS_TEAMID);
     }
 
+    public function testSpecialTeamIdConstants(): void
+    {
+        self::assertSame(40, League::ROOKIES_TEAMID);
+        self::assertSame(41, League::SOPHOMORES_TEAMID);
+        self::assertSame(50, League::ALL_STAR_AWAY_TEAMID);
+        self::assertSame(51, League::ALL_STAR_HOME_TEAMID);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('realFranchiseProvider')]
+    public function testIsRealFranchise(int $teamId, bool $expected): void
+    {
+        self::assertSame($expected, League::isRealFranchise($teamId));
+    }
+
+    /** @return array<string, array{int, bool}> */
+    public static function realFranchiseProvider(): array
+    {
+        return [
+            'free agents' => [0, false],
+            'first franchise' => [1, true],
+            'last franchise' => [28, true],
+            'above max' => [29, false],
+            'rookies' => [40, false],
+            'sophomores' => [41, false],
+            'all-star away' => [50, false],
+            'all-star home' => [51, false],
+            'negative' => [-1, false],
+        ];
+    }
+
     // ============================================
     // FORMAT TIDS FOR SQL QUERY TESTS
     // ============================================

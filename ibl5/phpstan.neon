@@ -27,3 +27,7 @@ services:
         class: PHPStanRules\BanDirectNukeGlobalsRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanBeginTransactionInRepositoryRule
+        tags:
+            - phpstan.rules.rule

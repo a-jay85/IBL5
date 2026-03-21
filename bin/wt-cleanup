@@ -91,24 +91,35 @@ check_worktree() {
         return
     fi
 
-    # Check if branch is merged into origin/master
-    if ! git -C "$REPO_ROOT" merge-base --is-ancestor "$branch" origin/master 2>/dev/null; then
-        echo "  SKIP $wt_name: branch '$branch' not merged to master"
-        SKIPPED=$((SKIPPED + 1))
-        return
+    # Determine if branch has been merged to master.
+    # Two checks needed: merge-base handles regular merges, PR state handles squash merges
+    # (squash creates a new commit, so the branch tip is never an ancestor of master).
+    local is_merged=false
+
+    # Check 1: Direct ancestor (non-squash merges)
+    if git -C "$REPO_ROOT" merge-base --is-ancestor "$branch" origin/master 2>/dev/null; then
+        is_merged=true
     fi
 
-    # If gh CLI available, check PR state — skip if PR is still OPEN
+    # Check 2: PR state (handles squash merges + guards against false positives)
     if command -v gh &>/dev/null; then
         local pr_state
         pr_state=$(cd "$REPO_ROOT" && gh pr view "$branch" --json state -q .state 2>/dev/null || true)
-        if [ "$pr_state" = "OPEN" ]; then
+        if [ "$pr_state" = "MERGED" ]; then
+            is_merged=true
+        elif [ "$pr_state" = "OPEN" ]; then
             local pr_num
             pr_num=$(cd "$REPO_ROOT" && gh pr view "$branch" --json number -q .number 2>/dev/null || true)
-            echo "  SKIP $wt_name: PR #$pr_num still open (branch merged but PR not closed)"
+            echo "  SKIP $wt_name: PR #$pr_num still open"
             SKIPPED=$((SKIPPED + 1))
             return
         fi
+    fi
+
+    if [ "$is_merged" = false ]; then
+        echo "  SKIP $wt_name: branch '$branch' not merged to master"
+        SKIPPED=$((SKIPPED + 1))
+        return
     fi
 
     cleanup_worktree "$wt_name" "$branch"

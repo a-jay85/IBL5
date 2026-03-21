@@ -101,7 +101,8 @@ class SecureCookie
             return true;
         }
 
-        if (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] === 443) {
+        $port = $_SERVER['SERVER_PORT'] ?? null;
+        if (is_numeric($port) && (int) $port === 443) {
             return true;
         }
 

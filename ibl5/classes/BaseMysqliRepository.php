@@ -415,6 +415,7 @@ abstract class BaseMysqliRepository
         }
         /** @var array{in_tx: int}|null $row */
         $row = $result->fetch_assoc();
+        $result->free();
         return $row !== null && $row['in_tx'] === 1;
     }
 

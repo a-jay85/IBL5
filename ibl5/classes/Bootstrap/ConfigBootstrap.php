@@ -93,7 +93,7 @@ class ConfigBootstrap implements BootstrapStepInterface
 
     private function loadNukeConfig(ContainerInterface $container): void
     {
-        /** @var \MySQL $db */ // @phpstan-ignore varTag.deprecatedClass
+        /** @var \Database\MySQL $db */ // @phpstan-ignore varTag.deprecatedClass
         $db = $GLOBALS['db'];
         $rawPrefix = $GLOBALS['prefix'] ?? 'nuke';
         $prefix = is_string($rawPrefix) ? $rawPrefix : 'nuke';

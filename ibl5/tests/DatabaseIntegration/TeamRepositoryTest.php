@@ -272,6 +272,122 @@ class TeamRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $roster[0]['teamid']);
     }
 
+    // ── getGMAwards ───────────────────────────────────────────
+
+    public function testGetGMAwardsReturnsRowsForKnownGM(): void
+    {
+        $this->insertRow('ibl_gm_awards', [
+            'name' => 'b9_test_gm',
+            'Award' => 'GM of the Year',
+            'year' => 2099,
+        ]);
+
+        $result = $this->repo->getGMAwards('b9_test_gm');
+
+        self::assertCount(1, $result);
+        self::assertSame('b9_test_gm', $result[0]['name']);
+        self::assertSame('GM of the Year', $result[0]['Award']);
+        self::assertSame(2099, $result[0]['year']);
+    }
+
+    public function testGetGMAwardsReturnsEmptyForUnknownGM(): void
+    {
+        self::assertSame([], $this->repo->getGMAwards('zz_no_such_gm_xyz'));
+    }
+
+    // ── getTeamAccomplishments ──────────────────────────────────
+
+    public function testGetTeamAccomplishmentsReturnsTeamAwardRows(): void
+    {
+        $this->insertTeamAwardRow('B9TestTeam', 'Atlantic Division Title', 2099);
+
+        $result = $this->repo->getTeamAccomplishments('B9TestTeam');
+
+        self::assertNotEmpty($result);
+        self::assertSame('Atlantic Division Title', $result[0]['Award']);
+    }
+
+    public function testGetTeamAccomplishmentsReturnsEmptyForUnknownTeam(): void
+    {
+        self::assertSame([], $this->repo->getTeamAccomplishments('ZZ_Nonexistent_Batch9'));
+    }
+
+    // ── getHEATHistory ──────────────────────────────────────────
+
+    public function testGetHEATHistoryReturnsArrayWithExpectedShape(): void
+    {
+        // ibl_heat_win_loss is a VIEW derived from game_type=3 boxscores.
+        // CI seed may have no HEAT game data — test shape contract only.
+        $result = $this->repo->getHEATHistory('Metros');
+
+        self::assertIsArray($result);
+        if ($result !== []) {
+            self::assertArrayHasKey('year', $result[0]);
+            self::assertArrayHasKey('currentname', $result[0]);
+            self::assertArrayHasKey('namethatyear', $result[0]);
+            self::assertArrayHasKey('wins', $result[0]);
+            self::assertArrayHasKey('losses', $result[0]);
+        }
+    }
+
+    // ── getPlayoffResults ───────────────────────────────────────
+
+    public function testGetPlayoffResultsReturnsPlayoffSeriesData(): void
+    {
+        // Insert 4 playoff boxscores (June = game_type=2 auto-generated).
+        // Team 1 (visitor) wins 3 games, Team 2 (home) wins 1 game.
+        // Total score = sum of all 4 quarters. Visitor wins when v_total > h_total.
+        $games = [
+            ['vTotal' => 100, 'hTotal' => 90],  // visitor (tid=1) wins
+            ['vTotal' => 85,  'hTotal' => 95],   // home (tid=2) wins
+            ['vTotal' => 98,  'hTotal' => 88],   // visitor wins
+            ['vTotal' => 97,  'hTotal' => 92],   // visitor wins
+        ];
+
+        foreach ($games as $i => $g) {
+            $date = sprintf('2099-06-%02d', $i + 1);
+            $this->insertRow('ibl_box_scores_teams', [
+                'Date' => $date,
+                'name' => $i % 2 === 0 ? 'Metros' : 'Sharks',
+                'gameOfThatDay' => 1,
+                'visitorTeamID' => 1,
+                'homeTeamID' => 2,
+                'attendance' => 15000, 'capacity' => 18000,
+                'visitorWins' => 0, 'visitorLosses' => 0,
+                'homeWins' => 0, 'homeLosses' => 0,
+                'visitorQ1points' => (int) ($g['vTotal'] / 4),
+                'visitorQ2points' => (int) ($g['vTotal'] / 4),
+                'visitorQ3points' => (int) ($g['vTotal'] / 4),
+                'visitorQ4points' => $g['vTotal'] - 3 * (int) ($g['vTotal'] / 4),
+                'visitorOTpoints' => 0,
+                'homeQ1points' => (int) ($g['hTotal'] / 4),
+                'homeQ2points' => (int) ($g['hTotal'] / 4),
+                'homeQ3points' => (int) ($g['hTotal'] / 4),
+                'homeQ4points' => $g['hTotal'] - 3 * (int) ($g['hTotal'] / 4),
+                'homeOTpoints' => 0,
+                'game2GM' => 30, 'game2GA' => 60, 'gameFTM' => 15, 'gameFTA' => 20,
+                'game3GM' => 8, 'game3GA' => 22, 'gameORB' => 10, 'gameDRB' => 30,
+                'gameAST' => 20, 'gameSTL' => 8, 'gameTOV' => 12, 'gameBLK' => 5, 'gamePF' => 18,
+            ]);
+        }
+
+        $this->insertFranchiseSeasonRow(1, 2099, 'Metros');
+        $this->insertFranchiseSeasonRow(2, 2099, 'Sharks');
+
+        $result = $this->repo->getPlayoffResults();
+
+        // Find our 2099 series
+        $series2099 = array_filter(
+            $result,
+            static fn (array $r): bool => $r['year'] === 2099,
+        );
+
+        self::assertNotEmpty($series2099);
+        $series = array_values($series2099)[0];
+        self::assertSame(3, $series['winner_games']);
+        self::assertSame(1, $series['loser_games']);
+    }
+
     private function ensureStandingsAndPowerExist(int $tid, string $division, string $conference): void
     {
         // Use REPLACE to ensure data exists within transaction regardless of DB state

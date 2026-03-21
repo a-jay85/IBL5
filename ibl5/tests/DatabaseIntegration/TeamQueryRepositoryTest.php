@@ -320,4 +320,62 @@ class TeamQueryRepositoryTest extends DatabaseTestCase
         $resultOver = $this->repo->canAddContractWithoutGoingOverHardCap(self::TEST_TID, \League::HARD_CAP_MAX);
         self::assertFalse($resultOver);
     }
+
+    // ── getTotalCurrentSeasonSalaries ───────────────────────────
+
+    public function testGetTotalCurrentSeasonSalariesSumsContracts(): void
+    {
+        // Use a real team with isolated test player. First clear any existing
+        // cy1>0 players on team 28 to get a predictable sum.
+        $this->db->query('UPDATE ibl_plr SET cy1 = 0 WHERE tid = 28');
+
+        $this->insertTestPlayer(200000150, 'TQ CurSal', [
+            'tid' => 28,
+            'cy' => 1,
+            'cyt' => 2,
+            'cy1' => 3000,
+            'cy2' => 3200,
+        ]);
+
+        $rows = $this->repo->getAllPlayersUnderContract(28);
+        $total = $this->repo->getTotalCurrentSeasonSalaries($rows);
+
+        self::assertIsInt($total);
+        self::assertSame(3000, $total);
+    }
+
+    // ── getTotalNextSeasonSalaries ──────────────────────────────
+
+    public function testGetTotalNextSeasonSalariesSumsContracts(): void
+    {
+        $this->db->query('UPDATE ibl_plr SET cy1 = 0 WHERE tid = 28');
+
+        $this->insertTestPlayer(200000151, 'TQ NxtSal', [
+            'tid' => 28,
+            'cy' => 1,
+            'cyt' => 2,
+            'cy1' => 1500,
+            'cy2' => 2200,
+        ]);
+
+        $rows = $this->repo->getAllPlayersUnderContract(28);
+        $total = $this->repo->getTotalNextSeasonSalaries($rows);
+
+        self::assertIsInt($total);
+        self::assertSame(2200, $total);
+    }
+
+    // ── canAddBuyoutWithoutExceedingBuyoutLimit ─────────────────
+
+    public function testCanAddBuyoutWithinLimitReturnsTrue(): void
+    {
+        // Team 99999 has no players → buyout sum is 0, adding 0 is within limit
+        self::assertTrue($this->repo->canAddBuyoutWithoutExceedingBuyoutLimit(99999, 0));
+    }
+
+    public function testCanAddBuyoutExceedingLimitReturnsFalse(): void
+    {
+        // Adding the entire hard cap always exceeds the buyout percentage limit
+        self::assertFalse($this->repo->canAddBuyoutWithoutExceedingBuyoutLimit(99999, \League::HARD_CAP_MAX));
+    }
 }

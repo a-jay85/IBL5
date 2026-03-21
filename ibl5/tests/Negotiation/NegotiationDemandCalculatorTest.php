@@ -75,6 +75,57 @@ class NegotiationDemandCalculatorTest extends TestCase
      * @group calculation
      * @group base-demands
      */
+    /**
+     * Pin exact demand values for known inputs to catch arithmetic mutations.
+     *
+     * With 21 player ratings all=50, market maxes all=100 (19 matching keys):
+     * rawScore = 19 × 50 = 950; adjusted = 950 - 700 = 250
+     * avgDemands = 250 × 3 = 750; totalDemands = 750 × 5 = 3750
+     * baseDemands = 3750 / 6 = 625; maxRaise = floor(625 × 0.10) = 62
+     * modifier = 1.10 (loyalty 0.05 + playingTime 0.05 from preferences=3)
+     */
+    public function testCalculateDemandsReturnsExactValuesForAveragePlayer(): void
+    {
+        $player = $this->createPlayerWithRatings(50);
+        $this->setupMarketMaximums(100);
+        $teamFactors = $this->getDefaultTeamFactors();
+
+        $demands = $this->calculator->calculateDemands($player, $teamFactors);
+
+        // Assert exact modifier
+        $this->assertEqualsWithDelta(1.10, $demands['modifier'], 0.001);
+
+        // Assert exact year demands (after modifier division + rounding)
+        $this->assertEquals(682, $demands['year1']);
+        $this->assertEquals(750, $demands['year2']);
+        $this->assertEquals(818, $demands['year3']);
+        $this->assertEquals(886, $demands['year4']);
+        $this->assertEquals(955, $demands['year5']);
+        $this->assertEquals(0, $demands['year6']);
+
+        // Assert total and years
+        $this->assertEquals(4091, $demands['total']);
+        $this->assertSame(5, $demands['years']);
+    }
+
+    /**
+     * Verify raise progression is exactly 10% of base demands.
+     */
+    public function testRaiseProgressionMatchesStandardPercentage(): void
+    {
+        $player = $this->createPlayerWithRatings(50);
+        $this->setupMarketMaximums(100);
+        $teamFactors = $this->getDefaultTeamFactors();
+
+        $demands = $this->calculator->calculateDemands($player, $teamFactors);
+
+        // year2 - year1 should equal year3 - year2 (linear raise, not compound)
+        $raise = $demands['year2'] - $demands['year1'];
+        $this->assertEqualsWithDelta($demands['year3'] - $demands['year2'], $raise, 1);
+        $this->assertEqualsWithDelta($demands['year4'] - $demands['year3'], $raise, 1);
+        $this->assertEqualsWithDelta($demands['year5'] - $demands['year4'], $raise, 1);
+    }
+
     public function testCalculatesHigherDemandsForBetterPlayer()
     {
         // Arrange

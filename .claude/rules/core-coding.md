@@ -21,7 +21,7 @@ $repo->getTeamDiscordID(string $teamName): ?int
 | Issue | Correct Approach |
 |-------|------------------|
 | Contract year salary | Use `PlayerContractCalculator::getCurrentSeasonSalary()` for typed access. For raw arrays: if `cy=2`, read `cy2` field (not `cy1`) |
-| Native types enabled | `MYSQLI_OPT_INT_AND_FLOAT_NATIVE` is on — INT columns return PHP `int`, VARCHAR columns return PHP `string`. Compare accordingly: `=== 0` for INT, `=== '0'` for VARCHAR |
+| Native types | INT columns return PHP `int`, VARCHAR returns `string`. Compare accordingly: `=== 0` for INT, `=== '0'` for VARCHAR |
 | Retired players | `retired` is TINYINT — check `retired === 0` (int) |
 | Free agents | `tid` is INT — check `tid === 0` or empty username |
 | Team lookup | Some methods use `tid` (int), others use team name (string) |

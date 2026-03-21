@@ -1,0 +1,9 @@
+.git
+.github
+.claude
+worktrees
+ibl5/node_modules
+ibl5/tests
+ibl5/fixtures
+ibl5/vendor
+*.md

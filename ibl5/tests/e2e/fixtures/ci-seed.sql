@@ -1209,3 +1209,11 @@ ON DUPLICATE KEY UPDATE name = VALUES(name), cy = VALUES(cy), cyt = VALUES(cyt);
 -- NOTE: Test user (nuke_users + auth_users) is created by the
 -- workflow via PHP bcrypt hash at runtime — not seeded here.
 -- ============================================================
+
+-- ============================================================
+-- Non-admin user for phase-gating E2E tests (Batch C prep)
+-- Username: E2E-Regular — no team, no admin privileges.
+-- Password hash is set at CI runtime (same pattern as primary test user).
+-- To activate: add IBL_TEST_USER_REGULAR / IBL_TEST_PASS_REGULAR
+-- GitHub secrets and a user-creation step in e2e-tests.yml.
+-- ============================================================

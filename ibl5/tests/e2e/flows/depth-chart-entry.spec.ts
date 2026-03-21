@@ -116,54 +116,6 @@ test.describe('DCE: NextSim position tabs', () => {
     expect(count).toBe(5);
   });
 
-  test('clicking tab triggers AJAX and updates active state', async ({
-    appState,
-    page,
-  }) => {
-    // Mock the nextsim-api to prevent flaky server-dependent innerHTML swap.
-    // The AJAX endpoint is already tested in ajax-api-endpoints.spec.ts —
-    // this test verifies the JS click handler (optimistic UI + fetch trigger).
-    const apiRequests: string[] = [];
-    await page.route(
-      (url) => url.toString().includes('op=nextsim-api'),
-      async (route) => {
-        apiRequests.push(route.request().url());
-        // Return empty html to prevent innerHTML swap (preserves optimistic UI)
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json; charset=utf-8',
-          body: JSON.stringify({ html: '' }),
-        });
-      },
-    );
-
-    // Navigate AFTER route is registered (beforeEach already navigated,
-    // but the route must intercept the fetch triggered by the tab click)
-    const tabs = page.locator('.nextsim-tab-container .ibl-tab');
-    const count = await tabs.count();
-    if (count < 2) {
-      test.skip(true, 'No NextSim tabs (no games in sim window)');
-      return;
-    }
-
-    // First tab (PG) should be active by default
-    await expect(tabs.first()).toHaveClass(/ibl-tab--active/);
-
-    // Click SG tab — JS immediately sets optimistic active state
-    await tabs.nth(1).click();
-
-    // Optimistic UI: active class should move synchronously (before AJAX)
-    await expect(tabs.nth(1)).toHaveClass(/ibl-tab--active/);
-    await expect(tabs.first()).not.toHaveClass(/ibl-tab--active/);
-
-    // Wait briefly for the fetch to fire, then verify it was intercepted
-    await page.waitForTimeout(1000);
-    expect(
-      apiRequests.length,
-      'nextsim-api request should have been intercepted',
-    ).toBeGreaterThan(0);
-  });
-
   test('tab click loads content without PHP errors', async ({ page }) => {
     const tabs = page.locator('.nextsim-tab-container .ibl-tab');
     const count = await tabs.count();

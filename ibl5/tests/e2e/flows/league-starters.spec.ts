@@ -65,25 +65,15 @@ test.describe('League Starters flow', () => {
   });
 
   test('switching to Season Totals view works', async ({ page }) => {
-    const totalsLink = page.locator('a[href*="display=total_s"]').first();
-    if (await totalsLink.count() > 0) {
-      const href = await totalsLink.getAttribute('href');
-      if (href) {
-        await page.goto(href);
-        await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-      }
-    }
+    await page.goto('modules.php?name=LeagueStarters&display=total_s');
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await assertNoPhpErrors(page, 'on League Starters Season Totals view');
   });
 
   test('switching to Season Averages view works', async ({ page }) => {
-    const avgLink = page.locator('a[href*="display=avg_s"]').first();
-    if (await avgLink.count() > 0) {
-      const href = await avgLink.getAttribute('href');
-      if (href) {
-        await page.goto(href);
-        await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-      }
-    }
+    await page.goto('modules.php?name=LeagueStarters&display=avg_s');
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await assertNoPhpErrors(page, 'on League Starters Season Averages view');
   });
 
   test('no PHP errors', async ({ page }) => {

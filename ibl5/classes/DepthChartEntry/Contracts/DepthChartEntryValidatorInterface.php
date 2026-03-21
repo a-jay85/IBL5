@@ -74,9 +74,9 @@ interface DepthChartEntryValidatorInterface
      * @return string HTML-formatted error display (empty string if no errors)
      * 
      * **HTML Format:**
-     * - Uses legacy font tags: `<font color=red><b>{message}</b></font>`
-     * - Detail text follows each error with paragraph breaks
-     * - Centered text with `<center>` tags
+     * - Uses `<strong>` and `<span>` for error formatting
+     * - Detail text follows each error with `<div>` wrappers
+     * - Centered text via CSS class
      * - Ready to echo directly without additional escaping
      * 
      * **Important Behaviors:**

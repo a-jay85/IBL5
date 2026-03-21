@@ -243,6 +243,9 @@
         <testsuite name="Settings Module Tests">
             <directory>tests/Settings</directory>
         </testsuite>
+        <testsuite name="TeamStats Module Tests">
+            <directory>tests/TeamStats</directory>
+        </testsuite>
     </testsuites>
     <!-- Database Integration Tests (tests/DatabaseIntegration/) are NOT registered
          as a suite. They require a running MariaDB and env vars:

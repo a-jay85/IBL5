@@ -109,4 +109,16 @@ class ApiInjuriesRepositoryTest extends DatabaseTestCase
             self::assertGreaterThanOrEqual($injuries[$i], $injuries[$i - 1]);
         }
     }
+
+    // ── Negative path ───────────────────────────────────────────
+
+    public function testGetInjuredPlayersReturnsEmptyWhenNoPlayersInjured(): void
+    {
+        // Clear all injuries within the rolled-back transaction
+        $this->db->query('UPDATE ibl_plr SET injured = 0 WHERE 1=1');
+
+        $result = $this->repo->getInjuredPlayers();
+
+        self::assertSame([], $result);
+    }
 }

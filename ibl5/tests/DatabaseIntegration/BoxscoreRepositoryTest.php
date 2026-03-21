@@ -416,6 +416,24 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
         self::assertSame([], $names);
     }
 
+    // ── deleteRegularSeasonAndPlayoffsBoxScores ────────────────
+
+    public function testDeleteRegularSeasonAndPlayoffsBoxScoresRemovesJanJuneGames(): void
+    {
+        // Season starting 2098: range is 2098-11-01 to 2099-06-30
+        $this->insertTeamBoxscoreRow('2099-01-15', 'Metros', 1, 2, 1);
+        $this->insertTeamBoxscoreRow('2099-06-10', 'Metros', 1, 3, 1);
+        // HEAT October game (before range start) — should survive
+        $this->insertTeamBoxscoreRow('2098-10-05', 'Metros', 1, 4, 1);
+
+        $result = $this->repo->deleteRegularSeasonAndPlayoffsBoxScores(2098);
+
+        self::assertTrue($result);
+        self::assertNull($this->repo->findTeamBoxscore('2099-01-15', 2, 1, 1));
+        self::assertNull($this->repo->findTeamBoxscore('2099-06-10', 3, 1, 1));
+        self::assertNotNull($this->repo->findTeamBoxscore('2098-10-05', 4, 1, 1));
+    }
+
     // ── deleteHeatBoxScores ─────────────────────────────────────
 
     public function testDeleteHeatBoxScoresRemovesOctoberGames(): void

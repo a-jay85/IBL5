@@ -8,10 +8,7 @@ use FreeAgency\FreeAgencyAdminRepository;
 
 /**
  * Tests FreeAgencyAdminRepository against real MariaDB — offers, demands,
- * contract updates, MLE/LLE marking, and offer clearing.
- *
- * NOTE: insertNewsStory() writes to nuke_stories (MyISAM, no transaction rollback).
- * It will be tested in a future PR with the MyISAM cleanup pattern (see SearchRepositoryTest).
+ * contract updates, MLE/LLE marking, news stories, and offer clearing.
  */
 class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 {
@@ -196,6 +193,31 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 
         self::assertNotNull($row);
         self::assertSame(0, $row['HasLLE']);
+    }
+
+    // ── insertNewsStory (nuke_stories is InnoDB — rolls back) ──
+
+    public function testInsertNewsStoryCreatesRow(): void
+    {
+        $affected = $this->repo->insertNewsStory(
+            'B10 FA Signing Test',
+            'Home text content',
+            'Body text content'
+        );
+
+        self::assertGreaterThan(0, $affected);
+
+        $stmt = $this->db->prepare("SELECT title, hometext, bodytext FROM nuke_stories WHERE title = ?");
+        self::assertNotFalse($stmt);
+        $title = 'B10 FA Signing Test';
+        $stmt->bind_param('s', $title);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertSame('Home text content', $row['hometext']);
+        self::assertSame('Body text content', $row['bodytext']);
     }
 
     // ── clearAllOffers ──────────────────────────────────────────

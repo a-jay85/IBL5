@@ -335,6 +335,25 @@ class TradingRepositoryTest extends DatabaseTestCase
         self::assertContains($pickId, $pickIds);
     }
 
+    // ── deleteTradeOfferById ───────────────────────────────────
+
+    public function testDeleteTradeOfferByIdRemovesOffer(): void
+    {
+        $offerId = $this->insertTradeOfferRow();
+
+        $affected = $this->repo->deleteTradeOfferById($offerId);
+
+        self::assertSame(1, $affected);
+
+        $stmt = $this->db->prepare("SELECT id FROM ibl_trade_offers WHERE id = ?");
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $offerId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        self::assertNull($row);
+    }
+
     // ── deleteTradeOffer (nested transaction) ───────────────────
     // MUST BE LAST: begin_transaction() inside implicitly commits the outer tx.
 

@@ -13,43 +13,41 @@ test.describe('Player Movement flow', () => {
     await expect(page.locator('.ibl-title')).toContainText(/Player Movement/i);
   });
 
-  test('player movement table is visible when data exists', async ({ page }) => {
+  // CI seed guarantees movement: pid=4 played for Metros (tid=1) in 2025,
+  // now on Stars (tid=2). Query: ibl_hist.year=2025 AND teamid != plr.tid.
+
+  test('player movement table is visible with expected headers', async ({ page }) => {
     const table = page.locator('.player-movement-table, .ibl-data-table');
-    const count = await table.count();
-    if (count > 0) {
-      await expect(table.first()).toBeVisible();
+    await expect(table.first()).toBeVisible();
 
-      const headerText = await table.first().locator('thead').textContent();
-      expect(headerText).toContain('Player');
-      expect(headerText).toContain('Old');
-      expect(headerText).toContain('New');
-    }
+    const headerText = await table.first().locator('thead').textContent();
+    expect(headerText).toContain('Player');
+    expect(headerText).toContain('Old');
+    expect(headerText).toContain('New');
   });
 
-  test('player links exist when data present', async ({ page }) => {
+  test('player links navigate to player page', async ({ page }) => {
     const playerLinks = page.locator('.player-movement-table a[href*="pid="], .ibl-data-table a[href*="pid="]');
-    const count = await playerLinks.count();
-    if (count > 0) {
-      const href = await playerLinks.first().getAttribute('href');
-      expect(href).toContain('name=Player');
-    }
+    await expect(playerLinks.first()).toBeVisible();
+
+    const href = await playerLinks.first().getAttribute('href');
+    expect(href).toContain('name=Player');
+
+    await page.goto(href!);
+    await assertNoPhpErrors(page, 'on player page from Player Movement link');
   });
 
-  test('rows have data-team-ids attribute when present', async ({ page }) => {
+  test('rows have data-team-ids attribute', async ({ page }) => {
     const rows = page.locator('tr[data-team-ids]');
-    const count = await rows.count();
-    if (count > 0) {
-      const teamIds = await rows.first().getAttribute('data-team-ids');
-      expect(teamIds).toBeTruthy();
-    }
+    await expect(rows.first()).toBeVisible();
+
+    const teamIds = await rows.first().getAttribute('data-team-ids');
+    expect(teamIds).toBeTruthy();
   });
 
   test('table is sortable', async ({ page }) => {
     const sortable = page.locator('.sortable');
-    const count = await sortable.count();
-    if (count > 0) {
-      await expect(sortable.first()).toBeVisible();
-    }
+    await expect(sortable.first()).toBeVisible();
   });
 
   test('no PHP errors', async ({ page }) => {

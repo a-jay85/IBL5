@@ -26,24 +26,21 @@ test.describe('Record Holders flow', () => {
     const cards = page.locator('.record-section .ibl-card');
     const cardCount = await cards.count();
 
-    // In CI with sparse seed data, some record categories may have no tables.
-    // Count cards that have at least one table with rows.
+    // CI seed guarantees data: box scores for single-game records,
+    // plus pid=3 year=2024 with games=55 for full-season averages.
     let cardsWithRows = 0;
     for (let i = 0; i < cardCount; i++) {
       const card = cards.nth(i);
       const tables = card.locator('.ibl-data-table');
-      if (await tables.count() > 0) {
+      const tableCount = await tables.count();
+      if (tableCount > 0) {
         const rows = tables.first().locator('tbody tr');
-        if (await rows.count() > 0) {
+        if ((await rows.count()) > 0) {
           cardsWithRows++;
         }
       }
     }
 
-    // With sparse CI seed data, skip rather than fail if no cards have data.
-    if (cardsWithRows === 0) {
-      test.skip(true, 'No record data available (sparse CI seed)');
-    }
     expect(cardsWithRows).toBeGreaterThan(0);
   });
 
@@ -52,11 +49,23 @@ test.describe('Record Holders flow', () => {
     await expect(playerLinks.first()).toBeVisible();
   });
 
-  test('team record rows contain team-colored cells', async ({ page }) => {
-    // Team records should have team styling via inline style or data attributes
-    const tables = page.locator('.ibl-data-table');
+  test('player links navigate to player page', async ({ page }) => {
+    const playerLink = page.locator('.record-section a[href*="pid="]').first();
+    const href = await playerLink.getAttribute('href');
+    expect(href).toBeTruthy();
+
+    await page.goto(href!);
+    await assertNoPhpErrors(page, 'on player page from Record Holders link');
+  });
+
+  test('record tables have data rows', async ({ page }) => {
+    // Multiple record tables should exist with actual tbody rows
+    const tables = page.locator('.record-section .ibl-data-table');
     const tableCount = await tables.count();
     expect(tableCount).toBeGreaterThan(0);
+
+    const firstTableRows = tables.first().locator('tbody tr');
+    expect(await firstTableRows.count()).toBeGreaterThan(0);
   });
 
   test('no PHP errors', async ({ page }) => {

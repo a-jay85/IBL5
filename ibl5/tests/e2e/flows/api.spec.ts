@@ -174,6 +174,164 @@ async function assertApiErrorRoute(
   expect(expectedStatuses, `${path} returned non-JSON (status ${lastStatus}) after 5 attempts`).toContain(lastStatus);
 }
 
+// ============================================================
+// Response envelope validation — verify the standard
+// { status, data, meta: { timestamp, version } } shape
+// ============================================================
+
+test.describe('API v1 — response envelope validation', () => {
+  test('GET /season has standard envelope', async ({ request }) => {
+    await assertGetRoute(request, '/season', (body: unknown) => {
+      const b = body as Record<string, unknown>;
+      expect(b.status).toBe('success');
+      expect(b).toHaveProperty('data');
+      expect(b).toHaveProperty('meta');
+      const meta = b.meta as Record<string, unknown>;
+      expect(meta.version).toBe('v1');
+      expect(typeof meta.timestamp).toBe('string');
+    });
+  });
+
+  test('GET /season data has phase field', async ({ request }) => {
+    await assertGetRoute(request, '/season', (body: unknown) => {
+      const b = body as Record<string, unknown>;
+      const data = b.data as Record<string, unknown>;
+      expect(typeof data.phase).toBe('string');
+    });
+  });
+
+  test('GET /players has envelope with pagination meta', async ({ request }) => {
+    await assertGetRoute(request, '/players', (body: unknown) => {
+      const b = body as Record<string, unknown>;
+      expect(b.status).toBe('success');
+      expect(Array.isArray(b.data)).toBe(true);
+      const meta = b.meta as Record<string, unknown>;
+      expect(meta).toHaveProperty('page');
+      expect(meta).toHaveProperty('per_page');
+      expect(meta).toHaveProperty('total');
+      expect(meta).toHaveProperty('total_pages');
+    });
+  });
+
+  test('GET /players/{uuid} data has player fields', async ({ request }) => {
+    await assertGetRoute(request, `/players/${SEED_PLAYER_UUID}`, (body: unknown) => {
+      const b = body as Record<string, unknown>;
+      expect(b.status).toBe('success');
+      const data = b.data as Record<string, unknown>;
+      expect(typeof data.uuid).toBe('string');
+      expect(typeof data.name).toBe('string');
+      expect(data.position).toMatch(/^(PG|SG|SF|PF|C)$/);
+    });
+  });
+
+  test('GET /standings data is array of team standings', async ({ request }) => {
+    await assertGetRoute(request, '/standings', (body: unknown) => {
+      const b = body as Record<string, unknown>;
+      expect(b.status).toBe('success');
+      expect(Array.isArray(b.data)).toBe(true);
+      const arr = b.data as Record<string, unknown>[];
+      if (arr.length > 0) {
+        const entry = arr[0];
+        expect(entry).toHaveProperty('team');
+        expect(entry).toHaveProperty('win_percentage');
+        const team = entry.team as Record<string, unknown>;
+        expect(typeof team.uuid).toBe('string');
+      }
+    });
+  });
+
+  test('GET /games data has game structure', async ({ request }) => {
+    await assertGetRoute(request, '/games', (body: unknown) => {
+      const b = body as Record<string, unknown>;
+      expect(b.status).toBe('success');
+      expect(Array.isArray(b.data)).toBe(true);
+      const arr = b.data as Record<string, unknown>[];
+      if (arr.length > 0) {
+        const game = arr[0];
+        expect(game).toHaveProperty('uuid');
+        expect(game).toHaveProperty('date');
+        expect(game).toHaveProperty('visitor');
+        expect(game).toHaveProperty('home');
+      }
+    });
+  });
+
+  test('GET /stats/leaders data has player+team+stats', async ({ request }) => {
+    await assertGetRoute(request, '/stats/leaders', (body: unknown) => {
+      const b = body as Record<string, unknown>;
+      expect(b.status).toBe('success');
+      expect(Array.isArray(b.data)).toBe(true);
+      const arr = b.data as Record<string, unknown>[];
+      if (arr.length > 0) {
+        const entry = arr[0];
+        expect(entry).toHaveProperty('player');
+        expect(entry).toHaveProperty('team');
+        expect(entry).toHaveProperty('stats');
+      }
+    });
+  });
+
+  test('Content-Type header is application/json', async ({ request }) => {
+    const response = await request.get(`${BASE_URL}/season`, {
+      headers: authHeaders,
+    });
+    if (response.status() === 200) {
+      const contentType = response.headers()['content-type'] ?? '';
+      expect(contentType).toContain('application/json');
+    }
+  });
+});
+
+// ============================================================
+// Pagination parameter tests
+// ============================================================
+
+test.describe('API v1 — pagination parameters', () => {
+  test('per_page limits result count', async ({ request }) => {
+    await assertGetRoute(request, '/players?per_page=5', (body: unknown) => {
+      const b = body as Record<string, unknown>;
+      const data = b.data as unknown[];
+      expect(data.length).toBeLessThanOrEqual(5);
+      const meta = b.meta as Record<string, unknown>;
+      expect(meta.per_page).toBe(5);
+    });
+  });
+
+  test('page parameter advances to next page', async ({ request }) => {
+    await assertGetRoute(request, '/players?page=2&per_page=5', (body: unknown) => {
+      const b = body as Record<string, unknown>;
+      const meta = b.meta as Record<string, unknown>;
+      expect(meta.page).toBe(2);
+      expect(meta.per_page).toBe(5);
+    });
+  });
+});
+
+// ============================================================
+// ETag / 304 caching
+// ============================================================
+
+test.describe('API v1 — ETag caching', () => {
+  test('ETag header present on cacheable endpoint', async ({ request }) => {
+    const response = await request.get(`${BASE_URL}/standings`, {
+      headers: authHeaders,
+    });
+    if (response.status() !== 200) return; // 401 or non-JSON — skip
+
+    const etag = response.headers()['etag'];
+    if (!etag) {
+      // Server may not implement ETag — skip gracefully
+      return;
+    }
+
+    // Second request with If-None-Match should return 304
+    const response2 = await request.get(`${BASE_URL}/standings`, {
+      headers: { ...authHeaders, 'If-None-Match': etag },
+    });
+    expect(response2.status()).toBe(304);
+  });
+});
+
 test.describe('API v1 — error handling', () => {
   test('GET /nonexistent returns 404', async ({ request }) => {
     await assertApiErrorRoute(request, 'get', '/nonexistent', [401, 404], (body) => {

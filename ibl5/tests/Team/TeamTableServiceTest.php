@@ -7,6 +7,7 @@ namespace Tests\Team;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Team\Contracts\TeamTableServiceInterface;
+use League\League;
 use Team\TeamTableService;
 
 /**
@@ -255,9 +256,9 @@ class TeamTableServiceTest extends TestCase
         $groups = $service->buildDropdownGroups($season);
 
         $vsDivision = $groups['vs. Division'];
-        $this->assertCount(count(\League::DIVISION_NAMES), $vsDivision);
+        $this->assertCount(count(League::DIVISION_NAMES), $vsDivision);
 
-        foreach (\League::DIVISION_NAMES as $division) {
+        foreach (League::DIVISION_NAMES as $division) {
             $key = 'split:div_' . strtolower($division);
             $this->assertArrayHasKey($key, $vsDivision);
             $this->assertSame('vs. ' . $division, $vsDivision[$key]);
@@ -271,9 +272,9 @@ class TeamTableServiceTest extends TestCase
         $groups = $service->buildDropdownGroups($season);
 
         $vsConference = $groups['vs. Conference'];
-        $this->assertCount(count(\League::CONFERENCE_NAMES), $vsConference);
+        $this->assertCount(count(League::CONFERENCE_NAMES), $vsConference);
 
-        foreach (\League::CONFERENCE_NAMES as $conference) {
+        foreach (League::CONFERENCE_NAMES as $conference) {
             $key = 'split:conf_' . strtolower($conference);
             $this->assertArrayHasKey($key, $vsConference);
             $this->assertSame('vs. ' . $conference, $vsConference[$key]);

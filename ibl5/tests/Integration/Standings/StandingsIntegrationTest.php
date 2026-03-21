@@ -9,6 +9,7 @@ use SeriesRecords\SeriesRecordsService;
 use Tests\Integration\IntegrationTestCase;
 use Tests\Integration\Mocks\TestDataFactory;
 use Standings\StandingsRepository;
+use League\League;
 use Standings\StandingsView;
 
 /**
@@ -142,7 +143,7 @@ class StandingsIntegrationTest extends IntegrationTestCase
         $this->mockDb->setMockData([]);
 
         // Act & Assert - All divisions should work without throwing
-        foreach (\League::DIVISION_NAMES as $division) {
+        foreach (League::DIVISION_NAMES as $division) {
             $result = $this->repository->getStandingsByRegion($division);
             $this->assertIsArray($result);
         }

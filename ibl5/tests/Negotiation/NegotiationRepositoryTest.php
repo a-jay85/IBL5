@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Negotiation;
 
 use PHPUnit\Framework\TestCase;
+use League\League;
 use Negotiation\NegotiationRepository;
 
 /**
@@ -164,7 +165,7 @@ class NegotiationRepositoryTest extends TestCase
 
         $result = $repository->getTeamCapSpaceNextSeason('Empty Team');
 
-        $this->assertSame(\League::HARD_CAP_MAX, $result);
+        $this->assertSame(League::HARD_CAP_MAX, $result);
     }
 
     public function testGetTeamCapSpaceNextSeasonReturnsCapMinusSalary(): void
@@ -176,7 +177,7 @@ class NegotiationRepositoryTest extends TestCase
 
         $result = $repository->getTeamCapSpaceNextSeason('Test Team');
 
-        $this->assertSame(\League::HARD_CAP_MAX - 5000, $result);
+        $this->assertSame(League::HARD_CAP_MAX - 5000, $result);
     }
 
     // ============================================

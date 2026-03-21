@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Voting;
 
+use League\League;
 use Player\Player;
 use Player\PlayerStats;
 use Voting\Contracts\VotingBallotServiceInterface;
@@ -37,7 +38,7 @@ class VotingBallotService implements VotingBallotServiceInterface
     public function getBallotData(
         string $voterTeamName,
         \Season $season,
-        \League $league
+        League $league
     ): array {
         if ($season->phase === 'Regular Season') {
             return $this->getAllStarBallotData($league);
@@ -51,7 +52,7 @@ class VotingBallotService implements VotingBallotServiceInterface
      *
      * @return list<BallotCategory>
      */
-    private function getAllStarBallotData(\League $league): array
+    private function getAllStarBallotData(League $league): array
     {
         return [
             $this->buildPlayerCategory('ECF', 'Eastern Conference Frontcourt', 'Select FOUR players. Tap/click to reveal/hide nominees.', $league->getAllStarCandidatesResult('ECF')),
@@ -66,7 +67,7 @@ class VotingBallotService implements VotingBallotServiceInterface
      *
      * @return list<BallotCategory>
      */
-    private function getEndOfYearBallotData(\League $league): array
+    private function getEndOfYearBallotData(League $league): array
     {
         return [
             $this->buildPlayerCategory('MVP', 'Most Valuable Player', 'Select your top THREE choices. Tap/click to reveal/hide nominees.', $league->getMVPCandidatesResult()),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ProjectedDraftOrder;
 
+use League\League;
 use ProjectedDraftOrder\Contracts\ProjectedDraftOrderRepositoryInterface;
 
 /**
@@ -24,7 +25,7 @@ class ProjectedDraftOrderRepository extends \BaseMysqliRepository implements Pro
              JOIN ibl_team_info t ON s.tid = t.teamid
              WHERE s.tid BETWEEN 1 AND ?",
             "i",
-            \League::MAX_REAL_TEAMID
+            League::MAX_REAL_TEAMID
         );
     }
 

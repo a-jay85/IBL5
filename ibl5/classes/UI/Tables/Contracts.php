@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace UI\Tables;
 
+use League\League;
 use Player\Player;
 use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
@@ -172,7 +173,7 @@ class Contracts
 <?php endforeach; ?>
     </tbody>
     <tfoot>
-<?php $hardCapMax = \League::HARD_CAP_MAX; ?>
+<?php $hardCapMax = League::HARD_CAP_MAX; ?>
         <tr>
             <td></td>
             <td>Cap Totals</td>

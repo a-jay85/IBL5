@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration;
 
+use League\League;
 use Team\TeamRepository;
 
 class TeamRepositoryTest extends DatabaseTestCase
@@ -222,7 +223,7 @@ class TeamRepositoryTest extends DatabaseTestCase
         self::assertCount(28, $teams);
         foreach ($teams as $team) {
             self::assertGreaterThanOrEqual(1, $team['teamid']);
-            self::assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $team['teamid']);
+            self::assertLessThanOrEqual(League::MAX_REAL_TEAMID, $team['teamid']);
         }
     }
 

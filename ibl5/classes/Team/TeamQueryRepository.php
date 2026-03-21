@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Team;
 
+use League\League;
 use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
 
@@ -384,7 +385,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         $totalCurrentSeasonSalaries = $this->getTotalCurrentSeasonSalaries($teamResult);
         $projectedTotalCurrentSeasonSalaries = $totalCurrentSeasonSalaries + $contractValue;
 
-        return $projectedTotalCurrentSeasonSalaries <= \League::HARD_CAP_MAX;
+        return $projectedTotalCurrentSeasonSalaries <= League::HARD_CAP_MAX;
     }
 
     /**
@@ -395,7 +396,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         $buyoutsResult = $this->getBuyouts($teamId);
         $totalCurrentSeasonBuyouts = $this->getTotalCurrentSeasonSalaries($buyoutsResult);
         $projectedTotalCurrentSeasonBuyouts = $totalCurrentSeasonBuyouts + $buyoutValue;
-        $buyoutLimit = \League::HARD_CAP_MAX * \Team::BUYOUT_PERCENTAGE_MAX;
+        $buyoutLimit = League::HARD_CAP_MAX * \Team::BUYOUT_PERCENTAGE_MAX;
 
         return $projectedTotalCurrentSeasonBuyouts <= $buyoutLimit;
     }

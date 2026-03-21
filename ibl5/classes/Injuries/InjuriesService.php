@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Injuries;
 
 use Injuries\Contracts\InjuriesServiceInterface;
+use League\League;
 use Player\Player;
 use Team;
 
@@ -15,7 +16,7 @@ use Team;
  */
 class InjuriesService implements InjuriesServiceInterface
 {
-    private \League $league;
+    private League $league;
     private \mysqli $db;
 
     /**
@@ -24,7 +25,7 @@ class InjuriesService implements InjuriesServiceInterface
     public function __construct(\mysqli $db)
     {
         $this->db = $db;
-        $this->league = new \League($db);
+        $this->league = new League($db);
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Api\Repository;
 
 use Api\Pagination\Paginator;
+use League\League;
 use League\LeagueContext;
 
 /**
@@ -43,7 +44,7 @@ class ApiTeamRepository extends \BaseMysqliRepository
              ORDER BY {$orderBy}
              LIMIT ? OFFSET ?",
             'iii',
-            \League::MAX_REAL_TEAMID,
+            League::MAX_REAL_TEAMID,
             $paginator->getLimit(),
             $paginator->getOffset()
         );
@@ -58,7 +59,7 @@ class ApiTeamRepository extends \BaseMysqliRepository
         $row = $this->fetchOne(
             "SELECT COUNT(*) AS total FROM {$this->teamInfoTable} WHERE teamid BETWEEN 1 AND ?",
             'i',
-            \League::MAX_REAL_TEAMID
+            League::MAX_REAL_TEAMID
         );
 
         return $row !== null ? $row['total'] : 0;

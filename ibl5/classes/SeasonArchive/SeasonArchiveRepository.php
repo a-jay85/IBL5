@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SeasonArchive;
 
 use BaseMysqliRepository;
+use League\League;
 use League\LeagueContext;
 use SeasonArchive\Contracts\SeasonArchiveRepositoryInterface;
 
@@ -135,7 +136,7 @@ class SeasonArchiveRepository extends BaseMysqliRepository implements SeasonArch
             FROM ibl_heat_win_loss hwl
             JOIN {$this->teamInfoTable} ti ON ti.team_name = hwl.currentname
             WHERE hwl.year = ?
-                AND ti.teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . "
+                AND ti.teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
             ORDER BY hwl.wins DESC, hwl.losses ASC",
             "i",
             $heatYear

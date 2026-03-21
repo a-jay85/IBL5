@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use League\League;
+
 /**
  * BaseMysqliRepository - Abstract base class for all IBL repositories using mysqli
  *
@@ -342,7 +344,7 @@ abstract class BaseMysqliRepository
 
         /** @var list<array<string, mixed>> */
         return $this->fetchAll(
-            "SELECT * FROM ibl_team_info WHERE teamid BETWEEN 1 AND " . \League::MAX_REAL_TEAMID . " ORDER BY $safeOrderBy"
+            "SELECT * FROM ibl_team_info WHERE teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . " ORDER BY $safeOrderBy"
         );
     }
 

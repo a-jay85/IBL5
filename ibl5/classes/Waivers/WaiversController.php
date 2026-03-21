@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Waivers;
 
+use League\League;
 use Player\Player;
 use Team\Contracts\TeamQueryRepositoryInterface;
 use UI\Components\TableViewSwitcher;
@@ -267,17 +268,17 @@ class WaiversController implements WaiversControllerInterface
         );
 
         // Display player table with view switcher
-        $league = new \League($this->db);
+        $league = new League($this->db);
 
         if ($action === 'waive') {
             $tableResult = $this->teamQueryRepo->getHealthyAndInjuredPlayersOrderedByName($team->teamID, $season);
             $styleTeam = $team;
         } elseif ($season->isOffseasonPhase()) {
             $tableResult = $league->getFreeAgentsResult($season);
-            $styleTeam = \Team::initialize($this->db, \League::FREE_AGENTS_TEAMID);
+            $styleTeam = \Team::initialize($this->db, League::FREE_AGENTS_TEAMID);
         } else {
             $tableResult = $league->getWaivedPlayersResult();
-            $styleTeam = \Team::initialize($this->db, \League::FREE_AGENTS_TEAMID);
+            $styleTeam = \Team::initialize($this->db, League::FREE_AGENTS_TEAMID);
         }
 
         $tabDefinitions = [
@@ -319,7 +320,7 @@ class WaiversController implements WaiversControllerInterface
      */
     private function getPlayersForAction(\Team $team, string $action): array
     {
-        $league = new \League($this->db);
+        $league = new League($this->db);
         $season = new \Season($this->db);
         $timeNow = time();
         /** @var list<string> $players */

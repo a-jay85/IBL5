@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ActivityTracker;
 
 use ActivityTracker\Contracts\ActivityTrackerRepositoryInterface;
+use League\League;
 
 /**
  * ActivityTrackerRepository - Database operations for activity tracker
@@ -29,7 +30,7 @@ class ActivityTrackerRepository extends \BaseMysqliRepository implements Activit
              WHERE teamid BETWEEN 1 AND ?
              ORDER BY teamid ASC",
             'i',
-            \League::MAX_REAL_TEAMID
+            League::MAX_REAL_TEAMID
         );
     }
 }

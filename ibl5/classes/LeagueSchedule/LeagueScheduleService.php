@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace LeagueSchedule;
 
+use League\League;
 use LeagueSchedule\Contracts\LeagueScheduleRepositoryInterface;
 use LeagueSchedule\Contracts\LeagueScheduleServiceInterface;
 use StrengthOfSchedule\StrengthOfScheduleCalculator;
@@ -44,7 +45,7 @@ class LeagueScheduleService implements LeagueScheduleServiceInterface
      */
     public function getSchedulePageData(
         \Season $season,
-        \League $league,
+        League $league,
         \Services\CommonMysqliRepository $commonRepo
     ): array {
         $projectedNextSimEndDate = $season->projectedNextSimEndDate;

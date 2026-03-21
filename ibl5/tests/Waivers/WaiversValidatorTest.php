@@ -6,6 +6,7 @@ namespace Tests\Waivers;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use League\League;
 use Waivers\WaiversValidator;
 
 class WaiversValidatorTest extends TestCase
@@ -350,7 +351,7 @@ class WaiversValidatorTest extends TestCase
      */
     public function testValidateAddExactlyAtHardCapSucceeds(): void
     {
-        $hardCap = \League::HARD_CAP_MAX;
+        $hardCap = League::HARD_CAP_MAX;
         $result = $this->validator->validateAdd(
             123,            // valid player ID
             5,              // healthy roster slots
@@ -366,7 +367,7 @@ class WaiversValidatorTest extends TestCase
      */
     public function testValidateAddOneOverHardCapWithVetMinSucceeds(): void
     {
-        $hardCap = \League::HARD_CAP_MAX;
+        $hardCap = League::HARD_CAP_MAX;
         $result = $this->validator->validateAdd(
             123,       // valid player ID
             5,         // healthy roster slots (under 12 players)
@@ -463,7 +464,7 @@ class WaiversValidatorTest extends TestCase
      */
     public function testValidateDropWithThreeRosterSlotsAtCapSucceeds(): void
     {
-        $hardCap = \League::HARD_CAP_MAX;
+        $hardCap = League::HARD_CAP_MAX;
         $result = $this->validator->validateDrop(
             3,        // 3 roster slots
             $hardCap  // exactly at hard cap
@@ -478,7 +479,7 @@ class WaiversValidatorTest extends TestCase
      */
     public function testValidateDropWithThreeRosterSlotsOneOverCapFails(): void
     {
-        $hardCap = \League::HARD_CAP_MAX;
+        $hardCap = League::HARD_CAP_MAX;
         $result = $this->validator->validateDrop(
             3,            // 3 roster slots
             $hardCap + 1  // one over hard cap
@@ -589,7 +590,7 @@ class WaiversValidatorTest extends TestCase
 
     public static function rosterSlotBoundaryProvider(): array
     {
-        $hardCap = \League::HARD_CAP_MAX;
+        $hardCap = League::HARD_CAP_MAX;
 
         return [
             '0 slots fails (full roster)' => [0, 6000, 100, false],
@@ -623,7 +624,7 @@ class WaiversValidatorTest extends TestCase
 
     public static function salaryBoundaryProvider(): array
     {
-        $hardCap = \League::HARD_CAP_MAX;
+        $hardCap = League::HARD_CAP_MAX;
 
         return [
             'exactly at cap succeeds' => [$hardCap - 100, 100, 5, true],

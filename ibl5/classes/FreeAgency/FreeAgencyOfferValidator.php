@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyOfferValidatorInterface;
+use League\League;
 
 /**
  * @see FreeAgencyOfferValidatorInterface
@@ -147,7 +148,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
      */
     private function validateHardCapSpace(): array
     {
-        $hardCapSpace1 = $this->offerData['amendedCapSpaceYear1'] + (\League::HARD_CAP_MAX - \League::SOFT_CAP_MAX);
+        $hardCapSpace1 = $this->offerData['amendedCapSpaceYear1'] + (League::HARD_CAP_MAX - League::SOFT_CAP_MAX);
 
         if ($this->offerData['offer1'] > $hardCapSpace1) {
             return [

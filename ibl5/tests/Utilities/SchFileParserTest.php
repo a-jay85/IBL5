@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Utilities;
 
 use PHPUnit\Framework\TestCase;
+use League\League;
 use Utilities\SchFileParser;
 
 /**
@@ -309,8 +310,8 @@ class SchFileParserTest extends TestCase
         // Team IDs should be valid
         $this->assertGreaterThan(0, $firstGame['visitor']);
         $this->assertGreaterThan(0, $firstGame['home']);
-        $this->assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $firstGame['visitor']);
-        $this->assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $firstGame['home']);
+        $this->assertLessThanOrEqual(League::MAX_REAL_TEAMID, $firstGame['visitor']);
+        $this->assertLessThanOrEqual(League::MAX_REAL_TEAMID, $firstGame['home']);
 
         // Visitor and home should be different teams
         $this->assertNotSame($firstGame['visitor'], $firstGame['home'], 'A team cannot play itself');
@@ -328,8 +329,8 @@ class SchFileParserTest extends TestCase
         foreach ($games as $game) {
             $this->assertGreaterThan(0, $game['visitor'], 'Visitor team ID should be positive');
             $this->assertGreaterThan(0, $game['home'], 'Home team ID should be positive');
-            $this->assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $game['visitor']);
-            $this->assertLessThanOrEqual(\League::MAX_REAL_TEAMID, $game['home']);
+            $this->assertLessThanOrEqual(League::MAX_REAL_TEAMID, $game['visitor']);
+            $this->assertLessThanOrEqual(League::MAX_REAL_TEAMID, $game['home']);
         }
     }
 

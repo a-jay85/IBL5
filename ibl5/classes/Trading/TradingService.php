@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Trading;
 
+use League\League;
 use Trading\Contracts\TradingServiceInterface;
 use Trading\Contracts\TradingRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
@@ -437,7 +438,7 @@ class TradingService implements TradingServiceInterface
 
         foreach ($allTeams as $row) {
             $teamName = $row['team_name'];
-            if ($teamName === \League::FREE_AGENTS_TEAM_NAME) {
+            if ($teamName === League::FREE_AGENTS_TEAM_NAME) {
                 continue;
             }
 

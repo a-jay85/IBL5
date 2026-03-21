@@ -134,4 +134,15 @@ class SeasonQueryRepositoryTest extends DatabaseTestCase
         // Falls back to overall sim number (5) when no sim_dates match the FA date range
         self::assertSame(5, $phaseSimNumber);
     }
+
+    // ── getFreeAgencyNotificationsState ──────────────────────────
+
+    public function testGetFreeAgencyNotificationsStateReturnsString(): void
+    {
+        $this->db->query("REPLACE INTO ibl_settings (name, value) VALUES ('Free Agency Notifications', 'On')");
+
+        $result = $this->repo->getFreeAgencyNotificationsState();
+
+        self::assertSame('On', $result);
+    }
 }

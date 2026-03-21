@@ -64,4 +64,27 @@ class CapSpaceRepositoryTest extends DatabaseTestCase
             self::assertNotSame($row['cy'], $row['cyt'], 'Found expiring contract that should have been filtered');
         }
     }
+
+    // ── Negative paths ──────────────────────────────────────────
+
+    public function testGetPlayersUnderContractAfterSeasonReturnsEmptyForUnknownTeam(): void
+    {
+        self::assertSame([], $this->repo->getPlayersUnderContractAfterSeason(99999));
+    }
+
+    public function testGetPlayersUnderContractAfterSeasonExcludesPipeNamePlayers(): void
+    {
+        // SQL has AND name NOT LIKE '%|%' — pipe-name players should be excluded
+        $this->insertTestPlayer(200100005, 'Cap|PipeName', [
+            'tid' => 1,
+            'cy' => 1,
+            'cyt' => 3,
+            'cy1' => 1500,
+        ]);
+
+        $players = $this->repo->getPlayersUnderContractAfterSeason(1);
+
+        $pids = array_column($players, 'pid');
+        self::assertNotContains(200100005, $pids);
+    }
 }

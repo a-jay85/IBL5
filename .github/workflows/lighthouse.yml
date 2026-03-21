@@ -1,0 +1,100 @@
+name: Lighthouse CI
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  lighthouse:
+    name: Performance Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      # --- Dependency Caching ---
+      - name: Cache vendor directory
+        uses: actions/cache@v5
+        with:
+          path: ibl5/vendor
+          key: ${{ runner.os }}-vendor-${{ hashFiles('ibl5/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-vendor-
+
+      - name: Cache node_modules
+        uses: actions/cache@v5
+        with:
+          path: ibl5/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('ibl5/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        working-directory: ibl5
+        run: |
+          composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+          bun install
+
+      # --- App Setup ---
+      - name: Create config.php
+        working-directory: ibl5
+        run: |
+          cat > config.php <<'PHPCFG'
+          <?php
+          if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
+              header("Location: index.php");
+              exit();
+          }
+          $display_errors = true;
+          $dbhost = getenv('DB_HOST') ?: '127.0.0.1';
+          $dbuname = 'root';
+          $dbpass = 'root';
+          $dbname = 'ibl5';
+          $prefix = 'nuke';
+          $user_prefix = 'nuke';
+          $dbtype = 'MySQL';
+          $sitekey = 'ci-test-key-not-secret';
+          $subscription_url = '';
+          $admin_file = 'admin';
+          PHPCFG
+
+      - name: Build CSS
+        working-directory: ibl5
+        run: bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css
+
+      # --- Docker Compose ---
+      - name: Pull or build PHP image
+        run: |
+          docker pull ghcr.io/a-jay85/ibl5/php-apache:latest || \
+          docker build -t ghcr.io/a-jay85/ibl5/php-apache:latest .
+
+      - name: Start Docker containers
+        run: docker compose -f docker-compose.ci.yml up -d --wait
+
+      # --- Database Setup ---
+      - name: Create database and apply migrations
+        run: |
+          chmod +x ibl5/bin/run-migrations-ci.sh
+          ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
+
+      - name: Import seed data
+        run: |
+          docker compose -f docker-compose.ci.yml exec -T mariadb \
+            mariadb -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
+
+      # --- Lighthouse ---
+      - name: Run Lighthouse CI
+        working-directory: ibl5
+        run: bunx @lhci/cli autorun
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+          CHROME_PATH: /usr/bin/google-chrome-stable
+
+      # --- Cleanup ---
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.ci.yml down --volumes

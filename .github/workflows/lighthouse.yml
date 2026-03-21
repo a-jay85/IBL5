@@ -87,15 +87,12 @@ jobs:
             mariadb -u root -proot ibl5 < ibl5/tests/e2e/fixtures/ci-seed.sql
 
       # --- Lighthouse ---
-      - name: Install Chrome for Lighthouse
-        run: npx @puppeteer/browsers install chrome@stable
-
       - name: Run Lighthouse CI
         working-directory: ibl5
         run: bunx @lhci/cli autorun
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
-          CHROME_PATH: ${{ github.workspace }}/chrome/*/chrome-linux64/chrome
+          CHROME_PATH: /usr/bin/google-chrome-stable
 
       # --- Cleanup ---
       - name: Teardown

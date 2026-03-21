@@ -12,6 +12,10 @@ on:
       - '**.php'
       - 'ibl5/migrations/**.sql'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: PHPUnit Tests

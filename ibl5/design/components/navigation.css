@@ -119,7 +119,7 @@
     }
 
     .team-banner-row > .team-banner-logo img {
-        margin: 0 auto !important;
+        margin: 0 auto;
     }
 }
 

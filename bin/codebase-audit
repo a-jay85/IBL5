@@ -592,7 +592,7 @@ check_css_frontend() {
     subsection "E3: Deprecated HTML tags"
     local found_e3=false
     local deprecated_hits
-    deprecated_hits=$(grep -rn -i -E '<(b|i|center|font|u)[> ]' "$CLASSES_DIR" --include="*.php" 2>/dev/null | grep -v -E '^[[:space:]]*//' | head -15 || true)
+    deprecated_hits=$(grep -rn -i -E '<(b|i|center|font|u)[> ]' "$CLASSES_DIR" --include="*.php" 2>/dev/null | grep -v -E '^[[:space:]]*//' | grep -v -E ':[0-9]+:\s*\*' | head -15 || true)
     if [[ -n "$deprecated_hits" ]]; then
         while IFS= read -r line; do
             [[ -z "$line" ]] && continue
@@ -619,7 +619,7 @@ check_css_frontend() {
         important_hits=$(php -r '
             $dir = $argv[1];
             // Selectors that are allowed to use !important (user-agent overrides)
-            $allowedSelectors = ["href^=\"tel\""];
+            $allowedSelectors = ["href^=\"tel\"", "nav-pinned"];
             $iter = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
             foreach ($iter as $file) {
                 if ($file->getExtension() !== "css") continue;

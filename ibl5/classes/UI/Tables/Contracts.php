@@ -196,7 +196,7 @@ class Contracts
         </tr>
         <tr class="tfoot-legend">
             <td colspan="19" style="text-align: left;">
-                Key: &nbsp; <i>(Waived)*</i> &nbsp; Becomes Free Agent^ &nbsp; Eligible for Rookie Option/Extension 0* (hover/tap to reveal link)
+                Key: &nbsp; <em>(Waived)*</em> &nbsp; Becomes Free Agent^ &nbsp; Eligible for Rookie Option/Extension 0* (hover/tap to reveal link)
             </td>
         </tr>
     </tfoot>

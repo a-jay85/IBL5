@@ -191,4 +191,100 @@ class PlayerStatsRepositoryTest extends DatabaseTestCase
         self::assertSame($byName['pid'], $byId['pid']);
         self::assertSame($byName['games'], $byId['games']);
     }
+
+    // ── getSimDates ─────────────────────────────────────────────
+
+    public function testGetSimDatesReturnsArray(): void
+    {
+        $dates = $this->repo->getSimDates();
+
+        self::assertIsArray($dates);
+        if ($dates !== []) {
+            self::assertArrayHasKey('Sim', $dates[0]);
+        }
+    }
+
+    public function testGetSimDatesRespectsLimit(): void
+    {
+        $dates = $this->repo->getSimDates(5);
+
+        self::assertLessThanOrEqual(5, count($dates));
+    }
+
+    // ── getPlayoffCareerAverages ────────────────────────────────
+
+    public function testGetPlayoffCareerAveragesReturnsNullForNoData(): void
+    {
+        self::assertNull($this->repo->getPlayoffCareerAverages('DB No PO Avg'));
+    }
+
+    public function testGetPlayoffCareerAveragesReturnsRow(): void
+    {
+        $pid = 200000077;
+        $this->insertTestPlayer($pid, 'DB PO Avgs');
+        $this->insertFranchiseSeasonRow(1, 2098, 'Metros');
+
+        $this->insertPlayerBoxscoreRow(
+            '2098-06-12', $pid, 'DB PO Avgs', 'PG', 2, 1, 1,
+            minutes: 30, points2m: 6, ftm: 3, points3m: 2
+        );
+
+        $result = $this->repo->getPlayoffCareerAverages('DB PO Avgs');
+
+        self::assertNotNull($result);
+        self::assertSame($pid, $result['pid']);
+        self::assertSame(1, $result['games']);
+    }
+
+    // ── HEAT stats ──────────────────────────────────────────────
+
+    public function testGetHeatStatsReturnsEmptyForNoData(): void
+    {
+        self::assertSame([], $this->repo->getHeatStats('DB No Heat'));
+    }
+
+    public function testGetHeatStatsReturnsRowForOctoberGames(): void
+    {
+        $pid = 200000078;
+        $this->insertTestPlayer($pid, 'DB Heat Plr');
+        $this->insertFranchiseSeasonRow(1, 2098, 'Metros');
+
+        // October date = game_type=3 (HEAT)
+        $this->insertPlayerBoxscoreRow(
+            '2097-10-15', $pid, 'DB Heat Plr', 'SF', 2, 1, 1,
+            minutes: 28, points2m: 5, ftm: 2, points3m: 1
+        );
+
+        $result = $this->repo->getHeatStats('DB Heat Plr');
+
+        self::assertNotEmpty($result);
+        self::assertSame(2098, $result[0]['year']);
+    }
+
+    public function testGetHeatCareerTotalsReturnsNullForNoData(): void
+    {
+        self::assertNull($this->repo->getHeatCareerTotals('DB No Heat Tot'));
+    }
+
+    public function testGetHeatCareerAveragesReturnsNullForNoData(): void
+    {
+        self::assertNull($this->repo->getHeatCareerAverages('DB No Heat Avg'));
+    }
+
+    // ── Olympics stats ──────────────────────────────────────────
+
+    public function testGetOlympicsStatsReturnsEmptyForNoData(): void
+    {
+        self::assertSame([], $this->repo->getOlympicsStats(999999999));
+    }
+
+    public function testGetOlympicsCareerTotalsReturnsNullForNoData(): void
+    {
+        self::assertNull($this->repo->getOlympicsCareerTotals(999999999));
+    }
+
+    public function testGetOlympicsCareerAveragesReturnsNullForNoData(): void
+    {
+        self::assertNull($this->repo->getOlympicsCareerAverages(999999999));
+    }
 }

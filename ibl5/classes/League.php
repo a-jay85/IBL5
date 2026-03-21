@@ -26,6 +26,7 @@ class League extends BaseMysqliRepository
     const HARD_CAP_MAX = 7000;
 
     const FREE_AGENTS_TEAMID = 0;
+    const FREE_AGENTS_TEAM_NAME = 'Free Agents';
     const MAX_REAL_TEAMID = 28;
     const ROOKIES_TEAMID = 40;
     const SOPHOMORES_TEAMID = 41;

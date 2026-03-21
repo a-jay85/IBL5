@@ -437,7 +437,7 @@ class TradingService implements TradingServiceInterface
 
         foreach ($allTeams as $row) {
             $teamName = $row['team_name'];
-            if ($teamName === 'Free Agents') {
+            if ($teamName === \League::FREE_AGENTS_TEAM_NAME) {
                 continue;
             }
 

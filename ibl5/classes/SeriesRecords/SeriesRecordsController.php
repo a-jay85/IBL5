@@ -59,7 +59,7 @@ class SeriesRecordsController implements SeriesRecordsControllerInterface
     public function displayForUser(string $username): void
     {
         $teamName = $this->commonRepository->getTeamnameFromUsername($username);
-        $teamId = ($teamName !== null && $teamName !== 'Free Agents')
+        $teamId = ($teamName !== null && $teamName !== \League::FREE_AGENTS_TEAM_NAME)
             ? ($this->commonRepository->getTidFromTeamname($teamName) ?? 0)
             : 0;
 

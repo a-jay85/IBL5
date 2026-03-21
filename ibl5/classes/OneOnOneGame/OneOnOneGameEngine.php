@@ -10,6 +10,10 @@ use Utilities\HtmlSanitizer;
 /**
  * OneOnOneGameEngine - Simulates One-on-One basketball games
  *
+ * WARNING: This is a fan-created mini-game. It is NOT a representation of how the
+ * Jump Shot Basketball (JSB) simulation engine works. While it uses player ratings,
+ * the game mechanics here are original and should not be used to understand JSB logic.
+ *
  * Implements the game simulation logic using player ratings to determine
  * outcomes for shots, blocks, steals, fouls, and rebounds.
  *

@@ -91,6 +91,3 @@ Values from `array<string, mixed>` are `mixed`. Before concatenation, casting, o
 
 ### `$_GET`/`$_POST` values are `mixed`
 Superglobal values are `mixed`, not `string`. Use `is_string($_GET['key'])` to narrow before passing to string-typed methods.
-
-### Use `AppPaths::root()` instead of the `IBL5_ROOT` constant
-The `IBL5_ROOT` constant is defined at runtime with `define()`, making it `mixed` to PHPStan. Use `\Bootstrap\AppPaths::root()` instead — it returns `string` directly with no narrowing needed.

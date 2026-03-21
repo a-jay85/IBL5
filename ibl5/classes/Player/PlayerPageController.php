@@ -92,7 +92,7 @@ class PlayerPageController
         $html .= '</td></tr>';
 
         // Action buttons
-        $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? 'Free Agents';
+        $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? \League::FREE_AGENTS_TEAM_NAME;
         $userTeam = \Team::initialize($this->mysqliDb, $userTeamName);
 
         $actionButtons = $this->renderActionButtons($pageService, $player, $playerID, $userTeam, $season);

@@ -120,7 +120,17 @@ if [ -z "$WORKTREE_NAME" ]; then
     exit 1
 fi
 
-WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
+# Resolve the actual worktree path from git (handles worktrees created from
+# subdirectories, e.g., ibl5/worktrees/ instead of worktrees/).
+WORKTREE_PATH=$(git worktree list --porcelain | awk -v branch="refs/heads/$WORKTREE_NAME" '
+    /^worktree / { path = substr($0, 10) }
+    $0 == "branch " branch { print path; exit }
+')
+
+# Fall back to the conventional location if git doesn't know the branch.
+if [ -z "$WORKTREE_PATH" ]; then
+    WORKTREE_PATH="$REPO_ROOT/worktrees/$WORKTREE_NAME"
+fi
 
 # If the worktree directory is gone (already removed), try to find and stop
 # orphaned containers by name pattern (slug = worktree name or pr-NNN).

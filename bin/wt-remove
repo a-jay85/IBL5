@@ -15,7 +15,19 @@ if [ $# -lt 1 ]; then
 fi
 
 NAME="$1"
-WT_PATH="$REPO_ROOT/worktrees/$NAME"
+
+# Resolve the actual worktree path from git (handles worktrees created from
+# subdirectories, e.g., ibl5/worktrees/ instead of worktrees/).
+WT_PATH=$(git worktree list --porcelain | awk -v branch="refs/heads/$NAME" '
+    /^worktree / { path = substr($0, 10) }
+    $0 == "branch " branch { print path; exit }
+')
+
+# Fall back to the conventional location if git doesn't know the branch
+# (e.g., branch already deleted but directory remains).
+if [ -z "$WT_PATH" ]; then
+    WT_PATH="$REPO_ROOT/worktrees/$NAME"
+fi
 
 if [ ! -d "$WT_PATH" ]; then
     echo "Error: worktree '$NAME' not found at $WT_PATH" >&2

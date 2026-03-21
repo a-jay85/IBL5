@@ -591,12 +591,12 @@
     margin: 0;
 }
 
-a.schedule-jump-btn {
+.schedule-container a.schedule-jump-btn {
     display: inline-flex;
     align-items: center;
     gap: 5px;
     padding: 5px 10px;
-    background: var(--accent-500) !important;
+    background: var(--accent-500);
     color: white;
     font-size: 1rem;
     font-weight: 600;
@@ -608,8 +608,8 @@ a.schedule-jump-btn {
     box-shadow: 0 2px 6px rgb(249 115 22 / 0.3);
 }
 
-a.schedule-jump-btn:hover {
-    background: var(--accent-600) !important;
+.schedule-container a.schedule-jump-btn:hover {
+    background: var(--accent-600);
     box-shadow: 0 3px 10px rgb(249 115 22 / 0.4);
 }
 
@@ -993,14 +993,14 @@ a.schedule-jump-btn:hover {
     color: var(--team-secondary);
 }
 
-.schedule-container--team .schedule-jump-btn {
-    background: var(--team-primary) !important;
-    color: var(--team-secondary) !important;
+.schedule-container--team a.schedule-jump-btn {
+    background: var(--team-primary);
+    color: var(--team-secondary);
     box-shadow: 0 2px 8px color-mix(in srgb, var(--team-primary) 40%, transparent);
 }
 
-.schedule-container--team .schedule-jump-btn:hover {
-    background: var(--team-primary) !important;
+.schedule-container--team a.schedule-jump-btn:hover {
+    background: var(--team-primary);
     opacity: 0.9;
     box-shadow: 0 4px 12px color-mix(in srgb, var(--team-primary) 50%, transparent);
 }
@@ -1078,11 +1078,11 @@ a.schedule-jump-btn:hover {
    ========================================================================== */
 
 /* Position column - minimal width */
-.fa-preview-pos-col {
+.ibl-data-table .fa-preview-pos-col {
     width: 1%;
     white-space: nowrap;
-    padding-left: 0.25rem !important;
-    padding-right: 0.25rem !important;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
 }
 
 
@@ -1233,7 +1233,7 @@ a.schedule-jump-btn:hover {
 
 .ibl-data-table tbody tr.next-sim-row--user:nth-child(odd):hover,
 .ibl-data-table tbody tr.next-sim-row--user:nth-child(even):hover {
-    background-color: var(--accent-200, #fed7aa) !important;
+    background-color: var(--accent-200, #fed7aa);
 }
 
 .next-sim-row--opponent {

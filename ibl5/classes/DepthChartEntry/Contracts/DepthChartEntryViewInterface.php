@@ -22,7 +22,7 @@ interface DepthChartEntryViewInterface
      * @return void Echoes HTML image tag
      * 
      * **HTML Output:**
-     * `<center><img src="images/logo/{teamID}.jpg"></center><br>`
+     * `<div class="depth-chart-logo"><img src="images/logo/{teamID}.jpg"></div>`
      * 
      * **Important Behaviors:**
      * - Directly echoes HTML (does not buffer)

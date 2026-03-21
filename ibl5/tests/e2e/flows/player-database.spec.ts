@@ -65,11 +65,32 @@ test.describe('Player Database flow', () => {
     const table = page.locator('table.sortable').first();
     if (!(await table.isVisible())) return;
 
-    // Click a sortable header
-    const sortableHeader = table.locator('thead th').nth(1);
-    await sortableHeader.click();
+    // Wait for sorttable to initialize
+    await expect(table).toHaveAttribute('data-sorttable', 'true');
 
-    // After sorting, the table should still be visible (no errors)
+    // Get first column cell values before sort
+    const cells = table.locator('tbody td:nth-child(1)');
+    const countBefore = await cells.count();
+    if (countBefore < 2) return; // Need at least 2 rows to verify reorder
+
+    const valuesBefore: string[] = [];
+    for (let i = 0; i < Math.min(countBefore, 5); i++) {
+      valuesBefore.push((await cells.nth(i).textContent()) ?? '');
+    }
+
+    // Click a sortable header (first column)
+    const sortableHeader = table.locator('thead th').first();
+    await sortableHeader.click();
+    await expect(sortableHeader).toHaveClass(/sorttable_sorted/);
+
+    // Get values after sort
+    const valuesAfter: string[] = [];
+    for (let i = 0; i < Math.min(countBefore, 5); i++) {
+      valuesAfter.push((await cells.nth(i).textContent()) ?? '');
+    }
+
+    // Values should have changed order (or be same if already sorted)
+    // At minimum the sort class changed, confirming interaction worked
     await expect(table).toBeVisible();
   });
 

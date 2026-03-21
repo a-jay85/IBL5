@@ -247,7 +247,7 @@ class VotingResultsService implements VotingResultsServiceInterface
      * Strips the trailing ", TeamName" portion. If there is no comma, returns
      * the full string (handles GM names and other non-player entries).
      */
-    private static function extractPlayerName(string $voteName): string
+    public static function extractPlayerName(string $voteName): string
     {
         $lastComma = strrpos($voteName, ',');
         if ($lastComma === false) {

@@ -265,6 +265,22 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
     }
 
     /**
+     * @see JsbImportRepositoryInterface::upsertAward()
+     */
+    public function upsertAward(int $year, string $award, string $name): int
+    {
+        return $this->execute(
+            "INSERT INTO ibl_awards (year, Award, name)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE name = VALUES(name)",
+            'iss',
+            $year,
+            $award,
+            $name
+        );
+    }
+
+    /**
      * @see JsbImportRepositoryInterface::resolveTeamId()
      */
     public function resolveTeamId(int $jsbTeamId): ?int

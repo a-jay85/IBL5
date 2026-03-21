@@ -19,7 +19,8 @@
     "wt:up": "cd .. && bin/wt-up",
     "wt:down": "cd .. && bin/wt-down",
     "wt:list": "cd .. && bin/wt-list",
-    "lighthouse": "bunx @lhci/cli autorun"
+    "lighthouse": "bunx @lhci/cli autorun",
+    "smoke:prod": "cd .. && bin/smoke-prod"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",

@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Production smoke test — lightweight HTTP checks against the live site.
+#
+# Usage: bin/smoke-prod [base_url]
+# Default: https://www.iblhoops.net
+#
+# Checks 7 public URLs for:
+#   - HTTP 200 status
+#   - Expected content in response body
+#   - Absence of PHP error messages
+#
+# Exit code: 0 if all pass, 1 if any fail.
+
+set -euo pipefail
+
+BASE="${1:-https://www.iblhoops.net}"
+PASS=0
+FAIL=0
+ERRORS=""
+
+TMPFILE=$(mktemp)
+trap 'rm -f "$TMPFILE"' EXIT
+
+check() {
+    local name="$1" url="$2" expect="${3:-}" accept="${4:-200}"
+
+    # Single request: capture body to temp file + status code
+    local status
+    status=$(curl -sS -w "%{http_code}" --max-time 30 -o "$TMPFILE" "$url" 2>/dev/null) || true
+    # Extract just the HTTP code (last 3 chars of output)
+    status="${status: -3}"
+    [[ "$status" =~ ^[0-9]+$ ]] || status="000"
+
+    # Check if status is in the accepted list (pipe-separated, e.g., "200|401")
+    if ! echo "$accept" | grep -qw "$status"; then
+        FAIL=$((FAIL + 1))
+        ERRORS="${ERRORS}\n  FAIL: $name — HTTP $status (expected $accept)"
+        return
+    fi
+
+    # Check content (only if expect is non-empty)
+    if [ -n "$expect" ]; then
+        # Check for PHP errors
+        if grep -qiE "Fatal error|Parse error|Warning:|Uncaught|Stack trace:" "$TMPFILE"; then
+            FAIL=$((FAIL + 1))
+            ERRORS="${ERRORS}\n  FAIL: $name — PHP error detected"
+            return
+        fi
+
+        # Check for expected content
+        if ! grep -qi "$expect" "$TMPFILE"; then
+            FAIL=$((FAIL + 1))
+            ERRORS="${ERRORS}\n  FAIL: $name — missing expected content: $expect"
+            return
+        fi
+    fi
+
+    PASS=$((PASS + 1))
+    echo "  OK: $name"
+}
+
+echo "Smoke testing $BASE ..."
+echo ""
+
+check "Homepage"     "$BASE/ibl5/index.php"                                 "IBL"
+check "Standings"    "$BASE/ibl5/modules.php?name=Standings"                "Standings"
+check "Team page"    "$BASE/ibl5/modules.php?name=Team&op=team&teamID=1"    "team"
+check "Player page"  "$BASE/ibl5/modules.php?name=Player&pa=showpage&pid=1" "player"
+check "Login page"   "$BASE/ibl5/modules.php?name=YourAccount"              "Sign In"
+check "API routing"   "$BASE/ibl5/api/v1/season"                             "" "200|401"
+check "CSS asset"    "$BASE/ibl5/themes/IBL/style/style.css"                ""
+
+echo ""
+echo "Results: $PASS passed, $FAIL failed"
+
+if [ "$FAIL" -gt 0 ]; then
+    echo -e "\nFailures:$ERRORS"
+    exit 1
+fi

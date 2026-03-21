@@ -118,8 +118,10 @@ test.describe('DCE: NextSim position tabs', () => {
 
   test('clicking tab moves active state', async ({ page }) => {
     const tabs = page.locator('.nextsim-tab-container .ibl-tab');
-    if ((await tabs.count()) === 0) {
+    const count = await tabs.count();
+    if (count < 2) {
       test.skip(true, 'No NextSim tabs (no games in sim window)');
+      return;
     }
 
     // First tab (PG) should be active by default
@@ -137,15 +139,17 @@ test.describe('DCE: NextSim position tabs', () => {
 
   test('tab click loads content without PHP errors', async ({ page }) => {
     const tabs = page.locator('.nextsim-tab-container .ibl-tab');
-    if ((await tabs.count()) === 0) {
+    const count = await tabs.count();
+    if (count < 3) {
       test.skip(true, 'No NextSim tabs (no games in sim window)');
+      return;
     }
 
     // Click a non-default tab
     const sfTab = tabs.nth(2);
     await sfTab.click();
 
-    // Wait for AJAX content to load (loading class removed)
+    // Wait for AJAX content to load
     await page.waitForTimeout(500);
     await assertNoPhpErrors(page, 'after NextSim tab switch');
   });

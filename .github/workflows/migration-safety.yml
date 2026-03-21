@@ -211,10 +211,13 @@ jobs:
 
     - name: Check required tables exist
       run: |
+        # Tables selected by codebase reference frequency (top-used in Repository classes).
+        # ibl_trades was removed — it never existed; the actual trade table is ibl_trade_info.
         REQUIRED_TABLES=(
           ibl_plr ibl_team_info ibl_schedule ibl_box_scores
           ibl_hist nuke_users nuke_stories auth_users ibl_settings
-          ibl_draft ibl_demands ibl_awards ibl_trades
+          ibl_draft ibl_draft_picks ibl_demands ibl_awards
+          ibl_trade_info ibl_standings
         )
         MISSING=""
         for table in "${REQUIRED_TABLES[@]}"; do
@@ -242,6 +245,9 @@ jobs:
           "ibl_schedule:Date,Year,Visitor,Home,uuid"
           "nuke_users:user_id,username,user_email,user_ibl_team"
           "ibl_settings:settingskey,settingsvalue"
+          "ibl_draft_picks:pickid,ownerofpick,owner_tid,year,round"
+          "ibl_trade_info:id,tradeofferid,itemid,trade_from,trade_to"
+          "ibl_standings:tid,team_name,wins,losses,pct"
         )
 
         FAIL=0

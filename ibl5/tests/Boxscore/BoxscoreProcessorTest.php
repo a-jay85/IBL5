@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Boxscore;
 
+use Boxscore\Boxscore;
 use Boxscore\BoxscoreProcessor;
 use Boxscore\Contracts\BoxscoreProcessorInterface;
 use PHPUnit\Framework\TestCase;
@@ -201,7 +202,7 @@ class BoxscoreProcessorTest extends TestCase
     public function testOlympicsLeagueMapsAllDatesToAugust(): void
     {
         $gameInfoLine = $this->buildGameInfoLine(0, 14); // month offset 0 = October in IBL
-        $boxscore = \Boxscore::withGameInfoLine($gameInfoLine, 2003, 'Regular Season/Playoffs', 'olympics');
+        $boxscore = Boxscore::withGameInfoLine($gameInfoLine, 2003, 'Regular Season/Playoffs', 'olympics');
 
         $this->assertSame('08', $boxscore->gameMonth);
         $this->assertSame(2003, $boxscore->gameYear);
@@ -211,7 +212,7 @@ class BoxscoreProcessorTest extends TestCase
     public function testOlympicsLeagueUsesEndingYear(): void
     {
         $gameInfoLine = $this->buildGameInfoLine(2, 5); // month offset 2 = December in IBL
-        $boxscore = \Boxscore::withGameInfoLine($gameInfoLine, 2005, 'Regular Season/Playoffs', 'olympics');
+        $boxscore = Boxscore::withGameInfoLine($gameInfoLine, 2005, 'Regular Season/Playoffs', 'olympics');
 
         $this->assertSame(2005, $boxscore->gameYear);
         $this->assertSame('08', $boxscore->gameMonth);
@@ -221,7 +222,7 @@ class BoxscoreProcessorTest extends TestCase
     {
         // Month offset 1 = November (10+1=11), should be in starting year
         $gameInfoLine = $this->buildGameInfoLine(1, 10);
-        $boxscore = \Boxscore::withGameInfoLine($gameInfoLine, 2026, 'Regular Season/Playoffs', 'ibl');
+        $boxscore = Boxscore::withGameInfoLine($gameInfoLine, 2026, 'Regular Season/Playoffs', 'ibl');
 
         $this->assertSame('11', $boxscore->gameMonth);
         $this->assertSame(2025, $boxscore->gameYear); // Starting year for November
@@ -231,7 +232,7 @@ class BoxscoreProcessorTest extends TestCase
     {
         // Default (no league param) should behave like IBL
         $gameInfoLine = $this->buildGameInfoLine(1, 10);
-        $boxscore = \Boxscore::withGameInfoLine($gameInfoLine, 2026, 'Regular Season/Playoffs');
+        $boxscore = Boxscore::withGameInfoLine($gameInfoLine, 2026, 'Regular Season/Playoffs');
 
         $this->assertSame('11', $boxscore->gameMonth);
         $this->assertSame(2025, $boxscore->gameYear);
@@ -240,7 +241,7 @@ class BoxscoreProcessorTest extends TestCase
     public function testOlympicsLeagueIsCaseInsensitive(): void
     {
         $gameInfoLine = $this->buildGameInfoLine(0, 1);
-        $boxscore = \Boxscore::withGameInfoLine($gameInfoLine, 2003, 'Regular Season/Playoffs', 'Olympics');
+        $boxscore = Boxscore::withGameInfoLine($gameInfoLine, 2003, 'Regular Season/Playoffs', 'Olympics');
 
         $this->assertSame('08', $boxscore->gameMonth);
         $this->assertSame(2003, $boxscore->gameYear);

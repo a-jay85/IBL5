@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Boxscore;
 
+use Boxscore\Boxscore;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @covers \Boxscore
+ * @covers \Boxscore\Boxscore
  */
 class BoxscoreTest extends TestCase
 {
@@ -17,7 +18,7 @@ class BoxscoreTest extends TestCase
     {
         // Month code "01" → +10 = 11 (November), hits elseif month > 10 → year = startingYear
         $line = $this->makeGameInfoLine(monthCode: '01', dayCode: '14');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
         $this->assertSame('11', $box->gameMonth);
         $this->assertSame(2025, $box->gameYear);
@@ -27,7 +28,7 @@ class BoxscoreTest extends TestCase
     {
         // Month code "02" → +10 = 12 (December), hits elseif month > 10
         $line = $this->makeGameInfoLine(monthCode: '02', dayCode: '09');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
         $this->assertSame('12', $box->gameMonth);
         $this->assertSame(2025, $box->gameYear);
@@ -37,7 +38,7 @@ class BoxscoreTest extends TestCase
     {
         // Month code "03" → +10 = 13 (> 12 and != 22) → 13 - 12 = 01
         $line = $this->makeGameInfoLine(monthCode: '03', dayCode: '04');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
         $this->assertSame('01', $box->gameMonth);
         $this->assertSame(2026, $box->gameYear);
@@ -47,7 +48,7 @@ class BoxscoreTest extends TestCase
     {
         // Month code "04" → +10 = 14 → 14 - 12 = 02
         $line = $this->makeGameInfoLine(monthCode: '04', dayCode: '00');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
         $this->assertSame('02', $box->gameMonth);
     }
@@ -56,7 +57,7 @@ class BoxscoreTest extends TestCase
     {
         // Month code "12" → +10 = 22 = JSB::PLAYOFF_MONTH → 22 - 16 = 06
         $line = $this->makeGameInfoLine(monthCode: '12', dayCode: '00');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
         $this->assertSame('06', $box->gameMonth);
         $this->assertSame(2026, $box->gameYear);
@@ -65,7 +66,7 @@ class BoxscoreTest extends TestCase
     public function testOlympicsGameUsesAugustAndEndingYear(): void
     {
         $line = $this->makeGameInfoLine(monthCode: '01', dayCode: '05');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs', 'olympics');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs', 'olympics');
 
         $this->assertSame('08', $box->gameMonth);
         $this->assertSame(2026, $box->gameYear);
@@ -74,7 +75,7 @@ class BoxscoreTest extends TestCase
     public function testOlympicsCaseInsensitive(): void
     {
         $line = $this->makeGameInfoLine(monthCode: '01', dayCode: '05');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs', 'Olympics');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs', 'Olympics');
 
         $this->assertSame('08', $box->gameMonth);
     }
@@ -83,7 +84,7 @@ class BoxscoreTest extends TestCase
     {
         // Month code "01" → +10 = 11, hits elseif month > 10, phase = "HEAT" → month = 10
         $line = $this->makeGameInfoLine(monthCode: '01', dayCode: '00');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'HEAT');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'HEAT');
 
         $this->assertSame('10', $box->gameMonth);
         $this->assertSame(2025, $box->gameYear);
@@ -93,7 +94,7 @@ class BoxscoreTest extends TestCase
     {
         // Visitor team code "04" → 4+1 = 5, Home team code "09" → 9+1 = 10
         $line = $this->makeGameInfoLine(visitorTeamCode: '04', homeTeamCode: '09');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
         $this->assertSame(5, $box->visitorTeamID);
         $this->assertSame(10, $box->homeTeamID);
@@ -103,7 +104,7 @@ class BoxscoreTest extends TestCase
     {
         // Day code "14" → 14+1 = 15
         $line = $this->makeGameInfoLine(dayCode: '14');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
         $this->assertSame('15', $box->gameDay);
     }
@@ -112,7 +113,7 @@ class BoxscoreTest extends TestCase
     {
         // gameOfThatDay code "02" → 2+1 = 3
         $line = $this->makeGameInfoLine(gameOfDayCode: '02');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
         $this->assertSame(3, $box->gameOfThatDay);
     }
@@ -120,7 +121,7 @@ class BoxscoreTest extends TestCase
     public function testAttendanceAndCapacityExtracted(): void
     {
         $line = $this->makeGameInfoLine(attendance: '18500', capacity: '20000');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
         $this->assertSame('18500', $box->attendance);
         $this->assertSame('20000', $box->capacity);
@@ -129,7 +130,7 @@ class BoxscoreTest extends TestCase
     public function testRecordExtracted(): void
     {
         $line = $this->makeGameInfoLine(vWins: '30', vLosses: '10', hWins: '25', hLosses: '15');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
         $this->assertSame('30', $box->visitorWins);
         $this->assertSame('10', $box->visitorLosses);
@@ -143,7 +144,7 @@ class BoxscoreTest extends TestCase
             vQ1: ' 25', vQ2: ' 30', vQ3: ' 22', vQ4: ' 28', vOT: '  0',
             hQ1: ' 27', hQ2: ' 24', hQ3: ' 31', hQ4: ' 26', hOT: '  0',
         );
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
         $this->assertSame(' 25', $box->visitorQ1points);
         $this->assertSame(' 30', $box->visitorQ2points);
@@ -155,7 +156,7 @@ class BoxscoreTest extends TestCase
     {
         // January 15th game in 2026 season
         $line = $this->makeGameInfoLine(monthCode: '03', dayCode: '14');
-        $box = \Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
+        $box = Boxscore::withGameInfoLine($line, 2026, 'Regular Season/Playoffs');
 
         $this->assertSame('2026-01-15', $box->gameDate);
     }
@@ -164,7 +165,7 @@ class BoxscoreTest extends TestCase
 
     public function testScoresMatchDatabaseReturnsTrueForMatchingScores(): void
     {
-        $box = \Boxscore::withGameInfoLine(
+        $box = Boxscore::withGameInfoLine(
             $this->makeGameInfoLine(
                 vQ1: ' 25', vQ2: ' 30', vQ3: ' 22', vQ4: ' 28', vOT: '  0',
                 hQ1: ' 27', hQ2: ' 24', hQ3: ' 31', hQ4: ' 26', hOT: '  0',
@@ -185,7 +186,7 @@ class BoxscoreTest extends TestCase
 
     public function testScoresMatchDatabaseReturnsFalseForMismatchedVisitorScores(): void
     {
-        $box = \Boxscore::withGameInfoLine(
+        $box = Boxscore::withGameInfoLine(
             $this->makeGameInfoLine(
                 vQ1: ' 25', vQ2: ' 30', vQ3: ' 22', vQ4: ' 28', vOT: '  0',
                 hQ1: ' 27', hQ2: ' 24', hQ3: ' 31', hQ4: ' 26', hOT: '  0',
@@ -206,7 +207,7 @@ class BoxscoreTest extends TestCase
 
     public function testScoresMatchDatabaseReturnsFalseForMismatchedHomeScores(): void
     {
-        $box = \Boxscore::withGameInfoLine(
+        $box = Boxscore::withGameInfoLine(
             $this->makeGameInfoLine(
                 vQ1: ' 25', vQ2: ' 30', vQ3: ' 22', vQ4: ' 28', vOT: '  0',
                 hQ1: ' 27', hQ2: ' 24', hQ3: ' 31', hQ4: ' 26', hOT: '  0',
@@ -229,7 +230,7 @@ class BoxscoreTest extends TestCase
 
     public function testOverrideGameContextSetsFields(): void
     {
-        $box = \Boxscore::withGameInfoLine(
+        $box = Boxscore::withGameInfoLine(
             $this->makeGameInfoLine(),
             2026,
             'Regular Season/Playoffs',
@@ -247,7 +248,7 @@ class BoxscoreTest extends TestCase
 
     public function testPlayerInsertSqlContainsTableName(): void
     {
-        $sql = \Boxscore::playerInsertSql('ibl_box_scores');
+        $sql = Boxscore::playerInsertSql('ibl_box_scores');
 
         $this->assertStringContainsString('ibl_box_scores', $sql);
         $this->assertStringContainsString('INSERT INTO', $sql);
@@ -255,7 +256,7 @@ class BoxscoreTest extends TestCase
 
     public function testPlayerInsertSqlContainsExpectedColumns(): void
     {
-        $sql = \Boxscore::playerInsertSql('ibl_box_scores');
+        $sql = Boxscore::playerInsertSql('ibl_box_scores');
 
         $this->assertStringContainsString('Date', $sql);
         $this->assertStringContainsString('pid', $sql);
@@ -265,7 +266,7 @@ class BoxscoreTest extends TestCase
 
     public function testTeamInsertSqlContainsTableName(): void
     {
-        $sql = \Boxscore::teamInsertSql('ibl_box_scores_teams');
+        $sql = Boxscore::teamInsertSql('ibl_box_scores_teams');
 
         $this->assertStringContainsString('ibl_box_scores_teams', $sql);
         $this->assertStringContainsString('INSERT INTO', $sql);
@@ -273,7 +274,7 @@ class BoxscoreTest extends TestCase
 
     public function testTeamInsertSqlContainsExpectedColumns(): void
     {
-        $sql = \Boxscore::teamInsertSql('ibl_box_scores_teams');
+        $sql = Boxscore::teamInsertSql('ibl_box_scores_teams');
 
         $this->assertStringContainsString('visitorTeamID', $sql);
         $this->assertStringContainsString('homeTeamID', $sql);

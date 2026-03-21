@@ -71,7 +71,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
             $log .= $this->updateTeamStats($tid, $teamName, $stats);
         }
 
-        \UI::displayDebugOutput($log, 'Power Rankings Update Log');
+        \UI\DebugOutput::display($log, 'Power Rankings Update Log');
 
         // Calculate and store Strength of Schedule
         $this->calculateAndStoreSos($allPlayedGames, $month);
@@ -319,7 +319,7 @@ class PowerRankingsUpdater extends \BaseMysqliRepository {
                 . "RSOS={$remainingSos} (rank {$remainingSosRank})<br>";
         }
 
-        \UI::displayDebugOutput($sosLog, 'Strength of Schedule Update Log');
+        \UI\DebugOutput::display($sosLog, 'Strength of Schedule Update Log');
         echo '<p>Strength of Schedule values have been calculated and stored.<p>';
     }
 }

@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+namespace Boxscore;
+
+use JSB;
+use Season;
+
 class Boxscore
 {
     /** Maximum player name length in ibl_box_scores.name (varchar(16)) */
@@ -284,7 +289,7 @@ class Boxscore
      */
     public static function deletePreseasonBoxScores(\mysqli $db): bool
     {
-        $repository = new \Boxscore\BoxscoreRepository($db);
+        $repository = new BoxscoreRepository($db);
         return $repository->deletePreseasonBoxScores();
     }
 
@@ -297,7 +302,7 @@ class Boxscore
      */
     public static function deleteHEATBoxScores(\mysqli $db, int $seasonStartingYear): bool
     {
-        $repository = new \Boxscore\BoxscoreRepository($db);
+        $repository = new BoxscoreRepository($db);
         return $repository->deleteHeatBoxScores($seasonStartingYear);
     }
 
@@ -310,7 +315,7 @@ class Boxscore
      */
     public static function deleteRegularSeasonAndPlayoffsBoxScores(\mysqli $db, int $seasonStartingYear): bool
     {
-        $repository = new \Boxscore\BoxscoreRepository($db);
+        $repository = new BoxscoreRepository($db);
         return $repository->deleteRegularSeasonAndPlayoffsBoxScores($seasonStartingYear);
     }
 }

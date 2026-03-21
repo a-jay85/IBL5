@@ -290,7 +290,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         int $personalFouls,
     ): int {
         return $this->execute(
-            \Boxscore::teamInsertSql($this->teamTable),
+            Boxscore::teamInsertSql($this->teamTable),
             "ssiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii",
             $date,
             $name,
@@ -364,7 +364,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         int $personalFouls,
     ): int {
         return $this->execute(
-            \Boxscore::playerInsertSql($this->playerTable),
+            Boxscore::playerInsertSql($this->playerTable),
             "ssssiiiiiiiiiiiiiiiiiiiiiiiii",
             $date,
             $uuid,

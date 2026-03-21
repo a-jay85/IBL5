@@ -285,7 +285,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $log .= $this->insertPlayoffGamesFromScheduleHtm($scheduleTable);
 
-        \UI::displayDebugOutput($log, "{$scheduleTable} SQL Queries");
+        \UI\DebugOutput::display($log, "{$scheduleTable} SQL Queries");
 
         echo "The {$scheduleTable} database table has been updated.<p>";
     }

@@ -162,7 +162,7 @@ class SavedDepthChartApiHandler
         if ($endDate !== null && $endDate !== '') {
             $team = \Team::initialize($this->db, $tid);
             $season = new \Season($this->db);
-            $statsHtml = \UI::periodAverages($this->db, $team, $season, $startDate, $endDate);
+            $statsHtml = \UI\Tables\PeriodAverages::render($this->db, $team, $season, $startDate, $endDate);
         }
 
         $response = [

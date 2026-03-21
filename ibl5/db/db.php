@@ -93,7 +93,7 @@ switch ($dbtype) {
 }
 
 if ($dbtype == 'MySQL') {
-    $db = new MySQL($dbhost, $dbuname, $dbpass, $dbname, false);
+    $db = new \Database\MySQL($dbhost, $dbuname, $dbpass, $dbname, false);
 
     // Create mysqli connection with native type casting enabled
     // This makes INT/FLOAT columns return PHP int/float instead of strings

@@ -1,0 +1,157 @@
+#!/bin/bash
+# Clean up worktrees whose branches have been merged to master.
+# Tears down Docker env, removes worktree, and deletes local branch.
+#
+# Usage: bin/wt-cleanup [<worktree-name>] [--all] [--dry-run]
+
+set -euo pipefail
+
+# Resolve to the main repo root, even when run from a worktree.
+# git worktree list always shows the main checkout first.
+REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+TARGET_NAME=""
+ALL=false
+DRY_RUN=false
+CLEANED=0
+SKIPPED=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --all) ALL=true ;;
+        --dry-run) DRY_RUN=true ;;
+        -*) echo "Unknown option: $arg" >&2; exit 1 ;;
+        *) TARGET_NAME="$arg" ;;
+    esac
+done
+
+if [ -z "$TARGET_NAME" ] && [ "$ALL" = false ]; then
+    echo "Usage: bin/wt-cleanup <worktree-name> [--dry-run]" >&2
+    echo "       bin/wt-cleanup --all [--dry-run]" >&2
+    exit 1
+fi
+
+if [ -n "$TARGET_NAME" ] && [ "$ALL" = true ]; then
+    echo "Error: Cannot specify both a worktree name and --all" >&2
+    exit 1
+fi
+
+# Get branch name for a worktree path from git worktree list --porcelain.
+# Handles branches with slashes (e.g., refs/heads/feature/foo).
+get_branch_for_worktree() {
+    local wt_path="$1"
+    git -C "$REPO_ROOT" worktree list --porcelain | awk -v wt="$wt_path" '
+        /^worktree / { cur = substr($0, 10) }
+        /^branch / && cur == wt {
+            # Strip refs/heads/ prefix
+            b = substr($0, 8)
+            sub(/^refs\/heads\//, "", b)
+            print b
+            exit
+        }
+    '
+}
+
+cleanup_worktree() {
+    local wt_name="$1"
+    local branch="$2"
+
+    if [ "$DRY_RUN" = true ]; then
+        echo "  WOULD clean: $wt_name (branch: $branch)"
+        CLEANED=$((CLEANED + 1))
+        return
+    fi
+
+    echo "Cleaning: $wt_name (branch: $branch)..."
+    "$REPO_ROOT/bin/wt-down" "$wt_name" --volumes --force 2>/dev/null || true
+    "$REPO_ROOT/bin/wt-remove" "$wt_name" 2>/dev/null || true
+    git -C "$REPO_ROOT" branch -d "$branch" 2>/dev/null || \
+        echo "  Note: local branch '$branch' already deleted or not found"
+    CLEANED=$((CLEANED + 1))
+    echo "  Done."
+}
+
+check_worktree() {
+    local wt_path="$1"
+    local wt_name
+    wt_name="$(basename "$wt_path")"
+
+    local branch
+    branch=$(get_branch_for_worktree "$wt_path")
+
+    if [ -z "$branch" ]; then
+        echo "  SKIP $wt_name: could not determine branch (detached HEAD?)"
+        SKIPPED=$((SKIPPED + 1))
+        return
+    fi
+
+    # Never touch protected branches
+    if [[ "$branch" == "master" || "$branch" == "main" || "$branch" == "production" ]]; then
+        echo "  SKIP $wt_name: protected branch ($branch)"
+        SKIPPED=$((SKIPPED + 1))
+        return
+    fi
+
+    # Check if branch is merged into origin/master
+    if ! git -C "$REPO_ROOT" merge-base --is-ancestor "$branch" origin/master 2>/dev/null; then
+        echo "  SKIP $wt_name: branch '$branch' not merged to master"
+        SKIPPED=$((SKIPPED + 1))
+        return
+    fi
+
+    # If gh CLI available, check PR state — skip if PR is still OPEN
+    if command -v gh &>/dev/null; then
+        local pr_state
+        pr_state=$(cd "$REPO_ROOT" && gh pr view "$branch" --json state -q .state 2>/dev/null || true)
+        if [ "$pr_state" = "OPEN" ]; then
+            local pr_num
+            pr_num=$(cd "$REPO_ROOT" && gh pr view "$branch" --json number -q .number 2>/dev/null || true)
+            echo "  SKIP $wt_name: PR #$pr_num still open (branch merged but PR not closed)"
+            SKIPPED=$((SKIPPED + 1))
+            return
+        fi
+    fi
+
+    cleanup_worktree "$wt_name" "$branch"
+}
+
+# Fetch to ensure origin/master is current
+echo "Fetching remote refs..."
+git -C "$REPO_ROOT" fetch --prune origin 2>/dev/null || echo "Warning: git fetch failed, using cached refs"
+
+if [ "$DRY_RUN" = true ]; then
+    echo ""
+    echo "DRY RUN — no changes will be made"
+    echo "-----------------------------------"
+fi
+
+if [ "$ALL" = true ]; then
+    # Process all git-registered worktrees (excluding main repo)
+    while IFS= read -r wt_path; do
+        [[ "$wt_path" == "$REPO_ROOT" ]] && continue
+        # Only process worktrees under our worktrees/ directory
+        [[ "$wt_path" == "$REPO_ROOT/worktrees/"* ]] || continue
+        check_worktree "$wt_path"
+    done < <(git -C "$REPO_ROOT" worktree list --porcelain | awk '/^worktree / { print substr($0, 10) }')
+
+    # Report orphaned directories (exist on disk but not registered with git)
+    if [ -d "$REPO_ROOT/worktrees" ]; then
+        for dir in "$REPO_ROOT"/worktrees/*/; do
+            [ -d "$dir" ] || continue
+            dir="${dir%/}"
+            if ! git -C "$REPO_ROOT" worktree list --porcelain | grep -q "^worktree $dir$"; then
+                echo "  WARNING: Orphaned directory $(basename "$dir") (not registered with git)"
+                echo "           To remove: rm -rf $dir"
+            fi
+        done
+    fi
+else
+    WT_PATH="$REPO_ROOT/worktrees/$TARGET_NAME"
+    if [ ! -d "$WT_PATH" ]; then
+        echo "Error: Worktree '$TARGET_NAME' not found at $WT_PATH" >&2
+        exit 1
+    fi
+    check_worktree "$WT_PATH"
+fi
+
+echo ""
+echo "Summary: $CLEANED cleaned, $SKIPPED skipped"

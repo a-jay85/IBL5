@@ -1,0 +1,27 @@
+{
+  "ci": {
+    "collect": {
+      "url": [
+        "http://localhost:8080/ibl5/index.php",
+        "http://localhost:8080/ibl5/modules.php?name=Standings",
+        "http://localhost:8080/ibl5/modules.php?name=Team&op=team&teamID=1",
+        "http://localhost:8080/ibl5/modules.php?name=Player&pa=showpage&pid=1",
+        "http://localhost:8080/ibl5/modules.php?name=SeasonLeaderboards"
+      ],
+      "numberOfRuns": 1,
+      "settings": {
+        "onlyCategories": ["performance", "accessibility", "best-practices"]
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["warn", { "minScore": 0.6 }],
+        "categories:accessibility": ["error", { "minScore": 0.85 }],
+        "categories:best-practices": ["warn", { "minScore": 0.8 }]
+      }
+    },
+    "upload": {
+      "target": "temporary-public-storage"
+    }
+  }
+}

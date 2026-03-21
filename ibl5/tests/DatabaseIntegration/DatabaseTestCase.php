@@ -522,6 +522,19 @@ abstract class DatabaseTestCase extends TestCase
         $this->insertRow('ibl_demands', array_merge($defaults, $overrides));
     }
 
+    /**
+     * Insert a row into ibl_team_awards (team-level awards, not individual player awards).
+     * Returns the auto-increment ID.
+     */
+    protected function insertTeamAwardRow(string $teamName, string $award, int $year): int
+    {
+        return $this->insertRow('ibl_team_awards', [
+            'year' => $year,
+            'name' => $teamName,
+            'Award' => $award,
+        ]);
+    }
+
     private function requireEnv(string $name): string
     {
         $value = getenv($name);

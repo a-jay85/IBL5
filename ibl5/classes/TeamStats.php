@@ -133,8 +133,8 @@ class TeamStats
         $this->seasonOffenseTotalThreePointersMade = $offenseTotalsRow['tgm'];
         $this->seasonOffenseTotalThreePointersAttempted = $offenseTotalsRow['tga'];
         $this->seasonOffenseTotalOffensiveRebounds = $offenseTotalsRow['orb'];
-        $this->seasonOffenseTotalDefensiveRebounds = $this->seasonOffenseTotalRebounds - $this->seasonOffenseTotalOffensiveRebounds;
         $this->seasonOffenseTotalRebounds = $offenseTotalsRow['reb'];
+        $this->seasonOffenseTotalDefensiveRebounds = $this->seasonOffenseTotalRebounds - $this->seasonOffenseTotalOffensiveRebounds;
         $this->seasonOffenseTotalAssists = $offenseTotalsRow['ast'];
         $this->seasonOffenseTotalSteals = $offenseTotalsRow['stl'];
         $this->seasonOffenseTotalTurnovers = $offenseTotalsRow['tvr'];
@@ -176,8 +176,8 @@ class TeamStats
         $this->seasonDefenseTotalThreePointersMade = $defenseTotalsRow['tgm'];
         $this->seasonDefenseTotalThreePointersAttempted = $defenseTotalsRow['tga'];
         $this->seasonDefenseTotalOffensiveRebounds = $defenseTotalsRow['orb'];
-        $this->seasonDefenseTotalDefensiveRebounds = $this->seasonDefenseTotalRebounds - $this->seasonDefenseTotalOffensiveRebounds;
         $this->seasonDefenseTotalRebounds = $defenseTotalsRow['reb'];
+        $this->seasonDefenseTotalDefensiveRebounds = $this->seasonDefenseTotalRebounds - $this->seasonDefenseTotalOffensiveRebounds;
         $this->seasonDefenseTotalAssists = $defenseTotalsRow['ast'];
         $this->seasonDefenseTotalSteals = $defenseTotalsRow['stl'];
         $this->seasonDefenseTotalTurnovers = $defenseTotalsRow['tvr'];

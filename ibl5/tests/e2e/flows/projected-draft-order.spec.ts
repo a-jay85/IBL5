@@ -14,7 +14,7 @@ test.describe('Projected Draft Order flow', () => {
   });
 
   test('draft order table is visible', async ({ page }) => {
-    const table = page.locator('.projected-draft-order-table, .ibl-data-table, table').first();
+    const table = page.locator('.projected-draft-order-table, .ibl-data-table').first();
     await expect(table).toBeVisible();
   });
 
@@ -27,20 +27,39 @@ test.describe('Projected Draft Order flow', () => {
     expect(headerText).toContain('Team');
   });
 
-  test('table has team rows with pick numbers', async ({ page }) => {
-    const table = page.locator('.projected-draft-order-table, .ibl-data-table, table').first();
-    const rows = table.locator('tbody tr');
-    const count = await rows.count();
-    expect(count).toBeGreaterThanOrEqual(1);
+  test('table has at least 28 team rows', async ({ page }) => {
+    // CI seed has 28 teams in standings — all should appear in round 1
+    const table = page.locator('.projected-draft-order-table, .ibl-data-table').first();
+    const rows = table.locator('tbody tr:not(.projected-draft-order-separator)');
+    expect(await rows.count()).toBeGreaterThanOrEqual(28);
   });
 
-  test('round separator rows exist when multiple rounds present', async ({ page }) => {
+  test('pick numbers start at 1', async ({ page }) => {
+    const table = page.locator('.projected-draft-order-table, .ibl-data-table').first();
+    const pickCells = table.locator('tbody tr:not(.projected-draft-order-separator) td:first-child');
+    const firstPick = await pickCells.first().textContent();
+    expect(parseInt(firstPick?.trim() ?? '', 10)).toBe(1);
+  });
+
+  test('team cells link to team pages', async ({ page }) => {
+    const teamLinks = page.locator('.projected-draft-order-table a[href*="teamID="], .ibl-data-table a[href*="teamID="]');
+    const count = await teamLinks.count();
+    expect(count).toBeGreaterThanOrEqual(1);
+
+    const href = await teamLinks.first().getAttribute('href');
+    expect(href).toContain('name=Team');
+
+    // Navigate and verify
+    await page.goto(href!);
+    await assertNoPhpErrors(page, 'on team page from Projected Draft Order');
+  });
+
+  test('round separator rows exist for multiple rounds', async ({ page }) => {
+    // CI seed has round 1 and round 2 picks
     const separators = page.locator('.projected-draft-order-separator, .ibl-table-subheading');
-    // May or may not have separators depending on data
     const count = await separators.count();
-    if (count > 0) {
-      await expect(separators.first()).toBeVisible();
-    }
+    expect(count).toBeGreaterThanOrEqual(1);
+    await expect(separators.first()).toBeVisible();
   });
 
   test('no PHP errors', async ({ page }) => {

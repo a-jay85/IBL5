@@ -170,6 +170,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         <button type="submit" name="action" value="reset_mles_lles" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset All MLEs/LLEs</button>
     </div>
 </section>
+<?= $this->renderHistArchiveControls($panelData) ?>
         <?php
         return (string) ob_get_clean();
     }
@@ -241,6 +242,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <?= $this->renderTradesSelect($panelData) ?>
     <?= $this->renderDraftLinkSelect($panelData) ?>
 </section>
+<?= $this->renderHistArchiveControls($panelData) ?>
         <?php
         return (string) ob_get_clean();
     }
@@ -359,6 +361,31 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     </select>
     <button type="submit" name="action" value="toggle_fa_notifications" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Toggle Free Agency Notifications</button>
 </div>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * @param array{phase: string, allowTrades: string, allowWaivers: string, showDraftLink: string, freeAgencyNotifications: string, triviaMode: string, simLengthInDays: int, seasonEndingYear: int} $panelData
+     */
+    private function renderHistArchiveControls(array $panelData): string
+    {
+        $year = $panelData['seasonEndingYear'];
+
+        ob_start();
+        ?>
+<section class="updater-section">
+    <div class="updater-section__label">Season History Archive</div>
+    <input type="hidden" name="season_year" value="<?= HtmlSanitizer::e((string) $year) ?>">
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="archive_season_hist" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Archive <?= HtmlSanitizer::e((string) $year) ?> Season to ibl_hist</button>
+    </div>
+    <div class="lcp-note">Requires IBL Champion to be crowned. Populates ibl_hist from box scores + current player ratings.</div>
+    <div class="lcp-control-row">
+        <button type="submit" name="action" value="validate_plr_accuracy" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Validate <?= HtmlSanitizer::e((string) $year) ?> ibl_hist vs Box Scores</button>
+    </div>
+    <div class="lcp-note">Compares ibl_hist game stats against box score aggregates to detect discrepancies.</div>
+</section>
         <?php
         return (string) ob_get_clean();
     }

@@ -101,6 +101,8 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringContainsString('value="set_waivers_to_free_agents"', $html);
         $this->assertStringContainsString('value="reset_contract_extensions"', $html);
         $this->assertStringContainsString('value="reset_mles_lles"', $html);
+        $this->assertStringContainsString('value="archive_season_hist"', $html);
+        $this->assertStringContainsString('value="validate_plr_accuracy"', $html);
     }
 
     public function testRenderPhaseControlsHeat(): void
@@ -151,6 +153,29 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringContainsString('value="reset_eoy_voting"', $html);
         $this->assertStringContainsString('value="set_allow_trades"', $html);
         $this->assertStringContainsString('value="set_show_draft_link"', $html);
+        $this->assertStringContainsString('value="archive_season_hist"', $html);
+        $this->assertStringContainsString('value="validate_plr_accuracy"', $html);
+    }
+
+    public function testRenderHistArchiveNotShownInRegularSeason(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Regular Season']),
+        ]);
+
+        $this->assertStringNotContainsString('value="archive_season_hist"', $html);
+        $this->assertStringNotContainsString('value="validate_plr_accuracy"', $html);
+    }
+
+    public function testRenderHistArchiveShowsSeasonYear(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Playoffs', 'seasonEndingYear' => 2025]),
+        ]);
+
+        $this->assertStringContainsString('Archive 2025 Season to ibl_hist', $html);
+        $this->assertStringContainsString('Validate 2025 ibl_hist vs Box Scores', $html);
+        $this->assertStringContainsString('name="season_year" value="2025"', $html);
     }
 
     public function testRenderPhaseControlsDraft(): void

@@ -67,6 +67,7 @@ class UpdaterController implements UpdaterControllerInterface
             'Boxscores processed' => 'Processing boxscores (.sco)...',
             'All-Star games processed' => 'Processing All-Star games...',
             'JSB files parsed' => 'Parsing JSB engine files...',
+            'Season history archived' => 'Archiving season history to ibl_hist...',
             default => $step->getLabel() . '...',
         };
     }

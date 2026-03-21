@@ -101,19 +101,11 @@ class SecureCookieTest extends TestCase
         $this->assertTrue(SecureCookie::set('test_cookie', 'value'));
     }
 
-    /**
-     * Documents a known bug: SERVER_PORT is a string in $_SERVER,
-     * but isHttps() compares with === 443 (int), which always fails.
-     * The port 443 detection path is effectively dead code.
-     */
-    public function testIsHttpsServerPortCheckUsesStrictIntComparison(): void
+    public function testIsHttpsDetectsPort443(): void
     {
-        // $_SERVER values are strings — '443' !== 443 in strict comparison
         $_SERVER['SERVER_PORT'] = '443';
 
-        // This test documents the CURRENT behavior (bug): port 443 is NOT detected as HTTPS
-        // because the code uses === 443 (int) against a string value.
-        // The cookie is still set (returns true), but with secure=false.
+        // Port 443 detection casts string to int before comparison
         $this->assertTrue(SecureCookie::set('test_cookie', 'value'));
     }
 }

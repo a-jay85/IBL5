@@ -8,7 +8,7 @@ use Bootstrap\Contracts\BootstrapStepInterface;
 use Bootstrap\Contracts\ContainerInterface;
 
 /**
- * Security bootstrap: FB bot redirect, include_secure(), gzip, IBL5_ROOT constant.
+ * Security bootstrap: FB bot redirect, include_secure(), gzip.
  *
  * Extracted from mainfile.php lines 15-85.
  */
@@ -40,10 +40,6 @@ class SecurityBootstrap implements BootstrapStepInterface
     {
         if (!defined('END_TRANSACTION')) {
             define('END_TRANSACTION', 2);
-        }
-
-        if (!defined('IBL5_ROOT')) {
-            define('IBL5_ROOT', dirname(__DIR__, 2));
         }
     }
 

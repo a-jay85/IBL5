@@ -56,11 +56,6 @@ function include_secure($file_name)
     }
 }
 
-// Application root constant — reliable across worktrees and DOCUMENT_ROOT layouts
-if (!defined('IBL5_ROOT')) {
-    define('IBL5_ROOT', __DIR__);
-}
-
 // Check if this file isn't being accessed directly
 
 if (realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {

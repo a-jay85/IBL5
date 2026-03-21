@@ -1,5 +1,7 @@
 # One-on-One Module
 
+> **Note:** This is a fan-created mini-game. It is **not** a representation of how the Jump Shot Basketball (JSB) simulation engine works. The game mechanics here are original and should not be used to understand JSB logic.
+
 The One-on-One module allows users to simulate a one-on-one basketball game between any two players in the league. Games are played to 21 points.
 
 ## Architecture

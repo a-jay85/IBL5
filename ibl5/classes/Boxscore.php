@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 class Boxscore
 {
+    /** Maximum player name length in ibl_box_scores.name (varchar(16)) */
+    public const MAX_PLAYER_NAME_LENGTH = 16;
+
     public string $gameDate;
     public int $gameYear;
     public string $gameMonth;

@@ -54,7 +54,8 @@ if [ ! -d "$WORKTREE_PATH" ]; then
 fi
 
 # Determine URL slug
-SLUG="$WORKTREE_NAME"
+# Sanitize slug: Docker project names can't contain slashes
+SLUG="${WORKTREE_NAME//\//-}"
 if [ "$USE_PR" = true ]; then
     if ! command -v gh &> /dev/null; then
         echo "Error: gh CLI required for --pr flag" >&2

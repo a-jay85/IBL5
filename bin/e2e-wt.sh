@@ -48,9 +48,13 @@ fi
 
 # --- Detect slug (plain name or pr-NNN) ---
 # wt-up uses the worktree name as slug by default, or pr-NNN with --pr flag.
+# Sanitize slug: Docker project names can't contain slashes.
 # Try both and use whichever has running containers.
+SANITIZED_NAME="${WORKTREE_NAME//\//-}"
 SLUG=""
-if docker ps --format '{{.Names}}' | grep -q "^ibl5-php-${WORKTREE_NAME}$"; then
+if docker ps --format '{{.Names}}' | grep -q "^ibl5-php-${SANITIZED_NAME}$"; then
+    SLUG="$SANITIZED_NAME"
+elif docker ps --format '{{.Names}}' | grep -q "^ibl5-php-${WORKTREE_NAME}$"; then
     SLUG="$WORKTREE_NAME"
 else
     # Check for --pr slug by looking up the PR number for this worktree's branch

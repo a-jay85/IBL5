@@ -397,16 +397,11 @@ class TradingRepository extends BaseMysqliRepository implements TradingRepositor
      */
     public function deleteTradeOffer(int $offerId): void
     {
-        $this->db->begin_transaction();
-        try {
+        $this->transactional(function () use ($offerId): void {
             $this->deleteTradeInfoByOfferId($offerId);
             $this->cashRepository->deleteTradeCashByOfferId($offerId);
             $this->deleteTradeOfferById($offerId);
-            $this->db->commit();
-        } catch (\Throwable $e) {
-            $this->db->rollback();
-            throw $e;
-        }
+        });
     }
 
     /**

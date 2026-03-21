@@ -166,7 +166,7 @@ interface BoxscoreRepositoryInterface
     /**
      * Find All-Star Game team names from existing boxscore records
      *
-     * Queries ibl_box_scores_teams for the All-Star Game (visitorTeamID=50, homeTeamID=51)
+     * Queries ibl_box_scores_teams for the All-Star Game (visitorTeamID=ALL_STAR_AWAY_TEAMID, homeTeamID=ALL_STAR_HOME_TEAMID)
      * on the given date. Returns the team names from the two team-total rows.
      *
      * @param string $date Game date in Y-m-d format
@@ -178,7 +178,7 @@ interface BoxscoreRepositoryInterface
      * Find All-Star Game team records that still have default placeholder names
      *
      * Returns rows from ibl_box_scores_teams where name is 'Team Away' or 'Team Home'
-     * and the game is an All-Star Game (visitorTeamID=50, homeTeamID=51).
+     * and the game is an All-Star Game (visitorTeamID=ALL_STAR_AWAY_TEAMID, homeTeamID=ALL_STAR_HOME_TEAMID).
      *
      * @return list<array{id: int, Date: string, name: string, visitorTeamID: int, homeTeamID: int}>
      */

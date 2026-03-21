@@ -204,6 +204,55 @@ class NegotiationValidatorTest extends TestCase
         $this->assertTrue($result->isValid());
     }
 
+    // ── Null-field edge cases (mutation hardening) ────────────────
+
+    public function testValidatesPlayerWithNullContractSalaryFields(): void
+    {
+        // Player with ALL contract salary fields null → should default to 0 via null coalescing
+        $player = new Player();
+        $player->name = 'Null Salary Player';
+        $player->teamName = 'Seattle Supersonics';
+        $player->contractCurrentYear = 6; // Last year → eligible
+        // All contractYear*Salary fields are null (not set)
+
+        $result = $this->validator->validateNegotiationEligibility($player, 'Seattle Supersonics');
+
+        // Should succeed — null salaries default to 0, and year 6 is the last year
+        $this->assertTrue($result->isValid());
+    }
+
+    public function testValidatesPlayerWithNullDraftAndExperienceFields(): void
+    {
+        // Player with null draftRound and yearsOfExperience
+        $player = new Player();
+        $player->name = 'Null Draft Player';
+        $player->teamName = 'Seattle Supersonics';
+        $player->contractCurrentYear = 5;
+        $player->contractYear6Salary = 0; // Can renegotiate
+        // draftRound and yearsOfExperience are null
+
+        $result = $this->validator->validateNegotiationEligibility($player, 'Seattle Supersonics');
+
+        // Should succeed — null draft round defaults to 0 (not a first rounder),
+        // null experience defaults to 0
+        $this->assertTrue($result->isValid());
+    }
+
+    public function testValidatesPlayerWithNullContractCurrentYear(): void
+    {
+        // Player with null contractCurrentYear → defaults to 0
+        $player = new Player();
+        $player->name = 'Null CY Player';
+        $player->teamName = 'Seattle Supersonics';
+        // contractCurrentYear is null → defaults to 0
+
+        $result = $this->validator->validateNegotiationEligibility($player, 'Seattle Supersonics');
+
+        // contractCurrentYear 0 means no active contract year,
+        // next year salary check uses contractYear1Salary (null → 0) → eligible
+        $this->assertTrue($result->isValid());
+    }
+
     /**
      * Helper to create a mock Player object for testing
      */
@@ -221,7 +270,7 @@ class NegotiationValidatorTest extends TestCase
         $player->contractYear6Salary = 0;
         $player->draftRound = 1;
         $player->yearsOfExperience = 5;
-        
+
         return $player;
     }
 }

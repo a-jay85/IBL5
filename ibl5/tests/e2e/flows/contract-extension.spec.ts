@@ -88,6 +88,53 @@ test.describe('Contract Extension flow', () => {
     expect(await formInputs.count()).toBe(0);
   });
 
+  test('submit extension with salary values', async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Regular Season' });
+    await page.goto('modules.php?name=Player&pa=negotiate&pid=30');
+
+    const form = page.locator('form[name="ExtensionOffer"]');
+    if ((await form.count()) === 0) {
+      test.skip(true, 'Extension form not rendered — CI seed data required');
+      return;
+    }
+
+    // Fill salary inputs with reasonable values
+    const inputs = page.locator('input[name^="offerYear"]');
+    const count = await inputs.count();
+    for (let i = 0; i < count; i++) {
+      await inputs.nth(i).fill('1500');
+    }
+
+    // Submit form — POSTs to modules/Player/extension.php, redirects to Team page
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+      form.locator('button[type="submit"], input[type="submit"]').first().click(),
+    ]);
+
+    // Should redirect to Team contracts page with result param
+    const url = page.url();
+    const hasResult =
+      url.includes('result=extension_accepted') ||
+      url.includes('result=extension_rejected') ||
+      url.includes('result=extension_error');
+    expect(hasResult).toBe(true);
+
+    await assertNoPhpErrors(page, 'after extension submission');
+  });
+
+  test('extension result banner renders on team page', async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Regular Season' });
+
+    // Navigate directly to the result page to verify banner rendering
+    await page.goto(
+      'modules.php?name=Team&op=team&teamID=1&display=contracts&result=extension_accepted&msg=Player+agreed+to+extension',
+    );
+
+    const banner = page.locator('.ibl-alert--success');
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText('Player response:');
+  });
+
   test('no PHP errors on extension-related pages', async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Regular Season' });
 

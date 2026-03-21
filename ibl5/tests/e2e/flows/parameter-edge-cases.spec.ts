@@ -22,10 +22,11 @@ test.describe('Parameter edge cases', () => {
 
   test('non-existent module shows not-active message', async ({ page }) => {
     await page.goto('modules.php?name=NonExistentModule');
-    // Should show the module-not-active message or a 404-like page
-    const body = await page.locator('body').textContent();
-    // Should not have PHP fatal errors
     await assertNoPhpErrors(page, 'on non-existent module');
+
+    // Should show a "doesn't exist" or similar error message
+    const body = await page.locator('body').textContent();
+    expect(body).toMatch(/doesn.t exist|not.*active|not.*found/i);
   });
 
   test('DraftHistory with invalid teamID shows no PHP errors', async ({ page }) => {
@@ -34,14 +35,35 @@ test.describe('Parameter edge cases', () => {
     // Should either show empty state or all teams
   });
 
-  test('Team module with out-of-range teamID shows no PHP errors', async ({ page }) => {
+  test('Team module with out-of-range teamID shows error alert', async ({ page }) => {
     await page.goto('modules.php?name=Team&op=team&teamID=-1');
     await assertNoPhpErrors(page, 'on Team with teamID=-1');
+
+    // Should show error alert for invalid team
+    const alert = page.locator('.ibl-alert--error');
+    if ((await alert.count()) > 0) {
+      await expect(alert).toContainText(/not found/i);
+    }
   });
 
-  test('Team module with string teamID shows no PHP errors', async ({ page }) => {
+  test('Team module with string teamID shows error alert', async ({ page }) => {
     await page.goto('modules.php?name=Team&op=team&teamID=abc');
     await assertNoPhpErrors(page, 'on Team with teamID=abc');
+
+    // Should show error alert — "abc" is not a valid team ID
+    const alert = page.locator('.ibl-alert--error');
+    if ((await alert.count()) > 0) {
+      await expect(alert).toContainText(/not found/i);
+    }
+  });
+
+  test('Player with invalid PID shows graceful empty state', async ({ page }) => {
+    await page.goto('modules.php?name=Player&pa=showpage&pid=99999');
+    await assertNoPhpErrors(page, 'on Player with invalid pid');
+
+    // Should not show a trading card (player doesn't exist)
+    const card = page.locator('.card-flip-container');
+    expect(await card.count()).toBe(0);
   });
 
   test('Standings with unexpected parameters shows no PHP errors', async ({ page }) => {

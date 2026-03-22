@@ -235,14 +235,17 @@ class DepthChartEntryViewTest extends TestCase
         $this->view->renderMobileView($players, ['PG', 'SG', 'SF', 'PF', 'C']);
         $output = (string) ob_get_clean();
 
-        // Count selects — all should have disabled attribute
-        $selectCount = substr_count($output, '<select');
-        $disabledSelectCount = substr_count($output, '<select ') - substr_count($output, '<select ') + preg_match_all('/select[^>]*disabled/', $output);
+        // All selects should have the disabled attribute
+        $selectCount = preg_match_all('/<select\b/', $output);
+        $disabledSelectCount = preg_match_all('/<select[^>]+disabled/', $output);
         $this->assertGreaterThan(0, $selectCount);
+        $this->assertSame($selectCount, $disabledSelectCount, 'All selects must have disabled attribute');
 
-        // Every <select should have disabled
-        $this->assertStringNotContainsString('<select name="pg1" aria-label', $output);
-        $this->assertStringContainsString('disabled', $output);
+        // All inputs should have the disabled attribute
+        $inputCount = preg_match_all('/<input\b/', $output);
+        $disabledInputCount = preg_match_all('/<input[^>]+disabled/', $output);
+        $this->assertGreaterThan(0, $inputCount);
+        $this->assertSame($inputCount, $disabledInputCount, 'All inputs must have disabled attribute');
     }
 
     public function testRenderMobileViewFieldNamesMatchDesktop(): void

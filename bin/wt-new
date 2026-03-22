@@ -1,0 +1,78 @@
+#!/bin/bash
+# Create a new worktree with symlinks and CSS — ready for development.
+# No Docker setup; use bin/wt-up if you need a browser preview.
+#
+# Usage: bin/wt-new <name> [--base <branch>]
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+MAIN_IBL5="$REPO_ROOT/ibl5"
+NAME=""
+BASE_BRANCH="master"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --base)
+            BASE_BRANCH="$2"
+            shift 2
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            echo "Usage: bin/wt-new <name> [--base <branch>]" >&2
+            exit 1
+            ;;
+        *)
+            NAME="$1"
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$NAME" ]; then
+    echo "Usage: bin/wt-new <name> [--base <branch>]" >&2
+    echo "" >&2
+    echo "Creates a git worktree at worktrees/<name> with symlinks and CSS." >&2
+    echo "Does NOT start Docker — use bin/wt-up <name> for browser preview." >&2
+    exit 1
+fi
+
+WT_ROOT="$REPO_ROOT/worktrees/$NAME"
+WT_IBL5="$WT_ROOT/ibl5"
+
+if [ -d "$WT_ROOT" ]; then
+    echo "Error: Worktree '$NAME' already exists at $WT_ROOT" >&2
+    exit 1
+fi
+
+# Create worktree + branch in one step
+echo "Creating worktree '$NAME' from $BASE_BRANCH..."
+git -C "$REPO_ROOT" worktree add "$WT_ROOT" -b "$NAME" "$BASE_BRANCH"
+
+# Symlinks
+echo "Setting up symlinks..."
+ln -sf "$MAIN_IBL5/config.php" "$WT_IBL5/config.php"
+ln -sf "$MAIN_IBL5/.env.test" "$WT_IBL5/.env.test"
+ln -sf "$MAIN_IBL5/vendor" "$WT_IBL5/vendor"
+ln -sf "$MAIN_IBL5/node_modules" "$WT_IBL5/node_modules"
+
+# Build CSS
+echo "Building CSS..."
+mkdir -p "$WT_IBL5/themes/IBL/style"
+(cd "$WT_IBL5" && bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css 2>/dev/null) || {
+    echo "CSS build failed — copying from main repo..."
+    cp "$MAIN_IBL5/themes/IBL/style/style.css" "$WT_IBL5/themes/IBL/style/style.css" 2>/dev/null || true
+}
+
+echo ""
+echo "================================================"
+echo "  Worktree ready!"
+echo "================================================"
+echo ""
+echo "  Path:    $WT_IBL5"
+echo "  Branch:  $NAME (based on $BASE_BRANCH)"
+echo "  cd $WT_IBL5"
+echo ""
+echo "  Need browser preview? Run: bin/wt-up $NAME"
+echo ""

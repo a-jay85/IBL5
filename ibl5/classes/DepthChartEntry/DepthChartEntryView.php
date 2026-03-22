@@ -406,19 +406,25 @@ JAVASCRIPT;
      */
     private function renderMobilePlayerCard(array $player, int $depthCount, array $slotNames): void
     {
+        /** @var int $pid */
         $pid = $player['pid'];
+        /** @var string $pos */
         $pos = $player['pos'];
         $name = $player['name'];
+        /** @var int $injured */
         $injured = $player['injured'] ?? 0;
 
         $nameHtml = HtmlSanitizer::safeHtmlOutput($name);
         $posHtml = HtmlSanitizer::safeHtmlOutput($pos);
         $imageUrl = \Player\PlayerImageHelper::getImageUrl($pid);
 
+        /** @var int $dcActive */
         $dcActive = $player['dc_canPlayInGame'] ?? 0;
         $checkedAttr = ($dcActive === 1) ? ' checked' : '';
 
-        $staminaCap = ($player['sta'] ?? 0) + 40;
+        /** @var int $sta */
+        $sta = $player['sta'] ?? 0;
+        $staminaCap = $sta + 40;
         if ($staminaCap > 40) {
             $staminaCap = 40;
         }
@@ -470,11 +476,17 @@ JAVASCRIPT;
         // Settings grid (6 columns)
         echo '<div class="dc-card__settings-grid">';
 
+        /** @var int $dcMinutes */
         $dcMinutes = $player['dc_minutes'] ?? 0;
+        /** @var int $dcOf */
         $dcOf = $player['dc_of'] ?? 0;
+        /** @var int $dcDf */
         $dcDf = $player['dc_df'] ?? 0;
+        /** @var int $dcOi */
         $dcOi = $player['dc_oi'] ?? 0;
+        /** @var int $dcDi */
         $dcDi = $player['dc_di'] ?? 0;
+        /** @var int $dcBh */
         $dcBh = $player['dc_bh'] ?? 0;
 
         // Minutes

@@ -220,6 +220,13 @@ if ($authService->isAuthenticated()) {
     }
 }
 
+// Demo mode: block all state-mutating requests with a user-friendly page
+if (($_SESSION['demo_mode'] ?? false) === true && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    http_response_code(403);
+    require_once __DIR__ . '/includes/demo-403.php';
+    exit;
+}
+
 require_once __DIR__ . "/includes/ipban.php";
 if (file_exists(__DIR__ . "/includes/custom_files/custom_mainfile.php")) {
     @include_once __DIR__ . "/includes/custom_files/custom_mainfile.php";

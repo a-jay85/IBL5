@@ -188,20 +188,21 @@ interface DepthChartEntryViewInterface
      * - Table footer row with two buttons in a single cell
      * - Reset button: Calls JavaScript, resets all dropdowns to defaults
      * - Submit button: Submits form to modules.php?name=DepthChartEntry&op=submit
-     * - Closing </form> and </table> tags
-     * 
+     * - Closing </table> and desktop wrapper div (does NOT close </form>)
+     *
      * **JavaScript Behavior:**
      * - resetDepthChart() confirms before resetting
      * - Sets default values for each field type:
      *   - active fields: Default 1 (Yes)
      *   - Position fields (pg-c): Default 0 (No)
      *   - Other fields: Default 0 (Auto or neutral)
-     * 
+     *
      * **Important Behaviors:**
      * - Provides user-friendly interface for form submission
      * - JavaScript confirmation prevents accidental resets
      * - Includes custom styling for buttons
-     * - Closes both form and table elements
+     * - Closes table and desktop wrapper, but NOT the form element
+     * - The form is closed by renderMobileView() which follows this method
      */
     public function renderFormFooter(): void;
 

@@ -11,12 +11,7 @@ test.describe('Depth Chart change detection', () => {
 
     // Wait for the form to load (async rendering)
     const form = page.locator('.depth-chart-form');
-    if (!(await form.isVisible({ timeout: 15000 }).catch(() => false))) {
-      test.skip(
-        true,
-        'Depth chart form did not load (async render or MAMP load)',
-      );
-    }
+    await expect(form).toBeVisible({ timeout: 15000 });
   });
 
   test('form loads with no glow indicators initially', async ({ page }) => {
@@ -32,9 +27,9 @@ test.describe('Depth Chart change detection', () => {
   }) => {
     // Find the first position select
     const posSelects = page.locator('.depth-chart-table select');
+    await expect(posSelects.first()).toBeVisible();
     const selectCount = await posSelects.count();
-
-    if (selectCount === 0) return;
+    expect(selectCount, 'Depth chart form should have position selects').toBeGreaterThan(0);
 
     const firstSelect = posSelects.first();
     const originalValue = await firstSelect.inputValue();
@@ -42,8 +37,7 @@ test.describe('Depth Chart change detection', () => {
     // Get available options
     const options = firstSelect.locator('option');
     const optionCount = await options.count();
-
-    if (optionCount < 2) return;
+    expect(optionCount, 'Position select should have at least 2 options').toBeGreaterThanOrEqual(2);
 
     // Select a different option
     for (let i = 0; i < optionCount; i++) {
@@ -63,9 +57,9 @@ test.describe('Depth Chart change detection', () => {
     page,
   }) => {
     const posSelects = page.locator('.depth-chart-table select');
+    await expect(posSelects.first()).toBeVisible();
     const selectCount = await posSelects.count();
-
-    if (selectCount === 0) return;
+    expect(selectCount, 'Depth chart form should have position selects').toBeGreaterThan(0);
 
     const firstSelect = posSelects.first();
     const originalValue = await firstSelect.inputValue();
@@ -73,7 +67,7 @@ test.describe('Depth Chart change detection', () => {
     // Get a different option value
     const options = firstSelect.locator('option');
     const optionCount = await options.count();
-    if (optionCount < 2) return;
+    expect(optionCount, 'Position select should have at least 2 options').toBeGreaterThanOrEqual(2);
 
     let differentValue = originalValue;
     for (let i = 0; i < optionCount; i++) {
@@ -97,9 +91,9 @@ test.describe('Depth Chart change detection', () => {
 
   test('multiple changes increase glow intensity', async ({ page }) => {
     const posSelects = page.locator('.depth-chart-table select');
+    await expect(posSelects.first()).toBeVisible();
     const selectCount = await posSelects.count();
-
-    if (selectCount < 3) return;
+    expect(selectCount, 'Depth chart form needs at least 3 selects for glow test').toBeGreaterThanOrEqual(3);
 
     // Change multiple selects to trigger higher glow levels
     for (let i = 0; i < Math.min(selectCount, 3); i++) {

@@ -26,10 +26,7 @@ test.describe('HTMX hx-boost navigation', () => {
     const contentLink = page
       .locator('#site-content a[href*="modules.php"]:not(.news-article__topic-icon-link)')
       .first();
-    if (await contentLink.count() === 0) {
-      // No visible links found in content area — skip
-      return;
-    }
+    await expect(contentLink).toBeVisible();
 
     await contentLink.click();
     await page.waitForURL(/modules\.php/);
@@ -49,14 +46,14 @@ test.describe('HTMX hx-boost navigation', () => {
     const contentLink = page
       .locator('#site-content a[href*="modules.php"]:not(.news-article__topic-icon-link)')
       .first();
-    if (await contentLink.count() > 0) {
-      await contentLink.click();
-      await page.waitForURL(/modules\.php/);
-      expect(page.url()).toContain('modules.php');
+    await expect(contentLink).toBeVisible();
 
-      // Verify browser title updated
-      await expect(page).toHaveTitle(/IBL/);
-    }
+    await contentLink.click();
+    await page.waitForURL(/modules\.php/);
+    expect(page.url()).toContain('modules.php');
+
+    // Verify browser title updated
+    await expect(page).toHaveTitle(/IBL/);
   });
 
   test('direct URL access returns full page with nav', async ({ page }) => {
@@ -79,20 +76,20 @@ test.describe('HTMX hx-boost navigation', () => {
     const contentLink = page
       .locator('#site-content a[href*="modules.php"]:not(.news-article__topic-icon-link)')
       .first();
-    if (await contentLink.count() > 0) {
-      await contentLink.click();
-      await page.waitForURL(/modules\.php/);
+    await expect(contentLink).toBeVisible();
 
-      // Go back
-      await page.goBack();
-      await page.waitForURL(/index\.php/);
-      expect(page.url()).toContain('index.php');
+    await contentLink.click();
+    await page.waitForURL(/modules\.php/);
 
-      // Go forward
-      await page.goForward();
-      await page.waitForURL(/modules\.php/);
-      expect(page.url()).toContain('modules.php');
-    }
+    // Go back
+    await page.goBack();
+    await page.waitForURL(/index\.php/);
+    expect(page.url()).toContain('index.php');
+
+    // Go forward
+    await page.goForward();
+    await page.waitForURL(/modules\.php/);
+    expect(page.url()).toContain('modules.php');
   });
 
   test('no PHP errors on pages loaded via HTMX', async ({ page }) => {

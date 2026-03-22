@@ -221,8 +221,9 @@ if ($authService->isAuthenticated()) {
 }
 
 // Demo mode: block all state-mutating requests with a user-friendly page
+// Uses 200 instead of 403 because Chrome replaces 403 response bodies
+// with its own "Access Denied" error page, hiding our explanation.
 if (($_SESSION['demo_mode'] ?? false) === true && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    http_response_code(403);
     require_once __DIR__ . '/includes/demo-403.php';
     exit;
 }

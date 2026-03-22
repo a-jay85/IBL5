@@ -55,6 +55,7 @@ class CommonMysqliRepository extends \BaseMysqliRepository
             return League::FREE_AGENTS_TEAM_NAME;
         }
 
+        // Primary: check ibl_team_info (authoritative for real GMs)
         /** @var array{team_name: string}|null $result */
         $result = $this->fetchOne(
             "SELECT team_name FROM ibl_team_info WHERE gm_username = ? LIMIT 1",
@@ -62,7 +63,19 @@ class CommonMysqliRepository extends \BaseMysqliRepository
             $username
         );
 
-        return $result !== null ? $result['team_name'] : null;
+        if ($result !== null) {
+            return $result['team_name'];
+        }
+
+        // Fallback: check nuke_users.user_ibl_team (for demo/non-GM users)
+        /** @var array{user_ibl_team: string}|null $fallback */
+        $fallback = $this->fetchOne(
+            "SELECT user_ibl_team FROM nuke_users WHERE username = ? AND user_ibl_team != '' LIMIT 1",
+            "s",
+            $username
+        );
+
+        return $fallback !== null ? $fallback['user_ibl_team'] : null;
     }
 
     /**

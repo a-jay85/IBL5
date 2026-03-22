@@ -36,12 +36,7 @@ test.describe('Player Database flow', () => {
 
     await expect(page.locator('table').first()).toBeVisible();
     const rows = page.locator('table tbody tr');
-    // CI seed data may have limited players — skip if no results
-    const count = await rows.count();
-    if (count === 0) {
-      test.skip(true, 'No players found for position filter in current dataset');
-    }
-    expect(count).toBeGreaterThan(0);
+    await expect(rows.first()).toBeVisible();
   });
 
   test('reset button clears form', async ({ page }) => {
@@ -63,7 +58,7 @@ test.describe('Player Database flow', () => {
     await page.locator('.ibl-filter-form__submit').click();
 
     const table = page.locator('table.sortable').first();
-    if (!(await table.isVisible())) return;
+    await expect(table).toBeVisible();
 
     // Wait for sorttable to initialize
     await expect(table).toHaveAttribute('data-sorttable', 'true');
@@ -71,7 +66,7 @@ test.describe('Player Database flow', () => {
     // Get first column cell values before sort
     const cells = table.locator('tbody td:nth-child(1)');
     const countBefore = await cells.count();
-    if (countBefore < 2) return; // Need at least 2 rows to verify reorder
+    expect(countBefore, 'Results table needs at least 2 rows to verify sort').toBeGreaterThanOrEqual(2);
 
     const valuesBefore: string[] = [];
     for (let i = 0; i < Math.min(countBefore, 5); i++) {

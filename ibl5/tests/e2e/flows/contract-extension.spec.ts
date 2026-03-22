@@ -16,6 +16,7 @@ test.describe('Contract Extension flow', () => {
     const body = await page.locator('body').textContent();
     if (!body?.includes('Extension Vet')) {
       test.skip(true, 'CI seed player pid=30 not present — skipping extension form test');
+      return;
     }
     expect(body).toContain('Extension Vet');
   });
@@ -29,6 +30,7 @@ test.describe('Contract Extension flow', () => {
     const count = await inputs.count();
     if (count === 0) {
       test.skip(true, 'Extension form not rendered — CI seed data required');
+      return;
     }
     expect(count).toBeGreaterThanOrEqual(3);
   });
@@ -42,6 +44,7 @@ test.describe('Contract Extension flow', () => {
     const isAttached = await playerID.count();
     if (isAttached === 0) {
       test.skip(true, 'Extension form not rendered — CI seed data required');
+      return;
     }
     await expect(playerID).toBeAttached();
     expect(await playerID.inputValue()).toBe('30');

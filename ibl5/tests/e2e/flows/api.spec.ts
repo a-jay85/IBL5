@@ -273,18 +273,23 @@ test.describe('API v1 — response envelope validation', () => {
 
   test('Content-Type header is application/json', async ({ request }) => {
     // Retry — PHP built-in server in CI can serve HTML homepage under load
+    let lastContentType = '';
     for (let attempt = 0; attempt < 3; attempt++) {
       const response = await request.get(`${BASE_URL}/season`, {
         headers: authHeaders,
       });
-      if (response.status() !== 200) return; // 401 — skip
+      if (response.status() === 401) {
+        test.skip(true, 'API key not configured — 401 response');
+        return;
+      }
 
-      const contentType = response.headers()['content-type'] ?? '';
-      if (!contentType.includes('json')) continue; // Got HTML — retry
-
-      expect(contentType).toContain('application/json');
-      return;
+      lastContentType = response.headers()['content-type'] ?? '';
+      if (lastContentType.includes('json')) {
+        expect(lastContentType).toContain('application/json');
+        return;
+      }
     }
+    expect(lastContentType, 'API must return JSON after retries').toContain('application/json');
   });
 });
 
@@ -322,13 +327,14 @@ test.describe('API v1 — ETag caching', () => {
     const response = await request.get(`${BASE_URL}/standings`, {
       headers: authHeaders,
     });
-    if (response.status() !== 200) return; // 401 or non-JSON — skip
-
-    const etag = response.headers()['etag'];
-    if (!etag) {
-      // Server may not implement ETag — skip gracefully
+    if (response.status() === 401) {
+      test.skip(true, 'API key not configured — 401 response');
       return;
     }
+    expect(response.status()).toBe(200);
+
+    const etag = response.headers()['etag'];
+    expect(etag, 'Standings endpoint should return ETag header').toBeTruthy();
 
     // Second request with If-None-Match should return 304
     const response2 = await request.get(`${BASE_URL}/standings`, {

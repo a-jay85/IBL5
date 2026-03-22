@@ -584,13 +584,14 @@ test.describe('Trade submission: accept and reject', () => {
     const bodyB = buildFormBody(fd, [userPlayers[1], partnerPlayers[1]]);
     const locationB = await submitOffer(request, bodyB);
 
-    if (
-      !locationA.includes('result=offer_sent') ||
-      !locationB.includes('result=offer_sent')
-    ) {
-      test.skip(true, 'Trade offers rejected by server (e.g., cap validation)');
-      return;
-    }
+    expect(
+      locationA,
+      `Offer A should succeed: ${locationA}`,
+    ).toContain('result=offer_sent');
+    expect(
+      locationB,
+      `Offer B should succeed: ${locationB}`,
+    ).toContain('result=offer_sent');
 
     const newIds = await collectNewOfferIds(page, existingIds);
     newIds.sort((a, b) => a - b);

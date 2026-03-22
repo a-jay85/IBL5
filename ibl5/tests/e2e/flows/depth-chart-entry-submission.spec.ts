@@ -12,12 +12,7 @@ test.describe('Depth Chart submission', () => {
 
   test('form loads with current depth chart', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
-    if (!(await form.isVisible({ timeout: 15000 }).catch(() => false))) {
-      test.skip(
-        true,
-        'Depth chart form did not load (async render or server load)',
-      );
-    }
+    await expect(form).toBeVisible({ timeout: 15000 });
 
     // Position selects should be pre-populated with current assignments
     const pgSelects = page.locator('select[name^="pg"]');
@@ -38,9 +33,7 @@ test.describe('Depth Chart submission', () => {
 
   test('change a position assignment', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
-    if (!(await form.isVisible({ timeout: 15000 }).catch(() => false))) {
-      test.skip(true, 'Form did not load');
-    }
+    await expect(form).toBeVisible({ timeout: 15000 });
 
     // Find a PG select with value "0" and change it to "2" (backup)
     const pgSelects = page.locator('select[name^="pg"]');
@@ -59,9 +52,7 @@ test.describe('Depth Chart submission', () => {
 
   test('submit depth chart successfully', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
-    if (!(await form.isVisible({ timeout: 15000 }).catch(() => false))) {
-      test.skip(true, 'Form did not load');
-    }
+    await expect(form).toBeVisible({ timeout: 15000 });
 
     // Submit the current depth chart (already valid from seed data)
     const submitBtn = page.locator('.depth-chart-submit-btn');
@@ -92,17 +83,12 @@ test.describe('Depth Chart submission', () => {
 
   test('loading saved depth chart updates form', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
-    if (!(await form.isVisible({ timeout: 15000 }).catch(() => false))) {
-      test.skip(true, 'Form did not load');
-    }
+    await expect(form).toBeVisible({ timeout: 15000 });
 
     const dropdown = page.locator('#saved-dc-select');
     const options = dropdown.locator('option');
     const optCount = await options.count();
-
-    if (optCount < 2) {
-      test.skip(true, 'No saved depth charts available');
-    }
+    expect(optCount, 'Saved DC dropdown should have at least 2 options').toBeGreaterThanOrEqual(2);
 
     // Record current value of first PG select
     const pgSelect = page.locator('select[name^="pg"]').first();

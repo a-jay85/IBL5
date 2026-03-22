@@ -49,9 +49,7 @@ test.describe('DCE Tab API', () => {
       'modules.php?name=DepthChartEntry&op=tab-api&teamID=1&display=ratings',
     );
 
-    if (!contentType.includes('json')) {
-      test.skip(true, 'Server returned HTML instead of JSON after retries');
-    }
+    expect(contentType, 'API endpoint must return JSON, not HTML').toContain('json');
 
     expect(status).toBe(200);
     expect(body).toHaveProperty('html');
@@ -68,7 +66,7 @@ test.describe('DCE Tab API', () => {
         `modules.php?name=DepthChartEntry&op=tab-api&teamID=1&display=${mode}`,
       );
 
-      if (!contentType.includes('json')) continue;
+      expect(contentType, `${mode} API must return JSON, not HTML`).toContain('json');
 
       expect(status, `${mode} should return 200`).toBe(200);
       expect(body, `${mode} should have html property`).toHaveProperty('html');
@@ -83,9 +81,7 @@ test.describe('DCE Tab API', () => {
       'modules.php?name=DepthChartEntry&op=tab-api&teamID=1&display=invalid_mode',
     );
 
-    if (!contentType.includes('json')) {
-      test.skip(true, 'Server returned HTML instead of JSON after retries');
-    }
+    expect(contentType, 'API endpoint must return JSON, not HTML').toContain('json');
 
     expect(status).toBe(200);
     expect(body).toHaveProperty('html');
@@ -110,7 +106,7 @@ test.describe('NextSim Tab API', () => {
         `modules.php?name=DepthChartEntry&op=nextsim-api&teamID=1&position=${pos}`,
       );
 
-      if (!contentType.includes('json')) continue;
+      expect(contentType, `${pos} API must return JSON, not HTML`).toContain('json');
 
       expect(status, `${pos} should return 200`).toBe(200);
       expect(body, `${pos} should have html property`).toHaveProperty('html');
@@ -124,9 +120,7 @@ test.describe('NextSim Tab API', () => {
       'modules.php?name=DepthChartEntry&op=nextsim-api&teamID=1&position=XX',
     );
 
-    if (!contentType.includes('json')) {
-      test.skip(true, 'Server returned HTML instead of JSON after retries');
-    }
+    expect(contentType, 'API endpoint must return JSON, not HTML').toContain('json');
 
     expect(status).toBe(200);
     expect(body).toHaveProperty('html');
@@ -147,9 +141,7 @@ test.describe('Team API', () => {
       'modules.php?name=Team&op=api&teamID=1&display=ratings',
     );
 
-    if (!contentType.includes('json')) {
-      test.skip(true, 'Server returned HTML instead of JSON after retries');
-    }
+    expect(contentType, 'API endpoint must return JSON, not HTML').toContain('json');
 
     expect(status).toBe(200);
     expect(body).toHaveProperty('html');
@@ -166,7 +158,7 @@ test.describe('Team API', () => {
         `modules.php?name=Team&op=api&teamID=1&display=${mode}`,
       );
 
-      if (!contentType.includes('json')) continue;
+      expect(contentType, `Team API ${mode} must return JSON, not HTML`).toContain('json');
 
       expect(status, `Team API ${mode} should return 200`).toBe(200);
       expect(body, `Team API ${mode} should have html`).toHaveProperty('html');
@@ -196,9 +188,7 @@ test.describe('Saved Depth Chart API', () => {
       'modules.php?name=DepthChartEntry&op=api&action=list',
     );
 
-    if (!contentType.includes('json')) {
-      test.skip(true, 'Server returned HTML instead of JSON after retries');
-    }
+    expect(contentType, 'API endpoint must return JSON, not HTML').toContain('json');
 
     // Should return 200 with saved depth chart list (may be empty array)
     expect(status).toBe(200);
@@ -213,10 +203,7 @@ test.describe('Saved Depth Chart API', () => {
     );
 
     const contentType = response.headers()['content-type'] ?? '';
-    if (!contentType.includes('json')) {
-      // Under MAMP load, may get HTML fallback — skip gracefully
-      test.skip(true, 'Server returned HTML instead of JSON');
-    }
+    expect(contentType, 'Unauth API endpoint must return JSON, not HTML').toContain('json');
 
     expect(response.status()).toBe(401);
     const body = await response.json();
@@ -229,9 +216,7 @@ test.describe('Saved Depth Chart API', () => {
       'modules.php?name=DepthChartEntry&op=api&action=nonexistent',
     );
 
-    if (!contentType.includes('json')) {
-      test.skip(true, 'Server returned HTML instead of JSON after retries');
-    }
+    expect(contentType, 'API endpoint must return JSON, not HTML').toContain('json');
 
     expect(status).toBe(400);
     expect(body).toHaveProperty('error');

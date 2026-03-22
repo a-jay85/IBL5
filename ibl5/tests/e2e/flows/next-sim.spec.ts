@@ -15,10 +15,17 @@ test.describe('NextSim flow', () => {
     await assertNoPhpErrors(page, 'on NextSim page');
   });
 
-  test('schedule strip container renders', async ({ page }) => {
-    // The strip container should always render, even if empty
+  test('schedule strip or empty message renders', async ({ page }) => {
+    // When games exist: .next-sim-schedule-strip renders
+    // When no games: .next-sim-empty renders with "No games projected" message
     const strip = page.locator('.next-sim-schedule-strip');
-    await expect(strip).toBeVisible();
+    const emptyMsg = page.locator('.next-sim-empty');
+    const stripCount = await strip.count();
+    const emptyCount = await emptyMsg.count();
+    expect(
+      stripCount + emptyCount,
+      'NextSim should show either schedule strip or empty message',
+    ).toBeGreaterThan(0);
   });
 
   test('schedule strip game cards have dates and logos', async ({

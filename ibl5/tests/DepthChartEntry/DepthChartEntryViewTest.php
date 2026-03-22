@@ -241,11 +241,12 @@ class DepthChartEntryViewTest extends TestCase
         $this->assertGreaterThan(0, $selectCount);
         $this->assertSame($selectCount, $disabledSelectCount, 'All selects must have disabled attribute');
 
-        // All inputs should have the disabled attribute
-        $inputCount = preg_match_all('/<input\b/', $output);
-        $disabledInputCount = preg_match_all('/<input[^>]+disabled/', $output);
-        $this->assertGreaterThan(0, $inputCount);
-        $this->assertSame($inputCount, $disabledInputCount, 'All inputs must have disabled attribute');
+        // All hidden/checkbox inputs should have the disabled attribute
+        // (excludes footer button/submit inputs which should NOT be disabled)
+        $formInputCount = preg_match_all('/<input\s+type="(hidden|checkbox)"/', $output);
+        $disabledFormInputCount = preg_match_all('/<input\s+type="(hidden|checkbox)"[^>]+disabled/', $output);
+        $this->assertGreaterThan(0, $formInputCount);
+        $this->assertSame($formInputCount, $disabledFormInputCount, 'All form inputs must have disabled attribute');
     }
 
     public function testRenderMobileViewFieldNamesMatchDesktop(): void

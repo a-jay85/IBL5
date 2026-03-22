@@ -4,11 +4,11 @@
 -- and would NULL out the real Warriors GM's ibl_team_info.gm_username.
 
 INSERT INTO nuke_users
-  (username, user_email, user_ibl_team, user_password, user_regdate, bio, ublock, user_level, user_active)
+  (username, user_email, user_ibl_team, user_password, user_regdate, user_avatar, bio, ublock, user_level, user_active)
 VALUES
   ('ibl_demo', 'demo@iblhoops.net', 'Warriors',
    '$2y$12$fjwBgVxheIiKifRWzXPbQ.gqbE.9LNLn7MevVdOjac2VxtPMfYEeG',
-   'Mar 22, 2026', '', '', 1, 1)
+   'Mar 22, 2026', '', '', '', 1, 1)
 ON DUPLICATE KEY UPDATE user_active = 1;
 
 INSERT INTO auth_users

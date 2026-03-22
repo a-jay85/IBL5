@@ -4,6 +4,7 @@ set -e
 fail() { echo "FAILED: $1"; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BRANCH=$(git branch --show-current)
 
 # 1. Guard: not master/production
@@ -54,5 +55,11 @@ fi
 
 # 11. Fetch all remotes and prune tracking branches
 git fetch --all --prune -q
+
+# 12. Rebase active worktree branches onto updated master
+if [ -x "$REPO_ROOT/bin/wt-rebase" ]; then
+    echo ""
+    "$REPO_ROOT/bin/wt-rebase"
+fi
 
 echo "Done."

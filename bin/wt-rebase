@@ -1,0 +1,76 @@
+#!/bin/bash
+# Rebase all active worktree branches onto origin/master.
+# Skips worktrees that are already up to date or have uncommitted changes.
+# Aborts rebase on conflicts so worktrees aren't left in a broken state.
+#
+# Usage: bin/wt-rebase [--dry-run]
+
+set -euo pipefail
+
+source "$(dirname "$0")/lib/wt-guards.sh"
+
+REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+DRY_RUN=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run) DRY_RUN=true ;;
+        -*) echo "Unknown option: $arg" >&2; exit 1 ;;
+    esac
+done
+
+REBASED=0
+FAILED=0
+SKIPPED=0
+
+echo "Rebasing worktrees onto origin/master..."
+
+while IFS= read -r wt_path; do
+    [[ "$wt_path" == "$REPO_ROOT" ]] && continue
+    [[ "$wt_path" == "$REPO_ROOT/worktrees/"* ]] || continue
+
+    wt_name=$(basename "$wt_path")
+    branch=$(git -C "$wt_path" branch --show-current 2>/dev/null || true)
+    [[ -z "$branch" ]] && continue
+
+    # Skip if already up to date
+    if git -C "$wt_path" merge-base --is-ancestor origin/master HEAD 2>/dev/null; then
+        continue
+    fi
+
+    # Skip if worktree is actively in use
+    if is_worktree_in_use "$wt_path"; then
+        echo "  SKIP    $wt_name — actively in use"
+        ((SKIPPED++))
+        continue
+    fi
+
+    # Skip if worktree has uncommitted changes
+    if ! git -C "$wt_path" diff --quiet HEAD 2>/dev/null || \
+       ! git -C "$wt_path" diff --cached --quiet HEAD 2>/dev/null; then
+        echo "  SKIP    $wt_name — uncommitted changes"
+        ((SKIPPED++))
+        continue
+    fi
+
+    if [ "$DRY_RUN" = true ]; then
+        echo "  WOULD   $wt_name ($branch)"
+        ((REBASED++))
+        continue
+    fi
+
+    if git -C "$wt_path" rebase origin/master -q 2>&1; then
+        echo "  OK      $wt_name ($branch)"
+        ((REBASED++))
+    else
+        git -C "$wt_path" rebase --abort 2>/dev/null || true
+        echo "  FAILED  $wt_name ($branch) — conflicts, rebase aborted"
+        ((FAILED++))
+    fi
+done < <(git -C "$REPO_ROOT" worktree list --porcelain | awk '/^worktree / { print substr($0, 10) }')
+
+if [[ $REBASED -eq 0 && $FAILED -eq 0 && $SKIPPED -eq 0 ]]; then
+    echo "  All worktrees up to date."
+fi
+
+echo "Done: $REBASED rebased, $SKIPPED skipped, $FAILED failed."

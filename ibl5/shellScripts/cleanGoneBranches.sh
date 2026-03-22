@@ -5,6 +5,7 @@ set -e
 # Also tears down associated worktrees and Docker environments if present.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+source "$REPO_ROOT/bin/lib/wt-guards.sh"
 
 echo "Fetching origin..."
 git fetch origin -q --prune
@@ -27,6 +28,14 @@ has_worktree() {
     echo "$WORKTREE_BRANCHES" | grep -qx "$1"
 }
 
+# Get worktree path for a branch name
+get_worktree_path() {
+    git worktree list --porcelain | awk -v branch="refs/heads/$1" '
+        /^worktree / { path = substr($0, 10) }
+        $0 == "branch " branch { print path; exit }
+    '
+}
+
 # Parse gone branches from git branch -v
 # The output may have a leading + (checked out in worktree) or * (current branch)
 while IFS= read -r line; do
@@ -46,12 +55,28 @@ while IFS= read -r line; do
 
     # Tear down worktree if one exists for this branch
     if has_worktree "$branch"; then
+        wt_path=$(get_worktree_path "$branch")
+
+        # Guard: skip if worktree is actively in use
+        if [ -n "$wt_path" ] && is_worktree_in_use "$wt_path"; then
+            echo "  SKIP    $branch (worktree is in active use)"
+            ((SKIPPED++))
+            continue
+        fi
+
+        # Guard: skip if branch has an open PR
+        if has_open_pr "$branch"; then
+            echo "  SKIP    $branch (PR #$WTG_PR_NUM still open)"
+            ((SKIPPED++))
+            continue
+        fi
+
         echo "  WORKTREE $branch — tearing down..."
         if [ -x "$REPO_ROOT/bin/wt-down" ]; then
             "$REPO_ROOT/bin/wt-down" "$branch" --volumes --force 2>&1 | sed 's/^/    /'
         fi
         if [ -x "$REPO_ROOT/bin/wt-remove" ]; then
-            "$REPO_ROOT/bin/wt-remove" "$branch" 2>&1 | sed 's/^/    /'
+            "$REPO_ROOT/bin/wt-remove" --force "$branch" 2>&1 | sed 's/^/    /'
         fi
     fi
 

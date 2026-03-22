@@ -44,7 +44,7 @@ test.describe('News module flow', () => {
   test('article detail page has title and body content', async ({ page }) => {
     await page.goto('modules.php?name=News');
     const link = page.locator('.news-article__link[href*="sid="]').first();
-    if ((await link.count()) === 0) return;
+    await expect(link).toBeVisible();
 
     const href = await link.getAttribute('href');
     await page.goto(href!);

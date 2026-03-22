@@ -25,12 +25,8 @@ test.describe('Depth Chart Entry flow', () => {
   });
 
   test('roster form loads with player rows', async ({ page }) => {
-    // The form may load asynchronously after the page header renders.
-    // If it doesn't appear within timeout, skip — MAMP may be under load.
     const form = page.locator('.depth-chart-form');
-    if (!(await form.isVisible({ timeout: 15000 }).catch(() => false))) {
-      test.skip(true, 'Depth chart form did not load (async render or MAMP load)');
-    }
+    await expect(form).toBeVisible({ timeout: 15000 });
 
     await expect(
       page.locator('.depth-chart-table').first(),
@@ -43,24 +39,22 @@ test.describe('Depth Chart Entry flow', () => {
 
   test('position selects have options', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
-    // Wait for form to load
-    if (!(await form.isVisible().catch(() => false))) return;
+    await expect(form).toBeVisible({ timeout: 15000 });
 
     const posSelect = page.locator('select[name^="pg"]').first();
-    if (await posSelect.isVisible()) {
-      const options = posSelect.locator('option');
-      await expect(options.first()).toBeAttached();
-    }
+    await expect(posSelect).toBeVisible();
+    const options = posSelect.locator('option');
+    await expect(options.first()).toBeAttached();
   });
 
   test('active selects have valid values', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
-    if (!(await form.isVisible().catch(() => false))) return;
+    await expect(form).toBeVisible({ timeout: 15000 });
 
     const activeSelects = page.locator('select[name^="canPlayInGame"]');
-    const count = await activeSelects.count();
-    if (count === 0) return;
+    await expect(activeSelects.first()).toBeVisible();
 
+    const count = await activeSelects.count();
     // Each active select should have a value of "1" or "0"
     for (let i = 0; i < Math.min(count, 3); i++) {
       const value = await activeSelects.nth(i).inputValue();
@@ -70,8 +64,7 @@ test.describe('Depth Chart Entry flow', () => {
 
   test('reset button prompts confirmation', async ({ page }) => {
     const resetBtn = page.locator('.depth-chart-reset-btn');
-    if (!(await resetBtn.isVisible().catch(() => false)))
-      return;
+    await expect(resetBtn).toBeVisible({ timeout: 15000 });
 
     let dialogFired = false;
     page.on('dialog', async (dialog) => {
@@ -85,7 +78,7 @@ test.describe('Depth Chart Entry flow', () => {
 
   test('submit button present when form loaded', async ({ page }) => {
     const form = page.locator('.depth-chart-form');
-    if (!(await form.isVisible().catch(() => false))) return;
+    await expect(form).toBeVisible({ timeout: 15000 });
 
     await expect(page.locator('.depth-chart-submit-btn')).toBeVisible();
   });

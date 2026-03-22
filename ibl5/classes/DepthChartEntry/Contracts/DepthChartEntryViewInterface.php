@@ -248,4 +248,20 @@ interface DepthChartEntryViewInterface
         bool $success,
         string $errorHtml = ''
     ): void;
+
+    /**
+     * Render mobile card view for all players
+     *
+     * Renders a card-based layout optimized for mobile viewports. Each player
+     * is rendered as a card with photo, position badge, name, active toggle,
+     * position slot selects, and game settings selects.
+     *
+     * All inputs are rendered with the `disabled` attribute by default.
+     * JavaScript enables them on mobile viewports and disables the desktop
+     * table inputs, ensuring only one set of inputs submits.
+     *
+     * @param list<PlayerRow> $players All players on the team roster
+     * @param array<string> $slotNames Position slot names (e.g., ['PG', 'SG', 'SF', 'PF', 'C'])
+     */
+    public function renderMobileView(array $players, array $slotNames): void;
 }

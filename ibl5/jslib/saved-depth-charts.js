@@ -100,7 +100,7 @@
             var form = document.forms['DepthChartEntry'];
             if (!form) return;
 
-            // Clear any previous traded player styling
+            // Clear any previous traded player styling (desktop)
             var allRows = form.querySelectorAll('tr[data-pid]');
             for (var i = 0; i < allRows.length; i++) {
                 allRows[i].classList.remove('depth-chart-traded-player');
@@ -112,6 +112,14 @@
                 for (var s = 0; s < selects.length; s++) {
                     selects[s].disabled = false;
                 }
+            }
+
+            // Clear previous traded player styling (mobile cards)
+            var allCards = form.querySelectorAll('.dc-card[data-pid]');
+            for (var ci = 0; ci < allCards.length; ci++) {
+                allCards[ci].classList.remove('dc-card--traded');
+                var cardBadge = allCards[ci].querySelector('.traded-badge');
+                if (cardBadge) cardBadge.remove();
             }
 
             // Populate player settings
@@ -162,13 +170,55 @@
                         tradedSelects[ts].disabled = true;
                     }
                 }
+
+                // Update mobile card for this player
+                var card = form.querySelector('.dc-card[data-pid="' + pid + '"]');
+                if (card) {
+                    // Sync canPlayInGame checkbox
+                    var cb = card.querySelector('.dc-card__active-cb');
+                    if (cb) {
+                        cb.checked = (player.dc_canPlayInGame === 1);
+                        if (cb.checked) {
+                            card.classList.remove('dc-card--inactive');
+                        } else {
+                            card.classList.add('dc-card--inactive');
+                        }
+                    }
+
+                    // Mark traded players on mobile
+                    if (!player.isOnCurrentRoster) {
+                        card.classList.add('dc-card--traded');
+                        if (!card.querySelector('.traded-badge')) {
+                            var nameEl = card.querySelector('.dc-card__name');
+                            if (nameEl) {
+                                var cardBadge2 = document.createElement('span');
+                                cardBadge2.className = 'traded-badge';
+                                cardBadge2.textContent = 'TRADED';
+                                nameEl.parentNode.insertBefore(cardBadge2, nameEl.nextSibling);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Re-apply mobile view state after populating
+            if (typeof window.IBL_applyDepthChartMobileView === 'function') {
+                window.IBL_applyDepthChartMobileView();
             }
         }
 
         function setSelectValue(form, name, value) {
             var sel = form.elements[name];
-            if (sel && sel.tagName === 'SELECT') {
+            if (!sel) return;
+            if (sel.tagName === 'SELECT') {
                 sel.value = String(value);
+            } else if (sel.length) {
+                // Multiple elements share this name (desktop + mobile views)
+                for (var i = 0; i < sel.length; i++) {
+                    if (sel[i].tagName === 'SELECT') {
+                        sel[i].value = String(value);
+                    }
+                }
             }
         }
 

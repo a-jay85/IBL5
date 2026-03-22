@@ -67,6 +67,7 @@
 @import './components/season-archive.css';
 @import './components/saved-depth-charts.css';
 @import './components/depth-chart-changes.css';
+@import './components/depth-chart-mobile.css';
 @import './components/sco-parser.css';
 @import './components/updater.css';
 @import './components/auth.css';

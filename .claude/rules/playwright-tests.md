@@ -20,6 +20,16 @@ cd ibl5 && bun run test:e2e:ui
 cd ibl5 && bunx playwright test tests/e2e/smoke/public-pages.spec.ts
 ```
 
+## Debugging Flaky Tests
+
+When tests fail intermittently (race conditions, resource contention, parallel worker conflicts), re-run with a single worker to isolate the issue:
+
+```bash
+cd ibl5 && bun run test:e2e:serial
+```
+
+This runs with `--workers=1 --retries=2` (CI-matching retries, single worker). Use this to determine whether a failure is a genuine bug or a parallelism artifact before investigating further.
+
 ## Prerequisites
 
 - **Docker must be running** — E2E tests hit the local server (`http://main.localhost/ibl5/`), unlike PHPUnit tests which use mocks

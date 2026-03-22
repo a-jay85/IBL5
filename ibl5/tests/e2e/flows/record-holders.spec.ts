@@ -5,6 +5,9 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Record Holders flow', () => {
+  // RecordHolders runs 17+ queries on cache miss — increase timeout
+  test.use({ navigationTimeout: 60_000, actionTimeout: 30_000 });
+
   test.beforeEach(async ({ page }) => {
     await page.goto('modules.php?name=RecordHolders');
   });

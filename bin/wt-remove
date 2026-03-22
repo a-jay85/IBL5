@@ -3,18 +3,28 @@
 # (vendor/, config.php, .env.test, style.css) appear as untracked
 # changes and block normal removal.
 #
-# Usage: bin/wt-remove <worktree-name>
+# Usage: bin/wt-remove <worktree-name> [--force]
 
 set -euo pipefail
 
+source "$(dirname "$0")/lib/wt-guards.sh"
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-if [ $# -lt 1 ]; then
-    echo "Usage: bin/wt-remove <worktree-name>" >&2
+NAME=""
+FORCE=false
+for arg in "$@"; do
+    case "$arg" in
+        --force) FORCE=true ;;
+        -*) echo "Unknown option: $arg" >&2; exit 1 ;;
+        *) NAME="$arg" ;;
+    esac
+done
+
+if [ -z "$NAME" ]; then
+    echo "Usage: bin/wt-remove <worktree-name> [--force]" >&2
     exit 1
 fi
-
-NAME="$1"
 
 # Resolve the actual worktree path from git (handles worktrees created from
 # subdirectories, e.g., ibl5/worktrees/ instead of worktrees/).
@@ -31,6 +41,13 @@ fi
 
 if [ ! -d "$WT_PATH" ]; then
     echo "Error: worktree '$NAME' not found at $WT_PATH" >&2
+    exit 1
+fi
+
+# Safety: refuse to remove a worktree that is actively in use
+if [ "$FORCE" != true ] && is_worktree_in_use "$WT_PATH"; then
+    echo "Error: worktree '$NAME' is in active use (processes detected in directory)" >&2
+    echo "Use --force to remove anyway." >&2
     exit 1
 fi
 

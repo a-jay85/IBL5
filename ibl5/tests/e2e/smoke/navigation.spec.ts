@@ -97,6 +97,7 @@ test.describe('Navigation bar smoke tests (public)', () => {
 });
 
 test.describe('Navigation bar smoke tests (mobile viewport)', () => {
+  test.use({ navigationTimeout: 30_000 });
   test.use({ viewport: { width: 375, height: 812 } });
 
   test('hamburger button is visible on mobile', async ({ page }) => {

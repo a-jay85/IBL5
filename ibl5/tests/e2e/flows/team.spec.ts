@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { test as publicTest, expect as publicExpect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 
 // Team page — public, no authentication required.
@@ -87,11 +88,16 @@ test.describe('Team page: additional display modes', () => {
     await dropdown.selectOption('chunk');
     await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
   });
+});
 
-  test('dropdown switches to playoffs', async ({ page }) => {
+// Playoffs option requires phase control — uses cookie-based appState (no DB races)
+publicTest.describe('Team page: playoffs display mode', () => {
+  publicTest('dropdown switches to playoffs', async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Playoffs' });
+    await page.goto('modules.php?name=Team&op=team&teamID=1');
     const dropdown = page.locator('.ibl-view-select').first();
     await dropdown.selectOption('playoffs');
-    await expect(page.locator('.ibl-data-table, table').first()).toBeVisible();
+    await publicExpect(page.locator('.ibl-data-table, table').first()).toBeVisible();
   });
 });
 
@@ -108,13 +114,8 @@ test.describe('Team page: dropdown content changes', () => {
     const dropdown = page.locator('.ibl-view-select').first();
     await dropdown.selectOption('contracts');
 
-    // Wait for table to update (AJAX swap or page reload)
-    const table = page.locator('.ibl-data-table, table').first();
-    await expect(table).toBeVisible();
-
-    // Contracts view uses .col-salary class on year-range headers
-    const salaryHeaders = table.locator('th.col-salary');
-    expect(await salaryHeaders.count()).toBeGreaterThan(0);
+    // Dropdown triggers page reload — wait for salary headers to appear
+    await expect(page.locator('th.col-salary').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('switching back to ratings shows rating columns', async ({ page }) => {

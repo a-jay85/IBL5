@@ -243,10 +243,7 @@
         <testsuite name="Settings Module Tests">
             <directory>tests/Settings</directory>
         </testsuite>
-        <testsuite name="TeamStats Module Tests">
-            <directory>tests/TeamStats</directory>
-        </testsuite>
-        <testsuite name="Logging Module Tests">
+<testsuite name="Logging Module Tests">
             <directory>tests/Logging</directory>
         </testsuite>
     </testsuites>

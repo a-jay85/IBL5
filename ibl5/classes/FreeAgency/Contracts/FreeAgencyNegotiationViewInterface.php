@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace FreeAgency\Contracts;
 
+use Team\Team;
+
 /**
  * Interface for rendering the Free Agency negotiation page
  *
@@ -24,7 +26,7 @@ interface FreeAgencyNegotiationViewInterface
      * - Notes/reminders card (cap rules, raise limits)
      * - Delete offer button (if offer exists)
      *
-     * @param array{player: \Player\Player, capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, demands: array<string, int>, existingOffer: array<string, int>, amendedCapSpace: int, hasExistingOffer: bool, veteranMinimum: int, maxContract: int, team: \Team} $negotiationData Pre-computed data from FreeAgencyService::getNegotiationData()
+     * @param array{player: \Player\Player, capMetrics: array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}, demands: array<string, int>, existingOffer: array<string, int>, amendedCapSpace: int, hasExistingOffer: bool, veteranMinimum: int, maxContract: int, team: Team} $negotiationData Pre-computed data from FreeAgencyService::getNegotiationData()
      * @param string|null $error Error message from PRG redirect (validation failure)
      * @return string Complete HTML negotiation form
      */

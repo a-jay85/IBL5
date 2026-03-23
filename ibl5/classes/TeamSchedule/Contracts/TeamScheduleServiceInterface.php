@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TeamSchedule\Contracts;
 
+use Team\Team;
+
 /**
  * TeamScheduleServiceInterface - Contract for team schedule business logic
  *
@@ -12,7 +14,7 @@ namespace TeamSchedule\Contracts;
  * @phpstan-type ScheduleGameRow array{
  *     game: \Game,
  *     currentMonth: string,
- *     opposingTeam: \Team,
+ *     opposingTeam: Team,
  *     opponentText: string,
  *     highlight: string,
  *     gameResult: string,

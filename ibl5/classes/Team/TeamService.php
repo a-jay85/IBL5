@@ -56,7 +56,7 @@ class TeamService implements TeamServiceInterface
         /** @var string $imagesPath */
         $imagesPath = $leagueConfig['images_path'];
 
-        $team = \Team::initialize($this->db, $teamID);
+        $team = Team::initialize($this->db, $teamID);
 
         $insertyear = ($yr !== null && $yr !== '') ? "&yr=$yr" : "";
 
@@ -110,7 +110,7 @@ class TeamService implements TeamServiceInterface
      *
      * @return SidebarData
      */
-    private function renderTeamInfoRight(\Team $team): array
+    private function renderTeamInfoRight(Team $team): array
     {
         $teamColorStyle = \UI\TableStyles::inlineVars($team->color1, $team->color2);
 
@@ -164,7 +164,7 @@ class TeamService implements TeamServiceInterface
      *
      * @return CurrentSeasonData|null
      */
-    private function prepareCurrentSeasonData(\Team $team): ?array
+    private function prepareCurrentSeasonData(Team $team): ?array
     {
         $powerData = $this->repository->getTeamPowerData($team->name);
         if ($powerData === null) {
@@ -216,7 +216,7 @@ class TeamService implements TeamServiceInterface
      *
      * @return BannerData
      */
-    private function prepareBannerData(\Team $team): array
+    private function prepareBannerData(Team $team): array
     {
         $banners = $this->repository->getChampionshipBanners($team->name);
 
@@ -285,7 +285,7 @@ class TeamService implements TeamServiceInterface
      *
      * @return PlayoffData
      */
-    private function preparePlayoffData(\Team $team): array
+    private function preparePlayoffData(Team $team): array
     {
         $playoffResults = $this->repository->getPlayoffResults();
         $teamName = $team->name;
@@ -385,7 +385,7 @@ class TeamService implements TeamServiceInterface
      * @param string $type 'regular' or 'heat'
      * @return WinLossHistoryData
      */
-    private function prepareWinLossHistoryData(\Team $team, string $type): array
+    private function prepareWinLossHistoryData(Team $team, string $type): array
     {
         if ($type === 'heat') {
             $history = $this->repository->getHEATHistory($team->name);
@@ -459,7 +459,7 @@ class TeamService implements TeamServiceInterface
      *
      * @return list<DraftPickItemData>
      */
-    private function prepareDraftPicksData(\Team $team): array
+    private function prepareDraftPicksData(Team $team): array
     {
         $teamQueryRepo = new TeamQueryRepository($this->db);
         $resultPicks = $teamQueryRepo->getDraftPicks($team->teamID);
@@ -467,12 +467,12 @@ class TeamService implements TeamServiceInterface
         $league = new League($this->db);
         $allTeamsResult = $league->getAllTeamsResult();
 
-        /** @var array<string, \Team> $teamsArray */
+        /** @var array<string, Team> $teamsArray */
         $teamsArray = [];
         foreach ($allTeamsResult as $teamRow) {
             /** @var TeamInfoRow $teamRow */
             $teamRowName = $teamRow['team_name'];
-            $teamsArray[$teamRowName] = \Team::initialize($this->db, $teamRow);
+            $teamsArray[$teamRowName] = Team::initialize($this->db, $teamRow);
         }
 
         /** @var list<DraftPickItemData> $draftPicks */

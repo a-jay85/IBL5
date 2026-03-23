@@ -6,6 +6,7 @@ namespace UI\Tables;
 
 use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
+use Team\Team;
 
 /**
  * SplitStats - Renders per-game averages table for split stats views
@@ -19,12 +20,12 @@ class SplitStats
      * Render the split stats per-game averages table
      *
      * @param list<array{name: string, pos: string, pid: int, games: int, gameMINavg: string|null, gameFGMavg: string|null, gameFGAavg: string|null, gameFGPavg: string|null, gameFTMavg: string|null, gameFTAavg: string|null, gameFTPavg: string|null, game3GMavg: string|null, game3GAavg: string|null, game3GPavg: string|null, gameORBavg: string|null, gameREBavg: string|null, gameASTavg: string|null, gameSTLavg: string|null, gameTOVavg: string|null, gameBLKavg: string|null, gamePFavg: string|null, gamePTSavg: string|null}> $rows Pre-queried split stats rows
-     * @param \Team $team Team object
+     * @param Team $team Team object
      * @param string $splitLabel Human-readable split label
      * @param list<int> $starterPids Starter player IDs for highlighting
      * @return string HTML table
      */
-    public static function render(array $rows, \Team $team, string $splitLabel, array $starterPids = []): string
+    public static function render(array $rows, Team $team, string $splitLabel, array $starterPids = []): string
     {
         /** @var list<array{name: string, pos: string, pid: int, games: int, min: string, fgm: string, fga: string, fgp: string, ftm: string, fta: string, ftp: string, tgm: string, tga: string, tgp: string, orb: string, reb: string, ast: string, stl: string, tov: string, blk: string, pf: string, pts: string}> $playerRows */
         $playerRows = [];

@@ -9,6 +9,7 @@ use Shared\SalaryConverter;
 use Extension\Contracts\ExtensionProcessorInterface;
 use Services\CommonContractValidator;
 use Team\Contracts\TeamQueryRepositoryInterface;
+use Team\Team;
 
 /**
  * ExtensionProcessor - Processes contract extension offers
@@ -278,12 +279,12 @@ class ExtensionProcessor implements ExtensionProcessorInterface
     /**
      * @param ExtensionData $extensionData
      * @param Player $player
-     * @return \Team|null
+     * @return Team|null
      */
-    private function getTeamObject(array $extensionData, Player $player): ?\Team
+    private function getTeamObject(array $extensionData, Player $player): ?Team
     {
         // If Team object already provided, return it
-        if (isset($extensionData['team']) && $extensionData['team'] instanceof \Team) {
+        if (isset($extensionData['team']) && $extensionData['team'] instanceof Team) {
             return $extensionData['team'];
         }
 
@@ -294,18 +295,18 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         }
 
         try {
-            return \Team::initialize($this->db, $teamName);
+            return Team::initialize($this->db, $teamName);
         } catch (\Exception $e) {
             return null;
         }
     }
 
     /**
-     * @param \Team $team
+     * @param Team $team
      * @param string|null $position
      * @return int
      */
-    private function calculateMoneyCommittedAtPosition(\Team $team, ?string $position): int
+    private function calculateMoneyCommittedAtPosition(Team $team, ?string $position): int
     {
         try {
             $stmt = $this->db->prepare("SELECT money_committed_at_position FROM ibl_team_info WHERE team_name = ? LIMIT 1");

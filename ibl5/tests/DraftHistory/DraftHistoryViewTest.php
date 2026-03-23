@@ -8,6 +8,7 @@ use DraftHistory\Contracts\DraftHistoryViewInterface;
 use DraftHistory\DraftHistoryView;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
+use Team\Team;
 
 /**
  * @covers \DraftHistory\DraftHistoryView
@@ -146,11 +147,11 @@ class DraftHistoryViewTest extends TestCase
     }
 
     /**
-     * @return \Team&\PHPUnit\Framework\MockObject\MockObject
+     * @return Team&\PHPUnit\Framework\MockObject\MockObject
      */
-    private function createMockTeam(string $name, int $teamId): \Team
+    private function createMockTeam(string $name, int $teamId): Team
     {
-        $team = $this->createMock(\Team::class);
+        $team = $this->createMock(Team::class);
         $team->name = $name;
         $team->teamID = $teamId;
 

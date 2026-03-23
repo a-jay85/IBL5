@@ -35,7 +35,7 @@ $teamID = isset($_GET['teamID']) ? (int) $_GET['teamID'] : 0;
 
 $isValidTeam = false;
 if ($teamID > 0) {
-    $team = \Team::initialize($mysqli_db, $teamID);
+    $team = \Team\Team::initialize($mysqli_db, $teamID);
     $isValidTeam = ($team->teamID > 0);
 }
 

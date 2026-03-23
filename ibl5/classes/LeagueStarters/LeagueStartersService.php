@@ -8,6 +8,7 @@ use League\League;
 use LeagueStarters\Contracts\LeagueStartersRepositoryInterface;
 use LeagueStarters\Contracts\LeagueStartersServiceInterface;
 use Player\Player;
+use Team\Team;
 
 /**
  * LeagueStartersService - Business logic for league starters display
@@ -99,7 +100,7 @@ class LeagueStartersService implements LeagueStartersServiceInterface
 
         foreach ($teams as $teamRow) {
             /** @var array<string, mixed> $teamRow */
-            $team = \Team::initialize($this->db, $teamRow);
+            $team = Team::initialize($this->db, $teamRow);
 
             foreach ($positions as $position) {
                 if (isset($starterMap[$team->teamID][$position])) {

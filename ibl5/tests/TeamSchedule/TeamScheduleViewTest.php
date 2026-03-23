@@ -7,6 +7,7 @@ namespace Tests\TeamSchedule;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use TeamSchedule\TeamScheduleView;
+use Team\Team;
 
 /**
  * TeamScheduleViewTest - Tests for TeamScheduleView HTML rendering
@@ -164,9 +165,9 @@ class TeamScheduleViewTest extends TestCase
      *
      * Uses a testable subclass that allows setting public properties
      */
-    private function createMockTeam(string $color1 = 'FFFFFF', string $color2 = '000000'): \Team
+    private function createMockTeam(string $color1 = 'FFFFFF', string $color2 = '000000'): Team
     {
-        $team = $this->getMockBuilder(\Team::class)
+        $team = $this->getMockBuilder(Team::class)
             ->disableOriginalConstructor()
             ->getMock();
 

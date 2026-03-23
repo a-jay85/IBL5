@@ -1,0 +1,65 @@
+@layer components {
+
+/* ==========================================================================
+   Depth Chart Module
+   ========================================================================== */
+
+.depth-chart-logo {
+    text-align: center;
+    margin-bottom: var(--space-4);
+}
+
+.depth-chart-logo img {
+    display: block;
+    width: 100%;
+    max-width: 415px;
+    aspect-ratio: 415 / 50;
+    height: auto;
+    margin: 0 auto;
+}
+
+/* Allow horizontal page scrolling on Depth Chart Entry so users can pan/zoom.
+   Desktop only — on mobile, overflow on <html> creates a scroll container
+   that captures position:fixed elements (nav scrolls with content). The
+   mobile card view doesn't need horizontal scrolling anyway. */
+@media (min-width: 769px) {
+    html:has(.depth-chart-form) {
+        overflow-x: auto;
+    }
+}
+
+.depth-chart-form {
+    max-width: 100%;
+    overflow-x: visible;
+}
+
+/* Depth chart table overrides moved to tables.css */
+
+.depth-chart-buttons {
+    text-align: center;
+    padding: var(--space-4);
+    background: var(--gray-50);
+}
+
+.depth-chart-reset-btn {
+    background-color: var(--gray-200);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-400);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    margin-right: var(--space-4);
+}
+
+.depth-chart-submit-btn {
+    background: linear-gradient(135deg, var(--success-500), var(--success-600));
+    color: white;
+    border: none;
+    padding: var(--space-2) var(--space-6);
+    border-radius: var(--radius-md);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+
+} /* end @layer components */

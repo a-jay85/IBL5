@@ -1,0 +1,23 @@
+@layer components {
+
+/* ==========================================================================
+   Player Awards Module
+   ========================================================================== */
+
+.player-awards-sort__option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--gray-600);
+    cursor: pointer;
+    margin-right: var(--space-2);
+}
+
+.player-awards-sort__option input[type="radio"] {
+    accent-color: var(--accent-500);
+}
+
+
+} /* end @layer components */

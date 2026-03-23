@@ -57,6 +57,18 @@
 
 @import './tokens/tokens.css';
 @import './base.css';
+@import './components/leaders.css';
+@import './components/news.css';
+@import './components/titles-and-grids.css';
+@import './components/team-page.css';
+@import './components/schedule.css';
+@import './components/draft.css';
+@import './components/transaction-history.css';
+@import './components/next-sim.css';
+@import './components/depth-chart.css';
+@import './components/player-awards.css';
+@import './components/topics.css';
+@import './components/search.css';
 @import './components/existing-components.css';
 @import './components/tables.css';
 @import './components/cards.css';

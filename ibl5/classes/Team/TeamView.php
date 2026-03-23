@@ -6,6 +6,7 @@ namespace Team;
 
 use Team\Contracts\TeamViewInterface;
 use Utilities\HtmlSanitizer;
+use Discord\Discord;
 
 /**
  * @phpstan-import-type TeamPageData from Contracts\TeamServiceInterface
@@ -130,7 +131,7 @@ class TeamView implements TeamViewInterface
         if ($userTeamName !== '') {
             if ($isOwnTeam) {
                 $tradeButton = '<a href="modules.php?name=Trading&amp;op=reviewtrade" class="team-action-link">Trade</a>';
-                $discordButton = '<a href="https://discord.com/channels/' . \Discord::getGuildID() . '" class="team-action-link" target="_blank" rel="noopener noreferrer">Discord</a>';
+                $discordButton = '<a href="https://discord.com/channels/' . Discord::getGuildID() . '" class="team-action-link" target="_blank" rel="noopener noreferrer">Discord</a>';
             } else {
                 $partnerParam = \Utilities\HtmlSanitizer::safeHtmlOutput($team->name);
                 $tradeButton = '<a href="modules.php?name=Trading&amp;op=offertrade&amp;partner=' . urlencode($team->name) . '" class="team-action-link">Trade</a>';

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Discord;
+
 class Discord
 {
     /** @var string Production IBL Discord server (guild) snowflake ID */
@@ -76,8 +78,8 @@ class Discord
             return;
         }
 
-        $configPath = __DIR__ . '/../config/discord.config.php';
-        $examplePath = __DIR__ . '/../config/discord.config.example.php';
+        $configPath = __DIR__ . '/../../config/discord.config.php';
+        $examplePath = __DIR__ . '/../../config/discord.config.example.php';
 
         if (file_exists($configPath)) {
             /** @var array{webhooks?: array<string, string>, iblbot_url?: string} $config */

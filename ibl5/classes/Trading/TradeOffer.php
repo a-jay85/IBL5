@@ -7,6 +7,7 @@ namespace Trading;
 use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Season\Season;
+use Discord\Discord;
 
 /**
  * TradeOffer - Creates and manages trade offers
@@ -30,7 +31,7 @@ class TradeOffer implements TradeOfferInterface
     protected Season $season;
     protected CashTransactionHandler $cashHandler;
     protected TradeValidator $validator;
-    protected ?\Discord $discord;
+    protected ?Discord $discord;
 
     public function __construct(\mysqli $db, ?TradingRepository $repository = null)
     {
@@ -44,7 +45,7 @@ class TradeOffer implements TradeOfferInterface
 
         // Initialize Discord with error handling (may fail if column doesn't exist)
         try {
-            $this->discord = new \Discord($db);
+            $this->discord = new Discord($db);
         } catch (\Exception $e) {
             // Discord unavailable - will skip notifications
             \Logging\LoggerFactory::getChannel('trade')->warning('Discord initialization failed in TradeOffer', ['error' => $e->getMessage()]);
@@ -502,7 +503,7 @@ class TradeOffer implements TradeOfferInterface
 
             $cleanTradeText = str_replace(['<br>', '&nbsp;', '<i>', '</i>'], ["\n", " ", "_", "_"], $tradeText);
 
-            \Discord::sendTradeDM($receivingUserDiscordID, $tradeOfferId, $offeringTeamName, $cleanTradeText);
+            Discord::sendTradeDM($receivingUserDiscordID, $tradeOfferId, $offeringTeamName, $cleanTradeText);
         } catch (\Exception $e) {
             \Logging\LoggerFactory::getChannel('trade')->error('Discord notification failed', ['trade_id' => $tradeOfferId, 'error' => $e->getMessage()]);
         }

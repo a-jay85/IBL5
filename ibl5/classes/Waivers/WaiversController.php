@@ -11,6 +11,7 @@ use UI\Components\TableViewSwitcher;
 use Waivers\Contracts\WaiversControllerInterface;
 use Team\Team;
 use Season\Season;
+use Discord\Discord;
 
 /**
  * @see WaiversControllerInterface
@@ -165,7 +166,7 @@ class WaiversController implements WaiversControllerInterface
 
         // Send Discord notification
         $hometext = "The " . \Utilities\HtmlSanitizer::e($teamName) . " cut " . \Utilities\HtmlSanitizer::e($player['name']) . " to waivers.";
-        \Discord::postToChannel('#waiver-wire', $hometext);
+        Discord::postToChannel('#waiver-wire', $hometext);
 
         \Logging\LoggerFactory::getChannel('audit')->info('player_waived', [
             'action' => 'player_waived',
@@ -219,7 +220,7 @@ class WaiversController implements WaiversControllerInterface
         \Mail\MailService::fromConfig()->send(self::NOTIFICATION_EMAIL_RECIPIENT, $storytitle, $hometext, self::NOTIFICATION_EMAIL_SENDER);
 
         // Send Discord notification
-        \Discord::postToChannel('#waiver-wire', $hometext);
+        Discord::postToChannel('#waiver-wire', $hometext);
 
         \Logging\LoggerFactory::getChannel('audit')->info('player_signed_from_waivers', [
             'action' => 'player_signed_from_waivers',

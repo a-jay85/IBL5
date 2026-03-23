@@ -8,6 +8,7 @@ use RecordHolders\Contracts\RecordBreakingDetectorInterface;
 use RecordHolders\Contracts\RecordHoldersRepositoryInterface;
 use Utilities\BoxScoreUrlBuilder;
 use Utilities\IblSeasonDateHelper;
+use Discord\Discord;
 
 /**
  * RecordBreakingDetector - Detects and announces broken/tied all-time IBL records.
@@ -429,8 +430,8 @@ class RecordBreakingDetector implements RecordBreakingDetectorInterface
      */
     private function sendDiscordNotification(string $message): void
     {
-        \Discord::postToChannel('#trades', $message);
-        \Discord::postToChannel('#general-chat', $message);
+        Discord::postToChannel('#trades', $message);
+        Discord::postToChannel('#general-chat', $message);
     }
 
     /**

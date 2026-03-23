@@ -11,6 +11,7 @@ use Team\Contracts\TeamQueryRepositoryInterface;
 use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 use Team\Team;
 use Season\Season;
+use LeagueSchedule\Game;
 
 /**
  * NextSimService - Business logic for next simulation games
@@ -64,7 +65,7 @@ class NextSimService implements NextSimServiceInterface
         $games = [];
 
         foreach ($projectedGames as $gameRow) {
-            $game = new \Game($gameRow);
+            $game = new Game($gameRow);
             $gameDate = new \DateTime($game->date);
             $dayNumber = $gameDate->diff($lastSimEndDateObject)->format('%a');
 

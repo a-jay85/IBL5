@@ -38,13 +38,45 @@ if (in_array('--status', $argv, true)) {
     exit(0);
 }
 
+/**
+ * Run post-migration schema validation.
+ *
+ * @return int Exit code (0 = pass, 1 = fail)
+ */
+function validateSchema(\mysqli $db): int
+{
+    $assertionsFile = dirname(__DIR__) . '/config/schema-assertions.php';
+    if (!file_exists($assertionsFile)) {
+        return 0;
+    }
+
+    /** @var list<\Migration\SchemaAssertion> $assertions */
+    $assertions = require $assertionsFile;
+
+    $validator = new \Migration\SchemaValidator($db);
+    $result = $validator->validate($assertions);
+
+    if ($result->passed) {
+        echo "Schema validation passed (" . count($assertions) . " assertions).\n";
+        return 0;
+    }
+
+    echo "SCHEMA VALIDATION FAILED:\n";
+    foreach ($result->missing as $column) {
+        echo "  MISSING: {$column}\n";
+    }
+    echo "\n" . count($result->missing) . " missing column(s) detected.\n";
+    return 1;
+}
+
 // Default: run all pending migrations
 try {
     $pending = $runner->getPending();
 
     if ($pending === []) {
         echo "Nothing to migrate.\n";
-        exit(0);
+        $exitCode = validateSchema($mysqli_db);
+        exit($exitCode);
     }
 
     // Guard: if there are pending migrations but migrate-seed hasn't been run,
@@ -63,7 +95,8 @@ try {
     foreach ($executed as $filename) {
         echo "  - {$filename}\n";
     }
-    exit(0);
+    $exitCode = validateSchema($mysqli_db);
+    exit($exitCode);
 } catch (\RuntimeException $e) {
     echo "Migration failed: " . $e->getMessage() . "\n";
     exit(1);

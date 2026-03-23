@@ -100,6 +100,16 @@ check_worktree() {
         return
     fi
 
+    # Never tear down a worktree with uncommitted or staged changes.
+    # A freshly created worktree (branch tip == master) passes merge-base --is-ancestor
+    # even though work is in progress. This guard prevents data loss.
+    if ! git -C "$wt_path" diff --quiet 2>/dev/null || \
+       ! git -C "$wt_path" diff --cached --quiet 2>/dev/null; then
+        echo "  SKIP $wt_name: has uncommitted changes"
+        SKIPPED=$((SKIPPED + 1))
+        return
+    fi
+
     # Determine if branch has been merged to master.
     # Two checks needed: merge-base handles regular merges, PR state handles squash merges
     # (squash creates a new commit, so the branch tip is never an ancestor of master).

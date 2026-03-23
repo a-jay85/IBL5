@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace TeamSchedule\Contracts;
 
+use Team\Team;
+
 /**
  * TeamScheduleViewInterface - Contract for team schedule view rendering
  *
@@ -18,11 +20,11 @@ interface TeamScheduleViewInterface
     /**
      * Render the complete team schedule
      *
-     * @param \Team $team Team object
+     * @param Team $team Team object
      * @param list<ScheduleGameRow> $games Processed game data
      * @param int $simLengthInDays Simulation length in days
      * @param string $seasonPhase Current season phase (e.g., 'Regular Season', 'Playoffs')
      * @return string HTML output
      */
-    public function render(\Team $team, array $games, int $simLengthInDays, string $seasonPhase): string;
+    public function render(Team $team, array $games, int $simLengthInDays, string $seasonPhase): string;
 }

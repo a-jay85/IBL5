@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Team\Contracts;
 
+use Team\Team;
+
 /**
  * TeamServiceInterface - Contract for Team module data orchestration
  *
@@ -15,7 +17,7 @@ namespace Team\Contracts;
  *
  * @phpstan-type TeamPageData array{
  *     teamID: int,
- *     team: \Team,
+ *     team: Team,
  *     imagesPath: string,
  *     yr: ?string,
  *     display: string,

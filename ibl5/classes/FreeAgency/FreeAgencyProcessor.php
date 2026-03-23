@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyProcessorInterface;
+use Team\Team;
 
 /**
  * @see FreeAgencyProcessorInterface
@@ -41,7 +42,7 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
         $player = \Player\Player::withPlayerID($this->mysqli_db, $playerID);
 
         // Load team object for validation
-        $team = \Team::initialize($this->mysqli_db, $teamName);
+        $team = Team::initialize($this->mysqli_db, $teamName);
 
         // Check if player already signed
         if ($this->repository->isPlayerAlreadySigned($playerID)) {
@@ -99,10 +100,10 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
      *
      * @param \Player\Player $player Player object
      * @param array<string, mixed> $postData POST data from offer form
-     * @param \Team $team Team object (provides team name and cap data)
+     * @param Team $team Team object (provides team name and cap data)
      * @return array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int} Parsed offer data
      */
-    private function parseOfferData(\Player\Player $player, array $postData, \Team $team): array
+    private function parseOfferData(\Player\Player $player, array $postData, Team $team): array
     {
         // Reconstruct derived values from player object
         $birdYears = $player->teamName === $team->name ? ($player->birdYears ?? 0) : 0;
@@ -182,12 +183,12 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     /**
      * Save a validated offer to the database
      *
-     * @param \Team $team Offering team
+     * @param Team $team Offering team
      * @param \Player\Player $player Player object
      * @param array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int, birdYears: int, offerType: int, vetmin: int, year1Max: int, amendedCapSpaceYear1: int} $offerData Offer details
      * @return bool True if saved successfully
      */
-    private function saveOffer(\Team $team, \Player\Player $player, array $offerData): bool
+    private function saveOffer(Team $team, \Player\Player $player, array $offerData): bool
     {
         $teamName = $team->name;
 

@@ -9,13 +9,14 @@ use PHPUnit\Framework\TestCase;
 use CapSpace\CapSpaceService;
 use CapSpace\Contracts\CapSpaceRepositoryInterface;
 use Team\Contracts\TeamQueryRepositoryInterface;
+use Team\Team;
 
 /**
  * Testable subclass that exposes protected methods for testing
  */
 class TestableCapSpaceService extends CapSpaceService
 {
-    public function publicProcessTeamCapData(\Team $team, \Season $season): array
+    public function publicProcessTeamCapData(Team $team, \Season $season): array
     {
         return $this->processTeamCapData($team, $season);
     }
@@ -213,11 +214,11 @@ class CapSpaceServiceTest extends TestCase
      *
      * @param int $hasMLE MLE flag (0 or 1)
      * @param int $hasLLE LLE flag (0 or 1)
-     * @return \Team&\PHPUnit\Framework\MockObject\MockObject Mock Team
+     * @return Team&\PHPUnit\Framework\MockObject\MockObject Mock Team
      */
-    private function createMockTeamWithMleLle(int $hasMLE, int $hasLLE): \Team
+    private function createMockTeamWithMleLle(int $hasMLE, int $hasLLE): Team
     {
-        $mockTeam = $this->createMock(\Team::class);
+        $mockTeam = $this->createMock(Team::class);
         $mockTeam->teamID = 1;
         $mockTeam->name = 'Test Team';
         $mockTeam->city = 'Test City';

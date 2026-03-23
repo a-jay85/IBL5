@@ -396,7 +396,7 @@ class TeamQueryRepository extends \BaseMysqliRepository implements TeamQueryRepo
         $buyoutsResult = $this->getBuyouts($teamId);
         $totalCurrentSeasonBuyouts = $this->getTotalCurrentSeasonSalaries($buyoutsResult);
         $projectedTotalCurrentSeasonBuyouts = $totalCurrentSeasonBuyouts + $buyoutValue;
-        $buyoutLimit = League::HARD_CAP_MAX * \Team::BUYOUT_PERCENTAGE_MAX;
+        $buyoutLimit = League::HARD_CAP_MAX * Team::BUYOUT_PERCENTAGE_MAX;
 
         return $projectedTotalCurrentSeasonBuyouts <= $buyoutLimit;
     }

@@ -7,6 +7,7 @@ namespace TeamSchedule;
 use TeamSchedule\Contracts\TeamScheduleViewInterface;
 use TeamSchedule\Contracts\TeamScheduleServiceInterface;
 use Utilities\HtmlSanitizer;
+use Team\Team;
 
 /**
  * TeamScheduleView - HTML rendering for team schedule
@@ -39,7 +40,7 @@ class TeamScheduleView implements TeamScheduleViewInterface
      *
      * @param list<ScheduleGameRow> $games
      */
-    public function render(\Team $team, array $games, int $simLengthInDays, string $seasonPhase): string
+    public function render(Team $team, array $games, int $simLengthInDays, string $seasonPhase): string
     {
         $color1 = HtmlSanitizer::safeHtmlOutput($team->color1);
         $color2 = HtmlSanitizer::safeHtmlOutput($team->color2);

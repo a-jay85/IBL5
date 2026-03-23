@@ -8,12 +8,13 @@ use FreeAgency\Contracts\FreeAgencyNegotiationViewInterface;
 use Player\Player;
 use Player\PlayerImageHelper;
 use Utilities\HtmlSanitizer;
+use Team\Team;
 
 /**
  * @see FreeAgencyNegotiationViewInterface
  *
  * @phpstan-type CapMetrics array{totalSalaries: array<int, int>, softCapSpace: array<int, int>, hardCapSpace: array<int, int>, rosterSpots: array<int, int>}
- * @phpstan-type NegotiationData array{player: Player, capMetrics: CapMetrics, demands: array<string, int>, existingOffer: array<string, int>, amendedCapSpace: int, hasExistingOffer: bool, veteranMinimum: int, maxContract: int, team: \Team}
+ * @phpstan-type NegotiationData array{player: Player, capMetrics: CapMetrics, demands: array<string, int>, existingOffer: array<string, int>, amendedCapSpace: int, hasExistingOffer: bool, veteranMinimum: int, maxContract: int, team: Team}
  */
 class FreeAgencyNegotiationView implements FreeAgencyNegotiationViewInterface
 {

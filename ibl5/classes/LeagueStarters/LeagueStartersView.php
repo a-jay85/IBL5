@@ -8,6 +8,7 @@ use LeagueStarters\Contracts\LeagueStartersViewInterface;
 use Player\Player;
 use UI\Components\TableViewSwitcher;
 use Utilities\HtmlSanitizer;
+use Team\Team;
 
 /**
  * LeagueStartersView - HTML rendering for league starters
@@ -50,7 +51,7 @@ class LeagueStartersView implements LeagueStartersViewInterface
      *
      * @param array<string, array<int, Player>> $startersByPosition
      */
-    public function render(array $startersByPosition, \Team $userTeam, string $display = 'ratings'): string
+    public function render(array $startersByPosition, Team $userTeam, string $display = 'ratings'): string
     {
         $tabDefinitions = [
             'ratings' => 'Ratings',
@@ -84,7 +85,7 @@ class LeagueStartersView implements LeagueStartersViewInterface
      *
      * @param array<int, Player> $result
      */
-    private function renderTableForDisplay(string $display, array $result, \Team $team): string
+    private function renderTableForDisplay(string $display, array $result, Team $team): string
     {
         switch ($display) {
             case 'total_s':

@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyCapCalculator;
 use League\League;
 use Team\Contracts\TeamQueryRepositoryInterface;
+use Team\Team;
 
 /**
  * Comprehensive tests for FreeAgencyCapCalculator
@@ -81,7 +82,7 @@ class FreeAgencyCapCalculatorTest extends TestCase
             $this->assertEquals(0, $result['totalSalaries'][$i], "totalSalaries year $i should be 0");
             $this->assertEquals(League::SOFT_CAP_MAX, $result['softCapSpace'][$i], "softCapSpace year $i");
             $this->assertEquals(League::HARD_CAP_MAX, $result['hardCapSpace'][$i], "hardCapSpace year $i");
-            $this->assertEquals(\Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][$i], "rosterSpots year $i");
+            $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][$i], "rosterSpots year $i");
         }
     }
 
@@ -120,12 +121,12 @@ class FreeAgencyCapCalculatorTest extends TestCase
         $this->assertEquals(0, $result['totalSalaries'][4]);
         $this->assertEquals(0, $result['totalSalaries'][5]);
 
-        $this->assertEquals(\Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][0]);
-        $this->assertEquals(\Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][1]);
-        $this->assertEquals(\Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][2]);
-        $this->assertEquals(\Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][3]);
-        $this->assertEquals(\Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][4]);
-        $this->assertEquals(\Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][5]);
+        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][0]);
+        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][1]);
+        $this->assertEquals(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][2]);
+        $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][3]);
+        $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][4]);
+        $this->assertEquals(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][5]);
     }
 
     /**
@@ -224,9 +225,9 @@ class FreeAgencyCapCalculatorTest extends TestCase
     /**
      * Create a basic mock team with no players or offers (used by setUp)
      */
-    private function createMockTeam(): \Team
+    private function createMockTeam(): Team
     {
-        $team = $this->createMock(\Team::class);
+        $team = $this->createMock(Team::class);
         $team->name = 'Test Team';
         $team->teamID = 1;
 
@@ -241,9 +242,9 @@ class FreeAgencyCapCalculatorTest extends TestCase
     /**
      * Create a mock Team entity (just properties, no methods)
      */
-    private function createMockTeamEntity(): \Team
+    private function createMockTeamEntity(): Team
     {
-        $team = $this->createMock(\Team::class);
+        $team = $this->createMock(Team::class);
         $team->name = 'Test Team';
         $team->teamID = 1;
         return $team;

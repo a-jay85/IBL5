@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Team;
+
 use League\League;
 
 /**
@@ -15,7 +17,7 @@ use League\League;
  *
  * @phpstan-type TeamWithStandingsRow array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, arena: string, capacity: int, owner_name: string, owner_email: string, discordID: ?int, Used_Extension_This_Chunk: int, Used_Extension_This_Season: ?int, HasMLE: int, HasLLE: int, leagueRecord: ?string, ...}
  */
-class Team extends BaseMysqliRepository
+class Team extends \BaseMysqliRepository
 {
     public int $teamID;
 

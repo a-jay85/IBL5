@@ -8,6 +8,7 @@ use DraftHistory\Contracts\DraftHistoryViewInterface;
 use Player\PlayerImageHelper;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
+use Team\Team;
 
 /**
  * View class for rendering draft history page.
@@ -44,7 +45,7 @@ class DraftHistoryView implements DraftHistoryViewInterface
      *
      * @param list<DraftPickByTeamRow> $draftPicks
      */
-    public function renderTeamHistory(\Team $team, array $draftPicks): string
+    public function renderTeamHistory(Team $team, array $draftPicks): string
     {
         $teamName = HtmlSanitizer::safeHtmlOutput($team->name);
         $teamId = $team->teamID;

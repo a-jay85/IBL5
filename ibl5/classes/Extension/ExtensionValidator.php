@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Extension;
 
 use Extension\Contracts\ExtensionValidatorInterface;
+use Team\Team;
 
 /**
  * ExtensionValidator - Validates contract extension offers
@@ -48,7 +49,7 @@ class ExtensionValidator implements ExtensionValidatorInterface
      */
     public function validateExtensionEligibility(object $team): array
     {
-        /** @var \Team $team */
+        /** @var Team $team */
         if ($team->hasUsedExtensionThisSeason === 1) {
             return [
                 'valid' => false,

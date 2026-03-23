@@ -45,8 +45,7 @@ class AuthBootstrap implements BootstrapStepInterface
         $GLOBALS['user'] = $user;
         $container->set('authService', $authService);
 
-        // IP ban and custom mainfile extensions
-        require_once $this->basePath . '/includes/ipban.php';
+        // Custom mainfile extensions
         if (file_exists($this->basePath . '/includes/custom_files/custom_mainfile.php')) {
             @include_once $this->basePath . '/includes/custom_files/custom_mainfile.php';
         }

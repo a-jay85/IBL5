@@ -160,7 +160,20 @@ if (empty($informant)) {
     $informant = $anonymous;
 }
 
-getTopics($sid);
+$stmtTopics = $mysqli_db->prepare(
+    "SELECT t.topicid, t.topicname, t.topicimage, t.topictext
+     FROM {$prefix}_stories s
+     LEFT JOIN {$prefix}_topics t ON t.topicid = s.topic
+     WHERE s.sid = ?"
+);
+$stmtTopics->bind_param('i', $sid);
+$stmtTopics->execute();
+$topicRow = $stmtTopics->get_result()->fetch_assoc();
+$stmtTopics->close();
+$topicid = (int) ($topicRow['topicid'] ?? 0);
+$topicname = \Utilities\HtmlSanitizer::e($topicRow['topicname'] ?? '');
+$topicimage = \Utilities\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
+$topictext = \Utilities\HtmlSanitizer::e($topicRow['topictext'] ?? '');
 
 // Fetch category using prepared statement if catid is set
 if ($catid !== 0) {
@@ -189,10 +202,7 @@ if ($multilingual == 1) {
 }
 
 cookiedecode($user);
-include "modules/$module_name/associates.php";
 
-// Comment system removed - deprecated functionality
-// The old comments.php was a security vulnerability (SQL injection)
-// Comments can be re-implemented with proper security if needed
+// Comment system and associated topics removed — both were deprecated PHP-Nuke features
 
 PageLayout\PageLayout::footer();

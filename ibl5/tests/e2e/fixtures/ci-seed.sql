@@ -650,8 +650,8 @@ INSERT INTO ibl_olympics_standings (tid, team_name, pct, leagueRecord, wins, los
   (4, 'Coqs',   0.250, '1-3', 1, 3, 'Group B', '');
 
 INSERT INTO ibl_olympics_schedule (SchedID, Date, Year, Visitor, VScore, Home, HScore, BoxID, uuid) VALUES
-  (1, '2026-07-01', 2026, 1, 95, 2, 88, 1, 'oly-c0000000-0000-0000-0000-0000000001'),
-  (2, '2026-07-01', 2026, 3, 82, 4, 79, 2, 'oly-c0000000-0000-0000-0000-0000000002');
+  (1, '2026-07-01', 2026, 1, 95, 2, 88, 1, 'e0000000-0000-0000-0000-000000000001'),
+  (2, '2026-07-01', 2026, 3, 82, 4, 79, 2, 'e0000000-0000-0000-0000-000000000002');
 
 INSERT INTO ibl_olympics_league_config (season_ending_year, team_slot, team_name, conference, division, team_count) VALUES
   (2026, 1, 'Eagles', 'Group A', '', 4),

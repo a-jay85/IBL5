@@ -8,6 +8,7 @@ use Trading\Contracts\TradeProcessorInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Trading\Contracts\TradeExecutionRepositoryInterface;
 use Season\Season;
+use Discord\Discord;
 
 /**
  * TradeProcessor - Executes trades
@@ -32,7 +33,7 @@ class TradeProcessor implements TradeProcessorInterface
     protected Season $season;
     protected CashTransactionHandler $cashHandler;
     protected \Services\NewsService $newsService;
-    protected ?\Discord $discord;
+    protected ?Discord $discord;
 
     public function __construct(\mysqli $db, ?TradingRepository $repository = null)
     {
@@ -47,7 +48,7 @@ class TradeProcessor implements TradeProcessorInterface
 
         // Initialize Discord with error handling
         try {
-            $this->discord = new \Discord($db);
+            $this->discord = new Discord($db);
         } catch (\Exception $e) {
             // Discord unavailable - will skip notifications
             \Logging\LoggerFactory::getChannel('trade')->warning('Discord initialization failed in TradeProcessor', ['error' => $e->getMessage()]);
@@ -364,11 +365,11 @@ class TradeProcessor implements TradeProcessorInterface
                 $discordText = "$offeringTeamName and $listeningTeamName agreed to a trade:\n" . $storytext;
             }
 
-            \Discord::postToChannel('#trades', $discordText);
+            Discord::postToChannel('#trades', $discordText);
 
             $serverName = $_SERVER['SERVER_NAME'] ?? 'localhost';
             if ($serverName !== 'localhost' && $serverName !== '127.0.0.1') {
-                \Discord::postToChannel('#general-chat', $storytext);
+                Discord::postToChannel('#general-chat', $storytext);
             }
         } catch (\Exception $e) {
             // Log the error but don't fail the trade

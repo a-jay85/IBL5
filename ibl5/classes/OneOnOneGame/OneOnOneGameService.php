@@ -7,6 +7,7 @@ namespace OneOnOneGame;
 use OneOnOneGame\Contracts\OneOnOneGameServiceInterface;
 use OneOnOneGame\Contracts\OneOnOneGameRepositoryInterface;
 use OneOnOneGame\Contracts\OneOnOneGameEngineInterface;
+use Discord\Discord;
 
 /**
  * OneOnOneGameService - Business logic coordinator for One-on-One games
@@ -119,7 +120,7 @@ class OneOnOneGameService implements OneOnOneGameServiceInterface
         $discordText .= "\n\t*(Game played by {$owner})*\n";
         $discordText .= $this->getGameUrl($gameId);
 
-        \Discord::postToChannel('#1v1-games', $discordText);
+        Discord::postToChannel('#1v1-games', $discordText);
     }
 
     /**

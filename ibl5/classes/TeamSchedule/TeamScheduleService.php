@@ -9,6 +9,7 @@ use TeamSchedule\Contracts\TeamScheduleRepositoryInterface;
 use TeamSchedule\Contracts\TeamScheduleServiceInterface;
 use Team\Team;
 use Season\Season;
+use LeagueSchedule\Game;
 
 /**
  * TeamScheduleService - Business logic for team schedule display
@@ -62,7 +63,7 @@ class TeamScheduleService implements TeamScheduleServiceInterface
         $lossStreak = 0;
 
         foreach ($teamSchedule as $gameRow) {
-            $game = new \Game($gameRow);
+            $game = new Game($gameRow);
             $opposingTeamId = $game->getOpposingTeamID($teamId);
             if (!isset($this->teamCache[$opposingTeamId])) {
                 $this->teamCache[$opposingTeamId] = Team::initialize($this->db, $opposingTeamId);

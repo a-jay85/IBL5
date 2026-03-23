@@ -8,6 +8,7 @@ use Player\Player;
 use Shared\SalaryConverter;
 use RookieOption\Contracts\RookieOptionControllerInterface;
 use Season\Season;
+use Discord\Discord;
 
 /**
  * @see RookieOptionControllerInterface
@@ -67,7 +68,7 @@ class RookieOptionController implements RookieOptionControllerInterface
         // Send Discord notification
         $playerName = $player->name ?? 'Unknown';
         $discordMessage = $teamName . " exercise the rookie extension option on " . $playerName . " in the amount of " . $extensionAmount . ".";
-        \Discord::postToChannel(self::DISCORD_CHANNEL, $discordMessage);
+        Discord::postToChannel(self::DISCORD_CHANNEL, $discordMessage);
 
         // Send email notification
         $emailSubject = "Rookie Extension Option - " . $playerName;

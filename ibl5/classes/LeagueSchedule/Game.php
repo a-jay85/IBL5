@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace LeagueSchedule;
+
 class Game
 {
     public string $date;

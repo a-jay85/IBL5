@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 namespace Draft\Contracts;
+use Discord\Discord;
+
 
 /**
  * DraftProcessorInterface - Contract for draft business logic

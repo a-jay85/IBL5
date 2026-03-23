@@ -7,6 +7,7 @@ namespace Tests\Team;
 use PHPUnit\Framework\TestCase;
 use Team\TeamView;
 use Team\Contracts\TeamViewInterface;
+use Discord\Discord;
 
 /**
  * Tests for TeamView
@@ -213,7 +214,7 @@ class TeamViewTest extends TestCase
             'isOwnTeam' => true,
         ]));
 
-        $this->assertStringContainsString('discord.com/channels/' . \Discord::getGuildID(), $output);
+        $this->assertStringContainsString('discord.com/channels/' . Discord::getGuildID(), $output);
     }
 
     public function testBannerDiscordLinksToUserProfileOnOtherTeam(): void

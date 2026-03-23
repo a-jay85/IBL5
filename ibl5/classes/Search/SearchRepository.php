@@ -139,47 +139,8 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
      */
     public function searchComments(string $query, int $offset = 0, int $limit = 10): array
     {
-        if (strlen($query) < 3) {
-            return ['results' => [], 'hasMore' => false];
-        }
-
-        $likeQuery = '%' . $query . '%';
-        $sql = "SELECT c.tid, c.sid, c.subject, c.date, c.name,
-                       s.title AS article_title,
-                       COALESCE(rc.reply_count, 0) AS reply_count
-                FROM {$this->prefix}_comments c
-                LEFT JOIN {$this->prefix}_stories s ON c.sid = s.sid
-                LEFT JOIN (
-                    SELECT pid, COUNT(*) AS reply_count
-                    FROM {$this->prefix}_comments
-                    GROUP BY pid
-                ) rc ON rc.pid = c.tid
-                WHERE (c.subject LIKE ? OR c.comment LIKE ?)
-                ORDER BY c.date DESC
-                LIMIT ?, ?";
-
-        /** @var list<CommentDbRow> $rows */
-        $rows = $this->fetchAll($sql, 'ssii', $likeQuery, $likeQuery, $offset, $limit + 1);
-        $hasMore = count($rows) > $limit;
-
-        if ($hasMore) {
-            array_pop($rows);
-        }
-
-        $results = [];
-        foreach ($rows as $row) {
-            $results[] = [
-                'tid' => $row['tid'],
-                'sid' => $row['sid'],
-                'subject' => $row['subject'],
-                'date' => $row['date'],
-                'name' => $row['name'],
-                'articleTitle' => $row['article_title'] ?? '',
-                'replyCount' => $row['reply_count'],
-            ];
-        }
-
-        return ['results' => $results, 'hasMore' => $hasMore];
+        // Comment system removed — nuke_comments table dropped
+        return ['results' => [], 'hasMore' => false];
     }
 
     /**

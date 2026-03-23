@@ -72,7 +72,16 @@ $ALLOWLIST = [
 ];
 
 $method = $_SERVER['REQUEST_METHOD'];
+$action = $_GET['action'] ?? '';
 header('Content-Type: application/json');
+
+// DELETE ?action=clear-throttle — clear auth throttling for E2E login
+if ($method === 'DELETE' && $action === 'clear-throttle') {
+    $db->query('DELETE FROM auth_users_throttling WHERE 1=1');
+    echo json_encode(['cleared' => $db->affected_rows]);
+    $db->close();
+    exit;
+}
 
 if ($method === 'GET') {
     $result = $db->query('SELECT name, value FROM ibl_settings');

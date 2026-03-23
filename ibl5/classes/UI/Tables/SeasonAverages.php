@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace UI\Tables;
 
+use BasketballStats\StatsFormatter;
 use Player\Player;
 use Player\PlayerImageHelper;
 use Player\PlayerStats;
+use TeamOffDefStats\TeamOffDefStatsRepository;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
 use Team\Team;
@@ -14,6 +16,9 @@ use Season\Season;
 
 /**
  * SeasonAverages - Displays season averages statistics table
+ *
+ * @phpstan-import-type TeamOffenseStatsRow from \TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface
+ * @phpstan-import-type TeamDefenseStatsRow from \TeamOffDefStats\Contracts\TeamOffDefStatsRepositoryInterface
  */
 class SeasonAverages
 {
@@ -33,7 +38,8 @@ class SeasonAverages
         $playerRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
 
         $season = new Season($db);
-        $teamStats = \TeamStats::withTeamName($db, $team->name, $season->endingYear);
+        $offDefRepo = new TeamOffDefStatsRepository($db);
+        $bothStats = $offDefRepo->getTeamBothStats($team->name, $season->endingYear);
 
         ob_start();
         ?>
@@ -104,54 +110,60 @@ endif; ?>
 <?php endforeach; ?>
     </tbody>
     <tfoot>
-<?php if ($yr === ""):
+<?php if ($yr === "" && $bothStats !== null):
     $labelColspan = ($moduleName === "LeagueStarters") ? 3 : 2;
+    $off = $bothStats['offense'];
+    $def = $bothStats['defense'];
+    $offGames = $off['games'];
+    $defGames = $def['games'];
+    $offPts = StatsFormatter::calculatePoints($off['fgm'], $off['ftm'], $off['tgm']);
+    $defPts = StatsFormatter::calculatePoints($def['fgm'], $def['ftm'], $def['tgm']);
 ?>
         <tr>
             <td colspan="<?= $labelColspan ?>"><?= HtmlSanitizer::e($team->name) ?> Offense</td>
-            <td><?= $teamStats->seasonOffenseGamesPlayed ?></td>
-            <td><?= $teamStats->seasonOffenseGamesPlayed ?></td>
+            <td><?= $offGames ?></td>
+            <td><?= $offGames ?></td>
             <td class="sep-r-team"></td>
-            <td><?= $teamStats->seasonOffenseFieldGoalsMadePerGame ?></td>
-            <td><?= $teamStats->seasonOffenseFieldGoalsAttemptedPerGame ?></td>
-            <td class="sep-r-weak"><?= $teamStats->seasonOffenseFieldGoalPercentage ?></td>
-            <td><?= $teamStats->seasonOffenseFreeThrowsMadePerGame ?></td>
-            <td><?= $teamStats->seasonOffenseFreeThrowsAttemptedPerGame ?></td>
-            <td class="sep-r-weak"><?= $teamStats->seasonOffenseFreeThrowPercentage ?></td>
-            <td><?= $teamStats->seasonOffenseThreePointersMadePerGame ?></td>
-            <td><?= $teamStats->seasonOffenseThreePointersAttemptedPerGame ?></td>
-            <td class="sep-r-team"><?= $teamStats->seasonOffenseThreePointPercentage ?></td>
-            <td><?= $teamStats->seasonOffenseOffensiveReboundsPerGame ?></td>
-            <td><?= $teamStats->seasonOffenseTotalReboundsPerGame ?></td>
-            <td><?= $teamStats->seasonOffenseAssistsPerGame ?></td>
-            <td><?= $teamStats->seasonOffenseStealsPerGame ?></td>
-            <td><?= $teamStats->seasonOffenseTurnoversPerGame ?></td>
-            <td><?= $teamStats->seasonOffenseBlocksPerGame ?></td>
-            <td><?= $teamStats->seasonOffensePersonalFoulsPerGame ?></td>
-            <td><?= $teamStats->seasonOffensePointsPerGame ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['fgm'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['fga'], $offGames) ?></td>
+            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($off['fgm'], $off['fga']) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['ftm'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['fta'], $offGames) ?></td>
+            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($off['ftm'], $off['fta']) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['tgm'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['tga'], $offGames) ?></td>
+            <td class="sep-r-team"><?= StatsFormatter::formatPercentage($off['tgm'], $off['tga']) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['orb'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['reb'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['ast'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['stl'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['tvr'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['blk'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($off['pf'], $offGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($offPts, $offGames) ?></td>
         </tr>
         <tr>
             <td colspan="<?= $labelColspan ?>"><?= HtmlSanitizer::e($team->name) ?> Defense</td>
-            <td><?= $teamStats->seasonDefenseGamesPlayed ?></td>
-            <td><?= $teamStats->seasonDefenseGamesPlayed ?></td>
+            <td><?= $defGames ?></td>
+            <td><?= $defGames ?></td>
             <td class="sep-r-team"></td>
-            <td><?= $teamStats->seasonDefenseFieldGoalsMadePerGame ?></td>
-            <td><?= $teamStats->seasonDefenseFieldGoalsAttemptedPerGame ?></td>
-            <td class="sep-r-weak"><?= $teamStats->seasonDefenseFieldGoalPercentage ?></td>
-            <td><?= $teamStats->seasonDefenseFreeThrowsMadePerGame ?></td>
-            <td><?= $teamStats->seasonDefenseFreeThrowsAttemptedPerGame ?></td>
-            <td class="sep-r-weak"><?= $teamStats->seasonDefenseFreeThrowPercentage ?></td>
-            <td><?= $teamStats->seasonDefenseThreePointersMadePerGame ?></td>
-            <td><?= $teamStats->seasonDefenseThreePointersAttemptedPerGame ?></td>
-            <td class="sep-r-team"><?= $teamStats->seasonDefenseThreePointPercentage ?></td>
-            <td><?= $teamStats->seasonDefenseOffensiveReboundsPerGame ?></td>
-            <td><?= $teamStats->seasonDefenseTotalReboundsPerGame ?></td>
-            <td><?= $teamStats->seasonDefenseAssistsPerGame ?></td>
-            <td><?= $teamStats->seasonDefenseStealsPerGame ?></td>
-            <td><?= $teamStats->seasonDefenseTurnoversPerGame ?></td>
-            <td><?= $teamStats->seasonDefenseBlocksPerGame ?></td>
-            <td><?= $teamStats->seasonDefensePersonalFoulsPerGame ?></td>
-            <td><?= $teamStats->seasonDefensePointsPerGame ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['fgm'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['fga'], $defGames) ?></td>
+            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($def['fgm'], $def['fga']) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['ftm'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['fta'], $defGames) ?></td>
+            <td class="sep-r-weak"><?= StatsFormatter::formatPercentage($def['ftm'], $def['fta']) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['tgm'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['tga'], $defGames) ?></td>
+            <td class="sep-r-team"><?= StatsFormatter::formatPercentage($def['tgm'], $def['tga']) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['orb'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['reb'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['ast'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['stl'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['tvr'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['blk'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($def['pf'], $defGames) ?></td>
+            <td><?= StatsFormatter::formatPerGameAverage($defPts, $defGames) ?></td>
         </tr>
 <?php endif; ?>
     </tfoot>

@@ -155,7 +155,7 @@ async function assertApiErrorRoute(
 ): Promise<void> {
   let lastStatus = 0;
   // More retries than assertGetRoute — error routes are more susceptible to
-  // Apache serving the HTML homepage under load (200 HTML vs expected 404 JSON).
+  // PHP built-in server serving the HTML homepage under load (200 HTML vs expected 404 JSON).
   for (let attempt = 0; attempt < 5; attempt++) {
     const response = method === 'get'
       ? await request.get(`${BASE_URL}${path}`, { headers: authHeaders })
@@ -163,7 +163,7 @@ async function assertApiErrorRoute(
     lastStatus = response.status();
     const contentType = response.headers()['content-type'] ?? '';
     if (!contentType.includes('json')) {
-      // Brief pause before retry — gives Apache time to recover from load
+      // Brief pause before retry — gives server time to recover from load
       await new Promise((r) => setTimeout(r, 200));
       continue;
     }
@@ -272,16 +272,13 @@ test.describe('API v1 — response envelope validation', () => {
   });
 
   test('Content-Type header is application/json', async ({ request }) => {
-    // Retry — PHP built-in server in CI can serve HTML homepage under load
+    // Verify JSON Content-Type regardless of auth status (200 or 401).
+    // Retry — PHP built-in server in CI can serve HTML homepage under load.
     let lastContentType = '';
     for (let attempt = 0; attempt < 3; attempt++) {
       const response = await request.get(`${BASE_URL}/season`, {
         headers: authHeaders,
       });
-      if (response.status() === 401) {
-        test.skip(true, 'API key not configured — 401 response');
-        return;
-      }
 
       lastContentType = response.headers()['content-type'] ?? '';
       if (lastContentType.includes('json')) {
@@ -327,8 +324,12 @@ test.describe('API v1 — ETag caching', () => {
     const response = await request.get(`${BASE_URL}/standings`, {
       headers: authHeaders,
     });
+
     if (response.status() === 401) {
-      test.skip(true, 'API key not configured — 401 response');
+      // Without a valid API key, verify the 401 error structure instead.
+      // ETag is a 200-only feature — this validates the auth path works.
+      const body = await response.json();
+      expect(body).toHaveProperty('error');
       return;
     }
     expect(response.status()).toBe(200);
@@ -363,11 +364,10 @@ test.describe('API v1 — error handling', () => {
         await new Promise((r) => setTimeout(r, 200));
         continue;
       }
-      if (lastStatus === 401) {
-        const body = await response.json();
-        expect(body).toHaveProperty('error');
-        expect(body.error).toBeTruthy();
-      }
+      expect(lastStatus, 'Empty API key should return 401').toBe(401);
+      const body = await response.json();
+      expect(body).toHaveProperty('error');
+      expect(body.error).toBeTruthy();
       return;
     }
     expect(lastStatus, '/season (unauth) returned non-JSON after 5 attempts').toBe(401);

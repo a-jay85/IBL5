@@ -39,7 +39,7 @@ cd ibl5 && composer run analyse
 cd ibl5 && bun run test:e2e
 ```
 
-E2E tests do NOT auto-run via hooks — run manually. Requires MAMP + `.env.test`. See `playwright-tests.md` for full rules and command variants.
+E2E tests do NOT auto-run via hooks — run manually. Requires Docker + `.env.test`. See `playwright-tests.md` for full rules and command variants.
 
 ## Architecture
 

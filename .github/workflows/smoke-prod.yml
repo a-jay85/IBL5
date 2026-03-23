@@ -17,6 +17,10 @@ on:
   schedule:
     - cron: '0 8 * * *'
 
+concurrency:
+  group: production-smoke
+  cancel-in-progress: false
+
 jobs:
   smoke:
     name: Production Health Check
@@ -34,3 +38,110 @@ jobs:
         run: |
           chmod +x bin/smoke-prod
           bin/smoke-prod "${{ github.event.inputs.base_url || 'https://www.iblhoops.net' }}"
+
+  rollback-and-notify:
+    name: Auto-Rollback and Notify
+    runs-on: ubuntu-latest
+    needs: smoke
+    if: >-
+      always() &&
+      needs.smoke.result == 'failure' &&
+      github.event_name == 'workflow_run'
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout production branch
+        uses: actions/checkout@v6
+        with:
+          ref: production
+          fetch-depth: 2
+          token: ${{ secrets.CI_PAT }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Check revert eligibility
+        id: check
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+          COMMIT_SHA=$(git log -1 --pretty=%H)
+          echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
+          echo "commit_msg=$COMMIT_MSG" >> "$GITHUB_OUTPUT"
+          if echo "$COMMIT_MSG" | grep -q "^Revert "; then
+            echo "should_revert=false" >> "$GITHUB_OUTPUT"
+            echo "HEAD is already a revert commit — skipping to prevent loop"
+          else
+            echo "should_revert=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Revert production commit
+        id: revert
+        if: steps.check.outputs.should_revert == 'true'
+        continue-on-error: true
+        run: |
+          git revert HEAD --no-edit
+          git push origin production
+          echo "Reverted: ${{ steps.check.outputs.commit_msg }}"
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+        env:
+          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Send Discord DM
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          COMMIT="${{ steps.check.outputs.commit_sha }}"
+          SHORT_SHA="${COMMIT:0:7}"
+
+          if [ "${{ steps.check.outputs.should_revert }}" = "false" ]; then
+            MSG="Production smoke test FAILED but HEAD is already a revert — manual intervention required.\n\nCommit: ${SHORT_SHA}\nRun: ${RUN_URL}"
+          elif [ "${{ steps.revert.outcome }}" = "failure" ]; then
+            MSG="Production smoke test FAILED and auto-revert FAILED (push rejected?) — manual intervention required.\n\nCommit: ${SHORT_SHA}\nRun: ${RUN_URL}"
+          else
+            MSG="Production smoke test FAILED after deploy. Auto-reverted commit ${SHORT_SHA}. A recovery deploy is in progress.\n\nReverted: ${{ steps.check.outputs.commit_msg }}\nRun: ${RUN_URL}"
+          fi
+
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            "curl -s --max-time 10 -X POST http://localhost:50000/discordDM \
+              -H 'Content-Type: application/json' \
+              -d '{\"content\":{\"receivingUserDiscordID\":\"${{ secrets.OWNER_DISCORD_ID }}\",\"message\":\"${MSG}\"}}'" \
+            || echo "IBLbot notification failed (bot may be down)"
+
+  notify-scheduled-failure:
+    name: Notify Scheduled Failure
+    runs-on: ubuntu-latest
+    needs: smoke
+    if: >-
+      always() &&
+      needs.smoke.result == 'failure' &&
+      github.event_name != 'workflow_run'
+    timeout-minutes: 5
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p ${{ secrets.PORT }} ${{ secrets.HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+        env:
+          DEPLOY_KEY: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Send Discord DM
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          TRIGGER="${{ github.event_name }}"
+          MSG="Production smoke test FAILED (${TRIGGER} trigger — no auto-rollback).\n\nThis may be a transient issue. Check the run for details: ${RUN_URL}"
+
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            "curl -s --max-time 10 -X POST http://localhost:50000/discordDM \
+              -H 'Content-Type: application/json' \
+              -d '{\"content\":{\"receivingUserDiscordID\":\"${{ secrets.OWNER_DISCORD_ID }}\",\"message\":\"${MSG}\"}}'" \
+            || echo "IBLbot notification failed (bot may be down)"

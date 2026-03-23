@@ -25,7 +25,7 @@ $cat = $catid;
 
 function theindex($catid)
 {
-    global $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $cookie, $nukeurl, $prefix, $multilingual, $currentlang, $db, $articlecomm, $module_name, $userinfo, $authService;
+    global $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $cookie, $nukeurl, $prefix, $multilingual, $currentlang, $db, $articlecomm, $module_name, $userinfo, $authService, $mysqli_db;
     if (is_user($user)) {$userinfo = $authService->getUserInfo();}
     if ($multilingual == 1) {
         $querylang = "AND (alanguage='$currentlang' OR alanguage='')"; /* the OR is needed to display stories who are posted to ALL languages */
@@ -54,7 +54,20 @@ function theindex($catid)
         $informant = $row['informant'];
         $notes = \Utilities\HtmlSanitizer::safeHtmlOutput($row['notes']);
         $acomm = intval($row['acomm']);
-        getTopics($s_sid);
+        $stmtTopics = $mysqli_db->prepare(
+            "SELECT t.topicid, t.topicname, t.topicimage, t.topictext
+             FROM {$prefix}_stories s
+             LEFT JOIN {$prefix}_topics t ON t.topicid = s.topic
+             WHERE s.sid = ?"
+        );
+        $stmtTopics->bind_param('i', $s_sid);
+        $stmtTopics->execute();
+        $topicRow = $stmtTopics->get_result()->fetch_assoc();
+        $stmtTopics->close();
+        $topicid = (int) ($topicRow['topicid'] ?? 0);
+        $topicname = \Utilities\HtmlSanitizer::e($topicRow['topicname'] ?? '');
+        $topicimage = \Utilities\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
+        $topictext = \Utilities\HtmlSanitizer::e($topicRow['topictext'] ?? '');
         if (!is_numeric($time)) {
             preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', $time, $dtParts);
             $time = gmmktime($dtParts[4], $dtParts[5], $dtParts[6], $dtParts[2], $dtParts[3], $dtParts[1]);

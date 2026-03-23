@@ -651,19 +651,6 @@ function loginbox(): void
 
 require_once __DIR__ . '/includes/buildRedirectUrl.php';
 
-function getTopics($s_sid)
-{
-    global $topicid, $topicname, $topicimage, $topictext, $prefix, $db;
-    $sid = intval($s_sid);
-    $result = $db->sql_query("SELECT t.topicid, t.topicname, t.topicimage, t.topictext FROM " . $prefix . "_stories s LEFT JOIN " . $prefix . "_topics t ON t.topicid = s.topic WHERE s.sid = " . $sid);
-    $row = $db->sql_fetchrow($result);
-    $db->sql_freeresult($result);
-    $topicid = intval($row['topicid']);
-    $topicname = filter($row['topicname'], "nohtml");
-    $topicimage = filter($row['topicimage'], "nohtml");
-    $topictext = filter($row['topictext'], "nohtml");
-}
-
 
 
 

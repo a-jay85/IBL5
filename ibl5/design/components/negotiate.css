@@ -2,6 +2,8 @@
    Offer Forms — Contract Extension & Free Agency Negotiate Pages
    ========================================================================== */
 
+@layer components {
+
 /* Player info row — photo + ratings side by side */
 .offer-player-info {
     display: flex;
@@ -64,3 +66,5 @@
 .offer-delete-section {
     margin-top: 1rem;
 }
+
+} /* end @layer components */

@@ -8,6 +8,17 @@
 #   bin/test --testsuite "Module"     # Single suite
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR/../ibl5" || exit 1
+IBL5_DIR="$SCRIPT_DIR/../ibl5"
+cd "$IBL5_DIR" || exit 1
+
+# Auto-heal vendor symlink if empty (wt-up replaces it with an empty dir for Docker)
+if [ ! -d "vendor/bin" ]; then
+    MAIN_VENDOR=$(echo "$IBL5_DIR" | sed 's|/worktrees/.*/ibl5|/ibl5/vendor|')
+    if [ -d "$MAIN_VENDOR/bin" ]; then
+        chmod -N vendor 2>/dev/null  # clear Docker's deny-delete ACL
+        rm -rf vendor
+        ln -sf "$MAIN_VENDOR" vendor
+    fi
+fi
 
 exec vendor/bin/phpunit --no-progress --no-output --testdox-summary "$@"

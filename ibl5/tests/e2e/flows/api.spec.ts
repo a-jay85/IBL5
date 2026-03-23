@@ -272,16 +272,13 @@ test.describe('API v1 — response envelope validation', () => {
   });
 
   test('Content-Type header is application/json', async ({ request }) => {
-    // Retry — PHP built-in server in CI can serve HTML homepage under load
+    // Verify JSON Content-Type regardless of auth status (200 or 401).
+    // Retry — PHP built-in server in CI can serve HTML homepage under load.
     let lastContentType = '';
     for (let attempt = 0; attempt < 3; attempt++) {
       const response = await request.get(`${BASE_URL}/season`, {
         headers: authHeaders,
       });
-      if (response.status() === 401) {
-        test.skip(true, 'API key not configured — 401 response');
-        return;
-      }
 
       lastContentType = response.headers()['content-type'] ?? '';
       if (lastContentType.includes('json')) {
@@ -327,8 +324,12 @@ test.describe('API v1 — ETag caching', () => {
     const response = await request.get(`${BASE_URL}/standings`, {
       headers: authHeaders,
     });
+
     if (response.status() === 401) {
-      test.skip(true, 'API key not configured — 401 response');
+      // Without a valid API key, verify the 401 error structure instead.
+      // ETag is a 200-only feature — this validates the auth path works.
+      const body = await response.json();
+      expect(body).toHaveProperty('error');
       return;
     }
     expect(response.status()).toBe(200);
@@ -363,11 +364,10 @@ test.describe('API v1 — error handling', () => {
         await new Promise((r) => setTimeout(r, 200));
         continue;
       }
-      if (lastStatus === 401) {
-        const body = await response.json();
-        expect(body).toHaveProperty('error');
-        expect(body.error).toBeTruthy();
-      }
+      expect(lastStatus, 'Empty API key should return 401').toBe(401);
+      const body = await response.json();
+      expect(body).toHaveProperty('error');
+      expect(body.error).toBeTruthy();
       return;
     }
     expect(lastStatus, '/season (unauth) returned non-JSON after 5 attempts').toBe(401);

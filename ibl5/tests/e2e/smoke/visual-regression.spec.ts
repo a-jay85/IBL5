@@ -160,6 +160,17 @@ authTest.describe('Visual regression — authenticated pages', () => {
     });
   });
 
+  authTest('depth chart entry mobile card view', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto('modules.php?name=DepthChartEntry');
+    await page.waitForLoadState('networkidle');
+    const firstCard = page.locator('.dc-card').first();
+    await authExpect(firstCard).toBeVisible();
+    await authExpect(firstCard).toHaveScreenshot('depth-chart-entry-mobile-card.png', {
+      animations: 'disabled',
+    });
+  });
+
   authTest('no PHP errors on visual regression pages', async ({ appState, page }) => {
     await appState({ 'Allow Trades': 'Yes', 'Current Season Phase': 'Free Agency' });
     const urls = [

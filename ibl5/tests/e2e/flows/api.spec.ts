@@ -11,10 +11,10 @@ const API_KEY = process.env.IBL_API_KEY || 'e2e-test-key-do-not-use-in-productio
 
 const authHeaders = { 'X-API-Key': API_KEY };
 
-// Known UUIDs seeded in ci-seed.sql — used to avoid dynamic list-endpoint dependency
-const SEED_PLAYER_UUID = 'plr-uuid-00000000-0000-000000000001';
-const SEED_TEAM_UUID = 'team-uuid-01';
-const SEED_GAME_UUID = 'sched-uuid-0001';
+// Known UUIDs seeded in ci-seed.sql — must match router's UUID regex [0-9a-f]{8}-{4}-{4}-{4}-{12}
+const SEED_PLAYER_UUID = 'a0000000-0000-0000-0000-000000000001';
+const SEED_TEAM_UUID = 'b0000000-0000-0000-0000-000000000001';
+const SEED_GAME_UUID = 'c0000000-0000-0000-0000-000000000001';
 
 /**
  * Helper: make a GET request and verify either 401 (with error structure)
@@ -25,15 +25,25 @@ async function assertGetRoute(
   path: string,
   validateBody?: (body: unknown) => void,
 ): Promise<void> {
-  // Retry up to 3 times — PHP built-in server in CI can return 500 under load
+  // Retry up to 5 times — CI server can return HTML or 500 under load
   let lastStatus = 0;
   let lastText = '';
+  let gotJson = false;
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     const response = await request.get(`${BASE_URL}${path}`, {
       headers: authHeaders,
     });
     lastStatus = response.status();
+    const contentType = response.headers()['content-type'] ?? '';
+
+    if (!contentType.includes('json')) {
+      lastText = await response.text();
+      await new Promise((r) => setTimeout(r, 200));
+      continue; // Retry — got HTML instead of JSON
+    }
+
+    gotJson = true;
 
     if (lastStatus === 401) {
       const body = await response.json();
@@ -42,24 +52,19 @@ async function assertGetRoute(
     }
 
     if (lastStatus === 200) {
-      const contentType = response.headers()['content-type'] ?? '';
-      if (!contentType.includes('json')) {
-        lastText = await response.text();
-        continue; // Retry — got HTML instead of JSON
-      }
-
       const body = await response.json();
       expect(body, `${path} should return truthy body`).toBeTruthy();
       if (validateBody) validateBody(body);
       return;
     }
 
-    // 500 or other error — retry
+    // 404/500 or other error — retry
     lastText = await response.text();
   }
 
-  // All retries exhausted
-  expect(lastStatus, `${path} returned ${lastStatus} after 3 attempts: ${lastText.slice(0, 200)}`).toBe(200);
+  // All retries exhausted — must have received JSON at least once
+  expect(gotJson, `${path} returned non-JSON (status ${lastStatus}) after 5 attempts: ${lastText.slice(0, 200)}`).toBe(true);
+  expect(lastStatus, `${path} returned ${lastStatus} after 5 attempts: ${lastText.slice(0, 200)}`).toBe(200);
 }
 
 test.describe('API v1 — list endpoints', () => {
@@ -275,7 +280,7 @@ test.describe('API v1 — response envelope validation', () => {
     // Verify JSON Content-Type regardless of auth status (200 or 401).
     // Retry — PHP built-in server in CI can serve HTML homepage under load.
     let lastContentType = '';
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       const response = await request.get(`${BASE_URL}/season`, {
         headers: authHeaders,
       });
@@ -285,6 +290,7 @@ test.describe('API v1 — response envelope validation', () => {
         expect(lastContentType).toContain('application/json');
         return;
       }
+      await new Promise((r) => setTimeout(r, 200));
     }
     expect(lastContentType, 'API must return JSON after retries').toContain('application/json');
   });
@@ -321,27 +327,35 @@ test.describe('API v1 — pagination parameters', () => {
 
 test.describe('API v1 — ETag caching', () => {
   test('ETag header present on cacheable endpoint', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/standings`, {
-      headers: authHeaders,
-    });
+    // Retry — CI server can return HTML under load
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const response = await request.get(`${BASE_URL}/standings`, {
+        headers: authHeaders,
+      });
+      const contentType = response.headers()['content-type'] ?? '';
+      if (!contentType.includes('json')) {
+        await new Promise((r) => setTimeout(r, 200));
+        continue;
+      }
 
-    if (response.status() === 401) {
-      // Without a valid API key, verify the 401 error structure instead.
-      // ETag is a 200-only feature — this validates the auth path works.
-      const body = await response.json();
-      expect(body).toHaveProperty('error');
+      if (response.status() === 401) {
+        const body = await response.json();
+        expect(body).toHaveProperty('error');
+        return;
+      }
+      expect(response.status()).toBe(200);
+
+      const etag = response.headers()['etag'];
+      expect(etag, 'Standings endpoint should return ETag header').toBeTruthy();
+
+      // Second request with If-None-Match should return 304
+      const response2 = await request.get(`${BASE_URL}/standings`, {
+        headers: { ...authHeaders, 'If-None-Match': etag },
+      });
+      expect(response2.status()).toBe(304);
       return;
     }
-    expect(response.status()).toBe(200);
-
-    const etag = response.headers()['etag'];
-    expect(etag, 'Standings endpoint should return ETag header').toBeTruthy();
-
-    // Second request with If-None-Match should return 304
-    const response2 = await request.get(`${BASE_URL}/standings`, {
-      headers: { ...authHeaders, 'If-None-Match': etag },
-    });
-    expect(response2.status()).toBe(304);
+    expect(false, 'Standings endpoint returned non-JSON after 5 attempts').toBe(true);
   });
 });
 

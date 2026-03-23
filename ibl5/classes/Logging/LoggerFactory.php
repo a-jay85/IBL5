@@ -11,6 +11,9 @@ use Monolog\Handler\RotatingFileHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Level;
 use Monolog\Logger;
+use Monolog\Processor\ProcessorInterface;
+use Monolog\Processor\UidProcessor;
+use Monolog\Processor\WebProcessor;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -38,6 +41,9 @@ class LoggerFactory implements LoggerFactoryInterface
     /** @var list<\Monolog\Handler\HandlerInterface> */
     private array $handlers;
 
+    /** @var list<ProcessorInterface> */
+    private array $processors;
+
     /** @var LoggingConfig */
     private const DEFAULT_CONFIG = [
         'log_dir' => null,
@@ -47,10 +53,12 @@ class LoggerFactory implements LoggerFactoryInterface
 
     /**
      * @param list<\Monolog\Handler\HandlerInterface> $handlers
+     * @param list<ProcessorInterface> $processors
      */
-    private function __construct(array $handlers)
+    private function __construct(array $handlers, array $processors = [])
     {
         $this->handlers = $handlers;
+        $this->processors = $processors;
         self::$instance = $this;
     }
 
@@ -103,7 +111,13 @@ class LoggerFactory implements LoggerFactoryInterface
             $handlers[] = $cliHandler;
         }
 
-        return new self($handlers);
+        $processors = [
+            new UidProcessor(7),
+            new WebProcessor(),
+            new UserContextProcessor(),
+        ];
+
+        return new self($handlers, $processors);
     }
 
     /**
@@ -125,6 +139,9 @@ class LoggerFactory implements LoggerFactoryInterface
             $logger = new Logger($channel);
             foreach ($this->handlers as $handler) {
                 $logger->pushHandler($handler);
+            }
+            foreach ($this->processors as $processor) {
+                $logger->pushProcessor($processor);
             }
             $this->channels[$channel] = $logger;
         }

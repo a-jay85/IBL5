@@ -108,4 +108,24 @@ class LoggerFactoryTest extends TestCase
 
         $this->assertSame('discord', $logger->getName());
     }
+
+    public function testFromConfigAttachesProcessors(): void
+    {
+        $factory = LoggerFactory::fromConfig();
+
+        /** @var Logger $logger */
+        $logger = $factory->channel('app');
+
+        $this->assertCount(3, $logger->getProcessors());
+    }
+
+    public function testForTestsHasNoProcessors(): void
+    {
+        $factory = LoggerFactory::forTests();
+
+        /** @var Logger $logger */
+        $logger = $factory->channel('test');
+
+        $this->assertCount(0, $logger->getProcessors());
+    }
 }

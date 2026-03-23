@@ -169,37 +169,6 @@ function blocks($side)
     $db->sql_freeresult($result);
 }
 
-function online()
-{
-    global $user, $cookie, $prefix, $db;
-    $ip = $_SERVER['REMOTE_ADDR'];
-    if (is_user($user)) {
-        cookiedecode($user);
-        $uname = $cookie[1];
-        $guest = 0;
-    } else {
-        $uname = $ip;
-        $guest = 1;
-    }
-    if (mt_rand(1, 100) === 1) {
-        $past = time() - 3600;
-        $sql = "DELETE FROM " . $prefix . "_session WHERE time < '$past'";
-        $db->sql_query($sql);
-    }
-    $sql = "SELECT time FROM " . $prefix . "_session WHERE uname='" . $db->db_connect_id->real_escape_string($uname) . "'";
-    $result = $db->sql_query($sql);
-    $ctime = time();
-    if (!empty($uname)) {
-        $uname = substr($uname, 0, 25);
-        $row = $db->sql_fetchrow($result);
-        if ($row) {
-            $db->sql_query("UPDATE " . $prefix . "_session SET uname='" . $db->db_connect_id->real_escape_string($uname) . "', time='$ctime', host_addr='" . $db->db_connect_id->real_escape_string($ip) . "', guest='$guest' WHERE uname='" . $db->db_connect_id->real_escape_string($uname) . "'");
-        } else {
-            $db->sql_query("INSERT INTO " . $prefix . "_session (uname, time, host_addr, guest) VALUES ('" . $db->db_connect_id->real_escape_string($uname) . "', '$ctime', '" . $db->db_connect_id->real_escape_string($ip) . "', '$guest')");
-        }
-    }
-    $db->sql_freeresult($result);
-}
 
 function blockfileinc($title, $blockfile, $side = 0)
 {

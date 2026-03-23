@@ -39,7 +39,7 @@ $view = new LeagueStartersView($mysqli_db, $season, $module_name);
 $startersByPosition = $service->getAllStartersByPosition();
 $display = $_REQUEST['display'] ?? 'ratings';
 
-// Render header first (populates $cookie via online() → cookiedecode())
+// Render header first (populates $cookie via cookiedecode())
 PageLayout\PageLayout::header();
 
 $username = strval($cookie[1] ?? '');

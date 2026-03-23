@@ -84,6 +84,12 @@ if ! docker ps --format '{{.Names}}' | grep -q '^ibl5-traefik$'; then
     echo "         (from $REPO_ROOT)"
 fi
 
+# Ensure node_modules symlink exists for CSS tooling
+NODE_MODULES="$WORKTREE_PATH/ibl5/node_modules"
+if [ ! -d "$NODE_MODULES" ]; then
+    ln -sf "$REPO_ROOT/ibl5/node_modules" "$NODE_MODULES"
+fi
+
 # Build CSS for the worktree
 STYLE_CSS="$WORKTREE_PATH/ibl5/themes/IBL/style/style.css"
 # Replace symlink with real file so Docker can mount the worktree cleanly
@@ -97,6 +103,20 @@ if [ ! -s "$STYLE_CSS" ]; then
     echo "CSS build failed or empty — copying from main repo..."
     cp "$REPO_ROOT/ibl5/themes/IBL/style/style.css" "$STYLE_CSS" 2>/dev/null || true
 fi
+
+# Kill any existing CSS watcher for this worktree
+CSS_PID_FILE="$WORKTREE_PATH/.css-watch.pid"
+if [ -f "$CSS_PID_FILE" ]; then
+    OLD_PID=$(cat "$CSS_PID_FILE")
+    kill "$OLD_PID" 2>/dev/null || true
+    rm -f "$CSS_PID_FILE"
+fi
+
+# Start CSS watcher in background so source changes auto-rebuild
+echo "Starting CSS watcher..."
+(cd "$WORKTREE_PATH/ibl5" && exec bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --watch) \
+    > "$WORKTREE_PATH/.css-watch.log" 2>&1 &
+echo $! > "$CSS_PID_FILE"
 
 # Remove vendor symlink if present — named volume mounts over this path.
 # The symlink is created by wt-new for host-side tools; Docker doesn't need it.
@@ -256,6 +276,9 @@ echo ""
 echo "  URL:     http://$SLUG.localhost/ibl5/"
 echo "  Adminer: http://localhost:8082 (server: db-$SLUG)"
 echo "  DB CLI:  docker exec -it $DB_CONTAINER $DB_CMD"
+if [ -f "$CSS_PID_FILE" ]; then
+    echo "  CSS:     Watcher running (PID $(cat "$CSS_PID_FILE"), log: .css-watch.log)"
+fi
 echo ""
 
 # Safari warning

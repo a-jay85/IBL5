@@ -25,8 +25,8 @@ $cat = $catid;
 
 function theindex($catid)
 {
-    global $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $cookie, $nukeurl, $prefix, $multilingual, $currentlang, $db, $articlecomm, $module_name, $userinfo;
-    if (is_user($user)) {getusrinfo($user);}
+    global $storyhome, $topicname, $topicimage, $topictext, $datetime, $user, $cookie, $nukeurl, $prefix, $multilingual, $currentlang, $db, $articlecomm, $module_name, $userinfo, $authService;
+    if (is_user($user)) {$userinfo = $authService->getUserInfo();}
     if ($multilingual == 1) {
         $querylang = "AND (alanguage='$currentlang' OR alanguage='')"; /* the OR is needed to display stories who are posted to ALL languages */
     } else {
@@ -55,7 +55,12 @@ function theindex($catid)
         $notes = \Utilities\HtmlSanitizer::safeHtmlOutput($row['notes']);
         $acomm = intval($row['acomm']);
         getTopics($s_sid);
-        formatTimestamp($time);
+        if (!is_numeric($time)) {
+            preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', $time, $dtParts);
+            $time = gmmktime($dtParts[4], $dtParts[5], $dtParts[6], $dtParts[2], $dtParts[3], $dtParts[1]);
+        }
+        $time -= date("Z");
+        $datetime = ucfirst(date(_DATESTRING, $time));
         $introcount = strlen($hometext);
         $fullcount = strlen($bodytext);
         $totalcount = $introcount + $fullcount;

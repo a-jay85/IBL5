@@ -155,18 +155,6 @@ function cookiedecode($user)
     return null;
 }
 
-function getusrinfo($user)
-{
-    global $userinfo, $authService;
-    $info = $authService->getUserInfo();
-    if ($info !== null) {
-        $userinfo = $info;
-        return $userinfo;
-    }
-    unset($userinfo);
-    return null;
-}
-
 
 function check_words($Message)
 {
@@ -312,20 +300,6 @@ function filter($what, $strip = "", $save = "", $type = "")
         $what = check_html($what, $strip);
     }
     return ($what);
-}
-
-function formatTimestamp($time)
-{
-    global $datetime, $locale;
-    setlocale(LC_TIME, $locale);
-    if (!is_numeric($time)) {
-        preg_match('/([0-9]{4})-([0-9]{1,2})-([0-9]{1,2}) ([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2})/', $time, $datetime);
-        $time = gmmktime($datetime[4], $datetime[5], $datetime[6], $datetime[2], $datetime[3], $datetime[1]);
-    }
-    $time -= date("Z");
-    $datetime = date(_DATESTRING, $time);
-    $datetime = ucfirst($datetime);
-    return $datetime;
 }
 
 

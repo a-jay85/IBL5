@@ -49,7 +49,7 @@ class TradeProcessor implements TradeProcessorInterface
             $this->discord = new \Discord($db);
         } catch (\Exception $e) {
             // Discord unavailable - will skip notifications
-            error_log("Discord initialization failed in TradeProcessor: " . $e->getMessage());
+            \Logging\LoggerFactory::getChannel('trade')->warning('Discord initialization failed in TradeProcessor', ['error' => $e->getMessage()]);
             $this->discord = null;
         }
     }
@@ -363,7 +363,7 @@ class TradeProcessor implements TradeProcessorInterface
             }
         } catch (\Exception $e) {
             // Log the error but don't fail the trade
-            error_log('Discord notification failed: ' . $e->getMessage());
+            \Logging\LoggerFactory::getChannel('trade')->error('Discord notification failed', ['error' => $e->getMessage()]);
         }
     }
 }

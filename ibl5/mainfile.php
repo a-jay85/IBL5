@@ -204,6 +204,9 @@ if (!$dbname) {
 
 require_once __DIR__ . "/db/db.php";
 
+// Initialize structured logging (Monolog with daily rotation + JSON output)
+\Logging\LoggerFactory::fromConfig();
+
 // Initialize session-based AuthService for user authentication
 $authService = new \Auth\AuthService($mysqli_db);
 

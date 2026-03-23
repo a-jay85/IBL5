@@ -95,6 +95,12 @@ abstract class BaseMysqliRepository
     protected ?\League\LeagueContext $leagueContext;
 
     /**
+     * Optional PSR-3 logger for structured error logging.
+     * When null, falls back to LoggerFactory::getChannel('db').
+     */
+    private ?\Psr\Log\LoggerInterface $logger = null;
+
+    /**
      * Constructor with connection validation
      *
      * @param \mysqli $db Active mysqli connection
@@ -112,6 +118,14 @@ abstract class BaseMysqliRepository
         }
         $this->db = $db;
         $this->leagueContext = $leagueContext;
+    }
+
+    /**
+     * Set a PSR-3 logger for structured error logging.
+     */
+    public function setLogger(\Psr\Log\LoggerInterface $logger): void
+    {
+        $this->logger = $logger;
     }
 
     /**
@@ -422,9 +436,11 @@ abstract class BaseMysqliRepository
     }
 
     /**
-     * Log database errors with context
+     * Log database errors with structured context.
      *
-     * Logs to PHP error log with query context and stack trace for debugging.
+     * Uses PSR-3 logger (via injected logger or LoggerFactory) with query
+     * context and stack trace. Falls back to error_log() if no logger is
+     * available (e.g. during very early bootstrap before LoggerFactory init).
      *
      * @param string $message Error message
      * @param string $query SQL query that caused the error
@@ -439,13 +455,12 @@ abstract class BaseMysqliRepository
             }
         }
 
-        $logMessage = sprintf(
-            "IBL5 DB Error | %s | Query: %s | Trace: %s",
-            $message,
-            substr($query, 0, 500), // Truncate long queries
-            implode(' -> ', $traceInfo)
-        );
+        $context = [
+            'query' => substr($query, 0, 500),
+            'trace' => implode(' -> ', $traceInfo),
+        ];
 
-        error_log($logMessage);
+        $logger = $this->logger ?? \Logging\LoggerFactory::getChannel('db');
+        $logger->error($message, $context);
     }
 }

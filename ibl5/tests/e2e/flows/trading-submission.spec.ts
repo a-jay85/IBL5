@@ -625,36 +625,30 @@ test.describe('Trade submission: accept and reject', () => {
 
   test('rejecting already-processed offer returns warning', async ({
     appState,
-    request,
     page,
   }) => {
     expect(setupDone, 'Setup test must have created offers').toBe(true);
 
     await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
 
-    // Navigate to review page to get a CSRF token from a reject form
+    // Navigate to review page — offerA should still be visible with a reject button
     await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
-    const rejectToken = await page
-      .locator('form[name="tradereject"] input[name="_csrf_token"]')
-      .first()
-      .getAttribute('value') ?? '';
+    const offerACard = page.locator('.trade-offer-card').filter({
+      has: page.locator(`[data-preview-offer="${offerAId}"]`),
+    });
 
-    const response = await request.post(
-      '/ibl5/modules/Trading/rejecttradeoffer.php',
-      {
-        form: {
-          _csrf_token: rejectToken,
-          offer: String(offerBId),
-          teamRejecting: offeringTeam,
-          teamReceiving: listeningTeam,
-        },
-        maxRedirects: 0,
-      },
-    );
-    const location = response.headers()['location'] ?? '';
-    expect(location).toContain('result=already_processed');
+    // Tamper with the reject form's offer ID to point at the already-rejected offerB.
+    // This simulates submitting a reject for an already-processed offer while
+    // still using a valid CSRF token from the browser's form.
+    await offerACard.locator('form[name="tradereject"] input[name="offer"]')
+      .evaluate((el, id) => { (el as HTMLInputElement).value = String(id); }, offerBId);
 
-    await page.goto(location.replace('/ibl5/', ''));
+    const rejectBtn = offerACard.locator('.ibl-btn--danger');
+    await Promise.all([
+      page.waitForURL(/result=already_processed/),
+      rejectBtn.click(),
+    ]);
+
     await expect(page.locator('.ibl-alert--warning')).toBeVisible();
   });
 

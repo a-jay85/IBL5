@@ -46,11 +46,10 @@ test.describe('Player Database flow', () => {
 
     // Click reset
     const resetButton = page.locator('.ibl-btn.ibl-btn--ghost').first();
-    if (await resetButton.isVisible()) {
-      await resetButton.click();
-      // Name input should be cleared
-      await expect(page.locator('input[name="search_name"]')).toHaveValue('');
-    }
+    await expect(resetButton).toBeVisible();
+    await resetButton.click();
+    // Name input should be cleared
+    await expect(page.locator('input[name="search_name"]')).toHaveValue('');
   });
 
   test('sortable table headers reorder rows', async ({ page }) => {

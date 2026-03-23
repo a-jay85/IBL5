@@ -208,8 +208,10 @@ After CI passes, check whether the PR can be auto-merged without user interventi
 
 **If all conditions are met:**
 ```bash
-gh pr merge --squash --delete-branch
+gh pr merge --squash --auto --delete-branch
 ```
+This enables GitHub's native auto-merge queue. GitHub waits for all required status checks to pass, then squash-merges and deletes the branch automatically. If checks have already passed, the merge happens immediately.
+
 Then pull master in the main repo so Phase 9's teardown has the merged code:
 ```bash
 cd <repo-root> && git checkout master && git pull origin master

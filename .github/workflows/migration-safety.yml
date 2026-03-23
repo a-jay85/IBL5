@@ -7,6 +7,7 @@ on:
       - 'ibl5/migrations/**.sql'
   pull_request:
     branches: [ master, develop ]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'ibl5/migrations/**.sql'
 

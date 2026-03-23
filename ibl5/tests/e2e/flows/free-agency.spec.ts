@@ -19,7 +19,7 @@ test.describe.configure({ mode: 'serial' });
 
 test.describe('Free Agency -- main page', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Free Agency' });
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
     await page.goto('modules.php?name=FreeAgency');
   });
 
@@ -103,7 +103,7 @@ test.describe('Free Agency -- main page', () => {
 
 test.describe('Free Agency -- negotiation page', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Free Agency' });
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
     // Navigate to negotiate page for FA Center (pid=11, pure free agent)
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
   });
@@ -150,33 +150,26 @@ test.describe('Free Agency -- negotiation page', () => {
 
 test.describe('Free Agency -- Bird Rights negotiation', () => {
   test('Bird Rights player shows raise info in notes', async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Free Agency' });
-    // pid=10 has bird=4 (Bird Rights) in CI seed; in production it may differ
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+    // pid=10 has bird=4 (Bird Rights) in CI seed
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=10');
 
     const notesCard = page.locator('.ibl-card').filter({
       has: page.locator('.ibl-card__title', { hasText: 'Notes / Reminders' }),
     });
-    // Skip if negotiate page doesn't show notes (player may not exist or no form)
-    if (await notesCard.count() === 0) {
-      test.skip(true, 'Notes card not visible — player may not exist in this environment');
-      return;
-    }
+    await expect(notesCard).toBeVisible();
 
     const notesText = await notesCard.textContent() ?? '';
-    // In CI, pid=10 has Bird Rights: shows "Bird Rights Player on Your Team" + 12.5% raise
-    // In production, pid=10 may not have Bird Rights: shows "do not have Bird Rights" + 10% raise
-    // Either way, the notes card should mention raise percentage
+    // pid=10 has Bird Rights: shows "Bird Rights Player on Your Team" + 12.5% raise
     expect(notesText).toMatch(/\d+%/);
   });
 });
 
 test.describe('Free Agency -- submit and manage offers', () => {
   test.describe.configure({ mode: 'serial' });
-  let customOfferSkipped = false;
 
   test.beforeEach(async ({ appState }) => {
-    await appState({ 'Current Season Phase': 'Free Agency' });
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
   });
 
   test('submit valid 1-year custom offer', async ({ page }) => {
@@ -185,19 +178,12 @@ test.describe('Free Agency -- submit and manage offers', () => {
     // FA Center has exp=8, vet min = 89
     await form.locator('input[name="offeryear1"]').fill('200');
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    // May get soft cap error if team is over the cap — check after navigation
-    await page.waitForURL(/result=offer_success|error=/);
-    if (page.url().includes('error=')) {
-      customOfferSkipped = true;
-      test.skip(true, 'Team cap space insufficient for custom offer — skipping submit tests');
-    }
+    // CI seed has Metros under soft cap — custom offer must succeed
+    await page.waitForURL(/result=offer_success/);
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
   });
 
   test('amend existing offer', async ({ page }) => {
-    if (customOfferSkipped) {
-      test.skip(true, 'Previous submit was skipped — no offer to amend');
-    }
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const form = offerForm(page);
     // Previous offer should pre-fill year 1
@@ -212,9 +198,6 @@ test.describe('Free Agency -- submit and manage offers', () => {
   });
 
   test('delete existing offer', async ({ page }) => {
-    if (customOfferSkipped) {
-      test.skip(true, 'Previous submit was skipped — no offer to delete');
-    }
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const deleteBtn = page.getByRole('button', { name: /Delete This Offer/i });
     await expect(deleteBtn).toBeVisible();
@@ -224,20 +207,14 @@ test.describe('Free Agency -- submit and manage offers', () => {
   });
 
   test('submit valid 2-year custom offer', async ({ page }) => {
-    if (customOfferSkipped) {
-      test.skip(true, 'Custom offers skip due to cap space — skipping multi-year offer');
-    }
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const form = offerForm(page);
     // yr1=200, yr2=210 (raise=10, under 10% max raise of 20)
     await form.locator('input[name="offeryear1"]').fill('200');
     await form.locator('input[name="offeryear2"]').fill('210');
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    await page.waitForURL(/result=offer_success|error=/);
-    if (page.url().includes('error=')) {
-      customOfferSkipped = true;
-      test.skip(true, 'Team cap space insufficient for multi-year offer — skipping');
-    }
+    // CI seed has Metros under soft cap — multi-year offer must succeed
+    await page.waitForURL(/result=offer_success/);
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
   });
 
@@ -255,11 +232,8 @@ test.describe('Free Agency -- submit and manage offers', () => {
     const form = offerForm(page);
     await form.locator('input[name="offeryear1"]').fill('200');
     await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    await page.waitForURL(/result=offer_success|error=/);
-    if (!page.url().includes('result=offer_success')) {
-      test.skip(true, 'Team has insufficient cap space to submit custom offer');
-      return;
-    }
+    // CI seed has Metros under soft cap — offer must succeed
+    await page.waitForURL(/result=offer_success/);
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
 
     // Verify the offer row appears in the Contract Offers section on the main page
@@ -294,7 +268,7 @@ test.describe('Free Agency -- quick offer buttons', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(async ({ appState }) => {
-    await appState({ 'Current Season Phase': 'Free Agency' });
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
   });
 
   test('submit veteran minimum offer', async ({ page }) => {
@@ -349,11 +323,8 @@ test.describe('Free Agency -- quick offer buttons', () => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const maxBtn = page.getByTestId('quick-offer-max-yr1');
     await maxBtn.click();
-    await page.waitForURL(/result=offer_success|error=/);
-    if (!page.url().includes('result=offer_success')) {
-      test.skip(true, 'Max contract offer failed — team lacks cap space');
-      return;
-    }
+    // CI seed has Metros under soft cap — max contract offer must succeed
+    await page.waitForURL(/result=offer_success/);
     await expect(page.locator('.ibl-alert--success')).toBeVisible();
   });
 
@@ -372,15 +343,12 @@ test.describe('Free Agency -- quick offer buttons', () => {
 
 test.describe('Free Agency -- validation errors', () => {
   test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Free Agency' });
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
     // Use FA Center pid=11 for validation tests
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-    // Skip if the negotiate page doesn't show the custom offer form
-    // (player may not exist or may be already signed in local DB)
+    // CI seed provides pid=11 as an unsigned free agent — form must be present
     const formCount = await page.locator('form[name="FAOffer"] input[type="number"]').count();
-    if (formCount === 0) {
-      test.skip(true, 'Negotiate form not available — player may not exist or is already signed');
-    }
+    expect(formCount, 'CI seed must provide negotiate form for pid=11').toBeGreaterThan(0);
   });
 
   test('zero first year shows error', async ({ page }) => {
@@ -432,10 +400,7 @@ test.describe('Free Agency -- validation errors', () => {
     const alert = page.locator('.ibl-alert--error');
     await expect(alert).toBeVisible();
     const text = await alert.textContent() ?? '';
-    // If the team is over the hard cap, the cap space error fires before the raise check
-    if (text.includes('cap space')) {
-      test.skip(true, 'Team is over the hard cap — raise validation unreachable');
-    }
+    // CI seed has Metros under hard cap — raise validation fires (not cap space error)
     expect(text).toContain('larger raise than is permitted');
   });
 
@@ -448,17 +413,14 @@ test.describe('Free Agency -- validation errors', () => {
     const alert = page.locator('.ibl-alert--error');
     await expect(alert).toBeVisible();
     const text = await alert.textContent() ?? '';
-    // If the team is over the hard cap, the cap space error fires before the gap check
-    if (text.includes('cap space')) {
-      test.skip(true, 'Team is over the hard cap — gap validation unreachable');
-    }
+    // CI seed has Metros under hard cap — gap validation fires (not cap space error)
     expect(text).toContain('gaps in contract years');
   });
 });
 
 test.describe('Free Agency -- wrong season phase', () => {
   test('page renders without PHP errors in non-FA phase', async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Regular Season' });
+    await appState({ 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' });
     await page.goto('modules.php?name=FreeAgency');
     await assertNoPhpErrors(page, 'in non-FA phase');
   });
@@ -466,7 +428,7 @@ test.describe('Free Agency -- wrong season phase', () => {
 
 publicTest.describe('Free Agency -- unauthenticated access', () => {
   publicTest('redirects to login page', async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Free Agency' });
+    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
     await page.goto('modules.php?name=FreeAgency');
     // Unauthenticated users are redirected to YourAccount (login) module
     await page.waitForURL(/name=YourAccount/);

@@ -37,20 +37,14 @@ test.describe('Contract List flow', () => {
   });
 
   test('table has sticky column for player names', async ({ page }) => {
-    const stickyCols = page.locator('.sticky-col');
-    const count = await stickyCols.count();
     // responsive-table should have sticky columns
-    if (count > 0) {
-      await expect(stickyCols.first()).toBeVisible();
-    }
+    const stickyCols = page.locator('.sticky-col');
+    await expect(stickyCols.first()).toBeVisible();
   });
 
   test('totals row exists', async ({ page }) => {
     const totalsRow = page.locator('.totals-row, tr.totals-row');
-    const count = await totalsRow.count();
-    if (count > 0) {
-      await expect(totalsRow.first()).toBeVisible();
-    }
+    await expect(totalsRow.first()).toBeVisible();
   });
 
   test('table is sortable', async ({ page }) => {

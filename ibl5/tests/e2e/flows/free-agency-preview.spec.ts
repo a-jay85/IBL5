@@ -38,20 +38,16 @@ test.describe('Free Agency Preview flow', () => {
 
   test('position cells contain basketball positions', async ({ page }) => {
     const firstPosCell = page.locator('tbody tr[data-team-id]').first().locator('td.fa-preview-pos-col');
-    const posCount = await firstPosCell.count();
-    if (posCount > 0) {
-      const text = (await firstPosCell.textContent())!.trim();
-      expect(text).toMatch(/^(PG|SG|SF|PF|C)$/);
-    }
+    await expect(firstPosCell).toBeVisible();
+    const text = (await firstPosCell.textContent())!.trim();
+    expect(text).toMatch(/^(PG|SG|SF|PF|C)$/);
   });
 
   test('player links point to player pages', async ({ page }) => {
     const playerLinks = page.locator('.sticky-table a[href*="pid="]');
-    const count = await playerLinks.count();
-    if (count > 0) {
-      const href = await playerLinks.first().getAttribute('href');
-      expect(href).toContain('name=Player');
-    }
+    await expect(playerLinks.first()).toBeVisible();
+    const href = await playerLinks.first().getAttribute('href');
+    expect(href).toContain('name=Player');
   });
 
   test('table is sortable', async ({ page }) => {

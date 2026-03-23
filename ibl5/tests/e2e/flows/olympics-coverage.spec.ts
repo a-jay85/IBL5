@@ -28,9 +28,7 @@ test.describe('Olympics module coverage', () => {
 
     // Team page should have a table (roster or stats)
     const table = page.locator('.ibl-data-table, table');
-    if ((await table.count()) > 0) {
-      await expect(table.first()).toBeVisible();
-    }
+    await expect(table.first()).toBeVisible();
   });
 
   test('olympics leaderboards loads', async ({ appState, page }) => {

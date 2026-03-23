@@ -50,25 +50,18 @@ test.describe('Team Stats flow', () => {
 
   test('sortable tables support client-side sorting', async ({ page }) => {
     const sortableTable = page.locator('.ibl-data-table.sortable').first();
+    await expect(sortableTable).toBeVisible();
 
-    if (await sortableTable.isVisible()) {
-      // Get initial first row text
-      const firstRowBefore = await sortableTable
-        .locator('tbody tr')
-        .first()
-        .textContent();
+    // Click a header to sort
+    const header = sortableTable.locator('thead th').nth(2);
+    await header.click();
 
-      // Click a header to sort
-      const header = sortableTable.locator('thead th').nth(2);
-      await header.click();
+    // Table should still be visible (no page reload errors)
+    await expect(sortableTable).toBeVisible();
 
-      // Table should still be visible (no page reload errors)
-      await expect(sortableTable).toBeVisible();
-
-      // Click again for reverse sort
-      await header.click();
-      await expect(sortableTable).toBeVisible();
-    }
+    // Click again for reverse sort
+    await header.click();
+    await expect(sortableTable).toBeVisible();
   });
 
   test('tables have team rows matching expected count', async ({ page }) => {

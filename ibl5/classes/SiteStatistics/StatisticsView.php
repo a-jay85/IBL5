@@ -58,7 +58,10 @@ class StatisticsView
         global $sitename, $textcolor2;
 
         \PageLayout\PageLayout::header();
-        \title(HtmlSanitizer::e($sitename) . " " . _STATS);
+        \OpenTable();
+        echo '<center><span class="title"><strong>' . HtmlSanitizer::e($sitename) . ' ' . _STATS . '</strong></span></center>';
+        \CloseTable();
+        echo '<br>';
         \OpenTable();
         \OpenTable();
 
@@ -231,7 +234,10 @@ class StatisticsView
         global $sitename;
 
         \PageLayout\PageLayout::header();
-        \title(HtmlSanitizer::e($sitename) . " " . _STATS);
+        \OpenTable();
+        echo '<center><span class="title"><strong>' . HtmlSanitizer::e($sitename) . ' ' . _STATS . '</strong></span></center>';
+        \CloseTable();
+        echo '<br>';
 
         $total++;
         \OpenTable();

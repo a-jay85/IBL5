@@ -173,8 +173,8 @@ class StatisticsRepository extends \BaseMysqliRepository
      */
     public function getMiscCounts(): array
     {
-        $topicsActive = function_exists('is_active') ? is_active("Topics") : false;
-        $linksActive = function_exists('is_active') ? is_active("Web_Links") : false;
+        $topicsActive = false;
+        $linksActive = false;
 
         /** @var array{users: int, authors: int, stories: int, comments: int}|null $row */
         $row = $this->fetchOne(

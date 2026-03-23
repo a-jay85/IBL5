@@ -60,11 +60,12 @@ test.describe('Depth Chart Entry: mobile card view', () => {
   test('active toggle changes card opacity', async ({ page }) => {
     const firstCard = page.locator('.dc-card').first();
     const checkbox = firstCard.locator('.dc-card__active-cb');
+    const toggle = firstCard.locator('.dc-card__active-toggle');
 
     const wasChecked = await checkbox.isChecked();
 
-    // Toggle it
-    await checkbox.click({ force: true });
+    // Click the visible toggle label (checkbox is visually hidden)
+    await toggle.click();
 
     if (wasChecked) {
       await expect(firstCard).toHaveClass(/dc-card--inactive/);
@@ -73,7 +74,7 @@ test.describe('Depth Chart Entry: mobile card view', () => {
     }
 
     // Toggle back
-    await checkbox.click({ force: true });
+    await toggle.click();
   });
 
   test('position selects are enabled on mobile', async ({ page }) => {

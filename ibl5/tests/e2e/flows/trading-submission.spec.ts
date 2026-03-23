@@ -377,9 +377,9 @@ test.describe('Trade submission: draft pick trade (API)', () => {
 
     expect(fd, 'CI seed must provide a partner with user pick + partner player').toBeTruthy();
 
+    const token = await getCsrfToken(page);
     const existingIds = await collectAllOfferIds(page);
 
-    const token = await getCsrfToken(page);
     const pickIdx = getUserPickIndices(fd!)[0];
     const partnerIdx = getPartnerPlayerIndices(fd!)[0];
     const body = buildFormBody(fd!, [pickIdx, partnerIdx], undefined, undefined, token);
@@ -420,9 +420,9 @@ test.describe('Trade submission: cash-only trade (API)', () => {
     const fd = await findPartner(page, () => true);
     expect(fd, 'CI seed must provide a trade partner').toBeTruthy();
 
+    const token = await getCsrfToken(page);
     const existingIds = await collectAllOfferIds(page);
 
-    const token = await getCsrfToken(page);
     const cashYear = fd!.cashStartYear;
     const body = buildFormBody(fd!, [], { [cashYear]: 200 }, undefined, token);
     const location = await submitOffer(request, body);
@@ -462,9 +462,9 @@ test.describe('Trade submission: mixed trade (API)', () => {
     );
     expect(fd, 'CI seed must provide a partner with tradeable players on both sides').toBeTruthy();
 
+    const token = await getCsrfToken(page);
     const existingIds = await collectAllOfferIds(page);
 
-    const token = await getCsrfToken(page);
     const userIdx = getUserPlayerIndices(fd!)[0];
     const partnerIdx = getPartnerPlayerIndices(fd!)[0];
     const cashYear = fd!.cashStartYear;
@@ -576,16 +576,16 @@ test.describe('Trade submission: accept and reject', () => {
     offeringTeam = fd!.offeringTeam;
     listeningTeam = fd!.listeningTeam;
 
+    const tokenA = await getCsrfToken(page);
+    const tradeFormUrl = page.url();
     const existingIds = await collectAllOfferIds(page);
     const userPlayers = getUserPlayerIndices(fd!);
     const partnerPlayers = getPartnerPlayerIndices(fd!);
-
-    const tokenA = await getCsrfToken(page);
     const bodyA = buildFormBody(fd!, [userPlayers[0], partnerPlayers[0]], undefined, undefined, tokenA);
     const locationA = await submitOffer(request, bodyA);
 
     // Reload trading form to get a fresh CSRF token (single-use tokens)
-    await page.goto(page.url());
+    await page.goto(tradeFormUrl);
     const tokenB = await getCsrfToken(page);
     const bodyB = buildFormBody(fd!, [userPlayers[1], partnerPlayers[1]], undefined, undefined, tokenB);
     const locationB = await submitOffer(request, bodyB);

@@ -8,7 +8,7 @@ namespace Trading\Contracts;
  * TradeExecutionRepositoryInterface - Contract for trade queue/execution database operations
  *
  * Defines methods for managing the trade execution queue and bulk trade cleanup.
- * Extracted from TradingRepositoryInterface to follow single-responsibility principle.
+ * Extracted from the original TradingRepositoryInterface to follow single-responsibility principle.
  */
 interface TradeExecutionRepositoryInterface
 {

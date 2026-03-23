@@ -7,7 +7,7 @@ namespace Api\Controller;
 use Api\Contracts\ControllerInterface;
 use Api\Response\JsonResponder;
 use Trading\TradeProcessor;
-use Trading\TradingRepository;
+use Trading\TradeOfferRepository;
 use Discord\Discord;
 
 class TradeAcceptController implements ControllerInterface
@@ -36,7 +36,7 @@ class TradeAcceptController implements ControllerInterface
             return;
         }
 
-        $repository = new TradingRepository($this->db);
+        $repository = new TradeOfferRepository($this->db);
         $tradeRows = $repository->getTradesByOfferId($offerId);
 
         if ($tradeRows === []) {

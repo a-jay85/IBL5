@@ -22,7 +22,7 @@ get_lang($module_name);
 
 function theindex($new_topic = "0")
 {
-    global $db, $storyhome, $topicname, $topicimage, $topictext, $user, $prefix, $multilingual, $currentlang, $articlecomm, $sitename, $user_news, $userinfo, $authService;
+    global $db, $storyhome, $topicname, $topicimage, $topictext, $user, $prefix, $multilingual, $currentlang, $articlecomm, $sitename, $user_news, $userinfo, $authService, $mysqli_db;
     if (is_user($user)) {$userinfo = $authService->getUserInfo();}
     $new_topic = intval($new_topic);
     if ($multilingual == 1) {
@@ -80,7 +80,20 @@ function theindex($new_topic = "0")
             $row2 = $db->sql_fetchrow($db->sql_query("SELECT title FROM " . $prefix . "_stories_cat WHERE catid='$catid'"));
             $cattitle = \Utilities\HtmlSanitizer::safeHtmlOutput($row2['title']);
         }
-        getTopics($s_sid);
+        $stmtTopics = $mysqli_db->prepare(
+            "SELECT t.topicid, t.topicname, t.topicimage, t.topictext
+             FROM {$prefix}_stories s
+             LEFT JOIN {$prefix}_topics t ON t.topicid = s.topic
+             WHERE s.sid = ?"
+        );
+        $stmtTopics->bind_param('i', $s_sid);
+        $stmtTopics->execute();
+        $topicRow = $stmtTopics->get_result()->fetch_assoc();
+        $stmtTopics->close();
+        $topicid = (int) ($topicRow['topicid'] ?? 0);
+        $topicname = \Utilities\HtmlSanitizer::e($topicRow['topicname'] ?? '');
+        $topicimage = \Utilities\HtmlSanitizer::e($topicRow['topicimage'] ?? '');
+        $topictext = \Utilities\HtmlSanitizer::e($topicRow['topictext'] ?? '');
         if (!is_numeric($time)) {
             preg_match('/(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})/', $time, $dtParts);
             $time = gmmktime($dtParts[4], $dtParts[5], $dtParts[6], $dtParts[2], $dtParts[3], $dtParts[1]);

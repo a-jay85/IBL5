@@ -255,43 +255,48 @@ Re-read the updated Manual Testing section. If any remaining steps are now indir
 
 Track iteration count starting at 1. Maximum 3 fix-push-retry cycles before escalating to the user.
 
-### Step 7.1: Wait for CI run to appear
+### Step 7.1: Wait for checks to register
 
-After the most recent push, the CI run may take 10-30 seconds to register. Poll with 15-second waits:
-
-```bash
-gh run list --branch <branch-name> --limit 1 --json databaseId,status,conclusion,createdAt
-```
-
-Repeat up to 4 times (60s total). If no run appears, warn the user and **stop the workflow** — do not proceed.
-
-### Step 7.2: Block until the run completes
+After the most recent push, CI checks may take 10-30 seconds to register. Poll `gh pr checks` until checks appear:
 
 ```bash
-gh run watch <run-id> --exit-status
+gh pr checks <pr-number> --json name,state 2>/dev/null | jq 'length'
 ```
 
-Use Bash timeout of 600000 (10 minutes). This blocks until the run finishes. Exit code 0 means all jobs passed; non-zero means at least one job failed.
+Repeat up to 4 times with 15-second waits (60s total). If count stays 0, warn the user and **stop the workflow** — do not proceed.
 
-If the command times out, fall back to polling `gh run view <run-id> --json status,conclusion` every 30 seconds until status is `completed`.
+**Why `gh pr checks` instead of `gh run list`:** A single push triggers multiple workflow runs (Tests & Analysis, E2E Tests, Lighthouse CI, etc.). `gh run list --limit 1` only returns one run. `gh pr checks` aggregates ALL checks across ALL workflow runs for the PR head commit.
+
+### Step 7.2: Block until ALL checks complete
+
+```bash
+gh pr checks <pr-number> --watch
+```
+
+Use Bash timeout of 600000 (10 minutes). This blocks until every check reaches a terminal state. Exit code 0 means all checks passed; non-zero means at least one failed.
+
+Do NOT use `gh run watch <single-run-id>` — that only monitors one workflow run and will miss failures in other runs.
+
+If the command times out, fall back to polling `gh pr checks <pr-number> --json name,state,conclusion` every 30 seconds until all states are terminal.
 
 ### Step 7.3: Evaluate result
 
-**If all jobs passed → proceed to Phase 7.5.**
+**If all checks passed → proceed to Phase 7.5.**
 
-**If any job failed:**
+**If any check failed:**
 
-1. Download failure logs: `gh run view <run-id> --log-failed`
-2. Run the 3-step CI failure checklist from `memory/feedback_ci_failures.md`:
+1. Identify failed checks: `gh pr checks <pr-number> --json name,state,conclusion | jq '[.[] | select(.conclusion == "failure")]'`
+2. For each failed check, find its run ID and download logs: `gh run view <run-id> --log-failed`
+3. Run the 3-step CI failure checklist from `memory/feedback_ci_failures.md`:
    - Is the failing file in my PR diff?
    - Is the failing line/assertion one I changed?
    - Did this test fail on the parent commit?
-3. Diagnose the failure from the logs
-4. Fix the code in the worktree
-5. Commit and push the fix
-6. Increment iteration count
-7. **If iteration count > 3:** Stop and report unresolved failures to the user. List what failed, what you tried, and the remaining error. Do NOT proceed to Phase 7.5.
-8. **Otherwise: GO BACK TO Step 7.1** — wait for the new CI run triggered by the push
+4. Diagnose the failure from the logs
+5. Fix the code in the worktree
+6. Commit and push the fix
+7. Increment iteration count
+8. **If iteration count > 3:** Stop and report unresolved failures to the user. List what failed, what you tried, and the remaining error. Do NOT proceed to Phase 7.5.
+9. **Otherwise: GO BACK TO Step 7.1** — wait for the new checks triggered by the push
 
 ---
 

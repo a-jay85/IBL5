@@ -362,27 +362,6 @@ function is_user($user)
 }
 
 
-function render_blocks($side, $blockfile, $title, $content, $bid, $url)
-{
-    if (!defined('BLOCK_FILE')) {
-        define('BLOCK_FILE', true);
-    }
-    if (empty($blockfile)) {
-        themecenterbox($title, $content);
-    } else {
-        $blockfiletitle = $title;
-        if (!file_exists("blocks/" . $blockfile)) {
-            $content = _BLOCKPROBLEM;
-        } else {
-            include "blocks/" . $blockfile;
-        }
-        if (empty($content)) {
-            $content = _BLOCKPROBLEM2;
-        }
-        themecenterbox($blockfiletitle, $content);
-    }
-}
-
 function blocks($side)
 {
     global $storynum, $prefix, $multilingual, $currentlang, $db, $user;
@@ -434,14 +413,28 @@ function blocks($side)
                 }
             }
             if (empty($row['bkey'])) {
-                if ($view == 0) {
-                    render_blocks($side, $blockfile, $title, $content, $bid, $url);
-                } elseif ($view == 1 and is_user($user) || is_admin()) {
-                    render_blocks($side, $blockfile, $title, $content, $bid, $url);
-                } elseif ($view == 2 and is_admin()) {
-                    render_blocks($side, $blockfile, $title, $content, $bid, $url);
-                } elseif ($view == 3 and !is_user($user) || is_admin()) {
-                    render_blocks($side, $blockfile, $title, $content, $bid, $url);
+                $shouldRender = ($view == 0)
+                    || ($view == 1 and is_user($user) || is_admin())
+                    || ($view == 2 and is_admin())
+                    || ($view == 3 and !is_user($user) || is_admin());
+                if ($shouldRender) {
+                    if (!defined('BLOCK_FILE')) {
+                        define('BLOCK_FILE', true);
+                    }
+                    if (empty($blockfile)) {
+                        themecenterbox($title, $content);
+                    } else {
+                        $blockfiletitle = $title;
+                        if (!file_exists("blocks/" . $blockfile)) {
+                            $content = _BLOCKPROBLEM;
+                        } else {
+                            include "blocks/" . $blockfile;
+                        }
+                        if (empty($content)) {
+                            $content = _BLOCKPROBLEM2;
+                        }
+                        themecenterbox($blockfiletitle, $content);
+                    }
                 }
             }
         }
@@ -476,13 +469,6 @@ function getusrinfo($user)
     return null;
 }
 
-function FixQuotes($what = "")
-{
-    while (stristr($what, "\\\\'")) {
-        $what = str_replace("\\\\'", "'", $what);
-    }
-    return $what;
-}
 
 function check_words($Message)
 {
@@ -639,7 +625,11 @@ function filter($what, $strip = "", $save = "", $type = "")
         $what = check_html($what, $strip);
         $what = addslashes($what);
     } else {
-        $what = stripslashes(FixQuotes($what));
+        $fixedWhat = $what;
+        while (stristr($fixedWhat, "\\\\'")) {
+            $fixedWhat = str_replace("\\\\'", "'", $fixedWhat);
+        }
+        $what = stripslashes($fixedWhat);
         $what = check_words($what);
         $what = check_html($what, $strip);
     }

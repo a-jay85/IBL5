@@ -165,6 +165,16 @@ async function findPartner(
 }
 
 /**
+ * Extract the CSRF token from the trading form on the current page.
+ */
+async function getCsrfToken(page: Page): Promise<string> {
+  const token = await page
+    .locator('form[name="Trade_Offer"] input[name="_csrf_token"]')
+    .getAttribute('value');
+  return token ?? '';
+}
+
+/**
  * Build the POST form body from extracted form data, checking specified indices.
  */
 function buildFormBody(
@@ -172,6 +182,7 @@ function buildFormBody(
   checkedIndices: number[],
   userCash?: Record<number, number>,
   partnerCash?: Record<number, number>,
+  csrfToken?: string,
 ): Record<string, string> {
   const body: Record<string, string> = {
     offeringTeam: formData.offeringTeam,
@@ -179,6 +190,10 @@ function buildFormBody(
     switchCounter: String(formData.switchCounter),
     fieldsCounter: String(formData.fieldsCounter),
   };
+
+  if (csrfToken) {
+    body['_csrf_token'] = csrfToken;
+  }
 
   for (let k = 0; k < formData.fieldsCounter; k++) {
     const field = formData.fields[k];
@@ -364,9 +379,10 @@ test.describe('Trade submission: draft pick trade (API)', () => {
 
     const existingIds = await collectAllOfferIds(page);
 
+    const token = await getCsrfToken(page);
     const pickIdx = getUserPickIndices(fd!)[0];
     const partnerIdx = getPartnerPlayerIndices(fd!)[0];
-    const body = buildFormBody(fd!, [pickIdx, partnerIdx]);
+    const body = buildFormBody(fd!, [pickIdx, partnerIdx], undefined, undefined, token);
     const location = await submitOffer(request, body);
 
     // Accept either success or cap/validation error — both prove the pipeline works
@@ -406,8 +422,9 @@ test.describe('Trade submission: cash-only trade (API)', () => {
 
     const existingIds = await collectAllOfferIds(page);
 
+    const token = await getCsrfToken(page);
     const cashYear = fd!.cashStartYear;
-    const body = buildFormBody(fd!, [], { [cashYear]: 200 });
+    const body = buildFormBody(fd!, [], { [cashYear]: 200 }, undefined, token);
     const location = await submitOffer(request, body);
 
     // CI seed provides teams under cap — cash trade must succeed
@@ -447,6 +464,7 @@ test.describe('Trade submission: mixed trade (API)', () => {
 
     const existingIds = await collectAllOfferIds(page);
 
+    const token = await getCsrfToken(page);
     const userIdx = getUserPlayerIndices(fd!)[0];
     const partnerIdx = getPartnerPlayerIndices(fd!)[0];
     const cashYear = fd!.cashStartYear;
@@ -455,6 +473,7 @@ test.describe('Trade submission: mixed trade (API)', () => {
       [userIdx, partnerIdx],
       { [cashYear]: 100 },
       { [cashYear]: 150 },
+      token,
     );
     const location = await submitOffer(request, body);
 
@@ -490,9 +509,10 @@ test.describe('Trade submission: validation errors', () => {
     const fd = await findPartner(page, () => true);
     expect(fd, 'CI seed must provide a trade partner').toBeTruthy();
 
+    const token = await getCsrfToken(page);
     const cashYear = fd!.cashStartYear;
     // 50 is below the 100 minimum
-    const body = buildFormBody(fd!, [], { [cashYear]: 50 });
+    const body = buildFormBody(fd!, [], { [cashYear]: 50 }, undefined, token);
     const location = await submitOffer(request, body);
     expect(location).toContain('error=');
 
@@ -560,10 +580,14 @@ test.describe('Trade submission: accept and reject', () => {
     const userPlayers = getUserPlayerIndices(fd!);
     const partnerPlayers = getPartnerPlayerIndices(fd!);
 
-    const bodyA = buildFormBody(fd!, [userPlayers[0], partnerPlayers[0]]);
+    const tokenA = await getCsrfToken(page);
+    const bodyA = buildFormBody(fd!, [userPlayers[0], partnerPlayers[0]], undefined, undefined, tokenA);
     const locationA = await submitOffer(request, bodyA);
 
-    const bodyB = buildFormBody(fd!, [userPlayers[1], partnerPlayers[1]]);
+    // Reload trading form to get a fresh CSRF token (single-use tokens)
+    await page.goto(page.url());
+    const tokenB = await getCsrfToken(page);
+    const bodyB = buildFormBody(fd!, [userPlayers[1], partnerPlayers[1]], undefined, undefined, tokenB);
     const locationB = await submitOffer(request, bodyB);
 
     // CI seed provides teams under cap — both offers must succeed

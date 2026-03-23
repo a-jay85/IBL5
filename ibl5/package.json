@@ -6,6 +6,7 @@
   "scripts": {
     "css:watch": "bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --watch",
     "css:build": "bunx @tailwindcss/cli -i design/input.css -o themes/IBL/style/style.css --minify",
+    "test:api": "bunx vitest run --config vitest.api.config.ts",
     "test:e2e": "bunx playwright test",
     "test:e2e:serial": "bunx playwright test --workers=1 --retries=2",
     "test:e2e:headed": "bunx playwright test --headed",
@@ -28,6 +29,7 @@
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.56.0",
     "@tailwindcss/cli": "^4.0.0",
-    "tailwindcss": "^4.0.0"
+    "tailwindcss": "^4.0.0",
+    "vitest": "^4.1.0"
   }
 }

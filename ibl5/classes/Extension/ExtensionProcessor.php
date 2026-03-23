@@ -186,6 +186,15 @@ class ExtensionProcessor implements ExtensionProcessorInterface
                 throw $e;
             }
 
+            \Logging\LoggerFactory::getChannel('audit')->info('extension_accepted', [
+                'action' => 'extension_accepted',
+                'player_name' => $playerName,
+                'team_name' => $teamName,
+                'years' => $offerYears,
+                'total_millions' => $offerInMillions,
+                'details' => $offerDetails,
+            ]);
+
             // Send Discord notification
             if (class_exists('Discord')) {
                 $hometext = "{$playerName} today accepted a contract extension offer from the {$teamName} worth $offerInMillions million dollars over $offerYears years:<br>" . $offerDetails;
@@ -221,6 +230,14 @@ class ExtensionProcessor implements ExtensionProcessorInterface
         } else {
             // Create news story for rejection
             $this->dbOps->createRejectedExtensionStory($playerName, $teamName, $offerInMillions, $offerYears);
+
+            \Logging\LoggerFactory::getChannel('audit')->info('extension_rejected', [
+                'action' => 'extension_rejected',
+                'player_name' => $playerName,
+                'team_name' => $teamName,
+                'years' => $offerYears,
+                'total_millions' => $offerInMillions,
+            ]);
 
             // Send Discord notification
             if (class_exists('Discord')) {

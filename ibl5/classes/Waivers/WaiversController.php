@@ -166,6 +166,13 @@ class WaiversController implements WaiversControllerInterface
         $hometext = "The " . \Utilities\HtmlSanitizer::e($teamName) . " cut " . \Utilities\HtmlSanitizer::e($player['name']) . " to waivers.";
         \Discord::postToChannel('#waiver-wire', $hometext);
 
+        \Logging\LoggerFactory::getChannel('audit')->info('player_waived', [
+            'action' => 'player_waived',
+            'player_id' => $playerID,
+            'player_name' => $player['name'],
+            'team_name' => $teamName,
+        ]);
+
         return ['success' => true, 'result' => 'player_dropped'];
     }
     
@@ -212,6 +219,14 @@ class WaiversController implements WaiversControllerInterface
 
         // Send Discord notification
         \Discord::postToChannel('#waiver-wire', $hometext);
+
+        \Logging\LoggerFactory::getChannel('audit')->info('player_signed_from_waivers', [
+            'action' => 'player_signed_from_waivers',
+            'player_id' => $playerID,
+            'player_name' => $player['name'],
+            'team_name' => $teamName,
+            'salary' => $playerSalary,
+        ]);
 
         return ['success' => true, 'result' => 'player_added'];
     }

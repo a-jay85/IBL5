@@ -54,6 +54,15 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
                     }
 
                     $this->db->commit();
+
+                    \Logging\LoggerFactory::getChannel('audit')->info('depth_chart_saved', [
+                        'action' => 'depth_chart_saved',
+                        'dc_id' => $loadedDcId,
+                        'team_id' => $tid,
+                        'dc_name' => $name,
+                        'phase' => $season->phase,
+                    ]);
+
                     return $loadedDcId;
                 }
             }
@@ -71,6 +80,15 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
                 }
 
                 $this->db->commit();
+
+                \Logging\LoggerFactory::getChannel('audit')->info('depth_chart_saved', [
+                    'action' => 'depth_chart_saved',
+                    'dc_id' => $mostRecent['id'],
+                    'team_id' => $tid,
+                    'dc_name' => $name,
+                    'phase' => $season->phase,
+                ]);
+
                 return $mostRecent['id'];
             }
 
@@ -93,6 +111,15 @@ class SavedDepthChartService implements SavedDepthChartServiceInterface
             $this->repository->saveDepthChartPlayers($dcId, $snapshots);
 
             $this->db->commit();
+
+            \Logging\LoggerFactory::getChannel('audit')->info('depth_chart_saved', [
+                'action' => 'depth_chart_saved',
+                'dc_id' => $dcId,
+                'team_id' => $tid,
+                'dc_name' => $name,
+                'phase' => $season->phase,
+            ]);
+
             return $dcId;
         } catch (\Throwable $e) {
             $this->db->rollback();

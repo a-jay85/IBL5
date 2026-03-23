@@ -136,7 +136,7 @@ class PlayerRatingsAndSalaryView implements PlayerRatingsAndSalaryViewInterface
         $totalSalaryMillion = $totalSalary / 100;
         ?>
     <tr>
-        <td colspan=24 class="text-center text-bold">Total Career Salary Earned: <?= $totalSalaryMillion ?> million dollars</td>
+        <td colspan=24 class="text-center font-bold">Total Career Salary Earned: <?= $totalSalaryMillion ?> million dollars</td>
     </tr>
 </table>
         <?php

@@ -98,7 +98,7 @@ class PlayerOneOnOneView implements PlayerOneOnOneViewInterface
             echo "* lost to {$opponentLink}, {$lossScore}-{$winScore} (<a href=\"{$gameLink}\" style=\"font-family: inherit; font-size: inherit;\">Game #{$gameId}</a>)<br>";
         }
         ?>
-        <div class="text-center text-bold">Record: <?= $winCount ?> - <?= $lossCount ?></div><br>
+        <div class="text-center font-bold">Record: <?= $winCount ?> - <?= $lossCount ?></div><br>
         </td>
     </tr>
 </table>

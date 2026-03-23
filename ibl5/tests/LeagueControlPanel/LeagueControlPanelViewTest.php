@@ -177,6 +177,75 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringContainsString('value="set_waivers_to_free_agents"', $html);
     }
 
+    // --- Awards Controls ---
+
+    public function testPlayoffsShowsGenerateAwardsButton(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Playoffs']),
+        ]);
+
+        $this->assertStringContainsString('value="generate_awards"', $html);
+        $this->assertStringContainsString('Generate Season Awards', $html);
+    }
+
+    public function testDraftShowsGenerateAwardsButton(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Draft']),
+        ]);
+
+        $this->assertStringContainsString('value="generate_awards"', $html);
+    }
+
+    public function testRegularSeasonDoesNotShowGenerateAwardsButton(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Regular Season']),
+        ]);
+
+        $this->assertStringNotContainsString('value="generate_awards"', $html);
+    }
+
+    public function testFreeAgencyDoesNotShowGenerateAwardsButton(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Free Agency']),
+        ]);
+
+        $this->assertStringNotContainsString('value="generate_awards"', $html);
+    }
+
+    public function testPlayoffsShowsFinalsMvpInputWhenNotSet(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Playoffs', 'hasFinalsMvp' => false]),
+        ]);
+
+        $this->assertStringContainsString('name="finals_mvp_name"', $html);
+        $this->assertStringContainsString('value="set_finals_mvp"', $html);
+    }
+
+    public function testPlayoffsHidesFinalsMvpInputWhenAlreadySet(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Playoffs', 'hasFinalsMvp' => true]),
+        ]);
+
+        $this->assertStringNotContainsString('name="finals_mvp_name"', $html);
+        $this->assertStringNotContainsString('value="set_finals_mvp"', $html);
+    }
+
+    public function testDraftShowsFinalsMvpInputWhenNotSet(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Draft', 'hasFinalsMvp' => false]),
+        ]);
+
+        $this->assertStringContainsString('name="finals_mvp_name"', $html);
+        $this->assertStringContainsString('value="set_finals_mvp"', $html);
+    }
+
     public function testRenderXssProtectionOnPanelData(): void
     {
         $html = $this->renderWithDefaults([

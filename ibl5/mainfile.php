@@ -361,37 +361,6 @@ function is_user($user)
     return $userSave = $authService->isAuthenticated() ? 1 : 0;
 }
 
-function title($text)
-{
-    OpenTable();
-    echo "<center><span class=\"title\"><strong>$text</strong></span></center>";
-    CloseTable();
-    echo "<br>";
-}
-
-function is_active($module)
-{
-    global $prefix, $db;
-    static $save;
-    if (is_array($save)) {
-        if (isset($save[$module])) {
-            return ($save[$module]);
-        }
-
-        return 0;
-    }
-    $sql = "SELECT title FROM " . $prefix . "_modules WHERE active=1";
-    $result = $db->sql_query($sql);
-    while ($row = $db->sql_fetchrow($result)) {
-        $save[$row[0]] = 1;
-    }
-    $db->sql_freeresult($result);
-    if (isset($save[$module])) {
-        return ($save[$module]);
-    }
-
-    return 0;
-}
 
 function render_blocks($side, $blockfile, $title, $content, $bid, $url)
 {
@@ -401,7 +370,16 @@ function render_blocks($side, $blockfile, $title, $content, $bid, $url)
     if (empty($blockfile)) {
         themecenterbox($title, $content);
     } else {
-        blockfileinc($title, $blockfile, 1);
+        $blockfiletitle = $title;
+        if (!file_exists("blocks/" . $blockfile)) {
+            $content = _BLOCKPROBLEM;
+        } else {
+            include "blocks/" . $blockfile;
+        }
+        if (empty($content)) {
+            $content = _BLOCKPROBLEM2;
+        }
+        themecenterbox($blockfiletitle, $content);
     }
 }
 
@@ -471,21 +449,6 @@ function blocks($side)
     $db->sql_freeresult($result);
 }
 
-
-function blockfileinc($title, $blockfile, $side = 0)
-{
-    $blockfiletitle = $title;
-    $file = file_exists("blocks/" . $blockfile . "");
-    if (!$file) {
-        $content = _BLOCKPROBLEM;
-    } else {
-        include "blocks/" . $blockfile . "";
-    }
-    if (empty($content)) {
-        $content = _BLOCKPROBLEM2;
-    }
-    themecenterbox($blockfiletitle, $content);
-}
 
 
 function cookiedecode($user)
@@ -701,36 +664,6 @@ function formatTimestamp($time)
     return $datetime;
 }
 
-function get_author($aid)
-{
-    global $prefix, $db;
-    static $users;
-    if (isset($users[$aid]) and is_array($users[$aid])) {
-        $row = $users[$aid];
-    } else {
-        $sql = "SELECT url, email FROM " . $prefix . "_authors WHERE aid='$aid'";
-        $result = $db->sql_query($sql);
-        $row = $db->sql_fetchrow($result);
-        $users[$aid] = $row;
-        $db->sql_freeresult($result);
-    }
-    $aidurl = filter($row['url'], "nohtml");
-    $aidmail = filter($row['email'], "nohtml");
-    if (isset($aidurl) && $aidurl != "http://") {
-        $aid = "<a href=\"" . $aidurl . "\">$aid</a>";
-    } elseif (isset($aidmail)) {
-        $aid = "<a href=\"mailto:" . $aidmail . "\">$aid</a>";
-    } else {
-        $aid = $aid;
-    }
-    return $aid;
-}
-
-function formatAidHeader($aid)
-{
-    $AidHeader = get_author($aid);
-    echo $AidHeader;
-}
 
 if (!defined('FORUM_ADMIN')) {
     $ThemeSel = 'IBL';

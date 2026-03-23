@@ -1,0 +1,47 @@
+@layer components {
+
+/* ==========================================================================
+   Team Page Responsive Layout
+   ========================================================================== */
+
+.team-page-layout {
+    width: 100%;
+    max-width: 100%;
+}
+
+.team-page-main {
+    min-width: 0;
+    max-width: 100%;
+}
+
+@media (min-width: 769px) {
+    .team-stats-block {
+        width: fit-content;
+        max-width: 100%;
+        margin-inline: auto;
+    }
+}
+
+.team-page-rafters {
+    margin-top: var(--space-4);
+}
+
+/* Non-team (e.g. free agents) logo fallback — centered logo without banner row */
+.team-logo-fallback {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.team-logo-fallback img {
+    display: block;
+    margin: 0 auto;
+}
+
+/* Franchise history card wrapper — constrains width and centers */
+.franchise-history-wrapper {
+    max-width: 1115px;
+    margin: 0 auto;
+}
+
+
+} /* end @layer components */

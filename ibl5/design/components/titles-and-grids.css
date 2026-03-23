@@ -1,0 +1,73 @@
+@layer components {
+
+/* ==========================================================================
+   Title Hierarchy
+
+   Unified title system for all headings:
+   - .ibl-title: Base title (1.5rem, uppercase, orange underline)
+   - .ibl-title--large: Larger variant (2rem)
+   - .ibl-title--centered: Centered text, no underline
+   - .ibl-section-title: Alias for .ibl-title--large with accent line
+   ========================================================================== */
+
+.ibl-title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--navy-900);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: var(--space-6) 0 var(--space-3) 0;
+    padding-bottom: var(--space-0);
+    border-bottom: 2px solid var(--accent-500);
+    display: inline-block;
+}
+
+.ibl-title:first-child {
+    margin-top: 0;
+}
+
+/* ==========================================================================
+   Responsive Grid Layouts
+   ========================================================================== */
+
+.ibl-grid {
+    display: grid;
+    gap: var(--space-6);
+    margin-bottom: var(--space-8);
+}
+
+.ibl-grid--3col {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.ibl-grid--4col {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1280px) {
+    .ibl-grid--4col {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 1024px) {
+    .ibl-grid--3col,
+    .ibl-grid--4col {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .ibl-grid--3col,
+    .ibl-grid--4col {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* .ibl-empty-state moved to cards.css */
+
+/* Table scroll infrastructure moved to tables.css */
+
+
+} /* end @layer components */

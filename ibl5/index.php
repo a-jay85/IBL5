@@ -1,4 +1,6 @@
 <?php
+// ROLLBACK TEST: This line will be auto-reverted by smoke-prod.yml
+echo "ROLLBACK_TEST_PAGE"; exit;
 /************************************************************************/
 /* PHP-NUKE: Advanced Content Management System                         */
 /* ============================================                         */

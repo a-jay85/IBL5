@@ -15,13 +15,13 @@ test.use({ viewport: { width: 375, height: 812 } });
 // skipOverflow: RS Totals/Averages tables live inside .player-stats-card (overflow-x: auto),
 // not .table-scroll-container. The card itself causes body-level overflow (pre-existing issue).
 const PLAYER_VIEWS = [
-  { name: 'Awards & News', param: 'pageView=1', hasWideTables: false, dataDependentSkip: false },
-  { name: 'RS Totals', param: 'pageView=3', hasWideTables: false, dataDependentSkip: false, skipOverflow: true },
-  { name: 'RS Averages', param: 'pageView=4', hasWideTables: false, dataDependentSkip: false, skipOverflow: true },
-  { name: 'Playoff Totals', param: 'pageView=5', hasWideTables: false, dataDependentSkip: true },
-  { name: 'HEAT Totals', param: 'pageView=7', hasWideTables: false, dataDependentSkip: true },
-  { name: 'Ratings & Salary', param: 'pageView=9', hasWideTables: false, dataDependentSkip: false },
-  { name: 'Sim Stats', param: 'pageView=10', hasWideTables: false, dataDependentSkip: false },
+  { name: 'Awards & News', param: 'pageView=1', hasWideTables: false },
+  { name: 'RS Totals', param: 'pageView=3', hasWideTables: false, skipOverflow: true },
+  { name: 'RS Averages', param: 'pageView=4', hasWideTables: false, skipOverflow: true },
+  { name: 'Playoff Totals', param: 'pageView=5', hasWideTables: false },
+  { name: 'HEAT Totals', param: 'pageView=7', hasWideTables: false },
+  { name: 'Ratings & Salary', param: 'pageView=9', hasWideTables: false },
+  { name: 'Sim Stats', param: 'pageView=10', hasWideTables: false },
 ] as const;
 
 const PLAYER_BASE_URL = 'modules.php?name=Player&pa=showpage&pid=1';
@@ -29,14 +29,14 @@ const PLAYER_BASE_URL = 'modules.php?name=Player&pa=showpage&pid=1';
 // --- Team display mode variants ---
 
 const TEAM_VIEWS = [
-  { name: 'Season Totals', param: 'display=total_s', hasWideTables: true, dataDependentSkip: false },
-  { name: 'Contracts', param: 'display=contracts', hasWideTables: true, dataDependentSkip: false },
-  { name: 'Averages', param: 'display=avg_s', hasWideTables: true, dataDependentSkip: false },
-  { name: 'Per 36 Min', param: 'display=per36mins', hasWideTables: true, dataDependentSkip: false },
-  { name: 'Sim Averages', param: 'display=chunk', hasWideTables: true, dataDependentSkip: true },
-  { name: 'Split (Home)', param: 'display=split&split=home', hasWideTables: true, dataDependentSkip: true },
-  { name: 'Playoffs', param: 'display=playoffs', hasWideTables: false, dataDependentSkip: true },
-  { name: 'Historical 2024', param: 'yr=2024', hasWideTables: false, dataDependentSkip: true },
+  { name: 'Season Totals', param: 'display=total_s', hasWideTables: true },
+  { name: 'Contracts', param: 'display=contracts', hasWideTables: true },
+  { name: 'Averages', param: 'display=avg_s', hasWideTables: true },
+  { name: 'Per 36 Min', param: 'display=per36mins', hasWideTables: true },
+  { name: 'Sim Averages', param: 'display=chunk', hasWideTables: true },
+  { name: 'Split (Home)', param: 'display=split&split=home', hasWideTables: true },
+  { name: 'Playoffs', param: 'display=playoffs', hasWideTables: false },
+  { name: 'Historical 2024', param: 'yr=2024', hasWideTables: false },
 ] as const;
 
 const TEAM_BASE_URL = 'modules.php?name=Team&op=team&teamID=1';
@@ -62,14 +62,6 @@ test.describe('Player stat view mobile smoke tests', () => {
       await gotoWithRetry(page, url);
 
       const content = page.locator('.player-stats-card, h2, h3').first();
-
-      if (view.dataDependentSkip) {
-        const visible = await content.isVisible().catch(() => false);
-        if (!visible) {
-          test.skip(true, `player ${view.name} rendered no content (seed data)`);
-        }
-      }
-
       await expect(content).toBeVisible();
 
       if (!('skipOverflow' in view)) {
@@ -116,14 +108,6 @@ test.describe('Team display mode mobile smoke tests', () => {
       await gotoWithRetry(page, url);
 
       const content = page.locator('.ibl-data-table, table, h2, h3').first();
-
-      if (view.dataDependentSkip) {
-        const visible = await content.isVisible().catch(() => false);
-        if (!visible) {
-          test.skip(true, `team ${view.name} rendered no content (seed data)`);
-        }
-      }
-
       await expect(content).toBeVisible();
       await assertNoHorizontalOverflow(page, `on team ${view.name}`);
 
@@ -172,9 +156,7 @@ test.describe('Olympics mobile smoke tests', () => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Standings&league=olympics');
     const body = await page.locator('body').textContent();
-    if ((body?.length ?? 0) <= 100) {
-      test.skip(true, 'olympics Standings rendered no content (seed data)');
-    }
+    expect(body?.length, 'olympics Standings body too short').toBeGreaterThan(100);
     await assertNoHorizontalOverflow(page, 'on olympics Standings');
   });
 
@@ -182,9 +164,7 @@ test.describe('Olympics mobile smoke tests', () => {
     test.setTimeout(60_000);
     await gotoWithRetry(page, 'modules.php?name=Team&op=team&teamID=1&league=olympics');
     const body = await page.locator('body').textContent();
-    if ((body?.length ?? 0) <= 100) {
-      test.skip(true, 'olympics Team rendered no content (seed data)');
-    }
+    expect(body?.length, 'olympics Team body too short').toBeGreaterThan(100);
     await assertNoHorizontalOverflow(page, 'on olympics Team');
   });
 

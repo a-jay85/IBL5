@@ -45,9 +45,8 @@ test.describe('Login page', () => {
     const username = process.env.IBL_TEST_USER;
     const password = process.env.IBL_TEST_PASS;
 
-    if (!username || !password) {
-      test.skip(true, 'Missing IBL_TEST_USER or IBL_TEST_PASS');
-    }
+    expect(username, 'IBL_TEST_USER must be set in .env.test').toBeTruthy();
+    expect(password, 'IBL_TEST_PASS must be set in .env.test').toBeTruthy();
 
     await page.goto('modules.php?name=YourAccount');
 
@@ -125,9 +124,8 @@ test.describe('Logout flow', () => {
     const username = process.env.IBL_TEST_USER;
     const password = process.env.IBL_TEST_PASS;
 
-    if (!username || !password) {
-      test.skip(true, 'Missing IBL_TEST_USER or IBL_TEST_PASS');
-    }
+    expect(username, 'IBL_TEST_USER must be set in .env.test').toBeTruthy();
+    expect(password, 'IBL_TEST_PASS must be set in .env.test').toBeTruthy();
 
     // Log in manually with a fresh session
     await page.goto('modules.php?name=YourAccount');

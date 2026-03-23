@@ -41,12 +41,9 @@ test.describe('Cap Space flow', () => {
   });
 
   test('sticky scroll wrapper exists for wide table', async ({ page }) => {
-    const wrapper = page.locator('.sticky-scroll-wrapper');
-    const count = await wrapper.count();
     // Cap space uses sticky table pattern
-    if (count > 0) {
-      await expect(wrapper.first()).toBeVisible();
-    }
+    const wrapper = page.locator('.sticky-scroll-wrapper');
+    await expect(wrapper.first()).toBeVisible();
   });
 
   test('table is sortable', async ({ page }) => {

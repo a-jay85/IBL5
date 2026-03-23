@@ -26,9 +26,8 @@ test.describe('Award History flow', () => {
 
     // Sort by year should be checked by default
     const yearRadio = page.locator('input[name="aw_sortby"][value="year"]');
-    if (await yearRadio.count() > 0) {
-      await expect(yearRadio).toBeChecked();
-    }
+    await expect(yearRadio).toBeVisible();
+    await expect(yearRadio).toBeChecked();
   });
 
   test('submitting empty form returns results table', async ({ page }) => {
@@ -60,11 +59,9 @@ test.describe('Award History flow', () => {
 
     // Check that results contain "MVP" in the Award column
     const rows = table.first().locator('tbody tr');
-    const rowCount = await rows.count();
-    if (rowCount > 0) {
-      const firstRowText = await rows.first().textContent();
-      expect(firstRowText).toContain('MVP');
-    }
+    await expect(rows.first()).toBeVisible();
+    const firstRowText = await rows.first().textContent();
+    expect(firstRowText).toContain('MVP');
   });
 
   test('non-existent name returns empty results without PHP error', async ({

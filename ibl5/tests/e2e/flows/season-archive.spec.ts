@@ -42,14 +42,11 @@ test.describe('Season Archive flow', () => {
     await assertNoPhpErrors(page, 'on Season Archive detail via link');
   });
 
-  test('detail page has navigation links when data exists', async ({ page }) => {
+  test('detail page has navigation links', async ({ page }) => {
     await page.goto('modules.php?name=SeasonArchive&year=2026');
     await assertNoPhpErrors(page, 'on Season Archive detail year=2026');
     const navLinks = page.locator('.season-archive-nav a');
-    const count = await navLinks.count();
-    if (count > 0) {
-      await expect(navLinks.first()).toBeVisible();
-    }
+    await expect(navLinks.first()).toBeVisible();
   });
 
   test('detail page renders without errors for year 2026', async ({ page }) => {

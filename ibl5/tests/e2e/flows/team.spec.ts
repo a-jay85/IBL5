@@ -20,11 +20,10 @@ test.describe('Team page flow', () => {
 
   test('team banner shows logo and action links', async ({ page }) => {
     const banner = page.locator('.team-banner-row').first();
-    if (await banner.isVisible()) {
-      // Action links flank the logo
-      const actionLinks = banner.locator('.team-action-link');
-      await expect(actionLinks.first()).toBeVisible();
-    }
+    await expect(banner).toBeVisible();
+    // Action links flank the logo
+    const actionLinks = banner.locator('.team-action-link');
+    await expect(actionLinks.first()).toBeVisible();
   });
 
   test('dropdown switches view to season totals', async ({ page }) => {
@@ -54,9 +53,7 @@ test.describe('Team page flow', () => {
 
   test('team cards display sidebar info', async ({ page }) => {
     const cards = page.locator('.team-card');
-    if (await cards.first().isVisible()) {
-      await expect(cards.first()).toBeVisible();
-    }
+    await expect(cards.first()).toBeVisible();
   });
 
   test('multiple teams render without errors', async ({ page }) => {

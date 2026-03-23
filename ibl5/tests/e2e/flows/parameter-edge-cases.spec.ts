@@ -41,9 +41,8 @@ test.describe('Parameter edge cases', () => {
 
     // Should show error alert for invalid team
     const alert = page.locator('.ibl-alert--error');
-    if ((await alert.count()) > 0) {
-      await expect(alert).toContainText(/not found/i);
-    }
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText(/not found/i);
   });
 
   test('Team module with string teamID shows error alert', async ({ page }) => {
@@ -52,9 +51,8 @@ test.describe('Parameter edge cases', () => {
 
     // Should show error alert — "abc" is not a valid team ID
     const alert = page.locator('.ibl-alert--error');
-    if ((await alert.count()) > 0) {
-      await expect(alert).toContainText(/not found/i);
-    }
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText(/not found/i);
   });
 
   test('Player with invalid PID shows graceful empty state', async ({ page }) => {

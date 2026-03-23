@@ -89,13 +89,10 @@ test.describe('Team Schedule — jump button', () => {
     }
   });
 
-  test('upcoming games highlighted when unplayed games exist', async ({ page }) => {
+  test('upcoming games are highlighted', async ({ page }) => {
+    // CI seed has unplayed games for Metros
     const upcoming = page.locator('.schedule-game--upcoming');
-    const count = await upcoming.count();
-    if (count > 0) {
-      await expect(upcoming.first()).toBeVisible();
-    }
-    // When all games are played, no upcoming games is correct behavior
+    await expect(upcoming.first()).toBeVisible();
   });
 });
 
@@ -109,47 +106,35 @@ test.describe('Team Schedule — unplayed game rows', () => {
     await page.goto(TEAM_SCHEDULE_URL);
   });
 
-  test('dash scores shown when unplayed games exist', async ({ page }) => {
-    // Unplayed games render scores as "–" in <span> elements
+  test('dash scores shown for unplayed games', async ({ page }) => {
+    // CI seed has unplayed games — scores render as "–" in <span> elements
     const dashScore = page.locator(
       '.schedule-game span.schedule-game__score-link',
       { hasText: '–' },
     );
-    const count = await dashScore.count();
-    if (count > 0) {
-      await expect(dashScore.first()).toBeVisible();
-    }
-    // When all games are played, no dash scores is correct behavior
+    await expect(dashScore.first()).toBeVisible();
   });
 
-  test('no cumulative record on unplayed', async ({ page }) => {
-    // Find an unplayed game (has span scores with dash)
+  test('no cumulative record on unplayed games', async ({ page }) => {
+    // CI seed has unplayed games — find one (has span scores with dash)
     const unplayedGames = page.locator(
       '.schedule-game:has(span.schedule-game__score-link:text("–"))',
     );
-    const count = await unplayedGames.count();
-    if (count > 0) {
-      const first = unplayedGames.first();
-      await expect(first).toBeVisible();
-      // Unplayed games show the opposing team's season record but NOT the
-      // user's cumulative W-L record (since the game hasn't been played).
-      const records = first.locator('.schedule-game__record');
-      const recordCount = await records.count();
-      expect(recordCount).toBeLessThanOrEqual(1);
-    }
-    // When all games are played, this test is a no-op
+    const first = unplayedGames.first();
+    await expect(first).toBeVisible();
+    // Unplayed games show the opposing team's season record but NOT the
+    // user's cumulative W-L record (since the game hasn't been played).
+    const records = first.locator('.schedule-game__record');
+    const recordCount = await records.count();
+    expect(recordCount).toBeLessThanOrEqual(1);
   });
 
   test('score is span not link when unplayed', async ({ page }) => {
-    // Unplayed games render scores as <span>, not <a>
+    // CI seed has unplayed games — scores render as <span>, not <a>
     const spanScore = page.locator(
       '.schedule-game span.schedule-game__score-link',
     );
-    const count = await spanScore.count();
-    if (count > 0) {
-      await expect(spanScore.first()).toBeVisible();
-    }
-    // When all games are played, no span scores is correct behavior
+    await expect(spanScore.first()).toBeVisible();
   });
 });
 
@@ -310,24 +295,15 @@ test.describe('Team Schedule — SOS summary', () => {
 // ============================================================
 
 test.describe('Team Schedule — SOS tier dot in streak', () => {
-  test('unplayed game streak shows tier dot when data exists', async ({
+  test('unplayed game streak shows tier dot', async ({
     appState,
     page,
   }) => {
     await appState({ 'Current Season Phase': 'Regular Season' });
     await page.goto(TEAM_SCHEDULE_URL);
-    // Tier dots only appear on unplayed games when power ranking data exists.
-    // Verify the feature works when the data supports it.
+    // CI seed has unplayed games and power rankings for Metros — tier dots should render
     const tierDots = page.locator('.schedule-game__streak .sos-tier-dot');
-    const hasUnplayed = await page.locator('.schedule-game--upcoming').count() > 0;
-    if (hasUnplayed) {
-      // With unplayed games and power rankings, tier dots should render
-      const dotCount = await tierDots.count();
-      if (dotCount > 0) {
-        await expect(tierDots.first()).toBeVisible();
-      }
-    }
-    // When all games are played, no tier dots is correct behavior
+    await expect(tierDots.first()).toBeVisible();
   });
 });
 
@@ -352,16 +328,15 @@ test.describe('Team Schedule — no SOS data', () => {
   });
 
   test('no tier dot in streak without power data', async ({ page }) => {
-    // This team may not have scheduled games, so check if any streaks exist
+    // CI seed has scheduled games for teamID=5 — streaks should exist
     const streaks = page.locator('.schedule-game__streak');
-    const count = await streaks.count();
-    if (count > 0) {
-      // Verify no tier dots in streak column for this team's games
-      // (opponents without power rankings won't show dots)
-      await expect(
-        page.locator('.schedule-game__streak .sos-tier-dot'),
-      ).toHaveCount(0);
-    }
+    await expect(streaks.first()).toBeVisible();
+
+    // Verify no tier dots in streak column for this team's games
+    // (opponents without power rankings won't show dots)
+    await expect(
+      page.locator('.schedule-game__streak .sos-tier-dot'),
+    ).toHaveCount(0);
   });
 });
 

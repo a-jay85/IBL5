@@ -273,13 +273,6 @@ function logout()
         'httponly' => true,
         'samesite' => 'Strict',
     ]);
-    // Remove session record
-    if ($r_username !== null) {
-        $stmt = $mysqli_db->prepare("DELETE FROM " . $prefix . "_session WHERE uname = ?");
-        $stmt->bind_param('s', $r_username);
-        $stmt->execute();
-        $stmt->close();
-    }
     $user = "";
     $cookie = "";
     $_SESSION['flash_success'] = 'You have successfully logged out.';
@@ -407,12 +400,6 @@ function login($username, $user_password)
     $rememberMe = isset($_POST['remember_me']) && $_POST['remember_me'] === '1';
     if ($authService->attempt($username, $user_password, $rememberMe)) {
         $uname = $_SERVER['REMOTE_ADDR'];
-
-        // Clean up guest session for this IP
-        $stmtDelSession = $mysqli_db->prepare("DELETE FROM " . $prefix . "_session WHERE uname = ? AND guest = '1'");
-        $stmtDelSession->bind_param('s', $uname);
-        $stmtDelSession->execute();
-        $stmtDelSession->close();
 
         // Record last IP
         $stmtUpdateIp = $mysqli_db->prepare("UPDATE " . $prefix . "_users SET last_ip = ? WHERE username = ?");

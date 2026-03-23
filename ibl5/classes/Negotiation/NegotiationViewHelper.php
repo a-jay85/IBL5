@@ -84,6 +84,7 @@ class NegotiationViewHelper implements NegotiationViewHelperInterface
         </div>
 
         <form name="ExtensionOffer" method="post" action="modules/Player/extension.php">
+            <?= \Utilities\CsrfGuard::generateToken('extension') ?>
             <div class="ibl-field-group">
                 <span class="ibl-label">Your Offer:</span>
                 <div class="ibl-field-group__content">

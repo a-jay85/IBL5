@@ -9,6 +9,11 @@ try {
 
 global $mysqli_db;
 
+if (!\Utilities\CsrfGuard::validateSubmittedToken('trade_reject')) {
+    header('Location: /ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
+    exit;
+}
+
 if (!isset($_POST['offer']) || empty($_POST['offer'])) {
     error_log("Missing offer ID in POST data");
     die("Error: Missing trade offer ID");

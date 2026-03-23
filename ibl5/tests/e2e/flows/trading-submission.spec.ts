@@ -165,6 +165,16 @@ async function findPartner(
 }
 
 /**
+ * Extract the CSRF token from the trading form on the current page.
+ */
+async function getCsrfToken(page: Page): Promise<string> {
+  const token = await page
+    .locator('form[name="Trade_Offer"] input[name="_csrf_token"]')
+    .getAttribute('value');
+  return token ?? '';
+}
+
+/**
  * Build the POST form body from extracted form data, checking specified indices.
  */
 function buildFormBody(
@@ -172,6 +182,7 @@ function buildFormBody(
   checkedIndices: number[],
   userCash?: Record<number, number>,
   partnerCash?: Record<number, number>,
+  csrfToken?: string,
 ): Record<string, string> {
   const body: Record<string, string> = {
     offeringTeam: formData.offeringTeam,
@@ -179,6 +190,10 @@ function buildFormBody(
     switchCounter: String(formData.switchCounter),
     fieldsCounter: String(formData.fieldsCounter),
   };
+
+  if (csrfToken) {
+    body['_csrf_token'] = csrfToken;
+  }
 
   for (let k = 0; k < formData.fieldsCounter; k++) {
     const field = formData.fields[k];
@@ -362,11 +377,12 @@ test.describe('Trade submission: draft pick trade (API)', () => {
 
     expect(fd, 'CI seed must provide a partner with user pick + partner player').toBeTruthy();
 
+    const token = await getCsrfToken(page);
     const existingIds = await collectAllOfferIds(page);
 
     const pickIdx = getUserPickIndices(fd!)[0];
     const partnerIdx = getPartnerPlayerIndices(fd!)[0];
-    const body = buildFormBody(fd!, [pickIdx, partnerIdx]);
+    const body = buildFormBody(fd!, [pickIdx, partnerIdx], undefined, undefined, token);
     const location = await submitOffer(request, body);
 
     // Accept either success or cap/validation error — both prove the pipeline works
@@ -404,10 +420,11 @@ test.describe('Trade submission: cash-only trade (API)', () => {
     const fd = await findPartner(page, () => true);
     expect(fd, 'CI seed must provide a trade partner').toBeTruthy();
 
+    const token = await getCsrfToken(page);
     const existingIds = await collectAllOfferIds(page);
 
     const cashYear = fd!.cashStartYear;
-    const body = buildFormBody(fd!, [], { [cashYear]: 200 });
+    const body = buildFormBody(fd!, [], { [cashYear]: 200 }, undefined, token);
     const location = await submitOffer(request, body);
 
     // CI seed provides teams under cap — cash trade must succeed
@@ -445,6 +462,7 @@ test.describe('Trade submission: mixed trade (API)', () => {
     );
     expect(fd, 'CI seed must provide a partner with tradeable players on both sides').toBeTruthy();
 
+    const token = await getCsrfToken(page);
     const existingIds = await collectAllOfferIds(page);
 
     const userIdx = getUserPlayerIndices(fd!)[0];
@@ -455,6 +473,7 @@ test.describe('Trade submission: mixed trade (API)', () => {
       [userIdx, partnerIdx],
       { [cashYear]: 100 },
       { [cashYear]: 150 },
+      token,
     );
     const location = await submitOffer(request, body);
 
@@ -490,9 +509,10 @@ test.describe('Trade submission: validation errors', () => {
     const fd = await findPartner(page, () => true);
     expect(fd, 'CI seed must provide a trade partner').toBeTruthy();
 
+    const token = await getCsrfToken(page);
     const cashYear = fd!.cashStartYear;
     // 50 is below the 100 minimum
-    const body = buildFormBody(fd!, [], { [cashYear]: 50 });
+    const body = buildFormBody(fd!, [], { [cashYear]: 50 }, undefined, token);
     const location = await submitOffer(request, body);
     expect(location).toContain('error=');
 
@@ -556,14 +576,18 @@ test.describe('Trade submission: accept and reject', () => {
     offeringTeam = fd!.offeringTeam;
     listeningTeam = fd!.listeningTeam;
 
+    const tokenA = await getCsrfToken(page);
+    const tradeFormUrl = page.url();
     const existingIds = await collectAllOfferIds(page);
     const userPlayers = getUserPlayerIndices(fd!);
     const partnerPlayers = getPartnerPlayerIndices(fd!);
-
-    const bodyA = buildFormBody(fd!, [userPlayers[0], partnerPlayers[0]]);
+    const bodyA = buildFormBody(fd!, [userPlayers[0], partnerPlayers[0]], undefined, undefined, tokenA);
     const locationA = await submitOffer(request, bodyA);
 
-    const bodyB = buildFormBody(fd!, [userPlayers[1], partnerPlayers[1]]);
+    // Reload trading form to get a fresh CSRF token (single-use tokens)
+    await page.goto(tradeFormUrl);
+    const tokenB = await getCsrfToken(page);
+    const bodyB = buildFormBody(fd!, [userPlayers[1], partnerPlayers[1]], undefined, undefined, tokenB);
     const locationB = await submitOffer(request, bodyB);
 
     // CI seed provides teams under cap — both offers must succeed
@@ -601,28 +625,30 @@ test.describe('Trade submission: accept and reject', () => {
 
   test('rejecting already-processed offer returns warning', async ({
     appState,
-    request,
     page,
   }) => {
     expect(setupDone, 'Setup test must have created offers').toBe(true);
 
     await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
 
-    const response = await request.post(
-      '/ibl5/modules/Trading/rejecttradeoffer.php',
-      {
-        form: {
-          offer: String(offerBId),
-          teamRejecting: offeringTeam,
-          teamReceiving: listeningTeam,
-        },
-        maxRedirects: 0,
-      },
-    );
-    const location = response.headers()['location'] ?? '';
-    expect(location).toContain('result=already_processed');
+    // Navigate to review page — offerA should still be visible with a reject button
+    await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+    const offerACard = page.locator('.trade-offer-card').filter({
+      has: page.locator(`[data-preview-offer="${offerAId}"]`),
+    });
 
-    await page.goto(location.replace('/ibl5/', ''));
+    // Tamper with the reject form's offer ID to point at the already-rejected offerB.
+    // This simulates submitting a reject for an already-processed offer while
+    // still using a valid CSRF token from the browser's form.
+    await offerACard.locator('form[name="tradereject"] input[name="offer"]')
+      .evaluate((el, id) => { (el as HTMLInputElement).value = String(id); }, offerBId);
+
+    const rejectBtn = offerACard.locator('.ibl-btn--danger');
+    await Promise.all([
+      page.waitForURL(/result=already_processed/),
+      rejectBtn.click(),
+    ]);
+
     await expect(page.locator('.ibl-alert--warning')).toBeVisible();
   });
 

@@ -14,6 +14,11 @@ if (!isset($mysqli_db) || !($mysqli_db instanceof mysqli)) {
     die("Error: Database connection failed");
 }
 
+if (!\Utilities\CsrfGuard::validateSubmittedToken('trade_accept')) {
+    header('Location: /ibl5/modules.php?name=Trading&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
+    exit;
+}
+
 $offerId = $_POST['offer'] ?? null;
 
 if ($offerId !== null) {

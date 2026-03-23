@@ -6,6 +6,11 @@ require __DIR__ . '/../../mainfile.php';
 
 global $mysqli_db;
 
+if (!\Utilities\CsrfGuard::validateSubmittedToken('extension')) {
+    header('Location: /ibl5/index.php');
+    exit;
+}
+
 // Collect input data
 $teamName = is_string($_POST['teamName'] ?? null) ? $_POST['teamName'] : '';
 $playerID = (int) ($_POST['playerID'] ?? 0);

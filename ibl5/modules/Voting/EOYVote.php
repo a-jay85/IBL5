@@ -10,6 +10,12 @@ PageLayout\PageLayout::header();
 
 echo "<HTML><HEAD><TITLE>End of Year Voting Result</TITLE></HEAD><BODY>";
 
+if (!\Utilities\CsrfGuard::validateSubmittedToken('eoy_vote')) {
+    echo 'Invalid or expired form submission. Please go back and try again.';
+    PageLayout\PageLayout::footer();
+    return;
+}
+
 $Team_Name = $_POST['teamname'] ?? '';
 $MVP1 = $_POST['MVP'][1] ?? '';
 $MVP2 = $_POST['MVP'][2] ?? '';

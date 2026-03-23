@@ -268,17 +268,7 @@ class SearchRepository extends BaseMysqliRepository implements SearchRepositoryI
      */
     public function getAuthors(): array
     {
-        /** @var list<AuthorDbRow> $rows */
-        $rows = $this->fetchAll(
-            "SELECT aid FROM {$this->prefix}_authors ORDER BY aid"
-        );
-
-        $authors = [];
-        foreach ($rows as $row) {
-            $authors[] = $row['aid'];
-        }
-
-        return $authors;
+        return [];
     }
 
     /**

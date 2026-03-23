@@ -118,11 +118,11 @@ class SearchRepositoryTest extends DatabaseTestCase
         }
     }
 
-    public function testGetAuthorsReturnsArray(): void
+    public function testGetAuthorsReturnsEmptyArray(): void
     {
         $authors = $this->repo->getAuthors();
 
-        self::assertIsArray($authors);
+        self::assertSame([], $authors);
     }
 
     // ── getTopicInfo ────────────────────────────────────────────

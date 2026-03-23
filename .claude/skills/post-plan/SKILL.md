@@ -188,12 +188,47 @@ After both agents complete:
 
 ## Phase 7: CI Monitoring
 
-1. Find CI runs: `gh run list --branch <branch-name> --limit 5`
-2. Monitor: `gh run watch <run-id>` or poll with `gh run view <run-id>`
-3. If a job fails: `gh run view <run-id> --log-failed` to get the error
-4. Fix the issue in the worktree, commit, and push
-5. Repeat until all CI jobs pass
-6. Report final CI status
+**BLOCKING GATE — do NOT proceed to Phase 7.5 until every CI check shows success. This phase loops until CI is green or you exhaust retries.**
+
+Track iteration count starting at 1. Maximum 3 fix-push-retry cycles before escalating to the user.
+
+### Step 7.1: Wait for CI run to appear
+
+After the most recent push, the CI run may take 10-30 seconds to register. Poll with 15-second waits:
+
+```bash
+gh run list --branch <branch-name> --limit 1 --json databaseId,status,conclusion,createdAt
+```
+
+Repeat up to 4 times (60s total). If no run appears, warn the user and **stop the workflow** — do not proceed.
+
+### Step 7.2: Block until the run completes
+
+```bash
+gh run watch <run-id> --exit-status
+```
+
+Use Bash timeout of 600000 (10 minutes). This blocks until the run finishes. Exit code 0 means all jobs passed; non-zero means at least one job failed.
+
+If the command times out, fall back to polling `gh run view <run-id> --json status,conclusion` every 30 seconds until status is `completed`.
+
+### Step 7.3: Evaluate result
+
+**If all jobs passed → proceed to Phase 7.5.**
+
+**If any job failed:**
+
+1. Download failure logs: `gh run view <run-id> --log-failed`
+2. Run the 3-step CI failure checklist from `memory/feedback_ci_failures.md`:
+   - Is the failing file in my PR diff?
+   - Is the failing line/assertion one I changed?
+   - Did this test fail on the parent commit?
+3. Diagnose the failure from the logs
+4. Fix the code in the worktree
+5. Commit and push the fix
+6. Increment iteration count
+7. **If iteration count > 3:** Stop and report unresolved failures to the user. List what failed, what you tried, and the remaining error. Do NOT proceed to Phase 7.5.
+8. **Otherwise: GO BACK TO Step 7.1** — wait for the new CI run triggered by the push
 
 ---
 

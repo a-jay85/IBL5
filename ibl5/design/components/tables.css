@@ -414,74 +414,13 @@
     /* width set by contract-hint.js */
 }
 
-/* Desktop: reveal link and hide zeros when hovering over hint cells */
-@media (hover: hover) {
-    tr:has(.contract-hint-cell:hover) .contract-hint-link {
-        display: flex;
-    }
-    tr:has(.contract-hint-cell:hover) .contract-hint-cell:has(.contract-hint-link) {
-        z-index: 1;
-    }
-    tr:has(.contract-hint-cell:hover) .contract-hint-cell {
-        color: transparent;
-        text-decoration: none;
-    }
-}
-
-/* Mobile: reveal link and hide zeros on focus/tap */
-tr:has(.contract-hint-cell:focus) .contract-hint-link {
-    display: flex;
-}
-tr:has(.contract-hint-cell:focus) .contract-hint-cell:has(.contract-hint-link) {
-    z-index: 1;
-}
-tr:has(.contract-hint-cell:focus) .contract-hint-cell {
-    color: transparent;
-    text-decoration: none;
-}
-
-/* Salary year columns — right-aligned (shared between Contracts and Free Agency) */
-.team-table th.col-salary,
-.team-table td.col-salary {
-    text-align: right;
-}
-
-/* Contract hint cells — show salary zeros with dotted underline; reveal action link on hover/tap.
-   The link lives in the first hint cell and spans all 5 via width: 500% + overflow: visible. */
-.contract-hint-cell {
-    position: relative;
-    overflow: visible;
-    cursor: pointer;
-    text-decoration: underline;
-    text-decoration-style: dotted;
-    text-decoration-color: var(--gray-400, #9ca3af);
-    text-underline-offset: 2px;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.ibl-data-table .contract-hint-link,
-.ibl-data-table .contract-hint-link:visited {
-    display: none;
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 0;
-    background-color: inherit;
-    color: var(--accent-700, #c2410c);
-    text-decoration-line: underline;
-    font-weight: 600;
-    white-space: nowrap;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    /* width set by contract-hint.js */
-}
-
 /* Desktop: reveal link and hide zeros on hover */
 @media (hover: hover) {
     tr:has(.contract-hint-cell):hover .contract-hint-link {
         display: flex;
+    }
+    tr:has(.contract-hint-cell):hover .contract-hint-cell:has(.contract-hint-link) {
+        z-index: 1;
     }
     tr:has(.contract-hint-cell):hover .contract-hint-cell {
         color: transparent;
@@ -492,6 +431,9 @@ tr:has(.contract-hint-cell:focus) .contract-hint-cell {
 /* Mobile: reveal link and hide zeros on focus/tap */
 tr:has(.contract-hint-cell):focus-within .contract-hint-link {
     display: flex;
+}
+tr:has(.contract-hint-cell):focus-within .contract-hint-cell:has(.contract-hint-link) {
+    z-index: 1;
 }
 tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
     color: transparent;
@@ -1184,16 +1126,6 @@ tr:has(.contract-hint-cell):focus-within .contract-hint-cell {
    Table Row Variants
    ========================================================================== */
 
-.ibl-table-row--highlight:nth-child(odd),
-.ibl-table-row--highlight:nth-child(even) {
-    background-color: var(--accent-100);
-}
-
-.ibl-table-row--user-team:nth-child(odd),
-.ibl-table-row--user-team:nth-child(even) {
-    background-color: #ffffcc;
-}
-
 /* User team highlighting (applied by user-team-highlighter.js) */
 tbody tr.user-team-row:nth-child(odd),
 tbody tr.user-team-row:nth-child(even) {
@@ -1203,34 +1135,6 @@ tbody tr.user-team-row:nth-child(even) {
 tbody tr.user-team-row:nth-child(odd):hover,
 tbody tr.user-team-row:nth-child(even):hover {
     background-color: var(--warning-200, #fde68a);
-}
-
-.ibl-table-row--winner {
-    font-weight: 700;
-    color: var(--accent-600);
-}
-
-/* ==========================================================================
-   Stat Value Formatting
-   ========================================================================== */
-
-.ibl-stat-value {
-    font-family: var(--font-display);
-    font-weight: 600;
-    text-align: right;
-}
-
-.ibl-stat-value--highlight {
-    color: var(--accent-500);
-    font-weight: 700;
-}
-
-.ibl-stat-value--positive {
-    color: var(--success-600, #16a34a);
-}
-
-.ibl-stat-value--negative {
-    color: var(--error-600, #dc2626);
 }
 
 /* ==========================================================================
@@ -1747,60 +1651,6 @@ td.ibl-team-cell--colored {
     border: 1px solid var(--gray-300, #d1d5db);
     border-radius: var(--radius-sm, 0.25rem);
     text-align: right;
-}
-
-/* Trade offer cards */
-.trade-offer-card {
-    margin-bottom: 1rem;
-    padding: 1rem;
-    border: 1px solid var(--gray-200, #e5e7eb);
-    border-radius: var(--radius-md, 0.375rem);
-    background: white;
-    box-shadow: var(--shadow-sm, 0 1px 2px 0 rgb(0 0 0 / 0.05));
-}
-
-.trade-offer-card p {
-    margin: 0.25rem 0;
-}
-
-/* Trading button variants (base .ibl-btn defined in forms.css) */
-.ibl-btn--primary {
-    background: var(--gradient-navy-header);
-    color: white;
-}
-
-.ibl-btn--primary:hover {
-    background: linear-gradient(135deg, var(--navy-700, #334155), var(--navy-800, #1e293b));
-}
-
-.ibl-btn--success {
-    background: linear-gradient(135deg, var(--success-500, #22c55e), var(--success-600, #16a34a));
-    color: white;
-}
-
-.ibl-btn--success:hover {
-    background: linear-gradient(135deg, var(--success-400, #4ade80), var(--success-500, #22c55e));
-}
-
-.ibl-btn--danger {
-    background: linear-gradient(135deg, var(--error-500, #ef4444), var(--error-600, #dc2626));
-    color: white;
-}
-
-.ibl-btn--danger:hover {
-    background: linear-gradient(135deg, var(--error-400, #f87171), var(--error-500, #ef4444));
-}
-
-/* Link styling for Trading */
-.ibl-link {
-    color: var(--navy-700, #334155);
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 150ms ease;
-}
-
-.ibl-link:hover {
-    color: var(--accent-500, #f97316);
 }
 
 /* ==========================================================================

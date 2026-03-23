@@ -96,14 +96,10 @@ function render_blocks($side, $blockfile, $title, $content, $bid, $url)
     if (!defined('BLOCK_FILE')) {
         define('BLOCK_FILE', true);
     }
-    if (empty($url)) {
-        if (empty($blockfile)) {
-            themecenterbox($title, $content);
-        } else {
-            blockfileinc($title, $blockfile, 1);
-        }
+    if (empty($blockfile)) {
+        themecenterbox($title, $content);
     } else {
-        headlines($bid, 1);
+        blockfileinc($title, $blockfile, 1);
     }
 }
 
@@ -438,18 +434,6 @@ function formatAidHeader($aid)
     echo $AidHeader;
 }
 
-if (!function_exists("themepreview")) {
-    function themepreview($title, $hometext, $bodytext = "", $notes = "")
-    {
-        echo "<b>$title</b><br><br>$hometext";
-        if (!empty($bodytext)) {
-            echo "<br><br>$bodytext";
-        }
-        if (!empty($notes)) {
-            echo "<br><br><b>" . _NOTE . "</b> <i>$notes</i>";
-        }
-    }
-}
 
 function loginbox(): void
 {
@@ -480,160 +464,4 @@ function getTopics($s_sid)
     $topictext = filter($row['topictext'], "nohtml");
 }
 
-function headlines($bid, $cenbox = 0)
-{
-    global $prefix, $db;
-    $bid = intval($bid);
-    $result = $db->sql_query("SELECT title, content, url, refresh, time FROM " . $prefix . "_blocks WHERE bid='$bid'");
-    $row = $db->sql_fetchrow($result);
-    $title = filter($row['title'], "nohtml");
-    $content = filter($row['content']);
-    $url = filter($row['url'], "nohtml");
-    $refresh = intval($row['refresh']);
-    $otime = $row['time'];
-    $past = time() - $refresh;
-    $cont = 0;
-    if ($otime < $past) {
-        $btime = time();
-        $rdf = parse_url($url);
-        $fp = fsockopen($rdf['host'], 80, $errno, $errstr, 15);
-        if (!$fp) {
-            $content = "";
-            $db->sql_query("UPDATE " . $prefix . "_blocks SET content='" . $db->db_connect_id->real_escape_string($content) . "', time='$btime' WHERE bid='$bid'");
-            $cont = 0;
-            themecenterbox($title, $content);
-            return;
-        }
-        if ($fp) {
-            if (!empty($rdf['query'])) {
-                $rdf['query'] = "?" . $rdf['query'];
-            }
 
-            fputs($fp, "GET " . $rdf['path'] . $rdf['query'] . " HTTP/1.0\r\n");
-            fputs($fp, "HOST: " . $rdf['host'] . "\r\n\r\n");
-            $string = "";
-            while (!feof($fp)) {
-                $pagetext = fgets($fp, 300);
-                $string .= chop($pagetext);
-            }
-            fputs($fp, "Connection: close\r\n\r\n");
-            fclose($fp);
-            $items = explode("</item>", $string);
-            $content = "<font class=\"content\">";
-            for ($i = 0; $i < 10; $i++) {
-                $link = preg_replace('/.*<link>/', '', $items[$i]);
-                $link = preg_replace('/<\/link>.*/', '', $link);
-                $title2 = preg_replace('/.*<title>/', '', $items[$i]);
-                $title2 = preg_replace('/<\/title>.*/', '', $title2);
-                $title2 = stripslashes($title2);
-                if (empty($items[$i]) and $cont != 1) {
-                    $content = "";
-                    $db->sql_query("UPDATE " . $prefix . "_blocks SET content='" . $db->db_connect_id->real_escape_string($content) . "', time='$btime' WHERE bid='$bid'");
-                    $cont = 0;
-                    themecenterbox($title, $content);
-                    return;
-                } else {
-                    if (strcmp($link, $title2) and !empty($items[$i])) {
-                        $cont = 1;
-                        $content .= "<strong><big>&middot;</big></strong><a href=\"$link\" target=\"new\">$title2</a><br>\n";
-                    }
-                }
-            }
-
-        }
-        $db->sql_query("UPDATE " . $prefix . "_blocks SET content='" . $db->db_connect_id->real_escape_string($content) . "', time='$btime' WHERE bid='$bid'");
-    }
-    $siteurl = str_replace("http://", "", $url);
-    $siteurl = explode("/", $siteurl);
-    if (($cont == 1) or (!empty($content))) {
-        $content .= "<br><a href=\"http://$siteurl[0]\" target=\"blank\"><b>" . _HREADMORE . "</b></a></font>";
-    } elseif (($cont == 0) or (empty($content))) {
-        $content = "<font class=\"content\">" . _RSSPROBLEM . "</font>";
-    }
-    themecenterbox($title, $content);
-}
-
-function get_theme()
-{
-    global $user, $userinfo, $Default_Theme, $name, $op;
-    if (isset($ThemeSelSave)) {
-        return $ThemeSelSave;
-    }
-
-    if (is_user($user) && ($name != "YourAccount" or $op != "logout")) {
-        getusrinfo($user);
-        if (empty($userinfo['theme'])) {
-            $userinfo['theme'] = $Default_Theme;
-        }
-
-        if (file_exists("themes/" . $userinfo['theme'] . "/theme.php")) {
-            $ThemeSel = $userinfo['theme'];
-        } else {
-            $ThemeSel = $Default_Theme;
-        }
-    } else {
-        $ThemeSel = $Default_Theme;
-    }
-    static $ThemeSelSave;
-    $ThemeSelSave = $ThemeSel;
-    return $ThemeSelSave;
-}
-
-function validate_mail($email)
-{
-    if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-        OpenTable();
-        echo _ERRORINVEMAIL;
-        CloseTable();
-        die();
-    } else {
-        return $email;
-    }
-}
-
-function redir($content)
-{
-    global $nukeurl;
-    unset($location);
-    $content = filter($content);
-    $links = array();
-    $hrefs = array();
-    $pos = 0;
-    $linkpos = 0;
-    while (!(($pos = strpos($content, "<", $pos)) === false)) {
-        $pos++;
-        $endpos = strpos($content, ">", $pos);
-        $tag = substr($content, $pos, $endpos - $pos);
-        $tag = trim($tag);
-        if (isset($location)) {
-            if (!strcasecmp(strtok($tag, " "), "/A")) {
-                $link = substr($content, $linkpos, $pos - 1 - $linkpos);
-                $links[] = $link;
-                $hrefs[] = $location;
-                unset($location);
-            }
-            $pos = $endpos + 1;
-        } else {
-            if (!strcasecmp(strtok($tag, " "), "A")) {
-                if (preg_match('/HREF[ \t\n\r\v]*=[ \t\n\r\v]*"([^"]*)"/i', $tag, $regs));
-                elseif (preg_match('/HREF[ \t\n\r\v]*=[ \t\n\r\v]*([^ \t\n\r\v]*)/i', $tag, $regs));
-                else{
-                    $regs[1] = "";
-                }
-
-                if ($regs[1]) {
-                    $location = $regs[1];
-                }
-                $pos = $endpos + 1;
-                $linkpos = $pos;
-            } else {
-                $pos = $endpos + 1;
-            }
-        }
-    }
-    for ($i = 0; $i < sizeof($hrefs); $i++) {
-        $url = urlencode($hrefs[$i]);
-        $content = str_replace("<a href=\"$hrefs[$i]\">", "<a href=\"$nukeurl/index.php?url=$url\" target=\"_blank\">", $content);
-    }
-    return ($content);
-}

@@ -29,7 +29,7 @@ $pagetitle = "- " . _ACTIVETOPICS;
 
 global $mysqli_db, $prefix, $user_prefix, $tipath, $articlecomm;
 
-$ThemeSel = get_theme();
+$ThemeSel = 'IBL';
 
 // Determine the image path: use theme-specific images if available, fall back to default
 $themePath = (is_dir("themes/{$ThemeSel}/images/topics/"))

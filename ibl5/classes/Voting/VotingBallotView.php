@@ -37,7 +37,9 @@ class VotingBallotView implements VotingBallotViewInterface
         $safeFormAction = HtmlSanitizer::safeHtmlOutput($formAction);
         $safeVoterTeam = HtmlSanitizer::safeHtmlOutput($voterTeamName);
 
+        $csrfFormName = $isASG ? 'asg_vote' : 'eoy_vote';
         $html = "<form name=\"{$formName}\" method=\"post\" action=\"{$safeFormAction}\">";
+        $html .= \Utilities\CsrfGuard::generateToken($csrfFormName);
         $html .= '<div class="voting-form-container">';
         $html .= "<img src=\"images/logo/{$tid}.jpg\" alt=\"Team Logo\" class=\"team-logo-banner\">";
         $html .= '<button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--lg">Submit Votes!</button>';

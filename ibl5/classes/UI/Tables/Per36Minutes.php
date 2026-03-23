@@ -10,6 +10,7 @@ use Player\Player;
 use Player\PlayerImageHelper;
 use UI\TeamCellHelper;
 use Utilities\HtmlSanitizer;
+use Team\Team;
 
 /**
  * Per36Minutes - Displays per-36-minute statistics table
@@ -21,13 +22,13 @@ class Per36Minutes
      *
      * @param \mysqli $db Database connection
      * @param iterable<int, Player|array<string, mixed>> $result Player result set
-     * @param \Team $team Team object
+     * @param Team $team Team object
      * @param string $yr Year filter (empty for current season)
      * @param list<int> $starterPids Starter player IDs
      * @param string $moduleName Module name
      * @return string HTML table
      */
-    public static function render(\mysqli $db, $result, \Team $team, string $yr, array $starterPids = [], string $moduleName = ""): string
+    public static function render(\mysqli $db, $result, Team $team, string $yr, array $starterPids = [], string $moduleName = ""): string
     {
         $resolvedRows = PlayerRowTransformer::resolveWithStats($db, $result, $yr);
 

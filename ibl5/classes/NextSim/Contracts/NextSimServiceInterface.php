@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace NextSim\Contracts;
 
+use Team\Team;
+
 /**
  * NextSimServiceInterface - Contract for next sim business logic
  *
  * Defines methods for processing next simulation game data.
  *
- * @phpstan-type NextSimGameData array{game: \Game, date: \DateTime, dayNumber: int, opposingTeam: \Team, locationPrefix: string, opposingStarters: array<string, \Player\Player>, opponentTier: string, opponentPowerRanking: float}
+ * @phpstan-type NextSimGameData array{game: \Game, date: \DateTime, dayNumber: int, opposingTeam: Team, locationPrefix: string, opposingStarters: array<string, \Player\Player>, opponentTier: string, opponentPowerRanking: float}
  *
  * @see \NextSim\NextSimService For the concrete implementation
  */
@@ -27,8 +29,8 @@ interface NextSimServiceInterface
     /**
      * Get user's starting lineup
      *
-     * @param \Team $team User's team
+     * @param Team $team User's team
      * @return array<string, \Player\Player> Starting players by position
      */
-    public function getUserStartingLineup(\Team $team): array;
+    public function getUserStartingLineup(Team $team): array;
 }

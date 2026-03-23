@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use NextSim\NextSimView;
 use NextSim\Contracts\NextSimViewInterface;
 use Player\Player;
+use Team\Team;
 
 /**
  * NextSimViewTest - Tests for NextSimView HTML rendering
@@ -18,8 +19,8 @@ class NextSimViewTest extends TestCase
 {
     private NextSimView $view;
 
-    /** @var \Team&\PHPUnit\Framework\MockObject\Stub */
-    private \Team $userTeam;
+    /** @var Team&\PHPUnit\Framework\MockObject\Stub */
+    private Team $userTeam;
 
     /** @var array<string, Player&\PHPUnit\Framework\MockObject\Stub> */
     private array $userStarters;
@@ -31,7 +32,7 @@ class NextSimViewTest extends TestCase
 
         $this->view = new NextSimView($mockSeason);
 
-        $this->userTeam = $this->createStub(\Team::class);
+        $this->userTeam = $this->createStub(Team::class);
         $this->userTeam->teamID = 1;
         $this->userTeam->city = 'Test';
         $this->userTeam->name = 'Team';
@@ -205,11 +206,11 @@ class NextSimViewTest extends TestCase
     }
 
     /**
-     * @return array<int, array{game: \Game, date: \DateTime, dayNumber: int, opposingTeam: \Team, locationPrefix: string, opposingStarters: array<string, Player>, opponentTier: string, opponentPowerRanking: float}>
+     * @return array<int, array{game: \Game, date: \DateTime, dayNumber: int, opposingTeam: Team, locationPrefix: string, opposingStarters: array<string, Player>, opponentTier: string, opponentPowerRanking: float}>
      */
     private function createGameData(): array
     {
-        $oppTeam = $this->createStub(\Team::class);
+        $oppTeam = $this->createStub(Team::class);
         $oppTeam->teamID = 2;
         $oppTeam->city = 'Rival';
         $oppTeam->name = 'Foes';

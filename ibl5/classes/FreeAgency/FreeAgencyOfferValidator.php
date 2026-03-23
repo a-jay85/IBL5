@@ -6,6 +6,7 @@ namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyOfferValidatorInterface;
 use League\League;
+use Team\Team;
 
 /**
  * @see FreeAgencyOfferValidatorInterface
@@ -262,7 +263,7 @@ class FreeAgencyOfferValidator implements FreeAgencyOfferValidatorInterface
      */
     private function getTeamProperty(string $property): int
     {
-        if ($this->team instanceof \Team) {
+        if ($this->team instanceof Team) {
             return match ($property) {
                 'hasMLE' => $this->team->hasMLE,
                 'hasLLE' => $this->team->hasLLE,

@@ -44,7 +44,7 @@ PageLayout\PageLayout::header();
 
 $username = strval($cookie[1] ?? '');
 $userTeamName = $commonRepository->getTeamnameFromUsername($username);
-$userTeam = Team::initialize($mysqli_db, $userTeamName);
+$userTeam = \Team\Team::initialize($mysqli_db, $userTeamName);
 
 echo $view->render($startersByPosition, $userTeam, $display);
 

@@ -48,7 +48,7 @@ if (!is_user($user)) {
 
     $username = strval($cookie[1] ?? '');
     $userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? '';
-    $userTeam = Team::initialize($mysqli_db, $userTeamName);
+    $userTeam = \Team\Team::initialize($mysqli_db, $userTeamName);
 
     // Initialize services
     $teamScheduleRepository = new TeamScheduleRepository($mysqli_db);

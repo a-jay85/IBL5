@@ -7,6 +7,7 @@ namespace FreeAgency;
 use FreeAgency\Contracts\FreeAgencyAdminProcessorInterface;
 use FreeAgency\Contracts\FreeAgencyAdminRepositoryInterface;
 use Player\Player;
+use Team\Team;
 
 /**
  * Processes admin free agency operations
@@ -125,9 +126,9 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
                 $processedPlayers[$playerName] = true;
 
                 // Get team info for IDs
-                $offeringTeam = \Team::initialize($this->db, $offeringTeamName);
+                $offeringTeam = Team::initialize($this->db, $offeringTeamName);
                 $player = Player::withPlayerID($this->db, $playerId);
-                $playerTeam = \Team::initialize($this->db, $player->teamName ?? '');
+                $playerTeam = Team::initialize($this->db, $player->teamName ?? '');
 
                 // Build Discord text
                 $discordText .= "**" . strtoupper("{$playerName}, {$playerTeam->city} {$player->teamName}") . "** <@!{$playerTeam->discordID}>\n";
@@ -170,7 +171,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
                 }
             } else {
                 // Additional offer for already-processed player - add to Discord text
-                $offeringTeam = \Team::initialize($this->db, $offeringTeamName);
+                $offeringTeam = Team::initialize($this->db, $offeringTeamName);
                 // Only add if offer wasn't auto-rejected
                 $offeringTeamDiscordId = (string) ($offeringTeam->discordID ?? '');
                 $discordText .= $this->buildOfferLine($offeringTeamName, $offer1, $offer2, $offer3, $offer4, $offer5, $offer6, $offeringTeamDiscordId);

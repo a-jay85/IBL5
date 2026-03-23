@@ -56,7 +56,7 @@ class TeamTableService implements TeamTableServiceInterface
         $teamColor1 = is_string($teamData['color1'] ?? null) ? $teamData['color1'] : '000000';
         $teamColor2 = is_string($teamData['color2'] ?? null) ? $teamData['color2'] : 'FFFFFF';
 
-        $team = \Team::initialize($this->db, $teamID);
+        $team = Team::initialize($this->db, $teamID);
 
         /** @var list<int> $starterPids */
         $starterPids = [];
@@ -169,7 +169,7 @@ class TeamTableService implements TeamTableServiceInterface
      * @param list<PlayerRow>|list<array<string, mixed>> $result
      * @param list<int> $starterPids
      */
-    public function renderTableForDisplay(string $display, array $result, \Team $team, ?string $yr, \Season $season, array $starterPids = [], ?string $split = null): string
+    public function renderTableForDisplay(string $display, array $result, Team $team, ?string $yr, \Season $season, array $starterPids = [], ?string $split = null): string
     {
         $yrStr = $yr ?? '';
         switch ($display) {
@@ -283,7 +283,7 @@ class TeamTableService implements TeamTableServiceInterface
      *
      * @param list<int> $starterPids
      */
-    private function renderSplitStats(\Team $team, \Season $season, string $splitKey, array $starterPids): string
+    private function renderSplitStats(Team $team, \Season $season, string $splitKey, array $starterPids): string
     {
         $splitRepo = new SplitStatsRepository($this->db);
         $teamID = $team->teamID;

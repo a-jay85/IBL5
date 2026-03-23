@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace NextSim\Contracts;
 
+use Team\Team;
+
 /**
  * NextSimViewInterface - Contract for next sim view rendering
  *
@@ -19,22 +21,22 @@ interface NextSimViewInterface
      * Render the complete next sim display
      *
      * @param array<int, NextSimGameData> $games Processed game data
-     * @param \Team $userTeam User's team object
+     * @param Team $userTeam User's team object
      * @param array<string, \Player\Player> $userStarters User's starting lineup by position
      * @return string HTML output
      */
-    public function render(array $games, \Team $userTeam, array $userStarters): string;
+    public function render(array $games, Team $userTeam, array $userStarters): string;
 
     /**
      * Render the full ratings table for a single position
      *
      * @param array<int, NextSimGameData> $games Processed game data
      * @param string $position Position abbreviation (PG, SG, SF, PF, C)
-     * @param \Team $userTeam User's team object
+     * @param Team $userTeam User's team object
      * @param array<string, \Player\Player> $userStarters User's starting lineup by position
      * @return string HTML table output
      */
-    public function renderPositionTable(array $games, string $position, \Team $userTeam, array $userStarters): string;
+    public function renderPositionTable(array $games, string $position, Team $userTeam, array $userStarters): string;
 
     /**
      * Render the horizontal schedule strip of compact game cards
@@ -49,9 +51,9 @@ interface NextSimViewInterface
      *
      * @param array<int, NextSimGameData> $games Processed game data
      * @param string $activePosition Currently active position tab (PG, SG, SF, PF, C)
-     * @param \Team $userTeam User's team object
+     * @param Team $userTeam User's team object
      * @param array<string, \Player\Player> $userStarters User's starting lineup by position
      * @return string HTML output with tabs wrapping the position table
      */
-    public function renderTabbedPositionTable(array $games, string $activePosition, \Team $userTeam, array $userStarters): string;
+    public function renderTabbedPositionTable(array $games, string $activePosition, Team $userTeam, array $userStarters): string;
 }

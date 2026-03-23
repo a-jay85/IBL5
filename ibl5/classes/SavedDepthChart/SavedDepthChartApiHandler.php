@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SavedDepthChart;
 
 use Utilities\HtmlSanitizer;
+use Team\Team;
 
 /**
  * AJAX JSON endpoint handler for saved depth charts
@@ -160,7 +161,7 @@ class SavedDepthChartApiHandler
         $endDate = $dc['sim_end_date'];
         $statsHtml = '';
         if ($endDate !== null && $endDate !== '') {
-            $team = \Team::initialize($this->db, $tid);
+            $team = Team::initialize($this->db, $tid);
             $season = new \Season($this->db);
             $statsHtml = \UI\Tables\PeriodAverages::render($this->db, $team, $season, $startDate, $endDate);
         }

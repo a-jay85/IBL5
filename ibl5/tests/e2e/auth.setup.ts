@@ -2,7 +2,7 @@ import { test as setup, expect } from '@playwright/test';
 
 const authFile = 'playwright/.auth/user.json';
 
-setup('authenticate', async ({ page }) => {
+setup('authenticate', async ({ page, request }) => {
   const username = process.env.IBL_TEST_USER;
   const password = process.env.IBL_TEST_PASS;
 
@@ -12,6 +12,10 @@ setup('authenticate', async ({ page }) => {
       'Copy .env.test.example to .env.test and fill in your credentials.'
     );
   }
+
+  // Clear auth throttling before login — repeated test runs accumulate
+  // failed attempts that trigger "Too many login attempts" and block auth.
+  await request.delete('test-state.php?action=clear-throttle');
 
   await page.goto('modules.php?name=YourAccount');
   const loginForm = page.locator('form', { has: page.locator('#login-username') });

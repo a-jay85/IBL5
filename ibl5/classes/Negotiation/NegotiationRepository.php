@@ -84,14 +84,14 @@ class NegotiationRepository extends BaseMysqliRepository implements NegotiationR
      */
     public function isFreeAgencyActive(): bool
     {
-        /** @var array{active: int}|null $result */
+        /** @var array{value: string}|null $result */
         $result = $this->fetchOne(
-            "SELECT active FROM nuke_modules WHERE title = ?",
+            "SELECT value FROM ibl_settings WHERE name = ?",
             "s",
-            "Free_Agency"
+            "Current Season Phase"
         );
 
-        return $result !== null && isset($result['active']) && $result['active'] === 1;
+        return $result !== null && $result['value'] === 'Free Agency';
     }
 
     /**

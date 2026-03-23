@@ -151,7 +151,10 @@ class StatisticsController
         $currentMonth = (int)$parts[1];
         
         \PageLayout\PageLayout::header();
-        \title(HtmlSanitizer::e($sitename) . " " . _STATS);
+        \OpenTable();
+        echo '<center><span class="title"><strong>' . HtmlSanitizer::e($sitename) . ' ' . _STATS . '</strong></span></center>';
+        \CloseTable();
+        echo '<br>';
         \OpenTable();
         
         $monthlyStats = $this->repository->getMonthlyStats($year);
@@ -187,7 +190,10 @@ class StatisticsController
         $currentDate = (int)$parts[0];
         
         \PageLayout\PageLayout::header();
-        \title(HtmlSanitizer::e($sitename) . " " . _STATS);
+        \OpenTable();
+        echo '<center><span class="title"><strong>' . HtmlSanitizer::e($sitename) . ' ' . _STATS . '</strong></span></center>';
+        \CloseTable();
+        echo '<br>';
         \OpenTable();
         
         $dailyStats = $this->repository->getDailyStats($year, $month);
@@ -221,7 +227,10 @@ class StatisticsController
         global $sitename;
         
         \PageLayout\PageLayout::header();
-        \title(HtmlSanitizer::e($sitename) . " " . _STATS);
+        \OpenTable();
+        echo '<center><span class="title"><strong>' . HtmlSanitizer::e($sitename) . ' ' . _STATS . '</strong></span></center>';
+        \CloseTable();
+        echo '<br>';
         \OpenTable();
         
         $hourlyStats = $this->repository->getHourlyStats($year, $month, $date);

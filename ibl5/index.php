@@ -38,7 +38,7 @@ if (str_contains($name, "..") || (isset($file) && str_contains($file, "..")) || 
     $ThemeSel = 'IBL';
     if (file_exists("themes/$ThemeSel/module.php")) {
         include "themes/$ThemeSel/module.php";
-        if (is_active("$default_module") and file_exists("modules/$default_module/" . $mod_file . ".php")) {
+        if (file_exists("modules/$default_module/" . $mod_file . ".php")) {
             $name = $default_module;
         }
     }

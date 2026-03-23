@@ -6,35 +6,43 @@ namespace Trading;
 
 use League\League;
 use Trading\Contracts\TradingServiceInterface;
-use Trading\Contracts\TradingRepositoryInterface;
+use Trading\Contracts\TradeOfferRepositoryInterface;
+use Trading\Contracts\TradeAssetRepositoryInterface;
+use Trading\Contracts\TradeFormRepositoryInterface;
 use Trading\Contracts\TradeCashRepositoryInterface;
 use Season\Season;
 
 /**
  * @see TradingServiceInterface
  *
- * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type TradeInfoRow from \Trading\Contracts\TradeOfferRepositoryInterface
  * @phpstan-import-type TradeCashRow from \Trading\Contracts\TradeCashRepositoryInterface
- * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradingRepositoryInterface
- * @phpstan-import-type TradingDraftPickRow from \Trading\Contracts\TradingRepositoryInterface
- * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradingRepositoryInterface
- * @phpstan-import-type TeamWithCityRow from \Trading\Contracts\TradingRepositoryInterface
+ * @phpstan-import-type DraftPickRow from \Trading\Contracts\TradeAssetRepositoryInterface
+ * @phpstan-import-type TradingDraftPickRow from \Trading\Contracts\TradeFormRepositoryInterface
+ * @phpstan-import-type TradingPlayerRow from \Trading\Contracts\TradeFormRepositoryInterface
+ * @phpstan-import-type TeamWithCityRow from \Trading\Contracts\TradeFormRepositoryInterface
  * @phpstan-import-type PlayerRow from \Services\CommonMysqliRepository
  */
 class TradingService implements TradingServiceInterface
 {
-    private TradingRepositoryInterface $repository;
+    private TradeOfferRepositoryInterface $offerRepository;
+    private TradeAssetRepositoryInterface $assetRepository;
+    private TradeFormRepositoryInterface $formRepository;
     private TradeCashRepositoryInterface $cashRepository;
     private \Services\CommonMysqliRepository $commonRepository;
     private \mysqli $mysqli_db;
 
     public function __construct(
-        TradingRepositoryInterface $repository,
+        TradeOfferRepositoryInterface $offerRepository,
+        TradeAssetRepositoryInterface $assetRepository,
+        TradeFormRepositoryInterface $formRepository,
         \Services\CommonMysqliRepository $commonRepository,
         \mysqli $mysqli_db,
         ?TradeCashRepositoryInterface $cashRepository = null
     ) {
-        $this->repository = $repository;
+        $this->offerRepository = $offerRepository;
+        $this->assetRepository = $assetRepository;
+        $this->formRepository = $formRepository;
         $this->cashRepository = $cashRepository ?? new TradeCashRepository($mysqli_db);
         $this->commonRepository = $commonRepository;
         $this->mysqli_db = $mysqli_db;
@@ -59,13 +67,13 @@ class TradingService implements TradingServiceInterface
         $userTeamId = $userTeamData !== null ? $userTeamData['teamid'] : 0;
         $partnerTeamId = $partnerTeamData !== null ? $partnerTeamData['teamid'] : 0;
 
-        $userPlayers = $this->repository->getTeamPlayersForTrading($userTeamId);
-        $userPicks = $this->repository->getTeamDraftPicksForTrading($userTeamId);
+        $userPlayers = $this->formRepository->getTeamPlayersForTrading($userTeamId);
+        $userPicks = $this->formRepository->getTeamDraftPicksForTrading($userTeamId);
         $userCashRecords = $this->cashRepository->getTeamCashRecordsForSalary($userTeamId);
         $userFutureSalary = $this->calculateFutureSalaries([...$userPlayers, ...$userCashRecords], $season);
 
-        $partnerPlayers = $this->repository->getTeamPlayersForTrading($partnerTeamId);
-        $partnerPicks = $this->repository->getTeamDraftPicksForTrading($partnerTeamId);
+        $partnerPlayers = $this->formRepository->getTeamPlayersForTrading($partnerTeamId);
+        $partnerPicks = $this->formRepository->getTeamDraftPicksForTrading($partnerTeamId);
         $partnerCashRecords = $this->cashRepository->getTeamCashRecordsForSalary($partnerTeamId);
         $partnerFutureSalary = $this->calculateFutureSalaries([...$partnerPlayers, ...$partnerCashRecords], $season);
 
@@ -112,11 +120,11 @@ class TradingService implements TradingServiceInterface
         $mysqliDb = $this->mysqli_db;
         $season = new Season($mysqliDb);
 
-        $allTradeRows = $this->repository->getAllTradeOffers();
+        $allTradeRows = $this->offerRepository->getAllTradeOffers();
         $tradeOffers = $this->groupTradeOffers($allTradeRows, $userTeam, $season->endingYear);
 
         // Get teams for the team selection sidebar
-        $allTeams = $this->repository->getAllTeamsWithCity();
+        $allTeams = $this->formRepository->getAllTeamsWithCity();
         $teams = $this->buildTeamList($allTeams);
 
         // Enrich offers with preview data (team IDs, colors, cash)
@@ -201,8 +209,8 @@ class TradingService implements TradingServiceInterface
                 $offerIds[] = $row['tradeofferid'];
             }
         }
-        $playersMap = $this->repository->getPlayersByIds(array_values(array_unique($playerIds)));
-        $picksMap = $this->repository->getDraftPicksByIds(array_values(array_unique($pickIds)));
+        $playersMap = $this->assetRepository->getPlayersByIds(array_values(array_unique($playerIds)));
+        $picksMap = $this->assetRepository->getDraftPicksByIds(array_values(array_unique($pickIds)));
         $cashMap = $this->cashRepository->getCashTransactionsByOfferIds(array_values(array_unique($offerIds)));
 
         $tradeOffers = [];

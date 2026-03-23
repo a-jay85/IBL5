@@ -5,19 +5,13 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration;
 
 use Trading\TradeCashRepository;
+use Trading\TradeAssetRepository;
+use Trading\TradeFormRepository;
 use Trading\TradeItemType;
-use Trading\TradingRepository;
+use Trading\TradeOfferRepository;
 
 /**
- * Tests TradingRepository against real MariaDB — trade offers, items, player/pick lookups.
- *
- * NOTE: getTradePlayers() and getTradePicks() query ibl_trade_players / ibl_trade_picks
- * which do not exist in the schema. These are dead code and are not tested.
- *
- * NOTE: playerExistsInTrade() also queries ibl_trade_players (non-existent). Not tested.
- *
- * NOTE: updateDraftPickOwner() references non-existent columns (currentteam, pick) in
- * ibl_draft_picks. The table has ownerofpick/owner_tid and year/round instead. Dead code.
+ * Tests Trading repositories against real MariaDB — trade offers, items, player/pick lookups.
  *
  * IMPORTANT: testDeleteTradeOfferRemovesAllRelatedRows MUST be last in this file.
  * deleteTradeOffer() calls begin_transaction() internally, which implicitly commits
@@ -25,14 +19,18 @@ use Trading\TradingRepository;
  */
 class TradingRepositoryTest extends DatabaseTestCase
 {
-    private TradingRepository $repo;
+    private TradeOfferRepository $offerRepo;
+    private TradeAssetRepository $assetRepo;
+    private TradeFormRepository $formRepo;
 
     protected function setUp(): void
     {
         parent::setUp();
         $_SERVER['SERVER_NAME'] = 'localhost';
         $cashRepo = new TradeCashRepository($this->db);
-        $this->repo = new TradingRepository($this->db, $cashRepo);
+        $this->offerRepo = new TradeOfferRepository($this->db, $cashRepo);
+        $this->assetRepo = new TradeAssetRepository($this->db);
+        $this->formRepo = new TradeFormRepository($this->db);
     }
 
     protected function tearDown(): void
@@ -43,16 +41,9 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     // ── Team queries (seed validation) ──────────────────────────
 
-    public function testGetAllTeamsReturns28Teams(): void
-    {
-        $teams = $this->repo->getAllTeams();
-
-        self::assertCount(28, $teams);
-    }
-
     public function testGetAllTeamsWithCityReturns28Teams(): void
     {
-        $teams = $this->repo->getAllTeamsWithCity();
+        $teams = $this->formRepo->getAllTeamsWithCity();
 
         self::assertCount(28, $teams);
         self::assertArrayHasKey('team_city', $teams[0]);
@@ -65,7 +56,7 @@ class TradingRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200030101, 'Trade Batch P1', ['tid' => 1]);
         $this->insertTestPlayer(200030102, 'Trade Batch P2', ['tid' => 2]);
 
-        $result = $this->repo->getPlayersByIds([200030101, 200030102]);
+        $result = $this->assetRepo->getPlayersByIds([200030101, 200030102]);
 
         self::assertCount(2, $result);
         self::assertArrayHasKey(200030101, $result);
@@ -76,7 +67,7 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testGetPlayersByIdsEmptyArrayReturnsEmpty(): void
     {
-        $result = $this->repo->getPlayersByIds([]);
+        $result = $this->assetRepo->getPlayersByIds([]);
 
         self::assertSame([], $result);
     }
@@ -88,7 +79,7 @@ class TradingRepositoryTest extends DatabaseTestCase
         $pickId1 = $this->insertDraftPickRow(1, 1, 2030, 1);
         $pickId2 = $this->insertDraftPickRow(2, 2, 2030, 2);
 
-        $result = $this->repo->getDraftPicksByIds([$pickId1, $pickId2]);
+        $result = $this->assetRepo->getDraftPicksByIds([$pickId1, $pickId2]);
 
         self::assertCount(2, $result);
         self::assertArrayHasKey($pickId1, $result);
@@ -97,7 +88,7 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testGetDraftPicksByIdsEmptyArrayReturnsEmpty(): void
     {
-        $result = $this->repo->getDraftPicksByIds([]);
+        $result = $this->assetRepo->getDraftPicksByIds([]);
 
         self::assertSame([], $result);
     }
@@ -106,8 +97,8 @@ class TradingRepositoryTest extends DatabaseTestCase
 
     public function testGenerateNextTradeOfferIdIsMonotonicallyIncreasing(): void
     {
-        $id1 = $this->repo->generateNextTradeOfferId();
-        $id2 = $this->repo->generateNextTradeOfferId();
+        $id1 = $this->offerRepo->generateNextTradeOfferId();
+        $id2 = $this->offerRepo->generateNextTradeOfferId();
 
         self::assertGreaterThan(0, $id1);
         self::assertGreaterThan($id1, $id2);
@@ -120,9 +111,9 @@ class TradingRepositoryTest extends DatabaseTestCase
         $offerId = $this->insertTradeOfferRow();
         $this->insertTestPlayer(200030103, 'Trade Item Plr', ['tid' => 1]);
 
-        $this->repo->insertTradeItem($offerId, 200030103, TradeItemType::Player, 'Metros', 'Sharks', 'Metros');
+        $this->offerRepo->insertTradeItem($offerId, 200030103, TradeItemType::Player, 'Metros', 'Sharks', 'Metros');
 
-        $trades = $this->repo->getTradesByOfferId($offerId);
+        $trades = $this->offerRepo->getTradesByOfferId($offerId);
         self::assertCount(1, $trades);
         self::assertSame($offerId, $trades[0]['tradeofferid']);
         self::assertSame(200030103, $trades[0]['itemid']);
@@ -138,7 +129,7 @@ class TradingRepositoryTest extends DatabaseTestCase
         $offerId = $this->insertTradeOfferRow();
         $this->insertTradeInfoRow($offerId, 1, '1', 'Metros', 'Sharks');
 
-        $trades = $this->repo->getTradesByOfferIdForUpdate($offerId);
+        $trades = $this->offerRepo->getTradesByOfferIdForUpdate($offerId);
 
         self::assertCount(1, $trades);
         self::assertSame($offerId, $trades[0]['tradeofferid']);
@@ -151,9 +142,9 @@ class TradingRepositoryTest extends DatabaseTestCase
         $offerId = $this->insertTradeOfferRow();
         $this->insertTradeInfoRow($offerId, 1, '1', 'Metros', 'Sharks', 'Metros');
 
-        $this->repo->markTradeInfoCompleted($offerId);
+        $this->offerRepo->markTradeInfoCompleted($offerId);
 
-        $trades = $this->repo->getTradesByOfferId($offerId);
+        $trades = $this->offerRepo->getTradesByOfferId($offerId);
         self::assertCount(1, $trades);
         self::assertSame('completed', $trades[0]['approval']);
     }
@@ -164,9 +155,9 @@ class TradingRepositoryTest extends DatabaseTestCase
         $this->insertTradeInfoRow($offerId, 1, '1', 'Metros', 'Sharks');
         $this->insertTradeInfoRow($offerId, 2, '0', 'Sharks', 'Metros');
 
-        $this->repo->deleteTradeInfoByOfferId($offerId);
+        $this->offerRepo->deleteTradeInfoByOfferId($offerId);
 
-        $trades = $this->repo->getTradesByOfferId($offerId);
+        $trades = $this->offerRepo->getTradesByOfferId($offerId);
         self::assertCount(0, $trades);
     }
 
@@ -180,7 +171,7 @@ class TradingRepositoryTest extends DatabaseTestCase
         $offerId2 = $this->insertTradeOfferRow();
         $this->insertTradeInfoRow($offerId2, 2, '1', 'Sharks', 'Metros', 'Metros');
 
-        $offers = $this->repo->getAllTradeOffers();
+        $offers = $this->offerRepo->getAllTradeOffers();
 
         $offerIds = array_column($offers, 'tradeofferid');
         self::assertNotContains($offerId1, $offerIds);
@@ -193,13 +184,13 @@ class TradingRepositoryTest extends DatabaseTestCase
     {
         // Use a team ID unlikely to have seed players: tid=3
         // First count existing players on tid=3
-        $baseline = $this->repo->getTeamPlayerCount(3);
+        $baseline = $this->formRepo->getTeamPlayerCount(3);
 
         $this->insertTestPlayer(200030104, 'Trade Count P1', ['tid' => 3, 'ordinal' => 100]);
         $this->insertTestPlayer(200030105, 'Trade Count P2', ['tid' => 3, 'ordinal' => 200]);
         $this->insertTestPlayer(200030106, 'Trade Count P3', ['tid' => 3, 'ordinal' => 300]);
 
-        $count = $this->repo->getTeamPlayerCount(3);
+        $count = $this->formRepo->getTeamPlayerCount(3);
 
         self::assertSame($baseline + 3, $count);
     }
@@ -216,7 +207,7 @@ class TradingRepositoryTest extends DatabaseTestCase
             'cy2' => 0,
         ]);
 
-        $baseline = $this->repo->getTeamPlayerCount(4, true);
+        $baseline = $this->formRepo->getTeamPlayerCount(4, true);
 
         // The expired player should not be counted (cy2=0 means no salary next year)
         // Insert a non-expired player for comparison
@@ -229,7 +220,7 @@ class TradingRepositoryTest extends DatabaseTestCase
             'cy2' => 1600,
         ]);
 
-        $count = $this->repo->getTeamPlayerCount(4, true);
+        $count = $this->formRepo->getTeamPlayerCount(4, true);
 
         // Only the active player adds to the count
         self::assertSame($baseline + 1, $count);
@@ -240,12 +231,12 @@ class TradingRepositoryTest extends DatabaseTestCase
     public function testPlayerIdExistsReturnsTrueForSeedPlayer(): void
     {
         // PID 1 exists in the CI seed
-        self::assertTrue($this->repo->playerIdExists(1));
+        self::assertTrue($this->assetRepo->playerIdExists(1));
     }
 
     public function testPlayerIdExistsReturnsFalseForUnknown(): void
     {
-        self::assertFalse($this->repo->playerIdExists(999999999));
+        self::assertFalse($this->assetRepo->playerIdExists(999999999));
     }
 
     // ── Player/pick updates ─────────────────────────────────────
@@ -254,10 +245,10 @@ class TradingRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200030109, 'Trade Update P', ['tid' => 1]);
 
-        $affected = $this->repo->updatePlayerTeam(200030109, 5);
+        $affected = $this->assetRepo->updatePlayerTeam(200030109, 5);
         self::assertSame(1, $affected);
 
-        $player = $this->repo->getPlayerById(200030109);
+        $player = $this->assetRepo->getPlayerById(200030109);
         self::assertNotNull($player);
         self::assertSame(5, $player['tid']);
     }
@@ -266,10 +257,10 @@ class TradingRepositoryTest extends DatabaseTestCase
     {
         $pickId = $this->insertDraftPickRow(1, 1, 2031, 1);
 
-        $affected = $this->repo->updateDraftPickOwnerById($pickId, 'Sharks', 2);
+        $affected = $this->assetRepo->updateDraftPickOwnerById($pickId, 'Sharks', 2);
         self::assertSame(1, $affected);
 
-        $pick = $this->repo->getDraftPickById($pickId);
+        $pick = $this->assetRepo->getDraftPickById($pickId);
         self::assertNotNull($pick);
         self::assertSame('Sharks', $pick['ownerofpick']);
         self::assertSame(2, $pick['owner_tid']);
@@ -281,7 +272,7 @@ class TradingRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200030110, 'Trade Fetch P', ['tid' => 2]);
 
-        $player = $this->repo->getPlayerById(200030110);
+        $player = $this->assetRepo->getPlayerById(200030110);
 
         self::assertNotNull($player);
         self::assertSame('Trade Fetch P', $player['name']);
@@ -292,7 +283,7 @@ class TradingRepositoryTest extends DatabaseTestCase
     {
         $pickId = $this->insertDraftPickRow(1, 1, 2032, 1);
 
-        $pick = $this->repo->getDraftPickById($pickId);
+        $pick = $this->assetRepo->getDraftPickById($pickId);
 
         self::assertNotNull($pick);
         self::assertSame($pickId, $pick['pickid']);
@@ -304,7 +295,7 @@ class TradingRepositoryTest extends DatabaseTestCase
     {
         $this->insertTestPlayer(200030111, 'Trade Valid P', ['ordinal' => 150, 'cy' => 2]);
 
-        $result = $this->repo->getPlayerForTradeValidation(200030111);
+        $result = $this->assetRepo->getPlayerForTradeValidation(200030111);
 
         self::assertNotNull($result);
         self::assertSame(150, $result['ordinal']);
@@ -318,7 +309,7 @@ class TradingRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200030112, 'Trade UI Plr', ['tid' => 5, 'ordinal' => 100]);
         $this->insertTestPlayer(200030113, '|Cash Trade', ['tid' => 5, 'ordinal' => 200]);
 
-        $players = $this->repo->getTeamPlayersForTrading(5);
+        $players = $this->formRepo->getTeamPlayersForTrading(5);
 
         $names = array_column($players, 'name');
         self::assertContains('Trade UI Plr', $names);
@@ -329,7 +320,7 @@ class TradingRepositoryTest extends DatabaseTestCase
     {
         $pickId = $this->insertDraftPickRow(6, 6, 2033, 1, ['ownerofpick' => 'Metros', 'owner_tid' => 6]);
 
-        $picks = $this->repo->getTeamDraftPicksForTrading(6);
+        $picks = $this->formRepo->getTeamDraftPicksForTrading(6);
 
         $pickIds = array_column($picks, 'pickid');
         self::assertContains($pickId, $pickIds);
@@ -341,7 +332,7 @@ class TradingRepositoryTest extends DatabaseTestCase
     {
         $offerId = $this->insertTradeOfferRow();
 
-        $affected = $this->repo->deleteTradeOfferById($offerId);
+        $affected = $this->offerRepo->deleteTradeOfferById($offerId);
 
         self::assertSame(1, $affected);
 
@@ -364,10 +355,10 @@ class TradingRepositoryTest extends DatabaseTestCase
         $this->insertTradeCashRow($offerId, 'Metros', 'Sharks', ['cy1' => 500]);
 
         // This implicitly commits the outer DatabaseTestCase transaction
-        $this->repo->deleteTradeOffer($offerId);
+        $this->offerRepo->deleteTradeOffer($offerId);
 
         // Verify all related rows are deleted
-        $trades = $this->repo->getTradesByOfferId($offerId);
+        $trades = $this->offerRepo->getTradesByOfferId($offerId);
         self::assertCount(0, $trades);
 
         $stmt = $this->db->prepare("SELECT id FROM ibl_trade_offers WHERE id = ?");
